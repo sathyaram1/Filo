@@ -410,3 +410,27 @@ test('con la domanda a schermo le finestre aperte dal sito si nascondono, e torn
   await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(false);
   await expect.poll(async () => (await finestre()).every((f) => f.visibile)).toBe(true);
 });
+
+test('una domanda lasciata aperta in un’altra finestra di Filo non nasconde il popup di accesso aperto qui', async ({ app, shell, openTab, testServer }) => {
+  const accesso = testServer.html('<title>Accedi</title><p>Accedi con il tuo account</p>');
+  const page = await testServer.openReady(openTab, '<h1>Negozio</h1>');
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    return !!(w && w._filoTabs && w._filoTabs.tabs.length);
+  }), { timeout: 15_000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }, u) => {
+    BrowserWindow.getAllWindows().find((x) => x._filoIncognito)._filoTabs.openTab(u);
+  }, testServer.html('<h1>Altra pagina</h1>', { pubblico: true }));
+  const altrove = 'sito-pubblico.test';
+  await expect.poll(() => nelMondoDiFilo(app, altrove, 'typeof SN_CONFIRM_UI').catch(() => ''), { timeout: 15_000 }).toBe('object');
+  await nelMondoDiFilo(app, altrove, `(() => { SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }); return 1; })()`);
+  await confermaSopraPagina(app);
+  await page.evaluate((u) => { window.open(`${u}?client_id=a&redirect_uri=b`, 'g', 'popup,width=440,height=500'); }, accesso);
+  const finestre = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => !w._filoTabs && /^https?:/.test(w.webContents.getURL()))
+    .map((w) => w.isVisible()));
+  await expect.poll(finestre, { timeout: 10_000 }).toHaveLength(1);
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(await finestre()).toEqual([true]);
+});

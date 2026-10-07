@@ -41,8 +41,10 @@ nella pagina, in uno Shadow DOM chiuso.
 - **Nemmeno una finestra del sito ci sta sopra.** Un sito apre senza gesto una finestrella «di accesso»
   (basta un `/login` nell'indirizzo), grande quanto e dove vuole: la posava sul testo del popup vero e
   lasciava scoperto l'OK (#592.6, giro 7). Ogni finestra nata da una pagina si registra
-  (`registraFinestraDelSito`); finché una domanda si vede, sono nascoste tutte tranne quella sotto la
-  domanda, e se il sito ne rimostra una torna giù. Alla risposta riappaiono senza rubare il fuoco.
+  (`registraFinestraDelSito`, con la finestra di Filo da cui nasce); finché una domanda si vede, sono nascoste
+  quelle nate dalla stessa finestra di Filo tranne quella sotto la domanda, e se il sito ne rimostra una torna
+  giù. Alla risposta riappaiono senza rubare il fuoco. Una domanda lasciata in un'altra finestra non le tocca:
+  nascondeva «Accedi con Google» dove l'utente lavorava, senza dire perché (giro 8).
 - **Segue la sua scheda.** Una domanda si vede solo sopra la scheda che l'ha fatta, quando è davanti;
   le altre aspettano. Tornando davanti si ridisegna da capo, e il mezzo secondo riparte. Scheda chiusa,
   pagina nuova, frame che naviga, renderer morto: la domanda vale un Annulla. Da un popup di accesso
