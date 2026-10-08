@@ -104,8 +104,8 @@ test('Altro: la conferma «Salvato» si spegne appena arriva un\'altra modifica'
   const scrivi = (t) => page.evaluate((v) => {
     const el = document.getElementById('blocklist');
     el.value = v;
-    // Come un incolla: parte subito, senza la pausa di chi batte i tasti.
-    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }));
+    // Come chi batte i tasti: parte dopo la pausa, e intanto la conferma di prima non deve restare accesa.
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
   }, t);
 
   await scrivi('primo.test');
