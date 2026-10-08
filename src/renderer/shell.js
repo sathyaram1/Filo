@@ -247,7 +247,7 @@
   // salvataggio chiude la scheda, quindi senza un ingresso sempre visibile la
   // lista di ciò che hai messo da parte resta irraggiungibile (l'icona dedicata
   // del menu del tasto destro è stata ritirata e l'icona Home porta alla nuova
-  // scheda, non lì). È l'analogo di "Scaricamenti": una lista di cose messe da
+  // scheda, non lì). È l'analogo di "Download": una lista di cose messe da
   // parte, non un'azione.
   // "Feedback" (la posta delle segnalazioni) e "Gestione" sono superfici
   // dell'owner: da quando i feedback li legge solo chi li gestisce (#583) a un
@@ -262,7 +262,7 @@
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
       { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
-      { label: 'Scaricamenti', icon: 'download', url: 'filo://downloads/downloads.html' },
+      { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
       { type: 'separator' },
       { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
     ];
@@ -1610,6 +1610,11 @@
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
 
+    // #1112 — nella home i download si vedono già (carte a sinistra, «Download» in «Altro»): lì l'indicatore
+    // c'è solo a pannello aperto, che una domanda sui programmi apre da sé (#588).
+    let suHome = true;
+    const indicatoreNascosto = () => dls.size === 0 || (suHome && !panelOpen);
+
     function fmtBytes(n) {
       n = Number(n) || 0;
       if (n < 1024) return `${n} B`;
@@ -1635,7 +1640,7 @@
     function renderIndicator() {
       const all = Array.from(dls.values());
       if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
-      dlBtn.hidden = false;
+      dlBtn.hidden = indicatoreNascosto();
       const active = all.filter(isActive);
       // #588 — un programma che aspetta una risposta conta quanto uno in corso:
       // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
@@ -1644,7 +1649,7 @@
       dlBtn.classList.toggle('attesa', attesa.length > 0);
       dlBtn.dataset.tip = attesa.length
         ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
-        : 'Scaricamenti';
+        : 'Download';
       if (active.length || attesa.length) {
         dlCount.hidden = false;
         dlCount.textContent = String(active.length + attesa.length);
@@ -1687,13 +1692,13 @@
       head.className = 'dl-panel-head';
       const title = document.createElement('span');
       title.className = 'dl-panel-title';
-      title.textContent = 'Scaricamenti';
+      title.textContent = 'Download';
       // Punto d'accesso alla pagina completa (cronologia + azioni per voce).
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'dl-panel-clear';
       allBtn.textContent = 'Vedi tutti';
-      allBtn.title = 'Apri l’elenco completo degli scaricamenti';
+      allBtn.title = 'Apri l’elenco completo dei download';
       allBtn.addEventListener('click', () => {
         api.tabs.open('filo://downloads/downloads.html');
         closePanel();
@@ -1702,7 +1707,7 @@
       clearBtn.type = 'button';
       clearBtn.className = 'dl-panel-clear';
       clearBtn.textContent = 'Svuota';
-      clearBtn.title = 'Rimuovi gli scaricamenti conclusi';
+      clearBtn.title = 'Rimuovi i download conclusi';
       clearBtn.addEventListener('click', () => {
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
@@ -1732,7 +1737,7 @@
       if (!all.length) {
         const empty = document.createElement('div');
         empty.className = 'dl-empty';
-        empty.textContent = 'Nessuno scaricamento';
+        empty.textContent = 'Nessun download';
         list.replaceChildren(empty);
       } else if (window.SN_RIGHE_VIVE) {
         window.SN_RIGHE_VIVE.riconcilia(list, all.map(renderRow), ':scope > .dl-row-actions');
@@ -1951,6 +1956,7 @@
       ensurePanel();
       panelOpen = true;
       panel.hidden = false;
+      dlBtn.hidden = indicatoreNascosto();
       dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
@@ -1968,11 +1974,22 @@
       firmaElenco = '';
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
+      dlBtn.hidden = indicatoreNascosto();
       riservaSopra('scaricamenti', 0);
     }
     function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
     dlBtn.addEventListener('click', togglePanel);
+
+    function seguiScheda(snap) {
+      const a = snap && Array.isArray(snap.tabs) ? snap.tabs.find((t) => t.id === snap.activeId) : null;
+      const home = isHomeUrl(a ? a.url : null);
+      if (home === suHome) return;
+      suHome = home;
+      renderIndicator();
+    }
+    api.tabs.onUpdate(seguiScheda);
+    api.tabs.snapshot().then(seguiScheda).catch(() => {});
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
     window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
 
