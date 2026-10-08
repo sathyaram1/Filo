@@ -195,9 +195,9 @@ perOgniSistema('spento a sessione aperta: quello già scaricato non si installa 
   assert.equal(U.conStatoAggiornamento(vive())[0].aggiornamento, undefined, 'la carta dice che si installa, ma non succederà');
   await U.installaAggiornamento();
   await calma();
-  assert.equal(u.autoInstallOnAppQuit, true);
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   assert.equal(u.scaricamenti, 1, 'una versione già scaricata non si riscarica');
-  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
 });
 
 test('spento a metà dello scaricamento dell\'avvio, «Installa» la installa davvero alla chiusura', async () => {
