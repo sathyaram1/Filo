@@ -146,6 +146,7 @@ perOgniSistema('«Installa» scarica, la carta mostra a che punto è e poi quand
   let stati = [];
   await U.avviaAggiornatore(u, {
     automatici: false,
+    chiesta: null,
     modo: s.modo,
     annuncia: () => { stati.push(U.conStatoAggiornamento(vive())[0]?.aggiornamento || null); },
   });
