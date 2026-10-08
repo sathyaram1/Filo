@@ -16,6 +16,10 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// Prima di ogni ascoltatore: una pagina che si riscrive non spegne Filo (#686.1).
+let riscrittura = null;
+try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
+
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
 //
 // Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in
@@ -143,14 +147,13 @@ function replayContextMenu(e) {
   setTimeout(tick, 16);
 }
 
-// Modalità zoom con la rotella attivata dal click centrale (sostituisce
-// l'autoscroll nativo). Sulle pagine web abilitiamo anche lo zoom con Ctrl/Cmd
-// (pinch del trackpad, Ctrl+rotella, Ctrl +/-/0). Vedi wheel-zoom.js.
-// Solo nel frame principale: lo zoom e il suo badge valgono per la scheda
-// intera, e un badge dentro un riquadro sarebbe un secondo indicatore che
-// contraddice il primo.
+// Modalità zoom con la rotella (clic centrale) e zoom con Ctrl/Cmd: vedi
+// wheel-zoom.js. Zoom e riquadro sono della scheda intera e stanno nel frame
+// principale; un riquadro incorporato gli passa solo i gesti (#686.1).
 if (!IS_SUBFRAME) {
   try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
+} else {
+  try { require('./wheel-zoom.js').riquadro(webFrame, { ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom riquadro', e); }
 }
 
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
@@ -503,15 +506,26 @@ const STYLES = [
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
 ];
 
+let stiliMessi = false;
 function injectStyles() {
   // Skip se il documento non è una pagina (es. about:blank, data:, view-source).
   if (!document.head) return;
+  stiliMessi = true;
   for (const f of STYLES) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'filo://style/' + f;
     document.head.appendChild(link);
   }
+}
+
+// La testa del documento riscritto è nuova: i fogli di Filo vanno rimessi.
+if (riscrittura) {
+  riscrittura.allaRiscrittura(() => {
+    if (!stiliMessi) return;
+    if (document.head) injectStyles();
+    else document.addEventListener('DOMContentLoaded', injectStyles, { once: true });
+  });
 }
 
 const SHARED_DIR = path.join(__dirname, '..', 'shared');

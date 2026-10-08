@@ -1,72 +1,253 @@
-// Modalità zoom con la rotella, attivata dal click centrale (rotella del mouse).
-//
-// PERCHÉ ESISTE
-//   Il click centrale di Chromium attiva l'autoscroll nativo: compare l'ancora
-//   e per scrollare devi spostare il mouse su/giù rispetto al punto cliccato.
-//   Un alpha tester l'ha trovato scomodo e ha chiesto di sostituirlo con una
-//   "modalità zoom": un click sulla rotella la attiva, mentre è attiva la
-//   rotella zooma/dezooma la pagina (invece di scrollare).
-//
-// COME SI CHIUDE (feedback alpha)
-//   Una volta attiva, QUALSIASI interazione la chiude: un altro click (sinistro,
-//   destro o centrale) e qualsiasi tasto della tastiera. L'unica eccezione è
-//   l'interazione col badge stesso, che ospita la percentuale di zoom editabile.
-//
-// IL BADGE
-//   In alto a destra un badge mostra "zoom 100%, rotella per zoomare". La
-//   percentuale è un campo editabile: l'utente può digitare un valore e premere
-//   Invio per impostare lo zoom esatto. Niente emoji, niente menzione di Esc.
-//   Uscendo NON si azzera lo zoom raggiunto: si torna solo a scrollare.
-//
-// Gira nel contesto del preload (ha accesso a `webFrame` di Electron), sia sulle
-// pagine web (page-preload) sia sulle pagine interne filo:// (internal-preload).
-//
-// CHI COMANDA LO ZOOM (#686, tre giri di verifica)
-//   Lo zoom è dell'utente, e un sito ha provato a riprenderselo da tre strade
-//   diverse. La regola è una sola, in tre pezzi che stanno tutti qui: i gesti
-//   si ascoltano sulla FINESTRA in cattura (da qui, cioè prima di qualunque
-//   script della pagina, che non può quindi zittirli); si accettano solo se
-//   `isTrusted` (la pagina non può fingerli); e il valore del campo nel
-//   riquadro è quello BATTUTO, non quello scritto nel DOM, dove arriva anche
-//   il sito. Tutto passa da `eseguiZoom`, porta unica.
-//
-// ZOOM CON CTRL (opts.pageZoom)
-//   Oltre alla modalità rotella, se `opts.pageZoom` è attivo la pagina zooma
-//   anche tenendo Ctrl/Cmd: pizzicando il trackpad, con Ctrl+rotella e da
-//   tastiera con Ctrl + / Ctrl - / Ctrl 0. Pinch e Ctrl+rotella arrivano
-//   entrambi come `wheel` con ctrlKey=true. È attivo sia sulle pagine web
-//   esterne (page-preload) sia sulle pagine interne filo:// (internal-preload):
-//   lo zoom deve funzionare allo stesso modo ovunque.
-//
-//   OPT-OUT PER LE PAGINE CHE ZOOMANO DA SÉ
-//   Una pagina di Filo che implementa il proprio zoom (l'editor scala il foglio
-//   via CSS invece dell'intera finestra) si tira fuori marcando
-//   `document.documentElement.dataset.filoOwnZoom = '1'`. Il controllo avviene
-//   al momento dell'evento, quindi il marker può essere messo quando vuole:
-//   senza, lo zoom verrebbe applicato due volte. Vale SOLO con `opts.interna`:
-//   il marcatore sta nel documento, e su un sito lo scriverebbe il sito.
-//
-//   LO ZOOM CHIESTO A PAROLE (#686)
-//   La chat non zooma da sé: manda `filo:zoom-key` come i tasti, con un verso
-//   oppure una percentuale esatta, e riceve indietro su `filo:zoom-applicato`
-//   la percentuale che è stata davvero applicata (chi chiede un valore fuori
-//   scala deve poterlo dire all'utente). Passo e limiti stanno in
-//   src/shared/zoomPagina.js: una regola sola per tasti, rotella, badge e chat.
-//
-//   QUANDO IL FOCUS È SULLA BARRA DI FILO
-//   Se l'utente ha appena cliccato una scheda, i tasti vanno alla barra e non
-//   alla pagina: nessun keydown arriva qui. Il main (tabs.js) intercetta lì
-//   Ctrl +/-/0 e li inoltra alla scheda attiva come `filo:zoom-key`, che
-//   rientra da questo stesso modulo — così la regola su chi zooma resta una
-//   sola. Serve `opts.ipcRenderer`.
+// Zoom della pagina nel preload: la modalità rotella (clic centrale), Ctrl+rotella e il riquadro con la percentuale.
+// Qui si ascoltano solo gesti VERI, e il campo vale i tasti battuti, mai il valore che ha nel documento: lì arriva anche il sito.
+// Chi prende i tasti e i riquadri: src/main/tabs/tabZoom.js. Regole: patterns/lo-zoom-lo-tiene-filo-non-la-pagina.md.
+
+const path = require('node:path');
+
+function caricaRegole() {
+  try { require(path.join(__dirname, '..', 'shared', 'zoomPagina.js')); } catch (_) {}
+  return (typeof globalThis !== 'undefined' && globalThis.SN_ZOOM) || null;
+}
+
+// Un evento che la pagina si scrive da sola arriva identico a questi
+// ascoltatori: lo zoom si muove solo per quelli del browser (#686).
+function gestoVero(e) { return !!(e && e.isTrusted); }
+
+// Cosa sta sotto il puntatore si legge da tutto il percorso dell'evento: dentro
+// un componente della pagina il bersaglio è solo il suo guscio (#686.1 giro 9).
+function percorso(e) {
+  try { const p = e.composedPath(); if (p && p.length) return p; } catch (_) {}
+  return e && e.target ? [e.target] : [];
+}
+
+function suUnLink(e) {
+  return percorso(e).some((n) => !!(n && n.nodeType === 1 && n.matches && n.matches('a[href], area[href]')));
+}
+
+// Un campo in cui si scrive: lì il clic che chiude la modalità ci mette anche il
+// cursore, e dove il clic centrale incolla (src/shared/zoomPagina.js) resta del sistema.
+const SCRIVIBILI = /^(|text|search|url|tel|email|password|number)$/;
+function incollaQui(e, Z) {
+  if (!Z || typeof Z.centraleIncolla !== 'function' || !Z.centraleIncolla(typeof process !== 'undefined' ? process.platform : '')) return false;
+  return scrivibile(e);
+}
+
+function scrivibile(e) {
+  let t = percorso(e)[0];
+  if (t && t.nodeType === 3) t = t.parentElement;
+  if (!t || t.nodeType !== 1) return false;
+  try {
+    if (t.ownerDocument && t.ownerDocument.designMode === 'on') return true;
+    if (t.isContentEditable) return true;
+    const tag = String(t.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA') return !t.readOnly && !t.disabled;
+    if (tag === 'INPUT') return SCRIVIBILI.test(String(t.type || '').toLowerCase()) && !t.readOnly && !t.disabled;
+  } catch (_) {}
+  return false;
+}
+
+// Sulla FINESTRA, in cattura, e dal preload: prima di qualunque script della
+// pagina, che quindi non può zittirli (#686). Un documento riscritto
+// (document.open) li cancella con i suoi: si rimettono, gli stessi, appena la
+// radice cambia; `alCambio` butta lo stato che viveva nel documento vecchio.
+function tieniAscoltatori(elenco, alCambio) {
+  const metti = () => {
+    for (const [tipo, fn, o] of elenco) {
+      try { window.addEventListener(tipo, fn, o); } catch (_) {}
+    }
+  };
+  metti();
+  let radice = document.documentElement;
+  try {
+    new MutationObserver(() => {
+      if (document.documentElement === radice) return;
+      radice = document.documentElement;
+      try { if (alCambio) alCambio(); } catch (_) {}
+      metti();
+    }).observe(document, { childList: true });
+  } catch (_) {}
+}
+
+// Un riquadro che la pagina riempie da sé (about:blank scritto, come negli
+// editor di testo ricco) non ha un preload suo: i suoi gesti li ascolta il
+// frame che lo contiene, con gli stessi ascoltatori (#686.1). Chi ha un preload
+// suo lo dice con `__filoZoomQui`, nel mondo isolato dove il sito non scrive.
+function haPreload(w) {
+  try { return w.__filoZoomQui === true; } catch (_) { return true; }
+}
+
+// Un riquadro dentro un componente chiuso della pagina (shadow DOM) non si vede
+// dal documento: glielo si chiede dal suo interno, nel mondo isolato di Filo
+// (999, dove il sito non scrive), e lui si presenta al primo frame che veglia.
+const MONDO_FILO = 999;
+const PRESENTATI = `(() => { try {
+  if (window.__filoZoomQui === true) return;
+  for (let p = window.parent, prima = window; p && p !== prima; prima = p, p = p.parent) {
+    if (typeof p.__filoZoomAggancia === 'function') { p.__filoZoomAggancia(window); return; }
+  }
+} catch (_) {} })();`;
+
+function vegliaRiquadri(elenco, webFrame) {
+  const agganciati = new WeakMap();
+  function aggancia(w) {
+    if (!w || w === window) return;
+    let doc = null;
+    try { doc = w.document; } catch (_) { return; }
+    if (!doc || haPreload(w)) return;
+    let stato = agganciati.get(w);
+    if (!stato) {
+      const avvolti = elenco.map(([tipo, fn, o]) => [tipo, (e) => { if (!haPreload(w)) fn(e); }, o]);
+      avvolti.push(['pointerover', sopra, true]);
+      stato = { avvolti, doc: null, radice: null };
+      agganciati.set(w, stato);
+    }
+    for (const [tipo, fn, o] of stato.avvolti) {
+      try { w.addEventListener(tipo, fn, o); } catch (_) {}
+    }
+    if (stato.doc === doc) return;
+    stato.doc = doc;
+    stato.radice = doc.documentElement;
+    try {
+      new MutationObserver(() => {
+        if (doc.documentElement === stato.radice) return;
+        stato.radice = doc.documentElement;
+        aggancia(w);
+      }).observe(doc, { childList: true });
+    } catch (_) {}
+    try { for (const f of doc.querySelectorAll('iframe, frame')) guarda(f); } catch (_) {}
+  }
+  function guarda(el) {
+    try {
+      el.addEventListener('load', () => aggancia(el.contentWindow));
+      aggancia(el.contentWindow);
+    } catch (_) {}
+  }
+  let ultimaRicerca = 0;
+  function cercaNascosti() {
+    if (!webFrame) return;
+    const ora = Date.now();
+    if (ora - ultimaRicerca < 200) return;
+    ultimaRicerca = ora;
+    const visita = (f) => {
+      let c = null;
+      try { c = f.firstChild; } catch (_) { return; }
+      for (; c; c = c.nextSibling) {
+        try {
+          const p = c.executeJavaScriptInIsolatedWorld(MONDO_FILO, [{ code: PRESENTATI }]);
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch (_) {}
+        visita(c);
+      }
+    };
+    visita(webFrame);
+  }
+  try { globalThis.__filoZoomAggancia = (w) => aggancia(w); } catch (_) {}
+
+  // Il puntatore che entra in un riquadro passa prima dal suo elemento: è lì
+  // che lo si aggancia, anche se è nato o è stato riscritto dopo. Dentro un
+  // componente l'evento arriva col suo ospite: il riquadro sta nel percorso
+  // se il componente è aperto, altrimenti lo si cerca fra i frame figli.
+  const riquadro = (t) => !!(t && (t.tagName === 'IFRAME' || t.tagName === 'FRAME'));
+  function sopra(e) {
+    let t = e && e.target;
+    if (!riquadro(t)) { try { t = e.composedPath()[0]; } catch (_) {} }
+    if (riquadro(t)) { aggancia(t.contentWindow); return; }
+    cercaNascosti();
+  }
+  return sopra;
+}
+
+// I gesti di un documento che non è quello del riquadro con la percentuale (un
+// riquadro incorporato, o uno che la pagina riempie da sé) partono come gesti:
+// un punto di quel documento non si misura mai contro il riquadro (#686.1 giro 9).
+// `s`: modalita(), campoAperto(), ctrlRotella() (Ctrl+rotella è nostra), manda(gesto).
+function gestiDiUnRiquadro(Z, s) {
+  let suppressContextMenu = false;
+  let centralePreso = false;
+
+  function onMouseDown(e) {
+    if (!gestoVero(e)) return;
+    if (e.button === 1) {
+      if (!s.modalita() && (suUnLink(e) || incollaQui(e, Z))) return;
+      e.preventDefault();
+      e.stopPropagation();
+      centralePreso = true;
+      s.manda({ tipo: 'medio' });
+      return;
+    }
+    if (!s.modalita()) return;
+    if (e.button === 2) suppressContextMenu = true;
+    if (e.button !== 0 || !scrivibile(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    s.manda({ tipo: 'esci' });
+  }
+
+  function onContextMenu(e) {
+    if (!suppressContextMenu) return;
+    suppressContextMenu = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onMouseUp(e) {
+    if (!gestoVero(e) || e.button !== 1 || !centralePreso) return;
+    centralePreso = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onWheel(e) {
+    if (!gestoVero(e)) return;
+    if (s.modalita()) {
+      e.preventDefault();
+      e.stopPropagation();
+      s.manda({ tipo: 'rotella', dy: e.deltaY });
+      return;
+    }
+    if (!(e.ctrlKey || e.metaKey) || !s.ctrlRotella()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    s.manda({ tipo: 'ctrl', dy: e.deltaY });
+  }
+
+  // Col campo della percentuale aperto il tasto è del campo, anche se il fuoco
+  // l'ha portato qui il sito (#686.1 giro 7); di solito lo prende già il main.
+  function onKeyDown(e) {
+    if (!gestoVero(e)) return;
+    if (s.campoAperto()) {
+      if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'v') return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      s.manda({ tipo: 'tasto', key: String(e.key || '') });
+      return;
+    }
+    if (!s.modalita()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    s.manda({ tipo: 'esci' });
+  }
+
+  return {
+    gesti: [
+      ['mousedown', onMouseDown, true],
+      ['mouseup', onMouseUp, true],
+      ['contextmenu', onContextMenu, true],
+      ['wheel', onWheel, { capture: true, passive: false }],
+      ['keydown', onKeyDown, true],
+    ],
+    azzera() { suppressContextMenu = false; centralePreso = false; },
+  };
+}
 
 module.exports = function setupWheelZoom(webFrame, opts) {
   if (!webFrame || typeof document === 'undefined') return;
   const pageZoom = !!(opts && opts.pageZoom);
   const ipc = (opts && opts.ipcRenderer) || null;
   // Solo le pagine di Filo possono dire «lo zoom me lo faccio io»: il marcatore
-  // sta nel documento, e su un sito lo scriverebbe il sito per rendersi
-  // impossibile da ingrandire (#686, primo giro di verifica).
+  // sta nel documento, e su un sito lo scriverebbe il sito (#686).
   const interna = !!(opts && opts.interna);
 
   // Lo zoom cambia anche da fuori (main, un'altra scheda dello stesso sito): il main tiene valori in px CSS
@@ -83,15 +264,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     osservaZoom();
   }
 
-  // Passo e limiti stanno in un posto solo (src/shared/zoomPagina.js): tasti,
-  // rotella, badge e chat devono zoomare della stessa quantità e fermarsi dove
-  // si ferma Chrome, altrimenti due strade sullo stesso zoom divergono.
-  try {
-    const path = require('node:path');
-    require(path.join(__dirname, '..', 'shared', 'zoomPagina.js'));
-  } catch (_) {}
-  const Z = (typeof globalThis !== 'undefined' && globalThis.SN_ZOOM) || null;
-  const ZOOM_STEP = Z ? Z.PASSO : 0.5;   // come un passo di Ctrl +/- (in "zoom level")
+  const Z = caricaRegole();
+  const ZOOM_STEP = Z ? Z.PASSO : 0.5;
   const MIN_LEVEL = Z ? Z.MIN_LIVELLO : -5;
   const MAX_LEVEL = Z ? Z.MAX_LIVELLO : 5;
 
@@ -99,42 +273,46 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   let badge = null;
   let percentInput = null;
   let suppressContextMenu = false;
+  // Il rilascio di un clic centrale preso dallo zoom: su Linux incollerebbe la
+  // selezione nel campo che ha il fuoco, ovunque si sia cliccato.
+  let centralePreso = false;
+  // Il numero nel riquadro: lo scrivono solo i tasti veri, dopo un clic vero
+  // nel campo (#686.1: col comando di inserimento testo del browser il sito
+  // scriveva un «25» che valeva come battuto, e poi toglieva il fuoco).
+  const campo = { valore: '100', fresco: false };
+  let inModifica = false;
+  // Quando Filo ha preso l'ultima rotella: la segnalazione di Chromium che segue è un'eco.
+  let rotellaPresa = 0;
 
-  // Lo zoom si muove per i gesti VERI dell'utente. Un evento che la pagina si
-  // scrive da sola arriva identico a questi listener, e un sito lo userebbe per
-  // rimettersi la misura che vuole (o per aprire da sé la modalità rotella)
-  // quante volte gli pare: #686, secondo giro di verifica.
-  function gestoVero(e) { return !!(e && e.isTrusted); }
-
-  // Percentuale di zoom corrente (100 = nessuno zoom).
   function currentPercent() {
     try { return Math.round(webFrame.getZoomFactor() * 100); }
     catch (_) { return 100; }
   }
 
-  // Ciò che l'utente ha BATTUTO nel campo del riquadro. Il campo sta nel
-  // documento, dove arriva anche il sito: applicare `input.value` gli
-  // basterebbe per rimettersi la pagina come vuole lui, scrivendoci un numero
-  // e aspettando un clic qualsiasi (#686, terzo giro di verifica).
-  let valoreBattuto = '100';
+  function letturaLivello() {
+    try { return webFrame.getZoomLevel(); } catch (_) { return 0; }
+  }
+
+  function mostraCampo() {
+    if (!percentInput) return;
+    percentInput.value = campo.valore;
+    try { percentInput.setSelectionRange(campo.valore.length, campo.valore.length); } catch (_) {}
+  }
 
   function mostraPercentuale() {
-    valoreBattuto = String(currentPercent());
-    if (percentInput) percentInput.value = valoreBattuto;
+    campo.valore = String(currentPercent());
+    campo.fresco = false;
+    mostraCampo();
   }
 
   function refreshPercent() {
-    // Non sovrascrivere mentre l'utente sta digitando nel campo.
-    if (percentInput && document.activeElement !== percentInput) mostraPercentuale();
+    if (!inModifica) mostraPercentuale();
+    ricontrollaPosto();
   }
 
-  // Lo zoom si chiede e si azzera da QUI, non con un evento sul documento: il
-  // menu del tasto destro gira nello stesso mondo isolato di questo file,
-  // mentre il documento lo condividiamo col sito, che userebbe la stessa porta
-  // per rimettersi la pagina come vuole lui (#686, primo giro di verifica).
-  // La percentuale è quella che l'utente VEDE: su una pagina che scala il
-  // proprio contenuto è la sua, non il 100% fermo della finestra (#686, terzo
-  // giro: il tasto destro diceva «tutto normale» su un foglio ingrandito).
+  // Il tasto destro chiede e azzera lo zoom da QUI, non con un evento sul
+  // documento che userebbe anche il sito (#686). Su una pagina che scala il
+  // proprio contenuto il numero è il suo, non il 100% fermo della finestra.
   try {
     globalThis.SN_ZOOM_PAGINA = {
       percentuale: () => {
@@ -160,8 +338,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     }, 800);
   }
 
-  // Applica un livello di zoom dentro i limiti condivisi. Unico punto che
-  // scrive lo zoom del webFrame: rotella, badge, tasti e chat passano da qui.
+  // Unico punto che scrive lo zoom del webFrame, dentro i limiti condivisi.
   function setLevel(level, { daRichiesta = false } = {}) {
     const prima = currentPercent();
     const clamped = Z ? Z.limita(level) : Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
@@ -170,26 +347,76 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     if (!daRichiesta) annotaZoom(prima);
   }
 
-  // Applica la percentuale BATTUTA nel campo, con gli stessi limiti di ogni
-  // altra strada (prima il badge accettava valori che i tasti non sanno
-  // reggere: il primo Ctrl+ dopo un 400% riportava indietro di colpo).
-  function applyPercentFromInput() {
+  // Col campo aperto le cifre le prende il main prima di qualunque frame (src/main/tabs/tabZoom.js).
+  function avvisaCampo(aperto) {
+    if (!ipc || typeof ipc.send !== 'function') return;
+    try { ipc.send('filo:zoom-campo', aperto); } catch (_) {}
+  }
+
+  function iniziaModifica() {
     if (!percentInput) return;
-    const esito = Z ? Z.risolvi(letturaLivello(), { percentuale: valoreBattuto }) : null;
+    inModifica = true;
+    campo.fresco = true;
+    avvisaCampo(true);
+    try { percentInput.focus(); percentInput.select(); } catch (_) {}
+  }
+
+  function chiudiModifica() {
+    if (inModifica) avvisaCampo(false);
+    inModifica = false;
+    try { if (percentInput && document.activeElement === percentInput) percentInput.blur(); } catch (_) {}
+  }
+
+  function battiNelCampo(key) {
+    if (!inModifica) return;
+    const r = Z ? Z.tastoCampo(campo, key) : { valore: campo.valore, fresco: false, azione: null };
+    campo.valore = r.valore;
+    campo.fresco = r.fresco;
+    mostraCampo();
+    if (r.azione === 'applica') applicaCampo();
+    else if (r.azione === 'annulla') annullaCampo();
+  }
+
+  function incollaNelCampo(testo) {
+    if (!inModifica) return;
+    const cifre = String(testo || '').replace(/[^\d]/g, '').slice(0, Z ? Z.CIFRE_CAMPO : 6);
+    if (!cifre) return;
+    campo.valore = cifre;
+    campo.fresco = false;
+    mostraCampo();
+  }
+
+  function applicaCampo() {
+    if (!inModifica) return;
+    const battuto = campo.valore;
+    chiudiModifica();
+    const esito = Z ? Z.risolvi(letturaLivello(), { percentuale: battuto }) : null;
     if (esito) setLevel(esito.livello);
     mostraPercentuale();
   }
 
-  function letturaLivello() {
-    try { return webFrame.getZoomLevel(); } catch (_) { return 0; }
+  function annullaCampo() {
+    chiudiModifica();
+    mostraPercentuale();
   }
 
+  // Elementi HTML anche in un documento che HTML non è (un'immagine SVG aperta
+  // da sola): lì createElement darebbe un nodo senza stile, e il riquadro non c'era.
+  const XHTML = 'http://www.w3.org/1999/xhtml';
+  const crea = (tag) => document.createElementNS(XHTML, tag);
+
+  // `all: initial` in testa: dentro il dialogo del sito, o sotto la sua radice,
+  // il riquadro non eredita il testo maiuscolo, spaziato o in ombra del sito.
   function makeBadge() {
-    const el = document.createElement('div');
+    const el = crea('div');
     el.id = '__filo-zoom-badge';
     el.setAttribute('role', 'status');
+    try { el.setAttribute('popover', 'manual'); } catch (_) {}
     Object.assign(el.style, {
-      position: 'fixed', top: '12px', right: '12px', zIndex: '2147483647',
+      all: 'initial', direction: 'ltr', unicodeBidi: 'isolate', whiteSpace: 'nowrap',
+      position: 'fixed', inset: 'auto', top: '12px', right: '12px', zIndex: '2147483647',
+      margin: '0', border: 'none', overflow: 'visible', width: 'auto', height: 'auto',
+      maxWidth: 'none', maxHeight: 'none',
       background: 'rgba(20,20,20,0.88)', color: '#fff',
       font: '12px/1.4 system-ui, -apple-system, sans-serif',
       padding: '6px 10px', borderRadius: '8px', pointerEvents: 'auto',
@@ -198,31 +425,17 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     });
     el.appendChild(document.createTextNode('zoom '));
 
-    const input = document.createElement('input');
+    const input = crea('input');
     input.id = '__filo-zoom-percent';
     input.type = 'text';
     input.inputMode = 'numeric';
     input.setAttribute('aria-label', 'Percentuale zoom');
     Object.assign(input.style, {
-      width: '3.4em', textAlign: 'right', background: 'transparent',
+      all: 'initial', width: '3.4em', textAlign: 'right', background: 'transparent',
       color: '#fff', border: 'none',
       borderBottom: '1px dashed rgba(255,255,255,0.55)',
       font: 'inherit', padding: '0 1px', margin: '0', outline: 'none',
     });
-    // Il valore lo segna chi BATTE: un `input.value` scritto dal sito non
-    // genera questo evento, e quindi non diventa mai lo zoom della pagina.
-    input.addEventListener('input', (e) => { if (gestoVero(e)) valoreBattuto = input.value; });
-    input.addEventListener('keydown', (e) => {
-      if (!gestoVero(e)) return;
-      // Mentre si edita la percentuale, i tasti NON chiudono la modalità.
-      e.stopPropagation();
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        applyPercentFromInput();
-        input.blur();
-      }
-    });
-    input.addEventListener('blur', (e) => { if (gestoVero(e)) applyPercentFromInput(); });
     el.appendChild(input);
     percentInput = input;
 
@@ -230,106 +443,181 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     return el;
   }
 
+  // Il riquadro sta nello strato superiore del documento, sopra frameset, dialoghi e tutto schermo;
+  // col dialogo modale aperto sta DENTRO il dialogo, perché il resto della pagina diventa intoccabile.
+  function ospite() {
+    let modale = null;
+    try { const m = document.querySelectorAll('dialog:modal'); modale = m[m.length - 1] || null; } catch (_) {}
+    return modale || document.documentElement;
+  }
+
+  function mettiInCima() {
+    if (!badge) return;
+    const dove = ospite();
+    if (!dove) return;
+    try {
+      if (badge.parentNode !== dove) dove.appendChild(badge);
+      if (typeof badge.showPopover !== 'function') return;
+      if (badge.matches(':popover-open')) badge.hidePopover();
+      badge.showPopover();
+    } catch (_) {}
+    inCimaPrima = altriInCima();
+  }
+
+  // Nello strato superiore vince l'ultimo arrivato: una notifica del sito aperta
+  // dopo il riquadro gli sta sopra. Il riquadro deve essere quello che si vede.
+  function coperto() {
+    try {
+      const r = badge.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0)) return false;
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return false;
+      const sopra = document.elementFromPoint(x, y);
+      return !!(sopra && sopra !== badge && !badge.contains(sopra));
+    } catch (_) { return false; }
+  }
+
+  // Chi entra nello strato superiore dopo il riquadro gli sta sopra anche se non
+  // prende i clic, e lì elementFromPoint non lo vede: conta l'arrivo.
+  let inCimaPrima = [];
+  function altriInCima() {
+    try {
+      return Array.from(document.querySelectorAll(':popover-open, dialog:modal, :fullscreen'))
+        .filter((el) => el !== badge);
+    } catch (_) { return []; }
+  }
+  function arrivatoQualcuno() {
+    const ora = altriInCima();
+    const nuovo = ora.some((el) => !inCimaPrima.includes(el));
+    inCimaPrima = ora;
+    return nuovo;
+  }
+
+  // Un dialogo che si apre o si chiude, un tutto schermo o un livello del sito
+  // arrivato dopo, a riquadro aperto: lo controlla anche la guardia, senza gesti.
+  // Sullo schermo il riquadro ha sempre la stessa misura, come gli altri riquadri di Filo nella pagina:
+  // al 300% copriva il titolo, al 33% non si leggeva (#686.1 giro 10). La guardia segue anche lo zoom cambiato altrove.
+  let scalaFatta = 0;
+  function scalaRiquadro() {
+    if (!badge) return;
+    let f = 1;
+    try { f = webFrame.getZoomFactor(); } catch (_) {}
+    if (!(f > 0) || f === scalaFatta) return;
+    scalaFatta = f;
+    try { badge.style.zoom = String(1 / f); } catch (_) {}
+  }
+
+  function ricontrollaPosto() {
+    if (!zoomMode || !badge) return;
+    scalaRiquadro();
+    let fuori = !badge.isConnected || badge.parentNode !== ospite();
+    try { if (!fuori && badge.showPopover && !badge.matches(':popover-open')) fuori = true; } catch (_) {}
+    if (arrivatoQualcuno()) fuori = true;
+    if (!fuori && coperto()) fuori = true;
+    if (fuori) mettiInCima();
+  }
+
+  let guardia = null;
+  function avviaGuardia() {
+    if (guardia) return;
+    try { guardia = setInterval(ricontrollaPosto, 250); } catch (_) { guardia = null; }
+  }
+  function fermaGuardia() {
+    if (!guardia) return;
+    try { clearInterval(guardia); } catch (_) {}
+    guardia = null;
+  }
+
+  // I riquadri incorporati devono sapere se la modalità è aperta, per fermare
+  // la rotella e i clic che cadono dentro di loro (src/main/tabs/tabZoom.js).
+  function avvisaModalita() {
+    if (!ipc || typeof ipc.send !== 'function') return;
+    try { ipc.send('filo:zoom-modalita', zoomMode); } catch (_) {}
+  }
+
+  // Lo sfondo che un sito dà a ogni livello in primo piano (::backdrop) velerebbe
+  // la pagina intera: la regola dell'utente con !important vince su quelle del sito.
+  let veloTolto = null;
+  function togliVelo() {
+    if (veloTolto != null || !webFrame || typeof webFrame.insertCSS !== 'function') return;
+    try {
+      veloTolto = webFrame.insertCSS('#__filo-zoom-badge::backdrop{background:transparent!important;'
+        + 'backdrop-filter:none!important;filter:none!important;opacity:0!important}', { cssOrigin: 'user' });
+    } catch (_) { veloTolto = null; }
+  }
+  function rimettiVelo() {
+    if (veloTolto == null) return;
+    try { webFrame.removeInsertedCSS(veloTolto); } catch (_) {}
+    veloTolto = null;
+  }
+
   function enter() {
     if (zoomMode) return;
     zoomMode = true;
     try {
-      if (!badge) badge = makeBadge();
-      (document.body || document.documentElement).appendChild(badge);
-      refreshPercent();
+      if (!badge) { badge = makeBadge(); scalaFatta = 0; }
+      scalaRiquadro();
+      togliVelo();
+      mettiInCima();
+      avviaGuardia();
+      inModifica = false;
+      mostraPercentuale();
       document.documentElement.style.cursor = 'zoom-in';
     } catch (_) {}
     try { document.documentElement.dataset.filoZoomMode = '1'; } catch (_) {}
+    avvisaModalita();
   }
 
+  // Uscire NON azzera lo zoom raggiunto; un numero battuto e non ancora
+  // confermato vale, come quando si esce dal campo con un clic.
   function exit() {
     if (!zoomMode) return;
+    applicaCampo();
     zoomMode = false;
+    fermaGuardia();
     try { if (badge && badge.parentNode) badge.parentNode.removeChild(badge); } catch (_) {}
+    rimettiVelo();
     try { document.documentElement.style.cursor = ''; } catch (_) {}
     try { delete document.documentElement.dataset.filoZoomMode; } catch (_) {}
+    avvisaModalita();
   }
 
   function toggle() { if (zoomMode) exit(); else enter(); }
 
-  function isOnLink(target) {
-    return !!(target && target.closest && target.closest('a[href], area[href]'));
-  }
-
-  // L'interazione col badge (editare la percentuale) non deve chiudere la modalità.
   function isInBadge(target) {
     return !!(badge && target && (target === badge || (badge.contains && badge.contains(target))));
   }
 
-  // Filo ascolta i gesti PER PRIMO: sulla finestra, in cattura, e da qui —
-  // cioè prima di qualunque script della pagina, che gira dopo il preload. Coi
-  // listener sul documento un sito si registrava prima sulla finestra e li
-  // zittiva, e lo zoom (tasti, rotella, clic centrale) moriva su quel sito
-  // (#686, terzo giro di verifica).
-  const ascolta = (tipo, fn, opts) => {
-    try { window.addEventListener(tipo, fn, opts === undefined ? true : opts); }
-    catch (_) { document.addEventListener(tipo, fn, opts === undefined ? true : opts); }
-  };
+  // Un clic vero che cade dove si VEDE il riquadro vale per il riquadro, anche se
+  // la pagina lo ha reso intoccabile (dialogo modale, anche dentro un componente chiuso).
+  function cadeSu(el, e) {
+    if (!el || !el.isConnected) return false;
+    try {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0
+        && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    } catch (_) { return false; }
+  }
 
-  // Click: il centrale attiva/disattiva la modalità (e blocca l'autoscroll
-  // nativo). In modalità zoom, QUALSIASI click (sinistro o destro) fuori dal
-  // badge la chiude. Sui link, fuori dalla modalità, il click centrale resta
-  // nativo (apre in nuova scheda).
-  ascolta('mousedown', (e) => {
-    if (!gestoVero(e)) return;
-    if (e.button === 1) {
-      if (!zoomMode && isOnLink(e.target)) return;
-      e.preventDefault();   // niente autoscroll
-      e.stopPropagation();
-      toggle();
-      return;
-    }
-    if (zoomMode && !isInBadge(e.target)) {
-      if (e.button === 2) suppressContextMenu = true; // niente menu sul destro
-      e.preventDefault();
-      e.stopPropagation();
-      exit();
-    }
-  }, true);
+  function passoModalita(deltaY) {
+    const dir = deltaY < 0 ? 1 : -1; // rotella su = zoom in
+    setLevel(letturaLivello() + dir * ZOOM_STEP);
+  }
 
-  // Sopprimi il menu contestuale solo quando il click destro è servito a chiudere
-  // la modalità zoom (così il destro "chiude e basta", senza aprire il menu).
-  ascolta('contextmenu', (e) => {
-    if (suppressContextMenu) {
-      suppressContextMenu = false;
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }, true);
+  // ~0.005/unità: un notch di rotella (deltaY≈100) vale un passo di Ctrl +/-,
+  // e il pinch del trackpad (delta piccoli) resta fluido.
+  function ctrlRotella(deltaY) {
+    setLevel(letturaLivello() - deltaY * 0.005);
+  }
 
-  // La rotella, in modalità zoom, zooma invece di scrollare.
-  ascolta('wheel', (e) => {
-    if (!zoomMode || !gestoVero(e)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const dir = e.deltaY < 0 ? 1 : -1; // rotella su = zoom in
-    setLevel(webFrame.getZoomLevel() + dir * ZOOM_STEP);
-  }, { capture: true, passive: false });
-
-  // Qualsiasi tasto chiude la modalità — tranne mentre si edita la percentuale
-  // nel badge (gestito dal listener sull'input, che ferma la propagazione).
-  ascolta('keydown', (e) => {
-    if (!zoomMode || !gestoVero(e)) return;
-    if (isInBadge(e.target)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    exit();
-  }, true);
-
-  // La pagina zooma da sé (vedi commento in testa): non ci mettiamo in mezzo.
   function pageHandlesZoom() {
     if (!interna) return false;
     try { return document.documentElement.dataset.filoOwnZoom === '1'; }
     catch (_) { return false; }
   }
 
-  // Quanto è ingrandita una pagina che zooma da sé: il livello della finestra
-  // lì resta fermo al 100%, quindi il numero lo deve dire lei.
+  // Una pagina che zooma da sé tiene la finestra al 100%: il numero lo dice lei.
   function percentualePropria() {
     if (!pageHandlesZoom()) return null;
     try {
@@ -339,19 +627,12 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   }
 
   // Porta UNICA dello zoom: tasti, rotella, riquadro, menu del tasto destro e
-  // chat passano tutti di qui, così nessuna strada può scavalcare le altre né
-  // perdere l'opt-out delle pagine che scalano il proprio contenuto. Ritorna
-  // l'esito da riferire, o null quando una di quelle pagine non dichiara il
-  // proprio numero: meglio tacere che inventarlo.
+  // chat passano di qui. Ritorna l'esito da riferire, o null quando una pagina
+  // che zooma da sé non dichiara il proprio numero: meglio tacere che inventarlo.
   function eseguiZoom(spec) {
-    // La pagina che zooma da sé (l'editor scala il foglio) non deve essere
-    // zoomata da qui — ma il comando va comunque CONSEGNATO, altrimenti su
-    // Mac il suo zoom muore in silenzio: là questa è l'unica strada, perché
-    // il tasto se lo prende la barra dei menu prima che arrivi alla pagina.
-    //
-    // Il verso sta nel NOME dell'evento, non in `detail`: fra il mondo
-    // isolato del preload e quello della pagina un `detail` non passa. Una
-    // percentuale esatta passa dal dataset, che il DOM condivide.
+    // L'editor scala il foglio: il comando gli si CONSEGNA (su Mac questa è
+    // l'unica strada del tasto). Il verso sta nel nome dell'evento, perché un
+    // `detail` non passa fra i due mondi; la percentuale passa dal dataset.
     if (pageHandlesZoom()) {
       const chiesto = Z ? Z.leggiPercentuale(spec && spec.percentuale) : null;
       try {
@@ -364,10 +645,6 @@ module.exports = function setupWheelZoom(webFrame, opts) {
           if (verso) document.dispatchEvent(new Event(verso));
         }
       } catch (_) {}
-      // Il numero lo dichiara la pagina (l'evento qui sopra è sincrono, quindi
-      // a questo punto è già aggiornato). Il foglio ha limiti suoi, più
-      // stretti di quelli della finestra: se ci si ferma prima, chi ha chiesto
-      // deve saperlo.
       const p = percentualePropria();
       if (p == null) return null;
       return {
@@ -383,72 +660,253 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     return { prima, percentuale: currentPercent(), richiesto: esito.richiesto, limitato: esito.limitato, min: esito.min, max: esito.max };
   }
 
-  // ── Zoom della pagina con Ctrl/Cmd (solo se opts.pageZoom) ──────────────
-  // Indipendente dalla modalità rotella: basta tenere Ctrl (o pizzicare il
-  // trackpad). Usa il livello di zoom del webFrame, così scala l'intera pagina
-  // (testo + immagini) come il classico zoom del browser.
-  if (pageZoom) {
-    // Il numero di una pagina che zooma da sé lo deve sapere anche il main, che altrimenti riferirebbe in chat il
-    // 100% della finestra mentre il foglio è al 150% (#686, secondo giro).
-    // Non muove niente: è solo il numero che la pagina dichiara di sé.
-    if (interna && ipc && typeof ipc.send === 'function') {
-      document.addEventListener('filo:zoom-proprio', () => {
-        const p = percentualePropria();
-        if (p != null) { try { ipc.send('filo:zoom-proprio', p); } catch (_) {} }
-      });
-    }
-
-    // Pinch del trackpad e Ctrl+rotella → wheel con ctrlKey=true. Passo
-    // proporzionale al delta così il pinch (incrementi piccoli) resta fluido.
-    // In modalità rotella ci pensa già l'handler sopra: qui ci tiriamo fuori.
-    ascolta('wheel', (e) => {
-      if (zoomMode || !gestoVero(e)) return;
-      if (!(e.ctrlKey || e.metaKey)) return;
-      if (pageHandlesZoom()) return;
+  // ── Ascoltatori ─────────────────────────────────────────────────────────
+  // Il centrale apre e chiude la modalità (e ferma l'autoscroll nativo); sui
+  // link, fuori dalla modalità, resta nativo. In modalità QUALSIASI clic fuori
+  // dal riquadro la chiude; il clic nel campo apre la modifica del numero.
+  function onMouseDown(e) {
+    if (!gestoVero(e)) return;
+    if (e.button === 1) {
+      if (!zoomMode && (suUnLink(e) || incollaQui(e, Z))) return;
       e.preventDefault();
       e.stopPropagation();
-      // ~0.005/unità: un notch di rotella (deltaY≈100) ≈ un passo di Ctrl +/-
-      // (ZOOM_STEP=0.5); il pinch del trackpad (delta piccoli) resta fluido.
-      let next;
-      try { next = webFrame.getZoomLevel() - e.deltaY * 0.005; }
-      catch (_) { return; }
-      setLevel(next);
-    }, { capture: true, passive: false });
-
-    // Da tastiera: Ctrl + / Ctrl - / Ctrl 0. Accettiamo anche il tastierino
-    // numerico via `code` (lì `key` è già '+'/'-'/'0', ma non su tutti i layout).
-    ascolta('keydown', (e) => {
-      if (zoomMode || !gestoVero(e)) return; // in modalità rotella un tasto qualsiasi esce
-      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-      const k = e.key;
-      const c = e.code;
-      let verso = null;
-      if (k === '+' || k === '=' || c === 'NumpadAdd') verso = 'in';
-      else if (k === '-' || k === '_' || c === 'NumpadSubtract') verso = 'out';
-      else if (k === '0' || c === 'Numpad0') verso = 'reset';
-      if (!verso) return;
-      e.preventDefault();
-      e.stopPropagation();
-      eseguiZoom({ verso });
-    }, true);
-
-    // Stesse scorciatoie, ma premute mentre il focus è sulla barra di Filo
-    // (fila delle schede): lì i tasti non arrivano alla pagina, quindi il main
-    // li inoltra qui. Passano dallo STESSO punto degli altri, così l'opt-out
-    // delle pagine che zoomano da sé vale anche per questa strada.
-    //
-    // Dalla stessa porta entra anche lo zoom chiesto a parole in chat, che
-    // oltre al verso può portare una percentuale esatta e un `rid` a cui
-    // rispondere: chi ha chiesto «al 900%» deve poter sapere dove è finito.
-    if (ipc && typeof ipc.on === 'function') {
-      ipc.on('filo:zoom-key', (_e, payload) => {
-        // Il verso da solo (i tasti) o un oggetto {verso|percentuale, rid}.
-        const spec = (payload && typeof payload === 'object') ? payload : { verso: payload };
-        const rid = spec.rid ? String(spec.rid) : '';
-        const esito = eseguiZoom(spec);
-        if (!rid || typeof ipc.send !== 'function') return;
-        try { ipc.send('filo:zoom-applicato', { rid, ...(esito || { sconosciuto: true }) }); } catch (_) {}
-      });
+      centralePreso = true;
+      toggle();
+      return;
     }
+    if (!zoomMode) return;
+    ricontrollaPosto();
+    const dentro = isInBadge(e.target);
+    if (dentro || cadeSu(badge, e)) {
+      const sulCampo = e.target === percentInput || cadeSu(percentInput, e);
+      if (sulCampo && e.button === 0) {
+        e.preventDefault();
+        iniziaModifica();
+      }
+      if (!dentro) { e.preventDefault(); e.stopPropagation(); }
+      return;
+    }
+    if (e.button === 2) suppressContextMenu = true; // il destro chiude e basta
+    if (e.button === 0 && scrivibile(e)) { exit(); return; }
+    e.preventDefault();
+    e.stopPropagation();
+    exit();
   }
+
+  function onContextMenu(e) {
+    if (!suppressContextMenu) return;
+    suppressContextMenu = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onMouseUp(e) {
+    if (!gestoVero(e) || e.button !== 1 || !centralePreso) return;
+    centralePreso = false;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function onWheel(e) {
+    if (!gestoVero(e)) return;
+    if (zoomMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      rotellaPresa = Date.now();
+      passoModalita(e.deltaY);
+      return;
+    }
+    if (!pageZoom || !(e.ctrlKey || e.metaKey) || pageHandlesZoom()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    rotellaPresa = Date.now();
+    ctrlRotella(e.deltaY);
+  }
+
+  function onKeyDown(e) {
+    if (!gestoVero(e)) return;
+    // Il numero si sta battendo: i tasti restano suoi anche se il fuoco se n'è
+    // andato, perché toglierlo a metà numero lo può fare anche il sito.
+    if (inModifica && percentInput) {
+      e.stopPropagation();
+      try { if (document.activeElement !== percentInput) percentInput.focus(); } catch (_) {}
+      // Ctrl+V incolla (lo prende onPaste); le altre combinazioni non scrivono.
+      if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'v') return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      battiNelCampo(e.key);
+      return;
+    }
+    // In modalità un tasto qualsiasi esce. I tasti dello zoom qui non arrivano
+    // da una scheda (li prende il main): questa strada serve alle finestre
+    // di login, che di scheda non hanno niente.
+    if (zoomMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      exit();
+      return;
+    }
+    if (!pageZoom) return;
+    const verso = Z ? Z.tastoZoom(e) : null;
+    if (!verso) return;
+    e.preventDefault();
+    e.stopPropagation();
+    eseguiZoom({ verso });
+  }
+
+  function onPaste(e) {
+    if (!gestoVero(e) || !inModifica || !percentInput || e.target !== percentInput) return;
+    e.preventDefault();
+    e.stopPropagation();
+    let testo = '';
+    try { testo = String(e.clipboardData.getData('text') || ''); } catch (_) {}
+    incollaNelCampo(testo);
+  }
+
+  // Quello che il campo mostra lo decide Filo: un testo messo dentro da altri
+  // (anche col comando di inserimento del browser) si rimette com'era.
+  function onInput(e) {
+    if (percentInput && e.target === percentInput && percentInput.value !== campo.valore) mostraCampo();
+  }
+
+  // I gesti fatti dentro un riquadro incorporato: arrivano dal main, o dai
+  // riquadri che la pagina riempie da sé, agganciati da qui.
+  function applicaGesto(g) {
+    const gesto = Z ? Z.gestoValido(g) : null;
+    if (!gesto) return;
+    if (gesto.tipo === 'rotella' || gesto.tipo === 'ctrl') rotellaPresa = Date.now();
+    if (gesto.tipo === 'medio') toggle();
+    else if (gesto.tipo === 'esci') exit();
+    else if (gesto.tipo === 'rotella') { if (zoomMode) passoModalita(gesto.dy); }
+    else if (gesto.tipo === 'ctrl') { if (pageZoom && !zoomMode && !pageHandlesZoom()) ctrlRotella(gesto.dy); }
+    else if (gesto.tipo === 'reset') eseguiZoom({ verso: 'reset' });
+    else if (gesto.tipo === 'tasto') battiNelCampo(gesto.key);
+  }
+
+  try { globalThis.__filoZoomQui = true; } catch (_) {}
+  const gesti = [
+    ['mousedown', onMouseDown, true],
+    ['mouseup', onMouseUp, true],
+    ['contextmenu', onContextMenu, true],
+    ['wheel', onWheel, { capture: true, passive: false }],
+    ['keydown', onKeyDown, true],
+  ];
+  const daiRiquadri = gestiDiUnRiquadro(Z, {
+    modalita: () => zoomMode,
+    campoAperto: () => inModifica,
+    ctrlRotella: () => pageZoom && !pageHandlesZoom(),
+    manda: applicaGesto,
+  });
+  tieniAscoltatori([
+    ...gesti,
+    ['paste', onPaste, true],
+    ['input', onInput, true],
+    ['fullscreenchange', () => { if (zoomMode) mettiInCima(); }, true],
+    ['pointerover', vegliaRiquadri(daiRiquadri.gesti, webFrame), true],
+  ], () => {
+    // Il documento vecchio se n'è andato col riquadro e i suoi ascoltatori.
+    const eraAperta = zoomMode;
+    zoomMode = false;
+    if (inModifica) avvisaCampo(false);
+    inModifica = false;
+    fermaGuardia();
+    badge = null;
+    percentInput = null;
+    suppressContextMenu = false;
+    centralePreso = false;
+    daiRiquadri.azzera();
+    rimettiVelo();
+    if (eraAperta) avvisaModalita();
+  });
+
+  if (pageZoom && interna && ipc && typeof ipc.send === 'function') {
+    // Il numero di una pagina che zooma da sé lo deve sapere anche il main,
+    // che altrimenti riferirebbe in chat il 100% della finestra (#686).
+    document.addEventListener('filo:zoom-proprio', () => {
+      const p = percentualePropria();
+      if (p != null) { try { ipc.send('filo:zoom-proprio', p); } catch (_) {} }
+    });
+  }
+
+  if (!ipc || typeof ipc.on !== 'function') return;
+
+  // I tasti (presi dal main prima della pagina, anche col focus sulla barra o
+  // in un riquadro), la barra dei menu e la chat. La chat porta anche una
+  // percentuale esatta e un `rid`: chi ha chiesto «al 900%» deve sapere dove
+  // è finito.
+  if (pageZoom) {
+    ipc.on('filo:zoom-key', (_e, payload) => {
+      const spec = (payload && typeof payload === 'object') ? payload : { verso: payload };
+      const rid = spec.rid ? String(spec.rid) : '';
+      const esito = eseguiZoom(spec);
+      if (!rid || typeof ipc.send !== 'function') return;
+      try { ipc.send('filo:zoom-applicato', { rid, ...(esito || { sconosciuto: true }) }); } catch (_) {}
+    });
+  }
+
+  // Ctrl+rotella visto da Chromium: vale solo se nessuno qui l'ha preso, e una
+  // volta per scatto (la segnalazione può arrivare doppia nello stesso istante).
+  // Il gesto di un riquadro arriva per un'altra strada e può passare dopo: si aspetta un poco.
+  if (pageZoom) {
+    let ultimaSegnalazione = 0;
+    ipc.on('filo:zoom-rotella', (_e, verso) => {
+      if (verso !== 'in' && verso !== 'out') return;
+      const ora = Date.now();
+      const prima = rotellaPresa;
+      if (ora - prima < 1000 || ora - ultimaSegnalazione < 30) return;
+      ultimaSegnalazione = ora;
+      setTimeout(() => { if (rotellaPresa === prima) eseguiZoom({ verso }); }, 80);
+    });
+  }
+
+  // Le cifre del campo, prese dal main prima di qualunque frame.
+  ipc.on('filo:zoom-campo-tasto', (_e, t) => {
+    if (!t || typeof t !== 'object') return;
+    if (typeof t.incolla === 'string') incollaNelCampo(t.incolla);
+    else if (typeof t.key === 'string') battiNelCampo(t.key);
+  });
+
+  ipc.on('filo:zoom-gesto', (_e, g) => applicaGesto(g));
+};
+
+// In un riquadro incorporato: niente zoom né riquadro propri (lo zoom è della
+// scheda intera), solo i gesti veri, passati al frame principale dal main.
+module.exports.riquadro = function setupRiquadro(webFrame, opts) {
+  const ipc = (opts && opts.ipcRenderer) || null;
+  if (!ipc || typeof ipc.send !== 'function' || typeof document === 'undefined') return;
+  const Z = caricaRegole();
+  let modalita = false;
+  let campoAperto = false;
+  // Lo stato si aggiorna subito, senza aspettare il giro dal frame principale.
+  const manda = (g) => {
+    if (g.tipo === 'medio') modalita = !modalita;
+    else if (g.tipo === 'esci') modalita = false;
+    else if (g.tipo === 'tasto' && (g.key === 'Enter' || g.key === 'Tab' || g.key === 'Escape')) campoAperto = false;
+    try { ipc.send('filo:zoom-gesto', g); } catch (_) {}
+  };
+
+  try {
+    ipc.on('filo:zoom-modalita', (_e, on) => { modalita = on === true; });
+    ipc.on('filo:zoom-campo-stato', (_e, on) => { campoAperto = on === true; });
+    ipc.send('filo:zoom-ciao');
+  } catch (_) {}
+
+  // Il tasto destro dentro il riquadro offre la stessa «Dimensione reale».
+  try {
+    globalThis.SN_ZOOM_PAGINA = {
+      percentuale: () => {
+        try { return Math.round(webFrame.getZoomFactor() * 100); } catch (_) { return 100; }
+      },
+      azzera: () => manda({ tipo: 'reset' }),
+    };
+  } catch (_) {}
+
+  const qui = gestiDiUnRiquadro(Z, {
+    modalita: () => modalita,
+    campoAperto: () => campoAperto,
+    ctrlRotella: () => true,
+    manda,
+  });
+  try { globalThis.__filoZoomQui = true; } catch (_) {}
+  tieniAscoltatori([...qui.gesti, ['pointerover', vegliaRiquadri(qui.gesti, webFrame), true]], qui.azzera);
 };

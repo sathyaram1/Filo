@@ -63,7 +63,8 @@
   // Ignoriamo silenziosamente le ricerche oltre questo limite.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
 
-  function isOpen() { return !!root; }
+  // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
+  function isOpen() { return !!(root && root.isConnected); }
 
   function close() {
     if (!root) return;
@@ -84,7 +85,8 @@
   }
 
   function open(context) {
-    if (root) return;
+    if (isOpen()) return;
+    if (root) close();
     history = [];
     ripiegoDetto = false;
     ripiegoDaDire = '';

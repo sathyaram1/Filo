@@ -15,6 +15,11 @@
       ],
       fixes: [
         'La protezione dal fingerprinting copre anche le scene 3D che un sito disegna per riconoscere la tua scheda grafica, e i disegni che prepara senza mostrarli. Prima da lì passava la tua impronta vera. Se poi una pagina salva un\'immagine prima di cominciare a disegnare, la sua grafica 3D parte lo stesso, mentre con la protezione accesa restava bloccata.',
+        'Lo zoom risponde anche sui siti che mostrano il contenuto in un riquadro incorporato: dopo un clic lì dentro, i tasti dello zoom, la rotella con Ctrl (Cmd su Mac) e il clic sulla rotella funzionano come sul resto della pagina. E un sito non può più cambiarti lo zoom né spegnerne i comandi.',
+        'Il tasto destro apre il menu di Filo anche sulle pagine che si ricostruiscono da capo mentre le stai usando.',
+        'Su Linux il clic sulla rotella in un campo di testo incolla di nuovo il testo selezionato, anche dentro un riquadro incorporato. Fuori dai campi apre lo zoom come prima, e non incolla più niente nel campo dove stavi scrivendo.',
+        'Il clic sulla rotella su un link apre solo il link anche sui siti costruiti a componenti: prima apriva in più lo zoom. E con lo zoom aperto, un clic in un campo di testo lo chiude e ti lascia scrivere lì.',
+        'Il riquadro con la percentuale dello zoom resta della stessa misura a qualunque zoom. Prima al 300% copriva la pagina e al 33% non si leggeva.',
       ],
     },
     {
