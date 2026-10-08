@@ -264,6 +264,13 @@ test('le porte nuove sono chiuse ai siti, e da Filo si apre un documento ma non 
     expect(await app.evaluate(() => globalThis.__aperti)).toEqual([join(dir, 'fattura.pdf')]);
     const sparito = await filo({ type: 'file_apri', percorso: join(dir, 'mai-esistito.pdf') });
     expect(sparito.frase).toMatch(/non c’è più/);
+    // Un file sparito dentro una cartella .app: la cartella si mostra, non si apre (su Mac aprirla lancia il programma).
+    const app_ = join(dir, 'Programma.app');
+    mkdirSync(app_, { recursive: true });
+    const mostra = await filo({ type: 'file_mostra_cartella', percorso: join(app_, 'fattura.pdf') });
+    expect(mostra).toMatchObject({ ok: true, mancaIlFile: true });
+    expect(await app.evaluate(() => globalThis.__aperti)).toEqual([join(dir, 'fattura.pdf')]);
+    expect(await app.evaluate(() => globalThis.__cartelle)).toEqual([app_]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
