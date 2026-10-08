@@ -404,7 +404,7 @@ test('quando il documento arriva, la nota sparisce da sola', () => {
   const pagina = leggi('site', 'transparency', 'business.html');
   assert.match(pagina, /Filo costa tanto così/);
   assert.doesNotMatch(pagina, /Fino ad allora è tutto offerto/);
-  rmSync(tmp, { recursive: true, force: true });
+  togliCartella(tmp);
 });
 
 test('i documenti citati per nome nel prompt di accoglienza esistono', () => {
