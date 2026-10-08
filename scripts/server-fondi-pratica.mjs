@@ -112,7 +112,8 @@ function ramoFisso(cartella, ramo, sha) {
  */
 export function lanciaFissato(cartella, ramo, verdetto, env, { lancia, fissa, log, err }) {
   const sha = verdetto && verdetto.server ? String(verdetto.server.sha || '') : '';
-  if (!sha) return lancia(cartella, [ramo], env);
+  if (!verdetto) return lancia(cartella, [ramo], env);
+  if (!sha) { err(`server:fondi: la verifica di ${ramo} non comprende commit del server: non fondo una punta che nessuno ha visto.`); return 1; }
   const fisso = fissa(cartella, ramo, sha);
   if (!fisso || !fisso.ok) {
     err(`server:fondi: non riesco a fermare lo sha verificato ${sha.slice(0, 9)} su un ramo suo, e senza non fondo: un push su ${ramo} entrerebbe senza verifica (${String((fisso && fisso.motivo) || '').slice(0, 300)}).`);
