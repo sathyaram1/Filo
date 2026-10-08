@@ -954,6 +954,8 @@
       if (c.cwd.rete) return MOTIVI.rete;
       r = { radice: c.cwd.radice, segs: c.cwd.segs.concat(pezzi(p)) };
     }
+    // Una lettera d'unità che punta a un altro computer (`pushd \\host\x` in cmd ne crea una) è rete anche lei.
+    if (c.reti && c.reti.has(r.radice)) return MOTIVI.rete;
     const segs = normalizza(r.segs);
     // Su macOS `/net/<host>` monta da solo le cartelle condivise di quel computer.
     if (!c.win && r.radice === '/' && segs.length > 1 && segs[0] === 'net') return MOTIVI.rete;
@@ -980,7 +982,8 @@
 
   function contesto(ctx) {
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null };
+    const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti) };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
