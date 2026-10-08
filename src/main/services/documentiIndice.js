@@ -187,14 +187,22 @@ function soloNelCloud(st) {
   return !!st && st.size > 4096 && st.blocks === 0;
 }
 
+// Una cartella dell'elenco che il sistema non lascia leggere (su Mac il «Non consentire» alla prima ricerca) non è una
+// cartella vuota: va detto, col modo di dare il permesso, o la ricerca risponde «non c'è» per sempre.
+const NEGATO = new Set(['EPERM', 'EACCES']);
+
 async function elenca(cartelle) {
   const trovati = new Map();
+  const negate = [];
   let contati = 0;
   let pieno = false;
   async function giro(dir, prof) {
     if (pieno || prof > PROFONDITA_MAX) return;
     let elenco;
-    try { elenco = await fsp.readdir(dir, { withFileTypes: true }); } catch (_) { return; }
+    try { elenco = await fsp.readdir(dir, { withFileTypes: true }); } catch (e) {
+      if (prof === 0 && e && NEGATO.has(e.code)) negate.push(dir);
+      return;
+    }
     for (const v of elenco) {
       if (pieno) return;
       // I file nascosti e quelli di blocco di Office (~$documento.docx) non sono documenti.
