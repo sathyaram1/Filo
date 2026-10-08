@@ -71,3 +71,38 @@ test('anche nella finestra normale la barra mostra l\'icona come data: URL, pure
   }, url);
   expect(dichiarato).toBe(icona);
 });
+
+test('passando a un altro sito l\'icona di prima non resta sulla scheda mentre arriva quella nuova', async ({ app, shell }) => {
+  const icone = await app.evaluate(({ BrowserWindow, session, net, nativeImage }) => {
+    const png = (bgra) => nativeImage.createFromBitmap(Buffer.from(bgra), { width: 1, height: 1 }).toPNG();
+    const rossa = png([0, 0, 255, 255]);
+    const blu = png([255, 0, 0, 255]);
+    session.defaultSession.protocol.handle('https', async (req) => {
+      const u = new URL(req.url);
+      if (!/^(primo|secondo)\.test$/.test(u.hostname)) return net.fetch(req, { bypassCustomProtocolHandlers: true });
+      if (u.pathname === '/icona.png') {
+        // L'icona del secondo sito arriva tardi: intanto la scheda è già sul secondo sito.
+        if (u.hostname === 'secondo.test') await new Promise((r) => setTimeout(r, 3000));
+        return new Response(u.hostname === 'primo.test' ? rossa : blu, { headers: { 'content-type': 'image/png' } });
+      }
+      return new Response(`<!doctype html><html><head><meta charset="utf-8"><title>${u.hostname}</title>`
+        + '<link rel="icon" href="/icona.png"></head><body>x</body></html>', { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    });
+    BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.openTab('https://primo.test/');
+    return { rossa: rossa.toString('base64'), blu: blu.toString('base64') };
+  });
+  const iconaDi = async (titolo) => shell.evaluate((t) => {
+    // Mentre carica c'è la rotella al posto dell'icona: conta quello che si vede a caricamento finito.
+    const ico = [...document.querySelectorAll('.tab')].find((x) => x.textContent.includes(t))?.querySelector('.favicon');
+    return ico ? ico.style.backgroundImage : null;
+  }, titolo);
+
+  await expect.poll(() => iconaDi('primo.test'), { timeout: 15000 }).toContain(icone.rossa);
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    tm.navigate(tm.tabs.find((t) => t.url === 'https://primo.test/').id, 'https://secondo.test/');
+  });
+  await expect.poll(() => iconaDi('secondo.test'), { timeout: 15000 }).not.toBeNull();
+  expect(await iconaDi('secondo.test'), 'l\'icona del primo sito sul secondo dice il falso').not.toContain(icone.rossa);
+  await expect.poll(() => iconaDi('secondo.test'), { timeout: 15000 }).toContain(icone.blu);
+});
