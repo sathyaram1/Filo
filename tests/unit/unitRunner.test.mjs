@@ -27,7 +27,7 @@ import {
   collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
   gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
   allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
-  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento, guardiaFermo,
+  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento, guardiaFermo, orologioMacchina,
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
@@ -548,6 +548,48 @@ test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
     assert.equal(r.status, 1);
     assert.match(r.stdout, /appeso\.test\.mjs/);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+test('l\'orologio della guardia va alla velocità della macchina: carica quattro volte, un minuto conta un quarto', () => {
+  let lavoro = 10;
+  let ora = 0;
+  const tempo = orologioMacchina({ misura: () => lavoro, ora: () => ora });
+  assert.equal(tempo(), 0);
+  ora = 60_000;
+  assert.equal(tempo(), 60_000, 'a macchina libera conta come l\'orologio');
+  lavoro = 40;
+  ora = 120_000;
+  assert.equal(tempo(), 75_000);
+  lavoro = 10;
+  ora = 180_000;
+  assert.equal(tempo(), 135_000, 'tornata libera, torna a contare per intero');
+});
+
+test('le righe che un test stampa non sono avanzamento: un file appeso che scrive diventa un rosso col suo nome', async () => {
+  const { default: avanzamento } = await import('../../scripts/lib/avanzamento-unit.mjs');
+  async function* eventi() {
+    yield { type: 'test:stdout', data: { message: 'aspetto' } };
+    yield { type: 'test:stderr', data: { message: 'aspetto' } };
+    yield { type: 'test:diagnostic', data: { message: 'aspetto' } };
+    yield { type: 'test:pass', data: { nesting: 1, name: 'x' } };
+  }
+  const righe = [];
+  for await (const r of avanzamento(eventi())) righe.push(r);
+  assert.deepEqual(righe, ['{}\n']);
+
+  const dir = cartellaTemporanea('filo-appeso-che-stampa-');
+  try {
+    writeFileSync(join(dir, 'chiacchiera.test.mjs'), "import { test } from 'node:test';\n"
+      + "test('appeso che stampa', async () => { setInterval(() => console.log('aspetto ancora'), 100); await new Promise(() => {}); });\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    assert.match(r.stdout, /ROSSO: .*chiacchiera\.test\.mjs non è andato avanti/);
+    assert.equal(r.status, 1);
   } finally {
     togliCartella(dir);
   }
