@@ -55,7 +55,8 @@ export function decidi(input, { root, adesso = Date.now(), env = process.env } =
 const PRELUDIO = 'const {existsSync,readFileSync}=require("fs"),{join}=require("path");'
   + `const MARCATORE=join(".claude","routine-orchestratore.json"),VALIDITA_MS=${VALIDITA_MS},`
   + `AL_POSTO_DEL_TESTO=${JSON.stringify(AL_POSTO_DEL_TESTO)},MOTIVO_SOTTOFONDO=${JSON.stringify(MOTIVO_SOTTOFONDO)},`
-  + `MOTIVO_PRIMO_PIANO=${JSON.stringify(MOTIVO_PRIMO_PIANO)},TIPI_DEL_GIRO=${JSON.stringify(TIPI_DEL_GIRO)};`;
+  + `MOTIVO_PRIMO_PIANO=${JSON.stringify(MOTIVO_PRIMO_PIANO)},TIPI_DEL_GIRO=${JSON.stringify(TIPI_DEL_GIRO)},`
+  + `RIGA_DEL_WORKER=${JSON.stringify(RIGA_DEL_WORKER)},MOTIVO_CONSEGNA=${JSON.stringify(MOTIVO_CONSEGNA)};`;
 const AVVIO = 'let s="";process.stdin.on("data",(d)=>{s+=d});process.stdin.on("end",()=>{let i;try{i=JSON.parse(s||"{}")}catch(_){return}'
   + 'const o=decidi(i,{root:process.env.CLAUDE_PROJECT_DIR||i.cwd});if(o)process.stdout.write(JSON.stringify(o))});';
 
