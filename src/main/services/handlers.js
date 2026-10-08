@@ -3384,7 +3384,7 @@ function documentSearchesForPrompt(actions) {
       continue;
     }
     const ind = out.indice || {};
-    const cartelle = (Array.isArray(ind.cartelle) ? ind.cartelle : []).map((c) => `${E.perCanaleSistema(c.nome || '')}${c.esiste ? '' : ' (non c\'è)'}`);
+    const cartelle = (Array.isArray(ind.cartelle) ? ind.cartelle : []).map((c) => `${E.perCanaleSistema(c.nome || '')}${c.esiste ? (c.negata ? ' (il sistema non la lascia leggere)' : '') : ' (non c\'è)'}`);
     const dove = cartelle.length ? `nelle cartelle ${cartelle.join(', ')}` : 'in nessuna cartella (l\'elenco è vuoto: si cambia con la preferenza cartelle_documenti)';
     const conti = `${ind.documenti || 0} documenti${ind.scansioni ? `, di cui ${ind.scansioni} scansioni senza testo (si trovano solo per nome)` : ''}`
       + `${ind.senzaTesto ? `, ${ind.senzaTesto} di cui Filo non sa leggere il testo` : ''}`;
