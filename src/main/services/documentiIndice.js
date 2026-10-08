@@ -329,9 +329,13 @@ function riassuntoIndice(rs, sotto) {
     else if (v.vuoto) scansioni += 1;
     else senzaTesto += 1;
   }
+  const negata = (p) => !!p && negate.has(path.resolve(p));
   return {
     documenti, conTesto, scansioni, senzaTesto, troppi,
-    cartelle: rs.map((r) => ({ voce: r.voce, nome: r.nome, percorso: r.percorso, esiste: r.esiste })),
+    cartelle: rs.map((r) => ({ voce: r.voce, nome: r.nome, percorso: r.percorso, esiste: r.esiste, negata: r.esiste && negata(r.percorso) })),
+    // Anche una cartella chiesta per l'occasione, fuori dall'elenco.
+    negate: sotto.filter(negata).map((p) => ({ nome: (rs.find((r) => r.percorso && path.resolve(r.percorso) === path.resolve(p)) || {}).nome || path.basename(p) || p, percorso: p })),
+    comePermesso: negate.size ? comeDarePermesso() : '',
   };
 }
 
