@@ -9,8 +9,12 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 <p id="p1">La fotosintesi clorofilliana trasforma la luce in energia chimica dentro le foglie.</p>
 <p id="p2">Il teorema di Pitagora vale per tutti i triangoli rettangoli del piano.</p>
 <textarea id="ta" style="display:block;width:640px;height:140px;font:20px monospace"></textarea>
-<p id="p3" style="font:12px sans-serif">parolainizio ${'lorem ipsum dolor sit amet '.repeat(150)}parolafine</p>
 </body>`;
+
+// Un paragrafo di oltre 4000 caratteri senza un punto, per la selezione lunga e la frase intorno a una parola.
+// Sta in una pagina sua: con lui Ctrl+A prenderebbe più del tetto dell'anticipo.
+const PAGINA_LUNGA = PAGINA.replace('</body>',
+  `<p id="p3" style="font:12px sans-serif">parolainizio ${'lorem ipsum dolor sit amet '.repeat(150)}parolafine</p></body>`);
 
 // Il fornitore finto conta le chiamate per tipo, riconoscendole dal prompt: nessuna esce dalla macchina.
 async function fornitoreFinto(app) {
@@ -44,9 +48,9 @@ async function fornitoreFinto(app) {
 
 const conti = (app) => app.evaluate(() => ({ ...globalThis.__conti }));
 
-async function apri(app, openTab, testServer) {
+async function apri(app, openTab, testServer, html = PAGINA) {
   await fornitoreFinto(app);
-  const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
+  const page = await testServer.openReady(openTab, html, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   return page;
 }
@@ -110,7 +114,7 @@ test('selezioni ed eventi finti per 5 s: nessuna spiegazione in anticipo; un dop
 
 test('selezione lunga: niente anticipo, al tasto destro intera; la frase intorno a una parola resta corta', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
-  const page = await apri(app, openTab, testServer);
+  const page = await apri(app, openTab, testServer, PAGINA_LUNGA);
   const ultima = () => app.evaluate(() => globalThis.__ultimaSpiega || '');
 
   // Un paragrafo senza punti: la «frase» di una parola non è più il blocco intero.
