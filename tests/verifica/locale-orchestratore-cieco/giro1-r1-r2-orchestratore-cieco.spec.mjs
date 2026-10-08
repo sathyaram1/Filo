@@ -14,7 +14,7 @@ const RADICE = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 function comandiDelGancio(evento) {
   const s = JSON.parse(readFileSync(join(RADICE, '.claude', 'settings.local.json'), 'utf8'));
   return (s.hooks?.[evento] || [])
-    .filter((v) => new RegExp(v.matcher).test('Agent'))
+    .filter((v) => !v.matcher || v.matcher === '*' || new RegExp(`^(?:${v.matcher})$`).test('Agent'))
     .flatMap((v) => v.hooks.map((h) => h.command));
 }
 
