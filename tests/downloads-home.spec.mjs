@@ -48,7 +48,7 @@ const statoDi = async (shell, nome) => {
   return (((r && r.items) || []).find((it) => it.filename === nome) || {}).state ?? null;
 };
 
-const paginaConLink = (srv, { openTab, testServer }) => testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px">
+const paginaConLink = (srv, { openTab, testServer }) => testServer.openReady(openTab, `<!doctype html><html><head><title>Pagina con link</title></head><body style="padding:40px">
   <a id="pdf" href="${srv.base}/report.pdf">Scarica il report</a>
   <a id="exe" href="${srv.base}/setup.exe">Scarica il programma</a></body></html>`);
 
@@ -71,9 +71,10 @@ test('nella home l’indicatore dei download non c’è, nelle altre schede sì,
     await expect(tessera).toHaveText('Download');
     await expect(home.getByText('Scaricamenti')).toHaveCount(0);
     await shell.screenshot({ path: join(SHOTS, 'download-1112-barra-home.png') });
+    await home.screenshot({ path: join(SHOTS, 'download-1112-home.png') });
 
     // Tornando alla pagina l'indicatore torna: fuori dalla home è l'unico posto che mostra i download.
-    await shell.locator('#tabs .tab', { hasText: 'Pagina' }).or(shell.locator('#tabs .tab:not(.active)').last()).first().click();
+    await shell.locator('#tabs .tab', { hasText: 'Pagina con link' }).click();
     await expect(indicatore).toBeVisible();
 
     await shell.locator('#tabs .tab', { hasText: 'Home' }).click();
