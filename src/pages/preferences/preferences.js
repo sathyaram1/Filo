@@ -1192,7 +1192,10 @@
     const dove = document.createElement('span');
     dove.className = 'doc-dove';
     dove.textContent = tolta ? 'tolta: Filo non ci cerca'
-      : (info && !info.esiste ? `${info.percorso ? `${info.percorso} · ` : ''}non c'è su questo computer` : ((info && info.percorso) || (CARTELLE_DI_SERIE[voce] ? '' : voce)));
+      : (info && !info.esiste ? `${info.percorso ? `${info.percorso} · ` : ''}non c'è su questo computer`
+        : (info && info.negata ? `il sistema non lascia leggere questa cartella a Filo · ${statoDocumenti.comePermesso || 'dagli il permesso nelle impostazioni del sistema'}`
+          : ((info && info.percorso) || (CARTELLE_DI_SERIE[voce] ? '' : voce))));
+    if (info && info.negata && !tolta) { dove.classList.add('doc-negata'); dove.title = info.percorso || ''; }
     if (dove.textContent) t.appendChild(dove);
     row.appendChild(t);
     const b = document.createElement('button');
