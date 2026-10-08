@@ -9,8 +9,7 @@ import { join, resolve } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const RADICE = resolve(import.meta.dirname, '..', '..');
-const HOOK = join(RADICE, '.claude', 'hooks', 'orchestratore-cieco.mjs');
-const { decidi, AL_POSTO_DEL_TESTO, VALIDITA_MS } = await import('../../.claude/hooks/orchestratore-cieco.mjs');
+const { decidi, AL_POSTO_DEL_TESTO, VALIDITA_MS, COMANDO } = await import('../../.claude/hooks/orchestratore-cieco.mjs');
 
 function cartellaCon(marcatore) {
   const root = cartellaTemporanea('filo-cieco-');
@@ -56,23 +55,34 @@ test('fuori da un giro è inerte: senza marcatore, marcatore vecchio, o di un\'a
   } finally { for (const r of [senza, vecchio, altra, rotto]) rmSync(r, { recursive: true, force: true }); }
 });
 
-test('il processo vero: legge l\'evento da stdin e scrive la risposta su stdout', () => {
+// La cartella è quella di un ramo di worker nato prima del gancio: nessun file del gancio, solo il marcatore.
+test('il comando vero, dalla shell: acceca anche con la cartella su un ramo che il gancio non lo ha', () => {
   const root = cartellaCon({ sessione: 's1', creato: Date.now() });
   try {
-    const run = (ev) => spawnSync(process.execPath, [HOOK], { input: JSON.stringify(ev), encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
-    const r = run(dopo());
+    const run = (input) => spawnSync('bash', ['-c', COMANDO], { input, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
+    const r = run(JSON.stringify(dopo()));
     assert.equal(r.status, 0, r.stderr);
     assert.equal(JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
-    assert.equal(run(dopo({ agent_id: 'w1' })).stdout, '');
-    assert.equal(spawnSync(process.execPath, [HOOK], { input: 'non json', encoding: 'utf8' }).status, 0);
+    assert.equal(JSON.parse(run(JSON.stringify(prima(true))).stdout).hookSpecificOutput.permissionDecision, 'deny');
+    assert.equal(run(JSON.stringify(dopo({ agent_id: 'w1' }))).stdout, '');
+    assert.equal(run(JSON.stringify(prima(false))).stdout, '');
+    assert.equal(run('non json').status, 0);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('il comando non dipende dalla macchina: niente apostrofi dentro, niente barre rovesciate', () => {
+  assert.equal((COMANDO.match(/'/g) || []).length, 2, 'un apostrofo nel corpo chiude gli apici della shell');
+  assert.ok(!COMANDO.includes('\\'), 'una barra rovesciata la mangia la riga di comando di Windows');
 });
 
 test('cablaggio: hook registrato prima e dopo Agent, sotto-agenti fissati su Opus, marcatore scritto dal preflight e mai committato', () => {
   const s = JSON.parse(readFileSync(join(RADICE, '.claude', 'settings.local.json'), 'utf8'));
+  const rigenera = 'rigeneralo da COMANDO di .claude/hooks/orchestratore-cieco.mjs';
   for (const ev of ['PreToolUse', 'PostToolUse']) {
-    const voce = (s.hooks[ev] || []).find((h) => /Agent/.test(h.matcher) && h.hooks.some((x) => /orchestratore-cieco\.mjs/.test(x.command)));
+    const voce = (s.hooks[ev] || []).find((h) => /Agent/.test(h.matcher) && h.hooks.some((x) => /routine-orchestratore/.test(x.command)));
     assert.ok(voce, `${ev} senza l'hook dell'orchestratore cieco`);
+    // Scritto per intero, non un rimando a un file: a worker finito la cartella è sul ramo del worker.
+    for (const x of voce.hooks) assert.equal(x.command, COMANDO, `${ev}: comando diverso da quello del gancio, ${rigenera}`);
   }
   assert.equal(s.env.CLAUDE_CODE_SUBAGENT_MODEL, 'opus');
   assert.equal(s.env.CLAUDE_CODE_SUBAGENT_MODEL_FORCE, '1');

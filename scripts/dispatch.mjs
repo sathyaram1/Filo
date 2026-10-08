@@ -2227,9 +2227,10 @@ if (isMainModule) {
               `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
               + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
           }
-          // Chi ha passato il preflight è l'orchestratore: il marcatore accende
-          // .claude/hooks/orchestratore-cieco.mjs, che gli toglie il testo dei worker.
+          // Chi ha passato il preflight è l'orchestratore: il marcatore accende il
+          // gancio dell'orchestratore cieco (.claude/hooks/orchestratore-cieco.mjs), che gli toglie il testo dei worker.
           try {
+            mkdirSync(resolve(ROOT, '.claude'), { recursive: true });
             writeFileSync(resolve(ROOT, '.claude', 'routine-orchestratore.json'),
               JSON.stringify({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', creato: Date.now() }));
           } catch (e) {

@@ -11,7 +11,8 @@ export const VALIDITA_MS = 24 * 60 * 60 * 1000;
 export const AL_POSTO_DEL_TESTO = 'Worker finito. Il suo testo di ritorno non ti arriva: sei cieco per design. Il passo dopo lo decidi solo dal canale, come dice il tuo ruolo.';
 export const MOTIVO_SOTTOFONDO = 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.';
 
-// Il corpo finisce fra apici singoli nella shell del gancio: solo virgolette doppie, niente apostrofi nemmeno nei commenti.
+// Il corpo finisce fra apici singoli nella shell del gancio: solo virgolette doppie, niente apostrofi nemmeno nei
+// commenti, niente barre rovesciate (la riga di comando di Windows le mangia: «\r» diventava un a capo).
 export function decidi(input, { root, adesso = Date.now(), env = process.env } = {}) {
   const strumento = input && input.tool_name;
   if (strumento !== "Agent" && strumento !== "Task") return null;
@@ -36,7 +37,7 @@ export function decidi(input, { root, adesso = Date.now(), env = process.env } =
 }
 
 const PRELUDIO = 'const {existsSync,readFileSync}=require("fs"),{join}=require("path");'
-  + `const MARCATORE=${JSON.stringify(MARCATORE)},VALIDITA_MS=${VALIDITA_MS},`
+  + `const MARCATORE=join(".claude","routine-orchestratore.json"),VALIDITA_MS=${VALIDITA_MS},`
   + `AL_POSTO_DEL_TESTO=${JSON.stringify(AL_POSTO_DEL_TESTO)},MOTIVO_SOTTOFONDO=${JSON.stringify(MOTIVO_SOTTOFONDO)};`;
 const AVVIO = 'let s="";process.stdin.on("data",(d)=>{s+=d});process.stdin.on("end",()=>{let i;try{i=JSON.parse(s||"{}")}catch(_){return}'
   + 'const o=decidi(i,{root:process.env.CLAUDE_PROJECT_DIR||i.cwd});if(o)process.stdout.write(JSON.stringify(o))});';
