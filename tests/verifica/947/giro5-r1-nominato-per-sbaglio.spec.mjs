@@ -28,3 +28,24 @@ test('r1 la risposta che parla della ricevuta dell\'assicurazione mostra solo il
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('r1 la risposta che scarta un candidato a parole non gli dà un bottone', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Giro5b');
+  cartellaDellaProva(dir);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'd1', name: 'CERCA_DOCUMENTI', arguments: JSON.stringify({ cosa: 'bolletta luce marzo' }) }] },
+      { text: 'È scan_00231.pdf, del periodo 01/03/2026 - 31/03/2026; non scan_00198.pdf, che è di febbraio.' },
+    ]);
+    const page = await home(app);
+    await chiedi(page, 'mi serve la bolletta della luce di marzo');
+    const file = page.locator('.dash-bubble-actions .dash-file-btn');
+    await expect(file.first()).toBeVisible({ timeout: 20_000 });
+    await page.waitForTimeout(1500);
+    expect(await file.locator('.dash-file-btn-nome').allTextContents()).toEqual(['scan_00231.pdf']);
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
