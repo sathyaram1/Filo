@@ -12,7 +12,11 @@
 // pagina (init script + reload) con risposte finte, e registriamo i messaggi
 // inviati per asserire COSA la pagina chiede al main.
 
+import { createRequire } from 'node:module';
 import { test, expect } from './fixtures/electron.mjs';
+
+createRequire(import.meta.url)('../src/shared/constants.js');
+const ESCLUSI_DI_SERIE = globalThis.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS;
 
 const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
 
@@ -314,7 +318,7 @@ test('ogni fornitore escluso dice perché, e il perché si salva', async ({ open
 // pagina deve riconoscerlo come la voce del codice, e dargli il suo motivo.
 test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e il motivo segue', async ({ openTab }) => {
   const page = await openStubbedEditor(openTab, {
-    excludedProviders: ['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI'],
+    excludedProviders: ESCLUSI_DI_SERIE.filter((n) => n !== 'Novita'),
   });
   await expect(page.locator('#excludedDriftText')).toContainText('Novita');
   await page.click('#addExcludedRow');
@@ -331,6 +335,52 @@ test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e i
   await expect(page.locator('#excludedDrift')).toBeVisible();
   await row.locator('.sn-model-id-wrap .sn-select-option', { hasText: 'NovitaAI' }).click();
   await expect(page.locator('#excludedDrift')).toBeHidden();
+});
+
+// #1059: i registri dell'owner non li vede nessun test, quindi un modello il cui produttore non è
+// escluso lo dice la riga stessa, con l'esclusione a un click.
+test('un modello di un produttore non escluso si segnala sulla riga e si esclude da lì', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    excludedProviders: ['Google', 'Z.AI'],
+    modelRegistry: {
+      mimo: { provider: 'openrouter', model: 'xiaomi/mimo-v2.6-flash' },
+      glm: { provider: 'openrouter', model: 'z-ai/glm-5.3-flash' },
+      claude: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' },
+    },
+  });
+  const riga = (nick) => page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)')
+    .nth(['mimo', 'glm', 'claude'].indexOf(nick));
+  const avviso = (nick) => riga(nick).locator('.sn-model-producer');
+
+  await expect(avviso('mimo')).toContainText('Il produttore di questo modello, Xiaomi,');
+  await expect(avviso('glm')).toBeEmpty();
+  await expect(avviso('claude')).toBeEmpty();
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((t) => window.SN_PAGE_BOOTSTRAP.applyTheme(t), theme);
+    await page.locator('#sec-model-registry').screenshot({ path: `tests/.shots/admin-defaults-produttore-${theme}.png` }).catch(() => {});
+  }
+
+  // Scrivendo il modello l'avviso segue: un produttore che nessuno ha censito si vede col suo prefisso.
+  const id = riga('glm').locator('.sn-model-id');
+  await id.fill('stepfun/step-3.5-flash');
+  await expect(avviso('glm')).toContainText('Il produttore di questo modello, stepfun,');
+  await id.fill('z-ai/glm-5.3-flash');
+  await expect(avviso('glm')).toBeEmpty();
+
+  // A un click il produttore entra nella lista, col suo motivo, e l'avviso sparisce.
+  await avviso('mimo').getByRole('button', { name: 'Escludi Xiaomi' }).click();
+  await expect(avviso('mimo')).toBeEmpty();
+  const xiaomi = page.locator('#excludedList .sn-excluded-row').last();
+  await expect(xiaomi.locator('.sn-excluded-name')).toHaveValue('Xiaomi');
+  await expect(xiaomi.locator('.sn-excluded-kind')).toHaveValue('producer');
+
+  await page.click('#saveBtn');
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd?.config?.excludedProviders).toEqual(['Google', 'Z.AI', 'Xiaomi']);
+
+  // Tolto dalla lista, l'avviso torna.
+  await page.locator('#excludedList .sn-excluded-row').last().getByRole('button', { name: 'Rimuovi' }).click();
+  await expect(avviso('mimo')).toContainText('Xiaomi');
 });
 
 // #1004.2: il blur chiude il menu in ritardo; un campo tornato a fuoco nel frattempo

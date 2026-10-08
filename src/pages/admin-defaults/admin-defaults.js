@@ -223,8 +223,8 @@
     row.appendChild(reasonSel);
     row.appendChild(del);
     row.appendChild(test);
-    row.appendChild(status);
     row.appendChild(producerMsg);
+    row.appendChild(status);
     checkModelProducer(row);
     return row;
   }

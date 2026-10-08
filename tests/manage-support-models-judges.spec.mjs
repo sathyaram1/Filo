@@ -96,3 +96,32 @@ test('il registro raccoglie le righe (anche quelle aggiunte) come voci OpenRoute
   // La chiave digitata è nel campo (verrà inviata dal save).
   await expect(page.locator('#mgSmKeyOpenrouter')).toHaveValue('sk-or-v1-nuova');
 });
+
+// #1059: i giudici girano sul server, che esclude i fornitori della lista scritta nel codice; un modello
+// il cui produttore lì non c'è lo dice la sua riga, mentre l'owner lo imposta.
+test('un modello dei giudici con un produttore non escluso si segnala sulla riga', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderSupportModelsEditor);
+  await page.evaluate(() => window.__mgTest.setTab('models'));
+  await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), {
+    ...FAKE_MODELS,
+    judgeRegistry: {
+      mimo: { provider: 'openrouter', model: 'xiaomi/mimo-v2.6-flash' },
+      strano: { provider: 'openrouter', model: 'stepfun/step-3.5-flash' },
+    },
+  });
+  const rows = page.locator('#mgSmRegistryList .sn-model-row:not(.sn-model-row-head)');
+  await expect(rows.nth(0).locator('.sn-model-producer')).toBeEmpty();
+  await expect(rows.nth(1).locator('.sn-model-producer')).toContainText('Il produttore di questo modello, stepfun,');
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), theme);
+    await page.locator('#mgSmRegistry').screenshot({ path: `tests/.shots/giudici-produttore-${theme}.png` }).catch(() => {});
+  }
+
+  // Cambiato il modello, l'avviso segue la riga.
+  await rows.nth(1).locator('.sn-model-id').fill('z-ai/glm-5.3-flash');
+  await expect(rows.nth(1).locator('.sn-model-producer')).toBeEmpty();
+  await rows.nth(0).locator('.sn-model-id').fill('arcee-ai/trinity-large');
+  await expect(rows.nth(0).locator('.sn-model-producer')).toContainText('arcee-ai');
+});

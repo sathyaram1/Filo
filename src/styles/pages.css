@@ -617,6 +617,7 @@ section:has(#dictList) .sn-spell-add-row {
   grid-column: 1 / -1;
   font-size: 11px;
   color: var(--sn-error);
+  overflow-wrap: anywhere;
 }
 .sn-model-row-msg:empty { display: none; }
 /* Quando una riga è stata scartata l'indicatore prende il colore d'allerta: un "Salvato" verde
