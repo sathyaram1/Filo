@@ -202,3 +202,64 @@ test('#587 giro 11 — scritture equivalenti del percorso non aggirano il perime
   assert.equal(lvl('Get-ChildItem Documenti,env:', WIN), 2);
   assert.equal(lvl('Get-Content rel,finale.txt', WIN), 1);
 });
+
+// #1072 — un percorso di rete (UNC, `\\?\UNC\`, `//server`) fa aprire a Windows una connessione verso
+// quel computer: anche una sola lettura di nomi chiede un OK, e il popup dice perché. Gemello: #810.13.
+test('#1072 — le letture su un percorso di rete chiedono un OK col motivo «rete»', () => {
+  const rete = /altro computer della rete/;
+  for (const cmd of [
+    'cd \\\\host\\x', 'chdir \\\\host\\x', 'pushd \\\\host\\x', 'Set-Location \\\\host\\x', 'sl -Path \\\\host\\x',
+    'Set-Location -LiteralPath:"\\\\host\\x"', 'Test-Path \\\\host\\x', 'Get-ChildItem \\\\host', 'gci -Path \\\\host\\x',
+    'dir \\\\host\\x', 'ls //host/x', 'Get-FileHash \\\\host\\x', 'Get-Item \\\\host\\x', 'Resolve-Path \\\\host\\x',
+    'tree \\\\host\\x', 'Get-ChildItem \\\\?\\UNC\\host\\x', 'ls Documents,\\\\host\\x', 'cd "\\\\host\\x"',
+    'gc \\\\host\\x', 'type \\\\host\\x', 'Select-String a -Path \\\\host\\x', 'grep --file=\\\\host\\x a.txt',
+    'echo \\\\host\\x | Test-Path', 'Test-Path (Join-Path "\\\\host" "x")', 'cd \\\\host\\x; ls',
+  ]) {
+    for (const ctx of [WIN, undefined]) {
+      const d = C.classifyDetail(cmd, ctx);
+      assert.equal(d.level, 2, `"${cmd}" non deve contattare un altro computer senza chiedere`);
+      assert.match(d.motivo, rete, `"${cmd}": il popup dice che si va in rete`);
+    }
+  }
+  // Il disco locale resta libero, anche scritto con il prefisso dei percorsi lunghi.
+  for (const cmd of ['cd C:\\Windows', 'ls C:\\Windows', 'Get-ChildItem C:\\Windows', 'dir \\\\?\\C:\\Windows',
+    'Test-Path Documents', 'cd ..', 'echo ciao', 'echo https://example.com/a']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+  // Su macOS `/net/<host>` monta le cartelle condivise di quel computer.
+  assert.equal(lvl('ls /net/host/x', MAC), 2);
+  assert.equal(lvl('ls /net', MAC), 1);
+});
+
+test('#1072 — con la cartella di lavoro in rete ogni percorso relativo va in rete', () => {
+  const inRete = { ...WIN, cwd: '\\\\host\\x' };
+  for (const cmd of ['ls', 'dir', 'Get-ChildItem', 'ls foo', 'cd foo', 'cd ..', 'Test-Path foo', 'cat a.txt', 'gc \\a.txt']) {
+    const d = C.classifyDetail(cmd, inRete);
+    assert.equal(d.level, 2, cmd);
+    assert.match(d.motivo, /rete/, cmd);
+  }
+  assert.equal(lvl('ls C:\\Users\\Mario\\Documents', inRete), 1, 'un percorso locale intero resta libero');
+  assert.equal(lvl('echo ciao', inRete), 1);
+});
+
+test('#1072 — un percorso preso dal contenuto di un file chiede un OK; i valori scritti nel comando no', () => {
+  for (const cmd of ['gc elenco.txt | Test-Path', 'Get-Content elenco.txt | Get-ChildItem', 'gc elenco.txt | cd',
+    'Test-Path (gc elenco.txt)', 'cd (Get-Content elenco.txt)', 'Get-FileHash (gc elenco.txt)']) {
+    assert.equal(lvl(cmd, WIN), 2, cmd);
+  }
+  for (const cmd of ['Test-Path (Join-Path $env:USERPROFILE "Downloads")', 'gci | Get-FileHash',
+    'Get-ChildItem Downloads | Select-Object -First 3 | Get-FileHash', 'Get-Content log.txt | Select-String errore',
+    'cat a.txt | wc -l']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
+test('#1072 — LEGGI_DOCUMENTO e il popup del terminale dicono che si va in rete', () => {
+  const doc = { type: 'LEGGI_DOCUMENTO', percorso: '\\\\host\\x\\a.pdf', _perimetro: WIN };
+  assert.equal(AL.costoFor(doc), 2);
+  assert.match(AL.describe(doc), /Perché te lo chiedo: si collega a un altro computer della rete/);
+  assert.equal(AL.costoFor({ ...doc, percorso: 'a.pdf', _perimetro: { ...WIN, cwd: '\\\\host\\x' } }), 2);
+  const cmd = { type: 'ESEGUI_COMANDO', comando: 'Test-Path \\\\host\\x', _perimetro: WIN };
+  assert.equal(AL.costoFor(cmd), 2);
+  assert.match(AL.describe(cmd), /Perché te lo chiedo: si collega a un altro computer della rete/);
+});

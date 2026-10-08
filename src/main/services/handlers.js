@@ -1551,12 +1551,22 @@ async function preparaRinomina(action, sender, avanzamento = null) {
   const cwd = cartellaDelComando(getAssistantCwd(sender));
   const saltati = [];
   const vero = (v) => v === true || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+  // Fuori perimetro un file si salta comunque: il disco non si tocca, nemmeno per guardare (#1072).
+  // Si misura anche il percorso come l'ha scritto il modello, lo stesso che misura il terminale.
+  const motivoFuori = (...ps) => {
+    if (!C) return 'non si sa dove legge';
+    for (const p of ps) { const m = C.fuoriPerimetro(p, perimetro); if (m) return m; }
+    return '';
+  };
+  const saltaFuori = (p, m) => ({ nome: nodePath.basename(p) || p, perche: /rete/.test(m) ? 'sta su un altro computer della rete' : 'sta fuori dalla tua cartella personale' });
   const elenco = [].concat(action.percorsi ?? action.file ?? action.files ?? action.percorso ?? action.path ?? [])
     .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
     .filter((x) => typeof x === 'string' && x.trim());
   let candidati = [];
   for (const x of elenco) {
     let full = DR.normalizePath(x, cwd);
+    const m = motivoFuori(x, full);
+    if (m) { saltati.push(saltaFuori(full, m)); continue; }
     try { await fsp.stat(full); } catch (_) {
       try { const alt = await DR.risolviTollerante(full); if (alt && alt.path) full = alt.path; } catch (_) {}
     }
@@ -1566,9 +1576,11 @@ async function preparaRinomina(action, sender, avanzamento = null) {
   if (typeof cartella === 'string' && cartella.trim()) {
     const dir = DR.normalizePath(cartella, cwd);
     let voci = null;
-    try { voci = await fsp.readdir(dir, { withFileTypes: true }); } catch (_) { voci = null; }
+    const m = motivoFuori(cartella, dir);
+    if (m) saltati.push({ ...saltaFuori(dir, m), nome: cartella.trim() });
+    else try { voci = await fsp.readdir(dir, { withFileTypes: true }); } catch (_) { voci = null; }
     if (!voci) {
-      if (!candidati.length) return { proposte: [], saltati, oltre: 0, errore: `la cartella ${dir} non si apre (non c'è, o non è una cartella)` };
+      if (!candidati.length && !saltati.length) return { proposte: [], saltati, oltre: 0, errore: `la cartella ${dir} non si apre (non c'è, o non è una cartella)` };
     } else {
       const tutti = vero(action.tutti ?? action.all);
       const scelti = voci.filter((d) => d.isFile() && !d.name.startsWith('.') && NF.tipoDi(d.name)
@@ -1583,7 +1595,7 @@ async function preparaRinomina(action, sender, avanzamento = null) {
   candidati = [...new Set(candidati)];
   if (!candidati.length) {
     const errore = !elenco.length && !cartella ? 'indica i file o una cartella'
-      : (!elenco.length && !vero(action.tutti ?? action.all)
+      : (!saltati.length && !elenco.length && !vero(action.tutti ?? action.all)
         ? 'nella cartella non c\'è un PDF, un\'immagine o un documento col nome che non dice niente: se vuoi rinominare anche gli altri, chiedilo' : '');
     return { proposte: [], saltati, oltre: 0, errore };
   }
@@ -1593,7 +1605,8 @@ async function preparaRinomina(action, sender, avanzamento = null) {
 
   async function unaProposta(full) {
     const nome = nodePath.basename(full);
-    if (C && C.fuoriPerimetro(full, perimetro)) return { saltato: { nome, perche: 'sta fuori dalla tua cartella personale' } };
+    const m = motivoFuori(full);
+    if (m) return { saltato: saltaFuori(full, m) };
     let st = null;
     try { st = await fsp.stat(full); } catch (_) { st = null; }
     if (!st) return { saltato: { nome, perche: 'non c\'è' } };
