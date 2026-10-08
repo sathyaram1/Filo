@@ -695,7 +695,7 @@ async function main(argv) {
       const depTogli = { esegui, percorsi: P, verifica: (wt) => (existsSync(wt) ? verifyLocal.verdictForCurrentBranch(wt) : {}), smista: bin ? smistaCon(bin, envFiglio(process.env)) : undefined };
       const falliti = await apriDerivatiDi(depTogli, p, { derivati: modoDerivati(p), salva: (q) => { s.pratiche[n] = q; store.scrivi(s); } });
       if (falliti) {
-        throw new Error(`#${n} non tolta: ${falliti === 1 ? 'un rilievo non si è aperto' : `${falliti} rilievi non si sono aperti`} come feedback, e col worktree se ne andrebbe:\n${p.avvisi.filter((a) => a.startsWith('feedback non aperto')).join('\n')}\nRiprova togli: quelli già aperti non si riaprono.`);
+        throw new Error(`#${n} non tolta: ${falliti === 1 ? 'un rilievo non si è aperto' : `${falliti} rilievi non si sono aperti`} come feedback, e col worktree se ne andrebbe:\n${p.avvisi.filter((a) => a.startsWith('feedback non aperto') || a.startsWith('rilievi messi da parte non aperti')).join('\n')}\nRiprova togli: quelli già aperti non si riaprono.`);
       }
     }
     delete s.pratiche[n];

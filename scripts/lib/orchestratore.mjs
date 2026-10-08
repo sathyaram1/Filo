@@ -207,20 +207,6 @@ const chiaveRilievo = (f) => `${f.level}${f.sede}:${String(f.text).slice(0, 80)}
 /** Come togli apre i rilievi rimasti: come li apriva l'avvia che ha guidato il lavoro. PURA. */
 export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
 
-// Il ripiego quando lo smistamento a giudizio non risponde (#1036): nomi espliciti → locale; un difetto mostrato
-// dall'interfaccia → routine, anche se nomina il server; il server, il database, Firestore o un deploy da fare → locale.
-const NOMI_SOLO_LOCALE = /filo-security|\bfunctions[/\\]|\b(firestore|storage)\.rules\b|firestore\.indexes|server:(pubblica|fondi)|regole:pubblica|\bSecrets? (di|su) GitHub|GitHub Secrets?|\bruleset\b|token admin|FILO_ADMIN_/i;
-const INTERFACCIA = /\b(pagin[ae]|pulsant[ei]|bottone|colonn[ae]|messaggi[oa]? (di|d’|d')\s*errore|scritt[ae]|etichett[ae]|tema (chiaro|scuro)|schermo|finestr[ae]|menu|hover|icon[ae]|tasto destro|toast|voce|voci)\b/i;
-const TEMI_SOLO_LOCALE = /\bCloud Functions?\b|\bFirestore\b|\bFirebase\b|\b(il|lo|i|del|dello|dei|al|ai|dal|dai|sul|sui|nel|nei|col|coi|lato)\s+server\b(?!\s+(di|dei|del|della|delle|degli)\s+(?!Filo\b))|\b(il|del|nel|sul|al|dal)\s+database\b|\bregol[ae]\s+(di|del|della|dello|delle)\s+(Storage|database|sicurezza)\b|\bindic[ei]\s+(di|del)\s+database\b|\b(ri)?deploy/i;
-
-/** Il ripiego a parole per un rilievo che lo smistamento non ha giudicato: 'locale' o 'non-locale'. PURA. */
-export function doveSiLavora(f) {
-  const t = String((f && f.text) || '');
-  if (NOMI_SOLO_LOCALE.test(t)) return 'locale';
-  if (INTERFACCIA.test(t)) return 'non-locale';
-  return TEMI_SOLO_LOCALE.test(t) ? 'locale' : 'non-locale';
-}
-
 /** Il compito di chi smista i rilievi a giudizio: risponde un array JSON di 'locale'/'non-locale', uno per rilievo. PURA. */
 export function promptSmistamento(testi) {
   return [
@@ -257,9 +243,10 @@ function rilieviNuovi(p, derived) {
 
 /**
  * I feedback da aprire per i rilievi che il lavoro non ha corretto, raggruppati come li apre il server. PURA.
- * Con `auto` i rilievi da lavorare in locale e quelli per le routine finiscono in feedback separati; `doveDi` è lo smistamento.
+ * Con `auto` i rilievi da lavorare in locale e quelli per le routine finiscono in feedback separati; `doveDi` è lo smistamento,
+ * e un rilievo che non ha ancora un giudizio (null) resta da aprire.
  */
-export function derivatiDaAprire(p, derived, modo = 'auto', doveDi = doveSiLavora) {
+export function derivatiDaAprire(p, derived, modo = 'auto', doveDi = () => null) {
   const nuovi = rilieviNuovi(p, derived);
   const dove = (f) => (modo === 'auto' ? doveDi(f) : modo);
   return ['non-locale', 'locale'].flatMap((qui) => ROUND.derivedGroups(nuovi.filter((f) => dove(f) === qui)).map((g) => {
@@ -477,24 +464,33 @@ export async function togliWorktree(dep, p) {
 const avvisaUnaVolta = (p, a) => { p.avvisi = p.avvisi || []; if (!p.avvisi.includes(a)) p.avvisi.push(a); };
 
 /**
- * Dove si lavora ogni rilievo nuovo, deciso a giudizio da dep.smista(prompt) e tenuto sulla pratica: le parole sbagliano nei due sensi.
- * Senza giudizio si ripiega sulle parole, con un avviso, e si riprova al passo dopo.
+ * Dove si lavora ogni rilievo nuovo, deciso a giudizio da dep.smista(prompt) e tenuto sulla pratica.
+ * Lo decide solo il giudizio (#1036: le parole sbagliavano nei due sensi): senza risposta il rilievo aspetta e si richiede al passo dopo.
  */
 async function smista(dep, p, derived) {
   p.doveRilievi = p.doveRilievi || {};
   const mancano = rilieviNuovi(p, derived).filter((f) => !p.doveRilievi[chiaveRilievo(f)]);
-  if (mancano.length && typeof dep.smista === 'function') {
+  let errore = '';
+  if (mancano.length) {
     let r = null;
-    try { r = leggiSmistamento(await dep.smista(promptSmistamento(mancano.map((f) => f.text))), mancano.length); } catch (_) { r = null; }
+    if (typeof dep.smista !== 'function') errore = 'Claude non trovato';
+    else {
+      try { r = leggiSmistamento(await dep.smista(promptSmistamento(mancano.map((f) => f.text))), mancano.length); } catch (e) { errore = primaRiga(String((e && e.message) || e)); }
+      if (!r && !errore) errore = 'risposta che non si legge';
+    }
     if (r) mancano.forEach((f, i) => { p.doveRilievi[chiaveRilievo(f)] = r[i]; });
-    else avvisaUnaVolta(p, 'rilievi smistati a parole: lo smistamento a giudizio non ha risposto');
   }
-  return (f) => p.doveRilievi[chiaveRilievo(f)] || doveSiLavora(f);
+  p.erroreSmistamento = errore;
+  p.avvisi = (p.avvisi || []).filter((a) => !a.startsWith(IN_ATTESA_DI_SMISTAMENTO));
+  if (errore) p.avvisi.push(`${IN_ATTESA_DI_SMISTAMENTO} (${errore}): si richiede al passo dopo`);
+  return (f) => p.doveRilievi[chiaveRilievo(f)] || null;
 }
+const IN_ATTESA_DI_SMISTAMENTO = 'rilievi messi da parte non aperti: lo smistamento non ha risposto';
 
 /**
  * Apre come feedback i rilievi esterni e messi da parte che il registro della verifica ha e la pratica non ha ancora aperto.
- * La usano il motore dopo ogni passo e togli prima di rimuovere il worktree, che quel registro se lo porta via. → quanti non aperti.
+ * La usano il motore dopo ogni passo e togli prima di rimuovere il worktree, che quel registro se lo porta via. → quanti non aperti,
+ * compresi quelli che aspettano lo smistamento (p.daSmistare).
  */
 export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati, salva = () => {} } = {}) {
   if (derivati === 'nessuno') return 0;
@@ -502,7 +498,8 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
   const entry = (dep.verifica(wt) || {}).entry || {};
   p.derivatiAperti = p.derivatiAperti || [];
   const doveDi = derivati === 'auto' ? await smista(dep, p, entry.derived) : undefined;
-  let falliti = 0;
+  p.daSmistare = doveDi ? rilieviNuovi(p, entry.derived).filter((f) => !doveDi(f)).length : 0;
+  let falliti = p.daSmistare;
   for (const d of derivatiDaAprire(p, entry.derived, derivati, doveDi)) {
     const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${d.dove}`, '--priorita', String(d.priorita)], { cwd: wt, input: d.testo });
     const m = /#(\d+)/.exec(String(r.out || ''));
@@ -906,7 +903,15 @@ export function creaMotore(dep, opzioni = {}) {
     } finally {
       inChiusura.delete(p.num);
     }
-    await apriDerivati(p);
+    // Il registro dei rilievi se ne va col worktree: si aspetta il giudizio come si aspetta il limite d'uso, e smetti lascia il passo da rifare.
+    while (await apriDerivati(p) && p.daSmistare) {
+      const attesa = attesaLimite(p.erroreSmistamento, adesso(), opz) || opz.pausaLimiteMs;
+      const quando = new Date(adesso() + attesa).toLocaleString('it-IT', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+      p.attesa = `smistamento dei rilievi messi da parte: si richiede il ${quando}`;
+      salva(p);
+      dep.log(`#${p.num} ${p.daSmistare} rilievi in attesa dello smistamento (${p.erroreSmistamento}), riprovo il ${quando}`);
+      try { await attendi(attesa, 'rilievi in attesa dello smistamento'); } finally { p.attesa = ''; }
+    }
     if (!opz.tieniWorktree) await pulisci(p);
     p.fusioneFatta = true;
     salva(p);
