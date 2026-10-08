@@ -9,6 +9,8 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 <p id="p1">La fotosintesi clorofilliana trasforma la luce in energia chimica dentro le foglie.</p>
 <p id="p2">Il teorema di Pitagora vale per tutti i triangoli rettangoli del piano.</p>
 <textarea id="ta" style="display:block;width:640px;height:140px;font:20px monospace"></textarea>
+<input id="cerca" style="display:block;margin-top:20px;font:20px monospace;width:400px">
+<button id="bt" style="margin-top:20px;font:20px sans-serif">Avanti</button>
 </body>`;
 
 // Un paragrafo di oltre 4000 caratteri senza un punto, per la selezione lunga e la frase intorno a una parola.
@@ -36,7 +38,12 @@ async function fornitoreFinto(app) {
       let tipo = 'altro';
       let text = 'ok';
       if (t.includes('ha selezionato un testo')) { tipo = 'spiega'; text = 'Spiegazione di prova'; globalThis.__ultimaSpiega = t; }
-      else if (t.includes('Analizza il testo qui sotto')) { tipo = 'scan'; text = '{"annotated":"","issues":[]}'; }
+      else if (t.includes('Analizza il testo qui sotto')) {
+        tipo = 'scan';
+        // Con `__segnaXq` lo scan segna come errore ogni parola «xq…», come un modello vero coi refusi.
+        const parole = globalThis.__segnaXq ? [...new Set(t.match(/xq[a-z]+\d+/g) || [])] : [];
+        text = JSON.stringify({ annotated: parole.map((w) => `**${w}**`).join(' '), issues: parole.map(() => ({ type: 'grammar', explanation: 'x', correction: 'y' })) });
+      }
       else if (t.includes('col tasto destro su una parola')) { tipo = 'parola'; text = '{"misspelled":false,"correction":""}'; }
       globalThis.__conti[tipo] += 1;
       return { text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
@@ -399,4 +406,57 @@ test('il controllo della parola lo paga il tasto che chiude una parola, non ogni
   const fatti = (await conti(app)).parola - prima;
   expect(fatti).toBeGreaterThanOrEqual(1);
   expect(fatti).toBeLessThanOrEqual(3);
+});
+
+test('un gesto paga solo la cosa che ha toccato: scrivere nella ricerca non paga la casella della pagina, un pulsante non paga la selezione lontana', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await apri(app, openTab, testServer);
+  await app.evaluate(() => { globalThis.__segnaXq = true; });
+  // Il sito dà il fuoco alla sua casella da script, una volta, e lo rimette sulla ricerca; a ogni tasto scritto nella
+  // ricerca (al più ogni 1,7 s) riscrive la casella con otto refusi. A ogni clic sul pulsante seleziona il primo paragrafo.
+  await page.evaluate(() => {
+    const ta = document.getElementById('ta');
+    ta.focus();
+    document.getElementById('cerca').focus();
+    let n = 0; let ultima = 0;
+    document.getElementById('cerca').addEventListener('keydown', () => {
+      if (Date.now() - ultima < 1700) return;
+      ultima = Date.now();
+      n += 1;
+      ta.value = Array.from({ length: 8 }, (_, i) => `xq${'abcdefgh'[i]}${n}`).join(' ') + ' fine.';
+      ta.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '.' }));
+    });
+    document.getElementById('bt').addEventListener('click', () => {
+      const t = document.getElementById('p1').firstChild;
+      const r = document.createRange();
+      r.setStart(t, n % 10); r.setEnd(t, 30 + (n % 10));
+      n += 1;
+      getSelection().removeAllRanges(); getSelection().addRange(r);
+    });
+  });
+  await page.locator('#cerca').click();
+  await page.keyboard.type('ricetta della pasta al forno con le melanzane', { delay: 130 });
+  for (let i = 0; i < 4; i++) { await page.locator('#bt').click(); await pausa(900); }
+  await pausa(2500);
+  expect(await conti(app)).toMatchObject({ scan: 0, parola: 0, spiega: 0 });
+
+  // Il doppio clic sulla parola resta la strada vera: paga la sua spiegazione.
+  const p = await puntoDellaParola(page, 'p2', 'Pitagora');
+  await page.mouse.dblclick(p.x, p.y);
+  await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(1);
+});
+
+test('chi esce dalla casella e ci rientra, anche col fuoco dato dalla pagina, ritrova il correttore sottolineato', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  await app.evaluate(() => { globalThis.__segnaXq = true; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi xqprima1 frase ');
+  await expect(page.locator('.sn-spell-overlay .sn-semantic-error')).toHaveText(['xqprima1'], { timeout: 6000 });
+  await page.locator('#cerca').click();
+  await pausa(500);
+  // Rientra col fuoco dato dalla pagina (come dopo un «Rispondi»): scrivere deve bastare.
+  await page.evaluate(() => { const ta = document.getElementById('ta'); ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; });
+  await page.keyboard.type(' poi xqseconda2 ');
+  await expect(page.locator('.sn-spell-overlay .sn-semantic-error')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
 });

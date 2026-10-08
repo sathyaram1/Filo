@@ -179,7 +179,7 @@
       id: 'spellcheck', title: 'Correttore mentre scrivi', category: 'writing',
       desc: 'Mentre scrivi in un campo di testo, segnala gli errori: zigzag rosso per l’ortografia (suggerimenti del sistema) e zigzag blu per gli errori di contesto rilevati dall’AI.',
       invoke: 'Automatico quando scrivi in un’area di testo; clic destro su una parola segnalata per i suggerimenti.',
-      doesNot: 'Il correttore contestuale (blu) lavora su testi né troppo corti né enormi e può essere disattivato. Parte solo da quello che scrivi tu: il testo che un sito inserisce da solo si controlla al tuo prossimo tasto, e a scheda nascosta il controllo aspetta che torni. Da una scheda partono al massimo 300 controlli al minuto: oltre, Filo li ferma e te lo dice.',
+      doesNot: 'Il correttore contestuale (blu) lavora su testi né troppo corti né enormi e può essere disattivato. Parte solo da quello che scrivi tu: il testo che un sito inserisce da solo si controlla al tuo prossimo tasto in quella casella, e a scheda nascosta il controllo aspetta che torni. Da una scheda partono al massimo 300 controlli al minuto: oltre, Filo li ferma e te lo dice.',
     },
     {
       id: 'spellcheck-manage', title: 'Gestisci correttore e dizionario', category: 'writing',

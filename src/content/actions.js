@@ -291,7 +291,7 @@
     const { kind, el } = ctx;
     if (!el || !el.isConnected) return;
     // Incolla e dettatura li ha chiesti l'utente a Filo, fuori dalla pagina: il correttore li tratta come scritti a mano.
-    try { global.SN_GESTO?.segna([global.SN_GESTO.CHIUDE]); } catch (_) {}
+    try { global.SN_GESTO?.segna([global.SN_GESTO.CHIUDE], { el, x: null, y: null, tasto: '' }); } catch (_) {}
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;
@@ -603,7 +603,9 @@
     if (key.length < 3) return;
     // Stessa selezione di prima: l'entry esistente sta già lavorando (o ha il risultato).
     if (prefetchedExplain && prefetchedExplain.key === key) return;
-    if (!Gesto.prendi('spiega', Gesto.SELEZIONA)) return;
+    // Solo il gesto che ha fatto o toccato questa selezione: un clic su un pulsante non paga il testo che la pagina
+    // seleziona altrove (#1070).
+    if (!Gesto.prendi('spiega', Gesto.SELEZIONA, Gesto.sullaSelezione)) return;
     prefetchedExplain = startExplainRequest(sel);
   }
 

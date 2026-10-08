@@ -133,6 +133,37 @@ test('gesto: una chiamata col tipo la paga solo il gesto che la chiede, non un t
   assert.equal(g.prendi('spiega', G.SELEZIONA), false, 'scaduto');
 });
 
+test('gesto: paga solo la cosa che ha toccato; il rilascio del mouse tocca anche dove è cominciata la pressione', () => {
+  const c = orologio();
+  const g = G.crea(c.ora);
+  const nodo = (nome, figli = []) => ({ nome, nodeType: 1, contains: (n) => n === nodo || figli.includes(n) });
+  const casella = nodo('casella');
+  const ricerca = nodo('ricerca');
+  const ev = (type, target, extra = {}) => g.suEvento({ isTrusted: true, type, target, ...extra });
+  // Scrivere nella ricerca della pagina non paga il controllo della sua casella, nemmeno con uno spazio.
+  ev('keydown', ricerca, { key: ' ', code: 'Space' });
+  assert.equal(g.prendi('correttore', undefined, G.dentro(casella)), false);
+  assert.equal(g.prendi('parola', G.CHIUDE, G.dentro(casella)), false);
+  assert.equal(g.prendi('parola', G.CHIUDE, G.dentro(ricerca)), true, 'nel campo dove si scrive, sì');
+  ev('keyup', ricerca, { key: ' ', code: 'Space' });
+  // Tab cade sul campo di prima; il rilascio, già nella casella, si aggiunge allo stesso gesto.
+  ev('keydown', ricerca, { key: 'Tab', code: 'Tab' });
+  assert.equal(g.prendi('correttore', undefined, G.dentro(casella)), false);
+  ev('keyup', casella, { key: 'Tab', code: 'Tab' });
+  assert.equal(g.prendi('correttore', undefined, G.dentro(casella)), true);
+  // Pressione su un pulsante, rilascio altrove: il rilascio porta con sé anche il punto della pressione.
+  const pulsante = nodo('pulsante');
+  ev('mousedown', pulsante, { clientX: 10, clientY: 20 });
+  ev('mouseup', casella, { clientX: 300, clientY: 400 });
+  const punti = [];
+  g.prendi('spiega', G.SELEZIONA, (l) => { punti.push([l.el.nome, l.x, l.y]); return false; });
+  assert.deepEqual(punti, [['casella', 300, 400], ['pulsante', 10, 20]]);
+  // Un gesto senza luogo (un evento senza bersaglio) non paga niente che chieda dove.
+  g.segna([G.SELEZIONA]);
+  assert.equal(g.prendi('spiega2', G.SELEZIONA, () => true), false);
+  assert.equal(g.prendi('spiega3', G.SELEZIONA), true, 'senza la domanda «dove» resta un gesto');
+});
+
 test('tetto: le azioni contate sono quelle automatiche di SN_CONST', () => {
   const A = SN_CONST.ACTIONS;
   assert.deepEqual(Object.keys(Tetto.GRUPPI).sort(), [A.EXPLAIN, A.SPELLCHECK_SEMANTIC, A.SPELLCHECK_WORD].sort());
