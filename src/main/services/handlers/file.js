@@ -89,10 +89,11 @@ module.exports = function register(on, ctx) {
     const p = percorsoDi(msg);
     if (!p) return nonTrovato();
     if (esiste(p)) { try { electron().shell.showItemInFolder(p); return { ok: true }; } catch (_) {} }
-    // Il file non c'è più ma la cartella sì: aprirla è comunque il passo che l'utente cercava.
+    // Il file non c'è più ma la cartella sì: la si mostra, non la si apre. Su Mac aprire una cartella .app lancia il
+    // programma, e il percorso può averlo scritto un modello.
     const dir = path.dirname(p);
     try {
-      if (fs.statSync(dir).isDirectory()) { await electron().shell.openPath(dir); return { ok: true, mancaIlFile: true }; }
+      if (fs.statSync(dir).isDirectory()) { electron().shell.showItemInFolder(dir); return { ok: true, mancaIlFile: true }; }
     } catch (_) {}
     return { ok: false, errore: 'non_trovato', frase: 'Né il file né la sua cartella ci sono più' };
   }));
