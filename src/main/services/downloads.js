@@ -368,8 +368,6 @@ function persist() {
 
 // ─── broadcast verso la shell ───────────────────────────────────────────
 function broadcast(kind, rec) {
-  // Un file appena arrivato si deve trovare alla prossima ricerca nei documenti (#947).
-  if (kind === 'done') { try { require('./documentiIndice').segnaCambiato(); } catch (_) {} }
   // Una voce tolta dall'elenco non torna nella barra con l'esito tardivo del
   // suo annullamento.
   if (kind !== 'removed' && rec && !records.has(rec.id)) { notifyTabs(); return; }

@@ -30,8 +30,6 @@ const SALTA = new Set(['node_modules', '__pycache__', '$recycle.bin', 'system vo
 const PROFONDITA_MAX = 24;
 // Un tetto che una persona non tocca (centomila documenti), e se lo tocca la ricerca lo dice.
 const FILE_MAX = 100_000;
-// Una ricerca rilegge le cartelle se l'ultimo giro è più vecchio di così: un file appena scaricato si trova.
-const FRESCO_MS = 30_000;
 const AVVIO_MS = 20_000;
 const OGNI_MS = 30 * 60_000;
 
@@ -201,13 +199,19 @@ async function elenca(cartelle) {
       if (pieno) return;
       // I file nascosti e quelli di blocco di Office (~$documento.docx) non sono documenti.
       if (v.name.startsWith('.') || v.name.startsWith('~$')) continue;
-      if (v.isSymbolicLink()) continue;
       const p = path.join(dir, v.name);
-      if (v.isDirectory()) {
+      let tipo = v;
+      // Su Windows l'elenco dà per collegamento ogni segnaposto di OneDrive, file e cartelle, anche già scaricati:
+      // lstat dice se è un collegamento vero (quelli restano fuori).
+      if (v.isSymbolicLink()) {
+        try { tipo = await fsp.lstat(p); } catch (_) { continue; }
+        if (tipo.isSymbolicLink()) continue;
+      }
+      if (tipo.isDirectory()) {
         if (!SALTA.has(v.name.toLowerCase())) await giro(p, prof + 1);
         continue;
       }
-      if (!v.isFile() || !tipoDi(p)) continue;
+      if (!tipo.isFile() || !tipoDi(p)) continue;
       if (++contati > FILE_MAX) { pieno = true; return; }
       try {
         const st = await fsp.stat(p);
@@ -267,9 +271,6 @@ async function eseguiGiro(extra) {
   else await compatta();
   if (!extra || !extra.length) ultimoGiro = Date.now();
 }
-
-// Un file appena scaricato o rinominato da Filo: la ricerca dopo rilegge le cartelle anche se l'ultimo giro è recente.
-function segnaCambiato() { ultimoGiro = 0; }
 
 /** Un giro sull'indice; se ce n'è già uno, ci si accoda a quello. `extra`: cartelle in più solo per questo giro. */
 function aggiorna({ extra = [] } = {}) {
@@ -340,13 +341,12 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
   }
   let fermata = false;
   if (!cartellaMancante) {
-    const serve = extra.length || corsa || Date.now() - ultimoGiro > FRESCO_MS;
-    if (serve) {
-      const lavoro = extra.length ? aggiorna({ extra }) : aggiorna();
-      const smetti = ascoltaGiro(avanzamento);
-      fermata = await Promise.race([lavoro.then(() => false), aspettaStop(segnale).then(() => true)]);
-      smetti();
-    }
+    // Ogni ricerca riguarda le cartelle: un file messo lì da un altro programma un attimo prima si trova. Elencare
+    // costa poco, si rileggono solo i file nuovi o cambiati.
+    const lavoro = extra.length ? aggiorna({ extra }) : aggiorna();
+    const smetti = ascoltaGiro(avanzamento);
+    fermata = await Promise.race([lavoro.then(() => false), aspettaStop(segnale).then(() => true)]);
+    smetti();
   }
   const candidati = [];
   for (const [p, v] of voci) {
@@ -439,8 +439,8 @@ function avviaInSottofondo() {
 }
 
 module.exports = {
-  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti, segnaCambiato,
-  cartellaDiSerie, elimina, DI_SERIE, FRESCO_MS,
+  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
+  cartellaDiSerie, elimina, DI_SERIE,
   // per gli unit test
   _giroInSottofondo: giroInSottofondo,
   _azzera: () => { voci = null; caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; },
