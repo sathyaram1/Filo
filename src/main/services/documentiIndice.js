@@ -97,7 +97,7 @@ function daPercorrere(rs) {
 
 // ── L'indice in memoria e su disco ──────────────────────────────────────────
 
-let voci = null;          // percorso → { n, m, s, k, t, pg, vuoto, e, tp?, np? }
+let voci = null;          // percorso → { n, m, s, k, t, pg, vuoto, e, tp?, np?, pp? }
 let caricamento = null;
 let ultimoGiro = 0;
 let troppi = false;
@@ -142,7 +142,7 @@ function inFila(lavoro) {
 }
 
 function rigaDi(p, v) {
-  const { tp, np, ...resto } = v;
+  const { tp, np, pp, ...resto } = v;
   return JSON.stringify({ ...resto, p });
 }
 
@@ -353,7 +353,8 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     if (!sotto.some((c) => dentro(p, c))) continue;
     if (v.tp == null) v.tp = Ricerca.piano(v.t);
     if (v.np == null) v.np = Ricerca.piano(v.n.replace(/\.[^.]+$/, ''));
-    candidati.push({ id: p, nome: v.n, testo: v.t, testoPiano: v.tp, nomePiano: v.np });
+    if (v.pp == null) v.pp = Ricerca.periodi(v.t);
+    candidati.push({ id: p, nome: v.n, testo: v.t, testoPiano: v.tp, nomePiano: v.np, periodi: v.pp });
   }
   const ordinati = Ricerca.ordina(candidati, richiesta, { limite: limite + 4 });
   const risultati = [];

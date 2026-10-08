@@ -244,3 +244,46 @@ test('i segnaposto di OneDrive, che l\'elenco di Windows dà per collegamenti, s
     rmSync(fuori, { recursive: true, force: true });
   }
 });
+
+// Una bolletta vera è emessa e scade il mese dopo il suo periodo: quella di febbraio è piena di date di marzo.
+function bollettaVera({ periodo, emessa, scadenza, lettura }) {
+  return [
+    'Servizio Elettrico Nazionale S.p.A. - Società con socio unico', 'Sede legale Viale Regina Margherita 125 00198 Roma',
+    'Gentile Cliente MARIO ROSSI - VIA ROMA 12 - 20100 MILANO', `Bolletta n. 4100223344 del ${emessa}`,
+    'Fornitura di energia elettrica - Servizio di Maggior Tutela', 'Codice cliente 123456789 - POD IT001E12345678',
+    `Totale da pagare 68,10 euro entro il ${scadenza}`, 'Il pagamento si fa con domiciliazione bancaria o bollettino postale.',
+    `Quanto hai consumato: lettura rilevata il ${lettura}. Consumo fatturato 240 kWh`,
+    'Spesa per la materia energia 40,10 euro; trasporto e gestione del contatore 15,00 euro', `Periodo di fatturazione: ${periodo}`,
+  ].join('\n');
+}
+
+test('fra bollette di mesi vicini vince il periodo dichiarato, non le date di emissione e scadenza; e lo squarcio lo mostra', () => {
+  const docs = [
+    { id: 'feb', nome: 'scan_00198.pdf', testo: bollettaVera({ periodo: '01/02/2026 - 28/02/2026', emessa: '06/03/2026', scadenza: '26/03/2026', lettura: '02/03/2026' }) },
+    { id: 'mar', nome: 'scan_00231.pdf', testo: bollettaVera({ periodo: '01/03/2026 - 31/03/2026', emessa: '08/04/2026', scadenza: '28/04/2026', lettura: '01/04/2026' }) },
+    { id: 'apr', nome: 'scan_00250.pdf', testo: bollettaVera({ periodo: '01/04/2026 - 30/04/2026', emessa: '07/05/2026', scadenza: '27/05/2026', lettura: '02/05/2026' }) },
+    { id: 'parole', nome: 'x.pdf', testo: 'Bolletta luce. Periodo di riferimento: febbraio 2026. Emessa il 05/03/2026, da pagare entro il 25/03/2026. 210 kWh' },
+  ];
+  for (const q of ['mi serve la bolletta della luce di marzo', 'bolletta luce energia elettrica kWh marzo 2026']) {
+    const r = Ricerca.ordina(docs, q);
+    assert.equal(r[0].id, 'mar', `${q}: ${r.map((x) => x.id).join(', ')}`);
+    assert.ok(!r.find((x) => x.id === 'parole') || r.findIndex((x) => x.id === 'parole') > 0);
+  }
+  const q = 'mi serve la bolletta della luce di marzo';
+  assert.match(Ricerca.squarcioMigliore(docs[1].testo, q), /Periodo di fatturazione: 01\/03\/2026 - 31\/03\/2026/);
+  assert.match(Ricerca.squarcioMigliore(docs[0].testo, q), /Periodo di fatturazione: 01\/02\/2026 - 28\/02\/2026/);
+  // Senza un periodo dichiarato le date contano come prima.
+  assert.equal(Ricerca.ordina([{ id: 'v', nome: 'aaa.docx', testo: 'Verbale della riunione del 14/03/2026' }], 'verbale marzo')[0].trovati.length, 2);
+});
+
+test('i periodi di un documento: intervalli di date, mese con l\'anno; una data sola non è un periodo', () => {
+  const p = (t) => Ricerca.periodi(t).map((x) => [x.testo, x.mesi]);
+  assert.deepEqual(p('Periodo 01/02/2026 - 28/02/2026, emessa il 06/03/2026'), [['01/02/2026 - 28/02/2026', [1]]]);
+  assert.deepEqual(p('dal 1 feb 2026 al 28 feb 2026'), [['1 feb 2026 al 28 feb 2026', [1]]]);
+  assert.deepEqual(p('Periodo: 01/01/2026 - 31/03/2026'), [['01/01/2026 - 31/03/2026', [0, 1, 2]]]);
+  assert.deepEqual(p('dal 01/12/2025 al 31/01/2026'), [['01/12/2025 al 31/01/2026', [11, 0]]]);
+  assert.deepEqual(p('Cedolino del mese di marzo 2026'), [['marzo 2026', [2]]]);
+  assert.deepEqual(p('Verbale del 14 marzo 2026'), []);
+  assert.deepEqual(p('Fattura n. 2026/031544 del 04/04/2026'), []);
+  assert.deepEqual(p(''), []);
+});

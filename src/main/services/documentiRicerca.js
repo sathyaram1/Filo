@@ -127,6 +127,59 @@ function contaDateDelMese(testo, mese) {
   return n;
 }
 
+// I periodi che un documento dichiara: un intervallo di date («01/02/2026 - 28/02/2026», «dal 1 feb 2026 al 28 feb 2026»)
+// o un mese con l'anno («marzo 2026», «03/2026»). Una bolletta è emessa e scade il mese dopo il suo periodo: quando il
+// documento dichiara un periodo, il mese chiesto si misura su quello e non sulle altre date.
+const NOMI_MESE = MESI.flat().slice().sort((a, b) => b.length - a.length).join('|');
+const RE_DATA_NUM = /(?<![\d/.\-])(\d{1,2})[/.\-](\d{1,2})[/.\-]((?:19|20)?\d{2})(?![\d/])/g;
+const RE_DATA_ISO = /(?<![\d/.\-])((?:19|20)\d{2})-(\d{1,2})-(\d{1,2})(?!\d)/g;
+const RE_DATA_NOME = new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2})\\s+(${NOMI_MESE})\\.?\\s+((?:19|20)\\d{2})(?!\\d)`, 'giu');
+const RE_MESE_NUM = /(?<![\d/.\-])(\d{1,2})[/.\-]((?:19|20)\d{2})(?![\d/.\-]?\d)/g;
+const RE_MESE_NOME = new RegExp(`(?<!\\d\\s{0,3})(?<![\\p{L}\\p{N}])(${NOMI_MESE})\\.?\\s+((?:19|20)\\d{2})(?!\\d)`, 'giu');
+const TRA_DATE = /^\s*(?:-|–|—|al|a|fino al|e il)\s*$/i;
+const PERIODI_MAX = 40;
+
+function anno(y) { const n = Number(y); return n < 100 ? 2000 + n : n; }
+function mesiFra(m1, y1, m2, y2) {
+  const da = y1 * 12 + m1;
+  const a = y2 * 12 + m2;
+  if (a < da) return [m1, m2];
+  if (a - da >= 11) return MESI.map((_, k) => k);
+  const out = [];
+  for (let x = da; x <= a; x++) out.push(x % 12);
+  return out;
+}
+
+/** → [{ i, fine, testo, mesi: [indice del mese] }]. PURA. */
+function periodi(testo) {
+  const s = String(testo || '');
+  if (!s) return [];
+  const date = [];
+  const mesi = [];
+  const prendi = (re, fn) => { re.lastIndex = 0; let m; while ((m = re.exec(s)) && date.length + mesi.length < 400) fn(m); };
+  const meseDiNome = (n) => meseDi(String(n).toLowerCase());
+  prendi(RE_DATA_NUM, (m) => { const g = +m[1]; const me = +m[2] - 1; if (g >= 1 && g <= 31 && me >= 0 && me < 12) date.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[3]) }); });
+  prendi(RE_DATA_ISO, (m) => { const me = +m[2] - 1; if (me >= 0 && me < 12) date.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[1]) }); });
+  prendi(RE_DATA_NOME, (m) => { const me = meseDiNome(m[2]); if (me >= 0) date.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[3]) }); });
+  prendi(RE_MESE_NUM, (m) => { const me = +m[1] - 1; if (me >= 0 && me < 12) mesi.push({ i: m.index, fine: m.index + m[0].length, m: me }); });
+  prendi(RE_MESE_NOME, (m) => { const me = meseDiNome(m[1]); if (me >= 0) mesi.push({ i: m.index, fine: m.index + m[0].length, m: me }); });
+  date.sort((a, b) => a.i - b.i);
+  const out = [];
+  for (let k = 0; k + 1 < date.length && out.length < PERIODI_MAX; k++) {
+    const a = date[k];
+    const b = date[k + 1];
+    if (b.i < a.fine || !TRA_DATE.test(s.slice(a.fine, b.i))) continue;
+    out.push({ i: a.i, fine: b.fine, testo: s.slice(a.i, b.fine).replace(/\s+/g, ' '), mesi: mesiFra(a.m, a.y, b.m, b.y) });
+    k += 1;
+  }
+  for (const x of mesi) {
+    if (out.length >= PERIODI_MAX) break;
+    if (date.some((d) => x.i < d.fine && d.i < x.fine)) continue;
+    out.push({ i: x.i, fine: x.fine, testo: s.slice(x.i, x.fine).replace(/\s+/g, ' '), mesi: [x.m] });
+  }
+  return out.sort((a, b) => a.i - b.i);
+}
+
 /**
  * Il punteggio di ogni documento per la richiesta, e i primi `limite`. PURA.
  * `documenti`: [{ id, nome, testo, testoPiano?, nomePiano? }]. → [{ id, punteggio, trovati: [nomi], primo: forma }]
@@ -134,15 +187,17 @@ function contaDateDelMese(testo, mese) {
 function ordina(documenti, richiesta, { limite = 8 } = {}) {
   const idee = concetti(richiesta);
   if (!idee.length) return [];
+  const conMese = idee.some((x) => x.mese >= 0);
   const docs = documenti.map((d) => ({
     d,
     testoPiano: d.testoPiano != null ? d.testoPiano : piano(d.testo),
     nomePiano: d.nomePiano != null ? d.nomePiano : piano(d.nome),
+    periodi: !conMese ? [] : (d.periodi != null ? d.periodi : periodi(d.testo)),
   }));
   // Quanti documenti contengono ogni idea: un'idea che hanno tutti (l'anno, «fattura» in una cartella di fatture)
   // distingue poco, una rara distingue molto.
   const presenze = idee.map(() => 0);
-  const misure = docs.map(({ d, testoPiano, nomePiano }) => idee.map((idea, k) => {
+  const misure = docs.map(({ d, testoPiano, nomePiano, periodi: per }) => idee.map((idea, k) => {
     let nelTesto = 0;
     let nelNome = 0;
     let forma = '';
@@ -155,7 +210,10 @@ function ordina(documenti, richiesta, { limite = 8 } = {}) {
       nelTesto += t;
       nelNome += n;
     }
-    if (idea.mese >= 0) nelTesto += contaDateDelMese(d.testo, idea.mese);
+    if (idea.mese >= 0 && per.length) {
+      const coperti = per.filter((p) => p.mesi.includes(idea.mese)).length;
+      nelTesto = coperti ? coperti + 1 : 0;
+    } else if (idea.mese >= 0) nelTesto += contaDateDelMese(d.testo, idea.mese);
     if (nelTesto || nelNome) presenze[k] += 1;
     return { nelTesto: Math.min(nelTesto, CONTA_MAX), nelNome, forma };
   }));
@@ -213,7 +271,9 @@ function squarcioMigliore(testo, richiesta, lunghezza = 280) {
   // Con lettere scomposte che non si ricompongono gli indici non tornerebbero: meglio l'inizio del testo.
   if (basso.length !== t.length) return squarcio(t, '', lunghezza);
   const punti = [];
-  concetti(richiesta).forEach((idea, k) => {
+  const idee = concetti(richiesta);
+  const perT = idee.some((x) => x.mese >= 0) ? periodi(t) : [];
+  idee.forEach((idea, k) => {
     for (const f of idea.forme) {
       const cerco = radice(piano(f));
       if (!cerco) continue;
@@ -226,7 +286,9 @@ function squarcioMigliore(testo, richiesta, lunghezza = 280) {
         punti.push({ i, k });
       }
     }
-    if (idea.mese >= 0) {
+    if (idea.mese >= 0 && perT.length) {
+      for (const p of perT) if (p.mesi.includes(idea.mese)) punti.push({ i: p.i, k });
+    } else if (idea.mese >= 0) {
       const mm = `0?${idea.mese + 1}`;
       const re = new RegExp(`\\b\\d{1,2}[/.\\-]${mm}[/.\\-](?:\\d{4}|\\d{2})\\b|\\b${mm}[/.\\-](?:19|20)\\d{2}\\b`, 'g');
       let m;
@@ -234,7 +296,7 @@ function squarcioMigliore(testo, richiesta, lunghezza = 280) {
       while (n++ < CONTA_MAX && (m = re.exec(t))) punti.push({ i: m.index, k });
     }
   });
-  if (!punti.length) return squarcio(t, '', lunghezza);
+  if (!punti.length) return conPeriodo(squarcio(t, '', lunghezza), t, perT, idee, 0, Math.min(t.length, lunghezza));
   punti.sort((a, b) => a.i - b.i);
   let migliore = { inizio: punti[0].i, idee: 0 };
   for (let a = 0; a < punti.length; a++) {
@@ -247,7 +309,21 @@ function squarcioMigliore(testo, richiesta, lunghezza = 280) {
   const spazio = t.lastIndexOf(' ', inizio);
   if (inizio > 0 && inizio - spazio < 25) inizio = spazio + 1;
   const fine = Math.min(t.length, inizio + lunghezza);
-  return `${inizio > 0 ? '…' : ''}${t.slice(inizio, fine)}${fine < t.length ? '…' : ''}`;
+  return conPeriodo(`${inizio > 0 ? '…' : ''}${t.slice(inizio, fine)}${fine < t.length ? '…' : ''}`, t, perT, idee, inizio, fine);
 }
 
-module.exports = { piano, concetti, ordina, squarcio, squarcioMigliore, conta, contaDateDelMese, SINONIMI, MESI };
+// Chi sceglie fra due bollette vicine deve vedere il periodo che ognuna dichiara, anche se sta lontano dalle parole
+// della richiesta: se la finestra non lo contiene, lo si accoda con le parole che lo introducono («Periodo di …»).
+function conPeriodo(base, t, perT, idee, inizio, fine) {
+  if (!perT.length || perT.some((p) => p.i >= inizio && p.fine <= fine)) return base;
+  const mesi = idee.filter((x) => x.mese >= 0).map((x) => x.mese);
+  const p = perT.find((x) => x.mesi.some((m) => mesi.includes(m))) || perT[0];
+  let da = Math.max(0, p.i - 30);
+  const spazio = t.lastIndexOf(' ', da);
+  if (da > 0 && da - spazio < 25) da = spazio + 1;
+  // Davanti solo parole: «8,00 Periodo di …» diventa «Periodo di …».
+  const prima = t.slice(da, p.i).replace(/^(?:[^\p{L}\s]*\s+|\S*\d\S*\s+)+/u, '');
+  return `${base.replace(/…$/, '')}… ${prima}${t.slice(p.i, p.fine)}${p.fine < t.length ? '…' : ''}`;
+}
+
+module.exports = { piano, concetti, ordina, squarcio, squarcioMigliore, conta, contaDateDelMese, periodi, SINONIMI, MESI };
