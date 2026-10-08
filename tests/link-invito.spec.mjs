@@ -187,12 +187,12 @@ test(T_CAMPO, async ({ app, openTab }) => {
   await app.evaluate(({ clipboard }) => clipboard.writeText('niente'));
   await primo.locator('.sn-wallet-invite-link').click();
   await expect(primo.locator('.sn-wallet-invite-link')).toHaveText('Copiato');
-  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://filo.red/i/AAAA2222');
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('https://filo.red/i/AAAA2222');
   await expect(primo.locator('.sn-wallet-invite-link')).toHaveText('https://filo.red/i/AAAA2222', { timeout: 5000 });
 
   // Anche il codice da dettare a voce, per chi preferisce.
   await primo.locator('.sn-wallet-code').click();
-  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toBe('AAAA-2222');
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('AAAA-2222');
 
   // Due clic attaccati — quello che fa chiunque non sia sicuro che il primo
   // sia andato a segno — non devono lasciare «Copiato» al posto del link: la

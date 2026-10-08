@@ -93,6 +93,14 @@ function hideForTests(win, { main = false } = {}) {
   return true;
 }
 
+// Fuori schermo, da Electron 44 su X11 la finestra disegna un fotogramma e poi aspetta un vsync che non arriva:
+// requestAnimationFrame si ferma, e Playwright, che prima di un clic aspetta due fotogrammi fermi, non clicca più.
+// Va chiesto prima di `ready`, quando nasce il processo che disegna.
+function disegnaAncheFuoriSchermo(app, { nascoste = HIDDEN } = {}) {
+  if (!nascoste || !app) return false;
+  try { app.commandLine.appendSwitch('disable-frame-rate-limit'); return true; } catch (_) { return false; }
+}
+
 // NIENTE APERTURE DI SISTEMA DURANTE I TEST.
 //
 // `shell.openExternal(url)` e `shell.openPath(p)` chiedono al sistema di aprire
@@ -133,6 +141,6 @@ function silenziaApertureDiSistema(shell, {
 }
 
 module.exports = {
-  HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests,
+  HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests, disegnaAncheFuoriSchermo,
   inModalitaTest, silenziaApertureDiSistema,
 };

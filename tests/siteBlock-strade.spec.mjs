@@ -58,15 +58,15 @@ test('dai risultati di una ricerca il sito della lista si ferma, cliccato o aper
   const avvisi = await contaAvvisi(app);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO CERCATO</h1>');
   const r = rete.rimbalzo('accorcia.test', '/r', bersaglio);
-  const risultati = rete.pagina('www.bing.com', '/search', `<a id="diretto" href="${bersaglio}">risultato</a> <a id="nuova" target="_blank" href="${r}">risultato</a>`);
+  const risultati = rete.pagina('www.ecosia.org', '/search', `<a id="diretto" href="${bersaglio}">risultato</a> <a id="nuova" target="_blank" href="${r}">risultato</a>`);
   await apri(app, shell, risultati);
-  const tab = app.windows().find((w) => w.url().includes('www.bing.com'));
+  const tab = app.windows().find((w) => w.url().includes('www.ecosia.org'));
   await tab.evaluate(() => document.getElementById('nuova').click());
   await shell.waitForTimeout(1500);
   await tab.evaluate(() => document.getElementById('diretto').click());
   await shell.waitForTimeout(1500);
   expect(await aperteSu(app, 'blocked.test')).toEqual([]);
-  expect(tab.url()).toContain('www.bing.com/search');
+  expect(tab.url()).toContain('www.ecosia.org/search');
   expect((await avvisi()).length).toBeGreaterThan(0);
 });
 

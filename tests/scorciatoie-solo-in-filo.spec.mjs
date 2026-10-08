@@ -288,9 +288,13 @@ async function pdfColTastieraNelVisore(app, shell, openTab, testServer, pdfUrl) 
   await expect.poll(() => { pdf = app.windows().find((w) => w.url() === pdfUrl); return !!pdf; }, { timeout: 15_000 }).toBe(true);
   const visore = () => pdf.frames().find((f) => f.url().startsWith('chrome-extension://'));
   await expect.poll(() => Boolean(visore()), { timeout: 15_000 }).toBe(true);
-  await expect.poll(() => visore().evaluate(() => Boolean(document.querySelector('pdf-viewer'))), { timeout: 15_000 }).toBe(true);
-  await pdf.mouse.click(300, 300);
-  await expect.poll(() => tastieraNelVisore(app, pdf, pdfUrl), { timeout: 10_000 }).toBe(true);
+  // Il clic sul documento gli dà la tastiera; partito mentre il visore si monta va a vuoto, e si ripete.
+  await expect.poll(async () => {
+    if (await tastieraNelVisore(app, pdf, pdfUrl)) return true;
+    const [larga, alta] = await pdf.evaluate(() => [innerWidth, innerHeight]);
+    await pdf.mouse.click(larga / 2, alta / 2);
+    return tastieraNelVisore(app, pdf, pdfUrl);
+  }, { timeout: 15_000 }).toBe(true);
   return (await schede(app)).activeId;
 }
 

@@ -6,6 +6,7 @@
 
 const { randomUUID } = require('node:crypto');
 const Psl = require('./safebrowse/psl');
+const { tastoPremuto } = require('../tastoDelMouse');
 
 // Ciò che Chrome chiede all'utente: si chiede anche qui. Ogni nome che Electron può mandare sta in uno dei gruppi sotto,
 // e la sentinella in tests/unit/permessiPagine.test.mjs lo confronta con quelli che Electron dichiara.
@@ -142,8 +143,7 @@ function lasciapassare(wc, tipo) {
 
 function tastoDelMenu(input) {
   const type = input.type;
-  // Electron non dà il pulsante: il tasto destro premuto sta fra i modificatori.
-  if (type === 'mouseDown') return Array.isArray(input.modifiers) && input.modifiers.includes('rightbuttondown');
+  if (type === 'mouseDown') return tastoPremuto(input) === 'right';
   return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
 }
 

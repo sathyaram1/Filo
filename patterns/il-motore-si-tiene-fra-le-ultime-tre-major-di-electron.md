@@ -29,6 +29,8 @@ salto si alzano lì `MAJOR` e `USCITA_STABILE`.
 - **Su Linux, in una sessione Wayland, Chromium parte su Wayland** (38): il lanciatore del pacchetto lo riporta su X,
   vedi [Mac e Linux si rompono in silenzio](mac-e-linux-si-rompono-in-silenzio.md).
 - **Il visore dei PDF non è più un webContents a sé** (41): i suoi tasti arrivano già alla scheda.
+- **I numeri italiani a quattro cifre perdono il punto** (44, dati di ICU più nuovi): `Intl` scrive 4990 invece di
+  4.990. Ogni numero formattato in italiano chiede `useGrouping: true`; sentinella `tests/unit/numeriItaliani.test.mjs`.
 
 ## Cosa non si prova da qui
 
