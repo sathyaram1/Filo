@@ -93,11 +93,14 @@ faceva spendere una chiamata.
   e Sostituisci della Modifica, Allega. Un incolla fabbricato non allega niente.
 - **Chi ascolta su window o sul documento** vede l'host, non il campo toccato:
   il nodo vero lo dà `SN_FILO_UI.bersaglio(e)` (il tasto destro dentro la casella
-  del feedback apre il menu di un campo di testo). Col fuoco dentro un riquadro
+  del feedback apre il menu di un campo di testo; il correttore si aggancia alla
+  casella dal focus). Un aiuto che ripete il testo della casella, come lo strato
+  delle sottolineature del correttore, sta dentro lo stesso riquadro chiuso, mai
+  nel documento. Col fuoco dentro un riquadro
   chiuso si sta scrivendo (`data-sn-riquadro`, regola in
   `src/shared/campoTesto.js`): Ctrl/Cmd+Z annulla, non porta via la pagina.
 - **Un evento che fabbrica Filo stesso** verso un campo di un riquadro (l'Incolla
-  del menu, la correzione) si segna con `SN_FILO_UI.nostro(ev)`: il cancello lo
+  del menu, la correzione, Sostituisci della Modifica) si segna con `SN_FILO_UI.nostro(ev)`: il cancello lo
   lascia passare, la copia che vede il sito non è nell'elenco.
 - **Una bozza resta al sito dove è nata, e lo decide il main**: la chiave porta
   l'origine (`sn_feedback_draft_text@<origine>`, `BOZZE_PER_SITO` in
@@ -134,7 +137,9 @@ vero, quindi passa. Il cancello chiude le strade senza l'utente, non il raggiro.
 Lo shadow chiuso non nasconde il **testo**: `window.find` trova anche quello
 scritto in una casella dentro un riquadro chiuso, e `getSelection().modify()`
 allarga la selezione trovata fino alla riga intera, che `toString()` restituisce
-(#1071). Basta indovinare una lettera. Il testo di una voce si può rendere come
+(#1071). Basta indovinare una lettera. Ancora più semplice: i tasti e gli
+inserimenti escono dallo shadow verso la finestra del sito, che li ascolta prima
+di noi, e un `execCommand` del sito scrive nella casella che ha il fuoco (#1071.1). Il testo di una voce si può rendere come
 contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
 toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
 vista sopra la scheda come gli avvisi

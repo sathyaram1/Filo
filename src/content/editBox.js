@@ -43,7 +43,7 @@
           <button type="button" data-sc="translate">${I18n.t('edit_box_shortcut_translate')}</button>
           <button type="button" data-sc="fix">${I18n.t('edit_box_shortcut_fix')}</button>
         </div>
-        <input type="text" class="sn-editbox-instruction" placeholder="${I18n.t('edit_box_instruction_placeholder')}">
+        <input type="text" class="sn-editbox-instruction">
         <div class="sn-editbox-panels">
           <div class="sn-editbox-panel">
             <div class="sn-editbox-label">${I18n.t('edit_box_original')}</div>
@@ -66,6 +66,8 @@
     const $orig = root.querySelector('.sn-editbox-original');
     const $prop = root.querySelector('.sn-editbox-proposed');
     const $instr = root.querySelector('.sn-editbox-instruction');
+    // Il testo d'esempio ha le virgolette: come attributo nel modello HTML si troncherebbe.
+    $instr.placeholder = I18n.t('edit_box_instruction_placeholder');
     const $cancel = root.querySelector('.sn-editbox-cancel');
     const $copy = root.querySelector('.sn-editbox-copy');
     const $replace = root.querySelector('.sn-editbox-replace');
@@ -160,7 +162,9 @@
         el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
         const caret = start + currentResult.length;
         el.setSelectionRange(start, caret);
-        el.dispatchEvent(new Event('input', { bubbles: true }));
+        // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
+        const ev = new Event('input', { bubbles: true });
+        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
       } else if (savedCtx.kind === 'ce') {
         try { document.execCommand('insertText', false, currentResult); } catch (_) {}
       }
