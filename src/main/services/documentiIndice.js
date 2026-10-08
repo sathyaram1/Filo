@@ -34,7 +34,6 @@ const FILE_MAX = 100_000;
 const FRESCO_MS = 30_000;
 const AVVIO_MS = 20_000;
 const OGNI_MS = 30 * 60_000;
-const SALVA_OGNI = 40;
 
 const deps = {
   impostazioni: async () => (globalThis.SN_STORAGE ? globalThis.SN_STORAGE.getSettings() : {}),
@@ -107,48 +106,78 @@ let troppi = false;
 let corsa = null;         // { promessa, stato: { fatti, totali, nome }, ascolta: Set }
 let daRifare = false;
 
-const fileIndice = () => path.join(deps.cartellaDati(), 'documenti', 'indice.json');
+// Su disco una riga per documento letto, accodata appena letto: il primo giro su migliaia di file non riscrive
+// tutto a ogni passo, e dopo un arresto quello che era già letto c'è. Una riga { p, via } toglie un documento; il
+// file si ricompatta a fine giro quando le righe superate sono più di quelle vive.
+const fileIndice = () => path.join(deps.cartellaDati(), 'documenti', 'indice.jsonl');
+let righeSuDisco = 0;
 
 async function carica() {
   if (voci) return voci;
   if (!caricamento) {
     caricamento = (async () => {
       const m = new Map();
+      let righe = 0;
       try {
-        const j = JSON.parse(await fsp.readFile(fileIndice(), 'utf8'));
-        for (const v of Array.isArray(j && j.voci) ? j.voci : []) if (v && typeof v.p === 'string') m.set(v.p, v);
-        ultimoGiro = 0;
-      } catch (_) { /* nessun indice ancora, o rotto: si rifà */ }
+        const testo = await fsp.readFile(fileIndice(), 'utf8');
+        for (const riga of testo.split('\n')) {
+          if (!riga.trim()) continue;
+          let v = null;
+          try { v = JSON.parse(riga); } catch (_) { continue; }
+          righe += 1;
+          if (!v || typeof v.p !== 'string') continue;
+          if (v.via) m.delete(v.p); else m.set(v.p, v);
+        }
+      } catch (_) { /* nessun indice ancora: si fa */ }
       voci = m;
+      righeSuDisco = righe;
       return m;
     })();
   }
   return caricamento;
 }
 
-let salvataggio = Promise.resolve();
-function salva() {
-  const elenco = [];
-  for (const [p, v] of voci || new Map()) {
-    const { tp, np, ...resto } = v;
-    elenco.push({ ...resto, p });
-  }
-  const dati = JSON.stringify({ v: 1, voci: elenco });
-  salvataggio = salvataggio.then(async () => {
+let scrittura = Promise.resolve();
+function inFila(lavoro) {
+  scrittura = scrittura.then(lavoro).catch(() => {});
+  return scrittura;
+}
+
+function rigaDi(p, v) {
+  const { tp, np, ...resto } = v;
+  return JSON.stringify({ ...resto, p });
+}
+
+function accoda(righe) {
+  if (!righe.length) return scrittura;
+  righeSuDisco += righe.length;
+  const testo = `${righe.join('\n')}\n`;
+  return inFila(async () => {
+    const f = fileIndice();
+    await fsp.mkdir(path.dirname(f), { recursive: true });
+    await fsp.appendFile(f, testo, 'utf8');
+  });
+}
+
+function compatta() {
+  if (righeSuDisco <= Math.max(voci.size * 2, 200)) return scrittura;
+  const righe = [];
+  for (const [p, v] of voci) righe.push(rigaDi(p, v));
+  righeSuDisco = righe.length;
+  return inFila(async () => {
     const f = fileIndice();
     await fsp.mkdir(path.dirname(f), { recursive: true });
     const tmp = `${f}.${process.pid}.tmp`;
-    await fsp.writeFile(tmp, dati, 'utf8');
+    await fsp.writeFile(tmp, righe.length ? `${righe.join('\n')}\n` : '', 'utf8');
     await fsp.rename(tmp, f);
-  }).catch(() => {});
-  return salvataggio;
+  });
 }
 
 async function elimina() {
   voci = new Map();
   caricamento = Promise.resolve(voci);
-  await salvataggio;
-  try { await fsp.rm(fileIndice(), { force: true }); } catch (_) {}
+  righeSuDisco = 0;
+  await inFila(() => fsp.rm(fileIndice(), { force: true }));
 }
 
 // ── Il giro: elencare le cartelle, leggere i file nuovi o cambiati ─────────
@@ -196,11 +225,15 @@ async function eseguiGiro(extra) {
   avvisa({ fase: 'elenco', fatti: 0, totali: 0, nome: '' });
   const { trovati, pieno } = await elenca(cartelle);
   troppi = pieno;
-  let cambiato = false;
   // Via quello che non c'è più, o che sta in una cartella tolta dall'elenco.
+  const tolti = [];
   for (const p of Array.from(voci.keys())) {
-    if (!trovati.has(p) && !(pieno && cartelle.some((c) => dentro(p, c)) && fs.existsSync(p))) { voci.delete(p); cambiato = true; }
+    if (!trovati.has(p) && !(pieno && cartelle.some((c) => dentro(p, c)) && fs.existsSync(p))) {
+      voci.delete(p);
+      tolti.push(JSON.stringify({ p, via: true }));
+    }
   }
+  accoda(tolti);
   const daLeggere = [];
   for (const [p, st] of trovati) {
     const v = voci.get(p);
@@ -212,17 +245,18 @@ async function eseguiGiro(extra) {
   for (const [p, st] of daLeggere) {
     avvisa({ fase: 'lettura', fatti: letti, totali: daLeggere.length, nome: path.basename(p) });
     const r = await deps.estrai(p);
-    voci.set(p, {
+    const v = {
       n: path.basename(p), m: st.m, s: st.s, k: tipoDi(p), t: r.testo || '', pg: r.pagine || 0,
       vuoto: !!r.vuoto, e: r.errore || '',
-    });
-    cambiato = true;
+    };
+    voci.set(p, v);
+    accoda([rigaDi(p, v)]);
     letti += 1;
-    if (letti % SALVA_OGNI === 0) salva();
   }
   avvisa({ fase: 'fine', fatti: letti, totali: daLeggere.length, nome: '' });
-  if (!rs.some((r) => r.esiste) && !(extra && extra.length) && !voci.size) { await elimina(); return; }
-  if (cambiato) await salva();
+  // Nessuna cartella da leggere: sul disco non resta niente dei documenti di prima.
+  if (!voci.size) await elimina();
+  else await compatta();
   if (!extra || !extra.length) ultimoGiro = Date.now();
 }
 
@@ -356,17 +390,19 @@ function avviaInSottofondo() {
   if (t.unref) t.unref();
   const i = setInterval(() => { aggiorna().catch(() => {}); }, OGNI_MS);
   if (i.unref) i.unref();
+  const cartelleDi = (s) => JSON.stringify((s && s.documenti && s.documenti.cartelle) || null);
+  let prima = null;
+  deps.impostazioni().then((s) => { prima = cartelleDi(s); }).catch(() => {});
   try {
-    let prima = '';
-    deps.impostazioni().then((s) => { prima = JSON.stringify((s && s.documenti && s.documenti.cartelle) || null); }).catch(() => {});
     globalThis.chrome.storage.onChanged.addListener((changes) => {
       if (!changes || !changes.settings) return;
-      const dopo = JSON.stringify((changes.settings.newValue && changes.settings.newValue.documenti
-        && changes.settings.newValue.documenti.cartelle) || null);
-      if (dopo === prima) return;
-      prima = dopo;
-      // Una cartella tolta esce dall'indice al giro dopo: lo si fa partire subito.
-      if (corsa) daRifare = true; else aggiorna().catch(() => {});
+      deps.impostazioni().then((s) => {
+        const dopo = cartelleDi(s);
+        if (dopo === prima) return;
+        prima = dopo;
+        // Una cartella tolta esce dall'indice al giro dopo, e una aggiunta si legge: lo si fa partire subito.
+        if (corsa) daRifare = true; else aggiorna().catch(() => {});
+      }).catch(() => {});
     });
   } catch (_) {}
 }
@@ -375,5 +411,5 @@ module.exports = {
   configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce,
   cartellaDiSerie, elimina, DI_SERIE, FRESCO_MS,
   // per gli unit test
-  _azzera: () => { voci = null; caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; },
+  _azzera: () => { voci = null; caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; },
 };
