@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, decidiRegole, derivatiDaAprire, doveSiLavora, leggiSmistamento, notaPerOwner, promptSmistamento, nuovaPratica, passoDalRamo, rigaChiusura, ruoloDelLavoro,
+  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, decidiRegole, derivatiDaAprire, leggiSmistamento, notaPerOwner, promptSmistamento, nuovaPratica, passoDalRamo, rigaChiusura, ruoloDelLavoro,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
@@ -24,7 +24,9 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..', '..');
 // `verdetti`: uno per verificatore lanciato ('fixed' | 'pass' | 'fail' | 'nulla' | 'fix-pending').
 // `risposte`: [regex sul comando, { code, out } | funzione] in ordine; vince la prima che combacia.
 // `filo`: il Filo dell'owner aperto (true) o chiuso, anche come funzione; il checkout principale è su main = origin/main.
-function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'fai X' })], verdetti = ['pass'], risposte = [], carichi = null, esiste = null, server = true, derived = [], opz = {}, errori = [], filo = false } = {}) {
+// `smista`: lo smistatore dei rilievi; quello finto manda in locale ciò che nomina regole o server.
+const smistaFinto = async (prompt) => JSON.stringify([...prompt.matchAll(/^Rilievo \d+:\n(.*)$/gm)].map((m) => (/rules|server/i.test(m[1]) ? 'locale' : 'non-locale')));
+function banco({ smista = smistaFinto, pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'fai X' })], verdetti = ['pass'], risposte = [], carichi = null, esiste = null, server = true, derived = [], opz = {}, errori = [], filo = false } = {}) {
   const stato = { coda: pratiche.map((p) => p.num), pratiche: Object.fromEntries(pratiche.map((p) => [p.num, p])) };
   const chiamate = [];
   const prompt = [];
@@ -101,6 +103,7 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
     },
     annota: async (id, t) => { chiamate.push({ riga: `annota ${id} ${t}` }); },
     richiestaDi: async () => 'richiesta letta',
+    smista,
   };
   const motore = creaMotore(dep, { pausaMs: 0, ...opz });
   return { motore, stato, chiamate, prompt, dormite, per, punta, dep, righe: () => chiamate.map((c) => c.riga) };
@@ -509,25 +512,25 @@ test('derivatiDaAprire: raggruppati come sul server, e mai due volte', () => {
     { level: 0, sede: 'v', text: 'vicino B' },
     { level: 1, sede: 'i', decision: true, text: 'scelta C?' },
   ];
-  const d = derivatiDaAprire(p, der);
+  const d = derivatiDaAprire(p, der, 'non-locale');
   assert.deepEqual(d.map((x) => x.titolo), ['esterno uno', 'scelta C?', 'Rilievi rimasti del lavoro locale #7']);
   assert.deepEqual(d.map((x) => x.priorita), [2, 1, 1]);
   assert.match(d[0].testo, /lavoro locale #7 \(ramo claude\/sette\)/);
   p.derivatiAperti.push({ chiave: d[0].chiave });
-  assert.equal(derivatiDaAprire(p, der).length, 2);
+  assert.equal(derivatiDaAprire(p, der, 'non-locale').length, 2);
 });
 
 test('rimasti messi da parte in due giri: il secondo feedback porta solo il nuovo, anche dopo pratiche registrate col solo gruppo', () => {
   const alfa = { level: 2, sede: 'i', text: 'riepilogo ALFA fermo' };
   const beta = { level: 2, sede: 'i', text: 'coda BETA disordinata' };
   const p = { num: 7, slug: 'sette', derivatiAperti: [] };
-  const [primo] = derivatiDaAprire(p, [alfa]);
+  const [primo] = derivatiDaAprire(p, [alfa], 'non-locale');
   p.derivatiAperti.push({ chiave: primo.chiave, chiavi: primo.chiavi });
-  const dopo = derivatiDaAprire(p, [alfa, beta]);
+  const dopo = derivatiDaAprire(p, [alfa, beta], 'non-locale');
   assert.deepEqual(dopo.map((d) => d.titolo), ['coda BETA disordinata']);
   assert.doesNotMatch(dopo[0].testo, /ALFA/);
   const vecchia = { num: 7, slug: 'sette', derivatiAperti: [{ chiave: primo.chiave }] };
-  assert.deepEqual(derivatiDaAprire(vecchia, [alfa, beta]).map((d) => d.titolo), ['coda BETA disordinata']);
+  assert.deepEqual(derivatiDaAprire(vecchia, [alfa, beta], 'non-locale').map((d) => d.titolo), ['coda BETA disordinata']);
 });
 
 test('giro intero con un rimasto messo da parte a ogni giro: ogni rilievo in un feedback solo', async () => {
@@ -909,11 +912,12 @@ test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso
       return /Z/.test(args[1]) || rete ? { code: 0, out: 'Aperto #1001' } : { code: 1, out: 'fetch failed' };
     },
   };
-  assert.equal(await apriDerivatiDi(dep, p), 1);
-  assert.equal(await apriDerivatiDi(dep, p), 1);
+  const modo = { derivati: 'non-locale' };
+  assert.equal(await apriDerivatiDi(dep, p, modo), 1);
+  assert.equal(await apriDerivatiDi(dep, p, modo), 1);
   assert.equal(p.avvisi.length, 1);
   rete = true;
-  assert.equal(await apriDerivatiDi(dep, p), 0);
+  assert.equal(await apriDerivatiDi(dep, p, modo), 0);
   assert.deepEqual(righe, ['altro lavoro Z', 'altro lavoro W', 'altro lavoro W', 'altro lavoro W']);
   assert.equal(await apriDerivatiDi(dep, p, { derivati: 'nessuno' }), 0);
 });
@@ -1250,19 +1254,11 @@ test('sforzo per ruolo come nelle routine (#1041): il primo lavoro dal suo agent
 });
 
 test('rilievi messi da parte secondo il caso (#1036): in locale solo ciò che si fa solo qui, il resto alle routine, in feedback separati', async () => {
-  assert.equal(doveSiLavora({ text: 'manca il campo nuovo in firestore.rules' }), 'locale');
-  assert.equal(doveSiLavora({ text: 'la function in filo-security non controlla il mittente' }), 'locale');
-  assert.equal(doveSiLavora({ text: 'dopo la fusione serve rideployare il server' }), 'locale');
-  assert.equal(doveSiLavora({ text: 'il pulsante in Gestione non ha l’hover' }), 'non-locale');
-  // Come la critica li scrive: a parole, senza nomi di file.
-  for (const t of ['Il server accetta la critica di un verificatore senza controllare da quale ramo arriva', 'Le regole di Firestore lasciano scrivere il campo nuovo a qualunque utente',
-    'La funzione del server che apre i feedback non controlla la priorità', 'Le regole di sicurezza del database non ammettono il campo nuovo', 'il server di Filo rifiuta la richiesta',
-    'dopo la fusione serve rideployare le functions', 'le Cloud Functions non leggono il campo']) assert.equal(doveSiLavora({ text: t }), 'locale', t);
-  for (const t of ['Nella pagina Gestione il pulsante per il deploy è tagliato in tema scuro', 'la voce Deploy del menu non ha l’hover', 'la chat si blocca quando il server di OpenRouter è lento',
-    'il mini server dei test non risponde', 'Nel menu del tasto destro la voce Copia non copia niente']) assert.equal(doveSiLavora({ text: t }), 'non-locale', t);
   const der = [{ level: 1, sede: 'i', text: 'hover mancante' }, { level: 1, sede: 'i', text: 'aggiorna storage.rules' }, { level: 2, sede: 'e', text: 'altro lavoro Z' }];
   const p = { num: 7, slug: 'sette', derivatiAperti: [] };
-  assert.deepEqual(derivatiDaAprire(p, der).map((x) => [x.titolo, x.dove]), [['altro lavoro Z', 'non-locale'], ['hover mancante', 'non-locale'], ['aggiorna storage.rules', 'locale']]);
+  const giudizio = (f) => (/rules/.test(f.text) ? 'locale' : 'non-locale');
+  assert.deepEqual(derivatiDaAprire(p, der, 'auto', giudizio).map((x) => [x.titolo, x.dove]), [['altro lavoro Z', 'non-locale'], ['hover mancante', 'non-locale'], ['aggiorna storage.rules', 'locale']]);
+  assert.deepEqual(derivatiDaAprire(p, der), [], 'senza giudizio non si apre niente');
   assert.deepEqual(derivatiDaAprire(p, der, 'locale').map((x) => x.dove), ['locale', 'locale']);
 
   const b = banco({ server: false, derived: der.slice(0, 2) });
@@ -1272,6 +1268,45 @@ test('rilievi messi da parte secondo il caso (#1036): in locale solo ciò che si
   assert.match(aperti[1].input, /storage\.rules/);
   assert.deepEqual(fine.derivatiAperti.map((d) => d.dove), ['non-locale', 'locale']);
   assert.match(rigaStato(fine), /#1001, #1001 \(locale\)/);
+});
+
+test('dopo la fusione, con lo smistamento al limite d’uso, il worktree resta finché i rilievi non sono aperti dalla parte giusta (#1036)', async () => {
+  const der = [{ level: 1, sede: 'e', text: 'la raccolta degli inviti si scrive da anonimi' }, { level: 1, sede: 'e', text: 'il pulsante resta cliccabile' }];
+  const epoca = Math.floor(Date.parse('2026-10-07T10:00:00Z') / 1000);
+  let risposte = 0;
+  const smista = async () => { risposte += 1; if (risposte < 3) throw new Error(`Claude AI usage limit reached|${epoca}`); return '["locale","non-locale"]'; };
+  const b = banco({ server: false, derived: der, smista });
+  const fine = (await b.motore.avvia()).pratiche[7];
+  assert.equal(fine.fase, 'fuso', JSON.stringify(fine.fermo));
+  const r = b.righe();
+  const aperti = b.chiamate.filter((c) => /claude-feedback/.test(c.riga)).map((c) => / --(non-locale|locale) /.exec(c.riga)[1]);
+  assert.deepEqual(aperti, ['non-locale', 'locale']);
+  assert.ok(indice(r, /claude-feedback/) < indice(r, /worktree remove/), r.join('\n'));
+  assert.ok(b.dormite.includes(3 * 86400_000 + 60_000), `attesa fino al reset: ${b.dormite}`);
+  assert.equal(fine.attesa, '');
+  assert.equal((fine.avvisi || []).filter((a) => /smistamento non ha risposto/.test(a)).length, 0);
+});
+
+test('smetti durante l’attesa dello smistamento dopo la fusione: il worktree e il registro restano, il prossimo avvia rifà il passo (#1036)', async () => {
+  const der = [{ level: 1, sede: 'e', text: 'la raccolta degli inviti si scrive da anonimi' }];
+  let b;
+  const smista = async () => {
+    if (b.righe().some((r) => /finish-local/.test(r))) b.motore.smetti('calma');
+    throw new Error('Claude AI usage limit reached');
+  };
+  b = banco({ server: false, derived: der, smista });
+  const fine = (await b.motore.avvia()).pratiche[7];
+  assert.equal(fine.fase, 'chiusura');
+  assert.ok(fine.interrotto, JSON.stringify(fine));
+  assert.equal(b.chiamate.filter((c) => /claude-feedback|worktree remove/.test(c.riga)).length, 0, b.righe().join('\n'));
+  assert.ok(fine.fusa.app);
+  b.dep.smista = async () => '["locale"]';
+  const dopo = (await creaMotore(b.dep, { pausaMs: 0 }).avvia()).pratiche[7];
+  assert.equal(dopo.fase, 'fuso', JSON.stringify(dopo.fermo));
+  const r = b.righe();
+  assert.match(r[indice(r, /claude-feedback/)], / --locale /);
+  assert.ok(indice(r, /claude-feedback/) < indice(r, /worktree remove/), r.join('\n'));
+  assert.equal(r.filter((x) => /finish-local/.test(x)).length, 1, 'la fusione non si rifà');
 });
 
 test('nota per l’owner sulla pratica: cosa è successo e cosa deve fare, in chiaro', () => {
@@ -1382,13 +1417,11 @@ test('avvia ascolta smetti da un altro terminale e i Ctrl-C del suo: prima con c
   assert.equal(segnali.listenerCount('SIGINT'), 0);
 });
 
-test('smistamento a giudizio (#1036): dove si lavora un rilievo lo decide la risposta, una volta sola; senza risposta le parole, con un avviso', async () => {
-  // Due rilievi che le parole metterebbero dalla parte sbagliata: il giudizio li rimette a posto.
+test('smistamento a giudizio (#1036): dove si lavora un rilievo lo decide la risposta, una volta sola; senza risposta il rilievo aspetta', async () => {
   const derived = [
     { level: 1, sede: 'e', text: 'La funzione che fonde i rami accetta un’approvazione scaduta da una settimana' },
     { level: 1, sede: 'e', text: 'Dopo il deploy di una nuova versione il changelog nella home non si aggiorna' },
   ];
-  assert.deepEqual(derived.map((f) => doveSiLavora(f)), ['non-locale', 'locale']);
   const p = nuovaPratica({ num: 7, slug: 'sette' });
   const aperti = [];
   const domande = [];
@@ -1408,19 +1441,25 @@ test('smistamento a giudizio (#1036): dove si lavora un rilievo lo decide la ris
   assert.equal(await apriDerivatiDi(dep, p), 1);
   assert.equal(domande.length, 1);
   assert.deepEqual(aperti[2], [derived[1].text, '--non-locale']);
-  assert.equal((p.avvisi || []).filter((a) => /smistati a parole/.test(a)).length, 0);
+  assert.equal((p.avvisi || []).filter((a) => /smistamento non ha risposto/.test(a)).length, 0);
 
-  // Senza risposta leggibile, o con lo smistamento che si rompe: le parole, un avviso solo, e si richiede al passo dopo.
-  for (const rotto of [async () => 'non so', async () => '["locale"]', async () => '["forse","locale"]', async () => { throw new Error('Not logged in'); }]) {
+  // Senza risposta leggibile, con lo smistamento che si rompe o senza Claude: nessun feedback, un avviso solo, e si richiede al passo dopo.
+  for (const rotto of [async () => 'non so', async () => '["locale"]', async () => '["forse","locale"]', async () => { throw new Error('Not logged in'); }, null]) {
     const q = nuovaPratica({ num: 8, slug: 'otto' });
     const righe = [];
     let chieste = 0;
-    const d2 = { ...dep, smista: async (x) => { chieste += 1; return rotto(x); }, esegui: async (cmd, args) => { righe.push(args[3]); return { code: 1, out: 'fetch failed' }; } };
-    await apriDerivatiDi(d2, q);
-    await apriDerivatiDi(d2, q);
-    assert.deepEqual(righe, ['--non-locale', '--locale', '--non-locale', '--locale']);
-    assert.equal(chieste, 2);
-    assert.equal(q.avvisi.filter((a) => /smistati a parole/.test(a)).length, 1);
+    const d2 = { ...dep, smista: rotto && (async (x) => { chieste += 1; return rotto(x); }), esegui: async (cmd, args) => { righe.push(args[3]); return { code: 0, out: 'Aperto #1002' }; } };
+    assert.equal(await apriDerivatiDi(d2, q), 2);
+    assert.equal(await apriDerivatiDi(d2, q), 2);
+    assert.deepEqual(righe, []);
+    assert.equal(chieste, rotto ? 2 : 0);
+    assert.equal(q.daSmistare, 2);
+    assert.equal(q.avvisi.filter((a) => /smistamento non ha risposto/.test(a)).length, 1, q.avvisi.join('\n'));
+    // Quando lo smistamento risponde, i rilievi si aprono dalla parte giusta e l'avviso se ne va.
+    d2.smista = async () => '["locale","non-locale"]';
+    assert.equal(await apriDerivatiDi(d2, q), 0);
+    assert.deepEqual(righe, ['--non-locale', '--locale']);
+    assert.equal(q.avvisi.filter((a) => /smistamento non ha risposto/.test(a)).length, 0);
   }
 
   // Con un modo scelto a mano non si chiede niente.
@@ -1430,15 +1469,11 @@ test('smistamento a giudizio (#1036): dove si lavora un rilievo lo decide la ris
   assert.equal(chiesto, false);
 });
 
-test('smistamento a giudizio: la risposta si legge solo se è un elenco giusto, e il ripiego tiene l’interfaccia dalla parte dell’app', () => {
+test('smistamento a giudizio: la risposta si legge solo se è un elenco giusto', () => {
   assert.deepEqual(leggiSmistamento('["non-locale","locale"]', 2), ['non-locale', 'locale']);
   assert.deepEqual(leggiSmistamento('Risposta:\n```json\n["locale"]\n```', 1), ['locale']);
   for (const [t, n] of [['', 1], ['["locale"]', 2], ['["Locale"]', 1], ['[locale]', 1], [null, 1], ['{"a":1}', 1]]) assert.equal(leggiSmistamento(t, n), null, String(t));
   const prompt = promptSmistamento(['primo «rilievo»', 'secondo']);
   assert.match(prompt, /array JSON di 2 stringhe/);
   assert.match(prompt, /Rilievo 1:\nprimo «rilievo»[\s\S]*Rilievo 2:\nsecondo/);
-  for (const t of ['La regola di Firestore sul campo crediti lascia scrivere chiunque', 'Chiunque può leggere da Firestore i feedback degli altri utenti',
-    'Su Firebase i dati di un utente restano dopo la cancellazione dell’account', 'I server di Filo non controllano la firma della critica']) assert.equal(doveSiLavora({ text: t }), 'locale', t);
-  for (const t of ['Il messaggio di errore quando il server non risponde è in inglese', 'La pagina Gestione mostra «errore del server» quando cade la rete',
-    'In Gestione la colonna con lo stato delle Cloud Functions esce dallo schermo a finestra stretta']) assert.equal(doveSiLavora({ text: t }), 'non-locale', t);
 });
