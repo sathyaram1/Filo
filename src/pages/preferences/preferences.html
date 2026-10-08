@@ -17,6 +17,7 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/autonomia.js"></script>
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
@@ -57,6 +58,13 @@
     .mem-riga:hover .mem-via, .mem-via:focus-visible { opacity: 0.85; }
     .mem-via:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.18)); color: var(--sn-error); }
     .mem-via:disabled { cursor: default; opacity: 0.2; }
+    /* Ricerca nei documenti (#947): cartelle come righe della memoria; quelle di serie tolte restano sbiadite. */
+    .doc-dove { display: block; font-size: 12px; color: var(--sn-muted); overflow-wrap: anywhere; }
+    .doc-tolta .mem-testo { opacity: 0.55; }
+    .doc-dove.doc-negata { color: var(--sn-error); }
+    .doc-rimetti { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 13px; padding: 2px 8px; border-radius: 6px; opacity: 0.6; transition: opacity 0.15s ease, background 0.15s ease; }
+    .doc-rimetti:hover, .doc-rimetti:focus-visible { opacity: 1; background: var(--sn-hover, rgba(127, 127, 127, 0.18)); }
+    .doc-piede { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -180,6 +188,13 @@
       <p id="agentStyleNote" class="agent-style-note" aria-live="polite" hidden></p>
     </section>
 
+    <section id="autonomia">
+      <h2 id="autonomiaTitolo">Autonomia di Filo</h2>
+      <p class="sn-muted">Filo fa da solo quello che può disfare. Quando legge cose scritte da altri, fa meno. Tu scegli con un livello quanto si fida.</p>
+      <div class="sn-cookie-modes" id="autonomiaLivelli" role="radiogroup" aria-labelledby="autonomiaTitolo"></div>
+      <span id="autonomiaHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+    </section>
+
     <section>
       <h2>Memoria di Filo</h2>
       <p class="sn-muted">Quello che Filo ha imparato su di te mentre parlavate. Entra in ogni conversazione: se una riga non ti torna, toglila.</p>
@@ -253,6 +268,11 @@
         <select id="notifSound"></select>
         <button type="button" class="sn-btn sn-btn-secondary" id="notifSoundPreview">Prova</button>
       </div>
+      <label for="notifSoundVolume" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Volume</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <input type="range" id="notifSoundVolume" min="0" max="100" step="5" style="width:220px;" />
+        <span id="notifSoundVolumeVal" class="sn-muted"></span>
+      </div>
     </section>
 
     <section>
@@ -267,6 +287,11 @@
           <option value="chime">Carillon</option>
         </select>
         <button type="button" class="sn-btn sn-btn-secondary" id="timerRingtonePreview">Prova</button>
+      </div>
+      <label for="timerRingtoneVolume" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Volume</label>
+      <div class="sn-row" style="align-items:center;gap:10px;">
+        <input type="range" id="timerRingtoneVolume" min="0" max="100" step="5" style="width:220px;" />
+        <span id="timerRingtoneVolumeVal" class="sn-muted"></span>
       </div>
     </section>
 
@@ -300,9 +325,41 @@
       </div>
     </section>
 
+    <section id="sec-documenti">
+      <h2>Ricerca nei documenti</h2>
+      <p class="sn-muted">Chiedi a Filo un tuo documento a parole, come «la bolletta della luce di marzo»: lo cerca in queste cartelle leggendone il testo, anche se il file si chiama «scan_00231.pdf». Il testo resta sul computer, e a un modello arrivano solo i pochi documenti candidati di una ricerca.</p>
+      <div id="documentiCartelle" class="mem-box"></div>
+      <div class="doc-piede">
+        <button type="button" class="sn-btn sn-btn-secondary" id="documentiAggiungi">Aggiungi una cartella</button>
+        <span id="documentiStato" class="sn-muted" aria-live="polite"></span>
+      </div>
+      <span id="documentiHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+    </section>
+
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">
       <h2>Impostazioni avanzate</h2>
       <p class="sn-muted">Qui puoi modificare ogni aspetto estetico di Filo. Ricorda però che puoi sempre chiedere a Filo di fare le modifiche, se non ti va di cercare l'impostazione giusta.</p>
+
+      <section id="sec-barra">
+        <h2>Barra laterale</h2>
+        <p class="sn-muted">La barra che si apre dal bordo sinistro con indietro, avanti, ricarica e home. Resta sempre raggiungibile dalla linguetta a sinistra delle schede e con la scorciatoia.</p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="barraSpinta" />
+            <span>Aprila quando il mouse si ferma contro il bordo sinistro</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="barraStriscia" />
+            <span>Mostra la striscia sottile sul bordo sinistro</span>
+          </label>
+        </div>
+        <label for="barraAttesa" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Attesa sul bordo prima che si apra (millisecondi, da 100 a 3000)</label>
+        <input type="number" id="barraAttesa" min="100" max="3000" step="50" style="width:120px;" />
+        <label for="barraUscita" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dopo quanto si chiude quando il mouse esce (millisecondi, da 100 a 5000)</label>
+        <input type="number" id="barraUscita" min="100" max="5000" step="50" style="width:120px;" />
+      </section>
 
       <section id="sec-tokens">
         <h2>Aspetto: token estetici</h2>
@@ -326,12 +383,21 @@
 
       <section id="sec-aggiornamenti">
         <h2>Aggiornamenti</h2>
-        <p class="sn-muted">A ogni avvio Filo controlla se c'è una versione nuova, la scarica e la installa quando lo chiudi. Se togli la spunta ti avvisa nella home e aspetta che premi «Installa». Fino ad allora restano aperti anche i problemi di sicurezza già corretti nella versione nuova.</p>
+        <p class="sn-muted">A ogni avvio Filo controlla se c'è una versione nuova, la scarica e la installa. Se togli la spunta ti avvisa nella home e aspetta che premi «Installa». Fino ad allora restano aperti anche i problemi di sicurezza già corretti nella versione nuova.</p>
         <div class="sn-toggle-row">
           <label>
             <input type="checkbox" id="aggiornamentiAutomatici" />
             <span>Installa gli aggiornamenti da solo</span>
           </label>
+        </div>
+        <!-- Solo su Windows: su Mac e Linux all'apertura non si installa niente (src/main/aggiornamentoRegole.js). -->
+        <div id="aggiornamentiQuando" hidden>
+          <p class="sn-muted" style="margin-top:12px;">Installata alla chiusura non si vede: se riapri Filo in quei dieci secondi, Windows dice che il collegamento non funziona.</p>
+          <label for="aggiornamentiInstalla" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Quando installarla</label>
+          <select id="aggiornamentiInstalla">
+            <option value="avvio">La prossima volta che apro Filo, con la barra di avanzamento</option>
+            <option value="chiusura">In silenzio, quando chiudo Filo</option>
+          </select>
         </div>
       </section>
 

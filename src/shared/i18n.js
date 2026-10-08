@@ -168,7 +168,6 @@
     edit_box_copy_new: 'Copia la nuova',
     edit_box_cancel: 'Annulla',
     edit_box_loading: 'Sto pensando…',
-    edit_box_error: 'Errore nella generazione',
     edit_box_replaced: 'Testo sostituito',
 
     // Coming soon
@@ -256,6 +255,11 @@
     toast_clipboard_empty: 'Cronologia appunti vuota',
     toast_open_weights_violated:
       'Hai scelto solo modelli a pesi aperti, ma questa risposta è arrivata da «%s», che è escluso. Segnalalo: la lista di esclusione va aggiornata.',
+    // Il tetto per scheda sulle chiamate automatiche (#1070): il numero è quello del tetto.
+    toast_tetto_spiegazioni:
+      'Da questa pagina sono partite più di %s spiegazioni automatiche in un minuto. Le fermo per un minuto, col tasto destro funzionano sempre.',
+    toast_tetto_correttore:
+      'Da questa pagina sono partiti più di %s controlli del correttore in un minuto. Li fermo per un minuto, col tasto destro le correzioni funzionano sempre.',
     toast_pasted_image: 'Immagine incollata',
     toast_image_saved: 'Immagine salvata',
     toast_image_save_failed: 'Non sono riuscito a salvare l\'immagine',

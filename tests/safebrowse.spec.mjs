@@ -16,6 +16,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -210,6 +211,26 @@ test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo"
   expect((await copertura(app)).coperta).toBe(false);
   await page.locator('#campo').fill('ok');
   await expect(page.locator('#campo')).toHaveValue('ok');
+});
+
+// #871 — la barra laterale resta raggiungibile sopra l'avviso: Indietro serve proprio lì.
+test('interstitial "pericoloso": la barra laterale sta sopra l\'avviso e si apre', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-paypa1.com/login': MODULO }, { gsbListed: true });
+  await apriSenzaAspettare(app, shell, 'https://conto-paypa1.com/login');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 6_000 });
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+  const ordine = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const figli = w.contentView.children;
+    return figli.indexOf(w._filoTabs.barra.vista) > figli.indexOf(w._filoTabs.avvisoSito.vista);
+  });
+  await expect.poll(ordine).toBe(true);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  expect(await ordine()).toBe(true);
+  await expect(barra.locator('#nav .ico[data-id="back"]')).toBeVisible();
 });
 
 test('interstitial "pericoloso": "Torna indietro" su scheda NUOVA esce SENZA confermare il sito (#288)', async ({ app, shell }) => {

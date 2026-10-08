@@ -11,6 +11,36 @@
   // Stack di popup aperti. L'ultimo è il topmost.
   const popups = [];
 
+  // Un errore dell'AI detto all'utente, dalla risposta dell'IPC (`error`) o
+  // dello stream (`message`). La regola sta in SN_CHAT_ERRORS, una volta sola:
+  // ricomporla qui faceva arrivare la riga grezza del servizio (#663).
+  function frasePerLUtente(res) {
+    const generico = I18n.t('err_provider_failed');
+    const CE = global.SN_CHAT_ERRORS;
+    if (!CE) return (res && (res.error || res.message)) || generico;
+    const r = { ...(res || {}) };
+    if (!r.error && r.message) r.error = r.message;
+    return CE.sentence(CE.fromResponse(r, generico));
+  }
+
+  // Il tasto che toglie l'ostacolo, sotto la frase che lo nomina. Su una pagina
+  // web «riscattalo nella pagina Crediti» è un'indicazione senza strada: da lì
+  // l'utente a quella pagina non sa arrivare (#663).
+  function mostraRimedio(host, res) {
+    const CE = global.SN_CHAT_ERRORS;
+    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(res) : null;
+    if (!host || !pagina) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-msg-rimedio';
+    btn.textContent = pagina.label;
+    btn.addEventListener('click', () => {
+      try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
+    });
+    host.appendChild(btn);
+    return btn;
+  }
+
   // z-index iniziale e step per stacking deterministico
   const Z_BASE = 2147483600;
   const Z_STEP = 1;
@@ -1125,9 +1155,12 @@
         popup.activePort = null;
       } else if (m.type === 'error') {
         // L'errore va LETTO: è l'unica cosa rimasta da leggere, la vista ci va.
+        // E va letto in italiano: la riga grezza del servizio («OpenRouter 402:
+        // {…}») non dice niente a chi ha finito i crediti (#663).
         scrollaConservando(popup, () => {
-          bubble.text.textContent = m.message || I18n.t('err_provider_failed');
+          bubble.text.textContent = frasePerLUtente(m);
           bubble.wrap.classList.add('sn-msg-error');
+          mostraRimedio(bubble.text, m);
         }, true);
         popup.activePort = null;
       }
@@ -1365,6 +1398,8 @@
     registerStack,
     apriCollegamento,
     scaricaCollegamento,
+    frasePerLUtente,
+    mostraRimedio,
     // C'è un riquadro aperto adesso? Lo chiede content.js per decidere di chi
     // è l'Esc quando si è a tutto schermo (#514).
     hasOpen: () => popups.length > 0,
