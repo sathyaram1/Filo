@@ -312,6 +312,8 @@ function anniChiesti(idee) {
 // Quanto è recente un documento, in mesi: la fine del periodo che dichiara per il mese chiesto (o di uno qualsiasi), se
 // no la data del file. Serve solo fra punteggi pari, entro PARI l'uno dall'altro.
 const PARI = 0.02;
+// Un candidato sotto un quarto del punteggio del migliore non arriva al modello.
+const VICINI = 0.25;
 function recenza({ d, periodi: per }, idee) {
   const mesi = idee.filter((x) => x.mese >= 0).map((x) => x.mese);
   const anni = anniChiesti(idee);
