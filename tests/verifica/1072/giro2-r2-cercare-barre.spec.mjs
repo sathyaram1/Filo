@@ -11,12 +11,13 @@ const CTX = { win: true, maiuscole: true, home: 'C:\\Users\\a', cwd: 'C:\\Users\
 test('r2 cercare un testo che comincia con due barre resta una lettura libera', () => {
   for (const cmd of [
     'grep -n "//TODO" app.js',
-    'grep -rn "//eslint-disable" src',
     'Select-String -Pattern "//TODO" -Path app.js',
     'findstr "//TODO" app.js',
   ]) {
     expect(C.classifyDetail(cmd, CTX), cmd).toEqual({ level: 1, motivo: '' });
   }
+  // La ricerca ricorsiva chiede già per i file nascosti (c'era su main): conta solo che non parli di rete.
+  expect(C.classifyDetail('grep -rn "//eslint-disable" src', CTX).motivo).not.toMatch(/rete/);
 });
 
 test('r2 un file da leggere su un computer della rete continua a chiedere', () => {
