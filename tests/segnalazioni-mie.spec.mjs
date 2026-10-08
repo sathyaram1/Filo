@@ -10,6 +10,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BACHECA = 'filo://board/board.html';
@@ -362,7 +363,7 @@ async function avvia(userData) {
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   return { app, shell };
 }

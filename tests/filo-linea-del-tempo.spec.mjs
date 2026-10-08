@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
@@ -24,7 +25,7 @@ async function avvia(userData) {
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   return { app, shell };
 }

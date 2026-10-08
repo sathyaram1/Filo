@@ -18,6 +18,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -90,7 +91,7 @@ test('pagina Sicurezza: il bottone "Esporta dati" salva uno zip con i dati', asy
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: p });
     }, outPath);
 
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://security/'));
 

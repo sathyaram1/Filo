@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
 import { chiudiApp } from './fixtures/electron.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -156,7 +157,7 @@ async function avvia() {
     cwd: APP_ROOT,
     env: { ...process.env, PATH: join(userData, 'bin-finto') + delimiter + process.env.PATH, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  shell = await app.firstWindow();
+  shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
 }
 test.afterEach(async () => {
