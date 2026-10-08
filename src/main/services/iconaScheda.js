@@ -20,7 +20,7 @@ const FIRME = [
 ];
 
 // Radice <svg> dopo dichiarazione, commenti e doctype: una pagina 404 con dentro un'icona svg non è un'icona.
-const RADICE_SVG = /^﻿?\s*(<\?xml[^>]*\?>\s*)?((<!--[\s\S]*?-->|<!DOCTYPE[^>[]*(\[[\s\S]*?\])?\s*>)\s*)*<svg[\s>]/i;
+const RADICE_SVG = /^\uFEFF?\s*(<\?xml[^>]*\?>\s*)?((<!--[\s\S]*?-->|<!DOCTYPE[^>[]*(\[[\s\S]*?\])?\s*>)\s*)*<svg[\s>]/i;
 
 // Il tipo lo dicono i byte, non l'intestazione del server né il data: URL della pagina.
 function tipoImmagine(buf) {
