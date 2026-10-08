@@ -1019,7 +1019,12 @@ export function verdettoDelRamo(ramo, { radice = ROOT, cartellaServer } = {}) {
   const opz = { root: d, entry, cartellaServer, fetch: true };
   const v = checkVerdict(entry, head, qui && isDirty(d), diff, serverDelRamo(ramo, opz));
   const origine = v.ok ? serverDelRamo(ramo, { ...opz, fetch: false, punta: 'origine' }) : null;
+  const verificato = (v.server && v.server.sha) || '';
   if (origine && origine.sha && origine.sha !== origine.locale) {
+    // Origin indietro rispetto allo sha verificato è un push mancato, non un ramo mosso: server:fondi spinge lui lo sha verificato.
+    if (verificato && tryGit(['merge-base', '--is-ancestor', origine.sha, verificato], origine.radice).ok) {
+      return { cartella: d, entry, ...v, reason: `${v.reason}; su origin il ramo del server è ancora a ${origine.sha.slice(0, 8)}, indietro: porto io lo sha verificato` };
+    }
     const o = checkVerdict(entry, head, qui && isDirty(d), diff, origine);
     if (!o.ok) return { cartella: d, entry, ...o, reason: `su origin: ${o.reason}` };
   }
