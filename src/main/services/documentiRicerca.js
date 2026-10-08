@@ -386,6 +386,10 @@ function ordina(documenti, richiesta, { limite = 8 } = {}) {
     risultati.push({ id: docs[i].d.id, punteggio, trovati, copertura, primo: primo ? primo.r.forma : '', recente: recenza(docs[i], idee) });
   });
   risultati.sort((a, b) => b.punteggio - a.punteggio);
+  // Al modello vanno solo i candidati necessari: chi resta lontano dal migliore ha in comune con la richiesta una parola
+  // sola (il mese per la busta paga, «luce» nella lista della spesa), e il suo testo non serve a scegliere.
+  const soglia = risultati.length ? risultati[0].punteggio * VICINI : 0;
+  const vicini = risultati.filter((r) => r.punteggio >= soglia);
   // A parità (le bollette di marzo di tre anni, scritte allo stesso modo) viene prima la più recente: chi chiede «la
   // bolletta di marzo» vuole l'ultima, non quella che l'indice ha letto per prima.
   const ordinati = [];
