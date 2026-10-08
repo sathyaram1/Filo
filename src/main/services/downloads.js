@@ -519,7 +519,6 @@ const stessoPercorso = (a, b) => (process.platform === 'win32' || process.platfo
 // #950 — un file dell'elenco cambiato di nome da Filo (da qualunque strada): la voce lo segue, invece di
 // dichiararlo sparito, e ricorda il nome di arrivo per poterlo rimettere.
 function rinominato(da, a) {
-  try { require('./documentiIndice').segnaCambiato(); } catch (_) {}
   let toccati = 0;
   for (const rec of records.values()) {
     if (!rec.savePath || !stessoPercorso(rec.savePath, da)) continue;
