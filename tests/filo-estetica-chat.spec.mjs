@@ -16,6 +16,7 @@
 // compare, il picker scrive il nuovo valore), non l'assenza di un errore.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -60,8 +61,10 @@ test('un valore di token non valido non scrive nulla', async ({ app }) => {
   expect(settings.themeTokens && settings.themeTokens.accent).toBeUndefined();
 });
 
-test('testo ≈ sfondo → livello 2: conferma prima di applicare, poi applica', async ({ app }) => {
+test('testo ≈ sfondo → costo 2: a Conservativo conferma prima di applicare, poi applica', async ({ app }) => {
   await waitForBoot(app);
+  // A Normale un compito pulito lo applicherebbe da solo: l'ha chiesto l'utente (#530).
+  await livelloAutonomia(app, 'conservativo');
   // Sfondo personalizzato indipendente dal tema, così l'illeggibilità non
   // dipende dal tema risolto in headless.
   await app.evaluate(async () => {
@@ -276,4 +279,63 @@ test('cinque colori cambiati insieme: cinque bottoni, ognuno col suo nome', asyn
   // Il bottone «Barra in alto» apre il box di QUEL token, non di un altro.
   await triggers.filter({ hasText: 'Barra in alto' }).click();
   await expect(page.locator('.sn-refine-title')).toHaveText('Regola: Barra in alto', { timeout: 8_000 });
+});
+
+// Il box fotografa TUTTI i token quando si apre e la mappa si salva intera: se
+// nel frattempo un altro colore cambia da un'altra parte, riscrivere la
+// fotografia lo cancellava invece di lasciarlo (#667).
+test('il box salva il suo token soltanto: gli altri colori cambiati nel frattempo restano', async ({ shell, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
+
+  // Filo applica il verde davvero (come farebbe rispondendo in chat) e la
+  // risposta stubbata porta l'azione da cui nasce il bottone del box.
+  await shell.evaluate(() => window.filoShell.message({
+    type: window.SN_MSG.MSG.FILO_RUN_ACTION,
+    action: { type: 'IMPOSTA_ESTETICA', token: 'button.bg', valore: '#3a7d44' },
+  }));
+  await page.evaluate(() => {
+    const { MSG } = window.SN_MSG;
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, cb) => {
+      if (msg && msg.type === MSG.FILO_CHAT) {
+        cb && cb({
+          ok: true,
+          text: 'Fatto, ho reso i bottoni verdi.',
+          actions: [{ type: 'IMPOSTA_ESTETICA', token: 'button.bg', valore: '#3a7d44' }],
+        });
+        return;
+      }
+      return orig(msg, cb);
+    };
+  });
+  await page.locator('#input').fill('rendi i bottoni verdi');
+  await page.locator('#sendBtn').click();
+  await page.locator('.sn-refine-trigger').click();
+  await expect(page.locator('.sn-refine-overlay')).toBeVisible({ timeout: 8_000 });
+
+  const salvati = () => page.evaluate(async () => {
+    const r = await chrome.storage.local.get('settings');
+    return ((r && r.settings) || {}).themeTokens || {};
+  });
+
+  // Col box aperto, un altro token cambia da fuori.
+  await shell.evaluate(() => window.filoShell.message({
+    type: window.SN_MSG.MSG.FILO_RUN_ACTION,
+    action: { type: 'IMPOSTA_ESTETICA', token: 'accent', valore: '#ff0000' },
+  }));
+  await expect.poll(async () => (await salvati()).accent, { timeout: 8_000 }).toBe('#ff0000');
+
+  await page.evaluate(() => {
+    const inp = document.querySelector('.sn-refine-color');
+    inp.value = '#112233';
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect.poll(async () => (await salvati())['button.bg'], { timeout: 8_000 }).toBe('#112233');
+  expect((await salvati()).accent, 'il colore cambiato nel frattempo resta').toBe('#ff0000');
+
+  // Anche «Annulla» rimette a posto il suo token soltanto.
+  await page.locator('.sn-refine-cancel').click();
+  await expect.poll(async () => (await salvati())['button.bg'], { timeout: 8_000 }).toBe('#3a7d44');
+  expect((await salvati()).accent, 'e non tocca gli altri').toBe('#ff0000');
 });

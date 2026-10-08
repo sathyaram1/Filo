@@ -24,6 +24,8 @@ require(path.join(SHARED, 'i18n.js'));
 // Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd):
 // serve a chiunque disegni un'etichetta, quindi sta in alto.
 require(path.join(SHARED, 'tasti.js'));
+// Dove sta ogni icona globale (riga, «Altro…», barra laterale): la legge la barra, la scrive il main.
+require(path.join(SHARED, 'disposizioneIcone.js'));
 // "Il cursore è in un campo di testo?": la regola che decide se Ctrl/Cmd+Z
 // annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine
 // (src/main/menu.js), i content script la chiamano direttamente.
@@ -93,6 +95,8 @@ require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei ma
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
 require(path.join(SHARED, 'provenienzaImmagine.js'));
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
+// #530 — la regola «Filo può fare X?» come dati: prima del registro, che le passa gli ingressi.
+require(path.join(SHARED, 'autonomia.js'));
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
 require(path.join(SHARED, 'pageRestyle.js'));

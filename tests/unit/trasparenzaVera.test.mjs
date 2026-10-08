@@ -84,7 +84,7 @@ test('l\'Aiuto chiede al server i percorsi del sito, e il documento sulla privac
 });
 
 test('cancellare le pagine visitate chiede solo un OK, e il documento sulla sicurezza lo dice', () => {
-  const soloOk = /CANCELLA_PAGINE:\s*\{\s*level:\s*2\b/.test(leggi('src', 'shared', 'actionLevels.js'));
+  const soloOk = /CANCELLA_PAGINE:\s*\{\s*costo:\s*3\b/.test(leggi('src', 'shared', 'actionLevels.js'));
   legame(soloOk, sicurezza, 'Le pagine visitate si cancellano con un OK', 'cronologia cancellata con un OK');
 });
 

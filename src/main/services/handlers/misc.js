@@ -41,7 +41,9 @@ async function fetchToFile({ url, referrer, session, kind = 'image', onHeaders, 
   let target = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     // eslint-disable-next-line no-await-in-loop
-    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders, onProgress, shouldStop });
+    const servito = target;
+    const conIndirizzo = onHeaders && ((h) => onHeaders({ ...h, servito }));
+    const res = await httpGetToFile(target, referrer, session, kind, { onHeaders: conIndirizzo, onProgress, shouldStop });
     if (res.redirect) {
       try { target = new URL(res.location, target).href; } catch (_) { throw new Error('redirect non valido'); }
       if (!/^https?:/i.test(target)) throw new Error('redirect non http');
@@ -407,13 +409,13 @@ module.exports = function register(on, ctx) {
         kind,
         // Arrivati gli header sappiamo nome e peso: da qui in poi il
         // salvataggio non è più cieco.
-        onHeaders: ({ filename, totalBytes }) => {
+        onHeaders: ({ filename, totalBytes, servito }) => {
           // Nome file sicuro: preferisci il Content-Disposition del server, poi
           // il path dell'URL; neutralizza separatori e tentativi di traversal.
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
-          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win) });
+          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win), servedFrom: servito });
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
           askDest = () => pickDestination(name).then((d) => {

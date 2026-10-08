@@ -83,6 +83,7 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
+import { fetchRitentato } from './lib/rete.mjs';
 import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
 import { PARTI, RAMO_RE, partiDaCampi } from './lib/parti-lavoro.mjs';
 import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
@@ -171,7 +172,7 @@ export async function segnaPreapprovazione(id, valore, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true, segno };
 }
@@ -283,7 +284,7 @@ export async function segnaLocale(id, valore, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   if (!chiusa) return { ok: true, segno, tieneScheda };
   // Tolto da una pratica chiusa: la scheda la rimette l'app dell'owner alla prossima sincronizzazione della bacheca.
@@ -294,7 +295,7 @@ export async function segnaLocale(id, valore, opts = {}) {
 
 /** Un lavoro locale non sta nella bacheca pubblica: la sua scheda si toglie. '' se fatto (o non c'era), sennò il motivo. */
 async function togliScheda(id, bearer) {
-  const res = await fetch(`${FIRESTORE_BASE}/feedback-public/${encodeURIComponent(id)}`, {
+  const res = await fetchRitentato(`${FIRESTORE_BASE}/feedback-public/${encodeURIComponent(id)}`, {
     method: 'DELETE', headers: { Authorization: `Bearer ${bearer}` },
   });
   return res.ok || res.status === 404 ? '' : `la scheda nella bacheca pubblica è rimasta (${res.status})`;
@@ -455,7 +456,7 @@ export async function scriviFrase(id, frase, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true };
 }
@@ -494,7 +495,7 @@ export async function registraParte(id, parte, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true, at };
 }
@@ -563,7 +564,7 @@ function packageVersion() {
 async function getDoc(id, bearer, campi = null) {
   const maschera = (Array.isArray(campi) && campi.length)
     ? `?${campi.map((f) => `mask.fieldPaths=${encodeURIComponent(f)}`).join('&')}` : '';
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}${maschera}`, {
+  const res = await fetchRitentato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}${maschera}`, {
     headers: { Authorization: `Bearer ${bearer}` },
   });
   if (res.status === 404) return null;
@@ -726,7 +727,7 @@ export async function scrivi(id, to, nota, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true, from, to };
 }

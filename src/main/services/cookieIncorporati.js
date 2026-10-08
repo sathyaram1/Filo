@@ -6,6 +6,7 @@
 
 const { session } = require('electron');
 const R = require('./cookieIncorporatiRegole');
+const Sito = require('./stessoSito');
 require('../../shared/authPopup');
 
 // «Qualche minuto» dopo l'ultima scheda che ospitava il riquadro: chi riapre l'articolo un attimo dopo non perde
@@ -44,8 +45,8 @@ const inArrivo = new Map();
 const partizionati = new Map();
 
 let modo = 'default';
-let fidati = new Set();
-let accessi = new Set();
+let fidati = new Sito.ElencoSiti();
+let accessi = new Sito.ElencoSiti();
 // Servizi a cui l'utente ha riattivato i cookie dal riquadro rotto (#760): si trattano come quelli con accesso.
 let riattivati = new Set();
 let agganciata = null;
@@ -61,7 +62,7 @@ function sitoDi(url) {
 // Mentre si sta guardando un accesso a un sito (la sua pagina di accesso è aperta, o la finestrella «Continua
 // con…»), i suoi cookie non si toccano: declassare quelli del giro di accesso lo farebbe uscire al riavvio.
 function protetti() {
-  const out = new Set(accessi);
+  const out = new Sito.ElencoSiti(accessi);
   for (const d of fidati) out.add(d);
   for (const d of riattivati) out.add(d);
   const ora = Date.now();
@@ -471,8 +472,8 @@ function configureFromSettings(settings) {
   const C = Cookies();
   const c = (settings && settings.security && settings.security.cookies) || {};
   modo = C.getMode(settings);
-  fidati = new Set(C.getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
-  accessi = new Set((Array.isArray(c.loggedSites) ? c.loggedSites : []).map((d) => String(d || '').toLowerCase()).filter(Boolean));
+  fidati = new Sito.ElencoSiti(C.getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
+  accessi = new Sito.ElencoSiti((Array.isArray(c.loggedSites) ? c.loggedSites : []).map((d) => String(d || '').toLowerCase()).filter(Boolean));
   const prima = riattivati;
   riattivati = new Set(C.getEmbedSites(settings));
   for (const s of [...accessi, ...fidati, ...riattivati]) { siti.delete(s); partizionati.delete(s); }
