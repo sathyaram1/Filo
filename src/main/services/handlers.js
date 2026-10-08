@@ -3895,24 +3895,39 @@ function fermaFiloChat(reqId, wc) {
 }
 
 // I documenti trovati con CERCA_DOCUMENTI che la risposta nomina, come azioni APRI_FILE da aggiungere. Nessuna se il
-// modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine della ricerca.
+// modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
+// Nominato vuol dire il nome del file come parola a sé, non una parola comune che ci coincide («ricevuta» per
+// ricevuta.pdf: senza estensione vale solo un nome che non è una parola, come scan_00231), e non scartato («non X»).
+const NEGA_FILE = /(?<![\p{L}])(?:non|né|nè|ne'|not|anziché|anziche|invece di|piuttosto che)(?![\p{L}])[^.;:!?\n,(]{0,25}$/iu;
+function posizioneDelNome(testo, nome) {
+  for (let i = testo.indexOf(nome); i >= 0; i = testo.indexOf(nome, i + 1)) {
+    const prima = i > 0 ? testo[i - 1] : '';
+    const dopo = testo[i + nome.length] || '';
+    if (/[\p{L}\p{N}_]/u.test(prima) || /[\p{L}\p{N}_]/u.test(dopo)) continue;
+    const clausola = testo.slice(Math.max(0, i - 60), i).split(/[.;:!?\n,(]/).pop();
+    if (NEGA_FILE.test(clausola)) continue;
+    return i;
+  }
+  return -1;
+}
 function fileNominatiDallaRisposta(textReply, azioni) {
   const testo = String(textReply || '').toLowerCase();
   const lista = Array.isArray(azioni) ? azioni : [];
   if (!testo || lista.some((x) => x && String(x.type || '').toUpperCase() === 'APRI_FILE')) return [];
-  const out = [];
+  const trovati = [];
   for (const x of lista) {
     if (!x || String(x.type || '').toUpperCase() !== 'CERCA_DOCUMENTI' || !x._output) continue;
     for (const r of Array.isArray(x._output.risultati) ? x._output.risultati : []) {
-      if (out.length >= 3 || !r || !r.percorso) continue;
+      if (!r || !r.percorso || trovati.some((o) => o.r.percorso === r.percorso)) continue;
       const nome = String(r.nome || '').toLowerCase();
       const senzaEstensione = nome.replace(/\.[^.]+$/, '');
-      const nominato = (nome.length >= 3 && testo.includes(nome)) || (senzaEstensione.length >= 5 && testo.includes(senzaEstensione));
-      if (!nominato || out.some((o) => o.percorso === r.percorso)) continue;
-      out.push({ type: 'APRI_FILE', percorso: r.percorso, etichetta: r.nome, _callId: `trovato_${out.length}` });
+      let i = nome.length >= 3 ? posizioneDelNome(testo, nome) : -1;
+      if (i < 0 && senzaEstensione.length >= 5 && /[^\p{L}\s]/u.test(senzaEstensione)) i = posizioneDelNome(testo, senzaEstensione);
+      if (i >= 0) trovati.push({ r, i });
     }
   }
-  return out;
+  return trovati.sort((a, b) => a.i - b.i).slice(0, 3)
+    .map(({ r }, k) => ({ type: 'APRI_FILE', percorso: r.percorso, etichetta: r.nome, _callId: `trovato_${k}` }));
 }
 
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
