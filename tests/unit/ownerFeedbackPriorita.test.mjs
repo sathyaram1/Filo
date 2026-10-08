@@ -17,6 +17,7 @@ const SCRIPT = join(ROOT, 'scripts', 'owner-feedback.mjs');
 const mod = await import(pathToFileURL(SCRIPT).href);
 const { decryptFeedbackFields } = await import(pathToFileURL(join(ROOT, 'scripts', 'lib', 'decrypt-feedback-fields.mjs')).href);
 const apri = await import(pathToFileURL(join(ROOT, 'scripts', 'claude-feedback.mjs')).href);
+const lib = await import(pathToFileURL(join(ROOT, 'scripts', 'lib', 'priorita.mjs')).href);
 const C = globalThis.SN_FEEDBACK_CRYPTO;
 const FB = globalThis.SN_FEEDBACK;
 
@@ -72,7 +73,7 @@ test('la priorità a riga di comando: solo una cifra della scala, il resto si ri
   }
   // La regola è una sola: quella che apre un feedback rifiuta le stesse cose.
   assert.equal(apri.parsePriorita(' ').ok, false, 'uno spazio non è la priorità 0');
-  assert.equal(apri.parsePriorita, mod.prioritaDaScrivere.length >= 0 && apri.parsePriorita);
+  assert.equal(apri.parsePriorita, lib.parsePriorita);
 });
 
 test('un valore fuori scala non tocca la rete, né da solo né con uno stato', async () => {
