@@ -73,3 +73,16 @@ test('esplora', async ({ openTab }) => {
   await page.screenshot({ path: 'tests/.shots/g3-ricevuti.png' });
   console.log('ESPLORA ' + JSON.stringify(out, null, 1));
 });
+
+test('esplora chip della scheda', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const aperti = Array.from({ length: 8 }, (_, i) => fb({ _id: `w-${i}`, seq: 960 + i, name: `Aspettato ${i}` }));
+  const lista = [3, 4, 5, 6, 8].map((n, k) => fb({ _id: `n-${n}`, seq: 930 + k, name: `Aspetta ${n}`, waitsFor: aperti.slice(0, n).map((a) => ({ id: a._id, num: String(a.seq) })) }));
+  await apri(page, [...lista, ...aperti], 'waiting');
+  const out = await page.evaluate(() => {
+    const col = document.querySelector('.mg-item').parentElement;
+    return { colSfora: col.scrollWidth - col.clientWidth, schede: [...document.querySelectorAll('.mg-item')].map((it) => ({ t: it.textContent.replace(/\s+/g, ' ').trim().slice(0, 30), sfora: it.scrollWidth - it.clientWidth })) };
+  });
+  console.log('CHIP ' + JSON.stringify(out));
+  await page.screenshot({ path: 'tests/.shots/g3-chip.png' });
+});
