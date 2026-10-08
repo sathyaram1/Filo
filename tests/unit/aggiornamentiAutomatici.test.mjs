@@ -288,7 +288,7 @@ perOgniSistema('spento, «Installa» e Filo chiuso a metà scaricamento: al riav
       prima.chiudi();
       assert.equal(prima.installata, false);
 
-      const dopo = await riavvia('0.2.0');
+      const dopo = await riavvia('0.2.0', { modo: s.modo });
       assert.equal(dopo.scaricamenti, 1, `${via}: al riavvio la versione chiesta non riprende a scaricare`);
       if (via === 'carta') {
         const [carta] = U.conStatoAggiornamento(vive());
