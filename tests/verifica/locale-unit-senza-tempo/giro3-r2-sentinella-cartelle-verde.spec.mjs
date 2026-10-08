@@ -11,7 +11,7 @@ test.setTimeout(15 * 60_000);
 test('r2 la sentinella delle cartelle tolte con rmSync nudo è verde sul ramo', () => {
   const r = spawnSync(process.execPath, ['--test', '--test-name-pattern=rmSync nudo', 'tests/unit/cartelleTemporanee.test.mjs'],
     { cwd: ROOT, encoding: 'utf8' });
-  const colpevoli = [...new Set(r.stdout.match(/[w\/.-]+.test.mjs(?=')/g) || [])].join(', ');
+  const colpevoli = [...new Set(r.stdout.match(/[\w\\/.-]+\.test\.mjs(?=')/g) || [])].join(', ');
   expect(r.status, `sentinella rossa: ${colpevoli || r.stdout.slice(-800)}`).toBe(0);
   expect(r.stdout).toMatch(/# pass 1/);
 });
