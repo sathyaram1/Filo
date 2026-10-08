@@ -15,3 +15,10 @@ test('r2 la sentinella delle cartelle tolte con rmSync nudo è verde sul ramo', 
   expect(r.status, `sentinella rossa: ${colpevoli || r.stdout.slice(-800)}`).toBe(0);
   expect(r.stdout).toMatch(/# pass 1/);
 });
+
+test('r2 la prova arrivata da main sulla nota che sparisce gira senza errori sul ramo', () => {
+  const r = spawnSync(process.execPath, ['--test', '--test-name-pattern=la nota sparisce da sola', 'tests/unit/transparency.test.mjs'],
+    { cwd: ROOT, encoding: 'utf8' });
+  expect(r.status, (r.stdout.match(/error: .*/) || [r.stdout.slice(-800)])[0]).toBe(0);
+  expect(r.stdout).toMatch(/# pass 1/);
+});
