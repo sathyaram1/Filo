@@ -291,7 +291,7 @@
     const { kind, el } = ctx;
     if (!el || !el.isConnected) return;
     // Incolla e dettatura li ha chiesti l'utente a Filo, fuori dalla pagina: il correttore li tratta come scritti a mano.
-    try { global.SN_GESTO?.segna(); } catch (_) {}
+    try { global.SN_GESTO?.segna([global.SN_GESTO.CHIUDE]); } catch (_) {}
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;
@@ -576,7 +576,7 @@
   // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
   // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta o troppo lunga.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
-  // - Parte solo dietro un gesto vero (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
+  // - Parte solo dietro un gesto vero che seleziona (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
   let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
   let prefetchTimer = null;
   // Oltre, una spiegazione «in anticipo» non vale il costo: si calcola intera al tasto destro.
@@ -595,7 +595,7 @@
     if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
     const Gesto = global.SN_GESTO;
-    if (!Gesto || !Gesto.recente()) return;
+    if (!Gesto || !Gesto.recente(Gesto.SELEZIONA)) return;
     const sel = Extract.getSelectionWithSentence();
     if (!sel) return;
     if (sel.selection.length > PREFETCH_MAX_CHARS) return;
@@ -603,7 +603,7 @@
     if (key.length < 3) return;
     // Stessa selezione di prima: l'entry esistente sta già lavorando (o ha il risultato).
     if (prefetchedExplain && prefetchedExplain.key === key) return;
-    if (!Gesto.prendi('spiega')) return;
+    if (!Gesto.prendi('spiega', Gesto.SELEZIONA)) return;
     prefetchedExplain = startExplainRequest(sel);
   }
 

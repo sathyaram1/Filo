@@ -373,7 +373,9 @@
         // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
         //    (boundary char), lancia subito il check ortografico così che al
         //    click destro non ci sia attesa. Limitato e in background.
-        prefetchJustCompletedWord(state);
+        //    Solo il tasto con cui l'utente chiude una parola lo paga: una pagina che a ogni lettera aggiunge una parola
+        //    ne otterrebbe uno per tasto (#1070).
+        if (global.SN_GESTO.prendi('parola', global.SN_GESTO.CHIUDE)) prefetchJustCompletedWord(state);
         // 4) il prossimo scan
         scheduleScan(state);
       });

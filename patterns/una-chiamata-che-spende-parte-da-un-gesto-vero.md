@@ -44,7 +44,16 @@ di 1,5 s. Il movimento del mouse non conta: passarci sopra non è chiedere.
    chiesto si sposta soltanto. Il rilascio del mouse invece è un gesto suo e
    prepara la spiegazione: chi si ferma prima di rilasciare non cambia più la
    selezione.
-3. **Un'azione chiesta a Filo vale come gesto** (`SN_GESTO.segna()`): incolla e
+3. **Un gesto paga solo la chiamata che chiede** (`prendi(chi, tipo)`): la
+   spiegazione in anticipo la paga un gesto che seleziona (mouse, dito, Maiusc
+   con un tasto di spostamento, seleziona tutto), il controllo della parola il
+   tasto che chiude una parola (spazio, punteggiatura, Invio, incolla). Con
+   «un tasto qualunque» una pagina trasformava ogni lettera scritta in una
+   spiegazione o in un controllo (#1070, terzo giro della stessa famiglia: un
+   gesto valeva troppe chiamate, poi un tasto tenuto troppi gesti, poi un tasto
+   qualunque ogni chiamata). Una chiamata automatica nuova dice il suo tipo; lo
+   scan del testo, uno per pausa, si accontenta di un gesto qualunque.
+4. **Un'azione chiesta a Filo vale come gesto** (`SN_GESTO.segna()`): incolla e
    dettatura arrivano da un menu fuori dalla pagina, o molto dopo il clic.
 4. **A scheda nascosta non si spende**: la chiamata si rimanda e parte al ritorno.
 5. **Il main ha un tetto per scheda** (`src/main/services/tettoAutomatiche.js`),

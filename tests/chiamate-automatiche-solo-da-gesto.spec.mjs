@@ -346,3 +346,57 @@ test('il main ferma le chiamate automatiche oltre il tetto per scheda, avvisa un
   await expect(avviso).toContainText('tasto destro');
   await page.screenshot({ path: 'tests/.shots/1070-tetto-avviso.png' }).catch(() => {});
 });
+
+// Un gesto paga solo la chiamata che chiede (#1070 giro 3): una lettera scritta non seleziona e non chiude parole.
+test('scrivere nel campo di ricerca della pagina non paga spiegazioni in anticipo delle selezioni che fa la pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer, PAGINA.replace('</body>', '<input id="cerca" style="font:20px monospace;width:400px"></body>'));
+  await page.evaluate(() => {
+    let i = 0;
+    let ultima = 0;
+    window.addEventListener('keydown', () => {
+      if (Date.now() - ultima < 450) return;
+      ultima = Date.now();
+      setTimeout(() => {
+        const p = document.getElementById('p1').firstChild;
+        const da = (i++ * 3) % 60;
+        const r = document.createRange();
+        r.setStart(p, da);
+        r.setEnd(p, da + 20);
+        getSelection().removeAllRanges();
+        getSelection().addRange(r);
+      }, 0);
+    });
+  });
+  await page.click('#cerca');
+  const prima = (await conti(app)).spiega;
+  await page.keyboard.type('una ricerca qualunque scritta da una persona normale', { delay: 150 });
+  await pausa(1500);
+  // Al più una: il clic nel campo è un gesto che seleziona, e lo prende la prima selezione della pagina.
+  expect((await conti(app)).spiega - prima).toBeLessThanOrEqual(1);
+});
+
+test('il controllo della parola lo paga il tasto che chiude una parola, non ogni lettera', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  await page.evaluate(() => {
+    let i = 0;
+    const ta = document.getElementById('ta');
+    ta.addEventListener('keydown', (e) => {
+      if (e.key.length !== 1) return;
+      e.preventDefault();
+      ta.value += ` xqzparola${i++} `;
+      ta.selectionStart = ta.selectionEnd = ta.value.length;
+      ta.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
+    });
+  });
+  await page.click('#ta');
+  await pausa(300);
+  const prima = (await conti(app)).parola;
+  await page.keyboard.type('ciao come stai oggi', { delay: 150 });
+  await pausa(2500);
+  // Tre parole chiuse dall'utente (tre spazi): un controllo ciascuna, non uno per ognuna delle 19 lettere.
+  const fatti = (await conti(app)).parola - prima;
+  expect(fatti).toBeGreaterThanOrEqual(1);
+  expect(fatti).toBeLessThanOrEqual(3);
+});

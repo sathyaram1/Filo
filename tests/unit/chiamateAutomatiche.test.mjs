@@ -91,6 +91,48 @@ test('gesto: un tasto tenuto premuto è un gesto solo, le sue ripetizioni e il r
   assert.equal(g.prendi('correttore'), true);
 });
 
+test('gesto: una chiamata col tipo la paga solo il gesto che la chiede, non un tasto qualunque', () => {
+  const c = orologio();
+  const g = G.crea(c.ora);
+  const ev = (type, key, extra = {}) => g.suEvento({ isTrusted: true, type, key, code: extra.code || key, ...extra });
+  // Scrivere lettere non seleziona e non chiude parole: una pagina che a ogni lettera sposta la selezione o
+  // aggiunge una parola non ne ottiene niente.
+  for (const k of ['c', 'i', 'a', 'o', 'Backspace', 'Shift']) {
+    ev('keydown', k); ev('keyup', k);
+    assert.equal(g.prendi('spiega', G.SELEZIONA), false, `${k} non seleziona`);
+    assert.equal(g.prendi('parola', G.CHIUDE), false, `${k} non chiude una parola`);
+    assert.equal(g.prendi('correttore'), true, 'ma resta un gesto per lo scan');
+  }
+  // Uno spazio, una virgola, Invio chiudono una parola: un controllo per tasto.
+  for (const k of [' ', ',', 'Enter']) {
+    ev('keydown', k);
+    assert.equal(g.prendi('parola', G.CHIUDE), true, `${JSON.stringify(k)} chiude`);
+    assert.equal(g.prendi('parola', G.CHIUDE), false);
+    ev('keyup', k);
+  }
+  // Maiusc+frecce, Ctrl/Cmd+A, il mouse e il dito selezionano; la freccia senza Maiusc no.
+  ev('keydown', 'ArrowRight');
+  assert.equal(g.prendi('spiega', G.SELEZIONA), false);
+  ev('keyup', 'ArrowRight');
+  for (const [type, key, extra] of [['keydown', 'ArrowRight', { shiftKey: true }], ['keydown', 'End', { shiftKey: true }],
+    ['keydown', 'a', { ctrlKey: true, code: 'KeyA' }], ['keydown', 'a', { metaKey: true, code: 'KeyA' }],
+    ['mouseup'], ['dblclick'], ['touchend']]) {
+    ev(type, key, extra);
+    assert.equal(g.prendi('spiega', G.SELEZIONA), true, `${type} ${key || ''} seleziona`);
+    if (key) ev('keyup', key, extra);
+  }
+  // Selezionare e poi copiare subito: Ctrl+C dopo il doppio clic non toglie l'anticipo della selezione.
+  ev('dblclick');
+  ev('keydown', 'Control', { ctrlKey: true });
+  ev('keydown', 'c', { ctrlKey: true, code: 'KeyC' });
+  assert.equal(g.prendi('spiega', G.SELEZIONA), true);
+  // Il rilascio di un tasto premuto prima non riporta indietro il gesto in corso.
+  ev('keyup', 'c', { ctrlKey: true, code: 'KeyC' });
+  ev('keyup', 'Control');
+  c.avanti(G.FINESTRA_MS + 1);
+  assert.equal(g.prendi('spiega', G.SELEZIONA), false, 'scaduto');
+});
+
 test('tetto: le azioni contate sono quelle automatiche di SN_CONST', () => {
   const A = SN_CONST.ACTIONS;
   assert.deepEqual(Object.keys(Tetto.GRUPPI).sort(), [A.EXPLAIN, A.SPELLCHECK_SEMANTIC, A.SPELLCHECK_WORD].sort());
