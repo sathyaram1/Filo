@@ -2078,7 +2078,13 @@ async function eseguiAzioneFilo(action, {
           const win = winOf(sender);
           const tm = win && win._filoTabs;
           if (tm && typeof tm.openTab === 'function') {
-            tabId = tm.openTab(url, { activate: !background });
+            // Per il giudizio sui siti chiedere a parole vale un clic (la pagina di ringraziamento scarica per richiesta), e
+            // l'assistente di una pagina apre un indirizzo che quella pagina gli ha messo davanti: arriva da quel sito.
+            const chiesto = !!String(parole || '').trim();
+            let daPagina = '';
+            try { daPagina = assistente && sender && sender.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+            const origine = /^https?:/i.test(daPagina) ? { tipo: 'link', da: daPagina, gesto: chiesto } : { tipo: 'filo', gesto: chiesto };
+            tabId = tm.openTab(url, { activate: !background, origine });
             // Gli schemi non web sono esclusi qui sopra: una scheda che non
             // nasce è la lista dei siti bloccati (#590), e la chat lo deve dire.
             // L'assistente sulla pagina può poi chiedere «Apri comunque» solo per quello che gli è stato fermato.

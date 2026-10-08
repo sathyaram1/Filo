@@ -12,7 +12,7 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
     if (!win || !win._filoTabs || !tabId) return { ok: true, level: 'safe', message: null };
-    const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment };
+    const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment, insecureForm: !!msg.insecureForm };
     // #758 — un campo password nella PAGINA (non in un riquadro, che nominerebbe un sito non suo) è una pagina di
     // accesso: il sito vale quello della scheda.
     if (msg.hasPassword) {

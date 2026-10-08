@@ -176,6 +176,13 @@ function registerIpcHandlers() {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
+  // Un clic o un tasto vero in un frame della pagina, riquadri compresi: per il rilevatore dei siti pericolosi (#814).
+  ipcMain.on('filo:gesto', (event) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      try { w._filoTabs?._sbGesto?.(event.sender); } catch (_) {}
+    }
+  });
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
@@ -364,7 +371,9 @@ function registerIpcHandlers() {
   ipcMain.handle('tabs:open', (event, { url } = {}) => {
     const win = winFor(event);
     if (!win || !win._filoTabs) return { ok: false };
-    const id = win._filoTabs.openTab(url || 'filo://newtab/');
+    // Per il giudizio sui siti «aperta da Filo» lo dice solo la barra di Filo.
+    const daShell = Boolean(finestraDellaBarra(event.sender));
+    const id = win._filoTabs.openTab(url || 'filo://newtab/', daShell ? { origine: { tipo: 'filo' } } : {});
     return { ok: true, id };
   });
   ipcMain.handle('tabs:close', (event, { id }) => {
@@ -529,7 +538,7 @@ function registerIpcHandlers() {
       if (typeof value === 'string' && value.startsWith('@action:')) {
         try { event.sender.send('shell:menu-action', value.slice('@action:'.length)); } catch (_) {}
       } else if (value) {
-        win._filoTabs.openTab(value);
+        win._filoTabs.openTab(value, finestraDellaBarra(event.sender) ? { origine: { tipo: 'filo' } } : {});
       }
     });
     return { ok: true };

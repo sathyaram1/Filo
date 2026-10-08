@@ -3,6 +3,13 @@
 // Niente blocca la navigazione. Regole: patterns/un-avviso-su-una-pagina-non-sta-dentro-la-pagina.md
 
 const { pageHints } = require('../../content/safebrowseHints.js');
+const Permessi = require('../services/permessiPagine');
+
+// Un programma che parte entro questo tempo dall'ultimo clic o tasto vero nella scheda (in qualunque riquadro, o sul link
+// che l'ha aperta), anche dopo pagine di passaggio, è voluto. Oltre, o senza, è partito da solo (#814).
+const SCARICO_VOLUTO_MS = 30 * 1000;
+// Le origini delle pagine già viste nella scheda, per avanti, indietro e ricarica.
+const ORIGINI_MAX = 100;
 
 // In un riquadro di un altro sito la pagina sopra non si legge: se è lei a nasconderlo (trasparente, ritagliato,
 // coperto) lo dice il motore, che vede tutta la catena dei riquadri. Senza risposta in tempo vale mostrato.
@@ -89,7 +96,7 @@ const safebrowseMethods = {
     if (!url) return { ok: true, level: 'safe', message: null };
     let verdict;
     try {
-      verdict = SB.analyze(url, { ...ctx, budgetUrl: tab._urlNavigato }, (next) => {
+      verdict = SB.analyze(url, this._sbCtx(tab, url, ctx), (next) => {
         this._sbMostra(tab, url, this._sbApplyState(tab, next));
       });
     } catch (_) {
@@ -111,16 +118,135 @@ const safebrowseMethods = {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!tab || !url) return;
     const sito = sitoDellaPagina(url, [tab._urlNavigato, tab._sbApertaDa]);
+    this._sbNuovoDocumento(tab, sito);
     if (!sito) { this._sbMostra(tab, null, null); return; }
     if (!SB) return;
     // L'indirizzo da cui la pagina è arrivata davvero: quello che si scrive dopo non sposta il conto (#591), qui e nel
     // blocco geografico.
     tab._urlNavigato = sito;
     try {
-      const verdict = SB.analyze(sito, {}, (next) => {
+      const verdict = SB.analyze(sito, this._sbCtx(tab, sito, {}), (next) => {
         this._sbMostra(tab, sito, this._sbApplyState(tab, next));
       });
       this._sbMostra(tab, sito, this._sbApplyState(tab, verdict));
+    } catch (_) {}
+  },
+
+  // Gli indizi del documento (campi, modulo in chiaro, scaricamenti, origine) si sommano a quelli di chi chiede: qualunque
+  // porta rifaccia il verdetto, li vede tutti, e un verdetto rifatto senza un indizio non toglie l'avviso che ne viene.
+  _sbCtx(tab, url, ctx = {}) {
+    const out = { ...ctx, budgetUrl: tab._urlNavigato };
+    const doc = tab._sbDoc;
+    if (!doc || !doc.url || !stessoSito(url, doc.url)) return out;
+    const i = doc.indizi;
+    for (const k of ['hasPassword', 'hasPayment', 'insecureForm']) {
+      if (ctx[k]) i[k] = true;
+      out[k] = !!i[k];
+    }
+    if (i.autoDownload) out.autoDownload = i.autoDownload;
+    if (i.downloadName) out.downloadName = i.downloadName;
+    const SB = globalThis.SN_SAFEBROWSE;
+    const origine = SB && SB.origineLink(doc.origine, url);
+    if (origine) out.linkOrigin = origine;
+    return out;
+  },
+
+  // Ogni navigazione della pagina intera: da dove parte e se l'ha chiesta un clic. Le aperture di Filo (indirizzo
+  // scritto, link da un'altra scheda, pagine sue) lasciano l'origine in `tab._sbOrigine` prima di caricare.
+  _sbInizioNavigazione(tab, wc, details) {
+    if (!details || details.isMainFrame === false || details.isSameDocument) return;
+    let da = '';
+    try { da = String((details.initiator && details.initiator.url) || ''); } catch (_) {}
+    let origine = null;
+    if (/^https?:/i.test(da)) origine = { tipo: 'link', da, gesto: gestoSulDocumento(tab, wc) || Permessi.navigazioneDaGesto(wc) };
+    else if (/^filo:/i.test(da)) origine = { tipo: 'filo' };
+    else if (!da) origine = tab._sbOrigine || (tab._sbOrigini && tab._sbOrigini.get(details.url)) || null;
+    tab._sbOrigine = null;
+    tab._sbGestoDoc = 0;
+    const gesto = !!(origine && origine.gesto);
+    if (gesto) tab._sbGestoAlle = Date.now();
+    tab._sbNav = { url: details.url, at: Date.now(), daPagina: !!da, gesto, origine };
+  },
+
+  // Un clic o un tasto vero in un frame della scheda (dal preload: anche nei riquadri di altri siti, che `input-event`
+  // non vede). È l'unica sorgente del «voluto» degli scaricamenti, oltre al gesto che ha aperto la scheda.
+  _sbGesto(wc) {
+    const tab = this.tabs.find((t) => { try { return t.view.webContents === wc; } catch (_) { return false; } });
+    if (tab) tab._sbGestoAlle = tab._sbGestoDoc = Date.now();
+  },
+
+  // Una scheda che ricrea la vista per un link (pagina di Filo → sito, privacy fra siti) carica da sé: l'origine la porta qui.
+  _sbOrigineDelSalto(tab, wc, event) {
+    let da = '';
+    try { da = String((event && event.initiator && event.initiator.url) || wc.getURL() || ''); } catch (_) {}
+    if (/^https?:/i.test(da)) tab._sbOrigine = { tipo: 'link', da, gesto: gestoSulDocumento(tab, wc) };
+    else if (/^filo:/i.test(da)) tab._sbOrigine = { tipo: 'filo' };
+  },
+
+  _sbNuovoDocumento(tab, sito) {
+    const nav = tab._sbNav;
+    const origine = nav ? nav.origine : null;
+    tab._sbDoc = { url: sito, at: Date.now(), origine, indizi: {} };
+    if (!sito || !origine) return;
+    if (!tab._sbOrigini) tab._sbOrigini = new Map();
+    tab._sbOrigini.delete(sito);
+    tab._sbOrigini.set(sito, origine);
+    if (tab._sbOrigini.size > ORIGINI_MAX) tab._sbOrigini.delete(tab._sbOrigini.keys().next().value);
+  },
+
+  // Uno scaricamento partito dalla pagina della scheda: un programma senza un clic poco prima, o un file col nome di un
+  // documento, diventano indizi della pagina. La domanda sui programmi (#588) resta quella di services/downloads.js.
+  _sbOnDownload(tab, info = {}) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    const wc = tab && tab.view && tab.view.webContents;
+    const doc = tab && tab._sbDoc;
+    if (!SB || !wc || wc.isDestroyed()) return;
+    if (!doc || !doc.url) {
+      // Una scheda aperta dalla pagina che diventa subito un file: lo scaricamento è della pagina che l'ha aperta.
+      const o = !doc && tab._sbNav && tab._sbNav.origine;
+      const apritrice = o && o.tipo === 'link' && o.daScheda && this.tabs.find((t) => t.id === o.daScheda && t !== tab);
+      if (apritrice) this._sbOnDownload(apritrice, { ...info, chain: [], voluto: !!o.gesto });
+      else this._sbFileAperto(tab, info);
+      return;
+    }
+    const sito = sitoDellaPagina(wc.getURL(), [tab._urlNavigato, tab._sbApertaDa]);
+    if (!sito || !stessoSito(sito, doc.url)) return;
+    const nome = String(info.filename || '');
+    const nav = tab._sbNav;
+    const primo = String((Array.isArray(info.chain) && info.chain[0]) || info.url || '');
+    const suaNav = !!(nav && nav.at >= doc.at && stessoIndirizzo(nav.url, primo));
+    // Un indirizzo che Filo ha caricato nella scheda e che è diventato un file non l'ha chiesto la pagina.
+    if (suaNav && !nav.daPagina) { this._sbFileAperto(tab, info); return; }
+    // Lo scaricamento che è la navigazione stessa di un clic resta voluto anche se il server ci mette più del tempo.
+    const voluto = info.voluto || (suaNav && nav.gesto) || Permessi.gestoEntro(wc, SCARICO_VOLUTO_MS)
+      || (tab._sbGestoAlle > 0 && Date.now() - tab._sbGestoAlle < SCARICO_VOLUTO_MS);
+    const i = doc.indizi;
+    let nuovo = false;
+    if (info.exe && !voluto && !i.autoDownload) { i.autoDownload = nome || true; nuovo = true; }
+    if (!i.downloadName && SB.signals.doppiaEstensione(nome)) { i.downloadName = nome; nuovo = true; }
+    if (!nuovo) return;
+    try {
+      const v = SB.analyze(sito, this._sbCtx(tab, sito, {}), (next) => this._sbMostra(tab, sito, this._sbApplyState(tab, next)));
+      this._sbMostra(tab, sito, this._sbApplyState(tab, v));
+    } catch (_) {}
+  },
+
+  // Un indirizzo aperto da Filo (scritto, dalla chat, chiesto a parole) che è un programma col nome di un documento: non
+  // c'è una pagina, l'avviso va sulla scheda, che resta aperta finché lo mostra. Il giudizio è sul sito che manda il file.
+  _sbFileAperto(tab, info = {}) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    const chain = Array.isArray(info.chain) ? info.chain.filter(Boolean).map(String) : [];
+    const url = chain.length ? chain[chain.length - 1] : String(info.url || '');
+    if (!SB || !/^https?:\/\//i.test(url)) return;
+    const nome = String(info.filename || '');
+    const nell = [url, chain[0] || ''].map(ultimoPezzo).find((n) => SB.signals.doppiaEstensione(n));
+    if (!SB.signals.doppiaEstensione(nome) && !nell) return;
+    const ctx = { downloadName: SB.signals.doppiaEstensione(nome) ? nome : nell, budgetUrl: url };
+    const origine = SB.origineLink(tab._sbNav && tab._sbNav.origine, url);
+    if (origine) ctx.linkOrigin = origine;
+    try {
+      const v = SB.analyze(url, ctx, (next) => this._sbMostra(tab, url, this._sbApplyState(tab, next)));
+      this._sbMostra(tab, url, this._sbApplyState(tab, v));
     } catch (_) {}
   },
 
@@ -146,7 +272,9 @@ const safebrowseMethods = {
       // Una pagina vuota scritta dal sito non si ricarica in una scheda: ci va il sito, sotto il suo avviso.
       const url = /^(https?|blob):/i.test(pwc.getURL()) ? pwc.getURL() : sitoOra();
       if (url) {
-        const id = this.openTab(url, { activate: true, openedByLink: true, apriComunque: this._siteAllowedIn(origine, url) });
+        // Per il giudizio sui siti la pagina arriva dal sito della scheda che ha aperto la finestrella, non da Filo.
+        const da = origine && origine._urlNavigato ? { tipo: 'link', da: origine._urlNavigato, gesto: false } : null;
+        const id = this.openTab(url, { activate: true, openedByLink: true, apriComunque: this._siteAllowedIn(origine, url), origine: da });
         const nuova = this.tabs.find((t) => t.id === id);
         if (nuova && origine) nuova._sbApertaDa = origine._urlNavigato;
       }
@@ -180,7 +308,7 @@ const safebrowseMethods = {
     pwc.on('did-finish-load', async () => {
       let h = null;
       try { h = await pwc.executeJavaScript(`(${pageHints.toString()})(document)`); } catch (_) {}
-      if (h && (h.shownPassword || h.shownPayment)) giudica({ hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment });
+      if (h && (h.shownPassword || h.shownPayment)) giudica({ hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment, insecureForm: !!h.insecureForm });
     });
   },
 
@@ -206,7 +334,7 @@ const safebrowseMethods = {
     let ospitata = null;
     try { const u = new URL(url); ospitata = SB.whitelist.hostedPlatform(u.hostname, u.pathname); } catch (_) {}
     if (tab._sbCampiUrl === url || !(ospitata || this._sbCampiContano(SB, url))) return;
-    const hints = { hasPassword: false, hasPayment: false, budgetUrl: tab._urlNavigato };
+    const hints = { hasPassword: false, hasPayment: false, insecureForm: false, budgetUrl: tab._urlNavigato };
     let frames = [];
     try { frames = wc.mainFrame.framesInSubtree; } catch (_) {}
     await Promise.all(frames.map(async (f) => {
@@ -217,6 +345,7 @@ const safebrowseMethods = {
         // Conta il campo a schermo: un modulo nascosto dietro «Accedi» si vedrà al giro dopo, quando si apre.
         if (r && r.shownPassword) hints.hasPassword = true;
         if (r && r.shownPayment) hints.hasPayment = true;
+        if (r && r.insecureForm) hints.insecureForm = true;
       } catch (_) {}
     }));
     if (wc.isDestroyed() || tab._sbScanGiro !== giro) return;
@@ -230,7 +359,7 @@ const safebrowseMethods = {
     if ((hints.hasPassword || hints.hasPayment) && wc.getURL() === url) {
       tab._sbCampiUrl = url;
       try {
-        const v = SB.analyze(url, hints, (next) => this._sbMostra(tab, url, this._sbApplyState(tab, next)));
+        const v = SB.analyze(url, this._sbCtx(tab, url, hints), (next) => this._sbMostra(tab, url, this._sbApplyState(tab, next)));
         if (v && v.level !== 'safe') this._sbMostra(tab, url, this._sbApplyState(tab, v));
       } catch (_) {}
       return;
@@ -331,12 +460,15 @@ const safebrowseMethods = {
     } else if (scelta === 'continua') {
       if (a.level === 'sospetto') this.safebrowseDismiss(tab.id, a.url);
     } else if (scelta === 'indietro') {
+      if (tab._sbSoloAvviso) { this._dropTab(tab); return; }
       this.safebrowseIndietro(tab.id);
     } else if (scelta === 'copia') {
       try { require('electron').clipboard.writeText(a.url); } catch (_) {}
     } else if (scelta === 'chiedi' || scelta === 'segnala') {
       this._sbApriCasa(tab, scelta);
     }
+    // Una scheda tenuta aperta solo per l'avviso di un file non ha niente da mostrare quando l'avviso va via (#814).
+    if (tab._sbSoloAvviso && !tab.sbAvviso) this._dropTab(tab);
   },
 
   _sbVociMenu() {
@@ -402,6 +534,22 @@ function hostDi(u) {
 
 function stessoSito(a, b) {
   try { return hostDi(a) === hostDi(b); } catch (_) { return true; }
+}
+
+// Un clic o un tasto vero sul documento che la scheda mostra adesso, in un riquadro compreso.
+function gestoSulDocumento(tab, wc) {
+  return Permessi.gestoRecente(wc) || (tab._sbGestoDoc > 0 && Date.now() - tab._sbGestoDoc < Permessi.GESTO_MS);
+}
+
+function ultimoPezzo(u) {
+  let p = '';
+  try { p = new URL(u).pathname; } catch (_) { return ''; }
+  try { p = decodeURIComponent(p); } catch (_) {}
+  return p.split('/').pop() || '';
+}
+
+function stessoIndirizzo(a, b) {
+  try { return new URL(a).href === new URL(b).href; } catch (_) { return false; }
 }
 
 // Installa i metodi sul prototype di TabManager (mixin). `this` resta l'istanza.

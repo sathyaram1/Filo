@@ -556,7 +556,7 @@
     },
     {
       id: 'dangerous-sites', title: 'Avviso dei siti pericolosi', category: 'settings',
-      desc: 'Un sito pericoloso (in lista per phishing o malware, o che imita un marchio e chiede la password) o sospetto viene coperto da un avviso appena si apre, prima che finisca di caricarsi. L\'avviso sta fuori dalla pagina: il sito non lo copre, non lo toglie e non sente quello che ci scrivi. Su un sito pericoloso si prosegue scrivendo «confermo», su uno sospetto con «Continua»; la scelta vale per quel sito in quella scheda finché resta aperta.',
+      desc: 'Un sito pericoloso (in lista per phishing o malware, o che imita un marchio e chiede la password) o sospetto viene coperto da un avviso appena si apre, prima che finisca di caricarsi. L\'avviso compare anche su un sito noto se la pagina fa partire da sola lo scaricamento di un programma (senza un tuo clic poco prima o una tua richiesta a Filo), se ti fa scaricare, o apri tu, un programma col nome di un documento (fattura.pdf.exe) o se il suo modulo manda password o carta a un indirizzo non cifrato. L\'avviso sta fuori dalla pagina: il sito non lo copre, non lo toglie e non sente quello che ci scrivi. Su un sito pericoloso si prosegue scrivendo «confermo», su uno sospetto con «Continua»; la scelta vale per quel sito in quella scheda finché resta aperta.',
       invoke: 'Compare da solo. Tasto destro sull\'avviso: «Chiedi a Filo di questo sito» (apre una chat nuova con la domanda), «Segnala un falso allarme» (apre «Invia feedback» già scritto), «Copia l\'indirizzo», «Torna indietro». Impostazioni → Sicurezza → «Avvisa sui siti pericolosi».',
       doesNot: 'Non blocca la navigazione e non chiude la scheda: la pagina carica sotto l\'avviso.',
     },

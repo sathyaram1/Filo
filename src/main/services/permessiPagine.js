@@ -182,8 +182,13 @@ function seguiGesti(wc) {
 }
 
 function gestoRecente(wc) {
+  return gestoEntro(wc, GESTO_MS);
+}
+
+// Un clic o un tasto vero sulla pagina negli ultimi `ms`: il conto riparte a ogni navigazione della pagina intera.
+function gestoEntro(wc, ms) {
   const t = wc && wc._filoGestoAlle;
-  return Boolean(t && Date.now() - t < GESTO_MS);
+  return Boolean(t && Date.now() - t < ms);
 }
 
 // Il gesto vale anche per la navigazione che ha fatto partire, finché non arriva: un rinvio del sito resta del clic.
@@ -423,7 +428,7 @@ function statoNotifiche(ses, url) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
+  installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, gestoEntro, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },

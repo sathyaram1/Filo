@@ -466,6 +466,19 @@ try {
   for (const ev of ['pointerdown', 'keydown', 'focusin']) {
     window.addEventListener(ev, claim, { capture: true, passive: true });
   }
+  // Un clic o un tasto VERO (una pagina non sa fabbricare isTrusted), anche in un riquadro di un altro sito che il main
+  // non vede: uno scaricamento che lo segue l'ha chiesto l'utente (#814).
+  let ultimoGesto = 0;
+  const gesto = (e) => {
+    if (!e || !e.isTrusted || e.key === 'Escape') return;
+    const now = Date.now();
+    if (now - ultimoGesto < 500) return;
+    ultimoGesto = now;
+    try { ipcRenderer.send('filo:gesto'); } catch (_) {}
+  };
+  for (const ev of ['pointerdown', 'keydown']) {
+    window.addEventListener(ev, gesto, { capture: true, passive: true });
+  }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────

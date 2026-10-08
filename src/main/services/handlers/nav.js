@@ -80,10 +80,15 @@ module.exports = function register(on, ctx) {
     // Da una pagina di Filo un indirizzo web o di posta passa dalla porta delle uscite (#810); `parole` = scritto dall'utente.
     if (isFilo(origin) && SCHEMI_USCITA.test(url)) {
       const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
-      const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url) });
+      // `parole` le manda solo la barra della home, con quello che l'utente ha scritto: per il giudizio sui siti è un
+      // indirizzo scritto a mano.
+      // Un clic su un collegamento di Filo vale per la pagina d'arrivo come un clic su un sito; l'Invio di chi scrive no.
+      const origine = parole.trim() ? { tipo: 'scritto' } : { tipo: 'filo', gesto: require('../permessiPagine').gestoRecente(sender?.wc) };
+      const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url, { origine }) });
       return { ok: true, ...r };
     }
-    win._filoTabs.openTab(url);
+    const daPagina = /^https?:/i.test(String(sender?.url || ''));
+    win._filoTabs.openTab(url, daPagina ? { origine: { tipo: 'link', da: sender.url, gesto: false } } : {});
     return { ok: true };
   });
 
@@ -99,8 +104,12 @@ module.exports = function register(on, ctx) {
       return { ok: true };
     }
     if (!win._filoTabs.apribileDallAssistente(sender && sender.wc, url)) return { ok: false, error: 'forbidden' };
-    // Ancora in lista: la notifica. Uscito dalla lista nel frattempo: si apre e basta.
-    win._filoTabs.openTab(url);
+    // Ancora in lista: la notifica. Uscito dalla lista nel frattempo: si apre e basta. Per il giudizio sui siti
+    // l'indirizzo arriva dalla pagina dell'assistente, come ogni sua apertura.
+    let da = '';
+    try { da = String(sender.wc.getURL() || ''); } catch (_) {}
+    const gesto = require('../permessiPagine').gestoRecente(sender && sender.wc);
+    win._filoTabs.openTab(url, { origine: /^https?:/i.test(da) ? { tipo: 'link', da, gesto } : { tipo: 'filo', gesto } });
     return { ok: true };
   });
 

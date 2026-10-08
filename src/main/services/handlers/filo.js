@@ -119,8 +119,10 @@ module.exports = function register(on, ctx) {
     const web = /^https?:/i.test(url);
     if (!SCHEMI_USCITA.test(url) || (web && !/^https?:\/\//i.test(url))) return { ok: false, error: 'indirizzo non ammesso' };
     const win = winOf(sender);
+    // Il clic sul collegamento vale per la pagina d'arrivo come un clic su un sito: si legge prima della porta, che può attendere.
+    const origine = { tipo: 'filo', gesto: require('../permessiPagine').gestoRecente(sender?.wc) };
     const r = await apriDaFilo(url, {
-      wc: sender?.wc, parole: paroleDa(msg), avvisa: false, apri: () => { if (win?._filoTabs) win._filoTabs.openTab(url); },
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: false, apri: () => { if (win?._filoTabs) win._filoTabs.openTab(url, { origine }); },
     });
     return { ok: true, ...r };
   });
@@ -134,9 +136,10 @@ module.exports = function register(on, ctx) {
     const avvisato = isFilo(origin);
     let pagina = '';
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
+    const gesto = require('../permessiPagine').gestoRecente(sender?.wc);
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato,
-      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo) }); },
+      apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo), gesto }); },
     });
     return { ok: true, ...r, avvisato };
   });

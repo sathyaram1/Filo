@@ -2,7 +2,7 @@
 //
 // Calcola, dal solo dominio normalizzato (+ opzionali indizi di pagina), i
 // segnali su cui poggia il giudizio. I segnali nel CONTENUTO della pagina
-// (password, contenuto misto) sono solo RINFORZO: arrivano dal chiamante via
+// (password, modulo in chiaro) sono solo RINFORZO: arrivano dal chiamante via
 // `ctx` e non sono mai l'unica base di un avviso ad alta gravità.
 //
 // Tipi di impersonazione (vedi spec):
@@ -117,13 +117,38 @@ function matchBrands(norm) {
   return { strict, weak: strict ? null : weak, broad: (strict || weak) ? null : broad };
 }
 
-// Doppia estensione eseguibile nell'URL (es. fattura.pdf.exe): forte indizio
-// di download ingannevole.
-const DOUBLE_EXT = /\.(pdf|jpe?g|png|gif|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp[34]|avi|html?)\.(exe|scr|bat|cmd|com|pif|vbs|vbe|js|jar|msi|apk|dmg|ps1|hta|cpl)(\?|#|$)/i;
+// Un programma con il nome di un documento (fattura.pdf.exe): conta l'ultima estensione, decisa dalla stessa lista che
+// mette la domanda sugli scaricamenti (#588), e quella prima deve essere di un file che si apre per leggerlo.
+const ESE = globalThis.SN_ESEGUIBILI || (require('../../../shared/eseguibili.js'), globalThis.SN_ESEGUIBILI);
+// Le estensioni dei file che si aprono per guardarli (documenti, immagini, audio, video, archivi): un elenco largo, perché
+// il travestimento usa quella che ispira fiducia; i pezzi di versione (setup.2.1.exe, x64) non ci sono.
+const DOCUMENTO = new Set((
+  'pdf doc docx docm dot dotx xls xlsx xlsm xlsb ppt pptx pptm pps ppsx odt ods odp odg rtf txt csv tsv md xml json ' +
+  'htm html xps oxps epub mobi pages numbers key eml msg ics vcf ' +
+  'jpg jpeg jpe png gif bmp tif tiff webp heic heif avif svg ico psd raw cr2 nef ' +
+  'mp3 wav flac aac ogg oga m4a wma opus aif aiff mid midi ' +
+  'mp4 m4v mkv avi mov wmv flv webm mpg mpeg 3gp vob m2ts srt ' +
+  'zip rar 7z tar gz tgz bz2 xz'
+).split(' '));
 
-// Calcola i segnali deterministici locali. `norm` = output di normalize().
-// `ctx` = indizi opzionali (mai unica base): { hasPassword, hasPayment,
-// mixedContent, autoDownload, linkOrigin, urlPath }.
+function doppiaEstensione(nome) {
+  const pulito = ESE.nomeVisibile(nome).replace(/[.\s\u00a0]+$/, '');
+  if (!ESE.eEseguibile(pulito)) return false;
+  // Spazi e punti in più prima dell'estensione vera (fattura.pdf      .exe, fattura.pdf..exe) non la nascondono qui.
+  const parti = pulito.split('.').map((p) => p.replace(/[\s\u00a0]+/g, ''));
+  const prima = parti.slice(0, -1).filter(Boolean);
+  return prima.length >= 2 && DOCUMENTO.has(prima[prima.length - 1].toLowerCase());
+}
+
+function ultimoPezzo(percorso) {
+  let p = String(percorso || '');
+  try { p = decodeURIComponent(p); } catch (_) {}
+  return p.split('/').pop() || '';
+}
+
+// Calcola i segnali deterministici locali. `norm` = output di normalize(). `ctx` = indizi della pagina e della scheda:
+// { hasPassword, hasPayment, insecureForm, autoDownload (nome del programma partito da solo), downloadName (un file
+// che la pagina ha fatto scaricare), urlPath }.
 function localSignals(norm, ctx = {}) {
   const out = [];
   if (!norm || !norm.ok) return out;
@@ -140,17 +165,20 @@ function localSignals(norm, ctx = {}) {
     out.push({ kind: 'insecure_transport' });
   }
 
-  // Doppia estensione nell'URL.
-  const path = ctx.urlPath || '';
-  if (path && DOUBLE_EXT.test(path)) out.push({ kind: 'double_extension' });
+  const nell = ultimoPezzo(ctx.urlPath);
+  if (doppiaEstensione(nell)) out.push({ kind: 'double_extension', name: nell, where: 'url' });
+  else {
+    const scaricato = [ctx.downloadName, ctx.autoDownload].find((n) => typeof n === 'string' && doppiaEstensione(n));
+    if (scaricato) out.push({ kind: 'double_extension', name: scaricato, where: 'download' });
+  }
+  if (ctx.autoDownload) out.push({ kind: 'auto_download', name: typeof ctx.autoDownload === 'string' ? ctx.autoDownload : '' });
 
   // Indizi di pagina (solo rinforzo).
   if (ctx.hasPassword) out.push({ kind: 'sensitive_input', field: 'password' });
   else if (ctx.hasPayment) out.push({ kind: 'sensitive_input', field: 'payment' });
-  if (ctx.mixedContent) out.push({ kind: 'mixed_content' });
-  if (ctx.autoDownload) out.push({ kind: 'auto_download' });
+  if (ctx.insecureForm) out.push({ kind: 'insecure_form' });
 
   return out;
 }
 
-module.exports = { localSignals, matchBrands, osaDistance };
+module.exports = { localSignals, matchBrands, osaDistance, doppiaEstensione };

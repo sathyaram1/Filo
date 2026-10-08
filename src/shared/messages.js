@@ -653,7 +653,7 @@
     // Il content script manda la URL corrente e gli indizi (campo password/pagamento); il main mostra l'avviso in una
     // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
     // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
-    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
+    SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment?, insecureForm? }
     // #1004 — la pagina, o un suo riquadro (il modulo di pagamento di un altro sito), mostra un campo password o carta:
     // il sito della scheda diventa delicato. Il sito lo dà il main, dalla scheda.
     CAMPI_DELICATI: 'campi_delicati', // { hasPassword, hasPayment } (campi a schermo) → { ok }
