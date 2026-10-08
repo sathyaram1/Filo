@@ -195,17 +195,6 @@ function once(key, run) {
   return p;
 }
 
-// Le analisi ancora in corso: una prova aspetta che finiscano, non un numero di millisecondi (#1063).
-const running = new Set();
-function track(p) {
-  running.add(p);
-  p.then(() => running.delete(p), () => running.delete(p));
-  return p;
-}
-async function settled() {
-  while (running.size) await Promise.allSettled([...running]);
-}
-
 // In volo una per pagina, qualunque indizio abbia l'analisi che arriva dopo: la risposta si ricorda per pagina.
 function deepen(stage, bKey, pKey, siteKey, run, store) {
   const fly = stage + ':' + pKey;
@@ -287,10 +276,10 @@ function analyze(url, ctx = {}, onUpdate) {
 
   const pending = UrlNav && UrlNav.homeNetworkPending(norm.host);
   if (pending) {
-    track(pending.then(() => {
+    pending.then(() => {
       const next = analyze(url, ctx, onUpdate);
       if (typeof onUpdate === 'function' && verdictChanged(first, next)) onUpdate(next);
-    }));
+    });
     return first;
   }
   if (isHomeNetwork(norm)) return first;
@@ -344,7 +333,7 @@ function analyze(url, ctx = {}, onUpdate) {
     tasks.push(...deepTasks(first));
   }
 
-  if (tasks.length) track(Promise.allSettled(tasks).then(notify));
+  if (tasks.length && typeof onUpdate === 'function') Promise.allSettled(tasks).then(notify);
   return first;
 }
 
@@ -404,7 +393,6 @@ const API = {
   // cache (per test / invalidazione)
   DEEP_BUDGET,
   _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed },
-  _settled: settled,
   // sotto-moduli (per test)
   normalize: normalizeMod.normalize,
   parseHost: normalizeMod.parseHost,
