@@ -336,14 +336,14 @@ test('chiesto quando non c\'è niente di nuovo, l\'esito lo dice e non scarica n
   assert.equal(u.scaricamenti, 0);
 });
 
-test('riacceso a sessione aperta: scarica come all\'avvio e si installa alla chiusura', async () => {
+perOgniSistema('riacceso a sessione aperta: scarica come all\'avvio e si installa come da acceso', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, false);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: true } });
+  await avvia(u, false, s);
+  U.seguiImpostazioni(impostazioni(s, true));
   await calma();
   assert.equal(u.scaricamenti, 1);
-  assert.equal(u.autoInstallOnAppQuit, true);
-  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
 });
 
 test('su Windows uno scaricamento che non riesce resta sulla carta, con «Installa» per riprovare', async () => {
