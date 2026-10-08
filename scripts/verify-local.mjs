@@ -148,11 +148,12 @@ export async function leggiBilanciDalServer({
   const pronta = attiva ? copia.campiDaCopia(url, { now, dir: copiaDir }) : null;
   if (pronta) return bilanciDaCampi(pronta.fields);
   const idToken = idTokenPronto || await fa.mintIdToken(refresh);
+  const { fetchRitentato, descriviErroreDiRete } = await import('./lib/rete.mjs');
   let res;
   try {
-    res = await fetchImpl(url, { headers: { Authorization: `Bearer ${idToken}` } });
+    res = await fetchRitentato(url, { headers: { Authorization: `Bearer ${idToken}` } }, { fetchImpl });
   } catch (e) {
-    throw new Error(`config/routines non letto dal server (rete): ${String((e && e.message) || e)}. Senza i bilanci la verifica non parte.`);
+    throw new Error(`config/routines non letto dal server (rete: ${descriviErroreDiRete(e)}). Senza i bilanci la verifica non parte.`);
   }
   if (res.status === 404) {
     throw new Error('config/routines non esiste sul server: l\'owner deve salvare i bilanci in Gestione → Automazioni. Non c\'è un default.');
