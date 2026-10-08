@@ -249,6 +249,44 @@ test('i segnaposto di OneDrive, che l\'elenco di Windows dà per collegamenti, s
   }
 });
 
+test('una cartella che il sistema non lascia leggere (il «Non consentire» del Mac) non passa per vuota: si dice, col modo di dare il permesso', async () => {
+  // Come macOS dopo un rifiuto: la cartella esiste, ma elencarla dà EPERM.
+  const vero = fsp.readdir;
+  fsp.readdir = async (dir, opz) => {
+    if (join(String(dir)) === join(DOC)) { const e = new Error('EPERM: operation not permitted, scandir'); e.code = 'EPERM'; throw e; }
+    return vero.call(fsp, dir, opz);
+  };
+  try {
+    Indice._azzera();
+    const r = await Indice.cerca('bolletta luce marzo');
+    assert.equal(r.risultati.length, 0);
+    assert.equal(r.indice.cartelle[0].esiste, true);
+    assert.equal(r.indice.cartelle[0].negata, true);
+    assert.deepEqual(r.indice.negate.map((c) => c.percorso), [DOC]);
+    assert.ok(r.indice.comePermesso);
+    assert.equal((await Indice.stato()).cartelle[0].negata, true, 'anche la pagina Preferenze lo sa');
+  } finally {
+    fsp.readdir = vero;
+  }
+  // Dato il permesso, la ricerca torna a trovare e il segno sparisce.
+  const r = await Indice.cerca('bolletta luce marzo');
+  assert.equal(r.risultati[0].nome, BOLLETTA_MARZO);
+  assert.equal(r.indice.cartelle[0].negata, false);
+  assert.deepEqual(r.indice.negate, []);
+  // Un ramo per sistema, scritto intero.
+  assert.match(Indice.comeDarePermesso('darwin'), /Privacy e sicurezza › File e cartelle/);
+  assert.match(Indice.comeDarePermesso('win32'), /Sicurezza/);
+  assert.match(Indice.comeDarePermesso('linux'), /permessi/);
+});
+
+test('l\'esempio dato al modello per cercare un documento non porta un anno scritto fisso, che invecchia e vince sull\'ultimo', () => {
+  // Con l'anno nella richiesta vince quell'anno (è voluto): un «marzo 2026» ricopiato nel 2027 darebbe la bolletta vecchia.
+  require('../../src/shared/actionTools.js');
+  const def = globalThis.SN_ACTION_TOOLS.definitions({}).find((d) => d.function.name === 'CERCA_DOCUMENTI');
+  const testo = `${def.function.description}\n${JSON.stringify(def.function.parameters)}`;
+  assert.doesNotMatch(testo, /\b(?:19|20)\d\d\b/);
+});
+
 // Una bolletta vera è emessa e scade il mese dopo il suo periodo: quella di febbraio è piena di date di marzo.
 function bollettaVera({ periodo, emessa, scadenza, lettura }) {
   return [
