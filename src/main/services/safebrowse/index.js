@@ -27,6 +27,7 @@ const psl = require('./psl');
 const net = require('./net');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
+const { origineLink } = require('./origine');
 
 // ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
@@ -383,6 +384,7 @@ function scopeOf(url) {
 const API = {
   checkSync,
   scopeOf,
+  origineLink,
   ownerOf,
   createOwnerBudget,
   analyze,

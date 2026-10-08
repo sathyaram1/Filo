@@ -140,12 +140,14 @@ module.exports = function register(on, ctx) {
 
   on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => ({ ok: true, tabs: await ArchivedTabs.clear() })));
 
-  on(MSG.REOPEN_ARCHIVED_TAB, async (msg, sender) => {
+  on(MSG.REOPEN_ARCHIVED_TAB, async (msg, sender, origin) => {
     // Riapre la scheda archiviata, ripristinando lo scroll registrato.
     const win = winOf(sender);
     if (win && win._filoTabs && msg.url) {
       const pct = typeof msg.scrollPct === 'number' ? msg.scrollPct : null;
-      const id = win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct });
+      // «Aperta da Filo» solo se la chiede una pagina di Filo: un sito non si dà la provenienza più rassicurante.
+      const daFilo = String(origin || '').startsWith('filo://');
+      const id = win._filoTabs.openTab(msg.url, { activate: true, restoreScrollPct: pct, origine: daFilo ? { tipo: 'filo' } : null });
       // Se la tab archiviata era instradata "da un altro paese", riaprila
       // proxata sulla stessa location: setTabProxy ricrea la view nella
       // partition proxata e ricarica l'URL attraverso l'endpoint del paese.

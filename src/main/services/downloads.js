@@ -413,7 +413,8 @@ function shellToast(text, opts, scope = '') {
 // scheda rimasta VUOTA quando un link "Scarica" con target=_blank apre una nuova
 // scheda che si trasforma subito in scaricamento (nessuna pagina si committa
 // mai). Best-effort e non bloccante: se non c'è una scheda da chiudere è un no-op.
-function notifyDownloadStarted(webContents) {
+// `info` ({ url, chain, filename, exe }) serve al giudizio sul sito della scheda (tabs/tabSafebrowse.js).
+function notifyDownloadStarted(webContents, info = null) {
   if (!webContents) return;
   try {
     const { BrowserWindow } = electron();
@@ -421,7 +422,7 @@ function notifyDownloadStarted(webContents) {
       if (!win || win.isDestroyed?.()) continue;
       const tm = win._filoTabs;
       if (tm && typeof tm.handleDownloadStarted === 'function') {
-        try { tm.handleDownloadStarted(webContents); } catch (_) {}
+        try { tm.handleDownloadStarted(webContents, info); } catch (_) {}
       }
     }
   } catch (_) {}
@@ -611,7 +612,9 @@ function onWillDownload(item, webContents, scope = '') {
   // #412 — chiudi la scheda "vuota" aperta apposta da un link Scarica
   // target=_blank. Deferito così il ciclo di vita del download (già preso in
   // carico qui sopra) è completamente cablato prima di toccare l'albero delle view.
-  setImmediate(() => notifyDownloadStarted(webContents));
+  let chain = [];
+  try { chain = item.getURLChain(); } catch (_) {}
+  setImmediate(() => notifyDownloadStarted(webContents, { url, chain, filename, exe }));
 
   // ── Argine anti-silenzio ────────────────────────────────────────────────
   // Il problema da cui nasce: quando un server tronca la connessione a metà,

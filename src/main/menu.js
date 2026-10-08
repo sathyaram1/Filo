@@ -163,7 +163,7 @@ function barraLaterale() {
 
 function apriPagina(url) {
   const win = finestra();
-  try { win && win._filoTabs.openTab(url); } catch (_) {}
+  try { win && win._filoTabs.openTab(url, { origine: { tipo: 'filo' } }); } catch (_) {}
 }
 
 function finestraIncognito() {

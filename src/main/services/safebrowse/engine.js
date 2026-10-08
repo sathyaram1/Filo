@@ -17,6 +17,8 @@ const { normalize } = require('./normalize');
 const { isWhitelisted, hostedPlatform, pagePath } = require('./whitelist');
 const { localSignals } = require('./signals');
 
+const ESE = globalThis.SN_ESEGUIBILI || (require('../../../shared/eseguibili.js'), globalThis.SN_ESEGUIBILI);
+
 const YOUNG_DOMAIN_DAYS = 30;     // sotto: dominio "giovane" → rinforzo sospetto
 const VERY_YOUNG_DOMAIN_DAYS = 7; // sotto: rinforzo forte (combinato → pericoloso)
 const CERT_BAD = new Set(['expired', 'mismatch', 'self_signed', 'untrusted', 'absent', 'revoked']);
@@ -53,9 +55,45 @@ function gsbText(category) {
   }
 }
 
+// Il nome lo sceglie chi serve il file: si mostra senza i caratteri che ne cambiano la lettura, e uno lunghissimo tiene
+// l'inizio e la fine, dove sta l'estensione.
+function nomeFile(n) {
+  const v = ESE.nomeVisibile(n).trim();
+  return v.length > 60 ? `${v.slice(0, 36)}…${v.slice(-20)}` : v;
+}
+
+// I segnali che non dipendono da chi è il sito: `sola` apre l'avviso, `coda` si mette in fila ai fatti di un'impersonazione.
+function fattiPagina({ dom, autoDl, doubleExt, insecureForm }) {
+  const out = [];
+  const travestito = (n) => `«${nomeFile(n)}», che sembra un documento ma è un programma`;
+  const stesso = !!(autoDl && doubleExt && doubleExt.where === 'download' && doubleExt.name === autoDl.name);
+  if (autoDl) {
+    const cosa = stesso ? travestito(autoDl.name) : `un programma${autoDl.name ? ` («${nomeFile(autoDl.name)}»)` : ''}`;
+    out.push({
+      titolo: 'Scaricamento partito da solo',
+      sola: `Questa pagina di ${dom} ha avviato da sola lo scaricamento di ${cosa}.`,
+      coda: `la pagina ha avviato da sola lo scaricamento di ${cosa}`,
+    });
+  }
+  if (doubleExt && !stesso) {
+    const t = travestito(doubleExt.name);
+    out.push(doubleExt.where === 'url'
+      ? { titolo: 'Programma travestito da documento', sola: `L'indirizzo di ${dom} finisce con ${t}.`, coda: `l'indirizzo finisce con ${t}` }
+      : { titolo: 'Programma travestito da documento', sola: `Questa pagina di ${dom} ti fa scaricare ${t}.`, coda: `la pagina ti fa scaricare ${t}` });
+  }
+  if (insecureForm) {
+    out.push({
+      titolo: 'Dati in chiaro',
+      sola: `I dati che scrivi qui viaggiano in chiaro: il modulo di ${dom} li manda a un indirizzo non cifrato.`,
+      coda: 'i dati che scrivi qui viaggiano in chiaro',
+    });
+  }
+  return out;
+}
+
 // Costruisce il messaggio specifico dai segnali fidati. `lead` è il segnale
 // guida; gli altri diventano frasi di rinforzo.
-function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox, hosted }) {
+function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPayment, sandbox, hosted, autoDl, doubleExt, insecureForm }) {
   const dom = hosted ? (norm.hostUnicode || norm.host) : (norm.registrableUnicode || norm.registrable || norm.host);
   // 1) Blacklist: prevale su tutto.
   if (gsb && gsb.listed) {
@@ -64,12 +102,17 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
       body: `Google Safe Browsing classifica ${dom} come ${gsbText(gsb.category)}.`,
     };
   }
+  const young = ageDays != null && ageDays < YOUNG_DOMAIN_DAYS;
+  const certBad = !!(cert && CERT_BAD.has(cert.status));
+  const sandboxBad = !!(sandbox && sandbox.verdict === 'dangerous');
+  const pagina = fattiPagina({ dom, autoDl, doubleExt, insecureForm });
   const facts = [];
-  if (ageDays != null && ageDays < YOUNG_DOMAIN_DAYS) facts.push(`registrato ${agePhrase(ageDays)}`);
-  if (cert && CERT_BAD.has(cert.status)) facts.push(certText(cert.status));
+  if (young) facts.push(`registrato ${agePhrase(ageDays)}`);
+  if (certBad) facts.push(certText(cert.status));
+  for (const p of pagina) facts.push(p.coda);
   if (hasPassword) facts.push('ti sta chiedendo la password');
   else if (hasPayment) facts.push('ti chiede i dati di pagamento');
-  if (sandbox && sandbox.verdict === 'dangerous') facts.push('analizzato in isolamento, mostra comportamento ingannevole');
+  if (sandboxBad) facts.push('analizzato in isolamento, mostra comportamento ingannevole');
   const tail = facts.length ? (', ' + joinIt(facts) + '.') : '.';
 
   // 2) Impersonazione stretta (e typo su brand corto quando un altro segnale conferma).
@@ -94,14 +137,27 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
       body: `${dom} usa il nome "${imp.brand.display}" ma non è un indirizzo ufficiale di ${imp.brand.display}${tail}`,
     };
   }
-  // 4) Solo segnali non legati all'identità.
-  if (cert && CERT_BAD.has(cert.status)) {
+  // 4) Un file o un modulo della pagina: dice cosa sta succedendo, gli altri fatti seguono.
+  if (pagina.length) {
+    const [prima, ...poi] = pagina;
+    const altri = [];
+    if (young) altri.push(`il dominio è stato registrato ${agePhrase(ageDays)}`);
+    if (certBad) altri.push(certText(cert.status));
+    for (const p of poi) altri.push(p.coda);
+    if (hasPassword) altri.push('la pagina ti chiede la password');
+    else if (hasPayment) altri.push('la pagina ti chiede i dati di pagamento');
+    if (sandboxBad) altri.push('aperta in isolamento, mostra un comportamento ingannevole');
+    const seguito = altri.length ? ` ${joinIt(altri).replace(/^./, (c) => c.toUpperCase())}.` : '';
+    return { title: prima.titolo, body: prima.sola + seguito };
+  }
+  // 5) Solo segnali non legati all'identità.
+  if (certBad) {
     return { title: 'Connessione non sicura', body: `La connessione a ${dom} non è protetta: ${certText(cert.status)}.` };
   }
-  if (ageDays != null && ageDays < YOUNG_DOMAIN_DAYS) {
+  if (young) {
     return { title: 'Dominio registrato da poco', body: `Il dominio ${dom} è stato registrato ${agePhrase(ageDays)}.` };
   }
-  if (sandbox && sandbox.verdict === 'dangerous') {
+  if (sandboxBad) {
     return { title: 'Comportamento sospetto', body: `Aperto in isolamento, ${dom} mostra un comportamento ingannevole.` };
   }
   return { title: 'Sito potenzialmente sospetto', body: `Fai attenzione su ${dom}.` };
@@ -112,9 +168,8 @@ function joinIt(arr) {
   return arr.slice(0, -1).join(', ') + ' e ' + arr[arr.length - 1];
 }
 
-// Valutazione completa. `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays,
-// sandbox, llm }. `ctx` opzionale (indizi pagina): { hasPassword, hasPayment,
-// mixedContent, autoDownload, urlPath }.
+// Valutazione completa. `asyncData` opzionale: { gsb, ageDays, cert, ctAgeDays, sandbox, llm }. `ctx` opzionale: gli
+// indizi della pagina e della scheda letti da localSignals (signals.js).
 function evaluate(url, ctx = {}, asyncData = {}) {
   const norm = normalize(url);
   if (!norm || !norm.ok) {
@@ -131,7 +186,9 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   // Conferma e chiusura di un avviso valgono per il sito; su una pagina ospitata solo per quella pagina.
   const scope = hosted ? norm.host + page : norm.registrable;
   const whitelisted = !hosted && isWhitelisted(norm.registrable);
-  const sigs = localSignals(norm, ctx);
+  let urlPath = '';
+  try { urlPath = new URL(String(url)).pathname; } catch (_) {}
+  const sigs = localSignals(norm, { ...ctx, urlPath });
   const reasons = sigs.map((s) => s.kind).concat(hosted ? ['hosted_content'] : []);
 
   // Blacklist: prevale su tutto, anche sulla whitelist.
@@ -151,17 +208,23 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const veryYoung = ageDays != null && ageDays < VERY_YOUNG_DOMAIN_DAYS;
   const sandboxBad = sandbox && sandbox.verdict === 'dangerous';
   const sandboxSus = sandbox && sandbox.verdict === 'suspicious';
-  const doubleExt = sigs.some((s) => s.kind === 'double_extension');
+  const doubleExt = sigs.find((s) => s.kind === 'double_extension') || null;
+  const autoDl = sigs.find((s) => s.kind === 'auto_download') || null;
+  const insecureForm = sigs.some((s) => s.kind === 'insecure_form');
+  const fileRisk = !!(doubleExt || autoDl);
   const sensitive = hasPassword || hasPayment;
+  const fatti = { autoDl, doubleExt, insecureForm };
 
-  // La whitelist certifica l'IDENTITÀ: niente impersonazione/LLM. Restano i
-  // controlli indipendenti dal contenuto (certificato, trasporto).
+  // La whitelist certifica l'IDENTITÀ: niente impersonazione/LLM. Restano i controlli indipendenti dal contenuto:
+  // certificato, file della pagina, modulo in chiaro.
   if (whitelisted) {
-    if (certBad) {
-      const message = buildMessage({ level: 'sospetto', norm, cert });
-      return { level: 'sospetto', reasons: ['cert_' + cert.status], norm, message, cert, needsLlm: false, whitelisted };
-    }
-    return { level: 'safe', reasons: ['whitelisted'], norm, message: null, needsLlm: false, whitelisted };
+    const level = (fileRisk && certBad) ? 'pericoloso' : (certBad || fileRisk || insecureForm) ? 'sospetto' : 'safe';
+    if (level === 'safe') return { level, reasons: ['whitelisted'], norm, message: null, needsLlm: false, whitelisted };
+    const message = buildMessage({ level, norm, cert, hasPassword, hasPayment, ...fatti });
+    return {
+      level, reasons: reasons.concat(certBad ? ['cert_' + cert.status] : [], ['whitelisted']),
+      norm, message, cert, needsLlm: false, whitelisted, scope,
+    };
   }
 
   // ── PERICOLOSO ────────────────────────────────────────────────────────
@@ -172,9 +235,9 @@ function evaluate(url, ctx = {}, asyncData = {}) {
     (weakTypo && (young || certBad || sensitive)) ||
     (sandboxBad) ||
     (imp && sensitive && certBad) ||
-    (doubleExt && (young || certBad));
+    (fileRisk && (young || certBad));
   if (strict || strongCombo) {
-    const message = buildMessage({ level: 'pericoloso', norm, imp, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox, hosted });
+    const message = buildMessage({ level: 'pericoloso', norm, imp, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox, hosted, ...fatti });
     return {
       level: 'pericoloso',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], sandboxBad ? ['sandbox_dangerous'] : []),
@@ -185,11 +248,11 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   // ── SOSPETTO ──────────────────────────────────────────────────────────
   const llmSus = llm && llm.suspicious;
   const impSus = weakTypo || broad;
-  const suspectTriggers = !!(impSus || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || doubleExt || sandboxSus || llmSus);
+  const suspectTriggers = !!(impSus || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || fileRisk || insecureForm || sandboxSus || llmSus);
   if (suspectTriggers) {
-    let message = buildMessage({ level: 'sospetto', norm, imp: impSus, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    let message = buildMessage({ level: 'sospetto', norm, imp: impSus, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox, hosted, ...fatti });
     // Su una pagina ospitata il dominio è della piattaforma: nominarlo farebbe credere che la pagina sia sua.
-    if (hosted && !impSus && !certBad) {
+    if (hosted && !impSus && !certBad && !fileRisk && !insecureForm) {
       message = {
         title: 'Pagina pubblicata da un utente',
         body: `Questa pagina è su ${hosted}, dove chiunque può pubblicare: non l'ha scritta chi gestisce ${norm.hostUnicode || norm.host}.`,
