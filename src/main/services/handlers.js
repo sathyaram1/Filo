@@ -1782,7 +1782,7 @@ async function executeFiloAction(action, opzioni = {}) {
 // compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
-  chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false,
+  chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -1841,6 +1841,14 @@ async function eseguiAzioneFilo(action, {
       if (built && built.elenco) {
         const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
         if (r.invariato) action._invariato = r.invariato;
+        // #947 — una cartella dei documenti che non c'è non entra nell'elenco: si dice subito, senza chiedere un OK a vuoto.
+        if (!r.invariato && built.elenco.percorso === 'documenti.cartelle' && built.elenco.op !== 'togli') {
+          const mancanti = await require('./documentiIndice').cartelleMancanti(built.elenco.voci);
+          if (mancanti.length) {
+            action._invariato = `${mancanti.map((m) => `«${m}»`).join(', ')} non ${mancanti.length > 1 ? 'sono cartelle' : 'è una cartella'} `
+              + 'di questo computer: controlla il percorso';
+          }
+        }
       }
     } catch (_) {}
   }
@@ -1944,7 +1952,7 @@ async function eseguiAzioneFilo(action, {
     if (cmd && !confirmed && !assistente && await primaVoltaDelTerminale()) action._primaVolta = true;
   }
 
-  if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
+  if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
 
   // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
   // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
@@ -2580,6 +2588,43 @@ async function eseguiAzioneFilo(action, {
           },
         };
       }
+      case 'CERCA_DOCUMENTI': {
+        // #947 — la richiesta a parole («la bolletta della luce di marzo») contro l'indice dei documenti che Filo tiene
+        // sul computer. Al modello vanno solo i pochi candidati, con un pezzo di testo: sceglie lui e li mostra con
+        // APRI_FILE. Mentre l'indice legge i file nuovi l'attesa dice quale e quanti mancano; il quadrato la ferma.
+        const cosa = String(action.cosa ?? action.query ?? action.testo ?? action.q ?? '').trim();
+        const cartella = String(action.cartella ?? '').trim();
+        const Indice = require('./documentiIndice');
+        let r;
+        try {
+          r = await Indice.cerca(cosa, {
+            cartella,
+            segnale,
+            avanzamento: avanzamento ? (st) => {
+              if (!st || st.fase !== 'lettura') return;
+              // Il numero è quello del documento che sta leggendo adesso: «1 di 60», non «0 di 60».
+              try { avanzamento(Math.min(st.fatti + 1, st.totali), st.totali, st.nome); } catch (_) {}
+            } : null,
+          });
+        } catch (e) {
+          console.warn('[Filo] ricerca nei documenti fallita', e?.message || e);
+          return { executed: false, kept: true, output: { cercato: cosa, risultati: [], errore: 'la ricerca non è riuscita' } };
+        }
+        const risultati = r.risultati.map((x) => ({ ...x, scaricato: fileScaricato(x.percorso) }));
+        return {
+          executed: !r.cartellaMancante,
+          kept: true,
+          output: {
+            cercato: cosa,
+            cartella,
+            risultati,
+            scaricato: risultati.some((x) => x.scaricato),
+            indice: r.indice,
+            fermata: !!r.fermata,
+            cartellaMancante: r.cartellaMancante || '',
+          },
+        };
+      }
       case 'PULISCI_TAB': {
         // Il popup generico spiega lo stesso riordino del bottone: confermato lì, si esegue. Quando la regola
         // dice sì il riordino parte qui, come ogni azione (#530); se no il pannello chiede come dice `domanda`.
@@ -2632,8 +2677,15 @@ async function eseguiAzioneFilo(action, {
         }
         return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte } };
       }
-      case 'APRI_FILE':
-        return { executed: true, kept: true };
+      case 'APRI_FILE': {
+        // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
+        const p = String(action.percorso ?? action.path ?? '').trim();
+        let dove = '';
+        if (/^(~([\\/]|$)|[\\/]|[a-z]:[\\/])/i.test(p)) {
+          try { dove = await require('./documentiIndice').doveSta(require('./documentRead').normalizePath(p)); } catch (_) {}
+        }
+        return { executed: true, kept: true, ...(dove ? { output: { dove } } : {}) };
+      }
       case 'RINOMINA_FILE': {
         const visti = bersagliMostrati(sender, action);
         const proposte = (visti && Array.isArray(visti.proposte) ? visti.proposte : []).slice(0, LOTTO_RINOMINA);
@@ -3301,8 +3353,12 @@ function documentReadsForPrompt(actions) {
       const why = E.perCanaleSistema(out.detail || out.error || 'non è stato possibile leggerlo');
       blocks.push(
         `[Documento "${etichetta}" non letto: ${why}. Dillo all'utente così com'è, `
-        + `senza inventare il contenuto. Filo legge i PDF e i file di testo (txt, csv, md e simili).]`,
+        + `senza inventare il contenuto. Filo legge i PDF, i documenti Word (.docx) e LibreOffice (.odt) e i file di testo (txt, csv, md e simili).]`,
       );
+      continue;
+    }
+    if (out.empty && out.kind === 'office') {
+      blocks.push(`[Documento "${etichetta}": dentro non c'è testo. Dillo all'utente e NON inventare cosa contiene.]`);
       continue;
     }
     if (out.empty) {
@@ -3342,6 +3398,71 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #947 — re-immissione di quello che CERCA_DOCUMENTI ha trovato. Fuori dalla busta solo le frasi di Filo e i
+// numeri dell'indice; nomi, cartelle, percorsi e pezzi di testo stanno dentro: li ha scritti chi ha fatto i file.
+function dataBreve(ms) {
+  const d = new Date(Number(ms) || 0);
+  return Number.isNaN(d.getTime()) || !ms ? '' : d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function documentSearchesForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'CERCA_DOCUMENTI') continue;
+    const out = a._output;
+    if (!out || !('cercato' in out)) continue;
+    const cercato = E.perCanaleSistema(out.cercato || '');
+    if (out.errore) { blocks.push(`[La ricerca fra i documenti "${cercato}" non è riuscita: dillo all'utente.]`); continue; }
+    if (out.cartellaMancante) {
+      blocks.push(`[La cartella "${E.perCanaleSistema(out.cartellaMancante)}" non c'è sul computer: chiedi all'utente dove sta, o cerca senza cartella.]`);
+      continue;
+    }
+    const ind = out.indice || {};
+    const cartelle = (Array.isArray(ind.cartelle) ? ind.cartelle : []).map((c) => `${E.perCanaleSistema(c.nome || '')}${c.esiste ? (c.negata ? ' (il sistema non la lascia leggere)' : '') : ' (non c\'è)'}`);
+    const dove = cartelle.length ? `nelle cartelle ${cartelle.join(', ')}` : 'in nessuna cartella (l\'elenco è vuoto: si cambia con la preferenza cartelle_documenti)';
+    const conti = `${ind.documenti || 0} documenti${ind.scansioni ? `, di cui ${ind.scansioni} scansioni senza testo (si trovano solo per nome)` : ''}`
+      + `${ind.senzaTesto ? `, ${ind.senzaTesto} di cui Filo non sa leggere il testo` : ''}`;
+    const note = [];
+    if (out.fermata) note.push('L\'utente ha FERMATO la ricerca mentre Filo leggeva i documenti nuovi: i risultati vengono solo da quelli già letti. Dillo in una riga.');
+    if (ind.troppi) note.push('Le cartelle hanno più documenti di quanti Filo ne guardi in un giro: alcuni possono mancare.');
+    const negate = Array.isArray(ind.negate) ? ind.negate : [];
+    if (negate.length) {
+      note.push(`Il sistema NON lascia leggere a Filo ${negate.map((c) => E.perCanaleSistema(c.nome || c.percorso || '')).join(', ')}: lì non ha guardato, `
+        + `quindi non dire che il documento non c'è. Spiega all'utente che manca il permesso e come darlo (${E.perCanaleSistema(ind.comePermesso || '')}), poi di richiedere.`);
+    }
+    const r = Array.isArray(out.risultati) ? out.risultati : [];
+    if (!r.length) {
+      blocks.push(`[Nessun documento combacia con "${cercato}" fra i ${conti} ${dove}. `
+        + 'Riprova con altre parole che quel documento conterrebbe (l\'ente che lo manda, il tipo, il mese scritto in numeri, l\'anno) prima di '
+        + 'dire all\'utente che non c\'è; se non c\'è, digli in quali cartelle hai guardato e che può aggiungerne.'
+        + `${note.length ? ` ${note.join(' ')}` : ''}]`);
+      continue;
+    }
+    const righe = r.map((x, i) => {
+      const tipo = x.tipo === 'pdf' ? `PDF${x.pagine ? `, ${x.pagine} ${x.pagine === 1 ? 'pagina' : 'pagine'}` : ''}` : (x.tipo || '');
+      const stato = x.scansione ? ' · SCANSIONE: niente testo, trovato solo per il nome'
+        : (x.senzaTesto === 'nuvola' ? ' · sta solo nel cloud (OneDrive, iCloud): Filo non lo scarica per leggerlo, trovato solo per il nome'
+          : (x.senzaTesto ? ' · testo non leggibile da Filo, trovato solo per il nome' : ''));
+      return [
+        `${i + 1}. ${x.nome} · ${dataBreve(x.data)} · ${tipo}${stato}`,
+        `   percorso: ${x.percorso}`,
+        x.inizio ? `   inizio: ${x.inizio}` : '',
+        x.squarcio ? `   testo: ${x.squarcio}` : '',
+        `   combacia con: ${(x.trovati || []).join(', ')}`,
+      ].filter(Boolean).join('\n');
+    });
+    blocks.push(
+      `[Ricerca fra i documenti dell'utente: "${cercato}". Ho guardato ${conti} ${dove}. I candidati, dal più probabile:]\n`
+      + E.imbusta({ tipo: 'DOCUMENTI_TROVATI', testo: righe.join('\n'), conIntestazione: true })
+      + '\n[Scegli tu quello giusto guardando il testo (periodo, tipo, ente, data): mostralo con APRI_FILE col suo percorso e di\' in una '
+      + 'frase perché è quello. Se due si somigliano, leggili con LEGGI_DOCUMENTO prima di scegliere. Non inventare quello che il testo non dice.'
+      + `${note.length ? ` ${note.join(' ')}` : ''}]`,
+    );
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
@@ -3350,7 +3471,7 @@ function documentReadsForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
+    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions),
@@ -3813,6 +3934,42 @@ function fermaFiloChat(reqId, wc) {
   return true;
 }
 
+// I documenti trovati con CERCA_DOCUMENTI che la risposta nomina, come azioni APRI_FILE da aggiungere. Nessuna se il
+// modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
+// Nominato vuol dire il nome del file come parola a sé, non una parola comune che ci coincide («ricevuta» per
+// ricevuta.pdf: senza estensione vale solo un nome che non è una parola, come scan_00231), e non scartato («non X»).
+const NEGA_FILE = /(?<![\p{L}])(?:non|né|nè|ne'|not|anziché|anziche|invece di|piuttosto che)(?![\p{L}])[^.;:!?\n,(]{0,12}$/iu;
+function posizioneDelNome(testo, nome) {
+  for (let i = testo.indexOf(nome); i >= 0; i = testo.indexOf(nome, i + 1)) {
+    const prima = i > 0 ? testo[i - 1] : '';
+    const dopo = testo[i + nome.length] || '';
+    if (/[\p{L}\p{N}_]/u.test(prima) || /[\p{L}\p{N}_]/u.test(dopo)) continue;
+    const clausola = testo.slice(Math.max(0, i - 60), i).split(/[.;:!?\n,(]/).pop();
+    if (NEGA_FILE.test(clausola)) continue;
+    return i;
+  }
+  return -1;
+}
+function fileNominatiDallaRisposta(textReply, azioni) {
+  const testo = String(textReply || '').toLowerCase();
+  const lista = Array.isArray(azioni) ? azioni : [];
+  if (!testo || lista.some((x) => x && String(x.type || '').toUpperCase() === 'APRI_FILE')) return [];
+  const trovati = [];
+  for (const x of lista) {
+    if (!x || String(x.type || '').toUpperCase() !== 'CERCA_DOCUMENTI' || !x._output) continue;
+    for (const r of Array.isArray(x._output.risultati) ? x._output.risultati : []) {
+      if (!r || !r.percorso || trovati.some((o) => o.r.percorso === r.percorso)) continue;
+      const nome = String(r.nome || '').toLowerCase();
+      const senzaEstensione = nome.replace(/\.[^.]+$/, '');
+      let i = nome.length >= 3 ? posizioneDelNome(testo, nome) : -1;
+      if (i < 0 && senzaEstensione.length >= 5 && /[^\p{L}\s]/u.test(senzaEstensione)) i = posizioneDelNome(testo, senzaEstensione);
+      if (i >= 0) trovati.push({ r, i });
+    }
+  }
+  return trovati.sort((a, b) => a.i - b.i).slice(0, 3)
+    .map(({ r }, k) => ({ type: 'APRI_FILE', percorso: r.percorso, etichetta: r.nome, _callId: `trovato_${k}` }));
+}
+
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
@@ -4108,9 +4265,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         : executeFiloAction(a, {
           sender, contesto: azioniViste, parole: paroleUtente, chatId, fontiLette, richiesta, accoglienza,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
-          avanzamento: canPush ? (fatti, totali) => push('filo:action', {
+          avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
+            ...(dettaglio ? { dettaglio: String(dettaglio) } : {}),
           }) : null,
+          segnale: turno.ctrl.signal,
         }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
@@ -4254,6 +4413,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       if (res.output) rendered._output = res.output;
       renderedActions.push(rendered);
     }
+  }
+  // #947 — il documento che la risposta nomina ha il suo bottone anche se il modello non l'ha mostrato con APRI_FILE:
+  // «eccolo» senza niente da cliccare è una promessa che dipende dal modello.
+  for (const a of fileNominatiDallaRisposta(textReply, renderedActions)) {
+    const res = await executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta });
+    if (res && res.kept && res.executed && !res.needsConfirm) renderedActions.push({ ...a, _executed: true, ...(res.output ? { _output: res.output } : {}) });
   }
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });

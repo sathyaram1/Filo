@@ -11,6 +11,8 @@
     {
       version: '0.2.238', date: '2026-10-07',
       features: [
+        'Chiedi a Filo un tuo documento descrivendolo, anche a voce: «mi serve la bolletta della luce di marzo». Lo trova leggendo il contenuto dei file in Documenti, Download e Scrivania, anche se si chiama «scan_00231.pdf», e ti risponde col file da aprire con un clic. Le cartelle si cambiano in Preferenze, e il testo dei documenti resta sul tuo computer.',
+        'Filo legge anche i documenti Word (.docx) e LibreOffice (.odt), oltre ai PDF e ai file di testo.',
         'Su Windows e Linux, quando una versione nuova di Filo è pronta te lo dice un avviso in basso a destra, e nella home resta una carta con «Riavvia e aggiorna» finché non la installi. Puoi anche scrivere a Filo «aggiornati». Su Windows, se non lo premi, la versione nuova si installa la prossima volta che apri Filo: vedi la barra di avanzamento per una decina di secondi e poi Filo si riapre da solo. Prima si installava di nascosto quando lo chiudevi, e se lo riaprivi in quel momento Windows diceva che il collegamento non funzionava. Chi preferisce il modo di prima lo rimette in Preferenze, Impostazioni avanzate.',
         'Nella pagina Trasparenza, «Come si sostiene» adesso dice come stanno le cose oggi. Finché Filo non chiede pagamenti è tutto offerto, e se usi una tua chiave OpenRouter paghi solo quella. Se chiedi a Filo quanto costa, ti risponde con le stesse parole.',
         'La suoneria del timer e delle sveglie ha il suo volume, in Preferenze accanto alla scelta del motivo, e lo stesso vale per il suono delle notifiche. Puoi girare le manopole o chiederlo a Filo: "abbassa il volume della suoneria", "metti la suoneria delicata", "azzera il volume delle notifiche". A zero resta muta.',

@@ -94,6 +94,8 @@
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
+    // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
+    allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
     archiviaAzione: (type, cambi) => {
       const id = chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];
@@ -626,6 +628,7 @@
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
+    CERCA_DOCUMENTI: 'Cerco fra i tuoi documenti…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
@@ -650,11 +653,14 @@
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
   }
-  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio.
-  function progressLabelFor(type, fatti, totali) {
-    const base = startLabelFor(type);
+  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio, e quale.
+  const PROGRESS_LABELS = { CERCA_DOCUMENTI: 'Leggo i documenti nuovi…' };
+  function progressLabelFor(type, fatti, totali, dettaglio) {
+    const base = PROGRESS_LABELS[String(type || '').toUpperCase()] || startLabelFor(type);
     const n = Number(totali);
-    return n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
+    const conto = n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
+    const quale = String(dettaglio || '').trim();
+    return quale ? `${conto} · ${quale.length > 60 ? `${quale.slice(0, 59)}…` : quale}` : conto;
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
@@ -748,7 +754,7 @@
         if (data.kind === 'start') {
           pending.working(startLabelFor(data.type), String(data.callId || ''));
         } else if (data.kind === 'progress') {
-          pending.working(progressLabelFor(data.type, data.fatti, data.totali));
+          pending.working(progressLabelFor(data.type, data.fatti, data.totali, data.dettaglio));
         } else if (data.kind === 'done') {
           const a = data.action;
           if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
@@ -1299,6 +1305,9 @@
   // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
+    // Un file trovato da Filo in chat, trascinato qui: entra come quelli trascinati dal disco.
+    const daChat = e.dataTransfer?.getData('application/x-filo-file') || '';
+    if (daChat) { addPendingFile(daChat); inputEl.focus(); return; }
     const files = e.dataTransfer?.files;
     if (files && files.length) {
       for (const f of files) handleDroppedFile(f);

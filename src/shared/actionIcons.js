@@ -39,6 +39,7 @@
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',
     LEGGI_DOCUMENTO: 'readDocument',
+    CERCA_DOCUMENTI: 'search',
     LEGGI_TRASPARENZA: 'transparency',
     LEGGI_IMPOSTAZIONI: 'options',
     TOGLI_PERMESSO_SITO: 'eraser',

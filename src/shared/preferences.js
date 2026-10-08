@@ -199,8 +199,10 @@
     const N = nomiSito();
     return N && N.leggibile ? N.leggibile(x) : x;
   }
+  const sitoLeggibileDi = sitoLeggibile;
   // L'elenco nuovo a partire da quello di adesso: { partial } da salvare, o { invariato } col perché.
   function applicaElenco(e, correnti) {
+    const sitoLeggibile = e.percorso === 'documenti.cartelle' ? nomeCartella : sitoLeggibileDi;
     const attuale = (Array.isArray(dentro(correnti, e.percorso)) ? dentro(correnti, e.percorso) : [])
       .filter((x) => typeof x === 'string' && x.trim());
     let nuovo;
@@ -215,6 +217,81 @@
       return { invariato: `nell'elenco «${e.nome}» ${perche} (${ha})` };
     }
     return { partial: nidifica(e.percorso, nuovo), lista: nuovo };
+  }
+
+  // ── Cartelle dei documenti (#947) ──────────────────────────────────────────
+  // Le cartelle in cui Filo cerca i documenti per contenuto. Le tre di sistema si dicono a parole e restano parole (il
+  // main le risolve su ogni piattaforma); le altre sono percorsi interi o con ~. Un percorso può contenere spazi e
+  // virgole, quindi più cartelle si separano col punto e virgola.
+  const CARTELLE_DI_SERIE = {
+    documenti: 'documenti', documents: 'documenti', download: 'download', downloads: 'download', scaricati: 'download',
+    scaricamenti: 'download', scrivania: 'scrivania', desktop: 'scrivania',
+  };
+  const NOMI_CARTELLE_DI_SERIE = { documenti: 'Documenti', download: 'Download', scrivania: 'Scrivania' };
+  function voceCartella(raw) {
+    let s = String(raw == null ? '' : raw).trim().replace(/^["'«(]+|["'»)]+$/g, '').trim()
+      .replace(/^(?:la\s+)?cartella\s+/i, '').trim();
+    if (!s) return '';
+    const chiave = CARTELLE_DI_SERIE[s.toLowerCase()];
+    if (chiave) return chiave;
+    if (s.length > 1) s = s.replace(/[\\/]+$/, '');
+    // Nel main «~» diventa la cartella personale: così «togli ~/Lavoro» trova la cartella scelta dalla pagina.
+    if (/^~([\\/]|$)/.test(s)) {
+      let casa = '';
+      try { casa = typeof require === 'function' ? require('node:os').homedir() : ''; } catch (_) { casa = ''; }
+      return casa ? casa + s.slice(1) : s;
+    }
+    if (/^[a-zA-Z]:[\\/]/.test(s) || /^[\\/]/.test(s)) return s;
+    return '';
+  }
+  function nomeCartella(v) { return NOMI_CARTELLE_DI_SERIE[v] || v; }
+  function elencoCartelle() {
+    const percorso = 'documenti.cartelle';
+    const nome = 'Cartelle dei documenti';
+    return {
+      keys: ['cartelle_documenti', 'cartelle dei documenti', 'cartelle documenti', 'dove cercare i documenti',
+        'cartelle della ricerca nei documenti', 'ricerca nei documenti'],
+      scrive: [percorso],
+      aiuto: '"aggiungi <cartella>" | "togli <cartella>" | "solo <cartella>" | "svuota" (le cartelle in cui Filo cerca i '
+        + 'documenti per contenuto; di serie Documenti, Download e Scrivania; le altre col percorso intero o con ~, più '
+        + 'cartelle separate da punto e virgola; svuotato, Filo non legge più nessun documento)',
+      costo: 2,
+      // Una cartella in più è un posto in più dove Filo legge: abbassa una difesa come aggiungere un sito fidato.
+      allenta: (r) => !!r.elenco && r.elenco.op !== 'togli' && r.elenco.voci.length > 0,
+      risk: 'Cambia le cartelle in cui Filo cerca i tuoi documenti quando li chiedi a parole. Filo ne legge il testo e '
+        + 'lo tiene sul computer in un indice; a un modello arrivano solo i pochi documenti candidati di una ricerca. '
+        + 'Una cartella tolta esce subito dall\'indice.',
+      build(v) {
+        const s = String(v == null ? '' : v).trim();
+        if (!s) return null;
+        if (SVUOTA.test(s)) {
+          return { partial: nidifica(percorso, []), label: `${nome} → svuota l'elenco`, elenco: { percorso, op: 'sostituisci', voci: [], nome } };
+        }
+        let op = 'aggiungi';
+        let resto = s;
+        for (const [n, re] of OP_ELENCO) {
+          const m = s.match(re);
+          if (m) { op = n; resto = s.slice(m[0].length); break; }
+        }
+        const voci = [];
+        const errati = [];
+        for (const pezzo of resto.split(/\s*[;\n]\s*/).map((x) => x.trim()).filter(Boolean)) {
+          const c = voceCartella(pezzo);
+          if (!c) errati.push(pezzo);
+          else if (!voci.includes(c)) voci.push(c);
+        }
+        if (errati.length) {
+          const mostra = (x) => `«${x.length > 60 ? `${x.slice(0, 59)}…` : x}»`;
+          return { rifiuto: `${errati.map(mostra).join(', ')} non ${errati.length > 1 ? 'sono cartelle' : 'è una cartella'}: `
+            + 'scrivi il percorso intero (o con ~ per la cartella personale), oppure Documenti, Download o Scrivania' };
+        }
+        if (!voci.length) return null;
+        const lista = voci.map(nomeCartella).join(', ');
+        const label = op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
+          : op === 'togli' ? `${nome} → togli ${lista}` : `${nome} → solo ${lista}`;
+        return { partial: nidifica(percorso, voci), label, elenco: { percorso, op, voci, nome } };
+      },
+    };
   }
 
   // I sei parametri del colore delle tab, uno per uno come nella pagina (#949). Range e nomi li dà tabColor.js.
@@ -1160,6 +1237,7 @@
       risk: 'Cambia i servizi i cui contenuti incorporati in altre pagine tengono i loro cookie: aggiungerne uno lo lascia '
         + 'ricordare di te fra una visita e l’altra, toglierlo fa durare i suoi cookie solo per la visita.',
     }),
+    elencoCartelle(),
     elenco({
       keys: ['domini_esclusi', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
       percorso: 'blocklist',
