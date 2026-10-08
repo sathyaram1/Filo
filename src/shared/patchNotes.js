@@ -53,6 +53,7 @@
         'Su Linux il correttore ortografico non scarica più i dizionari da Google, e su Windows nemmeno per le lingue che il sistema non corregge: quelli di italiano e inglese sono dentro Filo e funzionano anche senza rete.',
         'Quando riscatti un invito, la conferma dice quanti crediti d’ingresso ricevi. Prima nominava anche i crediti contati sul tuo computer, e sembrava che te li togliesse.',
         'Quando Filo ti mostra il file di cui parla o ti propone un evento per il calendario, la risposta resta nella chat sopra il bottone, anche se dopo qualcosa va storto. Prima a volte finiva chiusa nel blocco delle attività, e in chat restava solo «Ti ho messo anche il bottone per aprirlo».',
+        'Anche le schede dei siti senza https mostrano la loro icona.',
       ],
     },
     {
