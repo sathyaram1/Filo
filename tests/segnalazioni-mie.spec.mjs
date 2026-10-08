@@ -328,8 +328,9 @@ test('tasto destro su una riga: copia il testo, rimanda quella non partita già 
   await expect(bacheca.locator('.sn-fb-modal')).toHaveCount(0);
 
   await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
-  await bacheca.keyboard.press('Escape');
-  await expect(menu).toHaveCount(0);
+  await expect(menu).toBeVisible();
+  // Il menu ascolta i tasti dal giro dopo quello che l'ha aperto: un Esc partito nello stesso istante si ripete.
+  await expect.poll(async () => { await bacheca.keyboard.press('Escape'); return menu.count(); }).toBe(0);
   await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
   await menu.getByText('Togli dall’elenco').click();
   await expect(righe(bacheca)).toHaveCount(1);
