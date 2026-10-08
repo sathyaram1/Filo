@@ -365,7 +365,7 @@
           renderOverlayContent(state);
         }
         // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello.
-        if (!daUtente()) return;
+        if (!prendeGesto()) return;
         // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
         //    (boundary char), lancia subito il check ortografico così che al
         //    click destro non ci sia attesa. Limitato e in background.
@@ -384,7 +384,7 @@
     ensureOverlay(state);
     syncOverlay(state);
     // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente.
-    if (daUtente()) scheduleScan(state);
+    if (prendeGesto()) scheduleScan(state);
   }
 
   function detach(el) {
@@ -511,10 +511,11 @@
   // ============================================================================
   // Scan LLM (zigzag blu)
   // ============================================================================
-  // Solo un gesto vero apre una chiamata al modello: `input` e `focus` li fabbrica anche la pagina (#1070).
-  function daUtente() {
+  // Solo un gesto vero apre una chiamata al modello, e una volta sola: `input` e `focus` li fabbrica anche la pagina,
+  // e uno script che dopo un clic scrive quaranta parole ne otterrebbe quaranta controlli (#1070).
+  function prendeGesto() {
     const G = global.SN_GESTO;
-    return Boolean(G && G.recente());
+    return Boolean(G && G.prendi('correttore'));
   }
 
   function scheduleScan(state) {

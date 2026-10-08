@@ -34,7 +34,10 @@ di 1,5 s. Il movimento del mouse non conta: passarci sopra non è chiedere.
    chiedono sull'evento che li fa partire (selezione, `input`, fuoco), non al
    momento della chiamata: lo scan parte 1,5 s dopo.
 2. **Un gesto paga una chiamata per chi lo prende** (`SN_GESTO.prendi(chi)`): uno
-   script che dopo un clic vero cambia la selezione tre volte ne ottiene una.
+   script che dopo un clic vero cambia la selezione tre volte ne ottiene una, e
+   quello che scrive quaranta parole nella casella ottiene un solo controllo del
+   correttore. Chi scrive davvero fa un gesto per tasto, e il controllo resta
+   uno per parola. `recente()` da solo non basta mai a far partire una chiamata.
 3. **Un'azione chiesta a Filo vale come gesto** (`SN_GESTO.segna()`): incolla e
    dettatura arrivano da un menu fuori dalla pagina, o molto dopo il clic.
 4. **A scheda nascosta non si spende**: la chiamata si rimanda e parte al ritorno.

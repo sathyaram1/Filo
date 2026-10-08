@@ -168,6 +168,32 @@ test('il correttore non parte da execCommand, input finti o focus() di script; s
   expect((await conti(app)).parola).toBeGreaterThan(0);
 });
 
+test('un gesto vero paga al più un controllo del correttore: lo script che dopo un clic scrive quaranta parole ne ottiene uno', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  await page.evaluate(() => {
+    window.addEventListener('mouseup', () => {
+      const ta = document.getElementById('ta');
+      ta.focus();
+      for (let i = 0; i < 40; i++) {
+        ta.value += ` xqzparola${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26))} `;
+        ta.selectionStart = ta.selectionEnd = ta.value.length;
+        ta.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
+      }
+    }, { once: true });
+  });
+  await page.mouse.click(700, 20);
+  await pausa(3000);
+  expect((await conti(app)).parola).toBeLessThanOrEqual(1);
+
+  // Chi scrive davvero, parola per parola, ha il suo controllo per ognuna.
+  const prima = (await conti(app)).parola;
+  await page.locator('#ta').click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' qwzuno qwzdue qwztre ');
+  await expect.poll(async () => (await conti(app)).parola - prima, { timeout: 6000 }).toBeGreaterThanOrEqual(3);
+});
+
 // Le schede di dietro di Filo, coi test a finestra fuori schermo, restano «visible»: la scheda nascosta si
 // simula sulla nuova scheda, dove i content script girano nel mondo della pagina e vedono la stessa `document`.
 test('a scheda nascosta il correttore aspetta: riparte quando si torna', async ({ app }) => {
