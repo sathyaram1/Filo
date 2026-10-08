@@ -2574,7 +2574,8 @@ async function eseguiAzioneFilo(action, {
             segnale,
             avanzamento: avanzamento ? (st) => {
               if (!st || st.fase !== 'lettura') return;
-              try { avanzamento(st.fatti, st.totali, st.nome); } catch (_) {}
+              // Il numero è quello del documento che sta leggendo adesso: «1 di 60», non «0 di 60».
+              try { avanzamento(Math.min(st.fatti + 1, st.totali), st.totali, st.nome); } catch (_) {}
             } : null,
           });
         } catch (e) {
@@ -3401,7 +3402,8 @@ function documentSearchesForPrompt(actions) {
     const righe = r.map((x, i) => {
       const tipo = x.tipo === 'pdf' ? `PDF${x.pagine ? `, ${x.pagine} ${x.pagine === 1 ? 'pagina' : 'pagine'}` : ''}` : (x.tipo || '');
       const stato = x.scansione ? ' · SCANSIONE: niente testo, trovato solo per il nome'
-        : (x.senzaTesto ? ' · testo non leggibile da Filo, trovato solo per il nome' : '');
+        : (x.senzaTesto === 'nuvola' ? ' · sta solo nel cloud (OneDrive, iCloud): Filo non lo scarica per leggerlo, trovato solo per il nome'
+          : (x.senzaTesto ? ' · testo non leggibile da Filo, trovato solo per il nome' : ''));
       return [
         `${i + 1}. ${x.nome} · ${dataBreve(x.data)} · ${tipo}${stato}`,
         `   percorso: ${x.percorso}`,

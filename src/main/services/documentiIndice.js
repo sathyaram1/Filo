@@ -182,6 +182,13 @@ async function elimina() {
 
 // ── Il giro: elencare le cartelle, leggere i file nuovi o cambiati ─────────
 
+// Un file di OneDrive o di iCloud che sta solo nel cloud ha la sua misura ma nessun blocco sul disco: leggerlo vorrebbe
+// dire scaricarlo, e su una cartella sincronizzata l'indice scaricherebbe tutto. Si trova per nome. Sotto i 4 KB un file
+// può stare dentro l'indice del disco senza blocchi suoi (NTFS), e scaricarlo non costa niente.
+function soloNelCloud(st) {
+  return !!st && st.size > 4096 && st.blocks === 0;
+}
+
 async function elenca(cartelle) {
   const trovati = new Map();
   let contati = 0;
@@ -204,7 +211,7 @@ async function elenca(cartelle) {
       if (++contati > FILE_MAX) { pieno = true; return; }
       try {
         const st = await fsp.stat(p);
-        trovati.set(p, { m: Math.round(st.mtimeMs), s: st.size });
+        trovati.set(p, { m: Math.round(st.mtimeMs), s: st.size, nuvola: soloNelCloud(st) });
       } catch (_) {}
     }
   }
@@ -237,14 +244,15 @@ async function eseguiGiro(extra) {
   const daLeggere = [];
   for (const [p, st] of trovati) {
     const v = voci.get(p);
-    if (!v || v.m !== st.m || v.s !== st.s) daLeggere.push([p, st]);
+    // Un file che era solo nel cloud e adesso è scaricato si rilegge anche se data e misura sono le stesse.
+    if (!v || v.m !== st.m || v.s !== st.s || (v.e === 'nuvola' && !st.nuvola)) daLeggere.push([p, st]);
   }
   // Prima i più recenti: è più probabile che si cerchi la bolletta arrivata ieri che quella del 2019.
   daLeggere.sort((a, b) => b[1].m - a[1].m);
   let letti = 0;
   for (const [p, st] of daLeggere) {
     avvisa({ fase: 'lettura', fatti: letti, totali: daLeggere.length, nome: path.basename(p) });
-    const r = await deps.estrai(p);
+    const r = st.nuvola ? { testo: '', pagine: 0, vuoto: false, errore: 'nuvola' } : await deps.estrai(p);
     const v = {
       n: path.basename(p), m: st.m, s: st.s, k: tipoDi(p), t: r.testo || '', pg: r.pagine || 0,
       vuoto: !!r.vuoto, e: r.errore || '',
@@ -395,13 +403,20 @@ async function stato() {
   };
 }
 
+// Su macOS leggere Documenti, Scrivania e Download fa comparire la richiesta di permesso del sistema: la prima lettura
+// la fa la prima ricerca chiesta dall'utente, così la richiesta arriva quando ha un senso. Da lì in poi, in sottofondo.
+function giroInSottofondo() {
+  if (process.platform === 'darwin' && !fs.existsSync(fileIndice())) return;
+  aggiorna().catch(() => {});
+}
+
 let avviato = false;
 function avviaInSottofondo() {
   if (avviato) return;
   avviato = true;
-  const t = setTimeout(() => { aggiorna().catch(() => {}); }, AVVIO_MS);
+  const t = setTimeout(giroInSottofondo, AVVIO_MS);
   if (t.unref) t.unref();
-  const i = setInterval(() => { aggiorna().catch(() => {}); }, OGNI_MS);
+  const i = setInterval(giroInSottofondo, OGNI_MS);
   if (i.unref) i.unref();
   const cartelleDi = (s) => JSON.stringify((s && s.documenti && s.documenti.cartelle) || null);
   let prima = null;
@@ -414,7 +429,7 @@ function avviaInSottofondo() {
         if (dopo === prima) return;
         prima = dopo;
         // Una cartella tolta esce dall'indice al giro dopo, e una aggiunta si legge: lo si fa partire subito.
-        if (corsa) daRifare = true; else aggiorna().catch(() => {});
+        if (corsa) daRifare = true; else giroInSottofondo();
       }).catch(() => {});
     });
   } catch (_) {}
@@ -424,5 +439,6 @@ module.exports = {
   configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
   cartellaDiSerie, elimina, DI_SERIE, FRESCO_MS,
   // per gli unit test
+  _giroInSottofondo: giroInSottofondo,
   _azzera: () => { voci = null; caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; },
 };

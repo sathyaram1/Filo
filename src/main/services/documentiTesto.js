@@ -9,7 +9,7 @@ const path = require('node:path');
 
 // Per ritrovare un documento basta l'inizio: una bolletta dice cos'è nella prima pagina, un contratto nelle prime
 // dieci. Il tetto tiene fermo il costo di un libro di trecento pagine, non quello di una bolletta.
-const MAX_CARATTERI = 30000;
+const MAX_CARATTERI = 20000;
 const MAX_PAGINE = 40;
 // Oltre questo peso un file non si apre per l'indice (un PDF da mezzo giga terrebbe occupato il lettore per minuti):
 // resta cercabile per nome, e l'esito lo dice.

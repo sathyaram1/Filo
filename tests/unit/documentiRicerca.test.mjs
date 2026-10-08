@@ -5,7 +5,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { rmSync, unlinkSync, writeFileSync, mkdirSync } from 'node:fs';
+import { rmSync, unlinkSync, writeFileSync, mkdirSync, truncateSync, statSync, existsSync } from 'node:fs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { cartellaDellaProva, BOLLETTA_MARZO, pdf, docx } from '../helpers/documentiFinti.mjs';
 
@@ -148,4 +148,53 @@ test('il testo dei tipi chiesti: PDF con testo, Word, txt e md; un .doc vecchio 
   assert.equal((await Testo.estrai(join(CASA, 'vecchio.doc'))).errore, 'tipo');
   writeFileSync(join(CASA, 'rotto.pdf'), 'non sono un pdf');
   assert.equal((await Testo.estrai(join(CASA, 'rotto.pdf'))).errore, 'illeggibile');
+});
+
+test('un file che sta solo nel cloud (nessun blocco sul disco) non si scarica per leggerlo: si trova per nome', async (t) => {
+  const p = join(DOC, 'scan_nuvola_00777.pdf');
+  writeFileSync(p, '');
+  truncateSync(p, 200 * 1024);
+  if (statSync(p).blocks !== 0) { unlinkSync(p); t.skip('questo disco non fa file vuoti senza blocchi'); return; }
+  const letti = [];
+  Indice._azzera();
+  Indice.configura({ estrai: (q) => { letti.push(q); return Testo.estrai(q); } });
+  try {
+    const r = await Indice.cerca('scan_nuvola_00777');
+    assert.equal(r.risultati[0].nome, 'scan_nuvola_00777.pdf');
+    assert.equal(r.risultati[0].senzaTesto, 'nuvola');
+    assert.ok(!letti.includes(p), 'il file nel cloud non va aperto');
+  } finally {
+    unlinkSync(p);
+    Indice.configura({ estrai: (q) => Testo.estrai(q) });
+  }
+});
+
+test('su Mac le cartelle protette non si leggono in sottofondo prima della prima ricerca chiesta dall\'utente', async () => {
+  const piattaforma = Object.getOwnPropertyDescriptor(process, 'platform');
+  rmSync(DATI, { recursive: true, force: true });
+  Indice._azzera();
+  let letti = 0;
+  Indice.configura({ estrai: (q) => { letti += 1; return Testo.estrai(q); } });
+  try {
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    Indice._giroInSottofondo();
+    await new Promise((ok) => setTimeout(ok, 150));
+    assert.equal(letti, 0, 'in sottofondo, prima di ogni ricerca, nessun documento si apre');
+    assert.equal((await Indice.stato()).aggiornato, null);
+    await Indice.cerca('bolletta');
+    assert.ok(letti > 0, 'la prima ricerca legge');
+    assert.ok(existsSync(join(DATI, 'documenti', 'indice.jsonl')));
+    const nuovo = join(DOC, 'z_mac.txt');
+    writeFileSync(nuovo, 'arrivato dopo');
+    letti = 0;
+    Indice._azzera();
+    Indice._giroInSottofondo();
+    for (let i = 0; i < 40 && !letti; i++) await new Promise((ok) => setTimeout(ok, 25));
+    unlinkSync(nuovo);
+    assert.equal(letti, 1, 'dopo la prima ricerca il giro in sottofondo parte da sé e legge il file nuovo');
+    await Indice.aggiorna();
+  } finally {
+    Object.defineProperty(process, 'platform', piattaforma);
+    Indice.configura({ estrai: (q) => Testo.estrai(q) });
+  }
 });

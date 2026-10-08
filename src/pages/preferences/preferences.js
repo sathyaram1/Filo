@@ -1192,7 +1192,7 @@
     const dove = document.createElement('span');
     dove.className = 'doc-dove';
     dove.textContent = tolta ? 'tolta: Filo non ci cerca'
-      : (info && !info.esiste ? `${info.percorso || voce} · non c'è su questo computer` : ((info && info.percorso) || (CARTELLE_DI_SERIE[voce] ? '' : voce)));
+      : (info && !info.esiste ? `${info.percorso ? `${info.percorso} · ` : ''}non c'è su questo computer` : ((info && info.percorso) || (CARTELLE_DI_SERIE[voce] ? '' : voce)));
     if (dove.textContent) t.appendChild(dove);
     row.appendChild(t);
     const b = document.createElement('button');
