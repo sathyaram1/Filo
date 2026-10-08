@@ -239,6 +239,8 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   tecnico) non spostano feedback dai Ricevuti né dalle conferme `*_confirmed`, non
   lavorano feedback di utenti senza il sì dell'owner e non stampano testo di attacchi: `owner-feedback.mjs`
   rifiuta prima di scrivere.
+  La priorità invece la cambiano su ogni stato, Ricevuti compresi, perché non sposta la pratica:
+  `owner-feedback.mjs <n> --priorita 0..3`, scritta come il pallino di Gestione (cifrata, `priorityManual`).
 - Alla nascita un lavoro locale provato salta i giudici (`pipeline.skipped:
   'local_proven'`, status `todo`). Alla fusione `npm run finish` manda `feedbackId`
   (da `--feedback <N>` o da `verify-local.mjs start --feedback <N>`): se il documento

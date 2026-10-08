@@ -713,7 +713,8 @@ async function main() {
       process.exit(1);
     }
     if (v.ok) {
-      console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
+      console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}${v.server ? `, con il ramo del server ${v.server.ramo} su ${v.server.sha.slice(0, 8)}` : ''}`);
+      if (v.server && v.server.tollerato) console.log(`  ${v.reason}`);
       // Il verdetto vale per un commit. Se dopo di lui dalle prove del giro si
       // è solo tolto, regge lo stesso (#661): quando succede si DICE quali file
       // sono passati, perché un cancello che si apre in silenzio è
@@ -767,6 +768,17 @@ async function main() {
     if (rem.out !== cur) {
       console.error(`\n✗ Su origin '${branch}' è a ${rem.out.slice(0, 8)}, qui siamo a ${cur.slice(0, 8)}.`);
       console.error('  Il server fonderebbe una versione diversa da quella controllata.');
+      process.exit(1);
+    }
+  }
+
+  // I controlli durano minuti: intanto il ramo omonimo del server può essersi mosso, e il verdetto vale
+  // per tutti e due (#1062).
+  {
+    const ancora = verdictForCurrentBranch(ROOT);
+    if (!ancora.ok) {
+      console.error(`\n✗ La verifica non regge più: ${ancora.reason}`);
+      console.error('  Non chiedo la fusione.');
       process.exit(1);
     }
   }

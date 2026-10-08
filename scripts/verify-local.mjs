@@ -55,14 +55,19 @@
 //   Il verdetto vale per il commit su cui è stato dato. Se dopo il PASS si
 //   tocca ancora il codice, il verdetto decade e va rifatto: altrimenti
 //   basterebbe farsi approvare una versione e pubblicarne un'altra.
-//   UNICA eccezione (#661): dopo il verdetto dalle PROVE DEL GIRO si può solo
+//   Con un ramo omonimo nel checkout del server (filo-security) il verdetto
+//   vale per la coppia di commit, app e server, e decade se si muove uno dei
+//   due (#1062; sul server reggono solo le fusioni pulite di main, che
+//   server:fondi pretende: scripts/lib/ramo-server.mjs).
+//   Sull'app, UNICA eccezione (#661): dopo il verdetto dalle PROVE DEL GIRO si può solo
 //   TOGLIERE — una prova intera o un suo caso, quelli dei rilievi diventati un
 //   feedback loro. Il verdetto regge sul commit che lo fa, se lì non si
 //   aggiunge né si cambia una riga e niente sta fuori da `tests/verifica/`.
 //
 // DOVE VIVE
 //   `.claude/verify-local.json`, effimero e gitignorato come gli altri
-//   marcatori di sessione: riguarda questa macchina e questo momento.
+//   marcatori di sessione: riguarda questa macchina e questo momento. Le voci
+//   con il server hanno una copia nel checkout principale (fileVerdettiServer).
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -77,6 +82,9 @@ import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
 import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import {
+  cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
+} from './lib/ramo-server.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
 
@@ -239,9 +247,28 @@ export function leggiCoda(root = ROOT) {
  *   - ha corretto: serve un'altra verifica sul commit nuovo;
  *   - qualcuno ha verificato e si è fermato (un 3/2 non correggibile);
  *   - qualcuno ha verificato e ha approvato, ma POI il codice è cambiato → il
- *     verdetto riguarda una versione che non è quella che uscirebbe.
+ *     verdetto riguarda una versione che non è quella che uscirebbe;
+ *   - lo stesso sul ramo omonimo del server (#1062). `serverOra`: statoRamoServer, null se il server non c'è.
  */
-export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
+export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null, serverOra = undefined) {
+  const app = verdettoApp(entry, headSha, dirty, leggiDiff);
+  if (!app.ok) return app;
+  // Chi non guarda il server non può confermare un verdetto che lo comprende (#1062).
+  if (serverOra === undefined) {
+    return entry.server && entry.server.sha
+      ? { ok: false, reason: `la verifica comprende il ramo del server ${entry.server.ramo}, e qui non è stato guardato` }
+      : app;
+  }
+  const srv = confrontaServer(entry.server, serverOra);
+  if (!srv.ok) return { ok: false, reason: srv.reason };
+  if (!srv.sha) return app;
+  const dettaglio = srv.tollerato
+    ? `; nel ramo del server ${entry.server.ramo}, verificato a ${String(entry.server.sha).slice(0, 8)}, dopo è entrato solo main del server (ora a ${srv.sha.slice(0, 8)})`
+    : `, insieme al ramo del server ${entry.server.ramo} su ${srv.sha.slice(0, 8)}`;
+  return { ...app, server: { ramo: entry.server.ramo, sha: srv.sha, tollerato: !!srv.tollerato }, reason: `${app.reason}${dettaglio}` };
+}
+
+function verdettoApp(entry, headSha, dirty, leggiDiff) {
   if (!entry || (!entry.verdict && !entry.request)) {
     return { ok: false, reason: 'nessuna verifica avviata per questo lavoro' };
   }
@@ -294,6 +321,9 @@ export function checkVerdict(entry, headSha, dirty = false, leggiDiff = null) {
   return { ok: true, reason: 'verifica superata su questo contenuto' };
 }
 
+// Del ramo del server si tiene solo ciò che lega il verdetto: nome e commit. PURA.
+export const coppiaServer = (x) => (x && x.sha ? { ramo: String(x.ramo || ''), sha: String(x.sha) } : null);
+
 // Il numero di un rilievo vale per la critica che lo riporta: nella coda dei giri sarebbe il posto in una critica vecchia.
 const senzaNumero = (l) => l.map(({ n: _n, ...f }) => f);
 
@@ -302,12 +332,13 @@ const senzaNumero = (l) => l.map(({ n: _n, ...f }) => f);
  * I bilanci consumati e i rilievi messi da parte nei giri precedenti dello
  * stesso lavoro sopravvivono: sono del lavoro, non della singola verifica.
  */
-export function withRequest(state, branch, { request, sha, at, feedbackId, feedbackNum }) {
+export function withRequest(state, branch, { request, sha, at, feedbackId, feedbackNum, server = null }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   s[branch] = {
     request: String(request || ''),
     requestedSha: sha || '',
+    requestedServer: coppiaServer(server),
     requestedAt: at || new Date().toISOString(),
     counts: prev.counts || {},
     derived: Array.isArray(prev.derived) ? prev.derived : [],
@@ -333,7 +364,7 @@ export function withRequest(state, branch, { request, sha, at, feedbackId, feedb
  *   outcome 'fix'  → verdict 'fix-pending' (con `pending`: i rilievi da correggere)
  *   outcome 'stop' → verdict 'fail'
  */
-export function withCritique(state, branch, { critique, sha, at, caps, dirtyFiles = [] }) {
+export function withCritique(state, branch, { critique, sha, at, caps, dirtyFiles = [], server = null }) {
   // I bilanci arrivano dal server (leggiBilanciDalServer): qui non c'è un
   // default con cui rimpiazzarli, e mancarne uno è un errore di chi chiama.
   const mancanti = ROUND.missingCaps(caps);
@@ -356,6 +387,8 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   if (Array.isArray(dirtyFiles) && dirtyFiles.length) {
     return { ok: false, state: s, reason: dirtyTreeText(dirtyFiles) };
   }
+  const sporcoServer = testoServerSporco(server, 'la critica vale per i commit');
+  if (sporcoServer) return { ok: false, state: s, reason: `critica non registrata: ${sporcoServer}` };
   // La critica registrata non si modifica più, e un giro non si paga due volte
   // per un comando ripetuto: finché la correzione è in sospeso, prima si
   // consegna.
@@ -412,6 +445,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
     critique: testo,
     findings: parsed.findings,
     sha: sha || '',
+    server: coppiaServer(server),
     at: when,
     counts: decision.counts,
     // Ogni giro tiene anche il TESTO della critica: è la storia che il
@@ -444,7 +478,10 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
     entry.verdict = 'fix-pending';
     // Anche i rilievi messi da parte, gli esterni e i bilanci del giro:
     // servono a ristampare la risposta tale e quale se si è persa.
-    entry.pending = { findings: decision.fix, sha: sha || '', at: when, derived: decision.derived, external: decision.external, budgets: decision.budgets };
+    entry.pending = {
+      findings: decision.fix, sha: sha || '', serverSha: (server && server.sha) || '', at: when,
+      derived: decision.derived, external: decision.external, budgets: decision.budgets,
+    };
     entry.derived = coda.concat(senzaNumero(decision.derived));
   } else {
     entry.verdict = 'pass';
@@ -461,7 +498,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
  */
 export function notaDelGiro(entry, { branch, sha }) {
   const rounds = Array.isArray(entry && entry.rounds) ? entry.rounds : [];
-  const righe = [`Verifica locale, giro ${rounds.length + 1}: avviata sul ramo ${branch} (${String(sha || '').slice(0, 8)}).`];
+  const righe = [`Verifica locale, giro ${rounds.length + 1}: avviata sul ramo ${branch} (${String(sha || '').slice(0, 8)}${testoServer(entry && entry.requestedServer)}).`];
   const prima = rounds[rounds.length - 1];
   if (prima) {
     const rilievi = ROUND.parseFindings(String(prima.critique || '')).findings;
@@ -496,7 +533,7 @@ export function historyFromRounds(rounds) {
  * Rifiuta se non c'era niente in sospeso, o con modifiche non salvate: la
  * consegna vale per un commit, e la verifica dopo deve provare quello.
  */
-export function withFixed(state, branch, { report, sha, at, dirty = false, dirtyFiles = [] }) {
+export function withFixed(state, branch, { report, sha, at, dirty = false, dirtyFiles = [], server = null }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
@@ -516,6 +553,8 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
   if (sporchi.length || dirty) {
     return { ok: false, reason: dirtyTreeText(sporchi, 'consegna') };
   }
+  const sporcoServer = testoServerSporco(server, 'la consegna vale per i commit');
+  if (sporcoServer) return { ok: false, reason: `consegna non registrata: ${sporcoServer}` };
   const when = at || new Date().toISOString();
   const rounds = Array.isArray(prev.rounds) ? prev.rounds.slice() : [];
   const pending = Array.isArray(prev.pending.findings) ? prev.pending.findings : [];
@@ -524,12 +563,15 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
     pending: null,
     fixedReport: String(report || '').slice(0, MAX_CRITIQUE_CHARS),
     fixedSha: sha || '',
+    fixedServer: coppiaServer(server),
     fixedAt: when,
   };
-  // Nessun commit nuovo dopo la critica (o dopo la pulizia): niente è stato
-  // corretto, e non c'è niente da riverificare.
+  // Nessun commit nuovo dopo la critica (o dopo la pulizia), né sull'app né sul ramo del server (#1062): niente è
+  // stato corretto, e non c'è niente da riverificare.
   const partenza = prev.pending.shaPulizia || prev.pending.sha || '';
-  if (sha && partenza && sha === partenza) {
+  const partenzaServer = String(prev.pending.serverSha || '');
+  const serverFermo = partenzaServer === String((server && server.sha) || '');
+  if (sha && partenza && sha === partenza && serverFermo) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
     // Un vicino conta 0 qualunque livello porti scritto: non corretto non ferma, esce coi rimasti.
     const gravi = pending.filter((f) => ROUND.effectiveLevel(f) >= 2);
@@ -543,8 +585,10 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
     return { ok: true, state: s, outcome: 'pass', derived: lievi };
   }
   if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
-  s[branch] = { ...base, verdict: 'fixed', rounds, chiusura: { rilievi: pending, shaPrima: partenza } };
-  return { ok: true, state: s, outcome: 'fixed' };
+  const chiusura = { rilievi: pending, shaPrima: partenza };
+  if (!serverFermo && server && server.sha) Object.assign(chiusura, { ramoServer: server.ramo, shaPrimaServer: partenzaServer });
+  s[branch] = { ...base, verdict: 'fixed', rounds, chiusura };
+  return { ok: true, state: s, outcome: 'fixed', serverMosso: !serverFermo };
 }
 
 /**
@@ -805,6 +849,52 @@ export function readState(root = ROOT) {
 export function writeState(state, root = ROOT) {
   mkdirSync(resolve(root, '.claude'), { recursive: true });
   writeFileSync(stateFile(root), JSON.stringify(state, null, 2) + '\n', 'utf8');
+  specchiaVerdettiServer(state, root);
+}
+
+// Un verdetto che comprende il ramo del server deve sopravvivere al worktree dell'app, tolto magari dopo npm run finish:
+// server:fondi lo cerca qui quando nessun worktree lo ha più (#1062). Sta nel checkout principale, condiviso da tutti.
+export function fileVerdettiServer(root = ROOT) {
+  const common = git(['rev-parse', '--path-format=absolute', '--git-common-dir'], root);
+  return resolve(common ? resolve(common, '..') : root, '.claude', 'verdetti-server.json');
+}
+
+export function leggiVerdettiServer(root = ROOT) {
+  try {
+    const o = JSON.parse(readFileSync(fileVerdettiServer(root), 'utf8'));
+    return (o && typeof o === 'object') ? o : {};
+  } catch (_) { return {}; }
+}
+
+/** Ciò che serve a checkVerdict di una voce che comprende il server; null se il server non c'entra. PURA. */
+export function voceVerdettoServer(entry) {
+  const e = entry || {};
+  if (!(e.server && e.server.sha) && !(e.requestedServer && e.requestedServer.sha)) return null;
+  return {
+    request: String(e.request || '').slice(0, 300),
+    verdict: e.verdict || '',
+    sha: e.sha || '',
+    server: coppiaServer(e.server),
+    requestedServer: coppiaServer(e.requestedServer),
+    critique: String(e.critique || '').slice(0, 2000),
+  };
+}
+
+function specchiaVerdettiServer(state, root) {
+  const f = fileVerdettiServer(root);
+  const tutti = leggiVerdettiServer(root);
+  let cambiato = false;
+  for (const [ramo, entry] of Object.entries(state || {})) {
+    const voce = voceVerdettoServer(entry);
+    if (voce) { tutti[ramo] = voce; cambiato = true; } else if (ramo in tutti) { delete tutti[ramo]; cambiato = true; }
+  }
+  if (!cambiato) return;
+  try {
+    mkdirSync(dirname(f), { recursive: true });
+    writeFileSync(f, JSON.stringify(tutti, null, 2) + '\n', 'utf8');
+  } catch (e) {
+    console.error(`Attenzione: il verdetto non è copiato in ${f} (${String((e && e.message) || e)}): se il worktree sparisce prima di server:fondi, server:fondi non lo trova.`);
+  }
 }
 
 // ─── git ────────────────────────────────────────────────────────────────────
@@ -890,7 +980,61 @@ export function isDirty(root = ROOT) { return git(['status', '--porcelain'], roo
 export function verdictForCurrentBranch(root = ROOT) {
   const branch = currentBranch(root);
   const entry = readState(root)[branch];
-  return { branch, entry, ...checkVerdict(entry, headSha(root), isDirty(root), (base, head) => diffDopoLaVerifica(base, head, root)) };
+  const server = serverDelRamo(branch, { root, entry });
+  return { branch, entry, ...checkVerdict(entry, headSha(root), isDirty(root), (base, head) => diffDopoLaVerifica(base, head, root), server) };
+}
+
+/** Il ramo omonimo nel checkout del server accanto a `root` (statoRamoServer), o null se il server non c'è. */
+export function serverDelRamo(branch, { root = ROOT, entry = null, fetch = false, punta = 'locale', cartellaServer } = {}) {
+  const shaVerificato = (entry && entry.server && entry.server.sha) || '';
+  const cartella = cartellaServer !== undefined ? cartellaServer : cartellaDelServer(root);
+  return statoRamoServer(branch, { cartellaServer: cartella, shaVerificato, fetch, punta });
+}
+
+/**
+ * Il verdetto del lavoro dell'app che ha lo stesso nome del ramo del server, letto da server:fondi: null se nessun
+ * worktree del repo ne ha avviato la verifica. Guarda anche la punta su origin del server, quella che si fonde.
+ */
+export function verdettoDelRamo(ramo, { radice = ROOT, cartellaServer } = {}) {
+  const voci = [];
+  for (const riga of git(['worktree', 'list', '--porcelain'], radice).split('\n')) {
+    if (riga.startsWith('worktree ')) voci.push({ d: riga.slice('worktree '.length).trim(), ramo: '' });
+    else if (riga.startsWith('branch refs/heads/') && voci.length) voci[voci.length - 1].ramo = riga.slice('branch refs/heads/'.length).trim();
+  }
+  // Prima il worktree che ha il ramo davanti: lì sta la verifica viva, altrove al più una copia vecchia.
+  voci.sort((a, b) => Number(b.ramo === ramo) - Number(a.ramo === ramo));
+  const stati = voci.map((x) => ({ ...x, stato: readState(x.d) }));
+  const copie = leggiVerdettiServer(radice);
+  let trovati = stati.map((x) => ({ ...x, entry: x.stato[ramo] })).filter((x) => x.entry && (x.entry.request || x.entry.verdict));
+  if (!trovati.length) {
+    const copia = copie[ramo];
+    if (!copia) {
+      // Su un disco che non distingue le maiuscole git risolve claude/X come claude/x: il nome cercato deve essere quello che si fonde.
+      const quasi = [...stati.flatMap((x) => Object.keys(x.stato)), ...Object.keys(copie)].find((k) => k.toLowerCase() === String(ramo).toLowerCase());
+      return quasi ? { ok: false, cartella: radice, entry: null, reason: `la verifica è del ramo ${quasi}, che si scrive diverso da ${ramo} solo nelle maiuscole: rilancia col nome esatto` } : null;
+    }
+    trovati = [{ d: radice, ramo: '', entry: copia }];
+  }
+  const { d, entry } = trovati[0];
+  const qui = trovati[0].ramo === ramo;
+  let head = qui ? headSha(d) : git(['rev-parse', '--verify', '--quiet', `refs/heads/${ramo}`], radice);
+  // L'app già fusa e il suo ramo cancellato: quello che conta è che il commit verificato sia su main.
+  if (!head && entry.sha && ['refs/remotes/origin/main', 'refs/heads/main'].some((m) => tryGit(['merge-base', '--is-ancestor', entry.sha, m], radice).ok)) head = entry.sha;
+  if (!head) return { ok: false, cartella: d, entry, reason: `il ramo dell'app ${ramo}, verificato insieme a questo, non si trova più nel repo` };
+  const diff = (base, h) => diffDopoLaVerifica(base, h, d);
+  const opz = { root: d, entry, cartellaServer, fetch: true };
+  const v = checkVerdict(entry, head, qui && isDirty(d), diff, serverDelRamo(ramo, opz));
+  const origine = v.ok ? serverDelRamo(ramo, { ...opz, fetch: false, punta: 'origine' }) : null;
+  const verificato = (v.server && v.server.sha) || '';
+  if (origine && origine.sha && origine.sha !== origine.locale) {
+    // Origin indietro rispetto allo sha verificato è un push mancato, non un ramo mosso: server:fondi spinge lui lo sha verificato.
+    if (verificato && tryGit(['merge-base', '--is-ancestor', origine.sha, verificato], origine.radice).ok) {
+      return { cartella: d, entry, ...v, reason: `${v.reason}; su origin il ramo del server è ancora a ${origine.sha.slice(0, 8)}, indietro: porto io lo sha verificato` };
+    }
+    const o = checkVerdict(entry, head, qui && isDirty(d), diff, origine);
+    if (!o.ok) return { cartella: d, entry, ...o, reason: `su origin: ${o.reason}` };
+  }
+  return { cartella: d, entry, ...v };
 }
 
 // ─── Il testo consegnato all'istanza che verifica ───────────────────────────
@@ -900,7 +1044,7 @@ export function verdictForCurrentBranch(root = ROOT) {
  * ramo; NON il diff, NON i file toccati, NON il report di chi ha lavorato.
  * PURA (testata): è il punto in cui l'isolamento o c'è o non c'è.
  */
-export function buildVerifierBrief({ request, branch, recipe, history, scope, perimetro }) {
+export function buildVerifierBrief({ request, branch, recipe, history, scope, perimetro, server = null }) {
   const stretto = verifierScope(scope).scope === 'chiusura';
   const past = Array.isArray(history) && history.length
     ? ['', 'CRITICHE DEI GIRI PASSATI su questo stesso lavoro (dalla più vecchia): le porte già',
@@ -935,6 +1079,10 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     ...past,
     '',
     `RAMO DA PROVARE: ${branch} (è già quello su cui sei: non cambiarlo)`,
+    ...(server && server.sha ? [
+      `PARTE DEL SERVER: il ramo ${server.ramo} di filo-security (${String(server.sha).slice(0, 8)}${server.checkout ? `, in ${server.checkout}` : ''}).`,
+      'È lo stesso lavoro e il tuo esito vale anche per lui: le regole di isolamento valgono anche lì, e non cambiarlo.',
+    ] : []),
     '',
     ...(stretto
       ? ['IL TUO COMPITO: un giro prima ha trovato dei rilievi e sono stati corretti. Controlla',
@@ -1136,8 +1284,9 @@ if (isMain) {
     // Ramo e sha si rileggono: il riallineamento può averli riscritti, e il
     // verdetto deve legarsi al contenuto vero.
     const b = currentBranch();
+    const srvStart = serverDelRamo(b);
     const state = withRequest(readState(), b, {
-      request, sha: headSha(), feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '',
+      request, sha: headSha(), feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '', server: srvStart,
     });
     const partenza = state[b].chiusura && state[b].chiusura.shaPrima;
     if (partenza) {
@@ -1163,13 +1312,18 @@ if (isMain) {
     const scope = ambitoLocale(capsStart, state[b]);
     console.log(buildVerifierBrief({
       request, branch: b, recipe: readRecipe(ROOT, scope), history: historyFromRounds(state[b].rounds),
-      scope, perimetro: state[b].chiusura,
+      scope, perimetro: state[b].chiusura, server: srvStart,
     }));
     // I bilanci servono a chi guida, non a chi verifica: sapere prima quanti
     // giri restano per livello orienta il livello che si scrive. Vanno
     // sull'altro canale, fuori dal compito che si consegna.
     console.error(bilanciText(capsStart));
     console.error('Ambito della verifica: ' + (scope === 'chiusura' ? 'chiusura (giro stretto acceso, e il giro prima è stato corretto)' : 'pieno'));
+    if (srvStart && srvStart.sha) {
+      console.error(`Parte del server: ${srvStart.ramo} di filo-security su ${srvStart.sha.slice(0, 8)}. Il verdetto vale per tutti e due i rami, e decade se uno dei due si muove.`);
+      const sporco = testoServerSporco(srvStart, 'la critica si registra solo sui commit');
+      if (sporco) console.error(`Attenzione: ${sporco}`);
+    }
     console.error(state[b].feedbackId
       ? `Pratica del lavoro: ${state[b].feedbackNum ? '#' + state[b].feedbackNum : state[b].feedbackId} (la porta npm run finish).`
       : 'Nessuna pratica collegata. Ogni lavoro locale ha il suo feedback, e senza npm run finish non chiede la fusione: aprilo (npm run feedback:apri -- "<titolo>" "<cosa fa il lavoro>" --locale) e rilancia start --feedback <N>.');
@@ -1213,13 +1367,17 @@ if (isMain) {
     const stato = statoDirectory(ROOT);
     if (!stato.ok) { console.error(statoIllegibileText(stato.motivo)); process.exit(1); }
     // A correzione in sospeso il codice si muove di diritto (la stessa critica ristampa la risposta).
+    const srv = serverDelRamo(branch);
     if (!stato.lines.length && prev.verdict !== 'fix-pending') {
       const fermo = codiceCambiatoDallAvvio(prev.requestedSha, ROOT);
       if (fermo.cambiati.length) { console.error(testoCodiceCambiato(fermo.cambiati, prev.requestedSha)); process.exit(1); }
+      // Un avvio precedente a #1062 non ha registrato il server: lì non c'è niente con cui confrontarlo.
+      const mosso = 'requestedServer' in prev ? testoServerMossoDallAvvio(prev.requestedServer, srv) : '';
+      if (mosso) { console.error(mosso); process.exit(1); }
     }
     // I bilanci dal server, PRIMA di calcolare l'esito: nessun default.
     const caps = await bilanciOStop();
-    const r = withCritique(readState(), branch, { critique: text, sha, caps, dirtyFiles: stato.lines });
+    const r = withCritique(readState(), branch, { critique: text, sha, caps, dirtyFiles: stato.lines, server: srv });
     if (r.ok === false) { console.error(r.reason); process.exit(1); }
     if (!r.replayed) writeState(r.state);
     const e = r.state[branch];
@@ -1236,7 +1394,7 @@ if (isMain) {
       }
       console.log(`Bilanci: ${bilanciResiduiText(r.decision.budgets)}`);
     } else {
-      console.log(`══ ESITO: verifica superata per '${branch}' su ${sha.slice(0, 8)} ══`);
+      console.log(`══ ESITO: verifica superata per '${branch}' su ${sha.slice(0, 8)}${testoServer(e.server)} ══`);
       if (e.derived && e.derived.length) {
         console.log(`Rilievi non corretti, da riportare nel report per l'owner (esterni e domande un feedback ciascuno, gli altri un feedback solo, come raggruppati qui):\n${derivatiText(e.derived)}`);
         const due = dueDaParteText(r.decision.derived);
@@ -1304,15 +1462,17 @@ if (isMain) {
       if (tolte.ferma) { console.error(tolte.testo); process.exit(1); }
       if (tolte.testo) console.log(tolte.testo);
     }
-    const r = withFixed(readState(), branch, { report, sha, dirtyFiles: statoC.lines });
+    const srvC = serverDelRamo(branch);
+    const r = withFixed(readState(), branch, { report, sha, dirtyFiles: statoC.lines, server: srvC });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
     writeState(r.state);
+    const nessuno = `Nessun commit nuovo dopo la critica${srvC && srvC.sha ? `, né su '${branch}' né sul ramo del server` : ''}`;
     if (r.outcome === 'stop') {
-      console.log(`Nessun commit nuovo dopo la critica: i rilievi di livello 3/2 restano aperti e non si correggono da soli. Il lavoro si ferma: decide l'owner.\n${ROUND.formatFindings(r.blocking)}`);
+      console.log(`${nessuno}: i rilievi di livello 3/2 restano aperti e non si correggono da soli. Il lavoro si ferma: decide l'owner.\n${ROUND.formatFindings(r.blocking)}`);
       process.exit(0);
     }
     if (r.outcome === 'pass') {
-      console.log(`Nessun commit nuovo dopo la critica: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}.`);
+      console.log(`${nessuno}: niente da riverificare. Verifica superata per '${branch}' su ${sha.slice(0, 8)}${testoServer(r.state[branch].server)}.`);
       console.log(`Rilievi non corretti, da riportare nel report per l'owner (esterni e domande un feedback ciascuno, gli altri un feedback solo, come raggruppati qui):\n${derivatiText(r.derived)}`);
       // Stessa uscita, stesso consiglio: di qui esce un pass con rilievi
       // aperti esattamente come da «critica», e le loro prove del giro vanno
@@ -1320,7 +1480,7 @@ if (isMain) {
       console.log(testoProveDaCancellare(branch, r.derived));
       process.exit(0);
     }
-    console.log(`Correzione consegnata su '${branch}' (${sha.slice(0, 8)}). Serve un'altra verifica, di un'altra istanza:`);
+    console.log(`Correzione consegnata su '${branch}' (${sha.slice(0, 8)}${testoServer(srvC)}). Serve un'altra verifica, di un'altra istanza:`);
     console.log('  node scripts/verify-local.mjs start');
     process.exit(0);
   }
