@@ -275,12 +275,12 @@ async function riavvia(versioneInUso, { automatici = false, versione = '0.3.0', 
   return u;
 }
 
-test('spento, «Installa» e Filo chiuso a metà scaricamento: al riavvio la versione chiesta riprende e si installa', async () => {
+perOgniSistema('spento, «Installa» e Filo chiuso a metà scaricamento: al riavvio la versione chiesta riprende e si installa', async (s) => {
   for (const via of ['carta', 'chat']) {
     await conDiscoFinto(async () => {
       memoriaFinta();
       const prima = aggiornatoreFinto({ lento: true });
-      await avvia(prima, false);
+      await avvia(prima, false, s);
       if (via === 'chat') vive()[0].dismissed = true;
       await U.installaAggiornamento();
       await calma();
