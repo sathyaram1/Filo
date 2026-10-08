@@ -176,6 +176,13 @@ function registerIpcHandlers() {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
+  // È la chiave a essere stata rifiutata (credito finito compreso, moderazione
+  // no)? Lo decide SN_WALLET, una volta sola; qui viaggia con l'errore perché
+  // chi lo mostra possa offrire la pagina Crediti invece del solo «Riprova».
+  const rifiutoDellaChiave = (err) => {
+    try { return Boolean(globalThis.SN_WALLET?.keyRefusalOf?.(err)); } catch (_) { return false; }
+  };
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
@@ -188,7 +195,7 @@ function registerIpcHandlers() {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
       console.error('[Filo IPC] handler error', msg?.type, err);
-      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN' };
+      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN', keyRefused: rifiutoDellaChiave(err) };
     }
   });
 
@@ -229,7 +236,17 @@ function registerIpcHandlers() {
         send('done', { ...result });
       } catch (err) {
         console.warn('[Filo IPC] stream error', requestId, err);
-        send('error', { message: err.message || String(err), code: err.code || 'UNKNOWN' });
+        // Lo stream dice quello che dice la risposta di `filo:message`: senza
+        // status, fornitore e frase già scritta chi mostra l'errore non può
+        // ricomporlo e finisce per stampare la riga grezza del servizio (#663).
+        send('error', {
+          message: err.message || String(err),
+          code: err.code || 'UNKNOWN',
+          status: Number(err && err.status) || 0,
+          provider: (err && err.provider) || '',
+          userMessage: (err && typeof err.userMessage === 'string') ? err.userMessage : '',
+          keyRefused: rifiutoDellaChiave(err),
+        });
       } finally {
         inFlightStreams.delete(requestId);
       }
@@ -541,6 +558,18 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win && win._filoTabs.avvisi) win._filoTabs.avvisi.aggiorna(stato);
   });
+
+  // ─── barra laterale (#871) ────────────────────────────────────────────────
+  // Solo la shell della propria finestra: tema e profilo che mostra, e la maniglia.
+  const barraDellaShell = (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed() || win.webContents !== event.sender) return null;
+    return win._filoTabs?.barra || null;
+  };
+  ipcMain.on('barra:dalla-shell', (event, dati) => { barraDellaShell(event)?.dallaShell(dati); });
+  ipcMain.on('barra:commuta', (event) => { barraDellaShell(event)?.commuta('clic'); });
+  ipcMain.on('barra:chiudi', (event) => { barraDellaShell(event)?.chiudi(); });
+  ipcMain.on('barra:menu-maniglia', (event, dati) => { barraDellaShell(event)?.menuDellaManiglia(dati); });
 
   // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
   ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {

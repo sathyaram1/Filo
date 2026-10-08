@@ -1,7 +1,7 @@
 // Punti d'accesso del canale Red-team (spec §2 accesso/navigazione, §8.1 invio).
 //
 // Assert di COMPORTAMENTO (non "non crasha"):
-//   1) la home ha un controllo Red-team in alto a destra che apre filo://redteam/;
+//   1) la barra laterale ha un controllo Red-team che apre filo://redteam/;
 //   2) il pannello "Invia attacco" ha DUE campi separati (testo + descrizione)
 //      e un bottone d'invio che mostra il costo (50 cr);
 //   3) il bottone d'invio non procede con testo attacco vuoto (validazione);
@@ -11,34 +11,23 @@
 // + funzione pura iniettata via page.evaluate).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
 
 const RT_URL = 'filo://redteam/redteam.html';
 
-async function newtabPage(app) {
-  const deadline = Date.now() + 10_000;
-  let win = null;
-  while (Date.now() < deadline) {
-    win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
-    if (win) break;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  expect(win, 'newtab non trovata entro 10s').toBeTruthy();
-  await win.waitForLoadState('domcontentloaded');
-  return win;
-}
-
-test('la home ha un controllo Red-team in alto a destra che apre la pagina red-team', async ({ app, shell }) => {
+test('la barra laterale ha un controllo Red-team che apre la pagina red-team', async ({ app, shell }) => {
   await apriRedteamATutti(app);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
 
-  // Il controllo esiste tra i controlli della home (#dashControls).
-  const rtBtn = page.locator('#dashControls .dash-ctrl[data-command="redteam"]');
-  await expect(rtBtn).toBeVisible({ timeout: 8_000 });
+  // Il controllo sta in fondo alla barra (da #871 non più in alto nella home).
+  const rtBtn = barra.locator('#fisse [data-comando="redteam"]');
+  await expect(rtBtn).toBeVisible();
   await expect(rtBtn).toHaveAttribute('aria-label', /red-team/i);
 
-  // Cliccandolo si apre una scheda sulla pagina red-team.
   await rtBtn.click();
   const deadline = Date.now() + 10_000;
   let opened = null;

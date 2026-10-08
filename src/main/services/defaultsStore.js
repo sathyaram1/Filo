@@ -53,6 +53,14 @@ const CREDITS_DOC = 'config/credits';
 const REDTEAM_DOC = 'config/redteam';
 
 // Cache degli override remoti dall'ultimo refresh.
+// Campi del doc modelli lasciati dal fornitore ritirato: il salvataggio li toglie.
+const CAMPI_RITIRATI = ['geminiDirect'];
+
+function fornitoreNoto(p) {
+  const C = globalThis.SN_CONST || {};
+  return typeof p === 'string' && (C.PROVIDER_ORDER || ['openrouter']).includes(p);
+}
+
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
 // Popolato SOLO quando chi usa Filo è admin (#581): per tutti gli altri resta
 // null e le chiavi effettive sono quelle del build.
@@ -150,6 +158,8 @@ async function refresh() {
   const admin = isAdminUser();
   let dentro = false;
   try { dentro = Boolean(auth.isSignedIn()); } catch (_) {}
+  let prima = null;
+  try { prima = JSON.stringify(get()); } catch (_) { prima = null; }
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
   const tokenMancato = (admin || dentro) && !idToken;
@@ -180,7 +190,23 @@ async function refresh() {
   // la rete tornava un istante dopo. Riprovare subito non è un ciclo: qui ci
   // si passa solo all'avvio, all'accesso e quando una pagina chiede la config.
   if (risposto) lastFetchTs = adesso();
-  return get();
+  const dopo = get();
+  // La configurazione condivisa arriva dalla RETE, e la prima home è già a
+  // schermo quando arriva: chi decide se Filo può rispondere deve poterlo
+  // rifare adesso, invece di lasciare l'utente sul cartello «non posso
+  // rispondere» finché non ricarica (#663).
+  let dopoJson = null;
+  try { dopoJson = JSON.stringify(dopo); } catch (_) { dopoJson = null; }
+  if (prima !== dopoJson) {
+    for (const fn of ascoltatori) { try { fn(dopo); } catch (_) {} }
+  }
+  return dopo;
+}
+
+// Chi vuole sapere che la configurazione condivisa è cambiata davvero.
+const ascoltatori = [];
+function onChanged(fn) {
+  if (typeof fn === 'function') ascoltatori.push(fn);
 }
 
 // Ogni quanto la config remota si rilegge da sola. Cinque minuti erano
@@ -367,7 +393,13 @@ async function update(partial, idToken) {
   // Doc modelli (non segreto).
   const modelFields = {};
   const modelMask = [];
-  if (typeof partial.provider === 'string') { modelFields.provider = toFsValue(partial.provider); modelMask.push('provider'); }
+  // Il fornitore dichiarato si riscrive a ogni salvataggio dei modelli, anche se
+  // l'editor non lo mostra: un valore ritirato restava lì per sempre (#663).
+  if (typeof partial.provider === 'string' || partial.models || partial.modelRegistry) {
+    const C = globalThis.SN_CONST || {};
+    modelFields.provider = toFsValue(fornitoreNoto(partial.provider) ? partial.provider : (C.DEFAULT_PROVIDER || 'openrouter'));
+    modelMask.push('provider');
+  }
   if (partial.models && typeof partial.models === 'object') { modelFields.models = toFsValue(partial.models); modelMask.push('models'); }
   if (partial.modelRegistry && typeof partial.modelRegistry === 'object') {
     modelFields.modelRegistry = toFsValue(partial.modelRegistry);
@@ -421,6 +453,8 @@ async function update(partial, idToken) {
     modelFields.sitiDelicati = toFsValue(clean);
     modelMask.push('sitiDelicati');
   }
+  // Nella maschera ma non nel corpo: Firestore li cancella.
+  if (modelMask.length) modelMask.push(...CAMPI_RITIRATI);
   if (modelMask.length) {
     await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
     // Il salvato entra subito nella copia: se la rilettura qui sotto non arriva,
@@ -813,6 +847,7 @@ module.exports = {
   get,
   fornitoreUsabile,
   getPublicForAdmin,
+  onChanged,
   refresh,
   refreshIfStale,
   DEFAULT_MAX_AGE_MS,

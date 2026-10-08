@@ -118,7 +118,7 @@ function inModalitaTest(env = process.env) {
 }
 
 /**
- * Sostituisce openExternal/openPath dello `shell` di Electron con versioni che
+ * Sostituisce openExternal/openPath/showItemInFolder dello `shell` di Electron con versioni che
  * non aprono niente. No-op fuori dalla modalità test (lo shell resta com'è).
  * Ritorna true se ha sostituito.
  */
@@ -129,6 +129,8 @@ function silenziaApertureDiSistema(shell, {
   if (!inTest || !shell) return false;
   shell.openExternal = async (url) => { avvisa(`[test] openExternal soppresso: ${url}`); };
   shell.openPath = async (p) => { avvisa(`[test] openPath soppresso: ${p}`); return ''; };
+  // Anche il gestore file con il file selezionato: su Linux passa da DBus o da xdg-open come openPath.
+  shell.showItemInFolder = (p) => { avvisa(`[test] showItemInFolder soppresso: ${p}`); };
   return true;
 }
 

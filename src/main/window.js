@@ -32,6 +32,29 @@ function revealWindow(win) {
   } catch (_) {}
 }
 
+// Chi deve sapere che è nata una finestra normale fuori dall'avvio (il main ci
+// tiene il suo riferimento): senza, resterebbe puntato a una finestra chiusa.
+const osservatoriFinestraNormale = [];
+function onFinestraNormale(cb) { if (typeof cb === 'function') osservatoriFinestraNormale.push(cb); }
+
+// Durante la chiusura di Filo una finestra nuova annullerebbe l'uscita: chi ha
+// chiesto di uscire se lo vedrebbe riaprire da solo.
+let inChiusura = false;
+try { require('electron').app.on('before-quit', () => { inChiusura = true; }); } catch (_) {}
+
+// Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
+// non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
+function assicuraFinestraNormale() {
+  const esistente = BrowserWindow.getAllWindows().find((w) => {
+    try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
+  });
+  if (esistente) return esistente;
+  if (inChiusura) return null;
+  const win = createMainWindow();
+  for (const cb of osservatoriFinestraNormale) { try { cb(win); } catch (_) {} }
+  return win;
+}
+
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
 function wireWindowCommon(win, tabs) {
@@ -48,6 +71,11 @@ function wireWindowCommon(win, tabs) {
   } catch (_) {}
 
   win.on('resize', () => tabs.layout());
+  // Se si chiude la finestra che stava suonando, il turno passa a un'altra:
+  // senza questo avviso il rumore morirebbe con la finestra, scadenza viva.
+  win.on('closed', () => {
+    try { require('./services/handlers').broadcastLiveUpdate(); } catch (_) {}
+  });
   // Se la finestra va a tutto schermo per una strada che non è quella di Filo
   // (gesto o scorciatoia del sistema, gestore finestre), adottiamo la modalità
   // invece di limitarci al layout: altrimenti resterebbe uno schermo intero che
@@ -73,6 +101,8 @@ function wireWindowCommon(win, tabs) {
   // handleFullscreenEscape risponde false e l'Esc resta a chi lo usa nella barra
   // (il pannello degli scaricamenti si chiude ancora con Esc).
   win.webContents.on('before-input-event', (event, input) => {
+    // La barra laterale prima: il suo tasto, e l'Esc che la chiude prima di uscire dalla modalità.
+    if (tabs.barra && tabs.barra.tasto(input)) { event.preventDefault(); return; }
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
   });
@@ -215,4 +245,7 @@ function createIncognitoWindow() {
   return win;
 }
 
-module.exports = { createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT };
+module.exports = {
+  createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT,
+  assicuraFinestraNormale, onFinestraNormale,
+};

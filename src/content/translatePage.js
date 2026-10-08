@@ -94,6 +94,8 @@
   // tradurli: scoprire del testo e riceverlo dal sito, per chi guarda lo
   // schermo, sono la stessa cosa (#407).
   let hiddenSkipped = [];
+  // Lo stesso per i riquadri incorporati nascosti al momento della traduzione (#503): non si sono svegliati.
+  let hiddenFrames = [];
   // Una sezione si apre o si chiude solo se la pagina cambia o se l'utente la tocca: finché nessuna delle due
   // cose succede, la risposta di prima vale ancora.
   let revealedDirty = true;
@@ -225,6 +227,7 @@
           stopWatchingNewContent();
           newContentSeen = false;
           hiddenSkipped = [];
+          hiddenFrames = [];
           revealedDirty = true;
           revealedAnswer = false;
         }
@@ -439,25 +442,109 @@
   // invece di dichiarare tradotta una pagina con dentro un rettangolo in
   // inglese (#407).
 
-  // Quanti riquadri incorporati vale la pena guardare qui dentro. Serve alla
-  // pagina per sapere quante risposte aspettarsi: chi non risponde è un
-  // riquadro che nessuno script può toccare, e va detto.
-  function visibleEmbeddedFrames() {
-    let n = 0;
+  // I riquadri di questo documento, divisi da chi li guarda come guarda il resto della pagina (#503): quelli da
+  // contare e quelli che non si contano. Fra questi ultimi, a parte, quelli nascosti adesso che l'utente può aprire.
+  // Chi non si conta non deve nemmeno rispondere: un "ci sono" in più coprirebbe nel conto un riquadro muto.
+  function embeddedFrames() {
+    const shown = [];
+    const skipped = [];
+    const folded = [];
     try {
-      for (const f of document.querySelectorAll('iframe, frame')) {
-        const r = f.getBoundingClientRect();
-        if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) continue;
-        if (isInsideFiloUi(f)) continue;
+      for (const f of framesOf(document)) {
         // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo
         // che possa rispondere, ma il testo lo prende l'estrazione da qui.
-        // Aspettarne una risposta vorrebbe dire dire "una parte è rimasta
-        // fuori" su un rettangolo che invece è stato tradotto.
         if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) continue;
-        n++;
+        const nascosto = frameHidden(f);
+        if (isInsideFiloUi(f)) { skipped.push(f); continue; }
+        // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
+        // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
+        if (frameTooSmall(f)) { skipped.push(f); if (nascosto) folded.push(f); continue; }
+        if (nascosto) {
+          skipped.push(f);
+          folded.push(f);
+          continue;
+        }
+        shown.push(f);
       }
     } catch (_) {}
-    return n;
+    return { shown, skipped, folded };
+  }
+
+  // Anche i riquadri dentro i componenti aperti del sito: un incorporato avvolto in un componente è la norma. E quelli
+  // dentro un riquadro riempito dalla pagina (gli spazi pubblicitari): lì non c'è un Filo che li giudichi al posto nostro.
+  function framesOf(root) {
+    const out = [];
+    const roots = [root];
+    while (roots.length) {
+      const r = roots.pop();
+      let all;
+      try { all = r.querySelectorAll('*'); } catch (_) { continue; }
+      for (const el of all) {
+        const t = el.tagName;
+        if (t === 'IFRAME' || t === 'FRAME') {
+          out.push(el);
+          const body = Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(el);
+          if (body && body.ownerDocument) roots.push(body.ownerDocument);
+        }
+        if (el.shadowRoot) roots.push(el.shadowRoot);
+      }
+    }
+    return out;
+  }
+
+  // Il riquadro della pagina che ospita `el`, quando `el` sta dentro uno riempito dalla pagina; null al primo livello.
+  function hostFrameOf(el) {
+    try {
+      const w = el.ownerDocument && el.ownerDocument.defaultView;
+      return w && w !== window ? w.frameElement : null;
+    } catch (_) { return null; }
+  }
+
+  // Un riquadro è nascosto se lo è lui o uno dei riquadri della pagina che lo contengono.
+  function frameHidden(f) {
+    if (!(Extract && typeof Extract.isHiddenFromUser === 'function')) return false;
+    for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
+      if (Extract.isHiddenFromUser(el)) return true;
+    }
+    return false;
+  }
+
+  // Sotto le misure minime, lui o chi lo contiene: dentro un francobollo non c'è niente da leggere. Conta la finestra
+  // da cui si vede, non il rettangolo: un riquadro grande dietro una finestrella da un pixel è un francobollo.
+  function frameTooSmall(f) {
+    const misura = (el) => {
+      if (Extract && typeof Extract.clippedExtent === 'function') return Extract.clippedExtent(el);
+      const r = el.getBoundingClientRect();
+      return { w: r.width, h: r.height };
+    };
+    for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
+      const m = misura(el);
+      if (m.w < FRAME_MIN_W || m.h < FRAME_MIN_H) return true;
+    }
+    return false;
+  }
+
+  // Il giudizio arriva al riquadro prima della parola di tradurre: lo legge il suo preload, che senza un sì non lo
+  // sveglia. La chiave è scritta uguale in page-preload.js.
+  function tellFrames(runId, list, visible) {
+    for (const f of list) {
+      try {
+        const w = f.contentWindow;
+        if (w) w.postMessage({ filoFrameVerdict: 1, runId: String(runId), visible: !!visible }, '*');
+      } catch (_) {}
+    }
+  }
+
+  // Un riquadro nascosto alla traduzione che adesso si vede: per il menu è testo scoperto come gli altri.
+  function framesRevealed() {
+    for (const f of hiddenFrames) {
+      try {
+        if (!f.isConnected) continue;
+        if (frameTooSmall(f)) continue;
+        if (!frameHidden(f)) return true;
+      } catch (_) {}
+    }
+    return false;
   }
 
   // Vale la pena tradurre QUESTO riquadro? Un rettangolo grande come un
@@ -504,9 +591,13 @@
   // nessuno di visibile, non si spende nemmeno un messaggio.
   async function beginFrames(myRun) {
     if (!isTopFrame()) return null;
-    const expected = visibleEmbeddedFrames();
+    const { shown, skipped, folded } = embeddedFrames();
+    hiddenFrames = folded;
+    const expected = shown.length;
     if (!expected) return null;
     const runId = 'r' + myRun;
+    tellFrames(runId, skipped, false);
+    tellFrames(runId, shown, true);
     // Chi non si farà vivo resta nel conto: `expected` sono i riquadri che si
     // VEDONO, e un rettangolo visibile che nessuno script raggiunge è
     // esattamente ciò che l'avviso finale deve confessare.
@@ -562,7 +653,12 @@
     if (isTopFrame()) return;
     const runId = String((msg && msg.runId) || '');
     if (String(msg && msg.mode) === 'restore') { restoreOriginal({ quiet: true }); return; }
-    reportToHost(runId, { phase: 'ack', frames: visibleEmbeddedFrames() });
+    // Qui arriva solo un riquadro che chi lo ospita vede (il preload ha fermato gli altri): ai suoi passa lo stesso
+    // giudizio, e nel "ci sono" dice quanti ne contare.
+    const { shown, skipped } = embeddedFrames();
+    tellFrames(runId, skipped, false);
+    tellFrames(runId, shown, true);
+    reportToHost(runId, { phase: 'ack', frames: shown.length });
     if (!worthTranslatingHere()) { reportToHost(runId, { phase: 'end', applied: 0, left: 0 }); return; }
     translatePage({ quiet: true, runId });
   }
@@ -749,15 +845,12 @@
     return { ok: false, error: errFrom(null) };
   }
 
-  // La risposta d'errore che arriva dal main è un oggetto piatto
-  // ({ error, code }): lo ricompone nella forma che SN_CHAT_ERRORS sa leggere
-  // (message/code/status), così "chiave rifiutata", "servizio sovraccarico" e
-  // "rete caduta" diventano frasi diverse invece di un unico messaggio generico.
+  // La regola sta in SN_CHAT_ERRORS, una volta sola: ricomporre a mano la
+  // risposta d'errore dell'IPC faceva perdere il codice a chi se lo scordava.
   function errFrom(res) {
-    const e = new Error(String((res && res.error) || 'translate_failed'));
-    if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
-    if (res && Number(res.status) > 0) e.status = Number(res.status);
-    return e;
+    const CE = global.SN_CHAT_ERRORS;
+    return CE ? CE.fromResponse(res, 'translate_failed')
+      : new Error(String((res && res.error) || 'translate_failed'));
   }
 
   // Sostituisce il contenuto dell'unità con la traduzione, rimettendo i figli
@@ -924,6 +1017,7 @@
     stopWatchingNewContent();
     newContentSeen = false;
     hiddenSkipped = [];
+    hiddenFrames = [];
     revealedDirty = true;
     revealedAnswer = false;
     // Il lavoro ancora in volo smette di essere quello buono: quando le
@@ -1014,7 +1108,7 @@
     if (!revealedDirty) return revealedAnswer;
     revealedDirty = false;
     revealedAnswer = !!(Extract && typeof Extract.hasRevealedText === 'function'
-      && Extract.hasRevealedText(hiddenSkipped));
+      && Extract.hasRevealedText(hiddenSkipped)) || framesRevealed();
     return revealedAnswer;
   }
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi

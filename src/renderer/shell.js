@@ -17,6 +17,22 @@
   const tabsEl = document.getElementById('tabs');
   const newBtn = document.getElementById('tab-new');
   if (newBtn) newBtn.dataset.tip = `Nuova scheda (${tasto('Ctrl+T')})`;
+  // #871 — la maniglia apre e chiude la barra laterale; un clic altrove nella fila la chiude.
+  const manigliaBarra = document.getElementById('barra-maniglia');
+  if (manigliaBarra) {
+    manigliaBarra.dataset.tip = `Barra laterale (${TASTI && TASTI.etichettaBarra ? TASTI.etichettaBarra() : tasto('Ctrl+Shift+B')})`;
+    manigliaBarra.addEventListener('click', (e) => { if (e.isTrusted) api.barra?.commuta(); });
+    // Tasto destro: le scelte della striscia (aprirla, nasconderla, spegnere l'apertura dal bordo, regolarla).
+    manigliaBarra.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.isTrusted) api.barra?.menu?.(Math.round(e.clientX), Math.round(e.clientY));
+    });
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.isTrusted || (manigliaBarra && manigliaBarra.contains(e.target))) return;
+    try { api.barra?.chiudi(); } catch (_) {}
+  }, true);
   const backBtn = document.getElementById('nav-back');
   const fwdBtn = document.getElementById('nav-forward');
   const reloadBtn = document.getElementById('nav-reload');
@@ -67,6 +83,13 @@
   // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
   // notifiche successive rispettano i nuovi valori senza riavviare.
   let notifConfig = { durationSec: 5, soundEnabled: false, sound: 'default' };
+  // Un volume assente o storto vale «pieno»: il silenzio si sceglie, non si
+  // eredita da un'impostazione malformata.
+  function volumeValido(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
+
   function applyNotifConfig(notifications) {
     if (!notifications || typeof notifications !== 'object') return;
     const d = Number(notifications.durationSec);
@@ -74,6 +97,7 @@
       durationSec: Number.isFinite(d) && d >= 0 ? d : 5,
       soundEnabled: notifications.soundEnabled === true,
       sound: typeof notifications.sound === 'string' ? notifications.sound : 'default',
+      soundVolume: volumeValido(notifications.soundVolume),
     };
   }
   // #430 — carta con l'anteprima della scheda al passaggio del puntatore: accesa e misura dalle Preferenze.
@@ -89,9 +113,12 @@
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
+      rispecchiaBarra();
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
       applyTabPreview(r?.settings?.tabPreview);
+      applyRingTone(r?.settings?.timerRingtone, r?.settings?.timerRingtoneVolume);
+      refreshRinging();
       try { render(); } catch (_) {}
       try { NOTIFS.rispecchia(); } catch (_) {}
     })
@@ -100,9 +127,14 @@
     api.onBroadcast((m) => {
       if (m?.type === 'settings_updated') {
         applyShellTokens(m.settings?.themeTokens);
+        rispecchiaBarra();
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
         applyTabPreview(m.settings?.tabPreview);
+        applyRingTone(m.settings?.timerRingtone, m.settings?.timerRingtoneVolume);
+        // Il volume cambiato mentre suona deve sentirsi subito: senza questo si
+        // sentirebbe solo alla scadenza dopo.
+        refreshRinging();
         try { render(); } catch (_) {}
         try { NOTIFS.rispecchia(); } catch (_) {}
       }
@@ -124,13 +156,98 @@
     }
   }
 
+  // ── Suoneria di timer e sveglie ───────────────────────────────────────────
+  // Suona QUI perché la shell c'è sempre: una scadenza coglie l'utente su una
+  // scheda qualunque, e la pagina Nuova scheda può non essere nemmeno aperta.
+  const MSG_FILO = (window.SN_MSG && window.SN_MSG.MSG) || {};
+  const ringBtn = document.getElementById('ring-indicator');
+  const ringLabel = document.getElementById('ring-ind-label');
+  setIcon(document.getElementById('ring-ind-icon'), 'alarm', 15);
+  let ringTone = 'default';
+  let ringVolume = 100;
+  let ringingIds = [];
+  let ringWake = null;
+
+  function applyRingTone(id, volume) {
+    const tones = window.SN_SOUNDS && window.SN_SOUNDS.TONES;
+    if (typeof id === 'string' && tones && tones[id]) ringTone = id;
+    ringVolume = volumeValido(volume);
+  }
+
+  function testoSuoneria(list) {
+    if (list.length > 1) return `${list.length} scadenze`;
+    const t = list[0];
+    if (t.kind === 'alarm') return t.label ? `Sveglia — ${t.label}` : 'Sveglia';
+    return t.label ? `${t.label} — scaduto` : 'Timer scaduto';
+  }
+
+  // Il watcher del main ricontrolla ogni pochi secondi: sentire la suoneria
+  // cinque secondi dopo lo zero è attrito, quindi ci svegliamo sulla scadenza.
+  function programmaRisveglio(timers) {
+    if (ringWake) { clearTimeout(ringWake); ringWake = null; }
+    let primo = Infinity;
+    for (const t of timers) {
+      if (!t || t.ringing || t.paused) continue;
+      const ms = new Date(t.endsAt).getTime() - Date.now();
+      if (Number.isFinite(ms) && ms < primo) primo = ms;
+    }
+    if (primo === Infinity) return;
+    ringWake = setTimeout(refreshRinging, Math.min(60000, Math.max(250, primo + 150)));
+  }
+
+  // `mio` lo decide il main: fra le finestre che vedono la stessa scadenza ne
+  // suona una sola. Il pulsante invece sta in tutte, perché l'utente può essere
+  // davanti a una qualunque e il gesto per far smettere non si cerca.
+  function applyRinging(timers, mio) {
+    const tutti = Array.isArray(timers) ? timers : [];
+    programmaRisveglio(tutti);
+    const list = tutti.filter((t) => t && t.ringing);
+    ringingIds = list.map((t) => t.id);
+    const acceso = list.length > 0;
+    if (ringBtn) ringBtn.hidden = !acceso;
+    if (acceso && ringLabel) ringLabel.textContent = testoSuoneria(list);
+    const S = window.SN_SOUNDS;
+    if (!S) return;
+    if (acceso && mio !== false) S.ring(ringTone, ringVolume); else S.silence();
+  }
+
+  // Ogni finestra chiede le SUE scadenze: quella incognito vede solo le proprie
+  // (i timer non sono fra le chiavi che eredita dal disco), quindi nessuna
+  // scadenza può squillare in due finestre insieme.
+  function refreshRinging() {
+    const type = MSG_FILO.FILO_GET_TIMERS;
+    if (!type) return;
+    api.message({ type })
+      .then((r) => applyRinging(r && r.ok ? r.timers : [], !r || r.suona !== false))
+      .catch(() => {});
+  }
+
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === MSG_FILO.FILO_LIVE_UPDATED) refreshRinging();
+    });
+  }
+
+  if (ringBtn) {
+    ringBtn.addEventListener('click', () => {
+      const type = MSG_FILO.FILO_STOP_TIMER_ALARM;
+      const ids = ringingIds.slice();
+      // Zittisci subito: l'attesa della risposta è attrito su un gesto che
+      // esiste per far smettere un rumore.
+      applyRinging([], false);
+      if (!type) return;
+      Promise.all(ids.map((id) => api.message({ type, id }).catch(() => {})))
+        .then(refreshRinging);
+    });
+  }
+
   // Registro app del launcher. Il Feedback vive qui fra le App.
   //
   // "Aperti per dopo" sta qui perché è la CONTROPARTE di "Salva per dopo": il
   // salvataggio chiude la scheda, quindi senza un ingresso sempre visibile la
   // lista di ciò che hai messo da parte resta irraggiungibile (l'icona dedicata
   // del menu del tasto destro è stata ritirata e l'icona Home porta alla nuova
-  // scheda, non lì). È l'analogo di "Scaricamenti": una lista di cose messe da
+  // scheda, non lì). È l'analogo di "Download": una lista di cose messe da
   // parte, non un'azione.
   // "Feedback" (la posta delle segnalazioni) e "Gestione" sono superfici
   // dell'owner: da quando i feedback li legge solo chi li gestisce (#583) a un
@@ -145,7 +262,7 @@
       { label: 'Editor', icon: 'editor', url: 'filo://editor/editor.html' },
       { label: 'Deck builder MTG', icon: 'decks', url: 'filo://decks/decks.html' },
       { label: 'Aperti per dopo', icon: 'saveForLater', url: 'filo://home/home.html' },
-      { label: 'Scaricamenti', icon: 'download', url: 'filo://downloads/downloads.html' },
+      { label: 'Download', icon: 'download', url: 'filo://downloads/downloads.html' },
       { type: 'separator' },
       { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
     ];
@@ -179,16 +296,20 @@
 
   // Popup menu custom: BrowserWindow frameless che appare sopra le
   // WebContentsView native, stilizzato come il menu tasto destro.
+  // Dove aprire il prossimo menu quando lo chiede la barra laterale: accanto alla sua icona.
+  let ancoraMenu = null;
   function showNativeMenu(btn, entries) {
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
-    // La barra in alto è nascosta e le icone reali hanno rect nullo: i menu
-    // (Impostazioni, App, Account) si aprono sotto le icone, che ora vivono in
-    // alto a destra DENTRO la home. La home parte sotto la fila di tab (~40px) e
-    // le icone sono alte ~34px: ancoriamo appena sotto. Coordinate relative alla
-    // finestra shell. popup-menu.js riallinea/clampa per restare nello schermo.
-    if (r.width === 0 && r.height === 0) {
+    // La barra in alto è nascosta e le icone reali hanno rect nullo. Dalla barra
+    // laterale arriva l'ancora; dall'assistente no, e il menu si apre in alto a
+    // destra. Coordinate relative alla finestra shell: popup-menu.js clampa.
+    if (ancoraMenu) {
+      x = ancoraMenu.x;
+      y = ancoraMenu.y;
+      ancoraMenu = null;
+    } else if (r.width === 0 && r.height === 0) {
       x = Math.max(8, window.innerWidth - 250);
       y = 86;
     }
@@ -227,6 +348,7 @@
   }
 
   function renderAccount() {
+    rispecchiaBarra();
     if (!accountBtn) return;
     if (authBusy) {
       accountBtn.dataset.tip = 'Accesso in corso…';
@@ -335,6 +457,21 @@
     }
     refreshAuth();
   }
+  // La barra laterale si disegna in una vista sua: le arrivano da qui i colori già calcolati
+  // (tema, token dell'utente, incognito) e il profilo da mostrare.
+  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius'];
+  function rispecchiaBarra() {
+    if (!api.barra) return;
+    const cs = getComputedStyle(document.documentElement);
+    const tema = {};
+    for (const k of VAR_BARRA) { const v = cs.getPropertyValue(k).trim(); if (v) tema[k] = v; }
+    const account = authProfile
+      ? { dentro: true, foto: authProfile.picture || '', etichetta: shortName(authProfile) }
+      : { dentro: false, foto: '', etichetta: '' };
+    try { api.barra.stato({ tema, account }); } catch (_) {}
+  }
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchiaBarra); } catch (_) {}
+
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
@@ -352,9 +489,13 @@
       minimize: winMinBtn,
       fullscreen: winMaxBtn,
     };
-    api.onTriggerButton((command) => {
+    api.onTriggerButton((command, anchor) => {
       const btn = triggerMap[command];
-      if (btn) btn.click();
+      if (!btn) return;
+      const ok = anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y);
+      ancoraMenu = ok ? { x: Math.round(anchor.x), y: Math.round(anchor.y) } : null;
+      btn.click();
+      ancoraMenu = null;
     });
   }
 
@@ -1113,11 +1254,9 @@
     return !url || url.startsWith('filo://newtab/');
   }
 
-  // La barra indirizzi è sempre nascosta: le icone di navigazione (indietro,
-  // avanti, ricarica) vivono nel menu tasto destro, mentre home/impostazioni/
-  // app/profilo sono state spostate DENTRO la pagina home (in alto a destra).
-  // Resta solo la fila di tab, e la WebContentsView risale a coprire lo spazio
-  // liberato. Manteniamo applyChrome (chiamata dal render) per idempotenza.
+  // La barra indirizzi è sempre nascosta: navigazione, home, impostazioni, app e
+  // profilo vivono nella barra laterale (#871). Resta solo la fila di tab, e la
+  // WebContentsView risale a coprire lo spazio liberato.
   let chromeCompact = null;
   function applyChrome(_isHome) {
     const compact = true;
@@ -1307,7 +1446,10 @@
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
       if (wantSound && window.SN_SOUNDS) {
-        try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
+        try {
+          const tono = typeof wantSound === 'string' ? wantSound : notifConfig.sound;
+          window.SN_SOUNDS.play(tono, notifConfig.soundVolume);
+        } catch (_) {}
       }
 
       avviaTempo(card, durata);
@@ -1382,6 +1524,15 @@
             return {
               label: a.label,
               onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
+            };
+          }
+          // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
+          if (a && a.aggiornaFilo && !a.onClick) {
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'aggiornamento_installa' }).then((res) => {
+                if (res && res.ok === false) NOTIFS.show(res.frase || 'Non sono riuscito ad avviare l’aggiornamento');
+              }).catch(() => {}),
             };
           }
           // #410.1 — toast di fine scaricamento: apri il file / mostra in cartella.
@@ -1459,6 +1610,11 @@
     const ACTIVE = new Set(['progressing', 'paused']);
     const isActive = (r) => r && ACTIVE.has(r.state);
 
+    // #1112 — nella home i download si vedono già (carte a sinistra, «Download» in «Altro»): lì l'indicatore
+    // c'è solo a pannello aperto, che una domanda sui programmi apre da sé (#588).
+    let suHome = true;
+    const indicatoreNascosto = () => dls.size === 0 || (suHome && !panelOpen);
+
     function fmtBytes(n) {
       n = Number(n) || 0;
       if (n < 1024) return `${n} B`;
@@ -1484,7 +1640,7 @@
     function renderIndicator() {
       const all = Array.from(dls.values());
       if (!all.length) { dlBtn.hidden = true; if (panelOpen) closePanel(); return; }
-      dlBtn.hidden = false;
+      dlBtn.hidden = indicatoreNascosto();
       const active = all.filter(isActive);
       // #588 — un programma che aspetta una risposta conta quanto uno in corso:
       // l'avviso si può chiudere con la ×, e se l'indicatore tacesse l'unico
@@ -1493,7 +1649,7 @@
       dlBtn.classList.toggle('attesa', attesa.length > 0);
       dlBtn.dataset.tip = attesa.length
         ? (attesa.length === 1 ? 'Un programma aspetta la tua risposta' : `${attesa.length} programmi aspettano la tua risposta`)
-        : 'Scaricamenti';
+        : 'Download';
       if (active.length || attesa.length) {
         dlCount.hidden = false;
         dlCount.textContent = String(active.length + attesa.length);
@@ -1536,13 +1692,13 @@
       head.className = 'dl-panel-head';
       const title = document.createElement('span');
       title.className = 'dl-panel-title';
-      title.textContent = 'Scaricamenti';
+      title.textContent = 'Download';
       // Punto d'accesso alla pagina completa (cronologia + azioni per voce).
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'dl-panel-clear';
       allBtn.textContent = 'Vedi tutti';
-      allBtn.title = 'Apri l’elenco completo degli scaricamenti';
+      allBtn.title = 'Apri l’elenco completo dei download';
       allBtn.addEventListener('click', () => {
         api.tabs.open('filo://downloads/downloads.html');
         closePanel();
@@ -1551,7 +1707,7 @@
       clearBtn.type = 'button';
       clearBtn.className = 'dl-panel-clear';
       clearBtn.textContent = 'Svuota';
-      clearBtn.title = 'Rimuovi gli scaricamenti conclusi';
+      clearBtn.title = 'Rimuovi i download conclusi';
       clearBtn.addEventListener('click', () => {
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
@@ -1581,7 +1737,7 @@
       if (!all.length) {
         const empty = document.createElement('div');
         empty.className = 'dl-empty';
-        empty.textContent = 'Nessuno scaricamento';
+        empty.textContent = 'Nessun download';
         list.replaceChildren(empty);
       } else if (window.SN_RIGHE_VIVE) {
         window.SN_RIGHE_VIVE.riconcilia(list, all.map(renderRow), ':scope > .dl-row-actions');
@@ -1800,6 +1956,7 @@
       ensurePanel();
       panelOpen = true;
       panel.hidden = false;
+      dlBtn.hidden = indicatoreNascosto();
       dlBtn.classList.add('open');
       renderPanel();
       reserveForPanel();
@@ -1817,11 +1974,22 @@
       firmaElenco = '';
       if (panel) panel.hidden = true;
       dlBtn.classList.remove('open');
+      dlBtn.hidden = indicatoreNascosto();
       riservaSopra('scaricamenti', 0);
     }
     function togglePanel() { panelOpen ? closePanel() : openPanel(); }
 
     dlBtn.addEventListener('click', togglePanel);
+
+    function seguiScheda(snap) {
+      const a = snap && Array.isArray(snap.tabs) ? snap.tabs.find((t) => t.id === snap.activeId) : null;
+      const home = isHomeUrl(a ? a.url : null);
+      if (home === suHome) return;
+      suHome = home;
+      renderIndicator();
+    }
+    api.tabs.onUpdate(seguiScheda);
+    api.tabs.snapshot().then(seguiScheda).catch(() => {});
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelOpen) closePanel(); });
     window.addEventListener('resize', () => { if (panelOpen) reserveForPanel(); });
 
@@ -1848,12 +2016,12 @@
     });
 
     function provenienza(r) {
-      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); } catch (_) {}
+      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain, r.servedBy, r.filename); } catch (_) {}
       return r.site ? `da ${r.site}` : '';
     }
 
     function testoScarica(r) {
-      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain); } catch (_) {}
+      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
       return `«${r.filename}» è un programma. Scaricarlo?`;
     }
 

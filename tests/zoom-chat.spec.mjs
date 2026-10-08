@@ -333,8 +333,8 @@ test('il riquadro dello zoom applica il numero BATTUTO, non quello che ci scrive
   // Quello che batte l'utente invece vale.
   await page.mouse.click(200, 200, { button: 'middle' });
   await expect(page.locator('#__filo-zoom-badge')).toBeVisible();
-  await page.locator('#__filo-zoom-percent').fill('');
-  await page.locator('#__filo-zoom-percent').type('50');
+  await page.locator('#__filo-zoom-percent').click();
+  await page.keyboard.type('50');
   await page.keyboard.press('Enter');
   await expect.poll(async () => percentOf(app, page)).toBe(50);
 });

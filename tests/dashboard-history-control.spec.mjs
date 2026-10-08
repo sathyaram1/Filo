@@ -1,35 +1,22 @@
-// Feedback #2 + #281: la cronologia dev'essere un pulsante in alto a destra nella
-// home. Con #281 la pagina PRINCIPALE di cronologia è quella delle schede
-// visitate/chiuse (filo://archive), non più il log delle azioni AI (che resta
-// raggiungibile da lì come "Cronologia AI"). Questo test ASSERISCE che:
-//   1) tra i controlli in alto a destra della home esiste un pulsante Cronologia;
+// Feedback #2 + #281: la cronologia dev'essere a portata di un clic da ogni pagina. Con #281 la
+// pagina PRINCIPALE di cronologia è quella delle schede visitate/chiuse (filo://archive), non il log
+// delle azioni AI. Da #871 il pulsante sta in fondo alla barra laterale, non più in alto nella home:
+//   1) nella barra c'è il pulsante Cronologia;
 //   2) cliccandolo si apre davvero la pagina della cronologia schede (filo://archive).
-// Senza il pulsante (o se aprisse altro), il test è rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
-async function newtabPage(app) {
-  const deadline = Date.now() + 10_000;
-  let win = null;
-  while (Date.now() < deadline) {
-    win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
-    if (win) break;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  expect(win, 'newtab non trovata entro 10s').toBeTruthy();
-  await win.waitForLoadState('domcontentloaded');
-  return win;
-}
-
-test('la home ha un pulsante Cronologia in alto a destra che apre la cronologia schede', async ({ app, shell }) => {
+test('la barra laterale ha un pulsante Cronologia che apre la cronologia schede', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await newtabPage(app);
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
 
-  // Il pulsante esiste tra i controlli della home (#dashControls).
-  const histBtn = page.locator('#dashControls .dash-ctrl[data-command="history"]');
-  await expect(histBtn).toBeVisible({ timeout: 8_000 });
+  const histBtn = barra.locator('#fisse [data-comando="history"]');
+  await expect(histBtn).toBeVisible();
+  await expect(histBtn).toHaveAttribute('aria-label', 'Cronologia');
 
-  // Cliccandolo si apre una scheda sulla pagina della cronologia.
   await histBtn.click();
   const deadline = Date.now() + 10_000;
   let opened = null;
