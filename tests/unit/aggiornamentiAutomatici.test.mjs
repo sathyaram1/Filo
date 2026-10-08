@@ -210,9 +210,10 @@ perOgniSistema('spento a metà dello scaricamento dell\'avvio, «Installa» la i
   assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, undefined, 'spenta, la carta chiede ancora «Installa»');
   await U.installaAggiornamento();
   await calma();
-  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
   u.chiudi();
-  assert.equal(u.installata, true, 'la carta dice «pronta», ma alla chiusura non si è installata');
+  assert.equal(u.installata, s.allaChiusura, s.allaChiusura ? 'la carta dice «pronta», ma alla chiusura non si è installata'
+    : 'su Windows di serie si è installata alla chiusura invece che all\'apertura dopo');
   assert.equal(u.scaricamenti, 1, 'una versione già scaricata non si riscarica');
 });
 
