@@ -82,16 +82,18 @@ test('spiega con i modelli predefiniti, e con «solo pesi aperti», porta Alibab
   test.setTimeout(90_000);
   await shell.waitForLoadState('domcontentloaded');
 
+  let n = 0;
   const run = async (settings, opts) => {
+    n += 1;
     await preparaRouter(app, settings, opts);
-    return app.evaluate(async (_e, QWEN) => {
+    return app.evaluate(async (_e, { QWEN, n }) => {
       const C = globalThis.SN_CONST;
       const MSG = globalThis.SN_MSG.MSG;
-      const r = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.AI_REQUEST, action: C.ACTIONS.EXPLAIN, payload: { selection: 'mare', sentence: 'il mare è calmo' } }, {});
+      const r = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.AI_REQUEST, action: C.ACTIONS.EXPLAIN, payload: { selection: `mare${n}`, sentence: `il mare ${n} è calmo` } }, {});
       const items = await globalThis.SN_HISTORY.list();
       const v = items && items[0];
       return { ok: !(r && r.error), text: r && r.text, error: r && r.error, voce: v ? { servedBy: v.servedBy, policyViolation: v.policyViolation } : null };
-    }, QWEN);
+    }, { QWEN, n });
   };
 
   // I modelli predefiniti dei test, con l'azione spiega puntata su un Qwen nella config condivisa simulata.
