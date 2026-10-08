@@ -9,6 +9,7 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 <p id="p1">La fotosintesi clorofilliana trasforma la luce in energia chimica dentro le foglie.</p>
 <p id="p2">Il teorema di Pitagora vale per tutti i triangoli rettangoli del piano.</p>
 <textarea id="ta" style="display:block;width:640px;height:140px;font:20px monospace"></textarea>
+<p id="p3" style="font:12px sans-serif">parolainizio ${'lorem ipsum dolor sit amet '.repeat(150)}parolafine</p>
 </body>`;
 
 // Il fornitore finto conta le chiamate per tipo, riconoscendole dal prompt: nessuna esce dalla macchina.
@@ -30,7 +31,7 @@ async function fornitoreFinto(app) {
       const t = JSON.stringify(messages);
       let tipo = 'altro';
       let text = 'ok';
-      if (t.includes('ha selezionato un testo')) { tipo = 'spiega'; text = 'Spiegazione di prova'; }
+      if (t.includes('ha selezionato un testo')) { tipo = 'spiega'; text = 'Spiegazione di prova'; globalThis.__ultimaSpiega = t; }
       else if (t.includes('Analizza il testo qui sotto')) { tipo = 'scan'; text = '{"annotated":"","issues":[]}'; }
       else if (t.includes('col tasto destro su una parola')) { tipo = 'parola'; text = '{"misspelled":false,"correction":""}'; }
       globalThis.__conti[tipo] += 1;
@@ -98,6 +99,38 @@ test('selezioni ed eventi finti per 5 s: nessuna spiegazione in anticipo; un dop
   await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(1);
   await pausa(1200);
   expect((await conti(app)).spiega).toBe(1);
+
+  // Anche la tastiera è un gesto: Maiusc+frecce allarga la selezione, Ctrl+A prende tutto.
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(2);
+  await page.keyboard.press('ControlOrMeta+A');
+  await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(3);
+});
+
+test('selezione lunga: niente anticipo, al tasto destro intera; la frase intorno a una parola resta corta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  const ultima = () => app.evaluate(() => globalThis.__ultimaSpiega || '');
+
+  // Un paragrafo senza punti: la «frase» di una parola non è più il blocco intero.
+  const p = await puntoDellaParola(page, 'p3', 'parolainizio');
+  await page.mouse.dblclick(p.x, p.y);
+  await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(1);
+  expect(await ultima()).toContain('parolainizio');
+  expect(await ultima()).not.toContain('parolafine');
+
+  // Tre clic prendono il paragrafo (oltre 4000 caratteri): l'anticipo non parte.
+  await page.mouse.click(p.x, p.y, { clickCount: 3 });
+  await pausa(1500);
+  expect((await conti(app)).spiega).toBe(1);
+
+  // Al tasto destro la spiegazione si chiede davvero, con tutta la selezione.
+  await page.mouse.click(p.x, p.y, { button: 'right' });
+  const sezione = page.locator('.sn-menu .sn-menu-inline-explain');
+  await expect(sezione).toContainText('Spiegazione di prova', { timeout: 10_000 });
+  expect((await conti(app)).spiega).toBe(2);
+  expect(await ultima()).toContain('parolafine');
 });
 
 test('il correttore non parte da execCommand, input finti o focus() di script; scrivere davvero lo fa partire', async ({ app, openTab, testServer }) => {
@@ -168,28 +201,24 @@ test('a scheda nascosta il correttore aspetta: riparte quando si torna', async (
   await expect.poll(async () => (await conti(app)).scan, { timeout: 6000 }).toBe(1);
 });
 
-test('il main ferma le chiamate automatiche oltre il tetto per scheda, avvisa una volta, e il tasto destro passa', async ({ app }) => {
-  const r = await app.evaluate(async () => {
+test('il main ferma le chiamate automatiche oltre il tetto per scheda, avvisa una volta nella pagina, e il tasto destro passa', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  await page.mouse.click(5, 5);
+  const indirizzo = page.url();
+  const r = await app.evaluate(async ({ webContents }, url) => {
     const C = globalThis.SN_CONST;
     const M = globalThis.SN_MSG.MSG;
-    await globalThis.SN_STORAGE.updateSettings({
-      useDefaultModels: false,
-      apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.EXPLAIN]: 'deepseek-flash' },
-      modelRegistry: globalThis.SN_TEST_MODELS.registry,
-    });
     let chiamate = 0;
-    const finto = async () => { chiamate += 1; return { text: 'ok', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} }; };
-    globalThis.SN_PROVIDERS.completeWithFallback = finto;
-    const spinte = [];
-    const wc = {
-      id: 987654, isDestroyed: () => false, once() {}, getURL: () => 'https://sito.test/',
-      send: (_c, m) => spinte.push(m),
+    globalThis.SN_PROVIDERS.completeWithFallback = async () => {
+      chiamate += 1;
+      return { text: 'ok', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
     };
+    const wc = webContents.getAllWebContents().find((w) => w.getURL() === url);
     const H = globalThis.__filoHandlers;
     const chiedi = (n, extra = {}) => H.handleMessage(
       { type: M.AI_REQUEST, action: C.ACTIONS.EXPLAIN, payload: { selection: `parola ${n}`, sentence: `frase ${n}` }, ...extra },
-      { wc, url: 'https://sito.test/' },
+      { wc, url },
     );
     const esiti = [];
     for (let n = 0; n < 125; n += 1) esiti.push(await chiedi(n));
@@ -200,14 +229,17 @@ test('il main ferma le chiamate automatiche oltre il tetto per scheda, avvisa un
       frase: (esiti.find((e) => e && e.code === 'TROPPE_AUTOMATICHE') || {}).error || '',
       suRichiesta: Boolean(suRichiesta && suRichiesta.ok),
       chiamate,
-      avvisi: spinte.filter((m) => m && m.type === M.SHOW_TOAST).map((m) => m.text),
     };
-  });
+  }, indirizzo);
   expect(r.ok).toBe(120);
   expect(r.fermate).toBe(5);
   expect(r.frase).toMatch(/120/);
   expect(r.suRichiesta).toBe(true);
   expect(r.chiamate).toBe(121);
-  expect(r.avvisi).toHaveLength(1);
-  expect(r.avvisi[0]).toMatch(/tasto destro/);
+
+  const avviso = page.locator('.sn-toast');
+  await expect(avviso).toHaveCount(1, { timeout: 5000 });
+  await expect(avviso).toContainText('120 spiegazioni automatiche');
+  await expect(avviso).toContainText('tasto destro');
+  await page.screenshot({ path: 'tests/.shots/1070-tetto-avviso.png' }).catch(() => {});
 });
