@@ -194,6 +194,79 @@ test('un gesto vero paga al più un controllo del correttore: lo script che dopo
   await expect.poll(async () => (await conti(app)).parola - prima, { timeout: 6000 }).toBeGreaterThanOrEqual(3);
 });
 
+test('un tasto tenuto premuto è un gesto solo: le ripetizioni non pagano altri controlli né altre spiegazioni', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  // Il sito: a ogni ripetizione del tasto scrive una parola nella sua casella; ogni mezzo secondo cambia la selezione.
+  await page.evaluate(() => {
+    let i = 0;
+    let ultima = 0;
+    window.addEventListener('keydown', () => {
+      const ta = document.getElementById('ta');
+      if (document.activeElement !== ta) ta.focus();
+      ta.value += ` xqzgioco${i} `;
+      ta.selectionStart = ta.selectionEnd = ta.value.length;
+      ta.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
+      i += 1;
+      if (Date.now() - ultima < 500) return;
+      ultima = Date.now();
+      const p = document.getElementById('p1').firstChild;
+      const r = document.createRange();
+      r.setStart(p, i % 40); r.setEnd(p, (i % 40) + 15);
+      getSelection().removeAllRanges(); getSelection().addRange(r);
+    });
+  });
+  await page.mouse.click(700, 20);
+  await pausa(300);
+  // Tre secondi di freccia giù tenuta, come chi scorre o gioca.
+  for (let i = 0; i < 100; i++) { await page.keyboard.down('ArrowDown'); await pausa(30); }
+  await page.keyboard.up('ArrowDown');
+  await pausa(2500);
+  const c = await conti(app);
+  expect(c.parola).toBeLessThanOrEqual(1);
+  expect(c.spiega).toBeLessThanOrEqual(1);
+  expect(c.scan).toBeLessThanOrEqual(1);
+});
+
+test('chi tiene premuto un tasto dentro la casella ha lo scan sul testo finale, una volta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi ho scrito una frase ');
+  await expect.poll(async () => (await conti(app)).scan, { timeout: 6000 }).toBe(1);
+  // Due secondi di Backspace tenuto: lo scan non parte a metà, parte dopo, sul testo che resta.
+  for (let i = 0; i < 60; i++) { await page.keyboard.down('Backspace'); await pausa(33); }
+  await page.keyboard.up('Backspace');
+  await page.keyboard.type('oggi ho scrito ');
+  await expect.poll(async () => (await conti(app)).scan, { timeout: 6000 }).toBe(2);
+  await pausa(2000);
+  expect((await conti(app)).scan).toBe(2);
+});
+
+test('trascinamento lento con una pausa prima di rilasciare: la spiegazione in anticipo parte al rilascio', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  const e = await page.evaluate(() => {
+    const nodo = document.getElementById('p1').firstChild;
+    const r = document.createRange();
+    r.setStart(nodo, 0); r.setEnd(nodo, 1);
+    const a = r.getBoundingClientRect();
+    r.setStart(nodo, nodo.textContent.length - 1); r.setEnd(nodo, nodo.textContent.length);
+    const b = r.getBoundingClientRect();
+    return { x0: a.left + 1, y0: a.top + a.height / 2, x1: b.right - 1, y1: b.top + b.height / 2 };
+  });
+  await page.mouse.move(e.x0, e.y0);
+  await page.mouse.down();
+  for (let i = 1; i <= 20; i++) {
+    await page.mouse.move(e.x0 + ((e.x1 - e.x0) * i) / 20, e.y0 + ((e.y1 - e.y0) * i) / 20);
+    await pausa(100);
+  }
+  await pausa(700);
+  await page.mouse.up();
+  expect(await page.evaluate(() => getSelection().toString().length)).toBeGreaterThan(20);
+  await expect.poll(async () => (await conti(app)).spiega, { timeout: 4000 }).toBe(1);
+});
+
 // Le schede di dietro di Filo, coi test a finestra fuori schermo, restano «visible»: la scheda nascosta si
 // simula sulla nuova scheda, dove i content script girano nel mondo della pagina e vedono la stessa `document`.
 test('a scheda nascosta il correttore aspetta: riparte quando si torna', async ({ app }) => {

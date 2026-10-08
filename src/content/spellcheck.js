@@ -364,8 +364,12 @@
           state.issues = [];
           renderOverlayContent(state);
         }
-        // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello.
-        if (!prendeGesto()) return;
+        // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello. Lo scan già chiesto
+        // da un gesto (un tasto tenuto premuto) si sposta soltanto: resta una chiamata, sul testo finale.
+        if (!prendeGesto()) {
+          if (state.timer) scheduleScan(state);
+          return;
+        }
         // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
         //    (boundary char), lancia subito il check ortografico così che al
         //    click destro non ci sia attesa. Limitato e in background.
@@ -521,7 +525,7 @@
   function scheduleScan(state) {
     if (!isEnabled()) return;
     if (state.timer) clearTimeout(state.timer);
-    state.timer = setTimeout(() => scanText(state), DEBOUNCE_MS);
+    state.timer = setTimeout(() => { state.timer = null; scanText(state); }, DEBOUNCE_MS);
   }
 
   // Lo scan chiesto dall'utente e arrivato a scheda nascosta parte quando la scheda torna davanti.

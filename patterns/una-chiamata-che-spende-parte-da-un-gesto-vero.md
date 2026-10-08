@@ -38,6 +38,12 @@ di 1,5 s. Il movimento del mouse non conta: passarci sopra non è chiedere.
    quello che scrive quaranta parole nella casella ottiene un solo controllo del
    correttore. Chi scrive davvero fa un gesto per tasto, e il controllo resta
    uno per parola. `recente()` da solo non basta mai a far partire una chiamata.
+   **Un gesto è una pressione**: le ripetizioni di un tasto tenuto e il suo
+   rilascio tengono vivo il gesto della pressione, non ne aprono uno nuovo
+   (trenta ripetizioni al secondo sarebbero trenta chiamate); lo scan già
+   chiesto si sposta soltanto. Il rilascio del mouse invece è un gesto suo e
+   prepara la spiegazione: chi si ferma prima di rilasciare non cambia più la
+   selezione.
 3. **Un'azione chiesta a Filo vale come gesto** (`SN_GESTO.segna()`): incolla e
    dettatura arrivano da un menu fuori dalla pagina, o molto dopo il clic.
 4. **A scheda nascosta non si spende**: la chiamata si rimanda e parte al ritorno.

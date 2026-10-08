@@ -69,6 +69,28 @@ test('gesto: contano solo eventi veri, e solo quelli che uno script non sa rende
   }
 });
 
+test('gesto: un tasto tenuto premuto è un gesto solo, le sue ripetizioni e il rilascio lo tengono vivo', () => {
+  const c = orologio();
+  const g = G.crea(c.ora);
+  const tasto = (type, code, repeat = false) => g.suEvento({ isTrusted: true, type, code, repeat });
+  tasto('keydown', 'ArrowDown');
+  assert.equal(g.prendi('correttore'), true);
+  for (let i = 0; i < 30; i++) {
+    c.avanti(33);
+    tasto('keydown', 'ArrowDown', true);
+    assert.equal(g.prendi('correttore'), false, 'una ripetizione non è un gesto nuovo');
+  }
+  c.avanti(2000);
+  tasto('keyup', 'ArrowDown');
+  assert.equal(g.recente(), true, 'il rilascio tiene vivo il gesto');
+  assert.equal(g.prendi('correttore'), false, 'il rilascio non è un gesto nuovo');
+  // Un tasto diverso premuto dopo è un gesto suo; un rilascio senza pressione vista, anche.
+  tasto('keydown', 'KeyA');
+  assert.equal(g.prendi('correttore'), true);
+  tasto('keyup', 'KeyB');
+  assert.equal(g.prendi('correttore'), true);
+});
+
 test('tetto: le azioni contate sono quelle automatiche di SN_CONST', () => {
   const A = SN_CONST.ACTIONS;
   assert.deepEqual(Object.keys(Tetto.GRUPPI).sort(), [A.EXPLAIN, A.SPELLCHECK_SEMANTIC, A.SPELLCHECK_WORD].sort());
