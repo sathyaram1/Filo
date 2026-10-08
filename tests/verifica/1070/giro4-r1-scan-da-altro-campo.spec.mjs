@@ -5,6 +5,8 @@ import { test, expect } from '../../fixtures/electron.mjs';
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="font:20px sans-serif;padding:30px;margin:0">
 <input id="cerca" style="font:20px monospace;width:400px">
+<button id="bt" style="font:20px sans-serif">Avanti</button>
+<p id="p1">La fotosintesi clorofilliana trasforma la luce in energia chimica dentro le foglie verdi delle piante.</p>
 <textarea id="ta" style="display:block;width:640px;height:140px;font:20px monospace"></textarea>
 </body>`;
 
@@ -71,4 +73,29 @@ test('r1 scrivere nel campo di ricerca non paga il controllo della casella che l
   const c = await conti(app);
   console.log('conti dopo ~8 s di scrittura nella ricerca:', JSON.stringify(c));
   expect(c.scan + c.parola).toBe(0);
+});
+
+test('r1 un clic su un pulsante non paga la spiegazione di un testo che la pagina seleziona altrove', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await fornitoreFinto(app);
+  const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  // Il sito: a ogni clic sul suo pulsante seleziona un pezzo diverso del paragrafo, lontano dal pulsante.
+  await page.evaluate(() => {
+    let n = 0;
+    document.getElementById('bt').addEventListener('click', () => {
+      const t = document.getElementById('p1').firstChild;
+      const r = document.createRange();
+      r.setStart(t, n % 10);
+      r.setEnd(t, 30 + (n % 10));
+      n += 1;
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+    });
+  });
+  for (let i = 0; i < 5; i++) { await page.locator('#bt').click(); await pausa(900); }
+  await pausa(1000);
+  const c = await conti(app);
+  console.log('conti dopo cinque clic sul pulsante:', JSON.stringify(c));
+  expect(c.spiega).toBe(0);
 });
