@@ -151,8 +151,8 @@
   // non vede dentro) che il fuoco lì dentro è in un campo nostro; la radice resta raggiungibile solo da qui.
   const RIQUADRO = 'data-sn-riquadro';
   const ombre = new WeakMap();
-  function ombra(host, { aperta = false } = {}) {
-    const radice = host.attachShadow({ mode: aperta ? 'open' : 'closed' });
+  function ombra(host) {
+    const radice = host.attachShadow({ mode: 'closed' });
     ombre.set(host, radice);
     try { host.setAttribute(RIQUADRO, ''); } catch (_) {}
     return radice;
