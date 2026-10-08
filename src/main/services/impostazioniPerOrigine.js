@@ -63,11 +63,17 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
   'sn_icon_layout',
   'sn_qr_in_primary_migrated',
   'sn_feedback_client_id',
-  'sn_feedback_draft_text',
   'sn_redteam_attack_draft',
   'sn_redteam_desc_draft',
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
+
+// La bozza del feedback scritta in un sito resta a quel sito (#1071): ognuno legge e scrive solo la chiave che porta
+// la SUA origine, quella del riquadro che chiede e non della scheda (un riquadro incorporato è un altro sito). Un
+// documento senza origine (sandbox, data:) non ne ha: la sua «null» la condividerebbe con tutti gli altri.
+const BOZZA_PER_SITO = 'sn_feedback_draft_text@';
+const chiaveDelSito = (k, origineRiquadro) => typeof k === 'string' && typeof origineRiquadro === 'string'
+  && origineRiquadro !== '' && origineRiquadro !== 'null' && k === BOZZA_PER_SITO + origineRiquadro;
 
 // Le azioni di Filo che il codice dentro un sito chiede: la barra d'aiuto propone un
 // feedback e apre i link («apri in una nuova scheda»). Il resto no, nemmeno confermato:
@@ -205,9 +211,9 @@ function spingiAllaFinestra(win, message) {
 
 // Le chiavi che un sito può chiedere al magazzino, nella stessa forma della
 // richiesta (null = tutte le sue, stringa, elenco, oggetto coi valori di ripiego).
-function chiaviStoragePerOrigine(keys, origine) {
+function chiaviStoragePerOrigine(keys, origine, origineRiquadro) {
   if (isFilo(origine)) return keys;
-  const ammessa = (k) => typeof k === 'string' && CHIAVI_STORAGE_WEB.includes(k);
+  const ammessa = (k) => typeof k === 'string' && (CHIAVI_STORAGE_WEB.includes(k) || chiaveDelSito(k, origineRiquadro));
   if (keys == null) return [...CHIAVI_STORAGE_WEB];
   if (typeof keys === 'string') return ammessa(keys) ? keys : [];
   if (Array.isArray(keys)) return keys.filter(ammessa);
@@ -220,10 +226,11 @@ function chiaviStoragePerOrigine(keys, origine) {
 }
 
 // Scrivere o togliere scomparti da un sito: solo quelli dei content script.
-function scritturaStorageAmmessa(keys, origine) {
+function scritturaStorageAmmessa(keys, origine, origineRiquadro) {
   if (isFilo(origine)) return true;
   const elenco = Array.isArray(keys) ? keys : [keys];
-  return elenco.every((k) => typeof k === 'string' && CHIAVI_STORAGE_WEB_SCRITTURA.includes(k));
+  return elenco.every((k) => typeof k === 'string'
+    && (CHIAVI_STORAGE_WEB_SCRITTURA.includes(k) || chiaveDelSito(k, origineRiquadro)));
 }
 
 // Letture dello storage grezzo (chrome.storage.local.get): la chiave `settings`
@@ -239,6 +246,7 @@ module.exports = {
   SPINTE_WEB,
   SPINTE_WEB_IN_VISTA,
   CHIAVI_STORAGE_WEB,
+  BOZZA_PER_SITO,
   AZIONI_WEB,
   isFilo,
   impostazioniPerWeb,
