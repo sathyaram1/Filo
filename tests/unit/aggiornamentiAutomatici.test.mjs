@@ -217,23 +217,24 @@ perOgniSistema('spento a metà dello scaricamento dell\'avvio, «Installa» la i
   assert.equal(u.scaricamenti, 1, 'una versione già scaricata non si riscarica');
 });
 
-test('spento a metà dello scaricamento e poi riacceso: si installa alla chiusura', async () => {
+perOgniSistema('spento a metà dello scaricamento e poi riacceso: si installa come da acceso', async (s) => {
   const u = aggiornatoreFinto({ lento: true });
-  await avvia(u, true);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await avvia(u, true, s);
+  U.seguiImpostazioni(impostazioni(s, false));
   await calma();
   u.finisci();
   await calma();
-  U.seguiImpostazioni({ aggiornamenti: { automatici: true } });
+  U.seguiImpostazioni(impostazioni(s, true));
   await calma();
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   u.chiudi();
-  assert.equal(u.installata, true);
+  assert.equal(u.installata, s.allaChiusura);
 });
 
-test('spento a metà dello scaricamento e lasciato spento: alla chiusura non si installa', async () => {
+perOgniSistema('spento a metà dello scaricamento e lasciato spento: alla chiusura non si installa', async (s) => {
   const u = aggiornatoreFinto({ lento: true });
-  await avvia(u, true);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await avvia(u, true, s);
+  U.seguiImpostazioni(impostazioni(s, false));
   await calma();
   u.finisci();
   await calma();
