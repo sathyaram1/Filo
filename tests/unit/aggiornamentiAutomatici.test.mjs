@@ -156,11 +156,12 @@ perOgniSistema('«Installa» scarica, la carta mostra a che punto è e poi quand
   assert.equal(r.versione, '0.3.0');
   await calma();
   assert.equal(u.scaricamenti, 1);
-  assert.equal(u.autoInstallOnAppQuit, true, 'premuto «Installa», alla chiusura non si installerebbe');
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   u.chiudi();
-  assert.equal(u.installata, true, 'premuto «Installa», alla chiusura non si è installata');
-  assert.ok(stati.some((s) => s && s.percento === 42), `la carta non ha mai mostrato lo scaricamento: ${JSON.stringify(stati)}`);
-  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  assert.equal(u.installata, s.allaChiusura, s.allaChiusura ? 'premuto «Installa», alla chiusura non si è installata'
+    : 'su Windows di serie si è installata alla chiusura invece che all\'apertura dopo');
+  assert.ok(stati.some((x) => x && x.percento === 42), `la carta non ha mai mostrato lo scaricamento: ${JSON.stringify(stati)}`);
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s), 'la carta non dice quando si installa');
   // Premere due volte non scarica due volte.
   await U.installaAggiornamento();
   await calma();
