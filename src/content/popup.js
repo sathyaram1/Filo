@@ -885,7 +885,7 @@
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
     try { popup.pose?.dispose(); } catch (_) {}
-    popup.root.remove();
+    togliRiquadro(popup.root);
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
     // Rimette la selezione che il fuoco della riga per scrivere aveva spento:
@@ -954,7 +954,7 @@
       </div>
     `;
     root.querySelector('.sn-popup-title').textContent = title;
-    document.documentElement.appendChild(root);
+    document.documentElement.appendChild(riquadro(root));
 
     const cleanupZoom = attachZoomCompensation(root);
     const pose = attachPose(root, anchor);
@@ -985,14 +985,15 @@
     // Quando l'utente clicca dentro il popup, portalo in primo piano
     root.addEventListener('mousedown', () => bringToFront(popup), true);
 
-    // Send su Enter (senza Shift); Shift+Enter inserisce nuova riga
+    // Send su Enter (senza Shift); Shift+Enter inserisce nuova riga. Una domanda spende una chiamata: parte solo
+    // da un tasto o da un clic dell'utente, mai da uno fabbricato (#1071).
     popup.inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        submitFollowup(popup);
+        if (e.isTrusted) submitFollowup(popup);
       }
     });
-    popup.sendEl.addEventListener('click', () => submitFollowup(popup));
+    popup.sendEl.addEventListener('click', (e) => { if (e.isTrusted) submitFollowup(popup); });
     // Auto-grow textarea
     popup.inputEl.addEventListener('input', () => {
       autoGrow(popup.inputEl);
@@ -1434,6 +1435,8 @@
     renderMarkdown,
     resolveCalcMarkers,
     registerStack,
+    riquadro,
+    togliRiquadro,
     apriCollegamento,
     scaricaCollegamento,
     frasePerLUtente,
