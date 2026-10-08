@@ -24,6 +24,7 @@
 //   SN_FILO_UI.inside(el)   → sta dentro (o è) un pezzo di UI di Filo?
 //   SN_FILO_UI.aperti()     → le radici NOSTRE attaccate al documento adesso
 //   SN_FILO_UI.soloGestiVeri(el) → i gesti fabbricati dallo script del sito non lo toccano
+//   SN_FILO_UI.ombra(host)  → shadow root chiuso di un riquadro; bersaglio(e) ci scende dentro
 //
 // L'attributo e l'elenco rispondono a due domande diverse, e la differenza è
 // tutta nel mittente. Chi cammina sulla pagina chiede «questo pezzo lo salto?»:
