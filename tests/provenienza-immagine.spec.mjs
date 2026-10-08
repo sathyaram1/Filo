@@ -475,7 +475,7 @@ async function copiaEIncollaInChat(app, openTab, testServer, src, domanda) {
   await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 10000 });
   await app.evaluate(({ clipboard }) => clipboard.clear());
   await menu.getByText('Copia immagine', { exact: true }).click();
-  await expect.poll(() => app.evaluate(({ clipboard }) => !clipboard.readImage().isEmpty()), { timeout: 8000 }).toBe(true);
+  await expect.poll(() => app.evaluate(async ({ clipboard }) => (await clipboard.read()).some((v) => v.types.some((t) => t.startsWith('image/')))), { timeout: 8000 }).toBe(true);
 
   const home = await openTab('filo://newtab/');
   await expect(home.locator('#input')).toBeVisible({ timeout: 10000 });

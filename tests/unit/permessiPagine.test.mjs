@@ -154,13 +154,17 @@ test('quello che Chrome concede passa, quello che chiede si chiede, quello che F
     assert.deepEqual(chiedi(ses, wc, p), [true], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), true, p);
   }
-  const tipi = { midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi' };
+  const tipi = {
+    midiSysex: 'strumenti', 'idle-detection': 'presenza', 'window-management': 'schermi',
+    'geolocation-approximate': 'posizione', 'local-network-access': 'rete', 'local-network': 'rete', 'loopback-network': 'rete',
+  };
   for (const [p, tipo] of Object.entries(tipi)) {
     assert.deepEqual(chiedi(ses, wc, p), [], p);
     assert.equal(ses.avvisi.at(-1).dati.tipo, tipo, p);
   }
   assert.equal(ses.controllo(wc, 'idle-detection', 'https://video.example', {}), false, 'chi sa che sei al computer lo sa solo col sì');
-  for (const p of ['display-capture', 'unknown', 'hid', 'serial', 'usb']) {
+  for (const p of ['display-capture', 'unknown', 'hid', 'serial', 'usb', 'captured-surface-control', 'smart-card', 'nfc', 'ar', 'vr',
+    'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync', 'system-wake-lock']) {
     assert.deepEqual(chiedi(ses, wc, p), [false], p);
     assert.equal(ses.controllo(wc, p, 'https://video.example', {}), false, p);
   }

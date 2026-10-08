@@ -199,6 +199,18 @@ test('il lanciatore spegne la gabbia solo dove questo sistema la nega', { skip: 
     negata
       ? 'aperto dal menu delle applicazioni Filo non parte: la gabbia va spenta anche di lì'
       : 'aperto dal menu delle applicazioni Filo naviga senza gabbia su una macchina che la concede');
+
+  // Da Electron 38 una sessione Wayland fa partire Chromium su Wayland, dove i menu di Filo (finestre a sé) non
+  // stanno più accanto al puntatore: con un X a disposizione si resta su X, e chi sceglie da sé viene ascoltato.
+  const lancia = (args, env) => String(execFileSync(join(dove, 'filo'), args, { encoding: 'utf8', env })).trim();
+  const conX = { PATH: process.env.PATH, DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-0', XDG_SESSION_TYPE: 'wayland' };
+  assert.ok(lancia(['ciao'], conX).includes('--ozone-platform=x11'), 'in una sessione Wayland con X Filo parte su Wayland');
+  const scelta = lancia(['--ozone-platform=wayland', 'ciao'], conX);
+  assert.ok(scelta.includes('--ozone-platform=wayland') && !scelta.includes('--ozone-platform=x11'),
+    'chi chiede Wayland da sé si ritrova anche X');
+  const senzaX = lancia(['ciao'], { PATH: process.env.PATH, WAYLAND_DISPLAY: 'wayland-0', XDG_SESSION_TYPE: 'wayland' });
+  assert.ok(senzaX.includes('ciao') && !senzaX.includes('--ozone-platform'),
+    'senza un X a disposizione il lanciatore chiede X lo stesso, e Filo non si apre');
 });
 
 test('il pacchetto costruito, se c\'è, ha il lanciatore al posto giusto', () => {

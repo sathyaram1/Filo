@@ -237,12 +237,12 @@
     },
     TOGLI_PERMESSO_SITO: {
       description: 'Toglie una risposta che Filo ricorda per un sito (microfono, fotocamera, appunti, posizione, notifiche, '
-        + 'schermi, presenza, strumenti), come «Togli» nella pagina Sicurezza: «togli il microfono a meet.google.com», '
+        + 'schermi, presenza, strumenti, rete locale), come «Togli» nella pagina Sicurezza: «togli il microfono a meet.google.com», '
         + '«non ricordare più cosa ho risposto a example.com». Quali risposte ci sono lo dice LEGGI_IMPOSTAZIONI. '
         + 'Toglierla non concede niente: alla prossima richiesta il sito torna a chiedere.',
       properties: {
         sito: S('Il sito, come meet.google.com; vale anche per i suoi sottodomini.'),
-        permesso: S('Quale permesso ("microfono", "fotocamera", "appunti", "posizione", "notifiche", "schermi", "presenza", "strumenti"); ometti per toglierle tutte.'),
+        permesso: S('Quale permesso ("microfono", "fotocamera", "appunti", "posizione", "notifiche", "schermi", "presenza", "strumenti", "rete"); ometti per toglierle tutte.'),
       },
       required: ['sito'],
     },
