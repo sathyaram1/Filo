@@ -199,16 +199,47 @@ test('su Mac le cartelle protette non si leggono in sottofondo prima della prima
   }
 });
 
-test('un file appena scaricato si trova subito: lo scaricamento finito fa rileggere le cartelle anche dopo un giro recente', async () => {
+test('un file messo nella cartella da un altro programma subito dopo una ricerca si trova alla ricerca dopo', async () => {
   Indice._azzera();
   await Indice.cerca('bolletta');
-  const nuovo = join(DOC, 'scaricato_ora.txt');
+  const nuovo = join(DOC, 'salvato_ora.txt');
   writeFileSync(nuovo, 'Preventivo idraulico per la caldaia');
   try {
-    assert.equal((await Indice.cerca('preventivo idraulico')).risultati.length, 0, 'entro il giro recente la cartella non si rilegge');
-    Indice.segnaCambiato();
-    assert.equal((await Indice.cerca('preventivo idraulico')).risultati[0].nome, 'scaricato_ora.txt');
+    assert.equal((await Indice.cerca('preventivo idraulico')).risultati[0].nome, 'salvato_ora.txt');
   } finally {
     unlinkSync(nuovo);
+  }
+});
+
+test('i segnaposto di OneDrive, che l\'elenco di Windows dà per collegamenti, si leggono; un collegamento vero resta fuori', async (t) => {
+  const sotto = join(DOC, 'OneDrive_sotto');
+  mkdirSync(sotto, { recursive: true });
+  writeFileSync(join(sotto, 'scan_od_001.txt'), 'Bolletta del gas condominiale di novembre');
+  writeFileSync(join(DOC, 'scan_od_002.txt'), 'Ricevuta del meccanico per il tagliando');
+  const fuori = cartellaTemporanea('filo-documenti-fuori-');
+  writeFileSync(join(fuori, 'segreto.txt'), 'Preventivo del giardiniere');
+  let link = true;
+  try { symlinkSync(fuori, join(DOC, 'collegamento'), 'junction'); } catch (_) { link = false; }
+  // Come libuv su Windows: ogni voce con un reparse point (i segnaposto di OneDrive) esce come collegamento.
+  const vero = fsp.readdir;
+  fsp.readdir = async (dir, opz) => {
+    const voci = await vero.call(fsp, dir, opz);
+    if (!opz || !opz.withFileTypes) return voci;
+    return voci.map((v) => (v.name === 'OneDrive_sotto' || v.name === 'scan_od_002.txt'
+      ? Object.assign(Object.create(Object.getPrototypeOf(v)), v, { isSymbolicLink: () => true, isDirectory: () => false, isFile: () => false })
+      : v));
+  };
+  try {
+    Indice._azzera();
+    assert.equal((await Indice.cerca('bolletta gas condominiale novembre')).risultati[0].nome, 'scan_od_001.txt');
+    assert.equal((await Indice.cerca('ricevuta meccanico tagliando')).risultati[0].nome, 'scan_od_002.txt');
+    if (!link) { t.diagnostic('niente collegamenti su questo disco'); return; }
+    assert.equal((await Indice.cerca('preventivo giardiniere')).risultati.length, 0, 'un collegamento vero porta fuori dalle cartelle scelte');
+  } finally {
+    fsp.readdir = vero;
+    rmSync(sotto, { recursive: true, force: true });
+    rmSync(join(DOC, 'scan_od_002.txt'), { force: true });
+    rmSync(join(DOC, 'collegamento'), { force: true });
+    rmSync(fuori, { recursive: true, force: true });
   }
 });
