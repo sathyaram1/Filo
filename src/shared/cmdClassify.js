@@ -930,7 +930,8 @@
     // `\\?\C:\…` è il disco locale; ogni altro doppio separatore (UNC, `\\?\UNC\`, `//server`) e
     // `\??\` fanno contattare a Windows un altro computer: anche solo guardarci chiede un OK (#1072, #810.13).
     if (/^(?:[\\/]{2}[?.]|[\\/]\?\?)[\\/][A-Za-z]:/.test(p)) return MOTIVI.fuori;
-    if (/^(?:[\\/]{2}|[\\/]\?\?[\\/])/.test(p)) return MOTIVI.rete;
+    // Senza il nome di un computer dopo le barre (`//`, `// TODO` cercato in un file) non si contatta nessuno.
+    if (/^(?:[\\/]{2,}|[\\/]\?\?[\\/]+)[^\s\\/]/.test(p)) return MOTIVI.rete;
     if (/^[A-Za-z][A-Za-z0-9]+:/.test(p)) return MOTIVI.sistema; // `env:`, `HKCU:`, `Registry::`
     let r;
     if (p === '~' || /^~[\\/]/.test(p)) {
