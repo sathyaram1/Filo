@@ -27,6 +27,7 @@
         'Il riquadro con la percentuale dello zoom resta della stessa misura a qualunque zoom. Prima al 300% copriva la pagina e al 33% non si leggeva.',
         'Il timer e la sveglia suonano da qualunque scheda tu stia guardando, anche se la home non è aperta, e anche in una finestra incognito. Prima il suono usciva solo dalla home. Mentre suona, in cima alla finestra c’è il pulsante che la ferma, e finché suona quel pulsante resta a portata: se mandi qualcosa a tutto schermo Filo ne esce da solo. E se non hai nessuna finestra aperta dove quella scadenza si possa sentire, Filo ne apre una invece di restare muto.',
         'Il riquadro che sceglie la tonalità esatta di un colore cambia solo il suo: gli altri colori che hai cambiato mentre era aperto restano dove li hai messi.',
+        'La bozza di un feedback lasciata a metà resta sul sito dove l\'hai cominciata, e la ritrovi riaprendo il feedback lì. E sui siti la spiegazione, la Modifica e il feedback non prendono più lo stile della pagina: niente bottoni tutti maiuscoli o lettere spaziate.',
       ],
     },
     {

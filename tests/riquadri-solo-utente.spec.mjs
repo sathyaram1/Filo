@@ -1,11 +1,15 @@
 // #1071 — Riquadri di Filo dentro un sito: la bozza del feedback iniziata su un sito tornava nella casella dentro un
-// altro sito, che la leggeva; e lo script del sito premeva Invia (feedback) o l'invio della domanda (spiegazione,
-// Modifica) facendo spendere una chiamata. Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
+// altro sito, che la leggeva; e lo script del sito premeva Invia (feedback, attacco red-team) o l'invio della domanda
+// (spiegazione, Modifica) facendo spendere una chiamata o dei crediti. Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { nelMondoDiFilo, statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 
 const SEGRETO = 'bozza-segreta-1071 del mio conto';
+const PNG_1X1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 // Lo script del sito: guarda tutto ciò che entra nel suo documento e prova a premere e riempire i riquadri di Filo.
 const ATTACCO = `<script>
@@ -19,6 +23,7 @@ const ATTACCO = `<script>
     const bersagli = [host, document.activeElement, ...document.querySelectorAll('button, textarea, input')].filter(Boolean);
     const file = new File([new Uint8Array([137, 80, 78, 71])], 'finto.png', { type: 'image/png' });
     for (const el of bersagli) {
+      if (el.matches && el.matches('textarea, input') && el.id !== 'campo') el.value = 'scritto dal sito';
       el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, composed: true }));
       el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
       try {
@@ -28,8 +33,9 @@ const ATTACCO = `<script>
         el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, composed: true, clipboardData: dt }));
       } catch (_) {}
     }
-    for (const b of document.querySelectorAll('.sn-fb-send, .sn-popup-send, .sn-editbox-replace, [data-sc]')) b.click();
-    return { host: !!host, ombra: !!(host && host.shadowRoot), nostri: document.querySelectorAll('[class*="sn-fb-"], [class*="sn-popup"], [class*="sn-editbox"]').length };
+    for (const b of document.querySelectorAll('.sn-fb-send, .sn-popup-send, .sn-editbox-replace, [data-sc], .sn-rt-send')) b.click();
+    const nostri = '[class*="sn-fb-"], [class*="sn-popup"], [class*="sn-editbox"], [class*="sn-rt-"]';
+    return { host: !!host, ombra: !!(host && host.shadowRoot), nostri: document.querySelectorAll(nostri).length };
   };
 </script>`;
 
@@ -85,9 +91,20 @@ test('la bozza del feedback resta sul sito dove è nata: un altro sito non la ri
   expect(await conta(app, b, '.sn-fb-modal')).toBe(1);
   expect(await conta(app, b, '.sn-fb-thumb, .sn-fb-file-chip')).toBe(0);
 
+  // L'utente allega dal suo selettore: l'immagine entra. Un file su disco, come lo sceglie lui: coi byte in memoria
+  // Playwright fabbrica l'evento del campo, e il riquadro non lo ascolta.
+  const cartella = cartellaTemporanea('filo-1071-');
+  const foto = join(cartella, 'schermata.png');
+  writeFileSync(foto, Buffer.from(PNG_1X1, 'base64'));
+  const [selettore] = await Promise.all([b.waitForEvent('filechooser'), clicca(app, b, '.sn-fb-attach')]);
+  await selettore.setFiles(foto);
+  await expect.poll(() => conta(app, b, '.sn-fb-thumb')).toBe(1);
+
   // Il clic vero dell'utente invia.
   await clicca(app, b, '.sn-fb-send');
   await expect.poll(() => inviati(app, b)).toEqual(['Su B il tasto indietro non va']);
+
+  togliCartella(cartella);
 
   // Tornato su A, la sua bozza è lì.
   await nelMondoDiFilo(app, a, () => globalThis.SN_FEEDBACK_UI.open());
@@ -176,19 +193,58 @@ test('Modifica su un sito: lo script del sito non fa riscrivere né sostituire, 
   await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
   await page.locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
   await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
+  // Il tasto destro sulla selezione prepara già la sua spiegazione: si contano le chiamate da qui.
+  await page.waitForTimeout(1500);
+  const prima = await chiamate(app);
 
   const esito = await page.evaluate(() => window.attacca());
   expect(esito).toEqual({ host: true, ombra: false, nostri: 0 });
   await page.waitForTimeout(800);
-  expect(await chiamate(app)).toBe(0);
+  expect(await chiamate(app)).toBe(prima);
 
   await clicca(app, page, 'button[data-sc="fix"]');
-  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-proposed'))?.testo || '').toContain('TESTO RISCRITTO 1071');
-  expect(await chiamate(app)).toBe(1);
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-proposed'))?.testo || '').toContain('RISCRITTO');
+  expect(await chiamate(app)).toBe(prima + 1);
   // Lo script del sito preme Sostituisci: il campo resta com'era.
   await page.evaluate(() => window.attacca());
   await page.waitForTimeout(400);
   await expect(page.locator('#campo')).toHaveValue('Un testo con un erore.');
   await clicca(app, page, '.sn-editbox-replace');
   await expect(page.locator('#campo')).toHaveValue('TESTO RISCRITTO 1071');
+});
+
+test('attacco red-team su un sito: lo script del sito non lo manda e non legge la bozza di un altro sito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const a = await testServer.openReady(openTab, pagina('<p>Sito A</p>'));
+  await nelMondoDiFilo(app, a, () => globalThis.SN_REDTEAM_ATTACK_UI.open());
+  await expect.poll(() => statoDi(app, a, '.sn-rt-attack')).not.toBeNull();
+  await scrivi(app, a, '.sn-rt-attack', SEGRETO);
+  await expect.poll(() => bozzaSalvata(app, `sn_redteam_attack_draft@${testServer.origin}`)).toBe(SEGRETO);
+  await nelMondoDiFilo(app, a, () => globalThis.SN_REDTEAM_ATTACK_UI.close());
+
+  const b = await testServer.openReady(openTab, pagina('<p>Sito B</p>'), { pubblico: true });
+  // Un utente con l'accesso e crediti: l'invio costerebbe davvero.
+  await nelMondoDiFilo(app, b, () => {
+    window.__rt = [];
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (m, ...r) => {
+      if (m && m.type === 'auth_status') return Promise.resolve({ ok: true, signedIn: true });
+      if (m && m.type === 'get_credits') return Promise.resolve({ ok: true, credits: 500 });
+      if (m && m.type === 'redteam_submit') { window.__rt.push(m.attackText); return Promise.resolve({ status: 'error' }); }
+      return orig(m, ...r);
+    };
+    return true;
+  });
+  await nelMondoDiFilo(app, b, () => globalThis.SN_REDTEAM_ATTACK_UI.open());
+  await expect.poll(() => statoDi(app, b, '.sn-rt-attack')).not.toBeNull();
+  await b.waitForTimeout(600);
+  expect((await statoDi(app, b, '.sn-rt-attack')).valore, 'la bozza di A non torna su B').toBe('');
+  await scrivi(app, b, '.sn-rt-attack', 'attacco scritto su B');
+  await expect.poll(async () => (await statoDi(app, b, '.sn-rt-send'))?.disabilitato).toBe(false);
+  const esito = await b.evaluate(() => window.attacca());
+  expect(esito).toEqual({ host: true, ombra: false, nostri: 0 });
+  await b.waitForTimeout(800);
+  expect(await nelMondoDiFilo(app, b, () => window.__rt.slice())).toEqual([]);
+  await clicca(app, b, '.sn-rt-send');
+  await expect.poll(() => nelMondoDiFilo(app, b, () => window.__rt.slice())).toEqual(['attacco scritto su B']);
 });

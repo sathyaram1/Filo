@@ -31,14 +31,8 @@
     return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
   }
 
-  // La bozza sopravvive a chiusura/riapertura del box e al riavvio di Filo, ma resta dove è stata scritta: un sito
-  // ritrova solo la sua, le pagine di Filo la loro (#1071). Il main lo fa rispettare (impostazioniPerOrigine.js).
-  const DRAFT_KEY = (() => {
-    try {
-      if (location.protocol === 'filo:') return 'sn_feedback_draft_text';
-      return location.origin && location.origin !== 'null' ? 'sn_feedback_draft_text@' + location.origin : null;
-    } catch (_) { return null; }
-  })();
+  // La bozza sopravvive a chiusura/riapertura del box e al riavvio di Filo, ma resta al sito dove è nata (#1071).
+  const DRAFT_KEY = global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza('sn_feedback_draft_text') : null;
   // Colore/tratto del disegno di annotazione.
   const STROKE_COLOR = '#ff3b30';
   const STROKE_WIDTH = 3;

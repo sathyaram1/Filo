@@ -150,3 +150,17 @@ test('bersaglio(): dall\'host scende al nodo sotto il puntatore, o al fuoco se i
   const altro = { composedPath: () => [bottone], target: bottone };
   assert.equal(UI.bersaglio(altro), bottone, 'fuori dai riquadri resta il nodo dell\'evento');
 });
+
+test('chiaveDiBozza(): la bozza porta l\'origine del sito; le pagine di Filo tengono la loro; senza origine niente', () => {
+  const prima = globalThis.location;
+  try {
+    globalThis.location = { protocol: 'https:', origin: 'https://sito.example' };
+    assert.equal(UI.chiaveDiBozza('sn_feedback_draft_text'), 'sn_feedback_draft_text@https://sito.example');
+    globalThis.location = { protocol: 'filo:', origin: 'filo://newtab' };
+    assert.equal(UI.chiaveDiBozza('sn_feedback_draft_text'), 'sn_feedback_draft_text');
+    globalThis.location = { protocol: 'data:', origin: 'null' };
+    assert.equal(UI.chiaveDiBozza('sn_feedback_draft_text'), null);
+  } finally {
+    globalThis.location = prima;
+  }
+});

@@ -122,11 +122,9 @@
     window.addEventListener('auxclick', suCollegamento, true);
   }
 
-  // Spiegazione, Modifica e feedback portano parole dell'utente e dei modelli: in un sito stanno in uno shadow root
-  // chiuso e rispondono solo ai gesti veri (patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md).
-  // L'host non genera un box: posa, z-index e zoom restano quelli del riquadro, come quando stava nel documento.
-  // Sulle pagine di Filo non c'è codice di altri: lì il riquadro resta nel documento.
-  const FOGLI_RIQUADRO = ['theme.css', 'menu.css', 'popup.css', 'feedback.css'];
+  // In un sito i riquadri che portano parole dell'utente o dei modelli stanno in uno shadow root chiuso, chiusi ai gesti
+  // finti: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md. L'host non genera un box.
+  const FOGLI_RIQUADRO = ['theme.css', 'menu.css', 'popup.css', 'feedback.css', 'redteam-attack.css'];
   const FONT_SOLO_GENERICO = '*, ::before, ::after, ::placeholder { font-family: system-ui, sans-serif !important; }';
   let fogliRiquadro = null;
   function fogliDelRiquadro() {
