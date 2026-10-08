@@ -63,4 +63,50 @@ module.exports = function register(on, ctx) {
     return { ok: esiti.length > 0 && esiti.every((e) => e.ok), esiti };
   }));
   on(MSG.DOWNLOAD_RIMETTI_NOME, soloFilo(async (msg, sender) => DL().rimettiNome(msg.id, ambito(sender))));
+
+  // #947 — il bottone di un file trovato in chat. Il percorso può averlo scritto un modello che ha letto un documento
+  // ostile: si apre solo un documento o un'immagine, mai un programma.
+  const electron = () => require('electron');
+  const fs = require('node:fs');
+  const Testo = require('../documentiTesto');
+  const IMMAGINI = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.tif', '.tiff']);
+  const apribile = (p) => !!Testo.tipoDi(p) || IMMAGINI.has(path.extname(p).toLowerCase());
+  const esiste = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
+  on(MSG.FILE_APRI, soloFilo(async (msg) => {
+    const p = percorsoDi(msg);
+    if (!p || !esiste(p)) return nonTrovato();
+    if (!apribile(p)) {
+      return { ok: false, errore: 'tipo', frase: 'Da qui Filo apre solo documenti e immagini: questo file aprilo dalla sua cartella' };
+    }
+    try {
+      const errore = await electron().shell.openPath(p);
+      return errore ? { ok: false, errore: 'sistema', frase: 'Il computer non ha un programma per aprire questo file' } : { ok: true };
+    } catch (_) {
+      return { ok: false, errore: 'sistema', frase: 'Il computer non ha un programma per aprire questo file' };
+    }
+  }));
+  on(MSG.FILE_MOSTRA_CARTELLA, soloFilo(async (msg) => {
+    const p = percorsoDi(msg);
+    if (!p) return nonTrovato();
+    if (esiste(p)) { try { electron().shell.showItemInFolder(p); return { ok: true }; } catch (_) {} }
+    // Il file non c'è più ma la cartella sì: aprirla è comunque il passo che l'utente cercava.
+    const dir = path.dirname(p);
+    try {
+      if (fs.statSync(dir).isDirectory()) { await electron().shell.openPath(dir); return { ok: true, mancaIlFile: true }; }
+    } catch (_) {}
+    return { ok: false, errore: 'non_trovato', frase: 'Né il file né la sua cartella ci sono più' };
+  }));
+
+  const Indice = require('../documentiIndice');
+  on(MSG.DOCUMENTI_STATO, soloFilo(async () => ({ ok: true, ...(await Indice.stato()) })));
+  on(MSG.DOCUMENTI_SCEGLI_CARTELLA, soloFilo(async (msg, sender) => {
+    const { dialog, BrowserWindow } = electron();
+    const win = (sender && sender.win) || BrowserWindow.getFocusedWindow() || undefined;
+    try {
+      const r = await dialog.showOpenDialog(win, { title: 'Cartella da aggiungere ai documenti', properties: ['openDirectory'] });
+      if (!r || r.canceled || !Array.isArray(r.filePaths) || !r.filePaths[0]) return { ok: false };
+      return { ok: true, percorso: r.filePaths[0] };
+    } catch (_) { return { ok: false }; }
+  }));
+  Indice.avviaInSottofondo();
 };

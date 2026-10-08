@@ -202,4 +202,52 @@ function squarcio(testo, forma, lunghezza = 260) {
   return `${inizio > 0 ? '…' : ''}${t.slice(inizio, fine)}${fine < t.length ? '…' : ''}`;
 }
 
-module.exports = { piano, concetti, ordina, squarcio, conta, contaDateDelMese, SINONIMI, MESI };
+/**
+ * Lo squarcio che contiene più idee diverse della richiesta: per una bolletta, la riga col periodo e quella col tipo
+ * di fornitura insieme, che è quello che serve a chi deve scegliere fra due bollette quasi uguali. PURA.
+ */
+function squarcioMigliore(testo, richiesta, lunghezza = 280) {
+  const t = String(testo || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const basso = t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  // Con lettere scomposte che non si ricompongono gli indici non tornerebbero: meglio l'inizio del testo.
+  if (basso.length !== t.length) return squarcio(t, '', lunghezza);
+  const punti = [];
+  concetti(richiesta).forEach((idea, k) => {
+    for (const f of idea.forme) {
+      const cerco = radice(piano(f));
+      if (!cerco) continue;
+      let da = 0;
+      for (let n = 0; n < CONTA_MAX; n++) {
+        const i = basso.indexOf(cerco, da);
+        if (i < 0) break;
+        da = i + cerco.length;
+        if (i > 0 && /[\p{L}\p{N}]/u.test(basso[i - 1])) continue;
+        punti.push({ i, k });
+      }
+    }
+    if (idea.mese >= 0) {
+      const mm = `0?${idea.mese + 1}`;
+      const re = new RegExp(`\\b\\d{1,2}[/.\\-]${mm}[/.\\-](?:\\d{4}|\\d{2})\\b|\\b${mm}[/.\\-](?:19|20)\\d{2}\\b`, 'g');
+      let m;
+      let n = 0;
+      while (n++ < CONTA_MAX && (m = re.exec(t))) punti.push({ i: m.index, k });
+    }
+  });
+  if (!punti.length) return squarcio(t, '', lunghezza);
+  punti.sort((a, b) => a.i - b.i);
+  let migliore = { inizio: punti[0].i, idee: 0 };
+  for (let a = 0; a < punti.length; a++) {
+    const viste = new Set();
+    for (let b = a; b < punti.length && punti[b].i - punti[a].i < lunghezza - 40; b++) viste.add(punti[b].k);
+    if (viste.size > migliore.idee) migliore = { inizio: punti[a].i, idee: viste.size };
+  }
+  let inizio = Math.max(0, migliore.inizio - 30);
+  // Lo squarcio comincia a inizio di parola: «…GIA SERVIZIO» non si legge.
+  const spazio = t.lastIndexOf(' ', inizio);
+  if (inizio > 0 && inizio - spazio < 25) inizio = spazio + 1;
+  const fine = Math.min(t.length, inizio + lunghezza);
+  return `${inizio > 0 ? '…' : ''}${t.slice(inizio, fine)}${fine < t.length ? '…' : ''}`;
+}
+
+module.exports = { piano, concetti, ordina, squarcio, squarcioMigliore, conta, contaDateDelMese, SINONIMI, MESI };

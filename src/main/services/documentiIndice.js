@@ -302,7 +302,7 @@ function riassuntoIndice(rs, sotto) {
   }
   return {
     documenti, conTesto, scansioni, senzaTesto, troppi,
-    cartelle: rs.map((r) => ({ nome: r.nome, percorso: r.percorso, esiste: r.esiste })),
+    cartelle: rs.map((r) => ({ voce: r.voce, nome: r.nome, percorso: r.percorso, esiste: r.esiste })),
   };
 }
 
@@ -352,7 +352,7 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     if (!fs.existsSync(o.id)) continue;
     const v = voci.get(o.id);
     const testo = String(v.t || '');
-    const sq = Ricerca.squarcio(testo, o.primo);
+    const sq = Ricerca.squarcioMigliore(testo, richiesta);
     const inizio = testo ? Ricerca.squarcio(testo, '', 140) : '';
     risultati.push({
       percorso: o.id,
@@ -370,6 +370,19 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     });
   }
   return { risultati, indice: riassuntoIndice(rs, sotto), fermata, cartellaMancante };
+}
+
+/** Le voci dell'elenco che non sono una cartella di questo computer (per dirlo prima di salvarle). */
+async function cartelleMancanti(elenco) {
+  const out = [];
+  for (const v of Array.isArray(elenco) ? elenco : []) {
+    const voce = voceCartella(v);
+    if (voce && DI_SERIE[voce]) continue;
+    let ok = false;
+    if (voce) { try { ok = (await fsp.stat(voce)).isDirectory(); } catch (_) { ok = false; } }
+    if (!ok) out.push(String(v));
+  }
+  return out;
 }
 
 async function stato() {
@@ -408,7 +421,7 @@ function avviaInSottofondo() {
 }
 
 module.exports = {
-  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce,
+  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
   cartellaDiSerie, elimina, DI_SERIE, FRESCO_MS,
   // per gli unit test
   _azzera: () => { voci = null; caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; },

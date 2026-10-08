@@ -74,6 +74,7 @@
     'featureFlags.help': { nome: 'barra dell\'Aiuto', valore: ATTIVA, livello: 1 },
     'featureFlags.categorize': { nome: 'categorizzazione automatica', valore: ATTIVA, livello: 1 },
     blocklist: { nome: 'domini dove Filo non interviene', elenco: true, livello: 2 },
+    'documenti.cartelle': { nome: 'cartelle dove Filo cerca i documenti', elenco: true, livello: 2 },
     provider: { nome: 'fornitore dei modelli', valori: { openrouter: 'OpenRouter' }, livello: 2 },
     useDefaultModels: { nome: 'modelli predefiniti', valore: sino('in uso', 'spenti'), livello: 2 },
     openWeightsOnly: { nome: 'solo modelli a pesi aperti', valore: sino('sì', 'no'), livello: 2 },

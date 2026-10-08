@@ -141,6 +141,15 @@
     return fatto ? `Carta${nome} spostata nella home` : `Spostare la carta${nome} nella home`;
   }
 
+  // Perché la cartella di CERCA_DOCUMENTI esce dal perimetro ('' se ci sta, o se si cerca nelle cartelle di sempre).
+  function cartellaDocumentiFuori(a) {
+    const c = String((a && a.cartella) || '').trim();
+    if (!c || /^(documenti|documents|download|downloads|scaricati|scrivania|desktop)$/i.test(c)) return '';
+    const C = global.SN_CMD_CLASSIFY;
+    if (!C || !C.fuoriPerimetro) return 'non si sa dove legge';
+    return C.fuoriPerimetro(c, a && a._perimetro);
+  }
+
   // Perché LEGGI_DOCUMENTO esce dal perimetro di lettura ('' se ci sta). Senza
   // classificatore non si sa: si chiede.
   function documentoFuori(a) {
@@ -209,10 +218,11 @@
         return `Aprire ${url}`;
       },
     },
+    // Mette in chat il bottone del file e basta: ad aprirlo è il clic dell'utente (#947) → resta in chat, costo 0.
     APRI_FILE: {
-      costo: 1,
+      costo: 0,
       campo: 'file',
-      describe: (a) => `Aprire il file ${a.percorso || a.path || ''}`.trim(),
+      describe: (a) => `Mostrare in chat il file ${a.percorso || a.path || ''}`.trim(),
     },
     TIMER: {
       costo: 1,
@@ -440,6 +450,27 @@
         const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento);
         const perche = documentoFuori(a);
         return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
+      },
+    },
+    CERCA_DOCUMENTI: {
+      // #947 — Filo cerca fra i documenti dell'utente per contenuto, nell'indice che tiene sul computer. Sola lettura
+      // come LEGGI_DOCUMENTO: costo 0 nelle cartelle dell'elenco e nella cartella personale, 2 se la cartella chiesta
+      // sta fuori (#587). Gli squarci dei candidati sono testo di altri: sporcano il compito come un documento letto.
+      costo: (a) => (cartellaDocumentiFuori(a) ? 2 : 0),
+      campo: 'file',
+      fonte: (a, out) => {
+        const r = out && Array.isArray(out.risultati) ? out.risultati : [];
+        if (!r.length) return null;
+        return out.scaricato
+          ? { classe: 5, campo: 'file', chiave: `ricerca:${out.cercato || ''}`, motivo: 'ho letto pezzi di file scaricati' }
+          : { classe: 4, campo: 'file', chiave: `ricerca:${out.cercato || ''}`, motivo: 'ho letto pezzi dei documenti sul tuo disco' };
+      },
+      describe: (a) => {
+        const q = String((a && (a.cosa ?? a.query ?? a.testo)) || '').trim();
+        const c = String((a && a.cartella) || '').trim();
+        const perche = cartellaDocumentiFuori(a);
+        return `Cercare fra i tuoi documenti${q ? ` «${q.length > 80 ? `${q.slice(0, 79)}…` : q}»` : ''}${c ? ` nella cartella ${c}` : ''}`
+          + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
     },
     LEGGI_TRASPARENZA: {
