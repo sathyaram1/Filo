@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { resolve, dirname, join, relative, isAbsolute, sep } from 'node:path';
 import { tmpdir } from 'node:os';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { lottiPerRigaDiComando, costoArgomentoWindows } from './lib/riga-di-comando.mjs';
@@ -330,6 +331,32 @@ export function guardiaFermo(tetto = TETTO_FERMO_MS) {
   };
 }
 
+/** Un lavoro fisso per il processore: quanto ci mette dice quanto la macchina è carica adesso. */
+export function misuraLavoro() {
+  const t = performance.now();
+  let x = 0;
+  for (let i = 0; i < 1e6; i++) x += Math.sqrt(i);
+  return performance.now() - t + (x < 0 ? 1 : 0);
+}
+
+/**
+ * Un orologio che va alla velocità della macchina: il tempo passato si divide per quanto il lavoro fisso è più lento
+ * del più veloce visto. Sulla macchina carica un file sano rallenta con lei, uno appeso no (#1063). PURA salvo `misura`.
+ */
+export function orologioMacchina({ misura = misuraLavoro, ora = () => performance.now() } = {}) {
+  let migliore = Infinity;
+  let prima = null;
+  let tempo = 0;
+  return () => {
+    const d = Math.max(misura(), 1e-3);
+    migliore = Math.min(migliore, d);
+    const adesso = ora();
+    if (prima !== null) tempo += (adesso - prima) / (d / migliore);
+    prima = adesso;
+    return tempo;
+  };
+}
+
 /** PURA. */
 export function testoFermo(inCorso, fermoMs, root = REPO_ROOT) {
   const minuti = Math.round(fermoMs / 60000);
@@ -361,10 +388,11 @@ const lancia = (args, temp, avanzamento = null) => new Promise((ok) => {
   const c = spawn(process.execPath, args, { stdio: 'inherit', cwd: REPO_ROOT, env });
   let fermo = null;
   const eFermo = guardiaFermo();
+  const tempo = avanzamento && orologioMacchina();
   const guardia = avanzamento && setInterval(() => {
     let n = 0;
     try { n = statSync(avanzamento).size; } catch (_) { /* il reporter non ha ancora scritto niente */ }
-    if (!eFermo(n, Date.now())) return;
+    if (!eFermo(n, tempo())) return;
     clearInterval(guardia);
     fermo = fileInCorso(leggiRighe(avanzamento));
     chiudiAlbero(c);
