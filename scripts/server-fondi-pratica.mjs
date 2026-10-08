@@ -161,6 +161,11 @@ export async function esegui(argv, deps = {}) {
     err(`server:fondi: ${a.ramo} è un lavoro con l'app, e la sua verifica non regge: ${verdetto.reason}.\nNon ho toccato niente.`);
     return 1;
   }
+  // Con un verdetto si fonde solo uno sha che la verifica ha visto: senza, il server prenderebbe la punta del momento.
+  if (verdetto && !(verdetto.server && verdetto.server.sha)) {
+    err(`server:fondi: ${a.ramo} è un lavoro con l'app, e la sua verifica non comprende commit del server (quando è stata fatta il ramo del server non c'era, o era già su main): non c'è niente di verificato da portare su main. Se il lavoro sul server è nato dopo, serve una verifica che lo comprenda (dal checkout dell'app: node scripts/verify-local.mjs start).\nNon ho toccato niente.`);
+    return 1;
+  }
   if (verdetto) log(`Verifica del lavoro: ${verdetto.reason}.`);
 
   const of = await import('./owner-feedback.mjs');
