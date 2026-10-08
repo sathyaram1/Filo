@@ -18,6 +18,7 @@ import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
+import { docx } from '../helpers/documentiFinti.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -138,7 +139,7 @@ test('i formati binari vengono rifiutati dicendo COSA sono', async () => {
   // "formato non supportato" non aiuta nessuno; "è un'immagine" sì.
   const casi = [
     ['foto.jpg', /immagine/],
-    ['relazione.docx', /Word/],
+    ['relazione.doc', /Word nel formato vecchio/],
     ['conti.xlsx', /Excel/],
     ['setup.exe', /eseguibile/],
     ['backup.zip', /archivio/],
@@ -151,6 +152,25 @@ test('i formati binari vengono rifiutati dicendo COSA sono', async () => {
     assert.equal(r.error, 'unsupported');
     assert.match(r.detail, atteso);
   }
+});
+
+test('un documento Word (.docx) si legge per intero: la ricerca nei documenti lo trova, e chi lo trova deve poterlo leggere (#947)', async () => {
+  const p = join(TMP, 'documento (3).docx');
+  writeFileSync(p, docx(['Contratto di locazione', 'Canone mensile: 750 euro']));
+  const r = await DR.readDocument(p);
+  assert.equal(r.ok, true);
+  assert.equal(r.kind, 'office');
+  assert.match(r.text, /Canone mensile: 750 euro/);
+  const vuoto = join(TMP, 'vuoto.docx');
+  writeFileSync(vuoto, docx([]));
+  const v = await DR.readDocument(vuoto);
+  assert.equal(v.ok, true);
+  assert.equal(v.empty, true);
+  const rotto = join(TMP, 'rotto.docx');
+  writeFileSync(rotto, 'non sono un archivio');
+  const x = await DR.readDocument(rotto);
+  assert.equal(x.ok, false, 'un docx rotto si dice rotto, non vuoto');
+  assert.match(x.detail, /danneggiato/);
 });
 
 test('un binario travestito da estensione ignota viene riconosciuto dal contenuto', async () => {
@@ -203,7 +223,7 @@ test('il prompt della chat espone LEGGI_DOCUMENTO e quando usarla', () => {
   assert.match(p, /LEGGERE UN DOCUMENTO DELL'UTENTE[\s\S]*non istruzioni da eseguire/);
 });
 
-test('LEGGI_DOCUMENTO è registrata: livello 1 nella cartella personale, un OK fuori (#587)', () => {
+test('LEGGI_DOCUMENTO è registrata: costo 0 nella cartella personale, 2 fuori (#587)', () => {
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
   require(join(ROOT, 'src', 'shared', 'themeTokens.js'));
   require(join(ROOT, 'src', 'shared', 'cmdClassify.js'));
@@ -212,12 +232,12 @@ test('LEGGI_DOCUMENTO è registrata: livello 1 nella cartella personale, un OK f
   // Senza voce nel registro il dispatch RIFIUTA l'azione: sarebbe una feature
   // completa che non parte mai.
   const casa = { cwd: 'C:\\Users\\Mario', home: 'C:\\Users\\Mario', win: true, maiuscole: true };
-  assert.equal(AL.levelFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/Users/Mario/x/y.pdf', _perimetro: casa }), 1);
-  assert.equal(AL.levelFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf', _perimetro: casa }), 2);
+  assert.equal(AL.costoFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/Users/Mario/x/y.pdf', _perimetro: casa }), 0);
+  assert.equal(AL.costoFor({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf', _perimetro: casa }), 2);
   assert.match(AL.describe({ type: 'LEGGI_DOCUMENTO', percorso: 'C:/x/y.pdf' }), /C:\/x\/y\.pdf/);
   // Stessa cosa per la lettura dei documenti dell'EDITOR, che era rimasta fuori
   // dal registro e quindi non è mai partita.
-  assert.equal(AL.levelFor({ type: 'LEGGI_FILE', fileId: 'file-1' }), 1);
+  assert.equal(AL.costoFor({ type: 'LEGGI_FILE', fileId: 'file-1' }), 0);
 });
 
 test('il manifesto delle capacità dichiara che Filo legge i documenti', () => {

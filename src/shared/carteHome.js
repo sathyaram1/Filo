@@ -27,7 +27,7 @@
   // Le app che una carta non ce l'hanno: in «altro» restano un'icona.
   const APP = [
     { id: 'perDopo', titolo: 'Aperti per dopo', icona: 'saveForLater', url: 'filo://home/home.html' },
-    { id: 'scaricamenti', titolo: 'Scaricamenti', icona: 'download', url: 'filo://downloads/downloads.html' },
+    { id: 'scaricamenti', titolo: 'Download', icona: 'download', url: 'filo://downloads/downloads.html' },
     { id: 'cronologia', titolo: 'Cronologia', icona: 'history', url: 'filo://archive/archive.html' },
     { id: 'bacheca', titolo: 'Bacheca', icona: 'checklist', url: 'filo://board/board.html' },
   ];
@@ -82,7 +82,7 @@
   }
 
   // ===== La colonna di sinistra: una regola sola per la home e per la chat =====
-  // Uno scaricamento finito resta fra le cose accadute per un giorno: dopo lo si ritrova negli Scaricamenti.
+  // Uno scaricamento finito resta fra le cose accadute per un giorno: dopo lo si ritrova nei Download.
   const DOWNLOAD_RECENTE_MS = 24 * 60 * 60 * 1000;
   const DOWNLOAD_ATTIVI = ['progressing', 'paused', 'pending'];
   function downloadVisibile(r, ora = Date.now()) {

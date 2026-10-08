@@ -156,9 +156,10 @@ test('rotella: digitare la percentuale imposta lo zoom', async ({ app, openTab, 
   const percent = page.locator('#__filo-zoom-percent');
   await expect(percent).toBeVisible();
 
+  // Si batte davvero: il numero del campo lo scrivono solo i tasti (#686.1).
   await percent.click();
-  await percent.fill('150');
-  await percent.press('Enter');
+  await page.keyboard.type('150');
+  await page.keyboard.press('Enter');
 
   // Lo zoom della pagina è cambiato a ~150% e la modalità è ancora attiva
   // (editare il campo non la chiude).
@@ -166,4 +167,55 @@ test('rotella: digitare la percentuale imposta lo zoom', async ({ app, openTab, 
   await expect.poll(async () =>
     page.evaluate(() => document.documentElement.dataset.filoZoomMode || '')
   ).toBe('1');
+});
+
+// Il riquadro è di Filo, non della pagina: sullo schermo resta della stessa misura e allo stesso
+// posto a qualunque zoom (al 300% copriva il titolo, al 33% non si leggeva; #686.1 giro 10).
+test('rotella: il riquadro ha la stessa misura sullo schermo a qualunque zoom, e il numero si batte lo stesso', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, TALL_PAGE);
+  const zoomA = (livello) => app.evaluate(({ webContents }, livello) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let url = '';
+      try { url = wc.getURL(); } catch (_) {}
+      if (url.includes('127.0.0.1')) wc.setZoomLevel(livello);
+    }
+  }, livello);
+  const misura = () => page.locator('#__filo-zoom-badge').evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { alto: r.height * devicePixelRatio, margine: (innerWidth - r.right) * devicePixelRatio };
+  });
+  const badge = page.locator('#__filo-zoom-badge');
+
+  await page.mouse.click(200, 200, { button: 'middle' });
+  await expect(badge).toBeVisible();
+  const base = await misura();
+  await page.mouse.click(200, 200, { button: 'middle' });
+
+  const livelli = { '300%': Math.log(3) / Math.log(1.2), '33%': Math.log(1 / 3) / Math.log(1.2) };
+  for (const [nome, livello] of Object.entries(livelli)) {
+    await zoomA(livello);
+    await page.mouse.click(200, 200, { button: 'middle' });
+    await expect(badge).toBeVisible();
+    const m = await misura();
+    expect(m.alto / base.alto, `altezza al ${nome}`).toBeGreaterThan(0.9);
+    expect(m.alto / base.alto, `altezza al ${nome}`).toBeLessThan(1.1);
+    expect(Math.abs(m.margine - base.margine), `distanza dal bordo al ${nome}`).toBeLessThan(3);
+    await page.mouse.click(200, 200, { button: 'middle' });
+    await expect(badge).toHaveCount(0);
+  }
+
+  // Lo zoom cambiato dalla rotella a riquadro aperto: il riquadro lo segue subito.
+  await zoomA(0);
+  await page.mouse.click(200, 200, { button: 'middle' });
+  await expect(badge).toBeVisible();
+  for (let i = 0; i < 6; i++) await page.mouse.wheel(0, -100);
+  await expect.poll(async () => zoomFactorOf(app, '127.0.0.1')).toBeGreaterThan(1.5);
+  await expect.poll(async () => (await misura()).alto / base.alto).toBeLessThan(1.1);
+
+  // Al 300% il clic sul numero apre ancora la modifica, e il numero battuto vale.
+  await zoomA(livelli['300%']);
+  await page.locator('#__filo-zoom-percent').click();
+  await page.keyboard.type('120');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => Math.round((await zoomFactorOf(app, '127.0.0.1')) * 100)).toBe(120);
 });

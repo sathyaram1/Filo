@@ -457,6 +457,8 @@
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
     document.addEventListener('selectionchange', Actions.schedulePrefetchExplain);
+    // Chi si ferma prima di rilasciare il mouse non cambia più la selezione: il rilascio, gesto vero, la prepara (#1070).
+    document.addEventListener('mouseup', (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
@@ -1636,7 +1638,7 @@
     };
 
     if (refireInBackground) {
-      SpellCheck.requestWordSuggestion(wordCtx).then(applyResponse).catch(() => {});
+      SpellCheck.requestWordSuggestion(wordCtx, { suRichiesta: true }).then(applyResponse).catch(() => {});
     }
   }
 

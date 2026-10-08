@@ -38,10 +38,12 @@
         notifDuration: 'notifications.durationSec',
         notifSoundEnabled: 'notifications.soundEnabled',
         notifSound: 'notifications.sound',
+        notifSoundVolume: 'notifications.soundVolume',
         dictationAutoSend: 'dictation.autoSend',
         dictationSilence: 'dictation.silenceSec',
         dictationCancel: 'dictation.cancelSec',
         timerRingtone: 'timerRingtone',
+        timerRingtoneVolume: 'timerRingtoneVolume',
         terminalEnabled: 'terminal.enabled',
         terminalShell: 'terminal.shell',
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
@@ -50,10 +52,13 @@
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
+        aggiornamentiInstalla: 'aggiornamenti.installa',
       },
-      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
+      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle' },
       fuori: {},
       messaggi: {
+        DOCUMENTI_STATO: 'CERCA_DOCUMENTI',
+        DOCUMENTI_SCEGLI_CARTELLA: 'apre la finestra del sistema per scegliere una cartella: dalla chat la cartella si dice col suo percorso (cartelle_documenti)',
         FILO_MEMORY_VIEW: 'DIMENTICA',
         FILO_MEMORY_FORGET: 'DIMENTICA',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
@@ -194,7 +199,7 @@
     if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
-    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.level === 2 } : { come: '', chiave: '', conferma: false };
+    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2 } : { come: '', chiave: '', conferma: false };
   }
   function minuscola(s) {
     return s.charAt(0).toLowerCase() + s.slice(1);
@@ -321,6 +326,11 @@
     }
     if (voce && voce.testo) return String(v || '').trim() ? `«${String(v).trim()}»` : 'nessuno';
     if (percorso === 'terminal.shell' && sistema && sistema !== 'win32' && !['bash', 'sh'].includes(v)) return 'shell di sistema (sh)';
+    if (percorso === 'aggiornamenti.installa') {
+      const A = global.SN_AGGIORNAMENTI;
+      const altrove = A && A.sceltaNonVale ? A.sceltaNonVale() : null;
+      if (altrove) return `non vale qui (${altrove})`;
+    }
     if (K && K.valore) return K.valore(percorso, v);
     return typeof v === 'boolean' ? (v ? 'sì' : 'no') : String(v == null ? 'nessuno' : v);
   }

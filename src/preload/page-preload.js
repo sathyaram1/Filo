@@ -16,6 +16,10 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// Prima di ogni ascoltatore: una pagina che si riscrive non spegne Filo (#686.1).
+let riscrittura = null;
+try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
+
 // ─── #405 — riquadri incorporati (iframe) ───────────────────────────────────
 //
 // Da quando la scheda usa nodeIntegrationInSubFrames, questo preload gira in
@@ -143,14 +147,13 @@ function replayContextMenu(e) {
   setTimeout(tick, 16);
 }
 
-// Modalità zoom con la rotella attivata dal click centrale (sostituisce
-// l'autoscroll nativo). Sulle pagine web abilitiamo anche lo zoom con Ctrl/Cmd
-// (pinch del trackpad, Ctrl+rotella, Ctrl +/-/0). Vedi wheel-zoom.js.
-// Solo nel frame principale: lo zoom e il suo badge valgono per la scheda
-// intera, e un badge dentro un riquadro sarebbe un secondo indicatore che
-// contraddice il primo.
+// Modalità zoom con la rotella (clic centrale) e zoom con Ctrl/Cmd: vedi
+// wheel-zoom.js. Zoom e riquadro sono della scheda intera e stanno nel frame
+// principale; un riquadro incorporato gli passa solo i gesti (#686.1).
 if (!IS_SUBFRAME) {
   try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom', e); }
+} else {
+  try { require('./wheel-zoom.js').riquadro(webFrame, { ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom riquadro', e); }
 }
 
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
@@ -247,7 +250,83 @@ const broadcastListeners = new Set();
 // c'è ancora (i moduli condivisi si caricano dopo): il valore letterale è
 // l'unico modo, ed è lo stesso trucco della consegna delle scorciatoie.
 const WAKE_BROADCASTS = new Set(['frame_translate']);
+
+// #503 — il giudizio di chi ospita il riquadro, arrivato per lettera dalla finestra madre (translatePage.js lo
+// scrive con la stessa chiave). Un riquadro che lei non vede non si sveglia, non risponde al conto e non si paga.
+const VERDETTO_ATTESA_MS = 1500;
+const verdettiRiquadro = new Map();
+const inAttesaDiVerdetto = new Set();
+// Anche quelli dentro un riquadro riempito dalla pagina (about:, srcdoc): lì non c'è un Filo che passi parola.
+function riquadriFigli() {
+  const out = [];
+  const docs = [document];
+  while (docs.length && out.length < 500) {
+    let lista = [];
+    try { lista = Array.from(docs.pop().querySelectorAll('iframe, frame')); } catch (_) {}
+    for (const f of lista) {
+      out.push(f);
+      try { if (f.contentWindow.location.protocol === 'about:' && f.contentDocument) docs.push(f.contentDocument); } catch (_) {}
+    }
+  }
+  return out;
+}
+// Il giudizio arriva da chi ha un Filo e mi vede: la madre, o un antenato quando fra noi c'è solo un riquadro riempito
+// dalla pagina, che un Filo non ce l'ha.
+function daUnAntenato(src) {
+  try {
+    for (let w = window.parent, hops = 0; w && hops < 16; hops++) {
+      if (src === w) return true;
+      if (w === w.parent) break;
+      w = w.parent;
+    }
+  } catch (_) {}
+  return false;
+}
+if (IS_SUBFRAME) try {
+  window.addEventListener('message', (e) => {
+    const d = e && e.data;
+    if (!d || typeof d !== 'object' || d.filoFrameVerdict !== 1 || !daUnAntenato(e.source)) return;
+    const runId = typeof d.runId === 'string' ? d.runId.slice(0, 64) : '';
+    if (!runId) return;
+    const visto = d.visible === true;
+    verdettiRiquadro.delete(runId);
+    verdettiRiquadro.set(runId, visto);
+    if (verdettiRiquadro.size > 20) verdettiRiquadro.delete(verdettiRiquadro.keys().next().value);
+    // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
+    if (!visto) {
+      for (const f of riquadriFigli()) {
+        try { f.contentWindow.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
+      }
+    }
+    for (const fn of inAttesaDiVerdetto) fn();
+  });
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
+// Senza un giudizio entro l'attesa (chi ospita non ha Filo dentro) vale quello di prima: si traduce.
+function conVerdetto(runId, fn) {
+  if (verdettiRiquadro.has(runId)) { fn(verdettiRiquadro.get(runId)); return; }
+  let fatto = false;
+  const chiudi = (visto) => {
+    if (fatto) return;
+    fatto = true;
+    inAttesaDiVerdetto.delete(guarda);
+    clearTimeout(timer);
+    fn(visto);
+  };
+  const guarda = () => { if (verdettiRiquadro.has(runId)) chiudi(verdettiRiquadro.get(runId)); };
+  const timer = setTimeout(() => chiudi(true), VERDETTO_ATTESA_MS);
+  inAttesaDiVerdetto.add(guarda);
+}
+
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
+  if (IS_SUBFRAME && msg && msg.type === 'frame_translate' && msg.mode !== 'restore') {
+    conVerdetto(String(msg.runId || ''), (visto) => { if (visto) consegnaBroadcast(msg); });
+    return;
+  }
+  consegnaBroadcast(msg);
+});
+
+function consegnaBroadcast(msg) {
   const deliver = () => {
     for (const fn of broadcastListeners) {
       try { fn(msg, { id: 'filo-desktop' }, () => {}); } catch (e) { console.warn('[Filo CS] listener err', e); }
@@ -264,7 +343,7 @@ ipcRenderer.on('filo:broadcast', (_event, msg) => {
     return;
   }
   deliver();
-});
+}
 
 const chromeShim = {
   runtime: {
@@ -304,7 +383,10 @@ const chromeShim = {
           };
           const offError = (_e, data) => {
             cleanup();
-            if (onMessage) onMessage({ type: 'error', message: data.message, code: data.code });
+            // Tutto quello che il main ha detto sull'errore, non i due campi
+            // che servivano ieri: chi mostra l'errore ne ha bisogno per
+            // ricomporre la frase già scritta per l'utente (#663).
+            if (onMessage) onMessage({ type: 'error', ...data });
             if (onDisconnect) onDisconnect();
           };
           const cleanup = () => {
@@ -427,15 +509,26 @@ const STYLES = [
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
 ];
 
+let stiliMessi = false;
 function injectStyles() {
   // Skip se il documento non è una pagina (es. about:blank, data:, view-source).
   if (!document.head) return;
+  stiliMessi = true;
   for (const f of STYLES) {
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = 'filo://style/' + f;
     document.head.appendChild(link);
   }
+}
+
+// La testa del documento riscritto è nuova: i fogli di Filo vanno rimessi.
+if (riscrittura) {
+  riscrittura.allaRiscrittura(() => {
+    if (!stiliMessi) return;
+    if (document.head) injectStyles();
+    else document.addEventListener('DOMContentLoaded', injectStyles, { once: true });
+  });
 }
 
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
@@ -475,6 +568,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'calcMarkers.js')); } catch (e) { console.error('[Filo CS] calcMarkers', e); } // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo CS] overlayPlacement', e); } // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
+  try { require(path.join(CONTENT_DIR, 'gesto.js')); } catch (e) { console.error('[Filo CS] gesto', e); } // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }

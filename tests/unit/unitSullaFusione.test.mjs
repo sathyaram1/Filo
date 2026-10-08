@@ -264,7 +264,8 @@ test('chiudiAlbero toglie prima il collegamento: con un collegamento che non si 
 
 // ─── I clienti: cosa si manda, come si legge la risposta ─────────────────────
 
-const { askServerMerge, classifyOwnerMerge, exitCodeForOwnerMerge, messageForOwnerMerge, erroreDiConnessione } = await import('../../scripts/lib/owner-merge.mjs');
+const { askServerMerge, classifyOwnerMerge, exitCodeForOwnerMerge, messageForOwnerMerge } = await import('../../scripts/lib/owner-merge.mjs');
+const { erroreDiSocket } = await import('../../scripts/lib/rete.mjs');
 const { exitCodeFor } = await import('../../scripts/merge-gate.mjs');
 const { fermoDopoLaProva } = await import('../../scripts/finish-local.mjs');
 
@@ -284,7 +285,7 @@ test('finish: la prova viaggia con la richiesta, e «main mosso»/«unit rossi»
     // #933: dopo minuti di test la connessione può essere chiusa dall'altra parte; un secondo tentativo.
     let volte = 0;
     const r2 = await askServerMerge({
-      branch: 'claude/x', sha: SHA, url: 'https://esempio/ownerMerge',
+      branch: 'claude/x', sha: SHA, url: 'https://esempio/ownerMerge', attese: [0],
       fetchImpl: async () => {
         if (volte++ === 0) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'UND_ERR_SOCKET' } });
         return { status: 200, text: async () => JSON.stringify({ result: { ok: true, result: 'merged', sha: 'c'.repeat(40) } }) };
@@ -296,7 +297,7 @@ test('finish: la prova viaggia con la richiesta, e «main mosso»/«unit rossi»
     globalThis.fetch = vero;
     delete process.env.FILO_ADMIN_REFRESH_TOKEN;
   }
-  assert.equal(erroreDiConnessione(new Error('ENOTFOUND')), false, 'un nome che non si risolve non si ritenta');
+  assert.equal(erroreDiSocket(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } })), false, 'un nome che non si risolve non si ritenta');
   const rossi = classifyOwnerMerge(200, { result: { ok: true, result: 'unit_rossi', reason: 'unit rossi: 2' } });
   assert.equal(rossi.outcome, 'unit_rossi');
   assert.equal(exitCodeForOwnerMerge(rossi), 20);

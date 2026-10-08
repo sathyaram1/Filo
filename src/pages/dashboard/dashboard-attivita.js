@@ -22,6 +22,7 @@
 
   // Dipendenze dalla pagina, riempite da init().
   let send = null;
+  let allegaFile = null;
   let faviconUrl = () => '';
   let applyCommandCwd = () => {};
   let paroleUtente = () => [];
@@ -73,6 +74,9 @@
     let viva = null;
     let aperta = null;
     let fermato = false;
+    // Un rifiuto della regola (#530) si legge senza cercarlo: a fine lavoro il blocco resta srotolato, sul suo nodo.
+    let tieniAperto = false;
+    let nodoDaAprire = null;
     let inDiretta = true;
     let fineLavoro = 0;
     let anonime = 0;
@@ -326,7 +330,7 @@
         fineLavoro = Date.now();
         setPhase('answer');
         filo.chiudi();
-        avvolgi();
+        if (tieniAperto) mostraTesta(); else avvolgi();
       },
       // Il modello ha nominato un'azione (`callId`) o ne dice l'avanzamento: la riga lo dice subito, il filo si
       // annoda e si tende. Le azioni chiamate insieme fanno un nodo solo.
@@ -460,11 +464,26 @@
         filo.chiudi();
         wrap.classList.remove('dash-activity-vuoto');
         // Srotolato dall'utente mentre arrivava la risposta: la sua scelta resta.
+        if (tieniAperto && wrap.dataset.filo === 'gomitolo') srotola();
+        else if (tieniAperto) {
+          wrap.dataset.filo = 'srotolato';
+          head.setAttribute('aria-expanded', 'true');
+          head.title = 'Riavvolgi';
+        }
         if (wrap.dataset.filo === 'srotolato') mostraTesta(); else avvolgi();
+        if (tieniAperto && nodoDaAprire) apri(nodoDaAprire, true);
         label.textContent = failed ? `Tentativo non riuscito · ${riassunto()}` : riassunto();
         if (failed) wrap.dataset.failed = '1';
       },
       remove() { filo.distruggi(); wrap.remove(); },
+      mostra(a) {
+        tieniAperto = true;
+        const g = trova(a);
+        if (g) nodoDaAprire = g.seg;
+        if (phase !== 'done') return;
+        if (wrap.dataset.filo === 'gomitolo') srotola();
+        if (nodoDaAprire) apri(nodoDaAprire, true);
+      },
     };
 
     function closeTurnReasoning() {
@@ -483,6 +502,7 @@
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
     CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
+    CERCA_DOCUMENTI: (n) => (n > 1 ? `cercato fra i tuoi documenti ${n} volte` : 'cercato fra i tuoi documenti'),
     RINOMINA_FILE: () => 'dato un nome ai file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
@@ -644,6 +664,7 @@
       const nome = (a._output && a._output.name) || '';
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
+    CERCA_DOCUMENTI: (a) => ({ icon: '🔎', text: testoRicercaDocumenti(a) }),
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
@@ -721,8 +742,10 @@
     INSTALLA_AGGIORNAMENTO: (a) => {
       const o = a._output || {};
       if (o.aggiornamento === 'aggiornato') return { icon: '⬇', text: 'Filo è già aggiornato' };
-      if (o.aggiornamento === 'pronta') return { icon: '⬇', text: `Versione ${o.versione} pronta · si installa alla chiusura` };
+      if (o.aggiornamento === 'pronta') return { icon: '⬇', text: `Versione ${o.versione} pronta` };
       if (o.aggiornamento === 'scarica') return { icon: '⬇', text: `Scarico la versione ${o.versione}` };
+      if (o.aggiornamento === 'riavvio') return { icon: '⬇', text: `Riavvio per installare la versione ${o.versione}` };
+      if (o.aggiornamento === 'a-mano' && o.versione) return { icon: '⬇', text: `Versione ${o.versione} da scaricare a mano` };
       return { icon: '⬇', text: 'Aggiornamento' };
     },
     COMANDO_FINESTRA: (a) => {
@@ -752,6 +775,7 @@
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
+    CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
@@ -765,6 +789,7 @@
     CARTA_HOME: 'Carta della home non cambiata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
+    PULISCI_TAB: 'Schede non riordinate',
   };
   function rigaRadio(a, radio) {
     const o = a._output || {};
@@ -778,6 +803,18 @@
     if (o.collegato === null) return { icon, text: `Collegamento chiesto · ${nome}` };
     return { icon, text: `${o.collegato === false ? 'Scollegato' : 'Collegato'} · ${nome}` };
   }
+  // Detto di un'azione che la regola ha fermato prima di cominciare: dove l'etichetta di sopra parla di un esito.
+  const NO_LABELS = {
+    ESEGUI_COMANDO: 'Comando non eseguito', DIMENTICA: 'Non dimenticato',
+    CANCELLA_SVEGLIA: 'Non cancellata', MODIFICA_SVEGLIA: 'Non spostata',
+    CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
+    INVIA_FEEDBACK: 'Segnalazione non inviata',
+  };
+  // Riordino e svuotamento dell'archivio chiedono col loro pannello: come chiedere lo porta `_domanda` (#530).
+  const DOMANDE_PANNELLO = { PULISCI_TAB: 'riordino delle schede', CANCELLA_ARCHIVIO: 'eliminazione dall’archivio' };
+  // Aspetta una risposta dell'utente, da un popup o dal pannello dell'azione: non è un'azione fallita, e il suo bottone resta.
+  function aspettaUtente(a) { return !!(a && (a._confirm || a._domanda)); }
+
   function activityRowFor(a) {
     const row = rigaAttivita(a);
     if (!row || row.failed) return row;
@@ -801,11 +838,16 @@
     // Un segreto che sarebbe uscito (#810): cosa è stato fermato e da dove veniva, frase del main.
     const fermata = a._output && a._output.blocked === 'segreto' ? String(a._output.frase || '').trim() : '';
     if (fermata) return { icon: '🔒', text: fermata.charAt(0).toUpperCase() + fermata.slice(1), tipo: 'FERMATA' };
+    if (a._domanda) return { icon: '❔', text: `Conferma chiesta · ${DOMANDE_PANNELLO[type] || type.toLowerCase()}`, failed: true };
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
       const perche = motivoFallimento(a);
-      return { icon: '⚠', text: `${FAILED_LABELS[type] || 'Azione non riuscita'}${perche ? ` · ${perche}` : ''}`, failed: true };
+      // Un no della regola di autonomia non è un'azione andata a vuoto: «Niente da dimenticare» con le righe lì è falso.
+      const cosa = rifiutataDallaRegola(a)
+        ? (NO_LABELS[type] || FAILED_LABELS[type] || 'Non fatto')
+        : (FAILED_LABELS[type] || 'Azione non riuscita');
+      return { icon: '⚠', text: `${cosa}${perche ? ` · ${perche}` : ''}`, failed: true };
     }
     const fn = ACTIVITY_ROWS[type];
     if (fn) return fn(a);
@@ -813,6 +855,14 @@
     // che il silenzio — il diario deve dire tutto quello che Filo ha fatto.
     if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
     return null;
+  }
+  // Il main ha detto no prima di toccare niente (#530): l'azione non è partita, e il diario non la racconta come fatta.
+  function rifiutataDallaRegola(a) {
+    return !!(a && a._output && a._output.no);
+  }
+  // L'esito di un comando che è partito davvero: un comando bloccato o rifiutato si racconta come riga.
+  function esitoDiComando(a) {
+    return isType(a, 'ESEGUI_COMANDO') && !a._confirm && !!a._output && !a._output.blocked && !rifiutataDallaRegola(a);
   }
   // La ragione del fallimento, quando il main la conosce.
   function motivoFallimento(a) {
@@ -842,12 +892,16 @@
     // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e
     // va nella cronologia del blocco, non sotto la risposta. Se è stato
     // bloccato (terminale spento) resta in vista: è un problema da leggere.
-    if (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
+    if (esitoDiComando(a)) {
       activity.addCommand(a._output, spiegazioneDi(a), a);
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a); return true; }
+    if (row) {
+      activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a);
+      if (rifiutataDallaRegola(a) && activity.mostra) activity.mostra(a);
+      return true;
+    }
     // Un link aperto resta un bottone sotto la risposta, ma il nodo del filo lo conta e lo nomina.
     if (activity.azioneSenzaRiga) activity.azioneSenzaRiga(a);
     return false;
@@ -995,13 +1049,13 @@
       // (riga che racconta, bottone che porta all'editor) vale per tutto ciò
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
-      const anche = a._confirm
+      const anche = aspettaUtente(a)
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
         || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
-          if (!anche && (activityRowFor(a) || (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked))) continue;
+          if (!anche && (activityRowFor(a) || esitoDiComando(a))) continue;
         } else if (tellActionInActivity(activity, a) && !anche) {
           continue;
         }
@@ -1017,7 +1071,7 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
-      if (!a._confirm && !apribileComunque(a) && !permessoDaConcedere(a) && ((a._traccia && !anche) || a._executed === false)) continue;
+      if (!aspettaUtente(a) && !apribileComunque(a) && !permessoDaConcedere(a) && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
@@ -1066,10 +1120,20 @@
     const Tokens = window.SN_THEME_TOKENS;
     if (!R || !Tokens) return null;
     let persistTimer = null;
-    const persist = (overrides) => {
+    // Dal box arriva la fotografia dei token di quando si è aperto: si scrive
+    // il solo token cambiato, sopra lo stato fresco (la mappa si salva intera).
+    const persist = (overrides, token) => {
       clearTimeout(persistTimer);
-      persistTimer = setTimeout(() => {
-        send({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: overrides } });
+      persistTimer = setTimeout(async () => {
+        let themeTokens = { ...overrides };
+        if (token) {
+          let fresco = {};
+          try { fresco = { ...((await self.SN_STORAGE.getSettings()).themeTokens || {}) }; } catch (_) {}
+          if (overrides[token] === undefined) delete fresco[token];
+          else fresco[token] = overrides[token];
+          themeTokens = fresco;
+        }
+        send({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens } });
       }, 200);
     };
     const applyLive = (overrides) => {
@@ -1188,7 +1252,75 @@
   // #950 — un file trovato da Filo: dal tasto destro si apre o gli si dà un nome sensato, e il riferimento in
   // chat segue il nome nuovo (un clic dopo apre il file, non il percorso che non c'è più).
   const nomeDelPercorso = (p) => String(p || '').split(/[\\/]/).pop();
-  function menuDelFile(btn, a) {
+  // Un percorso sul disco (assoluto, con ~ o con la lettera del disco), non un indirizzo web.
+  const percorsoLocale = (p) => {
+    const s = String(p || '').trim();
+    return !!s && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s) && (/^([\\/]|~([\\/]|$)|[a-z]:[\\/])/i.test(s));
+  };
+  // Se il bottone non porta il «dove» coi nomi di Filo (una chat riaperta): le ultime due cartelle; il percorso intero sta
+  // nel suggerimento.
+  function cartellaBreve(p) {
+    const pezzi = String(p || '').split(/[\\/]+/).filter(Boolean);
+    pezzi.pop();
+    return pezzi.slice(-2).join(' › ');
+  }
+  function esitoSulFile(btn, testo) {
+    const R = window.SN_RINOMINA_UI;
+    if (R && R.esito) R.esito(btn, testo, { errore: true });
+    else btn.title = testo;
+  }
+  async function apriFileDaChat(btn, a) {
+    const percorso = String(a.percorso || a.path || '');
+    let r = null;
+    try { r = await send({ type: MSG.FILE_APRI, percorso }); } catch (_) { r = null; }
+    if (!r || !r.ok) esitoSulFile(btn, (r && r.frase) || 'Il file non si è aperto');
+  }
+  async function mostraNellaCartella(btn, a) {
+    const percorso = String(a.percorso || a.path || '');
+    let r = null;
+    try { r = await send({ type: MSG.FILE_MOSTRA_CARTELLA, percorso }); } catch (_) { r = null; }
+    if (!r || !r.ok) esitoSulFile(btn, (r && r.frase) || 'La cartella non si è aperta');
+    else if (r.mancaIlFile) esitoSulFile(btn, 'Il file non c’è più in quella cartella: forse è stato spostato o rinominato');
+  }
+  // #947 — il documento trovato: un clic lo apre col programma del sistema, il tasto destro ha le azioni di un file,
+  // e si trascina nel campo dove si scrive a Filo (o fuori, in un altro programma, col suo percorso).
+  function bottoneFile(a) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn dash-file-btn';
+    btn.draggable = true;
+    const icona = document.createElement('span');
+    icona.className = 'dash-file-btn-icona';
+    icona.setAttribute('aria-hidden', 'true');
+    const ICONE = window.SN_ICONS;
+    if (ICONE && typeof ICONE.readDocument === 'function') icona.innerHTML = ICONE.readDocument(15);
+    const nome = document.createElement('span');
+    nome.className = 'dash-file-btn-nome';
+    const dove = document.createElement('span');
+    dove.className = 'dash-file-btn-dove';
+    btn.append(icona, nome, dove);
+    const disegna = () => {
+      const p = String(a.percorso || a.path || '');
+      nome.textContent = a.etichetta || a.label || nomeDelPercorso(p) || 'File';
+      const doveFilo = a._output && typeof a._output.dove === 'string' ? a._output.dove : '';
+      dove.textContent = doveFilo || cartellaBreve(p);
+      dove.hidden = !dove.textContent;
+      btn.title = `Apri · ${p}`;
+      btn.dataset.percorso = p;
+    };
+    disegna();
+    btn.addEventListener('click', () => apriFileDaChat(btn, a));
+    btn.addEventListener('dragstart', (e) => {
+      const p = String(a.percorso || a.path || '');
+      if (!e.dataTransfer || !p) return;
+      e.dataTransfer.setData('application/x-filo-file', p);
+      e.dataTransfer.setData('text/plain', p);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    menuDelFile(btn, a, { disegna, locale: true });
+    return btn;
+  }
+  function menuDelFile(btn, a, { disegna = null, locale = false } = {}) {
     const R = window.SN_RINOMINA_UI;
     if (!R) return;
     const aggiorna = (r) => {
@@ -1200,6 +1332,7 @@
       if (etichetta && (etichetta === vecchio || etichetta === nomeDelPercorso(vecchio))) {
         if (a.etichetta) a.etichetta = r.nome; else a.label = r.nome;
       }
+      if (disegna) { disegna(); return; }
       btn.href = r.a;
       btn.textContent = a.etichetta || a.label || r.a;
     };
@@ -1212,6 +1345,10 @@
         const percorso = String(a.percorso || a.path || '');
         const nome = nomeDelPercorso(percorso);
         const voci = [['Apri', () => btn.click()]];
+        if (locale && percorso) {
+          voci.push(['Mostra nella cartella', () => mostraNellaCartella(btn, a)]);
+          if (allegaFile) voci.push(['Metti nel messaggio', () => allegaFile(String(a.percorso || a.path || ''))]);
+        }
         if (disp && percorso && R.tipoSupportato(nome)) {
           voci.push([R.VOCE, () => R.apri({ ancora: btn, percorso, nome, suRinominato: aggiorna, suRimesso: aggiorna })]);
         }
@@ -1223,6 +1360,17 @@
     btn.addEventListener('keydown', (e) => {
       if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) apriMenu(e);
     });
+  }
+
+  // «Cercato fra i documenti · bolletta luce marzo · 8 trovati»: dice anche quando la ricerca è stata fermata.
+  function testoRicercaDocumenti(a) {
+    const o = (a && a._output) || {};
+    const q = String((a && (a.cosa || a.query)) || o.cercato || '').trim();
+    const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
+    if (o.cartellaMancante) return `Cartella non trovata · ${o.cartellaMancante}`;
+    const n = Array.isArray(o.risultati) ? o.risultati.length : null;
+    const quanti = n == null ? '' : (n ? ` · ${n === 1 ? 'uno trovato' : `${n} trovati`}` : ' · nessuno trovato');
+    return `Cercato fra i documenti${breve ? ` · ${breve}` : ''}${quanti}${o.fermata ? ' · fermata da te' : ''}`;
   }
 
   function testoRinominati(o) {
@@ -1322,8 +1470,9 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI'];
-      if (AUTO_CONFIRM_TYPES.includes(type) && a._confirm.level === 2) {
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO'];
+      // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
+      if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';
       }
       // La conferma (popup + esecuzione) è una funzione a sé, così renderActions
@@ -1334,7 +1483,7 @@
       async function runConfirm() {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
-        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '' };
+        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', avviso: a._confirm.avviso || '' };
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
@@ -1360,7 +1509,7 @@
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           segnaComando((r && r.executed) ? '✓' : '✗');
-          if (r && r.output) btn.after(renderCommandResult(r.output));
+          if (r && r.output && !r.output.no) btn.after(renderCommandResult(r.output));
           if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
         }
@@ -1446,6 +1595,7 @@
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
+    if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';
@@ -1524,6 +1674,7 @@
       const c = String(a.cerca || '').trim();
       return stepTrace(c ? `⚙ Leggo come è impostato: ${c}` : '⚙ Leggo le impostazioni');
     }
+    if (type === 'CERCA_DOCUMENTI') return stepTrace(`🔎 ${testoRicercaDocumenti(a)}`);
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
       // per iscritto prima di rispondere sul perché di un modello o di un dato.
@@ -1546,6 +1697,8 @@
     a._confirmed = true;
     a._executed = true;
     delete a._confirm;
+    delete a._domanda;
+    delete a._perche;
     if (output) a._output = output;
     const ids = Array.isArray(cambi) ? cambi : [];
     if (ids.length) {
@@ -1558,7 +1711,7 @@
     try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id)); } catch (_) {}
   }
 
-  // La pulizia parte SOLO al click, con conferma, mai da sola (spec §2.1).
+  // Il riordino che la regola non fa partire da solo parte al clic, e chiede come dice `_domanda` (#530).
   function renderBottoneRiordino(a, activity) {
     const btn = document.createElement('button');
     btn.className = 'dash-action-btn dash-action-btn-primary';
@@ -1566,14 +1719,7 @@
     btn.textContent = '🧹 Riordina e archivia le schede';
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
-      // Livello 2 (#146.2): popup Filo che spiega la modifica, non il
-      // window.confirm nativo (PATTERNS.md: niente default del browser).
-      const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-        + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-      const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-        : window.confirm(`${text} Procedo?`);
-      if (!ok) return;
+      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche))) return;
       btn.disabled = true;
       btn.textContent = '🧹 Riordino in corso…';
       const r = await send({ type: MSG.RUN_TAB_TRIAGE });
@@ -1589,6 +1735,31 @@
       segnaConfermata(a, { archived: n }, activity);
     });
     return btn;
+  }
+
+  // Come chiedere lo dice la regola di autonomia del main (#530), mai il pannello. Senza risposta: la parola.
+  // `perche`: la frase della regola quando a far chiedere è ciò che il compito ha letto.
+  async function chiediSecondoRegola(domanda, opts, perche = '') {
+    if (domanda === 'si') return true;
+    if (perche) opts = { ...opts, text: `${opts.text}\n\n${perche}` };
+    const Ui = window.SN_CONFIRM_UI;
+    if (!Ui) return window.confirm(opts.text);
+    return domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts);
+  }
+
+  const TESTO_RIORDINO = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
+    + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
+  // Il riordino chiesto fuori dalla chat (/pulisci, il suggerimento della home) passa dalla stessa regola della
+  // chat: parte nel main, o torna la domanda da fare. `{ archived }`, `{ annullato }` o `{ errore }`.
+  async function riordinaSchede() {
+    const r = await send({ type: MSG.FILO_RUN_ACTION, action: { type: 'PULISCI_TAB' }, parole: paroleUtente() });
+    if (r && r.executed) return { archived: Number(r.output && r.output.archived) || 0 };
+    if (!r || !r.kept) return { errore: (r && r.output && r.output.error) || 'non riuscito' };
+    // Chiesto come assistente (#825.3) torna dal popup generico, che dice `needsConfirm` invece di `domanda`.
+    const domanda = r.domanda || (r.needsConfirm === 3 ? 'conferma' : 'chiede');
+    if (!(await chiediSecondoRegola(domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche))) return { annullato: true };
+    const t = await send({ type: MSG.RUN_TAB_TRIAGE });
+    return { archived: (t && t.archived) || 0 };
   }
 
   // §5 — pannello di cancellazione retroattiva: propone TUTTE e SOLE le schede
@@ -1682,12 +1853,8 @@
         if (del.disabled) return;
         const scelta = spuntate();
         if (!scelta.length) return;
-        // Livello 3 (#146.2): eliminazione irreversibile → l'utente deve
-        // digitare espressamente "conferma".
         const text = `Eliminare definitivamente ${quante(scelta.length)} dall’archivio.`;
-        const ok = window.SN_CONFIRM_UI
-          ? await window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione definitiva', text, okLabel: 'Elimina' })
-          : window.confirm(`${text} L’operazione non è reversibile.`);
+        const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche);
         if (!ok || del.disabled) return;
         del.disabled = true;
         scelte.forEach((x) => { x.box.disabled = true; });
@@ -1715,6 +1882,7 @@
 
   function init(deps) {
     send = deps.send;
+    if (deps.allegaFile) allegaFile = deps.allegaFile;
     if (deps.faviconUrl) faviconUrl = deps.faviconUrl;
     if (deps.applyCommandCwd) applyCommandCwd = deps.applyCommandCwd;
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
@@ -1736,5 +1904,6 @@
     // si rimettono (un'azione da confermare non si può ri-offrire giorni
     // dopo): resta il racconto di cosa Filo ha fatto.
     summarizeActivity,
+    riordinaSchede,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

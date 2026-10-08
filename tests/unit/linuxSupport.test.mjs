@@ -550,6 +550,17 @@ test('su Linux le scorciatoie si chiamano e funzionano come su Windows', () => {
     'su Linux lo zoom arriva alla pagina: quel tasto non è riservato');
 });
 
+test('su Linux il clic centrale in un campo resta all\'incolla del sistema, non apre lo zoom', () => {
+  require('../../src/shared/zoomPagina.js');
+  const Z = globalThis.SN_ZOOM;
+  assert.equal(Z.centraleIncolla('linux'), true, 'su Linux il clic centrale incolla la selezione: lo zoom non deve prenderselo nei campi');
+  assert.equal(Z.centraleIncolla('freebsd'), true);
+  assert.equal(Z.centraleIncolla('win32'), false);
+  assert.equal(Z.centraleIncolla('darwin'), false);
+  const preload = readFileSync(join(ROOT, 'src', 'preload', 'wheel-zoom.js'), 'utf8');
+  assert.equal((preload.match(/\|\| incollaQui\(e, Z\)/g) || []).length, 2, 'la pagina e i riquadri incorporati lasciano tutti e due il clic centrale ai campi');
+});
+
 // ── Batteria, rete e Bluetooth (#873) ────────────────────────────────────────
 
 test('su Linux batteria, rete e Bluetooth si leggono dal sistema, senza PowerShell né permessi', async () => {

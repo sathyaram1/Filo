@@ -26,9 +26,21 @@
 //   `offline` (opzionale, bool) dice se il computer è senza rete; senza, lo si
 //   chiede al lettore del sistema nel main o al browser in una pagina.
 //
+//   SN_CHAT_ERRORS.fromResponse(res, fallback)
+//     → la risposta d'errore dell'IPC ({ error, code, status }) ricomposta in un
+//       Error che le due funzioni qui sopra sanno leggere.
+//
 //   SN_CHAT_ERRORS.isTransientNetwork(err) → bool
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
+//
+//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | ''
+//     La pagina dove l'utente può togliere l'ostacolo, per chi affianca un
+//     collegamento al «Riprova» (che su questi codici non porta da nessuna
+//     parte finché non si cambia qualcosa).
+//   SN_CHAT_ERRORS.rimedioPagina(code) → { dove, url, label } | null
+//     La stessa cosa già pronta da mostrare: ogni superficie usa questa, così
+//     l'indirizzo e l'etichetta non vengono riscritti uno per riquadro.
 //
 // Logica PURA: niente I/O, niente Electron → unit-testabile.
 
@@ -79,17 +91,67 @@
     try { return !!(global.navigator && global.navigator.onLine === false); } catch (_) { return false; }
   }
 
+  // I codici il cui messaggio è GIÀ scritto per l'utente e dice dove si
+  // rimedia: passano invariati. La lista sta qui una volta sola e una
+  // sentinella la confronta con gli errori che il main solleva, perché un
+  // codice nuovo dimenticato qui diventa «qualcosa è andato storto» (#663).
+  const CODICI_GIA_SCRITTI = [
+    'NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
+    'FEEDBACK_READ_DENIED',
+  ];
+
+  // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
+  // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
+  // qualcosa), quindi accanto ci va il collegamento al posto giusto.
+  const RIMEDIO = {
+    NO_API_KEY: 'crediti',
+    NO_MODEL_FOR_ACTION: 'opzioni',
+    NO_OPEN_WEIGHTS_MODEL: 'opzioni',
+    LIMIT_REACHED: 'opzioni',
+  };
+  // Accetta il codice da solo o la risposta intera. Con la risposta si sa anche
+  // se il servizio ha rifiutato la CHIAVE (credito finito compreso): lì la
+  // strada è la pagina Crediti, e il codice da solo non lo direbbe.
+  function rimedio(x) {
+    if (x && typeof x === 'object') {
+      if (x.keyRefused) return 'crediti';
+      return RIMEDIO[String(x.code || '')] || '';
+    }
+    return RIMEDIO[String(x || '')] || '';
+  }
+
+  // La pagina che toglie l'ostacolo, già pronta da mostrare. Sta qui e non in
+  // ogni superficie perché una frase che nomina una pagina e non ci porta è
+  // muta per chi la legge da un sito qualunque (#663).
+  const RIMEDIO_PAGINE = {
+    crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti' },
+    opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni' },
+  };
+  function rimedioPagina(x) {
+    const dove = rimedio(x);
+    return dove ? { dove, ...RIMEDIO_PAGINE[dove] } : null;
+  }
+
+  // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
+  // a mano perde il codice, e la frase già scritta torna generica (#663).
+  function fromResponse(res, fallbackMessage) {
+    const e = new Error(String((res && res.error) || fallbackMessage || ''));
+    if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
+    if (res && Number(res.status) > 0) e.status = Number(res.status);
+    if (res && res.provider) e.provider = res.provider;
+    // La frase che il main ha già scritto sapendo quale chiave ha pagato e
+    // quanti crediti arrivano domani: vale più di qualsiasi ricostruzione.
+    if (res && typeof res.userMessage === 'string' && res.userMessage) e.userMessage = res.userMessage;
+    if (res && res.keyRefused) e.keyRefused = true;
+    return e;
+  }
+
   // Errore → proposizione per l'utente. Mai un codice HTTP nudo, mai un nome di
-  // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED,
-  // NO_MODEL_FOR_ACTION) portano già un messaggio i18n scritto per l'utente —
-  // dicono anche dove si rimedia — e passano invariati.
+  // endpoint.
   function friendly(e, opts) {
     const o = opts || {};
     const raw = String((e && e.message) || (typeof e === 'string' ? e : ''));
-    // FEEDBACK_READ_DENIED (#583): i feedback li legge solo chi li gestisce.
-    // Non è un guasto e riprovare non serve: la frase dice cosa manca.
-    if (e && (e.code === 'NO_API_KEY' || e.code === 'LIMIT_REACHED'
-      || e.code === 'NO_MODEL_FOR_ACTION' || e.code === 'FEEDBACK_READ_DENIED')) return raw;
+    if (e && CODICI_GIA_SCRITTI.includes(e.code)) return raw;
 
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
@@ -202,6 +264,8 @@
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
 
-  global.SN_CHAT_ERRORS = { friendly, sentence, isTransientNetwork };
+  global.SN_CHAT_ERRORS = {
+    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, CODICI_GIA_SCRITTI,
+  };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

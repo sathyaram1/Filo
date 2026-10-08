@@ -755,11 +755,8 @@
     synth.speak(u);
   }
 
-  // ── Suoneria timer (anteprima tramite WebAudio API) ─────────────────────
-  // Stesso catalogo della dashboard (RINGTONES): riproduce una sequenza di
-  // beep senza file audio. Usato dal pulsante "Prova" in questa pagina.
-  // I toni (sequenze di note + player AudioContext) vivono nel modulo condiviso
-  // SN_SOUNDS, riusato anche dalla shell per il suono delle notifiche (#170.1).
+  // I motivi stanno in SN_SOUNDS e basta: l'anteprima qui, le notifiche della
+  // shell e la suoneria di timer e sveglie devono suonare gli stessi.
   const Sounds = window.SN_SOUNDS;
 
   // Riempie il <select> dei suoni notifica con le stesse voci della suoneria.
@@ -776,11 +773,30 @@
     }
   }
 
+  // Il volume si giudica a orecchio: l'anteprima usa quello scelto adesso, o
+  // la manopola si regolerebbe alla cieca.
+  function volumeDa(id) {
+    const n = parseInt($(id).value, 10);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
   function previewRingtone() {
-    if (Sounds) Sounds.play($('timerRingtone').value);
+    if (Sounds) Sounds.play($('timerRingtone').value, volumeDa('timerRingtoneVolume'));
   }
   function previewNotifSound() {
-    if (Sounds) Sounds.play($('notifSound').value);
+    if (Sounds) Sounds.play($('notifSound').value, volumeDa('notifSoundVolume'));
+  }
+  function mostraVolume(id) {
+    const eco = $(id + 'Val');
+    if (eco) eco.textContent = `${volumeDa(id)}%`;
+  }
+  // Un valore assente o storto vale «pieno»: il silenzio si sceglie.
+  function volumeSalvato(salvato) {
+    const n = Number(salvato);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
+  function caricaVolume(id, salvato) {
+    $(id).value = String(volumeSalvato(salvato));
+    mostraVolume(id);
   }
 
   // Clamp dei due campi numerici "liberi" (li usano sia il salvataggio sia il
@@ -832,10 +848,12 @@
       case 'tabPreview.size': return misuraAnteprima($('tabPreviewSize').value);
       case 'agentStyle': return currentStyleText();
       case 'timerRingtone': return $('timerRingtone').value || 'default';
+      case 'timerRingtoneVolume': return volumeDa('timerRingtoneVolume');
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
+      case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
       case 'tts.pitch': return parseFloat($('ttsPitch').value) || 1;
@@ -851,6 +869,7 @@
       case 'barraLaterale.striscia': return $('barraStriscia').checked;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
+      case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
       case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
       case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
@@ -877,9 +896,11 @@
       case 'tabPreview.size': return misuraAnteprima(s.tabPreview && s.tabPreview.size);
       case 'agentStyle': return String(s.agentStyle || '').trim();
       case 'timerRingtone': return s.timerRingtone || 'default';
+      case 'timerRingtoneVolume': return volumeSalvato(s.timerRingtoneVolume);
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
+      case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -896,6 +917,7 @@
       case 'barraLaterale.striscia': return opzioniBarraLaterale(s.barraLaterale).striscia;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
+      case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
       case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
@@ -996,6 +1018,9 @@
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
+    if (vuole('aggiornamenti.installa')) {
+      $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
+    }
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -1016,6 +1041,7 @@
       const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
       $('notifSound').value = nsOpt ? notifSound : 'default';
     }
+    if (vuole('notifications.soundVolume')) caricaVolume('notifSoundVolume', notif.soundVolume);
 
     if (vuole('dictation.autoSend')) {
       $('dictationAutoSend').value = settings.dictation && settings.dictation.autoSend === false ? 'no' : 'si';
@@ -1030,6 +1056,7 @@
       const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
       $('timerRingtone').value = ringOpt ? ringtone : 'default';
     }
+    if (vuole('timerRingtoneVolume')) caricaVolume('timerRingtoneVolume', settings.timerRingtoneVolume);
 
     const tts = settings.tts || {};
     if (vuole('tts.modelVoice')) populateModelVoices(tts.modelVoice || '');
@@ -1144,12 +1171,181 @@
     caricaMemoria();
   }
 
+  // ── Ricerca nei documenti (#947) ─────────────────────────────────────────
+  // L'elenco delle cartelle si salva a ogni gesto, fuori dai campi in sospeso. Le tre di sistema tolte restano
+  // sbiadite con «Rimetti»: quello che si toglie si deve poter rimettere da qui.
+  const CARTELLE_DI_SERIE = { documenti: 'Documenti', download: 'Download', scrivania: 'Scrivania' };
+  let cartelleSalvate = null;
+  let statoDocumenti = null;
+  let giroStato = null;
+
+  function rigaCartella(voce, { tolta = false } = {}) {
+    const row = document.createElement('div');
+    row.className = `mem-riga${tolta ? ' doc-tolta' : ''}`;
+    row.dataset.cartella = voce;
+    const t = document.createElement('span');
+    t.className = 'mem-testo';
+    const nome = CARTELLE_DI_SERIE[voce] || voce.split(/[\\/]/).filter(Boolean).pop() || voce;
+    t.textContent = nome;
+    const info = statoDocumenti && Array.isArray(statoDocumenti.cartelle)
+      ? statoDocumenti.cartelle.find((c) => c.voce === voce) : null;
+    const dove = document.createElement('span');
+    dove.className = 'doc-dove';
+    dove.textContent = tolta ? 'tolta: Filo non ci cerca'
+      : (info && !info.esiste ? `${info.percorso ? `${info.percorso} · ` : ''}non c'è su questo computer`
+        : (info && info.negata ? `il sistema non lascia leggere questa cartella a Filo · ${statoDocumenti.comePermesso || 'dagli il permesso nelle impostazioni del sistema'}`
+          : ((info && info.percorso) || (CARTELLE_DI_SERIE[voce] ? '' : voce))));
+    if (info && info.negata && !tolta) { dove.classList.add('doc-negata'); dove.title = info.percorso || ''; }
+    if (dove.textContent) t.appendChild(dove);
+    row.appendChild(t);
+    const b = document.createElement('button');
+    b.type = 'button';
+    if (tolta) {
+      b.className = 'doc-rimetti';
+      b.textContent = 'Rimetti';
+      b.title = `Cerca di nuovo in ${nome}`;
+      b.addEventListener('click', () => salvaCartelle([...(cartelleSalvate || []), voce]));
+    } else {
+      b.className = 'mem-via';
+      b.textContent = '×';
+      b.title = 'Togli';
+      b.setAttribute('aria-label', `Togli la cartella ${nome}`);
+      b.addEventListener('click', () => salvaCartelle((cartelleSalvate || []).filter((x) => x !== voce)));
+    }
+    row.appendChild(b);
+    return row;
+  }
+
+  function disegnaCartelle(elenco) {
+    const box = $('documentiCartelle');
+    if (!box) return;
+    cartelleSalvate = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
+    box.textContent = '';
+    if (!cartelleSalvate.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessuna cartella: Filo non cerca fra i tuoi documenti.';
+      box.appendChild(p);
+    }
+    for (const v of cartelleSalvate) box.appendChild(rigaCartella(v));
+    for (const v of Object.keys(CARTELLE_DI_SERIE)) {
+      if (!cartelleSalvate.includes(v)) box.appendChild(rigaCartella(v, { tolta: true }));
+    }
+  }
+
+  function scriviStatoDocumenti() {
+    const el = $('documentiStato');
+    if (!el || !statoDocumenti) return;
+    const s = statoDocumenti;
+    const n = Number(s.documenti) || 0;
+    let t = n === 1 ? 'Un documento' : `${n.toLocaleString('it-IT')} documenti`;
+    if (s.scansioni) t += `, di cui ${s.scansioni} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
+    if (s.inCorso && s.inCorso.totali) t += ` · ne sto leggendo ${Math.min(s.inCorso.fatti + 1, s.inCorso.totali)} di ${s.inCorso.totali}`;
+    el.textContent = cartelleSalvate && cartelleSalvate.length ? t : '';
+  }
+
+  async function caricaStatoDocumenti() {
+    if (!$('documentiCartelle')) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_STATO }); } catch (_) { r = null; }
+    if (!r || !r.ok) return;
+    statoDocumenti = r;
+    if (cartelleSalvate) disegnaCartelle(cartelleSalvate);
+    scriviStatoDocumenti();
+    // Mentre legge, il conto si muove: la pagina lo chiede finché il giro non finisce.
+    clearTimeout(giroStato);
+    if (r.inCorso && !document.hidden) giroStato = setTimeout(caricaStatoDocumenti, 1500);
+  }
+
+  async function salvaCartelle(nuovo) {
+    const elenco = Array.from(new Set(nuovo));
+    disegnaCartelle(elenco);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { documenti: { cartelle: elenco } } });
+    flashSaved('documentiHint');
+    setTimeout(caricaStatoDocumenti, 400);
+  }
+
+  async function aggiungiCartella() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_SCEGLI_CARTELLA }); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.percorso) return;
+    if ((cartelleSalvate || []).includes(r.percorso)) { flashSaved('documentiHint'); return; }
+    await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
+  }
+
   let caricato = false;
+
+  // ── Autonomia di Filo (#530) ─────────────────────────────────────────────
+  // Alzare il livello vuole «conferma», abbassarlo no: lo dice SN_AUTONOMIA, non questa pagina.
+  // La scelta parte subito e da sola, fuori dai campi in sospeso: un livello mezzo confermato non esiste.
+  const Autonomia = window.SN_AUTONOMIA;
+  let livelloSalvato = Autonomia ? Autonomia.LIVELLO_PREDEFINITO : 'default';
+  let sceltaInCorso = false;
+
+  function disegnaAutonomia() {
+    const box = $('autonomiaLivelli');
+    if (!box || !Autonomia) return;
+    box.textContent = '';
+    for (const l of Autonomia.livelliSelezionabili()) {
+      const label = document.createElement('label');
+      label.className = 'sn-cookie-mode';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'autonomia';
+      input.value = l.id;
+      input.id = `autonomia-${l.id}`;
+      input.addEventListener('change', () => { if (input.checked) scegliAutonomia(l.id); });
+      const testo = document.createElement('span');
+      const nome = document.createElement('span');
+      nome.className = 'sn-cookie-mode-label';
+      nome.textContent = l.nome;
+      const frase = document.createElement('span');
+      frase.className = 'sn-muted sn-cookie-mode-desc';
+      frase.textContent = l.frase;
+      testo.append(nome, frase);
+      label.append(input, testo);
+      box.appendChild(label);
+    }
+  }
+
+  function mostraAutonomia(livello) {
+    if (!Autonomia) return;
+    livelloSalvato = Autonomia.livelloAttivo(livello);
+    const r = $(`autonomia-${livelloSalvato}`);
+    if (r) r.checked = true;
+  }
+
+  async function scegliAutonomia(nuovo) {
+    if (sceltaInCorso || nuovo === livelloSalvato) return;
+    const serve = Autonomia.richiestaCambioLivello(livelloSalvato, nuovo);
+    if (serve === 'no') { mostraAutonomia(livelloSalvato); return; }
+    if (serve === 'conferma') {
+      sceltaInCorso = true;
+      const info = Autonomia.infoLivello(nuovo);
+      const Ui = window.SN_CONFIRM_UI;
+      let ok = false;
+      try {
+        ok = Ui ? await Ui.confirmTyped({
+          title: `Autonomia: ${info.nome}`,
+          text: `Filo farà da solo più cose di adesso.\n\n${info.frase}`,
+          avviso: 'Così Filo si fida di più.',
+          okLabel: 'Cambia',
+        }) : false;
+      } finally { sceltaInCorso = false; }
+      if (!ok) { mostraAutonomia(livelloSalvato); return; }
+    }
+    mostraAutonomia(nuovo);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: nuovo } } });
+    flashSaved('autonomiaHint');
+  }
 
   async function load() {
     const settings = await Storage.getSettings();
+    disegnaAutonomia();
+    mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     buildPresetOptions();
     preparaShell();
+    $('aggiornamentiQuando').hidden = !shellDiWindows();
     populateNotifSounds();
     if (!ttsSupported()) {
       const u = $('ttsUnsupported');
@@ -1160,6 +1356,8 @@
       });
     }
     riempi(settings);
+    disegnaCartelle(settings.documenti && settings.documenti.cartelle);
+    caricaStatoDocumenti();
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
@@ -1188,9 +1386,15 @@
   // cambiato e che l'utente non sta toccando qui, così il cursore non salta.
   function riallinea(settings) {
     if (!caricato || !settings) return;
+    if (!sceltaInCorso) mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     riempi(settings, (k) => !toccati.has(k) && valoreDelCampo(k) !== valoreSalvato(settings, k));
     riallineaToken(settings.themeTokens);
     riallineaTabColor(settings.tabColor);
+    const cartelle = settings.documenti && settings.documenti.cartelle;
+    if (JSON.stringify(cartelle || []) !== JSON.stringify(cartelleSalvate || [])) {
+      disegnaCartelle(cartelle);
+      setTimeout(caricaStatoDocumenti, 400);
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1209,6 +1413,8 @@
     } catch (_) {}
     load();
     caricaMemoria();
+    $('documentiAggiungi').addEventListener('click', aggiungiCartella);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) caricaStatoDocumenti(); });
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
@@ -1249,6 +1455,7 @@
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
     }
+    $('aggiornamentiInstalla').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
     if (ttsSupported() && typeof window.speechSynthesis.addEventListener === 'function') {
@@ -1279,6 +1486,8 @@
     $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
+    $('notifSoundVolume').addEventListener('input', () => mostraVolume('notifSoundVolume'));
+    $('notifSoundVolume').addEventListener('change', persist);
     $('dictationAutoSend').addEventListener('change', persist);
     for (const id of ['dictationSilence', 'dictationCancel']) {
       $(id).addEventListener('input', (e) => { scriviTempiVoce(); caselle.cambiato('pref', e); });
@@ -1287,6 +1496,8 @@
 
     // Suoneria timer: salva al cambio + anteprima.
     $('timerRingtone').addEventListener('change', persist);
+    $('timerRingtoneVolume').addEventListener('input', () => mostraVolume('timerRingtoneVolume'));
+    $('timerRingtoneVolume').addEventListener('change', persist);
     $('timerRingtonePreview').addEventListener('click', previewRingtone);
 
     // Stile agente: scegliere un preset riempie il textarea; scrivere a mano
