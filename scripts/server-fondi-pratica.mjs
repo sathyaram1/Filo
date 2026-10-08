@@ -175,6 +175,9 @@ export async function esegui(argv, deps = {}) {
         : `resterebbe aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}${ramiApp.length ? '' : `. Se il lavoro sta solo sul server: ${soloComando}`}`;
     if (a.dryRun) {
       const k = lancia(cartella, [a.ramo, '--dry-run'], figlio);
+      if (verdetto && verdetto.server && verdetto.server.sha) {
+        log(`PROVA: la fusione vera porta su main lo sha verificato ${verdetto.server.sha.slice(0, 9)}, anche se ${a.ramo} nel frattempo va avanti.`);
+      }
       log(tardiva
         ? `PROVA: la pratica ${chi} non si riapre e, a fusione riuscita, ${dopo}.`
         : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
