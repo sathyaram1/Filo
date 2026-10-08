@@ -389,3 +389,26 @@ test('a parità di punteggio viene prima il documento più recente: il periodo d
   const piu = [{ id: 'giusto', nome: 'g.pdf', testo: 'Bolletta luce, energia elettrica, kWh. Periodo 01/03/2024 - 31/03/2024' }, { id: 'recente', nome: 'r.pdf', testo: 'Bolletta gas, Smc. Periodo 01/03/2026 - 31/03/2026' }];
   assert.equal(Ricerca.ordina(piu, 'bolletta luce marzo')[0].id, 'giusto');
 });
+
+// #947 giro 5: con un mese, l'anno chiesto è l'anno del periodo. Lo storico dei consumi di una bolletta di marzo 2026
+// nomina il 2025 nove volte, il consumo annuo va da aprile 2025 a marzo 2026: nessuno dei due la fa diventare di marzo 2025.
+test('l\'anno chiesto col mese è l\'anno del periodo, non una parola qualsiasi del testo', () => {
+  const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const storico = (y) => `Storico consumi: ${Array.from({ length: 12 }, (_, k) => `${MESI[(3 + k) % 12]} ${k < 9 ? y - 1 : y} ${100 + k} kWh`).join(' ')}`;
+  const bolletta = (y, extra) => ['Enel Energia S.p.A.', `Bolletta n. 41 del 08/04/${y}`, 'Fornitura di energia elettrica',
+    `Totale da pagare entro il 28/04/${y}`, `Periodo di fatturazione: 01/03/${y} - 31/03/${y}`, extra(y)].join('\n');
+  const annuo = (y) => `Consumo annuo 2.700 kWh dal 01/04/${y - 1} al 31/03/${y}`;
+  for (const extra of [storico, annuo]) {
+    const docs = [{ id: '2025', nome: 'a.pdf', data: 1, testo: bolletta(2025, extra) }, { id: '2026', nome: 'b.pdf', data: 1, testo: bolletta(2026, extra) }];
+    for (const ordine of [docs, docs.slice().reverse()]) {
+      for (const q of ['la bolletta della luce di marzo 2025', 'bolletta luce energia elettrica kWh marzo 2025']) {
+        assert.equal(Ricerca.ordina(ordine, q)[0].id, '2025', `${extra.name}: ${q}`);
+      }
+      assert.equal(Ricerca.ordina(ordine, 'bolletta luce marzo 2026')[0].id, '2026', extra.name);
+      assert.equal(Ricerca.ordina(ordine, 'mi serve la bolletta della luce di marzo')[0].id, '2026', extra.name);
+    }
+  }
+  // Un periodo senza anno vale per ogni anno; senza un mese l'anno resta una parola del testo.
+  assert.equal(Ricerca.ordina([{ id: 'x', nome: 'x.pdf', testo: 'Bolletta luce. Bolletta di marzo' }], 'bolletta luce marzo 2025')[0].trovati.includes('marzo'), true);
+  assert.deepEqual(Ricerca.ordina([{ id: 'c', nome: 'c.docx', testo: 'Contratto di locazione firmato nel 2025' }], 'contratto 2025')[0].trovati, ['contratto', '2025']);
+});

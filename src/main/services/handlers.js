@@ -3898,7 +3898,7 @@ function fermaFiloChat(reqId, wc) {
 // modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
 // Nominato vuol dire il nome del file come parola a sé, non una parola comune che ci coincide («ricevuta» per
 // ricevuta.pdf: senza estensione vale solo un nome che non è una parola, come scan_00231), e non scartato («non X»).
-const NEGA_FILE = /(?<![\p{L}])(?:non|né|nè|ne'|not|anziché|anziche|invece di|piuttosto che)(?![\p{L}])[^.;:!?\n,(]{0,25}$/iu;
+const NEGA_FILE = /(?<![\p{L}])(?:non|né|nè|ne'|not|anziché|anziche|invece di|piuttosto che)(?![\p{L}])[^.;:!?\n,(]{0,12}$/iu;
 function posizioneDelNome(testo, nome) {
   for (let i = testo.indexOf(nome); i >= 0; i = testo.indexOf(nome, i + 1)) {
     const prima = i > 0 ? testo[i - 1] : '';

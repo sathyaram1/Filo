@@ -200,7 +200,7 @@ function periodi(testo) {
     if (out.length >= PERIODI_MAX || preso(i, fine)) return;
     // L'inizio senza anno sta nell'anno della fine, o in quello prima se il mese viene dopo («dicembre - gennaio 2026»).
     const ya = y1 != null ? y1 : (m1 > m2 ? y2 - 1 : y2);
-    out.push({ i, fine, testo: s.slice(i, fine).replace(/\s+/g, ' '), mesi: mesiFra(m1, ya, m2, y2), fino: y2 * 12 + m2 });
+    out.push({ i, fine, testo: s.slice(i, fine).replace(/\s+/g, ' '), mesi: mesiFra(m1, ya, m2, y2), da: ya * 12 + m1, fino: y2 * 12 + m2 });
   };
   const prendi = (re, fn) => { re.lastIndex = 0; let m; let n = 0; while ((m = re.exec(s)) && n++ < 400) fn(m); };
   const meseDiNome = (n) => meseDi(String(n).toLowerCase());
@@ -290,11 +290,23 @@ function dopoEtichetta(s, out, date, metti) {
     const y1 = primo.y != null ? primo.y : null;
     if (y2 == null) {
       if (out.length >= PERIODI_MAX) return;
-      out.push({ i: primo.i, fine: chiude, testo: s.slice(primo.i, chiude).replace(/\s+/g, ' '), mesi: mesiFra(primo.m, 0, ultimo.m, primo.m > ultimo.m ? 1 : 0), fino: null });
+      out.push({ i: primo.i, fine: chiude, testo: s.slice(primo.i, chiude).replace(/\s+/g, ' '), mesi: mesiFra(primo.m, 0, ultimo.m, primo.m > ultimo.m ? 1 : 0), da: null, fino: null });
     } else {
       metti(primo.i, chiude, primo.m, y1, ultimo.m, y2);
     }
   }
+}
+
+// Il periodo copre il mese chiesto nell'anno chiesto. Un periodo senza anno («Bolletta di marzo») vale per ogni anno.
+function copre(p, mese, anni) {
+  if (!p.mesi.includes(mese)) return false;
+  if (!anni.length || p.fino == null) return true;
+  if (p.da == null || p.fino < p.da) return anni.includes(Math.floor(p.fino / 12));
+  return anni.some((y) => p.da <= y * 12 + mese && y * 12 + mese <= p.fino);
+}
+const ANNO = /^(?:19|20)\d{2}$/;
+function anniChiesti(idee) {
+  return idee.some((x) => x.mese >= 0) ? idee.filter((x) => x.mese < 0 && ANNO.test(x.nome)).map((x) => Number(x.nome)) : [];
 }
 
 // Quanto è recente un documento, in mesi: la fine del periodo che dichiara per il mese chiesto (o di uno qualsiasi), se
@@ -302,7 +314,8 @@ function dopoEtichetta(s, out, date, metti) {
 const PARI = 0.02;
 function recenza({ d, periodi: per }, idee) {
   const mesi = idee.filter((x) => x.mese >= 0).map((x) => x.mese);
-  const utili = per.filter((p) => p.fino != null && (!mesi.length || p.mesi.some((m) => mesi.includes(m))));
+  const anni = anniChiesti(idee);
+  const utili = per.filter((p) => p.fino != null && (!mesi.length || mesi.some((m) => copre(p, m, anni))));
   if (utili.length) return Math.max(...utili.map((p) => p.fino));
   const t = new Date(Number(d.data) || 0);
   return d.data && !Number.isNaN(t.getTime()) ? t.getFullYear() * 12 + t.getMonth() : -Infinity;
@@ -316,6 +329,10 @@ function ordina(documenti, richiesta, { limite = 8 } = {}) {
   const idee = concetti(richiesta);
   if (!idee.length) return [];
   const conMese = idee.some((x) => x.mese >= 0);
+  const mesiChiesti = idee.filter((x) => x.mese >= 0).map((x) => x.mese);
+  // Con un mese, l'anno chiesto è l'anno del periodo, non una parola qualsiasi: lo storico dei consumi di una
+  // bolletta di marzo 2026 nomina il 2025 nove volte.
+  const anni = anniChiesti(idee);
   const docs = documenti.map((d) => ({
     d,
     testoPiano: d.testoPiano != null ? d.testoPiano : piano(d.testo),
@@ -339,9 +356,13 @@ function ordina(documenti, richiesta, { limite = 8 } = {}) {
       nelNome += n;
     }
     if (idea.mese >= 0 && per.length) {
-      const coperti = per.filter((p) => p.mesi.includes(idea.mese)).length;
+      const coperti = per.filter((p) => copre(p, idea.mese, anni)).length;
       nelTesto = coperti ? coperti + 1 : 0;
     } else if (idea.mese >= 0) nelTesto += contaDateDelMese(d.testo, idea.mese);
+    else if (anni.includes(Number(idea.nome)) && ANNO.test(idea.nome) && per.some((p) => p.fino != null)) {
+      const coperti = per.filter((p) => p.fino != null && mesiChiesti.some((m) => copre(p, m, [Number(idea.nome)]))).length;
+      nelTesto = coperti ? coperti + 1 : 0;
+    }
     if (nelTesto || nelNome) presenze[k] += 1;
     return { nelTesto: Math.min(nelTesto, CONTA_MAX), nelNome, forma };
   }));

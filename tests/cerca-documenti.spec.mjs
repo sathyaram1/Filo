@@ -275,3 +275,34 @@ test('le porte nuove sono chiuse ai siti, e da Filo si apre un documento ma non 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// #947 giro 5: il bottone aggiunto da Filo è quello del file che la risposta sceglie. Una parola comune che coincide col
+// nome di un altro candidato («ricevuta» → ricevuta.pdf) o un file nominato per scartarlo non ne hanno uno.
+test('il bottone aggiunto dalla risposta è solo quello del file scelto', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = join(await cartellaScaricamenti(app), 'Scelto');
+  cartellaDellaProva(dir);
+  const casi = [
+    ['dov\'è la ricevuta dell\'assicurazione?', 'ricevuta assicurazione', 'Ecco la ricevuta dell\'assicurazione: è xyz123.pdf, la quietanza della polizza RC auto.', ['xyz123.pdf']],
+    ['mi serve la bolletta della luce di marzo', 'bolletta luce marzo', 'È scan_00231.pdf, del periodo 01/03/2026 - 31/03/2026; non scan_00198.pdf, che è di febbraio.', ['scan_00231.pdf']],
+    ['mi serve la bolletta della luce di marzo', 'bolletta luce marzo', 'Non è scan_00198 (febbraio): la bolletta di marzo è scan_00231.', ['scan_00231.pdf']],
+  ];
+  try {
+    const page = await home(app);
+    for (const [domanda, cosa, risposta, attesi] of casi) {
+      await modelloFinto(app, [
+        { toolCalls: [{ id: 'd1', name: 'CERCA_DOCUMENTI', arguments: JSON.stringify({ cosa }) }] },
+        { text: risposta },
+      ]);
+      const prima = await page.locator('.dash-bubble-actions').count();
+      await chiedi(page, domanda);
+      const bolla = page.locator('.dash-bubble-actions').nth(prima);
+      await expect(bolla.locator('.dash-file-btn').first()).toBeVisible({ timeout: 20_000 });
+      await expect(bolla.locator('.dash-file-btn-nome')).toHaveText(attesi);
+      await ripristina(app);
+    }
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
