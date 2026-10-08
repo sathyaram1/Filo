@@ -975,7 +975,12 @@
     .mg-liv-esito[data-kind="ok"]   { color: #2e9e5b; }
     .mg-liv-esito[data-kind="err"]  { color: #c0392b; }
     .mg-liv-esito[data-kind="wait"] { color: var(--sn-muted); }
-    .mg-liv-risposta { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    /* Le domande possono essere lunghe: la risposta resta in fondo al pannello, a vista, e le domande scorrono sopra (#1033). */
+    .mg-liv-risposta {
+      position: sticky; bottom: -12px; margin: 14px -12px -12px; padding: 10px 12px 12px;
+      display: flex; flex-direction: column; gap: 8px;
+      background: var(--sn-bg); border-top: 1px solid var(--sn-border);
+    }
 
     /* Toast in basso a destra, come nell'editor e nei mazzi: serve quando l'esito conta anche se l'owner ha già
        spostato lo sguardo dal pannello. */
