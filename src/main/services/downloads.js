@@ -368,6 +368,8 @@ function persist() {
 
 // ─── broadcast verso la shell ───────────────────────────────────────────
 function broadcast(kind, rec) {
+  // Un file appena arrivato si deve trovare alla prossima ricerca nei documenti (#947).
+  if (kind === 'done') { try { require('./documentiIndice').segnaCambiato(); } catch (_) {} }
   // Una voce tolta dall'elenco non torna nella barra con l'esito tardivo del
   // suo annullamento.
   if (kind !== 'removed' && rec && !records.has(rec.id)) { notifyTabs(); return; }
@@ -519,6 +521,7 @@ const stessoPercorso = (a, b) => (process.platform === 'win32' || process.platfo
 // #950 — un file dell'elenco cambiato di nome da Filo (da qualunque strada): la voce lo segue, invece di
 // dichiararlo sparito, e ricorda il nome di arrivo per poterlo rimettere.
 function rinominato(da, a) {
+  try { require('./documentiIndice').segnaCambiato(); } catch (_) {}
   let toccati = 0;
   for (const rec of records.values()) {
     if (!rec.savePath || !stessoPercorso(rec.savePath, da)) continue;

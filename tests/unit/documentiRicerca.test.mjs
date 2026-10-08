@@ -198,3 +198,17 @@ test('su Mac le cartelle protette non si leggono in sottofondo prima della prima
     Indice.configura({ estrai: (q) => Testo.estrai(q) });
   }
 });
+
+test('un file appena scaricato si trova subito: lo scaricamento finito fa rileggere le cartelle anche dopo un giro recente', async () => {
+  Indice._azzera();
+  await Indice.cerca('bolletta');
+  const nuovo = join(DOC, 'scaricato_ora.txt');
+  writeFileSync(nuovo, 'Preventivo idraulico per la caldaia');
+  try {
+    assert.equal((await Indice.cerca('preventivo idraulico')).risultati.length, 0, 'entro il giro recente la cartella non si rilegge');
+    Indice.segnaCambiato();
+    assert.equal((await Indice.cerca('preventivo idraulico')).risultati[0].nome, 'scaricato_ora.txt');
+  } finally {
+    unlinkSync(nuovo);
+  }
+});

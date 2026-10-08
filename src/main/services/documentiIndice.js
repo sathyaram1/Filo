@@ -268,6 +268,9 @@ async function eseguiGiro(extra) {
   if (!extra || !extra.length) ultimoGiro = Date.now();
 }
 
+// Un file appena scaricato o rinominato da Filo: la ricerca dopo rilegge le cartelle anche se l'ultimo giro è recente.
+function segnaCambiato() { ultimoGiro = 0; }
+
 /** Un giro sull'indice; se ce n'è già uno, ci si accoda a quello. `extra`: cartelle in più solo per questo giro. */
 function aggiorna({ extra = [] } = {}) {
   if (corsa) {
@@ -436,7 +439,7 @@ function avviaInSottofondo() {
 }
 
 module.exports = {
-  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
+  configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti, segnaCambiato,
   cartellaDiSerie, elimina, DI_SERIE, FRESCO_MS,
   // per gli unit test
   _giroInSottofondo: giroInSottofondo,
