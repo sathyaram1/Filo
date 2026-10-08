@@ -848,6 +848,52 @@ export function readState(root = ROOT) {
 export function writeState(state, root = ROOT) {
   mkdirSync(resolve(root, '.claude'), { recursive: true });
   writeFileSync(stateFile(root), JSON.stringify(state, null, 2) + '\n', 'utf8');
+  specchiaVerdettiServer(state, root);
+}
+
+// Un verdetto che comprende il ramo del server deve sopravvivere al worktree dell'app, tolto magari dopo npm run finish:
+// server:fondi lo cerca qui quando nessun worktree lo ha più (#1062). Sta nel checkout principale, condiviso da tutti.
+export function fileVerdettiServer(root = ROOT) {
+  const common = git(['rev-parse', '--path-format=absolute', '--git-common-dir'], root);
+  return resolve(common ? resolve(common, '..') : root, '.claude', 'verdetti-server.json');
+}
+
+export function leggiVerdettiServer(root = ROOT) {
+  try {
+    const o = JSON.parse(readFileSync(fileVerdettiServer(root), 'utf8'));
+    return (o && typeof o === 'object') ? o : {};
+  } catch (_) { return {}; }
+}
+
+/** Ciò che serve a checkVerdict di una voce che comprende il server; null se il server non c'entra. PURA. */
+export function voceVerdettoServer(entry) {
+  const e = entry || {};
+  if (!(e.server && e.server.sha) && !(e.requestedServer && e.requestedServer.sha)) return null;
+  return {
+    request: String(e.request || '').slice(0, 300),
+    verdict: e.verdict || '',
+    sha: e.sha || '',
+    server: coppiaServer(e.server),
+    requestedServer: coppiaServer(e.requestedServer),
+    critique: String(e.critique || '').slice(0, 2000),
+  };
+}
+
+function specchiaVerdettiServer(state, root) {
+  const f = fileVerdettiServer(root);
+  const tutti = leggiVerdettiServer(root);
+  let cambiato = false;
+  for (const [ramo, entry] of Object.entries(state || {})) {
+    const voce = voceVerdettoServer(entry);
+    if (voce) { tutti[ramo] = voce; cambiato = true; } else if (ramo in tutti) { delete tutti[ramo]; cambiato = true; }
+  }
+  if (!cambiato) return;
+  try {
+    mkdirSync(dirname(f), { recursive: true });
+    writeFileSync(f, JSON.stringify(tutti, null, 2) + '\n', 'utf8');
+  } catch (e) {
+    console.error(`Attenzione: il verdetto non è copiato in ${f} (${String((e && e.message) || e)}): se il worktree sparisce prima di server:fondi, server:fondi non lo trova.`);
+  }
 }
 
 // ─── git ────────────────────────────────────────────────────────────────────
