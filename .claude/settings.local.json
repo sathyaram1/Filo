@@ -49,6 +49,15 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/branch-guard.sh\""
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/orchestratore-cieco.mjs\""
+          }
+        ]
       }
     ],
     "StopFailure": [
@@ -61,6 +70,21 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/orchestratore-cieco.mjs\""
+          }
+        ]
+      }
     ]
+  },
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
+    "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"
   }
 }

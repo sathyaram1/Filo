@@ -50,6 +50,8 @@ test-results/
 # Ruolo dell'istanza al lavoro (esplorazione/sviluppo/verifica): stessa natura,
 # lo scrive il dispatcher e lo rilegge chi accoda un feedback per firmarlo.
 .claude/routine-role.json
+# L'orchestratore di questo giro (lo scrive il preflight): accende l'hook che lo rende cieco.
+.claude/routine-orchestratore.json
 
 # Il biglietto del giro in corso. Stessa natura effimera degli altri marcatori,
 # ma qui l'ignoranza NON è solo pulizia: è un SEGRETO, e questo repo è pubblico.

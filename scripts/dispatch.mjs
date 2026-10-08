@@ -2227,6 +2227,15 @@ if (isMainModule) {
               `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
               + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
           }
+          // Chi ha passato il preflight è l'orchestratore: il marcatore accende
+          // .claude/hooks/orchestratore-cieco.mjs, che gli toglie il testo dei worker.
+          try {
+            writeFileSync(resolve(ROOT, '.claude', 'routine-orchestratore.json'),
+              JSON.stringify({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', creato: Date.now() }));
+          } catch (e) {
+            console.error(`[dispatch] GUASTO (transient): marcatore dell'orchestratore non scritto (${e?.message || e})`);
+            process.exit(3);
+          }
           console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)
             || '(routines/roles/orchestrator.md mancante: segnala il guasto e fermati)');
