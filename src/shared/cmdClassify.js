@@ -867,7 +867,8 @@
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
   // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
-  function argomenti(raw) {
+  // Su Windows `\` prima di uno spazio è la fine di un percorso (`src\ \\host\x` sono due operandi), non un escape.
+  function argomenti(raw, win) {
     const out = [];
     const s = String(raw);
     let cur = '';
@@ -897,7 +898,7 @@
       // così `.ss\x68/config` fa comunque affiorare il pezzo `.ss` riservato.
       if (ch === '$' && (s[i + 1] === '\'' || s[i + 1] === '"')) { aperto = true; continue; }
       if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
-      if (ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
+      if (!win && ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
       cur += ch;
       espande += ch;
@@ -1172,7 +1173,7 @@
   // Livello di un comando già riconosciuto come lettura (livello 1 di base).
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw).slice(1);
+    const args = argomenti(raw, c.win).slice(1);
     const testi = args.map((a) => a.testo);
     let cerca = null;
     if (prog === 'grep') cerca = operandiGrep(testi);
@@ -1221,7 +1222,7 @@
   // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
   function spostati(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw).slice(1);
+    const args = argomenti(raw, c.win).slice(1);
     if (prog === 'popd' || args.some((a) => a.variabile)) return { ...c, cwd: null };
     let dest = null;
     for (let i = 0; i < args.length; i++) {
@@ -1475,9 +1476,19 @@
   }
 
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
+  // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
+  // devono vedere il comando che la shell esegue, non la sua grafia (#1072).
+  function comeLaShell(cmd, c) {
+    if (!c.win) return cmd;
+    return cmd.replace(/[\u201C-\u201F]/g, '"')
+      .replace(/[\u2018-\u201B]/g, "'")
+      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-');
+  }
+
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
-    return classifica(cmd, contesto(ctx), 0);
+    const c = contesto(ctx);
+    return classifica(comeLaShell(cmd, c), c, 0);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.

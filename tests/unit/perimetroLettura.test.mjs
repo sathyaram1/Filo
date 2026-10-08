@@ -325,3 +325,17 @@ test('#1072 — il testo cercato non si apre: due barre nel modello non sono ret
     assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
   }
 });
+
+test('#1072 — su Windows si legge il comando come lo spezza PowerShell: virgolette tipografiche, trattini lunghi, `\\` in coda', () => {
+  for (const cmd of ['cd “\\\\evil\\x”', 'cd ‘\\\\evil\\x’', 'Test-Path „\\\\evil\\x”', 'Get-ChildItem ‛\\\\evil\\x‛', 'cd -Path:“\\\\evil\\x”',
+    'Set-Location —Path:\\\\evil\\x', 'Get-ChildItem –LiteralPath:\\\\evil\\x', 'findstr a src\\ \\\\evil\\x\\a', 'dir C:\\ \\\\evil\\x',
+    'type src\\ \\\\evil\\x\\a']) {
+    assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+  for (const cmd of ['Get-Content “..\\..\\b\\secret.txt”', 'Get-Content —LiteralPath:..\\..\\b\\secret.txt', 'findstr a src\\ ..\\..\\b\\secret.txt']) {
+    assert.equal(lvl(cmd, WIN), 2, cmd);
+  }
+  assert.equal(lvl('Get-Content “notes.txt”', WIN), 1);
+  // In bash `\ ` protegge lo spazio: è un nome solo, nella cartella di lavoro.
+  assert.equal(lvl('cat my\\ file.txt', { win: false, maiuscole: false, home: '/home/a', cwd: '/home/a/p' }), 1);
+});
