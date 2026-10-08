@@ -234,9 +234,9 @@ async function elenca(cartelle) {
 
 /** Dove si dà a Filo il permesso di leggere una cartella, su questo sistema. */
 function comeDarePermesso(piattaforma = process.platform) {
-  if (piattaforma === 'darwin') return 'Impostazioni di Sistema › Privacy e sicurezza › File e cartelle › Filo: attiva la cartella';
-  if (piattaforma === 'win32') return 'tasto destro sulla cartella › Proprietà › Sicurezza: dai al tuo utente il permesso di lettura';
-  return 'i permessi della cartella (o, se Filo è installato come Flatpak o Snap, l\'accesso ai file nelle sue impostazioni)';
+  if (piattaforma === 'darwin') return 'apri Impostazioni di Sistema › Privacy e sicurezza › File e cartelle › Filo e attiva la cartella';
+  if (piattaforma === 'win32') return 'tasto destro sulla cartella › Proprietà › Sicurezza, e dai al tuo utente il permesso di lettura';
+  return 'controlla i permessi della cartella (con Filo installato come Flatpak o Snap, l\'accesso ai file nelle sue impostazioni)';
 }
 
 function avvisa(stato) {

@@ -29,7 +29,11 @@ Windows con un disco normale non si vedono:
   permesso del sistema, una per cartella. Se la fa un giro in sottofondo, compare
   venti secondi dopo l'avvio senza che l'utente abbia chiesto niente. Su Mac il
   primo giro lo fa la prima ricerca chiesta dall'utente; da lì in poi il giro in
-  sottofondo riparte da sé.
+  sottofondo riparte da sé. Chi risponde «Non consentire» ha una cartella che
+  esiste ma non si elenca (EPERM), e il Mac non lo richiede più: contata come
+  vuota, la ricerca risponderebbe «non c'è» per sempre. Il rifiuto si dice al
+  modello e in Preferenze, col modo di dare il permesso; le frasi che spiegano la
+  richiesta stanno nell'`extendInfo` del pacchetto.
 
 Il resto del giro segue
 [Il computer si legge senza permessi e finché serve](il-computer-si-legge-senza-permessi-e-finche-serve.md):

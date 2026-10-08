@@ -306,3 +306,54 @@ test('il bottone aggiunto dalla risposta è solo quello del file scelto', async 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// #947 giro 6: su Mac chi nega alla prima ricerca il permesso per una cartella ha una cartella che Filo non può
+// elencare. Non deve passare per vuota («0 documenti», «non c'è»): il modello sa che manca il permesso e come darlo, e
+// la pagina Preferenze lo dice accanto alla cartella. Il rifiuto si imita sull'elenco della cartella (EPERM, come macOS).
+test('una cartella che il sistema non lascia leggere non passa per vuota, né in chat né in Preferenze', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const scaricati = await cartellaScaricamenti(app);
+  const dir = join(scaricati, 'Negata');
+  cartellaDellaProva(dir);
+  try {
+    await app.evaluate((_e, negata) => {
+      const fsp = process.getBuiltinModule('node:fs/promises');
+      const path = process.getBuiltinModule('node:path');
+      globalThis.__readdirVero = fsp.readdir;
+      fsp.readdir = async (d, o) => {
+        if (path.resolve(String(d)) === path.resolve(negata)) {
+          const e = new Error(`EPERM: operation not permitted, scandir '${d}'`);
+          e.code = 'EPERM';
+          throw e;
+        }
+        return globalThis.__readdirVero(d, o);
+      };
+    }, scaricati);
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'd1', name: 'CERCA_DOCUMENTI', arguments: JSON.stringify({ cosa: 'bolletta luce energia elettrica kWh marzo' }) }] },
+      { text: 'Il sistema non mi lascia leggere i Download.' },
+    ]);
+    const page = await home(app);
+    await chiedi(page, RICHIESTA);
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+    const esito = testoDeiMessaggi((await chiamateAlModello(app))[1]);
+    const i = esito.lastIndexOf('[Nessun documento combacia');
+    expect(i, 'il blocco della ricerca arriva al modello').toBeGreaterThanOrEqual(0);
+    const blocco = esito.slice(i, i + 3000);
+    expect(blocco).toMatch(/Download \(il sistema non la lascia leggere\)/);
+    expect(blocco).toMatch(/NON lascia leggere a Filo Download[^\]]*non dire che il documento non c'è/);
+
+    const pref = await openTab('filo://preferences/preferences.html');
+    const riga = pref.locator('#documentiCartelle .mem-riga[data-cartella="download"] .doc-dove');
+    await expect(riga).toHaveText(/il sistema non lascia leggere questa cartella a Filo · \S/, { timeout: 10_000 });
+    await expect(riga).toHaveClass(/doc-negata/);
+    await pref.locator('#sec-documenti').screenshot({ path: 'tests/.shots/cerca-documenti-negata.png' });
+  } finally {
+    await app.evaluate(() => {
+      const fsp = process.getBuiltinModule('node:fs/promises');
+      if (globalThis.__readdirVero) fsp.readdir = globalThis.__readdirVero;
+    });
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

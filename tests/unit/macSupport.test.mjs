@@ -905,6 +905,16 @@ test('su Mac Filo dice perché usa il Bluetooth: senza la frase, macOS chiude bl
   assert.ok(typeof frase === 'string' && /Bluetooth/.test(frase), 'manca NSBluetoothAlwaysUsageDescription in build.mac.extendInfo');
 });
 
+// La ricerca nei documenti (#947) elenca Documenti, Scrivania e Download: macOS chiede il permesso per ognuna, e senza
+// la frase la richiesta non dice perché (e si nega più spesso). Un rifiuto lo gestisce la ricerca, che lo dice.
+test('su Mac Filo dice perché legge Documenti, Scrivania e Download', () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const info = (pkg.build && pkg.build.mac && pkg.build.mac.extendInfo) || {};
+  for (const k of ['NSDocumentsFolderUsageDescription', 'NSDesktopFolderUsageDescription', 'NSDownloadsFolderUsageDescription']) {
+    assert.ok(typeof info[k] === 'string' && /documenti/i.test(info[k]), `manca ${k} in build.mac.extendInfo`);
+  }
+});
+
 // Su Mac chiudere l'ultima finestra NON spegne Filo: resta nel Dock. Suono e
 // pulsante che ferma vivono in una finestra, quindi senza garantirne una il
 // timer scade vivo e muto e la notifica non porta da nessuna parte. È il caso

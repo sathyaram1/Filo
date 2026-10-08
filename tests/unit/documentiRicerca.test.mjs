@@ -276,7 +276,7 @@ test('una cartella che il sistema non lascia leggere (il «Non consentire» del 
   // Un ramo per sistema, scritto intero.
   assert.match(Indice.comeDarePermesso('darwin'), /Privacy e sicurezza › File e cartelle/);
   assert.match(Indice.comeDarePermesso('win32'), /Sicurezza/);
-  assert.match(Indice.comeDarePermesso('linux'), /permessi/);
+  assert.match(Indice.comeDarePermesso('linux'), /controlla i permessi/);
 });
 
 test('l\'esempio dato al modello per cercare un documento non porta un anno scritto fisso, che invecchia e vince sull\'ultimo', () => {
