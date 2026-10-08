@@ -409,3 +409,35 @@ test('tolto il worktree dell\'app, server:fondi trova ancora il verdetto: rifiut
   assert.equal(si.k, 0, si.testo);
   assert.equal(mainDelServer(sc), g(sc.server, 'rev-parse', RAMO));
 });
+
+test('lo sha verificato del server committato e non spinto: server:fondi lo porta su main lui, senza chiedere un\'altra verifica', async () => {
+  const sc = scenarioInWorktree();
+  const v = commit(sc.server, 'functions/lavoro.js', 'v2, non spinto\n', 'correzione del server');
+  verificato(sc);
+  const r = await fondi(sc, sc.work);
+  assert.equal(r.k, 0, r.testo);
+  assert.equal(mainDelServer(sc), v, r.testo);
+  assert.match(r.testo, /su origin il ramo del server è ancora a [0-9a-f]{8}, indietro: porto io lo sha verificato/);
+  assert.doesNotMatch(r.testo, /Serve un'altra verifica/);
+});
+
+test('una verifica senza commit del server: server:fondi non fonde la punta che trova, nemmeno se compare durante il giro', async () => {
+  const sc = scenarioInWorktree();
+  g(sc.server, 'checkout', '-q', 'main');
+  g(sc.server, 'branch', '-q', '-D', RAMO);
+  g(sc.server, 'push', '-q', 'origin', `:refs/heads/${RAMO}`);
+  g(sc.server, 'fetch', '-q', '--prune', 'origin');
+  assert.equal(vl(sc.work, 'start', 'fai X su app e server').code, 0);
+  assert.match(vl(sc.work, 'critica', PASS).out, /verifica superata per 'claude\/prova' su [0-9a-f]{8} ══/);
+  const prima = mainDelServer(sc);
+  const altro = resolve(sc.base, 'altro-nuovo');
+  execFileSync('git', ['clone', '-q', sc.srvOrigin, altro], { stdio: ['ignore', 'pipe', 'pipe'] });
+  identita(altro);
+  g(altro, 'checkout', '-q', '-b', RAMO);
+  commit(altro, 'functions/nuovo.js', 'mai verificato\n', 'spinto da fuori');
+  const r = await fondi(sc, sc.work, () => g(altro, 'push', '-q', 'origin', `refs/heads/${RAMO}:refs/heads/${RAMO}`));
+  assert.equal(r.k, 1, r.testo);
+  assert.deepEqual(r.passati, [], 'lo strumento del server non parte');
+  assert.match(r.testo, /la sua verifica non comprende commit del server[\s\S]*Non ho toccato niente/);
+  assert.equal(mainDelServer(sc), prima);
+});
