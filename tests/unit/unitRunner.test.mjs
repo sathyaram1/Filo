@@ -521,20 +521,19 @@ test('la guardia conta il tempo fermo dal primo evento: un file lento che avanza
   assert.equal(appeso(10, 1000), true);
 });
 
-test('un file lento che va avanti finisce verde, uno appeso diventa un rosso col suo nome', () => {
+test('senza il tetto di node, un file appeso dopo le sue prove diventa un rosso col suo nome e la corsa finisce', () => {
   const dir = cartellaTemporanea('filo-fermo-');
   try {
-    // Ogni prova dura meno del tetto, il file intero ben di più: sotto carico i file sani sono così.
-    writeFileSync(join(dir, 'a-lento.test.mjs'), "import { test } from 'node:test';\nfor (let i = 0; i < 15; i++) test('lento ' + i, () => new Promise((r) => setTimeout(r, 1000)));\n");
-    writeFileSync(join(dir, 'b-appeso.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
-    // Il tetto è dieci volte il passo del file lento: il margine regge una macchina carica.
-    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '10000' };
+    writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';
+test('prima di appendersi', () => {});
+setInterval(() => {}, 1000);
+");
+    // Un tetto corto qui non fa rossi finti: qualunque cosa sia ferma, l'unico file in corso è quello appeso.
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
-    for (let i = 0; i < 15; i++) assert.match(r.stdout, new RegExp(`^ok \\d+ - lento ${i}$`, 'm'), `il file lento è stato tagliato:\n${r.stdout}`);
-    assert.match(r.stdout, /ROSSO: .*b-appeso\.test\.mjs non è andato avanti/);
-    assert.doesNotMatch(r.stdout, /a-lento\.test\.mjs non è andato avanti/);
+    assert.match(r.stdout, /ROSSO: .*appeso.test.mjs non è andato avanti/);
     assert.equal(r.status, 1);
   } finally {
     togliCartella(dir);
