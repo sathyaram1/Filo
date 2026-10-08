@@ -339,7 +339,7 @@ test('nessuna capacità promette un\'icona del menu del tasto destro che non c\'
 
 test('ogni voce del menu «App» citata dal manifesto esiste davvero nel launcher', () => {
   // Simmetrico al test precedente sul lato "positivo": il manifesto indica il
-  // menu App come strada per alcune pagine (Scaricamenti, Aperti per dopo…).
+  // menu App come strada per alcune pagine (Download, Aperti per dopo…).
   // Se quella voce non è nel launcher, l'indicazione è falsa.
   //
   // Dal 2026-09 (#583) il registro è una FUNZIONE, perché "Feedback" e

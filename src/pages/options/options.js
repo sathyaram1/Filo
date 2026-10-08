@@ -8,6 +8,10 @@
   const Storage = window.SN_STORAGE;
   const ModelChain = window.SN_MODEL_CHAIN;
   const Caps = window.SN_MODEL_CAPS;
+  const staUsandoAdesso = (el) => {
+    const B = window.SN_PAGE_BOOTSTRAP;
+    return !!(B && B.staUsandoAdesso && B.staUsandoAdesso(el));
+  };
 
   // Mappa azione → editor a segmenti della sua catena di modelli (popolata in load()).
   let modelChains = {};
@@ -1003,11 +1007,24 @@
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
       const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('options', msg.settings, {
-        salta: (id, percorso, el) => document.hasFocus() && document.activeElement === el,
+        salta: (id, percorso, el) => staUsandoAdesso(el),
       });
       if (toccati.includes('useDefaultModels')) applyDefaultModelsVisibility();
       if (toccati.length) renderOpenWeightsImpact();
       if (toccati.includes('ordineHost')) rinfrescaMisure();
+      // Il modello di un'azione si sceglie anche dal tasto destro di una pagina (la dettatura): senza ridisegnare
+      // la griglia il salvataggio dopo lo rimanderebbe indietro. Non mentre qualcuno ci sta scrivendo dentro.
+      const s = msg.settings;
+      const griglia = $('modelsGrid');
+      const inUso = staUsandoAdesso(document.activeElement) ? document.activeElement : null;
+      if (s.models && griglia && !(inUso && griglia.contains(inUso))
+        && JSON.stringify(ModelChain.collect(modelChains || {})) !== JSON.stringify(s.models)) {
+        modelChains = ModelChain.renderGrid(griglia, {
+          models: s.models,
+          onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
+          getRegistry: () => collectModelRegistry().registry,
+        });
+      }
     });
   }
 

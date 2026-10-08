@@ -156,6 +156,9 @@
   const mgUserNoteBtn    = document.getElementById('mgUserNoteBtn');
   const mgUserNoteMsg    = document.getElementById('mgUserNoteMsg');
 
+  // I disegni delle forme vivono nel modulo condiviso: la pagina dei feedback disegna lo stesso segno.
+  const FORME_SVG = window.SN_MANAGE_REVIEW.FORME_SVG;
+
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
@@ -2372,9 +2375,7 @@
       item.style.borderLeftColor = ferma
         ? MR.REASONS.secaudit.color
         : (cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent'));
-      // Una riga sola: #N · titolo (ellissi). Il motivo (attacco/spam/…) resta
-      // implicito nel colore del border-left; il titolo completo nel tooltip,
-      // col sottotesto dello stato (statusReason: loop, clarify, …) se presente.
+      // Una riga sola: #N · segno · titolo (ellissi). Il bordo è la famiglia del motivo, il segno chi l'ha fermata.
       const norm = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
       // Quante volte questo lavoro si è arenato ed è rientrato in coda da solo.
       // Senza scriverlo da qualche parte, un feedback che si impianta sempre
@@ -2394,6 +2395,7 @@
       const rowHtml = `
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
+        ${leggibile ? segnoFermataHtml(fb) : ''}
         <span class="mg-item-title">${esc(title)}</span>
         ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
@@ -2412,6 +2414,15 @@
       });
       mgList.appendChild(item);
     }
+  }
+
+  // Il segno dei Ricevuti (D93): la forma del livello che ha fermato la pratica, il motivo sotto il puntatore.
+  function segnoFermataHtml(fb) {
+    const s = MR.segnoFermata(fb, { fusioni });
+    if (!s || !FORME_SVG[s.forma]) return '';
+    const cls = 'mg-segno-fermata' + (s.classe ? ` mg-forma--${s.classe}` : ' mg-segno-fermata--vuoto');
+    return `<span class="${cls}" data-forma="${esc(s.forma)}" data-livello="${esc(s.livello)}" title="${esc(s.testo)}" aria-label="${esc(s.testo)}" role="img">`
+      + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG[s.forma]}"/></svg></span>`;
   }
 
   // Aperta/Chiusa: quello che si sa di una segnalazione il cui stato fine è
@@ -4339,16 +4350,6 @@
   }
 
   // ── La fila dei cinque livelli ────────────────────────────────────────────
-  //
-  // I disegni delle quattro forme, dentro una griglia di 16. I cerchi dei
-  // giudici restano `.mg-dot` come sempre: sono lo stesso oggetto di prima, e
-  // cambiarne il disegno avrebbe cambiato una cosa che non c'era da cambiare.
-  const FORME_SVG = {
-    triangolo: 'M8 2 L14.5 13.6 L1.5 13.6 Z',
-    rombo:     'M8 1.4 L14.6 8 L8 14.6 L1.4 8 Z',
-    pentagono: 'M8 1.4 L14.6 6.3 L12.1 14.2 L3.9 14.2 L1.4 6.3 Z',
-    quadrato:  'M2.6 2.6 H13.4 V13.4 H2.6 Z',
-  };
 
   // Quale forma sta guardando il pannello di destra: serve a ridisegnarlo
   // quando arriva un aggiornamento (una fusione approvata altrove) e a
@@ -4976,6 +4977,7 @@
       listHtml += `
         <div class="mg-sender-item" data-id="${esc(fb._id)}" style="border-left-color:${color}">
           ${num ? `<span class="mg-sender-item-num">#${esc(num)}</span>` : ''}
+          ${statoLeggibile(fb) ? segnoFermataHtml(fb) : ''}
           <span class="mg-sender-item-title">${esc(title)}</span>
         </div>
       `;

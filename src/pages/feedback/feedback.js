@@ -275,6 +275,15 @@
     return `<span class="fb-fusione" title="${escapeHtml(titolo)}">${escapeHtml(testo)}</span>`;
   }
 
+  // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
+  function segnoFermataHtml(f) {
+    const s = MR.segnoFermata(f, { fusioni });
+    if (!s || !MR.FORME_SVG[s.forma]) return '';
+    const cls = 'fb-segno' + (s.classe ? ` fb-segno--${s.classe}` : ' fb-segno--vuoto');
+    return `<span class="${escapeHtml(cls)}" data-forma="${escapeHtml(s.forma)}" title="${escapeHtml(s.testo)}" aria-label="${escapeHtml(s.testo)}" role="img">`
+      + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${MR.FORME_SVG[s.forma]}"/></svg></span> `;
+  }
+
   function fmtTs(ts) {
     if (!ts) return '';
     try {
@@ -1068,7 +1077,7 @@
       const agentLabel = am ? (isRoutineFind ? `audit · ${am.model}` : am.model) : '';
       const agentBadgeTitle = isRoutineFind ? 'Audit automatico di una routine cloud' : "Modello che ha trovato l'errore";
       const agentTitleHtml = am && (am.title || num)
-        ? `<div class="fb-title">${numHtml}${numHtml && am.title ? ' ' : ''}${escapeHtml(am.title)}</div>` : '';
+        ? `<div class="fb-title">${numHtml}${numHtml ? ' ' : ''}${segnoFermataHtml(f)}${escapeHtml(am.title)}</div>` : '';
       const agentHtml = agent ? `
         <div class="fb-badges">
           <span class="fb-badge fb-badge--model" title="${escapeHtml(agentBadgeTitle)}">${agentIcon} ${escapeHtml(agentLabel)}</span>
@@ -1079,7 +1088,7 @@
       // Titolo breve (#22 + nome generato dall'LLM all'invio) per i feedback
       // non-agente; le issue d'agente hanno già il loro titolo in agentHtml.
       const titleHtml = !agent && (num || f.name)
-        ? `<div class="fb-title">${numHtml}${numHtml && f.name ? ' ' : ''}${escapeHtml(f.name || '')}</div>`
+        ? `<div class="fb-title">${numHtml}${numHtml ? ' ' : ''}${segnoFermataHtml(f)}${escapeHtml(f.name || '')}</div>`
         : '';
       // Conversazione a turni (#108): segnalazione + risposte di Filo + risposte
       // dell'utente in BOLLE diverse, in ordine cronologico, invece di un unico

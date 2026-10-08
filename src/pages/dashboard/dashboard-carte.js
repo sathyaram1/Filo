@@ -174,7 +174,7 @@
       chiave: `download:${r.id}`, tipo: 'download', icona: 'download', titolo: nome,
       togli: () => muovi({ tipo: 'nascondi', chiave: `download:${r.id}` }), etichettaTogli: 'Togli dalla home',
       esterno: 'download',
-      altreVoci: [{ etichetta: 'Mostra negli Scaricamenti', fai: () => apri(URL_SCARICAMENTI) }],
+      altreVoci: [{ etichetta: 'Mostra nei Download', fai: () => apri(URL_SCARICAMENTI) }],
     };
     if (r.state === 'progressing' || r.state === 'paused') {
       const fermo = r.state === 'paused';
@@ -197,7 +197,7 @@
         ...base,
         stato: 'è un programma: aspetta il tuo sì',
         principale: { etichetta: 'Decidi', fai: () => apri(URL_SCARICAMENTI) },
-        filo: `«${nome}» è un programma: lo scarico solo se mi dici di sì, dagli Scaricamenti.`,
+        filo: `«${nome}» è un programma: lo scarico solo se mi dici di sì, dai Download.`,
       };
     }
     const cartella = {
@@ -437,7 +437,9 @@
     ico.setAttribute('aria-hidden', 'true');
     const generica = () => {
       const ICONS = global.SN_ICONS || {};
-      const nome = ICONA_SUGGERIMENTO[s.icon] || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
+      // Un nome che l'insieme delle icone conosce vale com'è: col solo elenco, «Apri Opzioni» prendeva il globo dei siti.
+      const propria = typeof ICONS[s.icon] === 'function' ? s.icon : '';
+      const nome = ICONA_SUGGERIMENTO[s.icon] || propria || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
       ico.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](14) : '';
     };
     if (url) {

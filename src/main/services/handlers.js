@@ -484,12 +484,9 @@ function buildAttemptChain(settings, modelRef, action) {
     usable = pol.refs;
   }
 
-  // Ogni modello del registry porta il proprio provider, quindi l'ordine qui
-  // conta solo per i ref "legacy" (id grezzi senza nickname). Oggi il fornitore
-  // è uno solo, il router. buildModelAttempts scarta da sé i provider senza
-  // chiave o senza un id concreto per quel modello.
-  const providerOrder = ['openrouter'];
-  const out = SN_CONST.buildModelAttempts(usable, registry, providerOrder, settings.apiKeys || {});
+  // Stesso ordine di fornitori di SN_CONST.canServeAction: se le due liste
+  // divergono, «pronto» e «servibile» si contraddicono in silenzio (#663).
+  const out = SN_CONST.buildModelAttempts(usable, registry, SN_CONST.PROVIDER_ORDER, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
     e.code = 'NO_API_KEY';
@@ -907,7 +904,7 @@ async function lezioniAutomaticheConsentite({ sender = null, contesto = null, fo
 async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider]) return;
+    if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_LESSON)) return;
     const memory = await FiloMem.getMemory();
     const { profilo, preferenze } = FiloMem.renderMemoryForPrompt(memory);
     const lezioniText = await lessonsBufferText();
@@ -945,7 +942,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
 async function maybeRunCompactor() {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider]) return false;
+    if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPACT)) return false;
     const memory = await FiloMem.getMemory();
     const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
     const buf = await FiloMem.getLessonsBuffer();
@@ -976,6 +973,36 @@ async function maybeRunCompactor() {
 // safebrowse, cookie). È lo stesso percorso usato dal salvataggio dalla pagina
 // Preferenze: condividerlo garantisce che una modifica fatta da Filo via chat
 // si comporti esattamente come una fatta a mano (es. il tema cambia live).
+// Filo passa da «non ho un modello da chiamare» a «ce l'ho», o viceversa. Le
+// home già aperte lo devono sapere: l'accoglienza che aspettava parte e il
+// cartello sparisce, senza che l'utente ricarichi o apra una scheda nuova.
+// Le sorgenti sono TRE e arrivano in momenti diversi: la configurazione
+// condivisa (dalla rete, dopo l'avvio), le impostazioni (chiave, modelli,
+// interruttore dei pesi aperti) e il portafoglio, dove vive la chiave di chi
+// entra con un invito. Un solo avviso per tutte e tre (#663).
+// Si confronta anche il MOTIVO, non solo il sì/no: la home scrive un messaggio
+// diverso per ognuno, e col solo sì/no restava a chiedere una cosa già fatta.
+let _statoProntezza = null;
+async function avvisaSeLaProntezzaCambia() {
+  let ora = false;
+  let stato = '';
+  try {
+    const s = await getEffectiveSettings();
+    ora = SN_CONST.canServeAction(s, ACTIONS.FILO_CHAT)
+      || SN_CONST.canServeAction(s, ACTIONS.FILO_DASHBOARD);
+    stato = ora ? 'ok' : `no:${SN_CONST.whyCannotServe(s, [ACTIONS.FILO_DASHBOARD, ACTIONS.FILO_CHAT])}`;
+  } catch (_) { return; }
+  if (_statoProntezza === stato) return;
+  _statoProntezza = stato;
+  broadcastToTabs({ type: MSG.FILO_READY_CHANGED, ready: ora });
+}
+
+// La configurazione condivisa si ascolta da subito, perché arriva mentre la
+// prima home è già aperta. Il portafoglio chiama da sé: sta sotto, e non può
+// richiedere questo modulo senza chiudere il cerchio.
+try { Defaults.onChanged(() => { avvisaSeLaProntezzaCambia().catch(() => {}); }); } catch (_) {}
+globalThis.SN_PRONTEZZA_CAMBIATA = () => { avvisaSeLaProntezzaCambia().catch(() => {}); };
+
 // `mentreScrive`: la lista dei bloccati arriva a metà riga, e le schede aperte aspettano che stia ferma (#590.2).
 async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   // Gli override dei token estetici finiscono dentro <style> iniettati in
@@ -998,6 +1025,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     try { await globalThis.SN_WALLET_MAIN?.ownKeyChanged?.(); } catch (_) {}
   }
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
+  avvisaSeLaProntezzaCambia().catch(() => {});
   try {
     const { nativeTheme } = require('electron');
     const t = merged.theme;
@@ -1750,7 +1778,7 @@ async function executeFiloAction(action, opzioni = {}) {
 // compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
-  chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false,
+  chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -1809,6 +1837,14 @@ async function eseguiAzioneFilo(action, {
       if (built && built.elenco) {
         const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
         if (r.invariato) action._invariato = r.invariato;
+        // #947 — una cartella dei documenti che non c'è non entra nell'elenco: si dice subito, senza chiedere un OK a vuoto.
+        if (!r.invariato && built.elenco.percorso === 'documenti.cartelle' && built.elenco.op !== 'togli') {
+          const mancanti = await require('./documentiIndice').cartelleMancanti(built.elenco.voci);
+          if (mancanti.length) {
+            action._invariato = `${mancanti.map((m) => `«${m}»`).join(', ')} non ${mancanti.length > 1 ? 'sono cartelle' : 'è una cartella'} `
+              + 'di questo computer: controlla il percorso';
+          }
+        }
       }
     } catch (_) {}
   }
@@ -1912,7 +1948,7 @@ async function eseguiAzioneFilo(action, {
     if (cmd && !confirmed && !assistente && await primaVoltaDelTerminale()) action._primaVolta = true;
   }
 
-  if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
+  if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
 
   // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
   // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
@@ -2356,7 +2392,8 @@ async function eseguiAzioneFilo(action, {
         // riuscita: il testo torna lo stesso (dice all'agente che non c'è, così
         // non lo ricostruisce a memoria), ma il diario non deve scrivere
         // «riletto la trasparenza» per una cosa che nessuno ha letto (#515).
-        const trovato = !!(T && (!doc || T.get(doc)));
+        // La nota di una sezione non scritta invece si legge davvero (#888).
+        const trovato = !!(T && (!doc || T.get(doc) || (typeof T.nota === 'function' && T.nota(doc))));
         return { executed: trovato, kept: true, output: { doc: doc || null, text, missing: !trovato } };
       }
       case 'LEGGI_IMPOSTAZIONI': {
@@ -2547,6 +2584,43 @@ async function eseguiAzioneFilo(action, {
           },
         };
       }
+      case 'CERCA_DOCUMENTI': {
+        // #947 — la richiesta a parole («la bolletta della luce di marzo») contro l'indice dei documenti che Filo tiene
+        // sul computer. Al modello vanno solo i pochi candidati, con un pezzo di testo: sceglie lui e li mostra con
+        // APRI_FILE. Mentre l'indice legge i file nuovi l'attesa dice quale e quanti mancano; il quadrato la ferma.
+        const cosa = String(action.cosa ?? action.query ?? action.testo ?? action.q ?? '').trim();
+        const cartella = String(action.cartella ?? '').trim();
+        const Indice = require('./documentiIndice');
+        let r;
+        try {
+          r = await Indice.cerca(cosa, {
+            cartella,
+            segnale,
+            avanzamento: avanzamento ? (st) => {
+              if (!st || st.fase !== 'lettura') return;
+              // Il numero è quello del documento che sta leggendo adesso: «1 di 60», non «0 di 60».
+              try { avanzamento(Math.min(st.fatti + 1, st.totali), st.totali, st.nome); } catch (_) {}
+            } : null,
+          });
+        } catch (e) {
+          console.warn('[Filo] ricerca nei documenti fallita', e?.message || e);
+          return { executed: false, kept: true, output: { cercato: cosa, risultati: [], errore: 'la ricerca non è riuscita' } };
+        }
+        const risultati = r.risultati.map((x) => ({ ...x, scaricato: fileScaricato(x.percorso) }));
+        return {
+          executed: !r.cartellaMancante,
+          kept: true,
+          output: {
+            cercato: cosa,
+            cartella,
+            risultati,
+            scaricato: risultati.some((x) => x.scaricato),
+            indice: r.indice,
+            fermata: !!r.fermata,
+            cartellaMancante: r.cartellaMancante || '',
+          },
+        };
+      }
       case 'PULISCI_TAB': {
         // Il popup generico spiega lo stesso riordino del bottone: confermato lì, si esegue. Quando la regola
         // dice sì il riordino parte qui, come ogni azione (#530); se no il pannello chiede come dice `domanda`.
@@ -2599,8 +2673,15 @@ async function eseguiAzioneFilo(action, {
         }
         return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte } };
       }
-      case 'APRI_FILE':
-        return { executed: true, kept: true };
+      case 'APRI_FILE': {
+        // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
+        const p = String(action.percorso ?? action.path ?? '').trim();
+        let dove = '';
+        if (/^(~([\\/]|$)|[\\/]|[a-z]:[\\/])/i.test(p)) {
+          try { dove = await require('./documentiIndice').doveSta(require('./documentRead').normalizePath(p)); } catch (_) {}
+        }
+        return { executed: true, kept: true, ...(dove ? { output: { dove } } : {}) };
+      }
       case 'RINOMINA_FILE': {
         const visti = bersagliMostrati(sender, action);
         const proposte = (visti && Array.isArray(visti.proposte) ? visti.proposte : []).slice(0, LOTTO_RINOMINA);
@@ -3268,8 +3349,12 @@ function documentReadsForPrompt(actions) {
       const why = E.perCanaleSistema(out.detail || out.error || 'non è stato possibile leggerlo');
       blocks.push(
         `[Documento "${etichetta}" non letto: ${why}. Dillo all'utente così com'è, `
-        + `senza inventare il contenuto. Filo legge i PDF e i file di testo (txt, csv, md e simili).]`,
+        + `senza inventare il contenuto. Filo legge i PDF, i documenti Word (.docx) e LibreOffice (.odt) e i file di testo (txt, csv, md e simili).]`,
       );
+      continue;
+    }
+    if (out.empty && out.kind === 'office') {
+      blocks.push(`[Documento "${etichetta}": dentro non c'è testo. Dillo all'utente e NON inventare cosa contiene.]`);
       continue;
     }
     if (out.empty) {
@@ -3309,6 +3394,71 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #947 — re-immissione di quello che CERCA_DOCUMENTI ha trovato. Fuori dalla busta solo le frasi di Filo e i
+// numeri dell'indice; nomi, cartelle, percorsi e pezzi di testo stanno dentro: li ha scritti chi ha fatto i file.
+function dataBreve(ms) {
+  const d = new Date(Number(ms) || 0);
+  return Number.isNaN(d.getTime()) || !ms ? '' : d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function documentSearchesForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'CERCA_DOCUMENTI') continue;
+    const out = a._output;
+    if (!out || !('cercato' in out)) continue;
+    const cercato = E.perCanaleSistema(out.cercato || '');
+    if (out.errore) { blocks.push(`[La ricerca fra i documenti "${cercato}" non è riuscita: dillo all'utente.]`); continue; }
+    if (out.cartellaMancante) {
+      blocks.push(`[La cartella "${E.perCanaleSistema(out.cartellaMancante)}" non c'è sul computer: chiedi all'utente dove sta, o cerca senza cartella.]`);
+      continue;
+    }
+    const ind = out.indice || {};
+    const cartelle = (Array.isArray(ind.cartelle) ? ind.cartelle : []).map((c) => `${E.perCanaleSistema(c.nome || '')}${c.esiste ? (c.negata ? ' (il sistema non la lascia leggere)' : '') : ' (non c\'è)'}`);
+    const dove = cartelle.length ? `nelle cartelle ${cartelle.join(', ')}` : 'in nessuna cartella (l\'elenco è vuoto: si cambia con la preferenza cartelle_documenti)';
+    const conti = `${ind.documenti || 0} documenti${ind.scansioni ? `, di cui ${ind.scansioni} scansioni senza testo (si trovano solo per nome)` : ''}`
+      + `${ind.senzaTesto ? `, ${ind.senzaTesto} di cui Filo non sa leggere il testo` : ''}`;
+    const note = [];
+    if (out.fermata) note.push('L\'utente ha FERMATO la ricerca mentre Filo leggeva i documenti nuovi: i risultati vengono solo da quelli già letti. Dillo in una riga.');
+    if (ind.troppi) note.push('Le cartelle hanno più documenti di quanti Filo ne guardi in un giro: alcuni possono mancare.');
+    const negate = Array.isArray(ind.negate) ? ind.negate : [];
+    if (negate.length) {
+      note.push(`Il sistema NON lascia leggere a Filo ${negate.map((c) => E.perCanaleSistema(c.nome || c.percorso || '')).join(', ')}: lì non ha guardato, `
+        + `quindi non dire che il documento non c'è. Spiega all'utente che manca il permesso e come darlo (${E.perCanaleSistema(ind.comePermesso || '')}), poi di richiedere.`);
+    }
+    const r = Array.isArray(out.risultati) ? out.risultati : [];
+    if (!r.length) {
+      blocks.push(`[Nessun documento combacia con "${cercato}" fra i ${conti} ${dove}. `
+        + 'Riprova con altre parole che quel documento conterrebbe (l\'ente che lo manda, il tipo, il mese scritto in numeri, l\'anno) prima di '
+        + 'dire all\'utente che non c\'è; se non c\'è, digli in quali cartelle hai guardato e che può aggiungerne.'
+        + `${note.length ? ` ${note.join(' ')}` : ''}]`);
+      continue;
+    }
+    const righe = r.map((x, i) => {
+      const tipo = x.tipo === 'pdf' ? `PDF${x.pagine ? `, ${x.pagine} ${x.pagine === 1 ? 'pagina' : 'pagine'}` : ''}` : (x.tipo || '');
+      const stato = x.scansione ? ' · SCANSIONE: niente testo, trovato solo per il nome'
+        : (x.senzaTesto === 'nuvola' ? ' · sta solo nel cloud (OneDrive, iCloud): Filo non lo scarica per leggerlo, trovato solo per il nome'
+          : (x.senzaTesto ? ' · testo non leggibile da Filo, trovato solo per il nome' : ''));
+      return [
+        `${i + 1}. ${x.nome} · ${dataBreve(x.data)} · ${tipo}${stato}`,
+        `   percorso: ${x.percorso}`,
+        x.inizio ? `   inizio: ${x.inizio}` : '',
+        x.squarcio ? `   testo: ${x.squarcio}` : '',
+        `   combacia con: ${(x.trovati || []).join(', ')}`,
+      ].filter(Boolean).join('\n');
+    });
+    blocks.push(
+      `[Ricerca fra i documenti dell'utente: "${cercato}". Ho guardato ${conti} ${dove}. I candidati, dal più probabile:]\n`
+      + E.imbusta({ tipo: 'DOCUMENTI_TROVATI', testo: righe.join('\n'), conIntestazione: true })
+      + '\n[Scegli tu quello giusto guardando il testo (periodo, tipo, ente, data): mostralo con APRI_FILE col suo percorso e di\' in una '
+      + 'frase perché è quello. Se due si somigliano, leggili con LEGGI_DOCUMENTO prima di scegliere. Non inventare quello che il testo non dice.'
+      + `${note.length ? ` ${note.join(' ')}` : ''}]`,
+    );
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
@@ -3317,7 +3467,7 @@ function documentReadsForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
+    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions),
@@ -3780,6 +3930,42 @@ function fermaFiloChat(reqId, wc) {
   return true;
 }
 
+// I documenti trovati con CERCA_DOCUMENTI che la risposta nomina, come azioni APRI_FILE da aggiungere. Nessuna se il
+// modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
+// Nominato vuol dire il nome del file come parola a sé, non una parola comune che ci coincide («ricevuta» per
+// ricevuta.pdf: senza estensione vale solo un nome che non è una parola, come scan_00231), e non scartato («non X»).
+const NEGA_FILE = /(?<![\p{L}])(?:non|né|nè|ne'|not|anziché|anziche|invece di|piuttosto che)(?![\p{L}])[^.;:!?\n,(]{0,12}$/iu;
+function posizioneDelNome(testo, nome) {
+  for (let i = testo.indexOf(nome); i >= 0; i = testo.indexOf(nome, i + 1)) {
+    const prima = i > 0 ? testo[i - 1] : '';
+    const dopo = testo[i + nome.length] || '';
+    if (/[\p{L}\p{N}_]/u.test(prima) || /[\p{L}\p{N}_]/u.test(dopo)) continue;
+    const clausola = testo.slice(Math.max(0, i - 60), i).split(/[.;:!?\n,(]/).pop();
+    if (NEGA_FILE.test(clausola)) continue;
+    return i;
+  }
+  return -1;
+}
+function fileNominatiDallaRisposta(textReply, azioni) {
+  const testo = String(textReply || '').toLowerCase();
+  const lista = Array.isArray(azioni) ? azioni : [];
+  if (!testo || lista.some((x) => x && String(x.type || '').toUpperCase() === 'APRI_FILE')) return [];
+  const trovati = [];
+  for (const x of lista) {
+    if (!x || String(x.type || '').toUpperCase() !== 'CERCA_DOCUMENTI' || !x._output) continue;
+    for (const r of Array.isArray(x._output.risultati) ? x._output.risultati : []) {
+      if (!r || !r.percorso || trovati.some((o) => o.r.percorso === r.percorso)) continue;
+      const nome = String(r.nome || '').toLowerCase();
+      const senzaEstensione = nome.replace(/\.[^.]+$/, '');
+      let i = nome.length >= 3 ? posizioneDelNome(testo, nome) : -1;
+      if (i < 0 && senzaEstensione.length >= 5 && /[^\p{L}\s]/u.test(senzaEstensione)) i = posizioneDelNome(testo, senzaEstensione);
+      if (i >= 0) trovati.push({ r, i });
+    }
+  }
+  return trovati.sort((a, b) => a.i - b.i).slice(0, 3)
+    .map(({ r }, k) => ({ type: 'APRI_FILE', percorso: r.percorso, etichetta: r.nome, _callId: `trovato_${k}` }));
+}
+
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
@@ -4075,9 +4261,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         : executeFiloAction(a, {
           sender, contesto: azioniViste, parole: paroleUtente, chatId, fontiLette, richiesta, accoglienza,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
-          avanzamento: canPush ? (fatti, totali) => push('filo:action', {
+          avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
+            ...(dettaglio ? { dettaglio: String(dettaglio) } : {}),
           }) : null,
+          segnale: turno.ctrl.signal,
         }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
@@ -4222,6 +4410,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       renderedActions.push(rendered);
     }
   }
+  // #947 — il documento che la risposta nomina ha il suo bottone anche se il modello non l'ha mostrato con APRI_FILE:
+  // «eccolo» senza niente da cliccare è una promessa che dipende dal modello.
+  for (const a of fileNominatiDallaRisposta(textReply, renderedActions)) {
+    const res = await executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta });
+    if (res && res.kept && res.executed && !res.needsConfirm) renderedActions.push({ ...a, _executed: true, ...(res.output ? { _output: res.output } : {}) });
+  }
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
   // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
@@ -4301,7 +4495,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
 // è la parte "economica" che si può fare a ogni apertura di scheda.
 async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const settings = await getEffectiveSettings();
-  const hasKey = !!(settings.apiKeys?.[settings.provider]);
+  const canServe = SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD);
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
@@ -4394,7 +4588,7 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     openTabsCount, partOfDay, dayType, dateKey,
   });
 
-  return { settings, hasKey, payload, signature, saved };
+  return { settings, canServe, payload, signature, saved };
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
@@ -4494,24 +4688,52 @@ function ordinaCome(sx, layout) {
   }, layout);
 }
 
-function buildNoKeyDashboard(settings, saved) {
-  const suggestions = saved.slice(0, 5).map((p) => ({
+function savedSuggestions(saved) {
+  return saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
-  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu: nella home è la prima carta (#870).
-  if (!settings.apiKeys?.openrouter) {
-    suggestions.unshift({
+}
+
+// Saluto neutro mentre la home vera si calcola: Filo può rispondere, il
+// messaggio su misura no. La nuova scheda non aspetta mai l'LLM.
+function buildWaitingDashboard(saved) {
+  return { message: 'Buongiorno. Filo è qui.', suggestions: savedSuggestions(saved) };
+}
+
+// Home senza AI: istantanea, dalle pagine salvate. Dice PERCHÉ Filo non parla,
+// perché un'assenza muta faceva credere senza crediti chi li aveva (#663).
+function buildNoKeyDashboard(settings, saved) {
+  const suggestions = savedSuggestions(saved);
+  const motivo = SN_CONST.whyCannotServe(settings, [ACTIONS.FILO_DASHBOARD, ACTIONS.FILO_CHAT]);
+  const inOpzioni = (text) => ({
+    icon: 'options', text,
+    action: { type: 'NAVIGA', url: 'filo://options/options.html', label: 'Opzioni' },
+    importance: 3,
+  });
+  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
+  suggestions.unshift(motivo === 'chiave'
+    ? {
       carta: 'crediti',
       icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
       action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
       importance: 3,
-    });
+    }
+    : inOpzioni(motivo === 'pesi-aperti'
+      ? 'Apri Opzioni e rivedi «solo modelli a pesi aperti»'
+      : 'Scegli un modello in Opzioni'));
+  let message;
+  if (motivo === 'chiave') {
+    message = 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.';
+  } else if (motivo === 'pesi-aperti') {
+    message = 'I modelli che hai scelto vanno bene, ma «solo modelli a pesi aperti» li esclude tutti e nessuno di loro ha un equivalente a pesi aperti. In Opzioni puoi spegnere l\'interruttore o scegliere altri modelli.';
+  } else {
+    message = 'I crediti ci sono, ma nessun modello configurato può rispondere: la configurazione dei modelli è vuota o cita modelli che non esistono più. Puoi sceglierne uno tu in Opzioni.';
   }
-  const message = settings.apiKeys?.openrouter
-    ? 'Buongiorno. Filo è qui.'
-    : `Per attivare Filo serve un codice d'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.${saved.length ? ' Intanto, le tue pagine salvate sono fra i suggerimenti.' : ''}`;
+  // Il rimando alle pagine salvate solo se ce n'è almeno una: al primo avvio
+  // non ce n'è nessuna, e indicava una lista vuota (#663).
+  if (saved.length) message += ' Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 
@@ -4568,11 +4790,15 @@ function dashboardScheduler() {
       // Ri-raccoglie gli input ORA: accorpa tutte le modifiche della finestra.
       await FiloMem.gcTimers();
       const inputs = await gatherDashboardInputs({ openTabsCount: openTabsCount || 0 });
-      if (!inputs.hasKey) return;
+      if (!inputs.canServe) return;
       const cached = await FiloMem.getDashboardCache();
       // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
       if (cached && !cached.senzaChiave && cached.signature === inputs.signature) return;
-      const result = await generateDashboardFromInputs(inputs);
+      // Un giro fallito (rete giù, modello che rifiuta) lascia la home com'è e
+      // basta: qui siamo dentro un timer, e rilanciare porterebbe giù il main.
+      let result = null;
+      try { result = await generateDashboardFromInputs(inputs); }
+      catch (e) { console.warn('[Filo] ricalcolo home fallito', e); return; }
       // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
       broadcastToTabs({
         type: MSG.FILO_DASHBOARD_UPDATED,
@@ -4592,8 +4818,8 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   const inputs = await gatherDashboardInputs({ openTabsCount });
   const cached = await FiloMem.getDashboardCache();
 
-  // Senza chiave API: messaggio istantaneo dalle pagine salvate (come prima).
-  if (!inputs.hasKey) {
+  // Senza un modello servibile: messaggio istantaneo dalle pagine salvate.
+  if (!inputs.canServe) {
     const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
     await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature, senzaChiave: true });
     return { ...payload, cached: false, ts: new Date().toISOString() };
@@ -4604,7 +4830,7 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   if (cached && cached.senzaChiave && !force) {
     const onb = Onboarding ? await FiloMem.getOnboarding() : null;
     if (!onb || onb.done) dashboardScheduler().request(openTabsCount);
-    return { ...buildNoKeyDashboard(inputs.settings, inputs.saved), cached: false, ts: new Date().toISOString() };
+    return { ...buildWaitingDashboard(inputs.saved), cached: false, ts: new Date().toISOString() };
   }
 
   // C'è già una cache e non è un refresh esplicito: la serviamo SUBITO — la
@@ -4626,7 +4852,7 @@ async function maybeCategorizeAsync(savedEntry, pageInput) {
   const settings = await getEffectiveSettings();
   if (!settings.featureFlags?.categorize) return;
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) return;
-  if (!settings.apiKeys?.[settings.provider]) return;
+  if (!SN_CONST.canServeAction(settings, ACTIONS.CATEGORIZE)) return;
   const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '' });
   const result = await Categorizer.categorize({
     invokeAI,

@@ -333,6 +333,17 @@
     FILE_RINOMINA: 'file_rinomina',
     // { coppie: [{ attuale, prima }] } → { ok, esiti }
     FILE_RIMETTI_NOMI: 'file_rimetti_nomi',
+    // #947 — il bottone di un file in chat: aprirlo col programma del sistema (solo documenti e immagini: un programma
+    // aperto è un programma eseguito) e mostrarlo nella sua cartella. Toccano il sistema: solo da Filo (soloFilo).
+    // { percorso } → { ok } | { ok:false, errore, frase }
+    FILE_APRI: 'file_apri',
+    FILE_MOSTRA_CARTELLA: 'file_mostra_cartella',
+    // #947 — l'indice dei documenti per la pagina Preferenze: quanti documenti, quali cartelle, se sta leggendo; e la
+    // finestra del sistema per scegliere una cartella da aggiungere. Percorsi assoluti: solo da Filo (soloFilo).
+    // {} → { ok, documenti, conTesto, scansioni, senzaTesto, cartelle: [{ nome, percorso, esiste }], aggiornato, inCorso }
+    DOCUMENTI_STATO: 'documenti_stato',
+    // {} → { ok, percorso } | { ok:false } (annullata)
+    DOCUMENTI_SCEGLI_CARTELLA: 'documenti_scegli_cartella',
     // Segnale BROADCAST main→superfici: "la cronologia scaricamenti è cambiata"
     // (parte/avanza/finisce un download). VOLUTAMENTE contentless (nessun nome
     // file né percorso): la pagina filo://downloads lo riceve e ri-legge la
@@ -991,6 +1002,12 @@
     // schede nuove aperte insieme mostrano la stessa conversazione, non una
     // ferma a com'era. { onboarding }
     FILO_ONBOARDING_UPDATED: 'filo_onboarding_updated',
+    // Broadcast da background -> dashboard (#663): è cambiato se Filo ha o no
+    // un modello da chiamare. La configurazione condivisa arriva dalla rete
+    // DOPO che la prima home è già a schermo: senza questo avviso l'utente
+    // resta davanti al cartello «non posso rispondere» finché non ricarica.
+    // { ready: bool }
+    FILO_READY_CHANGED: 'filo_ready_changed',
     // Broadcast da background -> content: una lettura ad alta voce è attiva
     // (in QUALCHE scheda) oppure no. Ogni scheda usa questo flag per mostrare
     // "Interrompi lettura" nel menu anche se non è lei a leggere. { active: bool }
