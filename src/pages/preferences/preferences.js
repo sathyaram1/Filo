@@ -755,11 +755,8 @@
     synth.speak(u);
   }
 
-  // ── Suoneria timer (anteprima tramite WebAudio API) ─────────────────────
-  // Stesso catalogo della dashboard (RINGTONES): riproduce una sequenza di
-  // beep senza file audio. Usato dal pulsante "Prova" in questa pagina.
-  // I toni (sequenze di note + player AudioContext) vivono nel modulo condiviso
-  // SN_SOUNDS, riusato anche dalla shell per il suono delle notifiche (#170.1).
+  // I motivi stanno in SN_SOUNDS e basta: l'anteprima qui, le notifiche della
+  // shell e la suoneria di timer e sveglie devono suonare gli stessi.
   const Sounds = window.SN_SOUNDS;
 
   // Riempie il <select> dei suoni notifica con le stesse voci della suoneria.
@@ -776,11 +773,30 @@
     }
   }
 
+  // Il volume si giudica a orecchio: l'anteprima usa quello scelto adesso, o
+  // la manopola si regolerebbe alla cieca.
+  function volumeDa(id) {
+    const n = parseInt($(id).value, 10);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
   function previewRingtone() {
-    if (Sounds) Sounds.play($('timerRingtone').value);
+    if (Sounds) Sounds.play($('timerRingtone').value, volumeDa('timerRingtoneVolume'));
   }
   function previewNotifSound() {
-    if (Sounds) Sounds.play($('notifSound').value);
+    if (Sounds) Sounds.play($('notifSound').value, volumeDa('notifSoundVolume'));
+  }
+  function mostraVolume(id) {
+    const eco = $(id + 'Val');
+    if (eco) eco.textContent = `${volumeDa(id)}%`;
+  }
+  // Un valore assente o storto vale «pieno»: il silenzio si sceglie.
+  function volumeSalvato(salvato) {
+    const n = Number(salvato);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
+  function caricaVolume(id, salvato) {
+    $(id).value = String(volumeSalvato(salvato));
+    mostraVolume(id);
   }
 
   // Clamp dei due campi numerici "liberi" (li usano sia il salvataggio sia il
@@ -832,6 +848,7 @@
       case 'tabPreview.size': return misuraAnteprima($('tabPreviewSize').value);
       case 'agentStyle': return currentStyleText();
       case 'timerRingtone': return $('timerRingtone').value || 'default';
+      case 'timerRingtoneVolume': return volumeDa('timerRingtoneVolume');
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
@@ -852,6 +869,7 @@
       case 'barraLaterale.striscia': return $('barraStriscia').checked;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
+      case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
       case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
       case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
@@ -878,6 +896,7 @@
       case 'tabPreview.size': return misuraAnteprima(s.tabPreview && s.tabPreview.size);
       case 'agentStyle': return String(s.agentStyle || '').trim();
       case 'timerRingtone': return s.timerRingtone || 'default';
+      case 'timerRingtoneVolume': return volumeSalvato(s.timerRingtoneVolume);
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
@@ -898,6 +917,7 @@
       case 'barraLaterale.striscia': return opzioniBarraLaterale(s.barraLaterale).striscia;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
+      case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
       case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
@@ -1021,6 +1041,7 @@
       const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
       $('notifSound').value = nsOpt ? notifSound : 'default';
     }
+    if (vuole('notifications.soundVolume')) caricaVolume('notifSoundVolume', notif.soundVolume);
 
     if (vuole('dictation.autoSend')) {
       $('dictationAutoSend').value = settings.dictation && settings.dictation.autoSend === false ? 'no' : 'si';
@@ -1035,6 +1056,7 @@
       const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
       $('timerRingtone').value = ringOpt ? ringtone : 'default';
     }
+    if (vuole('timerRingtoneVolume')) caricaVolume('timerRingtoneVolume', settings.timerRingtoneVolume);
 
     const tts = settings.tts || {};
     if (vuole('tts.modelVoice')) populateModelVoices(tts.modelVoice || '');
@@ -1353,6 +1375,8 @@
     $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
+    $('notifSoundVolume').addEventListener('input', () => mostraVolume('notifSoundVolume'));
+    $('notifSoundVolume').addEventListener('change', persist);
     $('dictationAutoSend').addEventListener('change', persist);
     for (const id of ['dictationSilence', 'dictationCancel']) {
       $(id).addEventListener('input', (e) => { scriviTempiVoce(); caselle.cambiato('pref', e); });
@@ -1361,6 +1385,8 @@
 
     // Suoneria timer: salva al cambio + anteprima.
     $('timerRingtone').addEventListener('change', persist);
+    $('timerRingtoneVolume').addEventListener('input', () => mostraVolume('timerRingtoneVolume'));
+    $('timerRingtoneVolume').addEventListener('change', persist);
     $('timerRingtonePreview').addEventListener('click', previewRingtone);
 
     // Stile agente: scegliere un preset riempie il textarea; scrivere a mano

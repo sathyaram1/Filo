@@ -2403,6 +2403,8 @@
       durationSec: 5,
       soundEnabled: false,
       sound: 'default',
+      // Volume in percentuale (0-100): 100 è il livello di sempre, 0 è muto.
+      soundVolume: 100,
     },
     // Impostazioni di sicurezza/privacy per le pagine esterne (no filo://).
     // - protectIpLeak: forza WebRTC a usare solo l'interfaccia di rete pubblica
@@ -2574,6 +2576,9 @@
     // preme "Ferma". Generato via WebAudio API (nessun file audio esterno).
     // Valori: 'default' | 'gentle' | 'urgent' | 'chime'
     timerRingtone: 'default',
+    // Volume della suoneria in percentuale (0-100): una sveglia al mattino e un
+    // timer in cucina non vogliono la stessa voce. A 0 resta muta di proposito.
+    timerRingtoneVolume: 100,
   };
 
   // Tetto dello stile dell'agente, in caratteri visibili: oltre non si salva e

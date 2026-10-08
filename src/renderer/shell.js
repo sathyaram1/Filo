@@ -83,6 +83,13 @@
   // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
   // notifiche successive rispettano i nuovi valori senza riavviare.
   let notifConfig = { durationSec: 5, soundEnabled: false, sound: 'default' };
+  // Un volume assente o storto vale «pieno»: il silenzio si sceglie, non si
+  // eredita da un'impostazione malformata.
+  function volumeValido(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 100;
+  }
+
   function applyNotifConfig(notifications) {
     if (!notifications || typeof notifications !== 'object') return;
     const d = Number(notifications.durationSec);
@@ -90,6 +97,7 @@
       durationSec: Number.isFinite(d) && d >= 0 ? d : 5,
       soundEnabled: notifications.soundEnabled === true,
       sound: typeof notifications.sound === 'string' ? notifications.sound : 'default',
+      soundVolume: volumeValido(notifications.soundVolume),
     };
   }
   // #430 — carta con l'anteprima della scheda al passaggio del puntatore: accesa e misura dalle Preferenze.
@@ -109,6 +117,8 @@
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
       applyTabPreview(r?.settings?.tabPreview);
+      applyRingTone(r?.settings?.timerRingtone, r?.settings?.timerRingtoneVolume);
+      refreshRinging();
       try { render(); } catch (_) {}
       try { NOTIFS.rispecchia(); } catch (_) {}
     })
@@ -121,6 +131,10 @@
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
         applyTabPreview(m.settings?.tabPreview);
+        applyRingTone(m.settings?.timerRingtone, m.settings?.timerRingtoneVolume);
+        // Il volume cambiato mentre suona deve sentirsi subito: senza questo si
+        // sentirebbe solo alla scadenza dopo.
+        refreshRinging();
         try { render(); } catch (_) {}
         try { NOTIFS.rispecchia(); } catch (_) {}
       }
@@ -140,6 +154,91 @@
       badge.innerHTML = ico + '<span class="incognito-label">Incognito</span>';
       badge.hidden = false;
     }
+  }
+
+  // ── Suoneria di timer e sveglie ───────────────────────────────────────────
+  // Suona QUI perché la shell c'è sempre: una scadenza coglie l'utente su una
+  // scheda qualunque, e la pagina Nuova scheda può non essere nemmeno aperta.
+  const MSG_FILO = (window.SN_MSG && window.SN_MSG.MSG) || {};
+  const ringBtn = document.getElementById('ring-indicator');
+  const ringLabel = document.getElementById('ring-ind-label');
+  setIcon(document.getElementById('ring-ind-icon'), 'alarm', 15);
+  let ringTone = 'default';
+  let ringVolume = 100;
+  let ringingIds = [];
+  let ringWake = null;
+
+  function applyRingTone(id, volume) {
+    const tones = window.SN_SOUNDS && window.SN_SOUNDS.TONES;
+    if (typeof id === 'string' && tones && tones[id]) ringTone = id;
+    ringVolume = volumeValido(volume);
+  }
+
+  function testoSuoneria(list) {
+    if (list.length > 1) return `${list.length} scadenze`;
+    const t = list[0];
+    if (t.kind === 'alarm') return t.label ? `Sveglia — ${t.label}` : 'Sveglia';
+    return t.label ? `${t.label} — scaduto` : 'Timer scaduto';
+  }
+
+  // Il watcher del main ricontrolla ogni pochi secondi: sentire la suoneria
+  // cinque secondi dopo lo zero è attrito, quindi ci svegliamo sulla scadenza.
+  function programmaRisveglio(timers) {
+    if (ringWake) { clearTimeout(ringWake); ringWake = null; }
+    let primo = Infinity;
+    for (const t of timers) {
+      if (!t || t.ringing || t.paused) continue;
+      const ms = new Date(t.endsAt).getTime() - Date.now();
+      if (Number.isFinite(ms) && ms < primo) primo = ms;
+    }
+    if (primo === Infinity) return;
+    ringWake = setTimeout(refreshRinging, Math.min(60000, Math.max(250, primo + 150)));
+  }
+
+  // `mio` lo decide il main: fra le finestre che vedono la stessa scadenza ne
+  // suona una sola. Il pulsante invece sta in tutte, perché l'utente può essere
+  // davanti a una qualunque e il gesto per far smettere non si cerca.
+  function applyRinging(timers, mio) {
+    const tutti = Array.isArray(timers) ? timers : [];
+    programmaRisveglio(tutti);
+    const list = tutti.filter((t) => t && t.ringing);
+    ringingIds = list.map((t) => t.id);
+    const acceso = list.length > 0;
+    if (ringBtn) ringBtn.hidden = !acceso;
+    if (acceso && ringLabel) ringLabel.textContent = testoSuoneria(list);
+    const S = window.SN_SOUNDS;
+    if (!S) return;
+    if (acceso && mio !== false) S.ring(ringTone, ringVolume); else S.silence();
+  }
+
+  // Ogni finestra chiede le SUE scadenze: quella incognito vede solo le proprie
+  // (i timer non sono fra le chiavi che eredita dal disco), quindi nessuna
+  // scadenza può squillare in due finestre insieme.
+  function refreshRinging() {
+    const type = MSG_FILO.FILO_GET_TIMERS;
+    if (!type) return;
+    api.message({ type })
+      .then((r) => applyRinging(r && r.ok ? r.timers : [], !r || r.suona !== false))
+      .catch(() => {});
+  }
+
+  if (typeof api.onBroadcast === 'function') {
+    api.onBroadcast((m) => {
+      if (m?.type === MSG_FILO.FILO_LIVE_UPDATED) refreshRinging();
+    });
+  }
+
+  if (ringBtn) {
+    ringBtn.addEventListener('click', () => {
+      const type = MSG_FILO.FILO_STOP_TIMER_ALARM;
+      const ids = ringingIds.slice();
+      // Zittisci subito: l'attesa della risposta è attrito su un gesto che
+      // esiste per far smettere un rumore.
+      applyRinging([], false);
+      if (!type) return;
+      Promise.all(ids.map((id) => api.message({ type, id }).catch(() => {})))
+        .then(refreshRinging);
+    });
   }
 
   // Registro app del launcher. Il Feedback vive qui fra le App.
@@ -1347,7 +1446,10 @@
         ? opts.sound
         : (notifConfig.soundEnabled ? notifConfig.sound : false);
       if (wantSound && window.SN_SOUNDS) {
-        try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
+        try {
+          const tono = typeof wantSound === 'string' ? wantSound : notifConfig.sound;
+          window.SN_SOUNDS.play(tono, notifConfig.soundVolume);
+        } catch (_) {}
       }
 
       avviaTempo(card, durata);
