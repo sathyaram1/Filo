@@ -1177,6 +1177,46 @@
 
   const DEFAULT_PROVIDER = 'openrouter';
 
+  // I fornitori che una richiesta prova DAVVERO, in ordine. Conta solo per i
+  // ref legacy: ogni voce del registry porta già il proprio fornitore.
+  const PROVIDER_ORDER = [DEFAULT_PROVIDER];
+
+  // I fornitori di modelli per cui esiste una chiave. La chiave della ricerca
+  // web non serve a rispondere e non entra nel conto. PURA.
+  function modelProvidersWithKey(apiKeys) {
+    return PROVIDER_ORDER.filter((p) => (apiKeys || {})[p]);
+  }
+
+  // Filo può servire questa funzione? Si guarda quello che la chiamata userà,
+  // mai `settings.provider`: se nomina un fornitore ritirato, mente (#663). PURA.
+  // `cfg` e non `settings`: gira solo nel main, e la sentinella delle letture sui siti non la deve contare.
+  function canServeAction(cfg, action) {
+    const s = cfg || {};
+    const registry = s.modelRegistry || {};
+    let refs = usableModelRefs(parseModelRefs((s.models || {})[action] || ''), registry);
+    if (s.openWeightsOnly === true) refs = applyOpenWeightsPolicy(refs, registry, action).refs;
+    return buildModelAttempts(refs, registry, PROVIDER_ORDER, s.apiKeys || {}).length > 0;
+  }
+
+  // PERCHÉ Filo non può servire queste funzioni: 'chiave' (nessuna chiave da
+  // nessuna parte), 'pesi-aperti' (i modelli ci sono e sono validi, li esclude
+  // tutti l'interruttore) o 'modelli' (nessun modello, o solo scorciatoie che
+  // il registro non conosce). Stringa vuota se Filo può servirne almeno una.
+  // Chi tace deve dire il motivo GIUSTO: mandare a rivedere la configurazione
+  // dei modelli chi ne ha una buona lascia senza spiegazione (#663). PURA.
+  function whyCannotServe(cfg, actions) {
+    const s = cfg || {};
+    const lista = (actions || []).filter(Boolean);
+    if (lista.some((a) => canServeAction(s, a))) return '';
+    if (!modelProvidersWithKey(s.apiKeys).length) return 'chiave';
+    const registry = s.modelRegistry || {};
+    const bloccaLInterruttore = s.openWeightsOnly === true && lista.some((a) => {
+      const refs = usableModelRefs(parseModelRefs((s.models || {})[a] || ''), registry);
+      return refs.length > 0 && applyOpenWeightsPolicy(refs, registry, a).refs.length === 0;
+    });
+    return bloccaLInterruttore ? 'pesi-aperti' : 'modelli';
+  }
+
   // ─── IL SISTEMA SU CUI GIRA FILO, DETTO AL MODELLO ─────────────────────────
   // Filo lancia comandi da terminale e legge file per percorso: due cose che
   // hanno una forma DIVERSA su Windows, Mac e Linux. Finché il prompt non lo
@@ -2832,6 +2872,10 @@
     openWeightsImpact,
     DEPRECATED_MODELS,
     DEFAULT_PROVIDER,
+    PROVIDER_ORDER,
+    modelProvidersWithKey,
+    canServeAction,
+    whyCannotServe,
     DEFAULT_SETTINGS,
     AGENT_STYLE_MAX,
     agentStyleLength,

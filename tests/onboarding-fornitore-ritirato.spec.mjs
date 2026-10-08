@@ -1,0 +1,560 @@
+// #663 — «Filo è pronto?» non si decide sul fornitore dichiarato.
+//
+// Nella configurazione condivisa il campo che nomina il fornitore era rimasto a
+// un fornitore ritirato, mentre ogni modello del registro dichiara il suo e la
+// chiave che Filo possiede è quella. Le chiamate funzionavano; il controllo di
+// prontezza, che cercava una chiave INTESTATA al fornitore dichiarato, no. Il
+// risultato era un'assenza muta: l'accoglienza non partiva mai e la home
+// restava quella di chi non ha modo di pagare i modelli.
+//
+// Senza il fix il primo test è rosso (la home resta in stato "home" col
+// cartello dell'invito) e il terzo pure (il messaggio parla di crediti quando i
+// crediti ci sono).
+
+import { test, expect } from './fixtures/electron.mjs';
+
+async function newtabPage(app) {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('newtab non trovata');
+}
+
+// La configurazione condivisa com'era sul campo: fornitore dichiarato che non
+// esiste più, modelli del registro di prova (tutti su OpenRouter), chiave
+// OpenRouter valida. `models` opzionale per spegnere anche i modelli.
+async function configCondivisa(app, { provider, models }) {
+  await app.evaluate(async (_electron, cfg) => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => {
+      const base = origGet();
+      return { ...base, provider: cfg.provider, ...(cfg.models ? { models: cfg.models } : {}) };
+    };
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' } });
+  }, { provider, models });
+}
+
+async function stubProviders(app) {
+  await app.evaluate(() => {
+    const P = globalThis.SN_PROVIDERS;
+    const risposta = (attempts) => ({
+      text: JSON.stringify({ message: 'Buongiorno.', suggestions: [] }),
+      model: attempts[0].model, provider: attempts[0].provider, usage: {},
+    });
+    P.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      const r = risposta(attempts);
+      try { onDelta && onDelta(r.text); } catch (_) {}
+      return r;
+    };
+    P.completeWithFallback = async ({ attempts }) => risposta(attempts);
+  });
+}
+
+test('il fornitore dichiarato non esiste più ma i modelli hanno la chiave: l’accoglienza parte', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configCondivisa(app, { provider: 'gemini' });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  // Il punto di vista dell'utente: Filo si presenta, con la sua prima frase.
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo').first())
+    .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+});
+
+test('lo stesso vale aprendo una scheda nuova, senza ricaricare niente', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await configCondivisa(app, { provider: 'gemini' });
+  await stubProviders(app);
+  const prima = new Set(app.windows());
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/newtab.html'));
+  await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 10_000 });
+
+  const deadline = Date.now() + 10_000;
+  let page = null;
+  while (Date.now() < deadline && !page) {
+    page = app.windows().find((w) => !prima.has(w) && w.url().startsWith('filo://newtab'));
+    if (!page) await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!page) throw new Error('la scheda nuova non è comparsa');
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+});
+
+test('arrivati i crediti, l’accoglienza parte sulla home già aperta', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
+
+  // Il riscatto dell'invito visto da qui: la chiave compare e il main avvisa
+  // le pagine. Chi è già sulla home non deve aspettare la scheda dopo.
+  await stubProviders(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' } });
+    globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED });
+  });
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 20_000 });
+  await expect(page.locator('.dash-bubble-filo').first())
+    .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+});
+
+test('se davvero non c’è nessun modello da chiamare, la home lo dice invece di tacere', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  // Crediti a posto (la chiave c'è), configurazione dei modelli vuota: prima
+  // l'utente leggeva «serve un codice d'invito» e andava a cercare crediti che
+  // aveva già.
+  await configCondivisa(app, { provider: 'openrouter', models: {} });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  const messaggio = page.locator('#homeMessage');
+  await expect(messaggio).toContainText(/nessun modello/i, { timeout: 15_000 });
+  await expect(messaggio).not.toContainText(/codice d.invito/i);
+});
+
+// ── Il silenzio può finire mentre la home è già aperta ──────────────────────
+//
+// La prontezza si decide su modelli e chiavi, e tutti e due arrivano DOPO che
+// la prima home è a schermo: la configurazione condivisa la porta una lettura
+// di rete, i modelli propri li sceglie l'utente nelle Opzioni. Senza un avviso
+// che dica «adesso posso rispondere», l'utente resta sul cartello finché non
+// ricarica o apre una scheda nuova: lo stesso sintomo, da un'altra porta.
+// Senza il fix questi due test sono rossi (la home resta in stato "home").
+
+test('la configurazione condivisa arriva dalla rete a home già aperta: l’accoglienza parte', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  // Il primissimo avvio: la chiave c'è, i modelli no, perché la lettura di rete
+  // che li porta non è ancora finita. Nell'app non ce n'è nessuno scritto.
+  await app.evaluate(async () => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    globalThis.__filoConfigArrivata = false;
+    Defaults.get = () => (globalThis.__filoConfigArrivata
+      ? origGet()
+      : { ...origGet(), models: {}, modelRegistry: {} });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' } });
+  });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 15_000 });
+
+  await app.evaluate(async () => {
+    globalThis.__filoConfigArrivata = true;
+    await globalThis.__filoDefaults.refresh().catch(() => {});
+  });
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 25_000 });
+  await expect(page.locator('.dash-bubble-filo').first())
+    .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+});
+
+test('il modello scelto nelle Opzioni a home già aperta: l’accoglienza parte', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  // È la strada che la home stessa propone quando i crediti ci sono e nessun
+  // modello risponde: se non porta da nessuna parte, il suggerimento mente.
+  await configCondivisa(app, { provider: 'openrouter', models: {} });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 15_000 });
+
+  const azioni = await page.evaluate(() => {
+    const A = window.SN_CONST.ACTIONS;
+    return { chat: A.FILO_CHAT, home: A.FILO_DASHBOARD };
+  });
+  await page.evaluate(async (a) => {
+    await chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.UPDATE_SETTINGS,
+      settings: {
+        useDefaultModels: false,
+        models: { [a.chat]: 'testo', [a.home]: 'testo' },
+        modelRegistry: { testo: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash-0731' } },
+      },
+    });
+  }, azioni);
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 25_000 });
+  await expect(page.locator('.dash-bubble-filo').first())
+    .toContainText('Ciao, sono Filo', { timeout: 10_000 });
+});
+
+test('«solo modelli a pesi aperti» senza sostituti: la home nomina l’interruttore', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  const azioni = await page.evaluate(() => {
+    const A = window.SN_CONST.ACTIONS;
+    return { chat: A.FILO_CHAT, home: A.FILO_DASHBOARD };
+  });
+  // Crediti a posto e modelli validi: l'unica cosa che spegne Filo è
+  // l'interruttore. Dire che la configurazione è vuota manderebbe l'utente a
+  // controllare una configurazione in ordine.
+  await app.evaluate(async (_e, a) => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { [a.chat]: 'chiuso', [a.home]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
+  }, azioni);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  const messaggio = page.locator('#homeMessage');
+  await expect(messaggio).toContainText(/pesi aperti/i, { timeout: 15_000 });
+  await expect(messaggio).not.toContainText(/codice d.invito/i);
+});
+
+// ── La chiave che non passa dalle impostazioni ──────────────────────────────
+//
+// Chi entra con un invito non ha una chiave nelle impostazioni: la sua vive nel
+// portafoglio. Se il conto di «Filo può rispondere» si aggiorna solo quando
+// cambiano impostazioni e configurazione condivisa, per un invitato resta fermo
+// su com'era prima del riscatto, e l'avviso che sveglia le home aperte — che
+// parte solo quando quel conto CAMBIA — non parte più in nessuna direzione.
+// Senza il fix tutti e due questi test sono rossi.
+
+// Il riscatto vero deposita la chiave qui: sostituire la funzione che la legge
+// salterebbe proprio il momento che conta.
+async function chiaveNelPortafoglio(app, chiave) {
+  await app.evaluate((_e, k) => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    const w = req('./auth/wallet-store');
+    if (k) w.save({ key: k, pseudonym: 'prova' }); else w.clear();
+  }, chiave);
+}
+
+async function accoglienzaGiaFatta(app) {
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    const O = globalThis.SN_ONBOARDING;
+    await M.setOnboarding(O.close(O.emptyState(), new Date().toISOString()));
+  });
+}
+
+test('riscattato l’invito, la home già aperta smette di mandare a riscattarlo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await app.evaluate(async () => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({ ...origGet(), provider: 'openrouter' });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' } });
+  });
+  await accoglienzaGiaFatta(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 20_000 });
+
+  await chiaveNelPortafoglio(app, 'sk-or-personale-dall-invito');
+
+  await expect(page.locator('#homeMessage')).not.toContainText(/codice d.invito/i, { timeout: 30_000 });
+});
+
+test('l’invitato che accende «solo modelli a pesi aperti»: la home lo dice subito', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  const azioni = await page.evaluate(() => {
+    const A = window.SN_CONST.ACTIONS;
+    return { chat: A.FILO_CHAT, home: A.FILO_DASHBOARD };
+  });
+  await app.evaluate(async (_e, a) => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { [a.chat]: 'chiuso', [a.home]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' } });
+  }, azioni);
+  await chiaveNelPortafoglio(app, 'sk-or-personale-dall-invito');
+  await accoglienzaGiaFatta(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+  await expect(page.locator('#homeMessage')).not.toContainText(/pesi aperti/i, { timeout: 20_000 });
+
+  await page.evaluate(async () => {
+    await chrome.runtime.sendMessage({
+      type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { openWeightsOnly: true },
+    });
+  });
+
+  await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
+});
+
+// ── Quello che l'utente nuovo vede per primo ────────────────────────────────
+//
+// La home che spiega perché Filo tace è la PRIMA schermata di chi installa
+// Filo adesso: il messaggio non deve rimandare a cose che non ci sono, e il
+// suggerimento che lo accompagna è il primo elemento che quell'utente deve
+// cliccare. Senza il fix il primo test è rosso (il messaggio promette pagine
+// salvate che non esistono) e il secondo pure (il suggerimento nasce con una
+// lettera al posto dell'icona).
+
+test('senza pagine salvate la home non promette pagine salvate', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configCondivisa(app, { provider: 'openrouter', models: {} });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  const messaggio = page.locator('#homeMessage');
+  await expect(messaggio).toContainText(/nessun modello/i, { timeout: 15_000 });
+  await expect(messaggio).not.toContainText(/pagine salvate/i);
+});
+
+test('il suggerimento in cima alla home ha la sua icona, non una lettera', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configCondivisa(app, { provider: 'openrouter', models: {} });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
+  const primo = page.locator('#suggestions .dash-suggestion').first();
+  await expect(primo).toContainText(/Opzioni/, { timeout: 15_000 });
+  await expect(primo.locator('.dash-sug-icon svg')).toHaveCount(1);
+  await expect(primo.locator('.dash-sug-icon')).toHaveText('');
+});
+
+// Chiedere è la strada gemella di leggere il messaggio: chi scrive nella barra
+// invece di leggere sopra deve ricevere la stessa spiegazione, e il modo di
+// toglierla di mezzo. Senza il fix la bolla dice «Qualcosa è andato storto.
+// Riprova.» e accanto ha solo un «Riprova» che non potrà mai funzionare.
+test('chiesto qualcosa con «solo modelli a pesi aperti» che esclude tutto: la chat spiega e offre le Opzioni', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  const azioni = await page.evaluate(() => {
+    const A = window.SN_CONST.ACTIONS;
+    return { chat: A.FILO_CHAT, home: A.FILO_DASHBOARD };
+  });
+  await app.evaluate(async (_e, a) => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { [a.chat]: 'chiuso', [a.home]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
+  }, azioni);
+  await accoglienzaGiaFatta(app);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
+
+  await page.fill('#input', 'ciao');
+  await page.press('#input', 'Enter');
+
+  const bolla = page.locator('.dash-bubble-filo').last();
+  await expect(bolla).toContainText(/pesi aperti/i, { timeout: 30_000 });
+  await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
+  await expect(bolla.locator('.dash-action-btn', { hasText: 'Apri Opzioni' })).toHaveCount(1);
+});
+
+// ── Il motivo che cambia senza che cambi la risposta ────────────────────────
+//
+// La home già aperta si accorgeva solo del passaggio «non posso» ↔ «posso».
+// Ma i messaggi sono tre e mandano in tre posti diversi: restare «non posso»
+// per un motivo NUOVO è già uno stato nuovo da mostrare. Senza il fix questi
+// due test sono rossi (la home resta parola per parola quella di prima, e
+// arriva a chiedere all'utente una cosa che ha appena fatto).
+
+async function scriviOpzioni(page, settings) {
+  await page.evaluate(async (s) => {
+    await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: s });
+  }, settings);
+}
+
+// Chi tiene il conto di «Filo può rispondere» nasce senza una risposta, e il
+// primo salvataggio della sessione avvisa comunque le home. Un salvataggio che
+// non tocca la prontezza porta il conto al punto in cui si trova ogni sessione
+// che ha già vissuto: da lì in poi si misura quello che conta.
+async function contoGiaAvviato(page) {
+  await scriviOpzioni(page, { theme: 'system' });
+}
+
+async function modelliVuoti(page) {
+  return page.evaluate(() => {
+    const vuoti = {};
+    for (const a of Object.values(window.SN_CONST.ACTIONS)) vuoti[a] = '';
+    return vuoti;
+  });
+}
+
+test('spenti i modelli predefiniti, la home smette di incolpare «solo modelli a pesi aperti»', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await accoglienzaGiaFatta(app);
+  const A0 = await page.evaluate(() => window.SN_CONST.ACTIONS);
+  await app.evaluate(async (_e, a) => {
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { [a.FILO_CHAT]: 'chiuso', [a.FILO_DASHBOARD]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
+  }, A0);
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
+  await contoGiaAvviato(page);
+
+  // In Opzioni l'utente non tocca l'interruttore: spegne «usa i modelli
+  // predefiniti» e non ne ha di suoi. L'interruttore non decide più niente.
+  await scriviOpzioni(page, { useDefaultModels: false, models: await modelliVuoti(page) });
+
+  await expect(page.locator('#homeMessage')).not.toContainText(/pesi aperti/i, { timeout: 30_000 });
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 30_000 });
+});
+
+test('scelto il modello che la home chiedeva, la home smette di chiederlo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await accoglienzaGiaFatta(app);
+  await configCondivisa(app, { provider: 'openrouter', models: {} });
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ openWeightsOnly: true }); });
+  await stubProviders(app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 30_000 });
+  await contoGiaAvviato(page);
+
+  // L'utente fa quello che la home gli dice. Il modello è proprietario e
+  // l'interruttore lo esclude: Filo resta muto, ma per un motivo nuovo.
+  const A = await page.evaluate(() => window.SN_CONST.ACTIONS);
+  await scriviOpzioni(page, {
+    useDefaultModels: false,
+    modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    models: { ...(await modelliVuoti(page)), [A.FILO_CHAT]: 'chiuso', [A.FILO_DASHBOARD]: 'chiuso' },
+  });
+
+  await expect(page.locator('#homeMessage')).toContainText(/pesi aperti/i, { timeout: 30_000 });
+});
+
+// ── La stessa domanda fatta da una pagina web ───────────────────────────────
+//
+// Sulla home chi non legge il messaggio e scrive nella barra riceve la
+// spiegazione. Il riquadro dell'Aiuto su una pagina web è lo stesso gesto in un
+// posto dove sopra non c'è niente da leggere, e lì la frase già scritta si
+// perdeva: la risposta del main arriva come oggetto piatto e chi la
+// ricomponeva a mano buttava via il codice. Senza il fix questi due test sono
+// rossi («Qualcosa è andato storto. Riprova.»).
+
+const PAGINA_QUALUNQUE = '<!doctype html><meta charset="utf-8"><title>Una pagina</title><p>Contenuto.</p>';
+
+// L'Aiuto si apre col comando di pagina, lo stesso che gli mandano il menu del
+// tasto destro e la scorciatoia: su una pagina esterna i moduli di Filo vivono
+// nel mondo isolato del preload e da fuori non si chiamano.
+async function apriAiuto(app, page) {
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs) continue;
+      for (const t of w._filoTabs.tabs) {
+        const wc = t.view.webContents;
+        if (!wc.getURL().startsWith('http')) continue;
+        wc.mainFrame.send('filo:broadcast', { type: 'top_frame_command', surface: 'help' });
+      }
+    }
+  });
+  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
+  await page.fill('.sn-sidebar-input textarea', 'cosa posso fare qui?');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+}
+
+test('senza crediti, l’Aiuto su una pagina web dice che serve un invito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: '' }, openWeightsOnly: false });
+  });
+  const page = await testServer.openReady(openTab, PAGINA_QUALUNQUE);
+  await apriAiuto(app, page);
+
+  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  await expect(bolla).toBeVisible({ timeout: 30_000 });
+  await expect(bolla).toContainText(/invito|crediti/i, { timeout: 15_000 });
+  await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
+});
+
+test('con «solo modelli a pesi aperti» che esclude tutto, l’Aiuto su una pagina web nomina l’interruttore', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(async () => {
+    const A = globalThis.SN_CONST.ACTIONS;
+    const Defaults = globalThis.__filoDefaults;
+    const origGet = globalThis.__filoDefaultsGet || Defaults.get;
+    globalThis.__filoDefaultsGet = origGet;
+    Defaults.get = () => ({
+      ...origGet(),
+      provider: 'openrouter',
+      models: { ...origGet().models, [A.HELP]: 'chiuso' },
+      modelRegistry: { chiuso: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' } },
+    });
+    await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k-test' }, openWeightsOnly: true });
+  });
+  const page = await testServer.openReady(openTab, PAGINA_QUALUNQUE);
+  await apriAiuto(app, page);
+
+  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  await expect(bolla).toBeVisible({ timeout: 30_000 });
+  await expect(bolla).toContainText(/pesi aperti/i, { timeout: 15_000 });
+  await expect(bolla).not.toContainText(/qualcosa è andato storto/i);
+});

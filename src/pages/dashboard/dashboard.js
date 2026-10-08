@@ -659,6 +659,19 @@
     renderSuggestions();
   }
 
+  // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è
+  // ciò che l'utente aspetta al primo avvio; se resta chiusa (già fatta, o
+  // c'è una conversazione in corso) si rifà almeno il messaggio della home,
+  // che altrimenti continua a spiegare un silenzio finito (#663).
+  async function risvegliaHome() {
+    await Accoglienza.maybeOpenOnboardingLater();
+    if (Accoglienza.isActive() || document.body.dataset.state !== 'home') return;
+    // Senza `force`: chi sa rispondere serve subito il saluto d'attesa e si
+    // rifà il messaggio nel giro in background, invece di far aspettare
+    // l'utente davanti a una chiamata al modello.
+    await loadDashboard();
+  }
+
   // ===== Bolle conversazione =====
   function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
@@ -936,14 +949,21 @@
       // lo status.
       const W = window.SN_WALLET;
       const keyRefused = r && 'keyRefused' in r ? Boolean(r.keyRefused) : Boolean(W && W.isKeyRefusalStatus(r?.status));
-      if (r?.code === 'NO_API_KEY' || keyRefused) {
-        const credits = document.createElement('button');
-        credits.type = 'button';
-        credits.className = 'dash-action-btn';
-        credits.textContent = 'Apri Crediti';
-        credits.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter';
-        credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
-        row.appendChild(credits);
+      // Dove si rimedia lo dice chi conosce i codici, non un elenco di casi
+      // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
+      // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
+      const CE = window.SN_CHAT_ERRORS;
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused }) : null;
+      if (pagina) {
+        const via = document.createElement('button');
+        via.type = 'button';
+        via.className = 'dash-action-btn';
+        via.textContent = pagina.label;
+        via.title = pagina.dove === 'opzioni'
+          ? 'Scegli il modello per questa funzione'
+          : (r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter');
+        via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
+        row.appendChild(via);
       }
       if (r?.code === 'NO_API_KEY') err.dataset.senzaCrediti = '1';
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
@@ -1558,11 +1578,21 @@
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
       // scheda nuova.
       if (msg.signedIn) Accoglienza.maybeOpenOnboardingLater();
-    } else if (msg?.type === MSG.CREDITS_CHANGED && msg.walletNotice) {
+    } else if (msg?.type === MSG.CREDITS_CHANGED) {
       // Un invito riscattato da fuori (#651): il link aperto da un'altra
       // applicazione, o l'invito che aspettava questa installazione al primo
       // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
       inCodaPopup(chiediBenvenuto);
+      // Con i crediti arriva anche il modo di rispondere: l'accoglienza che
+      // aspettava parte adesso, come già fa all'accesso. Senza, chi entrava con
+      // un invito la vedeva solo alla scheda dopo (#663).
+      Accoglienza.maybeOpenOnboardingLater();
+    } else if (msg?.type === MSG.FILO_READY_CHANGED) {
+      // Adesso Filo ha (o non ha più) un modello da chiamare. La home aperta si
+      // rifà da sé: chi aspettava la configurazione condivisa, che arriva dalla
+      // rete dopo l'avvio, restava sul cartello «non posso rispondere» fino a
+      // un ricaricamento (#663).
+      risvegliaHome().catch(() => {});
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): la spinta arriva a ogni home, lo racconta chi lo prende (#664).
       inCodaPopup(chiediRegalo);
