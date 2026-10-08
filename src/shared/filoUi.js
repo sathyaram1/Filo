@@ -113,7 +113,12 @@
     'pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'keydown', 'keyup', 'keypress',
     'beforeinput', 'input', 'change', 'wheel', 'dragstart', 'dragenter', 'dragover', 'drop',
     'touchstart', 'touchmove', 'touchend'];
-  function fermaIFinti(e) { if (!e.isTrusted) e.stopImmediatePropagation(); }
+  // Un evento fabbricato da codice nostro (l'Incolla del menu che scrive in un campo, la correzione) passa: lo
+  // segniamo nel mondo isolato, dove l'oggetto che vede il sito è un altro e la sua copia non entra nell'elenco.
+  const nostri = new WeakSet();
+  function nostro(ev) { try { nostri.add(ev); } catch (_) {} return ev; }
+  function veroONostro(e) { return !!(e && (e.isTrusted || nostri.has(e))); }
+  function fermaIFinti(e) { if (!veroONostro(e)) e.stopImmediatePropagation(); }
   const chiusi = new WeakSet();
   function chiudi(n) {
     if (!n || n.nodeType !== 1 || chiusi.has(n)) return;
