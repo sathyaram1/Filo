@@ -401,7 +401,7 @@ test('chi supera il tetto di messaggi lo vede scritto', async ({ app, openTab })
   await expect(page.locator('.dk-chat-cap')).toHaveCount(0);
   await ask(page, 'una di troppo');
   await expect(page.locator('.dk-chat-cap')).toBeVisible();
-  const scritto = await page.evaluate((n) => n.toLocaleString('it-IT'), max);
+  const scritto = await page.evaluate((n) => n.toLocaleString('it-IT', { useGrouping: true }), max);
   await expect(page.locator('.dk-chat-cap')).toContainText(scritto);
 });
 

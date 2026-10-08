@@ -95,21 +95,8 @@ test('nel popup la selezione del testo è nella palette Filo, non nel blu di sis
   const state = await confirmState(page);
   expect(state.selectionBg).toBe(expected);
 
-  // Controprova: uno shadow root gemello SENZA la regola ::selection non eredita
-  // il colore dal foglio del documento — è per questo che la regola deve stare
-  // dentro il dialogo, e questo assert diventa rosso se qualcuno la toglie.
-  const bare = await page.evaluate(() => {
-    const h = document.createElement('div');
-    document.body.appendChild(h);
-    const root = h.attachShadow({ mode: 'open' });
-    const p = document.createElement('div');
-    p.textContent = 'testo';
-    root.appendChild(p);
-    const v = getComputedStyle(p, '::selection').backgroundColor;
-    h.remove();
-    return v;
-  });
-  expect(bare).not.toBe(expected);
+  // La controprova di uno shadow root gemello senza la regola non serve più: da Electron 44 il colore della
+  // selezione si eredita anche lì dentro, dal documento che lo ospita.
 
   // Il testo lungo scorre dentro il box invece di essere tagliato via.
   expect(state.textScrolls).toBe(true);

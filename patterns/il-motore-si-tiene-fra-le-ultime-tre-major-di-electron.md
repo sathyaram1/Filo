@@ -31,6 +31,16 @@ salto si alzano lì `MAJOR` e `USCITA_STABILE`.
 - **Il visore dei PDF non è più un webContents a sé** (41): i suoi tasti arrivano già alla scheda.
 - **I numeri italiani a quattro cifre perdono il punto** (44, dati di ICU più nuovi): `Intl` scrive 4990 invece di
   4.990. Ogni numero formattato in italiano chiede `useGrouping: true`; sentinella `tests/unit/numeriItaliani.test.mjs`.
+- **`input-event` dice il tasto del mouse in `button`**, non più fra i modificatori: si legge con `tastoPremuto`
+  (`src/main/tastoDelMouse.js`).
+- **`cookies.get({ url })` restituisce anche i cookie partizionati**, e nessun campo li distingue: li distingue una
+  scrittura, perché un set già scaduto toglie solo il cookie normale (`src/main/services/cookieIncorporati.js`).
+- **Le prove**: una finestra tutta fuori schermo smette di disegnare (le finestre nascoste dei test chiedono
+  `disable-frame-rate-limit`); senza scheda grafica non c'è WebGL (nei test `enable-unsafe-swiftshader`); la lista
+  HSTS di Chromium cresce a ogni versione e un nome vero servito in http da una rete finta (bing.com, youtube.com,
+  bbc.co.uk) si apre solo in https: nelle prove si usano nomi inventati, o un server https locale come in
+  `tests/ad-skip.spec.mjs`; le regole di un foglio di stile di un'altra origine `filo://` non si leggono più, si
+  guarda lo stile calcolato.
 
 ## Cosa non si prova da qui
 

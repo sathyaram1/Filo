@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const { coordinataFuoriSchermo, inModalitaTest, silenziaApertureDiSistema, disegnaAncheFuoriSchermo } =
+const { coordinataFuoriSchermo, inModalitaTest, silenziaApertureDiSistema, disegnaAncheFuoriSchermo, webglAncheSenzaScheda } =
   require(join(__dirname, '..', '..', 'src', 'main', 'test-window-mode.js'));
 
 // Il limite vero è 32767: si sta sotto con margine.
@@ -116,4 +116,14 @@ test('le finestre nascoste dei test continuano a disegnare fuori schermo; quelle
   assert.equal(disegnaAncheFuoriSchermo(app, { nascoste: true }), true);
   assert.deepEqual(chiesti, ['disable-frame-rate-limit']);
   assert.equal(disegnaAncheFuoriSchermo(null, { nascoste: true }), false);
+});
+
+// Senza scheda grafica Electron 44 non dà WebGL: nei test lo dà il disegno in software, fuori dai test resta com'è.
+test('WebGL in software solo nei test', () => {
+  const chiesti = [];
+  const app = { commandLine: { appendSwitch: (s) => chiesti.push(s) } };
+  assert.equal(webglAncheSenzaScheda(app, { inTest: false }), false);
+  assert.deepEqual(chiesti, []);
+  assert.equal(webglAncheSenzaScheda(app, { inTest: true }), true);
+  assert.deepEqual(chiesti, ['enable-unsafe-swiftshader']);
 });

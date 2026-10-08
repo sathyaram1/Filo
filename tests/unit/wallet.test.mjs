@@ -388,7 +388,8 @@ test('le manopole dei crediti sono sette, hanno un nome e limiti sensati', () =>
 // ── #816: le cifre dette fuori dalla pagina Crediti ─────────────────────────
 
 test('formatCredits scrive il saldo come la pagina Crediti: un decimale al più, alla italiana', () => {
-  assert.equal(W.formatCredits(4321.5), new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(4321.5));
+  assert.equal(W.formatCredits(4321.5), new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(4321.5));
+  assert.equal(W.formatCredits(4321.5), '4.321,5');
   assert.equal(W.formatCredits(12345.44), '12.345,4');
   assert.equal(W.formatCredits(0.3), '0,3');
   assert.equal(W.formatCredits(null), '0');

@@ -140,7 +140,8 @@ test('seed per-origine: deterministico, coerente fra sottodomini, scorrelato fra
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const NOMI = ['shop.com.tw', 'www.shop.com.tw', 'altro.com.tw', 'negozio.co.id', 'toko.co.id', 'tienda.com.co', 'otra.com.co', '192.168.1.10', '10.0.1.10'];
-const NOMI_FIDATI = ['www.bbc.co.uk', 'www.argos.co.uk', 'webmail.libero.it', 'www.libero.it'];
+// Nomi inventati sotto co.uk: bbc.co.uk e argos.co.uk da Electron 44 stanno nella lista HSTS e si aprono solo in https.
+const NOMI_FIDATI = ['www.giornale.co.uk', 'www.negozio.co.uk', 'webmail.libero.it', 'www.libero.it'];
 
 const testSiti = test.extend({
   app: async ({}, use) => {
@@ -242,16 +243,16 @@ testSiti.describe('siti fidati in Privacy', () => {
   testSiti('una voce fidata salvata come suffisso tiene connessi i siti sotto di lei, ognuno nel suo vaso', async ({ app, shell }) => {
     testSiti.setTimeout(90_000);
     await privacy(app, shell, ['co.uk']);
-    const bbc = await apri(app, shell, 'www.bbc.co.uk', '/accedi');
-    const argos = await apri(app, shell, 'www.argos.co.uk', '/');
-    expect(bbc.partizione).toMatch(/^persist:/);
-    expect(argos.partizione).toMatch(/^persist:/);
-    expect(argos.partizione, 'due siti, due vasi: argos non vede il cookie di bbc').not.toBe(bbc.partizione);
-    expect(argos.titolo).toBe('C=-');
+    const giornale = await apri(app, shell, 'www.giornale.co.uk', '/accedi');
+    const negozio = await apri(app, shell, 'www.negozio.co.uk', '/');
+    expect(giornale.partizione).toMatch(/^persist:/);
+    expect(negozio.partizione).toMatch(/^persist:/);
+    expect(negozio.partizione, 'due siti, due vasi: il negozio non vede il cookie del giornale').not.toBe(giornale.partizione);
+    expect(negozio.titolo).toBe('C=-');
     // Un giro sull'elenco dei fidati spazza i vasi orfani: quello di un sito coperto dalla voce resta.
     await privacy(app, shell, ['co.uk', 'esempio.it']);
     await new Promise((r) => setTimeout(r, 1500));
-    expect((await apri(app, shell, 'www.bbc.co.uk', '/torno')).titolo).toBe(CONNESSO);
+    expect((await apri(app, shell, 'www.giornale.co.uk', '/torno')).titolo).toBe(CONNESSO);
   });
 
   testSiti('un sito fidato scritto col suo sottodominio resta connesso su tutto il sito', async ({ app, shell }) => {

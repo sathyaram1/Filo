@@ -140,7 +140,14 @@ function silenziaApertureDiSistema(shell, {
   return true;
 }
 
+// Nelle macchine dei test non c'è una scheda grafica, e da Electron 44 Chromium non ripiega più da solo sul disegno
+// in software: WebGL mancherebbe, e le prove della protezione dal fingerprinting non avrebbero niente da provare.
+function webglAncheSenzaScheda(app, { inTest = inModalitaTest() } = {}) {
+  if (!inTest || !app) return false;
+  try { app.commandLine.appendSwitch('enable-unsafe-swiftshader'); return true; } catch (_) { return false; }
+}
+
 module.exports = {
   HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests, disegnaAncheFuoriSchermo,
-  inModalitaTest, silenziaApertureDiSistema,
+  inModalitaTest, silenziaApertureDiSistema, webglAncheSenzaScheda,
 };
