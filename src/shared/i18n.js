@@ -444,6 +444,8 @@
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
+    admin_defaults_producer_not_excluded: '%s produce questo modello e non è fra i fornitori esclusi: OpenRouter può mandargli le richieste.',
+    admin_defaults_producer_exclude: 'Escludi %s',
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',

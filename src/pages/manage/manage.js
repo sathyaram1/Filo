@@ -5556,7 +5556,7 @@
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(modelWrap, modelIn, {
         readOptions: () => readSmModelOptions(modelIn),
-        onPick: () => populateSmNicknames(),
+        onPick: () => { populateSmNicknames(); checkJudgeProducer(row); },
       });
     }
 
@@ -5569,12 +5569,29 @@
     // Aggiornare nickname o modello ridisegna i suggerimenti dei selettori
     // (un nickname compare tra i suggerimenti solo quando ha anche un modello).
     nickIn.addEventListener('input', () => populateSmNicknames());
-    modelIn.addEventListener('input', () => populateSmNicknames());
+    modelIn.addEventListener('input', () => { populateSmNicknames(); checkJudgeProducer(row); });
+
+    const producerMsg = document.createElement('div');
+    producerMsg.className = 'sn-model-row-msg sn-model-producer';
 
     row.appendChild(nickIn);
     row.appendChild(modelWrap);
     row.appendChild(del);
+    row.appendChild(producerMsg);
+    checkJudgeProducer(row);
     return row;
+  }
+
+  // I giudici girano sul server, che esclude i fornitori della lista scritta nel codice (la stessa
+  // DEFAULT_EXCLUDED_PROVIDERS): un produttore che lì non c'è lo si dice sulla riga (#1059).
+  function checkJudgeProducer(row) {
+    const C = window.SN_CONST;
+    const I18n = window.SN_I18N;
+    const msg = row.querySelector('.sn-model-producer');
+    msg.textContent = '';
+    if (!C || typeof C.producerNotExcluded !== 'function' || !I18n) return;
+    const producer = C.producerNotExcluded(row.querySelector('.sn-model-id').value, C.DEFAULT_EXCLUDED_PROVIDERS);
+    if (producer) msg.textContent = I18n.t('admin_defaults_producer_not_excluded', producer);
   }
 
   function renderJudgeRegistry(registry) {

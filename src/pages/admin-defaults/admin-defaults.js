@@ -174,12 +174,15 @@
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(idWrap, idIn, {
         readOptions: () => readProviderOptions(provSel.value),
+        onPick: () => checkModelProducer(row),
       });
     }
+    idIn.addEventListener('input', () => checkModelProducer(row));
 
     // Cambiando provider, il combobox legge l'altra lista (e la carica).
     provSel.addEventListener('change', () => {
       ensureProviderModels(provSel.value);
+      checkModelProducer(row);
     });
 
     // Livello di reasoning per QUESTO modello (#369): l'owner può forzarlo quando
@@ -211,6 +214,9 @@
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
+    const producerMsg = document.createElement('div');
+    producerMsg.className = 'sn-model-row-msg sn-model-producer';
+
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
@@ -218,7 +224,42 @@
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
+    row.appendChild(producerMsg);
+    checkModelProducer(row);
     return row;
+  }
+
+  // Un modello il cui produttore non è nella lista dei fornitori esclusi di questa pagina lo dice sulla
+  // riga, con l'esclusione a un click (#1059): i registri dell'owner non li vede nessun test.
+  function checkModelProducer(row) {
+    const C = window.SN_CONST;
+    const msg = row.querySelector('.sn-model-producer');
+    if (!msg) return;
+    msg.textContent = '';
+    if (!C || typeof C.producerNotExcluded !== 'function') return;
+    if (row.querySelector('.sn-model-provider').value !== 'openrouter') return;
+    const producer = C.producerNotExcluded(row.querySelector('.sn-model-id').value, collectExcluded());
+    if (!producer) return;
+    const text = document.createElement('span');
+    text.textContent = I18n.t('admin_defaults_producer_not_excluded', producer);
+    const fix = document.createElement('button');
+    fix.type = 'button';
+    fix.className = 'sn-excluded-guess';
+    fix.textContent = I18n.t('admin_defaults_producer_exclude', producer);
+    fix.addEventListener('click', () => {
+      const reasons = typeof C.excludedProviderReasons === 'function'
+        ? C.excludedProviderReasons([producer], [], C.DEFAULT_EXCLUDED_PROVIDER_REASONS) : [];
+      const r = reasons[0] && reasons[0].kind ? reasons[0] : { name: producer, kind: 'producer', note: '' };
+      $('excludedList').appendChild(makeExcludedRow(producer, r));
+      renderExcludedDrift();
+    });
+    msg.append(text, fix);
+  }
+
+  function checkAllModelProducers() {
+    const host = $('modelRegistryList');
+    if (!host) return;
+    for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) checkModelProducer(row);
   }
 
   async function runRowTest(nickIn, provSel, idIn, row, btn) {
@@ -513,7 +554,9 @@
     note.value = d.note || '';
   }
 
+  // Gira a ogni cambio della lista dei fornitori esclusi: anche gli avvisi sulle righe dei modelli ne dipendono.
   function renderExcludedDrift() {
+    checkAllModelProducers();
     const box = $('excludedDrift');
     if (!box) return;
     const missing = excludedMissingFromBuild();

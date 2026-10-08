@@ -2,7 +2,7 @@
 id: models
 title: Politica sui modelli
 subtitle: Le motivazioni etiche che governano la scelta dei modelli.
-updated: 2026-09-26
+updated: 2026-10-08
 order: 1
 ---
 
@@ -39,7 +39,7 @@ ElevenLabs (sintesi vocale, modello Eleven v3), da settembre 2026. Lo compro dir
 
 La regola non è "mai il produttore": da Anthropic compro esattamente dal produttore, in quanto è l'unico laboratorio di frontiera che voglio finanziare. La regola è **non finanziare chi non ritengo si stia comportando responsabilmente**, e per farlo basta non comprare da loro il servizio. I pesi sono un'altra cosa: un modello aperto servito da terzi, o eseguito sul tuo computer, non genera un centesimo per il laboratorio che l'ha addestrato.
 
-Non verranno quindi mai usati, attraverso i crediti di Filo, i **servizi** di **OpenAI** (ChatGPT), **xAI/SpaceX** (Grok), **Meta** (l'azienda che controlla Facebook e Instagram, e produce MuseSpark), **Google** (formalmente Alphabet, che produce Gemini) e dei laboratori cinesi (Moonshot, Z.ai, Alibaba, DeepSeek...). Le ragioni sono nelle sezioni che seguono.
+Non verranno quindi mai usati, attraverso i crediti di Filo, i **servizi** di **OpenAI** (ChatGPT), **xAI/SpaceX** (Grok), **Meta** (l'azienda che controlla Facebook e Instagram, e produce MuseSpark), **Google** (formalmente Alphabet, che produce Gemini) e dei laboratori cinesi (Moonshot, Z.ai, Alibaba, DeepSeek, Xiaomi...). Le ragioni sono nelle sezioni che seguono.
 
 **Come è applicata:** Filo non compra dai fornitori direttamente: passa da un servizio (OpenRouter) che smista le richieste e sceglie da sé chi ospita ogni modello. Lasciato a sé, prima o poi manderebbe la richiesta anche al produttore escluso da questa policy. Quindi la lista di esclusione viaggia con ogni richiesta, e **a risposta arrivata Filo registra chi l'ha effettivamente servita** e segnala se è qualcuno che doveva essere fuori.
 

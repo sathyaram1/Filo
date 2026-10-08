@@ -925,7 +925,7 @@
   // perché il punto dell'interruttore è poter rifiutare anche quella scelta.
   // I produttori dei «modelli stretti» ammessi dalla politica stanno qui per lo
   // stesso motivo: pesi chiusi comprati dal produttore, l'interruttore li spegne.
-  const OPEN_WEIGHTS_EXTRA_EXCLUDED = [...PRODUCER_ONLY_MODELS.flatMap((r) => r.hosts), 'TypeSafe'];
+  const OPEN_WEIGHTS_EXTRA_EXCLUDED = [...PRODUCER_ONLY_MODELS.flatMap((r) => r.hosts), ...NARROW_MODELS.map((m) => m.producer)];
 
   // Lista di esclusione EFFETTIVA da usare per una richiesta. PURA.
   function effectiveExcludedProviders(excluded, openWeightsOnly) {
@@ -2855,6 +2855,9 @@
     producerOnlyRule,
     servedPolicyViolation,
     hostPolicyViolation,
+    MODEL_PRODUCERS,
+    NARROW_MODELS,
+    producerNotExcluded,
     DICTATION_LIMITS,
     dictationTimes,
     missingExcludedProviders,
