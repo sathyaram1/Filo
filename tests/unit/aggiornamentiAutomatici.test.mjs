@@ -296,8 +296,9 @@ perOgniSistema('spento, «Installa» e Filo chiuso a metà scaricamento: al riav
       }
       dopo.finisci();
       await calma();
+      if (via === 'carta') assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
       dopo.chiudi();
-      assert.equal(dopo.installata, true, `${via}: dopo il riavvio la versione chiesta non si installa alla chiusura`);
+      assert.equal(dopo.installata, s.allaChiusura, `${via}: dopo il riavvio la versione chiesta non si installa quando deve`);
     });
   }
 });
