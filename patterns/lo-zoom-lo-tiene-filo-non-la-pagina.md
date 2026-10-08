@@ -10,7 +10,8 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   li consegna al preload del frame principale su `filo:zoom-key`. Il preload
   ha una porta sola (`eseguiZoom`) per tasti, barra dei menu, chat e tasto
   destro, e lì sta l'eccezione dell'editor, che scala il foglio.
-- **Rotella e clic centrale** non hanno un gancio nel main (Electron 33), quindi
+- **Rotella e clic centrale** non avevano un gancio nel main fino a Electron 33 (la 44 ha
+  `before-mouse-event`, da provare prima di contarci), quindi
   si ascoltano nel preload: solo eventi `isTrusted`, sulla finestra in cattura
   (prima degli script della pagina), e **rimessi** quando il documento cambia
   radice, perché `document.open` cancella gli ascoltatori della finestra
@@ -88,8 +89,9 @@ preload dello zoom non c'era, mentre dalla chat lo zoom lì funzionava.
 **Cosa resta.** Un sito che riscrive il proprio documento e ci mette dentro,
 nello stesso script, un suo ascoltatore sulla finestra arriva prima che gli
 ascoltatori di Filo siano rimessi (l'osservatore è un microtask): da lì si
-prende pizzico e clic centrale. Il main non può supplire: in Electron 33
-`input-event` non porta né il tasto del mouse né il verso della rotella. Il
+prende pizzico e clic centrale. Il main non può supplire: `input-event` non porta
+né il tasto del mouse né il verso della rotella (`before-mouse-event`, arrivato con
+la 44, porta il tasto e va provato). Il
 colpo di rotella con Ctrl lo recupera `zoom-changed`, i tasti restano
 all'utente comunque. Il riquadro con la percentuale sta ancora nel documento:
 un sito che lo cerca apposta può nasconderlo o toglierlo, non cambiare il numero

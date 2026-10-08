@@ -13,7 +13,7 @@ const USCITA_STABILE = '2026-08-25';
 const SETTIMANE_DI_SUPPORTO = 3 * 8;
 const COME = 'porta Electron all\'ultima stabile (npm view electron dist-tags.latest), poi alza MAJOR e USCITA_STABILE '
   + 'in tests/unit/electronSupportato.test.mjs con la data di releases.electronjs.org; cosa controllare nel salto: '
-  + 'patterns/aggiornare-electron.md';
+  + 'patterns/il-motore-si-tiene-fra-le-ultime-tre-major-di-electron.md';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const json = (nome) => JSON.parse(readFileSync(join(ROOT, nome), 'utf8'));
