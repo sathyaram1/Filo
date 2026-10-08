@@ -302,3 +302,96 @@ test('Modifica dentro la casella del feedback su un sito: Sostituisci arriva all
   await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.valore).toBe('TESTO RISCRITTO 1071');
   await expect.poll(() => bozzaSalvata(app, chiaveBozza(testServer.origin))).toBe('TESTO RISCRITTO 1071');
 });
+
+// Un sito con scorciatoie a un tasto ignora i tasti scritti in un suo campo; il campo di un riquadro chiuso, da fuori,
+// non sembra un campo: i tasti non devono arrivare ai suoi gestori, o «k» mette in pausa e «/» porta via il cursore.
+const SCORCIATOIE = `<script>
+  window.__comandi = [];
+  const cerca = () => document.querySelector('#cerca') || document.body.appendChild(Object.assign(document.createElement('input'), { id: 'cerca' }));
+  document.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (e.key === 'k') { e.preventDefault(); window.__comandi.push('pausa'); }
+    if (e.key === '/') { e.preventDefault(); cerca().focus(); }
+  });
+</script>`;
+
+test('nei riquadri su un sito con scorciatoie da tastiera quello che l\'utente scrive resta nella casella', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await contaChiamate(app);
+  const page = await testServer.openReady(openTab, pagina(`<p id="parola" style="font-size:20px">supercalifragilistico</p>${SCORCIATOIE}`));
+  const sitoFermo = async () => {
+    expect(await page.evaluate(() => window.__comandi), 'il sito non prende i tasti come comandi').toEqual([]);
+    expect(await page.evaluate(() => (document.querySelector('#cerca') || {}).value || ''), 'il testo non finisce nel sito').toBe('');
+  };
+
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  await clicca(app, page, '.sn-fb-text');
+  await page.keyboard.type('ok kiwi / poi', { delay: 20 });
+  expect((await statoDi(app, page, '.sn-fb-text')).valore).toBe('ok kiwi / poi');
+  await sitoFermo();
+  await page.keyboard.press('Escape');
+  await expect.poll(() => conta(app, page, '.sn-fb-modal')).toBe(0);
+
+  await page.locator('#parola').dblclick();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('Risposta del modello');
+  await clicca(app, page, '.sn-popup-input');
+  await page.keyboard.type('e kiwi / poi', { delay: 20 });
+  expect((await statoDi(app, page, '.sn-popup-input')).valore).toBe('e kiwi / poi');
+  await sitoFermo();
+  await page.keyboard.press('Escape');
+  await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
+
+  await page.evaluate(() => document.body.insertAdjacentHTML('beforeend', '<textarea id="campo">Un testo con un erore.</textarea>'));
+  await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await page.locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect.poll(() => statoDi(app, page, '.sn-editbox-instruction')).not.toBeNull();
+  await clicca(app, page, '.sn-editbox-instruction');
+  await page.keyboard.type('ok kiwi / poi', { delay: 20 });
+  expect((await statoDi(app, page, '.sn-editbox-instruction')).valore).toBe('ok kiwi / poi');
+  await sitoFermo();
+});
+
+test('spiegazione su un sito: il clic finto del sito non apre i collegamenti della risposta, quello dell\'utente sì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const risposta = 'Vuol dire straordinario. Vedi [la voce](https://example.org/voce).';
+  await contaChiamate(app);
+  await app.evaluate(async (_e, r) => {
+    const orig = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta(r); return { text: r, usage: {} }; } };
+  }, risposta);
+  const page = await testServer.openReady(openTab, pagina('<p id="parola" style="font-size:20px">supercalifragilistico</p>'));
+  await page.locator('#parola').dblclick();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('straordinario');
+  await nelMondoDiFilo(app, page, () => {
+    window.__aperti = [];
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (m, ...r) => {
+      if (m && m.type === 'apri_collegamento_filo') { window.__aperti.push(m.url); return Promise.resolve({ ok: true }); }
+      return orig(m, ...r);
+    };
+  });
+  const link = await statoDi(app, page, 'a.filo-md-link');
+  const punto = { x: link.x + link.width / 2, y: link.y + link.height / 2 };
+  await page.evaluate((p) => {
+    const host = document.querySelector('[data-sn-riquadro]');
+    for (const tipo of ['click', 'auxclick']) {
+      host.dispatchEvent(new MouseEvent(tipo, { bubbles: true, composed: true, cancelable: true, clientX: p.x, clientY: p.y, detail: 1, button: tipo === 'auxclick' ? 1 : 0 }));
+    }
+  }, punto);
+  await page.waitForTimeout(500);
+  expect(await nelMondoDiFilo(app, page, () => window.__aperti), 'lo script del sito non apre il collegamento').toEqual([]);
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => nelMondoDiFilo(app, page, () => window.__aperti)).toEqual(['https://example.org/voce']);
+});

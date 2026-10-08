@@ -99,6 +99,13 @@ faceva spendere una chiamata.
   nel documento. Col fuoco dentro un riquadro
   chiuso si sta scrivendo (`data-sn-riquadro`, regola in
   `src/shared/campoTesto.js`): Ctrl/Cmd+Z annulla, non porta via la pagina.
+  Lo stesso vale per il sito, che da fuori vede l'host e non un campo: le sue
+  scorciatoie a un tasto («k» pausa, «/» alla ricerca) si prenderebbero quello
+  che l'utente scrive. I tasti si fermano alla radice del riquadro, in bolla;
+  l'Esc no (chiude in cattura, e serve allo schermo intero, #514). Un ascoltatore
+  di quelli che dal nodo vero **fa** qualcosa (aprire un collegamento) accetta
+  solo il gesto vero: un clic finto sull'host, con le coordinate giuste, ci
+  arriva.
 - **Un evento che fabbrica Filo stesso** verso un campo di un riquadro (l'Incolla
   del menu, la correzione, Sostituisci della Modifica) si segna con `SN_FILO_UI.nostro(ev)`: il cancello lo
   lascia passare, la copia che vede il sito non è nell'elenco.
