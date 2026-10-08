@@ -185,10 +185,10 @@ test('una versione più nuova prende il posto della carta di quella prima', asyn
   assert.deepEqual(vive().map((n) => n.action.versione), ['0.3.1']);
 });
 
-test('spento a sessione aperta: quello già scaricato non si installa alla chiusura, e la carta lo propone', async () => {
+perOgniSistema('spento a sessione aperta: quello già scaricato non si installa da solo, e la carta lo propone', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, true);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await avvia(u, true, s);
+  U.seguiImpostazioni(impostazioni(s, false));
   await calma();
   assert.equal(u.autoInstallOnAppQuit, false, 'spento dopo lo scaricamento dell\'avvio, si installerebbe lo stesso');
   assert.equal(vive().length, 1);
