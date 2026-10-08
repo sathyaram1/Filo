@@ -113,6 +113,9 @@
     if (!a) return;
     e.preventDefault();
     e.stopPropagation();
+    // Sui siti un clic fabbricato sull'host di un riquadro chiuso arriva qui col bersaglio sotto le sue coordinate:
+    // il collegamento lo apre solo il clic dell'utente (#1071).
+    if (!inPaginaDiFilo && !global.SN_FILO_UI?.veroONostro?.(e)) return;
     if (inPaginaDiFilo) { try { window.open(a.getAttribute('href'), '_blank', 'noopener'); } catch (_) {} return; }
     apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
   };
