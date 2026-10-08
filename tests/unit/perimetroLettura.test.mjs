@@ -263,3 +263,38 @@ test('#1072 — LEGGI_DOCUMENTO e il popup del terminale dicono che si va in ret
   assert.equal(AL.costoFor(cmd), 2);
   assert.match(AL.describe(cmd), /Perché te lo chiedo: si collega a un altro computer della rete/);
 });
+
+test('#1072 — due barre senza il nome di un computer non sono un percorso di rete', () => {
+  for (const cmd of ['grep -n "// TODO" app.js', 'grep "//" app.js', 'Select-String -Pattern "// TODO" -Path app.js',
+    'findstr "//" app.js', 'Get-Content app.js | Select-String "//"']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN), { level: 1, motivo: '' }, cmd);
+  }
+  for (const cmd of ['cd \\\\evil\\x', 'Test-Path //evil/x', 'grep a //evil/x', 'echo \\\\evil\\x | ls', 'ls \\\\\\evil\\x']) {
+    assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+});
+
+test('#1072 — una lettera d\'unità che punta a un altro computer è rete, come cartella di lavoro e come percorso', () => {
+  const PUSHD = { ...WIN, cwd: 'Z:\\', reti: ['Z:'] };
+  for (const cmd of ['dir', 'ls', 'dir segreto', 'type nota.txt', 'dir \\segreto', 'dir Z:\\segreto', 'cd ..; ls']) {
+    const d = C.classifyDetail(cmd, PUSHD);
+    assert.equal(d.level, 2, cmd);
+    assert.match(d.motivo, /rete/, cmd);
+  }
+  assert.equal(lvl('dir Z:\\segreto', { ...WIN, reti: ['z:'] }), 2);
+  for (const cmd of ['dir C:\\Windows', 'cd C:\\Users\\Mario', 'ls C:\\Users\\Mario']) assert.equal(lvl(cmd, PUSHD), 1, cmd);
+  assert.equal(lvl('dir Z:\\segreto', WIN), 1, 'senza unità di rete note, Z: è un disco come un altro');
+});
+
+test('#1072 — le unità di rete si riconoscono da dove Windows le risolve', () => {
+  const { unitaDiRete } = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'shell.js'));
+  const risolte = { 'y:\\': '\\\\nas\\condivisa\\', 'x:\\': 'X:\\', 'w:\\': '\\\\?\\UNC\\nas\\altra\\' };
+  const realpath = (p) => { if (!(p in risolte)) throw new Error('ENOENT'); return risolte[p]; };
+  assert.deepEqual(unitaDiRete('Y:\\lavoro', { win: true, realpath }), ['y:']);
+  assert.deepEqual(unitaDiRete('X:\\dati', { win: true, realpath }), ['y:']);
+  assert.deepEqual(unitaDiRete('W:\\', { win: true, realpath }).sort(), ['w:', 'y:']);
+  assert.deepEqual(unitaDiRete('V:\\', { win: true, realpath }).sort(), ['w:', 'y:'], 'un\'unità che non risponde non diventa locale per sempre');
+  risolte['v:\\'] = '\\\\nas\\v\\';
+  assert.deepEqual(unitaDiRete('V:\\', { win: true, realpath }).sort(), ['v:', 'w:', 'y:']);
+  assert.deepEqual(unitaDiRete('/home/mario', { win: false, realpath }), []);
+});

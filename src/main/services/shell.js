@@ -118,15 +118,12 @@ function cartellaViva(p) {
 // manda nomi a quel computer come col percorso scritto per intero (#1072). Fuori da Windows non ci sono lettere.
 const _unita = new Map();
 function unitaDiRete(cwd, { win = process.platform === 'win32', realpath = (p) => fs.realpathSync.native(p) } = {}) {
-  if (win) {
-    const m = /^([A-Za-z]):/.exec(String(cwd || ''));
-    const u = m && `${m[1].toLowerCase()}:`;
-    if (u && !_unita.has(u)) {
-      // Windows risolve un'unità di rete nel suo percorso `\\host\cartella`; un errore non si ricorda, si riprova.
-      try { _unita.set(u, /^[\\/]{2}[^\\/?.]/.test(realpath(`${u}\\`))); } catch (_) {}
-    }
-  } else if (_unita.size) {
-    _unita.clear();
+  if (!win) return [];
+  const m = /^([A-Za-z]):/.exec(String(cwd || ''));
+  const u = m && `${m[1].toLowerCase()}:`;
+  if (u && !_unita.has(u)) {
+    // Windows risolve un'unità di rete nel suo percorso `\\host\cartella`; un errore non si ricorda, si riprova.
+    try { _unita.set(u, /^(?:[\\/]{2}[^\\/?.]|\\\\\?\\UNC\\)/i.test(realpath(`${u}\\`))); } catch (_) {}
   }
   return [..._unita].filter(([, rete]) => rete).map(([u]) => u);
 }
@@ -552,7 +549,7 @@ module.exports = {
   createSession, defaultCwd, commandExists, existenceProbes,
   // La cartella di lavoro, controllata in un posto solo (#551, quarto giro):
   // la usano il comando one-shot dell'assistente e il popup di conferma.
-  cartellaViva, cartellaPerComando, usableCwd,
+  cartellaViva, cartellaPerComando, usableCwd, unitaDiRete,
   // esportata per la guardia di regressione di #551: il comando che l'utente
   // digita non deve mai arrivare a PowerShell con byte fuori dall'ASCII.
   comandoPerPowerShell,

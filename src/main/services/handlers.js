@@ -1305,7 +1305,9 @@ function perimetroLettura(sender) {
   const win = process.platform === 'win32';
   let cwd = '';
   try { cwd = cartellaDelComando(getAssistantCwd(sender)) || ''; } catch (_) {}
-  return { cwd, home, win, maiuscole: win || process.platform === 'darwin' };
+  let reti = [];
+  try { reti = require('./shell').unitaDiRete(cwd); } catch (_) {}
+  return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
 }
 
 async function segretiCustoditi() {
