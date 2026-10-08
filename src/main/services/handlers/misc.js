@@ -496,7 +496,7 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
     }
     let negliAppunti = null;
-    try { negliAppunti = require('electron').clipboard.readImage(); } catch (_) {}
+    try { negliAppunti = await immagineNegliAppunti(); } catch (_) {}
     try {
       const ricordata = await require('../firmatariC2pa').ricordaCopia(originale, [copia, negliAppunti]);
       return { ok: true, ricordata };
