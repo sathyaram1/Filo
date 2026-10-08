@@ -59,7 +59,7 @@ async function conRete(docs, fn) {
 const ORA = Date.parse('2026-10-03T10:00:00Z');
 const ORE = 3600 * 1000;
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [] }) {
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
@@ -67,7 +67,7 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [] }) {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
       lancia: (cartella, args, env) => { lanci.push({ cartella, args, pratica: env[PRATICA_ENV] }); return codiceServer; },
-      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA,
+      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => verdetto,
     });
     return { k, lanci, scritture, testo: righe.join('\n') };
   });

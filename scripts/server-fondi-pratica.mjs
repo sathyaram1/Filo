@@ -3,12 +3,15 @@
 // Regole: tests/unit/serverFondiPratica.test.mjs. Uso: npm run server:fondi -- claude/<ramo> --feedback <N>
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { estraiOpzioneFeedback, risolviFeedback } from './lib/pratica-locale.mjs';
 import { argomentiDaNpm } from './lib/argomenti.mjs';
 import { FINESTRA_PARTE_TARDIVA_MS, NOME_PARTE, parteTardiva } from './lib/parti-lavoro.mjs';
+import { cartellaDelServer } from './lib/ramo-server.mjs';
+
+export { cartellaDelServer };
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Lo legge server:fondi di filo-security: senza, si rifiuta e rimanda qui.
@@ -22,19 +25,6 @@ export const SENZA_PRATICA = [
   '  npm run server:fondi -- <ramo> --feedback <N>',
   'Non ho toccato niente.',
 ].join('\n');
-
-/** La cartella functions del checkout del server accanto al repo Filo, anche da una sua worktree; '' se non c'è. */
-export function cartellaDelServer(radice, esiste = existsSync) {
-  let d = resolve(radice);
-  for (let i = 0; i < 8; i += 1) {
-    const f = join(dirname(d), 'filo-security', 'functions');
-    if (esiste(join(f, 'tools', 'server-fondi.js'))) return f;
-    const su = dirname(d);
-    if (su === d) break;
-    d = su;
-  }
-  return '';
-}
 
 /** Ramo, pratica, «solo server» e prova a vuoto, anche quando npm si è preso le opzioni. PURA. */
 export function leggiArgomenti(argv, env = {}) {
@@ -116,6 +106,15 @@ export async function esegui(argv, deps = {}) {
   if (!a.ramo) { err(`server:fondi: manca il ramo del server (claude/<nome>). ${USO}`); return 2; }
   const cartella = deps.funzioni !== undefined ? deps.funzioni : cartellaDelServer(deps.radice || ROOT);
   if (!cartella) { err('server:fondi: accanto al repo Filo non trovo il checkout del server (cartella filo-security). Non ho toccato niente.'); return 1; }
+  // Un ramo dell'app con lo stesso nome ha la sua verifica: il verdetto è di tutti e due, e si fonde solo lo sha verificato (#1062).
+  const verdetto = deps.verdetto
+    ? deps.verdetto(a.ramo, cartella)
+    : (await import('./verify-local.mjs')).verdettoDelRamo(a.ramo, { radice: deps.radice || ROOT, cartellaServer: cartella });
+  if (verdetto && !verdetto.ok) {
+    err(`server:fondi: ${a.ramo} è un lavoro con l'app, e la sua verifica non regge: ${verdetto.reason}.\nNon ho toccato niente.`);
+    return 1;
+  }
+  if (verdetto) log(`Verifica del lavoro: ${verdetto.reason}.`);
 
   const of = await import('./owner-feedback.mjs');
   let bearer = deps.bearer;
@@ -195,6 +194,10 @@ export async function esegui(argv, deps = {}) {
       return k;
     }
     const sha = (deps.punta || puntaDelServer)(cartella);
+    const verificato = verdetto && verdetto.server ? verdetto.server.sha : '';
+    if (verificato && sha && sha !== verificato) {
+      err(`Attenzione: main del server è su ${sha.slice(0, 9)}, non sullo sha verificato ${verificato.slice(0, 9)}: il ramo si è mosso fra il controllo e la fusione.`);
+    }
     const parte = await of.registraParte(r.id, 'server', { bearer, solo, ramo: a.ramo });
     if (!parte.ok) err(`La pratica ${chi} non ha registrato che la parte del server è su main (${parte.motivo}): una parte dell'app che arrivasse a pratica chiusa non la troverebbe.`);
     if (tardiva) {

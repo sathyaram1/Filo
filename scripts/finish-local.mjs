@@ -713,7 +713,8 @@ async function main() {
       process.exit(1);
     }
     if (v.ok) {
-      console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
+      console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}${v.server ? `, con il ramo del server ${v.server.ramo} su ${v.server.sha.slice(0, 8)}` : ''}`);
+      if (v.server && v.server.tollerato) console.log(`  ${v.reason}`);
       // Il verdetto vale per un commit. Se dopo di lui dalle prove del giro si
       // è solo tolto, regge lo stesso (#661): quando succede si DICE quali file
       // sono passati, perché un cancello che si apre in silenzio è
@@ -775,6 +776,15 @@ async function main() {
   //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
   //    codice appena controllato; la prova degli unit sulla fusione (#929) la
   //    lega al main su cui sono girati.
+  // I controlli durano minuti: il ramo omonimo del server può essersi mosso intanto, e il verdetto vale per tutti e due (#1062).
+  {
+    const ancora = verdictForCurrentBranch(ROOT);
+    if (!ancora.ok) {
+      console.error(`\n✗ La verifica non regge più: ${ancora.reason}`);
+      console.error('  Non chiedo la fusione.');
+      process.exit(1);
+    }
+  }
   // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
   const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
   const giro = await chiediConProva({
