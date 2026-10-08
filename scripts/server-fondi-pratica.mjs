@@ -187,7 +187,7 @@ export async function esegui(argv, deps = {}) {
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
     }
-    const k = lancia(cartella, [a.ramo], figlio);
+    const k = lanciaFissato(cartella, a.ramo, verdetto, figlio, { lancia, fissa: deps.fissa || ramoFisso, log, err });
     if (k !== 0) {
       if (tardiva) { err(`main del server non si è mosso, e la pratica ${chi} resta chiusa com'era: sistema e rilancia lo stesso comando.`); return k; }
       await of.annotaPratica(r.id, `server:fondi si è fermato (uscita ${k}) su ${a.ramo}: main del server non si è mosso.`, { bearer }).catch(() => null);
