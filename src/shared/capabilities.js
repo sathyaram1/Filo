@@ -143,7 +143,7 @@
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello.',
       invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Con Alt+E (Ctrl+Alt+E su Mac), o con la freccia accanto alla spiegazione, ne apri una più estesa in un riquadro sopra la selezione.',
-      doesNot: 'Non spiega il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando. In incognito non prepara la spiegazione mentre selezioni: parte quando apri il tasto destro.',
+      doesNot: 'Non spiega il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando. In incognito non prepara la spiegazione mentre selezioni: parte quando apri il tasto destro. Fuori dall’incognito la prepara solo se la selezione l’hai fatta tu (mouse, tastiera o dito) e non supera i 2000 caratteri; quella fatta da uno script del sito, o più lunga, parte anche lei dal tasto destro. Da una scheda partono al massimo 120 spiegazioni preparate al minuto: oltre, Filo le ferma e te lo dice.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
@@ -179,7 +179,7 @@
       id: 'spellcheck', title: 'Correttore mentre scrivi', category: 'writing',
       desc: 'Mentre scrivi in un campo di testo, segnala gli errori: zigzag rosso per l’ortografia (suggerimenti del sistema) e zigzag blu per gli errori di contesto rilevati dall’AI.',
       invoke: 'Automatico quando scrivi in un’area di testo; clic destro su una parola segnalata per i suggerimenti.',
-      doesNot: 'Il correttore contestuale (blu) lavora su testi né troppo corti né enormi e può essere disattivato.',
+      doesNot: 'Il correttore contestuale (blu) lavora su testi né troppo corti né enormi e può essere disattivato. Parte solo da quello che scrivi tu: il testo che un sito inserisce da solo si controlla al tuo prossimo tasto in quella casella, e a scheda nascosta il controllo aspetta che torni. Da una scheda partono al massimo 300 controlli al minuto: oltre, Filo li ferma e te lo dice.',
     },
     {
       id: 'spellcheck-manage', title: 'Gestisci correttore e dizionario', category: 'writing',
