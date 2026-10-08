@@ -46,9 +46,9 @@ test('in incognito l\'icona della pagina arriva dalla sessione della scheda, mai
   }, PNG_B64);
 
   const barra = await barraIncognito(app);
-  await expect.poll(async () => (await sfondoIcona(barra)).find((s) => s.includes('data:image/png')) || '', {
+  await expect.poll(async () => (await sfondoIcona(barra)).some((s) => s.includes(`data:image/png;base64,${PNG_B64}`)), {
     timeout: 15000, message: 'la scheda in incognito doveva mostrare l\'icona del sito',
-  }).toContain(`data:image/png;base64,${PNG_B64}`);
+  }).toBe(true);
 
   const richieste = await app.evaluate(() => globalThis.__richiesteIcona);
   expect(richieste.incognito, 'l\'icona la scarica la sessione della scheda').toContain('/icona.png');
@@ -61,9 +61,9 @@ test('anche nella finestra normale la barra mostra l\'icona come data: URL, pure
   const icona = testServer.asset(Buffer.from(PNG_B64, 'base64'), 'image/png');
   const url = testServer.html(`<!doctype html><html><head><meta charset="utf-8"><title>Normale</title><link rel="icon" href="${icona}"></head><body>x</body></html>`);
   await openTab(url);
-  await expect.poll(async () => (await sfondoIcona(shell)).find((s) => s.includes('data:image/png')) || '', {
+  await expect.poll(async () => (await sfondoIcona(shell)).some((s) => s.includes(`data:image/png;base64,${PNG_B64}`)), {
     timeout: 15000, message: 'la scheda doveva mostrare l\'icona del sito',
-  }).toContain(`data:image/png;base64,${PNG_B64}`);
+  }).toBe(true);
   // L'indirizzo dichiarato resta al main per archivio e salvati.
   const dichiarato = await app.evaluate(({ BrowserWindow }, u) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
