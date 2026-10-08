@@ -298,3 +298,30 @@ test('#1072 — le unità di rete si riconoscono da dove Windows le risolve', ()
   assert.deepEqual(unitaDiRete('V:\\', { win: true, realpath }).sort(), ['v:', 'w:', 'y:']);
   assert.deepEqual(unitaDiRete('/home/mario', { win: false, realpath }), []);
 });
+
+test('#1072 — `FileSystem::` davanti a un percorso non cambia dove porta: in rete chiede, sul disco no', () => {
+  for (const cmd of ['cd FileSystem::\\\\evil\\x', 'chdir filesystem::\\\\evil\\x', 'cd Microsoft.PowerShell.Core\\FileSystem::\\\\evil\\x',
+    'ls FileSystem::\\\\evil\\x', 'type FileSystem::\\\\evil\\x']) {
+    const d = C.classifyDetail(cmd, WIN);
+    assert.equal(d.level, 2, cmd);
+    assert.match(d.motivo, /rete/, cmd);
+  }
+  assert.equal(lvl('cd FileSystem::C:\\Windows', WIN), 1);
+  assert.match(C.classifyDetail('type FileSystem::C:\\Users\\Mario\\.ssh\\id_rsa', WIN).motivo, /nascosto/);
+  assert.equal(lvl('ls', { ...WIN, cwd: 'Microsoft.PowerShell.Core\\FileSystem::C:\\Users\\Mario' }), 1);
+});
+
+test('#1072 — il testo cercato non si apre: due barre nel modello non sono rete, nel file sì', () => {
+  for (const cmd of ['grep -n "//TODO" app.js', 'findstr "//TODO" app.js', 'Select-String -Pattern "//TODO" -Path app.js',
+    'Select-String "//eslint-disable" app.js', 'git log -S "//TODO"', 'git log --grep=//fix']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN), { level: 1, motivo: '' }, cmd);
+  }
+  // La ricerca in una cartella intera chiedeva già prima, per i file nascosti: il motivo resta quello.
+  for (const cmd of ['grep -rn "//eslint-disable" src', 'git grep "//TODO"']) {
+    assert.doesNotMatch(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+  for (const cmd of ['grep TODO //evil/x/app.js', 'grep -f //evil/x/p a.txt', 'grep "//TODO" //evil/x/a.js', 'findstr /d:\\\\evil\\x a *.txt',
+    'Select-String "//x" \\\\evil\\a', 'git grep x //evil/x', 'git --git-dir=\\\\evil\\x\\.git log', 'echo \\\\evil\\x | ls']) {
+    assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+});

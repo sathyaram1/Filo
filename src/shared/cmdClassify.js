@@ -927,6 +927,9 @@
     const p = p0.replace(/^(\$env:userprofile|\$env:home|\$home|%userprofile%|%homedrive%%homepath%)(?=$|[\\/])/i, '~');
     const nomi = nomiVariabili(p);
     if (nomi.length) return nomi.every((n) => VAR_INNOCUE.has(n)) ? MOTIVI.ignoto : MOTIVI.variabili;
+    // `FileSystem::x` per PowerShell è il percorso `x`: stesse regole, rete compresa (#1072).
+    const prov = /^(?:microsoft\.powershell\.core\\)?filesystem::/i.exec(p);
+    if (prov) return dove(p.slice(prov[0].length), c);
     // `\\?\C:\…` è il disco locale; ogni altro doppio separatore (UNC, `\\?\UNC\`, `//server`) e
     // `\??\` fanno contattare a Windows un altro computer: anche solo guardarci chiede un OK (#1072, #810.13).
     if (/^(?:[\\/]{2}[?.]|[\\/]\?\?)[\\/][A-Za-z]:/.test(p)) return MOTIVI.fuori;
@@ -1147,6 +1150,14 @@
     return primoFuori(percorsi, c);
   }
 
+  // In git il testo cercato (`-S`, `--grep`, il modello di `git grep`) non si apre come percorso.
+  const TESTO_GIT = /^(?:-[SG]|--(?:grep|author|committer|format|pretty))$/;
+  function testiGit(testi) {
+    const sub = testi.findIndex((x) => !x.startsWith('-'));
+    if (sub >= 0 && testi[sub].toLowerCase() === 'grep') return testi.slice(0, sub).concat(operandiGrep(testi.slice(sub + 1)).file);
+    return testi.filter((t, i) => !/^(?:-[SG].|--(?:grep|author|committer|format|pretty)=)/.test(t) && !(i > 0 && TESTO_GIT.test(testi[i - 1])));
+  }
+
   // Un percorso di rete scritto per intero, come operando o valore di un flag
   // (`-Path:x`, `--from=x`, `-fx`), per QUALUNQUE lettura: anche `echo` lo passa a un tubo.
   function scriveRete(testi, c) {
@@ -1162,16 +1173,17 @@
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
     const args = argomenti(raw).slice(1);
-    if (scriveRete(args.map((a) => a.testo), c)) return due(MOTIVI.rete);
-    if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
-    if (PROCESSI.has(prog)) return due(MOTIVI.processi);
-    if (prog === 'git') return gitPerimetro(dequote(raw), c);
     const testi = args.map((a) => a.testo);
-    if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     let cerca = null;
     if (prog === 'grep') cerca = operandiGrep(testi);
     else if (prog === 'findstr') cerca = operandiFindstr(testi);
     else if (prog === 'select-string' || prog === 'sls') cerca = operandiSls(testi);
+    // Il testo cercato non si apre mai: `grep "//TODO" a.js` non contatta nessuno.
+    if (scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
+    if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
+    if (PROCESSI.has(prog)) return due(MOTIVI.processi);
+    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     if (cerca) {
       if (cerca.ricorsivo) return due(MOTIVI.ricorsivo);
       if (cerca.ignoto) return due(MOTIVI.ignoto);
