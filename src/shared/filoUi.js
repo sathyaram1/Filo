@@ -145,5 +145,70 @@
     return el;
   }
 
-  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark, soloGestiVeri };
+  // Un riquadro che porta parole dell'utente o di un modello sta in uno shadow root chiuso (#1071): l'host è l'unico
+  // nodo che il documento vede. L'attributo dice a chi chiede «si sta scrivendo?» da fuori (anche dal main, che
+  // non vede dentro) che il fuoco lì dentro è in un campo nostro; la radice resta raggiungibile solo da qui.
+  const RIQUADRO = 'data-sn-riquadro';
+  const ombre = new WeakMap();
+  function ombra(host, { aperta = false } = {}) {
+    const radice = host.attachShadow({ mode: aperta ? 'open' : 'closed' });
+    ombre.set(host, radice);
+    try { host.setAttribute(RIQUADRO, ''); } catch (_) {}
+    return radice;
+  }
+  function ombraDi(el) {
+    try { return (el && (el.shadowRoot || ombre.get(el))) || null; } catch (_) { return null; }
+  }
+
+  // Il nodo vero sotto un evento. Chi ascolta su window o sul documento vede l'host di un riquadro chiuso, non il
+  // campo o il collegamento toccati: si scende col punto del puntatore, o col fuoco quando il gesto è da tastiera.
+  function bersaglio(e) {
+    let t = null;
+    try { t = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target || null; } catch (_) { t = null; }
+    for (let giri = 0; t && giri < 8; giri++) {
+      const r = ombre.get(t);
+      if (!r) break;
+      let giu = null;
+      const x = Number(e.clientX);
+      const y = Number(e.clientY);
+      const colPuntatore = Number.isFinite(x) && Number.isFinite(y) && (x !== 0 || y !== 0) && e.detail !== 0;
+      try { if (colPuntatore || e.type === 'contextmenu') giu = r.elementFromPoint(x, y); } catch (_) { giu = null; }
+      if (!giu || giu === t) giu = r.activeElement;
+      if (!giu || giu === t) break;
+      t = giu;
+    }
+    return t;
+  }
+
+  const _test = {
+    // Il primo nodo che risponde al selettore, nel documento o dentro un riquadro nostro (anche chiuso).
+    trova(sel) { return trovaTutti(sel)[0] || null; },
+    trovaTutti,
+    // Il nodo più profondo sotto un punto, scendendo nei riquadri nostri.
+    daPunto(x, y) {
+      let el = document.elementFromPoint(x, y);
+      for (let giri = 0; el && ombre.has(el) && giri < 8; giri++) {
+        const giu = ombre.get(el).elementFromPoint(x, y);
+        if (!giu || giu === el) break;
+        el = giu;
+      }
+      return el;
+    },
+  };
+  function trovaTutti(sel) {
+    const out = [];
+    try {
+      out.push(...document.querySelectorAll(sel));
+      for (const host of document.querySelectorAll('[' + RIQUADRO + ']')) {
+        const r = ombre.get(host);
+        if (r) out.push(...r.querySelectorAll(sel));
+      }
+    } catch (_) {}
+    return out;
+  }
+
+  global.SN_FILO_UI = {
+    ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, nostro, veroONostro,
+    ombra, ombraDi, bersaglio, _test,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
