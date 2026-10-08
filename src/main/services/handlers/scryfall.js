@@ -581,7 +581,7 @@ module.exports = function register(on, ctx) {
         const r2 = Stats.simulate({ library, want: parsed.prob.needs, turn: parsed.prob.turn });
         const pct = (r2.probability * 100).toFixed(1).replace('.', ',');
         const wantsTxt = parsed.prob.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
-        reply = [reply, `Probabilità di avere ${wantsTxt} al turno ${parsed.prob.turn}: ≈ ${pct}% (${r2.iterations.toLocaleString('it-IT')} mani simulate).`]
+        reply = [reply, `Probabilità di avere ${wantsTxt} al turno ${parsed.prob.turn}: ≈ ${pct}% (${r2.iterations.toLocaleString('it-IT', { useGrouping: true })} mani simulate).`]
           .filter(Boolean).join('\n');
       }
 

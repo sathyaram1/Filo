@@ -174,7 +174,7 @@
   // (`account`: { credits, usage } da `GET /api/v1/credits`), e senza nemmeno
   // quello resta la sola spesa.
   function ownKeyBalanceLine({ limit, usage, limit_remaining, account } = {}) {
-    const usd = (n) => `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+    const usd = (n) => `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
     const spesa = `Spesi ${usd(usage)}`;
     const conto = account && Number.isFinite(Number(account.credits))
       ? Math.max(0, Number(account.credits) - (Number(account.usage) || 0))
@@ -495,7 +495,7 @@
   // italiana. La chat lo scrive uguale, così i due numeri non divergono.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
-    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);
   }
 
   // ── Il premio di una segnalazione chiusa, con un portafoglio (#816) ───────
