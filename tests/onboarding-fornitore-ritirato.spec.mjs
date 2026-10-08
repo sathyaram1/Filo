@@ -159,9 +159,18 @@ test('la configurazione condivisa arriva dalla rete a home già aperta: l’acco
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
   await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 15_000 });
 
+  // Nelle prove Firestore è chiuso (#735.1): il documento che la rete porterebbe si finge qui, e la lettura
+  // vera del main lo riceve. Un campo in più nel registro basta perché la configurazione cambi davvero.
   await app.evaluate(async () => {
     globalThis.__filoConfigArrivata = true;
-    await globalThis.__filoDefaults.refresh().catch(() => {});
+    const vera = globalThis.fetch;
+    const doc = { fields: { modelRegistry: { mapValue: { fields: { 'arrivo-rete': { mapValue: { fields: {
+      provider: { stringValue: 'openrouter' }, model: { stringValue: 'deepseek/deepseek-v4-flash-0731' },
+    } } } } } } } };
+    globalThis.fetch = (u, o) => (String(u).includes('/documents/config/models')
+      ? Promise.resolve(new Response(JSON.stringify(doc), { status: 200, headers: { 'content-type': 'application/json' } }))
+      : vera(u, o));
+    try { await globalThis.__filoDefaults.refresh(); } finally { globalThis.fetch = vera; }
   });
 
   await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 25_000 });
@@ -359,10 +368,11 @@ test('il suggerimento in cima alla home ha la sua icona, non una lettera', async
   await page.waitForLoadState('domcontentloaded');
 
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 10_000 });
-  const primo = page.locator('#suggestions .dash-suggestion').first();
-  await expect(primo).toContainText(/Opzioni/, { timeout: 15_000 });
-  await expect(primo.locator('.dash-sug-icon svg')).toHaveCount(1);
-  await expect(primo.locator('.dash-sug-icon')).toHaveText('');
+  // I suggerimenti stanno in una carta della home (#870): la voce che porta alle Opzioni.
+  const primo = page.locator('.dash-carta-voce', { hasText: /Opzioni/ }).first();
+  await expect(primo).toBeVisible({ timeout: 15_000 });
+  await expect(primo.locator('.dash-carta-voce-ico svg')).toHaveCount(1);
+  await expect(primo.locator('.dash-carta-voce-ico')).toHaveText('');
 });
 
 // Chiedere è la strada gemella di leggere il messaggio: chi scrive nella barra
