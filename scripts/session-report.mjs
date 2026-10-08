@@ -737,30 +737,12 @@ async function inizioFinestraPrima(principale, since) {
   const sinceMs = Date.parse(String(since));
   if (!Number.isFinite(sinceMs)) return { since, continua: false };
   const prima = (await lineeDi(principale)).filter((l) => {
-    const m = l.match(/"timestamp":"([^"]+)"/);
-    const ms = m ? Date.parse(m[1]) : NaN;
+    let ms = NaN;
+    try { ms = Date.parse(JSON.parse(l).timestamp); } catch (_) { /* riga illeggibile: la scarta finestraOrchestratore */ }
     return !Number.isFinite(ms) || ms < sinceMs;
   });
   const { inizioMs, continua } = finestraOrchestratore(prima);
   return { since: Number.isFinite(inizioMs) ? new Date(inizioMs + 1).toISOString() : '', continua };
-}
-
-/**
- * Il costo dell'orchestratore dopo l'ultimo biglietto (la chiusura, o un'accensione senza worker): nessun
- * rilascio lo porta, viaggia con la risposta alla domanda di fine sessione. Non lancia mai.
- */
-export async function rapportoChiusura({ transcript = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
-  const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
-  const base = { v: 3, role: 'orchestrator', closing: true, notes: [] };
-  if (!trovato.file) return { ...base, notes: [trovato.note || 'transcript non trovato'] };
-  const principale = eSottoAgente(trovato.file) ? `${dirname(dirname(trovato.file))}.jsonl` : trovato.file;
-  try {
-    const r = await rapportoOrchestratore(principale);
-    if (!r) return { ...base, notes: [`thread principale assente: ${principale}`] };
-    return { ...base, ...r };
-  } catch (e) {
-    return { ...base, notes: [`thread principale illeggibile: ${String((e && e.message) || e)}`] };
-  }
 }
 
 /**
