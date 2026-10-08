@@ -374,9 +374,10 @@ test('il suggerimento in cima alla home ha la sua icona, non una lettera', async
   await expect(primo.locator('.dash-carta-voce-ico svg')).toHaveCount(1);
   await expect(primo.locator('.dash-carta-voce-ico')).toHaveText('');
   // L'icona delle Opzioni, non il globo che la carta dà a un collegamento qualunque.
-  const icone = await primo.locator('.dash-carta-voce-ico').evaluate((el) => ({
-    ha: el.innerHTML, opzioni: self.SN_ICONS.options(14), globo: self.SN_ICONS.globe(14),
-  }));
+  const icone = await primo.locator('.dash-carta-voce-ico').evaluate((el) => {
+    const comeNelDom = (html) => { const d = document.createElement('span'); d.innerHTML = html; return d.innerHTML; };
+    return { ha: el.innerHTML, opzioni: comeNelDom(self.SN_ICONS.options(14)), globo: comeNelDom(self.SN_ICONS.globe(14)) };
+  });
   expect(icone.opzioni).not.toBe(icone.globo);
   expect(icone.ha).toBe(icone.opzioni);
 });
