@@ -609,8 +609,8 @@
     }).then(
       (res) => (res?.ok && typeof res.text === 'string')
         ? { text: res.text, keyFallback: res.keyFallback || null }
-        : { error: res?.error || I18n.t('err_provider_failed') },
-      (e) => ({ error: e?.message || I18n.t('err_provider_failed') }),
+        : { error: Popup.frasePerLUtente(res) },
+      (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
     );
     return entry;
   }
@@ -661,6 +661,7 @@
           el.classList.remove('sn-menu-inline-loading');
           if (!res || res.error || !res.text) {
             el.classList.add('sn-menu-inline-error');
+            // Già tradotto da startExplainRequest: qui si mostra, non si ritraduce.
             body.textContent = (res && res.error) || I18n.t('err_provider_failed');
             return;
           }
@@ -779,7 +780,7 @@
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
-              body.textContent = res?.error || I18n.t('err_provider_failed');
+              body.textContent = Popup.frasePerLUtente(res);
               return;
             }
             testoChiuso(body, res.text);
@@ -857,7 +858,7 @@
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              body.textContent = m.message || I18n.t('err_provider_failed');
+              body.textContent = Popup.frasePerLUtente(m);
             }
           });
           port.postMessage({
@@ -1660,7 +1661,7 @@
         action: ACTIONS.TRANSCRIBE_IMAGE,
         payload: { dataUrl: region.dataUrl },
       });
-      if (!res?.ok) { Popup.showToast(I18n.t('err_provider_failed')); return; }
+      if (!res?.ok) { Popup.showToast(Popup.frasePerLUtente(res), { duration: 9000 }); return; }
       const text = (res.text || '').trim();
       if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {

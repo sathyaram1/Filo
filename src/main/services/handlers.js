@@ -482,12 +482,9 @@ function buildAttemptChain(settings, modelRef, action) {
     usable = pol.refs;
   }
 
-  // Ogni modello del registry porta il proprio provider, quindi l'ordine qui
-  // conta solo per i ref "legacy" (id grezzi senza nickname). Oggi il fornitore
-  // è uno solo, il router. buildModelAttempts scarta da sé i provider senza
-  // chiave o senza un id concreto per quel modello.
-  const providerOrder = ['openrouter'];
-  const out = SN_CONST.buildModelAttempts(usable, registry, providerOrder, settings.apiKeys || {});
+  // Stesso ordine di fornitori di SN_CONST.canServeAction: se le due liste
+  // divergono, «pronto» e «servibile» si contraddicono in silenzio (#663).
+  const out = SN_CONST.buildModelAttempts(usable, registry, SN_CONST.PROVIDER_ORDER, settings.apiKeys || {});
   if (!out.length) {
     const e = new Error(I18n.t('err_no_api_key'));
     e.code = 'NO_API_KEY';
@@ -911,7 +908,7 @@ async function lezioniAutomaticheConsentite({ sender = null, contesto = null, fo
 async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider]) return;
+    if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_LESSON)) return;
     const memory = await FiloMem.getMemory();
     const { profilo, preferenze } = FiloMem.renderMemoryForPrompt(memory);
     const lezioniText = await lessonsBufferText();
@@ -949,7 +946,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
 async function maybeRunCompactor() {
   try {
     const settings = await getEffectiveSettings();
-    if (!settings.apiKeys?.[settings.provider]) return false;
+    if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPACT)) return false;
     const memory = await FiloMem.getMemory();
     const moduliText = Object.entries(memory).map(([k, v]) => `${k}:\n${v || '(vuoto)'}`).join('\n\n');
     const buf = await FiloMem.getLessonsBuffer();
@@ -980,6 +977,36 @@ async function maybeRunCompactor() {
 // safebrowse, cookie). È lo stesso percorso usato dal salvataggio dalla pagina
 // Preferenze: condividerlo garantisce che una modifica fatta da Filo via chat
 // si comporti esattamente come una fatta a mano (es. il tema cambia live).
+// Filo passa da «non ho un modello da chiamare» a «ce l'ho», o viceversa. Le
+// home già aperte lo devono sapere: l'accoglienza che aspettava parte e il
+// cartello sparisce, senza che l'utente ricarichi o apra una scheda nuova.
+// Le sorgenti sono TRE e arrivano in momenti diversi: la configurazione
+// condivisa (dalla rete, dopo l'avvio), le impostazioni (chiave, modelli,
+// interruttore dei pesi aperti) e il portafoglio, dove vive la chiave di chi
+// entra con un invito. Un solo avviso per tutte e tre (#663).
+// Si confronta anche il MOTIVO, non solo il sì/no: la home scrive un messaggio
+// diverso per ognuno, e col solo sì/no restava a chiedere una cosa già fatta.
+let _statoProntezza = null;
+async function avvisaSeLaProntezzaCambia() {
+  let ora = false;
+  let stato = '';
+  try {
+    const s = await getEffectiveSettings();
+    ora = SN_CONST.canServeAction(s, ACTIONS.FILO_CHAT)
+      || SN_CONST.canServeAction(s, ACTIONS.FILO_DASHBOARD);
+    stato = ora ? 'ok' : `no:${SN_CONST.whyCannotServe(s, [ACTIONS.FILO_DASHBOARD, ACTIONS.FILO_CHAT])}`;
+  } catch (_) { return; }
+  if (_statoProntezza === stato) return;
+  _statoProntezza = stato;
+  broadcastToTabs({ type: MSG.FILO_READY_CHANGED, ready: ora });
+}
+
+// La configurazione condivisa si ascolta da subito, perché arriva mentre la
+// prima home è già aperta. Il portafoglio chiama da sé: sta sotto, e non può
+// richiedere questo modulo senza chiudere il cerchio.
+try { Defaults.onChanged(() => { avvisaSeLaProntezzaCambia().catch(() => {}); }); } catch (_) {}
+globalThis.SN_PRONTEZZA_CAMBIATA = () => { avvisaSeLaProntezzaCambia().catch(() => {}); };
+
 // `mentreScrive`: la lista dei bloccati arriva a metà riga, e le schede aperte aspettano che stia ferma (#590.2).
 async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   // Gli override dei token estetici finiscono dentro <style> iniettati in
@@ -1002,6 +1029,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     try { await globalThis.SN_WALLET_MAIN?.ownKeyChanged?.(); } catch (_) {}
   }
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
+  avvisaSeLaProntezzaCambia().catch(() => {});
   try {
     const { nativeTheme } = require('electron');
     const t = merged.theme;
@@ -4306,7 +4334,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
 // è la parte "economica" che si può fare a ogni apertura di scheda.
 async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const settings = await getEffectiveSettings();
-  const hasKey = !!(settings.apiKeys?.[settings.provider]);
+  const canServe = SN_CONST.canServeAction(settings, ACTIONS.FILO_DASHBOARD);
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
@@ -4399,7 +4427,7 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     openTabsCount, partOfDay, dayType, dateKey,
   });
 
-  return { settings, hasKey, payload, signature, saved };
+  return { settings, canServe, payload, signature, saved };
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
@@ -4499,24 +4527,52 @@ function ordinaCome(sx, layout) {
   }, layout);
 }
 
-function buildNoKeyDashboard(settings, saved) {
-  const suggestions = saved.slice(0, 5).map((p) => ({
+function savedSuggestions(saved) {
+  return saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
-  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu: nella home è la prima carta (#870).
-  if (!settings.apiKeys?.openrouter) {
-    suggestions.unshift({
+}
+
+// Saluto neutro mentre la home vera si calcola: Filo può rispondere, il
+// messaggio su misura no. La nuova scheda non aspetta mai l'LLM.
+function buildWaitingDashboard(saved) {
+  return { message: 'Buongiorno. Filo è qui.', suggestions: savedSuggestions(saved) };
+}
+
+// Home senza AI: istantanea, dalle pagine salvate. Dice PERCHÉ Filo non parla,
+// perché un'assenza muta faceva credere senza crediti chi li aveva (#663).
+function buildNoKeyDashboard(settings, saved) {
+  const suggestions = savedSuggestions(saved);
+  const motivo = SN_CONST.whyCannotServe(settings, [ACTIONS.FILO_DASHBOARD, ACTIONS.FILO_CHAT]);
+  const inOpzioni = (text) => ({
+    icon: 'options', text,
+    action: { type: 'NAVIGA', url: 'filo://options/options.html', label: 'Opzioni' },
+    importance: 3,
+  });
+  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
+  suggestions.unshift(motivo === 'chiave'
+    ? {
       carta: 'crediti',
       icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
       action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
       importance: 3,
-    });
+    }
+    : inOpzioni(motivo === 'pesi-aperti'
+      ? 'Apri Opzioni e rivedi «solo modelli a pesi aperti»'
+      : 'Scegli un modello in Opzioni'));
+  let message;
+  if (motivo === 'chiave') {
+    message = 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.';
+  } else if (motivo === 'pesi-aperti') {
+    message = 'I modelli che hai scelto vanno bene, ma «solo modelli a pesi aperti» li esclude tutti e nessuno di loro ha un equivalente a pesi aperti. In Opzioni puoi spegnere l\'interruttore o scegliere altri modelli.';
+  } else {
+    message = 'I crediti ci sono, ma nessun modello configurato può rispondere: la configurazione dei modelli è vuota o cita modelli che non esistono più. Puoi sceglierne uno tu in Opzioni.';
   }
-  const message = settings.apiKeys?.openrouter
-    ? 'Buongiorno. Filo è qui.'
-    : `Per attivare Filo serve un codice d'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.${saved.length ? ' Intanto, le tue pagine salvate sono fra i suggerimenti.' : ''}`;
+  // Il rimando alle pagine salvate solo se ce n'è almeno una: al primo avvio
+  // non ce n'è nessuna, e indicava una lista vuota (#663).
+  if (saved.length) message += ' Intanto, le tue pagine salvate sono qui.';
   return { message, suggestions };
 }
 
@@ -4573,11 +4629,15 @@ function dashboardScheduler() {
       // Ri-raccoglie gli input ORA: accorpa tutte le modifiche della finestra.
       await FiloMem.gcTimers();
       const inputs = await gatherDashboardInputs({ openTabsCount: openTabsCount || 0 });
-      if (!inputs.hasKey) return;
+      if (!inputs.canServe) return;
       const cached = await FiloMem.getDashboardCache();
       // Se nel frattempo gli input sono tornati uguali alla cache, niente AI.
       if (cached && !cached.senzaChiave && cached.signature === inputs.signature) return;
-      const result = await generateDashboardFromInputs(inputs);
+      // Un giro fallito (rete giù, modello che rifiuta) lascia la home com'è e
+      // basta: qui siamo dentro un timer, e rilanciare porterebbe giù il main.
+      let result = null;
+      try { result = await generateDashboardFromInputs(inputs); }
+      catch (e) { console.warn('[Filo] ricalcolo home fallito', e); return; }
       // Spinge l'aggiornamento alle home aperte: si aggiornano senza rifare l'LLM.
       broadcastToTabs({
         type: MSG.FILO_DASHBOARD_UPDATED,
@@ -4597,8 +4657,8 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   const inputs = await gatherDashboardInputs({ openTabsCount });
   const cached = await FiloMem.getDashboardCache();
 
-  // Senza chiave API: messaggio istantaneo dalle pagine salvate (come prima).
-  if (!inputs.hasKey) {
+  // Senza un modello servibile: messaggio istantaneo dalle pagine salvate.
+  if (!inputs.canServe) {
     const payload = buildNoKeyDashboard(inputs.settings, inputs.saved);
     await FiloMem.setDashboardCache({ ...payload, signature: inputs.signature, senzaChiave: true });
     return { ...payload, cached: false, ts: new Date().toISOString() };
@@ -4609,7 +4669,7 @@ async function handleFiloGenerateDashboard({ force = false, openTabsCount = 0 } 
   if (cached && cached.senzaChiave && !force) {
     const onb = Onboarding ? await FiloMem.getOnboarding() : null;
     if (!onb || onb.done) dashboardScheduler().request(openTabsCount);
-    return { ...buildNoKeyDashboard(inputs.settings, inputs.saved), cached: false, ts: new Date().toISOString() };
+    return { ...buildWaitingDashboard(inputs.saved), cached: false, ts: new Date().toISOString() };
   }
 
   // C'è già una cache e non è un refresh esplicito: la serviamo SUBITO — la
@@ -4631,7 +4691,7 @@ async function maybeCategorizeAsync(savedEntry, pageInput) {
   const settings = await getEffectiveSettings();
   if (!settings.featureFlags?.categorize) return;
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) return;
-  if (!settings.apiKeys?.[settings.provider]) return;
+  if (!SN_CONST.canServeAction(settings, ACTIONS.CATEGORIZE)) return;
   const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '' });
   const result = await Categorizer.categorize({
     invokeAI,
