@@ -242,17 +242,18 @@ perOgniSistema('spento a metà dello scaricamento e lasciato spento: alla chiusu
   assert.equal(u.installata, false);
 });
 
-test('chiusa la carta, chiedendolo (a Filo) la versione si installa lo stesso', async () => {
+perOgniSistema('chiusa la carta, chiedendolo (a Filo) la versione si installa lo stesso', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, false);
+  await avvia(u, false, s);
   vive()[0].dismissed = true;
   const r = await U.installaAggiornamento();
   await calma();
   assert.equal(r.ok, true);
   assert.equal(r.versione, '0.3.0');
   assert.equal(u.scaricamenti, 1);
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   u.chiudi();
-  assert.equal(u.installata, true);
+  assert.equal(u.installata, s.allaChiusura);
 });
 
 // La richiesta di «Installa» sta nel disco: un riavvio a metà scaricamento non la perde.
@@ -265,10 +266,10 @@ async function conDiscoFinto(fn) {
   };
   try { await fn(disco); } finally { delete globalThis.SN_STORAGE; }
 }
-async function riavvia(versioneInUso, { automatici = false, versione = '0.3.0' } = {}) {
+async function riavvia(versioneInUso, { automatici = false, versione = '0.3.0', modo } = {}) {
   await U.togliAvvisiSuperati(versioneInUso);
   const u = aggiornatoreFinto({ versione, lento: true });
-  await U.avviaAggiornatore(u, { automatici, chiesta: await U.richiestaValida(versioneInUso) });
+  await U.avviaAggiornatore(u, { automatici, chiesta: await U.richiestaValida(versioneInUso), modo });
   await calma();
   await calma();
   return u;
