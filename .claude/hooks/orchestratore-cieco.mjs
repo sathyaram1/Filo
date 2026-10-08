@@ -19,6 +19,11 @@ export const TIPI_DEL_GIRO = ['routine-worker', 'routine-nuovo-lavoro', 'routine
 // commenti, niente barre rovesciate (la riga di comando di Windows le mangia: «\r» diventava un a capo).
 export function decidi(input, { root, adesso = Date.now(), env = process.env } = {}) {
   const strumento = input && input.tool_name;
+  if (strumento === "SubagentHandback") {
+    if (!input.agent_id || !TIPI_DEL_GIRO.includes(input.agent_type) || input.hook_event_name !== "PreToolUse") return null;
+    if (String((input.tool_input || {}).message || "").trim() === RIGA_DEL_WORKER) return null;
+    return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: MOTIVO_CONSEGNA } };
+  }
   if (strumento !== "Agent" && strumento !== "Task") return null;
   if (input.agent_id) return null;
   const ti = input.tool_input || {};
