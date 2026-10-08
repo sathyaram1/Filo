@@ -99,7 +99,7 @@ function ramoFisso(cartella, ramo, sha) {
     ok: true,
     ramo: nome,
     togli: () => {
-      const via = gitEsito(radice, ['push', '--quiet', 'origin', '--delete', nome]);
+      const via = gitEsito(radice, ['push', '--quiet', 'origin', `:refs/heads/${nome}`]);
       gitIn(radice, ['update-ref', '-d', `refs/remotes/origin/${nome}`]);
       return via;
     },
@@ -123,7 +123,7 @@ export function lanciaFissato(cartella, ramo, verdetto, env, { lancia, fissa, lo
     return lancia(cartella, [fisso.ramo], env);
   } finally {
     const t = fisso.togli();
-    if (t && !t.ok) err(`Non ho tolto ${fisso.ramo} da origin del server (${String(t.out || '').slice(0, 200)}): git push origin --delete ${fisso.ramo}`);
+    if (t && !t.ok) err(`Non ho tolto ${fisso.ramo} da origin del server (${String(t.out || '').slice(0, 200)}): git push origin :refs/heads/${fisso.ramo}`);
   }
 }
 
