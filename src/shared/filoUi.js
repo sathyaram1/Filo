@@ -181,6 +181,15 @@
     return t;
   }
 
+  // La chiave di una bozza scritta in un riquadro: resta al sito dove è nata, e il main concede a ogni riquadro solo
+  // quella con la sua origine (BOZZE_PER_SITO in impostazioniPerOrigine.js). Senza origine non c'è bozza (null).
+  function chiaveDiBozza(nome) {
+    try {
+      if (location.protocol === 'filo:') return nome;
+      return location.origin && location.origin !== 'null' ? `${nome}@${location.origin}` : null;
+    } catch (_) { return null; }
+  }
+
   const _test = {
     // Il primo nodo che risponde al selettore, nel documento o dentro un riquadro nostro (anche chiuso).
     trova(sel) { return trovaTutti(sel)[0] || null; },
@@ -210,6 +219,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, nostro, veroONostro,
-    ombra, ombraDi, bersaglio, _test,
+    ombra, ombraDi, bersaglio, chiaveDiBozza, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

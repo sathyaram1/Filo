@@ -207,7 +207,8 @@
         else return;
       } catch (_) { return; }
       e.preventDefault();
-      prima.dispatchEvent(new Event('input', { bubbles: true }));
+      const ev = new Event('input', { bubbles: true });
+      prima.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
     });
 
     let settled = false;

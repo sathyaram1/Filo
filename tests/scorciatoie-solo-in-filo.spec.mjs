@@ -4,6 +4,10 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi } from './helpers/riquadri.mjs';
+
+// Sui siti la spiegazione sta in uno shadow root chiuso (#1071): il titolo si legge dal mondo dei content script.
+const titolo = async (app, page, frame = null) => (await statoDi(app, page, '.sn-popup .sn-popup-title', frame))?.testo || '';
 
 const TESTO = `<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif">
   <p id="testo">Una frase abbastanza lunga da poterla selezionare, spiegare e tradurre.</p>
@@ -60,7 +64,7 @@ test('Alt+E sul testo selezionato apre la spiegazione, e la pagina non vede il t
   await page.locator('#testo').click();
   await seleziona(page, '#testo');
   await premi(app, 'E');
-  await expect(page.locator('.sn-popup .sn-popup-title')).toHaveText('Approfondimento', { timeout: 8000 });
+  await expect.poll(() => titolo(app, page), { timeout: 8000 }).toBe('Approfondimento');
   expect(await page.evaluate(() => window.__visti)).toEqual([]);
 });
 
@@ -69,7 +73,7 @@ test('Alt+T sul testo selezionato apre la traduzione', async ({ app, openTab, te
   await page.locator('#testo').click();
   await seleziona(page, '#testo');
   await premi(app, 'T');
-  await expect(page.locator('.sn-popup .sn-popup-title')).toHaveText('Traduzione', { timeout: 8000 });
+  await expect.poll(() => titolo(app, page), { timeout: 8000 }).toBe('Traduzione');
 });
 
 test('Alt+H apre l\'Aiuto sulla pagina, anche col fuoco sulla barra di Filo', async ({ app, openTab, testServer }) => {
@@ -98,7 +102,7 @@ test('Alt+E sul testo selezionato dentro un riquadro di un altro sito apre la sp
   const frame = page.frames().find((f) => f !== page.mainFrame());
   await seleziona(frame, '#inner-text');
   await premi(app, 'E');
-  await expect(frameLoc.locator('.sn-popup')).toBeVisible({ timeout: 8000 });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup', frame))?.visibile, { timeout: 8000 }).toBe(true);
 });
 
 test('Alt+S salva la pagina e chiude la scheda una volta sola, anche tenendolo premuto', async ({ app, openTab, testServer }) => {

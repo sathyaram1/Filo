@@ -237,7 +237,7 @@ test('un sito chiede al magazzino solo gli scomparti dei content script, in ogni
 test('un sito scrive e toglie solo gli scomparti dei content script, mai le impostazioni', () => {
   const web = 'https://sito.example';
   assert.equal(W.scritturaStorageAmmessa(['sn_feedback_draft_text@https://sito.example'], web, 'https://sito.example'), true);
-  assert.equal(W.scritturaStorageAmmessa('sn_redteam_attack_draft', web), true);
+  assert.equal(W.scritturaStorageAmmessa('sn_redteam_attack_draft@https://sito.example', web, 'https://sito.example'), true);
   for (const k of ['settings', 'filo_memory', 'savedPages', 'clipboardHistory', '__proto__']) {
     assert.equal(W.scritturaStorageAmmessa([k], web), false, k);
     assert.equal(W.scritturaStorageAmmessa(['sn_personal_dict', k], web), false, `${k} in compagnia`);
@@ -536,11 +536,17 @@ test('la spinta frame per frame ritaglia su ogni indirizzo, e una finestra di un
 
 // #1071 — la bozza del feedback rimessa nella casella di un altro sito: quel sito la leggeva. Ogni sito vede solo la
 // sua, e a dire qual è la sua è l'origine vera del riquadro che chiede, non il nome che la chiave si dà.
-test('la bozza del feedback: un sito legge e scrive solo quella con la sua origine', () => {
+test('le bozze dei riquadri: un sito legge e scrive solo quelle con la sua origine', () => {
   const pagina = 'https://b.example/pagina';
   const b = 'https://b.example';
-  const suaB = W.BOZZA_PER_SITO + b;
-  const diA = W.BOZZA_PER_SITO + 'https://a.example';
+  const suaB = `sn_feedback_draft_text@${b}`;
+  const diA = 'sn_feedback_draft_text@https://a.example';
+  assert.deepEqual(W.BOZZE_PER_SITO, ['sn_feedback_draft_text', 'sn_redteam_attack_draft', 'sn_redteam_desc_draft']);
+  for (const bozza of W.BOZZE_PER_SITO) {
+    assert.equal(W.scritturaStorageAmmessa([`${bozza}@${b}`], pagina, b), true, bozza);
+    assert.equal(W.scritturaStorageAmmessa([bozza], pagina, b), false, `${bozza} senza origine`);
+    assert.deepEqual(W.chiaviStoragePerOrigine([`${bozza}@https://a.example`], pagina, b), [], `${bozza} di un altro sito`);
+  }
   assert.deepEqual(W.chiaviStoragePerOrigine([suaB, diA], pagina, b), [suaB]);
   assert.deepEqual(W.chiaviStoragePerOrigine(diA, pagina, b), []);
   assert.deepEqual(W.chiaviStoragePerOrigine({ [diA]: '' }, pagina, b), {});
@@ -554,9 +560,9 @@ test('la bozza del feedback: un sito legge e scrive solo quella con la sua origi
   // Un riquadro incorporato chiede con la sua origine, non con quella della scheda che lo ospita.
   assert.deepEqual(W.chiaviStoragePerOrigine([suaB], pagina, 'https://pubblicita.example'), []);
   // Senza origine (sandbox, data:) non c'è una bozza che sia solo sua.
-  assert.deepEqual(W.chiaviStoragePerOrigine([W.BOZZA_PER_SITO + 'null'], 'data:text/html,x', 'null'), []);
-  assert.equal(W.scritturaStorageAmmessa([W.BOZZA_PER_SITO + 'null'], 'data:text/html,x', 'null'), false);
-  assert.equal(W.scritturaStorageAmmessa([W.BOZZA_PER_SITO], pagina, ''), false);
+  assert.deepEqual(W.chiaviStoragePerOrigine(['sn_feedback_draft_text@null'], 'data:text/html,x', 'null'), []);
+  assert.equal(W.scritturaStorageAmmessa(['sn_feedback_draft_text@null'], 'data:text/html,x', 'null'), false);
+  assert.equal(W.scritturaStorageAmmessa(['sn_feedback_draft_text@'], pagina, ''), false);
   // Le pagine di Filo restano com'erano.
   assert.deepEqual(W.chiaviStoragePerOrigine(['sn_feedback_draft_text'], 'filo://newtab/', 'filo://newtab'), ['sn_feedback_draft_text']);
 });

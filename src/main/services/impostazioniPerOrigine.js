@@ -63,17 +63,16 @@ const CHIAVI_STORAGE_WEB = Object.freeze([
   'sn_icon_layout',
   'sn_qr_in_primary_migrated',
   'sn_feedback_client_id',
-  'sn_redteam_attack_draft',
-  'sn_redteam_desc_draft',
 ]);
 const CHIAVI_STORAGE_WEB_SCRITTURA = Object.freeze(CHIAVI_STORAGE_WEB.filter((k) => k !== 'settings'));
 
-// La bozza del feedback scritta in un sito resta a quel sito (#1071): ognuno legge e scrive solo la chiave che porta
-// la SUA origine, quella del riquadro che chiede e non della scheda (un riquadro incorporato è un altro sito). Un
-// documento senza origine (sandbox, data:) non ne ha: la sua «null» la condividerebbe con tutti gli altri.
-const BOZZA_PER_SITO = 'sn_feedback_draft_text@';
+// Le bozze dei riquadri (feedback, attacco red-team) scritte in un sito restano a quel sito (#1071): ognuno legge e
+// scrive solo le chiavi che portano la SUA origine, quella del riquadro che chiede e non della scheda (un riquadro
+// incorporato è un altro sito). Un documento senza origine (sandbox, data:) non ne ha: «null» è di tutti.
+const BOZZE_PER_SITO = Object.freeze(['sn_feedback_draft_text', 'sn_redteam_attack_draft', 'sn_redteam_desc_draft']);
 const chiaveDelSito = (k, origineRiquadro) => typeof k === 'string' && typeof origineRiquadro === 'string'
-  && origineRiquadro !== '' && origineRiquadro !== 'null' && k === BOZZA_PER_SITO + origineRiquadro;
+  && origineRiquadro !== '' && origineRiquadro !== 'null'
+  && BOZZE_PER_SITO.some((b) => k === `${b}@${origineRiquadro}`);
 
 // Le azioni di Filo che il codice dentro un sito chiede: la barra d'aiuto propone un
 // feedback e apre i link («apri in una nuova scheda»). Il resto no, nemmeno confermato:
@@ -246,7 +245,7 @@ module.exports = {
   SPINTE_WEB,
   SPINTE_WEB_IN_VISTA,
   CHIAVI_STORAGE_WEB,
-  BOZZA_PER_SITO,
+  BOZZE_PER_SITO,
   AZIONI_WEB,
   isFilo,
   impostazioniPerWeb,
