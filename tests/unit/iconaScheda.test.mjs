@@ -30,6 +30,7 @@ test('il tipo viene dai byte: png, ico, svg con radice svg; una pagina html con 
   assert.equal(tipoImmagine(PNG), 'image/png');
   assert.equal(tipoImmagine(ICO), 'image/x-icon');
   assert.equal(tipoImmagine(SVG), 'image/svg+xml');
+  assert.equal(tipoImmagine(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), SVG])), 'image/svg+xml');
   assert.equal(tipoImmagine(Buffer.from('<!doctype html><html><body><svg></svg></body></html>')), '');
   assert.equal(tipoImmagine(Buffer.from('not found')), '');
   assert.equal(tipoImmagine(Buffer.alloc(0)), '');
