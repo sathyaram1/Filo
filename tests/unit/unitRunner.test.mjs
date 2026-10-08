@@ -524,16 +524,13 @@ test('la guardia conta il tempo fermo dal primo evento: un file lento che avanza
 test('senza il tetto di node, un file appeso dopo le sue prove diventa un rosso col suo nome e la corsa finisce', () => {
   const dir = cartellaTemporanea('filo-fermo-');
   try {
-    writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';
-test('prima di appendersi', () => {});
-setInterval(() => {}, 1000);
-");
+    writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
     // Un tetto corto qui non fa rossi finti: qualunque cosa sia ferma, l'unico file in corso è quello appeso.
     const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
-    assert.match(r.stdout, /ROSSO: .*appeso.test.mjs non è andato avanti/);
+    assert.match(r.stdout, /ROSSO: .*appeso\.test\.mjs non è andato avanti/);
     assert.equal(r.status, 1);
   } finally {
     togliCartella(dir);
