@@ -51,6 +51,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PRIORITA_AMMESSE, parsePriorita } from './lib/priorita.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura, come in owner-feedback.mjs:
@@ -151,22 +152,8 @@ export function exitCodeForError(err) {
   return EXIT.IRRAGGIUNGIBILE;
 }
 
-/**
- * Priorità richiesta dalla riga di comando. PURA.
- * La scala è 3/2/1/0 (lo 0 è un gradino della scala, non «nessuna»: assente
- * = non impostata). Qualunque altra cosa è un errore d'uso: meglio fermarsi
- * che scrivere una priorità inventata.
- * @returns {{ ok: true, valore: number|null } | { ok: false, motivo: string }}
- */
-export const PRIORITA_AMMESSE = Object.freeze([0, 1, 2, 3]);
-export function parsePriorita(raw) {
-  if (raw === undefined || raw === null || raw === '') return { ok: true, valore: null };
-  const n = Number(raw);
-  if (!Number.isInteger(n) || !PRIORITA_AMMESSE.includes(n)) {
-    return { ok: false, motivo: `priorità "${raw}" non valida: ammessi ${PRIORITA_AMMESSE.join(', ')}` };
-  }
-  return { ok: true, valore: n };
-}
+// La regola della priorità a riga di comando è una sola, condivisa con owner-feedback (--priorita).
+export { PRIORITA_AMMESSE, parsePriorita };
 
 /**
  * Deposita il feedback. Ritorna { ok, id, seq } oppure { ok:false, ... }.
