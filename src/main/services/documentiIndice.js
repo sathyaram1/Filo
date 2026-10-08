@@ -1,6 +1,6 @@
-// L'indice locale dei documenti dell'utente: nome, data e testo dei file delle cartelle scelte (di serie Documenti,
-// Download e Scrivania), aggiornato in sottofondo. Il testo resta sul computer: al modello arrivano solo i pochi
-// candidati di una ricerca (CERCA_DOCUMENTI). Non scrive mai nei file dell'utente. Punteggio: documentiRicerca.js.
+// L'indice locale dei documenti dell'utente (nome, data, testo delle cartelle scelte), aggiornato in sottofondo: al
+// modello vanno solo i pochi candidati di una ricerca (CERCA_DOCUMENTI). Non scrive mai nei file dell'utente.
+// Punteggio: documentiRicerca.js; regole del giro: patterns/leggere-in-blocco-i-file-dell-utente-il-cloud.md.
 
 'use strict';
 

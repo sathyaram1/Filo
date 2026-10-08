@@ -62,6 +62,9 @@ test('la prova della segnalazione: la bolletta della luce di marzo è il primo r
     expect(esito).toContain(bolletta);
     expect(esito).toMatch(/01\/03\/2026/);
     expect(esito, 'il testo di un documento che non è fra i candidati non esce').not.toContain('Programma cotone 40 gradi');
+    // I PDF li ha letti il processo a parte, non quello da cui dipendono finestre e schede.
+    const lettori = await app.evaluate(({ app: a }) => a.getAppMetrics().filter((m) => m.type === 'Utility').map((m) => m.name || m.serviceName || ''));
+    expect(lettori).toContain('Filo · lettura documenti');
 
     // Un clic lo apre col programma del sistema.
     await file.click();
@@ -83,6 +86,34 @@ test('la prova della segnalazione: la bolletta della luce di marzo è il primo r
     await expect(allegato).toHaveText(new RegExp(BOLLETTA_MARZO.replace('.', '\\.')));
     await expect(allegato).toHaveAttribute('title', bolletta);
     await page.screenshot({ path: 'tests/.shots/cerca-documenti-risposta.png' });
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('la stessa ricerca dalla chat di un\'altra scheda', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const dir = join(await cartellaScaricamenti(app), 'Scheda');
+  cartellaDellaProva(dir);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'd1', name: 'CERCA_DOCUMENTI', arguments: JSON.stringify({ cosa: 'ricevuta assicurazione' }) }] },
+      { text: 'È xyz123.pdf: è la quietanza della polizza RC auto.' },
+    ]);
+    // In tema scuro, per guardare il bottone anche lì.
+    await app.evaluate(async () => globalThis.__filoHandlers.handleMessage(
+      { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
+      { url: 'filo://preferences/preferences.html' },
+    ));
+    const page = await openTab('filo://newtab/');
+    await expect(page.locator('#input')).toBeVisible({ timeout: 10_000 });
+    await chiedi(page, 'dov\'è la ricevuta dell\'assicurazione?');
+    const file = page.locator('.dash-bubble-actions .dash-file-btn');
+    await expect(file.locator('.dash-file-btn-nome')).toHaveText('xyz123.pdf', { timeout: 20_000 });
+    await page.screenshot({ path: 'tests/.shots/cerca-documenti-scuro.png' });
+    await file.hover();
+    await page.screenshot({ path: 'tests/.shots/cerca-documenti-scuro-hover.png' });
   } finally {
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });
