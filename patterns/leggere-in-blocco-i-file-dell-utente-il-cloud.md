@@ -21,7 +21,10 @@ Windows con un disco normale non si vedono:
   misura vera e nessun blocco occupato sul disco (`stat().blocks === 0`). Sotto i
   4 KB la regola non vale, perché NTFS tiene i file piccoli dentro il proprio
   indice e li dà con zero blocchi anche quando sono sul disco. Un file così si
-  trova per nome, e il modello sa che sta nel cloud.
+  trova per nome, e il modello sa che sta nel cloud. Prima ancora, l'elenco di
+  una cartella su Windows dà per collegamento ogni segnaposto, file e
+  sottocartelle, anche già scaricati: chi salta i collegamenti senza chiedere a
+  `lstat` se lo sono davvero non vede niente di Documenti e Scrivania.
 - **macOS.** Leggere Documenti, Scrivania e Download fa comparire la richiesta di
   permesso del sistema, una per cartella. Se la fa un giro in sottofondo, compare
   venti secondi dopo l'avvio senza che l'utente abbia chiesto niente. Su Mac il
