@@ -1,4 +1,4 @@
-// Verifica #1070 giro 2: sonde sul gesto vero (trascinamento lento, tasto tenuto premuto).
+// Verifica #1070 giro 2: r1 un tasto tenuto premuto vale un gesto solo; r2 il trascinamento lento con una pausa avvia l'anticipo.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -59,7 +59,7 @@ function estremi(page) {
   });
 }
 
-test('r1 trascinamento lento con una pausa prima di rilasciare: la spiegazione in anticipo parte', async ({ app, openTab, testServer }) => {
+test('r2 trascinamento lento con una pausa prima di rilasciare: la spiegazione in anticipo parte', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer);
   const e = await estremi(page);
@@ -78,7 +78,7 @@ test('r1 trascinamento lento con una pausa prima di rilasciare: la spiegazione i
   await expect.poll(async () => (await conti(app)).spiega, { timeout: 4000 }).toBe(1);
 });
 
-test('r2 un tasto tenuto premuto è un gesto solo: la pagina che scrive una parola a ogni ripetizione ottiene un controllo', async ({ app, openTab, testServer }) => {
+test('r1 un tasto tenuto premuto è un gesto solo: la pagina che scrive una parola a ogni ripetizione ottiene un controllo', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer);
   await page.evaluate(() => {
@@ -99,4 +99,29 @@ test('r2 un tasto tenuto premuto è un gesto solo: la pagina che scrive una paro
   await page.keyboard.up('ArrowDown');
   await pausa(2500);
   expect((await conti(app)).parola - prima).toBeLessThanOrEqual(2);
+});
+
+test('r1 un tasto tenuto premuto è un gesto solo: la pagina che cambia la selezione a ogni ripetizione ottiene una spiegazione', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  await page.evaluate(() => {
+    let i = 0;
+    let ultima = 0;
+    window.addEventListener('keydown', () => {
+      if (Date.now() - ultima < 500) return;
+      ultima = Date.now();
+      const p = document.getElementById('p1').firstChild;
+      const da = i++ % 40;
+      const r = document.createRange();
+      r.setStart(p, da); r.setEnd(p, da + 15);
+      getSelection().removeAllRanges(); getSelection().addRange(r);
+    });
+  });
+  await page.mouse.click(700, 20);
+  await pausa(300);
+  const prima = (await conti(app)).spiega;
+  for (let i = 0; i < 100; i++) { await page.keyboard.down('ArrowDown'); await pausa(30); }
+  await page.keyboard.up('ArrowDown');
+  await pausa(1500);
+  expect((await conti(app)).spiega - prima).toBeLessThanOrEqual(1);
 });
