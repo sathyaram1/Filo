@@ -116,27 +116,47 @@ function conta(testoPiano, forma) {
   return n;
 }
 
+// Le date che dicono quando un documento è stato emesso, quando scade o quando si è letto il contatore: non dicono di
+// che mese parla. Una bolletta di febbraio è emessa, scade e si legge a marzo.
+const AMMINISTRATIVE = /(?:scaden|scade|emess|emission|entro|lettur|rilevat|pagam|pagare|addebit)[\p{L}]*[^\n]{0,24}$/iu;
+function amministrativa(s, i) {
+  return AMMINISTRATIVE.test(s.slice(Math.max(0, i - 40), i));
+}
+
 // Le date col numero del mese: 01/03/2026, 1.3.26, 03/2026, 2026-03-15. Sul testo vero, prima che i segni spariscano.
+function reDateDelMese(mese) {
+  const mm = `0?${mese + 1}`;
+  return new RegExp(`(?:\\b\\d{1,2}[/.\\-]${mm}[/.\\-](?:\\d{4}|\\d{2})\\b)|(?:\\b${mm}[/.\\-](?:19|20)\\d{2}\\b)|(?:\\b(?:19|20)\\d{2}[/.\\-]${mm}(?:[/.\\-]\\d{1,2})?\\b)`, 'g');
+}
 function contaDateDelMese(testo, mese) {
-  const m = mese + 1;
-  const mm = `0?${m}`;
-  const re = new RegExp(`(?:\\b\\d{1,2}[/.\\-]${mm}[/.\\-](?:\\d{4}|\\d{2})\\b)|(?:\\b${mm}[/.\\-](?:19|20)\\d{2}\\b)|(?:\\b(?:19|20)\\d{2}[/.\\-]${mm}(?:[/.\\-]\\d{1,2})?\\b)`, 'g');
-  let n = 0;
+  const re = reDateDelMese(mese);
   const s = String(testo || '');
-  while (n < CONTA_MAX && re.exec(s)) n += 1;
+  let n = 0;
+  let m;
+  while (n < CONTA_MAX && (m = re.exec(s))) if (!amministrativa(s, m.index)) n += 1;
   return n;
 }
 
-// I periodi che un documento dichiara: un intervallo di date («01/02/2026 - 28/02/2026», «dal 1 feb 2026 al 28 feb 2026»)
-// o un mese con l'anno («marzo 2026», «03/2026»). Una bolletta è emessa e scade il mese dopo il suo periodo: quando il
-// documento dichiara un periodo, il mese chiesto si misura su quello e non sulle altre date.
+// I periodi che un documento dichiara: un intervallo («01/02/2026 - 28/02/2026», «dal 1 al 28 febbraio 2026»,
+// «gennaio-febbraio 2026», le due date in colonna sotto «periodo») o un mese con l'anno («marzo 2026», «03/2026»). Quando
+// il documento dichiara un periodo, il mese chiesto si misura su quello e non sulle altre date.
 const NOMI_MESE = MESI.flat().slice().sort((a, b) => b.length - a.length).join('|');
-const RE_DATA_NUM = /(?<![\d/.\-])(\d{1,2})[/.\-](\d{1,2})[/.\-]((?:19|20)?\d{2})(?![\d/])/g;
+const MESE = `(${NOMI_MESE})\\.?`;
+const TRA = '\\s*(?:-|–|—|\\bal\\b|\\ba\\b|fino al)\\s*';
+const RE_DATA_NUM = /(?<![\d/.])(\d{1,2})[/.\-](\d{1,2})[/.\-]((?:19|20)?\d{2})(?![\d/])/g;
 const RE_DATA_ISO = /(?<![\d/.\-])((?:19|20)\d{2})-(\d{1,2})-(\d{1,2})(?!\d)/g;
-const RE_DATA_NOME = new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2})\\s+(${NOMI_MESE})\\.?\\s+((?:19|20)\\d{2})(?!\\d)`, 'giu');
+const RE_DATA_NOME = new RegExp(`(?<![\\p{L}\\p{N}])(\\d{1,2})\\s+${MESE}\\s+((?:19|20)\\d{2})(?!\\d)`, 'giu');
 const RE_MESE_NUM = /(?<![\d/.\-])(\d{1,2})[/.\-]((?:19|20)\d{2})(?![\d/.\-]?\d)/g;
-const RE_MESE_NOME = new RegExp(`(?<!\\d\\s{0,3})(?<![\\p{L}\\p{N}])(${NOMI_MESE})\\.?\\s+((?:19|20)\\d{2})(?!\\d)`, 'giu');
-const TRA_DATE = /^\s*(?:-|–|—|al|a|fino al|e il)\s*$/i;
+const RE_MESE_NOME = new RegExp(`(?<!\\d\\s{0,3})(?<![\\p{L}\\p{N}])${MESE}\\s+((?:19|20)\\d{2})(?!\\d)`, 'giu');
+// L'inizio scritto a metà, che prende mese e anno dalla fine: «1-28 febbraio 2026», «dal 1 febbraio al 28 febbraio
+// 2026», «dal 01/02 al 28/02/2026», «gennaio - febbraio 2026».
+const RE_GIORNI_NOME = new RegExp(`(?<![\\p{L}\\p{N}/.])(\\d{1,2})(?:\\s+${MESE})?${TRA}(\\d{1,2})\\s+${MESE}\\s+((?:19|20)\\d{2})(?!\\d)`, 'giu');
+const RE_GIORNI_NUM = new RegExp(`(?<![\\p{L}\\p{N}/.])(\\d{1,2})(?:[/.](\\d{1,2}))?${TRA}(\\d{1,2})[/.](\\d{1,2})[/.]((?:19|20)?\\d{2})(?![\\d/])`, 'gu');
+const RE_MESI_NOME = new RegExp(`(?<![\\p{L}\\p{N}])${MESE}\\s*(?:-|–|—|/|\\be\\b|\\ba\\b)\\s*${MESE}\\s+((?:19|20)\\d{2})(?!\\d)`, 'giu');
+const TRA_DATE = /^\s*(?:-|–|—|\/|al|a|fino al|e il)\s*$/i;
+// Due date affiancate senza niente in mezzo sono un periodo solo sotto la parola che lo annuncia (le colonne «dal» e
+// «al» di una tabella), e solo se fra quella parola e le date non si parla di emissione o scadenza.
+const ANNUNCIO = /(?:periodo|competenza|fatturazion|fornitura|riferimento|consumi|\bdal\b)(?![\s\S]*(?:periodo|competenza|fatturazion|fornitura|riferimento|consumi|\bdal\b))([\s\S]*)$/i;
 const PERIODI_MAX = 40;
 
 function anno(y) { const n = Number(y); return n < 100 ? 2000 + n : n; }
@@ -150,39 +170,82 @@ function mesiFra(m1, y1, m2, y2) {
   return out;
 }
 
-/** → [{ i, fine, testo, mesi: [indice del mese] }]. PURA. */
+function annunciato(s, i) {
+  const m = ANNUNCIO.exec(s.slice(Math.max(0, i - 80), i));
+  return !!m && !AMMINISTRATIVE.test(m[1]) && !/(?:scaden|emess|emission|entro|lettur)/i.test(m[1]);
+}
+
+/** → [{ i, fine, testo, mesi: [indice del mese], fino: anno * 12 + mese della fine }]. PURA. */
 function periodi(testo) {
   const s = String(testo || '');
   if (!s) return [];
+  const out = [];
+  const preso = (i, fine) => out.some((p) => i < p.fine && p.i < fine);
+  const metti = (i, fine, m1, y1, m2, y2) => {
+    if (out.length >= PERIODI_MAX || preso(i, fine)) return;
+    // L'inizio senza anno sta nell'anno della fine, o in quello prima se il mese viene dopo («dicembre - gennaio 2026»).
+    const ya = y1 != null ? y1 : (m1 > m2 ? y2 - 1 : y2);
+    out.push({ i, fine, testo: s.slice(i, fine).replace(/\s+/g, ' '), mesi: mesiFra(m1, ya, m2, y2), fino: y2 * 12 + m2 });
+  };
+  const prendi = (re, fn) => { re.lastIndex = 0; let m; let n = 0; while ((m = re.exec(s)) && n++ < 400) fn(m); };
+  const meseDiNome = (n) => meseDi(String(n).toLowerCase());
+  const giorno = (g) => +g >= 1 && +g <= 31;
+  prendi(RE_GIORNI_NOME, (m) => {
+    const m2 = meseDiNome(m[4]);
+    const m1 = m[2] ? meseDiNome(m[2]) : m2;
+    if (m1 >= 0 && m2 >= 0 && giorno(m[1]) && giorno(m[3])) metti(m.index, m.index + m[0].length, m1, null, m2, anno(m[5]));
+  });
+  prendi(RE_GIORNI_NUM, (m) => {
+    const m2 = +m[4] - 1;
+    const m1 = m[2] ? +m[2] - 1 : m2;
+    if (m1 >= 0 && m1 < 12 && m2 >= 0 && m2 < 12 && giorno(m[1]) && giorno(m[3])) metti(m.index, m.index + m[0].length, m1, null, m2, anno(m[5]));
+  });
+  prendi(RE_MESI_NOME, (m) => {
+    const m1 = meseDiNome(m[1]);
+    const m2 = meseDiNome(m[2]);
+    if (m1 >= 0 && m2 >= 0) metti(m.index, m.index + m[0].length, m1, null, m2, anno(m[3]));
+  });
   const date = [];
   const mesi = [];
-  const prendi = (re, fn) => { re.lastIndex = 0; let m; while ((m = re.exec(s)) && date.length + mesi.length < 400) fn(m); };
-  const meseDiNome = (n) => meseDi(String(n).toLowerCase());
-  prendi(RE_DATA_NUM, (m) => { const g = +m[1]; const me = +m[2] - 1; if (g >= 1 && g <= 31 && me >= 0 && me < 12) date.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[3]) }); });
+  prendi(RE_DATA_NUM, (m) => { const me = +m[2] - 1; if (giorno(m[1]) && me >= 0 && me < 12) date.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[3]) }); });
   prendi(RE_DATA_ISO, (m) => { const me = +m[2] - 1; if (me >= 0 && me < 12) date.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[1]) }); });
   prendi(RE_DATA_NOME, (m) => { const me = meseDiNome(m[2]); if (me >= 0) date.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[3]) }); });
-  prendi(RE_MESE_NUM, (m) => { const me = +m[1] - 1; if (me >= 0 && me < 12) mesi.push({ i: m.index, fine: m.index + m[0].length, m: me }); });
-  prendi(RE_MESE_NOME, (m) => { const me = meseDiNome(m[1]); if (me >= 0) mesi.push({ i: m.index, fine: m.index + m[0].length, m: me }); });
-  date.sort((a, b) => a.i - b.i);
-  const out = [];
-  for (let k = 0; k + 1 < date.length && out.length < PERIODI_MAX; k++) {
-    const a = date[k];
-    const b = date[k + 1];
-    if (b.i < a.fine || !TRA_DATE.test(s.slice(a.fine, b.i))) continue;
-    out.push({ i: a.i, fine: b.fine, testo: s.slice(a.i, b.fine).replace(/\s+/g, ' '), mesi: mesiFra(a.m, a.y, b.m, b.y) });
+  prendi(RE_MESE_NUM, (m) => { const me = +m[1] - 1; if (me >= 0 && me < 12) mesi.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[2]) }); });
+  prendi(RE_MESE_NOME, (m) => { const me = meseDiNome(m[1]); if (me >= 0) mesi.push({ i: m.index, fine: m.index + m[0].length, m: me, y: anno(m[2]) }); });
+  const libere = date.filter((d) => !preso(d.i, d.fine)).sort((a, b) => a.i - b.i);
+  for (let k = 0; k + 1 < libere.length; k++) {
+    const a = libere[k];
+    const b = libere[k + 1];
+    if (b.i < a.fine) continue;
+    const tra = s.slice(a.fine, b.i);
+    const affiancate = /^\s+$/.test(tra) && annunciato(s, a.i);
+    if (!TRA_DATE.test(tra) && !affiancate) continue;
+    // Un intervallo va avanti nel tempo: due date affiancate all'indietro sono altro (emissione e scadenza in tabella).
+    if (affiancate && b.y * 12 + b.m < a.y * 12 + a.m) continue;
+    metti(a.i, b.fine, a.m, a.y, b.m, b.y);
     k += 1;
   }
   for (const x of mesi) {
-    if (out.length >= PERIODI_MAX) break;
     if (date.some((d) => x.i < d.fine && d.i < x.fine)) continue;
-    out.push({ i: x.i, fine: x.fine, testo: s.slice(x.i, x.fine).replace(/\s+/g, ' '), mesi: [x.m] });
+    metti(x.i, x.fine, x.m, x.y, x.m, x.y);
   }
   return out.sort((a, b) => a.i - b.i);
 }
 
+// Quanto è recente un documento, in mesi: la fine del periodo che dichiara per il mese chiesto (o di uno qualsiasi), se
+// no la data del file. Serve solo fra punteggi pari, entro PARI l'uno dall'altro.
+const PARI = 0.02;
+function recenza({ d, periodi: per }, idee) {
+  const mesi = idee.filter((x) => x.mese >= 0).map((x) => x.mese);
+  const utili = per.filter((p) => p.fino != null && (!mesi.length || p.mesi.some((m) => mesi.includes(m))));
+  if (utili.length) return Math.max(...utili.map((p) => p.fino));
+  const t = new Date(Number(d.data) || 0);
+  return d.data && !Number.isNaN(t.getTime()) ? t.getFullYear() * 12 + t.getMonth() : -Infinity;
+}
+
 /**
  * Il punteggio di ogni documento per la richiesta, e i primi `limite`. PURA.
- * `documenti`: [{ id, nome, testo, testoPiano?, nomePiano? }]. → [{ id, punteggio, trovati: [nomi], primo: forma }]
+ * `documenti`: [{ id, nome, testo, data?, testoPiano?, nomePiano?, periodi? }]. → [{ id, punteggio, trovati: [nomi], primo: forma }]
  */
 function ordina(documenti, richiesta, { limite = 8 } = {}) {
   const idee = concetti(richiesta);
@@ -234,10 +297,19 @@ function ordina(documenti, richiesta, { limite = 8 } = {}) {
     punteggio *= 0.4 + copertura * copertura;
     const primo = righe.map((r, k) => ({ r, k })).filter((x) => x.r.forma)
       .sort((a, b) => peso[b.k] - peso[a.k])[0];
-    risultati.push({ id: docs[i].d.id, punteggio, trovati, copertura, primo: primo ? primo.r.forma : '' });
+    risultati.push({ id: docs[i].d.id, punteggio, trovati, copertura, primo: primo ? primo.r.forma : '', recente: recenza(docs[i], idee) });
   });
   risultati.sort((a, b) => b.punteggio - a.punteggio);
-  return risultati.slice(0, limite);
+  // A parità (le bollette di marzo di tre anni, scritte allo stesso modo) viene prima la più recente: chi chiede «la
+  // bolletta di marzo» vuole l'ultima, non quella che l'indice ha letto per prima.
+  const ordinati = [];
+  for (let a = 0; a < risultati.length;) {
+    let b = a + 1;
+    while (b < risultati.length && risultati[b].punteggio >= risultati[a].punteggio * (1 - PARI)) b += 1;
+    ordinati.push(...risultati.slice(a, b).sort((x, y) => y.recente - x.recente));
+    a = b;
+  }
+  return ordinati.slice(0, limite).map(({ recente, ...r }) => r);
 }
 
 /** Uno squarcio di testo intorno alla prima volta che compare `forma`, con gli spazi raccolti. PURA. */
@@ -289,11 +361,10 @@ function squarcioMigliore(testo, richiesta, lunghezza = 280) {
     if (idea.mese >= 0 && perT.length) {
       for (const p of perT) if (p.mesi.includes(idea.mese)) punti.push({ i: p.i, k });
     } else if (idea.mese >= 0) {
-      const mm = `0?${idea.mese + 1}`;
-      const re = new RegExp(`\\b\\d{1,2}[/.\\-]${mm}[/.\\-](?:\\d{4}|\\d{2})\\b|\\b${mm}[/.\\-](?:19|20)\\d{2}\\b`, 'g');
+      const re = reDateDelMese(idea.mese);
       let m;
       let n = 0;
-      while (n++ < CONTA_MAX && (m = re.exec(t))) punti.push({ i: m.index, k });
+      while (n++ < CONTA_MAX && (m = re.exec(t))) if (!amministrativa(t, m.index)) punti.push({ i: m.index, k });
     }
   });
   if (!punti.length) return conPeriodo(squarcio(t, '', lunghezza), t, perT, idee, 0, Math.min(t.length, lunghezza));

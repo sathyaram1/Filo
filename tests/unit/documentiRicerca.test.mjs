@@ -47,7 +47,9 @@ test('le idee della richiesta: le parole di contorno restano fuori, i sinonimi e
 
 test('il mese si riconosce anche scritto in numeri, e «mar» non combacia con «mare»', () => {
   assert.equal(Ricerca.contaDateDelMese('Periodo 01/03/2026 - 31/03/2026', 2), 2);
-  assert.equal(Ricerca.contaDateDelMese('scadenza 03/2026, emessa 2026-03-04', 2), 2);
+  assert.equal(Ricerca.contaDateDelMese('rata 03/2026, verbale del 2026-03-04', 2), 2);
+  // Emissione, scadenza e lettura non dicono di che mese parla un documento.
+  assert.equal(Ricerca.contaDateDelMese('Bolletta del 06/03/2026. Da pagare entro il 26/03/2026, lettura rilevata il 02/03/2026', 2), 1);
   assert.equal(Ricerca.contaDateDelMese('il 13/12/2026', 2), 0);
   assert.equal(Ricerca.conta(Ricerca.piano('al mare'), 'mar'), 0);
   assert.equal(Ricerca.conta(Ricerca.piano('bollette e bolletta'), 'bolletta'), 2);

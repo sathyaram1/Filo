@@ -354,7 +354,7 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     if (v.tp == null) v.tp = Ricerca.piano(v.t);
     if (v.np == null) v.np = Ricerca.piano(v.n.replace(/\.[^.]+$/, ''));
     if (v.pp == null) v.pp = Ricerca.periodi(v.t);
-    candidati.push({ id: p, nome: v.n, testo: v.t, testoPiano: v.tp, nomePiano: v.np, periodi: v.pp });
+    candidati.push({ id: p, nome: v.n, testo: v.t, data: v.m, testoPiano: v.tp, nomePiano: v.np, periodi: v.pp });
   }
   const ordinati = Ricerca.ordina(candidati, richiesta, { limite: limite + 4 });
   const risultati = [];
