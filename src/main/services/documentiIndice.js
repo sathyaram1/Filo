@@ -101,7 +101,8 @@ let voci = null;          // percorso → { n, m, s, k, t, pg, vuoto, e, tp?, np
 let caricamento = null;
 let ultimoGiro = 0;
 let troppi = false;
-let corsa = null;         // { promessa, stato: { fatti, totali, nome }, ascolta: Set }
+let negate = new Set();   // le cartelle che il sistema non ha lasciato elencare all'ultimo giro
+let corsa = null;        // { promessa, stato: { fatti, totali, nome }, ascolta: Set }
 let daRifare = false;
 
 // Su disco una riga per documento letto, accodata appena letto: il primo giro su migliaia di file non riscrive
