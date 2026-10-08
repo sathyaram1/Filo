@@ -66,6 +66,7 @@
     // Riallinea overlay attivo a scroll/resize della finestra.
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
+    document.addEventListener('visibilitychange', riprendiScanRimandato);
 
     // Riceve i suggerimenti del correttore nativo spinti dal main al click destro.
     try {
@@ -363,6 +364,8 @@
           state.issues = [];
           renderOverlayContent(state);
         }
+        // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello.
+        if (!daUtente()) return;
         // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
         //    (boundary char), lancia subito il check ortografico così che al
         //    click destro non ci sia attesa. Limitato e in background.
@@ -380,7 +383,8 @@
     activeEl = el;
     ensureOverlay(state);
     syncOverlay(state);
-    scheduleScan(state);
+    // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente.
+    if (daUtente()) scheduleScan(state);
   }
 
   function detach(el) {
@@ -507,14 +511,31 @@
   // ============================================================================
   // Scan LLM (zigzag blu)
   // ============================================================================
+  // Solo un gesto vero apre una chiamata al modello: `input` e `focus` li fabbrica anche la pagina (#1070).
+  function daUtente() {
+    const G = global.SN_GESTO;
+    return Boolean(G && G.recente());
+  }
+
   function scheduleScan(state) {
     if (!isEnabled()) return;
     if (state.timer) clearTimeout(state.timer);
     state.timer = setTimeout(() => scanText(state), DEBOUNCE_MS);
   }
 
+  // Lo scan chiesto dall'utente e arrivato a scheda nascosta parte quando la scheda torna davanti.
+  function riprendiScanRimandato() {
+    if (document.hidden || !activeEl) return;
+    const state = monitored.get(activeEl);
+    if (!state || !state.rimandato) return;
+    state.rimandato = false;
+    scheduleScan(state);
+  }
+
   async function scanText(state) {
     if (!state || !state.el || !document.body.contains(state.el)) return;
+    if (document.hidden) { state.rimandato = true; return; }
+    state.rimandato = false;
     const text = getEditableText(state.el);
 
     // Reset se il testo è troppo corto o invariato
@@ -600,7 +621,7 @@
   // appena chiuso (ultimo carattere = boundary), così quando fa click destro
   // sulla parola la correzione è già pronta in cache.
   async function prefetchJustCompletedWord(state) {
-    if (!isEnabled()) return;
+    if (!isEnabled() || document.hidden) return;
     const el = state.el;
     const text = getEditableText(el);
     if (!text || text.length < 2) return;
@@ -1216,12 +1237,14 @@
   // Richiesta on-demand: parola sotto cursore → suggerimento LLM
   // ============================================================================
   // Restituisce { misspelled, correction } o null se la chiamata fallisce.
-  async function requestWordSuggestion({ word, sentence, prev, next }) {
+  // `suRichiesta`: il tasto destro dell'utente, che il tetto del main sulle chiamate automatiche non ferma.
+  async function requestWordSuggestion({ word, sentence, prev, next }, { suRichiesta = false } = {}) {
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.SPELLCHECK_WORD,
         payload: { word, sentence, prev, next },
+        ...(suRichiesta ? { suRichiesta: true } : {}),
       });
       if (!res?.ok) {
         console.error('[SN] word check — provider error:', res?.code, res?.error);

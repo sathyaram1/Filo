@@ -1636,7 +1636,7 @@
     };
 
     if (refireInBackground) {
-      SpellCheck.requestWordSuggestion(wordCtx).then(applyResponse).catch(() => {});
+      SpellCheck.requestWordSuggestion(wordCtx, { suRichiesta: true }).then(applyResponse).catch(() => {});
     }
   }
 
