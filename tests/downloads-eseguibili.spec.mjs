@@ -20,6 +20,7 @@ import { existsSync, readdirSync, mkdirSync, writeFileSync, rmSync } from 'node:
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const PDF = Buffer.from('%PDF-1.4\n% finto pdf di prova\n' + 'x'.repeat(2048));
 const EXE = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
@@ -752,7 +753,7 @@ test('un’immagine disco scaricata prima che fosse in lista chiede conferma dop
     env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: dir, NODE_ENV: 'test' },
   });
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await app.evaluate(({ shell }) => {
       globalThis.__aperti = [];

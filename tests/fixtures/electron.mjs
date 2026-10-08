@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
+import { primaFinestra } from '../helpers/primaFinestra.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
@@ -141,7 +142,7 @@ export const test = base.extend({
   // Pagina della shell del browser (tab bar + barra indirizzi). È la prima
   // window che Filo apre.
   shell: async ({ app }, use) => {
-    const win = await app.firstWindow();
+    const win = await primaFinestra(app);
     await win.waitForLoadState('domcontentloaded');
     await use(win);
   },

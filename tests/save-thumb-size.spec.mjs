@@ -15,6 +15,7 @@ import { deflateSync } from 'node:zlib';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SOGLIA = 60 * 1024;
@@ -310,7 +311,7 @@ test('le miniature grandi già salvate si rimpiccioliscono una volta, senza perd
     env: { ...process.env, FILO_USER_DATA: profilo, NODE_ENV: 'test' },
   });
   try {
-    await app.firstWindow();
+    await primaFinestra(app);
     const leggi = () => app.evaluate(async ({ nativeImage }) => {
       const misura = (t) => {
         if (!t) return null;

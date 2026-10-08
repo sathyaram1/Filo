@@ -3,6 +3,7 @@
 
 import { rmSync } from 'node:fs';
 import { test, expect, lista, schede, finestre, apri, idAttiva, contaAvvisi, schedaSu, avviaFilo, chiudiApp, cartellaTemporanea } from './helpers/reteFinta.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const aperteSu = async (app, host) => (await schede(app)).filter((u) => u.includes(host));
 const PAGINA_BLOCCATA = /^filo:\/\/error\/error\.html\?.*code=blocked/;
@@ -257,7 +258,7 @@ test('alla riapertura di Filo una scheda su un sito della lista torna sulla pagi
   const userData = cartellaTemporanea('filo-test-');
   const avvia = async () => {
     const app = await avviaFilo(rete, userData);
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     return { app, shell };
   };

@@ -23,6 +23,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -54,7 +55,7 @@ test.beforeAll(async () => {
       FILO_DEFAULT_SAFEBROWSING_KEY: FABBRICA.safeBrowsing,
     },
   });
-  await app.firstWindow();
+  await primaFinestra(app);
 });
 
 test.afterAll(async () => {

@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -95,7 +96,7 @@ test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)'
   try {
     // ─── FASE 1: apri la tab esterna, lascia salvare la sessione, chiudi ───
     app = await launch(userData);
-    let shell = await app.firstWindow();
+    let shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), restoredUrl);
     const tab1 = await findWindow(app, (w) => w.url().startsWith(restoredUrl));
@@ -107,7 +108,7 @@ test('le tab ripristinate non fanno partire i video (autoplay bloccato al boot)'
 
     // ─── FASE 2: riapri con lo STESSO userData → la sessione viene ripristinata ─
     app = await launch(userData);
-    shell = await app.firstWindow();
+    shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
 
     // Tab ripristinata: autoplay disabilitato (il video non parte da solo).

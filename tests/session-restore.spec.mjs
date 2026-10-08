@@ -5,6 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback: alla riapertura di Filo devono essere riaperte tutte le tab
 // presenti al momento della chiusura.
@@ -43,7 +44,7 @@ test('reopens previous session tabs after restart', async ({ testServer }) => {
   try {
     // ── Avvio 1: apri un tab verso la pagina di test, poi chiudi ──
     app = await launch();
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const opened = await waitForTabWindow(app, host);
