@@ -574,6 +574,8 @@
     'Cohere',
     'Meta',         // produttore di Llama
     'Z.AI',         // Zhipu / GLM
+    'Xiaomi',       // MiMo
+    'NVIDIA',       // Nemotron, Parakeet
     // Non è un produttore: è un host che nel banco di prova del 30/08 ha
     // risposto ad alcune richieste con la risposta di un'ALTRA richiesta in
     // corso (media 0.42 contro 0.84-0.91 degli altri host). Escluso per tutti i
@@ -586,7 +588,7 @@
   // `kind`: 'producer' (produce i modelli) | 'unreliable' (serve male).
   const EXCLUDED_PROVIDER_KINDS = ['producer', 'unreliable'];
   const DEFAULT_EXCLUDED_PROVIDER_REASONS = [
-    ...['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI']
+    ...['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI', 'Xiaomi', 'NVIDIA']
       .map((name) => ({ name, kind: 'producer', note: '' })),
     { name: 'Novita', kind: 'unreliable', note: 'Banco di prova del 30/08/2026: ha risposto con la risposta di un\'altra richiesta.' },
   ];
@@ -651,6 +653,45 @@
     const rule = producerOnlyRule(modelId);
     if (rule && !names.some((n) => matchesProviderBase(n, [...rule.hosts, ...rule.only]))) return 'not-producer';
     return '';
+  }
+
+  // Chi produce i pesi, dal prefisso dell'id dello smistatore (#1059): ogni produttore sta fra i fornitori
+  // esclusi col nome `host`; '' solo per chi non vende inferenza. Sentinella: tests/unit/produttoriEsclusi.test.mjs.
+  const MODEL_PRODUCERS = [
+    { prefix: 'google', host: 'Google' },
+    { prefix: 'openai', host: 'OpenAI' },
+    { prefix: 'x-ai', host: 'xAI' },
+    { prefix: 'deepseek', host: 'DeepSeek' },
+    { prefix: 'mistralai', host: 'Mistral' },
+    { prefix: 'moonshotai', host: 'Moonshot AI' },
+    { prefix: 'minimax', host: 'MiniMax' },
+    { prefix: 'qwen', host: 'Qwen' },
+    { prefix: 'alibaba', host: 'Qwen' },
+    { prefix: 'cohere', host: 'Cohere' },
+    { prefix: 'meta-llama', host: 'Meta' },
+    { prefix: 'z-ai', host: 'Z.AI' },
+    { prefix: 'thudm', host: 'Z.AI' },
+    { prefix: 'xiaomi', host: 'Xiaomi' },
+    { prefix: 'nvidia', host: 'NVIDIA' },
+    // Kokoro: pesi pubblicati da una persona che non vende inferenza, non c'è un fornitore da escludere.
+    { prefix: 'hexgrad', host: '' },
+  ];
+
+  // Modelli stretti che la politica compra dal produttore (transparency/models.md, «Ammessi oggi»).
+  const NARROW_MODELS = [{ prefix: 'typesafe/', producer: 'TypeSafe' }];
+
+  // Il produttore di `modelId` che `excluded` lascia fuori, '' se è escluso, se la politica lo compra
+  // dal produttore (Anthropic, modelli stretti) o se l'id non ha prefisso. Un prefisso ignoto vale da nome. PURA.
+  function producerNotExcluded(modelId, excluded) {
+    const id = String(modelId == null ? '' : modelId).trim().toLowerCase().replace(/^~/, '');
+    const slash = id.indexOf('/');
+    if (slash <= 0) return '';
+    if (producerOnlyRule(id) || NARROW_MODELS.some((m) => id.startsWith(m.prefix))) return '';
+    const prefix = id.slice(0, slash);
+    const known = MODEL_PRODUCERS.find((p) => p.prefix === prefix);
+    if (known && !known.host) return '';
+    const name = known ? known.host : prefix;
+    return isProviderExcluded(name, excluded) ? '' : name;
   }
 
   // I tempi del microfono delle chat (settings.dictation), dentro limiti che lo lasciano usabile: sotto un
