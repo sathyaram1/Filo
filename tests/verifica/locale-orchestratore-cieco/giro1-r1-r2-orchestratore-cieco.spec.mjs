@@ -23,8 +23,11 @@ test('r1 sul ramo di un worker nato prima di questo lavoro il suo testo non arri
   const progetto = cartellaTemporanea('filo-ramo-vecchio-');
   try {
     // La cartella del progetto com'è su un ramo nato da main prima della fusione di questo lavoro.
-    const tar = execFileSync('git', ['-C', RADICE, 'archive', 'origin/main', '.claude'], { maxBuffer: 64 * 1024 * 1024 });
-    execFileSync('tar', ['-x', '-C', progetto], { input: tar });
+    const git = (...a) => execFileSync('git', ['-C', RADICE, ...a], { maxBuffer: 64 * 1024 * 1024 });
+    for (const f of git('ls-tree', '-r', '--name-only', 'origin/main', '--', '.claude').toString().split('\n').filter(Boolean)) {
+      mkdirSync(dirname(join(progetto, f)), { recursive: true });
+      writeFileSync(join(progetto, f), git('show', `origin/main:${f}`));
+    }
     mkdirSync(join(progetto, '.claude'), { recursive: true });
     // Il marcatore scritto dal preflight sopravvive al cambio di ramo (è escluso in locale).
     writeFileSync(join(progetto, '.claude', 'routine-orchestratore.json'), JSON.stringify({ sessione: 'S1', creato: Date.now() }));
