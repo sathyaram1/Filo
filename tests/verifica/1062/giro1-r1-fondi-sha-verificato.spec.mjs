@@ -114,7 +114,6 @@ async function fondi(sc, radice, primaDelServer = () => {}) {
   } finally { globalThis.fetch = vero; }
 }
 
-test.describe.configure({ mode: 'serial' });
 test.setTimeout(180_000);
 
 test('r1 un commit spinto sul ramo del server mentre server:fondi prepara la fusione non entra in main', async () => {
