@@ -382,8 +382,8 @@
     },
     {
       id: 'transparency-docs', title: 'Perché Filo fa così (trasparenza)', category: 'assistant',
-      desc: 'Le scelte dichiarate di Filo, scritte per esteso e con le fonti: quali modelli AI usa e quali aziende esclude, e perché; quali dati restano sul tuo computer, quali escono, verso chi e perché, con i punti deboli; come sono difesi il codice che si riscrive dai feedback e gli agenti che agiscono sul computer, e come controllare che il file scaricato venga dal codice pubblico. Le stesse pagine le puoi leggere anche senza connessione, e puoi chiederne conto a Filo in chat — le rilegge e risponde con quello che c’è scritto, invece di improvvisare. La sezione su come Filo si sostiene è in arrivo.',
-      invoke: 'Pagina filo://transparency/transparency.html (Modelli, Privacy, Sicurezza); in chat basta chiedere perché Filo usa un certo modello, quali dati condivide o com’è protetto.',
+      desc: 'Le scelte dichiarate di Filo, scritte per esteso e con le fonti: quali modelli AI usa e quali aziende esclude, e perché; quali dati restano sul tuo computer, quali escono, verso chi e perché, con i punti deboli; come sono difesi il codice che si riscrive dai feedback e gli agenti che agiscono sul computer, e come controllare che il file scaricato venga dal codice pubblico. Le stesse pagine le puoi leggere anche senza connessione, e puoi chiederne conto a Filo in chat — le rilegge e risponde con quello che c’è scritto, invece di improvvisare. La sezione su come Filo si sostiene è in arrivo; per ora la pagina dice: «Questa pagina la scrivo quando Filo comincerà a chiedere pagamenti: dirà quanto costa, dove vanno i soldi e quanto ci guadagno. Fino ad allora è tutto offerto. Se usi una tua chiave OpenRouter, paghi solo quella.»',
+      invoke: 'Pagina filo://transparency/transparency.html (Modelli, Privacy, Sicurezza); in chat basta chiedere perché Filo usa un certo modello, quali dati condivide, com’è protetto o quanto costa Filo.',
       doesNot: 'Non è un riassunto scritto dall’assistente: è il testo dell’autore di Filo, e quando cambia idea la pagina riporta la data dell’ultima revisione.',
     },
     {

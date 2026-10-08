@@ -12,6 +12,7 @@
       version: '0.2.238', date: '2026-10-07',
       features: [
         'Su Windows e Linux, quando una versione nuova di Filo è pronta te lo dice un avviso in basso a destra, e nella home resta una carta con «Riavvia e aggiorna» finché non la installi. Puoi anche scrivere a Filo «aggiornati». Su Windows, se non lo premi, la versione nuova si installa la prossima volta che apri Filo: vedi la barra di avanzamento per una decina di secondi e poi Filo si riapre da solo. Prima si installava di nascosto quando lo chiudevi, e se lo riaprivi in quel momento Windows diceva che il collegamento non funzionava. Chi preferisce il modo di prima lo rimette in Preferenze, Impostazioni avanzate.',
+        'Nella pagina Trasparenza, «Come si sostiene» adesso dice come stanno le cose oggi. Finché Filo non chiede pagamenti è tutto offerto, e se usi una tua chiave OpenRouter paghi solo quella. Se chiedi a Filo quanto costa, ti risponde con le stesse parole.',
       ],
       fixes: [
         'La protezione dal fingerprinting copre anche le scene 3D che un sito disegna per riconoscere la tua scheda grafica, e i disegni che prepara senza mostrarli. Prima da lì passava la tua impronta vera. Se poi una pagina salva un\'immagine prima di cominciare a disegnare, la sua grafica 3D parte lo stesso, mentre con la protezione accesa restava bloccata.',

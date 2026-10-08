@@ -33,9 +33,9 @@
 
   function currentId() {
     const q = requestedId();
-    const ids = T.ids();
-    if (ids.includes(q)) return q;
-    return q ? '' : ids[0];
+    const doc = T.get(q);
+    if (doc) return doc.id;
+    return q ? '' : (T.ids()[0] || '');
   }
 
   function renderNav(activeId) {
@@ -62,24 +62,31 @@
   // posto un altro documento senza avvisare è la stessa promessa a vuoto che
   // questa pagina esiste per non fare.
   function renderMissing(chiesto) {
-    const voce = T.NAV.find((n) => n.id === chiesto);
+    const voce = T.NAV.find((n) => n.id === T.idDi(chiesto));
     const nome = chiesto ? (voce ? voce.label : chiesto) : 'Trasparenza';
     document.title = 'Filo — ' + nome;
     $('title').textContent = nome;
     // Senza niente nell'indirizzo non c'è nessuna sezione da negare: qui non
     // c'è proprio ancora niente di scritto, e lo dice il corpo della pagina.
-    $('subtitle').textContent = !chiesto ? ''
+    // Una nota dice già da sé che la sezione non è scritta: sta al posto della frase.
+    const nota = voce ? T.nota(voce.id) : '';
+    $('subtitle').textContent = !chiesto || nota ? ''
       : (voce ? 'Questa sezione non è ancora scritta.' : 'Questa sezione non esiste.');
     $('meta').textContent = '';
 
     const body = $('doc-body');
     body.textContent = '';
+    if (nota) {
+      const n = document.createElement('p');
+      n.textContent = nota;
+      body.appendChild(n);
+    }
     const p = document.createElement('p');
     const docs = T.all();
     if (!docs.length) {
       p.textContent = 'Non c’è ancora nessun documento di trasparenza.';
     } else {
-      p.appendChild(document.createTextNode('Quello che c’è scritto: '));
+      p.appendChild(document.createTextNode(nota ? 'Intanto puoi leggere: ' : 'Quello che c’è scritto: '));
       docs.forEach((d, i) => {
         if (i) p.appendChild(document.createTextNode(', '));
         const a = document.createElement('a');
@@ -90,7 +97,7 @@
       p.appendChild(document.createTextNode('.'));
     }
     body.appendChild(p);
-    renderNav(chiesto);
+    renderNav(voce ? voce.id : chiesto);
   }
 
   function render() {

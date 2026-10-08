@@ -93,6 +93,19 @@
       + (d.sezioni.length ? '; sezioni: ' + d.sezioni.join(', ') : '') + ')').join('; ');
   }
 
+  // Le sezioni non ancora scritte che hanno una nota dell'owner su com'è oggi:
+  // si leggono come un documento, altrimenti a «quanto costa Filo?» l'agente
+  // risponderebbe «non esiste» mentre la pagina dice come stanno le cose (#888).
+  function noteTrasparenza() {
+    try {
+      const T = global.SN_TRANSPARENCY;
+      if (T && typeof T.conNota === 'function') {
+        return T.conNota().map((n) => ({ id: String(n.id || ''), label: String(n.label || '') })).filter((n) => n.id);
+      }
+    } catch (_) {}
+    return [];
+  }
+
   const RIPETI = {
     description: 'Ricorrenza: un array di giorni ["lun","mer"] (token: lun mar mer gio ven sab dom) oppure una scorciatoia "feriali" | "weekend" | "ogni giorno".',
     anyOf: [
@@ -236,19 +249,28 @@
     LEGGI_TRASPARENZA: {
       description: () => {
         const docs = docsTrasparenza();
-        const base = 'Chiede il testo di un documento di trasparenza di Filo. USALO SEMPRE prima di rispondere quando l\'utente chiede perché Filo usa un certo modello o una certa azienda, se Filo usa ChatGPT/Gemini/Grok, dove finiscono i suoi soldi o i suoi dati: sono scelte documentate per iscritto e NON vanno ricostruite a memoria. Rispondi citando il testo, senza aggiungere motivazioni tue.';
-        if (!docs.length) return base + ' In questo momento non c\'è nessun documento scritto: non chiamarlo.';
-        return base + ' I documenti scritti sono questi, e sono gli unici che esistono: '
-          + elencoTrasparenza(docs) + '. I titoli non dicono tutto: se la domanda può toccare uno di questi'
+        const note = noteTrasparenza();
+        const base = 'Chiede il testo di un documento di trasparenza di Filo. USALO SEMPRE prima di rispondere quando l\'utente chiede perché Filo usa un certo modello o una certa azienda, se Filo usa ChatGPT/Gemini/Grok, quanto costa Filo e perché è gratis, come ci guadagna, dove finiscono i suoi soldi o i suoi dati: sono scelte documentate per iscritto e NON vanno ricostruite a memoria. Rispondi citando il testo, senza aggiungere motivazioni tue.';
+        const conNote = note.length
+          ? ' Queste sezioni non sono ancora scritte ma hanno una nota breve su com\'è oggi, che si legge allo stesso modo: '
+            + note.map((n) => n.id + ' («' + n.label + '»)').join('; ') + '.'
+          : '';
+        if (!docs.length && !note.length) return base + ' In questo momento non c\'è nessun documento scritto: non chiamarlo.';
+        return base + (docs.length ? ' I documenti scritti sono questi, e sono gli unici che esistono: '
+          + elencoTrasparenza(docs) + '.' : ' Non c\'è ancora nessun documento scritto.') + conNote
+          + ' I titoli non dicono tutto: se la domanda può toccare uno di questi'
           + ' documenti, leggilo prima di rispondere. Solo se nel testo la risposta non c\'è, dillo all\'utente'
           + ' invece di rispondere a memoria.';
       },
       properties: () => {
         const docs = docsTrasparenza();
-        const testo = docs.length
-          ? 'Quale documento: ' + elencoTrasparenza(docs) + '. Sono gli unici che esistono. Senza `doc` torna l\'elenco di quelli disponibili.'
+        const note = noteTrasparenza();
+        const leggibili = docs.map((d) => d.id).concat(note.map((n) => n.id));
+        const testo = leggibili.length
+          ? 'Quale documento: ' + [elencoTrasparenza(docs), note.map((n) => n.id + ' («' + n.label + '», per ora solo una nota)').join('; ')].filter(Boolean).join('; ')
+            + '. Sono gli unici che esistono. Senza `doc` torna l\'elenco di quelli disponibili.'
           : 'Quale documento. Al momento non ne esiste nessuno: senza `doc` torna l\'elenco, che sarà vuoto.';
-        return { doc: S(testo, docs.length ? { enum: docs.map((d) => d.id) } : null) };
+        return { doc: S(testo, leggibili.length ? { enum: leggibili } : null) };
       },
       required: [],
       risultato: true,
