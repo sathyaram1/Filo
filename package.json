@@ -99,7 +99,10 @@
       "identity": null,
       "darkModeSupport": true,
       "extendInfo": {
-        "NSBluetoothAlwaysUsageDescription": "Filo usa il Bluetooth quando gli chiedi di accenderlo, di spegnerlo o di collegare un dispositivo."
+        "NSBluetoothAlwaysUsageDescription": "Filo usa il Bluetooth quando gli chiedi di accenderlo, di spegnerlo o di collegare un dispositivo.",
+        "NSDocumentsFolderUsageDescription": "Filo legge i documenti di questa cartella per ritrovarli quando glieli chiedi a parole. Il loro testo resta sul tuo computer.",
+        "NSDesktopFolderUsageDescription": "Filo legge i documenti della Scrivania per ritrovarli quando glieli chiedi a parole. Il loro testo resta sul tuo computer.",
+        "NSDownloadsFolderUsageDescription": "Filo legge i documenti scaricati per ritrovarli quando glieli chiedi a parole. Il loro testo resta sul tuo computer."
       },
       "publish": [
         {

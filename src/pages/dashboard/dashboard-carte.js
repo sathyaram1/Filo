@@ -437,7 +437,9 @@
     ico.setAttribute('aria-hidden', 'true');
     const generica = () => {
       const ICONS = global.SN_ICONS || {};
-      const nome = ICONA_SUGGERIMENTO[s.icon] || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
+      // Un nome che l'insieme delle icone conosce vale com'è: col solo elenco, «Apri Opzioni» prendeva il globo dei siti.
+      const propria = typeof ICONS[s.icon] === 'function' ? s.icon : '';
+      const nome = ICONA_SUGGERIMENTO[s.icon] || propria || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
       ico.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](14) : '';
     };
     if (url) {

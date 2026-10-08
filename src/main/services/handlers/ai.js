@@ -94,8 +94,25 @@ module.exports = function register(on, ctx) {
     try { return Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) { return true; }
   }
 
+  const tettoAutomatiche = require('../tettoAutomatiche').crea();
+  const { spingiAllaScheda } = require('../impostazioniPerOrigine');
+  // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
+  function fermataDalTetto(msg, sender) {
+    const wc = sender && sender.wc;
+    const fermo = tettoAutomatiche.passa(msg, wc);
+    if (!fermo) return null;
+    const I18n = globalThis.SN_I18N;
+    const frase = I18n ? I18n.t(`toast_tetto_${fermo.gruppo}`, fermo.tetto) : `${fermo.gruppo}: ${fermo.tetto}`;
+    if (fermo.primo) {
+      try { spingiAllaScheda(wc, { type: MSG.SHOW_TOAST, text: frase, duration: 9000 }, { inVista: true }); } catch (_) {}
+    }
+    return { ok: false, code: 'TROPPE_AUTOMATICHE', error: frase };
+  }
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
+    const fermata = fermataDalTetto(msg, sender);
+    if (fermata) return fermata;
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
@@ -687,7 +704,7 @@ module.exports = function register(on, ctx) {
     (async () => {
       try {
         const settings = await getEffectiveSettings();
-        if (!settings.apiKeys?.[settings.provider]) return;
+        if (!SN_CONST.canServeAction(settings, SN_CONST.ACTIONS.HELP_INTENT_GUESS)) return;
         // Niente user agent e nessun identificativo del mittente (#584): nel
         // documento non ci entrano, e sistema operativo più versione più lingua
         // bastavano a rimettere insieme i percorsi della stessa installazione su

@@ -54,9 +54,11 @@
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
       },
-      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
+      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle' },
       fuori: {},
       messaggi: {
+        DOCUMENTI_STATO: 'CERCA_DOCUMENTI',
+        DOCUMENTI_SCEGLI_CARTELLA: 'apre la finestra del sistema per scegliere una cartella: dalla chat la cartella si dice col suo percorso (cartelle_documenti)',
         FILO_MEMORY_VIEW: 'DIMENTICA',
         FILO_MEMORY_FORGET: 'DIMENTICA',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',

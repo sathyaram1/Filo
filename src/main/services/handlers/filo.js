@@ -8,6 +8,7 @@ module.exports = function register(on, ctx) {
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
+  const { SN_CONST } = globalThis;
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
   const Onboarding = globalThis.SN_ONBOARDING;
@@ -395,12 +396,12 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_GET_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: true, onboarding: { done: true, ticked: [], thread: [] }, ready: false };
-    // Senza un modello a disposizione (nessun accesso, nessuna chiave) Filo non
-    // può sostenere una conversazione: l'intervista resta in attesa e la home
-    // mostra come attivare Filo. Aprirla comunque significherebbe accogliere
-    // l'utente con una bolla d'errore. Appena c'è la chiave, parte da sola.
+    // Senza un modello che la chat possa chiamare l'intervista resta in attesa
+    // e la home dice cosa manca: accoglierlo con una bolla d'errore sarebbe
+    // peggio. La domanda è «questa chiamata parte?», non «c'è una chiave
+    // intestata al fornitore dichiarato»: quel campo può essere vecchio (#663).
     const settings = await ctx.getEffectiveSettings();
-    const ready = !!(settings.apiKeys?.[settings.provider]);
+    const ready = SN_CONST.canServeAction(settings, SN_CONST.ACTIONS.FILO_CHAT);
     let state = await FiloMem.getOnboarding();
     // `peek`: chi legge soltanto (Preferenze, per rileggere le interviste
     // conservate) non deve aprire niente né prenotare la ripresa di un turno.

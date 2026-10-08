@@ -58,6 +58,13 @@
     .mem-riga:hover .mem-via, .mem-via:focus-visible { opacity: 0.85; }
     .mem-via:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.18)); color: var(--sn-error); }
     .mem-via:disabled { cursor: default; opacity: 0.2; }
+    /* Ricerca nei documenti (#947): cartelle come righe della memoria; quelle di serie tolte restano sbiadite. */
+    .doc-dove { display: block; font-size: 12px; color: var(--sn-muted); overflow-wrap: anywhere; }
+    .doc-tolta .mem-testo { opacity: 0.55; }
+    .doc-dove.doc-negata { color: var(--sn-error); }
+    .doc-rimetti { flex: 0 0 auto; border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 13px; padding: 2px 8px; border-radius: 6px; opacity: 0.6; transition: opacity 0.15s ease, background 0.15s ease; }
+    .doc-rimetti:hover, .doc-rimetti:focus-visible { opacity: 1; background: var(--sn-hover, rgba(127, 127, 127, 0.18)); }
+    .doc-piede { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -316,6 +323,17 @@
           <span>Dai da solo un nome sensato ai file scaricati</span>
         </label>
       </div>
+    </section>
+
+    <section id="sec-documenti">
+      <h2>Ricerca nei documenti</h2>
+      <p class="sn-muted">Chiedi a Filo un tuo documento a parole, come «la bolletta della luce di marzo»: lo cerca in queste cartelle leggendone il testo, anche se il file si chiama «scan_00231.pdf». Il testo resta sul computer, e a un modello arrivano solo i pochi documenti candidati di una ricerca.</p>
+      <div id="documentiCartelle" class="mem-box"></div>
+      <div class="doc-piede">
+        <button type="button" class="sn-btn sn-btn-secondary" id="documentiAggiungi">Aggiungi una cartella</button>
+        <span id="documentiStato" class="sn-muted" aria-live="polite"></span>
+      </div>
+      <span id="documentiHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
     </section>
 
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">

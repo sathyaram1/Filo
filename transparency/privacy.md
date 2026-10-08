@@ -2,7 +2,7 @@
 id: privacy
 title: Privacy
 subtitle: Cosa resta sul tuo computer, cosa esce, verso chi, e perché.
-updated: 2026-10-04
+updated: 2026-10-08
 order: 2
 ---
 
@@ -18,7 +18,7 @@ La seconda: **se qualcosa può stare sul tuo computer, sta sul tuo computer.** L
 
 ## Cosa resta sul tuo computer
 
-Tutto quello che Filo sa di te vive nella sua cartella dei dati, dentro la tua cartella utente (su Windows sta in AppData, sotto Filo). Ci sono le impostazioni, le memorie che Filo si è fatto su di te, le chat, l'elenco delle richieste fatte ai modelli con domanda e risposta, gli appunti e i documenti dell'editor, le pagine salvate, le pagine visitate, le schede aperte e quelle archiviate, i download, la cronologia di quello che copi, i timer e le notifiche, una copia delle segnalazioni che hai mandato, i nomi dei siti in cui Filo ha visto un campo password o di carta (per tenerli fra le pagine delicate anche dopo un riavvio; li vedi in Sicurezza, dove ne togli uno quando per te non è delicato, e se ne vanno quando cancelli le pagine visitate di quel sito, o tutte), un registro delle azioni recenti che Filo usa per ricordarsi cosa è successo, i costi mese per mese. E per un mese i segreti letti: le chiavi di accesso, gli IBAN e i numeri di carta che Filo ha trovato in una pagina, in un documento o nell'uscita di un comando. Li tiene per riconoscerli se un link o una ricerca provasse a portarli fuori, e non li mostra mai a un modello.
+Tutto quello che Filo sa di te vive nella sua cartella dei dati, dentro la tua cartella utente (su Windows sta in AppData, sotto Filo). Ci sono le impostazioni, le memorie che Filo si è fatto su di te, le chat, l'elenco delle richieste fatte ai modelli con domanda e risposta, gli appunti e i documenti dell'editor, le pagine salvate, le pagine visitate, le schede aperte e quelle archiviate, i download, la cronologia di quello che copi, i timer e le notifiche, una copia delle segnalazioni che hai mandato, i nomi dei siti in cui Filo ha visto un campo password o di carta (per tenerli fra le pagine delicate anche dopo un riavvio; li vedi in Sicurezza, dove ne togli uno quando per te non è delicato, e se ne vanno quando cancelli le pagine visitate di quel sito, o tutte), un registro delle azioni recenti che Filo usa per ricordarsi cosa è successo, i costi mese per mese. C'è anche l'indice dei tuoi documenti: nome, data e testo dei file nelle cartelle in cui Filo li cerca quando glieli chiedi a parole (di serie Documenti, Download e Scrivania; le cambi in Preferenze, e una cartella tolta esce dall'indice). E per un mese i segreti letti: le chiavi di accesso, gli IBAN e i numeri di carta che Filo ha trovato in una pagina, in un documento o nell'uscita di un comando. Li tiene per riconoscerli se un link o una ricerca provasse a portarli fuori, e non li mostra mai a un modello.
 
 Questi file li legge in chiaro chi ha accesso al tuo computer, come qualunque documento tuo. Fanno eccezione le chiavi (quelle che scrivi nelle Opzioni, la chiave dei crediti e il tuo accesso Google) e i segreti letti, che Filo cifra con il portachiavi del sistema operativo. Se il portachiavi non c'è (succede su alcuni Linux), l'accesso Google e la chiave dei crediti non vengono salvati affatto, mentre le chiavi delle Opzioni e i segreti letti restano in chiaro.
 
@@ -35,6 +35,7 @@ Filo funziona con modelli linguistici, e un modello risponde solo a quello che g
 - **L'Aiuto sulla pagina.** Indirizzo e titolo della pagina, la sua struttura e uno screenshot della parte visibile, perché l'agente deve vedere dove cliccare.
 - **La chat con Filo e la home.** La conversazione, le tue memorie, i riassunti dei documenti dell'editor, timer, notifiche, pagine salvate, le azioni recenti e i titoli delle schede aperte (fino a dodici, senza i loro indirizzi). Di una pagina delicata, al posto del titolo, solo il nome del sito.
 - **Il terminale e i documenti.** Quando Filo lancia un comando o legge un file per risponderti, quello che il comando stampa o il file contiene. Il terminale è acceso di serie: i comandi che leggono soltanto partono senza chiedere, e così la lettura dei documenti nella tua cartella utente. Fuori da lì Filo chiede un OK. Il terminale si spegne dalle Preferenze.
+- **La ricerca nei documenti.** Quando chiedi un documento descrivendolo («la bolletta della luce di marzo»), la ricerca la fa Filo sul tuo computer, nell'indice. Al modello arrivano nome, cartella, data e un pezzo di testo dei candidati migliori, al massimo otto, per scegliere quello giusto; il testo intero va solo del documento che poi legge per risponderti. I documenti non partono mai tutti insieme verso un modello.
 - **Le schede.** Il riassunto delle schede chiuse e la pulizia automatica, descritti qui sotto.
 - **Correttore e riscrittura.** Il testo che stai scrivendo e il suo contesto. Il correttore è acceso di serie e guarda le aree di testo di ogni sito, mai i campi da una riga né le password.
 - **L'editor.** Il documento, quando gli fai una domanda o quando Filo ne scrive titolo e riassunto.

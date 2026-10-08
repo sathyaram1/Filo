@@ -22,6 +22,7 @@
 
   // Dipendenze dalla pagina, riempite da init().
   let send = null;
+  let allegaFile = null;
   let faviconUrl = () => '';
   let applyCommandCwd = () => {};
   let paroleUtente = () => [];
@@ -501,6 +502,7 @@
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
     CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
+    CERCA_DOCUMENTI: (n) => (n > 1 ? `cercato fra i tuoi documenti ${n} volte` : 'cercato fra i tuoi documenti'),
     RINOMINA_FILE: () => 'dato un nome ai file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
@@ -662,6 +664,7 @@
       const nome = (a._output && a._output.name) || '';
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
+    CERCA_DOCUMENTI: (a) => ({ icon: '🔎', text: testoRicercaDocumenti(a) }),
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
@@ -772,6 +775,7 @@
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
+    CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
@@ -1248,7 +1252,75 @@
   // #950 — un file trovato da Filo: dal tasto destro si apre o gli si dà un nome sensato, e il riferimento in
   // chat segue il nome nuovo (un clic dopo apre il file, non il percorso che non c'è più).
   const nomeDelPercorso = (p) => String(p || '').split(/[\\/]/).pop();
-  function menuDelFile(btn, a) {
+  // Un percorso sul disco (assoluto, con ~ o con la lettera del disco), non un indirizzo web.
+  const percorsoLocale = (p) => {
+    const s = String(p || '').trim();
+    return !!s && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s) && (/^([\\/]|~([\\/]|$)|[a-z]:[\\/])/i.test(s));
+  };
+  // Se il bottone non porta il «dove» coi nomi di Filo (una chat riaperta): le ultime due cartelle; il percorso intero sta
+  // nel suggerimento.
+  function cartellaBreve(p) {
+    const pezzi = String(p || '').split(/[\\/]+/).filter(Boolean);
+    pezzi.pop();
+    return pezzi.slice(-2).join(' › ');
+  }
+  function esitoSulFile(btn, testo) {
+    const R = window.SN_RINOMINA_UI;
+    if (R && R.esito) R.esito(btn, testo, { errore: true });
+    else btn.title = testo;
+  }
+  async function apriFileDaChat(btn, a) {
+    const percorso = String(a.percorso || a.path || '');
+    let r = null;
+    try { r = await send({ type: MSG.FILE_APRI, percorso }); } catch (_) { r = null; }
+    if (!r || !r.ok) esitoSulFile(btn, (r && r.frase) || 'Il file non si è aperto');
+  }
+  async function mostraNellaCartella(btn, a) {
+    const percorso = String(a.percorso || a.path || '');
+    let r = null;
+    try { r = await send({ type: MSG.FILE_MOSTRA_CARTELLA, percorso }); } catch (_) { r = null; }
+    if (!r || !r.ok) esitoSulFile(btn, (r && r.frase) || 'La cartella non si è aperta');
+    else if (r.mancaIlFile) esitoSulFile(btn, 'Il file non c’è più in quella cartella: forse è stato spostato o rinominato');
+  }
+  // #947 — il documento trovato: un clic lo apre col programma del sistema, il tasto destro ha le azioni di un file,
+  // e si trascina nel campo dove si scrive a Filo (o fuori, in un altro programma, col suo percorso).
+  function bottoneFile(a) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn dash-file-btn';
+    btn.draggable = true;
+    const icona = document.createElement('span');
+    icona.className = 'dash-file-btn-icona';
+    icona.setAttribute('aria-hidden', 'true');
+    const ICONE = window.SN_ICONS;
+    if (ICONE && typeof ICONE.readDocument === 'function') icona.innerHTML = ICONE.readDocument(15);
+    const nome = document.createElement('span');
+    nome.className = 'dash-file-btn-nome';
+    const dove = document.createElement('span');
+    dove.className = 'dash-file-btn-dove';
+    btn.append(icona, nome, dove);
+    const disegna = () => {
+      const p = String(a.percorso || a.path || '');
+      nome.textContent = a.etichetta || a.label || nomeDelPercorso(p) || 'File';
+      const doveFilo = a._output && typeof a._output.dove === 'string' ? a._output.dove : '';
+      dove.textContent = doveFilo || cartellaBreve(p);
+      dove.hidden = !dove.textContent;
+      btn.title = `Apri · ${p}`;
+      btn.dataset.percorso = p;
+    };
+    disegna();
+    btn.addEventListener('click', () => apriFileDaChat(btn, a));
+    btn.addEventListener('dragstart', (e) => {
+      const p = String(a.percorso || a.path || '');
+      if (!e.dataTransfer || !p) return;
+      e.dataTransfer.setData('application/x-filo-file', p);
+      e.dataTransfer.setData('text/plain', p);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    menuDelFile(btn, a, { disegna, locale: true });
+    return btn;
+  }
+  function menuDelFile(btn, a, { disegna = null, locale = false } = {}) {
     const R = window.SN_RINOMINA_UI;
     if (!R) return;
     const aggiorna = (r) => {
@@ -1260,6 +1332,7 @@
       if (etichetta && (etichetta === vecchio || etichetta === nomeDelPercorso(vecchio))) {
         if (a.etichetta) a.etichetta = r.nome; else a.label = r.nome;
       }
+      if (disegna) { disegna(); return; }
       btn.href = r.a;
       btn.textContent = a.etichetta || a.label || r.a;
     };
@@ -1272,6 +1345,10 @@
         const percorso = String(a.percorso || a.path || '');
         const nome = nomeDelPercorso(percorso);
         const voci = [['Apri', () => btn.click()]];
+        if (locale && percorso) {
+          voci.push(['Mostra nella cartella', () => mostraNellaCartella(btn, a)]);
+          if (allegaFile) voci.push(['Metti nel messaggio', () => allegaFile(String(a.percorso || a.path || ''))]);
+        }
         if (disp && percorso && R.tipoSupportato(nome)) {
           voci.push([R.VOCE, () => R.apri({ ancora: btn, percorso, nome, suRinominato: aggiorna, suRimesso: aggiorna })]);
         }
@@ -1283,6 +1360,17 @@
     btn.addEventListener('keydown', (e) => {
       if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) apriMenu(e);
     });
+  }
+
+  // «Cercato fra i documenti · bolletta luce marzo · 8 trovati»: dice anche quando la ricerca è stata fermata.
+  function testoRicercaDocumenti(a) {
+    const o = (a && a._output) || {};
+    const q = String((a && (a.cosa || a.query)) || o.cercato || '').trim();
+    const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
+    if (o.cartellaMancante) return `Cartella non trovata · ${o.cartellaMancante}`;
+    const n = Array.isArray(o.risultati) ? o.risultati.length : null;
+    const quanti = n == null ? '' : (n ? ` · ${n === 1 ? 'uno trovato' : `${n} trovati`}` : ' · nessuno trovato');
+    return `Cercato fra i documenti${breve ? ` · ${breve}` : ''}${quanti}${o.fermata ? ' · fermata da te' : ''}`;
   }
 
   function testoRinominati(o) {
@@ -1507,6 +1595,7 @@
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
+    if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';
@@ -1585,6 +1674,7 @@
       const c = String(a.cerca || '').trim();
       return stepTrace(c ? `⚙ Leggo come è impostato: ${c}` : '⚙ Leggo le impostazioni');
     }
+    if (type === 'CERCA_DOCUMENTI') return stepTrace(`🔎 ${testoRicercaDocumenti(a)}`);
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
       // per iscritto prima di rispondere sul perché di un modello o di un dato.
@@ -1792,6 +1882,7 @@
 
   function init(deps) {
     send = deps.send;
+    if (deps.allegaFile) allegaFile = deps.allegaFile;
     if (deps.faviconUrl) faviconUrl = deps.faviconUrl;
     if (deps.applyCommandCwd) applyCommandCwd = deps.applyCommandCwd;
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;

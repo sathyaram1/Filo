@@ -94,6 +94,8 @@
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
+    // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
+    allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
     archiviaAzione: (type, cambi) => {
       const id = chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];
@@ -562,6 +564,19 @@
     renderSuggestions();
   }
 
+  // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è
+  // ciò che l'utente aspetta al primo avvio; se resta chiusa (già fatta, o
+  // c'è una conversazione in corso) si rifà almeno il messaggio della home,
+  // che altrimenti continua a spiegare un silenzio finito (#663).
+  async function risvegliaHome() {
+    await Accoglienza.maybeOpenOnboardingLater();
+    if (Accoglienza.isActive() || document.body.dataset.state !== 'home') return;
+    // Senza `force`: chi sa rispondere serve subito il saluto d'attesa e si
+    // rifà il messaggio nel giro in background, invece di far aspettare
+    // l'utente davanti a una chiamata al modello.
+    await loadDashboard();
+  }
+
   // ===== Bolle conversazione =====
   function makeBubble({ role, text, pending = false, markdown = false }) {
     const div = document.createElement('div');
@@ -613,6 +628,7 @@
     CERCA_WEB: 'Cerco sul web…',
     LEGGI_FILE: 'Leggo un file…',
     LEGGI_DOCUMENTO: 'Leggo il documento…',
+    CERCA_DOCUMENTI: 'Cerco fra i tuoi documenti…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
@@ -637,11 +653,14 @@
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
   }
-  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio.
-  function progressLabelFor(type, fatti, totali) {
-    const base = startLabelFor(type);
+  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio, e quale.
+  const PROGRESS_LABELS = { CERCA_DOCUMENTI: 'Leggo i documenti nuovi…' };
+  function progressLabelFor(type, fatti, totali, dettaglio) {
+    const base = PROGRESS_LABELS[String(type || '').toUpperCase()] || startLabelFor(type);
     const n = Number(totali);
-    return n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
+    const conto = n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
+    const quale = String(dettaglio || '').trim();
+    return quale ? `${conto} · ${quale.length > 60 ? `${quale.slice(0, 59)}…` : quale}` : conto;
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
@@ -735,7 +754,7 @@
         if (data.kind === 'start') {
           pending.working(startLabelFor(data.type), String(data.callId || ''));
         } else if (data.kind === 'progress') {
-          pending.working(progressLabelFor(data.type, data.fatti, data.totali));
+          pending.working(progressLabelFor(data.type, data.fatti, data.totali, data.dettaglio));
         } else if (data.kind === 'done') {
           const a = data.action;
           if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
@@ -839,14 +858,21 @@
       // lo status.
       const W = window.SN_WALLET;
       const keyRefused = r && 'keyRefused' in r ? Boolean(r.keyRefused) : Boolean(W && W.isKeyRefusalStatus(r?.status));
-      if (r?.code === 'NO_API_KEY' || keyRefused) {
-        const credits = document.createElement('button');
-        credits.type = 'button';
-        credits.className = 'dash-action-btn';
-        credits.textContent = 'Apri Crediti';
-        credits.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter';
-        credits.addEventListener('click', () => chrome.tabs.create({ url: 'filo://credits/credits.html' }));
-        row.appendChild(credits);
+      // Dove si rimedia lo dice chi conosce i codici, non un elenco di casi
+      // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
+      // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
+      const CE = window.SN_CHAT_ERRORS;
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused }) : null;
+      if (pagina) {
+        const via = document.createElement('button');
+        via.type = 'button';
+        via.className = 'dash-action-btn';
+        via.textContent = pagina.label;
+        via.title = pagina.dove === 'opzioni'
+          ? 'Scegli il modello per questa funzione'
+          : (r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter');
+        via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
+        row.appendChild(via);
       }
       if (r?.code === 'NO_API_KEY') err.dataset.senzaCrediti = '1';
       // #524 — durante l'accoglienza il solo "Riprova" è un vicolo cieco: se il
@@ -1279,6 +1305,9 @@
   // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
+    // Un file trovato da Filo in chat, trascinato qui: entra come quelli trascinati dal disco.
+    const daChat = e.dataTransfer?.getData('application/x-filo-file') || '';
+    if (daChat) { addPendingFile(daChat); inputEl.focus(); return; }
     const files = e.dataTransfer?.files;
     if (files && files.length) {
       for (const f of files) handleDroppedFile(f);
@@ -1457,11 +1486,21 @@
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
       // scheda nuova.
       if (msg.signedIn) Accoglienza.maybeOpenOnboardingLater();
-    } else if (msg?.type === MSG.CREDITS_CHANGED && msg.walletNotice) {
+    } else if (msg?.type === MSG.CREDITS_CHANGED) {
       // Un invito riscattato da fuori (#651): il link aperto da un'altra
       // applicazione, o l'invito che aspettava questa installazione al primo
       // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
       inCodaPopup(chiediBenvenuto);
+      // Con i crediti arriva anche il modo di rispondere: l'accoglienza che
+      // aspettava parte adesso, come già fa all'accesso. Senza, chi entrava con
+      // un invito la vedeva solo alla scheda dopo (#663).
+      Accoglienza.maybeOpenOnboardingLater();
+    } else if (msg?.type === MSG.FILO_READY_CHANGED) {
+      // Adesso Filo ha (o non ha più) un modello da chiamare. La home aperta si
+      // rifà da sé: chi aspettava la configurazione condivisa, che arriva dalla
+      // rete dopo l'avvio, restava sul cartello «non posso rispondere» fino a
+      // un ricaricamento (#663).
+      risvegliaHome().catch(() => {});
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): la spinta arriva a ogni home, lo racconta chi lo prende (#664).
       inCodaPopup(chiediRegalo);

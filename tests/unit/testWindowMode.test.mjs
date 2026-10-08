@@ -79,12 +79,14 @@ test('in modalità test openExternal e openPath non aprono niente e lo dicono su
   assert.equal(silenziaApertureDiSistema(shell, { inTest: true, avvisa: (r) => righe.push(r) }), true);
   const a = await shell.openExternal('https://accounts.google.com/o/oauth2/v2/auth?x=1');
   const b = await shell.openPath('/una/cartella/file.pdf');
+  shell.showItemInFolder('/una/cartella/file.pdf');
   assert.equal(a, undefined);
   assert.equal(b, '', 'openPath deve rispondere come Electron quando va bene: stringa vuota');
   assert.deepEqual(chiamate, [], 'l\'originale non va chiamato');
   assert.deepEqual(righe, [
     '[test] openExternal soppresso: https://accounts.google.com/o/oauth2/v2/auth?x=1',
     '[test] openPath soppresso: /una/cartella/file.pdf',
+    '[test] showItemInFolder soppresso: /una/cartella/file.pdf',
   ]);
 });
 
