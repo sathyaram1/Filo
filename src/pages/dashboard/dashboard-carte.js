@@ -174,7 +174,7 @@
       chiave: `download:${r.id}`, tipo: 'download', icona: 'download', titolo: nome,
       togli: () => muovi({ tipo: 'nascondi', chiave: `download:${r.id}` }), etichettaTogli: 'Togli dalla home',
       esterno: 'download',
-      altreVoci: [{ etichetta: 'Mostra negli Scaricamenti', fai: () => apri(URL_SCARICAMENTI) }],
+      altreVoci: [{ etichetta: 'Mostra nei Download', fai: () => apri(URL_SCARICAMENTI) }],
     };
     if (r.state === 'progressing' || r.state === 'paused') {
       const fermo = r.state === 'paused';
@@ -197,7 +197,7 @@
         ...base,
         stato: 'è un programma: aspetta il tuo sì',
         principale: { etichetta: 'Decidi', fai: () => apri(URL_SCARICAMENTI) },
-        filo: `«${nome}» è un programma: lo scarico solo se mi dici di sì, dagli Scaricamenti.`,
+        filo: `«${nome}» è un programma: lo scarico solo se mi dici di sì, dai Download.`,
       };
     }
     const cartella = {

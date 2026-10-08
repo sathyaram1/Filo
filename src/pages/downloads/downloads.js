@@ -412,7 +412,7 @@
     if (!filtered.length) {
       const empty = $('empty');
       empty.textContent = (items.length && q)
-        ? 'Nessuno scaricamento corrisponde alla ricerca.'
+        ? 'Nessun download corrisponde alla ricerca.'
         : 'Non hai ancora scaricato nulla.';
       empty.hidden = false;
       list.textContent = '';
@@ -453,8 +453,8 @@
       // Una voce in attesa di conferma NON è conclusa: "Svuota" non deve
       // promettere di toglierla (il main la tiene, e giustamente) (#588).
       const hasTerminal = items.some((r) => !isActive(r) && r.state !== 'pending');
-      if (!hasTerminal) { flash('Nessuno scaricamento concluso da rimuovere'); return; }
-      const text = 'Rimuovere dall’elenco tutti gli scaricamenti conclusi? Gli scaricamenti in corso restano.';
+      if (!hasTerminal) { flash('Nessun download concluso da rimuovere'); return; }
+      const text = 'Rimuovere dall’elenco tutti i download conclusi? Quelli in corso restano.';
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({ title: 'Svuota elenco', text, okLabel: 'Svuota' })
         : window.confirm(text);
