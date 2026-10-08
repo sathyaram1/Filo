@@ -393,10 +393,10 @@ function ordina(documenti, richiesta, { limite = 8 } = {}) {
   // A parità (le bollette di marzo di tre anni, scritte allo stesso modo) viene prima la più recente: chi chiede «la
   // bolletta di marzo» vuole l'ultima, non quella che l'indice ha letto per prima.
   const ordinati = [];
-  for (let a = 0; a < risultati.length;) {
+  for (let a = 0; a < vicini.length;) {
     let b = a + 1;
-    while (b < risultati.length && risultati[b].punteggio >= risultati[a].punteggio * (1 - PARI)) b += 1;
-    ordinati.push(...risultati.slice(a, b).sort((x, y) => y.recente - x.recente));
+    while (b < vicini.length && vicini[b].punteggio >= vicini[a].punteggio * (1 - PARI)) b += 1;
+    ordinati.push(...vicini.slice(a, b).sort((x, y) => y.recente - x.recente));
     a = b;
   }
   return ordinati.slice(0, limite).map(({ recente, ...r }) => r);
