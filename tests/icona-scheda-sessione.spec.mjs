@@ -106,3 +106,28 @@ test('passando a un altro sito l\'icona di prima non resta sulla scheda mentre a
   expect(await iconaDi('secondo.test'), 'l\'icona del primo sito sul secondo dice il falso').not.toContain(icone.rossa);
   await expect.poll(() => iconaDi('secondo.test'), { timeout: 15000 }).toContain(icone.blu);
 });
+
+test('un aggiornamento delle schede non rispedisce né ridisegna le icone che non sono cambiate', async ({ app, shell, openTab, testServer }) => {
+  const ico = testServer.asset(Buffer.from(PNG_B64, 'base64'), 'image/png');
+  await openTab(testServer.html(`<!doctype html><html><head><meta charset="utf-8"><title>Ferma</title><link rel="icon" href="${ico}"></head><body>x</body></html>`));
+  await expect.poll(async () => (await sfondoIcona(shell)).some((s) => s.includes(PNG_B64)), { timeout: 15000 }).toBe(true);
+  await shell.evaluate((png) => {
+    window.__nodoIcona = [...document.querySelectorAll('.tab .favicon')].find((x) => x.style.backgroundImage.includes(png));
+    window.__arrivi = [];
+    window.filoShell.tabs.onUpdate((snap) => window.__arrivi.push(JSON.stringify(snap)));
+  }, PNG_B64);
+  // Un aggiornamento qualunque (titolo, caricamento, audio) ridisegna tutta la barra.
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs._broadcast();
+  });
+  await expect.poll(() => shell.evaluate(() => window.__arrivi.length), { timeout: 5000 }).toBeGreaterThan(0);
+  const esito = await shell.evaluate((png) => ({
+    // Le altre schede possono ricevere ancora la loro icona: conta che questa non viaggi più.
+    rispedita: window.__arrivi.some((a) => a.includes(png)),
+    stessoNodo: window.__nodoIcona.isConnected,
+    mostrata: [...document.querySelectorAll('.tab .favicon')].some((x) => x.style.backgroundImage.includes(png)),
+  }), PNG_B64);
+  expect(esito.rispedita, 'l\'icona non cambiata non viaggia di nuovo').toBe(false);
+  expect(esito.stessoNodo, 'l\'icona non cambiata non si ridisegna').toBe(true);
+  expect(esito.mostrata).toBe(true);
+});

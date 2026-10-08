@@ -3296,11 +3296,27 @@ class TabManager {
     this.anteprime.pota(new Set(this.tabs.map((t) => t.id)));
     // La shell è il primary webContents della BrowserWindow.
     try {
-      this.win.webContents.send('tabs:updated', this.snapshot());
+      this.win.webContents.send('tabs:updated', this._snapshotPerBarra());
     } catch (_) { /* shell non ancora caricata */ }
     this.barra.aggiornaNav();
     this._annunciaVista();
     this._persistSession();
+  }
+
+  // Alla barra un'icona viaggia solo quando cambia: rispedirle tutte a ogni aggiornamento la bloccava con icone pesanti (#1083).
+  // Chi la riceve riprende le altre dall'ultimo snapshot; quello chiesto con tabs:snapshot resta intero.
+  _snapshotPerBarra() {
+    const snap = this.snapshot();
+    const prima = this._iconeInviate || new Map();
+    this._iconeInviate = new Map();
+    for (const t of snap.tabs) {
+      this._iconeInviate.set(t.id, t.favicon);
+      if (t.favicon && prima.get(t.id) === t.favicon) {
+        delete t.favicon;
+        t.faviconUguale = true;
+      }
+    }
+    return snap;
   }
 
   // ─── persistenza sessione (riapri i tab alla riapertura di Filo) ──────────

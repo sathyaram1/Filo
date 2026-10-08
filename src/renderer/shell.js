@@ -1009,6 +1009,35 @@
     });
   }
 
+  // Il main rispedisce un'icona solo quando cambia (`faviconUguale`): le altre si riprendono dall'ultimo snapshot.
+  const iconeNote = new Map();
+  function conIcone(snap) {
+    if (!snap || !Array.isArray(snap.tabs)) return snap;
+    const vive = new Map();
+    for (const t of snap.tabs) {
+      if (t.faviconUguale) t.favicon = iconeNote.get(t.id) || '';
+      vive.set(t.id, t.favicon || '');
+    }
+    iconeNote.clear();
+    for (const [id, dato] of vive) iconeNote.set(id, dato);
+    for (const id of nodiIcona.keys()) if (!vive.has(id)) nodiIcona.delete(id);
+    return snap;
+  }
+
+  // Il nodo dell'icona si riusa finché l'immagine resta quella: riscrivere a ogni ridisegno un data: URL da centinaia di KB blocca la barra.
+  // Solo byte già scaricati dal main con la sessione della scheda: un indirizzo qui girerebbe nella sessione della barra (#1083).
+  const nodiIcona = new Map();
+  function nodoIcona(t) {
+    const dato = /^data:image\//.test(t.favicon || '') ? t.favicon : '';
+    const noto = nodiIcona.get(t.id);
+    if (noto && noto.dato === dato) return noto.el;
+    const el = document.createElement('div');
+    el.className = 'favicon';
+    if (dato) el.style.backgroundImage = `url("${dato}")`;
+    nodiIcona.set(t.id, { dato, el });
+    return el;
+  }
+
   function render() {
     // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
     // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
@@ -1105,13 +1134,12 @@
         }
       }
 
-      const ico = document.createElement('div');
+      let ico;
       if (t.loading) {
+        ico = document.createElement('div');
         ico.className = 'spinner';
       } else {
-        ico.className = 'favicon';
-        // Solo byte già scaricati dal main con la sessione della scheda: un indirizzo qui girerebbe nella sessione della barra (#1083).
-        if (/^data:image\//.test(t.favicon || '')) ico.style.backgroundImage = `url("${t.favicon}")`;
+        ico = nodoIcona(t);
       }
       el.appendChild(ico);
 
@@ -2091,10 +2119,10 @@
 
   api.tabs.onUpdate((snap) => {
     fermaLarghezzeSeChiusa(snap);
-    state = snap;
+    state = conIcone(snap);
     render();
   });
-  api.tabs.snapshot().then((snap) => { state = snap; render(); });
+  api.tabs.snapshot().then((snap) => { state = conIcone(snap); render(); });
 
   // ─── Velo d'ombra "modalità annotazione" feedback ──────────────────────────
   // Il box feedback vive in un content script sulla pagina e da lì oscura solo
