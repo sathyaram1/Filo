@@ -200,10 +200,10 @@ perOgniSistema('spento a sessione aperta: quello già scaricato non si installa 
   assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
 });
 
-test('spento a metà dello scaricamento dell\'avvio, «Installa» la installa davvero alla chiusura', async () => {
+perOgniSistema('spento a metà dello scaricamento dell\'avvio, «Installa» la installa davvero', async (s) => {
   const u = aggiornatoreFinto({ lento: true });
-  await avvia(u, true);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await avvia(u, true, s);
+  U.seguiImpostazioni(impostazioni(s, false));
   await calma();
   u.finisci();
   await calma();
