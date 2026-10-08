@@ -292,7 +292,7 @@ test('la critica si rifiuta se il server si è mosso dall\'avvio o ha modifiche 
   const sporco = vl(sc.work, 'critica', PASS);
   assert.equal(sporco.code, 1);
   assert.match(sporco.out, /modifiche non salvate[\s\S]*functions\/lavoro\.js/);
-  assert.doesNotMatch(sporco.out, /node_modules/, 'un file che git non segue non conta');
+  assert.doesNotMatch(sporco.out, /node_modules/, 'il collegamento a node_modules non è codice');
   g(sc.server, 'checkout', '--', 'functions/lavoro.js');
   assert.equal(vl(sc.work, 'critica', PASS).code, 0);
   assert.equal(vl(sc.work, 'status').code, 0);
@@ -344,7 +344,7 @@ function spintoDaFuori(sc) {
 }
 
 /** server:fondi dal comando vero; lo strumento del server finto fa come quello vero: fetch, e main sulla punta su origin del ramo che riceve. */
-async function fondi(sc, radice, primaDelServer = () => {}) {
+async function fondi(sc, radice, primaDelServer = () => {}, argv = [RAMO, '--feedback', 'p']) {
   const { esegui } = await import('../../scripts/server-fondi-pratica.mjs');
   const vero = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
@@ -354,14 +354,16 @@ async function fondi(sc, radice, primaDelServer = () => {}) {
   const righe = [];
   const passati = [];
   try {
-    const k = await esegui([RAMO, '--feedback', 'p'], {
+    const k = await esegui(argv, {
       env: {}, radice, funzioni: join(sc.server, 'functions'), bearer: 'finto', base: FIRESTORE_BASE, ramiAperti: () => [],
       log: (x) => righe.push(String(x)), err: (x) => righe.push(String(x)),
       lancia: (_cartella, args) => {
         primaDelServer();
         passati.push(args[0]);
+        // Come lo strumento vero: origin/… e refs/heads/… valgono il ramo.
+        const ramo = args[0].replace(/^refs\/heads\//, '').replace(/^(refs\/remotes\/)?origin\//, '');
         g(sc.server, 'fetch', '-q', 'origin');
-        g(sc.server, 'push', '-q', 'origin', `${g(sc.server, 'rev-parse', `refs/remotes/origin/${args[0]}`)}:refs/heads/main`);
+        g(sc.server, 'push', '-q', 'origin', `${g(sc.server, 'rev-parse', `refs/remotes/origin/${ramo}`)}:refs/heads/main`);
         return 0;
       },
     });
@@ -440,4 +442,49 @@ test('una verifica senza commit del server: server:fondi non fonde la punta che 
   assert.deepEqual(r.passati, [], 'lo strumento del server non parte');
   assert.match(r.testo, /la sua verifica non comprende commit del server[\s\S]*Non ho toccato niente/);
   assert.equal(mainDelServer(sc), prima);
+});
+
+// ─── Verifica del giro 3: il nome cercato è quello che si fonde; i file nuovi del server contano ─────────────────
+
+test('server:fondi con origin/<ramo> o refs/heads/<ramo> cerca il verdetto del ramo: un commit mai verificato non entra', async () => {
+  for (const forma of [`origin/${RAMO}`, `refs/heads/${RAMO}`]) {
+    const sc = scenarioInWorktree();
+    verificato(sc);
+    const prima = mainDelServer(sc);
+    commit(sc.server, 'functions/lavoro.js', 'mai verificato\n', 'dopo il verdetto');
+    g(sc.server, 'push', '-q', 'origin', `refs/heads/${RAMO}:refs/heads/${RAMO}`);
+    const r = await fondi(sc, sc.work, () => {}, [forma, '--feedback', 'p']);
+    assert.equal(r.k, 1, r.testo);
+    assert.match(r.testo, /claude\/prova è un lavoro con l'app, e la sua verifica non regge: il ramo del server claude\/prova si è mosso/);
+    assert.deepEqual(r.passati, []);
+    assert.equal(mainDelServer(sc), prima);
+  }
+});
+
+test('un nome diverso solo nelle maiuscole non trova un verdetto altrui per sbaglio, né lo scavalca', () => {
+  const sc = scenarioInWorktree();
+  verificato(sc);
+  const v = VL.verdettoDelRamo('claude/Prova', { radice: sc.work });
+  assert.equal(v && v.ok, false);
+  assert.match(v.reason, /la verifica è del ramo claude\/prova, che si scrive diverso da claude\/Prova solo nelle maiuscole/);
+});
+
+test('un file nuovo non aggiunto nel checkout del server ferma critica e consegna, e viene nominato', () => {
+  const sc = scenario();
+  assert.equal(vl(sc.work, 'start', 'fai X su app e server').code, 0);
+  scrivi(sc.server, 'functions/nuovo-modulo.js', 'module.exports = 1;\n');
+  scrivi(sc.server, '.claude/worktrees/x/a.txt', 'non è codice\n');
+  const c = vl(sc.work, 'critica', PASS);
+  assert.equal(c.code, 1, c.out);
+  assert.match(c.out, /modifiche non salvate[\s\S]*functions\/nuovo-modulo\.js/);
+  assert.doesNotMatch(c.out, /\.claude\//);
+  g(sc.server, 'add', 'functions/nuovo-modulo.js');
+  g(sc.server, 'commit', '-q', '-m', 'modulo nuovo');
+  assert.equal(vl(sc.work, 'start').code, 0);
+  assert.equal(vl(sc.work, 'critica', FIX).code, 0);
+  scrivi(sc.server, 'functions/altro-modulo.js', 'module.exports = 2;\n');
+  const k = vl(sc.work, 'corretto', 'Corretto il salvataggio del campo nuovo con un modulo nuovo nel ramo del server; app invariata.');
+  assert.equal(k.code, 1, k.out);
+  assert.doesNotMatch(k.out, /Nessun commit nuovo/);
+  assert.match(k.out, /functions\/altro-modulo\.js/);
 });

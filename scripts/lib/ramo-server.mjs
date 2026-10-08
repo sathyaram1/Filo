@@ -63,11 +63,14 @@ export function checkoutDelRamo(porcelain, ramo) {
   return '';
 }
 
-// Solo i file tracciati: il .gitignore del server non copre il collegamento a node_modules né .claude/worktrees.
+// Anche i file nuovi non aggiunti: fuori dal commit, la verifica li vedrebbe e la fusione no. Il .gitignore del server
+// non copre il collegamento a node_modules né .claude/, che non sono codice.
+const NON_CODICE = /^(\.claude(\/|$)|(.*\/)?node_modules\/?$)/;
 function modificheNonSalvate(git, cartella) {
-  const out = git(cartella, ['status', '--porcelain', '--untracked-files=no']);
+  const out = git(cartella, ['-c', 'core.quotepath=false', 'status', '--porcelain']);
   if (out === null) return ['(stato del checkout illeggibile)'];
-  return out.split('\n').map((r) => r.trimEnd()).filter(Boolean);
+  return out.split('\n').map((r) => r.trimEnd()).filter(Boolean)
+    .filter((r) => !(r.startsWith('?? ') && NON_CODICE.test(r.slice(3).replace(/^"(.*)"$/, '$1'))));
 }
 
 /**

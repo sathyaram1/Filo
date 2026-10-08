@@ -28,6 +28,9 @@ test('leggiArgomenti: ramo, pratica e prova a vuoto, anche quando npm si prende 
   assert.equal(npm.dryRun, true);
   assert.match(leggiArgomenti(['claude/x', '--forza']).errore, /non capiti/);
   assert.match(leggiArgomenti(['claude/x', 'claude/y']).errore, /un ramo solo/);
+  // Il nome come lo legge lo strumento del server: il verdetto si cerca su quello che si fonde (#1062).
+  for (const forma of ['origin/claude/x', 'refs/heads/claude/x', 'refs/remotes/origin/claude/x', ' claude/x ']) assert.equal(leggiArgomenti([forma]).ramo, 'claude/x', forma);
+  for (const no of ['feature/x', 'claude/../main', 'claude/x.lock']) assert.match(leggiArgomenti([no]).errore, /solo rami claude/, no);
   assert.equal(leggiArgomenti(['claude/x']).pratica, null);
 });
 
@@ -307,4 +310,12 @@ test('con la verifica che regge si fonde, e se main finisce su un altro sha lo s
   assert.equal(senzaFermo.k, 1);
   assert.equal(senzaFermo.lanci.length, 0, 'senza il ramo fermo lo strumento del server non parte');
   assert.match(senzaFermo.testo, /non riesco a fermare lo sha verificato aaaaaaaaa[\s\S]*push rifiutato/);
+});
+
+test('la prova a vuoto con un verdetto guarda lo sha verificato, come la fusione vera', async () => {
+  const si = { ok: true, reason: 'verifica superata su questo contenuto, insieme al ramo del server claude/x su aaaaaaaa', server: { ramo: 'claude/x', sha: 'a'.repeat(40) } };
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--dry-run'], verdetto: si });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`, '--dry-run']]);
+  assert.deepEqual(r.scritture, []);
 });

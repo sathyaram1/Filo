@@ -1003,10 +1003,16 @@ export function verdettoDelRamo(ramo, { radice = ROOT, cartellaServer } = {}) {
   }
   // Prima il worktree che ha il ramo davanti: lì sta la verifica viva, altrove al più una copia vecchia.
   voci.sort((a, b) => Number(b.ramo === ramo) - Number(a.ramo === ramo));
-  let trovati = voci.map((x) => ({ ...x, entry: readState(x.d)[ramo] })).filter((x) => x.entry && (x.entry.request || x.entry.verdict));
+  const stati = voci.map((x) => ({ ...x, stato: readState(x.d) }));
+  const copie = leggiVerdettiServer(radice);
+  let trovati = stati.map((x) => ({ ...x, entry: x.stato[ramo] })).filter((x) => x.entry && (x.entry.request || x.entry.verdict));
   if (!trovati.length) {
-    const copia = leggiVerdettiServer(radice)[ramo];
-    if (!copia) return null;
+    const copia = copie[ramo];
+    if (!copia) {
+      // Su un disco che non distingue le maiuscole git risolve claude/X come claude/x: il nome cercato deve essere quello che si fonde.
+      const quasi = [...stati.flatMap((x) => Object.keys(x.stato)), ...Object.keys(copie)].find((k) => k.toLowerCase() === String(ramo).toLowerCase());
+      return quasi ? { ok: false, cartella: radice, entry: null, reason: `la verifica è del ramo ${quasi}, che si scrive diverso da ${ramo} solo nelle maiuscole: rilancia col nome esatto` } : null;
+    }
     trovati = [{ d: radice, ramo: '', entry: copia }];
   }
   const { d, entry } = trovati[0];
