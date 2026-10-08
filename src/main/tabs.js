@@ -1567,6 +1567,7 @@ class TabManager {
     IconaScheda.iconaPer(wc.session, lista, { interna, vivo }).then(({ url, dato }) => {
       if (!vivo()) return;
       if (url) tab.faviconUrl = url;
+      try { tab._origineIcona = origineDi(wc.getURL()); } catch (_) {}
       if (tab.favicon === dato) return;
       tab.favicon = dato;
       this._broadcast();
@@ -2505,6 +2506,9 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // L'icona in volo era del documento di prima; quella mostrata vale ancora solo sullo stesso sito.
+      tab._giroIcona = (tab._giroIcona || 0) + 1;
+      if (origineDi(url) !== tab._origineIcona) tab.favicon = '';
       // Testo e titolo letti sono della pagina di prima: sotto l'indirizzo nuovo partirebbero col suo nome (#1004).
       // Una pagina senza titolo non lo cambia mai: vale quello del documento nuovo, cioè l'indirizzo, come negli altri browser.
       tab.contentExtract = '';
@@ -3408,6 +3412,10 @@ class TabManager {
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
+
+function origineDi(url) {
+  try { return new URL(url).origin; } catch (_) { return ''; }
+}
 
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.
