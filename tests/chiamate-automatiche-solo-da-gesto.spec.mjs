@@ -183,7 +183,6 @@ test('il main ferma le chiamate automatiche oltre il tetto per scheda, avvisa un
       suRichiesta: Boolean(suRichiesta && suRichiesta.ok),
       chiamate,
       avvisi: spinte.filter((m) => m && m.type === M.SHOW_TOAST).map((m) => m.text),
-      tetto: globalThis.SN_TETTO_AUTOMATICHE && globalThis.SN_TETTO_AUTOMATICHE.TETTI,
     };
   });
   expect(r.ok).toBe(120);
