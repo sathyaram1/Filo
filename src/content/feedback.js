@@ -655,7 +655,8 @@
       }
     }, true);
 
-    // Paste immagini nel modal. Allegare è dell'utente: un incolla o un trascinamento fabbricati non portano niente.
+    // Paste immagini nel modal. Allegare è dell'utente: un incolla fabbricato non porta niente (il trascinamento
+    // fabbricato lo ferma soloGestiVeri, sui siti).
     modal.addEventListener('paste', async (e) => {
       if (!e.isTrusted) return;
       const items = e.clipboardData?.items;
@@ -686,7 +687,6 @@
       e.preventDefault(); modal.classList.remove('sn-fb-drop-hover');
     }));
     modal.addEventListener('drop', async (e) => {
-      if (!e.isTrusted) return;
       const dropped = e.dataTransfer?.files;
       if (!dropped || !dropped.length) return;
       for (const f of dropped) await addAttachment(f);

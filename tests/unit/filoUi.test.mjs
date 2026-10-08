@@ -112,3 +112,41 @@ test('onMark ignora chi non passa una funzione e restituisce sempre un disiscriv
   assert.equal(typeof UI.onMark('ciao'), 'function');
   UI.onMark(undefined)();
 });
+
+// #1071 — i riquadri chiusi di Filo ricevono i gesti veri e quelli che fabbrica Filo stesso (l'Incolla del menu che
+// scrive nel campo), mai quelli del sito: la differenza la tiene un elenco nel mondo isolato, che il sito non tocca.
+test('veroONostro: passa un evento vero o uno segnato da nostro(), non un finto qualsiasi', () => {
+  assert.equal(UI.veroONostro({ isTrusted: true }), true);
+  const finto = { isTrusted: false };
+  assert.equal(UI.veroONostro(finto), false);
+  const fatto = UI.nostro({ isTrusted: false });
+  assert.equal(UI.veroONostro(fatto), true);
+  assert.equal(UI.veroONostro({ isTrusted: false }), false, 'un altro oggetto uguale non è nell\'elenco');
+  assert.equal(UI.veroONostro(null), false);
+});
+
+test('ombra(): radice chiusa registrata, l\'host lo dice con un attributo, ombraDi() la ritrova solo da qui', () => {
+  const host = elemento(true);
+  let modo = null;
+  const radice = { tipo: 'radice' };
+  host.attachShadow = ({ mode }) => { modo = mode; return radice; };
+  assert.equal(UI.ombra(host), radice);
+  assert.equal(modo, 'closed');
+  assert.equal(host.getAttribute(UI.RIQUADRO), '');
+  assert.equal(UI.ombraDi(host), radice);
+  assert.equal(UI.ombraDi(elemento(true)), null);
+});
+
+test('bersaglio(): dall\'host scende al nodo sotto il puntatore, o al fuoco se il gesto è da tastiera', () => {
+  const campo = { nome: 'campo' };
+  const bottone = { nome: 'bottone' };
+  const host = elemento(true);
+  host.attachShadow = () => ({ elementFromPoint: (x, y) => (x === 10 && y === 20 ? bottone : null), activeElement: campo });
+  UI.ombra(host);
+  const evento = (extra) => ({ composedPath: () => [host], target: host, ...extra });
+  assert.equal(UI.bersaglio(evento({ clientX: 10, clientY: 20, detail: 1 })), bottone);
+  assert.equal(UI.bersaglio(evento({ key: 'z' })), campo, 'un tasto: il campo col fuoco');
+  assert.equal(UI.bersaglio(evento({ clientX: 0, clientY: 0, detail: 0 })), campo, 'un clic da tastiera: il fuoco');
+  const altro = { composedPath: () => [bottone], target: bottone };
+  assert.equal(UI.bersaglio(altro), bottone, 'fuori dai riquadri resta il nodo dell\'evento');
+});
