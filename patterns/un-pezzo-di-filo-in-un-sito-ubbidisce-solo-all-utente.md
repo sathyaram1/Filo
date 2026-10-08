@@ -145,8 +145,9 @@ Lo shadow chiuso non nasconde il **testo**: `window.find` trova anche quello
 scritto in una casella dentro un riquadro chiuso, e `getSelection().modify()`
 allarga la selezione trovata fino alla riga intera, che `toString()` restituisce
 (#1071). Basta indovinare una lettera. Ancora più semplice: i tasti e gli
-inserimenti escono dallo shadow verso la finestra del sito, che li ascolta prima
-di noi, e un `execCommand` del sito scrive nella casella che ha il fuoco (#1071.1). Il testo di una voce si può rendere come
+inserimenti escono dallo shadow verso la finestra del sito, che in cattura li
+ascolta prima di noi (fermarli alla radice toglie solo la bolla, e con lei le
+scorciatoie comuni del sito), e un `execCommand` del sito scrive nella casella che ha il fuoco (#1071.1). Il testo di una voce si può rendere come
 contenuto generato (regola 2), quello che l'utente scrive in una casella no: per
 toglierlo davvero al sito il riquadro deve stare fuori dal suo documento, in una
 vista sopra la scheda come gli avvisi
