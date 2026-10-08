@@ -3,15 +3,14 @@
 //
 // PERCHÉ ESISTE
 //   Nell'ambiente cloud delle routine l'installer nativo di Electron
-//   (@electron/get → got) ABORTISCE il download del binario attraverso il proxy,
-//   quindi il postinstall di `electron` fallisce e `npm install` esce con errore.
+//   (@electron/get → got) ABORTISCE il download del binario attraverso il proxy.
+//   Da Electron 42 `npm install` non scarica più il binario: lo scarica
+//   `require('electron')` al primo uso, con quello stesso installer, e lì cade.
 //   Questo script, idempotente, procura lo zip del binario da una delle sorgenti
 //   qui sotto e lo estrae dove Electron lo cerca, così `require('electron')` e
 //   Playwright (`_electron.launch`) funzionano senza toccare l'installer rotto.
 //
-//   Va lanciato DOPO `npm install`. Per non far fallire l'install in partenza,
-//   installa con ELECTRON_SKIP_BINARY_DOWNLOAD=1 e poi lancia questo script:
-//     ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && node scripts/ensure-electron.mjs
+//   Va lanciato DOPO `npm install`: npm install && node scripts/ensure-electron.mjs
 //
 // SORGENTI DEL BINARIO (provate in quest'ordine — prima quelle SENZA rete esterna,
 // che sono le uniche affidabili quando la policy di egress blocca github):
@@ -54,7 +53,7 @@ if (process.platform !== 'linux' || process.arch !== 'x64') {
 }
 
 if (!existsSync(ELECTRON_DIR)) {
-  log('node_modules/electron assente: lancia prima `npm install` (con ELECTRON_SKIP_BINARY_DOWNLOAD=1). Nessuna azione.');
+  log('node_modules/electron assente: lancia prima `npm install`. Nessuna azione.');
   process.exit(0);
 }
 

@@ -1,7 +1,7 @@
 // Unit test per src/shared/audioState.js — parsing dello stato audio
 // dell'evento `audio-state-changed` tra versioni di Electron (#193).
 //
-// Pre-condizione del bug: su Electron 33 l'evento passa UN solo argomento con
+// Pre-condizione del bug: da Electron 32 in poi l'evento passa UN solo argomento con
 // `audible` come proprietà dell'evento. Leggendo solo il secondo argomento
 // l'audible risultava sempre false → l'indicatore audio sulle tab non compariva.
 

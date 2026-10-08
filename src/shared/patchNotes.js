@@ -17,6 +17,7 @@
         'La pagina dei file scaricati adesso si chiama «Download»: nella home, nel menu App e sulla scheda. E nella home non trovi più il tasto dei download in alto, che ripeteva quello che vedi già nelle carte.',
       ],
       fixes: [
+        'Il motore che apre le pagine web è aggiornato all\'ultima versione stabile, con le correzioni di sicurezza più recenti: prima era fermo a una versione che non le riceveva più.',
         'La protezione dal fingerprinting copre anche le scene 3D che un sito disegna per riconoscere la tua scheda grafica, e i disegni che prepara senza mostrarli. Prima da lì passava la tua impronta vera. Se poi una pagina salva un\'immagine prima di cominciare a disegnare, la sua grafica 3D parte lo stesso, mentre con la protezione accesa restava bloccata.',
         'Lo zoom risponde anche sui siti che mostrano il contenuto in un riquadro incorporato: dopo un clic lì dentro, i tasti dello zoom, la rotella con Ctrl (Cmd su Mac) e il clic sulla rotella funzionano come sul resto della pagina. E un sito non può più cambiarti lo zoom né spegnerne i comandi.',
         'Il tasto destro apre il menu di Filo anche sulle pagine che si ricostruiscono da capo mentre le stai usando.',
