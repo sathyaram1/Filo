@@ -96,7 +96,7 @@ test('riscattato l’invito con i modelli non ancora arrivati: la home smette di
 
   const home = await openTab('filo://dashboard/dashboard.html');
   await expect(home.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 30_000 });
-  await expect(home.locator('#suggestions .dash-suggestion', { hasText: /Apri Crediti/ })).toHaveCount(1, { timeout: 30_000 });
+  await expect(home.locator('.dash-carta[data-chiave="crediti"]')).toHaveCount(1, { timeout: 30_000 });
 
   // Si riscatta davvero, dalla pagina Crediti, con la home già aperta dietro.
   const crediti = await openTab('filo://credits/credits.html');
@@ -110,6 +110,6 @@ test('riscattato l’invito con i modelli non ancora arrivati: la home smette di
   // rispondere, ma il motivo è cambiato. La home non deve più chiedere un
   // invito già riscattato, né col messaggio né col suggerimento in cima.
   await expect(home.locator('#homeMessage')).not.toContainText(/codice d.invito/i, { timeout: 30_000 });
-  await expect(home.locator('#suggestions .dash-suggestion', { hasText: /riscatta l.invito/i })).toHaveCount(0, { timeout: 30_000 });
+  await expect(home.locator('.dash-carta[data-chiave="crediti"]')).toHaveCount(0, { timeout: 30_000 });
   await expect(home.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 30_000 });
 });

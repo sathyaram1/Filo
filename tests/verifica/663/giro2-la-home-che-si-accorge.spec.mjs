@@ -111,9 +111,17 @@ test('accoglienza già fatta: la configurazione condivisa che arriva dopo toglie
   await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 15_000 });
   await expect(page.locator('#homeMessage')).toContainText(/nessun modello/i, { timeout: 15_000 });
 
+  // Nelle prove Firestore è chiuso (#735.1): il documento che la rete porterebbe si finge qui.
   await app.evaluate(async () => {
     globalThis.__filoConfigArrivata = true;
-    await globalThis.__filoDefaults.refresh().catch(() => {});
+    const vera = globalThis.fetch;
+    const doc = { fields: { modelRegistry: { mapValue: { fields: { 'arrivo-rete': { mapValue: { fields: {
+      provider: { stringValue: 'openrouter' }, model: { stringValue: 'deepseek/deepseek-v4-flash-0731' },
+    } } } } } } } };
+    globalThis.fetch = (u, o) => (String(u).includes('/documents/config/models')
+      ? Promise.resolve(new Response(JSON.stringify(doc), { status: 200, headers: { 'content-type': 'application/json' } }))
+      : vera(u, o));
+    try { await globalThis.__filoDefaults.refresh(); } finally { globalThis.fetch = vera; }
   });
 
   // Niente intervista da far partire: quello che deve cambiare è il messaggio.

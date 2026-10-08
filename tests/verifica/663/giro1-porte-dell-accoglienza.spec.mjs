@@ -180,9 +180,17 @@ test('la configurazione condivisa arriva dalla rete a home già aperta: l’acco
 
   // La lettura di rete della configurazione condivisa finisce, ed è quella che
   // porta i modelli: da adesso Filo ha di che rispondere.
+  // Nelle prove Firestore è chiuso (#735.1): il documento che la rete porterebbe si finge qui.
   await app.evaluate(async () => {
     globalThis.__filoConfigArrivata = true;
-    await globalThis.__filoDefaults.refresh().catch(() => {});
+    const vera = globalThis.fetch;
+    const doc = { fields: { modelRegistry: { mapValue: { fields: { 'arrivo-rete': { mapValue: { fields: {
+      provider: { stringValue: 'openrouter' }, model: { stringValue: 'deepseek/deepseek-v4-flash-0731' },
+    } } } } } } } };
+    globalThis.fetch = (u, o) => (String(u).includes('/documents/config/models')
+      ? Promise.resolve(new Response(JSON.stringify(doc), { status: 200, headers: { 'content-type': 'application/json' } }))
+      : vera(u, o));
+    try { await globalThis.__filoDefaults.refresh(); } finally { globalThis.fetch = vera; }
   });
 
   // L'utente è ancora lì, sulla stessa home aperta: Filo deve presentarsi,
