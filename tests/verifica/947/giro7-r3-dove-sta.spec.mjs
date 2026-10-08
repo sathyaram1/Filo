@@ -1,4 +1,4 @@
-// Verifica #947 giro 7. r2: il bottone del file trovato dice dove sta con le ultime due cartelle del percorso così
+// Verifica #947 giro 7. r3: il bottone del file trovato dice dove sta con le ultime due cartelle del percorso così
 // come sono sul disco: per un file appena scaricato esce il nome dell'account e «Downloads», non «Download» come la
 // chiamano Filo in Preferenze e il sistema in italiano.
 
@@ -10,7 +10,7 @@ import { cartellaDellaProva, BOLLETTA_MARZO } from '../../helpers/documentiFinti
 
 const RICHIESTA = 'Mi serve la bolletta della luce di marzo. Dov\'è?';
 
-test('r2 il file appena scaricato, in cima ai Download: il bottone dice «Download», non la cartella dell\'account', async ({ app }) => {
+test('r3 il file appena scaricato, in cima ai Download: il bottone dice «Download», non la cartella dell\'account', async ({ app }) => {
   test.setTimeout(90_000);
   const scaricati = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
   cartellaDellaProva(scaricati);

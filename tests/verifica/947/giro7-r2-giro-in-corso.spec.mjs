@@ -1,4 +1,4 @@
-// Verifica #947 giro 7. r1: una ricerca chiesta mentre l'indice sta già leggendo (il primo giro dopo l'avvio, o un
+// Verifica #947 giro 7. r2: una ricerca chiesta mentre l'indice sta già leggendo (il primo giro dopo l'avvio, o un
 // lotto di file nuovi) si accoda a quel giro, che ha elencato le cartelle prima che il file arrivasse: la bolletta
 // salvata un attimo prima di chiedere non si trova.
 
@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { writeFileSync, rmSync } from 'node:fs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
-test('r1 la bolletta salvata mentre l\'indice sta leggendo altri file si trova alla ricerca chiesta subito dopo', async ({ app }) => {
+test('r2 la bolletta salvata mentre l\'indice sta leggendo altri file si trova alla ricerca chiesta subito dopo', async ({ app }) => {
   test.setTimeout(120_000);
   const doc = cartellaTemporanea('filo-947-g7-');
   for (let i = 0; i < 40; i++) writeFileSync(join(doc, `vecchio_${String(i).padStart(3, '0')}.txt`), `appunti numero ${i}`);
@@ -35,7 +35,8 @@ test('r1 la bolletta salvata mentre l\'indice sta leggendo altri file si trova a
     // L'utente salva la bolletta dalla posta e la chiede subito.
     writeFileSync(join(doc, 'scan_00777.txt'), 'bolletta');
     const r = await app.evaluate(() => globalThis.SN_DOCUMENTI_INDICE.cerca('mi serve la bolletta della luce di marzo'));
-    expect(r.risultati.map((x) => x.nome)).toContain('scan_00777.txt');
+    const dopo = await app.evaluate(() => globalThis.SN_DOCUMENTI_INDICE.cerca('mi serve la bolletta della luce di marzo'));
+    expect(r.risultati.map((x) => x.nome), `chiedendo una seconda volta: ${dopo.risultati.map((x) => x.nome).join(', ')}`).toContain('scan_00777.txt');
   } finally {
     rmSync(doc, { recursive: true, force: true });
   }
