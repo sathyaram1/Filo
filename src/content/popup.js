@@ -108,7 +108,8 @@
   const inPaginaDiFilo = location.protocol === 'filo:';
   const suCollegamento = (e) => {
     if (e.type === 'auxclick' && e.button !== 1) return;
-    const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
+    const t = global.SN_FILO_UI?.bersaglio ? global.SN_FILO_UI.bersaglio(e) : e.target;
+    const a = t && t.closest && t.closest('a.filo-md-link');
     if (!a) return;
     e.preventDefault();
     e.stopPropagation();
