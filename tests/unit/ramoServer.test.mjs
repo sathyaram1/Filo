@@ -313,3 +313,99 @@ test('senza checkout del server accanto, tutto come prima', () => {
   assert.equal(vl(work, 'status').code, 0);
   assert.equal(VL.verdettoDelRamo('claude/nessuno', { radice: work }), null, 'nessuna verifica di un ramo omonimo: server:fondi come prima');
 });
+
+// ─── server:fondi fonde lo sha verificato, non la punta del momento (#1062, verifica del giro 1) ─────────────────
+
+const { FIRESTORE_BASE } = await import('../../scripts/lib/firestore-auth.mjs');
+const PRATICA = {
+  name: 'projects/x/databases/(default)/documents/feedback/p',
+  fields: {
+    seq: { integerValue: '910' }, clientId: { stringValue: 'local:claude' }, status: { stringValue: 'todo' },
+    statusPublic: { stringValue: 'open' }, notes: { stringValue: '' }, senderProof: { stringValue: 'admin' },
+    localOnly: { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1' } } } },
+  },
+};
+
+/** L'app in un worktree come in locale: il checkout principale resta su main. */
+function scenarioInWorktree() {
+  const sc = scenario();
+  g(sc.work, 'checkout', '-q', 'main');
+  g(sc.work, 'worktree', 'add', '-q', join('.claude', 'worktrees', 'prova'), RAMO);
+  return { ...sc, main: sc.work, work: resolve(sc.work, '.claude', 'worktrees', 'prova') };
+}
+
+function spintoDaFuori(sc) {
+  const altro = resolve(sc.base, `altro-${Math.random().toString(16).slice(2)}`);
+  execFileSync('git', ['clone', '-q', '--branch', RAMO, sc.srvOrigin, altro], { stdio: ['ignore', 'pipe', 'pipe'] });
+  identita(altro);
+  const sha = commit(altro, 'functions/lavoro.js', 'mai verificato\n', 'spinto da fuori');
+  g(altro, 'push', '-q', 'origin', `refs/heads/${RAMO}:refs/heads/${RAMO}`);
+  return sha;
+}
+
+/** server:fondi dal comando vero; lo strumento del server finto fa come quello vero: fetch, e main sulla punta su origin del ramo che riceve. */
+async function fondi(sc, radice, primaDelServer = () => {}) {
+  const { esegui } = await import('../../scripts/server-fondi-pratica.mjs');
+  const vero = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method && init.method !== 'GET') return new Response('{}', { status: 200 });
+    return String(url).includes('/feedback/p') ? new Response(JSON.stringify(PRATICA), { status: 200 }) : new Response('{}', { status: 404 });
+  };
+  const righe = [];
+  const passati = [];
+  try {
+    const k = await esegui([RAMO, '--feedback', 'p'], {
+      env: {}, radice, funzioni: join(sc.server, 'functions'), bearer: 'finto', base: FIRESTORE_BASE, ramiAperti: () => [],
+      log: (x) => righe.push(String(x)), err: (x) => righe.push(String(x)),
+      lancia: (_cartella, args) => {
+        primaDelServer();
+        passati.push(args[0]);
+        g(sc.server, 'fetch', '-q', 'origin');
+        g(sc.server, 'push', '-q', 'origin', `${g(sc.server, 'rev-parse', `refs/remotes/origin/${args[0]}`)}:refs/heads/main`);
+        return 0;
+      },
+    });
+    return { k, passati, testo: righe.join('\n') };
+  } finally { globalThis.fetch = vero; }
+}
+
+const mainDelServer = (sc) => { g(sc.server, 'fetch', '-q', 'origin'); return g(sc.server, 'rev-parse', 'refs/remotes/origin/main'); };
+const dentroDi = (cwd, a, b) => spawnSync('git', ['merge-base', '--is-ancestor', a, b], { cwd }).status === 0;
+
+test('un push sul ramo del server mentre server:fondi parla con la pratica non entra in main: si fonde lo sha verificato', async () => {
+  const sc = scenarioInWorktree();
+  verificato(sc);
+  const v = g(sc.server, 'rev-parse', RAMO);
+  let estraneo = '';
+  const r = await fondi(sc, sc.work, () => { estraneo = spintoDaFuori(sc); });
+  assert.equal(r.k, 0, r.testo);
+  assert.equal(mainDelServer(sc), v, r.testo);
+  assert.equal(dentroDi(sc.server, estraneo, v), false);
+  assert.deepEqual(r.passati, [`${RAMO}-verificato-${v.slice(0, 12)}`]);
+  assert.equal(g(sc.srvOrigin, 'branch', '--list', `${RAMO}-verificato-*`), '', 'il ramo fermo si toglie da origin');
+  assert.doesNotMatch(r.testo, /Attenzione/);
+});
+
+test('tolto il worktree dell\'app, server:fondi trova ancora il verdetto: rifiuta un server mosso, fonde quello verificato', async () => {
+  const sc = scenarioInWorktree();
+  verificato(sc);
+  g(sc.main, 'worktree', 'remove', '--force', sc.work);
+  const estraneo = spintoDaFuori(sc);
+  g(sc.server, 'fetch', '-q', 'origin');
+  g(sc.server, 'merge', '-q', '--ff-only', `origin/${RAMO}`);
+  const no = await fondi(sc, sc.main);
+  assert.equal(no.k, 1, no.testo);
+  assert.match(no.testo, /la sua verifica non regge: il ramo del server claude\/prova si è mosso dopo la verifica/);
+  assert.equal(dentroDi(sc.server, estraneo, mainDelServer(sc)), false);
+
+  // Riportato allo sha verificato, e con l'app già fusa e il suo ramo cancellato: si fonde.
+  g(sc.server, 'reset', '-q', '--hard', 'HEAD~1');
+  g(sc.server, 'push', '-q', '--force', 'origin', `refs/heads/${RAMO}:refs/heads/${RAMO}`);
+  g(sc.main, 'merge', '-q', '--ff-only', RAMO);
+  g(sc.main, 'branch', '-q', '-D', RAMO);
+  const v = VL.verdettoDelRamo(RAMO, { radice: sc.main });
+  assert.equal(v.ok, true, v.reason);
+  const si = await fondi(sc, sc.main);
+  assert.equal(si.k, 0, si.testo);
+  assert.equal(mainDelServer(sc), g(sc.server, 'rev-parse', RAMO));
+});

@@ -59,7 +59,9 @@ async function conRete(docs, fn) {
 const ORA = Date.parse('2026-10-03T10:00:00Z');
 const ORE = 3600 * 1000;
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null }) {
+const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${sha.slice(0, 12)}`, togli: () => ({ ok: true }) });
+
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
@@ -67,7 +69,7 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null }
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
       lancia: (cartella, args, env) => { lanci.push({ cartella, args, pratica: env[PRATICA_ENV] }); return codiceServer; },
-      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => verdetto,
+      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => verdetto, fissa,
     });
     return { k, lanci, scritture, testo: righe.join('\n') };
   });
@@ -299,4 +301,10 @@ test('con la verifica che regge si fonde, e se main finisce su un altro sha lo s
   assert.doesNotMatch(r.testo, /Attenzione/);
   const altro = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: { ...si, server: { ramo: 'claude/x', sha: 'b'.repeat(40) } } });
   assert.match(altro.testo, /Attenzione: main del server è su aaaaaaaaa, non sullo sha verificato bbbbbbbbb/);
+  // Allo strumento del server va il ramo fermo sullo sha verificato, non quello che può ancora muoversi (#1062).
+  assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`]]);
+  const senzaFermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: si, fissa: () => ({ ok: false, motivo: 'push rifiutato' }) });
+  assert.equal(senzaFermo.k, 1);
+  assert.equal(senzaFermo.lanci.length, 0, 'senza il ramo fermo lo strumento del server non parte');
+  assert.match(senzaFermo.testo, /non riesco a fermare lo sha verificato aaaaaaaaa[\s\S]*push rifiutato/);
 });

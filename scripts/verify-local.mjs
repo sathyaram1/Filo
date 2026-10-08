@@ -66,7 +66,8 @@
 //
 // DOVE VIVE
 //   `.claude/verify-local.json`, effimero e gitignorato come gli altri
-//   marcatori di sessione: riguarda questa macchina e questo momento.
+//   marcatori di sessione: riguarda questa macchina e questo momento. Le voci
+//   con il server hanno una copia nel checkout principale (fileVerdettiServer).
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
