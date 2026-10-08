@@ -84,9 +84,9 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lent
 // L'aggiornatore finto risponde in microtask: un giro del ciclo li esaurisce tutti, compresa la fila degli avvisi.
 const calma = () => new Promise((r) => setImmediate(r));
 
-async function avvia(u, automatici) {
+async function avvia(u, automatici, { modo } = {}) {
   // Ogni prova parte senza un «Installa» lasciato da quella prima.
-  await U.avviaAggiornatore(u, { automatici, chiesta: null });
+  await U.avviaAggiornatore(u, { automatici, chiesta: null, modo });
   await calma();
 }
 
@@ -98,11 +98,27 @@ function conPiattaforma(p, fn) {
   });
 }
 
+// La piattaforma si inietta, mai quella che esegue la prova: nata su Linux, la prova era rossa solo su Windows.
+// Su Windows di serie la versione pronta si installa all'apertura dopo, con la barra visibile; alla chiusura solo
+// se l'utente l'ha scelto (#1039). Mac e Linux installano alla chiusura.
+const SISTEMI = [
+  { nome: 'Linux', piattaforma: 'linux', allaChiusura: true },
+  { nome: 'Mac', piattaforma: 'darwin', allaChiusura: true },
+  { nome: 'Windows, scelta la chiusura', piattaforma: 'win32', modo: 'chiusura', allaChiusura: true },
+  { nome: 'Windows, di serie', piattaforma: 'win32', allaChiusura: false },
+];
+function perOgniSistema(titolo, fn) {
+  for (const s of SISTEMI) test(`${titolo} (${s.nome})`, () => conPiattaforma(s.piattaforma, () => fn(s)));
+}
+// Cambiare «automatici» dalle Preferenze non deve riportare Windows al modo di serie.
+const impostazioni = (s, automatici) => ({ aggiornamenti: { automatici, ...(s.modo ? { installa: s.modo } : {}) } });
+const pronta = (s) => (s.allaChiusura ? { pronta: true } : { pronta: true, allApertura: true });
+
 beforeEach(() => memoriaFinta());
 
-test('spento: la versione nuova non si scarica e non si installa, e in home c\'è la sua carta con «Installa»', async () => {
+perOgniSistema('spento: la versione nuova non si scarica e non si installa, e in home c\'è la sua carta con «Installa»', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, false);
+  await avvia(u, false, s);
   assert.equal(u.scaricamenti, 0, 'da spento la versione nuova è partita da sola');
   assert.equal(u.autoDownload, false);
   assert.equal(u.autoInstallOnAppQuit, false, 'da spento si installerebbe alla chiusura');
@@ -113,20 +129,24 @@ test('spento: la versione nuova non si scarica e non si installa, e in home c\'�
   assert.ok(!/aggiornamento-disponibile/.test(vive()[0].text), 'il marcatore interno è finito nel testo');
 });
 
-test('acceso: tutto come prima, scarica da solo, si installa alla chiusura e non scrive carte', async () => {
+perOgniSistema('acceso: scarica da solo, si installa quando lo prevede il sistema e non scrive carte «Installa»', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, true);
+  await avvia(u, true, s);
   assert.equal(u.autoDownload, true);
-  assert.equal(u.autoInstallOnAppQuit, true);
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   assert.equal(u.scaricamenti, 1);
-  assert.deepEqual(carte, []);
+  assert.deepEqual(vive(), []);
+  u.chiudi();
+  assert.equal(u.installata, s.allaChiusura, s.allaChiusura ? 'acceso, alla chiusura non si è installata'
+    : 'su Windows di serie si è installata alla chiusura, senza farsi vedere (#1039)');
 });
 
-test('«Installa» scarica, la carta mostra a che punto è e poi che si installa alla chiusura', async () => {
+perOgniSistema('«Installa» scarica, la carta mostra a che punto è e poi quando si installa', async (s) => {
   const u = aggiornatoreFinto();
   let stati = [];
   await U.avviaAggiornatore(u, {
     automatici: false,
+    modo: s.modo,
     annuncia: () => { stati.push(U.conStatoAggiornamento(vive())[0]?.aggiornamento || null); },
   });
   await calma();
