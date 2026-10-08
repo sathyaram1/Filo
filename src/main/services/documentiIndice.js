@@ -249,8 +249,9 @@ async function eseguiGiro(extra) {
   const rs = await radici();
   const cartelle = daPercorrere(rs).concat((extra || []).filter((c) => !daPercorrere(rs).some((r) => dentro(c, r))));
   avvisa({ fase: 'elenco', fatti: 0, totali: 0, nome: '' });
-  const { trovati, pieno } = await elenca(cartelle);
+  const { trovati, pieno, negate: rifiutate } = await elenca(cartelle);
   troppi = pieno;
+  negate = new Set(rifiutate.map((c) => path.resolve(c)));
   // Via quello che non c'è più, o che sta in una cartella tolta dall'elenco.
   const tolti = [];
   for (const p of Array.from(voci.keys())) {
