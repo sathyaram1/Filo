@@ -31,20 +31,24 @@ module.exports = function register(on, ctx) {
   const AppuntiDaiSiti = require('../appuntiDaiSiti');
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
+  // L'origine vera del riquadro che chiede (anche un about:blank ha quella di chi l'ha aperto): la bozza per sito.
+  const origineRiquadro = (sender) => { try { return String(sender?.frame?.origin || ''); } catch (_) { return ''; } };
+
   on('_storage:get', async (msg, sender, origin) => {
-    const value = await globalThis.chrome.storage.local.get(chiaviStoragePerOrigine(msg.keys ?? null, origin));
+    const chiavi = chiaviStoragePerOrigine(msg.keys ?? null, origin, origineRiquadro(sender));
+    const value = await globalThis.chrome.storage.local.get(chiavi);
     return { ok: true, value: storagePerOrigine(value, origin, SETTINGS_KEY, indirizziDelMittente(sender)) };
   });
 
   on('_storage:set', async (msg, sender, origin) => {
     const obj = msg.obj || {};
-    if (!scritturaStorageAmmessa(Object.keys(obj), origin)) return vietato;
+    if (!scritturaStorageAmmessa(Object.keys(obj), origin, origineRiquadro(sender))) return vietato;
     await globalThis.chrome.storage.local.set(obj);
     return { ok: true };
   });
 
   on('_storage:remove', async (msg, sender, origin) => {
-    if (!scritturaStorageAmmessa(msg.keys, origin)) return vietato;
+    if (!scritturaStorageAmmessa(msg.keys, origin, origineRiquadro(sender))) return vietato;
     await globalThis.chrome.storage.local.remove(msg.keys);
     return { ok: true };
   });

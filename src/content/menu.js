@@ -717,7 +717,7 @@
     const host = document.createElement('div');
     global.SN_FILO_UI?.mark(host);
     host.style.cssText = HOST_CHIUSO;
-    const ombra = host.attachShadow({ mode: 'closed' });
+    const ombra = global.SN_FILO_UI?.ombra ? global.SN_FILO_UI.ombra(host) : host.attachShadow({ mode: 'closed' });
     try { ombra.adoptedStyleSheets = fogliDelMenu(); } catch (_) {}
     ombra.appendChild(contenuto);
     return host;
