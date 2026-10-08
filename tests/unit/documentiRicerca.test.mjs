@@ -289,3 +289,57 @@ test('i periodi di un documento: intervalli di date, mese con l\'anno; una data 
   assert.deepEqual(p('Fattura n. 2026/031544 del 04/04/2026'), []);
   assert.deepEqual(p(''), []);
 });
+
+// Il periodo di una bolletta vera è scritto in molti modi: ognuno deve far vincere marzo, e lo squarcio deve dirlo.
+test('il periodo si riconosce comunque sia scritto, e fra bollette vicine vince marzo con ogni grafia', () => {
+  const grafie = {
+    'dal 1 al 28 febbraio 2026': ['dal 1 al 28 febbraio 2026', 'dal 1 al 31 marzo 2026', 'dal 1 al 30 aprile 2026'],
+    'dal 1 febbraio al 28 febbraio 2026': ['dal 1 febbraio al 28 febbraio 2026', 'dal 1 marzo al 31 marzo 2026', 'dal 1 aprile al 30 aprile 2026'],
+    'unite dal trattino': ['01/02/2026-28/02/2026', '01/03/2026-31/03/2026', '01/04/2026-30/04/2026'],
+    'in colonna': ['01/02/2026 28/02/2026', '01/03/2026 31/03/2026', '01/04/2026 30/04/2026'],
+    'Dal Al': ['Dal Al\n01/02/2026\n28/02/2026', 'Dal Al\n01/03/2026\n31/03/2026', 'Dal Al\n01/04/2026\n30/04/2026'],
+    'ISO con la barra': ['2026-02-01 / 2026-02-28', '2026-03-01 / 2026-03-31', '2026-04-01 / 2026-04-30'],
+    'dal 01/02 al 28/02/2026': ['dal 01/02 al 28/02/2026', 'dal 01/03 al 31/03/2026', 'dal 01/04 al 30/04/2026'],
+  };
+  for (const [nome, [feb, mar, apr]] of Object.entries(grafie)) {
+    const docs = [
+      { id: 'feb', nome: 'scan_00198.pdf', testo: bollettaVera({ periodo: feb, emessa: '06/03/2026', scadenza: '26/03/2026', lettura: '02/03/2026' }) },
+      { id: 'mar', nome: 'scan_00231.pdf', testo: bollettaVera({ periodo: mar, emessa: '08/04/2026', scadenza: '28/04/2026', lettura: '01/04/2026' }) },
+      { id: 'apr', nome: 'scan_00250.pdf', testo: bollettaVera({ periodo: apr, emessa: '07/05/2026', scadenza: '27/05/2026', lettura: '02/05/2026' }) },
+    ];
+    const r = Ricerca.ordina(docs, 'mi serve la bolletta della luce di marzo');
+    assert.equal(r[0].id, 'mar', `${nome}: ${r.map((x) => x.id).join(', ')}`);
+    assert.ok(Ricerca.squarcioMigliore(docs[1].testo, 'mi serve la bolletta della luce di marzo').replace(/\s+/g, ' ').includes(mar.replace(/\s+/g, ' ')), nome);
+  }
+  const mesi = (t) => Ricerca.periodi(t).map((x) => x.mesi);
+  assert.deepEqual(mesi('Periodo: gennaio - febbraio 2026'), [[0, 1]]);
+  assert.deepEqual(mesi('Periodo: dicembre-gennaio 2026'), [[11, 0]]);
+  assert.deepEqual(mesi('consumi 1-28 febbraio 2026'), [[1]]);
+  // Emissione e scadenza affiancate in tabella non sono un periodo, nemmeno sotto la riga del periodo vero.
+  assert.deepEqual(mesi('Periodo di fatturazione 01/02/2026 - 28/02/2026 Data emissione Data scadenza 06/03/2026 26/03/2026'), [[1]]);
+  assert.deepEqual(mesi('Data emissione Data scadenza\n06/03/2026 26/03/2026'), []);
+  // Due date affiancate senza la parola che annuncia un periodo restano due date.
+  assert.deepEqual(mesi('Ricevuta 06/03/2026 26/03/2026'), []);
+});
+
+test('senza un periodo dichiarato, le date di emissione, scadenza e lettura non fanno di febbraio una bolletta di marzo', () => {
+  const docs = [
+    { id: 'feb', nome: 'a.pdf', testo: 'Bolletta luce di febbraio. Emessa il 06/03/2026, da pagare entro il 26/03/2026, lettura del 02/03/2026. 240 kWh' },
+    { id: 'mar', nome: 'b.pdf', testo: 'Bolletta luce di marzo. Emessa il 08/04/2026, da pagare entro il 28/04/2026, lettura del 01/04/2026. 250 kWh' },
+  ];
+  assert.equal(Ricerca.ordina(docs, 'bolletta luce marzo')[0].id, 'mar');
+});
+
+test('a parità di punteggio viene prima il documento più recente: il periodo dichiarato, se no la data del file', () => {
+  const bolletta = (y) => `Bolletta del 08/04/${y}\nFornitura di energia elettrica, 240 kWh\nPeriodo di fatturazione: 01/03/${y} - 31/03/${y}`;
+  const docs = [{ id: '2024', nome: 'a.pdf', testo: bolletta(2024) }, { id: '2026', nome: 'c.pdf', testo: bolletta(2026) }, { id: '2025', nome: 'b.pdf', testo: bolletta(2025) }];
+  assert.deepEqual(Ricerca.ordina(docs, 'mi serve la bolletta della luce di marzo').map((x) => x.id), ['2026', '2025', '2024']);
+  const contratti = [
+    { id: 'vecchio', nome: 'x.docx', testo: 'Contratto di locazione, Via Roma 12', data: Date.UTC(2022, 5, 1) },
+    { id: 'nuovo', nome: 'y.docx', testo: 'Contratto di locazione, Via Roma 12', data: Date.UTC(2025, 5, 1) },
+  ];
+  assert.deepEqual(Ricerca.ordina(contratti, 'contratto affitto').map((x) => x.id), ['nuovo', 'vecchio']);
+  // Il più recente non scavalca un documento che combacia di più.
+  const piu = [{ id: 'giusto', nome: 'g.pdf', testo: 'Bolletta luce, energia elettrica, kWh. Periodo 01/03/2024 - 31/03/2024' }, { id: 'recente', nome: 'r.pdf', testo: 'Bolletta gas, Smc. Periodo 01/03/2026 - 31/03/2026' }];
+  assert.equal(Ricerca.ordina(piu, 'bolletta luce marzo')[0].id, 'giusto');
+});
