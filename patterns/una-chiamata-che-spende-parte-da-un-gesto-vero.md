@@ -55,14 +55,14 @@ di 1,5 s. Il movimento del mouse non conta: passarci sopra non è chiedere.
    scan del testo, uno per pausa, si accontenta di un gesto qualunque.
 4. **Un'azione chiesta a Filo vale come gesto** (`SN_GESTO.segna()`): incolla e
    dettatura arrivano da un menu fuori dalla pagina, o molto dopo il clic.
-4. **A scheda nascosta non si spende**: la chiamata si rimanda e parte al ritorno.
-5. **Il main ha un tetto per scheda** (`src/main/services/tettoAutomatiche.js`),
+5. **A scheda nascosta non si spende**: la chiamata si rimanda e parte al ritorno.
+6. **Il main ha un tetto per scheda** (`src/main/services/tettoAutomatiche.js`),
    la difesa che resta se un sito trova un'altra porta. Si conta nel main, mai
    nella pagina. È dimensionato sul doppio del caso peggiore di chi usa Filo
    davvero, non si raggiunge per caso, e quando ferma avvisa una volta nella
    scheda con il numero. Il tasto destro porta `suRichiesta: true` e non si
    ferma mai.
-6. **Il costo si riduce senza tagliare in silenzio**: una selezione oltre i 2000
+7. **Il costo si riduce senza tagliare in silenzio**: una selezione oltre i 2000
    caratteri non si prepara in anticipo e al tasto destro parte intera; la frase
    di contesto è al massimo 600 caratteri per lato, perché senza un punto vicino
    (codice, tabelle) diventava il blocco intero.
