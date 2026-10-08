@@ -333,7 +333,7 @@ const safebrowseMethods = {
     } else if (scelta === 'indietro') {
       this.safebrowseIndietro(tab.id);
     } else if (scelta === 'copia') {
-      try { require('electron').clipboard.writeText(a.url); } catch (_) {}
+      try { Promise.resolve(require('electron').clipboard.writeText(a.url)).catch(() => {}); } catch (_) {}
     } else if (scelta === 'chiedi' || scelta === 'segnala') {
       this._sbApriCasa(tab, scelta);
     }
