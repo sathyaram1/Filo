@@ -3391,6 +3391,11 @@ function documentSearchesForPrompt(actions) {
     const note = [];
     if (out.fermata) note.push('L\'utente ha FERMATO la ricerca mentre Filo leggeva i documenti nuovi: i risultati vengono solo da quelli già letti. Dillo in una riga.');
     if (ind.troppi) note.push('Le cartelle hanno più documenti di quanti Filo ne guardi in un giro: alcuni possono mancare.');
+    const negate = Array.isArray(ind.negate) ? ind.negate : [];
+    if (negate.length) {
+      note.push(`Il sistema NON lascia leggere a Filo ${negate.map((c) => E.perCanaleSistema(c.nome || c.percorso || '')).join(', ')}: lì non ha guardato, `
+        + `quindi non dire che il documento non c'è. Spiega all'utente che manca il permesso e come darlo (${E.perCanaleSistema(ind.comePermesso || '')}), poi di richiedere.`);
+    }
     const r = Array.isArray(out.risultati) ? out.risultati : [];
     if (!r.length) {
       blocks.push(`[Nessun documento combacia con "${cercato}" fra i ${conti} ${dove}. `
