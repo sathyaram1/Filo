@@ -92,7 +92,8 @@
 //   node scripts/routine-channel.mjs domanda <parola-d-ordine> | domanda --biglietto <biglietto>
 //       → la domanda di fine sessione e il comando per rispondere. Exit 0 = domanda, 2 = nessuna (chiudi e basta), 4 = rifiutato.
 //   node scripts/routine-channel.mjs risposta <parola-d-ordine> <id> | risposta --biglietto <biglietto>   (testo da stdin)
-//       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo.
+//       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo. Con la parola
+//         d'ordine allega da solo il rapporto dei turni dell'orchestratore dopo l'ultimo biglietto.
 //
 //   La FUSIONE su main non ha un sottocomando qui: passa da
 //   `scripts/merge-gate.mjs <branch>`, che usa merge() di questo modulo. Il
@@ -463,13 +464,14 @@ export async function releaseConRapporto(t, fault, report, opts) {
 // ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
 
 /** Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA. */
-export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '' } = {}) {
+export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '', report = null } = {}) {
   if (!passphrase === !ticket) throw new Error('serve esattamente una fra parola d\'ordine e biglietto');
   const corpo = passphrase ? { passphrase: String(passphrase), op } : { ticket: String(ticket), op };
   if (op === 'question' && passphrase && requestId) corpo.requestId = String(requestId);
   if (op === 'answer') {
     if (passphrase) corpo.id = String(id || '');
     corpo.answer = String(answer ?? '');
+    if (passphrase && report && typeof report === 'object') corpo.report = report;
   }
   return corpo;
 }
@@ -518,8 +520,18 @@ export async function domandaChiusura(cred, opts) {
   return r;
 }
 
-export async function rispostaChiusura(cred, answer, opts) {
-  const { status, body } = await call('routineClosing', corpoChiusura('answer', { ...cred, answer }), opts);
+/**
+ * `report` (solo orchestratore): i suoi turni dopo l'ultimo biglietto. Se il server non lo prende, la
+ * risposta riparte senza e lo si dice: la risposta conta più del rapporto.
+ */
+export async function rispostaChiusura(cred, answer, opts, report = null) {
+  const tenta = (rap) => call('routineClosing', corpoChiusura('answer', { ...cred, answer, report: rap }), opts);
+  let { status, body } = await tenta(report);
+  if (report && (body && (body.reason === 'report_too_big' || body.reason === 'report_malformed'))) {
+    const motivo = `${body.reason}${body.detail ? `: ${body.detail}` : ''}`;
+    ({ status, body } = await tenta(null));
+    return { ...leggiRispostaChiusura(status, body), avviso: `il server non ha preso il rapporto della chiusura (${motivo}): risposta mandata SENZA rapporto.` };
+  }
   return leggiRispostaChiusura(status, body);
 }
 
@@ -1083,7 +1095,19 @@ if (isMain) {
       console.error(`  … risposta ${a.cred.ticket ? '--biglietto <biglietto>' : '"<parola-d-ordine>" <id>'} <<'FINE'\n  niente\n  FINE`);
       process.exit(1);
     }
-    const r = await rispostaChiusura(a.cred, testo);
+    // Il costo dell'orchestratore dopo l'ultimo biglietto viaggia con la sua risposta: nessun rilascio lo porta.
+    let rapporto = null;
+    if (a.cred.passphrase) {
+      try {
+        const { rapportoChiusura } = await import('./session-report.mjs');
+        rapporto = await rapportoChiusura({ cwd: ROOT });
+        if (rapporto.turns !== undefined) console.error(`chiusura dell'orchestratore: ${Number(rapporto.costUsd || 0).toFixed(4)} (${rapporto.turns} turni, contesto ${rapporto.maxContextTokens}, ${rapporto.rewarmTurns} da riscaldare, fermo ${rapporto.attesaPrimaS}s)`);
+      } catch (e) {
+        rapporto = { v: 3, role: 'orchestrator', closing: true, notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
+      }
+    }
+    const r = await rispostaChiusura(a.cred, testo, undefined, rapporto);
+    if (r.avviso) console.error(r.avviso);
     if (r.esito === 'ok') { console.log('OK: risposta registrata.'); process.exit(0); }
     if (r.esito === 'assente') { console.error(`risposta non arrivata (${r.reason}): chiudi comunque, senza insistere.`); process.exit(EXIT_CHIUSURA.assente); }
     console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato);

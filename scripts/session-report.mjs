@@ -662,7 +662,8 @@ export function finestraOrchestratore(linee) {
     if (!msg || !Number.isFinite(ms)) continue;
     const blocchi = Array.isArray(msg.content) ? msg.content : [];
     if (e.type === 'assistant') {
-      if (msg.usage) turni.push(ms);
+      // Una richiesta fallita («<synthetic>», usage a zero) non ha toccato la cache: non accorcia l'attesa.
+      if (msg.usage && !/^<[^>]*>$/.test(String(msg.model || ''))) turni.push(ms);
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
         if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
@@ -704,6 +705,7 @@ export function finestraOrchestratore(linee) {
   const prima = turni.filter((t) => t <= inizio);
   const dentro = turni.filter((t) => t > inizio);
   return {
+    inizioMs: inizio,
     righe: voci.filter((v) => Number.isFinite(v.ms) && v.ms > inizio).map((v) => v.l),
     // Quanto è rimasto fermo il thread principale prima del primo turno: oltre
     // un'ora la sua cache (a un'ora) è scaduta e il turno riscrive tutto.
@@ -714,17 +716,51 @@ export function finestraOrchestratore(linee) {
   };
 }
 
-async function rapportoOrchestratore(fileSottoAgente) {
-  const principale = `${dirname(dirname(fileSottoAgente))}.jsonl`;
-  if (!existsSync(principale)) return null;
+async function lineeDi(file) {
   const linee = [];
-  for await (const l of righeDelFile(principale)) if (String(l).trim()) linee.push(l);
-  const { righe, attesaPrimaS, continua } = finestraOrchestratore(linee);
+  for await (const l of righeDelFile(file)) if (String(l).trim()) linee.push(l);
+  return linee;
+}
+
+async function rapportoOrchestratore(principale) {
+  if (!existsSync(principale)) return null;
+  const { righe, attesaPrimaS, continua } = finestraOrchestratore(await lineeDi(principale));
   const r = await analizzaRighe(righe, { role: 'orchestrator', continua });
   return {
     costUsd: r.costUsd, turns: r.turns, coldTurns: r.coldTurns, rewarmTurns: r.rewarmTurns, rewarmTokens: r.rewarmTokens,
     maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, startedAt: r.startedAt, endedAt: r.endedAt,
   };
+}
+
+/** Il confine della finestra dell'orchestratore prima di `since`: { since: ISO, o '' = dall'inizio; continua }. */
+async function inizioFinestraPrima(principale, since) {
+  const sinceMs = Date.parse(String(since));
+  if (!Number.isFinite(sinceMs)) return { since, continua: false };
+  const prima = (await lineeDi(principale)).filter((l) => {
+    const m = l.match(/"timestamp":"([^"]+)"/);
+    const ms = m ? Date.parse(m[1]) : NaN;
+    return !Number.isFinite(ms) || ms < sinceMs;
+  });
+  const { inizioMs, continua } = finestraOrchestratore(prima);
+  return { since: Number.isFinite(inizioMs) ? new Date(inizioMs + 1).toISOString() : '', continua };
+}
+
+/**
+ * Il costo dell'orchestratore dopo l'ultimo biglietto (la chiusura, o un'accensione senza worker): nessun
+ * rilascio lo porta, viaggia con la risposta alla domanda di fine sessione. Non lancia mai.
+ */
+export async function rapportoChiusura({ transcript = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
+  const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
+  const base = { v: 3, role: 'orchestrator', closing: true, notes: [] };
+  if (!trovato.file) return { ...base, notes: [trovato.note || 'transcript non trovato'] };
+  const principale = eSottoAgente(trovato.file) ? `${dirname(dirname(trovato.file))}.jsonl` : trovato.file;
+  try {
+    const r = await rapportoOrchestratore(principale);
+    if (!r) return { ...base, notes: [`thread principale assente: ${principale}`] };
+    return { ...base, ...r };
+  } catch (e) {
+    return { ...base, notes: [`thread principale illeggibile: ${String((e && e.message) || e)}`] };
+  }
 }
 
 /**
@@ -741,9 +777,13 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
   }
   try {
     const finestre = [];
-    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since, finestreAgent: finestre });
-    if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
     const sottoAgente = eSottoAgente(trovato.file);
+    // L'orchestratore che rilascia per un worker morto: i suoi turni fra la fine del worker di prima e il
+    // biglietto (il primo riscrive la cache) non li porta nessun altro rapporto.
+    // I sotto-agenti restano dal biglietto: quelli di prima sono di altri biglietti.
+    const finestra = !sottoAgente && role === 'orchestrator' && since ? await inizioFinestraPrima(trovato.file, since) : { since, continua: false };
+    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since: finestra.since, continua: finestra.continua, finestreAgent: finestre });
+    if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
     if (sottoAgente) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
     // Una sessione ha i suoi sotto-agenti in <sessione>/subagents/; un
     // sotto-agente li ha ACCANTO a se', e li si riconosce dal meta (o, in
@@ -758,7 +798,7 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     }
     if (sottoAgente) {
       try {
-        rep.orchestrator = await rapportoOrchestratore(trovato.file);
+        rep.orchestrator = await rapportoOrchestratore(`${dirname(dirname(trovato.file))}.jsonl`);
       } catch (e) {
         rep.notes.push(`thread principale illeggibile: ${String((e && e.message) || e)}`);
       }

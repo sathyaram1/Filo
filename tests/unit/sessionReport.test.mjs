@@ -15,7 +15,7 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const {
   analizzaRighe, generaRapporto, trovaTranscript, slugProgetto, chiaveSicura,
-  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente, finestraOrchestratore,
+  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente, finestraOrchestratore, rapportoChiusura,
 } = await import('../../scripts/session-report.mjs');
 
 const T = (s) => `2026-09-16T10:${s}.000Z`;
@@ -293,13 +293,15 @@ test('chi rilascia è un sotto-agente: il rapporto è il suo, non la sessione ma
     assert.equal((await generaRapporto({ cwd: progetto, configDir: config })).sessionId, 'w2');
     // L'orchestratore che rilascia il biglietto di un worker morto: il suo
     // messaggio dell'assistente è l'ultimo, e la finestra del biglietto
-    // (`since`) lascia fuori i suoi turni di prima e il worker 1.
+    // (`since`) lascia fuori il worker 1. I turni dell'orchestratore partono
+    // invece dalla fine del worker di prima: qui nessuna chiamata Agent, quindi
+    // dall'inizio della sessione (nessun altro rapporto li porta).
     writeFileSync(join(dir, 'orch.jsonl'), turnoDi('o3', T('30:00'), 1000, 50, 'orch') + '\n', { flag: 'a' });
     const orch = await generaRapporto({ role: 'orchestrator', cwd: progetto, configDir: config, since: T('15:00') });
     assert.equal(orch.sessionId, 'orch');
     assert.equal(orch.subagentRuns, 2, 'i due file dei sotto-agenti si leggono…');
-    assert.equal(orch.turns, 3, '…ma nella finestra ci sono solo il rilascio e i turni del worker 2');
-    assert.equal(orch.tokens.cacheWrite, 42000);
+    assert.equal(orch.turns, 5, '…ma del worker 1 non entra niente: o1, o2, o3 e i due turni del worker 2');
+    assert.equal(orch.tokens.cacheWrite, 73000);
     // Senza finestra, la sessione madre resta la somma di tutto (era così prima).
     const tutto = await generaRapporto({ cwd: progetto, configDir: config });
     assert.equal(tutto.turns, 7);
@@ -621,4 +623,67 @@ test('worker in sottofondo: la notifica si riconosce anche dal solo task-id, o s
   // Un comando in sottofondo che finisce ha il suo tool-use-id: non chiude il worker.
   const bash = SOTTOFONDO.slice(0, 4).concat(JSON.stringify({ type: 'user', timestamp: H('10:30:00'), message: { role: 'user', content: '<task-notification>\n<tool-use-id>toolu_bash</tool-use-id>\n</task-notification>' } }), orch('s3b', H('10:30:05'), { cr: 31000 }));
   assert.deepEqual(ids(finestraOrchestratore(bash)), ['s1', 's2', 's3', 's3b']);
+});
+
+test('una richiesta fallita («<synthetic>») dopo la fine del worker non accorcia l\'attesa: la cache l\'ha toccata solo il turno vero', () => {
+  const sintetico = JSON.stringify({ type: 'assistant', timestamp: H('11:31:08'), sessionId: 'orch', message: { id: 'syn', model: '<synthetic>', usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 }, content: [{ type: 'text', text: 'API Error' }] } });
+  const righe = SOTTOFONDO.slice(0, 7).concat(sintetico, orch('s4', H('12:20:00'), { cw: 32000 }));
+  assert.equal(finestraOrchestratore(righe).attesaPrimaS, 8340, 'da s3 alle 10:01 a s4 alle 12:20, non fino alla richiesta fallita');
+});
+
+// La chiusura: dopo l'ultimo worker l'orchestratore riscrive la cache, chiede un biglietto che non c'è e risponde
+// alla domanda. Nessun rilascio porta quei turni: li porta la risposta.
+const CHIUSURA = SOTTOFONDO.concat(
+  JSON.stringify({ type: 'user', timestamp: H('13:10:00'), message: { role: 'user', content: notifica('bg2') } }),
+  orch('c1', H('13:10:05'), { cw: 34000 }),
+  orch('c2', H('13:10:30'), { cr: 34000 }),
+  orch('c3', H('13:11:00'), { cr: 34500, tool: { type: 'tool_use', id: 'rs', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs risposta "<parola-d-ordine>" c9' } } }),
+);
+
+test('chiusura: il rapporto della risposta dell\'orchestratore porta i suoi turni dopo la fine dell\'ultimo worker', async () => {
+  const base = cartellaTemporanea('filo-rapporto-chiusura-');
+  try {
+    const file = join(base, 'orch.jsonl');
+    writeFileSync(file, CHIUSURA.join('\n') + '\n');
+    const r = await rapportoChiusura({ transcript: file });
+    assert.equal(r.role, 'orchestrator');
+    assert.equal(r.closing, true);
+    assert.equal(r.turns, 3, 'c1, c2, c3: i turni dei worker di prima stanno nei loro rilasci');
+    assert.equal(r.rewarmTurns, 1, 'c1 riscrive la cache dopo un\'ora e mezza');
+    assert.equal(r.attesaPrimaS, 5885, 'da s7 alle 11:32 a c1 alle 13:10');
+    assert.ok(r.costUsd > 0);
+    // Un'accensione senza worker: tutta la sessione è chiusura.
+    writeFileSync(file, [orch('p1', H('09:00:00'), { cw: 30000 }), orch('p2', H('09:00:20'), { cr: 30000 })].join('\n') + '\n');
+    const vuota = await rapportoChiusura({ transcript: file });
+    assert.equal(vuota.turns, 2);
+    assert.equal(vuota.attesaPrimaS, 0);
+    // Senza transcript: la nota, mai un errore.
+    const nessuno = await rapportoChiusura({ transcript: join(base, 'non-c-e.jsonl') });
+    assert.equal(nessuno.closing, true);
+    assert.match(nessuno.notes[0], /assente/);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('worker morto: il rilascio dell\'orchestratore parte dalla fine del worker di prima, non dal biglietto', async () => {
+  const base = cartellaTemporanea('filo-rapporto-morto-');
+  try {
+    const file = join(base, 'orch.jsonl');
+    const righe = SOTTOFONDO.slice(0, 7).concat(
+      orch('s4', H('11:31:10'), { cw: 32000 }),
+      // il biglietto del worker che morirà
+      orch('s5', H('11:31:30'), { cr: 32000, tool: { type: 'tool_use', id: 'tk', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs ticket x --json' } } }),
+      orch('s6', H('11:31:50'), { cr: 32500, tool: { type: 'tool_use', id: 'bg2', name: 'Agent', input: {} } }),
+      lanciato('bg2', H('11:31:53')),
+      orch('s7', H('11:32:00'), { cr: 33000 }),
+      JSON.stringify({ type: 'user', timestamp: H('11:40:00'), message: { role: 'user', content: notifica('bg2') } }),
+      orch('s8', H('11:40:05'), { cr: 33000, tool: { type: 'tool_use', id: 'rel', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release tkt --role orchestrator' } } }),
+    );
+    writeFileSync(file, righe.join('\n') + '\n');
+    const rep = await generaRapporto({ transcript: file, role: 'orchestrator', since: H('11:31:30') });
+    assert.equal(rep.turns, 5, 's4 (fra la fine del worker di prima e il biglietto), s5, s6, s7, s8');
+    assert.equal(rep.rewarmTurns, 1, 's4 riscrive la cache dopo l\'attesa');
+    // Un ruolo che non è l'orchestratore resta dal biglietto.
+    const worker = await generaRapporto({ transcript: file, role: 'verifier', since: H('11:31:30') });
+    assert.equal(worker.turns, 4);
+  } finally { rmSync(base, { recursive: true, force: true }); }
 });
