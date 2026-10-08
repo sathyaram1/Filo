@@ -251,3 +251,23 @@ test('riga di comando: --priorita mangiata da npm si riprende dall’ambiente; l
   const aiuto = lancia(['--help']);
   assert.match(aiuto.stderr, /--priorita <0-3>.*solo la priorità/);
 });
+
+test('riga di comando: due priorità nello stesso comando si rifiutano e non scrivono', () => {
+  const { lancia, scritte } = reteFinta(cartellaTemporanea('priorita-1058-'));
+  const r = lancia(['1058', '--priorita', '3', '--priorita', '1']);
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stderr, /--priorita è scritta più di una volta/);
+  assert.deepEqual(scritte(), []);
+});
+
+test('claude-feedback: se la priorità non nasce col documento, l\'uscita dà il comando per metterla', async () => {
+  const FB = globalThis.SN_FEEDBACK;
+  apri.credenziale.ottieni = async () => ({ idToken: 'tok-finto' });
+  apri.ambiente.routine = () => false;
+  const orig = { submit: FB.submit, log: console.log };
+  const righe = [];
+  FB.submit = async () => ({ id: 'doc1', seq: 4321, senderProof: '' });
+  console.log = (...a) => righe.push(a.join(' '));
+  try { await apri.main(['titolo', 'testo', '--locale', '--priorita', '3']); } finally { FB.submit = orig.submit; console.log = orig.log; }
+  assert.match(righe.join('\n'), /Priorità 3 NON impostata: mettila con npm run feedback -- 4321 --priorita 3/);
+});

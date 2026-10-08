@@ -277,6 +277,7 @@ export async function main(argvIn) {
   const OPZ = {
     opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega'],
+    ripetibili: ['--allega'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
   const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
@@ -376,7 +377,7 @@ export async function main(argvIn) {
 
   // `!= null`, non un controllo di verità: lo 0 è una priorità da scrivere.
   if (r.priorita != null) console.log(`Priorità ${r.priorita} impostata.`);
-  else if (p.valore != null) console.log(`Priorità ${p.valore} NON impostata: mettila dalla dashboard.`);
+  else if (p.valore != null) console.log(`Priorità ${p.valore} NON impostata: mettila con npm run feedback -- ${r.seq || r.id} --priorita ${p.valore}`);
   else if (!locale) console.log('Priorità: la decide il giudice di priorità, come per ogni feedback che entra in coda.');
   // Un allegato mancante è un rifiuto parziale: chi lancia lo script deve
   // accorgersene, perché il feedback senza il documento può non avere senso.
