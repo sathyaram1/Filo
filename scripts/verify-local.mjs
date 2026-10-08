@@ -1002,11 +1002,17 @@ export function verdettoDelRamo(ramo, { radice = ROOT, cartellaServer } = {}) {
   }
   // Prima il worktree che ha il ramo davanti: lì sta la verifica viva, altrove al più una copia vecchia.
   voci.sort((a, b) => Number(b.ramo === ramo) - Number(a.ramo === ramo));
-  const trovati = voci.map((x) => ({ ...x, entry: readState(x.d)[ramo] })).filter((x) => x.entry && (x.entry.request || x.entry.verdict));
-  if (!trovati.length) return null;
+  let trovati = voci.map((x) => ({ ...x, entry: readState(x.d)[ramo] })).filter((x) => x.entry && (x.entry.request || x.entry.verdict));
+  if (!trovati.length) {
+    const copia = leggiVerdettiServer(radice)[ramo];
+    if (!copia) return null;
+    trovati = [{ d: radice, ramo: '', entry: copia }];
+  }
   const { d, entry } = trovati[0];
   const qui = trovati[0].ramo === ramo;
-  const head = qui ? headSha(d) : git(['rev-parse', '--verify', '--quiet', `refs/heads/${ramo}`], radice);
+  let head = qui ? headSha(d) : git(['rev-parse', '--verify', '--quiet', `refs/heads/${ramo}`], radice);
+  // L'app già fusa e il suo ramo cancellato: quello che conta è che il commit verificato sia su main.
+  if (!head && entry.sha && ['refs/remotes/origin/main', 'refs/heads/main'].some((m) => tryGit(['merge-base', '--is-ancestor', entry.sha, m], radice).ok)) head = entry.sha;
   if (!head) return { ok: false, cartella: d, entry, reason: `il ramo dell'app ${ramo}, verificato insieme a questo, non si trova più nel repo` };
   const diff = (base, h) => diffDopoLaVerifica(base, h, d);
   const opz = { root: d, entry, cartellaServer, fetch: true };
