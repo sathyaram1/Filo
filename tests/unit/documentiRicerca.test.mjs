@@ -5,7 +5,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { rmSync, unlinkSync, writeFileSync, mkdirSync, truncateSync, statSync, existsSync } from 'node:fs';
+import { rmSync, unlinkSync, writeFileSync, mkdirSync, truncateSync, statSync, existsSync, symlinkSync } from 'node:fs';
+import fsp from 'node:fs/promises';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { cartellaDellaProva, BOLLETTA_MARZO, pdf, docx } from '../helpers/documentiFinti.mjs';
 
