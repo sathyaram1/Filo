@@ -47,6 +47,8 @@ test-results/
 # Esito della verifica indipendente del lavoro locale: riguarda questa macchina
 # e questo momento (ramo + commit verificato), non ha senso versionarlo.
 .claude/verify-local.json
+# La sua copia per i lavori con il server, nel checkout principale: server:fondi la legge a worktree tolto (#1062).
+.claude/verdetti-server.json
 # Ruolo dell'istanza al lavoro (esplorazione/sviluppo/verifica): stessa natura,
 # lo scrive il dispatcher e lo rilegge chi accoda un feedback per firmarlo.
 .claude/routine-role.json

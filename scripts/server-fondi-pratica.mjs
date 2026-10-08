@@ -3,12 +3,15 @@
 // Regole: tests/unit/serverFondiPratica.test.mjs. Uso: npm run server:fondi -- claude/<ramo> --feedback <N>
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { estraiOpzioneFeedback, risolviFeedback } from './lib/pratica-locale.mjs';
 import { argomentiDaNpm } from './lib/argomenti.mjs';
-import { FINESTRA_PARTE_TARDIVA_MS, NOME_PARTE, parteTardiva } from './lib/parti-lavoro.mjs';
+import { FINESTRA_PARTE_TARDIVA_MS, NOME_PARTE, RAMO_RE, parteTardiva } from './lib/parti-lavoro.mjs';
+import { cartellaDelServer } from './lib/ramo-server.mjs';
+
+export { cartellaDelServer };
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Lo legge server:fondi di filo-security: senza, si rifiuta e rimanda qui.
@@ -23,19 +26,6 @@ export const SENZA_PRATICA = [
   'Non ho toccato niente.',
 ].join('\n');
 
-/** La cartella functions del checkout del server accanto al repo Filo, anche da una sua worktree; '' se non c'è. */
-export function cartellaDelServer(radice, esiste = existsSync) {
-  let d = resolve(radice);
-  for (let i = 0; i < 8; i += 1) {
-    const f = join(dirname(d), 'filo-security', 'functions');
-    if (esiste(join(f, 'tools', 'server-fondi.js'))) return f;
-    const su = dirname(d);
-    if (su === d) break;
-    d = su;
-  }
-  return '';
-}
-
 /** Ramo, pratica, «solo server» e prova a vuoto, anche quando npm si è preso le opzioni. PURA. */
 export function leggiArgomenti(argv, env = {}) {
   const daNpm = argomentiDaNpm(env, { opzioni: ['--feedback', '--dry-run', '--solo-server'], conValore: ['--feedback'] });
@@ -48,7 +38,17 @@ export function leggiArgomenti(argv, env = {}) {
   const sconosciute = altri.filter((a) => /^-/.test(a));
   if (sconosciute.length) return { errore: `argomenti non capiti (${sconosciute.join(' ')})` };
   if (altri.length > 1) return { errore: `un ramo solo, non ${altri.length} (${altri.join(' ')})` };
-  return { ramo: altri[0] || '', pratica: f.valore, dryRun, soloServer, nota: daNpm.nota };
+  const ramo = ramoCanonico(altri[0]);
+  if (ramo && (!RAMO_RE.test(ramo) || /\.\.|\.lock$|\.$|\/\./.test(ramo))) return { errore: `porto su main solo rami claude/<nome>: «${altri[0]}» no` };
+  return { ramo, pratica: f.valore, dryRun, soloServer, nota: daNpm.nota };
+}
+
+/**
+ * Il nome come lo legge lo strumento del server (origin/…, refs/heads/… valgono il ramo): il verdetto si cerca e il
+ * server riceve questo, mai la forma scritta, così il nome cercato è quello che si fonde (#1062). PURA.
+ */
+export function ramoCanonico(r) {
+  return String(r || '').trim().replace(/^refs\/heads\//, '').replace(/^(refs\/remotes\/)?origin\//, '');
 }
 
 export const notaInizio = (ramo) => `Lavoro sul server: porto ${ramo} su main di filo-security (npm run server:fondi).`;
@@ -97,6 +97,54 @@ function lanciaServer(cartella, args, env) {
   return typeof r.status === 'number' ? r.status : 1;
 }
 
+/** Il ramo usa-e-getta che contiene solo lo sha verificato di `ramo`: lo crea solo server:fondi, quindi nessuno lo muove. PURA. */
+export const nomeRamoFisso = (ramo, sha) => `${ramo}-verificato-${String(sha).slice(0, 12)}`;
+
+function ramoFisso(cartella, ramo, sha) {
+  const radice = dirname(cartella);
+  const nome = nomeRamoFisso(ramo, sha);
+  const fatto = gitEsito(radice, ['push', '--quiet', 'origin', `${sha}:refs/heads/${nome}`]);
+  if (!fatto.ok) return { ok: false, motivo: fatto.out };
+  return {
+    ok: true,
+    ramo: nome,
+    togli: () => {
+      const via = gitEsito(radice, ['push', '--quiet', 'origin', `:refs/heads/${nome}`]);
+      gitIn(radice, ['update-ref', '-d', `refs/remotes/origin/${nome}`]);
+      return via;
+    },
+  };
+}
+
+/**
+ * Lo strumento del server fonde la punta che trova su origin dopo il suo fetch: con un verdetto che comprende il server
+ * (#1062) gli si passa un ramo fermo sullo sha verificato, così un push arrivato dopo il controllo resta fuori.
+ */
+export function lanciaFissato(cartella, ramo, verdetto, env, { lancia, fissa, log, err, prova = false }) {
+  const sha = verdetto && verdetto.server ? String(verdetto.server.sha || '') : '';
+  const coda = prova ? ['--dry-run'] : [];
+  if (!verdetto) return lancia(cartella, [ramo, ...coda], env);
+  if (!sha) { err(`server:fondi: la verifica di ${ramo} non comprende commit del server: non fondo una punta che nessuno ha visto.`); return 1; }
+  const fisso = fissa(cartella, ramo, sha);
+  if (!fisso || !fisso.ok) {
+    err(`server:fondi: non riesco a fermare lo sha verificato ${sha.slice(0, 9)} su un ramo suo, e senza non fondo: un push su ${ramo} entrerebbe senza verifica (${String((fisso && fisso.motivo) || '').slice(0, 300)}).`);
+    return 1;
+  }
+  log(`${prova ? 'PROVA sullo' : 'Porto su main lo'} sha verificato ${sha.slice(0, 9)} di ${ramo}: allo strumento del server va ${fisso.ramo}, che contiene solo quello e tolgo alla fine.`);
+  try {
+    return lancia(cartella, [fisso.ramo, ...coda], env);
+  } finally {
+    const t = fisso.togli();
+    if (t && !t.ok) err(`Non ho tolto ${fisso.ramo} da origin del server (${String(t.out || '').slice(0, 200)}): git push origin :refs/heads/${fisso.ramo}`);
+  }
+}
+
+function gitEsito(cwd, args) {
+  try { return { ok: true, out: execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) }; } catch (e) {
+    return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || String(e.message || e) };
+  }
+}
+
 function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
@@ -116,6 +164,21 @@ export async function esegui(argv, deps = {}) {
   if (!a.ramo) { err(`server:fondi: manca il ramo del server (claude/<nome>). ${USO}`); return 2; }
   const cartella = deps.funzioni !== undefined ? deps.funzioni : cartellaDelServer(deps.radice || ROOT);
   if (!cartella) { err('server:fondi: accanto al repo Filo non trovo il checkout del server (cartella filo-security). Non ho toccato niente.'); return 1; }
+  // Un ramo dell'app con lo stesso nome ha la sua verifica: il verdetto è di tutti e due, e si fonde solo lo sha
+  // verificato (#1062).
+  const verdetto = deps.verdetto
+    ? deps.verdetto(a.ramo, cartella)
+    : (await import('./verify-local.mjs')).verdettoDelRamo(a.ramo, { radice: deps.radice || ROOT, cartellaServer: cartella });
+  if (verdetto && !verdetto.ok) {
+    err(`server:fondi: ${a.ramo} è un lavoro con l'app, e la sua verifica non regge: ${verdetto.reason}.\nNon ho toccato niente.`);
+    return 1;
+  }
+  // Con un verdetto si fonde solo uno sha che la verifica ha visto: senza, il server prenderebbe la punta del momento.
+  if (verdetto && !(verdetto.server && verdetto.server.sha)) {
+    err(`server:fondi: ${a.ramo} è un lavoro con l'app, e la sua verifica non comprende commit del server (quando è stata fatta il ramo del server non c'era, o era già su main): non c'è niente di verificato da portare su main. Se il lavoro sul server è nato dopo, serve una verifica che lo comprenda (dal checkout dell'app: node scripts/verify-local.mjs start).\nNon ho toccato niente.`);
+    return 1;
+  }
+  if (verdetto) log(`Verifica del lavoro: ${verdetto.reason}.`);
 
   const of = await import('./owner-feedback.mjs');
   let bearer = deps.bearer;
@@ -173,8 +236,10 @@ export async function esegui(argv, deps = {}) {
       : chiude
         ? `si chiuderebbe con «${notaFine(a.ramo, '')}»`
         : `resterebbe aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}${ramiApp.length ? '' : `. Se il lavoro sta solo sul server: ${soloComando}`}`;
+    // La prova guarda lo stesso sha che fonderebbe la fusione vera, non la punta del ramo.
+    const fissate = { lancia, fissa: deps.fissa || ramoFisso, log, err };
     if (a.dryRun) {
-      const k = lancia(cartella, [a.ramo, '--dry-run'], figlio);
+      const k = lanciaFissato(cartella, a.ramo, verdetto, figlio, { ...fissate, prova: true });
       log(tardiva
         ? `PROVA: la pratica ${chi} non si riapre e, a fusione riuscita, ${dopo}.`
         : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
@@ -187,7 +252,7 @@ export async function esegui(argv, deps = {}) {
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
     }
-    const k = lancia(cartella, [a.ramo], figlio);
+    const k = lanciaFissato(cartella, a.ramo, verdetto, figlio, fissate);
     if (k !== 0) {
       if (tardiva) { err(`main del server non si è mosso, e la pratica ${chi} resta chiusa com'era: sistema e rilancia lo stesso comando.`); return k; }
       await of.annotaPratica(r.id, `server:fondi si è fermato (uscita ${k}) su ${a.ramo}: main del server non si è mosso.`, { bearer }).catch(() => null);
@@ -195,6 +260,10 @@ export async function esegui(argv, deps = {}) {
       return k;
     }
     const sha = (deps.punta || puntaDelServer)(cartella);
+    const verificato = verdetto && verdetto.server ? verdetto.server.sha : '';
+    if (verificato && sha && sha !== verificato) {
+      err(`Attenzione: main del server è su ${sha.slice(0, 9)}, non sullo sha verificato ${verificato.slice(0, 9)}: il ramo si è mosso fra il controllo e la fusione.`);
+    }
     const parte = await of.registraParte(r.id, 'server', { bearer, solo, ramo: a.ramo });
     if (!parte.ok) err(`La pratica ${chi} non ha registrato che la parte del server è su main (${parte.motivo}): una parte dell'app che arrivasse a pratica chiusa non la troverebbe.`);
     if (tardiva) {
