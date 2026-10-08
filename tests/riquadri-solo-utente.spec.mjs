@@ -148,15 +148,18 @@ async function contaChiamate(app) {
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__chiamate1071 = 0;
+    globalThis.__domande1071 = 0;
     const orig = globalThis.SN_PROVIDER_OPENROUTER;
     globalThis.SN_PROVIDER_OPENROUTER = {
       ...orig,
       complete: async () => { globalThis.__chiamate1071++; return { text: 'TESTO RISCRITTO 1071', usage: {} }; },
-      streamComplete: async ({ onDelta }) => { globalThis.__chiamate1071++; onDelta('Risposta del modello.'); return { text: 'Risposta del modello.', usage: {} }; },
+      streamComplete: async ({ onDelta }) => { globalThis.__chiamate1071++; globalThis.__domande1071++; onDelta('Risposta del modello.'); return { text: 'Risposta del modello.', usage: {} }; },
     };
   });
 }
 const chiamate = (app) => app.evaluate(() => globalThis.__chiamate1071);
+// Le risposte in streaming: spiegazione e domande. Il correttore, che lavora anche nella casella della domanda, no.
+const domande = (app) => app.evaluate(() => globalThis.__domande1071);
 
 test('spiegazione su un sito: lo script del sito non manda domande, la domanda dell\'utente parte', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
@@ -168,19 +171,19 @@ test('spiegazione su un sito: lo script del sito non manda domande, la domanda d
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('Risposta del modello');
-  await expect.poll(() => chiamate(app)).toBe(1);
+  await expect.poll(() => domande(app)).toBe(1);
   expect(await page.evaluate(() => window.cosaVede())).not.toContain('Risposta del modello');
 
   // Lo script del sito riempie e preme: nessuna chiamata in più.
   const esito = await page.evaluate(() => window.attacca());
   expect(esito).toEqual({ host: true, ombra: false, nostri: 0 });
   await page.waitForTimeout(800);
-  expect(await chiamate(app)).toBe(1);
+  expect(await domande(app)).toBe(1);
 
   // L'utente scrive la domanda e preme Invio: parte.
   await scrivi(app, page, '.sn-popup-input', 'e in breve?');
   await page.keyboard.press('Enter');
-  await expect.poll(() => chiamate(app)).toBe(2);
+  await expect.poll(() => domande(app)).toBe(2);
 });
 
 test('Modifica su un sito: lo script del sito non fa riscrivere né sostituire, l\'utente sì', async ({ app, openTab, testServer }) => {
@@ -247,4 +250,55 @@ test('attacco red-team su un sito: lo script del sito non lo manda e non legge l
   expect(await nelMondoDiFilo(app, b, () => window.__rt.slice())).toEqual([]);
   await clicca(app, b, '.sn-rt-send');
   await expect.poll(() => nelMondoDiFilo(app, b, () => window.__rt.slice())).toEqual(['attacco scritto su B']);
+});
+
+// Gli aiuti di Filo per scrivere lavorano anche dentro i riquadri chiusi: il correttore si aggancia alla casella e
+// il suo strato, che ripete il testo, sta nel riquadro e non nel documento del sito.
+test('nei riquadri su un sito la correzione automatica lavora, e il testo ripetuto dal correttore non entra nel sito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await contaChiamate(app);
+  await app.evaluate(async () => { await globalThis.chrome.storage.local.set({ sn_autocorrect: { perchè: 'perché' } }); });
+  const page = await testServer.openReady(openTab, pagina('<p id="parola" style="font-size:20px">supercalifragilistico</p>'));
+
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  await clicca(app, page, '.sn-fb-text');
+  await page.keyboard.type('perchè ', { delay: 30 });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.valore).toBe('perché ');
+  await page.keyboard.type('la frase segreta del feedback', { delay: 5 });
+  await expect.poll(() => conta(app, page, '.sn-spell-overlay')).toBe(1);
+  expect(await page.evaluate(() => window.cosaVede())).not.toContain('frase segreta');
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.close());
+
+  await page.locator('#parola').dblclick();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('Risposta del modello');
+  await clicca(app, page, '.sn-popup-input');
+  await page.keyboard.type('perchè ', { delay: 30 });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-input'))?.valore).toBe('perché ');
+});
+
+test('Modifica dentro la casella del feedback su un sito: Sostituisci arriva alla bozza, e il suggerimento dell\'istruzione è intero', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await contaChiamate(app);
+  const page = await testServer.openReady(openTab, pagina('<p>Sito</p>'));
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  const campo = await statoDi(app, page, '.sn-fb-text');
+  await scrivi(app, page, '.sn-fb-text', 'testo con erore');
+  await page.keyboard.press('Control+A');
+  await page.mouse.click(campo.x + 30, campo.y + 12, { button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await page.locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
+  const segnaposto = await nelMondoDiFilo(app, page, () => globalThis.SN_FILO_UI._test.trova('.sn-editbox-instruction').placeholder);
+  expect(segnaposto).toContain('"rendi più formale"');
+  await clicca(app, page, 'button[data-sc="fix"]');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-proposed'))?.testo || '').toContain('RISCRITTO');
+  await clicca(app, page, '.sn-editbox-replace');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.valore).toBe('TESTO RISCRITTO 1071');
+  await expect.poll(() => bozzaSalvata(app, chiaveBozza(testServer.origin))).toBe('TESTO RISCRITTO 1071');
 });

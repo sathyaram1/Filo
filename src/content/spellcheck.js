@@ -315,23 +315,40 @@
     return null;
   }
 
+  // Da un riquadro chiuso di Filo (feedback, spiegazione) il focus arriva all'host: il campo vero lo sa SN_FILO_UI,
+  // e l'overlay sta dentro lo stesso riquadro, perché ripete il testo e nel documento del sito lo leggerebbe (#1071).
+  function editabileDellEvento(e) {
+    const UI = global.SN_FILO_UI;
+    const t = e && e.target;
+    const riquadro = !!(UI && UI.bersaglio && t && t.hasAttribute && t.hasAttribute(UI.RIQUADRO));
+    return findSupportedEditable(riquadro ? UI.bersaglio(e) : t);
+  }
+  function radiceDi(el) {
+    try {
+      const r = el.getRootNode();
+      const UI = global.SN_FILO_UI;
+      if (r && r !== document && r.host && UI && r.host.hasAttribute(UI.RIQUADRO)) return r;
+    } catch (_) {}
+    return null;
+  }
+
   // ============================================================================
   // Focus lifecycle
   // ============================================================================
   function onFocusIn(e) {
     if (!isEnabled()) return;
-    const el = findSupportedEditable(e.target);
+    const el = editabileDellEvento(e);
     if (!el) return;
     attach(el);
   }
 
   function onFocusOut(e) {
-    const el = findSupportedEditable(e.target);
+    const el = editabileDellEvento(e);
     if (!el) return;
     // Mantieni l'overlay finché l'utente sta interagendo col popup correzione,
     // altrimenti il click destro su un range blu lo nasconde subito.
     setTimeout(() => {
-      if (document.activeElement === el) return;
+      if ((radiceDi(el) || document).activeElement === el) return;
       detach(el);
     }, 200);
   }
@@ -412,19 +429,19 @@
   ];
 
   function ensureOverlay(state) {
-    if (state.overlay && document.body.contains(state.overlay)) return;
+    if (state.overlay && state.overlay.isConnected) return;
     const o = document.createElement('div');
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(o);
+    (radiceDi(state.el) || document.body).appendChild(o);
     state.overlay = o;
   }
 
   function syncOverlay(state) {
     const o = state.overlay;
     const el = state.el;
-    if (!o || !el || !document.body.contains(el)) return;
+    if (!o || !el || !el.isConnected) return;
 
     const cs = window.getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -514,7 +531,7 @@
   }
 
   async function scanText(state) {
-    if (!state || !state.el || !document.body.contains(state.el)) return;
+    if (!state || !state.el || !state.el.isConnected) return;
     const text = getEditableText(state.el);
 
     // Reset se il testo è troppo corto o invariato
