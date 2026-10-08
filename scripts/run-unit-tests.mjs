@@ -335,7 +335,7 @@ export function guardiaFermo(tetto = TETTO_FERMO_MS) {
 export function misuraLavoro() {
   const t = performance.now();
   let x = 0;
-  for (let i = 0; i < 1e6; i++) x += Math.sqrt(i);
+  for (let i = 0; i < 2e6; i++) x += Math.sqrt(i);
   return performance.now() - t + (x < 0 ? 1 : 0);
 }
 
