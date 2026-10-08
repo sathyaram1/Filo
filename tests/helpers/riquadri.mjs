@@ -1,7 +1,6 @@
 // Sui siti spiegazione, Modifica, feedback e attacco red-team stanno in uno shadow root chiuso (#1071): i locator
-// non ci entrano.
-// Si guardano dall'hook SN_FILO_UI._test nel mondo dei content script (isolato sui siti, la pagina su filo://),
-// e si toccano coi clic e coi tasti veri sulle coordinate che l'hook restituisce.
+// non ci entrano. Si guardano dall'hook SN_FILO_UI._test nel mondo dei content script (isolato sui siti, la pagina
+// su filo://) e si toccano coi clic e coi tasti veri sulle coordinate che l'hook restituisce.
 
 const MONDO_CONTENT_SCRIPT = 999;
 
