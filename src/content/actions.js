@@ -85,7 +85,7 @@
         const end = activeEl.selectionEnd ?? 0;
         activeEl.value = activeEl.value.slice(0, start) + activeEl.value.slice(end);
         activeEl.setSelectionRange(start, start);
-        activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        activeEl.dispatchEvent(nostro(new Event('input', { bubbles: true })));
       } else {
         document.execCommand('delete');
       }
@@ -110,6 +110,9 @@
   // ------------------------------------------------------------
   // Incolla (da clipboard e da cronologia)
   // ------------------------------------------------------------
+  // Ciò che scriviamo noi in un campo di un riquadro di Filo lo deve sentire anche il riquadro, che ai finti è chiuso.
+  const nostro = (ev) => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
@@ -131,9 +134,9 @@
             if (targetKind === 'input') {
               // input/textarea non supportano immagini: prova a delegare ad
               // un handler custom (es. il modal feedback) via evento bubbling.
-              const pasteEvt = new CustomEvent('filo:paste-image', {
+              const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
                 bubbles: true, cancelable: true, detail: { blob },
-              });
+              }));
               if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
                 return;
               }
@@ -197,9 +200,9 @@
       // feedback, barra input dashboard, ecc.) possono allegarla. Senza questa
       // delega l'Incolla→cronologia falliva ovunque Ctrl+V su immagine funziona.
       if (ctx?.kind === 'input' && blob) {
-        const pasteEvt = new CustomEvent('filo:paste-image', {
+        const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
           bubbles: true, cancelable: true, detail: { blob },
-        });
+        }));
         if (ctx.el.dispatchEvent(pasteEvt) === false) {
           Popup.showToast(I18n.t('toast_pasted_image'));
           return;
@@ -299,7 +302,7 @@
       ctx.start = caret;
       ctx.end = caret;
       // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text }));
+      el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text })));
     } else if (kind === 'ce') {
       el.focus();
       // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:

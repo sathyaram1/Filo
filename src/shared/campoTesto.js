@@ -29,6 +29,9 @@
   // colore…) non contano: lì Ctrl+Z non ha niente da annullare.
   function campoDiTesto(el) {
     if (!el) return false;
+    // Un riquadro chiuso di Filo (data-sn-riquadro) non mostra a chi guarda da fuori il campo che ha il fuoco: se il
+    // fuoco è lì dentro, si sta scrivendo (#1071).
+    if (el.matches && el.matches('[data-sn-riquadro]:focus-within')) return true;
     if (el.matches && el.matches('input, textarea')) {
       const tipo = String((el.getAttribute && el.getAttribute('type')) || '').toLowerCase();
       const nonTesto = ['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'image', 'color', 'range'];

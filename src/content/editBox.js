@@ -61,7 +61,7 @@
         </div>
       </div>
     `;
-    document.documentElement.appendChild(root);
+    document.documentElement.appendChild(Popup.riquadro ? Popup.riquadro(root) : root);
 
     const $orig = root.querySelector('.sn-editbox-original');
     const $prop = root.querySelector('.sn-editbox-proposed');
@@ -80,8 +80,10 @@
       translate: 'Traduci il testo in inglese.',
       fix: 'Correggi eventuali errori grammaticali e di ortografia, senza alterare il senso.',
     };
+    // Una riscrittura spende una chiamata: parte solo da un tasto o da un clic dell'utente (#1071).
     root.querySelectorAll('.sn-editbox-shortcuts button').forEach((b) => {
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
+        if (!e.isTrusted) return;
         const k = b.dataset.sc;
         $instr.value = SHORTCUTS[k] || '';
         runEdit();
@@ -129,7 +131,7 @@
     $instr.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        runEdit();
+        if (e.isTrusted) runEdit();
       } else if (e.key === 'Escape') {
         close();
         // Il tasto è nostro e lo dichiariamo (#514): a schermo intero è così
@@ -139,13 +141,15 @@
       }
     });
     $cancel.addEventListener('click', close);
-    $copy.addEventListener('click', () => {
+    $copy.addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
       navigator.clipboard.writeText(currentResult).then(() => {
         Popup.showToast(I18n.t('toast_copied'));
         close();
       }, () => Popup.showToast(I18n.t('err_provider_failed')));
     });
-    $replace.addEventListener('click', () => {
+    $replace.addEventListener('click', (e) => {
+      if (!e.isTrusted) return;
       deps.setPasteContext(savedCtx);
       deps.restorePasteContext();
       // In input/textarea sostituisco il range salvato; in contenteditable uso execCommand insertText
@@ -165,7 +169,8 @@
     });
 
     function close() {
-      try { root.remove(); } catch (_) {}
+      if (Popup.togliRiquadro) Popup.togliRiquadro(root);
+      else { try { root.remove(); } catch (_) {} }
       document.removeEventListener('keydown', onDocKey, true);
     }
     const onDocKey = (e) => {

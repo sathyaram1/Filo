@@ -610,7 +610,10 @@
   // all'host del componente, e closest()/tagName non vedono più il link,
   // l'immagine o il campo davvero cliccati. composedPath()[0] attraversa lo
   // shadow boundary e restituisce l'elemento reale.
+  // Dentro un riquadro chiuso di Filo (spiegazione, Modifica, feedback) il nodo vero lo sa solo SN_FILO_UI.
   function realTarget(e) {
+    const UI = self.SN_FILO_UI;
+    if (e && UI?.bersaglio) return UI.bersaglio(e);
     return (typeof e?.composedPath === 'function' && e.composedPath()[0]) || e?.target || null;
   }
 
@@ -652,7 +655,8 @@
       for (const el of hits) {
         if (!el || seen.has(el)) continue;
         seen.add(el);
-        if (el.shadowRoot) collect(el.shadowRoot);
+        const ombra = el.shadowRoot || self.SN_FILO_UI?.ombraDi?.(el);
+        if (ombra) collect(ombra);
         out.push(el);
       }
     };

@@ -1119,7 +1119,8 @@
         const caret = before.length + safeReplacement.length;
         try { el.setSelectionRange(caret, caret); } catch (_) {}
       }
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      // Segnato come nostro: un campo di un riquadro di Filo, chiuso ai finti, deve sentire la correzione.
+      el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
     } else {
       const text = el.textContent || '';
       if (range.start < 0 || range.end > text.length || range.end <= range.start) {
