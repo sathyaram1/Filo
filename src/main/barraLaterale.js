@@ -681,7 +681,9 @@ class BarraLaterale {
       { label: 'Copia data e ora', action: 'barra:copia-ora' },
     ];
     const scegli = (a) => {
-      if (a === 'barra:copia-ora') { try { require('electron').clipboard.writeText(`${data} ${orario}`); } catch (_) {} }
+      if (a === 'barra:copia-ora') {
+        try { Promise.resolve(require('electron').clipboard.writeText(`${data} ${orario}`)).catch(() => {}); } catch (_) {}
+      }
     };
     return { voci, scegli };
   }
