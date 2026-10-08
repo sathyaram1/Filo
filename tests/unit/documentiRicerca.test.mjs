@@ -450,3 +450,54 @@ test('l\'anno chiesto col mese è l\'anno del periodo, non una parola qualsiasi 
   assert.equal(Ricerca.ordina([{ id: 'x', nome: 'x.pdf', testo: 'Bolletta luce. Bolletta di marzo' }], 'bolletta luce marzo 2025')[0].trovati.includes('marzo'), true);
   assert.deepEqual(Ricerca.ordina([{ id: 'c', nome: 'c.docx', testo: 'Contratto di locazione firmato nel 2025' }], 'contratto 2025')[0].trovati, ['contratto', '2025']);
 });
+
+// #947 giro 7: al modello va solo il testo dei candidati necessari. La busta paga e la lettera di dimissioni combaciano
+// con la bolletta della luce di marzo solo per «marzo», la lista della spesa solo per «luce».
+test('i candidati lontani dal migliore, trovati per una parola sola, non arrivano al modello', async () => {
+  const nomi = (await Indice.cerca('mi serve la bolletta della luce di marzo')).risultati.map((x) => x.nome);
+  assert.equal(nomi[0], BOLLETTA_MARZO);
+  for (const via of ['stampa.pdf', 'Documento1.docx', 'Nuovo documento.docx']) assert.ok(!nomi.includes(via), `${via}: ${nomi.join(', ')}`);
+  assert.ok(nomi.includes('scan_00198.pdf') && nomi.includes('doc_8812.pdf'), 'le bollette vicine restano, il modello sceglie fra loro');
+  assert.deepEqual((await Indice.cerca('la busta paga di marzo')).risultati.map((x) => x.nome), ['stampa.pdf']);
+});
+
+// #947 giro 7: la ricerca chiesta mentre l'indice legge in sottofondo non si accontenta di quel giro, che ha elencato le
+// cartelle prima che la bolletta arrivasse.
+test('un file salvato mentre l\'indice sta leggendo si trova alla ricerca chiesta subito dopo', async () => {
+  const nuovo = join(DOC, 'scan_00777.txt');
+  Indice._azzera();
+  rmSync(DATI, { recursive: true, force: true });
+  Indice.configura({ estrai: async (p) => { await new Promise((ok) => setTimeout(ok, 15)); return Testo.estrai(p); } });
+  try {
+    const sottofondo = Indice.aggiorna();
+    for (let i = 0; i < 200 && !(await Indice.stato()).inCorso; i++) await new Promise((ok) => setTimeout(ok, 5));
+    assert.ok((await Indice.stato()).inCorso, 'il giro in sottofondo sta leggendo');
+    writeFileSync(nuovo, 'Bolletta per la fornitura di energia elettrica\nPeriodo di fatturazione: 01/03/2027 - 31/03/2027\nConsumo 199 kWh');
+    const stati = [];
+    const r = await Indice.cerca('bolletta luce marzo 2027', { avanzamento: (s) => stati.push(s) });
+    assert.equal(r.risultati[0] && r.risultati[0].nome, 'scan_00777.txt');
+    assert.ok(stati.some((s) => s.fase === 'lettura' && s.nome === 'scan_00777.txt'), 'l\'attesa segue anche il giro che legge il file nuovo');
+    await sottofondo;
+  } finally {
+    unlinkSync(nuovo);
+    Indice.configura({ estrai: (p) => Testo.estrai(p) });
+  }
+});
+
+// #947 giro 7: il bottone del file dice dove sta coi nomi delle cartelle di Filo, mai con la cartella dell'account.
+test('dove sta un file: le cartelle di serie col loro nome, niente cartella dell\'account', async () => {
+  const prima = process.env.FILO_DOWNLOAD_DIR;
+  const scaricati = join(CASA, 'Downloads');
+  process.env.FILO_DOWNLOAD_DIR = scaricati;
+  try {
+    assert.equal(await Indice.doveSta(join(scaricati, 'scan_00231.pdf')), 'Download');
+    assert.equal(await Indice.doveSta(join(scaricati, 'Scansioni', 'scan_00231.pdf')), 'Download › Scansioni');
+    assert.equal(await Indice.doveSta(join(scaricati, 'Casa', 'Bollette', '2026', 'a.pdf')), 'Download › … › 2026');
+    assert.equal(await Indice.doveSta(join(DOC, 'scan_00231.pdf')), 'Documenti', 'una cartella dell\'elenco col suo nome');
+    const casa = (await import('node:os')).homedir();
+    assert.equal(await Indice.doveSta(join(casa, 'Lavoro', 'Fatture', 'f.pdf')), 'Lavoro › Fatture');
+    assert.equal(await Indice.doveSta(join(casa, 'f.pdf')), 'Cartella personale');
+  } finally {
+    if (prima == null) delete process.env.FILO_DOWNLOAD_DIR; else process.env.FILO_DOWNLOAD_DIR = prima;
+  }
+});

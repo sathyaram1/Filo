@@ -1257,7 +1257,8 @@
     const s = String(p || '').trim();
     return !!s && !/^[a-z][a-z0-9+.-]*:\/\//i.test(s) && (/^([\\/]|~([\\/]|$)|[a-z]:[\\/])/i.test(s));
   };
-  // «Documenti › Scansioni»: le ultime due cartelle dicono dove sta; il percorso intero sta nel suggerimento.
+  // Se il bottone non porta il «dove» coi nomi di Filo (una chat riaperta): le ultime due cartelle; il percorso intero sta
+  // nel suggerimento.
   function cartellaBreve(p) {
     const pezzi = String(p || '').split(/[\\/]+/).filter(Boolean);
     pezzi.pop();
@@ -1301,7 +1302,8 @@
     const disegna = () => {
       const p = String(a.percorso || a.path || '');
       nome.textContent = a.etichetta || a.label || nomeDelPercorso(p) || 'File';
-      dove.textContent = cartellaBreve(p);
+      const doveFilo = a._output && typeof a._output.dove === 'string' ? a._output.dove : '';
+      dove.textContent = doveFilo || cartellaBreve(p);
       dove.hidden = !dove.textContent;
       btn.title = `Apri · ${p}`;
       btn.dataset.percorso = p;

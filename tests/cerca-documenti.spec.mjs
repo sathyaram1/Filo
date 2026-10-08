@@ -51,7 +51,8 @@ test('la prova della segnalazione: la bolletta della luce di marzo è il primo r
     const file = page.locator('.dash-bubble-actions .dash-file-btn');
     await expect(file).toHaveCount(1, { timeout: 20_000 });
     await expect(file.locator('.dash-file-btn-nome')).toHaveText(BOLLETTA_MARZO);
-    await expect(file.locator('.dash-file-btn-dove')).toHaveText(/Scansioni/);
+    // Dove sta, coi nomi delle cartelle di Filo: «Download», non «downloads» né la cartella dell'account.
+    await expect(file.locator('.dash-file-btn-dove')).toHaveText('Download › Scansioni');
     await expect(file).toHaveAttribute('data-percorso', bolletta);
 
     // Al modello è arrivato quel file come PRIMO candidato, con il pezzo di testo che lo distingue; il testo intero
@@ -62,6 +63,9 @@ test('la prova della segnalazione: la bolletta della luce di marzo è il primo r
     expect(esito).toContain(bolletta);
     expect(esito).toMatch(/01\/03\/2026/);
     expect(esito, 'il testo di un documento che non è fra i candidati non esce').not.toContain('Programma cotone 40 gradi');
+    // Né quello dei documenti che con la richiesta hanno in comune una parola sola: busta paga e dimissioni («marzo»).
+    expect(esito).not.toContain('Retribuzione netta');
+    expect(esito).not.toContain('dimissioni');
     // I PDF li ha letti il processo a parte, non quello da cui dipendono finestre e schede.
     const lettori = await app.evaluate(({ app: a }) => a.getAppMetrics().filter((m) => m.type === 'Utility').map((m) => m.name || m.serviceName || ''));
     expect(lettori).toContain('Filo · lettura documenti');
@@ -111,6 +115,7 @@ test('la stessa ricerca dalla chat di un\'altra scheda', async ({ app, openTab }
     await chiedi(page, 'dov\'è la ricevuta dell\'assicurazione?');
     const file = page.locator('.dash-bubble-actions .dash-file-btn');
     await expect(file.locator('.dash-file-btn-nome')).toHaveText('xyz123.pdf', { timeout: 20_000 });
+    await expect(file.locator('.dash-file-btn-dove')).toHaveText('Download › Scheda');
     await page.screenshot({ path: 'tests/.shots/cerca-documenti-scuro.png' });
     await file.hover();
     await page.screenshot({ path: 'tests/.shots/cerca-documenti-scuro-hover.png' });
@@ -135,6 +140,7 @@ test('il file trovato si trascina nel campo dove si scrive a Filo', async ({ app
     const file = page.locator('.dash-file-btn');
     await expect(file).toHaveCount(1, { timeout: 20_000 });
     await expect(file.locator('.dash-file-btn-nome')).toHaveText('documento (3).docx');
+    await expect(file.locator('.dash-file-btn-dove')).toHaveText('Download › Trascina');
     await file.dragTo(page.locator('#input'));
     await expect(page.locator('.dash-file-chip')).toHaveText(/documento \(3\)\.docx/, { timeout: 5_000 });
   } finally {

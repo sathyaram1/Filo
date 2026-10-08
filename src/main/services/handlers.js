@@ -2649,8 +2649,15 @@ async function eseguiAzioneFilo(action, {
         }
         return { executed: tolte.length > 0, kept: false, output: { dimenticate: tolte } };
       }
-      case 'APRI_FILE':
-        return { executed: true, kept: true };
+      case 'APRI_FILE': {
+        // Il bottone dice dove sta il file con i nomi delle cartelle di Filo, non con quelli del disco (#947).
+        const p = String(action.percorso ?? action.path ?? '').trim();
+        let dove = '';
+        if (/^(~([\\/]|$)|[\\/]|[a-z]:[\\/])/i.test(p)) {
+          try { dove = await require('./documentiIndice').doveSta(require('./documentRead').normalizePath(p)); } catch (_) {}
+        }
+        return { executed: true, kept: true, ...(dove ? { output: { dove } } : {}) };
+      }
       case 'RINOMINA_FILE': {
         const visti = bersagliMostrati(sender, action);
         const proposte = (visti && Array.isArray(visti.proposte) ? visti.proposte : []).slice(0, LOTTO_RINOMINA);
@@ -4383,7 +4390,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // «eccolo» senza niente da cliccare è una promessa che dipende dal modello.
   for (const a of fileNominatiDallaRisposta(textReply, renderedActions)) {
     const res = await executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta });
-    if (res && res.kept && res.executed && !res.needsConfirm) renderedActions.push({ ...a, _executed: true });
+    if (res && res.kept && res.executed && !res.needsConfirm) renderedActions.push({ ...a, _executed: true, ...(res.output ? { _output: res.output } : {}) });
   }
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });

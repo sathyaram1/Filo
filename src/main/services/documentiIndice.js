@@ -102,7 +102,9 @@ let caricamento = null;
 let ultimoGiro = 0;
 let troppi = false;
 let negate = new Set();   // le cartelle che il sistema non ha lasciato elencare all'ultimo giro
-let corsa = null;        // { promessa, stato: { fatti, totali, nome }, ascolta: Set }
+let corsa = null;        // { promessa, stato: { fase, fatti, totali, nome } }
+// Chi aspetta una ricerca segue ogni giro finché non l'ha avuta, anche quello che parte dopo il giro in corso.
+const inAscolto = new Set();
 let daRifare = false;
 
 // Su disco una riga per documento letto, accodata appena letto: il primo giro su migliaia di file non riscrive
@@ -240,9 +242,8 @@ function comeDarePermesso(piattaforma = process.platform) {
 }
 
 function avvisa(stato) {
-  if (!corsa) return;
-  corsa.stato = stato;
-  for (const f of corsa.ascolta) { try { f(stato); } catch (_) {} }
+  if (corsa) corsa.stato = stato;
+  for (const f of inAscolto) { try { f(stato); } catch (_) {} }
 }
 
 async function eseguiGiro(extra) {
@@ -289,13 +290,17 @@ async function eseguiGiro(extra) {
   if (!extra || !extra.length) ultimoGiro = Date.now();
 }
 
-/** Un giro sull'indice; se ce n'è già uno, ci si accoda a quello. `extra`: cartelle in più solo per questo giro. */
-function aggiorna({ extra = [] } = {}) {
+/**
+ * Un giro sull'indice; se ce n'è già uno, ci si accoda a quello. `extra`: cartelle in più solo per questo giro.
+ * `dopo`: serve un giro che elenchi le cartelle da adesso, e quello in corso le ha elencate prima (un file salvato
+ * mentre l'indice leggeva non ci sarebbe): finito quello, se ne fa un altro, che rilegge solo i file nuovi.
+ */
+function aggiorna({ extra = [], dopo = false } = {}) {
   if (corsa) {
-    if (!extra.length) return corsa.promessa;
+    if (!extra.length && !dopo) return corsa.promessa;
     return corsa.promessa.then(() => aggiorna({ extra }));
   }
-  const c = { stato: null, ascolta: new Set(), promessa: null };
+  const c = { stato: null, promessa: null };
   corsa = c;
   c.promessa = eseguiGiro(extra).catch(() => {}).finally(() => {
     if (corsa === c) corsa = null;
@@ -305,11 +310,10 @@ function aggiorna({ extra = [] } = {}) {
 }
 
 function ascoltaGiro(f) {
-  if (!corsa || typeof f !== 'function') return () => {};
-  corsa.ascolta.add(f);
-  if (corsa.stato) { try { f(corsa.stato); } catch (_) {} }
-  const c = corsa;
-  return () => c.ascolta.delete(f);
+  if (typeof f !== 'function') return () => {};
+  inAscolto.add(f);
+  if (corsa && corsa.stato) { try { f(corsa.stato); } catch (_) {} }
+  return () => inAscolto.delete(f);
 }
 
 // ── La ricerca ─────────────────────────────────────────────────────────────
@@ -364,7 +368,7 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
   if (!cartellaMancante) {
     // Ogni ricerca riguarda le cartelle: un file messo lì da un altro programma un attimo prima si trova. Elencare
     // costa poco, si rileggono solo i file nuovi o cambiati.
-    const lavoro = extra.length ? aggiorna({ extra }) : aggiorna();
+    const lavoro = aggiorna({ extra, dopo: true });
     const smetti = ascoltaGiro(avanzamento);
     fermata = await Promise.race([lavoro.then(() => false), aspettaStop(segnale).then(() => true)]);
     smetti();
@@ -403,6 +407,23 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     });
   }
   return { risultati, indice: riassuntoIndice(rs, sotto), fermata, cartellaMancante };
+}
+
+/**
+ * Dove sta un file, detto all'utente: «Download», «Documenti › Bollette», «Lavoro › … › 2026». Le cartelle di serie
+ * col nome che hanno in Preferenze (sul disco sono «Downloads», «Documents»), e mai la cartella dell'account.
+ */
+async function doveSta(percorso) {
+  const dir = path.dirname(path.resolve(String(percorso || '')));
+  const basi = Object.keys(DI_SERIE).map((k) => ({ p: cartellaDiSerie(k), nome: DI_SERIE[k].nome }));
+  try { for (const r of await radici()) if (!DI_SERIE[r.voce]) basi.push({ p: r.percorso, nome: r.nome }); } catch (_) {}
+  basi.push({ p: os.homedir(), nome: '' });
+  const base = basi.filter((b) => b.p && dentro(dir, b.p)).sort((a, b) => b.p.length - a.p.length)[0];
+  const pezzi = base
+    ? [base.nome, ...path.relative(base.p, dir).split(/[\\/]+/)].filter(Boolean)
+    : dir.split(/[\\/]+/).filter(Boolean).slice(-2);
+  if (!pezzi.length) return base ? 'Cartella personale' : '';
+  return pezzi.length > 2 ? `${pezzi[0]} › … › ${pezzi[pezzi.length - 1]}` : pezzi.join(' › ');
 }
 
 /** Le voci dell'elenco che non sono una cartella di questo computer (per dirlo prima di salvarle). */
@@ -462,7 +483,7 @@ function avviaInSottofondo() {
 
 module.exports = {
   configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
-  cartellaDiSerie, elimina, comeDarePermesso, DI_SERIE,
+  cartellaDiSerie, elimina, comeDarePermesso, doveSta, DI_SERIE,
   // per gli unit test
   _giroInSottofondo: giroInSottofondo,
   _azzera: () => { voci = null; caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; negate = new Set(); },
