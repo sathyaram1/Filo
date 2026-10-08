@@ -2309,9 +2309,9 @@ class TabManager {
     });
     // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
-      wc.on('console-message', (_e, level, message, line, source) => {
-        const tag = ['log', 'warn', 'error'][level] || 'info';
-        const src = source ? ` (${source}:${line})` : '';
+      wc.on('console-message', ({ level, message, lineNumber, sourceId }) => {
+        const tag = { warning: 'warn', error: 'error', info: 'log' }[level] || level || 'log';
+        const src = sourceId ? ` (${sourceId}:${lineNumber})` : '';
         console.log(`[tab:${tab.id.slice(0, 6)}:${tag}] ${message}${src}`);
       });
     }
