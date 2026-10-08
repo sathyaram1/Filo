@@ -1,4 +1,4 @@
-// Verifica #1070 giro 3: sonde.
+// Verifica #1070 giro 3: r1 un tasto qualunque non compra la chiamata che non chiede (spiegazione in anticipo, controllo della parola).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -6,7 +6,6 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="font:20px sans-serif;padding:30px;margin:0">
 <p id="p1">La fotosintesi clorofilliana trasforma la luce in energia chimica dentro le foglie verdi delle piante.</p>
 <textarea id="ta" style="display:block;width:640px;height:140px;font:20px monospace"></textarea>
-<div id="ed" contenteditable="true" style="width:640px;height:80px;border:1px solid #888;font:20px monospace"></div>
 <input id="cerca" style="font:20px monospace;width:400px">
 </body>`;
 
@@ -49,45 +48,7 @@ async function apri(app, openTab, testServer) {
   return page;
 }
 
-test('sonda execCommand paste: produce un paste vero?', async ({ app, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const page = await apri(app, openTab, testServer);
-  const esito = await page.evaluate(async () => {
-    const visti = [];
-    document.addEventListener('paste', (e) => visti.push(e.isTrusted));
-    const ta = document.getElementById('ta');
-    ta.focus();
-    let ok = null;
-    try { ok = document.execCommand('paste'); } catch (e) { ok = String(e); }
-    await new Promise((r) => setTimeout(r, 200));
-    return { ok, visti };
-  });
-  console.log('PASTE', JSON.stringify(esito));
-});
-
-test('sonda editor ricco: tasti veri con inserimento da script, la parola si controlla', async ({ app, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const page = await apri(app, openTab, testServer);
-  await page.evaluate(() => {
-    const ed = document.getElementById('ed');
-    ed.addEventListener('keydown', (e) => {
-      if (e.key.length !== 1) return;
-      e.preventDefault();
-      ed.textContent += e.key;
-      const r = document.createRange(); r.selectNodeContents(ed); r.collapse(false);
-      getSelection().removeAllRanges(); getSelection().addRange(r);
-      ed.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: e.key }));
-    });
-  });
-  await page.click('#ed');
-  await page.keyboard.type('qwzrtx sbagliatta ', { delay: 60 });
-  await pausa(2500);
-  const c = await conti(app);
-  console.log('EDITOR', JSON.stringify(c));
-  expect(c.parola + c.scan).toBeGreaterThan(0);
-});
-
-test('sonda: la pagina sfrutta i tasti scritti nel suo campo di ricerca per cambiare la selezione', async ({ app, openTab, testServer }) => {
+test('r1 scrivere nel campo di ricerca della pagina non paga spiegazioni in anticipo di selezioni fatte dalla pagina', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer);
   await page.evaluate(() => {
@@ -108,5 +69,29 @@ test('sonda: la pagina sfrutta i tasti scritti nel suo campo di ricerca per camb
   const prima = (await conti(app)).spiega;
   await page.keyboard.type('una ricerca qualunque scritta da una persona normale', { delay: 150 });
   await pausa(1500);
-  console.log('SPIEGA PER TASTI', (await conti(app)).spiega - prima);
+  expect((await conti(app)).spiega - prima).toBeLessThanOrEqual(1);
+});
+
+test('r1 ogni lettera scritta non paga il controllo di una parola chiusa dalla pagina: al più uno per parola chiusa dall\'utente', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  await page.evaluate(() => {
+    let i = 0;
+    const ta = document.getElementById('ta');
+    ta.addEventListener('keydown', (e) => {
+      if (e.key.length !== 1) return;
+      e.preventDefault();
+      ta.value += ` xqzparola${i++} `;
+      ta.selectionStart = ta.selectionEnd = ta.value.length;
+      ta.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: ' ' }));
+    });
+  });
+  await page.click('#ta');
+  await pausa(300);
+  const prima = await conti(app);
+  await page.keyboard.type('ciao come stai oggi', { delay: 150 });
+  await pausa(2500);
+  const dopo = await conti(app);
+  // L'utente ha chiuso tre parole (tre spazi): il ritmo legittimo è un controllo per parola, più l'ultima.
+  expect(dopo.parola - prima.parola).toBeLessThanOrEqual(4);
 });
