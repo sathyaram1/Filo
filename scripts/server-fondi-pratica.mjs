@@ -87,6 +87,52 @@ function lanciaServer(cartella, args, env) {
   return typeof r.status === 'number' ? r.status : 1;
 }
 
+/** Il ramo usa-e-getta che contiene solo lo sha verificato di `ramo`: lo crea solo server:fondi, quindi nessuno lo muove. PURA. */
+export const nomeRamoFisso = (ramo, sha) => `${ramo}-verificato-${String(sha).slice(0, 12)}`;
+
+function ramoFisso(cartella, ramo, sha) {
+  const radice = dirname(cartella);
+  const nome = nomeRamoFisso(ramo, sha);
+  const fatto = gitEsito(radice, ['push', '--quiet', 'origin', `${sha}:refs/heads/${nome}`]);
+  if (!fatto.ok) return { ok: false, motivo: fatto.out };
+  return {
+    ok: true,
+    ramo: nome,
+    togli: () => {
+      const via = gitEsito(radice, ['push', '--quiet', 'origin', '--delete', nome]);
+      gitIn(radice, ['update-ref', '-d', `refs/remotes/origin/${nome}`]);
+      return via;
+    },
+  };
+}
+
+/**
+ * Lo strumento del server fonde la punta che trova su origin dopo il suo fetch: con un verdetto che comprende il server
+ * (#1062) gli si passa un ramo fermo sullo sha verificato, così un push arrivato dopo il controllo resta fuori.
+ */
+export function lanciaFissato(cartella, ramo, verdetto, env, { lancia, fissa, log, err }) {
+  const sha = verdetto && verdetto.server ? String(verdetto.server.sha || '') : '';
+  if (!sha) return lancia(cartella, [ramo], env);
+  const fisso = fissa(cartella, ramo, sha);
+  if (!fisso || !fisso.ok) {
+    err(`server:fondi: non riesco a fermare lo sha verificato ${sha.slice(0, 9)} su un ramo suo, e senza non fondo: un push su ${ramo} entrerebbe senza verifica (${String((fisso && fisso.motivo) || '').slice(0, 300)}).`);
+    return 1;
+  }
+  log(`Porto su main lo sha verificato ${sha.slice(0, 9)} di ${ramo}: allo strumento del server va ${fisso.ramo}, che contiene solo quello e tolgo alla fine.`);
+  try {
+    return lancia(cartella, [fisso.ramo], env);
+  } finally {
+    const t = fisso.togli();
+    if (t && !t.ok) err(`Non ho tolto ${fisso.ramo} da origin del server (${String(t.out || '').slice(0, 200)}): git push origin --delete ${fisso.ramo}`);
+  }
+}
+
+function gitEsito(cwd, args) {
+  try { return { ok: true, out: execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) }; } catch (e) {
+    return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || String(e.message || e) };
+  }
+}
+
 function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
