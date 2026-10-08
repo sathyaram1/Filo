@@ -277,6 +277,20 @@ function bytesDaDataUrl(dataUrl) {
   } catch (_) { return null; }
 }
 
+// I byte dell'immagine che il sistema tiene negli appunti, PNG prima di tutto; null se non ce n'è.
+async function immagineNegliAppunti() {
+  const voci = await require('electron').clipboard.read();
+  for (const tipo of ['image/png', /^image\//]) {
+    for (const v of voci) {
+      const t = v.types.find((x) => (typeof tipo === 'string' ? x === tipo : tipo.test(x)));
+      if (!t) continue;
+      const b = Buffer.from(await (await v.getType(t)).arrayBuffer());
+      if (b.length && b.length <= MAX_BYTE_PROVENIENZA) return b;
+    }
+  }
+  return null;
+}
+
 module.exports = function register(on, ctx) {
   const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
