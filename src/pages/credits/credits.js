@@ -655,7 +655,7 @@
   }
 
   function formatInt(n) {
-    return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
+    return new Intl.NumberFormat('it-IT', { useGrouping: true }).format(Math.round(Number(n) || 0));
   }
   // Crediti con al più un decimale, così un consumo sotto il credito resta
   // visibile. La regola è una sola con la chat (#816): SN_WALLET.formatCredits.

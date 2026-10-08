@@ -305,40 +305,6 @@ function template(piattaforma) {
   return [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
 }
 
-// La barra esegue da sé i suoi tasti registrati quando nessuna pagina li ha usati:
-// chi inoltra tasti lo chiede qui per non far fare la stessa cosa due volte (#838).
-const formeDellaBarra = new Map();
-function formaTasto(mods, tasto) {
-  const NOMI = { plus: '+', left: 'arrowleft', right: 'arrowright' };
-  const k = String(tasto || '').toLowerCase();
-  return `${[...new Set(mods)].sort().join('+')}|${NOMI[k] || k}`;
-}
-function tastoDellaBarra(input, piattaforma = process.platform) {
-  if (!input) return false;
-  if (!formeDellaBarra.has(piattaforma)) {
-    const MAC = piattaforma === 'darwin';
-    const MOD = [
-      [/^(commandorcontrol|cmdorctrl)$/, MAC ? 'meta' : 'control'],
-      [/^(command|cmd|meta|super)$/, 'meta'], [/^(control|ctrl)$/, 'control'],
-      [/^(alt|option)$/, 'alt'], [/^shift$/, 'shift'],
-    ];
-    const forme = new Set();
-    const scendi = (voci) => {
-      for (const v of voci) {
-        if (v.submenu) scendi(v.submenu);
-        if (!v.accelerator || v.registerAccelerator === false) continue;
-        const parti = String(v.accelerator).split('+');
-        const mods = parti.slice(0, -1).map((p) => (MOD.find(([re]) => re.test(p.toLowerCase())) || [])[1]);
-        forme.add(formaTasto(mods, parti[parti.length - 1]));
-      }
-    };
-    scendi(template(piattaforma));
-    formeDellaBarra.set(piattaforma, forme);
-  }
-  const mods = ['meta', 'control', 'alt', 'shift'].filter((m) => input[m]);
-  return formeDellaBarra.get(piattaforma).has(formaTasto(mods, input.key));
-}
-
 // Da chiamare una volta sola, dopo `app.whenReady()`.
 function installaMenuApplicazione() {
   const { Menu, app } = require('electron');
@@ -352,4 +318,4 @@ function installaMenuApplicazione() {
   }
 }
 
-module.exports = { installaMenuApplicazione, template, tastoDellaBarra, annulla, ripeti, staScrivendo };
+module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo };

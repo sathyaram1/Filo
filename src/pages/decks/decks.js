@@ -627,7 +627,7 @@
       hits += r.hits; iters += r.iterations; seen = r.seen;
       const p = hits / iters;
       out.textContent = `≈ ${(p * 100).toFixed(1).replace('.', ',')}%`;
-      out.title = `${iters.toLocaleString('it-IT')} mani simulate, ${seen} carte viste`;
+      out.title = `${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate, ${seen} carte viste`;
       // Converge finché non tocca il tetto; un risultato esattamente 0 o 100%
       // è deterministico (caso certo/impossibile) → inutile insistere.
       if (iters < PROB_CAP && hits > 0 && hits < iters) {
@@ -1031,7 +1031,7 @@
   // Bolla in attesa: la frase del modello appena c'è, e la fase della ricerca con quante carte su quante (#382).
   function progressHtml(p) {
     if (!p || !(p.total > 0)) return '<div class="dk-msg-pending">Filo sta pensando…</div>';
-    const n = (x) => Number(x).toLocaleString('it-IT');
+    const n = (x) => Number(x).toLocaleString('it-IT', { useGrouping: true });
     const done = Math.min(Number(p.done) || 0, p.total);
     const label = p.fase === 'controllo'
       ? `Controllo una per una le ${n(p.total)} carte trovate…`
@@ -1135,7 +1135,7 @@
     chatDom = next;
     const capEl = log.querySelector(':scope > .dk-chat-cap');
     if (Chat.fits(msgs)) { if (capEl) capEl.remove(); } else if (!capEl) {
-      log.insertAdjacentHTML('beforeend', `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT')} messaggi e da qui in poi Filo non salva i nuovi. Svuotala per ripartire da zero.</p>`);
+      log.insertAdjacentHTML('beforeend', `<p class="dk-msg dk-chat-cap" role="status">Questa chat ha superato i ${Chat.MAX_MESSAGES.toLocaleString('it-IT', { useGrouping: true })} messaggi e da qui in poi Filo non salva i nuovi. Svuotala per ripartire da zero.</p>`);
     }
     log.scrollTop = follow ? log.scrollHeight : prevTop;
     syncCarouselHighlight();

@@ -229,7 +229,7 @@
   // Conteggi di token nel formato dei numeri italiano (1.234), per il
   // suggerimento del riuso.
   function formatTokens(n) {
-    return Number(n || 0).toLocaleString('it-IT');
+    return Number(n || 0).toLocaleString('it-IT', { useGrouping: true });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
