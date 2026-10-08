@@ -109,4 +109,6 @@ module.exports = function register(on, ctx) {
     } catch (_) { return { ok: false }; }
   }));
   Indice.avviaInSottofondo();
+  // Le prove lo raggiungono dal processo principale (app.evaluate), come gli altri servizi su globalThis.
+  globalThis.SN_DOCUMENTI_INDICE = Indice;
 };
