@@ -277,3 +277,26 @@ test('ramiApertiDellaPratica: il ramo dell’app con lo stesso nome di quello de
   assert.deepEqual(con('claude/assente'), []);
   assert.deepEqual(con('main'), []);
 });
+
+// #1062: il ramo del server con un ramo dell'app omonimo in verifica si fonde solo allo sha verificato.
+test('un lavoro con l’app la cui verifica non regge non si fonde, e non si tocca niente', async () => {
+  const no = { ok: false, reason: 'il ramo del server claude/x si è mosso dopo la verifica (11111111 → 22222222)' };
+  for (const argv of [['claude/x', '--feedback', 'p'], ['claude/x', '--feedback', 'p', '--dry-run']]) {
+    const r = await giro({ docs: { p: doc('p') }, argv, verdetto: no });
+    assert.equal(r.k, 1, r.testo);
+    assert.match(r.testo, /claude\/x è un lavoro con l'app, e la sua verifica non regge: il ramo del server claude\/x si è mosso/);
+    assert.match(r.testo, /Non ho toccato niente/);
+    assert.deepEqual(r.lanci, []);
+    assert.deepEqual(r.scritture, []);
+  }
+});
+
+test('con la verifica che regge si fonde, e se main finisce su un altro sha lo si dice', async () => {
+  const si = { ok: true, reason: 'verifica superata su questo contenuto, insieme al ramo del server claude/x su aaaaaaaa', server: { ramo: 'claude/x', sha: 'a'.repeat(40) } };
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: si });
+  assert.equal(r.k, 0, r.testo);
+  assert.match(r.testo, /Verifica del lavoro: verifica superata/);
+  assert.doesNotMatch(r.testo, /Attenzione/);
+  const altro = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: { ...si, server: { ramo: 'claude/x', sha: 'b'.repeat(40) } } });
+  assert.match(altro.testo, /Attenzione: main del server è su aaaaaaaaa, non sullo sha verificato bbbbbbbbb/);
+});

@@ -772,11 +772,8 @@ async function main() {
     }
   }
 
-  // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
-  //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
-  //    codice appena controllato; la prova degli unit sulla fusione (#929) la
-  //    lega al main su cui sono girati.
-  // I controlli durano minuti: il ramo omonimo del server può essersi mosso intanto, e il verdetto vale per tutti e due (#1062).
+  // I controlli durano minuti: intanto il ramo omonimo del server può essersi mosso, e il verdetto vale
+  // per tutti e due (#1062).
   {
     const ancora = verdictForCurrentBranch(ROOT);
     if (!ancora.ok) {
@@ -785,6 +782,11 @@ async function main() {
       process.exit(1);
     }
   }
+
+  // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
+  //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
+  //    codice appena controllato; la prova degli unit sulla fusione (#929) la
+  //    lega al main su cui sono girati.
   // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
   const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
   const giro = await chiediConProva({

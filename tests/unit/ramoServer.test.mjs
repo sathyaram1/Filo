@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -156,13 +156,11 @@ function scenario() {
 }
 
 function vl(work, ...args) {
-  try {
-    const out = execFileSync(process.execPath, [VERIFY, ...args], {
-      cwd: work, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, FILO_REPO_ROOT: work, FILO_ROUTINE_CONFIG_URL: FINTO, FILO_ADMIN_ID_TOKEN: 'finto-id-token' },
-    });
-    return { code: 0, out };
-  } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
+  const r = spawnSync(process.execPath, [VERIFY, ...args], {
+    cwd: work, encoding: 'utf8',
+    env: { ...process.env, FILO_REPO_ROOT: work, FILO_ROUTINE_CONFIG_URL: FINTO, FILO_ADMIN_ID_TOKEN: 'finto-id-token' },
+  });
+  return { code: r.status, out: `${r.stdout || ''}${r.stderr || ''}` };
 }
 
 const PASS = 'Provato il lavoro intero, app e server insieme, con inserimenti vuoti e lunghi: regge in ogni caso provato.';
@@ -183,7 +181,7 @@ test('#715: una correzione fatta solo sul ramo del server non passa per «verifi
   assert.match(avvio.out, /Parte del server: claude\/prova di filo-security su [0-9a-f]{8}/);
   assert.equal(vl(sc.work, 'critica', FIX).code, 0);
   commit(sc.server, 'functions/lavoro.js', 'v2, corretto\n', 'correzione del server');
-  const c = vl(sc.work, 'corretto', 'Corretto il salvataggio del campo nuovo nel server; l\'app non andava toccata.');
+  const c = vl(sc.work, 'corretto', 'Corretto il salvataggio del campo nuovo nel ramo del server; l\'app non andava toccata, è rimasta com\'era.');
   assert.equal(c.code, 0, c.out);
   assert.match(c.out, /Correzione consegnata/);
   assert.doesNotMatch(c.out, /Verifica superata/);
@@ -191,14 +189,14 @@ test('#715: una correzione fatta solo sul ramo del server non passa per «verifi
   assert.equal(st.code, 1, 'la correzione del server deve passare da un\'altra verifica');
   assert.match(st.out, /serve un'altra verifica/);
   const giro2 = vl(sc.work, 'start');
-  assert.match(giro2.out, /La correzione è passata anche dal ramo del server claude\/prova|PARTE DEL SERVER/);
+  assert.match(giro2.out, /PARTE DEL SERVER/);
   assert.equal(vl(sc.work, 'critica', PASS).code, 0);
   const ok = vl(sc.work, 'status');
   assert.equal(ok.code, 0, ok.out);
   assert.match(ok.out, /insieme al ramo del server claude\/prova/);
 });
 
-test('un commit sul ramo del server dopo il verdetto lo fa decadere: status, finish e server:fondi dicono di no', () => {
+test('un commit sul ramo del server dopo il verdetto lo fa decadere: status, finish e server:fondi dicono di no', async () => {
   const sc = scenario();
   verificato(sc);
   assert.equal(VL.verdettoDelRamo(RAMO, { radice: sc.work }).ok, true);
@@ -209,6 +207,16 @@ test('un commit sul ramo del server dopo il verdetto lo fa decadere: status, fin
   const v = VL.verdettoDelRamo(RAMO, { radice: sc.work });
   assert.equal(v.ok, false);
   assert.match(v.reason, /si è mosso dopo la verifica/);
+  // server:fondi, dal comando vero: si ferma prima di parlare con la pratica e prima di lanciare il server.
+  const { esegui } = await import('../../scripts/server-fondi-pratica.mjs');
+  const righe = [];
+  const k = await esegui([RAMO, '--feedback', '910'], {
+    env: {}, radice: sc.work, funzioni: join(sc.server, 'functions'), bearer: 'finto', base: 'http://127.0.0.1:9/nessuno',
+    log: (x) => righe.push(String(x)), err: (x) => righe.push(String(x)),
+    lancia: () => { throw new Error('il server non doveva partire'); },
+  });
+  assert.equal(k, 1, righe.join('\n'));
+  assert.match(righe.join('\n'), /la sua verifica non regge: il ramo del server claude\/prova si è mosso dopo la verifica/);
   // Riportato dov'era, il verdetto torna a valere: conta il contenuto, non la storia.
   g(sc.server, 'reset', '-q', '--hard', 'HEAD~1');
   assert.equal(vl(sc.work, 'status').code, 0);
@@ -243,22 +251,18 @@ test('una fusione pulita di main del server dopo il verdetto (server:fondi la ch
   assert.match(st.out, /dopo è entrato solo main del server/);
   assert.equal(VL.verdettoDelRamo(RAMO, { radice: sc.work }).ok, true);
 
-  // Un conflitto risolto è contenuto che nessuno ha verificato.
+  // Un conflitto risolto è contenuto che nessuno ha verificato, anche se dopo il verdetto c'è solo la fusione.
+  const gitN = (cwd, a) => { try { return g(cwd, ...a); } catch (_) { return null; } };
   commit(altro, 'functions/index.js', 'main\n', 'main tocca index');
   g(altro, 'push', '-q', 'origin', 'refs/heads/main:refs/heads/main');
-  scrivi(sc.server, 'functions/index.js', 'ramo\n');
-  g(sc.server, 'commit', '-q', '-am', 'il ramo tocca index');
-  g(sc.server, 'reset', '-q', '--hard', 'HEAD~1');
-  const prima = g(sc.server, 'rev-parse', 'HEAD');
-  commit(sc.server, 'functions/index.js', 'ramo\n', 'il ramo tocca index');
+  const verificatoQui = commit(sc.server, 'functions/index.js', 'ramo\n', 'il ramo tocca index');
   g(sc.server, 'fetch', '-q', 'origin');
-  try { g(sc.server, 'merge', '--no-edit', 'origin/main'); } catch (_) { /* conflitto atteso */ }
+  assert.throws(() => g(sc.server, 'merge', '--no-edit', 'origin/main'), 'la fusione va in conflitto');
   scrivi(sc.server, 'functions/index.js', 'risolto a mano\n');
   g(sc.server, 'commit', '-q', '-am', 'fusione risolta');
-  const radice = sc.server;
-  const fusione = g(radice, 'rev-parse', 'HEAD');
-  assert.equal(soloFusioniPulite((cwd, a) => { try { return g(cwd, ...a); } catch (_) { return null; } }, radice, prima, fusione, 'refs/remotes/origin/main'), false);
-  assert.equal(vl(sc.work, 'status').code, 1, 'e comunque qui c\'era un commit nuovo del ramo');
+  const risolta = g(sc.server, 'rev-parse', 'HEAD');
+  assert.equal(soloFusioniPulite(gitN, sc.server, verificatoQui, risolta, 'refs/remotes/origin/main'), false);
+  assert.equal(soloFusioniPulite(gitN, sc.server, verificatoQui, verificatoQui, 'refs/remotes/origin/main'), true, 'controllo: niente in mezzo');
 });
 
 test('una fusione di un ramo che non è main non è tollerata', () => {

@@ -106,7 +106,8 @@ export async function esegui(argv, deps = {}) {
   if (!a.ramo) { err(`server:fondi: manca il ramo del server (claude/<nome>). ${USO}`); return 2; }
   const cartella = deps.funzioni !== undefined ? deps.funzioni : cartellaDelServer(deps.radice || ROOT);
   if (!cartella) { err('server:fondi: accanto al repo Filo non trovo il checkout del server (cartella filo-security). Non ho toccato niente.'); return 1; }
-  // Un ramo dell'app con lo stesso nome ha la sua verifica: il verdetto è di tutti e due, e si fonde solo lo sha verificato (#1062).
+  // Un ramo dell'app con lo stesso nome ha la sua verifica: il verdetto è di tutti e due, e si fonde solo lo sha
+  // verificato (#1062).
   const verdetto = deps.verdetto
     ? deps.verdetto(a.ramo, cartella)
     : (await import('./verify-local.mjs')).verdettoDelRamo(a.ramo, { radice: deps.radice || ROOT, cartellaServer: cartella });
