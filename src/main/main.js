@@ -44,6 +44,7 @@ try {
   if (scelto) app.commandLine.appendSwitch('password-store', scelto);
 } catch (_) {}
 require('./test-window-mode').disegnaAncheFuoriSchermo(app);
+require('./test-window-mode').webglAncheSenzaScheda(app);
 
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
