@@ -152,6 +152,11 @@
     host.style.cssText = 'all:initial!important;display:contents!important;';
     const radice = UI?.ombra ? UI.ombra(host) : host.attachShadow({ mode: 'closed' });
     try { radice.adoptedStyleSheets = fogliDelRiquadro(); } catch (_) {}
+    // Da fuori il fuoco sta sull'host, che non è un campo: le scorciatoie a un tasto del sito prenderebbero quello che
+    // l'utente scrive qui (#1071). L'Esc esce, come prima: chiude il riquadro in cattura e serve allo schermo intero.
+    for (const tipo of ['keydown', 'keypress', 'keyup']) {
+      radice.addEventListener(tipo, (e) => { if (e.key !== 'Escape') e.stopPropagation(); });
+    }
     UI?.soloGestiVeri(contenuto);
     radice.appendChild(contenuto);
     return host;
