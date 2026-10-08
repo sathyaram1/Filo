@@ -1110,7 +1110,8 @@
         ico.className = 'spinner';
       } else {
         ico.className = 'favicon';
-        if (t.favicon) ico.style.backgroundImage = `url("${t.favicon}")`;
+        // Solo byte già scaricati dal main con la sessione della scheda: un indirizzo qui girerebbe nella sessione della barra (#1083).
+        if (/^data:image\//.test(t.favicon || '')) ico.style.backgroundImage = `url("${t.favicon}")`;
       }
       el.appendChild(ico);
 

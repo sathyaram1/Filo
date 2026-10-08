@@ -18,6 +18,7 @@ const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
+const IconaScheda = require('./services/iconaScheda');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -898,7 +899,9 @@ class TabManager {
       view,
       title: 'Nuova scheda',
       url,
+      // `favicon` è il data: URL che vede la barra; `faviconUrl` l'indirizzo dichiarato dalla pagina, per archivio e salvati.
       favicon: '',
+      faviconUrl: '',
       loading: true,
       canBack: false,
       canFwd: false,
@@ -1142,7 +1145,7 @@ class TabManager {
         Archive.archive({
           url,
           title: tab.title || url,
-          favicon: tab.favicon || '',
+          favicon: tab.faviconUrl || '',
           identityColor: tab.identityColor || null,
           openedAt: tab.openedAt || null,
           closedAt: new Date().toISOString(),
@@ -1549,6 +1552,25 @@ class TabManager {
     if (tab.color === next) return;
     tab.color = next;
     this._broadcast();
+  }
+
+  // L'icona la scarica il main con la sessione di questa scheda: la barra riceve solo byte già scaricati (#1083).
+  // Fino all'arrivo resta quella di prima: un'icona che cambia nella stessa pagina (un contatore) non lampeggia.
+  _aggiornaIcona(tab, wc, candidati) {
+    const lista = (Array.isArray(candidati) ? candidati : []).filter((u) => typeof u === 'string' && u);
+    tab.faviconUrl = lista[0] || '';
+    const giro = (tab._giroIcona || 0) + 1;
+    tab._giroIcona = giro;
+    const vivo = () => tab._giroIcona === giro && !!tab.view && tab.view.webContents === wc && !wc.isDestroyed();
+    let interna = false;
+    try { interna = /^filo:/i.test(wc.getURL() || ''); } catch (_) {}
+    IconaScheda.iconaPer(wc.session, lista, { interna, vivo }).then(({ url, dato }) => {
+      if (!vivo()) return;
+      if (url) tab.faviconUrl = url;
+      if (tab.favicon === dato) return;
+      tab.favicon = dato;
+      this._broadcast();
+    }, () => {});
   }
 
   // Colore IDENTITÀ del sito (§1.2): theme-color/manifest/favicon calcolato dal
@@ -2475,7 +2497,7 @@ class TabManager {
       update({ title: title || tab.title });
       this.visite.titolo(wc, title);
     });
-    wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
+    wc.on('page-favicon-updated', (_e, favicons) => this._aggiornaIcona(tab, wc, favicons));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
       // #412 — questa scheda ha committato una vera navigazione main-frame:
       // NON è più il "contenitore vuoto" di un download (una scheda aperta da un
