@@ -48,8 +48,10 @@ test('le idee della richiesta: le parole di contorno restano fuori, i sinonimi e
 test('il mese si riconosce anche scritto in numeri, e «mar» non combacia con «mare»', () => {
   assert.equal(Ricerca.contaDateDelMese('Periodo 01/03/2026 - 31/03/2026', 2), 2);
   assert.equal(Ricerca.contaDateDelMese('rata 03/2026, verbale del 2026-03-04', 2), 2);
-  // Emissione, scadenza e lettura non dicono di che mese parla un documento.
-  assert.equal(Ricerca.contaDateDelMese('Bolletta del 06/03/2026. Da pagare entro il 26/03/2026, lettura rilevata il 02/03/2026', 2), 1);
+  // Emissione (anche come «n. … del»), scadenza e lettura non dicono di che mese parla un documento.
+  assert.equal(Ricerca.contaDateDelMese('Bolletta del 06/03/2026. Da pagare entro il 26/03/2026, lettura rilevata il 02/03/2026', 2), 0);
+  assert.equal(Ricerca.contaDateDelMese('Fattura n. 33 del 05/03/2026; Bolletta n. 4100223344 del 06/03/2026', 2), 0);
+  assert.equal(Ricerca.contaDateDelMese('Verbale della riunione del 14/03/2026', 2), 1);
   assert.equal(Ricerca.contaDateDelMese('il 13/12/2026', 2), 0);
   assert.equal(Ricerca.conta(Ricerca.piano('al mare'), 'mar'), 0);
   assert.equal(Ricerca.conta(Ricerca.piano('bollette e bolletta'), 'bolletta'), 2);
@@ -320,6 +322,50 @@ test('il periodo si riconosce comunque sia scritto, e fra bollette vicine vince 
   assert.deepEqual(mesi('Data emissione Data scadenza\n06/03/2026 26/03/2026'), []);
   // Due date affiancate senza la parola che annuncia un periodo restano due date.
   assert.deepEqual(mesi('Ricevuta 06/03/2026 26/03/2026'), []);
+});
+
+// #947 giro 4: la regola è una, non una grafia in più. Quello che segue la parola che annuncia il periodo è il periodo,
+// comunque sia scritto; un mese accanto a emissione, numero del documento, scadenza o «prossima» non lo è mai.
+test('il periodo è quello che segue la sua etichetta, comunque sia scritto; le date amministrative non contano mai', () => {
+  const grafie = {
+    'dal 1° al 28 febbraio 2026': ['dal 1° al 28 febbraio 2026', 'dal 1° al 31 marzo 2026', 'dal 1° al 30 aprile 2026'],
+    '1°-28 febbraio 2026': ['1°-28 febbraio 2026', '1°-31 marzo 2026', '1°-30 aprile 2026'],
+    'febbraio-2026': ['febbraio-2026', 'marzo-2026', 'aprile-2026'],
+    'febbraio - Anno 2026': ['febbraio - Anno 2026', 'marzo - Anno 2026', 'aprile - Anno 2026'],
+    'Feb 1, 2026 - Feb 28, 2026': ['Feb 1, 2026 - Feb 28, 2026', 'Mar 1, 2026 - Mar 31, 2026', 'Apr 1, 2026 - Apr 30, 2026'],
+  };
+  const q = 'mi serve la bolletta della luce di marzo';
+  for (const [nome, [feb, mar, apr]] of Object.entries(grafie)) {
+    // Stessa data del file per tutte: a decidere deve essere il periodo, non l'ordine in cui sono arrivate.
+    const docs = [
+      { id: 'feb', nome: 'scan_00198.pdf', testo: bollettaVera({ periodo: feb, emessa: '06/03/2026', scadenza: '26/03/2026', lettura: '02/03/2026' }), data: 1 },
+      { id: 'mar', nome: 'scan_00231.pdf', testo: bollettaVera({ periodo: mar, emessa: '08/04/2026', scadenza: '28/04/2026', lettura: '01/04/2026' }), data: 1 },
+      { id: 'apr', nome: 'scan_00250.pdf', testo: bollettaVera({ periodo: apr, emessa: '07/05/2026', scadenza: '27/05/2026', lettura: '02/05/2026' }), data: 1 },
+    ];
+    for (const ordine of [docs, docs.slice().reverse()]) {
+      const r = Ricerca.ordina(ordine, q);
+      assert.equal(r[0].id, 'mar', `${nome}: ${r.map((x) => x.id).join(', ')}`);
+    }
+    if (!nome.startsWith('Feb')) assert.ok(Ricerca.squarcioMigliore(docs[1].testo, q).includes(mar), nome);
+  }
+  // Senza anno: «Bolletta di marzo», «Mese di riferimento: marzo».
+  const senzaAnno = (m, em) => `Enel Energia\nBolletta n. 1 del ${em}\nFornitura di energia elettrica\nBolletta di ${m}`;
+  const r = Ricerca.ordina([{ id: 'feb', nome: 'a.pdf', testo: senzaAnno('febbraio', '06/03/2026') }, { id: 'mar', nome: 'b.pdf', testo: senzaAnno('marzo', '08/04/2026') }], q);
+  assert.equal(r[0].id, 'mar');
+  assert.deepEqual(Ricerca.periodi('Mese di riferimento: Marzo').map((x) => x.mesi), [[2]]);
+  // Un mese con l'anno che parla d'altro non è un secondo periodo.
+  const prossima = (per, em, sc, x) => `Bolletta n. 1 del ${em}\nFornitura di energia elettrica\nTotale da pagare entro il ${sc}\nPeriodo di fatturazione: ${per}\nProssima lettura prevista a ${x}`;
+  assert.deepEqual(Ricerca.periodi(prossima('01/02/2026 - 28/02/2026', '06/03/2026', '26/03/2026', 'marzo 2026')).map((x) => x.mesi), [[1]]);
+  const docs = [
+    { id: 'feb', nome: 'a.pdf', testo: prossima('01/02/2026 - 28/02/2026', '06/03/2026', '26/03/2026', 'marzo 2026'), data: 1 },
+    { id: 'mar', nome: 'b.pdf', testo: prossima('01/03/2026 - 31/03/2026', '08/04/2026', '28/04/2026', 'aprile 2026'), data: 1 },
+  ];
+  assert.equal(Ricerca.ordina(docs, q)[0].id, 'mar');
+  assert.equal(Ricerca.ordina(docs.slice().reverse(), q)[0].id, 'mar');
+  // L'etichetta senza un mese dopo non inventa niente, e una scadenza nella riga sotto resta una scadenza.
+  assert.deepEqual(Ricerca.periodi('Periodo di fatturazione\nTotale da pagare entro il 26/03/2026'), []);
+  assert.deepEqual(Ricerca.periodi('Periodo di validità: fino al 31/12/2026'), []);
+  assert.deepEqual(Ricerca.periodi('Codice di riferimento 0612345'), []);
 });
 
 test('senza un periodo dichiarato, le date di emissione, scadenza e lettura non fanno di febbraio una bolletta di marzo', () => {

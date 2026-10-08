@@ -116,11 +116,13 @@ function conta(testoPiano, forma) {
   return n;
 }
 
-// Le date che dicono quando un documento è stato emesso, quando scade o quando si è letto il contatore: non dicono di
-// che mese parla. Una bolletta di febbraio è emessa, scade e si legge a marzo.
-const AMMINISTRATIVE = /(?:scaden|scade|emess|emission|entro|lettur|rilevat|pagam|pagare|addebit)[\p{L}]*[^\n]{0,24}$/iu;
+// Emissione («Fattura n. 33 del …»), scadenza, lettura, «prossima»: non dicono di che mese parla un documento, né come
+// periodo né da sole. Una bolletta di febbraio è emessa, scade e si legge a marzo.
+const AMMINISTRATIVE = /(?:scaden|scade|emess|emission|entro|lettur|rilevat|pagam|pagare|addebit|prossim|previst|successiv|valid)[\p{L}]*[^\n]{0,24}$/iu;
+const EMISSIONE = /(?:\b(?:bolletta|fattura|ricevuta|nota di credito|documento)\s+del|\bn(?:um(?:ero)?|r)?\s*[.°º:]?\s*[\w./-]*\d[\w./-]*\s+(?:del|in data))\s*$/iu;
 function amministrativa(s, i) {
-  return AMMINISTRATIVE.test(s.slice(Math.max(0, i - 40), i));
+  const prima = s.slice(Math.max(0, i - 40), i);
+  return AMMINISTRATIVE.test(prima) || EMISSIONE.test(prima);
 }
 
 // Le date col numero del mese: 01/03/2026, 1.3.26, 03/2026, 2026-03-15. Sul testo vero, prima che i segni spariscano.
@@ -132,6 +134,19 @@ function contaDateDelMese(testo, mese) {
   const re = reDateDelMese(mese);
   const s = String(testo || '');
   let n = 0;
+  let m;
+  while (n < CONTA_MAX && (m = re.exec(s))) if (!amministrativa(s, m.index)) n += 1;
+  return n;
+}
+// Il mese scritto a lettere, come parola intera: «marzo», «mar», «March».
+function reNomeDelMese(mese) {
+  return new RegExp(`(?<![\\p{L}\\p{N}])(?:${MESI[mese].join('|')})(?![\\p{L}])`, 'giu');
+}
+/** Gli indizi del mese in un documento che non dichiara un periodo: date e nomi del mese, tolti quelli amministrativi. */
+function contaMese(testo, mese) {
+  const s = String(testo || '');
+  const re = reNomeDelMese(mese);
+  let n = contaDateDelMese(s, mese);
   let m;
   while (n < CONTA_MAX && (m = re.exec(s))) if (!amministrativa(s, m.index)) n += 1;
   return n;
@@ -226,10 +241,60 @@ function periodi(testo) {
     k += 1;
   }
   for (const x of mesi) {
-    if (date.some((d) => x.i < d.fine && d.i < x.fine)) continue;
+    if (date.some((d) => x.i < d.fine && d.i < x.fine) || amministrativa(s, x.i)) continue;
     metti(x.i, x.fine, x.m, x.y, x.m, x.y);
   }
+  dopoEtichetta(s, out, date, metti);
   return out.sort((a, b) => a.i - b.i);
+}
+
+// Quello che segue la parola che annuncia il periodo («dal 1° al 28 febbraio», «febbraio-2026», «Bolletta di febbraio»)
+// È il periodo anche quando nessuna forma lo riconosce: fino a fine riga, o nella riga sotto se l'etichetta la chiude.
+const ETICHETTA = /(?<![\p{L}])(?:periodo|competenza|fatturazione|consumi|riferimento|(?:mese|bolletta|fattura) di)(?![\p{L}])/giu;
+const RE_NOME_MESE = new RegExp(`(?<![\\p{L}\\p{N}])(${NOMI_MESE})(?![\\p{L}])`, 'giu');
+const RE_ANNO = /(?<!\d)((?:19|20)\d{2})(?!\d)/g;
+const FINESTRA = 80;
+function dopoEtichetta(s, out, date, metti) {
+  ETICHETTA.lastIndex = 0;
+  let e;
+  let giri = 0;
+  while ((e = ETICHETTA.exec(s)) && giri++ < 200) {
+    const da = e.index + e[0].length;
+    let fine = s.indexOf('\n', da);
+    if (fine < 0) fine = s.length;
+    if (!/[\p{L}\p{N}]/u.test(s.slice(da, fine)) && fine < s.length) {
+      const dopo = s.indexOf('\n', fine + 1);
+      fine = dopo < 0 ? s.length : dopo;
+    }
+    fine = Math.min(fine, da + FINESTRA);
+    if (out.some((p) => p.i < fine && da < p.fine)) continue;
+    const pezzi = [];
+    RE_NOME_MESE.lastIndex = da;
+    let m;
+    while ((m = RE_NOME_MESE.exec(s)) && m.index < fine) {
+      const me = meseDi(m[1].toLowerCase());
+      if (me >= 0) pezzi.push({ i: m.index, fine: m.index + m[0].length, m: me, y: null });
+    }
+    for (const d of date) if (d.i >= da && d.fine <= fine) pezzi.push({ ...d });
+    const validi = pezzi.filter((x) => !amministrativa(s, x.i)).sort((a, b) => a.i - b.i);
+    if (!validi.length) continue;
+    const primo = validi[0];
+    const ultimo = validi[validi.length - 1];
+    let chiude = ultimo.fine;
+    let y2 = ultimo.y;
+    if (y2 == null) {
+      RE_ANNO.lastIndex = ultimo.fine;
+      const a = RE_ANNO.exec(s);
+      if (a && a.index < fine) { y2 = Number(a[1]); chiude = a.index + a[0].length; }
+    }
+    const y1 = primo.y != null ? primo.y : null;
+    if (y2 == null) {
+      if (out.length >= PERIODI_MAX) return;
+      out.push({ i: primo.i, fine: chiude, testo: s.slice(primo.i, chiude).replace(/\s+/g, ' '), mesi: mesiFra(primo.m, 0, ultimo.m, primo.m > ultimo.m ? 1 : 0), fino: null });
+    } else {
+      metti(primo.i, chiude, primo.m, y1, ultimo.m, y2);
+    }
+  }
 }
 
 // Quanto è recente un documento, in mesi: la fine del periodo che dichiara per il mese chiesto (o di uno qualsiasi), se
