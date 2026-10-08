@@ -121,6 +121,43 @@
     window.addEventListener('auxclick', suCollegamento, true);
   }
 
+  // Spiegazione, Modifica e feedback portano parole dell'utente e dei modelli: in un sito stanno in uno shadow root
+  // chiuso e rispondono solo ai gesti veri (patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md).
+  // L'host non genera un box: posa, z-index e zoom restano quelli del riquadro, come quando stava nel documento.
+  const FOGLI_RIQUADRO = ['theme.css', 'menu.css', 'popup.css', 'feedback.css'];
+  const FONT_SOLO_GENERICO = '*, ::before, ::after, ::placeholder { font-family: system-ui, sans-serif !important; }';
+  let fogliRiquadro = null;
+  function fogliDelRiquadro() {
+    if (fogliRiquadro) return fogliRiquadro;
+    let testo = '';
+    try {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      testo = FOGLI_RIQUADRO.map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
+    } catch (_) {}
+    if (!inPaginaDiFilo) testo += '\n' + FONT_SOLO_GENERICO;
+    const foglio = new CSSStyleSheet();
+    try { foglio.replaceSync(testo); } catch (_) {}
+    fogliRiquadro = [foglio];
+    return fogliRiquadro;
+  }
+  function riquadro(contenuto) {
+    const UI = global.SN_FILO_UI;
+    const host = document.createElement('div');
+    UI?.mark(host);
+    host.style.cssText = 'all:initial!important;display:contents!important;';
+    // Sulle pagine di Filo non c'è codice di altri: lì la radice resta aperta e i locator degli spec ci entrano.
+    const radice = UI?.ombra ? UI.ombra(host, { aperta: inPaginaDiFilo }) : host.attachShadow({ mode: 'closed' });
+    try { radice.adoptedStyleSheets = fogliDelRiquadro(); } catch (_) {}
+    if (!inPaginaDiFilo) UI?.soloGestiVeri(contenuto);
+    radice.appendChild(contenuto);
+    return host;
+  }
+  function togliRiquadro(contenuto) {
+    const host = contenuto && contenuto.getRootNode && contenuto.getRootNode().host;
+    try { (host || contenuto).remove(); } catch (_) {}
+  }
+
   // ----------------------------------------------------------------
   // Compensazione zoom (Ctrl+/-, pinch). Identica per popup e menu.
   // ----------------------------------------------------------------
