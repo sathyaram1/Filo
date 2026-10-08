@@ -290,6 +290,8 @@
     if (!ctx) return;
     const { kind, el } = ctx;
     if (!el || !el.isConnected) return;
+    // Incolla e dettatura li ha chiesti l'utente a Filo, fuori dalla pagina: il correttore li tratta come scritti a mano.
+    try { global.SN_GESTO?.segna(); } catch (_) {}
     if (kind === 'input') {
       const start = ctx.start ?? el.value.length;
       const end = ctx.end ?? el.value.length;
@@ -572,10 +574,13 @@
   // il box inline lo mostra istantaneamente invece di aspettare il provider.
   // - Debounce 400ms (selectionchange spara molto durante il drag).
   // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
-  // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta.
+  // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta o troppo lunga.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
+  // - Parte solo dietro un gesto vero (#1070): una selezione fatta da uno script spenderebbe i crediti dell'utente.
   let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
   let prefetchTimer = null;
+  // Oltre, una spiegazione «in anticipo» non vale il costo: si calcola intera al tasto destro.
+  const PREFETCH_MAX_CHARS = 2000;
 
   function explainKey(text) { return (text || '').trim().slice(0, 2000); }
 
@@ -589,27 +594,36 @@
     // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
     if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
+    const Gesto = global.SN_GESTO;
+    if (!Gesto || !Gesto.recente()) return;
     const sel = Extract.getSelectionWithSentence();
     if (!sel) return;
+    if (sel.selection.length > PREFETCH_MAX_CHARS) return;
     const key = explainKey(sel.selection);
     if (key.length < 3) return;
     // Stessa selezione di prima: l'entry esistente sta già lavorando (o ha il risultato).
     if (prefetchedExplain && prefetchedExplain.key === key) return;
+    if (!Gesto.prendi('spiega')) return;
     prefetchedExplain = startExplainRequest(sel);
   }
 
-  function startExplainRequest(selInfo) {
+  // `suRichiesta`: l'ha chiesta l'utente col tasto destro, e il tetto del main sulle automatiche non la ferma.
+  function startExplainRequest(selInfo, { suRichiesta = false } = {}) {
     const key = explainKey(selInfo.selection);
-    const entry = { key, sentence: selInfo.sentence };
+    const entry = { key, sentence: selInfo.sentence, fermata: false };
     entry.promise = chrome.runtime.sendMessage({
       type: MSG.AI_REQUEST,
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
+      ...(suRichiesta ? { suRichiesta: true } : {}),
     }).then(
-      (res) => (res?.ok && typeof res.text === 'string')
-        ? { text: res.text, keyFallback: res.keyFallback || null }
-        : { error: Popup.frasePerLUtente(res) },
+      (res) => {
+        if (res && res.code === 'TROPPE_AUTOMATICHE') entry.fermata = true;
+        return (res?.ok && typeof res.text === 'string')
+          ? { text: res.text, keyFallback: res.keyFallback || null }
+          : { error: Popup.frasePerLUtente(res) };
+      },
       (e) => ({ error: Popup.frasePerLUtente({ message: e?.message }) }),
     );
     return entry;
@@ -617,14 +631,19 @@
 
   // Restituisce la Promise per la spiegazione di questa selezione.
   // Riusa il prefetch se è dello stesso testo; altrimenti parte ora.
+  // Un anticipo fermato dal tetto delle automatiche non è la risposta: al tasto destro si chiede davvero.
   function getExplainPromise(selInfo) {
     const key = explainKey(selInfo.selection);
-    if (prefetchedExplain && prefetchedExplain.key === key) {
-      return prefetchedExplain.promise;
+    const chiedi = () => {
+      const entry = startExplainRequest(selInfo, { suRichiesta: true });
+      prefetchedExplain = entry;
+      return entry.promise;
+    };
+    const pre = prefetchedExplain;
+    if (pre && pre.key === key && !pre.fermata) {
+      return pre.promise.then((res) => (pre.fermata ? chiedi() : res));
     }
-    const entry = startExplainRequest(selInfo);
-    prefetchedExplain = entry;
-    return entry.promise;
+    return chiedi();
   }
 
   function buildInlineExplain(selInfo, opts = {}) {

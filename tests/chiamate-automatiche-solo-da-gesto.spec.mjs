@@ -131,22 +131,40 @@ test('il correttore non parte da execCommand, input finti o focus() di script; s
   expect((await conti(app)).parola).toBeGreaterThan(0);
 });
 
-test('a scheda nascosta il correttore aspetta: riparte quando si torna', async ({ app, shell, openTab, testServer }) => {
+// Le schede di dietro di Filo, coi test a finestra fuori schermo, restano «visible»: la scheda nascosta si
+// simula sulla nuova scheda, dove i content script girano nel mondo della pagina e vedono la stessa `document`.
+test('a scheda nascosta il correttore aspetta: riparte quando si torna', async ({ app }) => {
   test.setTimeout(60_000);
-  const page = await apri(app, openTab, testServer);
-  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
-  const qui = snap.activeId;
-  const altra = snap.tabs.find((t) => t.id !== qui).id;
+  await fornitoreFinto(app);
+  const deadline = Date.now() + 10_000;
+  let page = null;
+  while (!page && Date.now() < deadline) {
+    page = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (!page) await pausa(100);
+  }
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await page.evaluate(() => {
+    const ta = document.createElement('textarea');
+    ta.id = 'sn-test-ta';
+    ta.style.cssText = 'position:fixed;top:220px;left:40px;width:560px;height:120px;font:20px monospace;z-index:2147483000';
+    document.body.appendChild(ta);
+  });
 
-  await page.locator('#ta').click();
+  await page.locator('#sn-test-ta').click();
   await page.keyboard.type('oggi ho scrito una frase');
-  await shell.evaluate((id) => window.filoShell.tabs.activate(id), altra);
-  await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('hidden');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
   await pausa(2500);
   expect((await conti(app)).scan).toBe(0);
 
-  await shell.evaluate((id) => window.filoShell.tabs.activate(id), qui);
-  await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe('visible');
+  await page.evaluate(() => {
+    delete document.hidden;
+    delete document.visibilityState;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
   await expect.poll(async () => (await conti(app)).scan, { timeout: 6000 }).toBe(1);
 });
 
