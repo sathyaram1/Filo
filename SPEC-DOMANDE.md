@@ -529,9 +529,8 @@ I numeri restano dell'owner, in Routine → Crediti.
 
 - **Riserva dell'owner:** il **10% di ogni account** resta sempre libero. Il
   pacemaker non accende più su un account arrivato al 90% della settimana. Le
-  sessioni locali dell'owner consumano dallo stesso account: entrano nel
-  conto solo se si misura la percentuale del piano. Con la stima dai token il
-  server non le vede.
+  sessioni locali dell'owner consumano dallo stesso account: col dato della
+  barra di stato entrano nel conto da sole.
 - **Passo:** ogni giorno si spende al massimo il rimasto diviso i giorni che
   mancano al rinnovo, così la settimana non finisce il martedì.
 - **Ordine:**
