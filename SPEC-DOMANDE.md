@@ -595,7 +595,57 @@ migrazione le mappa. Il codice che decide in base al prefisso
   - `node_modules`;
   - video e modelli pesanti.
 
-## 12. Ordine di lavoro
+## 12. Orchestratore
+
+### 12.1 Oggi
+
+- Il pacemaker accende fino a `maxSessions` orchestratori, una sessione cloud
+  ciascuno. Ogni orchestratore fa lavorare un worker alla volta, in fila.
+- Un orchestratore chiude quando:
+  - la coda è vuota;
+  - il suo contesto supera il 70%;
+  - c'è un guasto o arriva un limite di sessione.
+- Il pacemaker ne riaccende un altro dai battiti. Ogni accensione conta nel
+  tetto giornaliero (12 per account).
+- L'orchestratore gira col modello della sessione, e la sua rilettura del
+  contesto fra un biglietto e l'altro è buona parte del 40% di consumo che i
+  biglietti non contano.
+
+### 12.2 Domani
+
+- **Un orchestratore Haiku.** Non legge feedback e non sceglie niente: lancia,
+  aspetta e rilascia. I worker restano Opus, dalle definizioni degli agenti.
+- **Lavori in parallelo dentro la stessa sessione.** Chiede un biglietto, lancia
+  il worker in sottofondo, e ripete finché il server dice di sì.
+- **I posti li conta solo il server.** Un biglietto nuovo esce solo se i lavori
+  vivi, di tutti gli orchestratori insieme, sono meno di N. L'orchestratore non
+  fa conti: chiede, e il server risponde sì o no. Così più orchestratori
+  possono convivere e i lavori non superano mai N.
+- **Abbassare N** non chiude niente: il server smette di dare biglietti, e i
+  lavori in corso finiscono.
+- **Vita di 4 ore.** Dopo 4 ore, o col contesto oltre il 70%, l'orchestratore
+  smette di chiedere biglietti, aspetta che i suoi worker finiscano e chiude.
+- **Il pacemaker** accende un orchestratore nuovo ogni 4 ore, o prima se
+  nessun orchestratore vivo sta ancora chiedendo biglietti e ci sono posti
+  liberi. Le accensioni scendono a circa 6 al giorno.
+- **Un tetto per sessione, K.** Oltre ai posti totali N, un orchestratore non
+  tiene più di K worker insieme. K si misura sul contenitore: CPU e memoria con
+  le prove Electron in parallelo (il battito misura già la memoria).
+  - Con N maggiore di K, il pacemaker accende più orchestratori.
+  - K limita anche il danno di un crash: oggi muore un lavoro, domani tutti
+    quelli della sessione.
+
+Da sistemare prima dei worker in parallelo:
+
+- **Il salvataggio automatico** oggi passa da tutte le cartelle di lavoro, e due
+  worker si pestano sui lock: deve salvare solo la cartella di chi ha
+  modificato.
+- **Le prove** non devono contendersi display virtuali, porte o cartelle: vanno
+  provate con 2, 3 e 4 worker insieme.
+- **Account:** ogni orchestratore consuma dall'account che lo ha acceso.
+  Accende su A solo sotto il 90% (§ 8.2).
+
+## 13. Ordine di lavoro
 
 Ogni punto è un feedback fidato. Finché il § 7 non è fatto, i punti *server* si
 lavorano in locale.
