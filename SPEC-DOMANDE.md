@@ -508,11 +508,22 @@ I numeri restano dell'owner, in Routine → Crediti.
   dalla parte nuova del registro: costa millisecondi e zero token. Lo fa anche
   l'orchestratore, che oggi non è contato. Un biglietto morto ha almeno il
   consumo fino all'ultimo battito.
-- **La misura vera è la percentuale del piano** che Claude Code mostra
-  (settimanale e cinque ore). Se si può leggere da uno script, il battito
-  allega quella, e i token servono solo per ripartire la spesa fra i lavori.
-  Altrimenti si stima dai token con la taratura misurata (100% ≈ 2.150 $ a
-  settimana per account). È la prima cosa da verificare.
+- **La misura vera è la percentuale del piano** (settimanale e cinque ore).
+  Claude Code la passa, documentata, solo allo script della **barra di stato**
+  (`rate_limits.five_hour` e `rate_limits.seven_day`, con l'ora del rinnovo). Da
+  nessun'altra parte.
+  - **In locale:** la barra di stato dell'owner salva il dato, e il battito della
+    sessione lo manda al server. Basta una sessione aperta per sapere la
+    percentuale vera di quell'account.
+  - **In cloud:** non è documentato se la barra di stato giri. Va provato con
+    una routine di prova. Se gira, il battito delle routine allega la
+    percentuale di ciascun account.
+  - **Altrimenti:** si stima dai token con la taratura (100% ≈ 2.150 $ a
+    settimana per account), e la taratura si corregge ogni volta che arriva una
+    lettura vera da una sessione locale sullo stesso account.
+
+  I token servono comunque a ripartire la spesa fra i lavori (quanto costa un
+  giro, un ruolo, un feedback).
 
 ### 8.2 Decidere
 
