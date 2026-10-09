@@ -328,7 +328,9 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 | `design` + `secaudit`, `l5`; attacchi, spam, sospetti | Ricevuti |
 
 Il feedback in attesa resta `design` col suo motivo e prende `domandaId`: la
-macchina a stati non cambia.
+macchina a stati non cambia. Per l'owner, però, un `design` con una domanda
+aperta si vede nella scheda **In coda**, col segno «aspetta una domanda» che
+porta alla domanda, e non in Ricevuti.
 
 ## 4. Compiti ricorrenti, pubblicazione, monitoraggio
 
