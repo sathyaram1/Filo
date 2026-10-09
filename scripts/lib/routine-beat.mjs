@@ -119,8 +119,11 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
   // Un battito rimasto acceso su un ALTRO biglietto va spento ADESSO: fra una
   // riga il marcatore viene sovrascritto, e da quel momento nessuno saprebbe
   // più come raggiungerlo mentre lui continua a tenere vivo un semaforo che non
-  // serve a nessuno. (I lavoratori sono uno alla volta per costruzione: un
-  // biglietto nuovo in questa cartella vuol dire che il precedente ha finito.)
+  // serve a nessuno. In una cartella lavora un worker alla volta, quindi un
+  // biglietto nuovo qui vuol dire che il precedente ha finito; ma con i worker
+  // in parallelo (#1157) ognuno ha il suo clone, e un marcatore arrivato da
+  // un'ALTRA cartella (un clone fatto per copia) nomina il battito vivo di un
+  // altro worker: quello non si tocca.
   //
   // Ma solo se il marcatore è ancora CREDIBILE. Un marcatore vecchio di giorni
   // nomina un numero di processo che il sistema ha già riassegnato a qualcun
