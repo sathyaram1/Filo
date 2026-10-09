@@ -918,6 +918,22 @@ if (isMain) {
     }
   }
 
+  // Un comando senza stato fa una cosa sola: ogni altra opzione andrebbe persa in silenzio, quindi si rifiuta.
+  // --serve-locale prende la posizione dello stato per il suo perché, e vale come comando senza stato.
+  if (!status || argv.includes('--serve-locale')) {
+    const soloConStato = ['--branch', '--reason', '--come-routine', '--starred', '--unstar'].filter((o) => argv.includes(o));
+    if (soloConStato.length) {
+      console.error(`RIFIUTATO: ${soloConStato.join(' ')} vale solo insieme a uno stato (<n> <stato> "nota"): senza, non lo scriverei — non ho toccato niente.`);
+      process.exit(1);
+    }
+    const comandi = [['--frase'], ['--preapprova', '--chiedi-prima'], ['--solo-locale', '--non-locale', '--serve-locale'], ['--aspetta', '--aspetta-niente']]
+      .map((g) => g.find((o) => argv.includes(o))).filter(Boolean);
+    if (comandi.length > 1) {
+      console.error(`RIFIUTATO: ${comandi.join(' e ')} sono due comandi: lancia un comando per ciascuno — non ho toccato niente.`);
+      process.exit(1);
+    }
+  }
+
   // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale.
   if (argv.includes('--solo-locale') && isRoutineInstance(ROOT)) {
     console.error('RIFIUTATO: una routine non segna lavoro locale. Rimandalo nei Ricevuti: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché" — non ho toccato niente.');
@@ -938,8 +954,8 @@ if (isMain) {
   if (attese.length) {
     if (!id) { uso(); process.exit(1); }
     if (attese.length > 1) { console.error('RIFIUTATO: --aspetta e --aspetta-niente insieme — non ho toccato niente.'); process.exit(1); }
-    if (status || argv.some((a) => ['--solo-locale', '--non-locale', '--serve-locale', '--preapprova', '--chiedi-prima', '--frase', '--starred', '--unstar'].includes(a))) {
-      console.error(`RIFIUTATO: ${attese[0]} va da solo, senza stato né altri segni — non ho toccato niente.`);
+    if (status) {
+      console.error(`RIFIUTATO: ${attese[0]} va da solo, senza stato né nota — non ho toccato niente.`);
       process.exit(1);
     }
     const valore = attese[0] === '--aspetta' ? String(flag('aspetta') || '') : '';
@@ -1003,10 +1019,6 @@ if (isMain) {
 
   // Solo la frase per chi ha segnalato, stato invariato: `<id> --frase "…"`.
   if (id && !status && typeof frase === 'string') {
-    if (typeof preapprova === 'boolean' || typeof starred === 'boolean' || branch !== undefined || reason !== undefined) {
-      console.error('RIFIUTATO: --frase senza stato va da sola — non ho toccato niente.');
-      process.exit(1);
-    }
     const r = await scriviFrase(id, frase, { dryRun, bearer });
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
     console.log(r.dryRun
