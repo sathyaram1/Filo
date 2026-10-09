@@ -527,10 +527,10 @@ I numeri restano dell'owner, in Routine → Crediti.
 
 ### 8.2 Decidere
 
-- **Riserva dell'owner:** il **10% di ogni account** resta sempre libero. Il
-  pacemaker non accende più su un account arrivato al 90% della settimana. Le
-  sessioni locali dell'owner consumano dallo stesso account: col dato della
-  barra di stato entrano nel conto da sole.
+- **Riserva dell'owner:** sull'**account A**, il principale dell'owner, il
+  10% resta sempre libero: il pacemaker non ci accende più niente oltre il 90%
+  della settimana. Le sessioni locali dell'owner consumano da A: col dato della
+  barra di stato entrano nel conto da sole. L'account B può arrivare al 100%.
 - **Passo:** ogni giorno si spende al massimo il rimasto diviso i giorni che
   mancano al rinnovo, così la settimana non finisce il martedì.
 - **Ordine:**
