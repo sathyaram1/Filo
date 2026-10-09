@@ -69,6 +69,10 @@ test-results/
 # data: serve a non battere più di una volta ogni cinque minuti).
 .claude/routine-beat-hook.stamp
 
+# Chi è il worker di questo clone (indice e quanti in parallelo, #1157): lo scrive
+# scripts/clone-worker.mjs, vale per questa cartella e basta.
+.claude/filo-worker.json
+
 # Stato locale del giro (ripiego: quello vero vive sul server). Effimero come
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.
