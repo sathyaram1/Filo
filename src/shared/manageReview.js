@@ -1721,6 +1721,102 @@
       .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
   }
 
+  // ── Sezioni di Gestione (SPEC-DOMANDE §2.1) ───────────────────────────────
+  // Le sezioni raggruppano SCHEDE, non stati: lo stato → scheda resta in feedbackStatus.js.
+  // Una scheda nuova (Risposte automatiche, Crediti…) entra qui quando esiste la cosa che mostra.
+  const SEZIONI = Object.freeze([
+    { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
+    { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'local', 'resolved', 'archived', 'fbstats', 'stats'] },
+    { id: 'routine', nome: 'Routine', schede: ['automation', 'log'] },
+    { id: 'impostazioni', nome: 'Impostazioni predefinite', schede: ['models'] },
+  ]);
+
+  function sezioneDiScheda(tab) {
+    const s = SEZIONI.find((x) => x.schede.includes(String(tab || '')));
+    return s ? s.id : null;
+  }
+
+  function schedaPredefinita(sezione) {
+    const s = SEZIONI.find((x) => x.id === sezione);
+    return s ? s.schede[0] : null;
+  }
+
+  /**
+   * L'ultima sezione ricordata, con la scheda di ogni sezione, validata: una parte storta butta tutto,
+   * perché una scelta ricordata a metà torna come un'altra (patterns/una-scelta-ricordata-si-ricorda-intera.md). PURA.
+   */
+  function leggiSceltaSezione(raw) {
+    let v = raw;
+    if (typeof v === 'string') { try { v = JSON.parse(v); } catch (_) { return null; } }
+    if (!v || typeof v !== 'object' || !v.schede || typeof v.schede !== 'object') return null;
+    const schede = {};
+    for (const [sez, tab] of Object.entries(v.schede)) {
+      if (sezioneDiScheda(tab) !== sez) return null;
+      schede[sez] = tab;
+    }
+    if (!schede[v.sezione]) return null;
+    return { sezione: v.sezione, schede };
+  }
+
+  // Domande: quale scheda le mostra. Fino alla sezione Domande vera (#1150 fase 2) è la regola minima.
+  const SCHEDA_DOMANDA = { aperta: 'domande', in_lavorazione: 'domande-lavoro', chiusa: 'domande-archivio', superata: 'domande-archivio' };
+  function schedaDomanda(d) {
+    return (d && SCHEDA_DOMANDA[d.stato]) || null;
+  }
+  function contaDomande(domande) {
+    const n = { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 };
+    for (const d of (Array.isArray(domande) ? domande : [])) {
+      const t = schedaDomanda(d);
+      if (t) n[t]++;
+    }
+    return n;
+  }
+  function bloccanteAperta(domande) {
+    return (Array.isArray(domande) ? domande : []).some((d) => d && d.stato === 'aperta' && d.priorita === 'bloccante');
+  }
+
+  /**
+   * Dove si apre Gestione: Domande con una bloccante aperta, Ricevuti se non è vuoto, poi l'ultima sezione,
+   * poi Feedback → Ricevuti. `domande` null = non lette; `ricevuti` null = non si sa. PURA.
+   */
+  function sezioneDiApertura(o) {
+    const opts = o || {};
+    if (bloccanteAperta(opts.domande)) return { sezione: 'domande', scheda: 'domande', motivo: 'bloccante' };
+    if (typeof opts.ricevuti === 'number' && opts.ricevuti > 0) return { sezione: 'feedback', scheda: 'inbox', motivo: 'ricevuti' };
+    const u = leggiSceltaSezione(opts.ultima);
+    if (u) return { sezione: u.sezione, scheda: u.schede[u.sezione], motivo: 'ultima' };
+    return { sezione: 'feedback', scheda: 'inbox', motivo: 'predefinita' };
+  }
+
+  // ── Filtro dei Ricevuti per livello (SPEC-DOMANDE §2.2) ───────────────────
+  const LIVELLI_RICEVUTI = Object.freeze(['l1', 'l2', 'l3', 'l4', 'l5']);
+  const FORMA_DI_LIVELLO = Object.freeze({ l1: 'triangolo', l2: 'cerchio', l3: 'rombo', l4: 'pentagono', l5: 'quadrato' });
+
+  /** Il livello a cui è ferma una pratica dei Ricevuti ('l1'…'l5'), o null: lo stesso del segno in lista. PURA. */
+  function livelloRicevuti(fb, opts) {
+    const s = segnoFermata(fb, opts);
+    return s && LIVELLI_RICEVUTI.includes(s.livello) ? s.livello : null;
+  }
+
+  /** Nessun livello scelto = tutto (anche le pratiche senza livello); più livelli = l'unione. PURA. */
+  function filtraLivelli(lista, livelli, opts) {
+    const items = Array.isArray(lista) ? lista : [];
+    const scelti = (Array.isArray(livelli) ? livelli : []).filter((l) => LIVELLI_RICEVUTI.includes(l));
+    if (!scelti.length) return items.slice();
+    return items.filter((fb) => scelti.includes(livelloRicevuti(fb, opts)));
+  }
+
+  /** Quante pratiche dei Ricevuti sono ferme a ogni livello, a filtro spento; `senza` = nessun livello. PURA. */
+  function contaLivelliRicevuti(feedbacks, opts) {
+    const n = { l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, senza: 0 };
+    for (const fb of (feedbacks || [])) {
+      if (manageTabFor(fb, opts) !== 'inbox') continue;
+      const l = livelloRicevuti(fb, opts);
+      n[l || 'senza']++;
+    }
+    return n;
+  }
+
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi
