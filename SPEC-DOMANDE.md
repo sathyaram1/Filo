@@ -464,8 +464,17 @@ vale per tutti i compiti di quel tipo.
 - **Domani:** il biglietto `server` porta con sé un **token GitHub di breve
   durata**. Lo crea il server, da un'applicazione GitHub dedicata («filo-lavori»,
   non il cancello di fusione) installata solo su filo-security, con un solo
-  permesso: scrivere i contenuti, su quel repo soltanto. Il token scade in
-  un'ora.
+  permesso: scrivere i contenuti, su quel repo soltanto.
+
+  Un token di applicazione GitHub dura al massimo un'ora: è un limite di
+  GitHub, non una scelta. Per il worker vale **finché il lavoro serve**:
+  - git chiede il token a un aiutante di credenziali (`biglietto.mjs token`),
+    che ne chiede uno nuovo al server quando quello vecchio sta per scadere;
+  - il worker non se ne accorge;
+  - alla chiusura del biglietto il server revoca il token in corso.
+
+  Rispetto a un token da 24 ore, così un biglietto che si sporca perde l'accesso
+  entro l'ora, e uno chiuso subito.
 
   Il server lo dà solo a un biglietto pulito su un feedback fidato, e non lo
   rinnova a un biglietto che si è sporcato. Il worker clona filo-security con
