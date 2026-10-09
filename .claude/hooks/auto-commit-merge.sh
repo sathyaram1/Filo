@@ -123,7 +123,8 @@ segnala_avviso() {
 # sostituisce: se qualcuno riuscisse a raccontare un default diverso, main e
 # master resterebbero comunque protetti.
 #
-RAMO_DEFAULT=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+# Letto nel repo della cartella salvata: un clone ha il suo.
+RAMO_DEFAULT=$(git -C "$CARTELLA" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
 
 # La linea principale, comunque sia scritto il nome. Una HEAD staccata NON e' la
 # linea principale: e' "nessun ramo", e si tratta a parte (is_spedibile) — li' il
@@ -230,17 +231,11 @@ else
   COMMIT_AS_EMAIL="claude@local"
 fi
 
-# (Qui si cercava la cartella che aveva il ramo principale, per fonderci dentro
-# i rami di lavoro. La fusione automatica non esiste piu' dal 2026-08-07 e quella
-# ricerca non serviva piu' a nessuno.)
-
-# 1) Commit pending changes in every worktree.
-git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while IFS= read -r wt; do
-  [ -d "$wt" ] || continue
-  cd "$wt" || continue
+salva_cartella() {
+  local wt="$1"
+  cd "$wt" || return 0
 
   BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-  if e_mia "$wt"; then QUI_MIA=1; else QUI_MIA=0; fi
 
   # ─── SUL RAMO PRINCIPALE NON SI COMMITTA ───────────────────────────────────
   #
@@ -344,8 +339,8 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   if is_spedibile "$BRANCH"; then
     spedisci_ramo "$BRANCH" "$wt" || true
   fi
-
-done
+}
+salva_cartella "$CARTELLA"
 
 # ─── NESSUNA pubblicazione automatica sul ramo principale ────────────────────
 #
@@ -364,7 +359,7 @@ done
 #
 # Il lavoro non si perde: ogni ramo di lavoro e' gia' stato committato e spedito
 # qui sopra. Una cartella che si trova sul ramo principale non viene toccata, e
-# l'hook lo dice riga per riga nel ciclo — qui non serve ripeterlo.
+# l'hook lo dice li' — qui non serve ripeterlo.
 
 # ─── Battito del semaforo (scripts/lib/routine-beat.mjs) ─────────────────────
 #
@@ -377,14 +372,23 @@ done
 # rilancia un battito SINGOLO, non piu' di uno ogni 5 minuti. Senza biglietto
 # (macchina dell'owner, giro finito) non fa niente; con un biglietto morto il
 # battito esce da solo al primo rifiuto.
-TICKET_FILE="$PROJECT_DIR/.claude/routine-ticket.json"
-BEAT_STAMP="$PROJECT_DIR/.claude/routine-beat-hook.stamp"
+# Biglietto e timbro sono quelli della cartella salvata: con un clone per
+# worker, ogni worker ha il suo (#1157). Transcript e sessione servono al
+# consumo del battito (#1156).
+TICKET_FILE="$CARTELLA/.claude/routine-ticket.json"
+BEAT_STAMP="$CARTELLA/.claude/routine-beat-hook.stamp"
 if [ -f "$TICKET_FILE" ] && command -v node >/dev/null 2>&1; then
   now_s=$(date +%s)
   last_s=$(date -r "$BEAT_STAMP" +%s 2>/dev/null || echo 0)
   if [ $((now_s - last_s)) -ge 300 ]; then
     touch "$BEAT_STAMP" 2>/dev/null
-    (cd "$PROJECT_DIR" && node scripts/routine-channel.mjs heartbeat >/dev/null 2>&1 &)
+    (
+      cd "$CARTELLA" || exit 0
+      export FILO_REPO_ROOT="$CARTELLA"
+      [ -n "$HOOK_TRANSCRIPT" ] && export FILO_TRANSCRIPT="$HOOK_TRANSCRIPT"
+      [ -n "$HOOK_SESSION" ] && export FILO_SESSION_ID="$HOOK_SESSION"
+      node scripts/routine-channel.mjs heartbeat >/dev/null 2>&1 &
+    )
   fi
 fi
 
@@ -410,14 +414,12 @@ fi
 stringa_json() {
   tr '\r\t' '  ' | tr -d '\000-\010\013\014\016-\037' | sed 's/\\/\\\\/g; s/"/\\"/g' | awk 'NR>1{printf "\\n"}{printf "%s",$0}'
 }
-# I guai delle ALTRE cartelle vanno in coda, una riga ciascuno, e la coda che
-# dice di spedire riguarda solo la propria.
-if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ] || [ -s "$ALTRUI_FILE" ]; then
-  TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" "$ALTRUI_FILE" 2>/dev/null | stringa_json)
+if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
+  TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null | stringa_json)
   CODA=""
   [ -s "$FALLIMENTI_FILE" ] && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"SALVATAGGIO: %s%s"}}\n' "$HOOK_EVENT" "$TESTO" "$CODA"
 fi
-rm -f "$FALLIMENTI_FILE" "$AVVISI_FILE" "$ALTRUI_FILE" 2>/dev/null
+rm -f "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null
 
 exit 0
