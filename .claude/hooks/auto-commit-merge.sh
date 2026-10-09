@@ -1,10 +1,10 @@
 #!/bin/bash
 # Hook di SALVATAGGIO: committa e spedisce il ramo di lavoro, a ogni modifica.
 #
-# Cosa fa, e basta: per ogni cartella di lavoro del repo, se ci sono modifiche
-# le committa sul ramo che quella cartella ha sotto i piedi e spedisce QUEL ramo
-# su origin. E' il trasporto del lavoro (lo rende visibile a verifica e server)
-# e il paracadute se la sessione muore di colpo.
+# Cosa fa, e basta: nella cartella di chi ha modificato (sotto), se ci sono
+# modifiche le committa sul ramo che quella cartella ha sotto i piedi e spedisce
+# QUEL ramo su origin. E' il trasporto del lavoro (lo rende visibile a verifica e
+# server) e il paracadute se la sessione muore di colpo.
 #
 # Cosa NON fa (e non deve tornare a fare): fondere, e toccare il ramo
 # principale. La fusione automatica c'era fino al 2026-08-07 ed e' stata tolta
