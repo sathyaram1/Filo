@@ -30,71 +30,82 @@ HOOK_INPUT=""
 HOOK_EVENT=$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*"hook_event_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
 [ -z "$HOOK_EVENT" ] && HOOK_EVENT="PostToolUse"
 
-# ─── LA CARTELLA DELLA SESSIONE ──────────────────────────────────────────────
+# ─── LA CARTELLA DI CHI HA MODIFICATO (#1157) ────────────────────────────────
 #
-# Questo hook gira su TUTTE le cartelle di lavoro del repo, ma la sessione che
-# lo ha svegliato sta in una sola: Claude Code la passa nello stdin (campo
-# `cwd`). Un guaio di un'altra cartella — una fusione a meta' altrui, un ramo
-# altrui non su origin — fino al giro 5 della verifica (16/09/2026) arrivava
-# alla sessione con le parole di un problema SUO, e l'agente andava a
-# finire il rebase di qualcun altro. Ora si distingue: i guai della propria
-# cartella si dicono come oggi; quelli delle altre in una riga, come altrui,
-# mai come ordini. Nella JSON di Claude Code le barre di Windows arrivano
-# raddoppiate: si rimettono normali e si chiede a git qual e' la radice.
-HOOK_CWD=$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 | sed 's#\\\\#/#g')
-[ -z "$HOOK_CWD" ] && HOOK_CWD="$PROJECT_DIR"
-MIA_CARTELLA=$(git -C "$HOOK_CWD" rev-parse --show-toplevel 2>/dev/null)
-minuscolo() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's#/*$##'; }
-# La cartella del ciclo e' quella della sessione? Senza una radice nota (stdin
-# senza cwd e PROJECT_DIR fuori da git) ogni cartella e' «mia», com'era prima.
-e_mia() {
-  [ -z "$MIA_CARTELLA" ] && return 0
-  [ "$(minuscolo "$1")" = "$(minuscolo "$MIA_CARTELLA")" ]
+# Si salva UNA cartella: la radice git del file appena modificato
+# (`tool_input.file_path` o `notebook_path`). Fino al 2026-10 l'hook passava da
+# tutte le cartelle di lavoro del repo: due worker in parallelo si pestavano sui
+# lock, e un clone separato non compariva nemmeno in quell'elenco. Senza un file
+# (lancio a mano, stdin vuoto) vale la cartella di `cwd`, poi PROJECT_DIR; mai
+# le altre. Un file di un ALTRO repo (filo-security) non si salva: si salva a
+# mano. Le barre di Windows nel JSON arrivano raddoppiate.
+campo_json() {
+  printf '%s' "$HOOK_INPUT" | grep -oE "\"($1)\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|[\\\\].)*\"" | head -1 \
+    | sed 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//'
 }
-QUI_MIA=1
+percorso_json() { campo_json "$1" | sed 's#[\\][\\]*#/#g'; }
+HOOK_FILE=$(percorso_json 'file_path|notebook_path')
+HOOK_CWD=$(percorso_json cwd)
+HOOK_TRANSCRIPT=$(percorso_json transcript_path)
+HOOK_SESSION=$(campo_json session_id)
+minuscolo() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's#/*$##'; }
+url_norm() { minuscolo "$1" | sed 's#\.git$##; s#/*$##'; }
+# La radice git di un percorso, risalendo fino alla prima cartella che esiste.
+radice_di() {
+  local d="$1" su
+  while [ -n "$d" ] && [ ! -d "$d" ]; do
+    su=$(dirname "$d"); [ "$su" = "$d" ] && return 1; d="$su"
+  done
+  [ -n "$d" ] && git -C "$d" rev-parse --show-toplevel 2>/dev/null
+}
+COMUNE_PROGETTO=$(minuscolo "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")
+ORIGIN_PROGETTO=$(url_norm "$(git remote get-url origin 2>/dev/null)")
+# Una cartella del progetto: un suo worktree (stessa .git) o un clone con lo stesso origin.
+del_progetto() {
+  local c o
+  c=$(minuscolo "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")
+  [ -n "$c" ] && [ "$c" = "$COMUNE_PROGETTO" ] && return 0
+  o=$(url_norm "$(git -C "$1" remote get-url origin 2>/dev/null)")
+  [ -n "$o" ] && [ "$o" = "$ORIGIN_PROGETTO" ]
+}
+CARTELLA=""
+if [ -n "$HOOK_FILE" ]; then
+  r=$(radice_di "$HOOK_FILE")
+  if [ -n "$r" ] && del_progetto "$r"; then
+    CARTELLA="$r"
+  else
+    echo "[auto-commit] '$HOOK_FILE' non sta in una cartella di questo progetto: li' non salvo (si salva a mano)." >&2
+  fi
+fi
+if [ -z "$CARTELLA" ] && [ -n "$HOOK_CWD" ]; then
+  r=$(radice_di "$HOOK_CWD")
+  [ -n "$r" ] && del_progetto "$r" && CARTELLA="$r"
+fi
+[ -z "$CARTELLA" ] && CARTELLA=$(git rev-parse --show-toplevel 2>/dev/null)
+[ -n "$CARTELLA" ] || exit 0
 
-# I fallimenti della spedizione e le astensioni, raccolti qui: il ciclo dei
-# worktree gira in un sotto-processo (un tubo) e una variabile non ne
-# uscirebbe. Tre file perche' alla fine si dicono in modo diverso: a un push
-# fallito segue cosa fare per spedire, a un'astensione no, e i guai delle
-# altre cartelle si dicono come altrui.
+# I fallimenti della spedizione e le astensioni, raccolti qui per dirli alla
+# sessione alla fine: a un push fallito segue cosa fare per spedire, a
+# un'astensione no.
 FALLIMENTI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-fallimenti.$$")
 : > "$FALLIMENTI_FILE" 2>/dev/null
 AVVISI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-avvisi.$$")
 : > "$AVVISI_FILE" 2>/dev/null
-ALTRUI_FILE=$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/auto-commit-altrui.$$")
-: > "$ALTRUI_FILE" 2>/dev/null
 
-# Un guaio di un'altra cartella: una riga, con la cartella, senza ordini.
-# $1 = la cartella, $2 = il fatto, in breve.
-segnala_altrui() {
-  local riga="[auto-commit] un'altra cartella di lavoro, non la tua: '$1' — $2"
-  echo "$riga" >&2
-  [ -n "$ALTRUI_FILE" ] && printf '%s\n' "$riga" >> "$ALTRUI_FILE" 2>/dev/null
-}
 # Un fallimento si dice DUE volte: su stderr (il registro di debug) e nel
 # file, da cui alla fine diventa il contesto che la sessione vede davvero.
-# $1 = la cartella, $2 = il testo (per la propria cartella); $3 = il fatto in
-# breve, per quando la cartella e' di un altro.
+# $1 = la cartella, $2 = il testo.
 segnala_fallimento() {
-  if [ "$QUI_MIA" = 1 ]; then
-    echo "[auto-commit] '$1': $2" >&2
-    [ -n "$FALLIMENTI_FILE" ] && printf '%s\n' "[auto-commit] '$1': $2" >> "$FALLIMENTI_FILE" 2>/dev/null
-  else
-    segnala_altrui "$1" "$3"
-  fi
+  echo "[auto-commit] '$1': $2" >&2
+  [ -n "$FALLIMENTI_FILE" ] && printf '%s\n' "[auto-commit] '$1': $2" >> "$FALLIMENTI_FILE" 2>/dev/null
 }
 # Un'astensione (un rebase o una fusione a meta') vale lo stesso: fino al
 # giro 4 della verifica (16/09/2026) stava solo su stderr, e la sessione che
 # risolveva i conflitti con Edit non sapeva che quel salvataggio non era
-# avvenuto finche' non provava a consegnare. Stessi tre argomenti.
+# avvenuto finche' non provava a consegnare.
 segnala_avviso() {
-  if [ "$QUI_MIA" = 1 ]; then
-    echo "[auto-commit] '$1': $2" >&2
-    [ -n "$AVVISI_FILE" ] && printf '%s\n' "[auto-commit] '$1': $2" >> "$AVVISI_FILE" 2>/dev/null
-  else
-    segnala_altrui "$1" "$3"
-  fi
+  echo "[auto-commit] '$1': $2" >&2
+  [ -n "$AVVISI_FILE" ] && printf '%s\n' "[auto-commit] '$1': $2" >> "$AVVISI_FILE" 2>/dev/null
 }
 
 # ─── I RAMI CHE QUESTO AUTOMATISMO NON TOCCA MAI ─────────────────────────────
