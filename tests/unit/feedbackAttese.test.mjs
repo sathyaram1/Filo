@@ -248,7 +248,7 @@ test('--aspetta da riga di comando: dice quelle che sostituisce e cosa succede d
     assert.deepEqual(r.attese.map((w) => w.num), ['676', '951'], 'il cancellato #951, già scritto, non si rifiuta');
     assert.deepEqual(r.tolte, [{ id: 'id663-2', num: '663.2' }]);
     const testo = owner.rispostaAttese('903', r);
-    assert.match(testo, /Tolta l’attesa su #663.2, che c’era prima/);
+    assert.match(testo, /Tolta l’attesa su #663\.2, che c’era prima/);
     assert.match(testo, /È nei Ricevuti: in coda lo mette l’owner/);
     assert.doesNotMatch(testo, /entra in coda da solo/);
   } finally { rete.ripristina(); }
@@ -256,9 +256,9 @@ test('--aspetta da riga di comando: dice quelle che sostituisce e cosa succede d
   try {
     const r = await owner.segnaAttese('id903', '676', { bearer: 'tok', dryRun: true });
     assert.deepEqual(rete.scritte, []);
-    assert.match(owner.rispostaAttese('903', r), /scriverei «aspetta #676» e toglierei quelle su #663.2, #951, che c’erano prima/);
+    assert.match(owner.rispostaAttese('903', r), /scriverei «aspetta #676» e toglierei quelle su #663\.2, #951, che c’erano prima/);
     const scritta = await owner.segnaAttese('id903', '676', { bearer: 'tok' });
-    assert.match(owner.rispostaAttese('903', scritta), /Tolte le attese su #663.2, #951.*poi entra in coda da solo/);
-    assert.match(owner.rispostaAttese('903', await owner.segnaAttese('id903', '', { bearer: 'tok' })), /non aspetta più niente (tolte le attese su #663.2, #951)/);
+    assert.match(owner.rispostaAttese('903', scritta), /Tolte le attese su #663\.2, #951.*poi entra in coda da solo/);
+    assert.match(owner.rispostaAttese('903', await owner.segnaAttese('id903', '', { bearer: 'tok' })), /non aspetta più niente \(tolte le attese su #663\.2, #951\)/);
   } finally { rete.ripristina(); }
 });
