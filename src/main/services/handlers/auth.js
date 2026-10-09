@@ -71,6 +71,20 @@ function erroreSegno(e) {
   return e?.message || 'Non riuscito.';
 }
 
+// Un errore di ownerDomande detto all'owner. Prima del deploy la callable non esiste (404 senza codice del
+// protocollo): lo si dice, non «riprova». Un 404 col codice è una domanda che non c'è, e la frase è del server.
+function erroreDomande(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.';
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere le domande: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
 // Un istante del server (ISO, millisecondi, secondi o Timestamp serializzato) come ISO; '' se non c'è.
 function aIso(v) {
   if (v == null || v === '') return '';
@@ -1463,6 +1477,61 @@ module.exports = function register(on, ctx) {
     // Una risposta di `clear` che non riporta l'ora la conosce comunque chi l'ha chiesta.
     if (action === 'clear' && !out.flagged && !out.clearedAt) out.clearedAt = new Date().toISOString();
     return out;
+  }));
+
+  // Le domande all'owner (#1149): il main fa solo da tramite verso ownerDomande. Le azioni le applica il server,
+  // che decide anche chi ha scritto ogni turno: la pagina non può dichiararlo.
+  async function chiamaDomande(data) {
+    let r;
+    try {
+      r = await callSecurityFunction('ownerDomande', data);
+    } catch (e) {
+      return { ok: false, error: erroreDomande(e) };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sulle domande.' };
+    return r;
+  }
+
+  on(MSG.DOMANDE_ELENCO, ownerOnly(async (msg) => {
+    const data = { op: 'elenco' };
+    if (Number.isFinite(msg?.dopo) && msg.dopo > 0) data.dopo = msg.dopo;
+    if (msg?.tutte === true) data.tutte = true;
+    const r = await chiamaDomande(data);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      domande: Array.isArray(r.domande) ? r.domande : [],
+      riferimenti: r.riferimenti && typeof r.riferimenti === 'object' ? r.riferimenti : {},
+      adesso: Number(r.adesso) || 0,
+    };
+  }));
+
+  on(MSG.DOMANDA_MOSTRA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda da mostrare.' };
+    const r = await chiamaDomande({ op: 'mostra', id });
+    if (!r.ok) return r;
+    return { ok: true, domanda: r.domanda || null, riferimenti: r.riferimenti || {} };
+  }));
+
+  on(MSG.DOMANDA_RISPONDI, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda a cui rispondere.' };
+    const data = { op: 'rispondi', id };
+    if (Number.isInteger(msg?.scelta)) data.scelta = msg.scelta;
+    if (typeof msg?.testo === 'string' && msg.testo.trim()) data.testo = msg.testo;
+    if (data.scelta === undefined && data.testo === undefined) return { ok: false, error: 'Scegli un’opzione o scrivi una risposta.' };
+    const r = await chiamaDomande(data);
+    if (!r.ok) return r;
+    return { ok: true, domanda: r.domanda || null, esito: r.esito || null };
+  }));
+
+  on(MSG.DOMANDE_CONSIGLIO, ownerOnly(async (msg) => {
+    const ids = Array.isArray(msg?.ids) ? msg.ids.map((x) => String(x || '').trim()).filter(Boolean) : [];
+    if (!ids.length) return { ok: false, error: 'Nessuna domanda selezionata.' };
+    const r = await chiamaDomande({ op: 'consiglio', ids });
+    if (!r.ok) return r;
+    return { ok: true, esiti: Array.isArray(r.esiti) ? r.esiti : [] };
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {

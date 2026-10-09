@@ -139,6 +139,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Le domande all'owner (#1149, SPEC-DOMANDE.md §3): le scrive solo il server, che decide autore e fiducia di
+    // ogni turno; un client che scrivesse qui si darebbe la voce dell'owner. Testi cifrati per l'owner.
+    match /domande/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Allowlist routine. Gestita SOLO da console Firebase.
     match /routines/{email} {
       allow read: if isAdmin();
