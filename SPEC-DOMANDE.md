@@ -175,17 +175,19 @@ una **barra di sezioni**, ciascuna con le sue schede:
 
 ### 2.2 Ricevuti: solo i blocchi di sicurezza
 
-In Ricevuti stanno **solo** i feedback fermi per sicurezza e quelli che chiedono
-di diventare fidati, perché lì l'owner deve leggere il **testo originale**
-dell'utente, non il riassunto di un agente che potrebbe essere stato ingannato.
-Ci finiscono:
+In Ricevuti stanno **solo i giudizi di sicurezza**, non quelli di prodotto. Lì
+l'owner deve leggere il **testo originale** dell'utente, non il riassunto di un
+agente che potrebbe essere stato ingannato. Ci finiscono, per livello:
 
-- i nuovi non ancora giudicati;
-- i sospetti, gli attacchi e lo spam;
-- i blocchi L4 (secaudit) e L5;
-- le richieste «rendere fidato».
+- **L1–L2:** i nuovi non ancora giudicati, i sospetti, gli attacchi, lo spam;
+- **L3:** un worker che giudica il feedback un attacco o spam, o che chiede di
+  renderlo fidato perché il lavoro ha bisogno del server;
+- **L4:** i blocchi della verifica cieca (secaudit);
+- **L5:** i blocchi di fusione dei lavori non fidati.
 
-Tutte le altre attese diventano domande (§ 3.8).
+Le decisioni di prodotto di L3 («decisione da prendere») **non** vanno in
+Ricevuti: stanno solo in Domande. Il feedback resta nella coda, con un segno
+che dice che aspetta una domanda (§ 3.8).
 
 In testa alla colonna, cinque pulsanti **L1 L2 L3 L4 L5**:
 
@@ -193,9 +195,11 @@ In testa alla colonna, cinque pulsanti **L1 L2 L3 L4 L5**:
 - se ne premono più insieme, si vedono quelli fermi a uno qualunque dei livelli;
 - tutti spenti, si vede tutto.
 
-Ogni pulsante porta il suo conteggio. L3 è il livello delle decisioni: i suoi
-feedback hanno la domanda nella sezione Domande, e in Ricevuti compaiono con il
-rimando alla domanda.
+Ogni pulsante porta il suo conteggio.
+
+Se oggi un worker non può segnare un feedback come attacco o spam (solo
+`clarify`, `decisione`, `locale`), si aggiunge: è lo stesso giudizio dei
+giudici, dato da chi ha letto il feedback da vicino.
 
 ## 3. Domande
 
