@@ -495,12 +495,32 @@ vale per tutti i compiti di quel tipo.
 
 ## 8. Crediti
 
-Proposta da confermare con l'owner: i numeri restano suoi, in Routine → Crediti.
+I numeri restano dell'owner, in Routine → Crediti.
 
-- **Una sola misura:** la quota settimanale di ciascun account, in dollari
-  equivalenti (misurata il 07/10: circa 2.150 $ a settimana per account).
-- **Riserva per l'owner:** una parte della quota resta alle sessioni locali e
-  alle discussioni (percentuale impostabile).
+### 8.1 Misurare
+
+- **Oggi:** alla chiusura del biglietto uno script legge il registro della
+  sessione e allega al rilascio i token usati. Non costa niente al modello. Ma
+  i biglietti contano solo il 60% circa del consumo vero: mancano
+  l'orchestratore e i biglietti morti senza rilascio.
+- **Domani: a ogni battito.** Il battito parte già ogni pochi minuti da un
+  processo che non è il modello. Si allega il consumo progressivo, letto
+  dalla parte nuova del registro: costa millisecondi e zero token. Lo fa anche
+  l'orchestratore, che oggi non è contato. Un biglietto morto ha almeno il
+  consumo fino all'ultimo battito.
+- **La misura vera è la percentuale del piano** che Claude Code mostra
+  (settimanale e cinque ore). Se si può leggere da uno script, il battito
+  allega quella, e i token servono solo per ripartire la spesa fra i lavori.
+  Altrimenti si stima dai token con la taratura misurata (100% ≈ 2.150 $ a
+  settimana per account). È la prima cosa da verificare.
+
+### 8.2 Decidere
+
+- **Riserva dell'owner:** il **10% di ogni account** resta sempre libero. Il
+  pacemaker non accende più su un account arrivato al 90% della settimana. Le
+  sessioni locali dell'owner consumano dallo stesso account: entrano nel
+  conto solo se si misura la percentuale del piano. Con la stima dai token il
+  server non le vede.
 - **Passo:** ogni giorno si spende al massimo il rimasto diviso i giorni che
   mancano al rinnovo, così la settimana non finisce il martedì.
 - **Ordine:**
