@@ -911,7 +911,7 @@ if (isMain) {
     if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo} — non ho toccato niente.`); process.exit(1); }
     priorita = p.valore;
     const conStato = ['--frase', '--branch', '--reason', '--starred', '--unstar', '--preapprova', '--chiedi-prima', '--come-routine'];
-    const altre = ['--solo-locale', '--non-locale', '--serve-locale', ...(status ? [] : conStato)].filter((o) => argv.includes(o));
+    const altre = ['--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-niente', ...(status ? [] : conStato)].filter((o) => argv.includes(o));
     if (altre.length) {
       console.error(`RIFIUTATO: --priorita ${status ? 'non va' : 'senza stato va da sola, non'} con ${altre.join(' ')}: lancia un comando per ciascuno — non ho toccato niente.`);
       process.exit(1);

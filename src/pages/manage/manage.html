@@ -1129,13 +1129,14 @@
     }
 
     /* «Aspetta #N» (#903): la forma del segno locale, tinta d'accento solo sui numeri non ancora fusi. */
+    /* Con tante attese va a capo fra un numero e l'altro invece di uscire dalla scheda: i numeri si leggono tutti. */
     .mg-attesa-badge {
-      flex: none;
-      font-size: 10.5px; line-height: 1;
-      padding: 3px 6px; border-radius: 999px;
+      flex: 0 1 auto; min-width: 0;
+      font-size: 10.5px; line-height: 1.25;
+      padding: 2px 6px; border-radius: 9px;
       border: 1px solid color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent);
       color: var(--sn-accent, #c8763c);
-      white-space: nowrap;
+      white-space: normal; overflow-wrap: anywhere;
     }
     .mg-attese-toggle[hidden] { display: none; }
     .mg-attese-toggle.mg-attese-piena { border-color: var(--sn-accent, #c8763c); color: var(--sn-accent, #c8763c); }

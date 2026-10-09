@@ -255,7 +255,8 @@
     }
     /* «Aspetta #N» (#903): la forma del chip qui sopra, nella tinta d'accento come in Gestione. */
     .fb-attesa {
-      font-size: 10.5px; line-height: 1; padding: 3px 6px; border-radius: 999px; white-space: nowrap;
+      display: inline-block; max-width: 100%; box-sizing: border-box;
+      font-size: 10.5px; line-height: 1.25; padding: 2px 6px; border-radius: 9px; white-space: normal; overflow-wrap: anywhere;
       border: 1px solid color-mix(in srgb, var(--sn-accent, #c8763c) 45%, transparent); color: var(--sn-accent, #c8763c);
     }
     .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }

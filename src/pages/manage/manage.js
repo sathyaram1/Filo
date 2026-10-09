@@ -2549,10 +2549,14 @@
     // Nessun tempo promesso: il momento del rientro dipende da quando il ramo si
     // è fermato, e una riga che dice "fra un'ora" sarebbe di nuovo una cosa non
     // vera.
+    // Chi aspetta altri feedback non lo prende nessuno finché non sono fusi: né un verificatore né il rientro in coda.
+    const aspetta = !!(ATT && fb && ATT.aspettaAncora(fb, trovaAtteso));
     const who = progress.active
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
       : `<span class="mg-work-idle">${
-          progress.current.key === 'impl'
+          aspetta
+            ? 'Nessuna istanza al lavoro: riparte quando quelli che aspetta sono fusi'
+            : progress.current.key === 'impl'
             ? 'Nessuna istanza al lavoro: rientra in coda da solo'
             : 'Nessuna istanza al lavoro: in attesa di un verificatore'
         }</span>`;

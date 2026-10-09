@@ -117,7 +117,7 @@ main. Così le pagine girano quasi invariate.
 - [x] Hotkey globali (Alt+E/T/S/H; su Mac Ctrl+Alt, perché Alt da solo è il tasto degli accenti)
 - [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
 - [x] **Content script** in pagine web (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) iniettati via `page-preload.js`
-- [x] Test Playwright adattati a `_electron.launch` (~450 spec, ~1.450 casi)
+- [x] Test Playwright adattati a `_electron.launch` (~470 spec, ~1.450 casi)
 - [x] Auto-update (electron-builder/NSIS, vedi `src/main/updater.js`)
 - [x] Packaging Windows (NSIS) e Mac (dmg universale, Intel + Apple Silicon); Linux non previsto per ora
 
@@ -126,7 +126,7 @@ main. Così le pagine girano quasi invariate.
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~450 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
+npm test               # suite Playwright completa (~470 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 

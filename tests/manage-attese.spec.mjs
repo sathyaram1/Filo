@@ -226,3 +226,49 @@ test('coi numeri il tasto delle attese non allunga la fila dei tasti; con uno so
   await expect(page.locator('#mgAtteseToggle')).toHaveAttribute('title', /#140663\.2/);
   await page.screenshot({ path: 'tests/.shots/aspetta-tre-numeri.png' });
 });
+
+// Chi aspetta non lo prende nessuno: la riga dello stato del lavoro non promette un verificatore o un rientro in coda,
+// e con tante attese l'etichetta va a capo dentro la sua scheda, qui e nella pagina gemella.
+const ASPETTATI = Array.from({ length: 8 }, (_, i) => fb({ _id: `w${i}`, seq: 960 + i, name: `Aspettato ${i}` }));
+const ATTESE_OTTO = ASPETTATI.map((a) => ({ id: a._id, num: String(a.seq) }));
+
+test('nella sezione Aspettano la scheda di una pratica avviata dice che aspetta, non che arriva qualcuno', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.evaluate((l) => window.__mgTest.setData(l), [
+    fb({ _id: 'rev', seq: 940, status: 'revision_capability', waitsFor: [{ id: 'w0', num: '960' }] }),
+    fb({ _id: 'sec', seq: 941, status: 'revision_security', waitsFor: [{ id: 'w0', num: '960' }] }),
+    ...ASPETTATI,
+  ]);
+  await page.evaluate(() => window.__mgTest.setTab('waiting'));
+  for (const n of ['#940', '#941']) {
+    const scheda = page.locator('.mg-item', { hasText: n });
+    await expect(scheda).toContainText('riparte quando quelli che aspetta sono fusi');
+    await expect(scheda).not.toContainText('in attesa di un verificatore');
+    await expect(scheda).not.toContainText('rientra in coda da solo');
+  }
+});
+
+test('otto attese stanno dentro la scheda, in Gestione e nella pagina dei feedback', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.evaluate((l) => window.__mgTest.setData(l), [fb({ seq: 934, waitsFor: ATTESE_OTTO }), ...ASPETTATI]);
+  await page.evaluate(() => window.__mgTest.setTab('waiting'));
+  const scheda = page.locator('.mg-item', { hasText: '#934' });
+  await expect(scheda.locator('.mg-attesa-badge')).toContainText('#967');
+  const m = await scheda.evaluate((it) => ({ scheda: it.scrollWidth - it.clientWidth, colonna: it.parentElement.scrollWidth - it.parentElement.clientWidth }));
+  expect(m).toEqual({ scheda: 0, colonna: 0 });
+
+  const fbPage = await openTab('filo://feedback/feedback.html');
+  await fbPage.waitForLoadState('domcontentloaded');
+  await fbPage.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW && window.SN_FB_ATTESE);
+  await fbPage.evaluate((items) => window.__fbTest.setData(items), [fb({ seq: 934, waitsFor: ATTESE_OTTO }), ...ASPETTATI]);
+  await fbPage.locator('#tabs [data-tab="waiting"]').click();
+  const chip = fbPage.locator('.fb-card[data-id="f903"] .fb-attesa');
+  await expect(chip).toContainText('#967');
+  const sfora = await chip.evaluate((c) => {
+    const card = c.closest('.fb-card');
+    return Math.max(0, c.getBoundingClientRect().right - card.getBoundingClientRect().right, card.scrollWidth - card.clientWidth);
+  });
+  expect(sfora).toBe(0);
+});
