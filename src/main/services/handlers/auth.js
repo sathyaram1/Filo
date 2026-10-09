@@ -334,15 +334,20 @@ module.exports = function register(on, ctx) {
 
   // «Aspetta #N» (#903): la pagina manda i numeri come li ha scritti l'owner; li risolve e li controlla il main, che
   // legge i documenti col token (la pagina ne vede una finestra). Vuoto = togliere. Regole: SN_FB_ATTESE.valida.
-  async function prepareAttese(id, valore, idToken) {
+  // `tieni`: id delle attese già scritte che la pagina non sa rinumerare (aspettato cancellato o non letto): restano come sono.
+  async function prepareAttese(id, valore, idToken, tieni) {
     const A = globalThis.SN_FB_ATTESE;
     const FB = globalThis.SN_FEEDBACK;
     const letti = A.leggiNumeri(valore === null || valore === false ? '' : valore);
-    if (!letti.ok || !letti.numeri.length) return letti.ok ? { ok: true, attese: [] } : letti;
-    const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq'], timeoutMs: 20000 });
+    if (!letti.ok) return letti;
+    if (tieni !== undefined && (!Array.isArray(tieni) || tieni.length > A.MAX || tieni.some((x) => typeof x !== 'string'))) {
+      return { ok: false, motivo: 'elenco delle attese da tenere non valido' };
+    }
+    if (!letti.numeri.length && !(tieni || []).length) return { ok: true, attese: [] };
+    const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
     if (!proprio) return { ok: false, motivo: 'il feedback non esiste più' };
     return A.valida({
-      id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri,
+      id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri, gia: A.atteseDi(proprio), tieni: tieni || [],
       risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
       leggiAttese: async (ids) => {
         const out = new Map();
@@ -409,7 +414,7 @@ module.exports = function register(on, ctx) {
       const senderProof = msg.senderProof === 'admin' ? 'admin' : undefined;
       let waitsFor;
       if (msg.waitsFor !== undefined) {
-        const r = await prepareAttese(id, msg.waitsFor, idToken);
+        const r = await prepareAttese(id, msg.waitsFor, idToken, msg.waitsTieni);
         if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
         waitsFor = r.attese;
       }

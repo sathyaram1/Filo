@@ -3389,27 +3389,34 @@
     }).join('');
   }
 
-  // I numeri da riscrivere: quelli di adesso (anche quando l'attesa ne ha perso uno, dal documento) più o meno uno.
-  function numeriAttuali(fb) {
-    return ATT.atteseDi(fb).map((w) => w.num || numeroDi(trovaAtteso(w.id)));
+  // Le attese da riscrivere, tranne `salvo`: per numero quelle di un aspettato che la pagina vede, per id le altre
+  // (cancellato, non letto, senza numero), che il main tiene come sono invece di rifiutarle cercandone il numero.
+  function atteseDaTenere(fb, salvo = '') {
+    return ATT.atteseDi(fb).filter((w) => w.id !== salvo).map((w) => {
+      const doc = trovaAtteso(w.id);
+      const n = doc && !doc.missing ? (w.num || numeroDi(doc)) : '';
+      return n || { id: w.id };
+    });
   }
 
-  async function scriviAttese(id, numeri) {
+  async function scriviAttese(id, voci) {
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb || !ATT) return false;
     const num = numeroDi(fb);
     const chi = num ? `#${num}` : 'Il feedback';
-    if (numeri.some((n) => !n)) { setManageMsg('Attese non scritte: una non ha numero. Toglile tutte e rimetti quelle che servono.', 'err'); return false; }
-    const lette = ATT.leggiNumeri(numeri);
+    const tieni = voci.filter((v) => v && typeof v === 'object').map((v) => v.id);
+    const lette = ATT.leggiNumeri(voci.filter((v) => typeof v === 'string'));
     if (!lette.ok) { setManageMsg(`Attese non scritte: ${lette.motivo}.`, 'err'); return false; }
+    const vuoto = !lette.numeri.length && !tieni.length;
     for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = true;
-    setManageMsg(lette.numeri.length ? 'Scrivo le attese…' : 'Tolgo le attese…', '');
+    setManageMsg(vuoto ? 'Tolgo le attese…' : 'Scrivo le attese…', '');
     try {
-      const r = await sendToMain({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') });
+      const r = await sendToMain(Object.assign({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') }, tieni.length ? { waitsTieni: tieni } : {}));
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
-      // Tolta l'ultima, la casella si chiude: non c'è più niente da guardare.
-      if (!fb.waitsFor && atteseApertePer === id) atteseApertePer = '';
+      // Si chiude col gesto che toglie l'ultima, non con la risposta: un'attesa tenuta per id resta da guardare.
+      if (vuoto && atteseApertePer === id) atteseApertePer = '';
+      else if (!vuoto) atteseApertePer = id;
       renderList();
       if (selectedId === id) reflectAttese(fb);
       const dove = MR.manageTabFor(fb, opzSezioni());
@@ -3453,7 +3460,7 @@
     // Il campo si libera subito per il numero dopo; a un rifiuto torna il testo, se nel frattempo non se n'è scritto altro.
     const testo = mgAtteseInput.value;
     mgAtteseInput.value = '';
-    const ok = await accodaAttese(fb._id, (f) => [...numeriAttuali(f), ...nuovi.numeri]);
+    const ok = await accodaAttese(fb._id, (f) => [...atteseDaTenere(f), ...nuovi.numeri]);
     if (!ok && !mgAtteseInput.value) mgAtteseInput.value = testo;
   }
   if (mgAtteseToggle) {
@@ -3488,7 +3495,7 @@
       if (!fb) return;
       if (btn.dataset.azione === 'apri') { openFromAttesa(li.dataset.id); return; }
       const via = li.dataset.id;
-      accodaAttese(fb._id, (f) => ATT.atteseDi(f).filter((w) => w.id !== via).map((w) => w.num || numeroDi(trovaAtteso(w.id))));
+      accodaAttese(fb._id, (f) => atteseDaTenere(f, via));
     });
   }
   // Dall'attesa alla pratica aspettata, nella sua sezione.

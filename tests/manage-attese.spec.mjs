@@ -8,11 +8,14 @@
 //   4. Dal tasto destro sulla scheda si arriva alla casella, e si toglie tutto in un gesto.
 //   5. «Non aspettare più» sotto il campo c'è solo con due attese o più: con una basta la sua ×.
 //   6. Un gesto fatto mentre una scrittura è in volo parte dall'elenco già scritto, non da quello di prima.
+//   7. Un'attesa su un aspettato che la pagina non legge (cancellato) viaggia per id e resta: le altre si toccano.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const ID_DEL_NUMERO = { 12: 'f12', 13: 'f13' };
+// Le attese già scritte che il main tiene per id, col numero che hanno sul documento.
+const TENUTE = { via951: '951' };
 
 function fb(over = {}) {
   return Object.assign({
@@ -27,11 +30,11 @@ const LISTA = [
   fb({ _id: 'f13', seq: 13, name: 'Il secondo', status: 'archived', statusPublic: 'closed', resolvedInVersion: '0.2.230' }),
 ];
 
-async function apri(page) {
+async function apri(page, lista = LISTA) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate((ids) => {
+  await page.evaluate(({ ids, tenute }) => {
     window.__updates = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
@@ -43,12 +46,13 @@ async function apri(page) {
         const numeri = String(msg.waitsFor).split(/[\s,]+/).filter(Boolean).map((n) => n.replace('#', ''));
         const ignoto = numeri.find((n) => !ids[n]);
         if (ignoto) return { ok: false, error: `#${ignoto} non esiste` };
-        return { ok: true, waitsFor: numeri.map((n) => ({ id: ids[n], num: n })) };
+        const tenuti = (msg.waitsTieni || []).filter((id) => tenute[id]).map((id) => ({ id, num: tenute[id] }));
+        return { ok: true, waitsFor: [...tenuti, ...numeri.map((n) => ({ id: ids[n], num: n }))] };
       }
       return orig(msg);
     };
-  }, ID_DEL_NUMERO);
-  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, LISTA);
+  }, { ids: ID_DEL_NUMERO, tenute: TENUTE });
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, lista);
   await page.evaluate(() => window.__mgTest.setTab('queue'));
 }
 
@@ -271,4 +275,22 @@ test('otto attese stanno dentro la scheda, in Gestione e nella pagina dei feedba
     return Math.max(0, c.getBoundingClientRect().right - card.getBoundingClientRect().right, card.scrollWidth - card.clientWidth);
   });
   expect(sfora).toBe(0);
+});
+
+test('un aspettato cancellato non blocca le altre attese: viaggia per id e resta', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [fb({ waitsFor: [{ id: 'via951', num: '951' }, { id: 'f12', num: '12' }] }), ...LISTA.slice(1)]);
+  await page.evaluate(() => window.__mgTest.openDetail('f903'));
+  const righe = page.locator('#mgAtteseLista .mg-attesa');
+  await expect(righe).toHaveCount(2);
+  await righe.filter({ hasText: '#12' }).locator('.mg-attesa-togli').click();
+  await expect(page.locator('#mgManageMsg')).toHaveText(/Da ora #903 aspetta #951/);
+  await expect(righe).toHaveCount(1);
+  await page.locator('#mgAtteseInput').fill('13');
+  await page.locator('#mgAtteseInput').press('Enter');
+  await expect(righe).toHaveCount(2);
+  await expect(page.locator('#mgAtteseLista')).toContainText('#951');
+  await expect(page.locator('#mgAtteseLista')).toContainText('#13');
+  const inviati = await page.evaluate(() => window.__updates);
+  expect(inviati.map((u) => [u.waitsFor, u.waitsTieni])).toEqual([['', ['via951']], ['13', ['via951']]]);
 });

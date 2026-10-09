@@ -103,25 +103,32 @@
   /**
    * Le attese da scrivere su `id`, controllate: esistono, non sono lui, non chiudono un giro, al più MAX.
    * `risolvi(num)` → id o null (non esiste; un guasto si lancia). `leggiAttese(ids)` → Map id → attese di quel
-   * feedback (`atteseDi`). `num` = il numero di `id`, per i messaggi.
+   * feedback (`atteseDi`). `num` = il numero di `id`, per i messaggi. `gia` = le attese che `id` ha adesso: un loro
+   * numero non si risolve di nuovo e quelle con l'id in `tieni` restano come sono, così un aspettato cancellato non blocca le altre.
    * @returns {Promise<{ ok: true, attese: Array<{id,num}> } | { ok: false, motivo: string }>}
    */
-  async function valida({ id, num = '', numeri, risolvi, leggiAttese }) {
+  async function valida({ id, num = '', numeri, gia = [], tieni = [], risolvi, leggiAttese }) {
     const lista = Array.isArray(numeri) ? numeri.map(normalizzaNumero) : [];
     if (lista.some((n) => !n)) return { ok: false, motivo: 'c’è un numero di feedback non valido' };
-    if (lista.length > MAX) {
-      return { ok: false, motivo: `sono ${lista.length} numeri: un feedback ne aspetta al più ${MAX}, togline ${lista.length - MAX}` };
+    const salvate = atteseDi({ [CAMPO]: gia });
+    const perNumero = new Map(salvate.filter((w) => w.num).map((w) => [w.num, w]));
+    const tenute = salvate.filter((w) => (Array.isArray(tieni) ? tieni : []).map(String).includes(w.id));
+    const quante = new Set([...lista, ...tenute.map((w) => w.num || w.id)]).size;
+    if (quante > MAX) {
+      return { ok: false, motivo: `sono ${quante} numeri: un feedback ne aspetta al più ${MAX}, togline ${quante - MAX}` };
     }
     const proprio = normalizzaNumero(num);
     const attese = [];
     for (const n of lista) {
       if (proprio && n === proprio) return { ok: false, motivo: `#${n} è questo stesso feedback: non può aspettare sé stesso` };
+      const nota = perNumero.get(n);
       // eslint-disable-next-line no-await-in-loop
-      const altro = await risolvi(n);
+      const altro = nota ? nota.id : await risolvi(n);
       if (!altro) return { ok: false, motivo: `#${n} non esiste` };
       if (String(altro) === String(id)) return { ok: false, motivo: `#${n} è questo stesso feedback: non può aspettare sé stesso` };
       if (!attese.some((a) => a.id === String(altro))) attese.push({ id: String(altro), num: n });
     }
+    for (const w of tenute) if (!attese.some((a) => a.id === w.id)) attese.push({ id: w.id, num: w.num });
     if (!attese.length || !id) return { ok: true, attese };
     const giro = await cercaGiro(String(id), attese, leggiAttese);
     if (giro && giro.troppi) return { ok: false, motivo: `le attese a catena superano ${MAX_VISITATI} feedback: non so dire se chiudono un giro` };

@@ -133,6 +133,7 @@ function reteFinta(docs) {
     const d = docs[id];
     if (!d) return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
     const fields = { seq: { integerValue: String(d.seq) }, subSeq: { integerValue: String(d.subSeq || 0) } };
+    if (d.status) fields.status = { stringValue: d.status };
     if (d.waitsFor) {
       fields.waitsFor = { arrayValue: { values: d.waitsFor.map((w) => ({ mapValue: { fields: { id: { stringValue: w.id }, num: { stringValue: w.num } } } })) } };
     }
@@ -146,7 +147,8 @@ test('npm run feedback -- <id> --aspetta: scrive solo le attese (stato invariato
   const rete = reteFinta(DOCS);
   try {
     let r = await owner.segnaAttese('id903', '676,663.2', { bearer: 'tok' });
-    assert.deepEqual(r, { ok: true, attese: [{ id: 'id676', num: '676' }, { id: 'id663-2', num: '663.2' }] });
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.attese, [{ id: 'id676', num: '676' }, { id: 'id663-2', num: '663.2' }]);
     assert.equal(rete.scritte.length, 1);
     const w = rete.scritte[0];
     assert.match(w.url, /updateMask\.fieldPaths=waitsFor&updateMask\.fieldPaths=updatedAt$/);
@@ -154,7 +156,8 @@ test('npm run feedback -- <id> --aspetta: scrive solo le attese (stato invariato
     assert.equal(w.body.fields.waitsFor.arrayValue.values.length, 2);
 
     r = await owner.segnaAttese('id903', '', { bearer: 'tok' });
-    assert.deepEqual(r, { ok: true, attese: [] });
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.attese, []);
     assert.match(rete.scritte[1].url, /updateMask\.fieldPaths=waitsFor/);
     assert.deepEqual(Object.keys(rete.scritte[1].body.fields), ['updatedAt'], 'nominato nella maschera e assente: cancellato');
   } finally { rete.ripristina(); }
@@ -217,4 +220,45 @@ test('npm run feedback senza stato: un\'opzione in più si rifiuta prima delle c
   const conStato = lancia('todo', 'nota', '--aspetta', '676');
   assert.equal(conStato.status, 1);
   assert.match(conStato.stderr, /--aspetta va da solo, senza stato né nota/);
+});
+
+test('valida: le attese già scritte non si risolvono di nuovo, e quelle da tenere per id restano', async () => {
+  const risolvi = async (n) => ({ 952: 'f952', 953: 'f953' }[n] || null);
+  const leggiAttese = async () => new Map();
+  const gia = [{ id: 'via951', num: '951' }, { id: 'f952', num: '952' }];
+  // #951 è stato cancellato: riscritto col suo numero non si rifiuta.
+  assert.deepEqual(await A.valida({ id: 'f950', num: '950', numeri: ['951', '953'], gia, risolvi, leggiAttese }),
+    { ok: true, attese: [{ id: 'via951', num: '951' }, { id: 'f953', num: '953' }] });
+  // Per id: resta solo chi è già scritto; un id che non c'è non entra.
+  assert.deepEqual(await A.valida({ id: 'f950', num: '950', numeri: ['953'], gia, tieni: ['via951', 'estraneo'], risolvi, leggiAttese }),
+    { ok: true, attese: [{ id: 'f953', num: '953' }, { id: 'via951', num: '951' }] });
+  // Il tetto conta anche quelle tenute.
+  const venti = Array.from({ length: 20 }, (_, i) => String(900 + i));
+  const tanti = await A.valida({ id: 'f950', num: '950', numeri: venti, gia, tieni: ['via951'], risolvi: async (n) => `f${n}`, leggiAttese });
+  assert.equal(tanti.ok, false);
+  assert.match(tanti.motivo, /sono 21 numeri/);
+});
+
+test('--aspetta da riga di comando: dice quelle che sostituisce e cosa succede dopo per lo stato della pratica', async () => {
+  const conAttesa = (status) => ({ ...DOCS, id903: { seq: 903, status, waitsFor: [{ id: 'id663-2', num: '663.2' }, { id: 'via951', num: '951' }] } });
+  let rete = reteFinta(conAttesa('design'));
+  try {
+    const r = await owner.segnaAttese('id903', '676,951', { bearer: 'tok' });
+    assert.equal(r.ok, true, r.motivo);
+    assert.deepEqual(r.attese.map((w) => w.num), ['676', '951'], 'il cancellato #951, già scritto, non si rifiuta');
+    assert.deepEqual(r.tolte, [{ id: 'id663-2', num: '663.2' }]);
+    const testo = owner.rispostaAttese('903', r);
+    assert.match(testo, /Tolta l’attesa su #663.2, che c’era prima/);
+    assert.match(testo, /È nei Ricevuti: in coda lo mette l’owner/);
+    assert.doesNotMatch(testo, /entra in coda da solo/);
+  } finally { rete.ripristina(); }
+  rete = reteFinta(conAttesa('todo'));
+  try {
+    const r = await owner.segnaAttese('id903', '676', { bearer: 'tok', dryRun: true });
+    assert.deepEqual(rete.scritte, []);
+    assert.match(owner.rispostaAttese('903', r), /scriverei «aspetta #676» e toglierei quelle su #663.2, #951, che c’erano prima/);
+    const scritta = await owner.segnaAttese('id903', '676', { bearer: 'tok' });
+    assert.match(owner.rispostaAttese('903', scritta), /Tolte le attese su #663.2, #951.*poi entra in coda da solo/);
+    assert.match(owner.rispostaAttese('903', await owner.segnaAttese('id903', '', { bearer: 'tok' })), /non aspetta più niente (tolte le attese su #663.2, #951)/);
+  } finally { rete.ripristina(); }
 });
