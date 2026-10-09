@@ -637,9 +637,20 @@ migrazione le mappa. Il codice che decide in base al prefisso
 
 Da sistemare prima dei worker in parallelo:
 
-- **Il salvataggio automatico** oggi passa da tutte le cartelle di lavoro, e due
-  worker si pestano sui lock: deve salvare solo la cartella di chi ha
-  modificato.
+- **Una copia del repo per worker.** Oggi il worker porta l'unica cartella del
+  progetto sul suo ramo. Due worker lavorano su rami diversi, ma hanno bisogno
+  di due cartelle. Le cartelle di lavoro di git condividono la stessa `.git`:
+  scaricare e spingere insieme si contendono i lock dei riferimenti. In più il
+  salvataggio automatico passa da tutte le cartelle. Quindi ogni worker ha il
+  suo **clone**, con la cache dei pacchetti condivisa, e il salvataggio salva
+  solo la cartella di chi ha modificato.
+- **Sotto-lavori.** Un worker è già un sotto-agente dell'orchestratore, e un
+  sotto-agente non può lanciarne altri. Quando un lavoro va diviso (una
+  revisione grande, per esempio), il worker chiede al server dei biglietti
+  figli, col ruolo e i numeri, mai testo libero, come per l'unione (§ 1.3).
+  L'orchestratore li lancia come gli altri, dentro N e K. I figli ereditano la
+  fiducia del padre in quel momento. Il padre aspetta i loro esiti dal server.
+  Le chiusure a metà e i crash li segue il monitoraggio.
 - **Le prove** non devono contendersi display virtuali, porte o cartelle: vanno
   provate con 2, 3 e 4 worker insieme.
 - **Account:** ogni orchestratore consuma dall'account che lo ha acceso.
