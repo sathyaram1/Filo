@@ -668,6 +668,8 @@ lavorano in locale.
 13. Posta (`posta`, `invio`), quando l'owner ha creato l'ambiente.
 14. Mittenti normalizzati (§ 10).
 15. Cartella padre per le sessioni cloud (§ 11).
+16. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
+    il salvataggio per cartella.
 
 I punti 1–4 danno già il risultato principale: un posto solo, con le domande
 ordinate per priorità e i blocchi di sicurezza letti sul testo originale.
