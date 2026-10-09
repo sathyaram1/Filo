@@ -257,7 +257,7 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
     if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
       echo "[auto-commit] '$wt' si trova sul ramo principale ('$BRANCH'): NON committo e NON spedisco. Le modifiche sono ancora li'. Spostale in una cartella dedicata: git worktree add .claude/worktrees/<nome> -b claude/<nome>" >&2
     fi
-    continue
+    return 0
   fi
 
   # ─── NEL MEZZO DI UN CONFLITTO NON SI COMMITTA ─────────────────────────────
@@ -279,7 +279,7 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
      || [ -n "$(git ls-files -u 2>/dev/null | head -1)" ]; then
     segnala_avviso "$wt" "un rebase o una fusione e' a meta' (o ci sono file ancora in conflitto): NON committo e NON spedisco, o metterei in commit i segni di conflitto. Finiscilo (risolvi i file, git add, poi git rebase --continue o git commit): al primo salvataggio dopo il ramo parte." \
       "un rebase o una fusione e' a meta' li' (o ci sono file in conflitto): quel salvataggio non e' avvenuto"
-    continue
+    return 0
   fi
 
   # ─── UN COMMIT CHE NON RIESCE NON TACE ─────────────────────────────────────
@@ -293,10 +293,10 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   ESITO_ADD=$(git add -A 2>&1) || {
     segnala_avviso "$wt" "le modifiche NON sono state committate (git add e' fallito): $(motivo_git "$ESITO_ADD"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella: se e' un index.lock a terra e nessun git e' in corso, si toglie; al primo salvataggio dopo si riprova." \
       "il salvataggio li' non e' riuscito (git add): $(motivo_git "$ESITO_ADD")"
-    continue
+    return 0
   }
   if git diff --cached --quiet 2>/dev/null; then
-    continue
+    return 0
   fi
 
   # Commit message: list the changed files (first 3 + count) instead of a bare
@@ -310,7 +310,7 @@ git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}' | while 
   ESITO_COMMIT=$(git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" commit -q -m "auto: $SUMMARY" 2>&1) || {
     segnala_avviso "$wt" "le modifiche NON sono state committate (git commit e' fallito): $(motivo_git "$ESITO_COMMIT"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella, in scena: un pre-commit che rifiuta dice il perche' qui sopra; al primo salvataggio dopo si riprova." \
       "il salvataggio li' non e' riuscito (git commit): $(motivo_git "$ESITO_COMMIT")"
-    continue
+    return 0
   }
 
   # NESSUNA fusione automatica sul ramo principale (cambiato il 2026-08-07).
