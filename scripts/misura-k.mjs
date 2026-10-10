@@ -208,7 +208,8 @@ async function main() {
     mkdirSync(cartella, { recursive: true });
     const cloni = [];
     for (let i = 1; i <= n; i++) {
-      const p = preparaClone(principale, i, { dest: join(cartella, `clone-${i}`), paralleli: n, pushUrl: nudo, strumentiDa: TOOLS_ROOT, basePin: join(dir, 'strumenti') });
+      // Fuori dal registro del principale: i suoi numeri sono dei worker veri, che una misura non deve togliere.
+      const p = preparaClone(principale, i, { dest: join(cartella, `clone-${i}`), paralleli: n, pushUrl: nudo, strumentiDa: TOOLS_ROOT, basePin: join(dir, 'strumenti'), registra: false });
       if (!p.ok) { console.error(`[misura-k] clone ${i} della corsa ${r + 1} non pronto: ${p.why}`); process.exitCode = 1; return; }
       const c = spawnSync('git', ['checkout', '-q', '-B', 'misura-k', ramo], { cwd: p.dir, encoding: 'utf8' });
       if (c.status !== 0) { console.error(`[misura-k] ${ramo} non si apre nel clone: ${String(c.stderr).trim()}`); process.exitCode = 1; return; }
