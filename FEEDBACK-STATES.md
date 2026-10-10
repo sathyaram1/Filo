@@ -270,8 +270,7 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
   'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
   giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
   mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
-  - origine dell'owner, di una sessione o del server (mittente provato, anche un derivato già in
-    coda) → `todo`;
+  - origine fidata (anche un derivato fidato già in coda) → `todo`;
   - origine d'utente non ancora fusa → resta `unlabeled` (`statusReason: attesa_origine`); quando
     l'origine arriva a `done` → `todo`; se si blocca (`attack`, `spam`, `suspicious_file`, i
     confermati, `design` per `secaudit` o `l5`) → `design` (`statusReason: origine_bloccata`,
