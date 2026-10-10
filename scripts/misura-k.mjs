@@ -55,9 +55,33 @@ const INFRASTRUTTURA = [
   ['avvio', /Process failed to launch|0xC0000142/i],
 ];
 
-/** I nomi delle famiglie d'errore d'infrastruttura trovate in un log. PURA. */
+/**
+ * Le righe di un log che non vengono dai rapporti dei test: fuori il TAP di node --test (titoli, uscita dei test come
+ * diagnostica, blocchi YAML) e i titoli di Playwright e dell'elenco dei rossi. Un test verde che si chiama «index.lock
+ * a terra» non è un guasto della macchina; un test che cade per un guasto vero è già un rosso. PURA.
+ */
+export function righeFuoriDaiTest(testo) {
+  const fuori = [];
+  let yaml = null;
+  for (const riga of String(testo || '').split(/\r?\n/)) {
+    if (yaml !== null) {
+      const rientro = riga.match(/^\s*/)[0].length;
+      if (riga.trim() === '...' && rientro === yaml) { yaml = null; continue; }
+      if (!riga.trim() || rientro > yaml) continue;
+      yaml = null;
+    }
+    const apre = riga.match(/^(\s*)---\s*$/);
+    if (apre) { yaml = apre[1].length; continue; }
+    if (/^\s*(#|(not )?ok \d+\b|1\.\.\d+\s*$|TAP version)/.test(riga)) continue;
+    if (/^\s*(ok|x|✓|✘|✖|×|-|°)\s+\d+\s/.test(riga) || /^\s*\d+\)\s/.test(riga) || /[✘✖×]/.test(riga)) continue;
+    fuori.push(riga);
+  }
+  return fuori.join('\n');
+}
+
+/** I nomi delle famiglie d'errore d'infrastruttura trovate in un log, fuori dai rapporti dei test. PURA. */
 export function erroriInfrastruttura(testo) {
-  const t = String(testo || '');
+  const t = righeFuoriDaiTest(testo);
   return INFRASTRUTTURA.filter(([, re]) => re.test(t)).map(([nome]) => nome);
 }
 
