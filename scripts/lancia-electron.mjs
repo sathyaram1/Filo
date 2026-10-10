@@ -20,5 +20,8 @@ const radice = pinnedRepoRoot() || resolve(dirname(fileURLToPath(import.meta.url
 const l = preparaLancioElectron(cmd, args, { worker: datiWorker({ root: radice }) });
 if (!l.ok) { console.error(l.motivo); process.exit(1); }
 if (l.nota) console.error(l.nota);
-const r = spawnSync(l.cmd, l.args, { stdio: 'inherit', env: l.env || process.env, shell: process.platform === 'win32' });
+// Su Windows serve la shell per trovare npx.cmd, e la shell spezza agli spazi: «C:\Program Files\…» va fra virgolette.
+const win = process.platform === 'win32';
+const cita = (s) => (win && /[\s"]/.test(s) ? `"${String(s).replace(/"/g, '\\"')}"` : s);
+const r = spawnSync(cita(l.cmd), l.args.map(cita), { stdio: 'inherit', env: l.env || process.env, shell: win });
 process.exit(r.status === null ? 1 : r.status);
