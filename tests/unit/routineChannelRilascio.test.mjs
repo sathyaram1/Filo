@@ -12,10 +12,10 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
@@ -203,7 +203,7 @@ function scena() {
   return { base, origin, work };
 }
 const remoteSha = (origin, ramo) => (g(origin, ['rev-parse', '--verify', '-q', `refs/heads/${ramo}`]) || '');
-test.after(() => { for (const d of made) { try { rmSync(d, { recursive: true, force: true }); } catch (_) {} } });
+test.after(() => { for (const d of made) { try { togliCartella(d); } catch (_) {} } });
 
 describe('pushRamoCorrente', () => {
   test('un ramo mai spedito arriva su origin; uno riscritto da un rebase pure (--force-with-lease)', () => {

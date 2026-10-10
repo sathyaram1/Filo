@@ -1,9 +1,11 @@
 // Sentinella delle pagine visitate (#866): una pagina che riscrive la propria voce di cronologia (history.replaceState:
 // una mappa spostata, un filtro) resta UNA visita; una pagina nuova dentro la stessa (pushState) è una visita in più.
 
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+
+import { scorri } from '../helpers/orologio.mjs';
 
 const { VisiteSchede } = createRequire(import.meta.url)('../../src/main/tabs/visite.js');
 
@@ -71,9 +73,15 @@ function preparaTitoli(tempi = { assestamento: 30, finestra: 400 }) {
   });
   return { v, scritte, aggiornate };
 }
-const attendi = (ms) => new Promise((r) => setTimeout(r, ms));
+// I tempi dei titoli contano in tick dell'orologio finto: su una macchina carica fra due titoli «a 5 ms» passerebbe
+// l'assestamento intero (#1063).
+async function conOrologioFinto(fn) {
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+  try { await fn(); } finally { mock.timers.reset(); }
+}
+const attendi = (ms) => scorri(ms);
 
-test('un titolo scritto dopo il caricamento diventa quello della visita, una volta sola quando si ferma', async () => {
+test('un titolo scritto dopo il caricamento diventa quello della visita, una volta sola quando si ferma', () => conOrologioFinto(async () => {
   const { v, scritte, aggiornate } = preparaTitoli();
   const wc = schedaFinta();
   wc.push('https://posta.test/');
@@ -83,9 +91,9 @@ test('un titolo scritto dopo il caricamento diventa quello della visita, una vol
   await attendi(80);
   assert.equal(scritte.length, 1);
   assert.deepEqual(aggiornate, [{ visita: 'v1', titolo: 'Posta in arrivo (3)' }]);
-});
+}));
 
-test('il titolo di passaggio dopo un cambio d’indirizzo interno lascia il posto a quello vero', async () => {
+test('il titolo di passaggio dopo un cambio d’indirizzo interno lascia il posto a quello vero', () => conOrologioFinto(async () => {
   const { v, scritte, aggiornate } = preparaTitoli();
   const wc = schedaFinta();
   wc.push('https://video.test/');
@@ -102,9 +110,9 @@ test('il titolo di passaggio dopo un cambio d’indirizzo interno lascia il post
   await attendi(80);
   assert.deepEqual(scritte.map((s) => s.titolo), ['Titolo', 'Caricamento…']);
   assert.deepEqual(aggiornate, [{ visita: 'v2', titolo: 'Orche al tramonto' }]);
-});
+}));
 
-test('il titolo della pagina dopo, scritto un istante prima di cambiare indirizzo, non va alla pagina di prima', async () => {
+test('il titolo della pagina dopo, scritto un istante prima di cambiare indirizzo, non va alla pagina di prima', () => conOrologioFinto(async () => {
   const { v, aggiornate } = preparaTitoli();
   const wc = schedaFinta();
   wc.push('https://video.test/1');
@@ -115,9 +123,9 @@ test('il titolo della pagina dopo, scritto un istante prima di cambiare indirizz
   v.navigata(wc, 1, 'https://video.test/2', { inPagina: true });
   await attendi(80);
   assert.deepEqual(aggiornate, []);
-});
+}));
 
-test('un titolo che cambia di continuo non riempie il filo: dopo la finestra vale quello fermo all’uscita', async () => {
+test('un titolo che cambia di continuo non riempie il filo: dopo la finestra vale quello fermo all’uscita', () => conOrologioFinto(async () => {
   const { v, aggiornate } = preparaTitoli({ assestamento: 30, finestra: 60 });
   const wc = schedaFinta();
   wc.push('https://borsa.test/');
@@ -131,4 +139,4 @@ test('un titolo che cambia di continuo non riempie il filo: dopo la finestra val
   assert.deepEqual(aggiornate.map((a) => a.titolo), []);
   await attendi(5);
   assert.deepEqual(aggiornate.map((a) => a.titolo), ['Indice 39']);
-});
+}));

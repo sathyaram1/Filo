@@ -5,9 +5,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { rmSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const { dirtyTreeLines, dirtyTreeText } = await import('../../scripts/dispatch.mjs');
 const { gitStatusPorcelain, statoDirectory: statoDirectorySync } = await import('../../scripts/lib/dirty-tree.mjs');
@@ -29,7 +29,7 @@ test('gitStatusPorcelain: un nome con lettere accentate arriva com\'è, non in s
     const righe = dirtyTreeLines(gitStatusPorcelain(dir));
     assert.deepEqual(righe, ['con spazio è.spec.mjs']);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -138,7 +138,7 @@ test('CLI routine-channel deliver: revisione, correzione, critica e verdetto di 
     assert.equal(pulito.status, 3, `a commit fatto deve arrivare al server (che qui è giù): ${pulito.stderr}`);
     assert.doesNotMatch(String(pulito.stderr), /non registrata/);
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
+    togliCartella(sandbox);
   }
 });
 
@@ -178,7 +178,7 @@ test('CLI --record-fixed: con modifiche non salvate respinge PRIMA del server, c
     assert.equal(pulito.status, 3, `a commit fatto deve arrivare al server (che qui è giù): ${pulito.stderr}`);
     assert.doesNotMatch(String(pulito.stderr), /consegna non registrata: ci sono modifiche/);
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
+    togliCartella(sandbox);
   }
 });
 
@@ -201,7 +201,7 @@ test('statoDirectory: fuori da un deposito dice che non lo sa, non che è pulito
       assert.match(t, /non tratto il silenzio come/i, `porta ${cosa}: dice perché si ferma`);
     }
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -215,6 +215,6 @@ test('statoDirectory: dentro un deposito elenca i file fuori dai commit, coi nom
     assert.equal(s.ok, true);
     assert.deepEqual(s.lines, ['con spazio è.spec.mjs']);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
