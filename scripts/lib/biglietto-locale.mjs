@@ -73,6 +73,34 @@ export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) 
   return out;
 }
 
+// I marcatori dei turni della conversazione (gemelli di USER_TURN_RE e MODEL_TURN_RE in src/shared/feedbackThread.js).
+const TURNO_OWNER_RE = /^---s*(?:Riaperto il|La tua risposta del)s*.*?s*---s*$/;
+const TURNO_ALTRI_RE = /^---s*(?:Aggiornamento dell'agente del|Filo ha risposto il)s*.*?s*---s*$/;
+
+/**
+ * La conversazione contiene testo scritto da altri che dall'owner (routine, sessioni, Filo)? PURA. Il server sa se
+ * l'ha scritto un biglietto sporco (\), da qui no: nel dubbio, chi la stampa si sporca.
+ */
+export function noteConScrittiDiAltri(notes) {
+  let altri = true;
+  for (const riga of String(notes || '').split(/?
+/)) {
+    if (TURNO_OWNER_RE.test(riga)) { altri = false; continue; }
+    if (TURNO_ALTRI_RE.test(riga)) { altri = true; continue; }
+    if (riga.startsWith('@@filo-attachment ')) continue;
+    if (altri && riga.trim()) return true;
+  }
+  return false;
+}
+
+/** Perché chi stampa questo feedback si sporca (§1.2): testo non fidato, o una conversazione scritta anche da altri. PURA. */
+export function motiviDiLettura({ fiducia, notes } = {}) {
+  const out = [];
+  if (fiducia !== 'fidato') out.push('testo di un feedback non fidato');
+  if (noteConScrittiDiAltri(notes)) out.push('conversazione con scritti di routine o sessioni');
+  return out;
+}
+
 /** Il motivo di un rifiuto della callable, per l'owner. PURA. */
 export function messaggioErrore(status, body) {
   const err = (body && body.error) || {};
