@@ -225,10 +225,9 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   nei Lavori locali. Solo da lì (#957): nessuno strumento delle sessioni lo scrive, perché
   hanno le credenziali dell'owner e un testo d'utente potrebbe convincerle a darselo. Le regole non distinguono la
   pagina da uno script con lo stesso token: il limite sta negli strumenti (sentinella in
-  `tests/unit/lavoroLocaleApprovato.test.mjs`). Vale quanto la prova del
-  mittente (`isProvenLocalWork` nell'app, `localMergeEligibility` sul server), quindi la
-  sessione lo lega a `start`/`finish --feedback` e alla fusione L5 registra senza
-  fermare. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
+  `tests/unit/lavoroLocaleApprovato.test.mjs`). Lo stesso clic segna anche fidato il
+  feedback (#1148, callable `ownerFiducia`): è la fiducia, non il segno, a far registrare L5
+  senza fermare (§4b); la sessione lo lega a `start`/`finish --feedback`. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
   un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
   segnalato l'hover lo dice e serve guardarlo prima.
   Togliere il segno locale lascia l'approvazione, così il segno si rimette con un clic

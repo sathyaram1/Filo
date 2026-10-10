@@ -61,9 +61,12 @@ test('risolviFeedback: numero che non esiste, id che non esiste, rete che rispon
 });
 
 test('avvisoDaCampi: dice cosa manca perché L5 si salti, e tace se non manca niente', () => {
-  const pieno = { senderProof: { stringValue: 'admin' }, localOnly: { mapValue: { fields: {} } }, statusPublic: { stringValue: 'open' } };
+  const pieno = { fiducia: { stringValue: 'fidato' }, localOnly: { mapValue: { fields: {} } }, statusPublic: { stringValue: 'open' } };
   assert.equal(avvisoDaCampi(pieno), '');
-  assert.match(avvisoDaCampi({ ...pieno, senderProof: undefined }), /prova del mittente/);
+  // #1148: conta la fiducia, non la prova del mittente; assente o ignota vale non fidato.
+  for (const fiducia of [undefined, { stringValue: 'non_fidato' }, { stringValue: 'FIDATO' }]) {
+    assert.match(avvisoDaCampi({ ...pieno, fiducia, senderProof: { stringValue: 'admin' } }), /manca la fiducia .*Segna fidato/);
+  }
   assert.match(avvisoDaCampi({ ...pieno, localOnly: undefined }), /solo in locale/);
   assert.match(avvisoDaCampi({ ...pieno, statusPublic: { stringValue: 'closed' } }), /chiusa/);
   // Chiusa dalla parte del server dello stesso lavoro da poco: per l'app vale ancora, e si dice fino a quando (#915).
