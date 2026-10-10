@@ -78,6 +78,31 @@ function collega(verso, link) {
   symlinkSync(verso, link, process.platform === 'win32' ? 'junction' : 'dir');
 }
 
+// node_modules del clone è una cartella vera con un collegamento per ogni pacchetto del principale, non un collegamento
+// solo: `npm ci` svuota la cartella entrando nel collegamento, e così toglie i collegamenti invece dei pacchetti di tutti.
+export const MARCA_COLLEGATI = '.filo-collegati';
+const collegatiVoceAVoce = (nm) => existsSync(resolve(nm, MARCA_COLLEGATI));
+
+function collegaVoci(verso, nm) {
+  mkdirSync(nm, { recursive: true });
+  for (const voce of readdirSync(verso, { withFileTypes: true })) {
+    const da = resolve(verso, voce.name);
+    let cartella = voce.isDirectory();
+    if (voce.isSymbolicLink()) { try { cartella = statSync(da).isDirectory(); } catch (_) { continue; } }
+    if (cartella) collega(da, resolve(nm, voce.name)); // i file (.package-lock.json) npm li ricostruisce da sé
+  }
+  writeFileSync(resolve(nm, MARCA_COLLEGATI), `${verso}\n`, 'utf8');
+}
+
+/** Toglie i collegamenti del node_modules di un clone, uno per uno; anche quello intero dei clone nati prima. */
+export function scollegaPacchetti(nm) {
+  if (scollega(nm) || !existsSync(nm)) return;
+  for (const nome of readdirSync(nm)) scollega(resolve(nm, nome));
+  rmSync(resolve(nm, MARCA_COLLEGATI), { force: true });
+}
+
+const restaUnCollegamento = (nm) => eLink(nm) || (existsSync(nm) && readdirSync(nm).some((n) => eLink(resolve(nm, n))));
+
 function npmCiDavvero(cartella) {
   const env = { ...process.env, ELECTRON_SKIP_BINARY_DOWNLOAD: '1' };
   const ci = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: cartella, env, stdio: 'inherit', shell: process.platform === 'win32' });
