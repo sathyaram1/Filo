@@ -489,8 +489,16 @@ function existenceProbes({ shell, cmd }) {
   ];
 }
 
+// Timeout difensivo: un resolver che si impalla non deve restare appeso.
+// Largo di proposito (10s): qui un falso negativo è il danno vero — un
+// comando valido colorato di rosso — mentre una risposta lenta è solo
+// lenta. Sotto carico (antivirus su node_modules fresco, suite di test in
+// parallelo) anche `where.exe` può metterci secondi; le prove passano la
+// loro attesa, perché con la macchina carica dieci secondi non bastano (#1063).
+const ATTESA_PROBE_MS = 10000;
+
 // Esegue UN probe e risolve true se il processo esce con codice 0.
-function runProbe({ file, args, env: probeEnv }, cwd) {
+function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS) {
   return new Promise((resolve) => {
     let done = false;
     let proc;
