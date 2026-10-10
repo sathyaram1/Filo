@@ -678,7 +678,7 @@ export function testaNotifica(e) {
   return s.split(/<summary>|<result>/)[0];
 }
 
-export function finestraOrchestratore(linee) {
+function finestraDalleVoci(linee) {
   const voci = [];
   for (const l of linee) {
     let e;
