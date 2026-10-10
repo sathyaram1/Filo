@@ -3,11 +3,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import vm from 'node:vm';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const build = await import(pathToFileURL(join(ROOT, 'scripts', 'build-approvazioni.mjs')).href);
@@ -42,7 +42,7 @@ test('il predeploy rifiuta una copia vecchia, e la ricopia la rimette in pari', 
     writeFileSync(join(radice, build.COPIE[0][0]), '/* cambiata */\n');
     assert.equal(build.main(['--controlla'], { log: () => {}, err: () => {}, radice }), 3);
   } finally {
-    rmSync(radice, { recursive: true, force: true });
+    togliCartella(radice);
   }
 });
 

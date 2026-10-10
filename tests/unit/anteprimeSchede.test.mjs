@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -58,11 +59,8 @@ function manager(tabs, activeId) {
   return m;
 }
 
-const aspetta = (cond, ms = 3000) => new Promise((ok, ko) => {
-  const fine = Date.now() + ms;
-  const giro = () => (cond() ? ok() : Date.now() > fine ? ko(new Error('scaduto')) : setTimeout(giro, 20));
-  giro();
-});
+// Si aspetta il fatto, non un tempo: a macchina carica i giri dei timer arrivano quando arrivano (#1063).
+const aspetta = (cond) => aspettaChe(cond, { ogniMs: 20, cosa: 'l’anteprima attesa non è arrivata' });
 
 test('la scheda che va dietro lascia la sua foto, e chi la riceve la sa', async () => {
   const a = scheda('a');
@@ -177,7 +175,7 @@ test('una scheda di dietro che non si riesce a fotografare, finiti i tentativi, 
   m.anteprime = new AnteprimeSchede(m, { ritenta: 20, tettoDisegno: 50 });
   m.anteprime.nataDietro(dietro);
   m.anteprime.caricata(dietro);
-  await aspetta(() => !m.anteprime.tieneSveglia(dietro), 5000);
+  await aspetta(() => !m.anteprime.tieneSveglia(dietro));
   assert.equal(m.anteprime.get('b'), null);
   // Una finestra coperta da un'altra smette di disegnare senza dirlo: il fuoco la rimette in coda.
   dietro.view.webContents.capturePage = async () => immagine(false);
