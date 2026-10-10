@@ -184,7 +184,9 @@ Le forme che cadevano, e cosa le ha sostituite:
 - **Il tetto del lanciatore** (20 minuti in cui niente va avanti, non la durata del file: un
   file sano sotto carico è lento ma avanza): una prova sola che ci si avvicina si divide, e una
   scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
-  (`tests/helpers/scenaHook.mjs`).
+  (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
+  risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
+  lanciatore, e la riprova dei rossi pure (`--solo`).
 
 ## Il verso opposto (#937)
 
