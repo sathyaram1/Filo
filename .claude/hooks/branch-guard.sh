@@ -90,8 +90,7 @@ del_progetto() {
   norm_path "$PROJECT_DIR"; [ "$c" = "$REPLY" ] && return 0
   [ -n "$COMUNE_PROGETTO" ] || { comune_di "$PROJECT_DIR"; norm_path "$REPLY"; COMUNE_PROGETTO=${REPLY:--}; }
   comune_di "$1"
-  [ -n "$REPLY" ] || return 1
-  norm_path "$REPLY"; [ "$REPLY" = "$COMUNE_PROGETTO" ] && return 0
+  if [ -n "$REPLY" ]; then norm_path "$REPLY"; [ "$REPLY" = "$COMUNE_PROGETTO" ] && return 0; fi
   [ -n "$ORIGIN_PROGETTO" ] || { origin_di "$PROJECT_DIR"; ORIGIN_PROGETTO=${REPLY:--}; }
   origin_di "$1"
   [ -n "$REPLY" ] && [ "$REPLY" = "$ORIGIN_PROGETTO" ]
