@@ -535,7 +535,6 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
 import { execFileSync as _exec } from 'node:child_process';
 import { writeFileSync as _write } from 'node:fs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 const _ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 function depositoUsaEGetta() {
