@@ -1615,3 +1615,124 @@ test('segno: il motivo si traduce se è un codice, passa com’è se è un testo
   assert.equal(MR.motivoSegnoText(''), '');
   assert.equal(MR.motivoSegnoText(null), '');
 });
+
+// ── Sezioni di Gestione e filtro dei Ricevuti per livello (#1150) ─────────
+
+const RICEVUTI_PER_LIVELLO = [
+  { _id: 'a1', status: 'suspicious_file', livello: 'l1' },
+  { _id: 'a2', status: 'attack', pipeline: { action: 'block_attack' }, livello: 'l1' },
+  { _id: 'b1', status: 'unlabeled', livello: 'l2' },
+  { _id: 'b2', status: 'aligned', livello: 'l2' },
+  { _id: 'b3', status: 'spam', pipeline: { verdicts: [] }, livello: 'l2' },
+  { _id: 'c1', status: 'design', statusReason: 'clarify', livello: 'l3' },
+  { _id: 'c2', status: 'design', statusReason: 'decisione', livello: 'l3' },
+  { _id: 'c3', status: 'design', statusReason: 'locale', livello: 'l3' },
+  { _id: 'd1', status: 'design', statusReason: 'secaudit', livello: 'l4' },
+  { _id: 'e1', status: 'design', statusReason: 'l5', livello: 'l5' },
+];
+const FUORI_DAI_RICEVUTI = [{ _id: 'q1', status: 'todo' }, { _id: 'z1', status: 'archived' }];
+const soloId = (l) => l.map((f) => f._id).sort();
+
+test('livelloRicevuti: ogni stato dei Ricevuti ha il livello del suo segno, fuori dai Ricevuti nessuno', () => {
+  for (const fb of RICEVUTI_PER_LIVELLO) {
+    assert.equal(MR.livelloRicevuti(fb), fb.livello, `${fb._id} (${fb.status}/${fb.statusReason || ''})`);
+  }
+  for (const fb of FUORI_DAI_RICEVUTI) assert.equal(MR.livelloRicevuti(fb), null);
+});
+
+test('filtro dei Ricevuti: spento = tutto, un livello = solo quello, più livelli = unione', () => {
+  const tutti = RICEVUTI_PER_LIVELLO.concat(FUORI_DAI_RICEVUTI);
+  const lista = (livelli) => soloId(MR.listForManageTab(tutti, 'inbox', { livelli }));
+  assert.deepEqual(lista([]), soloId(RICEVUTI_PER_LIVELLO));
+  assert.deepEqual(lista(undefined), soloId(RICEVUTI_PER_LIVELLO));
+  assert.deepEqual(lista(['l1']), ['a1', 'a2']);
+  assert.deepEqual(lista(['l4']), ['d1']);
+  assert.deepEqual(lista(['l1', 'l5']), ['a1', 'a2', 'e1']);
+  assert.deepEqual(lista(['l3', 'l2']), ['b1', 'b2', 'b3', 'c1', 'c2', 'c3']);
+  // Un livello che non esiste vale come filtro spento, non nasconde tutto.
+  assert.deepEqual(lista(['l9']), soloId(RICEVUTI_PER_LIVELLO));
+  // Le altre schede non conoscono il filtro.
+  assert.deepEqual(soloId(MR.listForManageTab(tutti, 'queue', { livelli: ['l1'] })), ['q1']);
+});
+
+test('filtro dei Ricevuti: una pratica senza livello si vede solo a filtro spento', () => {
+  // Stato cifrato: nessun segno, quindi nessun livello.
+  const senza = { _id: 'y1', status: 'FENC1:abc' };
+  assert.equal(MR.livelloRicevuti(senza), null);
+  assert.equal(MR.filtraLivelli([senza], []).length, 1);
+  for (const l of MR.LIVELLI_RICEVUTI) assert.equal(MR.filtraLivelli([senza], [l]).length, 0, l);
+});
+
+test('conteggi per livello: lunghezza della lista filtrata, e la scheda Ricevuti segue il filtro', () => {
+  const tutti = RICEVUTI_PER_LIVELLO.concat(FUORI_DAI_RICEVUTI);
+  const n = MR.contaLivelliRicevuti(tutti, {});
+  assert.deepEqual(n, { l1: 2, l2: 3, l3: 3, l4: 1, l5: 1, senza: 0 });
+  for (const l of MR.LIVELLI_RICEVUTI) {
+    assert.equal(n[l], MR.listForManageTab(tutti, 'inbox', { livelli: [l] }).length, l);
+    assert.equal(MR.manageTabCounts(tutti, { livelli: [l] }).inbox, n[l], `scheda con ${l}`);
+  }
+  assert.equal(MR.manageTabCounts(tutti, {}).inbox, RICEVUTI_PER_LIVELLO.length);
+  assert.equal(MR.manageTabCounts(tutti, { livelli: ['l1', 'l4'] }).inbox, 3);
+  // Il filtro dei Ricevuti non tocca i numeri delle altre schede.
+  assert.equal(MR.manageTabCounts(tutti, { livelli: ['l1'] }).queue, 1);
+});
+
+test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta fuori', () => {
+  const attese = {
+    domande: 'domande', 'domande-lavoro': 'domande', 'domande-archivio': 'domande',
+    inbox: 'feedback', queue: 'feedback', local: 'feedback', resolved: 'feedback', archived: 'feedback',
+    fbstats: 'feedback', stats: 'feedback',
+    automation: 'routine', log: 'routine',
+    models: 'impostazioni',
+  };
+  for (const [tab, sez] of Object.entries(attese)) assert.equal(MR.sezioneDiScheda(tab), sez, tab);
+  const tutte = MR.SEZIONI.flatMap((s) => s.schede);
+  assert.deepEqual(tutte.slice().sort(), Object.keys(attese).sort());
+  assert.equal(new Set(tutte).size, tutte.length);
+  assert.equal(MR.sezioneDiScheda('nessuna'), null);
+  assert.equal(MR.schedaPredefinita('feedback'), 'inbox');
+  assert.equal(MR.schedaPredefinita('routine'), 'automation');
+});
+
+test('scelta ricordata: torna intera o non torna', () => {
+  const buona = { sezione: 'routine', schede: { routine: 'log', feedback: 'queue' } };
+  assert.deepEqual(MR.leggiSceltaSezione(buona), buona);
+  assert.deepEqual(MR.leggiSceltaSezione(JSON.stringify(buona)), buona);
+  assert.equal(MR.leggiSceltaSezione('{rotto'), null);
+  assert.equal(MR.leggiSceltaSezione(null), null);
+  assert.equal(MR.leggiSceltaSezione({ sezione: 'routine' }), null);
+  // La sezione ricordata senza la sua scheda, o una scheda nella sezione sbagliata: niente.
+  assert.equal(MR.leggiSceltaSezione({ sezione: 'routine', schede: { feedback: 'queue' } }), null);
+  assert.equal(MR.leggiSceltaSezione({ sezione: 'routine', schede: { routine: 'log', feedback: 'models' } }), null);
+  assert.equal(MR.leggiSceltaSezione({ sezione: 'statistiche', schede: { statistiche: 'x' } }), null);
+});
+
+test('apertura: bloccante aperta > Ricevuti non vuoto > ultima sezione > Feedback/Ricevuti', () => {
+  const bloccante = { id: 'D-1', stato: 'aperta', priorita: 'bloccante' };
+  const ultima = { sezione: 'routine', schede: { routine: 'log' } };
+  const ap = (o) => { const r = MR.sezioneDiApertura(o); return `${r.sezione}/${r.scheda}/${r.motivo}`; };
+  assert.equal(ap({ domande: [bloccante], ricevuti: 4, ultima }), 'domande/domande/bloccante');
+  assert.equal(ap({ domande: [], ricevuti: 4, ultima }), 'feedback/inbox/ricevuti');
+  assert.equal(ap({ domande: [], ricevuti: 0, ultima }), 'routine/log/ultima');
+  assert.equal(ap({ domande: null, ricevuti: null, ultima }), 'routine/log/ultima');
+  assert.equal(ap({ domande: null, ricevuti: 0, ultima: null }), 'feedback/inbox/predefinita');
+  assert.equal(ap({ ultima: 'rotto' }), 'feedback/inbox/predefinita');
+  assert.equal(ap(undefined), 'feedback/inbox/predefinita');
+  // Solo una bloccante APERTA: chiusa, in lavorazione o importante non aprono Domande.
+  for (const d of [
+    { stato: 'chiusa', priorita: 'bloccante' }, { stato: 'in_lavorazione', priorita: 'bloccante' },
+    { stato: 'aperta', priorita: 'importante' },
+  ]) assert.equal(ap({ domande: [d], ricevuti: 0, ultima: null }), 'feedback/inbox/predefinita', JSON.stringify(d));
+});
+
+test('domande: la scheda di ogni stato e i conteggi delle tre schede', () => {
+  assert.equal(MR.schedaDomanda({ stato: 'aperta' }), 'domande');
+  assert.equal(MR.schedaDomanda({ stato: 'in_lavorazione' }), 'domande-lavoro');
+  assert.equal(MR.schedaDomanda({ stato: 'chiusa' }), 'domande-archivio');
+  assert.equal(MR.schedaDomanda({ stato: 'superata' }), 'domande-archivio');
+  assert.equal(MR.schedaDomanda({ stato: 'boh' }), null);
+  assert.deepEqual(MR.contaDomande([
+    { stato: 'aperta' }, { stato: 'aperta' }, { stato: 'in_lavorazione' }, { stato: 'superata' }, { stato: 'boh' },
+  ]), { domande: 2, 'domande-lavoro': 1, 'domande-archivio': 1 });
+  assert.deepEqual(MR.contaDomande(null), { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 });
+});

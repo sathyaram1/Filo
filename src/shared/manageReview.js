@@ -971,7 +971,7 @@
   // `opts.releasedVersion` (DB3) è passato a manageTabFor per il gate "Risolti".
   function listForManageTab(feedbacks, tab, opts) {
     const items = (feedbacks || []).filter((f) => manageTabFor(f, opts) === tab);
-    if (tab === 'inbox') return sortReview(items);
+    if (tab === 'inbox') return sortReview(filtraLivelli(items, opts && opts.livelli, opts));
     // In coda: priorità DESC come criterio primario tra i non-in-lavorazione.
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
@@ -1035,14 +1035,17 @@
   // In coda / Risolti l'ordinamento non cambia la lunghezza, quindi basta
   // l'appartenenza (manageTabFor, lo stesso filtro di listForManageTab);
   // Archiviati passa da listArchiveTab perché ha regole e filtri suoi.
-  // `opts`: { releasedVersion, starredOnly, confirmedOnly }. PURA.
+  // `opts`: { releasedVersion, starredOnly, confirmedOnly, livelli }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
     const counts = { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 };
+    const inbox = [];
     for (const f of list) {
       const tab = manageTabFor(f, opts);
-      if (tab === 'inbox' || tab === 'queue' || tab === 'local' || tab === 'resolved') counts[tab]++;
+      if (tab === 'inbox') inbox.push(f);
+      else if (tab === 'queue' || tab === 'local' || tab === 'resolved') counts[tab]++;
     }
+    counts.inbox = filtraLivelli(inbox, opts && opts.livelli, opts).length;
     counts.archived = listArchiveTab(list, opts).length;
     return counts;
   }

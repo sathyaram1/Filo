@@ -225,6 +225,21 @@
   const MR  = window.SN_MANAGE_REVIEW;
   const TH  = window.SN_FEEDBACK_THREAD;
   const SRCH = window.SN_MANAGE_SEARCH;
+  const DOMANDE = window.SN_MG_DOMANDE;
+
+  // ── Sezioni (SPEC-DOMANDE §2.1) ───────────────────────────────────────────
+  const mgSezioni = document.getElementById('mgSezioni');
+  const mgLivelliFiltro = document.getElementById('mgLivelliFiltro');
+  const SEZIONE_KEY = 'filo_manage_sezione';
+  let sezioneAttiva = 'feedback';
+  const schedaPerSezione = {};
+  for (const s of MR.SEZIONI) schedaPerSezione[s.id] = s.schede[0];
+  // Dopo un clic dell'utente la sezione d'apertura non scatta più: niente cambi di sezione sotto la mano.
+  let utenteHaScelto = false;
+  let aperturaFatta = false;
+  // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
+  let livelliScelti = [];
+  const DOMANDE_TABS = (MR.SEZIONI.find((s) => s.id === 'domande') || { schede: [] }).schede;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
   const SORT_MODE_KEY = 'filo_manage_sort';
   const AUTOMATION_GET = (window.SN_MSG?.MSG?.AUTOMATION_GET) || 'automation_get';
@@ -1627,14 +1642,23 @@
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
   // sinistra. Le altre (fbstats/stats/models/automation/log) hanno il loro
   // pannello, `panel-<nome>`.
-  function selectTab(tab) {
+  // `opts.apertura`: la scelta automatica d'apertura, che non conta come scelta dell'utente e non si ricorda.
+  function selectTab(tab, opts) {
+    const sezione = MR.sezioneDiScheda(tab);
+    if (!sezione) return;
+    const apertura = !!(opts && opts.apertura);
+    if (!apertura) utenteHaScelto = true;
+    sezioneAttiva = sezione;
+    schedaPerSezione[sezione] = tab;
+    if (!apertura) salvaSezione();
     // Cambiando scheda la ricerca si chiude da sola: vedi la scheda scelta.
     if (searchMode) closeSearch({ keepList: true });
     document.querySelectorAll('.mg-tab').forEach((t) => {
       t.classList.toggle('mg-tab--active', t.dataset.tab === tab);
     });
+    aggiornaSezioniAttive();
     const isList = LIST_TABS.includes(tab);
-    const panelId = isList ? 'panel-list' : `panel-${tab}`;
+    const panelId = isList ? 'panel-list' : (DOMANDE_TABS.includes(tab) ? 'panel-domande' : `panel-${tab}`);
     document.querySelectorAll('.mg-panel').forEach((p) => {
       p.classList.toggle('mg-panel--active', p.id === panelId);
     });

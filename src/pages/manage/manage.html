@@ -62,7 +62,7 @@
        del riquadro delle fusioni non morde. Perché: patterns/unarea-che-si-prende-quello-che-avanza-pretende-un-tetto.md */
     .sn-page:has(> #panel-list.mg-panel--active) { height: 100vh; }
     /* Testata: altezza sua, non si lascia stringere dalla pressione qui sopra. */
-    .mg-banner, .mg-tabs, .mg-no-sections, .mg-searchbar { flex: 0 0 auto; }
+    .mg-banner, .mg-sezioni, .mg-tabs, .mg-no-sections, .mg-searchbar { flex: 0 0 auto; }
 
     /* `.sn-page label` (pages.css) impone `display: block` a OGNI label di una pagina filo:// e con specificità 0-1-1
        batteva `.mg-switch`: della levetta restava la sola pallina. Vincere senza toccare pages.css costa questo selettore. */
@@ -153,6 +153,72 @@
     .mg-auto-warn {
       margin: 12px 0 0; font-size: 12px; font-weight: 600; color: #c0392b;
     }
+
+    /* Prima fila: le sezioni. Più grandi delle schede sotto, perché sono il primo livello della scelta. */
+    .mg-sezioni {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+      margin: 0 0 var(--mg-sezioni-gap, 6px);
+    }
+    .mg-sezione {
+      all: unset; cursor: pointer;
+      padding: 6px 12px; border-radius: var(--mg-sezione-radius, 8px);
+      font-size: var(--mg-sezione-size, 14px); font-weight: 600; color: var(--sn-muted);
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s;
+    }
+    .mg-sezione:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-sezione:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+    .mg-sezione--active { color: var(--sn-fg); background: var(--mg-sezione-bg, var(--sn-hover)); }
+    .mg-sezione-count { margin-left: 5px; font-weight: 400; font-variant-numeric: tabular-nums; opacity: 0.8; }
+    .mg-sezione-count:empty { display: none; }
+    /* Una domanda bloccante: il numero si fa notare anche da un'altra sezione. */
+    .mg-sezione--urgente .mg-sezione-count { color: var(--mg-urgente-color, #c0392b); font-weight: 600; opacity: 1; }
+    .mg-sezione--arrivi::after {
+      content: ''; display: inline-block; vertical-align: super;
+      width: 5px; height: 5px; margin-left: 3px; border-radius: 50%;
+      background: var(--mg-arrivo-color, var(--sn-accent));
+    }
+
+    /* I cinque livelli dei Ricevuti: pasticche piccole, la forma è quella del segno in lista. */
+    .mg-livelli-filtro {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      padding: 6px 12px; border-bottom: 1px solid var(--sn-border);
+      flex: 0 0 auto;
+    }
+    .mg-livelli-filtro[hidden] { display: none; }
+    .mg-livello-btn {
+      all: unset; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border: 1px solid var(--sn-border); border-radius: 999px;
+      font-size: 12px; color: var(--sn-muted); white-space: nowrap; font-variant-numeric: tabular-nums;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+    }
+    .mg-livello-btn:hover { background: var(--sn-hover); color: var(--sn-fg); }
+    .mg-livello-btn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    .mg-livello-btn[aria-pressed="true"] {
+      color: var(--sn-fg); border-color: var(--sn-accent);
+      background: color-mix(in srgb, var(--sn-accent) 14%, transparent);
+    }
+    .mg-livello-btn svg { width: 10px; height: 10px; display: block; overflow: visible; }
+    .mg-livello-btn svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+    .mg-livello-count { opacity: 0.8; }
+    .mg-livello-count:empty { display: none; }
+
+    /* Domande, fase uno: un elenco semplice finché non arriva la vista vera della domanda. */
+    .mg-domande-stato { margin: 6px 0 12px; font-size: 13px; color: var(--sn-muted); }
+    .mg-domande-stato[hidden], #mgDomandeRiprova[hidden], .mg-domande-lista[hidden] { display: none; }
+    .mg-domande-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+    .mg-domanda {
+      display: flex; align-items: baseline; gap: 10px;
+      padding: 8px 10px; border-radius: 6px; font-size: 13px;
+      transition: background 0.1s;
+    }
+    .mg-domanda:hover { background: var(--sn-hover); }
+    .mg-domanda-num, .mg-domanda-data { color: var(--sn-muted); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+    .mg-domanda-titolo { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+    .mg-domanda-prio { flex: 0 0 auto; font-size: 11.5px; color: var(--sn-muted); }
+    .mg-domanda[data-priorita="bloccante"] .mg-domanda-prio { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
+    .mg-domanda-data { font-size: 11.5px; }
 
     .mg-tabs {
       display: flex;
@@ -1302,7 +1368,21 @@
       <button type="button" class="sn-btn" id="mgSignIn">Accedi</button>
     </div>
 
+    <!-- Sezioni (SPEC-DOMANDE §2.1): la tabella sezione → schede sta in manageReview.js (SEZIONI). -->
+    <nav class="mg-sezioni" id="mgSezioni" role="tablist" aria-label="Sezioni di Gestione">
+      <button type="button" class="mg-sezione" data-sezione="domande" role="tab">Domande<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione mg-sezione--active" data-sezione="feedback" role="tab">Feedback<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione" data-sezione="routine" role="tab">Routine<span class="mg-sezione-count"></span></button>
+      <button type="button" class="mg-sezione" data-sezione="impostazioni" role="tab">Impostazioni predefinite<span class="mg-sezione-count"></span></button>
+      <!-- Lente di ricerca "a senso": cerca un feedback per SIGNIFICATO fra TUTTE le schede. -->
+      <button type="button" class="mg-search-toggle" id="mgSearchToggle"
+        title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
+    </nav>
+
     <nav class="mg-tabs" id="mgTabs" role="tablist">
+      <button type="button" class="mg-tab" data-tab="domande" role="tab" hidden>Da rispondere</button>
+      <button type="button" class="mg-tab" data-tab="domande-lavoro" role="tab" hidden>In lavorazione</button>
+      <button type="button" class="mg-tab" data-tab="domande-archivio" role="tab" hidden>Archivio</button>
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
       <button type="button" class="mg-tab" data-tab="local" role="tab">Lavori locali</button>
@@ -1310,12 +1390,9 @@
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
       <button type="button" class="mg-tab" data-tab="stats" role="tab">Red Team</button>
-      <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
-      <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
-      <button type="button" class="mg-tab" data-tab="log" role="tab">Log</button>
-      <!-- Lente di ricerca "a senso": cerca un feedback per SIGNIFICATO fra TUTTE le schede. -->
-      <button type="button" class="mg-search-toggle" id="mgSearchToggle"
-        title="Cerca un feedback a senso" aria-label="Cerca un feedback" aria-expanded="false"></button>
+      <button type="button" class="mg-tab" data-tab="automation" role="tab" hidden>Automazioni</button>
+      <button type="button" class="mg-tab" data-tab="log" role="tab" hidden>Log</button>
+      <button type="button" class="mg-tab" data-tab="models" role="tab" hidden>Modelli di supporto</button>
     </nav>
 
     <!-- Lo stato viaggia cifrato: senza la chiave dell'owner non si legge, e allora le quattro sezioni non si
@@ -1345,6 +1422,14 @@
             <div id="mgListHead">Ricevuti</div>
             <button type="button" class="mg-sort-btn" id="mgSortBtn"
               title="Riordina i feedback — clic o tasto destro" aria-label="Riordina i feedback">⇅</button>
+          </div>
+          <!-- Ricevuti per livello (SPEC-DOMANDE §2.2): nessuno acceso = tutto, più accesi = unione. Non si ricorda. -->
+          <div class="mg-livelli-filtro" id="mgLivelliFiltro" role="group" aria-label="Filtra i Ricevuti per livello" hidden>
+            <button type="button" class="mg-livello-btn" data-livello="l1" aria-pressed="false" title="Fermi al filtro d’ingresso">L1<span class="mg-livello-count"></span></button>
+            <button type="button" class="mg-livello-btn" data-livello="l2" aria-pressed="false" title="Fermi ai giudici">L2<span class="mg-livello-count"></span></button>
+            <button type="button" class="mg-livello-btn" data-livello="l3" aria-pressed="false" title="Aspettano una tua decisione">L3<span class="mg-livello-count"></span></button>
+            <button type="button" class="mg-livello-btn" data-livello="l4" aria-pressed="false" title="Bloccati dalla verifica di sicurezza">L4<span class="mg-livello-count"></span></button>
+            <button type="button" class="mg-livello-btn" data-livello="l5" aria-pressed="false" title="Fermi al cancello di fusione">L5<span class="mg-livello-count"></span></button>
           </div>
           <!-- Filtro ⭐ della tab Archiviati (DB2): OFF = solo gli archiviati,
                ON = tutti i preferiti di qualunque stato. Nascosto sulle altre tab. -->
@@ -1511,6 +1596,13 @@
 
     <!-- Due sorgenti, due date: i feedback (data d'invio) e il registro dei worker (data di lavorazione).
          Finestra e creatore valgono su tutta la scheda; i conti li fa src/shared/feedbackStats.js. -->
+    <!-- Le tre schede di Domande condividono questo pannello; lo disegna manageDomande.js. -->
+    <section class="mg-panel" id="panel-domande" data-panel="domande">
+      <p class="mg-domande-stato" id="mgDomandeStato" role="status">Caricamento…</p>
+      <button type="button" class="sn-btn sn-btn-secondary" id="mgDomandeRiprova" hidden>Riprova</button>
+      <ol class="mg-domande-lista" id="mgDomandeLista" hidden></ol>
+    </section>
+
     <section class="mg-panel" id="panel-fbstats" data-panel="fbstats">
       <div class="mg-fs" id="mgFsRoot">
         <h2>Statistiche feedback</h2>
@@ -2051,6 +2143,7 @@
 
   <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
 
+  <script src="manageDomande.js"></script>
   <script src="manage.js"></script>
   <script src="manageRedteam.js"></script>
 </body>
