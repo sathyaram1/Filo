@@ -84,6 +84,10 @@
 //         l'owner — un trade-off vero, che decide lui — letta intera dal file
 //         e scritta dal server nel livello L3 del feedback.
 //
+//   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
+//       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
+//         repo). Da lì ciò che scrivi nasce non fidato. Exit 0 = registrato, 4 = rifiutato, 3 = guasto.
+//
 //   node scripts/routine-channel.mjs compare <biglietto> <ruolo> <numero>
 //       → registra cosa aveva scelto il cammino su git accanto a cosa aveva
 //         scelto il server, e consuma il biglietto. Serve solo nella fase in
