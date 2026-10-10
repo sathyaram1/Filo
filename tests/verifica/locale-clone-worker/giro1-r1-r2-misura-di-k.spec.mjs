@@ -73,6 +73,7 @@ test.beforeAll(() => {
     cloneVero,
     canarino: existsSync(join(canarino, 'node_modules', 'CANARINO.txt')),
   };
+  writeFileSync(ESITO, JSON.stringify(esito));
 });
 
 test('r1 la misura di K coi valori predefiniti fa girare le prove Electron in ogni worker', () => {
