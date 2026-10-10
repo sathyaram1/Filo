@@ -141,6 +141,8 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       domandaMostra: { type: MSG.DOMANDA_MOSTRA, id: 'D-1' },
       domandaRispondi: { type: MSG.DOMANDA_RISPONDI, id: 'D-1', scelta: 0 },
       domandeConsiglio: { type: MSG.DOMANDE_CONSIGLIO, ids: ['D-1', 'D-2'] },
+      domandaArchivia: { type: MSG.DOMANDA_ARCHIVIA, id: 'D-1' },
+      domandaRiapri: { type: MSG.DOMANDA_RIAPRI, id: 'D-1' },
     });
     const esegui = async (mittente) => {
       const res = {};
