@@ -188,17 +188,28 @@ function opzione(args, nome, predefinito = '') {
   return i >= 0 && i + 1 < args.length ? args[i + 1] : predefinito;
 }
 
-function lancia(comando, cwd, env, log) {
+// I passi uno dopo l'altro nello stesso log, anche dopo un rosso (finish:check corre gli spec anche con gli unit rossi):
+// la durata è la somma, l'uscita la prima diversa da zero.
+function lancia(passi, cwd, log) {
   return new Promise((ok) => {
     const inizio = Date.now();
     const out = createWriteStream(log);
-    const c = spawn(comando, { cwd, env, shell: true });
-    c.stdout.pipe(out, { end: false });
-    c.stderr.pipe(out, { end: false });
-    c.on('error', (e) => { out.end(`\n[misura-k] non partito: ${e.message}\n`); ok({ codice: 1, durataMs: Date.now() - inizio }); });
-    c.on('close', (codice, segnale) => {
-      out.end(`\n[misura-k] uscita ${codice}${segnale ? ` segnale ${segnale}` : ''}\n`, () => ok({ codice: codice ?? 137, durataMs: Date.now() - inizio }));
-    });
+    let codice = 0;
+    const passo = (i) => {
+      if (i >= passi.length) {
+        out.end(`\n[misura-k] uscita ${codice}\n`, () => ok({ codice, durataMs: Date.now() - inizio }));
+        return;
+      }
+      const p = passi[i];
+      let finito = false;
+      const fine = (k, nota) => { if (finito) return; finito = true; if (nota) out.write(nota); codice = codice || k; passo(i + 1); };
+      const c = spawn(p.cmd, p.args, { cwd, env: p.env, shell: p.shell });
+      c.stdout.pipe(out, { end: false });
+      c.stderr.pipe(out, { end: false });
+      c.on('error', (e) => fine(1, `\n[misura-k] non partito: ${e.message}\n`));
+      c.on('close', (k, segnale) => fine(k ?? 137, segnale ? `\n[misura-k] segnale ${segnale}\n` : ''));
+    };
+    passo(0);
   });
 }
 
