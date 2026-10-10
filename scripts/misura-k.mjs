@@ -245,6 +245,9 @@ async function main() {
       if (!pk.ok) { console.error(`[misura-k] pacchetti del clone ${i}: ${pk.why}`); process.exitCode = 1; return; }
       cloni.push(p.dir);
     }
+    const piani = cloni.map((_, k) => passiWorker(comando, spec, { indice: k + 1, paralleli: n, env: ambienteWorker(process.env, k + 1, n) }));
+    const fermo = piani.find((p) => !p.ok);
+    if (fermo) { console.error(`[misura-k] ${fermo.motivo}`); process.exitCode = 1; return; }
     console.log(`[misura-k] corsa ${r + 1}: ${n} insieme`);
     const prelievi = [];
     const preleva = () => { const s = { corsa: r + 1, n, ...campione() }; prelievi.push(s); appendFileSync(campioni, `${JSON.stringify(s)}\n`); };
