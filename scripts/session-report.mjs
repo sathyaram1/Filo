@@ -312,13 +312,7 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
   if (dichiarato) {
     return existsSync(dichiarato) ? { file: dichiarato, note: '' } : { file: '', note: `transcript indicato ma assente: ${dichiarato}` };
   }
-  const base = configDir || env.CLAUDE_CONFIG_DIR || join(os.homedir(), '.claude');
-  const cartelle = [];
-  for (const dir of [resolve(cwd), checkoutPrincipale(cwd)]) {
-    if (!dir) continue;
-    const c = join(base, 'projects', slugProgetto(dir));
-    if (!cartelle.includes(c)) cartelle.push(c);
-  }
+  const cartelle = cartelleTranscript({ env, cwd, configDir });
   const guardate = [];
   const candidati = [];
   for (const cartella of cartelle) {
