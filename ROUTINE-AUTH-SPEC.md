@@ -403,15 +403,10 @@ Da oggi la fusione è una consegna del canale come le altre:
   riallinea: il suo ramo vive anche nella cartella dell'owner, e un commit
   messo sul remoto dal server farebbe respingere in silenzio il salvataggio
   automatico di quella cartella.
-- **Il segno di pre-approvazione**, in breve: l'owner può marcare una pratica
-  con «Fondi senza chiedermelo» (dal dettaglio in Gestione, o dallo script
-  locale dei feedback; si toglie con «Chiedimi prima di fondere»). Con il
-  segno, un blocco L5 sul lavoro di quella pratica non apre la richiesta: il
-  server fonde come dopo un'approvazione e registra la fusione fra le
-  approvazioni con `preapproved: true`, chi aveva messo il segno e l'elenco
-  intero dei blocchi (`ownerMergeApprovals {op:'list'}` → `preapproved`).
-  Vale solo per il lavoro delle routine, mai per il finish locale; non esiste
-  una pre-approvazione globale o per mittente.
+- **Il segno del clic** (#515): un'approvazione col clic vale anche per i
+  riallineamenti dello stesso ciclo, limitata ai blocchi già approvati. Dal
+  #1148 il segno vive nello stato del giro (`routine-state/{id}.approvatoIl`,
+  solo server) e si toglie quando la pratica entra o esce dalla chiusura.
 
 ### L'identità del server: una GitHub App (2026-08-20)
 
