@@ -459,10 +459,8 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     rep.tokens.cacheRead += cr;
     rep.tokens.output += out;
     if (typeof model === 'string' && model) modelli.add(model);
-    const fam = famigliaPrezzo(model);
     if (!fam.known && model) sconosciuti.set(String(model), fam.key);
-    const p = PREZZI[fam.key];
-    costo += (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cr * p.cacheRead + out * p.output) / 1e6;
+    costo += c;
   }
 
   rep.models = [...modelli];
