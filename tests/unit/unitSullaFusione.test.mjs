@@ -611,10 +611,9 @@ test('la riprova dei rossi sulla fusione passa dal lanciatore: un file fermo si 
     const r = spawnSync(process.execPath, ['--input-type=module', '-e', codice], { env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la riprova è rimasta appesa');
     assert.equal(r.status, 0, r.stdout + r.stderr);
-    const esito = JSON.parse(r.stdout.trim().split(/?
-/).pop());
+    const esito = JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
     assert.equal(esito.ok, false, JSON.stringify(esito));
-    assert.match(esito.coda, /fermo.test.mjs non è andato avanti/);
+    assert.match(esito.coda, /fermo\.test\.mjs non è andato avanti/);
   } finally {
     togliCartella(casa);
   }
