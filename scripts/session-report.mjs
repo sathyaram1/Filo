@@ -776,8 +776,17 @@ export async function nascitaBiglietto(principale, ticket) {
 async function inizioFinestraPrima(principale, since) {
   const sinceMs = Date.parse(String(since));
   if (!Number.isFinite(sinceMs)) {
-    // Senza un momento del biglietto: dall'ultimo confine, mai dall'inizio, che è già nei rapporti di prima.
-    const { inizioMs, continua } = finestraOrchestratore(await lineeDi(principale));
+    // Senza un momento del biglietto: dall'ultimo confine prima di questo rilascio, mai dall'inizio, che è già
+    // nei rapporti di prima. Il rilascio in corso è anche lui nel transcript, ed è un confine: si guarda prima.
+    const linee = await lineeDi(principale);
+    let ultimo = linee.length;
+    for (let i = linee.length - 1; i >= 0; i -= 1) {
+      let e;
+      try { e = JSON.parse(linee[i]); } catch (_) { continue; }
+      const blocchi = e && e.type === 'assistant' && e.message && Array.isArray(e.message.content) ? e.message.content : [];
+      if (blocchi.some((b) => b && b.type === 'tool_use' && b.input && eRilascio(b.input.command))) { ultimo = i; break; }
+    }
+    const { inizioMs, continua } = finestraOrchestratore(linee.slice(0, ultimo));
     return { since: Number.isFinite(inizioMs) ? new Date(inizioMs + 1).toISOString() : '', continua, senzaBiglietto: true };
   }
   const prima = (await lineeDi(principale)).filter((l) => {

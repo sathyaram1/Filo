@@ -695,3 +695,45 @@ test('worker morto: il rilascio dell\'orchestratore parte dalla fine del worker 
     assert.equal(worker.turns, 4);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
+
+test('worker morto prima di dispatch: il rilascio dell\'orchestratore conta dal suo biglietto, non dal marcatore del worker di prima', async () => {
+  const base = cartellaTemporanea('filo-rapporto-marcatore-');
+  try {
+    const sess = join(base, 'orch.jsonl');
+    const sub = join(base, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const righe = SOTTOFONDO.slice(0, 7).concat(
+      orch('s4', H('11:31:10'), { cw: 32000 }),
+      orch('s5', H('11:31:30'), { cr: 32000, tool: { type: 'tool_use', id: 'tk', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs ticket x --json' } } }),
+      JSON.stringify({ type: 'user', timestamp: H('11:31:31'), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tk', content: '{"ticket":"tkt-due","role":"verifier"}' }] } }),
+      orch('s6', H('11:31:50'), { cr: 32500, tool: { type: 'tool_use', id: 'bg2', name: 'Agent', input: {} } }),
+      lanciato('bg2', H('11:31:53')),
+      JSON.stringify({ type: 'user', timestamp: H('11:32:10'), message: { role: 'user', content: notifica('bg2') } }),
+      orch('s8', H('11:32:20'), { cr: 33000, tool: { type: 'tool_use', id: 'rel', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release tkt-due --role orchestrator' } } }),
+    );
+    writeFileSync(sess, righe.join('\n') + '\n');
+    // Il worker 1 ha preso il suo biglietto alle 10:01 (marcatore di dispatch) e il suo costo è già nel suo rilascio.
+    writeFileSync(join(sub, 'agent-w1.jsonl'), [orch('w1a', H('10:01:10'), { cw: 25000 }), orch('w1b', H('11:30:00'), { cr: 25000, out: 1000 })].join('\n') + '\n');
+    const rep = await generaRapporto({ transcript: sess, role: 'orchestrator', ticket: 'tkt-due', since: H('10:01:05') });
+    assert.equal(rep.turns, 4, 's4, s5, s6, s8: né s1–s3 né i turni del worker 1, già nel rapporto del suo biglietto');
+    assert.equal(rep.subagentCostUsd, 0);
+    assert.equal(rep.rewarmTurns, 1, 's4 riscrive la cache dopo l\'attesa');
+    // Senza il momento del biglietto, dall'ultimo confine e con la nota: mai dall'inizio della sessione.
+    const senza = await generaRapporto({ transcript: sess, role: 'orchestrator', ticket: 'altro', since: '' });
+    assert.equal(senza.turns, 1);
+    assert.ok(senza.notes.some((n) => /momento del biglietto non trovato/.test(n)), senza.notes.join(' | '));
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test('il marcatore di un altro biglietto non dà il momento del rilascio', async () => {
+  const { readTicketSince } = await import('../../scripts/lib/routine-ticket.mjs');
+  const base = cartellaTemporanea('filo-marcatore-altro-');
+  try {
+    mkdirSync(join(base, '.claude'), { recursive: true });
+    const since = new Date(Date.now() - 60000).toISOString();
+    writeFileSync(join(base, '.claude', 'routine-ticket.json'), JSON.stringify({ ticket: 'uno', since }));
+    assert.equal(readTicketSince(base, { ticket: 'uno' }), since);
+    assert.equal(readTicketSince(base, { ticket: 'due' }), '');
+    assert.equal(readTicketSince(base), since);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
