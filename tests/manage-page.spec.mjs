@@ -2059,7 +2059,6 @@ test('#1034 — In coda: «Segna fidato» al clic resta premuto sulla stessa rig
 // La riga non va mai a capo: con tanti tasti (spam, file sospetto, «Segna fidato») o con la colonna stretta i tasti
 // si stringono e restano dentro la riga.
 const RIGA_BASE = { text: 'Testo.', name: 'Prova', seq: 12, subSeq: 0, createdAt: '2026-06-22T10:00:00Z', images: [] };
-const RIGA_CASI = [
 // [nome, sezione, feedback, tasti visibili almeno].
 const RIGA_CASI = [
   ['spam', 'inbox', { ...RIGA_BASE, _id: 'riga-spam', status: 'spam', clientId: 'tester@example.com' }, 5],
