@@ -3,7 +3,7 @@
 // tolto prima della cartella). Unit test: tests/unit/cloneWorker.test.mjs. Comando: scripts/clone-worker.mjs.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { ensureSessionExcludes } from './branch-integrity.mjs';
@@ -78,29 +78,59 @@ function collega(verso, link) {
 }
 
 // node_modules del clone è una cartella vera con un collegamento per ogni pacchetto del principale, non un collegamento
-// solo: `npm ci` svuota la cartella entrando nel collegamento, e così toglie i collegamenti invece dei pacchetti di tutti.
+// solo: npm, svuotando o riordinando la cartella, toglie così i collegamenti invece dei pacchetti di tutti. Per lo
+// stesso motivo gli ambiti (@x) sono cartelle con un collegamento per pacchetto, e .bin è una copia.
 export const MARCA_COLLEGATI = '.filo-collegati';
 const collegatiVoceAVoce = (nm) => existsSync(resolve(nm, MARCA_COLLEGATI));
 
-function collegaVoci(verso, nm) {
+function copiaBin(da, a) {
+  mkdirSync(a, { recursive: true });
+  for (const voce of readdirSync(da, { withFileTypes: true })) {
+    const s = resolve(da, voce.name);
+    const d = resolve(a, voce.name);
+    // Un collegamento relativo (../pacchetto/cli.js) porta al pacchetto collegato del clone; dove il sistema lo nega, la copia.
+    if (voce.isSymbolicLink()) { try { symlinkSync(readlinkSync(s), d); continue; } catch (_) { /* sotto, copiato */ } }
+    try { copyFileSync(s, d); } catch (_) { /* un collegamento rotto nel principale: niente da copiare */ }
+  }
+}
+
+function collegaVoci(verso, nm, radice = true) {
   mkdirSync(nm, { recursive: true });
   for (const voce of readdirSync(verso, { withFileTypes: true })) {
     const da = resolve(verso, voce.name);
+    const a = resolve(nm, voce.name);
     let cartella = voce.isDirectory();
     if (voce.isSymbolicLink()) { try { cartella = statSync(da).isDirectory(); } catch (_) { continue; } }
-    if (cartella) collega(da, resolve(nm, voce.name)); // i file (.package-lock.json) npm li ricostruisce da sé
+    if (!cartella) continue; // i file (.package-lock.json) npm li ricostruisce da sé
+    if (radice && voce.name === '.bin') copiaBin(da, a);
+    else if (radice && voce.name.startsWith('@')) collegaVoci(da, a, false);
+    else collega(da, a);
   }
-  writeFileSync(resolve(nm, MARCA_COLLEGATI), `${verso}\n`, 'utf8');
+  if (radice) writeFileSync(resolve(nm, MARCA_COLLEGATI), `${verso}\n`, 'utf8');
+}
+
+/** I collegamenti di un node_modules collegato voce per voce: le voci e i pacchetti degli ambiti. */
+function vociCollegate(nm) {
+  if (!existsSync(nm) || eLink(nm)) return [];
+  const voci = [];
+  for (const nome of readdirSync(nm)) {
+    const p = resolve(nm, nome);
+    if (eLink(p)) voci.push(p);
+    else if (nome.startsWith('@')) {
+      try { for (const n of readdirSync(p)) if (eLink(resolve(p, n))) voci.push(resolve(p, n)); } catch (_) { /* non una cartella */ }
+    }
+  }
+  return voci;
 }
 
 /** Toglie i collegamenti del node_modules di un clone, uno per uno; anche quello intero dei clone nati prima. */
 export function scollegaPacchetti(nm) {
   if (scollega(nm) || !existsSync(nm)) return;
-  for (const nome of readdirSync(nm)) scollega(resolve(nm, nome));
+  for (const p of vociCollegate(nm)) scollega(p);
   rmSync(resolve(nm, MARCA_COLLEGATI), { force: true });
 }
 
-const restaUnCollegamento = (nm) => eLink(nm) || (existsSync(nm) && readdirSync(nm).some((n) => eLink(resolve(nm, n))));
+const restaUnCollegamento = (nm) => eLink(nm) || vociCollegate(nm).length > 0;
 
 function npmCiDavvero(cartella) {
   const env = { ...process.env, ELECTRON_SKIP_BINARY_DOWNLOAD: '1' };
