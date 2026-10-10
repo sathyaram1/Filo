@@ -307,6 +307,18 @@ export function ultimoAssistantMs(file) {
  * Torna { file, note } — `file` vuoto se non c'è niente, con la nota che
  * spiega dove si è guardato.
  */
+/** Le cartelle dei transcript di questa cartella di lavoro (e del checkout principale, da un worktree). */
+export function cartelleTranscript({ env = process.env, cwd = process.cwd(), configDir = '' } = {}) {
+  const base = configDir || env.CLAUDE_CONFIG_DIR || join(os.homedir(), '.claude');
+  const cartelle = [];
+  for (const dir of [resolve(cwd), checkoutPrincipale(cwd)]) {
+    if (!dir) continue;
+    const c = join(base, 'projects', slugProgetto(dir));
+    if (!cartelle.includes(c)) cartelle.push(c);
+  }
+  return cartelle;
+}
+
 export function trovaTranscript({ explicit = '', env = process.env, cwd = process.cwd(), configDir = '' } = {}) {
   const dichiarato = String(explicit || env.FILO_TRANSCRIPT || '').trim();
   if (dichiarato) {
