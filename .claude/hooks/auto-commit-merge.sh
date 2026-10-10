@@ -203,8 +203,7 @@ spedisci_ramo() {
     # e un rebase non lo cura: si dice per quello che e', col motivo del
     # remoto, e non si ritenta col lease (verifica del giro 4).
     *"[remote rejected]"*)
-      segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")" \
-        "il suo ramo '$ramo' non e' su origin, il remoto ha rifiutato il push: $(motivo_git "$esito")"
+      segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"
       return 1 ;;
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
       # --force-if-includes: il lease da solo si fida del ref remoto che questa
@@ -213,12 +212,10 @@ spedisci_ramo() {
       # giro 2). Con --force-if-includes git rifiuta se quel commit non e' mai
       # passato dalla storia locale di questo ramo.
       esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
-      segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")" \
-        "il suo ramo '$ramo' non e' su origin, storia divergente e rinvio rifiutato: $(motivo_git "$esito2")"
+      segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")"
       return 1 ;;
   esac
-  segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin: $(motivo_git "$esito")" \
-    "il suo ramo '$ramo' non e' su origin: $(motivo_git "$esito")"
+  segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin: $(motivo_git "$esito")"
   return 1
 }
 
@@ -272,8 +269,7 @@ salva_cartella() {
   if [ -d "$GIT_DIR_QUI/rebase-merge" ] || [ -d "$GIT_DIR_QUI/rebase-apply" ] \
      || [ -f "$GIT_DIR_QUI/MERGE_HEAD" ] || [ -f "$GIT_DIR_QUI/CHERRY_PICK_HEAD" ] || [ -f "$GIT_DIR_QUI/REVERT_HEAD" ] \
      || [ -n "$(git ls-files -u 2>/dev/null | head -1)" ]; then
-    segnala_avviso "$wt" "un rebase o una fusione e' a meta' (o ci sono file ancora in conflitto): NON committo e NON spedisco, o metterei in commit i segni di conflitto. Finiscilo (risolvi i file, git add, poi git rebase --continue o git commit): al primo salvataggio dopo il ramo parte." \
-      "un rebase o una fusione e' a meta' li' (o ci sono file in conflitto): quel salvataggio non e' avvenuto"
+    segnala_avviso "$wt" "un rebase o una fusione e' a meta' (o ci sono file ancora in conflitto): NON committo e NON spedisco, o metterei in commit i segni di conflitto. Finiscilo (risolvi i file, git add, poi git rebase --continue o git commit): al primo salvataggio dopo il ramo parte."
     return 0
   fi
 
@@ -286,8 +282,7 @@ salva_cartella() {
   # del push fallito, col motivo di git. Un fallimento qui non e' un push a
   # vuoto: non c'e' niente di committato, e la coda dice questo.
   ESITO_ADD=$(git add -A 2>&1) || {
-    segnala_avviso "$wt" "le modifiche NON sono state committate (git add e' fallito): $(motivo_git "$ESITO_ADD"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella: se e' un index.lock a terra e nessun git e' in corso, si toglie; al primo salvataggio dopo si riprova." \
-      "il salvataggio li' non e' riuscito (git add): $(motivo_git "$ESITO_ADD")"
+    segnala_avviso "$wt" "le modifiche NON sono state committate (git add e' fallito): $(motivo_git "$ESITO_ADD"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella: se e' un index.lock a terra e nessun git e' in corso, si toglie; al primo salvataggio dopo si riprova."
     return 0
   }
   if git diff --cached --quiet 2>/dev/null; then
@@ -303,8 +298,7 @@ salva_cartella() {
   [ "${N:-0}" -gt 3 ] && SUMMARY="$SUMMARY (+$((N-3)) file)"
   [ -z "$SUMMARY" ] && SUMMARY=$(date +%Y-%m-%dT%H:%M:%S)
   ESITO_COMMIT=$(git -c user.email="$COMMIT_AS_EMAIL" -c user.name="$COMMIT_AS_NAME" commit -q -m "auto: $SUMMARY" 2>&1) || {
-    segnala_avviso "$wt" "le modifiche NON sono state committate (git commit e' fallito): $(motivo_git "$ESITO_COMMIT"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella, in scena: un pre-commit che rifiuta dice il perche' qui sopra; al primo salvataggio dopo si riprova." \
-      "il salvataggio li' non e' riuscito (git commit): $(motivo_git "$ESITO_COMMIT")"
+    segnala_avviso "$wt" "le modifiche NON sono state committate (git commit e' fallito): $(motivo_git "$ESITO_COMMIT"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella, in scena: un pre-commit che rifiuta dice il perche' qui sopra; al primo salvataggio dopo si riprova."
     return 0
   }
 

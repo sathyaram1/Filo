@@ -18,6 +18,8 @@ import { SESSION_MARKERS } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+// Nessuna prova installa pacchetti davvero: con lo stesso lock non deve nemmeno provarci.
+const npmMai = () => { throw new Error('npm ci lanciato con lo stesso package-lock'); };
 const eLink = (p) => { try { return lstatSync(p).isSymbolicLink(); } catch (_) { return false; } };
 
 /** Origin nudo, principale clonato da lì con node_modules (e un canarino dentro), strumenti finti dell'orchestratore. */
@@ -47,7 +49,7 @@ test('il clone nasce con l\'origin VERO del principale, node_modules collegato, 
   const s = scena();
   try {
     const dest = resolve(s.base, 'lavori', '1');
-    const r = preparaClone(s.principale, 1, { dest, paralleli: 3, strumentiDa: s.strumenti, basePin: s.basePin });
+    const r = preparaClone(s.principale, 1, { dest, paralleli: 3, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai });
     assert.equal(r.ok, true, r.why);
     assert.equal(r.pacchetti, 'collegati');
     const originClone = git(dest, ['remote', 'get-url', 'origin']);
@@ -63,7 +65,7 @@ test('il clone nasce con l\'origin VERO del principale, node_modules collegato, 
     assert.equal(r.strumenti, pinnedDirWorker(1, s.basePin));
     assert.equal(pinnedRepoRoot(r.strumenti), dest, 'gli strumenti del worker conoscono il suo clone');
 
-    const di = preparaClone(s.principale, 1, { dest, paralleli: 3, strumentiDa: s.strumenti, basePin: s.basePin });
+    const di = preparaClone(s.principale, 1, { dest, paralleli: 3, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai });
     assert.equal(di.ok, true, `rilanciato riprende lo stesso clone: ${di.why}`);
   } finally {
     togliCartella(s.base);
@@ -95,7 +97,7 @@ test('package-lock diverso dal principale: installazione privata, e il node_modu
   const s = scena();
   try {
     const dest = resolve(s.base, 'lavori', '1');
-    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin }).ok, true);
+    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
     let chiamate = 0;
     const npmCi = (cartella) => { chiamate += 1; mkdirSync(resolve(cartella, 'node_modules', 'privato'), { recursive: true }); return { ok: true }; };
     assert.equal(allineaPacchetti(dest, s.principale, { npmCi }).pacchetti, 'collegati', 'stesso lock: collegati');
@@ -119,7 +121,7 @@ test('la rimozione toglie il collegamento PRIMA della cartella: il principale re
   const s = scena();
   try {
     const dest = resolve(s.base, 'lavori', '1');
-    const r = preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin });
+    const r = preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai });
     assert.equal(r.ok, true, r.why);
     const t = togliClone(s.principale, 1, { basePin: s.basePin });
     assert.equal(t.ok, true, t.why);
@@ -134,7 +136,7 @@ test('la rimozione toglie il collegamento PRIMA della cartella: il principale re
     const no = togliClone(s.principale, 3, { dest: estranea, basePin: s.basePin });
     assert.equal(no.ok, false, 'una cartella senza il marcatore del worker non si toglie');
     assert.ok(existsSync(resolve(estranea, 'cosa.txt')));
-    assert.equal(preparaClone(s.principale, 3, { dest: estranea, strumentiDa: s.strumenti, basePin: s.basePin }).ok, false, 'e non si usa come clone');
+    assert.equal(preparaClone(s.principale, 3, { dest: estranea, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, false, 'e non si usa come clone');
   } finally {
     togliCartella(s.base);
   }
