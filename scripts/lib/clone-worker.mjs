@@ -3,7 +3,7 @@
 // tolto prima della cartella). Unit test: tests/unit/cloneWorker.test.mjs. Comando: scripts/clone-worker.mjs.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { ensureSessionExcludes } from './branch-integrity.mjs';
@@ -105,7 +105,8 @@ export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {
     if (eLink(nm)) return { ok: true, pacchetti: 'collegati', why: '' };
     if (esisteLink(nm)) rmSync(nm, { recursive: true, force: true }); // un'installazione privata rimasta da un ramo prima
     if (!existsSync(resolve(principale, 'node_modules'))) return { ok: false, pacchetti: '', why: 'il principale non ha node_modules' };
-    collega(resolve(principale, 'node_modules'), nm);
+    // Al bersaglio vero: il node_modules di un worktree è già un collegamento a quello del principale.
+    collega(realpathSync(resolve(principale, 'node_modules')), nm);
     return { ok: true, pacchetti: 'collegati', why: '' };
   }
   scollega(nm);
