@@ -729,6 +729,17 @@ export async function compare(t, mine, opts) {
 }
 
 /**
+ * Autodichiarazione (SPEC-DOMANDE.md §1.2, #1148): chi lavora ha letto qualcosa che il server non vede (una pagina, un
+ * file fuori dal repo) e si dichiara sporco. Da qui in poi ciò che scrive nasce non fidato; nessuna strada fa il contrario.
+ */
+export async function sporca(t, motivo, opts) {
+  const { status, body } = await call('routineSporca', { ticket: t, motivo: String(motivo || '') }, opts);
+  if (status === 200 && body && body.ok) return { outcome: 'ok', fiducia: body.fiducia };
+  if (status === 404) return { outcome: 'fault', reason: 'routineSporca non è ancora pubblicata sul server' };
+  return { outcome: status >= 500 || status === 0 ? 'fault' : 'refused', reason: String((body && body.reason) || `http_${status}`) };
+}
+
+/**
  * Chiede al SERVER di fondere il ramo su main (SPEC-RIDISEGNO-MAX.md §10).
  *
  * Qui non si decide niente: il server verifica dallo stato VERO (verdetti di
