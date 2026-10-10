@@ -152,11 +152,18 @@ mittenti fidati e dei derivati. L'iter `todo→working→revision_*→done` e `r
 lo muovono solo le routine; l'owner dall'iter può solo archiviare. Nessuna riga owner →
 `done`. Transizioni non elencate = illegali: il writer le rifiuta.
 
+**La fiducia** (#1148, SPEC-DOMANDE.md §1): `fiducia` (`fidato`|`non_fidato`, in chiaro) la
+scrive solo il server, le regole la vietano a ogni client. Alla nascita: fidato l'owner
+dall'app (`owner:` con la prova dell'admin), una sessione col biglietto pulito
+(`bigliettoLocale`), un biglietto pulito delle routine, il server (allarmi); tutto il resto
+non fidato. Dopo, solo «🤝 Segna fidato» in Gestione (callable `ownerFiducia`; da riga di
+comando no). Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
+(fidati prima) e L5 (§4b, e ROUTINE-AUTH-SPEC.md).
+
 **La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
 scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
 ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
-Il ripasso non dà più la prova al solo nome; sui feedback nati prima, col nome ancora
-intero, l'owner può dire che è suo con «🙋 È mio» in Gestione (da riga di comando no, #957).
+Dal #1148 serve solo alle statistiche, alle raffiche e al segno di pericolo: non dà permessi.
 
 **Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:` con la prova): mai `attack`/`spam`; se un
 livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
