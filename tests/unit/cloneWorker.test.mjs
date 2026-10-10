@@ -142,6 +142,33 @@ test('la rimozione toglie il collegamento PRIMA della cartella: il principale re
   }
 });
 
+test('la misura di K, fuori dal registro, non toglie il worker vero che ha lo stesso numero', () => {
+  const s = scena();
+  try {
+    const vero = resolve(s.base, 'lavori', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest: vero, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
+    const registrati = () => elencoCloni(s.principale).map((c) => resolve(c.cartella));
+    const pinMisura = resolve(s.base, 'pin-misura');
+    const misura = resolve(s.base, 'misura', 'clone-1');
+    const m = preparaClone(s.principale, 1, { dest: misura, strumentiDa: s.strumenti, basePin: pinMisura, npmCi: npmMai, registra: false });
+    assert.equal(m.ok, true, m.why);
+    assert.deepEqual(registrati(), [vero], 'il clone della misura non entra nel registro');
+    assert.equal(togliClone(s.principale, 1, { dest: misura, basePin: pinMisura, registra: false }).ok, true);
+    assert.deepEqual(registrati(), [vero], 'e togliendolo il worker vero resta');
+
+    const altro = resolve(s.base, 'altro', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest: altro, strumentiDa: s.strumenti, basePin: pinMisura, npmCi: npmMai, registra: false }).ok, true);
+    assert.equal(togliClone(s.principale, 1, { dest: altro, basePin: pinMisura }).ok, true);
+    assert.deepEqual(registrati(), [vero], 'una voce che punta a un\'altra cartella non se ne va col dest di qualcun altro');
+    assert.ok(existsSync(s.canarino));
+
+    assert.equal(togliClone(s.principale, 1, { basePin: s.basePin }).ok, true);
+    assert.deepEqual(registrati(), [], 'il worker vero, tolto lui, esce dal registro');
+  } finally {
+    togliCartella(s.base);
+  }
+});
+
 test('stessoRemoto, chiaviAccesso, datiWorker, concorrenzaUnit: le parti pure', () => {
   assert.ok(stessoRemoto('https://github.com/Sathyaram1/Filo.git', 'https://github.com/sathyaram1/filo/'));
   assert.ok(!stessoRemoto('https://github.com/sathyaram1/filo', 'C:/Users/x/Filo'));
