@@ -130,7 +130,8 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
   // altro, e ammazzeremmo un estraneo: riprodotto dal vivo con un marcatore di
   // tre giorni prima. Il controllo d'età è lo stesso di `beatIsLive`, che è il
   // punto: due strade che decidono la stessa cosa non devono usare due criteri.
-  if (vecchio && String(vecchio.ticket || '') !== t
+  const diQui = !vecchio || !vecchio.root || stessaCartella(vecchio.root, root);
+  if (vecchio && diQui && String(vecchio.ticket || '') !== t
       && beatIsLive(vecchio, vecchio.ticket, { now, alive })) {
     try { process.kill(Number(vecchio.pid)); } catch (_) { /* già morto */ }
   }
