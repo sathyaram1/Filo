@@ -47,8 +47,36 @@ export function togliScene() {
   for (const d of fatte.splice(0)) { try { rmSync(d, { recursive: true, force: true }); } catch (_) { /* resta nella temporanea */ } }
 }
 
-// Chi lancia le prove non dichiara la sessione al posto loro: FILO_ROUTINE entra solo da `env`.
+// Chi lancia le prove non dichiara la sessione al posto loro: una routine si dichiara con FILO_ROUTINE=1 nella sua
+// shell, e ereditata qui faceva rosso il controllo sulla provenienza per tutto il giro. Entra solo da `env`.
 const ambiente = () => { const a = { ...process.env }; delete a.FILO_ROUTINE; return a; };
+
+export function runHook(work, env = {}, hook = 'auto-commit-merge.sh', stdin = '') {
+  try {
+    execFileSync('bash', [resolve(work, '.claude', 'hooks', hook)], {
+      cwd: work, encoding: 'utf8', input: stdin,
+      env: { ...ambiente(), CLAUDE_PROJECT_DIR: work, ...env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } catch (_) { /* l'hook non fallisce mai per contratto */ }
+}
+
+/** Il messaggio che una sessione limitata consegna a cap-observe.sh. */
+export const LIMITE = JSON.stringify({
+  hook_event_name: 'StopFailure',
+  error_type: 'usage_limit',
+  error_message: 'session limit reached',
+});
+
+/** SHA locale di un ramo ('' se non esiste). */
+export function shaOf(work, ref) {
+  try { return git(work, ['rev-parse', ref]); } catch (_) { return ''; }
+}
+
+export function filesOnMain(work) {
+  git(work, ['fetch', '-q', 'origin', 'main']);
+  return git(work, ['ls-tree', '-r', '--name-only', 'origin/main']).split('\n').filter(Boolean);
+}
 
 export function runHookRaw(work, stdin, env = {}) {
   return spawnSync('bash', [resolve(work, '.claude', 'hooks', 'auto-commit-merge.sh')], {
