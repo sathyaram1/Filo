@@ -202,7 +202,7 @@ export function readTicketReply(status, body) {
 }
 
 export async function ticket(passphrase, opts) {
-  const { status, body } = await call('routineTicket', { passphrase }, opts);
+  const { status, body } = await call('routineTicket', { passphrase, ...creditiDi(opts) }, opts);
   return readTicketReply(status, body);
 }
 
@@ -218,7 +218,7 @@ export async function ticket(passphrase, opts) {
  * @returns {{ outcome:'work'|'nothing'|'fault', reason?: string }}
  */
 export async function probe(passphrase, opts) {
-  const { status, body } = await call('routineTicket', { passphrase, probe: true }, opts);
+  const { status, body } = await call('routineTicket', { passphrase, probe: true, ...creditiDi(opts) }, opts);
   const b = body || {};
   if (status === 200 && b.ok && b.work === true) return { outcome: 'work' };
   if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
@@ -419,10 +419,17 @@ export function misureCrediti({ root = ROOT, env = process.env, cwd = process.cw
   return out;
 }
 
+/**
+ * Le misure dei crediti da allegare a ogni chiamata della sessione (battito, biglietto, rilascio, chiusura): il
+ * consumo dopo l'ultimo battito arriva così. Mai un motivo per non fare la chiamata.
+ */
+export function creditiDi(opts = {}) {
+  const o = opts || {};
+  try { return (o.misureCrediti || misureCrediti)(o); } catch (_) { return {}; }
+}
+
 export async function heartbeat(t, opts = {}) {
-  let crediti = {};
-  try { crediti = (opts.misureCrediti || misureCrediti)(opts); } catch (_) { /* il battito vale anche senza */ }
-  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...crediti }, opts);
+  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...creditiDi(opts) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt, avvisi: Array.isArray(body.avvisi) ? body.avvisi : [] };
   const reason = String((body && body.reason) || `http_${status}`);
   return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
@@ -444,6 +451,7 @@ export async function release(t, fault = '', opts, report = null) {
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
   if (report && typeof report === 'object') payload.report = report;
+  Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
 }
@@ -534,7 +542,7 @@ export async function domandaChiusura(cred, opts) {
   // Un id per invocazione, uguale in tutti i ritentativi di call(): il server ritrova lo
   // stesso documento invece di crearne uno orfano per ogni 5xx arrivato dopo la scrittura.
   const requestId = cred.passphrase ? randomUUID() : '';
-  const { status, body } = await call('routineClosing', corpoChiusura('question', { ...cred, requestId }), opts);
+  const { status, body } = await call('routineClosing', { ...corpoChiusura('question', { ...cred, requestId }), ...creditiDi(opts) }, opts);
   const r = leggiRispostaChiusura(status, body);
   // Senza testo, o senza l'id con cui rispondere, non c'è una domanda a cui rispondere.
   if (r.esito === 'ok' && (!r.question.trim() || (cred.passphrase && !r.id))) return { esito: 'assente', reason: 'busta_incompleta' };
@@ -542,7 +550,7 @@ export async function domandaChiusura(cred, opts) {
 }
 
 export async function rispostaChiusura(cred, answer, opts) {
-  const { status, body } = await call('routineClosing', corpoChiusura('answer', { ...cred, answer }), opts);
+  const { status, body } = await call('routineClosing', { ...corpoChiusura('answer', { ...cred, answer }), ...creditiDi(opts) }, opts);
   return leggiRispostaChiusura(status, body);
 }
 
