@@ -1086,31 +1086,20 @@
       border-color: #e0a30b; color: #b9770a;
       background: color-mix(in srgb, #e0a30b 12%, var(--sn-bg, transparent));
     }
-    /* Acceso = il server fonde senza chiedere: tinta d'accento e non della stella, perché è una delega. */
-    /* `all: unset` azzera anche il display di [hidden]: senza questa riga un tasto nascosto resta visibile. */
-    .mg-preapprove-btn[hidden] { display: none; }
-    .mg-preapprove-btn[aria-pressed="true"] {
+    /* «Segna fidato»: tinta d'accento e non della stella, perché è una delega. `all: unset` azzera anche il
+       display di [hidden]: senza questa riga un tasto nascosto resta visibile. */
+    .mg-fiducia-btn[hidden] { display: none; }
+    .mg-fiducia-btn:not(:disabled):hover {
       border-color: var(--sn-accent); color: var(--sn-accent);
       background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
     }
     /* Prende lo spazio che i tasti lasciano e va a capo dentro di sé: la riga dei tasti resta una. */
-    .mg-preapproved-info {
+    .mg-fiducia-info {
       flex: 1 1 14em; min-width: 0;
       font-size: 12px; line-height: 1.35;
       color: var(--sn-muted);
     }
-    .mg-preapproved-info[hidden] { display: none; }
-    /* Il segno in lista è piccolo e sta prima dei pallini di priorità, che si spingono a destra da soli. */
-    .mg-preapproved {
-      flex: none;
-      font-size: 10.5px;
-      line-height: 1;
-      padding: 3px 6px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--sn-accent) 45%, transparent);
-      color: var(--sn-accent);
-      white-space: nowrap;
-    }
+    .mg-fiducia-info[hidden] { display: none; }
 
     /* «Solo in locale»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
     .mg-local-btn[hidden], .mg-sender-btn[hidden] { display: none; }
