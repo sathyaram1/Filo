@@ -163,7 +163,7 @@ if [ "$QUANTE" -gt 1 ]; then
   done <<EOF_CARTELLE
 $CARTELLE
 EOF_CARTELLE
-  [ -n "$AVVISI" ] && printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$(printf '%s' "$AVVISI" | sed 's/"/\\"/g')"
+  [ -n "$AVVISI" ] && printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$(printf '%s' "$AVVISI" | sed 's#\\\([^n]\)#/\1#g; s/"/\\"/g')"
   exit 0
 fi
 
