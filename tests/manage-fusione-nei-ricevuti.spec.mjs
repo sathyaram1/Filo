@@ -1,6 +1,6 @@
 // Gestione: una pratica con una richiesta di fusione che aspetta l'owner sta nei Ricevuti anche se il suo
-// stato non è arrivato al cancello, e ci arriva da sola a pagina aperta; il segno nato da un clic «Approva»
-// non schiaccia il titolo della scheda.
+// stato non è arrivato al cancello, e ci arriva da sola a pagina aperta; il badge della fusione non schiaccia il
+// titolo della scheda, e un vecchio segno «fondi senza chiedermelo» rimasto nel dato non si mostra più (#1148).
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -73,14 +73,15 @@ test('la richiesta che arriva a pagina aperta sposta la pratica e la sezione lo 
   await expect(scheda(page, 'fb515')).toBeVisible();
 });
 
-test('col segno di un clic «Approva» il titolo della scheda resta leggibile', async ({ openTab }) => {
+test('il badge della fusione lascia leggibile il titolo; il segno di prima nel dato non si mostra', async ({ openTab }) => {
   const segno = { by: `owner@example.com · approvazione ${RICHIESTA}`, at: '2026-09-25T08:30:00.000Z' };
   const page = await apri(openTab, [
     fb('lavoro', { status: 'working', name: 'La Gestione non aggiorna le sezioni da sola', mergePreapproved: segno }),
-    fb('fermo', { seq: 516, status: 'design', statusReason: 'l5', name: 'Fusione ferma sulle regole', mergePreapproved: segno }),
+    fb('fermo', { seq: 516, status: 'design', statusReason: 'l5', name: 'Fusione ferma sulle regole' }),
   ], [{ ...richiesta('fermo'), num: '516' }]);
   await tab(page, 'queue').click();
-  await expect(scheda(page, 'lavoro').locator('.mg-preapproved')).toBeVisible();
+  await expect(scheda(page, 'lavoro')).toBeVisible();
+  await expect(page.locator('.mg-preapproved')).toHaveCount(0);
   const largo = (id) => scheda(page, id).locator('.mg-item-title').evaluate((el) => el.getBoundingClientRect().width);
   expect(await largo('lavoro')).toBeGreaterThan(80);
   await tab(page, 'inbox').click();
