@@ -2909,6 +2909,7 @@
   // approva allineati): durante la ricerca la lista è "trasversale" alle schede.
   function hideTabBars() {
     if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+    if (mgLivelliFiltro) mgLivelliFiltro.hidden = true;
     if (mgReevalBar)     mgReevalBar.hidden = true;
     if (mgAlignedBar)    mgAlignedBar.hidden = true;
   }
