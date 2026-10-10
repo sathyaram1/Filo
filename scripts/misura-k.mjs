@@ -190,6 +190,7 @@ async function main() {
   const corseN = opzione(args, '--corse', CORSE_PREDEFINITE.join(',')).split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
   const comando = opzione(args, '--comando', 'npm run finish:check');
   const ramo = opzione(args, '--ramo', 'origin/main');
+  const spec = opzione(args, '--spec', SPEC_MISURA.join(',')).split(',').map((s) => s.trim()).filter(Boolean);
   const tieni = args.includes('--tieni');
   const principale = process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT)
     : (pinnedRepoRoot() || resolve(fileURLToPath(new URL('..', import.meta.url))));
