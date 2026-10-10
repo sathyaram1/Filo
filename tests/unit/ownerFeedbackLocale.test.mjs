@@ -12,9 +12,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
 
 const campo = (v) => (typeof v === 'string' ? { stringValue: v } : v);
+// Dal #1148 conta la fiducia, non la prova: le pratiche dell'owner e delle sessioni con la prova nascono (o la migrazione
+// le fa) fidate. Le prove la dicono come la scriverebbe il server, salvo dove la passano loro.
 function documento(id, f) {
   const fields = {};
-  for (const [k, v] of Object.entries(f)) if (v !== undefined) fields[k] = campo(v);
+  const proprie = /^(owner|local):/i.test(String(f.clientId || '')) && f.senderProof === 'admin';
+  for (const [k, v] of Object.entries(proprie && !('fiducia' in f) ? { ...f, fiducia: 'fidato' } : f)) if (v !== undefined) fields[k] = campo(v);
   return { name: `projects/p/databases/(default)/documents/feedback/${id}`, fields };
 }
 
