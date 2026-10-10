@@ -820,7 +820,7 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     const figli = sottoAgente ? figliDelSottoAgente(trovato.file, finestre, rep.notes) : transcriptSottoAgenti(trovato.file);
     for (const f of figli) {
       try {
-        sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket, since }));
+        sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket, since: sinceFigli }));
       } catch (e) {
         rep.notes.push(`transcript di un sotto-agente illeggibile (${f}): ${String((e && e.message) || e)}`);
       }
