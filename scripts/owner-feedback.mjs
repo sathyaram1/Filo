@@ -161,7 +161,7 @@ async function lavoroVietato(doc, to) {
   const fb = await praticaInChiaro(doc);
   if (!fb) return { motivo: 'mittente o stato non decifrabili: non so di chi è la pratica', utente: false };
   const chi = MR.localSenderCheck(fb);
-  if (!chi.ok) return { motivo: chi.motivo, utente: !!chi.utente, routine: !!chi.routine, senzaProva: !!chi.senzaProva, ...contestoDelRifiuto(fb) };
+  if (!chi.ok) return { motivo: chi.motivo, utente: !!chi.utente, routine: !!chi.routine, senzaProva: !!chi.senzaProva, nonFidato: !!chi.nonFidato, ...contestoDelRifiuto(fb) };
   // Presa in carico: la stessa regola di start --feedback (praticaPerLaSessione).
   if (to === 'working' && !MR.isLocalOnly(fb)) return { motivo: SENZA_SEGNO, utente: false, senzaSegno: true };
   return null;
@@ -414,12 +414,14 @@ export async function registraParte(id, parte, opts = {}) {
 export function rifiutoPratica(id, r) {
   const righe = [`RIFIUTATO: ${String((r && r.motivo) || 'pratica non lavorabile in locale').replace(/\.$/, '')}.`];
   if (r && r.senzaSegno) {
-    righe.push('Se l’owner ti ha chiesto di lavorarla in locale, mettilo e rilancia (col segno, alla chiusura si fonde senza chiedergli):');
+    righe.push('Se l’owner ti ha chiesto di lavorarla in locale, mettilo e rilancia (col segno e il lavoro fidato, alla chiusura si fonde senza chiedergli):');
     righe.push(`  node scripts/owner-feedback.mjs ${id} --solo-locale`);
     righe.push('Se il segno l’ha tolto lui, chiediglielo prima: la vuole rivedere prima della fusione, o lasciare alle routine.');
   }
   if (r && r.senzaProva && r.segnalato) {
     righe.push('È segnalato dai giudici: se l’owner se ne fida lo segna fidato lui, in Gestione, dopo averlo guardato.');
+  } else if (r && r.nonFidato) {
+    righe.push(SOLO_DA_GESTIONE_MIO);
   } else if (r && r.senzaProva) {
     // #912: il ripasso non dà più la prova al solo nome.
     righe.push(SOLO_DA_GESTIONE_MIO);
