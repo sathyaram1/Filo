@@ -17,11 +17,11 @@
 // COL TOKEN DELL'OWNER, SEMPRE (#595, #908)
 //   Si usa la STESSA strada dell'app (`src/shared/feedback.js`), testo cifrato
 //   verso l'owner, con la create autenticata che porta `senderProof: 'admin'`:
-//   senza quella prova il prefisso `local:` lo può scrivere chiunque. Chi lo
+//   senza quella prova il prefisso `local:` lo può scrivere chiunque. Porta l'impronta del biglietto della sessione
+//   (`bigliettoLocale`, #1148): la fiducia la decide il server da lì, e senza biglietto nasce non fidato. Chi lo
 //   lavora si sceglie ogni volta: `--locale` mette il segno `localOnly` (il
-//   lavoro di questa sessione: nessuna routine lo prende, e `npm run finish` col
-//   suo numero salta L5), `--non-locale` lo apre per le routine. Con la prova
-//   tutti e due saltano i giudici (#914): il primo va nei Lavori locali, il
+//   lavoro di questa sessione: nessuna routine lo prende), `--non-locale` lo apre per le routine. Fidati,
+//   tutti e due saltano i giudici: il primo va nei Lavori locali, il
 //   secondo In coda. Una routine non lo usa. Senza scelta
 //   non parte niente. Senza token (o col token rifiutato) non parte niente:
 //   da anonimo sarebbe un feedback d'utente. `--priorita` nasce col documento.
@@ -52,6 +52,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PRIORITA_AMMESSE, parsePriorita } from './lib/priorita.mjs';
+import { trovaBiglietto } from './lib/biglietto-locale.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura, come in owner-feedback.mjs:
@@ -162,7 +163,7 @@ export { PRIORITA_AMMESSE, parsePriorita };
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, biglietto = null } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
@@ -175,6 +176,8 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
     return { ok: false, codice: EXIT.RIFIUTATO, motivo: 'manca il token admin: senza la prova del mittente il feedback sarebbe di un utente. Rigenera le credenziali: node scripts/admin-login.mjs' };
   }
 
+  // Il biglietto della sessione: quello che vale (il più sporco); senza, o col server giù, il feedback nasce non fidato.
+  const b = biglietto || await trovaBiglietto().catch(() => null);
   let res;
   try {
     res = await FB.submit({
@@ -195,6 +198,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // Nasce col documento: il server alla nascita la vede e non la fa decidere al giudice (#914).
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
+      ...(b && b.fp ? { bigliettoLocale: b.fp } : {}),
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
@@ -207,6 +211,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
     senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly),
     priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
+    biglietto: b && b.fp ? (b.fiducia === 'fidato' ? 'pulito' : 'sporco') : 'assente',
   };
 }
 
@@ -368,7 +373,11 @@ export async function main(argvIn) {
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
   console.log(locale
     ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
-    : 'Aperto per le routine: con la prova del mittente salta i giudici e va dritto In coda.');
+    : 'Aperto per le routine.');
+  // La fiducia la decide il server dal biglietto (#1148): pulito salta i giudici, sporco o assente ci passa.
+  console.log(r.biglietto === 'pulito' ? 'Biglietto della sessione pulito: nasce fidato, niente giudici.'
+    : r.biglietto === 'sporco' ? 'Biglietto della sessione sporco: nasce non fidato, passa dai giudici e la fusione aspetta il tuo sì.'
+      : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
 
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {

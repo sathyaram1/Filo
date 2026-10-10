@@ -85,6 +85,7 @@ import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prov
 import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
 } from './lib/ramo-server.mjs';
+import { registraRamo } from './lib/biglietto-locale.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
 
@@ -973,6 +974,26 @@ export function shaPrimaAllineato(shaPrima, root = ROOT, base = `origin/${MAIN}`
 
 export function currentBranch(root = ROOT) { return git(['rev-parse', '--abbrev-ref', 'HEAD'], root); }
 export function headSha(root = ROOT) { return git(['rev-parse', 'HEAD'], root); }
+
+/** La riga che dice com'è andata la registrazione del ramo nel registro del server (#1148). PURA. */
+export function rigaRegistro(repo, r) {
+  const chi = repo === 'server' ? 'del server' : 'dell’app';
+  if (r && r.ok) return `Registro del ramo ${chi}: ${r.ramoFidato ? 'lavoro fidato, scritto solo da sessioni pulite' : 'non fidato: se i controlli lo fermano, la fusione aspetterà il tuo sì'}.`;
+  if (r && r.senzaBiglietto) return `Registro del ramo ${chi}: questa sessione non ha un biglietto (node scripts/biglietto.mjs stato), il lavoro non risulta fidato.`;
+  return `Registro del ramo ${chi} non scritto (${String((r && r.errore) || 'motivo sconosciuto').slice(0, 160)}): il lavoro non risulta fidato.`;
+}
+
+/**
+ * Questa sessione ha scritto la punta di adesso (#1148): una voce nel registro dei rami, con la fiducia del suo
+ * biglietto in questo momento. La chiamano start e finish. Mai un'eccezione: senza voce il lavoro non è fidato.
+ */
+export async function registraNelRegistro({ ramo, sha, feedbackId = '', server = null }, registra = registraRamo) {
+  const righe = [rigaRegistro('app', await registra({ repo: 'app', ramo, sha, feedbackId }))];
+  if (server && server.ramo && server.sha) {
+    righe.push(rigaRegistro('server', await registra({ repo: 'server', ramo: server.ramo, sha: server.sha, feedbackId })));
+  }
+  return righe;
+}
 /** Ci sono modifiche non salvate (anche solo nell'area di stage)? */
 export function isDirty(root = ROOT) { return git(['status', '--porcelain'], root).length > 0; }
 
@@ -1299,6 +1320,7 @@ if (isMain) {
       }
     }
     writeState(state);
+    for (const riga of await registraNelRegistro({ ramo: b, sha: state[b].requestedSha || headSha(), feedbackId: state[b].feedbackId || '', server: srvStart })) console.error(riga);
     // La pratica racconta il lavoro: presa in carico al primo giro, e a ogni giro com'è andato quello prima.
     if (state[b].feedbackId) {
       const { annotaPratica } = await import('./owner-feedback.mjs');
