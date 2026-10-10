@@ -100,7 +100,10 @@ export function rossiNotiDa(json) {
 
 const media = (v) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN);
 
-/** La base: le corse con un worker solo (durata media, rossi di almeno una). null senza corse da uno. PURA. */
+/**
+ * La base: le corse con un worker solo (durata media, rossi di almeno una, se tutte sono uscite a zero). null senza
+ * corse da uno. PURA.
+ */
 export function baseDa(corse) {
   const uno = corse.filter((c) => c.n === 1);
   if (!uno.length) return null;
@@ -108,6 +111,7 @@ export function baseDa(corse) {
     durataMs: media(uno.flatMap((c) => c.durateMs)),
     rossi: [...new Set(uno.flatMap((c) => c.rossi))].sort(),
     infra: [...new Set(uno.flatMap((c) => c.infra))],
+    uscitePulite: uno.every((c) => (c.codici || []).every((k) => k === 0)),
   };
 }
 
@@ -118,6 +122,12 @@ export function valutaCorsa(corsa, base, { rossiNoti = [], soglie = SOGLIE } = {
   const rossiInPiu = corsa.rossi.filter((r) => !noti.has(r));
   const durataMs = media(corsa.durateMs);
   if (rossiInPiu.length) motivi.push(`rossi in più: ${rossiInPiu.join(', ')}`);
+  // Un worker che cade senza una riga rossa riconoscibile (Playwright che non parte, un crollo) si vede solo
+  // dall'uscita: conta quando da solo il comando usciva pulito.
+  const cadute = (corsa.codici || []).map((k, i) => [k, i + 1]).filter(([k]) => k !== 0);
+  if (base && base.uscitePulite && corsa.n > 1 && cadute.length) {
+    motivi.push(`uscite diverse da zero: ${cadute.map(([k, i]) => `worker ${i} → ${k}`).join(', ')}`);
+  }
   if (corsa.infra.length) motivi.push(`infrastruttura: ${corsa.infra.join(', ')}`);
   if (corsa.tettoMb > 0 && corsa.piccoMb >= soglie.memoria * corsa.tettoMb) {
     motivi.push(`memoria ${Math.round(corsa.piccoMb)}/${Math.round(corsa.tettoMb)} MB oltre il ${Math.round(soglie.memoria * 100)}%`);
