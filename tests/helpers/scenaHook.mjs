@@ -8,7 +8,9 @@ import { cartellaTemporanea } from './percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const HOOKS_DIR = resolve(ROOT, '.claude', 'hooks');
-const HOOKS = ['auto-commit-merge.sh', 'cap-observe.sh'];
+// Gli automatismi che girano da soli a ogni modifica: il salvataggio e il diagnostico dei limiti di sessione. Due file,
+// ma rispondono alla stessa domanda («questo ramo lo posso toccare?») e devono rispondere allo stesso modo.
+export const HOOKS = ['auto-commit-merge.sh', 'cap-observe.sh'];
 const fatte = [];
 
 export function git(cwd, args) {
