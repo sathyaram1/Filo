@@ -200,7 +200,7 @@ async function main() {
   if (!existsSync(nudo)) spawnSync('git', ['init', '--bare', '-q', nudo]);
   const campioni = join(dir, 'campioni.jsonl');
   const rossiNoti = rossiNotiDa(JSON.parse(leggi(join(principale, 'tests', 'rossi-noti.json')) || '{}'));
-  console.log(`[misura-k] corse ${corseN.join(', ')} · comando «${comando}» · ramo ${ramo} · dati in ${dir}`);
+  console.log(`[misura-k] corse ${corseN.join(', ')} · comando «${comando}» · ramo ${ramo} · spec in più ${spec.join(', ') || 'nessuno'} · dati in ${dir}`);
 
   const corse = [];
   for (const [r, n] of corseN.entries()) {
