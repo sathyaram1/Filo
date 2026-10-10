@@ -1169,6 +1169,7 @@ if (isMain) {
       const r = await heartbeat(biglietto);
       if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
       console.log(`OK: semaforo vivo fino a ${r.expiresAt}`);
+      for (const a of r.avvisi) console.error(`misura scartata dal server (${a.campo}: ${a.reason}): ${a.detail || ''}`);
     } else {
       // Sessioni lunghe: si batte finché il biglietto vale. Quando il server
       // dice che è morto (rilasciato o semaforo caduto) il ciclo finisce da solo
