@@ -15,7 +15,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const {
   analizzaRighe, generaRapporto, trovaTranscript, slugProgetto, chiaveSicura,
-  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente,
+  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente, finestraOrchestratore, eRilascio,
 } = await import('../../scripts/session-report.mjs');
 
 const T = (s) => `2026-09-16T10:${s}.000Z`;
@@ -58,7 +58,7 @@ const RIGHE = [
 
 test('dieci righe: turni, freddi, token, strumenti, timeout, sotto-agenti, durata', async () => {
   const rep = await analizzaRighe(RIGHE, { role: 'resolver', ticket: 'tkt-1' });
-  assert.equal(rep.v, 2);
+  assert.equal(rep.v, 3);
   assert.equal(rep.role, 'resolver');
   assert.equal(rep.ticket, 'tkt-1');
   assert.equal(rep.sessionId, 'sess-1');
@@ -293,13 +293,15 @@ test('chi rilascia è un sotto-agente: il rapporto è il suo, non la sessione ma
     assert.equal((await generaRapporto({ cwd: progetto, configDir: config })).sessionId, 'w2');
     // L'orchestratore che rilascia il biglietto di un worker morto: il suo
     // messaggio dell'assistente è l'ultimo, e la finestra del biglietto
-    // (`since`) lascia fuori i suoi turni di prima e il worker 1.
+    // (`since`) lascia fuori il worker 1. I turni dell'orchestratore partono
+    // invece dalla fine del worker di prima: qui nessuna chiamata Agent, quindi
+    // dall'inizio della sessione (nessun altro rapporto li porta).
     writeFileSync(join(dir, 'orch.jsonl'), turnoDi('o3', T('30:00'), 1000, 50, 'orch') + '\n', { flag: 'a' });
     const orch = await generaRapporto({ role: 'orchestrator', cwd: progetto, configDir: config, since: T('15:00') });
     assert.equal(orch.sessionId, 'orch');
     assert.equal(orch.subagentRuns, 2, 'i due file dei sotto-agenti si leggono…');
-    assert.equal(orch.turns, 3, '…ma nella finestra ci sono solo il rilascio e i turni del worker 2');
-    assert.equal(orch.tokens.cacheWrite, 42000);
+    assert.equal(orch.turns, 5, '…ma del worker 1 non entra niente: o1, o2, o3 e i due turni del worker 2');
+    assert.equal(orch.tokens.cacheWrite, 73000);
     // Senza finestra, la sessione madre resta la somma di tutto (era così prima).
     const tutto = await generaRapporto({ cwd: progetto, configDir: config });
     assert.equal(tutto.turns, 7);
@@ -506,5 +508,245 @@ test('giro 6: la data della prima riga si trova anche oltre i 64 KB di compito',
     const senza = join(base, 'agent-y.jsonl');
     writeFileSync(senza, 'niente\n{"type":"user"}\n');
     assert.ok(Number.isNaN(primoTimestampMs(senza)));
+  } finally { togliCartella(base); }
+});
+
+// Il thread principale di una routine: due worker chiusi, un rilascio fatto
+// dall'orchestratore per un worker morto, il worker che sta rilasciando adesso.
+const H = (s) => `2026-10-07T${s}.000Z`;
+const orch = (id, ts, { cw = 0, cr = 0, out = 10, tool = null } = {}) => JSON.stringify({
+  type: 'assistant', timestamp: ts, sessionId: 'orch',
+  message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: out }, content: tool ? [tool] : [{ type: 'text', text: id }] },
+});
+const fine = (id, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'fatto' }] } });
+const PRINCIPALE = [
+  orch('o1', H('09:00:00'), { cw: 30000 }),
+  orch('o2', H('09:01:00'), { cr: 30000, tool: { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} } }),
+  fine('ag1', H('09:30:00')),
+  orch('o3', H('09:30:10'), { cr: 31000, cw: 2000 }),
+  orch('o4', H('09:31:00'), { cr: 33000, tool: { type: 'tool_use', id: 'ag2', name: 'Agent', input: {} } }),
+  fine('ag2', H('11:00:00')),
+  // il worker 2 è morto: rilascia l'orchestratore, e quel turno sta nel rapporto di allora
+  orch('o5', H('11:00:30'), { cw: 34000, tool: { type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release abc --role orchestrator' } } }),
+  fine('b1', H('11:01:00')),
+  orch('o6', H('11:02:00'), { cr: 34000, cw: 1000 }),
+  orch('o7', H('11:03:00'), { cr: 35000, tool: { type: 'tool_use', id: 'ag3', name: 'Agent', input: {} } }),
+];
+
+test('finestra dell\'orchestratore: dal rilascio (o dalla fine del worker) di prima alla chiamata Agent aperta', () => {
+  const f = finestraOrchestratore(PRINCIPALE);
+  const ids = f.righe.map((l) => JSON.parse(l).message.id).filter(Boolean);
+  assert.deepEqual(ids, ['o6', 'o7']);
+  assert.equal(f.attesaPrimaS, 90, 'da o5 a o6');
+  // Primo worker della sessione: tutto dall'inizio fino alla sua chiamata.
+  const primo = finestraOrchestratore(PRINCIPALE.slice(0, 2));
+  assert.deepEqual(primo.righe.map((l) => JSON.parse(l).message.id), ['o1', 'o2']);
+  // Secondo worker: dopo la fine del primo, col turno che riscalda la cache dopo 29 minuti.
+  const secondo = finestraOrchestratore(PRINCIPALE.slice(0, 5));
+  assert.deepEqual(secondo.righe.map((l) => JSON.parse(l).message.id).filter(Boolean), ['o3', 'o4']);
+  assert.equal(secondo.attesaPrimaS, 1750);
+});
+
+test('il rilascio dell\'orchestratore chiude la finestra comunque sia scritto il comando', () => {
+  const ids = (righe) => finestraOrchestratore(righe).righe.map((l) => JSON.parse(l).message.id).filter(Boolean);
+  const conComando = (command) => PRINCIPALE.map((l) => {
+    const e = JSON.parse(l);
+    if (e.message && e.message.id === 'o5') e.message.content[0].input.command = command;
+    return JSON.stringify(e);
+  });
+  // In cloud il preflight consegna gli strumenti col percorso intero fra virgolette (#1116, giro 4).
+  for (const c of [
+    'node "/tmp/filo tools/scripts/routine-channel.mjs" release abc --role orchestrator',
+    "FILO_ROUTINE=1 node '/tmp/t/scripts/routine-channel.mjs' release abc --role orchestrator",
+    'cd /repo && node C:\\filo\\scripts\\routine-channel.mjs release abc',
+  ]) {
+    assert.ok(eRilascio(c), c);
+    assert.deepEqual(ids(conComando(c)), ['o6', 'o7'], c);
+  }
+  for (const c of ['node scripts/routine-channel.mjs ticket x --json', 'grep -n "routine-channel.mjs release" x.md', 'node scripts/routine-channel.mjs.bak release abc']) {
+    assert.equal(eRilascio(c), false, c);
+  }
+});
+
+test('il rapporto del worker porta a parte i turni dell\'orchestratore, e la cache riscaldata', async () => {
+  const base = cartellaTemporanea('filo-rapporto-orch-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(dir, 'orch.jsonl'), PRINCIPALE.join('\n') + '\n');
+    // Il worker: un comando lungo fa scadere la cache a 5 minuti e il terzo turno riscrive quasi tutto.
+    const w = (id, ts, cw, cr) => JSON.stringify({ type: 'assistant', timestamp: ts, sessionId: 'w3', message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: 100 }, content: [{ type: 'text', text: id }] } });
+    writeFileSync(join(sub, 'agent-w3.jsonl'), [w('a1', H('11:03:10'), 40000, 0), w('a2', H('11:04:00'), 1000, 40000), w('a3', H('11:20:00'), 38000, 3000)].join('\n') + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 60, t - 60);
+    const rep = await generaRapporto({ role: 'verifier', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w3');
+    assert.equal(rep.rewarmTurns, 1, 'a3 scrive 38.000 e ne legge 3.000');
+    assert.equal(rep.rewarmTokens, 38000);
+    assert.equal(rep.coldTurns, 0, 'la definizione vecchia (lettura zero) non lo vedeva');
+    assert.equal(rep.maxContextTokens, 41000);
+    const o = rep.orchestrator;
+    assert.equal(o.turns, 2);
+    assert.deepEqual(o.tokens, { input: 0, cacheRead: 69000, cacheWrite: 1000, output: 20 });
+    assert.equal(o.costUsd, Math.round(((69000 * 0.2 + 1000 * 5 + 20 * 20) / 1e6) * 10000) / 10000);
+    assert.equal(o.attesaPrimaS, 90);
+    assert.equal(o.maxContextTokens, 35000);
+    assert.equal(rep.costUsd, 0.4096, 'costUsd resta quello del worker, senza l’orchestratore');
+    assert.match(riassunto(rep)[3], /orchestratore \$/);
+  } finally { togliCartella(base); }
+});
+
+// Worker in sottofondo (il default di Claude Code): la chiamata riceve subito
+// «Async agent launched», la fine arriva come notifica in più forme.
+const lanciato = (id, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'Async agent launched successfully.\nagentId: x' }] }] } });
+const notifica = (id) => `<task-notification>\n<task-id>x</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n</task-notification>`;
+const SOTTOFONDO = [
+  orch('s1', H('10:00:00'), { cw: 30000 }),
+  orch('s2', H('10:00:50'), { cr: 30000, tool: { type: 'tool_use', id: 'bg1', name: 'Agent', input: {} } }),
+  lanciato('bg1', H('10:00:53')),
+  orch('s3', H('10:01:00'), { cr: 30500 }),
+  JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp: H('11:31:05'), content: notifica('bg1') }),
+  JSON.stringify({ type: 'attachment', timestamp: H('11:31:05'), attachment: { type: 'queued_command', prompt: notifica('bg1') } }),
+  JSON.stringify({ type: 'user', timestamp: H('11:31:06'), message: { role: 'user', content: notifica('bg1') } }),
+  orch('s4', H('11:31:10'), { cw: 32000 }),
+  orch('s5', H('11:31:20'), { cr: 32000 }),
+  orch('s6', H('11:31:50'), { cr: 32500, tool: { type: 'tool_use', id: 'bg2', name: 'Agent', input: {} } }),
+  lanciato('bg2', H('11:31:53')),
+  orch('s7', H('11:32:00'), { cr: 33000 }),
+];
+
+test('worker in sottofondo: la finestra va dalla notifica del worker di prima a adesso, con l\'attesa vera e la cache riscritta', async () => {
+  const ids = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
+  const primo = finestraOrchestratore(SOTTOFONDO.slice(0, 4));
+  assert.deepEqual(ids(primo), ['s1', 's2', 's3'], 'il turno d\'attesa dopo il lancio è del primo worker');
+  const secondo = finestraOrchestratore(SOTTOFONDO);
+  assert.deepEqual(ids(secondo), ['s4', 's5', 's6', 's7']);
+  assert.equal(secondo.attesaPrimaS, 5410, 'da s3 a s4: un\'ora e mezza ferma, la cache a un\'ora è scaduta');
+  assert.equal(secondo.continua, true);
+  const r = await analizzaRighe(secondo.righe, { role: 'orchestrator', continua: secondo.continua });
+  assert.equal(r.rewarmTurns, 1, 's4 riscrive la cache');
+  // Il lancio in primo piano, a parità di passi, dà la stessa finestra.
+  const primoPiano = SOTTOFONDO.filter((l) => !l.includes('Async agent') && !l.includes('task-notification'));
+  primoPiano.splice(3, 0, fine('bg1', H('11:31:05')));
+  assert.deepEqual(ids(finestraOrchestratore(primoPiano.slice(0, -1))), ['s4', 's5', 's6']);
+});
+
+test('worker in sottofondo: la notifica si riconosce anche dal solo task-id; una che non lo nomina non lo chiude', () => {
+  const ids = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
+  const soloTask = SOTTOFONDO.map((l) => l.split('<tool-use-id>bg1</tool-use-id>').join(''));
+  assert.deepEqual(ids(finestraOrchestratore(soloTask)), ['s4', 's5', 's6', 's7'], 'agentId: x del lancio = task-id della notifica');
+  // Mentre il primo worker lavora arrivano notifiche d'altri: un comando (col suo tool-use-id), l'evento di un
+  // Monitor (solo il suo task-id), la fine di un artefatto osservato (nessun id), e un turno che nomina le notifiche.
+  const altrui = [
+    JSON.stringify({ type: 'user', timestamp: H('10:30:00'), message: { role: 'user', content: '<task-notification>\n<tool-use-id>toolu_bash</tool-use-id>\n</task-notification>' } }),
+    JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp: H('10:40:00'), content: '<task-notification>\n<task-id>bmonitor1</task-id>\n<summary>Monitor event: "finish"</summary>\n<event>EXIT 1</event>\n</task-notification>' }),
+    JSON.stringify({ type: 'attachment', timestamp: H('10:50:00'), attachment: { type: 'queued_command', prompt: '<task-notification>\n<task-type>artifact-watch-lifecycle</task-type>\n<summary>Stopped watching</summary>\n</task-notification>' } }),
+    orch('s3b', H('11:00:00'), { cr: 31000 }).replace('"content":[', '"content":[{"type":"text","text":"aspetto la <task-notification> del worker"},'),
+  ];
+  const conAltrui = SOTTOFONDO.slice(0, 4).concat(altrui);
+  assert.deepEqual(ids(finestraOrchestratore(conAltrui)), ['s1', 's2', 's3', 's3b'], 'il primo worker è ancora al lavoro');
+  const tutte = SOTTOFONDO.slice(0, 4).concat(altrui, SOTTOFONDO.slice(4));
+  const f = finestraOrchestratore(tutte);
+  assert.deepEqual(ids(f), ['s4', 's5', 's6', 's7']);
+  // Lo stesso con le notifiche d'altri mentre lavora il SECONDO worker: i turni prima del suo lancio restano suoi.
+  const dopo = SOTTOFONDO.concat(altrui.slice(1, 3));
+  assert.deepEqual(ids(finestraOrchestratore(dopo)), ['s4', 's5', 's6', 's7']);
+  assert.equal(finestraOrchestratore(dopo).attesaPrimaS, 5410);
+});
+
+test('una notifica citata nel risultato di uno strumento, o un id nel rapporto riportato, non chiude il worker', () => {
+  const ids = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
+  const citata = JSON.stringify({ type: 'user', timestamp: H('10:30:00'), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_read', content: notifica('bg1') }] } });
+  const riportato = JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp: H('10:40:00'), content: '<task-notification>\n<task-id>altro</task-id>\n<tool-use-id>toolu_altro</tool-use-id>\n<summary>Agent finished</summary>\n<result>ho visto <tool-use-id>bg1</tool-use-id></result>\n</task-notification>' });
+  const righe = SOTTOFONDO.slice(0, 4).concat(citata, riportato, orch('s3b', H('11:00:00'), { cr: 31000 }));
+  assert.deepEqual(ids(finestraOrchestratore(righe)), ['s1', 's2', 's3', 's3b']);
+});
+
+test('una richiesta fallita («<synthetic>») dopo la fine del worker non accorcia l\'attesa: la cache l\'ha toccata solo il turno vero', () => {
+  const sintetico = JSON.stringify({ type: 'assistant', timestamp: H('11:31:08'), sessionId: 'orch', message: { id: 'syn', model: '<synthetic>', usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 }, content: [{ type: 'text', text: 'API Error' }] } });
+  const righe = SOTTOFONDO.slice(0, 7).concat(sintetico, orch('s4', H('12:20:00'), { cw: 32000 }));
+  assert.equal(finestraOrchestratore(righe).attesaPrimaS, 8340, 'da s3 alle 10:01 a s4 alle 12:20, non fino alla richiesta fallita');
+});
+
+test('il turno che rilascia e chiama anche altro, su più righe, resta tutto nella finestra di prima', () => {
+  const riga = (ts, tool) => JSON.parse(orch('o5', ts, { cw: 34000, tool }));
+  const righe = PRINCIPALE.slice(0, 6).concat(
+    JSON.stringify(riga(H('11:00:30'), { type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release abc --role orchestrator' } })),
+    JSON.stringify(riga(H('11:00:31'), { type: 'tool_use', id: 'b2', name: 'Bash', input: { command: 'node scripts/dispatch.mjs --linea-principale' } })),
+    fine('b1', H('11:01:00')), fine('b2', H('11:01:01')),
+    PRINCIPALE[8], PRINCIPALE[9],
+  );
+  const f = finestraOrchestratore(righe);
+  assert.deepEqual(f.righe.map((l) => JSON.parse(l).message.id).filter(Boolean), ['o6', 'o7']);
+  assert.equal(f.attesaPrimaS, 89, 'dall\'ultima riga di o5 a o6');
+});
+
+test('worker morto: il rilascio dell\'orchestratore parte dalla fine del worker di prima, non dal biglietto', async () => {
+  const base = cartellaTemporanea('filo-rapporto-morto-');
+  try {
+    const file = join(base, 'orch.jsonl');
+    const righe = SOTTOFONDO.slice(0, 7).concat(
+      orch('s4', H('11:31:10'), { cw: 32000 }),
+      // il biglietto del worker che morirà
+      orch('s5', H('11:31:30'), { cr: 32000, tool: { type: 'tool_use', id: 'tk', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs ticket x --json' } } }),
+      orch('s6', H('11:31:50'), { cr: 32500, tool: { type: 'tool_use', id: 'bg2', name: 'Agent', input: {} } }),
+      lanciato('bg2', H('11:31:53')),
+      orch('s7', H('11:32:00'), { cr: 33000 }),
+      JSON.stringify({ type: 'user', timestamp: H('11:40:00'), message: { role: 'user', content: notifica('bg2') } }),
+      orch('s8', H('11:40:05'), { cr: 33000, tool: { type: 'tool_use', id: 'rel', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release tkt --role orchestrator' } } }),
+    );
+    writeFileSync(file, righe.join('\n') + '\n');
+    const rep = await generaRapporto({ transcript: file, role: 'orchestrator', since: H('11:31:30') });
+    assert.equal(rep.turns, 5, 's4 (fra la fine del worker di prima e il biglietto), s5, s6, s7, s8');
+    assert.equal(rep.rewarmTurns, 1, 's4 riscrive la cache dopo l\'attesa');
+    // Un ruolo che non è l'orchestratore resta dal biglietto.
+    const worker = await generaRapporto({ transcript: file, role: 'verifier', since: H('11:31:30') });
+    assert.equal(worker.turns, 4);
+  } finally { togliCartella(base); }
+});
+
+test('worker morto prima di dispatch: il rilascio dell\'orchestratore conta dal suo biglietto, non dal marcatore del worker di prima', async () => {
+  const base = cartellaTemporanea('filo-rapporto-marcatore-');
+  try {
+    const sess = join(base, 'orch.jsonl');
+    const sub = join(base, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const righe = SOTTOFONDO.slice(0, 7).concat(
+      orch('s4', H('11:31:10'), { cw: 32000 }),
+      orch('s5', H('11:31:30'), { cr: 32000, tool: { type: 'tool_use', id: 'tk', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs ticket x --json' } } }),
+      JSON.stringify({ type: 'user', timestamp: H('11:31:31'), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tk', content: '{"ticket":"tkt-due","role":"verifier"}' }] } }),
+      orch('s6', H('11:31:50'), { cr: 32500, tool: { type: 'tool_use', id: 'bg2', name: 'Agent', input: {} } }),
+      lanciato('bg2', H('11:31:53')),
+      JSON.stringify({ type: 'user', timestamp: H('11:32:10'), message: { role: 'user', content: notifica('bg2') } }),
+      orch('s8', H('11:32:20'), { cr: 33000, tool: { type: 'tool_use', id: 'rel', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release tkt-due --role orchestrator' } } }),
+    );
+    writeFileSync(sess, righe.join('\n') + '\n');
+    // Il worker 1 ha preso il suo biglietto alle 10:01 (marcatore di dispatch) e il suo costo è già nel suo rilascio.
+    writeFileSync(join(sub, 'agent-w1.jsonl'), [orch('w1a', H('10:01:10'), { cw: 25000 }), orch('w1b', H('11:30:00'), { cr: 25000, out: 1000 })].join('\n') + '\n');
+    const rep = await generaRapporto({ transcript: sess, role: 'orchestrator', ticket: 'tkt-due', since: H('10:01:05') });
+    assert.equal(rep.turns, 4, 's4, s5, s6, s8: né s1–s3 né i turni del worker 1, già nel rapporto del suo biglietto');
+    assert.equal(rep.subagentCostUsd, 0);
+    assert.equal(rep.rewarmTurns, 1, 's4 riscrive la cache dopo l\'attesa');
+    // Senza il momento del biglietto, dall'ultimo confine e con la nota: mai dall'inizio della sessione.
+    const senza = await generaRapporto({ transcript: sess, role: 'orchestrator', ticket: 'altro', since: '' });
+    assert.equal(senza.turns, 1);
+    assert.ok(senza.notes.some((n) => /momento del biglietto non trovato/.test(n)), senza.notes.join(' | '));
+  } finally { togliCartella(base); }
+});
+
+test('il marcatore di un altro biglietto non dà il momento del rilascio', async () => {
+  const { readTicketSince } = await import('../../scripts/lib/routine-ticket.mjs');
+  const base = cartellaTemporanea('filo-marcatore-altro-');
+  try {
+    mkdirSync(join(base, '.claude'), { recursive: true });
+    const since = new Date(Date.now() - 60000).toISOString();
+    writeFileSync(join(base, '.claude', 'routine-ticket.json'), JSON.stringify({ ticket: 'uno', since }));
+    assert.equal(readTicketSince(base, { ticket: 'uno' }), since);
+    assert.equal(readTicketSince(base, { ticket: 'due' }), '');
+    assert.equal(readTicketSince(base), since);
   } finally { togliCartella(base); }
 });
