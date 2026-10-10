@@ -15,7 +15,12 @@ export function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
-export function scene() {
+/**
+ * Repo isolato con finto origin, e una copia degli hook veri da eseguire. `poison` avvelena la configurazione locale
+ * di git come nello scenario reale: `push.default=upstream` + `branch.<ramo>.merge=refs/heads/main` è ciò che git
+ * imposta DA SÉ su ogni ramo nato da origin/main.
+ */
+export function scene({ poison = false } = {}) {
   const base = cartellaTemporanea('filo-hook-');
   fatte.push(base);
   const origin = resolve(base, 'origin.git');
@@ -24,6 +29,11 @@ export function scene() {
   git(origin, ['init', '--bare', '-q', '--initial-branch=main']);
   git(work, ['init', '-q', '--initial-branch=main']);
   git(work, ['remote', 'add', 'origin', origin]);
+  if (poison) {
+    git(work, ['config', 'push.default', 'upstream']);
+    git(work, ['config', 'branch.main.merge', 'refs/heads/main']);
+    git(work, ['config', 'branch.main.remote', 'origin']);
+  }
   writeFileSync(resolve(work, 'README.md'), 'base\n', 'utf8');
   git(work, ['add', '-A']);
   git(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'base']);
