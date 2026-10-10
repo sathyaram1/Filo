@@ -227,7 +227,9 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
       const righe = [`✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`];
       if (r.skippedL5) {
         const blocchi = Array.isArray(r.blocks) ? r.blocks : [];
-        righe.push(`  L5 saltato: lavoro locale di ${pratica}, ${r.approvato ? `feedback ${r.daRoutine ? 'di una routine' : 'di un utente'} che hai approvato come lavoro locale` : 'mittente provato'}.`);
+        const perche = r.fidato ? 'lavoro fidato, scritto solo da sessioni col biglietto pulito'
+          : r.approvato ? `feedback ${r.daRoutine ? 'di una routine' : 'di un utente'} che hai approvato come lavoro locale` : 'mittente provato';
+        righe.push(`  L5 saltato: lavoro locale di ${pratica}, ${perche}.`);
         righe.push(blocchi.length
           ? `  Blocchi registrati (${blocchi.length}), li rileggi in Gestione → Automazioni, «Fuse senza chiedere»:\n${blocchi.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
           : '  Nessun blocco registrato: i controlli non avrebbero fermato niente.');
