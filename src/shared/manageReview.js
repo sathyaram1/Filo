@@ -164,20 +164,19 @@
 
     const p = fb && fb.pipeline;
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
-    const trusted = isFidato(fb);
+    // Lo stato lo decide statusForDecision sul server, che fino al §10 esenta da attacco/spam il mittente provato.
+    const trusted = isTrustedClient(fb && fb.clientId, fb && fb.senderProof);
     const status = (fb && fb.status) || 'new';
     // "Da giudicare": feedback aperto e in attesa di giudizio. Esclude i chiusi
     // (done/verified/archived/ignored) e i `clarify` (sono un dialogo con l'owner,
     // non in attesa dei giudici).
     const judgeable = !CLOSED_STATUSES.includes(status) && status !== 'clarify';
 
-    // Feedback FIDATO SENZA verdetti = i giudici non sono (ancora) girati su un
-    // feedback che non ne aveva bisogno, o l'identità era stata flaggata per
-    // errore. NON è un blocco: è "da ri-giudicare" (bianco). Va prima dei
-    // controlli di blocco identità.
-    if (p && trusted && verdicts.length === 0 && judgeable) {
+    // SENZA verdetti: fidato coi giudici saltati alla nascita → nessun colore; mittente provato flaggato per errore
+    // → "da ri-giudicare" (bianco), non un blocco. Va prima dei controlli di blocco identità.
+    if (p && verdicts.length === 0 && judgeable) {
       if (judgesSkippedText(fb)) return null;
-      return { reason: 'unfiltered', ...REASONS.unfiltered };
+      if (trusted) return { reason: 'unfiltered', ...REASONS.unfiltered };
     }
 
     // Nessun pipeline: un feedback APERTO non ancora giudicato → bianco ("non
@@ -576,7 +575,8 @@
       if (panelComplete(fb)) {
         const worst = worstVerdictBlock(fb);
         if (worst) {
-          const chi = isFidato(fb) ? 'Fidato, ma segnalato' : 'Segnalato';
+          const chi = isFidato(fb) ? 'Fidato, ma segnalato'
+            : isTrustedClient(fb.clientId, fb.senderProof) ? 'Mittente provato, segnalato' : 'Segnalato';
           return { text: `${chi} come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
         }
         return null;

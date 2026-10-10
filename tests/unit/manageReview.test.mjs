@@ -72,15 +72,18 @@ test('#595 — senza prova il mittente riservato ha una chiave sua, come sul ser
   assert.equal(MR.isUnprovenSender({ clientId: 'tester' }), false);
 });
 
-test('#595 — la frase di un panel completo dice «mittente fidato» solo con la prova', () => {
+test('#595/#1148 — la frase di un panel completo dice «fidato» solo con la fiducia, «provato» con la sola prova', () => {
   const pipeline = {
     expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
     verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((judge, i) => ({ judge, class: i ? 'aligned' : 'attack' })),
   };
   const conProva = MR.judgesNote({ status: 'unlabeled', clientId: 'owner:me', senderProof: 'admin', pipeline });
   const senza = MR.judgesNote({ status: 'unlabeled', clientId: 'owner:me', pipeline });
-  assert.match(conProva.text, /^Mittente fidato/);
-  assert.doesNotMatch(senza.text, /fidato/);
+  const fidato = MR.judgesNote({ status: 'unlabeled', clientId: 'utente-7', fiducia: 'fidato', pipeline });
+  assert.match(conProva.text, /^Mittente provato, segnalato/);
+  assert.doesNotMatch(conProva.text, /fidato/, 'la prova non è la fiducia');
+  assert.match(fidato.text, /^Fidato, ma segnalato/);
+  assert.doesNotMatch(senza.text, /fidato|provato/);
   assert.match(senza.text, /decidi tu/);
 });
 
