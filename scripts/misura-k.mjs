@@ -1,13 +1,7 @@
 #!/usr/bin/env node
-// Misura di K (SPEC-DOMANDE.md §12.2, #1157): quanti worker reggono insieme in un contenitore, con `finish:check` in un
-// clone ciascuno. Dati e log solo in <tmpdir>/filo-k/ (mai nel repo); i cloni spediscono su un repo nudo locale, mai
-// su GitHub. Unit test delle parti pure: tests/unit/misuraK.test.mjs.
-//
+// Misura di K (SPEC-DOMANDE.md §12.2, #1157): quanti worker reggono insieme, `finish:check` in un clone ciascuno. Dati
+// e log solo in <tmpdir>/filo-k/, mai nel repo; i clone spediscono su un repo nudo locale, mai su GitHub. Prove: misuraK.
 //   node scripts/misura-k.mjs [--corse 1,1,2,3,4] [--comando "npm run finish:check"] [--ramo <ref>] [--tieni]
-//
-// Soglie (T7 della mappa #1157): per ogni N, nessun rosso in più rispetto a un worker solo (rossi noti esclusi),
-// nessun errore d'infrastruttura, picco di memoria sotto l'85% del tetto, tempo medio entro 1,5 volte quello di uno
-// solo. K = il più grande N che le rispetta, salendo da 1 senza buchi.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
