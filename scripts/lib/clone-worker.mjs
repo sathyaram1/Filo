@@ -63,7 +63,6 @@ export function elencoCloni(principale) {
   }).sort((a, b) => a.indice - b.indice);
 }
 
-const esisteLink = (p) => { try { lstatSync(p); return true; } catch (_) { return false; } };
 const eLink = (p) => { try { return lstatSync(p).isSymbolicLink(); } catch (_) { return false; } };
 
 /** Mai ricorsivo: si toglie il collegamento, non quello a cui punta (una junction attraversata svuota il principale). */
