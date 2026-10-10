@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, relative, sep } from 'node:path';
 import { collectTestFiles } from '../../scripts/run-unit-tests.mjs';
 import { costoInUnita, rapportoFraCosti, unitaDiRiferimento, GIRI } from '../helpers/tempoRelativo.mjs';
+import { pidMorto } from '../helpers/processi.mjs';
 
 const QUI = fileURLToPath(import.meta.url);
 const ROOT = join(dirname(QUI), '..', '..');
