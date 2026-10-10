@@ -26,6 +26,8 @@ const { commandExists, existenceProbes } = require(
 );
 
 const SHELL = process.platform === 'win32' ? 'powershell' : undefined;
+// La risposta vera del sistema, non i dieci secondi del prodotto: con la macchina carica non bastano (#1063).
+const SISTEMA = { shell: SHELL, attesaMs: TETTO_ATTESA_MS };
 
 test('riconosce un eseguibile sempre presente (node)', async () => {
   assert.equal(await commandExists({ ...SISTEMA, command: 'node' }), true);
