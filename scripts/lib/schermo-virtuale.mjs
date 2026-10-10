@@ -1,5 +1,6 @@
 // Come uno script lancia un comando che apre Electron: su Linux senza schermo ci mette davanti
-// `xvfb-run -a` e ELECTRON_DISABLE_SANDBOX=1, o si ferma dicendo cosa manca. Windows e Mac: invariato.
+// `xvfb-run -a` (con `-n <base>` per un worker in parallelo) e ELECTRON_DISABLE_SANDBOX=1, o si ferma
+// dicendo cosa manca. Windows e Mac: invariato.
 // Unit test: tests/unit/schermoVirtuale.test.mjs.
 
 import { spawnSync } from 'node:child_process';
