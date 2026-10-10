@@ -74,17 +74,16 @@ export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) 
 }
 
 // I marcatori dei turni della conversazione (gemelli di USER_TURN_RE e MODEL_TURN_RE in src/shared/feedbackThread.js).
-const TURNO_OWNER_RE = /^---s*(?:Riaperto il|La tua risposta del)s*.*?s*---s*$/;
-const TURNO_ALTRI_RE = /^---s*(?:Aggiornamento dell'agente del|Filo ha risposto il)s*.*?s*---s*$/;
+const TURNO_OWNER_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*.*?\s*---\s*$/;
+const TURNO_ALTRI_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*.*?\s*---\s*$/;
 
 /**
  * La conversazione contiene testo scritto da altri che dall'owner (routine, sessioni, Filo)? PURA. Il server sa se
- * l'ha scritto un biglietto sporco (\), da qui no: nel dubbio, chi la stampa si sporca.
+ * l'ha scritto un biglietto sporco (`scrittoSporco`), da qui no: nel dubbio, chi la stampa si sporca.
  */
 export function noteConScrittiDiAltri(notes) {
   let altri = true;
-  for (const riga of String(notes || '').split(/?
-/)) {
+  for (const riga of String(notes || '').split(/\r?\n/)) {
     if (TURNO_OWNER_RE.test(riga)) { altri = false; continue; }
     if (TURNO_ALTRI_RE.test(riga)) { altri = true; continue; }
     if (riga.startsWith('@@filo-attachment ')) continue;
