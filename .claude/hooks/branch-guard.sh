@@ -159,7 +159,8 @@ if [ "$QUANTE" -gt 1 ]; then
     deriva_di "$dir" && continue
     if [ "$CURRENT" = "HEAD" ]; then dove="staccata"; else dove="sul ramo '$CURRENT'"; fi
     [ -n "$AVVISI" ] && AVVISI="$AVVISI\\n"
-    AVVISI="$AVVISI[branch-guard] il comando nomina più cartelle di lavoro: '$dir' è $dove invece che su '$EXPECTED'. Se è la tua, torna sul ramo assegnato prima di proseguire."
+    # Barre normali: una barra rovesciata di Windows romperebbe la stringa JSON.
+    AVVISI="$AVVISI[branch-guard] il comando nomina più cartelle di lavoro: '$(printf '%s' "$dir" | tr '\\' '/')' è $dove invece che su '$EXPECTED'. Se è la tua, torna sul ramo assegnato prima di proseguire."
   done <<EOF_CARTELLE
 $CARTELLE
 EOF_CARTELLE
