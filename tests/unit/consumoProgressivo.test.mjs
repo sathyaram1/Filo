@@ -3,9 +3,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, truncateSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, truncateSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const { avanzaFile, consumoSessione, principaleDi, sessioneDa, statoFile, totaliDi } = await import('../../scripts/lib/consumo-progressivo.mjs');
 const { analizzaRighe } = await import('../../scripts/session-report.mjs');
@@ -45,7 +45,7 @@ test('un messaggio diviso fra due letture vale la sua ULTIMA usage, come nel rap
     const rep = await rapportoDi(principale);
     assert.equal(t.output, rep.tokens.output);
     assert.equal(Math.round(t.costo * 10000) / 10000, rep.costUsd, 'stesso prezzo del rapporto');
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 test('una riga a metà si legge solo quando è intera; un file accorciato si rilegge da capo', () => {
@@ -64,7 +64,7 @@ test('una riga a metà si legge solo quando è intera; un file accorciato si ril
     writeFileSync(principale, riga('n1', 9));
     st = avanzaFile(principale, st);
     assert.equal(totaliDi(st).output, 9, 'riscritto più corto: niente resti della lettura vecchia');
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 test('consumo della sessione intera: principale + sotto-agenti, idempotente, e dal sotto-agente si risale', () => {
@@ -87,7 +87,7 @@ test('consumo della sessione intera: principale + sotto-agenti, idempotente, e d
     writeFileSync(join(sub, 'agent-y.jsonl'), riga('s2', 5));
     assert.equal(consumoSessione({ root, env, configDir: casa }).consumo.tokens.output, 35);
     assert.ok(existsSync(statoFile(root)));
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 test('stato illeggibile: si ricomincia senza lanciare, con lo stesso risultato', () => {
@@ -100,7 +100,7 @@ test('stato illeggibile: si ricomincia senza lanciare, con lo stesso risultato',
     assert.deepEqual(consumoSessione({ root, env, configDir: casa }).consumo, giusto);
     writeFileSync(statoFile(root), JSON.stringify({ sessioni: { 'sess-a': { file: { [principale]: { offset: 'x' } }, aggiornatoIl: Date.now() } } }));
     assert.deepEqual(consumoSessione({ root, env, configDir: casa }).consumo, giusto);
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 test('sessione: FILO_SESSION_ID si cerca nelle cartelle del progetto; senza indicazioni nessun ripiego fuori da una routine', () => {
@@ -116,7 +116,7 @@ test('sessione: FILO_SESSION_ID si cerca nelle cartelle del progetto; senza indi
     assert.equal(sessioneDa({ env: {}, cwd, configDir: casa }).file, '', 'in locale il «più recente» può essere la sessione di un altro');
     assert.ok(sessioneDa({ env: {}, cwd, configDir: casa, ripiego: true }).file.endsWith('.jsonl'));
     assert.equal(consumoSessione({ root, env: {}, cwd, configDir: casa }).consumo, null);
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 test('battito: consumo, barra e lettura della barra solo se è di questa sessione', async () => {
@@ -151,7 +151,7 @@ test('battito: consumo, barra e lettura della barra solo se è di questa session
     assert.deepEqual(corpo.quota, lettura);
     assert.ok('uptimeS' in corpo, 'le misure del contenitore restano');
     assert.equal(r.avvisi[0].reason, 'reset_fuori_ancora');
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 test('il file di stato del consumo è un marcatore di sessione: gitignorato ed escluso', () => {

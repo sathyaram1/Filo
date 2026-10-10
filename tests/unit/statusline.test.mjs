@@ -3,10 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/statusline.mjs', import.meta.url));
 const { barra, invia, letturaDa, quotaFile, invioFile, INVIO_OGNI_MS } = await import('../../scripts/statusline.mjs');
@@ -42,7 +42,7 @@ test('barra: scrive la lettura per sessione, stampa la riga, lancia l invio al m
     assert.equal(lanci, 2);
     // Nessun file temporaneo lasciato in giro: la scrittura è un rename.
     assert.deepEqual(readdirSync(join(home, '.claude')).filter((n) => n.endsWith('.tmp')), []);
-  } finally { rmSync(home, { recursive: true, force: true }); }
+  } finally { togliCartella(home); }
 });
 
 test('barra: senza limiti la sessione si registra (barra presente) ma la lettura buona non si perde', () => {
@@ -57,7 +57,7 @@ test('barra: senza limiti la sessione si registra (barra presente) ma la lettura
     assert.ok(f.sessioni['sess-b'], 'la barra ha girato in sess-b');
     assert.equal(f.sessioni['sess-b'].lettura, undefined);
     assert.equal(f.ultima.pct7d, 61, 'l ultima lettura vera resta');
-  } finally { rmSync(home, { recursive: true, force: true }); }
+  } finally { togliCartella(home); }
 });
 
 test('barra: stdin rotto o file illeggibile non lanciano mai', () => {
@@ -69,7 +69,7 @@ test('barra: stdin rotto o file illeggibile non lanciano mai', () => {
     writeFileSync(quotaFile(home), 'spazzatura');
     barra(JSON.stringify(STDIN), { home, nowMs: NOW, lancia: () => { throw new Error('rete giù'); }, scrivi: (s) => righe.push(s) });
     assert.deepEqual(righe, ['5h – · 7g –\n', '5h 34% · 7g 61%\n']);
-  } finally { rmSync(home, { recursive: true, force: true }); }
+  } finally { togliCartella(home); }
 });
 
 test('invia: la lettura va a ownerCrediti op:lettura col token; l esito resta scritto, anche «non ancora pubblicata»', async () => {
@@ -87,7 +87,7 @@ test('invia: la lettura va a ownerCrediti op:lettura col token; l esito resta sc
     assert.match(JSON.parse(readFileSync(invioFile(home), 'utf8')).errore, /non ancora pubblicata/);
     const senza = await invia({ home, nowMs: NOW + 2, token: null, fetchImpl: async () => { throw new Error('mai'); } });
     assert.equal(senza.ok, false);
-  } finally { rmSync(home, { recursive: true, force: true }); }
+  } finally { togliCartella(home); }
 });
 
 test('lo script vero: stdin finto, una riga, il file nella casa indicata', async () => {
@@ -103,5 +103,5 @@ test('lo script vero: stdin finto, una riga, il file nella casa indicata', async
     assert.equal(out.err, null);
     assert.equal(out.so, '5h 34% · 7g 61%\n');
     assert.ok(existsSync(quotaFile(home)));
-  } finally { rmSync(home, { recursive: true, force: true }); }
+  } finally { togliCartella(home); }
 });
