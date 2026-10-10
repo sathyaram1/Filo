@@ -146,9 +146,13 @@ if (resolve(process.argv[1] || '') === resolve(QUI)) {
     try { await invia({ home: process.env.FILO_QUOTA_HOME || os.homedir() }); } catch (_) { /* staccato: nessuno legge */ }
   } else {
     let testo = '';
+    let fatto = false;
+    // Uno stdin che non si chiude non deve appendere la barra: dopo due secondi si stampa con quello che c'è.
+    const una = () => { if (fatto) return; fatto = true; barra(testo); process.exit(0); };
+    setTimeout(una, 2000).unref();
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', (c) => { testo += c; });
-    process.stdin.on('end', () => barra(testo));
-    process.stdin.on('error', () => barra(''));
+    process.stdin.on('end', una);
+    process.stdin.on('error', una);
   }
 }
