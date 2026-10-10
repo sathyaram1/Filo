@@ -88,8 +88,9 @@ function copiaBin(da, a) {
   for (const voce of readdirSync(da, { withFileTypes: true })) {
     const s = resolve(da, voce.name);
     const d = resolve(a, voce.name);
-    // Un collegamento relativo (../pacchetto/cli.js) porta al pacchetto collegato del clone; dove il sistema lo nega, la copia.
-    if (voce.isSymbolicLink()) { try { symlinkSync(readlinkSync(s), d); continue; } catch (_) { /* sotto, copiato */ } }
+    // Su Linux e Mac le voci sono collegamenti relativi (../pacchetto/cli.js): rifatti uguali portano al pacchetto
+    // collegato del clone, e lì il tipo non conta. Su Windows sono file (cmd-shim) e si copiano.
+    if (voce.isSymbolicLink() && process.platform !== 'win32') { try { collega(readlinkSync(s), d); continue; } catch (_) { /* sotto, copiato */ } }
     try { copyFileSync(s, d); } catch (_) { /* un collegamento rotto nel principale: niente da copiare */ }
   }
 }
