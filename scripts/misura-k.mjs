@@ -56,30 +56,38 @@ const INFRASTRUTTURA = [
 ];
 
 /**
- * Le righe di un log che non vengono dai rapporti dei test: fuori il TAP di node --test (titoli, uscita dei test come
- * diagnostica, blocchi YAML) e i titoli di Playwright e dell'elenco dei rossi. Un test verde che si chiama «index.lock
- * a terra» non è un guasto della macchina; un test che cade per un guasto vero è già un rosso. PURA.
+ * Le righe di un log, ciascuna con `tap` vero se viene dal TAP di node --test: risultati, titoli, l'uscita dei test
+ * come diagnostica `#`, blocchi YAML. Lì dentro parlano i test, verdi compresi, non la macchina. PURA.
  */
-export function righeFuoriDaiTest(testo) {
-  const fuori = [];
-  // Il blocco YAML di node --test segue la riga del risultato, allo stesso rientro dei suoi campi, e chiude con `...`.
+export function righeDelLog(testo) {
+  const righe = [];
+  // Il blocco YAML segue la riga del risultato, allo stesso rientro dei suoi campi, e chiude con `...`.
   let yaml = null;
   let dopoRisultato = false;
   for (const riga of String(testo || '').split(/\r?\n/)) {
     if (yaml !== null) {
       const rientro = riga.match(/^\s*/)[0].length;
-      if (riga.trim() === '...' && rientro === yaml) { yaml = null; continue; }
-      if (!riga.trim() || rientro >= yaml) continue;
+      if (riga.trim() === '...' && rientro === yaml) { yaml = null; righe.push({ riga, tap: true }); continue; }
+      if (!riga.trim() || rientro >= yaml) { righe.push({ riga, tap: true }); continue; }
       yaml = null;
     }
     const apre = dopoRisultato && riga.match(/^(\s*)---\s*$/);
     dopoRisultato = /^\s*(not )?ok \d+\b/.test(riga);
-    if (apre) { yaml = apre[1].length; continue; }
-    if (/^\s*(#|(not )?ok \d+\b|1\.\.\d+\s*$|TAP version)/.test(riga)) continue;
-    if (/^\s*(ok|x|✓|✘|✖|×|-|°)\s+\d+\s/.test(riga) || /^\s*\d+\)\s/.test(riga) || /[✘✖×]/.test(riga)) continue;
-    fuori.push(riga);
+    if (apre) yaml = apre[1].length;
+    righe.push({ riga, tap: !!apre || /^\s*(#|(not )?ok \d+\b|1\.\.\d+\s*$|TAP version)/.test(riga) });
   }
-  return fuori.join('\n');
+  return righe;
+}
+
+const TITOLO_DI_TEST = (riga) => /^\s*(ok|x|✓|✘|✖|×|-|°)\s+\d+\s/.test(riga) || /^\s*\d+\)\s/.test(riga) || /[✘✖×]/.test(riga);
+
+/**
+ * Le righe che non vengono dai rapporti dei test: fuori il TAP e i titoli di Playwright e dell'elenco dei rossi. Un
+ * test verde che si chiama «index.lock a terra» non è un guasto della macchina; uno che cade per un guasto vero è già
+ * un rosso. PURA.
+ */
+export function righeFuoriDaiTest(testo) {
+  return righeDelLog(testo).filter((r) => !r.tap && !TITOLO_DI_TEST(r.riga)).map((r) => r.riga).join('\n');
 }
 
 /** I nomi delle famiglie d'errore d'infrastruttura trovate in un log, fuori dai rapporti dei test. PURA. */
