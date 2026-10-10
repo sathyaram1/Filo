@@ -33,10 +33,15 @@ export function erroriInfrastruttura(testo) {
   return INFRASTRUTTURA.filter(([, re]) => re.test(t)).map(([nome]) => nome);
 }
 
-/** I file di prova rossi di un log di `finish:check` (Playwright e riepilogo degli unit), senza doppioni. PURA. */
+/**
+ * I rossi di un log di `finish:check`, senza doppioni: i file di Playwright e del riepilogo degli unit, e i test di
+ * primo livello del TAP che `node --test` scrive quando l'uscita non è un terminale (lì il nome del test). PURA.
+ */
 export function estraiRossi(testo) {
   const rossi = new Set();
   for (const riga of String(testo || '').split(/\r?\n/)) {
+    const tap = riga.match(/^not ok \d+ - (.+?)\s*(?:#.*)?$/);
+    if (tap) { rossi.add(tap[1].replace(/\\+/g, '/')); continue; }
     if (!/(✘|✖|×|^\s*\d+\)\s)/.test(riga)) continue;
     const m = riga.match(/tests\/[\w./ -]+?\.(?:spec|test)\.mjs/);
     if (m) rossi.add(m[0]);
