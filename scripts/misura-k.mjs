@@ -146,6 +146,9 @@ export function calcolaK(corse, { rossiNoti = [], soglie = SOGLIE } = {}) {
   const base = baseDa(corse);
   if (!base) return { k: null, motivo: 'nessuna corsa con un worker solo: manca la base' };
   if (base.infra.length) return { k: null, motivo: `la base ha errori d'infrastruttura (${base.infra.join(', ')}): misura da rifare` };
+  if (!base.uscitePulite && !base.rossi.length) {
+    return { k: null, motivo: 'la base esce con errore senza un rosso riconoscibile: la misura non vedrebbe cosa cade, da rifare' };
+  }
   const tetto = corse.filter((c) => c.n === 1).find((c) => c.tettoMb > 0 && c.piccoMb >= soglie.memoria * c.tettoMb);
   if (tetto) return { k: null, motivo: 'già un worker solo supera la soglia di memoria' };
   let k = 1;
