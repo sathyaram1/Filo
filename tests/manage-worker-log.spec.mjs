@@ -14,6 +14,7 @@
 // sessione admin): si verifica la resa e la traduzione dei ruoli.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -27,7 +28,7 @@ test('la tab Log apre il pannello dedicato', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  await page.click('.mg-tab[data-tab="log"]');
+  await apriScheda(page, 'log');
   await expect(page.locator('#panel-log')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveClass(/mg-tab--active/);
 });

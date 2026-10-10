@@ -1,6 +1,7 @@
 // #465: la ricerca fra i feedback prende il modello da Gestione → Modelli di supporto, sul main vero
 // (owner, Firestore e OpenRouter finti). Un salvataggio non sceglie per lei; senza modello la pagina dice dove si imposta.
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const DEFAULTS = {
   provider: 'openrouter',
@@ -67,7 +68,7 @@ test('salvare Gestione mentre i Modelli predefiniti non sono ancora arrivati las
 
   const page = await openTab('filo://manage/manage.html');
   await page.waitForFunction(() => window.filo && window.__mgTest);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await apriScheda(page, 'models');
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 8000 });
   // L'owner cambia solo un giudice e salva.
   const giudice = page.locator('.mg-sm-slot[data-slot="judge2"] .sn-chain-input').first();
@@ -112,7 +113,7 @@ test('mai impostata in Gestione: segue la catena in uso finché l\'owner non la 
   await preparaOwner(app, { supportDoc: { judge1: 'flash' }, defaults: { ...DEFAULTS, modelRegistry: { ...DEFAULTS.modelRegistry, nuovo: { provider: 'openrouter', model: 'vendor/nuovo' } } } });
   const page = await openTab('filo://manage/manage.html');
   await page.waitForFunction(() => window.filo && window.__mgTest);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await apriScheda(page, 'models');
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 8000 });
   const campo = page.locator('.mg-sm-slot[data-slot="manageSearch"] .sn-chain-input').first();
   await expect(campo).toHaveValue('vecchio');

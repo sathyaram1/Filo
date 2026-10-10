@@ -37,6 +37,7 @@
 //   gate proprietario si verificano invece SENZA stub, sul main vero.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const NEWTAB = 'filo://newtab/';
 const MANAGE = 'filo://manage/manage.html';
@@ -127,13 +128,13 @@ async function apriGestione(page, opts) {
   await page.evaluate((admin) => window.__mgTest.setAdmin(admin), opts?.admin !== false);
   await page.evaluate(() => window.__mgTest.setData([]));
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 }
 
 /** Gestione → Automazioni: dove vive la traccia delle decisioni passate. */
 async function apriAutomazioni(page, opts) {
   await apriGestione(page, opts);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 }
 
 // ── 1. Una fusione senza segnalazione l'owner la trova in Automazioni ───────
@@ -298,7 +299,7 @@ test('l’elenco vive in Automazioni: sulle schede-lista non c’è', async ({ o
   }
 
   // Tornando in Automazioni è ancora lì, senza ricaricare niente.
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac')).toBeVisible();
 });
 

@@ -3,6 +3,7 @@
 // Il finto server copia il main: legge, scrive, rilegge, e ogni passo può tardare.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -10,7 +11,7 @@ async function apri(openTab) {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo && window.SN_ROUTINE_SESSIONI);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await page.evaluate(() => {
     const attesa = (ms) => new Promise((r) => setTimeout(r, ms || 0));
     window.__auto = {

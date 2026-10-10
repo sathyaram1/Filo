@@ -31,6 +31,7 @@
 //   VERO di lettura e disegno della pagina.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const SHA = 'a1b2c3d4'.repeat(5);
@@ -664,7 +665,7 @@ test('una fusione senza segnalazione non sparisce: resta in Automazioni', async 
   // Un ramo locale chiuso con la pubblicazione: numero non ne ha.
   await apri(page, [FB_COMPLETO], { pending: [richiesta({ id: 'ff'.repeat(12), num: '', origin: 'locale', branch: 'claude/lavoro-locale' })] });
 
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const elenco = page.locator('#mgMergeApprovalsOrphans .sn-mac');
   await expect(elenco).toBeVisible({ timeout: 8_000 });
   await expect(elenco).toContainText('claude/lavoro-locale');

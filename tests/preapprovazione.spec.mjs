@@ -18,6 +18,7 @@
 //   ripercorre il codice VERO di scrittura e disegno della pagina.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const SHA = 'a1b2c3d4'.repeat(5);
@@ -149,7 +150,7 @@ test('Automazioni elenca le fuse senza chiedere, con tutto quello che era stato 
   };
   await apri(page, [pratica()], { preapproved: [fusa] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
 
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
@@ -199,7 +200,7 @@ test('Automazioni: la data della fusione per esteso, e quante ne restano fuori',
     };
   });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible();
   await expect(box.locator('.sn-mac-preapproved-row')).toHaveCount(8);
@@ -211,7 +212,7 @@ test('senza fusioni pre-approvate l’elenco non compare', async ({ openTab }) =
   const page = await openTab(MANAGE);
   await apri(page, [pratica()], { preapproved: [] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgMergeApprovalsPreapproved')).toBeHidden();
 });
 
@@ -229,7 +230,7 @@ test('Automazioni: una fusa col segno di un sì non dice «fondi senza chiederme
   const daSi = riga(1, { preapprovedBy: 'owner@esempio · approvazione ab12cd34ef56ab12cd34ef56' });
   await apri(page, [pratica()], { preapproved: [daSi] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
   const intro = box.locator('.sn-mac-preapproved-intro');
