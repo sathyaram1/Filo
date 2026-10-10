@@ -201,7 +201,7 @@ globalThis.fetch = async (url, opts = {}) => {
   return new Response(JSON.stringify({ name: doc.name, fields }), { status: 200 });
 };`);
   const lancia = (args, env = {}) => spawnSync(process.execPath, ['--import', pathToFileURL(finto).href, SCRIPT, ...args], {
-    encoding: 'utf8', timeout: 60000,
+    encoding: 'utf8', timeout: TETTO_ATTESA_MS,
     env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '', ...env },
   });
   const scritte = () => (existsSync(registro) ? readFileSync(registro, 'utf8').trim().split('\n').filter(Boolean).map((r) => JSON.parse(r)) : []);
