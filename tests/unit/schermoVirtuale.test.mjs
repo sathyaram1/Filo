@@ -113,7 +113,7 @@ test('ogni lancio a mano di xvfb-run -a che CLAUDE.md e i ruoli chiedono porta l
   const senzaBase = [];
   for (const f of file) {
     readFileSync(resolve(ROOT, f), 'utf8').split(/\r?\n/).forEach((riga, i) => {
-      if (/xvfb-run\s+-a\b/.test(riga) && !/\s-n\s/.test(riga)) senzaBase.push(`${f}:${i + 1}`);
+      if (/xvfb-run\s+-a\b/.test(riga) && !/\s-n\s/.test(riga)) senzaBase.push(`${f}:${i + 1}: ${riga.trim().slice(0, 120)}`);
     });
   }
   assert.deepEqual(senzaBase, []);
