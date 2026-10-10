@@ -541,7 +541,7 @@
       }
       // Lo rimandano qui una sessione o una routine, su un feedback di chiunque (#914): la frase segue il mittente.
       if (statusReason === 'locale') {
-        // Owner, sessione provata o già approvato: basta il segno. Routine e utenti passano dal sì dell'owner (#913).
+        // Fidato o già approvato: basta il segno. Gli altri passano dal sì dell'owner (#913), che li segna anche fidati.
         const text = localSenderCheck(fb).ok
           ? 'Richiede lavoro locale: con «Solo lavoro locale» la prende una sessione sulla tua macchina.'
           : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro locale» lo lavora e lo chiude una sessione.';

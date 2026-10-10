@@ -1,5 +1,5 @@
-// #914: in Gestione un feedback che ha saltato i giudici alla nascita (routine, sessione per le routine, lavoro
-// locale) lo dice, e non sembra «da ri-giudicare»; i ruoli di chi risolve rimandano il lavoro solo locale.
+// #914/#1148: in Gestione un feedback fidato che ha saltato i giudici alla nascita lo dice, e non sembra «da
+// ri-giudicare»; senza la fiducia il segno non vale. I ruoli di chi risolve rimandano il lavoro solo locale.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,31 +15,32 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 
 const pipeline = (skipped) => ({ skipped, verdicts: [], l1Category: null, l2Class: null, action: 'human_review', stage: 'nascita' });
 const routine = (over = {}) => ({
-  _id: 'r1', status: 'aligned', clientId: 'routine:residuo', senderProof: 'server', pipeline: pipeline('routine_proven'), ...over,
+  _id: 'r1', status: 'aligned', clientId: 'routine:residuo', senderProof: 'server', fiducia: 'fidato', pipeline: pipeline('routine_proven'), ...over,
 });
 
-test('una routine provata nei Ricevuti: niente «da ri-giudicare», la nota dice perché mancano i giudici', () => {
+test('una routine fidata nei Ricevuti: niente «da ri-giudicare», la nota dice perché mancano i giudici', () => {
   const fb = routine();
   assert.equal(MR.classifyLegacyBlock(fb), null);
-  assert.match(MR.judgesSkippedText(fb), /routine.*prova del server.*I giudici non servono/);
+  assert.equal(MR.judgesSkippedText(fb), 'Aperto da un lavoro fidato: i giudici non servono.');
   const nota = MR.judgesNote(fb);
-  assert.match(nota.text, /I giudici non servono\. Aspetta la tua approvazione\./);
+  assert.equal(nota.text, 'Aperto da un lavoro fidato: i giudici non servono. Aspetta la tua approvazione.');
   assert.doesNotMatch(nota.text, /Tutti d’accordo/);
   assert.equal(MR.manageTabFor(fb), 'inbox');
 });
 
-test('sessione per le routine e lavoro locale hanno la loro frase', () => {
-  const sessione = { status: 'todo', clientId: 'local:claude', senderProof: 'admin', pipeline: pipeline('session_proven') };
-  assert.match(MR.judgesSkippedText(sessione), /sessione per le routine/);
+test('il fidato nato da te o da una sessione pulita, il lavoro locale e i documenti di prima hanno la loro frase', () => {
+  const sessione = { status: 'todo', clientId: 'local:claude', senderProof: 'admin', fiducia: 'fidato', pipeline: pipeline('fidato') };
+  assert.equal(MR.judgesSkippedText(sessione), 'Fidato: i giudici non servono.');
   assert.equal(MR.classifyLegacyBlock(sessione), null);
-  const locale = { ...sessione, pipeline: pipeline('local_proven') };
-  assert.match(MR.judgesSkippedText(locale), /Lavoro locale/);
+  assert.equal(MR.judgesSkippedText({ ...sessione, pipeline: pipeline('local_proven') }), 'Lavoro locale fidato: i giudici non servono.');
+  assert.match(MR.judgesSkippedText({ ...sessione, pipeline: pipeline('session_proven') }), /^Aperto da una sessione/);
 });
 
-test('il segno senza mittente provato, o un valore sconosciuto, non vale', () => {
+test('il segno senza la fiducia, o un valore sconosciuto, non vale; la prova del mittente da sola non basta', () => {
   for (const fb of [
-    routine({ senderProof: undefined }),
-    routine({ clientId: 'utente-1' }),
+    routine({ fiducia: undefined }),
+    routine({ fiducia: 'non_fidato' }),
+    routine({ fiducia: 'FIDATO' }),
     routine({ pipeline: pipeline('qualunque') }),
     routine({ pipeline: null }),
   ]) {
@@ -47,8 +48,9 @@ test('il segno senza mittente provato, o un valore sconosciuto, non vale', () =>
     const nota = MR.judgesNote(fb);
     assert.doesNotMatch((nota && nota.text) || '', /I giudici non servono/);
   }
-  // Fidato senza verdetti e senza segno: resta «da ri-giudicare», come prima.
+  // Mittente provato senza verdetti e senza segno: resta «da ri-giudicare», come prima.
   assert.equal(MR.classifyLegacyBlock(routine({ pipeline: pipeline(undefined) })).reason, 'unfiltered');
+  assert.equal(MR.classifyLegacyBlock(routine({ fiducia: undefined })).reason, 'unfiltered', 'il segno senza fiducia non lo toglie dal ri-giudizio');
 });
 
 // Chi risolve per una routine non apre lavoro locale: rimanda nei Ricevuti col motivo di --serve-locale.
@@ -63,20 +65,21 @@ test('i tre ruoli di chi risolve dicono come rimandare un lavoro che si fa solo 
   }
 });
 
-test('«richiede lavoro locale» dice il vero secondo chi ha aperto il feedback', () => {
+test('«richiede lavoro locale» dice il vero secondo la fiducia del feedback', () => {
   const rimandato = (over) => ({ status: 'design', statusReason: 'locale', notes: 'Richiede lavoro locale.', ...over });
-  const owner = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin' })).text;
-  const sessione = MR.judgesNote(rimandato({ clientId: 'local:claude', senderProof: 'admin' })).text;
+  const owner = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato' })).text;
+  const sessione = MR.judgesNote(rimandato({ clientId: 'local:claude', senderProof: 'admin', fiducia: 'fidato' })).text;
   const routine = MR.judgesNote(rimandato({ clientId: 'routine:residuo', senderProof: 'server' })).text;
   const utente = MR.judgesNote(rimandato({ clientId: 'utente-1' })).text;
   const senzaProva = MR.judgesNote(rimandato({ clientId: 'owner:me' })).text;
+  const mioNonFidato = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin' })).text;
   const approvato = MR.judgesNote(rimandato({ clientId: 'utente-2', localApproval: { by: 'owner', at: 1 } })).text;
   for (const t of [owner, sessione, approvato]) {
     assert.match(t, /Solo lavoro locale/);
     assert.doesNotMatch(t, /💻 Lavoro locale/);
   }
   // Routine e utenti (#913): la frase porta al sì dell'owner, che è anche il tasto principale nei Ricevuti.
-  for (const t of [routine, utente, senzaProva]) {
+  for (const t of [routine, utente, senzaProva, mioNonFidato]) {
     assert.match(t, /Con «💻 Lavoro locale» lo lavora e lo chiude una sessione/);
     assert.doesNotMatch(t, /non si lavorano/);
   }
