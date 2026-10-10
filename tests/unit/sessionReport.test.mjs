@@ -614,15 +614,35 @@ test('worker in sottofondo: la finestra va dalla notifica del worker di prima a 
   assert.deepEqual(ids(finestraOrchestratore(primoPiano.slice(0, -1))), ['s4', 's5', 's6']);
 });
 
-test('worker in sottofondo: la notifica si riconosce anche dal solo task-id, o senza id chiude il lancio più vecchio', () => {
+test('worker in sottofondo: la notifica si riconosce anche dal solo task-id; una che non lo nomina non lo chiude', () => {
   const ids = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
   const soloTask = SOTTOFONDO.map((l) => l.split('<tool-use-id>bg1</tool-use-id>').join(''));
   assert.deepEqual(ids(finestraOrchestratore(soloTask)), ['s4', 's5', 's6', 's7'], 'agentId: x del lancio = task-id della notifica');
-  const senzaId = SOTTOFONDO.map((l) => l.split('<tool-use-id>bg1</tool-use-id>').join('').split('<task-id>x</task-id>').join(''));
-  assert.deepEqual(ids(finestraOrchestratore(senzaId)), ['s4', 's5', 's6', 's7']);
-  // Un comando in sottofondo che finisce ha il suo tool-use-id: non chiude il worker.
-  const bash = SOTTOFONDO.slice(0, 4).concat(JSON.stringify({ type: 'user', timestamp: H('10:30:00'), message: { role: 'user', content: '<task-notification>\n<tool-use-id>toolu_bash</tool-use-id>\n</task-notification>' } }), orch('s3b', H('10:30:05'), { cr: 31000 }));
-  assert.deepEqual(ids(finestraOrchestratore(bash)), ['s1', 's2', 's3', 's3b']);
+  // Mentre il primo worker lavora arrivano notifiche d'altri: un comando (col suo tool-use-id), l'evento di un
+  // Monitor (solo il suo task-id), la fine di un artefatto osservato (nessun id), e un turno che nomina le notifiche.
+  const altrui = [
+    JSON.stringify({ type: 'user', timestamp: H('10:30:00'), message: { role: 'user', content: '<task-notification>\n<tool-use-id>toolu_bash</tool-use-id>\n</task-notification>' } }),
+    JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp: H('10:40:00'), content: '<task-notification>\n<task-id>bmonitor1</task-id>\n<summary>Monitor event: "finish"</summary>\n<event>EXIT 1</event>\n</task-notification>' }),
+    JSON.stringify({ type: 'attachment', timestamp: H('10:50:00'), attachment: { type: 'queued_command', prompt: '<task-notification>\n<task-type>artifact-watch-lifecycle</task-type>\n<summary>Stopped watching</summary>\n</task-notification>' } }),
+    orch('s3b', H('11:00:00'), { cr: 31000 }).replace('"content":[', '"content":[{"type":"text","text":"aspetto la <task-notification> del worker"},'),
+  ];
+  const conAltrui = SOTTOFONDO.slice(0, 4).concat(altrui);
+  assert.deepEqual(ids(finestraOrchestratore(conAltrui)), ['s1', 's2', 's3', 's3b'], 'il primo worker è ancora al lavoro');
+  const tutte = SOTTOFONDO.slice(0, 4).concat(altrui, SOTTOFONDO.slice(4));
+  const f = finestraOrchestratore(tutte);
+  assert.deepEqual(ids(f), ['s4', 's5', 's6', 's7']);
+  // Lo stesso con le notifiche d'altri mentre lavora il SECONDO worker: i turni prima del suo lancio restano suoi.
+  const dopo = SOTTOFONDO.concat(altrui.slice(1, 3));
+  assert.deepEqual(ids(finestraOrchestratore(dopo)), ['s4', 's5', 's6', 's7']);
+  assert.equal(finestraOrchestratore(dopo).attesaPrimaS, 5410);
+});
+
+test('una notifica citata nel risultato di uno strumento, o un id nel rapporto riportato, non chiude il worker', () => {
+  const ids = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
+  const citata = JSON.stringify({ type: 'user', timestamp: H('10:30:00'), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_read', content: notifica('bg1') }] } });
+  const riportato = JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp: H('10:40:00'), content: '<task-notification>\n<task-id>altro</task-id>\n<tool-use-id>toolu_altro</tool-use-id>\n<summary>Agent finished</summary>\n<result>ho visto <tool-use-id>bg1</tool-use-id></result>\n</task-notification>' });
+  const righe = SOTTOFONDO.slice(0, 4).concat(citata, riportato, orch('s3b', H('11:00:00'), { cr: 31000 }));
+  assert.deepEqual(ids(finestraOrchestratore(righe)), ['s1', 's2', 's3', 's3b']);
 });
 
 test('una richiesta fallita («<synthetic>») dopo la fine del worker non accorcia l\'attesa: la cache l\'ha toccata solo il turno vero', () => {
