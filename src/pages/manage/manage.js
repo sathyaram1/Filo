@@ -5602,8 +5602,11 @@
     sezioneAttiva() { return sezioneAttiva; },
     // Domande finte, o { errore } per un guasto finto: il main non le rimpiazza più.
     setDomande(lista, opts) { if (DOMANDE) DOMANDE.imposta(lista, opts); },
-    // Rifà la scelta d'apertura anche dopo un clic: gli spec la provano coi dati finti già in pagina.
-    sceltaApertura() { return sceltaApertura({ forza: true }); },
+    // Rifà la scelta d'apertura coi dati finti già in pagina; `{ comeAvvio: true }` rispetta il clic dell'utente come all'avvio.
+    sceltaApertura(opts) {
+      if (opts && opts.comeAvvio) { aperturaFatta = false; return sceltaApertura(); }
+      return sceltaApertura({ forza: true });
+    },
     livelliFiltro(livelli) {
       if (Array.isArray(livelli)) { livelliScelti = livelli.filter((l) => MR.LIVELLI_RICEVUTI.includes(l)); renderList(); }
       return livelliScelti.slice();

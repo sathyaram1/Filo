@@ -44,8 +44,9 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 10 tab della dashboard unificata (la nona: «Statistiche feedback», #496; la decima: «Lavori locali», #908).
-  await expect(page.locator('.mg-tab')).toHaveCount(10);
+  // 10 schede della dashboard unificata (la nona: «Statistiche feedback», #496; la decima: «Lavori locali», #908),
+  // più le tre della sezione Domande (#1150).
+  await expect(page.locator('.mg-tab')).toHaveCount(13);
   // Con i feedback caricati (qui: nessuno) le cinque schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
