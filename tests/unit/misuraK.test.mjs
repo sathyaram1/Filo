@@ -42,8 +42,8 @@ test('gli spec della misura esistono e non stanno fra i rossi noti', () => {
   assert.deepEqual(SPEC_MISURA.filter((s) => noti.has(`tests/${s}`)), [], 'misurerebbero il contenitore, non il carico');
 });
 
-const corsa = (n, minuti, { rossi = [], infra = [], piccoMb = 4000, tettoMb = 16000 } = {}) => ({
-  n, durateMs: Array(n).fill(minuti * 60000), codici: Array(n).fill(0), rossi, infra, piccoMb, tettoMb, caricoMax: 3, psiCpu: 1, psiMem: 0,
+const corsa = (n, minuti, { rossi = [], infra = [], piccoMb = 4000, tettoMb = 16000, codici = Array(n).fill(0) } = {}) => ({
+  n, durateMs: Array(n).fill(minuti * 60000), codici, rossi, infra, piccoMb, tettoMb, caricoMax: 3, psiCpu: 1, psiMem: 0,
 });
 
 test('dai log: i file rossi di Playwright e degli unit, senza doppioni', () => {
@@ -67,6 +67,30 @@ test('dai log: il TAP di node --test fuori da un terminale (com\'era nella prova
     'not ok 3681 - worker in parallelo (#1157): il battito resta',
   ].join('\n');
   assert.deepEqual(estraiRossi(tap), ['due invocazioni con lo stesso biglietto accendono UN battito solo', 'tests/unit/autoCommitGate.test.mjs', 'worker in parallelo (#1157): il battito resta']);
+});
+
+test('dai log: su Windows Playwright scrive il percorso con le barre rovesciate, e il rosso conta lo stesso', () => {
+  const log = [
+    '  ✘  3 tests\\context-menu.spec.mjs:30:1 › la voce feedback (21.2s)',
+    '  1) tests\\verifica\\locale-x\\giro1-r1-a.spec.mjs:5:1 › r1 caso',
+    '  ok  1 tests\\tab-archive.spec.mjs:15:1 › verde',
+  ].join('\n');
+  assert.deepEqual(estraiRossi(log), ['tests/context-menu.spec.mjs', 'tests/verifica/locale-x/giro1-r1-a.spec.mjs']);
+});
+
+test('un worker che esce con errore senza un rosso riconoscibile non vale come sano, se da solo usciva pulito', () => {
+  const uno = [corsa(1, 20), corsa(1, 20)];
+  const r = calcolaK([...uno, corsa(2, 21, { codici: [0, 1] })]);
+  assert.equal(r.k, 1);
+  assert.match(r.motivo, /con 2 insieme: uscite diverse da zero: worker 2 → 1/);
+  // Da solo il comando usciva gia' rosso coi suoi unit: li' l'uscita non dice niente, contano i rossi.
+  const sporca = [corsa(1, 20, { codici: [1], rossi: ['tests/unit/lento.test.mjs'] })];
+  assert.equal(calcolaK([...sporca, corsa(2, 21, { codici: [1, 1], rossi: ['tests/unit/lento.test.mjs'] })]).k, 2);
+  assert.equal(calcolaK([...sporca, corsa(2, 21, { codici: [1, 1], rossi: ['tests/unit/lento.test.mjs', 'tests/menu.spec.mjs'] })]).k, 1);
+  // Una base che cade senza dire cosa: la misura non vedrebbe niente.
+  const cieca = calcolaK([corsa(1, 1, { codici: [1] }), corsa(2, 1, { codici: [1, 1] })]);
+  assert.equal(cieca.k, null);
+  assert.match(cieca.motivo, /senza un rosso riconoscibile/);
 });
 
 test('dai log: le famiglie dei guasti d\'infrastruttura', () => {
