@@ -1425,8 +1425,8 @@ if (isMain) {
     const motivo = args.join(' ').trim();
     if (!motivo) { console.error('sporca vuole il motivo: cosa hai letto che il server non vede. Il server non è stato chiamato.'); process.exit(1); }
     const { readTicket } = await import('./lib/routine-ticket.mjs');
-    const biglietto = readTicket(ROOT);
-    if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato.'); process.exit(1); }
+    const biglietto = mano.ticket || readTicket(ROOT);
+    if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
     const r = await sporca(biglietto, motivo);
     if (r.outcome === 'ok') { console.log('Biglietto sporcato: da qui ciò che scrivi nasce non fidato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
