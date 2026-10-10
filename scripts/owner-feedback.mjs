@@ -313,7 +313,8 @@ export async function praticaPerLaSessione(id, opts = {}) {
   if (!opts.allaChiusura && !MR.isLocalOnly(fb) && STATI_DEL_LAVORO_LOCALE.includes(fb.status)) {
     return { ok: false, motivo: SENZA_SEGNO, utente: false, senzaSegno: true };
   }
-  return { ok: true, avviso: [avvisoDaCampi(doc.fields), avvisoFrase(fb, id)].filter(Boolean).join('\n') };
+  const avviso = [avvisoDaCampi(doc.fields), avvisoFrase(fb, id)].filter(Boolean).join('\n');
+  return { ok: true, avviso, fiducia: fb.fiducia === 'fidato' ? 'fidato' : 'non_fidato' };
 }
 
 /** Il promemoria della frase per chi ha segnalato (regola: SN_MANAGE_REVIEW.fraseAttesa), '' se non serve. PURA. */

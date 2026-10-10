@@ -13,6 +13,7 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
+import { rigaSporco } from './lib/biglietto-locale.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
@@ -476,6 +477,9 @@ async function main(argv) {
     const pid = inCorso();
     console.log(pid ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
     if (!(s.coda || []).length) console.log('Coda vuota.');
+    // Le domande le scrivono i lavoratori, che leggono testo d'utente: chi le legge si sporca prima (#1148).
+    const conDomande = (s.coda || []).filter((n) => s.pratiche[n] && s.pratiche[n].fermo && s.pratiche[n].fermo.domanda);
+    if (conDomande.length) console.log(await rigaSporco(`stato dei lavori locali (${conDomande.map((n) => `#${n}`).join(', ')})`, ['domande scritte dai lavoratori']));
     for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n]));
     return 0;
   }
