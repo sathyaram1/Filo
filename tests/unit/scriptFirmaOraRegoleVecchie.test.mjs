@@ -13,7 +13,7 @@ const SCRIPTS = join(ROOT, 'scripts');
 const ID = 'fbRegoleVecchie';
 
 // Regole di produzione prima della pubblicazione: una PATCH che scrive `updatedAt` viene respinta.
-async function conRegoleVecchie(fn) {
+async function conRegoleVecchie(fn, campi = {}) {
   const realFetch = globalThis.fetch;
   const patch = [];
   globalThis.fetch = async (url, init = {}) => {
