@@ -26,22 +26,7 @@ const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o 
 
 // Il server finto che serve config/routines ai comandi del CLI (processo
 // separato: i comandi si lanciano in modo sincrono). Vale per tutto il file.
-import { spawn as _spawn } from 'node:child_process';
-async function fintoConfigRoutines(env = {}) {
-  const helper = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'helpers', 'finto-config-routines.mjs');
-  const p = _spawn(process.execPath, [helper], { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
-  const port = await new Promise((ok, no) => {
-    let so = '';
-    p.stdout.on('data', (c) => { so += c; const m = so.match(/PORT=(\d+)/); if (m) ok(Number(m[1])); });
-    p.on('exit', (code) => no(new Error(`server finto uscito con ${code}`)));
-    // Si aspetta la porta, non un tempo: il tetto serve solo a non restare appesi a un figlio muto (#1063).
-    setTimeout(() => no(new Error(`server finto: nessuna porta entro ${TETTO_ATTESA_MS / 1000} s`)), TETTO_ATTESA_MS).unref();
-  });
-  // Il figlio non deve tenere in vita il processo dei test: senza unref il
-  // runner aspettava per sempre la fine del server.
-  p.unref(); p.stdout.unref(); p.stderr.unref();
-  return { url: `http://127.0.0.1:${port}/config/routines`, kill: () => { try { p.kill(); } catch (_) { /* già morto */ } } };
-}
+import { avviaConfigRoutinesFinto as fintoConfigRoutines } from '../helpers/server-finto.mjs';
 const FINTO = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify(CAPS_TEST) });
 process.env.FILO_ROUTINE_CONFIG_URL = FINTO.url;
 process.env.FILO_ADMIN_ID_TOKEN = 'finto-id-token';
