@@ -81,7 +81,7 @@ if [ -z "$CARTELLA" ] && [ -n "$HOOK_CWD" ]; then
   r=$(radice_di "$HOOK_CWD")
   [ -n "$r" ] && del_progetto "$r" && CARTELLA="$r"
 fi
-[ -z "$CARTELLA" ] && CARTELLA=$(git rev-parse --show-toplevel 2>/dev/null)
+[ -z "$CARTELLA" ] && CARTELLA="$RADICE_PROGETTO"
 [ -n "$CARTELLA" ] || exit 0
 
 # I fallimenti della spedizione e le astensioni, raccolti qui per dirli alla
