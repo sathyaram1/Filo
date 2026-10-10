@@ -2261,10 +2261,7 @@
   // restano raggiungibili. Ritorna true se le sezioni si possono disegnare.
   function mostraSezioni() {
     const ok = sezioniAttendibili();
-    for (const tab of LIST_TABS) {
-      const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
-      if (btn) btn.hidden = !ok;
-    }
+    aggiornaSchedeVisibili();
     if (mgNoSections) {
       mgNoSections.hidden = ok;
       if (!ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
