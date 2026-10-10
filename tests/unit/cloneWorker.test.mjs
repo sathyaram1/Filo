@@ -21,6 +21,10 @@ const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', st
 // Nessuna prova installa pacchetti davvero: con lo stesso lock non deve nemmeno provarci.
 const npmMai = () => { throw new Error('npm ci lanciato con lo stesso package-lock'); };
 const eLink = (p) => { try { return lstatSync(p).isSymbolicLink(); } catch (_) { return false; } };
+const collegato = (clone) => {
+  const nm = resolve(clone, 'node_modules');
+  return !eLink(nm) && existsSync(resolve(nm, MARCA_COLLEGATI)) && eLink(resolve(nm, 'pacchetto'));
+};
 
 /** Origin nudo, principale clonato da lì con node_modules (e un canarino dentro), strumenti finti dell'orchestratore. */
 function scena() {
