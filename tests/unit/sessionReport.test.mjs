@@ -518,8 +518,7 @@ const orch = (id, ts, { cw = 0, cr = 0, out = 10, tool = null } = {}) => JSON.st
   type: 'assistant', timestamp: ts, sessionId: 'orch',
   message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: out }, content: tool ? [tool] : [{ type: 'text', text: id }] },
 });
-const fine = (id, ts, testo = 'fatto') => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: testo }] } });
-const RILASCIATO = 'ramo spedito su origin\nOK: biglietto rilasciato.';
+const fine = (id, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'fatto' }] } });
 const PRINCIPALE = [
   orch('o1', H('09:00:00'), { cw: 30000 }),
   orch('o2', H('09:01:00'), { cr: 30000, tool: { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} } }),
