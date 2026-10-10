@@ -33,6 +33,7 @@ function principaleFinto() {
   git(principale, 'add', '-A');
   git(principale, 'commit', '-q', '-m', 'base');
   git(principale, 'push', '-q', '-u', 'origin', 'main');
+  git(origine, 'symbolic-ref', 'HEAD', 'refs/heads/main');
   mkdirSync(join(principale, 'node_modules', 'pacchetto'), { recursive: true });
   writeFileSync(join(principale, 'node_modules', 'pacchetto', 'index.js'), '');
   // Da solo ogni worker esce 1 con lo stesso rosso leggibile; con due insieme il worker 2 cade in un altro modo.
