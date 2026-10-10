@@ -3,6 +3,7 @@
 // non schiaccia il titolo della scheda.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 const RICHIESTA = 'abcdefabcdefabcdefabcdef';
@@ -50,7 +51,7 @@ const tab = (page, t) => page.locator(`.mg-tab[data-tab="${t}"]`);
 
 test('una richiesta di fusione in attesa porta la pratica nei Ricevuti, anche se lo stato è ancora di lavoro', async ({ openTab }) => {
   const page = await apri(openTab, [fb('fb515')], [richiesta('fb515')]);
-  await tab(page, 'inbox').click();
+  await apriScheda(page, 'inbox');
   await expect(scheda(page, 'fb515')).toBeVisible();
   await expect(tab(page, 'inbox')).toContainText('(1)');
   await expect(tab(page, 'queue')).toContainText('(0)');
@@ -58,7 +59,7 @@ test('una richiesta di fusione in attesa porta la pratica nei Ricevuti, anche se
 
 test('la richiesta che arriva a pagina aperta sposta la pratica e la sezione lo segnala', async ({ openTab }) => {
   const page = await apri(openTab, [fb('fb515')], []);
-  await tab(page, 'queue').click();
+  await apriScheda(page, 'queue');
   await expect(scheda(page, 'fb515')).toBeVisible();
 
   await page.evaluate((r) => { window.__pending = [r]; }, richiesta('fb515'));
@@ -79,11 +80,11 @@ test('col segno di un clic «Approva» il titolo della scheda resta leggibile', 
     fb('lavoro', { status: 'working', name: 'La Gestione non aggiorna le sezioni da sola', mergePreapproved: segno }),
     fb('fermo', { seq: 516, status: 'design', statusReason: 'l5', name: 'Fusione ferma sulle regole', mergePreapproved: segno }),
   ], [{ ...richiesta('fermo'), num: '516' }]);
-  await tab(page, 'queue').click();
+  await apriScheda(page, 'queue');
   await expect(scheda(page, 'lavoro').locator('.mg-preapproved')).toBeVisible();
   const largo = (id) => scheda(page, id).locator('.mg-item-title').evaluate((el) => el.getBoundingClientRect().width);
   expect(await largo('lavoro')).toBeGreaterThan(80);
-  await tab(page, 'inbox').click();
+  await apriScheda(page, 'inbox');
   await expect(scheda(page, 'fermo').locator('.mg-fusione-badge')).toBeVisible();
   expect(await largo('fermo')).toBeGreaterThan(80);
 });

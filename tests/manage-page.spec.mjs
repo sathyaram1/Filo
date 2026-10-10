@@ -83,13 +83,13 @@ test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arri
   // Le 4 tab-lista usano lo STESSO pannello (panel-list), cambia solo
   // l'intestazione — che dice anche quanti feedback sta mostrando (#495).
   for (const [tab, head] of [['queue', 'In coda'], ['resolved', 'Risolti'], ['archived', 'Archiviati'], ['inbox', 'Ricevuti']]) {
-    await page.locator(`.mg-tab[data-tab="${tab}"]`).click();
+    await apriScheda(page, tab);
     await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);
     await expect(page.locator('#mgListHead')).toHaveText(`${head} (0)`);
   }
 
   // Red Team → l'interruttore «aperto a tutti» (#896).
-  await page.locator('.mg-tab[data-tab="stats"]').click();
+  await apriScheda(page, 'stats');
   await expect(page.locator('#panel-stats')).toHaveClass(/mg-panel--active/);
   await expect(page.locator('#panel-stats #mgRtOpenSwitch')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
@@ -114,7 +114,7 @@ test('lo switch "Modalità automatica" vive nella tab Automazioni ed è read-onl
   await expect(sw).toBeVisible();
 
   // Cambiando tab lo switch non è più visibile (è una sezione, non globale).
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(sw).toBeHidden();
 
   // Da non-admin (userData pulito → nessuna sessione) lo switch è disabilitato:
@@ -1710,7 +1710,7 @@ test('la modalità automatica NON sposta gli allineati: restano nei Ricevuti fin
   // Owner + dati: l'allineato (in attesa di approvazione) è nei Ricevuti.
   await page.evaluate((fb) => { window.__mgTest.setAdmin(true); window.__mgTest.setData([fb]); window.__mgTest.setTab('inbox'); }, FAKE_FB_ALIGNED);
   await expect(page.locator('.mg-item')).toHaveCount(1);
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item')).toHaveCount(0);
 
   // Accendi l'automatica: NON deve cambiare nulla nelle liste.
@@ -1720,16 +1720,16 @@ test('la modalità automatica NON sposta gli allineati: restano nei Ricevuti fin
     el.disabled = false; el.checked = true;
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item')).toHaveCount(0);
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
   // È l'APPROVAZIONE (che scrive lo status todo) a spostarlo in coda.
   const approved = { ...FAKE_FB_ALIGNED, status: 'todo' };
   await page.evaluate((fb) => { window.__mgTest.setData([fb]); window.__mgTest.setTab('queue'); }, approved);
   await expect(page.locator('.mg-item')).toHaveCount(1);
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('.mg-item')).toHaveCount(0);
 });
 
@@ -1798,7 +1798,7 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   // e ricompare sotto "In coda".
   await expect(page.locator('#mgDetail')).toBeHidden();
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(0);
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(1);
 });
 
@@ -1856,7 +1856,7 @@ test('tab Archiviati: OFF mostra i soli archiviati, il filtro ⭐ mostra tutti i
   await expect(page.locator('.mg-item-title')).toHaveText('Preferito in coda');
 
   // Il filtro sparisce sulle altre tab.
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   await expect(page.locator('#mgArchiveFilter')).toBeHidden();
 });
 

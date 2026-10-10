@@ -643,7 +643,7 @@ test('se la segnalazione c’è, la richiesta NON sta in Automazioni: sta sulla 
   await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-card')).toHaveCount(0);
 
   // …e riconoscibile nella lista, dove aspetta una decisione.
-  await page.locator('.mg-tab[data-tab="inbox"]').click();
+  await apriScheda(page, 'inbox');
   const card = page.locator('.mg-item', { hasText: 'Menu copertina' });
   await expect(card).toBeVisible({ timeout: 8_000 });
   await expect(card.locator('.mg-fusione-badge')).toBeVisible();

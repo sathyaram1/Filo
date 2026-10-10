@@ -13,6 +13,7 @@
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const UTENTE_EMAIL = 'utente@prova.test';
@@ -255,7 +256,7 @@ test('#896 — acceso da Gestione, chi non è owner lo rivede senza riavviare; u
   await entra(app, 'owner');
 
   const mg = await openTab('filo://manage/manage.html');
-  await mg.locator('.mg-tab[data-tab="stats"]').click();
+  await apriScheda(mg, 'stats');
   const levetta = mg.locator('#mgRtOpenSwitch');
   await expect(levetta).not.toHaveClass(/mg-switch--disabled/);
   await expect(mg.locator('#mgRtOpenToggle')).not.toBeChecked();

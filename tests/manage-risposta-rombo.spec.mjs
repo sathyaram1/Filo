@@ -3,6 +3,7 @@
 // risposta (una bozza, un invio): la risposta entra in chat e la pratica torna in coda.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 
@@ -68,7 +69,7 @@ test('dal rombo verde si risponde: la risposta entra in conversazione e la prati
   expect(patch.notes).toContain('Intendo il pulsante in alto a destra.');
   await expect(page.locator('#mgDetail')).toBeHidden();
   await expect(page.locator('#mgSide')).toBeHidden();
-  await page.locator('.mg-tab[data-tab="queue"]').click();
+  await apriScheda(page, 'queue');
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(1);
 });
 

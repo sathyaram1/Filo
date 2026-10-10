@@ -19,6 +19,7 @@
 //      routine, e i testi lo dicono; «Copia» nomina finish solo dove il numero lo lega a un lavoro.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const FEEDBACK = 'filo://feedback/feedback.html';
@@ -75,7 +76,7 @@ test('la sezione «Lavori locali» tiene i feedback col segno, fuori dalla coda'
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await expect(page.locator('.mg-item')).toContainText('#700');
 
-  await tabBtn(page, 'local').click();
+  await apriScheda(page, 'local');
   await expect(page.locator('#mgListHead')).toContainText('Lavori locali');
   await expect(page.locator('.mg-item')).toHaveCount(1);
   await expect(page.locator('.mg-item')).toContainText('#908');
@@ -136,7 +137,7 @@ test('tasto destro sulla scheda: la voce del segno, che apre la pratica e la spo
   expect(updates).toEqual([{ type: 'feedback_update', id: pratica._id, localOnly: true }]);
 
   // Dalla sua sezione, la stessa voce lo rimette alle routine.
-  await tabBtn(page, 'local').click();
+  await apriScheda(page, 'local');
   await page.locator('.mg-item').click({ button: 'right' });
   await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Rimetti anche alle routine' }).click();
   await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
@@ -199,7 +200,7 @@ test('Automazioni: la fusione locale che ha saltato L5 dice perché non ha chies
   };
   await apri(page, [fb({ localOnly: SEGNO })], { preapproved: [fusa] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await tabBtn(page, 'automation').click();
+  await apriScheda(page, 'automation');
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
   await expect(box).toContainText('lavoro locale · feedback #908');
@@ -246,7 +247,7 @@ test('lavoro locale: niente «Fondi senza chiedermelo», una riga dice che si fo
   await expect(riga).not.toContainText('segno messo da');
 
   // Il segno locale messo dal dettaglio fa sparire il tasto subito; tolto, il tasto torna.
-  await tabBtn(page, 'queue').click();
+  await apriScheda(page, 'queue');
   await page.evaluate(() => window.__mgTest.openDetail('own-1'));
   await expect(tasto).toBeVisible();
   await expect(tasto).toHaveText('Senza chiedere');
@@ -371,7 +372,7 @@ test('un lavoro locale «In lavorazione» dice che lo porta avanti una sessione,
   await apri(page, [preso, routine]);
   // Il lavoro di una routine resta com'era.
   await expect(page.locator('.mg-item[data-id="r-1"]')).toContainText('rientra in coda da solo');
-  await tabBtn(page, 'local').click();
+  await apriScheda(page, 'local');
   const scheda = page.locator('.mg-item[data-id="loc-1"]');
   await expect(scheda).toContainText('In lavorazione in una sessione locale');
   await expect(scheda).not.toContainText(/rientra in coda|Controllo sicurezza/);

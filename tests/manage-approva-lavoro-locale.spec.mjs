@@ -10,6 +10,7 @@
 //   5. La pagina gemella dei feedback offre la stessa azione e scrive gli stessi campi.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const FEEDBACK = 'filo://feedback/feedback.html';
@@ -74,7 +75,7 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   expect(scrittura(updates[0])).toEqual({ status: 'todo', reviewDecision: 'accepted', localOnly: true, localApproval: true });
 
   // Nei Lavori locali: si fonde senza chiedere, e l'hover del segno dice chi l'ha approvato.
-  await tabBtn(page, 'local').click();
+  await apriScheda(page, 'local');
   await page.locator('.mg-item').click();
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('si fonde senza chiedere');
   const segno = page.locator('#mgLocalBtn');
