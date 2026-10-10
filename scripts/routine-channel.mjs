@@ -398,9 +398,30 @@ export function attesaBattito(expiresAt, now = Date.now()) {
   return Math.min(BEAT_EVERY_MS, Math.max(1000, Math.floor(resta / 3)));
 }
 
+/**
+ * I campi dei crediti nel battito (SPEC-DOMANDE.md §8.1): `consumo` cumulativo della sessione, `quota` (lettura
+ * della barra di stato, se è di questa sessione) e `barra`. Best-effort: un campo che non si legge non parte.
+ * La sessione la dicono FILO_TRANSCRIPT / FILO_SESSION_ID (dall'hook); il ripiego del transcript più recente vale
+ * solo per una routine dichiarata o con un biglietto in cartella, dove non c'è la sessione di un altro da sbagliare.
+ */
+export function misureCrediti({ root = ROOT, env = process.env, cwd = process.cwd(), configDir = '', home = os.homedir(), nowMs = Date.now() } = {}) {
+  const out = {};
+  const routine = (Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0') || existsSync(join(root, '.claude', 'routine-ticket.json'));
+  const { consumo } = consumoSessione({ root, env, cwd, configDir, ripiego: routine, nowMs });
+  if (consumo) out.consumo = consumo;
+  let letture = null;
+  try { letture = JSON.parse(readFileSync(quotaFile(home), 'utf8')); } catch (_) { /* barra mai girata qui */ }
+  const mia = consumo && letture && letture.sessioni && typeof letture.sessioni === 'object' ? letture.sessioni[consumo.sessionId] : null;
+  if (consumo) out.barra = mia ? 'presente' : 'assente';
+  if (mia && mia.lettura && typeof mia.lettura === 'object') out.quota = mia.lettura;
+  return out;
+}
+
 export async function heartbeat(t, opts = {}) {
-  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts) }, opts);
-  if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
+  let crediti = {};
+  try { crediti = (opts.misureCrediti || misureCrediti)(opts); } catch (_) { /* il battito vale anche senza */ }
+  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...crediti }, opts);
+  if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt, avvisi: Array.isArray(body.avvisi) ? body.avvisi : [] };
   const reason = String((body && body.reason) || `http_${status}`);
   return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
 }
