@@ -322,6 +322,8 @@ const PRATICA = {
   fields: {
     seq: { integerValue: '910' }, clientId: { stringValue: 'local:claude' }, status: { stringValue: 'todo' },
     statusPublic: { stringValue: 'open' }, notes: { stringValue: '' }, senderProof: { stringValue: 'admin' },
+    // #1148: server:fondi lega solo pratiche fidate; questa l'ha aperta una sessione col biglietto pulito.
+    fiducia: { stringValue: 'fidato' },
     localOnly: { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1' } } } },
   },
 };
