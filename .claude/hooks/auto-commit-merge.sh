@@ -58,15 +58,15 @@ radice_di() {
   done
   [ -n "$d" ] && git -C "$d" rev-parse --show-toplevel 2>/dev/null
 }
-COMUNE_PROGETTO=$(minuscolo "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")
-ORIGIN_PROGETTO=$(url_norm "$(git remote get-url origin 2>/dev/null)")
-# Una cartella del progetto: un suo worktree (stessa .git) o un clone con lo stesso origin.
+RADICE_PROGETTO=$(git rev-parse --show-toplevel 2>/dev/null)
+# Una cartella del progetto: la sua radice, un suo worktree (stessa .git) o un clone con lo stesso origin.
 del_progetto() {
   local c o
+  [ "$(minuscolo "$1")" = "$(minuscolo "$RADICE_PROGETTO")" ] && return 0
   c=$(minuscolo "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")
-  [ -n "$c" ] && [ "$c" = "$COMUNE_PROGETTO" ] && return 0
+  [ -n "$c" ] && [ "$c" = "$(minuscolo "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")" ] && return 0
   o=$(url_norm "$(git -C "$1" remote get-url origin 2>/dev/null)")
-  [ -n "$o" ] && [ "$o" = "$ORIGIN_PROGETTO" ]
+  [ -n "$o" ] && [ "$o" = "$(url_norm "$(git remote get-url origin 2>/dev/null)")" ]
 }
 CARTELLA=""
 if [ -n "$HOOK_FILE" ]; then
