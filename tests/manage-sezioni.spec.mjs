@@ -128,7 +128,9 @@ test('l’ultima sezione torna intera alla riapertura, con la sua scheda caricat
 
   // Ricevuti vuoti e nessuna bloccante: vince l'ultima sezione, e la scheda si carica come se l'avessi cliccata.
   await page.evaluate((items) => window.__mgTest.setData(items), [fb('q1', 3, 'todo')]);
+  // Si torna a Feedback come farebbe un'apertura nuova; il clic riscrive la memoria, quindi la si rimette.
   await page.evaluate(() => window.__mgTest.setSezione('feedback'));
+  await page.evaluate((r) => localStorage.setItem('filo_manage_sezione', JSON.stringify(r)), ricordata);
   await registraChiamate(page);
   const MSG = await page.evaluate(() => window.SN_MSG.MSG);
   const scelta = await page.evaluate(() => window.__mgTest.sceltaApertura());
