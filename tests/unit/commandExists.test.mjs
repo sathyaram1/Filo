@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,14 +28,14 @@ const { commandExists, existenceProbes } = require(
 const SHELL = process.platform === 'win32' ? 'powershell' : undefined;
 
 test('riconosce un eseguibile sempre presente (node)', async () => {
-  assert.equal(await commandExists({ shell: SHELL, command: 'node' }), true);
+  assert.equal(await commandExists({ ...SISTEMA, command: 'node' }), true);
 });
 
 test('riconosce uno shim npm (npm) — guard regressione "firebase rosso"', async () => {
   // npm è sempre installato (serve a far girare l'app). Sul vecchio resolver
   // PowerShell via Get-Command tornava false per questo shim: questo assert è
   // proprio ciò che diventa rosso senza il fix.
-  assert.equal(await commandExists({ shell: SHELL, command: 'npm' }), true);
+  assert.equal(await commandExists({ ...SISTEMA, command: 'npm' }), true);
 });
 
 // `where.exe` e Get-Command sono programmi di Windows: fuori da lì il resolver
@@ -58,20 +59,20 @@ test('il probe veloce (where.exe) viene PRIMA di Get-Command — guard "firebase
 
 test('NON riconosce un nome palesemente inventato', async () => {
   assert.equal(
-    await commandExists({ shell: SHELL, command: 'questocomandononesistedavvero_xyz123' }),
+    await commandExists({ ...SISTEMA, command: 'questocomandononesistedavvero_xyz123' }),
     false,
   );
 });
 
 test('input vuoto o solo spazi → non esiste', async () => {
-  assert.equal(await commandExists({ shell: SHELL, command: '' }), false);
-  assert.equal(await commandExists({ shell: SHELL, command: '   ' }), false);
-  assert.equal(await commandExists({ shell: SHELL, command: undefined }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: '' }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: '   ' }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: undefined }), false);
 });
 
 test('un nome con newline/null (tentativo di iniezione) → non esiste', async () => {
-  assert.equal(await commandExists({ shell: SHELL, command: 'node\necho hacked' }), false);
-  assert.equal(await commandExists({ shell: SHELL, command: 'node\0' }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: 'node\necho hacked' }), false);
+  assert.equal(await commandExists({ ...SISTEMA, command: 'node\0' }), false);
 });
 
 test('un token che sembra codice NON viene eseguito (niente RCE nel controllo)', async () => {
@@ -87,7 +88,7 @@ test('un token che sembra codice NON viene eseguito (niente RCE nel controllo)',
   const payload = process.platform === 'win32'
     ? `node;[IO.File]::WriteAllText('${sentinel.replace(/\\/g, '/')}','x')`
     : `node;touch '${sentinel}'`;
-  await commandExists({ shell: SHELL, command: payload });
+  await commandExists({ ...SISTEMA, command: payload });
   const executed = fs.existsSync(sentinel);
   try { fs.unlinkSync(sentinel); } catch (_) { /* ok */ }
   assert.equal(executed, false, 'il controllo di esistenza NON deve eseguire il token');
