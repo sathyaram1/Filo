@@ -125,6 +125,8 @@ test('dai log: un test che nomina un guasto nel titolo o nella sua uscita non è
   assert.deepEqual(erroriInfrastruttura(`${verdi}\nfatal: Unable to create '/c/.git/index.lock': File exists.`), ['lock']);
   // Un `---` qualunque, non dopo un risultato del TAP, non apre un blocco che inghiotte il resto.
   assert.deepEqual(erroriInfrastruttura('---\nKilled'), ['ucciso']);
+  // Stessa regola per i rossi: l'uscita di un test verde che stampa un elenco di rossi non è un rosso.
+  assert.deepEqual(estraiRossi('# Subtest: il riepilogo\n# ✖ tests/unit/finto.test.mjs:3  stampato da un test\nok 1 - il riepilogo'), []);
 });
 
 test('dai log: il fermo del lanciatore degli unit è un rosso, col file fermo e quelli chiusi insieme', () => {
