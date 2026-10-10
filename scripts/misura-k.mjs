@@ -104,15 +104,19 @@ export function erroriInfrastruttura(testo) {
 export function estraiRossi(testo) {
   const rossi = new Set();
   const file = (f) => f.trim().replace(/\\+/g, '/');
-  for (const riga of String(testo || '').split(/\r?\n/)) {
+  for (const { riga, tap: delTap } of righeDelLog(testo)) {
+    if (delTap) {
+      // Del TAP contano solo i risultati di primo livello: la diagnostica è l'uscita dei test, anche dei verdi.
+      const tap = riga.match(/^not ok \d+ - (.+?)(\s+#\s*(?:TODO|SKIP)\b.*)?$/i);
+      if (tap && !/TODO/i.test(tap[2] || '')) rossi.add(tap[1].replace(/\\+/g, '/'));
+      continue;
+    }
     // Il fermo del lanciatore degli unit chiude la corsa con una riga sua: il file fermo e quelli chiusi insieme
     // restano senza esito, ed è il guasto tipico di più worker sulla stessa macchina.
     const fermo = riga.match(/^\[test:unit\] ROSSO: (?:(.+?) non è andato avanti per |per .+? non è andato avanti niente)/);
     if (fermo) { rossi.add(fermo[1] ? file(fermo[1]) : 'test:unit fermo'); continue; }
     const chiusi = riga.match(/^\[test:unit\] chiusi insieme, senza esito: (.+?)\.?\s*$/);
     if (chiusi) { for (const f of chiusi[1].split(', ')) if (f.trim()) rossi.add(file(f)); continue; }
-    const tap = riga.match(/^not ok \d+ - (.+?)(\s+#\s*(?:TODO|SKIP)\b.*)?$/i);
-    if (tap) { if (!/TODO/i.test(tap[2] || '')) rossi.add(tap[1].replace(/\\+/g, '/')); continue; }
     if (!/(✘|✖|×|^\s*\d+\)\s)/.test(riga)) continue;
     const m = riga.match(/tests[\\/][\w.\\/ -]+?\.(?:spec|test)\.mjs/);
     if (m) rossi.add(m[0].replace(/\\+/g, '/'));
