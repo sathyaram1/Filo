@@ -1387,12 +1387,9 @@
     if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
     const fb = allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
     if (!fb) return;
-    // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
-    // la segnalazione è già lì.
-    if (sezioniAttendibili()) {
-      mostraNelFiltro(fb);
-      selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
-    }
+    // Senza stato leggibile la lista è una sola: si torna lì (l'avviso può stare in Automazioni), senza scegliere scheda.
+    mostraNelFiltro(fb);
+    selectTab(sezioniAttendibili() ? MR.manageTabFor(fb, { releasedVersion, fusioni }) : 'inbox');
     openDetail(fb._id);
   }
 
@@ -1731,6 +1728,7 @@
       const tab = btn.dataset.tab;
       btn.hidden = MR.sezioneDiScheda(tab) !== sezioneAttiva || (LIST_TABS.includes(tab) && !ok);
     });
+    if (mgNoSections) mgNoSections.hidden = ok || sezioneAttiva !== 'feedback';
   }
 
   function salvaSezione() {
@@ -2275,11 +2273,8 @@
   // restano raggiungibili. Ritorna true se le sezioni si possono disegnare.
   function mostraSezioni() {
     const ok = sezioniAttendibili();
+    if (mgNoSections && !ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
     aggiornaSchedeVisibili();
-    if (mgNoSections) {
-      mgNoSections.hidden = ok;
-      if (!ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
-    }
     return ok;
   }
   // "(24)" o "(24+)" secondo il tetto: una sola regola per la barra, per
