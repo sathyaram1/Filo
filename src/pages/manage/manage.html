@@ -1089,20 +1089,13 @@
     /* «Segna fidato»: tinta d'accento e non della stella, perché è una delega. `all: unset` azzera anche il
        display di [hidden]: senza questa riga un tasto nascosto resta visibile. */
     .mg-fiducia-btn[hidden] { display: none; }
-    .mg-fiducia-btn:not(:disabled):hover {
+    .mg-fiducia-btn:not(:disabled):hover, .mg-fiducia-btn[aria-pressed="true"] {
       border-color: var(--sn-accent); color: var(--sn-accent);
       background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
     }
-    /* Prende lo spazio che i tasti lasciano e va a capo dentro di sé: la riga dei tasti resta una. */
-    .mg-fiducia-info {
-      flex: 1 1 14em; min-width: 0;
-      font-size: 12px; line-height: 1.35;
-      color: var(--sn-muted);
-    }
-    .mg-fiducia-info[hidden] { display: none; }
 
     /* «Solo in locale»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
-    .mg-local-btn[hidden], .mg-sender-btn[hidden] { display: none; }
+    .mg-local-btn[hidden] { display: none; }
     .mg-local-btn[aria-pressed="true"] {
       border-color: var(--sn-fg); color: var(--sn-fg);
       background: color-mix(in srgb, var(--sn-fg) 8%, var(--sn-bg, transparent));
@@ -1424,14 +1417,11 @@
                     <!-- «Solo in locale» (#908): c'è solo sui feedback dell'owner o di una sessione con la prova; testo e hover dal JS. -->
                     <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
                     <!-- «Segna fidato» (#1148): al posto di «Fondi senza chiedermelo» e di «È mio». Lo scrive il server;
-                       c'è solo sui feedback non fidati, testi e visibilità dal JS. -->
-                    <button type="button" class="mg-star-btn mg-fiducia-btn" id="mgFiduciaBtn" hidden>🤝 Segna fidato</button>
+                       premuto = fidato, e un clic la toglie. Testi e visibilità dal JS. -->
+                    <button type="button" class="mg-star-btn mg-fiducia-btn" id="mgFiduciaBtn" aria-pressed="false" hidden>🤝 Segna fidato</button>
                   </div>
                 </div>
                 </div>
-
-                <!-- Da chi viene la fiducia: in fondo alla riga, accanto ai tasti. -->
-                <span class="mg-fiducia-info" id="mgFiduciaInfo" hidden></span>
               </div>
 
               <!-- «Il segno era un errore» (#922): la conferma dice cosa cambia, subito sotto il tasto. Testi dal JS. -->

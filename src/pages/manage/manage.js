@@ -162,7 +162,6 @@
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgFiduciaBtn = document.getElementById('mgFiduciaBtn');
-  const mgFiduciaInfo = document.getElementById('mgFiduciaInfo');
   const mgLocalBtn   = document.getElementById('mgLocalBtn');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
@@ -1951,7 +1950,9 @@
       voci.push({ testo: '💻 Approva come lavoro locale', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
     }
     if (isAdmin && MR.fiduciaCheck(fb).ok) {
-      voci.push({ testo: '🤝 Segna fidato', titolo: titoloFiducia(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); segnaFidato(fb._id); } });
+      voci.push({ testo: '🤝 Segna fidato', titolo: titoloFiducia(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); impostaFiducia(fb._id, true); } });
+    } else if (isAdmin && MR.fiduciaTogliCheck(fb).ok) {
+      voci.push({ testo: '🤝 Togli fiducia', titolo: titoloTogliFiducia(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); impostaFiducia(fb._id, false); } });
     }
     if (num) {
       voci.push({
@@ -3078,44 +3079,48 @@
     const c = MR.fiduciaCheck(fb);
     return c.segnalato ? `${TITOLO_FIDUCIA} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_FIDUCIA;
   }
-  function reflectFiducia(fb) {
-    const c = MR.fiduciaCheck(fb);
-    if (mgFiduciaBtn) {
-      mgFiduciaBtn.hidden = !isAdmin || !c.ok;
-      mgFiduciaBtn.disabled = false;
-      mgFiduciaBtn.title = titoloFiducia(fb);
-    }
-    if (mgFiduciaInfo) {
-      const riga = isAdmin ? MR.fiduciaText(fb) : '';
-      mgFiduciaInfo.hidden = !riga;
-      mgFiduciaInfo.textContent = riga;
-    }
+  // Premuto: da dove viene la fiducia, e che un clic la toglie (se si può mettere si può togliere).
+  const TITOLO_TOGLI_FIDUCIA = 'Un clic la toglie: i lavori nuovi tornano a passare dai giudici, e la fusione a chiederti il via libera.';
+  function titoloTogliFiducia(fb) {
+    return `${MR.fiduciaText(fb)} ${TITOLO_TOGLI_FIDUCIA}`;
   }
-  async function segnaFidato(id) {
+  function reflectFiducia(fb) {
+    if (!mgFiduciaBtn) return;
+    const on = MR.isFidato(fb);
+    const c = on ? MR.fiduciaTogliCheck(fb) : MR.fiduciaCheck(fb);
+    mgFiduciaBtn.hidden = !isAdmin || !c.ok;
+    mgFiduciaBtn.disabled = false;
+    mgFiduciaBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    mgFiduciaBtn.textContent = on ? '🤝 Fidato' : '🤝 Segna fidato';
+    mgFiduciaBtn.title = on ? titoloTogliFiducia(fb) : titoloFiducia(fb);
+  }
+  async function impostaFiducia(id, valore) {
     const fb = allFeedbacks.find((f) => f._id === id);
-    if (!fb || !MR.fiduciaCheck(fb).ok) return;
+    if (!fb || !(valore ? MR.fiduciaCheck(fb) : MR.fiduciaTogliCheck(fb)).ok) return;
     const num = FB.formatNum(fb.seq, fb.subSeq);
     const chi = num ? ` (#${num})` : '';
     if (selectedId === id && mgFiduciaBtn) mgFiduciaBtn.disabled = true;
-    setManageMsg('Lo segno fidato…', '');
+    setManageMsg(valore ? 'Lo segno fidato…' : 'Tolgo la fiducia…', '');
     try {
-      const r = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non l’ha segnato');
+      const r = await sendToMain(valore ? { type: FIDUCIA_SEGNA, feedbackId: id } : { type: FIDUCIA_SEGNA, feedbackId: id, fidato: false });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non ha risposto');
       // Il server l'ha scritto: la rilettura porterà lo stesso valore, intanto la pagina lo dice subito.
       const ora = allFeedbacks.find((f) => f._id === id) || fb;
-      ora.fiducia = 'fidato';
+      ora.fiducia = valore ? 'fidato' : 'non_fidato';
       ora.fiduciaDa = { by: 'owner', at: Date.now() };
       if (selectedId === id) reflectManage(ora);
       renderList();
-      setManageMsg(`Da ora${chi} è fidato.`, 'ok');
+      setManageMsg(valore ? `Da ora${chi} è fidato.` : `Da ora${chi} non è più fidato: i lavori nuovi passano dai giudici, e la fusione chiede il tuo sì.`, 'ok');
     } catch (e) {
-      setManageMsg(`Non segnato fidato${chi}: ${e.message || 'Errore'}`, 'err');
+      setManageMsg(`${valore ? 'Non segnato fidato' : 'Fiducia non tolta'}${chi}: ${e.message || 'Errore'}`, 'err');
     } finally {
       if (mgFiduciaBtn) mgFiduciaBtn.disabled = false;
     }
   }
   if (mgFiduciaBtn) {
-    mgFiduciaBtn.addEventListener('click', () => { if (selectedId) segnaFidato(selectedId); });
+    mgFiduciaBtn.addEventListener('click', () => {
+      if (selectedId) impostaFiducia(selectedId, mgFiduciaBtn.getAttribute('aria-pressed') !== 'true');
+    });
   }
 
   async function setLocalSign(id, valore) {

@@ -775,6 +775,14 @@
     return segnalato ? { ok: true, segnalato } : { ok: true };
   }
 
+  // Il contrario: su un fidato e aperto. Toglierla non ripulisce né sporca niente di già scritto.
+  function fiduciaTogliCheck(fb) {
+    if (!fb) return { ok: false, motivo: 'feedback non trovato' };
+    if (!isFidato(fb)) return { ok: false, motivo: 'non è fidato' };
+    if (String(fb.statusPublic || 'open') === 'closed') return { ok: false, motivo: 'la pratica è chiusa: la fiducia vale per il lavoro che verrà' };
+    return { ok: true };
+  }
+
   // Da dove viene la fiducia, in una riga per il dettaglio. '' per un non fidato: lì parla il tasto.
   const FIDUCIA_DA = Object.freeze({
     owner: 'Fidato: l’hai segnato tu',
@@ -1765,7 +1773,7 @@
     workProgress, WORK_STAGES,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
-    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
+    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
     isLocalOnly, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,

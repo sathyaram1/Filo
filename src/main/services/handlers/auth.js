@@ -1447,21 +1447,22 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
-  // «Segna fidato» (#1148): la fiducia la scrive solo il server, mai la pagina né il main col token.
+  // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
   on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
+    const togli = msg?.fidato === false;
     if (!feedbackId) return { ok: false, error: 'Manca il feedback da segnare fidato.' };
     let r;
     try {
-      r = await callSecurityFunction('ownerFiducia', { op: 'segna', feedbackId });
+      r = await callSecurityFunction('ownerFiducia', { op: togli ? 'togli' : 'segna', feedbackId });
     } catch (e) {
       if (e?.httpStatus === 404) return { ok: false, error: 'La funzione «segna fidato» non è ancora pubblicata sul server.' };
       if (String(e?.code || '').toUpperCase() === 'PERMISSION_DENIED') return { ok: false, error: 'Il server dice che questo account non può segnare fidato: serve quello del proprietario.' };
       if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
       return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
     }
-    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || 'Il server non l’ha segnato fidato.' };
-    return { ok: true, fiducia: 'fidato' };
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
+    return { ok: true, fiducia: togli ? 'non_fidato' : 'fidato' };
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
