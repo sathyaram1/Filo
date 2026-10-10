@@ -1423,20 +1423,15 @@
                       title="Scrivi la riga che leggerà chi ha segnalato">Frase</button>
                     <!-- «Solo in locale» (#908): c'è solo sui feedback dell'owner o di una sessione con la prova; testo e hover dal JS. -->
                     <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
-                    <!-- «È mio» (#908): sul prefisso dell'owner o di una sessione senza prova; solo l'owner la può dare. -->
-                    <button type="button" class="mg-star-btn mg-sender-btn" id="mgSenderBtn" hidden>🙋 È mio</button>
-                    <!-- «Fondi senza chiedermelo» (#1034): sulla riga col nome corto, lo stesso della lista; il nome intero sta
-                       nell'hover. Acceso = aria-pressed; testi e visibilità dal JS, sulle pratiche chiuse sparisce. -->
-                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
-                      aria-pressed="false" hidden>Senza chiedere</button>
-                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveRevokeBtn"
-                      hidden>Chiedimi prima</button>
+                    <!-- «Segna fidato» (#1148): al posto di «Fondi senza chiedermelo» e di «È mio». Lo scrive il server;
+                       c'è solo sui feedback non fidati, testi e visibilità dal JS. -->
+                    <button type="button" class="mg-star-btn mg-fiducia-btn" id="mgFiduciaBtn" hidden>🤝 Segna fidato</button>
                   </div>
                 </div>
                 </div>
 
-                <!-- Chi ha messo il segno: in fondo alla riga, accanto al tasto che lo dice acceso. -->
-                <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
+                <!-- Da chi viene la fiducia: in fondo alla riga, accanto ai tasti. -->
+                <span class="mg-fiducia-info" id="mgFiduciaInfo" hidden></span>
               </div>
 
               <!-- «Il segno era un errore» (#922): la conferma dice cosa cambia, subito sotto il tasto. Testi dal JS. -->
