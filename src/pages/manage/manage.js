@@ -3065,7 +3065,7 @@
     mgSearchToggle.addEventListener('click', () => {
       if (searchMode) { closeSearch(); return; }
       // I risultati prendono il posto della lista dei feedback: da un'altra scheda si torna lì prima di cercare.
-      if (!LIST_TABS.includes(schedaPerSezione[sezioneAttiva]) || sezioneAttiva !== 'feedback') {
+      if (!LIST_TABS.includes(schedaPerSezione[sezioneAttiva])) {
         const lista = LIST_TABS.includes(schedaPerSezione.feedback) ? schedaPerSezione.feedback : 'inbox';
         selectTab(lista);
       }
