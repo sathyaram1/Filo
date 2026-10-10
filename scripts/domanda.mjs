@@ -244,6 +244,12 @@ export async function esegui(argv, io = {}) {
     if (a.cmd === 'elenco') {
       const r = await chiama(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
       scrivi(formattaElenco(r.domande));
+      if (r.altre) scrivi(`\nCe ne sono altre oltre le prime ${(r.domande || []).length}: il server non le ha mandate tutte.`);
+      return 0;
+    }
+    if (a.cmd === 'archivia' || a.cmd === 'riapri') {
+      const r = await chiama({ op: a.cmd, id: a.id });
+      scrivi(`OK: ${a.id} è ${visibile((r.domanda && r.domanda.stato) || '?')}.`);
       return 0;
     }
     if (a.cmd === 'rispondi') {
