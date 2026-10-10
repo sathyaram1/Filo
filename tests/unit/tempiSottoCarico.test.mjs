@@ -81,6 +81,29 @@ test('nessuno unit test dà a un processo vero un tempo massimo scritto a mano',
   assert.deepEqual(fuori, [], 'usa TETTO_ATTESA_MS da tests/helpers/attese.mjs: sotto carico un tetto stretto è un rosso finto');
 });
 
+// Il pid di un processo morto non si prende lanciandone uno (#1063): sotto carico il figlio non parte e non scrive
+// niente, o il suo pid torna in uso, e la prova crede viva una cosa morta.
+const PID_DI_UN_FIGLIO = [/\bspawnSync\s*\([^;]*?\)\s*\.pid\b/, /['"`]-e['"`]\s*,\s*['"`][^'"`]*console\.log\(process\.pid\)/];
+const pidDiUnFiglio = (testo) => PID_DI_UN_FIGLIO.some((re) => re.test(testo));
+
+test('nessuno unit test prende il pid di un processo morto lanciandone uno', () => {
+  assert.ok(pidDiUnFiglio("const morto = spawnSync(process.execPath, ['-e', '']).pid;"));
+  assert.ok(pidDiUnFiglio("spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim()"));
+  assert.ok(!pidDiUnFiglio("const r = spawnSync(process.execPath, ['x'], { encoding: 'utf8' });\nassert.equal(r.status, 0);"));
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    if (pidDiUnFiglio(readFileSync(file, 'utf8'))) fuori.push(relative(ROOT, file).split(sep).join('/'));
+  }
+  assert.deepEqual(fuori, [], 'usa pidMorto da tests/helpers/processi.mjs');
+});
+
+test('pidMorto dà un pid che nessun processo ha, senza lanciarne', () => {
+  const pid = pidMorto();
+  assert.ok(Number.isInteger(pid) && pid > 0 && pid !== process.pid);
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
+});
+
 // Un evento si aspetta, non si corre contro un timer (#1063): «la richiamata o 50 ms» e «la risposta o 5 secondi» su
 // una macchina carica scadono prima che il lavoro finisca. Le forme: il risolutore dato al lavoro e anche a un
 // setTimeout con un numero; una corsa fra la promessa e un setTimeout con un numero.
