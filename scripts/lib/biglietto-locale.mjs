@@ -305,6 +305,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
     }
     return { riga: `Biglietto della sessione: ${fiducia === 'fidato' ? 'pulito' : 'sporco'}${envFile ? '' : ' (CLAUDE_ENV_FILE assente: vale la cartella .claude/biglietti)'}.`, path };
   } catch (e) {
-    return { riga: `Biglietto della sessione non preso: ${String((e && e.message) || e).slice(0, 160)}.` };
+    // Una riga sola: l'hook stampa solo la prima, e un errore di rete porta con sé il corpo JSON della risposta.
+    return { riga: `Biglietto della sessione non preso: ${String((e && e.message) || e).replace(/\s+/g, ' ').trim().slice(0, 160)}.` };
   }
 }
