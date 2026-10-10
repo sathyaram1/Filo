@@ -4,12 +4,13 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
-import { cpus, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { ensureSessionExcludes } from './branch-integrity.mjs';
+import { MARCATORE_WORKER } from './dati-worker.mjs';
 import { pinWorkerTools, pinnedDirWorker, TOOLS_ROOT } from './tools-pin.mjs';
 
-export const MARCATORE_WORKER = '.claude/filo-worker.json';
+export { MARCATORE_WORKER, datiWorker, concorrenzaUnit } from './dati-worker.mjs';
 export const REGISTRO = 'filo-cloni';
 
 /** Dove nascono i clone: fuori dal progetto, per costruzione. `FILO_CLONI_DIR` per i test. */
@@ -39,32 +40,6 @@ export function chiaviAccesso(uscitaNull) {
     const a = voce.indexOf('\n');
     return a < 0 ? [voce, ''] : [voce.slice(0, a), voce.slice(a + 1)];
   }).filter(([k]) => CHIAVE_ACCESSO.test(k));
-}
-
-/** Quanti file di prova insieme per worker: le CPU divise fra i worker, almeno uno. PURA. */
-export function concorrenzaUnit(paralleli, cpu = cpus().length) {
-  const k = Number(paralleli);
-  if (!Number.isInteger(k) || k < 2) return 0;
-  return Math.max(1, Math.floor(Number(cpu) / k));
-}
-
-/**
- * Chi è questo worker: `{ indice, paralleli }` dall'ambiente (`FILO_WORKER`, `FILO_WORKER_PARALLELI`) o dal marcatore
- * del clone; `null` fuori da un clone di worker. In Claude Code l'ambiente non passa da una chiamata Bash all'altra:
- * il marcatore sì.
- */
-export function datiWorker({ env = process.env, root = process.cwd() } = {}) {
-  const num = (v) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : 0; };
-  let indice = num(env.FILO_WORKER);
-  let paralleli = num(env.FILO_WORKER_PARALLELI);
-  if (!indice || !paralleli) {
-    try {
-      const m = JSON.parse(readFileSync(resolve(root, MARCATORE_WORKER), 'utf8'));
-      indice = indice || num(m.indice);
-      paralleli = paralleli || num(m.paralleli);
-    } catch (_) { /* nessun marcatore: non è un clone di worker */ }
-  }
-  return indice ? { indice, paralleli: paralleli || 0 } : null;
 }
 
 function gitIn(cwd, args, { env } = {}) {
