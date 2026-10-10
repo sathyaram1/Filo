@@ -307,12 +307,21 @@ export function conTettoDiTempo(opzioni) {
 
 /**
  * Un worker in parallelo (#1157) prende la sua parte di CPU: N `node --test` a tutte le CPU insieme fanno rossi i test
- * sensibili ai tempi. Chi lancia con un `--test-concurrency` suo decide lui. PURA.
+ * sensibili ai tempi. `n` = file insieme (0 = decide node); chi lancia con un `--test-concurrency` suo decide lui. PURA.
  */
-export function conConcorrenza(opzioni, { worker = null, cpu } = {}) {
+export function conConcorrenza(opzioni, n = 0) {
   if (opzioni.some((a) => a === '--test-concurrency' || String(a).startsWith('--test-concurrency='))) return opzioni;
-  const n = worker ? concorrenzaUnit(worker.paralleli, ...(cpu === undefined ? [] : [cpu])) : 0;
-  return n ? [`--test-concurrency=${n}`, ...opzioni] : opzioni;
+  return n > 0 ? [`--test-concurrency=${n}`, ...opzioni] : opzioni;
+}
+
+// Importato qui e non in testa per la stessa ragione di temporaneaDellaCorsa: le copie di questo lanciatore che
+// portano con sé solo i suoi file (le prove di unit-sulla-fusione) non hanno il modulo, e lì vale node.
+async function concorrenzaDelWorker() {
+  const modulo = join(__dirname, 'lib', 'dati-worker.mjs');
+  if (!existsSync(modulo)) return 0;
+  const { datiWorker, concorrenzaUnit } = await import(pathToFileURL(modulo).href);
+  const w = datiWorker({ root: REPO_ROOT });
+  return w ? concorrenzaUnit(w.paralleli) : 0;
 }
 
 async function main() {
