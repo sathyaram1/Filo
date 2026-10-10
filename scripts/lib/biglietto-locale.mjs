@@ -88,6 +88,8 @@ export function messaggioErrore(status, body) {
  * → il risultato del server; lancia un Error col motivo (anche «non ancora pubblicata») se non va.
  */
 export async function chiama(op, data = {}, deps = {}) {
+  // Dentro una prova (node --test) il server vero non si tocca mai: un ramo di prova finirebbe nel registro vero.
+  if (!deps.fetchImpl && process.env.NODE_TEST_CONTEXT) throw new Error('niente server vero dentro una prova');
   const fetchImpl = deps.fetchImpl || fetch;
   const idToken = deps.idToken ? await deps.idToken() : await tokenOwner();
   if (!idToken) throw new Error('nessuna credenziale admin su questa macchina');
