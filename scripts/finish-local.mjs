@@ -381,6 +381,17 @@ export function specsForChangedFiles(changed, tracked) {
 }
 
 /**
+ * Spec da correre oltre a quelli delle aree, da `FILO_SPEC_IN_PIU` (nomi separati da virgole o spazi): la misura di K
+ * (#1157) li chiede su un ramo che non tocca niente, dove le aree non sceglierebbero nulla. Aggiungono prove, mai ne
+ * tolgono. PURA.
+ */
+export function specInPiu(env = process.env) {
+  return [...new Set(String((env && env.FILO_SPEC_IN_PIU) || '').split(/[\s,]+/).filter(Boolean)
+    .map((s) => s.replace(/\\/g, '/').replace(/\.spec\.mjs$/, ''))
+    .map((s) => (s.startsWith('tests/') ? s : `tests/${s}`)))];
+}
+
+/**
  * Divide gli spec da lanciare fra quelli che DEVONO essere verdi e quelli
  * rossi anche su main su questa macchina (tests/rossi-noti.json, feedback
  * #563): questi ultimi si lanciano e si mostrano, ma non fermano la
