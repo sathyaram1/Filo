@@ -60,12 +60,10 @@ test('lista salvata prima del lavoro: la pagina nomina Alibaba, la rimette come 
   await drift.getByRole('button', { name: 'Rimettili nella lista' }).click();
   await expect(drift).toBeHidden();
   expect(await nomi(page)).toContain('Alibaba');
-  const riga = page.locator('#excludedList .sn-excluded-row').filter({ has: page.locator('.sn-excluded-name[value="Alibaba"], .sn-excluded-name') })
-    .filter({ hasText: '' });
   const alibaba = await page.locator('#excludedList .sn-excluded-row').evaluateAll((rs) => rs
     .map((r) => ({ nome: r.querySelector('.sn-excluded-name').value, tipo: (r.querySelector('.sn-excluded-kind') || {}).value, msg: (r.querySelector('.sn-model-row-msg') || {}).textContent || '' }))
     .find((x) => x.nome === 'Alibaba'));
-  expect(riga).toBeTruthy();
+  expect(alibaba).toBeTruthy();
   expect(alibaba.tipo).toBe('producer');
   expect(alibaba.msg.trim()).toBe('');
 
