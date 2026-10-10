@@ -1986,8 +1986,7 @@ test('#497 — azioni di stato, ⭐ e frase: tutti i tasti sulla stessa riga', a
 // ── #1034: anche l'ultimo tasto dell'owner sta sulla riga dei tasti ────────
 // Aveva una riga sua sotto gli altri tasti, su ogni pratica aperta. Si guarda
 // alla misura della finestra di serie: i Ricevuti (il caso con più tasti fra
-// quelli di ogni giorno) e una pratica in coda segnata fidata, dove accanto ai
-// tasti c'è anche da dove viene la fiducia (#1148).
+// quelli di ogni giorno) e una pratica in coda che si segna fidata (#1148).
 async function tastiDellOwner(page) {
   return page.evaluate(() => {
     const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
@@ -1995,8 +1994,7 @@ async function tastiDellOwner(page) {
       const r = b.getBoundingClientRect();
       return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, basso: r.bottom };
     });
-    const info = document.getElementById('mgFiduciaInfo');
-    return { tasti, infoTop: vis(info) ? info.getBoundingClientRect().top : null };
+    return { tasti };
   });
 }
 
@@ -2021,7 +2019,7 @@ test('#1034 — Ricevuti: anche «Segna fidato» sta sulla riga degli altri tast
   for (const t of tasti) expect(Math.abs(t.centro - tasti[0].centro), t.id).toBeLessThan(6);
 });
 
-test('#1034 — In coda: «Segna fidato» al clic diventa la riga di chi l’ha segnato, accanto ai tasti; i vicini non si spostano', async ({ openTab }) => {
+test('#1034 — In coda: «Segna fidato» al clic resta premuto sulla stessa riga, e i vicini non si spostano', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
@@ -2048,29 +2046,28 @@ test('#1034 — In coda: «Segna fidato» al clic diventa la riga di chi l’ha 
   const stella = await page.locator('#mgStarBtn').boundingBox();
 
   await tasto.click();
-  await expect(tasto).toBeHidden();
-  await expect(page.locator('#mgFiduciaInfo')).toContainText('Fidato: l’hai segnato tu');
+  await expect(tasto).toHaveAttribute('aria-pressed', 'true');
+  await expect(tasto).toHaveText('🤝 Fidato');
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: 'fb-una-riga-coda' }]);
   const dopo = await tastiDellOwner(page);
-  // Da dove viene la fiducia sta accanto ai tasti, non sotto.
-  expect(dopo.infoTop).toBeLessThan(dopo.tasti[0].basso);
+  for (const t of dopo.tasti) expect(Math.abs(t.centro - dopo.tasti[0].centro), t.id).toBeLessThan(6);
   const stellaDopo = await page.locator('#mgStarBtn').boundingBox();
   expect(Math.round(stellaDopo.x)).toBe(Math.round(stella.x));
   expect(Math.round(stellaDopo.y)).toBe(Math.round(stella.y));
 });
 
 // La riga non va mai a capo: con tanti tasti (spam, file sospetto, «Segna fidato») o con la colonna stretta i tasti
-// si stringono e restano dentro la riga; da dove viene la fiducia resta leggibile.
+// si stringono e restano dentro la riga.
 const RIGA_BASE = { text: 'Testo.', name: 'Prova', seq: 12, subSeq: 0, createdAt: '2026-06-22T10:00:00Z', images: [] };
 const RIGA_CASI = [
-// [nome, sezione, feedback, tasti visibili almeno]: da fidato «Segna fidato» non c'è, al suo posto la riga.
+// [nome, sezione, feedback, tasti visibili almeno].
 const RIGA_CASI = [
   ['spam', 'inbox', { ...RIGA_BASE, _id: 'riga-spam', status: 'spam', clientId: 'tester@example.com' }, 5],
   ['proprio non fidato', 'inbox', { ...RIGA_BASE, _id: 'riga-mio', status: 'new', clientId: 'owner:abc' }, 5],
   ['file sospetto, non fidato', 'inbox', { ...RIGA_BASE, _id: 'riga-file', status: 'suspicious_file', clientId: 'owner:abc' }, 5],
   ['in coda, da segnare fidato', 'queue', { ...RIGA_BASE, _id: 'riga-coda', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com' }, 4],
   ['in coda, segnato fidato da te', 'queue', { ...RIGA_BASE, _id: 'riga-fidato', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com',
-    fiducia: 'fidato', fiduciaDa: { by: 'owner', at: Date.parse('2026-09-13T07:30:00.000Z') } }, 3],
+    fiducia: 'fidato', fiduciaDa: { by: 'owner', at: Date.parse('2026-09-13T07:30:00.000Z') } }, 4],
 ];
 for (const larghezza of [1280, 960]) {
   for (const [nome, tab, fb, minimo] of RIGA_CASI) {
@@ -2089,7 +2086,7 @@ for (const larghezza of [1280, 960]) {
         window.__mgTest.setTab(t);
         window.__mgTest.openDetail(f._id);
       }, [fb, tab]);
-      await expect(page.locator(fb.fiducia ? '#mgFiduciaInfo' : '#mgFiduciaBtn')).toBeVisible();
+      await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
       const m = await page.evaluate(() => {
         const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
         const riga = document.querySelector('#mgOwnerBar .mg-owner-row').getBoundingClientRect();
@@ -2101,8 +2098,7 @@ for (const larghezza of [1280, 960]) {
           const v = b.getBoundingClientRect();
           return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, destra: v.right, sinistra: v.left, largo: r.width };
         });
-        const info = document.getElementById('mgFiduciaInfo');
-        return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti, infoLarga: vis(info) ? info.getBoundingClientRect().width : null };
+        return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti };
       });
       expect(m.tasti.length).toBeGreaterThanOrEqual(minimo);
       expect(m.destraScatola).toBeLessThanOrEqual(m.destraRiga + 1);
@@ -2112,7 +2108,6 @@ for (const larghezza of [1280, 960]) {
         expect(t.sinistra, t.id).toBeGreaterThanOrEqual(m.sinistraRiga - 2);
         expect(t.largo, t.id).toBeGreaterThan(24);
       }
-      if (m.infoLarga !== null) expect(m.infoLarga).toBeGreaterThan(150);
     });
   }
 }
@@ -2149,8 +2144,7 @@ test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto'
   await page.mouse.wheel(0, 600);
   await expect.poll(dentro).toBe(true);
   await ultimo.click();
-  await expect(ultimo).toBeHidden();
-  await expect(page.locator('#mgFiduciaInfo')).toContainText('Fidato: l’hai segnato tu');
+  await expect(ultimo).toHaveAttribute('aria-pressed', 'true');
 });
 
 // ── Priorità visibile + modificabile dalla coda ─────────────────────────────

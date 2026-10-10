@@ -11,8 +11,8 @@
 //      l'approvazione dice dove va.
 //   5. Automazioni: una fusione locale che ha saltato L5 si legge come tale.
 //   6. La pagina gemella dei feedback ha la stessa sezione con lo stesso numero.
-//   7. «Fondi senza chiedermelo» e «È mio» non ci sono più: su un non fidato c'è «Segna
-//      fidato», che arriva al main come richiesta al server; da fidato il segno si mette.
+//   7. «Fondi senza chiedermelo» e «È mio» non ci sono più: c'è «Segna fidato», che arriva
+//      al main come richiesta al server; da fidato il segno si mette.
 //   8. Su un lavoro locale chiuso togliere il segno lo rimette nella bacheca pubblica, non alle
 //      routine, e i testi lo dicono; «Copia» nomina finish solo dove il numero lo lega a un lavoro.
 
@@ -225,20 +225,21 @@ test('la pagina gemella dei feedback ha la stessa sezione, con lo stesso numero'
   await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
 });
 
-test('lavoro locale fidato: niente «Segna fidato» né i tasti di prima, una riga dice da dove viene la fiducia', async ({ openTab }) => {
+test('lavoro locale fidato: il tasto della fiducia è premuto e dice da dove viene; i tasti di prima non ci sono', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const daSessione = fb({ localOnly: SEGNO, fiduciaDa: { by: 'nascita', at: SEGNO.at } });
   await apri(page, [daSessione], { tab: 'local' });
   await page.evaluate(() => window.__mgTest.openDetail('loc-1'));
   await expect(page.locator('#mgLocalBtn')).toBeVisible();
-  await expect(page.locator('#mgFiduciaBtn')).toBeHidden();
-  await expect(page.locator('#mgFiduciaInfo')).toHaveText('Fidato: scritto da te o da una sessione pulita.');
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /^Fidato: scritto da te o da una sessione pulita\./);
   for (const via of ['#mgPreapproveBtn', '#mgPreapproveRevokeBtn', '#mgPreapprovedInfo', '#mgSenderBtn']) {
     await expect(page.locator(via)).toHaveCount(0);
   }
   await page.locator('.mg-item[data-id="loc-1"]').click({ button: 'right' });
   await expect(page.locator('.mg-ctxmenu')).toBeVisible();
   await expect(page.locator('.mg-ctxmenu')).not.toContainText(/Segna fidato|È mio|senza chiedere/);
+  await expect(page.locator('.mg-ctxmenu')).toContainText('Togli fiducia');
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
@@ -264,8 +265,8 @@ test('il proprio non fidato: niente «Locale» finché non è fidato; «Segna fi
   await expect(page.locator('#mgLocalBtn')).toBeHidden();
   await btn.click();
   await expect(page.locator('#mgManageMsg')).toContainText('Da ora (#908) è fidato.');
-  await expect(btn).toBeHidden();
-  await expect(page.locator('#mgFiduciaInfo')).toContainText('Fidato: l’hai segnato tu');
+  await expect(btn).toHaveAttribute('aria-pressed', 'true');
+  await expect(btn).toHaveAttribute('title', /^Fidato: l’hai segnato tu/);
   await expect(page.locator('#mgLocalBtn')).toBeVisible();
   expect(await page.evaluate(() => window.__updates)).toEqual([{ type: 'fiducia_segna', feedbackId: 's-1' }]);
 });

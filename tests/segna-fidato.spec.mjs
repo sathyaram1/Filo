@@ -3,9 +3,10 @@
 // COSA DEVE ESSERE VERO
 //   1. Su un feedback non fidato e aperto il tasto c'è, nel dettaglio e dal tasto destro sulla scheda; il gesto
 //      arriva al main come richiesta al server ({ type: 'fiducia_segna', feedbackId }), mai come scrittura del
-//      feedback. Riuscito, il tasto sparisce e la riga dice che l'hai segnato tu.
+//      feedback. Riuscito, il tasto resta premuto («🤝 Fidato») e l'hover dice che l'hai segnato tu; un altro clic
+//      la toglie ({ ..., fidato: false }), e il tasto torna com'era.
 //   2. Se il server non lo segna, il messaggio dice perché e il tasto resta.
-//   3. Su un fidato o su una pratica chiusa il tasto non c'è; su un segnalato l'hover dice di guardarlo prima.
+//   3. Su una pratica chiusa il tasto non c'è; su un segnalato l'hover dice di guardarlo prima.
 //   4. I tasti di prima non ci sono più, e la pagina non fonde da sé le richieste ferme: un vecchio segno nel
 //      dato non conta.
 //   5. Gestione → Automazioni elenca le fuse senza chiedere: il lavoro fidato come «lavoro fidato: controllo
@@ -66,7 +67,7 @@ async function apri(page, fbs, opts) {
   await page.evaluate((tab) => window.__mgTest.setTab(tab), (opts && opts.tab) || 'queue');
 }
 
-test('dal dettaglio: «Segna fidato» va al server, il tasto sparisce e la riga dice che l’hai segnato tu', async ({ openTab }) => {
+test('dal dettaglio: «Segna fidato» va al server e il tasto resta premuto; un altro clic toglie la fiducia', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fb = pratica();
   await apri(page, [fb]);
@@ -76,12 +77,21 @@ test('dal dettaglio: «Segna fidato» va al server, il tasto sparisce e la riga 
   await expect(btn).toBeVisible();
   await expect(btn).toHaveText('🤝 Segna fidato');
   await expect(btn).toHaveAttribute('title', /^L’hai letto e ti fidi: i giudici non servono più/);
-  await expect(page.locator('#mgFiduciaInfo')).toBeHidden();
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
   await btn.click();
   await expect(page.locator('#mgManageMsg')).toContainText('Da ora (#581) è fidato.');
-  await expect(btn).toBeHidden();
-  await expect(page.locator('#mgFiduciaInfo')).toContainText('Fidato: l’hai segnato tu il ');
-  expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: fb._id }]);
+  await expect(btn).toHaveAttribute('aria-pressed', 'true');
+  await expect(btn).toHaveText('🤝 Fidato');
+  await expect(btn).toHaveAttribute('title', /^Fidato: l’hai segnato tu il .*Un clic la toglie/);
+  // Se si può mettere si può togliere.
+  await btn.click();
+  await expect(page.locator('#mgManageMsg')).toContainText('Da ora (#581) non è più fidato');
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
+  await expect(btn).toHaveText('🤝 Segna fidato');
+  expect(await page.evaluate(() => window.__fiducia)).toEqual([
+    { type: 'fiducia_segna', feedbackId: fb._id },
+    { type: 'fiducia_segna', feedbackId: fb._id, fidato: false },
+  ]);
   // La fiducia la scrive il server: la pagina non tocca il feedback.
   expect(await page.evaluate(() => window.__updates)).toEqual([]);
 });
@@ -97,10 +107,15 @@ test('dal tasto destro sulla scheda fa la stessa cosa del tasto, e apre la prati
   await expect(page.locator('#mgDetail')).toBeVisible();
   await expect(page.locator('#mgManageMsg')).toContainText('è fidato');
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: fb._id }]);
-  // Da fidato la voce non c'è più.
+  // Da fidato la voce diventa il suo contrario, come il tasto.
   await page.locator(`.mg-item[data-id="${fb._id}"]`).click({ button: 'right' });
   await expect(page.locator('.mg-ctxmenu')).toBeVisible();
   await expect(page.locator('.mg-ctxmenu')).not.toContainText('Segna fidato');
+  const togli = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Togli fiducia' });
+  await expect(togli).toHaveAttribute('title', /Un clic la toglie/);
+  await togli.click();
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'false');
+  expect((await page.evaluate(() => window.__fiducia)).at(-1)).toEqual({ type: 'fiducia_segna', feedbackId: fb._id, fidato: false });
 });
 
 test('se il server non lo segna, il messaggio dice perché e il tasto resta', async ({ openTab }) => {
@@ -112,18 +127,18 @@ test('se il server non lo segna, il messaggio dice perché e il tasto resta', as
   await expect(page.locator('#mgManageMsg')).toContainText('Non segnato fidato (#581): Il feedback non è ancora pubblicato');
   await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
   await expect(page.locator('#mgFiduciaBtn')).toBeEnabled();
-  await expect(page.locator('#mgFiduciaInfo')).toBeHidden();
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('su un fidato o su una pratica chiusa il tasto non c’è; su un segnalato l’hover dice di guardarlo prima', async ({ openTab }) => {
+test('su un fidato il tasto dice da dove viene; su una chiusa non c’è; su un segnalato l’hover dice di guardarlo prima', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fidato = pratica({ _id: 'fid', seq: 582, fiducia: 'fidato', fiduciaDa: { by: 'migrazione', at: 1 } });
   const chiusa = pratica({ _id: 'chi', seq: 583, status: 'done', statusPublic: 'closed' });
   const segnalato = pratica({ _id: 'seg', seq: 584, status: 'attack' });
   await apri(page, [fidato, chiusa, segnalato]);
   await page.evaluate(() => window.__mgTest.openDetail('fid'));
-  await expect(page.locator('#mgFiduciaBtn')).toBeHidden();
-  await expect(page.locator('#mgFiduciaInfo')).toHaveText('Fidato: mittente provato o già approvato da te.');
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /^Fidato: mittente provato o già approvato da te\. Un clic la toglie/);
   await page.evaluate(() => window.__mgTest.setTab('resolved'));
   await page.evaluate(() => window.__mgTest.openDetail('chi'));
   await expect(page.locator('#mgFiduciaBtn')).toBeHidden();

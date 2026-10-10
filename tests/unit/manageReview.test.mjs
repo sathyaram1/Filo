@@ -826,6 +826,18 @@ test('fiduciaCheck: si offre su un non fidato aperto, anche segnalato (col motiv
   assert.equal(MR.fiduciaCheck(null).ok, false);
 });
 
+test('fiduciaTogliCheck: se si può mettere si può togliere, su un fidato aperto; mai su un non fidato o una chiusa', () => {
+  assert.deepEqual(MR.fiduciaTogliCheck(locale()), { ok: true });
+  assert.equal(MR.fiduciaTogliCheck(locale({ fiducia: undefined })).ok, false);
+  assert.equal(MR.fiduciaTogliCheck(locale({ fiducia: 'non_fidato' })).ok, false);
+  assert.equal(MR.fiduciaTogliCheck(locale({ statusPublic: 'closed' })).ok, false);
+  assert.equal(MR.fiduciaTogliCheck(null).ok, false);
+  // Le due non valgono mai insieme: il tasto è uno solo.
+  for (const fb of [locale(), locale({ fiducia: undefined }), locale({ statusPublic: 'closed' })]) {
+    assert.ok(!(MR.fiduciaCheck(fb).ok && MR.fiduciaTogliCheck(fb).ok), JSON.stringify(fb.fiducia));
+  }
+});
+
 test('fiduciaText: da dove viene la fiducia, in una riga; niente per un non fidato', () => {
   assert.equal(MR.fiduciaText(locale({ fiducia: undefined })), '');
   assert.equal(MR.fiduciaText(locale({ fiduciaDa: { by: 'nascita', at: 1 } })), 'Fidato: scritto da te o da una sessione pulita.');

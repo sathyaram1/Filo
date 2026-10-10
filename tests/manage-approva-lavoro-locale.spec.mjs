@@ -83,8 +83,8 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   // Nei Lavori locali: è fidato, e l'hover del segno dice chi l'ha approvato.
   await tabBtn(page, 'local').click();
   await page.locator('.mg-item').click();
-  await expect(page.locator('#mgFiduciaInfo')).toContainText('Fidato: l’hai segnato tu');
-  await expect(page.locator('#mgFiduciaBtn')).toBeHidden();
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /^Fidato: l’hai segnato tu/);
   const segno = page.locator('#mgLocalBtn');
   await expect(segno).toBeVisible();
   await expect(segno).toHaveAttribute('title', /Approvato come lavoro locale da .*l'approvazione resta/);
@@ -140,6 +140,7 @@ test('se il server non lo segna fidato, il lavoro locale resta e il messaggio lo
   await tabBtn(page, 'local').click();
   await page.locator('.mg-item').click();
   await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('segnalato dai giudici: il tasto c’è e l’hover dice di guardarlo prima', async ({ openTab }) => {
