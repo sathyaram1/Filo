@@ -3,30 +3,43 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   calcolaK, cpuDelCgroup, erroriInfrastruttura, estraiRossi, pressione, rossiNotiDa, tabella, valutaCorsa, baseDa,
-  ambienteWorker, SPEC_MISURA,
+  ambienteWorker, passiWorker, SPEC_MISURA,
 } from '../../scripts/misura-k.mjs';
-import { specInPiu, specsForChangedFiles } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SPEC_FILE = SPEC_MISURA.map((s) => `tests/${s}.spec.mjs`);
 
-test('coi valori predefiniti ogni worker corre anche spec Electron: sul ramo principale le aree non ne sceglierebbero', () => {
+test('coi valori predefiniti ogni worker, dopo il comando, corre spec Electron: sul ramo della misura le aree non ne scelgono', () => {
+  assert.deepEqual(specsForChangedFiles([], SPEC_FILE), [], 'un ramo che non tocca niente non sceglie spec da solo');
   const env = ambienteWorker({ PATH: 'p', FILO_REPO_ROOT: '/altrove', FILO_NO_BEAT: '1' }, 2, 3);
   assert.deepEqual([env.FILO_WORKER, env.FILO_WORKER_PARALLELI, env.PATH], ['2', '3', 'p']);
   assert.equal(env.FILO_REPO_ROOT, undefined, 'il principale della misura non arriva ai test');
   assert.equal(env.FILO_NO_BEAT, undefined);
-  const tracciati = execFileSync('git', ['ls-files', 'tests/*.spec.mjs'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
-  const tracked = new Set(tracciati);
-  assert.deepEqual(specsForChangedFiles([], tracciati), [], 'un ramo che non tocca niente non sceglie spec da solo');
-  const scelti = [...new Set([...specsForChangedFiles([], tracciati), ...specInPiu(env)])].filter((s) => tracked.has(`${s}.spec.mjs`));
-  assert.equal(scelti.length, SPEC_MISURA.length, `spec della misura che non esistono: ${SPEC_MISURA.filter((s) => !scelti.includes(`tests/${s}`)).join(', ')}`);
+
+  const win = passiWorker('npm run finish:check', SPEC_MISURA, { indice: 2, paralleli: 3, env, platform: 'win32' });
+  assert.equal(win.ok, true);
+  assert.deepEqual(win.passi.map((p) => [p.cmd, p.args]), [['npm run finish:check', []], ['npx', ['playwright', 'test', ...SPEC_FILE]]]);
+
+  const linux = passiWorker('npm run finish:check', SPEC_MISURA, { indice: 2, paralleli: 3, env, platform: 'linux', haXvfb: () => true });
+  assert.deepEqual(linux.passi[1].args.slice(0, 4), ['-a', '-n', '120', 'npx'], 'il worker 2 cerca il display dalla base sua');
+  assert.equal(linux.passi[1].cmd, 'xvfb-run');
+  assert.equal(linux.passi[1].env.ELECTRON_DISABLE_SANDBOX, '1');
+  assert.equal(linux.passi[1].env.FILO_WORKER, '2');
+  const senzaXvfb = passiWorker('npm run finish:check', SPEC_MISURA, { indice: 1, paralleli: 1, env: {}, platform: 'linux', haXvfb: () => false });
+  assert.equal(senzaXvfb.ok, false, 'senza xvfb la misura si ferma prima, col motivo');
+  assert.deepEqual(passiWorker('x', [], { indice: 1, paralleli: 1, env: {} }).passi.length, 1, '--spec vuoto: solo il comando');
+});
+
+test('gli spec della misura esistono e non stanno fra i rossi noti', () => {
+  assert.deepEqual(SPEC_FILE.filter((f) => !existsSync(resolve(ROOT, f))), []);
   const noti = new Set(rossiNotiDa(JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'))));
-  assert.deepEqual(scelti.filter((s) => noti.has(s)), [], 'uno spec fra i rossi noti misurerebbe il contenitore, non il carico');
+  assert.deepEqual(SPEC_MISURA.filter((s) => noti.has(`tests/${s}`)), [], 'misurerebbero il contenitore, non il carico');
 });
 
 const corsa = (n, minuti, { rossi = [], infra = [], piccoMb = 4000, tettoMb = 16000 } = {}) => ({
