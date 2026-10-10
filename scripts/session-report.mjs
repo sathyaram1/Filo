@@ -814,6 +814,7 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     const sinceFigli = perMorto ? (sinceBiglietto || finestra.since) : since;
     const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since: finestra.since, continua: finestra.continua, finestreAgent: finestre });
     if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
+    if (finestra.senzaBiglietto) rep.notes.push('momento del biglietto non trovato: contato dalla fine dell\'ultimo worker');
     if (sottoAgente) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
     // Una sessione ha i suoi sotto-agenti in <sessione>/subagents/; un
     // sotto-agente li ha ACCANTO a se', e li si riconosce dal meta (o, in
