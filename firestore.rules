@@ -401,11 +401,6 @@ service cloud.firestore {
                     'updatedAt',
                     // I livelli L3/L4 (vincolo di forma: livelliValidi, in cima).
                     'livelli',
-                    // La pre-approvazione della fusione, per singola pratica:
-                    // solo l'owner la mette e la toglie (vedi il vincolo di
-                    // forma più sotto). Il server la legge prima di aprire una
-                    // richiesta di approvazione per il lavoro delle routine.
-                    'mergePreapproved',
                     // #908: il segno «solo in locale» (forma: localOnlyValido).
                     'localOnly',
                     // #915: le parti del lavoro locale già su main (forma: localMergesValido).
