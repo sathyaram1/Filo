@@ -1,6 +1,6 @@
-// #913: il feedback di un utente (o di una routine) che l'owner approva come lavoro locale (`localApproval`).
-// I CASI sono gli stessi di functions/test/lavoro-locale-approvato-913.test.js in filo-security: client e server
-// devono dare lo stesso esito, perché la Gestione dice «si fonde senza chiedere» esattamente quando il server lo fa.
+// #913/#1148: quali pratiche una sessione lavora in locale. Dal #1148 conta la fiducia (assente = non fidato); il sì
+// come lavoro locale (`localApproval`) resta ammesso, e lo stesso clic in Gestione segna fidato. Saltare L5 lo decide
+// il server col registro del ramo, che da qui non si legge; le regole di prima reggono solo le pratiche migrate.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,41 +22,47 @@ const { mittenteInParole } = await import(pathToFileURL(join(ROOT, 'scripts', 'l
 const SEGNO = Object.freeze({ by: 'owner@esempio', at: 1759400000000 });
 const SI = Object.freeze({ by: 'owner@esempio', at: 1759400000001 });
 
-// [nome, feedback, lavoro locale ammesso]. Copia esatta del gemello nel server.
+// [nome, feedback, una sessione lo può lavorare in locale].
 const CASI = [
   ['utente senza approvazione', { clientId: 'utente-7', status: 'todo', localOnly: SEGNO }, false],
   ['utente approvato dall’owner', { clientId: 'utente-7', status: 'todo', localOnly: SEGNO, localApproval: SI }, true],
-  ['sessione con la prova', { clientId: 'local:claude', senderProof: 'admin', status: 'todo', localOnly: SEGNO }, true],
-  ['owner con la prova', { clientId: 'owner:app', senderProof: 'admin', status: 'working', localOnly: SEGNO }, true],
+  ['utente segnato fidato', { clientId: 'utente-7', status: 'todo', localOnly: SEGNO, fiducia: 'fidato' }, true],
+  ['sessione col biglietto pulito', { clientId: 'local:claude', senderProof: 'admin', status: 'todo', localOnly: SEGNO, fiducia: 'fidato' }, true],
+  ['sessione con la prova ma non fidata', { clientId: 'local:claude', senderProof: 'admin', status: 'todo', localOnly: SEGNO, fiducia: 'non_fidato' }, false],
+  ['owner con la prova, fiducia assente', { clientId: 'owner:app', senderProof: 'admin', status: 'working', localOnly: SEGNO }, false],
   ['routine senza approvazione', { clientId: 'routine:worker', senderProof: 'server', status: 'todo', localOnly: SEGNO }, false],
   ['routine approvata dall’owner', { clientId: 'routine:worker', senderProof: 'server', status: 'todo', localOnly: SEGNO, localApproval: SI }, true],
   ['prefisso di sessione senza prova', { clientId: 'local:claude', status: 'todo', localOnly: SEGNO }, false],
-  ['approvato ma senza il segno locale', { clientId: 'utente-7', status: 'todo', localApproval: SI }, false],
+  ['fiducia scritta storta', { clientId: 'local:claude', senderProof: 'admin', status: 'todo', localOnly: SEGNO, fiducia: 'FIDATO' }, false],
   ['approvazione senza firma', { clientId: 'utente-7', status: 'todo', localOnly: SEGNO, localApproval: { by: '  ', at: 1 } }, false],
   ['approvazione non mappa', { clientId: 'utente-7', status: 'todo', localOnly: SEGNO, localApproval: true }, false],
 ];
 
-test('i casi del gemello: lavoro locale (e fusione senza chiedere) solo con la prova o col sì dell’owner', () => {
+test('una sessione lavora in locale solo il fidato o l’approvato dall’owner; la prova del mittente da sola no (#1148)', () => {
   for (const [nome, fb, atteso] of CASI) {
-    assert.equal(MR.isProvenLocalWork(fb), atteso, nome);
+    assert.equal(MR.localSenderCheck(fb).ok, atteso, nome);
   }
+  assert.equal(MR.isProvenLocalWork, undefined, 'il predicato della prova non decide più niente');
 });
 
-test('una sessione lega il lavoro solo a chi ha la prova o il sì: utente e routine senza, rifiutati col motivo', () => {
+test('i rifiuti dicono perché e la strada: utente, routine, e il proprio non fidato', () => {
   assert.equal(MR.localSenderCheck({ clientId: 'utente-7' }).ok, false);
   assert.equal(MR.localSenderCheck({ clientId: 'utente-7' }).utente, true);
   assert.match(MR.localSenderCheck({ clientId: 'utente-7' }).motivo, /approva come lavoro locale/);
   const routine = MR.localSenderCheck({ clientId: 'routine:worker', senderProof: 'server' });
   assert.deepEqual([routine.ok, routine.routine], [false, true]);
+  const mio = MR.localSenderCheck({ clientId: 'local:claude', senderProof: 'admin' });
+  assert.deepEqual([mio.ok, mio.nonFidato], [false, true]);
+  assert.match(mio.motivo, /non è fidato/);
   assert.deepEqual(MR.localSenderCheck({ clientId: 'utente-7', localApproval: SI }), { ok: true, approvato: true });
-  assert.deepEqual(MR.localSenderCheck({ clientId: 'routine:worker', senderProof: 'server', localApproval: SI }), { ok: true, approvato: true });
-  assert.deepEqual(MR.localSenderCheck({ clientId: 'local:claude', senderProof: 'admin' }), { ok: true });
-  // Approvato, il segno si rimette come per i feedback dell'owner.
+  assert.deepEqual(MR.localSenderCheck({ clientId: 'utente-7', fiducia: 'fidato' }), { ok: true });
+  assert.match(of.rifiutoPratica('913', { ok: false, motivo: mio.motivo, nonFidato: true }), /«🤝 Segna fidato».*da riga di comando non si può/);
+  // Approvato, il segno si rimette come per i feedback fidati.
   assert.equal(MR.localSignCheck({ clientId: 'utente-7', status: 'todo', localApproval: SI }, true).ok, true);
   assert.equal(MR.localSignCheck({ clientId: 'utente-7', status: 'todo' }, true).ok, false);
 });
 
-test('il tasto dei Ricevuti: c’è su utente e routine, non sui propri, non fuori dai Ricevuti', () => {
+test('il tasto dei Ricevuti: c’è su chi non è fidato, non su un fidato, non fuori dai Ricevuti', () => {
   const ricevuto = { clientId: 'utente-7', status: 'design', statusReason: 'locale', statusPublic: 'open' };
   const az = MR.ownerActionFor(ricevuto, 'accept_local');
   assert.ok(az, 'utente nei Ricevuti');
@@ -66,7 +72,8 @@ test('il tasto dei Ricevuti: c’è su utente e routine, non sui propri, non fuo
   assert.ok(MR.ownerActionAllowsStatus(ricevuto, 'todo'));
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'routine:worker', senderProof: 'server' }, 'accept_local'), 'routine (#914)');
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'local:claude' }, 'accept_local'), 'prefisso senza prova = utente');
-  assert.equal(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin' }, 'accept_local'), null, 'ai propri basta il segno');
+  assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin' }, 'accept_local'), 'il proprio non fidato: il clic lo segna fidato');
+  assert.equal(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato' }, 'accept_local'), null, 'a un fidato basta il segno');
   assert.equal(MR.ownerActionFor({ ...ricevuto, localOnly: SEGNO, localApproval: SI }, 'accept_local'), null, 'già approvato');
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'todo' }, 'accept_local'), null, 'in coda');
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'archived' }, 'accept_local'), null);
@@ -78,12 +85,12 @@ test('il tasto dei Ricevuti: c’è su utente e routine, non sui propri, non fuo
   assert.equal(MR.localApprovalCheck(ricevuto).segnalato, undefined);
 });
 
-test('la fusione che il client promette è quella del server: approvato in lavorazione → «si fonde senza chiedere»', () => {
-  const approvato = { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: SEGNO, localApproval: SI };
+test('l’avviso della sessione segue la fiducia: approvato e fidato in lavorazione → niente avviso su L5', () => {
+  const approvato = { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: SEGNO, localApproval: SI, fiducia: 'fidato' };
   assert.equal(MR.manageTabFor(approvato), 'local');
-  assert.equal(MR.isProvenLocalWork(approvato), true);
-  assert.equal(avvisoDaCampi({ localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), '');
-  assert.match(avvisoDaCampi({ localOnly: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), /approvazione dell’owner/);
+  assert.equal(MR.localSenderCheck(approvato).ok, true);
+  assert.equal(avvisoDaCampi({ fiducia: { stringValue: 'fidato' }, localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), '');
+  assert.match(avvisoDaCampi({ localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), /manca la fiducia/);
 });
 
 test('il lettore dice chi l’ha scritto anche dopo il sì: resta un utente', () => {
@@ -134,7 +141,7 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
     const mio = /riconosci/.test(nome);
     assert.equal(r.status, 1, `${nome}: ${r.stderr}`);
     assert.match(r.stderr, mio ? /RIFIUTATO: --riconosci non c'è più/ : /RIFIUTATO: --approva-locale non c'è più/, nome);
-    assert.match(r.stderr, mio ? /in Gestione, col tasto «🙋 È mio»/ : /in Gestione, col tasto «💻 Lavoro locale»/, nome);
+    assert.match(r.stderr, mio ? /in Gestione, col tasto «🤝 Segna fidato»/ : /in Gestione, col tasto «💻 Lavoro locale»/, nome);
     assert.doesNotMatch(r.stdout, /^Auth:/m, `${nome}: non deve nemmeno prendere le credenziali`);
   }
 });
@@ -159,12 +166,13 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la 
 
 test('approvato: start/finish --feedback e i passaggi del lavoro lo accettano; senza il sì no, e il rifiuto dice la strada', async () => {
   const approvato = documento('a1', {
-    clientId: 'utente-7', status: 'todo', statusPublic: 'open', localOnly: mappa(SEGNO), localApproval: mappa(SI), notes: '',
+    clientId: 'utente-7', status: 'todo', statusPublic: 'open', localOnly: mappa(SEGNO), localApproval: mappa(SI), fiducia: 'fidato', notes: '',
   });
   await conRete(approvato, async () => {
     const r = await of.praticaPerLaSessione('a1', OPTS);
     assert.equal(r.ok, true, r.motivo);
-    assert.doesNotMatch(r.avviso, /L5/, 'il sì vale quanto la prova: niente avviso sulla fusione');
+    assert.doesNotMatch(r.avviso, /L5/, 'approvato e fidato: niente avviso sulla fusione');
+    assert.equal(r.fiducia, 'fidato');
     assert.match(r.avviso, /frase/, 'chi l’ha mandato è un utente: la frase per lui la scrive la sessione');
   });
   await conRete(approvato, async (patch) => {
