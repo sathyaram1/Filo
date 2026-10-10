@@ -60,8 +60,8 @@ test('il biglietto è un segreto: .gitignore e i marcatori di sessione lo tengon
   const gi = readFileSync(join(ROOT, '.gitignore'), 'utf8').split(/\r?\n/);
   assert.ok(gi.includes('.claude/biglietti/'), '.gitignore deve escludere la cartella dei biglietti');
   assert.ok(SESSION_MARKERS.includes('.claude/biglietti/'), 'SESSION_MARKERS deve elencarla (info/exclude su ogni ramo)');
-  const ignorato = execFileSync('git', ['check-ignore', '-q', '--no-index', '.claude/biglietti/sessione.json'], { cwd: ROOT, stdio: 'ignore' });
-  assert.equal(ignorato.length, 0);
+  // check-ignore esce 0 solo se il percorso è ignorato.
+  assert.doesNotThrow(() => execFileSync('git', ['check-ignore', '-q', '--no-index', '.claude/biglietti/sessione.json'], { cwd: ROOT, stdio: 'ignore' }));
 });
 
 test('la riga di comando: prendi, sporca col motivo, stato, chiudi; niente per tornare puliti', () => {
