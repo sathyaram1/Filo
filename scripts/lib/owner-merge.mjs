@@ -145,6 +145,7 @@ function campiLocali(r) {
     }
     if (loc.late && typeof loc.late === 'object') out.late = { part: String(loc.late.part || ''), at: String(loc.late.at || '').slice(0, 40) };
     if (typeof loc.noted === 'boolean') out.noted = loc.noted;
+    if (loc.fidato === true) out.fidato = true;
     if (loc.approvato === true) out.approvato = true;
     if (loc.approvato === true && loc.daRoutine === true) out.daRoutine = true;
     return out;
