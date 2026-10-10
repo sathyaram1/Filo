@@ -23,6 +23,7 @@ async function registraChiamate(page) {
       window.__chiamate.push(t);
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'merge_approvals_get') return { ok: true, pending: [], failed: [], recent: [], preapproved: [], ttlMs: 1 };
+      if (t === 'worker_log_get') return { ok: true, entries: [] };
       return orig(msg);
     };
   });
