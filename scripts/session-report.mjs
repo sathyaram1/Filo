@@ -806,7 +806,8 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     const sottoAgente = eSottoAgente(trovato.file);
     // L'orchestratore che rilascia per un worker morto: i suoi turni fra la fine del worker di prima e il
     // biglietto (il primo riscrive la cache) non li porta nessun altro rapporto.
-    // I sotto-agenti restano dal biglietto: quelli di prima sono di altri biglietti.
+    // I sotto-agenti restano dal biglietto: quelli di prima sono di altri biglietti. Il biglietto è quello
+    // rilasciato, nato nel transcript: il marcatore può essere del worker di prima, già contato (giro 5).
     const perMorto = !sottoAgente && role === 'orchestrator';
     const sinceBiglietto = perMorto ? ((await nascitaBiglietto(trovato.file, ticket)) || since) : since;
     const finestra = perMorto ? await inizioFinestraPrima(trovato.file, sinceBiglietto) : { since, continua: false };
