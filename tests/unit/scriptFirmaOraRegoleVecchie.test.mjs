@@ -40,8 +40,8 @@ test('con le regole vecchie la scrittura dello script passa, senza la firma', as
     assert.ok(patch[0].body.fields.updatedAt);
     assert.doesNotMatch(patch[1].url, /updatedAt/);
     assert.equal('updatedAt' in patch[1].body.fields, false);
-    assert.match(patch[1].url, /updateMask\.fieldPaths=mergePreapproved/);
-  });
+    assert.match(patch[1].url, /updateMask\.fieldPaths=localOnly/);
+  }, segno);
 });
 
 test('la riprova tiene il resto della domanda, e non riparte se il rifiuto non riguarda la firma', async () => {
