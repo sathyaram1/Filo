@@ -9,6 +9,7 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { lottiPerRigaDiComando, costoArgomentoWindows } from './lib/riga-di-comando.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /** Da QUESTO file, mai da dove è stato lanciato il comando. */
