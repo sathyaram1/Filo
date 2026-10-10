@@ -1956,8 +1956,8 @@
     if (num) {
       voci.push({
         testo: `Copia #${num}`,
-        // Solo le pratiche tue, di una sessione o approvate da te si legano a un lavoro locale: per le altre il numero serve a parlarne.
-        titolo: MR.isLocalWorkSender(fb) ? 'Il numero con cui parlarne, anche a npm run finish -- --feedback' : 'Il numero con cui parlarne',
+        // Solo le pratiche fidate o approvate da te si legano a un lavoro locale: per le altre il numero serve a parlarne.
+        titolo: (MR.isFidato(fb) || MR.isLocalApproved(fb)) ? 'Il numero con cui parlarne, anche a npm run finish -- --feedback' : 'Il numero con cui parlarne',
         azione: () => { navigator.clipboard.writeText(`#${num}`).then(() => setManageMsg(`#${num} copiato.`, 'ok'), () => {}); },
       });
     }
@@ -3032,10 +3032,10 @@
   }
 
   // ── «Solo in locale» (#908) ───────────────────────────────────────────────
-  // Il tasto c'è dove il segno si può mettere (owner o sessione con la prova; su una pratica chiusa
+  // Il tasto c'è dove il segno si può mettere (feedback fidato; su una pratica chiusa
   // dice che era un lavoro locale e la toglie dalla bacheca) o togliere; sui feedback degli utenti solo col sì dell'owner (#913).
   function localToggleOffered(fb) {
-    return MR.isLocalOnly(fb) || MR.isProvenLocalSender(fb) || MR.isLocalApproved(fb);
+    return MR.isLocalOnly(fb) || MR.isFidato(fb) || MR.isLocalApproved(fb);
   }
   // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
   const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';

@@ -56,7 +56,13 @@
   // Stati "chiusi": non vanno (più) giudicati, restano nei loro flussi.
   const CLOSED_STATUSES = ['done', 'verified', 'archived', 'ignored'];
 
-  // Fidato = prefisso riservato E prova del mittente (#595): il prefisso da solo lo scrive chiunque.
+  // La fiducia (SPEC-DOMANDE.md §1): `fiducia` la scrive solo il server; assente o ignota vale non fidato.
+  // Gemello di fiduciaDi in filo-security/functions/src/fiducia.js.
+  function isFidato(fb) {
+    return !!fb && fb.fiducia === 'fidato';
+  }
+
+  // Mittente provato = prefisso riservato E prova (#595): resta per le statistiche e le icone, non dà permessi.
   // Speculare a isTrustedIdentity nel backend (filo-security).
   const SENDER_PROOFS = ['admin', 'server'];
   const RESERVED_CLIENT_RE = /^(owner|routine|agent|local):/i;
@@ -74,10 +80,9 @@
   }
 
   // ── Lavori locali (#908) ─────────────────────────────────────────────────
-  // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno
-  // da solo la toglie alle routine; si mette solo su feedback dell'owner o di una
-  // sessione CON la prova (#595), mai sul solo prefisso, o su un feedback che l'owner ha approvato come
-  // lavoro locale (`localApproval { by, at }`, #913: lo scrive solo l'admin). Gemello: localWork.js sul server.
+  // `localOnly { by, at }`: la pratica la lavora solo una sessione locale. Il segno da solo la toglie alle routine;
+  // si mette su un feedback fidato (#1148) o approvato dall'owner come lavoro locale (`localApproval { by, at }`,
+  // #913: lo scrive solo l'admin). Saltare L5 lo decide il server con la fiducia del ramo (fiduciaRamo.js).
   const LOCAL_SENDER_RE = /^(owner|local):/i;
   function isLocalOnly(fb) {
     const m = fb && fb.localOnly;
@@ -90,13 +95,6 @@
     const m = fb && fb.localApproval;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
   }
-  function isLocalWorkSender(fb) {
-    return isProvenLocalSender(fb) || isLocalApproved(fb);
-  }
-  // Segno E (prova o sì dell'owner): la condizione con cui il server la fonde saltando L5, quindi lì «fondi senza chiedermelo» non conta.
-  function isProvenLocalWork(fb) {
-    return isLocalOnly(fb) && isLocalWorkSender(fb);
-  }
   // Senza scheda pubblica solo il lavoro dell'owner e delle sessioni: il feedback di un utente approvato come lavoro
   // locale (#913) la tiene, è da lì che chi l'ha mandato vede la risoluzione. Gemello: isPrivateLocalWork sul server.
   function isPrivateLocalWork(fb) {
@@ -106,12 +104,14 @@
   function fraseAttesa(fb) {
     return isLocalApproved(fb) && !isTrustedClient(fb.clientId, fb.senderProof) && !String(fb.userNote || '').trim();
   }
-  // Giudici saltati alla nascita (#908, #914): `pipeline.skipped` lo scrive solo il server, che lo decide con la
-  // prova del mittente (functions/src/nascita.js). Senza mittente provato non vale, e la pratica resta da giudicare.
+  // Giudici saltati alla nascita: `pipeline.skipped` lo scrive solo il server, e solo per un feedback fidato
+  // (functions/src/nascita.js). Senza fiducia non vale, e la pratica resta da giudicare.
   const GIUDICI_SALTATI = Object.freeze({
-    local_proven: 'Lavoro locale aperto da te o da una sessione, con la prova del mittente. I giudici non servono.',
-    session_proven: 'Aperto da una sessione per le routine, con la prova del mittente. I giudici non servono.',
-    routine_proven: 'Aperto da una routine, con la prova del server. I giudici non servono.',
+    fidato: 'Fidato: i giudici non servono.',
+    local_proven: 'Lavoro locale fidato: i giudici non servono.',
+    routine_proven: 'Aperto da un lavoro fidato: i giudici non servono.',
+    // Documenti nati prima della fiducia: nessuno lo scrive più.
+    session_proven: 'Aperto da una sessione con la prova del mittente: i giudici non servono.',
   });
   // Il feedback da cui nasce un lavoro di routine (#914): il numero lo scrive il server nel pipeline alla decisione.
   function origineText(fb) {
@@ -123,13 +123,13 @@
     const p = fb && fb.pipeline;
     const k = p && typeof p === 'object' ? String(p.skipped || '') : '';
     if (!Object.prototype.hasOwnProperty.call(GIUDICI_SALTATI, k)) return '';
-    return isTrustedClient(fb.clientId, fb.senderProof) ? GIUDICI_SALTATI[k] : '';
+    return isFidato(fb) ? GIUDICI_SALTATI[k] : '';
   }
   // Un lavoro di routine che aspetta la fusione del feedback d'utente da cui nasce (#914): non è un «non filtrato»,
-  // il server non lo ri-giudica; entra in coda da solo.
+  // il server non lo ri-giudica; entra in coda da solo. Il motivo lo scrive solo il server, fidato o già giudicato.
   function inAttesaOrigine(fb) {
     const { status, statusReason } = normalizeStatus(fb);
-    return status === 'unlabeled' && statusReason === 'attesa_origine' && !!judgesSkippedText(fb);
+    return status === 'unlabeled' && statusReason === 'attesa_origine';
   }
   // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
   function mittenteDaRiconoscere(fb) {
@@ -168,17 +168,17 @@
 
     const p = fb && fb.pipeline;
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
-    const trusted = isTrustedClient(fb && fb.clientId, fb && fb.senderProof);
+    const trusted = isFidato(fb);
     const status = (fb && fb.status) || 'new';
     // "Da giudicare": feedback aperto e in attesa di giudizio. Esclude i chiusi
     // (done/verified/archived/ignored) e i `clarify` (sono un dialogo con l'owner,
     // non in attesa dei giudici).
     const judgeable = !CLOSED_STATUSES.includes(status) && status !== 'clarify';
 
-    // Mittente FIDATO (isTrustedClient: prefisso riservato e prova) SENZA
-    // verdetti = i giudici non sono (ancora) girati su un feedback del proprietario
-    // — spesso perché l'identità era stata flaggata per errore. NON è un blocco:
-    // è "da ri-giudicare" (bianco). Va prima dei controlli di blocco identità.
+    // Feedback FIDATO SENZA verdetti = i giudici non sono (ancora) girati su un
+    // feedback che non ne aveva bisogno, o l'identità era stata flaggata per
+    // errore. NON è un blocco: è "da ri-giudicare" (bianco). Va prima dei
+    // controlli di blocco identità.
     if (p && trusted && verdicts.length === 0 && judgeable) {
       if (judgesSkippedText(fb)) return null;
       return { reason: 'unfiltered', ...REASONS.unfiltered };
@@ -572,7 +572,7 @@
     if (status === 'spam') return { text: 'Segnalato come spam.', color: S.spam.color };
     if (status === 'unlabeled') {
       // Un lavoro di routine nato da un feedback d'utente entra in coda quando quello si fonde (#914).
-      if (statusReason === 'attesa_origine' && judgesSkippedText(fb)) {
+      if (inAttesaOrigine(fb)) {
         const o = fb.pipeline && fb.pipeline.origine;
         const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
         return { text: `Aspetta la fusione di ${num || 'il feedback da cui nasce'}, poi entra in coda da solo.`, color: null };
@@ -580,7 +580,7 @@
       if (panelComplete(fb)) {
         const worst = worstVerdictBlock(fb);
         if (worst) {
-          const chi = isTrustedClient(fb.clientId, fb.senderProof) ? 'Mittente fidato segnalato' : 'Segnalato';
+          const chi = isFidato(fb) ? 'Fidato, ma segnalato' : 'Segnalato';
           return { text: `${chi} come ${worst.label.toLowerCase()}: decidi tu.`, color: worst.color };
         }
         return null;
@@ -726,13 +726,16 @@
   }
 
   /**
-   * Una sessione locale può lavorare una pratica di questo mittente? PURA. Solo owner o sessione con la
-   * prova (#595), o approvata dall'owner come lavoro locale (#913); `utente`/`routine`: senza quel sì no.
+   * Una sessione locale può lavorare questa pratica? PURA. Se è fidata (#1148), o approvata dall'owner come lavoro
+   * locale (#913); il mittente dice solo perché no. Una non fidata salta L5 solo dopo «Segna fidato».
    */
   function localSenderCheck(fb) {
     if (!fb) return { ok: false, motivo: 'feedback non trovato' };
-    if (isProvenLocalSender(fb)) return { ok: true };
+    if (isFidato(fb)) return { ok: true };
     if (isLocalApproved(fb)) return { ok: true, approvato: true };
+    if (isProvenLocalSender(fb)) {
+      return { ok: false, nonFidato: true, motivo: 'è tuo o di una tua sessione, ma non è fidato: segnalo fidato, o approvalo come lavoro locale' };
+    }
     const cid = String(fb.clientId || '');
     if (LOCAL_SENDER_RE.test(cid)) {
       return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale si lavora solo se l’owner lo approva come lavoro locale' };
@@ -752,13 +755,45 @@
     if (!fb) return { ok: false, motivo: 'feedback non trovato' };
     if (statusUnreadable(fb)) return { ok: false, motivo: 'lo stato non si legge: non so dove sta la pratica' };
     if (isLocalApproved(fb)) return { ok: false, motivo: 'l’hai già approvato come lavoro locale' };
-    if (isProvenLocalSender(fb)) return { ok: false, motivo: 'è tuo o di una tua sessione: basta il segno «solo in locale»' };
+    if (isFidato(fb)) return { ok: false, motivo: 'è fidato: basta il segno «solo in locale»' };
     if (manageTabFor(fb, opts) !== 'inbox') return { ok: false, motivo: 'si approva come lavoro locale dai Ricevuti' };
     const status = normalizeStatus(fb).status;
     const segnalato = /^(attack|spam|suspicious_file)$/.test(status)
       ? `è segnalato come ${status === 'spam' ? 'spam' : status === 'attack' ? 'attacco' : 'file sospetto'}`
       : segnalatoComeAttacco({ status, pipeline: fb.pipeline });
     return segnalato ? { ok: true, segnalato } : { ok: true };
+  }
+
+  /**
+   * L'owner può segnare fidato questo feedback ADESSO (#1148)? PURA. Non su uno già fidato né su una pratica chiusa
+   * (vale per il lavoro che verrà). `segnalato`: il motivo per guardarlo prima; da Gestione l'owner lo segna lo stesso.
+   */
+  function fiduciaCheck(fb) {
+    if (!fb) return { ok: false, motivo: 'feedback non trovato' };
+    if (isFidato(fb)) return { ok: false, motivo: 'è già fidato' };
+    if (String(fb.statusPublic || 'open') === 'closed') return { ok: false, motivo: 'la pratica è chiusa: la fiducia vale per il lavoro che verrà' };
+    const status = normalizeStatus(fb).status;
+    const segnalato = /^(attack|spam|suspicious_file|attack_confirmed|spam_confirmed)$/.test(status)
+      ? `è segnalato come ${/^spam/.test(status) ? 'spam' : /^attack/.test(status) ? 'attacco' : 'file sospetto'}`
+      : segnalatoComeAttacco({ status, pipeline: fb.pipeline });
+    return segnalato ? { ok: true, segnalato } : { ok: true };
+  }
+
+  // Da dove viene la fiducia, in una riga per il dettaglio. '' per un non fidato: lì parla il tasto.
+  const FIDUCIA_DA = Object.freeze({
+    owner: 'Fidato: l’hai segnato tu',
+    nascita: 'Fidato: scritto da te o da una sessione pulita',
+    migrazione: 'Fidato: mittente provato o già approvato da te',
+    server: 'Fidato: aperto dal server o da un lavoro fidato',
+  });
+  function fiduciaText(fb) {
+    if (!isFidato(fb)) return '';
+    const da = fb.fiduciaDa && typeof fb.fiduciaDa === 'object' ? fb.fiduciaDa : {};
+    const base = FIDUCIA_DA[da.by] || 'Fidato';
+    const at = Number(da.at);
+    if (da.by !== 'owner' || !Number.isFinite(at) || at <= 0) return `${base}.`;
+    const d = new Date(at);
+    return `${base} il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}.`;
   }
 
   function richiestaInAttesa(fb, opts) {
@@ -1591,8 +1626,9 @@
         titolo,
         righe: versione ? [riga('Uscito nella versione', versione)] : [],
         testo: !preapproved.length ? 'Il lavoro è entrato in main.'
-          : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati in Automazioni.'
-            : 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
+          : preapproved[0].motivo === 'fiducia' ? 'Lavoro fidato: controllo registrato in Automazioni.'
+            : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati in Automazioni.'
+              : 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
         azioni: [],
       }, { richiesta: preapproved[0] || null, richieste: preapproved, conflitto: false });
     }
@@ -1733,7 +1769,7 @@
     workProgress, WORK_STAGES,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
-    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isTrustedClient, isUnprovenSender, effectiveClientId,
+    panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
     isLocalOnly, isLocalApproved, isLocalWorkSender, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, isProvenLocalWork, judgesSkippedText,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco, mittenteDaRiconoscere,
