@@ -39,17 +39,31 @@ HOOK_EVENT=$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*"hook_event_name"[[:space:]
 # (lancio a mano, stdin vuoto) vale la cartella di `cwd`, poi PROJECT_DIR; mai
 # le altre. Un file di un ALTRO repo (filo-security) non si salva: si salva a
 # mano. Le barre di Windows nel JSON arrivano raddoppiate.
+#
+# Senza sottoprocessi: su Windows ogni processo costa decine di millisecondi,
+# secondi a macchina carica, e l'hook gira a ogni Edit (#1157). Le funzioni
+# rispondono in REPLY.
+BS='\'
 campo_json() {
-  printf '%s' "$HOOK_INPUT" | grep -oE "\"($1)\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|[\\\\].)*\"" | head -1 \
-    | sed 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//'
+  local re="\"($1)\"[[:space:]]*:[[:space:]]*\"(([^\"\\\\]|\\\\.)*)\""
+  REPLY=''
+  [[ $HOOK_INPUT =~ $re ]] && REPLY=${BASH_REMATCH[2]}
+  return 0
 }
-percorso_json() { campo_json "$1" | sed 's#[\\][\\]*#/#g'; }
-HOOK_FILE=$(percorso_json 'file_path|notebook_path')
-HOOK_CWD=$(percorso_json cwd)
-HOOK_TRANSCRIPT=$(percorso_json transcript_path)
-HOOK_SESSION=$(campo_json session_id)
-minuscolo() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's#/*$##'; }
-url_norm() { minuscolo "$1" | sed 's#\.git$##; s#/*$##'; }
+percorso_json() {
+  campo_json "$1"
+  while [[ $REPLY == *"$BS$BS"* ]]; do REPLY=${REPLY//"$BS$BS"/$BS}; done
+  REPLY=${REPLY//"$BS"//}
+}
+percorso_json 'file_path|notebook_path'; HOOK_FILE=$REPLY
+percorso_json cwd; HOOK_CWD=$REPLY
+percorso_json transcript_path; HOOK_TRANSCRIPT=$REPLY
+campo_json session_id; HOOK_SESSION=$REPLY
+minuscolo() {
+  if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ]; then eval 'REPLY=${1,,}'; else REPLY=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]'); fi
+  while [[ $REPLY == */ ]]; do REPLY=${REPLY%/}; done
+}
+url_norm() { minuscolo "$1"; REPLY=${REPLY%.git}; while [[ $REPLY == */ ]]; do REPLY=${REPLY%/}; done; }
 # La radice git di un percorso, risalendo fino alla prima cartella che esiste.
 radice_di() {
   local d="$1" su
