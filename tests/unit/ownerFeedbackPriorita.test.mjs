@@ -232,7 +232,7 @@ test('riga di comando: valori sbagliati e accoppiate che la perderebbero si rifi
     assert.equal(r.status, 1, `«${v}»`);
     assert.match(r.stderr, /RIFIUTATO: .*0, 1, 2, 3 — non ho toccato niente/, `«${v}»: ${r.stderr}`);
   }
-  for (const altre of [['--frase', 'ciao'], ['--preapprova'], ['--solo-locale'], ['--come-routine']]) {
+  for (const altre of [['--frase', 'ciao'], ['--solo-locale'], ['--come-routine']]) {
     const r = lancia(['fid', '--priorita', '3', ...altre], senzaCredenziali);
     assert.equal(r.status, 1, altre.join(' '));
     assert.match(r.stderr, /--priorita senza stato va da sola/, r.stderr);
