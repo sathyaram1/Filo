@@ -128,6 +128,40 @@ test('una copia vecchia non sopravvive alla nuova', () => {
   }
 });
 
+test('worker in parallelo (#1157): una copia a testa, presa dagli strumenti dell\'orchestratore, col clone come progetto', () => {
+  // Con una sola copia condivisa, ripinnare un worker a giro iniziato toglie gli
+  // strumenti da sotto chi lavora, e tutti scriverebbero nella stessa cartella.
+  const orchestratore = progettoFinto();
+  const cloneA = progettoFinto();
+  const cloneB = progettoFinto();
+  const base = resolve(tmpdir(), `filo-strumenti-prova-worker-${process.pid}`);
+  try {
+    writeFileSync(resolve(orchestratore, 'scripts', 'buono.mjs'), 'o\n', 'utf8');
+    writeFileSync(resolve(cloneA, 'scripts', 'del-ramo.mjs'), 'r\n', 'utf8');
+    const suo = pinTools(orchestratore, { dest: base });
+    assert.equal(suo.ok, true);
+    const a = pinWorkerTools(cloneA, 1, { da: orchestratore, base });
+    const b = pinWorkerTools(cloneB, 2, { da: orchestratore, base });
+    assert.equal(a.ok && b.ok, true, `${a.why} ${b.why}`);
+    assert.equal(a.dir, pinnedDirWorker(1, base));
+    assert.notEqual(a.dir, b.dir);
+    assert.equal(pinnedRepoRoot(a.dir), resolve(cloneA), 'il progetto del worker 1 è il suo clone');
+    assert.equal(pinnedRepoRoot(b.dir), resolve(cloneB));
+    assert.ok(existsSync(resolve(a.dir, 'scripts', 'buono.mjs')), 'gli strumenti vengono dall\'orchestratore');
+    assert.ok(!existsSync(resolve(a.dir, 'scripts', 'del-ramo.mjs')), 'non dal clone, che è già sul ramo');
+
+    // Ripinnare il worker 1 non tocca la copia dell'orchestratore né quella del worker 2.
+    writeFileSync(resolve(b.dir, 'in-uso.txt'), 'x\n', 'utf8');
+    assert.equal(pinWorkerTools(cloneA, 1, { da: orchestratore, base }).ok, true);
+    assert.ok(existsSync(resolve(b.dir, 'in-uso.txt')), 'la copia del worker 2 resta');
+    assert.equal(pinnedRepoRoot(base), resolve(orchestratore), 'e quella dell\'orchestratore pure');
+    assert.throws(() => pinnedDirWorker(0, base), /non valido/);
+    assert.equal(pinWorkerTools(cloneA, 'x', { da: orchestratore, base }).ok, false);
+  } finally {
+    for (const d of [base, `${base}-1`, `${base}-2`, orchestratore, cloneA, cloneB]) togliCartella(d);
+  }
+});
+
 // ── La regola, non l'elenco ────────────────────────────────────────────────
 
 test('nessuno strumento importa roba che la copia non contiene', async () => {
