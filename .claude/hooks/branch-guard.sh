@@ -42,15 +42,31 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 # deriva, quindi una riga di avviso e nessun blocco.
 HOOK_INPUT=""
 [ -t 0 ] || HOOK_INPUT=$(cat 2>/dev/null)
+# Senza sottoprocessi dove si può: la guardia gira dopo OGNI chiamata, e su
+# Windows ogni processo costa decine di millisecondi, secondi a macchina carica.
+# Le funzioni rispondono in REPLY.
+BS='\'
 campo_json() {
-  printf '%s' "$HOOK_INPUT" | grep -oE "\"($1)\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|[\\\\].)*\"" | head -1 \
-    | sed 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//'
+  local re="\"($1)\"[[:space:]]*:[[:space:]]*\"(([^\"\\\\]|\\\\.)*)\""
+  REPLY=''
+  [[ $HOOK_INPUT =~ $re ]] && REPLY=${BASH_REMATCH[2]}
+  return 0
 }
-percorso_json() { campo_json "$1" | sed 's#[\\][\\]*#/#g'; }
+percorso_json() {
+  campo_json "$1"
+  while [[ $REPLY == *"$BS$BS"* ]]; do REPLY=${REPLY//"$BS$BS"/$BS}; done
+  REPLY=${REPLY//"$BS"//}
+}
+minuscolo() {
+  if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ]; then eval 'REPLY=${1,,}'; else REPLY=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]'); fi
+}
 # Su Windows JSON.stringify raddoppia le barre rovesciate ("C:\\Users\\…"): un
 # confronto letterale fallirebbe sempre e la guardia sarebbe inerte proprio dove serve.
 norm_path() {
-  printf '%s' "$1" | sed 's|\\\\|/|g; s|\\|/|g; s|/*$||' | tr '[:upper:]' '[:lower:]'
+  REPLY=${1//"$BS$BS"//}
+  REPLY=${REPLY//"$BS"//}
+  while [[ $REPLY == */ ]]; do REPLY=${REPLY%/}; done
+  minuscolo "$REPLY"
 }
 radice_di() {
   local d="$1" su
@@ -59,51 +75,65 @@ radice_di() {
   done
   [ -n "$d" ] && git -C "$d" rev-parse --show-toplevel 2>/dev/null
 }
-comune_di() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
-origin_di() { git -C "$1" remote get-url origin 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's#\.git$##; s#/*$##'; }
-# Una cartella del progetto: un suo worktree (stessa .git) o un clone con lo stesso origin.
+comune_di() { REPLY=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); }
+origin_di() {
+  minuscolo "$(git -C "$1" remote get-url origin 2>/dev/null)"
+  REPLY=${REPLY%.git}
+  while [[ $REPLY == */ ]]; do REPLY=${REPLY%/}; done
+}
+# Una cartella del progetto: un suo worktree (stessa .git) o un clone con lo stesso origin. I valori del progetto si
+# chiedono a git una volta sola, e solo se servono.
+COMUNE_PROGETTO=''; ORIGIN_PROGETTO=''
 del_progetto() {
-  local c o
-  [ "$(norm_path "$1")" = "$(norm_path "$PROJECT_DIR")" ] && return 0
-  c=$(comune_di "$1")
-  [ -n "$c" ] && [ "$(norm_path "$c")" = "$(norm_path "$(comune_di "$PROJECT_DIR")")" ] && return 0
-  o=$(origin_di "$1")
-  [ -n "$o" ] && [ "$o" = "$(origin_di "$PROJECT_DIR")" ]
+  local c
+  norm_path "$1"; c=$REPLY
+  norm_path "$PROJECT_DIR"; [ "$c" = "$REPLY" ] && return 0
+  [ -n "$COMUNE_PROGETTO" ] || { comune_di "$PROJECT_DIR"; norm_path "$REPLY"; COMUNE_PROGETTO=${REPLY:--}; }
+  comune_di "$1"
+  [ -n "$REPLY" ] || return 1
+  norm_path "$REPLY"; [ "$REPLY" = "$COMUNE_PROGETTO" ] && return 0
+  [ -n "$ORIGIN_PROGETTO" ] || { origin_di "$PROJECT_DIR"; ORIGIN_PROGETTO=${REPLY:--}; }
+  origin_di "$1"
+  [ -n "$REPLY" ] && [ "$REPLY" = "$ORIGIN_PROGETTO" ]
 }
 # Un percorso dentro un testo in minuscolo, nelle due scritture di Windows (c:/x e /c/x).
 contiene_percorso() {
-  local testo="$1" p q
-  p=$(norm_path "$2")
+  local testo="$1" p
+  norm_path "$2"; p=$REPLY
   case "$testo" in *"$p"*) return 0 ;; esac
-  q=$(printf '%s' "$p" | sed -n 's#^\([a-z]\):/#/\1/#p')
-  [ -n "$q" ] && case "$testo" in *"$q"*) return 0 ;; esac
+  [[ $p =~ ^([a-z]):/ ]] && case "$testo" in *"/${BASH_REMATCH[1]}/${p:3}"*) return 0 ;; esac
   return 1
 }
 
 CARTELLE=""
-FILE_TOCCATO=$(percorso_json 'file_path|notebook_path')
+percorso_json 'file_path|notebook_path'; FILE_TOCCATO=$REPLY
 if [ -n "$FILE_TOCCATO" ]; then
   r=$(radice_di "$FILE_TOCCATO")
   [ -n "$r" ] && del_progetto "$r" && CARTELLE="$r"
 else
-  COMUNE=$(comune_di "$PROJECT_DIR")
+  # Il registro sta nella .git comune: nella cartella principale è lì sotto, e git non serve.
+  if [ -d "$PROJECT_DIR/.git" ]; then COMUNE="${PROJECT_DIR//"$BS"//}/.git"; else comune_di "$PROJECT_DIR"; COMUNE=$REPLY; fi
   REGISTRO="$COMUNE/filo-cloni"
   if [ -n "$COMUNE" ] && [ -d "$REGISTRO" ]; then
-    COMANDO=$(norm_path "$(campo_json command | sed 's#[\\][\\]*#/#g')")
-    CWD_HOOK=$(norm_path "$(percorso_json cwd)")
+    percorso_json command; norm_path "$REPLY"; COMANDO=$REPLY
+    percorso_json cwd; norm_path "$REPLY"; CWD_HOOK=$REPLY
     for voce in "$REGISTRO"/*; do
       [ -f "$voce" ] || continue
-      clone=$(head -1 "$voce" 2>/dev/null)
+      clone=''
+      IFS= read -r clone < "$voce" 2>/dev/null
       [ -n "$clone" ] && [ -d "$clone" ] || continue
       if { [ -n "$COMANDO" ] && contiene_percorso "$COMANDO" "$clone"; } \
          || { [ -n "$CWD_HOOK" ] && contiene_percorso "$CWD_HOOK/" "$clone/"; }; then
-        CARTELLE=$(printf '%s\n%s' "$CARTELLE" "$clone" | sed '/^$/d')
+        CARTELLE=${CARTELLE:+$CARTELLE$'\n'}$clone
       fi
     done
   fi
 fi
 [ -z "$CARTELLE" ] && CARTELLE="$PROJECT_DIR"
-QUANTE=$(printf '%s\n' "$CARTELLE" | sed '/^$/d' | wc -l | tr -d ' ')
+QUANTE=0
+while IFS= read -r _cartella; do [ -n "$_cartella" ] && QUANTE=$((QUANTE + 1)); done <<EOF_QUANTE
+$CARTELLE
+EOF_QUANTE
 
 # Estrazione senza jq (non garantito nel container delle routine).
 read_field() {
