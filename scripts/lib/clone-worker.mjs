@@ -203,7 +203,7 @@ export function togliClone(principale, n, { base = baseCloni(), dest = '', baseP
     if (eLink(resolve(dir, 'node_modules'))) return { ok: false, dir, why: 'il collegamento a node_modules non si toglie: mi fermo prima della cartella' };
     rmSync(dir, { recursive: true, force: true });
   }
-  if (voce) rmSync(voce, { force: true });
+  if (voce && (!daRegistro || stessaCartella(daRegistro, dir))) rmSync(voce, { force: true });
   const strumenti = pinnedDirWorker(i, ...(basePin ? [basePin] : []));
   const marca = String(leggi(resolve(strumenti, '.filo-repo-root')) || '').trim();
   if (marca && resolve(marca) === dir) rmSync(strumenti, { recursive: true, force: true });
