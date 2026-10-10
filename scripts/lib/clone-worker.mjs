@@ -170,7 +170,7 @@ export function preparaClone(principale, n, {
   writeFileSync(resolve(dir, MARCATORE_WORKER), `${JSON.stringify({ indice: i, paralleli: Number(paralleli) || 0, principale: radice })}\n`, 'utf8');
   ensureSessionExcludes(dir);
 
-  const registro = cartellaRegistro(radice);
+  const registro = registra ? cartellaRegistro(radice) : '';
   if (registro) {
     mkdirSync(registro, { recursive: true });
     writeFileSync(resolve(registro, String(i)), `${dir}\n`, 'utf8');
