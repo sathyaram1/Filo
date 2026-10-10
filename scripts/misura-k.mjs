@@ -9,6 +9,7 @@ import os from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allineaPacchetti, preparaClone, togliClone } from './lib/clone-worker.mjs';
+import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { pinnedRepoRoot, TOOLS_ROOT } from './lib/tools-pin.mjs';
 import { memoriaContenitore, statoContenitore } from './routine-channel.mjs';
 
