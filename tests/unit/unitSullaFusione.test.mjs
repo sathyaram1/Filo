@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
+import { pidMorto } from '../helpers/processi.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
   provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
