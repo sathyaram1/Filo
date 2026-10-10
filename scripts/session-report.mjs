@@ -639,18 +639,6 @@ export function sommaSottoAgente(rep, sub) {
 }
 
 /**
- * Le righe del thread principale che toccano al biglietto in corso: i turni
- * dell'orchestratore dopo la fine del worker di prima (o dopo un suo rilascio
- * di un biglietto morto, già contato lì) fino a adesso, cioè fino al rilascio
- * del worker che sta lavorando. Un worker lanciato in sottofondo (il default di
- * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
- * col suo tool-use-id, non quel risultato. PURA.
- */
-export function finestraOrchestratore(linee) {
-  return finestraDalleVoci(linee);
-}
-
-/**
  * Un rilascio andato a buon fine, riconosciuto da ciò che il canale stampa e non da come è scritto il comando:
  * in cloud il preflight lo consegna col percorso intero fra virgolette. Un rilascio respinto non ha portato il rapporto. PURA.
  */
@@ -678,7 +666,15 @@ export function testaNotifica(e) {
   return s.split(/<summary>|<result>/)[0];
 }
 
-function finestraDalleVoci(linee) {
+/**
+ * Le righe del thread principale che toccano al biglietto in corso: i turni
+ * dell'orchestratore dopo la fine del worker di prima (o dopo un suo rilascio
+ * di un biglietto morto, già contato lì) fino a adesso, cioè fino al rilascio
+ * del worker che sta lavorando. Un worker lanciato in sottofondo (il default di
+ * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
+ * col suo tool-use-id, non quel risultato. PURA.
+ */
+export function finestraOrchestratore(linee) {
   const voci = [];
   for (const l of linee) {
     let e;
