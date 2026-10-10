@@ -1420,6 +1420,17 @@ if (isMain) {
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
+  } else if (cmd === 'sporca') {
+    // Il biglietto è quello del giro (il marcatore lo scrive dispatch): sulla riga c'è solo il motivo.
+    const motivo = args.join(' ').trim();
+    if (!motivo) { console.error('sporca vuole il motivo: cosa hai letto che il server non vede. Il server non è stato chiamato.'); process.exit(1); }
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const biglietto = readTicket(ROOT);
+    if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato.'); process.exit(1); }
+    const r = await sporca(biglietto, motivo);
+    if (r.outcome === 'ok') { console.log('Biglietto sporcato: da qui ciò che scrivi nasce non fidato.'); process.exit(0); }
+    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
+    console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {
     const r = await compare(args[0], { role: args[1] || '', num: args[2] || '' });
     if (!r.ok) { console.error('confronto non registrato'); process.exit(0); }
