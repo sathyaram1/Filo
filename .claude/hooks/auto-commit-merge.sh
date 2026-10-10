@@ -33,9 +33,9 @@ HOOK_EVENT=$(printf '%s' "$HOOK_INPUT" | sed -n 's/.*"hook_event_name"[[:space:]
 # ─── LA CARTELLA DI CHI HA MODIFICATO (#1157) ────────────────────────────────
 #
 # Si salva UNA cartella: la radice git del file appena modificato
-# (`tool_input.file_path` o `notebook_path`). Fino al 2026-10 l'hook passava da
-# tutte le cartelle di lavoro del repo: due worker in parallelo si pestavano sui
-# lock, e un clone separato non compariva nemmeno in quell'elenco. Senza un file
+# (`tool_input.file_path` o `notebook_path`). Passare da tutte le cartelle del
+# repo fa pestare due worker in parallelo sui lock, e un clone separato non
+# compare nemmeno in `git worktree list`. Senza un file
 # (lancio a mano, stdin vuoto) vale la cartella di `cwd`, poi PROJECT_DIR; mai
 # le altre. Un file di un ALTRO repo (filo-security) non si salva: si salva a
 # mano. Le barre di Windows nel JSON arrivano raddoppiate.
