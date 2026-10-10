@@ -150,7 +150,7 @@ test('con l\'eco spento cmd non mostra il prompt: il terminale della dashboard r
   const uscita = await conCmdFinto(() => new Promise((resolve, reject) => {
     const sessione = S.createSession({ shell: 'cmd', cwd: TMP });
     let testo = '';
-    const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale con cmd non ha mai risposto')); }, 15_000);
+    const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale con cmd non ha mai risposto')); }, ATTESA);
     sessione.exec('echo ciao', {
       onData: ({ chunk }) => { testo += chunk; },
       onExit: ({ code }) => { clearTimeout(scade); sessione.kill(); resolve({ testo, code }); },
