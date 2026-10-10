@@ -3323,7 +3323,14 @@
       updateTabCounts();
       if (action.locale) {
         const num = FB.formatNum(fb.seq, fb.subSeq);
-        toast(`${num ? `#${num}` : 'Il feedback'} è nei Lavori locali. Nessuna routine lo prende.`, 'ok');
+        // Il sì dato leggendo il testo nei Ricevuti è anche fiducia (SPEC-DOMANDE.md §1.1): senza, la fusione
+        // del lavoro locale tornerebbe a chiederlo. La scrive il server.
+        let fiducia = '';
+        if (!MR.isFidato(fb)) {
+          const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err.message }));
+          if (f && f.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; } else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
+        }
+        toast(`${num ? `#${num}` : 'Il feedback'} è nei Lavori locali. Nessuna routine lo prende.${fiducia}`, fiducia ? 'err' : 'ok');
       }
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
