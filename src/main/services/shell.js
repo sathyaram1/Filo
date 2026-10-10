@@ -515,7 +515,7 @@ function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS
   });
 }
 
-async function commandExists({ shell, cwd, command } = {}) {
+async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS } = {}) {
   const cmd = String(command == null ? '' : command).trim();
   // Niente da controllare, o token chiaramente non un nome di comando
   // (newline/null): consideralo "non esiste".
