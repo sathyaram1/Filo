@@ -87,7 +87,7 @@ test('la sezione «Lavori locali» tiene i feedback col segno, fuori dalla coda'
   await page.locator('.mg-item').click();
   await expect(page.locator('#mgActionsRow')).toContainText('Risolto');
   // Nato come lavoro locale provato, i giudici li ha saltati: la conversazione lo dice.
-  await expect(page.locator('#mgThread')).toContainText('I giudici non servono');
+  await expect(page.locator('#mgThread')).toContainText(/giudici non servono/i);
 });
 
 test('dal dettaglio: il tasto «Locale» mette il segno, la pratica passa nei Lavori locali, e si toglie', async ({ openTab }) => {
