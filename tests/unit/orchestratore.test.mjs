@@ -865,8 +865,7 @@ test('lavoro rimasto a metà da un orchestratore chiuso: togli lo toglie, ripren
   assert.match(orch('togli', '7').stderr, /orchestratore in corso/);
   assert.match(orch('riprendi', '7').stderr, /orchestratore in corso/);
 
-  const morto = spawnSync(process.execPath, ['-e', '']).pid;
-  writeFileSync(join(d, 'avvia.lock'), String(morto));
+  writeFileSync(join(d, 'avvia.lock'), String(pidMorto()));
   const r = orch('riprendi', '7');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /riparte da sola col prossimo «avvia»/);
