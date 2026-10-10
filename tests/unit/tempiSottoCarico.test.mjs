@@ -128,6 +128,61 @@ test('nessuno unit test aspetta un evento con una scadenza in millisecondi scrit
   assert.deepEqual(fuori, [], "aspetta l'evento (una promessa, SB._settled, aspettaChe) o usa l'orologio finto di tests/helpers/orologio.mjs");
 });
 
+// Un tempo massimo da secondi scritto a mano è sempre una guardia contro l'appeso contata sull'orologio, in qualunque
+// forma (#1063, giro 6: quindici secondi a un server finto, dentro un timer che la regola sopra non vedeva). Sotto i
+// cinque secondi, un tempo dato al codice provato è quello che la prova stessa fa scadere.
+const SECONDO_MS = 1000;
+const DATO_AL_CODICE_MS = 5000;
+const numeroScritto = (s) => (/^\s*[1-9][\d_]*\s*$/.test(s) ? Number(s.replace(/[\s_]/g, '')) : NaN);
+
+/** Le righe con un setTimeout da un secondo in su, o un timeoutMs/attesaMs da cinque, scritti come numero. */
+function tempiMassimiAMano(testo) {
+  const righe = new Set();
+  const riga = (i) => testo.slice(0, i).split('\n').length;
+  for (const m of testo.matchAll(/\bsetTimeout\(/g)) {
+    let prof = 1;
+    let virgola = -1;
+    let i = m.index + m[0].length;
+    for (; i < testo.length && prof; i++) {
+      const c = testo[i];
+      if (c === '/' && testo[i + 1] === '/') { i = testo.indexOf('\n', i); if (i < 0) break; continue; }
+      if (c === '/' && testo[i + 1] === '*') { i = testo.indexOf('*/', i + 2) + 1; if (i <= 0) break; continue; }
+      if (c === "'" || c === '"' || c === '`') {
+        for (i++; i < testo.length && testo[i] !== c; i++) if (testo[i] === '\\') i++;
+        continue;
+      }
+      if ('([{'.includes(c)) prof++;
+      else if (')]}'.includes(c)) prof--;
+      else if (c === ',' && prof === 1) virgola = i;
+    }
+    if (!prof && virgola >= 0 && numeroScritto(testo.slice(virgola + 1, i - 1)) >= SECONDO_MS) righe.add(riga(m.index));
+  }
+  for (const m of testo.matchAll(/\b(?:timeoutMs|attesaMs)\s*:\s*([1-9][\d_]*)\b/g)) {
+    if (numeroScritto(m[1]) >= DATO_AL_CODICE_MS) righe.add(riga(m.index));
+  }
+  return [...righe];
+}
+
+test('nessuno unit test aspetta con un tempo massimo da secondi scritto a mano', () => {
+  const casi = {
+    "new Promise((ok, no) => {\n  p.on('exit', no);\n  setTimeout(() => no(new Error('nessuna porta entro 15 s')), 15000).unref();\n})": [3],
+    "const stop = setTimeout(() => { try { s.kill(); } catch (_) {} // l'appeso\n  rifiuta(new Error('(muto)')); }, 15_000);": [1],
+    "T.runCommand('echo x', { shell: 'cmd', timeoutMs: 15_000 });": [1],
+    "commandExists({ command: 'node', attesaMs: 10000 });": [1],
+    "setTimeout(() => no(new Error(`nessuna porta entro ${TETTO_ATTESA_MS / 1000} s`)), TETTO_ATTESA_MS);": [],
+    'await new Promise((r) => setTimeout(r, 30));': [],
+    "esegui('ping -n 600 127.0.0.1', { timeoutMs: 1500 });": [],
+    "setTimeout(() => cb(null, out), 400);\nmock.timers.tick(5000);": [],
+  };
+  for (const [testo, atteso] of Object.entries(casi)) assert.deepEqual(tempiMassimiAMano(testo), atteso, testo);
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    for (const r of tempiMassimiAMano(readFileSync(file, 'utf8'))) fuori.push(`${relative(ROOT, file).split(sep).join('/')}:${r}`);
+  }
+  assert.deepEqual(fuori, [], 'usa TETTO_ATTESA_MS da tests/helpers/attese.mjs: un tempo massimo scritto a mano cade a macchina carica');
+});
+
 // Un orologio finto: ogni chiamata avanza del costo che le si dà, così il conto si prova senza misurare niente.
 function banco(costiOp, costiRif) {
   let adesso = 0;
