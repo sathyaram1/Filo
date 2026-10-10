@@ -37,7 +37,7 @@ async function conRete(doc, fn) {
   try { return await fn(patch); } finally { globalThis.fetch = vero; }
 }
 const OPTS = { bearer: 'tok-finto' };
-const utente = (extra = {}) => documento('u1', { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: segnoFs, localApproval: segnoFs, ...extra });
+const utente = (extra = {}) => documento('u1', { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: segnoFs, localApproval: segnoFs, fiducia: 'fidato', ...extra });
 
 test('la regola: solo l’utente approvato senza frase', () => {
   assert.equal(MR.fraseAttesa({ clientId: 'utente-7', localApproval: SEGNO }), true);
