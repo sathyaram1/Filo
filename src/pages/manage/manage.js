@@ -5598,6 +5598,16 @@
     // mittenti auto-approvati, esplorazione a coda vuota — usato dai test.
     loadAutoMode,
     setTab(tab) { selectTab(tab); },
+    setSezione(sezione) { if (schedaPerSezione[sezione]) selectTab(schedaPerSezione[sezione]); },
+    sezioneAttiva() { return sezioneAttiva; },
+    // Domande finte, o { errore } per un guasto finto: il main non le rimpiazza più.
+    setDomande(lista, opts) { if (DOMANDE) DOMANDE.imposta(lista, opts); },
+    // Rifà la scelta d'apertura anche dopo un clic: gli spec la provano coi dati finti già in pagina.
+    sceltaApertura() { return sceltaApertura({ forza: true }); },
+    livelliFiltro(livelli) {
+      if (Array.isArray(livelli)) { livelliScelti = livelli.filter((l) => MR.LIVELLI_RICEVUTI.includes(l)); renderList(); }
+      return livelliScelti.slice();
+    },
     // Ordinamento della lista (menu tasto destro): impostalo e rirender.
     setSortMode(mode) { if (SORT_MODES[mode]) { sortMode = mode; reflectSortBtn(); renderList(); } },
     getSortMode() { return sortMode; },
@@ -7587,6 +7597,7 @@
     // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.
     firstListPromise = leggiTutti();
     firstListPromise.catch(() => {});
+    const domandePronte = DOMANDE ? DOMANDE.carica().catch(() => {}) : Promise.resolve();
     injectSearchIcons();
     await loadLayout();
     await refreshAuth();
@@ -7596,6 +7607,8 @@
     impostazioniAvviate = true;
     await Promise.allSettled([caricaImpostazioni(), loadSortMode()]);
     await loadData();
+    await domandePronte;
+    sceltaApertura();
     startLive();
   }
 
