@@ -36,7 +36,6 @@ before(async () => {
 after(async () => { await new Promise((r) => server.close(r)); });
 
 function lancia(args) {
-  arrivate = [];
   return new Promise((resolve) => {
     execFile(process.execPath, [CANALE, ...args], { env: { ...process.env, FILO_ROUTINE_API: base, FILO_ROUTINE_TICKET: '' }, encoding: 'utf8', timeout: 60000 },
       (err, stdout, stderr) => resolve({ code: err ? err.code : 0, stdout, stderr }));
@@ -56,6 +55,7 @@ const DOMANDA = {
 };
 
 test('deliver domanda: al server va l’intento con la domanda controllata, a chi chiede il numero', async () => {
+  arrivate = [];
   const r = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('ok.json', JSON.stringify(DOMANDA))]);
   assert.equal(r.code, 0, r.stderr);
   assert.match(r.stdout, /OK: D-4/);
@@ -68,6 +68,7 @@ test('deliver domanda: al server va l’intento con la domanda controllata, a ch
 });
 
 test('deliver domanda: JSON storto, tipo non attivo o campi in più si fermano prima del server', async () => {
+  arrivate = [];
   const storto = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('storto.json', '{"titolo":')]);
   assert.equal(storto.code, 1);
   assert.match(storto.stderr, /JSON malformato/);
