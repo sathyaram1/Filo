@@ -292,7 +292,13 @@ service cloud.firestore {
       // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
       // (#595), la prova del mittente che il create anonimo sotto NON ammette:
       // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
+      // La fiducia (SPEC-DOMANDE.md §1) la scrive solo l'Admin SDK: nessun client,
+      // nemmeno l'admin, che è anche ogni sessione locale. `bigliettoLocale` (impronta
+      // del biglietto della sessione) solo qui, alla nascita. Sentinella:
+      // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved'])
+        && bigliettoLocaleValido(request.resource.data)
         // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
 
