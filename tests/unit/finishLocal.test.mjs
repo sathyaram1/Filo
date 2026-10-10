@@ -22,7 +22,7 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { specsForChangedFiles, specInPiu, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota, lottiPerRigaDiComando } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota, lottiPerRigaDiComando } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SORGENTE = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
@@ -120,14 +120,6 @@ describe('quali spec lanciare', () => {
     test('la chiamata vera passa l’elenco degli spec tracciati', () => {
       assert.match(SORGENTE, /specsForChangedFiles\(changed, \[\.\.\.tracked\]\)/);
     });
-  });
-
-  test('FILO_SPEC_IN_PIU aggiunge spec in ogni scrittura, senza doppioni; vuota non aggiunge niente (#1157)', () => {
-    assert.deepEqual(specInPiu({ FILO_SPEC_IN_PIU: 'tab-archive, tests/context-menu.spec.mjs tests\\menu  tab-archive' }),
-      ['tests/tab-archive', 'tests/context-menu', 'tests/menu']);
-    assert.deepEqual(specInPiu({}), []);
-    assert.deepEqual(specInPiu({ FILO_SPEC_IN_PIU: ' , ' }), []);
-    assert.match(SORGENTE, /\.\.\.specsForChangedFiles\(changed, \[\.\.\.tracked\]\), \.\.\.inPiu/, 'si sommano a quelli delle aree');
   });
 });
 

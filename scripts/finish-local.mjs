@@ -381,17 +381,6 @@ export function specsForChangedFiles(changed, tracked) {
 }
 
 /**
- * Spec da correre oltre a quelli delle aree, da `FILO_SPEC_IN_PIU` (nomi separati da virgole o spazi): la misura di K
- * (#1157) li chiede su un ramo che non tocca niente, dove le aree non sceglierebbero nulla. Aggiungono prove, mai ne
- * tolgono. PURA.
- */
-export function specInPiu(env = process.env) {
-  return [...new Set(String((env && env.FILO_SPEC_IN_PIU) || '').split(/[\s,]+/).filter(Boolean)
-    .map((s) => s.replace(/\\/g, '/').replace(/\.spec\.mjs$/, ''))
-    .map((s) => (s.startsWith('tests/') ? s : `tests/${s}`)))];
-}
-
-/**
  * Divide gli spec da lanciare fra quelli che DEVONO essere verdi e quelli
  * rossi anche su main su questa macchina (tests/rossi-noti.json, feedback
  * #563): questi ultimi si lanciano e si mostrano, ma non fermano la
@@ -668,10 +657,7 @@ async function main() {
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
-    const inPiu = spec.rilancia ? specInPiu() : [];
-    const inPiuMancanti = inPiu.filter((s) => !tracked.has(`${s}.spec.mjs`));
-    if (inPiu.length) console.log(`\n▸ Spec in più chiesti da FILO_SPEC_IN_PIU: ${inPiu.length}${inPiuMancanti.length ? `, non trovati e saltati: ${inPiuMancanti.join(', ')}` : ''}`);
-    const specs = [...new Set([...specsForChangedFiles(changed, [...tracked]), ...inPiu])].filter((s) => tracked.has(`${s}.spec.mjs`));
+    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
     if (specs.length) {
       const schermo = preparaLancioElectron('npx', []);
