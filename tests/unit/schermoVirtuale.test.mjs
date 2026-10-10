@@ -31,6 +31,17 @@ test('Linux senza schermo con xvfb: xvfb-run -a davanti e la sandbox spenta', ()
   assert.match(l.nota, /xvfb-run -a/);
 });
 
+test('worker in parallelo (#1157): ognuno cerca il display da una base sua; senza indice il comando resta com\'era', () => {
+  const lancio = (worker) => preparaLancioElectron('npx', ['playwright', 'test'], { platform: 'linux', env: { PATH: '/bin' }, haXvfb: () => true, worker });
+  assert.deepEqual(lancio({ indice: 1, paralleli: 3 }).args, ['-a', '-n', '110', 'npx', 'playwright', 'test']);
+  assert.deepEqual(lancio({ indice: 2, paralleli: 3 }).args, ['-a', '-n', '120', 'npx', 'playwright', 'test']);
+  assert.match(lancio({ indice: 2, paralleli: 3 }).nota, /xvfb-run -a -n 120/);
+  assert.deepEqual(lancio(null).args, ['-a', 'npx', 'playwright', 'test']);
+  assert.deepEqual(preparaLancioElectron('npx', [], { platform: 'linux', env: { FILO_WORKER: '3' }, haXvfb: () => true }).args, ['-a', '-n', '130', 'npx'],
+    'l\'indice arriva anche dall\'ambiente');
+  assert.deepEqual(preparaLancioElectron('npx', [], { platform: 'win32', env: {}, haXvfb: mai, worker: { indice: 1 } }).args, [], 'fuori da Linux senza schermo niente cambia');
+});
+
 test('Linux senza schermo e senza xvfb: si ferma e dice cosa manca', () => {
   const l = preparaLancioElectron('npx', [], { platform: 'linux', env: { DISPLAY: '  ' }, haXvfb: () => false });
   assert.equal(l.ok, false);
