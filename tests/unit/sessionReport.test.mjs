@@ -547,27 +547,25 @@ test('finestra dell\'orchestratore: dal rilascio (o dalla fine del worker) di pr
   assert.equal(secondo.attesaPrimaS, 1750);
 });
 
-test('il rilascio dell\'orchestratore chiude la finestra per ciò che stampa, comunque sia scritto il comando', async () => {
+test('il rilascio dell\'orchestratore chiude la finestra comunque sia scritto il comando', () => {
   const ids = (righe) => finestraOrchestratore(righe).righe.map((l) => JSON.parse(l).message.id).filter(Boolean);
-  const conComando = (command, testo) => PRINCIPALE.map((l) => {
+  const conComando = (command) => PRINCIPALE.map((l) => {
     const e = JSON.parse(l);
     if (e.message && e.message.id === 'o5') e.message.content[0].input.command = command;
-    if (e.type === 'user' && e.message.content[0].tool_use_id === 'b1') e.message.content[0].content = testo;
     return JSON.stringify(e);
   });
   // In cloud il preflight consegna gli strumenti col percorso intero fra virgolette (#1116, giro 4).
-  const cloud = 'node "/tmp/filo-tools/scripts/routine-channel.mjs" release abc --role orchestrator';
-  assert.deepEqual(ids(conComando(cloud, RILASCIATO)), ['o6', 'o7']);
-  assert.deepEqual(ids(conComando(`FILO_ROUTINE=1 ${cloud}`, [{ type: 'text', text: 'OK: biglietto rilasciato, guasto dichiarato.' }])), ['o6', 'o7']);
-  // Un rilascio respinto non ha portato il rapporto al server: quei turni restano del worker dopo.
-  assert.deepEqual(ids(conComando(cloud, 'rilascio non riuscito (dead_ticket)')), ['o5', 'o6', 'o7']);
-  // Il testo riconosciuto è quello che il canale stampa davvero.
-  const { readFileSync } = await import('node:fs');
-  const canale = readFileSync(new URL('../../scripts/routine-channel.mjs', import.meta.url), 'utf8');
-  const stampati = [...canale.matchAll(/'(OK: biglietto rilasciato[^']*)'/g)].map((m) => m[1]);
-  assert.equal(stampati.length, 2);
-  for (const s of stampati) assert.ok(rilascioRiuscito(`push saltato\n${s}`), s);
-  assert.equal(rilascioRiuscito('il comando stampa «OK: biglietto rilasciato.»'), false);
+  for (const c of [
+    'node "/tmp/filo tools/scripts/routine-channel.mjs" release abc --role orchestrator',
+    "FILO_ROUTINE=1 node '/tmp/t/scripts/routine-channel.mjs' release abc --role orchestrator",
+    'cd /repo && node C:\\filo\\scripts\\routine-channel.mjs release abc',
+  ]) {
+    assert.ok(eRilascio(c), c);
+    assert.deepEqual(ids(conComando(c)), ['o6', 'o7'], c);
+  }
+  for (const c of ['node scripts/routine-channel.mjs ticket x --json', 'grep -n "routine-channel.mjs release" x.md', 'node scripts/routine-channel.mjs.bak release abc']) {
+    assert.equal(eRilascio(c), false, c);
+  }
 });
 
 test('il rapporto del worker porta a parte i turni dell\'orchestratore, e la cache riscaldata', async () => {
