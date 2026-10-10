@@ -111,6 +111,8 @@ import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-
 import { leggiTestoLivello } from './lib/livelli.mjs';
 import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
+import { consumoSessione } from './lib/consumo-progressivo.mjs';
+import { quotaFile } from './statusline.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
