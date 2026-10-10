@@ -167,29 +167,6 @@
     return String((req && req.num) || '').trim().replace(/^#+/, '');
   }
 
-  /**
-   * Le richieste in attesa che il segno «fondi senza chiedermelo» su una
-   * pratica copre. PURA. Il segno vale per il lavoro delle AUTOMAZIONI su
-   * QUELLA pratica (per id, o per numero quando l'id manca): il finish locale
-   * non ha una pratica e resta fuori. Una richiesta aperta per i soli blocchi
-   * NUOVI emersi dopo un riallineamento (`supersedes`) il server l'ha aperta
-   * apposta perché l'owner li guardi: entra solo con `ancheNuovi`, cioè quando
-   * è lui a mettere il segno adesso, con quella richiesta davanti.
-   */
-  function richiesteCoperte(pending, chiave) {
-    var c = chiave || {};
-    var id = String(c.feedbackId || '').trim();
-    var num = String(c.numero || '').trim().replace(/^#+/, '');
-    return (Array.isArray(pending) ? pending : []).filter(function (req) {
-      if (!req || !req.id || req.used || req.discarded || req.expired) return false;
-      if (originOf(req) !== 'routine') return false;
-      if (req.supersedes && !c.ancheNuovi) return false;
-      var rid = String(req.feedbackId || '').trim();
-      if (id && rid) return rid === id;
-      return !!num && feedbackNum(req) === num;
-    });
-  }
-
   /** L'etichetta della provenienza, col numero del feedback quando c'è. PURA. */
   function originLabel(req) {
     var num = feedbackNum(req);
@@ -206,16 +183,21 @@
   }
 
   /**
-   * Fusa senza passare dall’owner perché era il lavoro locale di una pratica provata (#908) o di un feedback che
-   * l’owner ha approvato come lavoro locale (#913): L5 ha girato solo per registrare i blocchi. PURA.
+   * Fusa senza passare dall’owner: lavoro fidato (`motivo: 'fiducia'`, #1148: feedback fidato e sessioni tutte pulite)
+   * o, sui rami di prima, il lavoro locale di una pratica provata (#908) o approvata dall’owner (#913). L5 ha girato
+   * solo per registrare i blocchi. PURA.
    */
   function isSkippedL5(r) {
     return !!(r && r.skippedL5 === true);
   }
+  function isFiducia(r) {
+    return isSkippedL5(r) && r.motivo === 'fiducia';
+  }
 
-  /** Perché quella fusione non ha chiesto: la prova del mittente, o il sì dell’owner a un feedback non suo. PURA. */
+  /** Perché quella fusione non ha chiesto: la fiducia, la prova del mittente, o il sì dell’owner a un feedback non suo. PURA. */
   function skippedL5Hint(r) {
     var dopo = ' I controlli hanno solo registrato cosa avrebbero fermato.';
+    if (isFiducia(r)) return 'Lavoro fidato: feedback fidato, scritto solo da sessioni col biglietto pulito.' + dopo;
     if (!(r && r.localApproved === true)) return 'Pratica aperta da te o da una sessione locale, con la prova del mittente.' + dopo;
     var by = String(r.preapprovedBy || '').trim().slice(0, 120);
     return 'Feedback di un utente o di una routine, approvato come lavoro locale' + (by ? ' da ' + by : '') + '.' + dopo;
@@ -347,6 +329,7 @@
   function recentOutcome(r) {
     var v = r || {};
     var ria = !!(v.realigned && typeof v.realigned === 'object');
+    if (isFiducia(v)) return 'lavoro fidato: controllo registrato';
     if (isSkippedL5(v)) return 'fusa senza chiedere (lavoro locale)';
     if (v.outcome === 'merged') return ria ? 'approvata, riallineata e fusa' : 'approvata e fusa';
     if (v.outcome === 'conflict') return 'approvata, ma in conflitto';
@@ -895,12 +878,12 @@
       : 'Ce ne sono altre ' + n + ', più vecchie, che qui non entrano.';
   }
 
-  // Il segno che il server mette quando l'owner approva col clic una richiesta:
-  // «<email> · approvazione <id>». Non è pieno: copre solo i blocchi già approvati.
+  // Il segno che il server lascia quando l'owner approva col clic una richiesta: «<email> · approvazione <id>».
+  // Non è pieno: copre solo i blocchi già approvati. Pieno = la pre-approvazione dei rami di prima.
   var RE_SEGNO_DA_APPROVAZIONE = / · approvazione ([0-9a-f]{24})$/;
 
   /**
-   * Il segno «fondi senza chiedermelo» di una pratica, letto. PURA.
+   * Il segno con cui una fusione non ha chiesto, letto dalla traccia. PURA.
    * null se non c'è; `tipo` 'pieno' (messo a mano, copre tutto) o
    * 'approvazione' (nato da un sì a una richiesta: blocchi nuovi = si chiede).
    */
@@ -926,52 +909,6 @@
     return quando ? 'dal tuo sì alla richiesta del ' + quando : 'dal tuo sì a una richiesta';
   }
 
-  /**
-   * Le parole del segno: l'etichetta sulla scheda, il suo hover e la riga del
-   * dettaglio. PURA. Il segno a mano resta com'era; quello da approvazione dice
-   * che vale solo per i blocchi già approvati.
-   */
-  function segnoTesti(segno) {
-    if (!segno) return null;
-    if (segno.tipo === 'approvazione') {
-      var origine = origineSegnoDaApprovazione(segno);
-      return {
-        etichetta: 'blocchi già approvati',
-        titolo: 'Si fonde senza chiedere solo coi blocchi che hai già approvato (' + origine
-          + '); se ne compaiono di nuovi, ti chiede.',
-        riga: 'Si fonde senza chiedere solo coi blocchi che hai già approvato, ' + origine
-          + '. Se ne compaiono di nuovi, ti chiede.',
-      };
-    }
-    var q = quandoSegno(segno.at);
-    return {
-      etichetta: 'senza chiedere',
-      titolo: 'Si fonde senza chiedere: segno messo da ' + segno.by,
-      riga: 'Si fonde senza chiedere: segno messo da ' + segno.by + (q ? ' il ' + q : '') + '.',
-    };
-  }
-
-  /**
-   * Cosa scrive un clic sull'interruttore. PURA. true = metti il segno pieno
-   * (anche sopra quello da approvazione, che non basta a fondere tutto); false =
-   * toglilo (solo il pieno si toglie da qui: è l'unico che l'interruttore mostra acceso).
-   */
-  function segnoAlClic(segno) {
-    return !(segno && segno.tipo === 'pieno');
-  }
-
-  /**
-   * Quale segno è, fra una lettura e l'altra. PURA. '' = nessun segno. Chi lo
-   * rimette (Gestione, lo script, un'altra finestra) scrive un `at` nuovo: la
-   * chiave cambia anche se fra le due letture il segno non si è visto sparire.
-   */
-  function chiaveSegno(segno) {
-    if (!segno) return '';
-    var at = String(segno.at || '').trim();
-    var ms = Date.parse(at);
-    return isFinite(ms) ? String(ms) : (at || String(segno.by || '').trim());
-  }
-
   /** Chi aveva messo il segno sulla pratica, in una frase. PURA. */
   function preapprovedBy(r) {
     var by = String((r && r.preapprovedBy) || '').trim();
@@ -981,8 +918,9 @@
     return by ? 'pre-approvata da ' + by : 'pre-approvata sulla pratica';
   }
 
-  /** Perché una fusione non ha chiesto: 'pieno' (segno a mano), 'approvazione' (segno da un sì), 'locale'. PURA. */
+  /** Perché una fusione non ha chiesto: 'fiducia', 'pieno' (segno a mano), 'approvazione' (segno da un sì), 'locale'. PURA. */
   function specieFusaSenzaChiedere(r) {
+    if (isFiducia(r)) return 'fiducia';
     if (isSkippedL5(r)) return 'locale';
     var segno = segnoPreapprovazione({ by: r && r.preapprovedBy, at: r && r.preapprovedAt });
     return segno && segno.tipo === 'approvazione' ? 'approvazione' : 'pieno';
@@ -990,6 +928,10 @@
 
   // Per specie: `solo` è una frase intera, `misto` segue «Alcuni/altri».
   var PERCHE_SENZA_CHIEDERE = [
+    ['fiducia', {
+      solo: 'Erano lavoro fidato: feedback fidato, scritto solo da sessioni col biglietto pulito.',
+      misto: 'erano lavoro fidato (feedback fidato, scritto solo da sessioni col biglietto pulito)',
+    }],
     ['pieno', {
       solo: 'Sulla pratica avevi messo «fondi senza chiedermelo».',
       misto: 'avevano sulla pratica il tuo «fondi senza chiedermelo»',
@@ -1073,9 +1015,10 @@
       var sha = el('span', 'sn-mac-sha', shortSha(r.mergeSha || r.sha));
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
       head.appendChild(sha);
-      var who = el('span', 'sn-mac-recent-who', isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
+      var who = el('span', 'sn-mac-recent-who', isFiducia(r) ? 'lavoro fidato: controllo registrato'
+        : isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
       var specie = specieFusaSenzaChiedere(r);
-      if (specie === 'locale') who.title = skippedL5Hint(r);
+      if (specie === 'locale' || specie === 'fiducia') who.title = skippedL5Hint(r);
       else if (specie === 'approvazione') who.title = 'Il segno l’aveva lasciato il tuo sì e valeva solo per i blocchi già approvati. Con blocchi nuovi ti avrebbe chiesto.';
       else if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
@@ -1127,11 +1070,11 @@
     originHint: originHint,
     isSkippedL5: isSkippedL5,
     skippedL5Hint: skippedL5Hint,
+    isFiducia: isFiducia,
     howToRetry: howToRetry,
     blockLabel: blockLabel,
     blockItems: blockItems,
     outcomeMessage: outcomeMessage,
-    richiesteCoperte: richiesteCoperte,
     render: render,
     occupata: occupata,
     quandoLibera: quandoLibera,
@@ -1139,9 +1082,6 @@
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
     segnoPreapprovazione: segnoPreapprovazione,
-    segnoTesti: segnoTesti,
-    segnoAlClic: segnoAlClic,
-    chiaveSegno: chiaveSegno,
     preapprovedWhenText: preapprovedWhenText,
     dateTimeText: dateTimeText,
     mergedWhenText: mergedWhenText,
