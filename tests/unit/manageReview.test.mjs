@@ -683,8 +683,9 @@ test('manageTabCounts: spostare un feedback sposta due numeri (approvazione)', (
 // ── Lavori locali (#908) ────────────────────────────────────────────────────
 
 const SEGNO = { by: 'owner@x', at: 1790000000000 };
+// Una sessione col biglietto pulito: il server l'ha fatta nascere fidata (#1148).
 const locale = (extra) => ({
-  _id: 'l1', status: 'todo', clientId: 'local:claude', senderProof: 'admin', createdAt: '2026-09-01', ...extra,
+  _id: 'l1', status: 'todo', clientId: 'local:claude', senderProof: 'admin', fiducia: 'fidato', createdAt: '2026-09-01', ...extra,
 });
 
 test('Lavori locali: col segno la pratica esce da «In coda» e ha la sua sezione', () => {
@@ -721,19 +722,24 @@ test('Lavori locali: una fusione che aspetta l’owner lo porta nei Ricevuti anc
   assert.equal(MR.manageTabFor(fb, { fusioni }), 'inbox');
 });
 
-test('localSignCheck: il segno si mette solo su owner o sessione CON la prova', () => {
+test('localSignCheck: il segno si mette su un fidato o un approvato, mai sulla sola prova (#1148)', () => {
   assert.equal(MR.localSignCheck(locale(), true).ok, true);
   assert.equal(MR.localSignCheck(locale({ clientId: 'owner:me' }), true).ok, true);
-  // Il solo prefisso non basta: senza prova vale come un utente.
-  const senzaProva = MR.localSignCheck(locale({ senderProof: undefined }), true);
-  assert.equal(senzaProva.ok, false);
-  assert.equal(senzaProva.utente, true);
+  assert.equal(MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined }), true).ok, true, 'un utente segnato fidato');
+  // Con la prova ma senza fiducia: è suo, e la risposta dice la strada.
+  const mio = MR.localSignCheck(locale({ fiducia: undefined }), true);
+  assert.deepEqual([mio.ok, mio.nonFidato], [false, true]);
+  assert.match(mio.motivo, /non è fidato/);
+  assert.equal(MR.localSignCheck(locale({ fiducia: 'non_fidato' }), true).ok, false);
+  // Il solo prefisso: vale come un utente.
+  const senzaProva = MR.localSignCheck(locale({ senderProof: undefined, fiducia: undefined }), true);
+  assert.deepEqual([senzaProva.ok, senzaProva.utente], [false, true]);
   assert.match(senzaProva.motivo, /prova/);
   // Un utente: rifiutato, e la risposta lo dice (lo script propone i Ricevuti).
-  const utente = MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined }), true);
+  const utente = MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined, fiducia: undefined }), true);
   assert.deepEqual([utente.ok, utente.utente], [false, true]);
-  // Una routine con la prova: non è un utente, ma non è nemmeno lavoro locale.
-  const routine = MR.localSignCheck(locale({ clientId: 'routine:worker', senderProof: 'server' }), true);
+  // Una routine non fidata: non è un utente, ma non è nemmeno lavoro locale.
+  const routine = MR.localSignCheck(locale({ clientId: 'routine:worker', senderProof: 'server', fiducia: undefined }), true);
   assert.deepEqual([routine.ok, !!routine.utente], [false, false]);
 });
 
@@ -742,17 +748,14 @@ test('localSignCheck: una pratica chiusa si segna (era un lavoro locale: fuori d
     const r = MR.localSignCheck(locale({ status, statusPublic: 'closed' }), true);
     assert.deepEqual([r.ok, r.chiusa], [true, true], status);
   }
-  // Il solo prefisso resta di un utente anche a pratica chiusa.
-  assert.equal(MR.localSignCheck(locale({ status: 'done', statusPublic: 'closed', senderProof: undefined }), true).ok, false);
+  // Senza fiducia non si segna nemmeno a pratica chiusa.
+  assert.equal(MR.localSignCheck(locale({ status: 'done', statusPublic: 'closed', fiducia: undefined }), true).ok, false);
   assert.equal(MR.localSignCheck(locale({ status: 'attack_confirmed', statusPublic: 'closed' }), true).ok, false);
 });
 
-test('mittenteDaRiconoscere: solo i prefissi dell’owner e delle sessioni senza prova', () => {
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'local:claude' }), true);
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'owner:abc' }), true);
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'local:claude', senderProof: 'admin' }), false);
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'routine:residuo' }), false);
-  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'c-utente' }), false);
+test('«È mio» non c’è più: al suo posto «Segna fidato» (#1148)', () => {
+  assert.equal(MR.mittenteDaRiconoscere, undefined);
+  assert.equal(typeof MR.fiduciaCheck, 'function');
 });
 
 test('localSignCheck: pratica segnalata o in mano a una routine → no', () => {
@@ -776,10 +779,12 @@ test('localSignCheck: pratica segnalata o in mano a una routine → no', () => {
 test('localSenderCheck: la pratica da legare a un lavoro locale, segno o no', () => {
   assert.equal(MR.localSenderCheck(locale({ localOnly: SEGNO })).ok, true);
   assert.equal(MR.localSenderCheck(locale({ clientId: 'owner:me' })).ok, true);
-  const utente = MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined }));
+  assert.equal(MR.localSenderCheck(locale({ fiducia: undefined })).nonFidato, true);
+  const utente = MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined, fiducia: undefined }));
   assert.deepEqual([utente.ok, utente.utente], [false, true]);
-  assert.equal(MR.localSenderCheck(locale({ senderProof: undefined })).utente, true);
-  assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server' })).ok, false);
+  assert.equal(MR.localSenderCheck(locale({ senderProof: undefined, fiducia: undefined })).utente, true);
+  assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server', fiducia: undefined })).ok, false);
+  assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server' })).ok, true, 'un lavoro fidato delle routine');
 });
 
 test('localSignCheck: togliere il segno si può sempre, se c’è', () => {
@@ -801,12 +806,32 @@ test('isLocalOnly: serve una mappa con chi l’ha messo', () => {
   assert.equal(MR.isLocalOnly({}), false);
 });
 
-test('isProvenLocalWork: segno e prova insieme, come il server che la fonde saltando L5', () => {
-  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO })), true);
-  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, clientId: 'owner:me' })), true);
-  assert.equal(MR.isProvenLocalWork(locale()), false);
-  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, senderProof: undefined })), false);
-  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, clientId: 'utente-x' })), false);
+test('la fiducia: solo il valore esatto scritto dal server vale fidato; il resto no (#1148)', () => {
+  assert.equal(MR.isProvenLocalWork, undefined, 'la prova non fa più fondere senza chiedere');
+  assert.equal(MR.isFidato(locale()), true);
+  for (const fiducia of [undefined, null, '', 'non_fidato', 'FIDATO', 'fidato ', true, 1]) {
+    assert.equal(MR.isFidato(locale({ fiducia })), false, String(fiducia));
+  }
+  assert.equal(MR.isFidato(null), false);
+});
+
+test('fiduciaCheck: si offre su un non fidato aperto, anche segnalato (col motivo), mai su un fidato o una chiusa', () => {
+  assert.deepEqual(MR.fiduciaCheck(locale({ fiducia: undefined })), { ok: true });
+  assert.equal(MR.fiduciaCheck(locale()).ok, false);
+  assert.match(MR.fiduciaCheck(locale()).motivo, /già fidato/);
+  assert.equal(MR.fiduciaCheck(locale({ fiducia: undefined, statusPublic: 'closed' })).ok, false);
+  const attacco = MR.fiduciaCheck(locale({ fiducia: undefined, status: 'attack' }));
+  assert.equal(attacco.ok, true);
+  assert.match(attacco.segnalato, /attacco/);
+  assert.equal(MR.fiduciaCheck(null).ok, false);
+});
+
+test('fiduciaText: da dove viene la fiducia, in una riga; niente per un non fidato', () => {
+  assert.equal(MR.fiduciaText(locale({ fiducia: undefined })), '');
+  assert.equal(MR.fiduciaText(locale({ fiduciaDa: { by: 'nascita', at: 1 } })), 'Fidato: scritto da te o da una sessione pulita.');
+  assert.equal(MR.fiduciaText(locale({ fiduciaDa: { by: 'migrazione', at: 1 } })), 'Fidato: mittente provato o già approvato da te.');
+  assert.match(MR.fiduciaText(locale({ fiduciaDa: { by: 'owner', at: Date.parse('2026-10-09T10:00:00Z') } })), /^Fidato: l’hai segnato tu il 9 ottobre.$/);
+  assert.equal(MR.fiduciaText(locale({ fiduciaDa: { by: 'altro' } })), 'Fidato.');
 });
 
 test('livelli L5: la fusione locale che ha saltato L5 non dice «avevi messo il segno»', () => {
