@@ -124,6 +124,21 @@ export function famigliaPrezzo(model) {
   return { key, known: !!v && VERSIONI[v[1]][v[3] ? `${v[2]}-${v[3]}` : v[2]] === key };
 }
 
+/**
+ * Token e costo di UNA usage (l'ultima di un messaggio). PURA. La usano il rapporto di fine sessione e il
+ * lettore progressivo del battito (lib/consumo-progressivo.mjs): un prezzo solo, scritto in un posto solo.
+ */
+export function valutaUso(u, model) {
+  const input = Number(u && u.input_tokens) || 0;
+  const { cw5m, cw1h } = scrittureCache(u);
+  const cacheRead = Number(u && u.cache_read_input_tokens) || 0;
+  const output = Number(u && u.output_tokens) || 0;
+  const fam = famigliaPrezzo(model);
+  const p = PREZZI[fam.key];
+  const costo = (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cacheRead * p.cacheRead + output * p.output) / 1e6;
+  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam };
+}
+
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
 export function slugProgetto(percorso) {
   return String(percorso || '').replace(/[^A-Za-z0-9]/g, '-');
