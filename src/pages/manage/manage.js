@@ -1680,6 +1680,9 @@
       closeSidebar();
       renderList();
     }
+    if (DOMANDE && DOMANDE_TABS.includes(tab)) DOMANDE.mostra(tab);
+    // I caricamenti pigri ascoltano questo, non il clic: una scheda si mostra anche da una sezione o all'apertura.
+    document.dispatchEvent(new CustomEvent('mg-scheda', { detail: { tab } }));
   }
 
   mgTabs.addEventListener('click', (e) => {
@@ -1687,6 +1690,94 @@
     if (!btn) return;
     selectTab(btn.dataset.tab);
   });
+
+  if (mgSezioni) {
+    mgSezioni.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mg-sezione');
+      if (!btn) return;
+      selectTab(schedaPerSezione[btn.dataset.sezione]);
+    });
+  }
+
+  function aggiornaSezioniAttive() {
+    if (mgSezioni) {
+      mgSezioni.querySelectorAll('.mg-sezione').forEach((b) => {
+        const on = b.dataset.sezione === sezioneAttiva;
+        b.classList.toggle('mg-sezione--active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+    }
+    aggiornaSchedeVisibili();
+  }
+
+  // Una scheda si vede se è della sezione accesa; le schede-lista anche solo se lo stato si legge (mostraSezioni).
+  function aggiornaSchedeVisibili() {
+    const ok = sezioniAttendibili();
+    mgTabs.querySelectorAll('.mg-tab').forEach((btn) => {
+      const tab = btn.dataset.tab;
+      btn.hidden = MR.sezioneDiScheda(tab) !== sezioneAttiva || (LIST_TABS.includes(tab) && !ok);
+    });
+  }
+
+  function salvaSezione() {
+    try { localStorage.setItem(SEZIONE_KEY, JSON.stringify({ sezione: sezioneAttiva, schede: schedaPerSezione })); } catch (_) {}
+  }
+  function leggiSezione() {
+    try { return MR.leggiSceltaSezione(localStorage.getItem(SEZIONE_KEY)); } catch (_) { return null; }
+  }
+
+  // Gira una volta, quando feedback e domande sono arrivati (o falliti), e mai dopo un clic dell'utente.
+  function sceltaApertura(opts) {
+    const forza = !!(opts && opts.forza);
+    if (!forza && (aperturaFatta || utenteHaScelto)) return null;
+    aperturaFatta = true;
+    const d = DOMANDE ? DOMANDE.stato() : null;
+    const ricevuti = dataLoaded && sezioniAttendibili()
+      ? MR.listForManageTab(allFeedbacks, 'inbox', { releasedVersion, fusioni }).length
+      : null;
+    const scelta = MR.sezioneDiApertura({ domande: d && d.lette ? d.domande : null, ricevuti, ultima: leggiSezione() });
+    // Si apre sui Ricevuti per quello che c'è dentro: a filtri spenti, o un blocco nuovo resterebbe nascosto.
+    if (scelta.scheda === 'inbox' && livelliScelti.length) { livelliScelti = []; renderList(); }
+    const giaQui = scelta.sezione === sezioneAttiva && schedaPerSezione[sezioneAttiva] === scelta.scheda
+      && document.querySelector(`.mg-tab--active[data-tab="${scelta.scheda}"]`);
+    if (!giaQui) selectTab(scelta.scheda, { apertura: true });
+    return scelta;
+  }
+
+  // ── Filtro dei Ricevuti per livello ──────────────────────────────────────
+  if (mgLivelliFiltro) {
+    mgLivelliFiltro.querySelectorAll('.mg-livello-btn').forEach((b) => {
+      const forma = MR.FORME_SVG[MR.FORMA_DI_LIVELLO[b.dataset.livello]];
+      if (forma) b.insertAdjacentHTML('afterbegin', `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${forma}"/></svg>`);
+    });
+    mgLivelliFiltro.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mg-livello-btn');
+      if (!btn) return;
+      const l = btn.dataset.livello;
+      livelliScelti = livelliScelti.includes(l) ? livelliScelti.filter((x) => x !== l) : livelliScelti.concat(l);
+      renderList();
+    });
+  }
+
+  // Aprire una pratica precisa (avviso, statistiche, ricerca) la deve far vedere anche col filtro acceso.
+  function mostraNelFiltro(fb) {
+    if (!fb || !livelliScelti.length) return;
+    if (!MR.filtraLivelli([fb], livelliScelti, { fusioni }).length) livelliScelti = [];
+  }
+
+  function updateLivelliFiltro() {
+    if (!mgLivelliFiltro) return;
+    const show = currentTab === 'inbox' && !searchMode && sezioniAttendibili();
+    mgLivelliFiltro.hidden = !show;
+    if (!show) return;
+    const n = dataLoaded ? MR.contaLivelliRicevuti(allFeedbacks, { releasedVersion, fusioni }) : null;
+    mgLivelliFiltro.querySelectorAll('.mg-livello-btn').forEach((b) => {
+      const l = b.dataset.livello;
+      b.setAttribute('aria-pressed', livelliScelti.includes(l) ? 'true' : 'false');
+      const c = b.querySelector('.mg-livello-count');
+      if (c) c.textContent = n ? countText(n[l]) : '';
+    });
+  }
 
   // Filtro ⭐ della tab Archiviati: ricalcola la lista (la selezione resta).
   if (mgStarFilter) {
