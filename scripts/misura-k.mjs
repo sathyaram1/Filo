@@ -16,7 +16,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { allineaPacchetti, preparaClone, togliClone } from './lib/clone-worker.mjs';
 import { pinnedRepoRoot, TOOLS_ROOT } from './lib/tools-pin.mjs';
-import { statoContenitore } from './routine-channel.mjs';
+import { memoriaContenitore, statoContenitore } from './routine-channel.mjs';
 
 export const SOGLIE = Object.freeze({ memoria: 0.85, tempo: 1.5 });
 export const CORSE_PREDEFINITE = Object.freeze([1, 1, 2, 3, 4]);
@@ -138,9 +138,14 @@ const leggi = (p) => { try { return readFileSync(p, 'utf8'); } catch (_) { retur
 
 function campione() {
   const memPeak = Number(leggi('/sys/fs/cgroup/memory.peak'));
+  const mb = 1048576;
+  // Usata e tetto del cgroup; fuori da un contenitore, quelli della macchina.
+  const cg = memoriaContenitore();
   return {
     t: Date.now(),
     ...statoContenitore(),
+    usataMb: Math.round(cg ? cg.usedMb : (os.totalmem() - os.freemem()) / mb),
+    tettoMb: Math.round(cg && cg.limitMb > 0 ? cg.limitMb : os.totalmem() / mb),
     memoryPeakMb: Number.isFinite(memPeak) ? Math.round(memPeak / 1048576) : null,
     psiCpu: pressione(leggi('/proc/pressure/cpu')),
     psiMem: pressione(leggi('/proc/pressure/memory')),
@@ -210,15 +215,14 @@ async function main() {
     preleva();
     const logs = cloni.map((_, k) => leggi(join(cartella, `worker-${k + 1}.log`)) || '');
     const max = (campo) => { const v = prelievi.map((s) => s[campo]).filter(Number.isFinite); return v.length ? Math.max(...v) : null; };
-    const ultimo = prelievi[prelievi.length - 1] || {};
     const corsa = {
       n,
       durateMs: esiti.map((e) => e.durataMs),
       codici: esiti.map((e) => e.codice),
       rossi: [...new Set(logs.flatMap(estraiRossi))].sort(),
       infra: [...new Set(logs.flatMap(erroriInfrastruttura))],
-      piccoMb: max('rssMb') || 0,
-      tettoMb: Number.isFinite(ultimo.rssMb) && Number.isFinite(ultimo.freeMb) ? ultimo.rssMb + ultimo.freeMb : 0,
+      piccoMb: max('usataMb') || 0,
+      tettoMb: max('tettoMb') || 0,
       caricoMax: max('loadAvg'),
       psiCpu: max('psiCpu'),
       psiMem: max('psiMem'),
