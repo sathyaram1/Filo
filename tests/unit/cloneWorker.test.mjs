@@ -106,7 +106,7 @@ test('package-lock diverso dal principale: installazione privata, e il node_modu
     const r = allineaPacchetti(dest, s.principale, { npmCi });
     assert.equal(r.pacchetti, 'privati');
     assert.equal(chiamate, 1);
-    assert.ok(!eLink(resolve(dest, 'node_modules')), 'un node_modules suo, non il collegamento');
+    assert.ok(!collegato(dest) && !eLink(resolve(dest, 'node_modules')), 'un node_modules suo, senza collegamenti');
     assert.ok(existsSync(s.canarino), 'il principale ha ancora i suoi pacchetti');
     assert.ok(!existsSync(resolve(s.principale, 'node_modules', 'privato')), 'e l\'installazione privata non e\' finita li\'');
     git(dest, ['checkout', '--', 'package-lock.json']);
