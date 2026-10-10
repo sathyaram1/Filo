@@ -73,14 +73,19 @@ radice_di() {
   [ -n "$d" ] && git -C "$d" rev-parse --show-toplevel 2>/dev/null
 }
 RADICE_PROGETTO=$(git rev-parse --show-toplevel 2>/dev/null)
-# Una cartella del progetto: la sua radice, un suo worktree (stessa .git) o un clone con lo stesso origin.
+# Una cartella del progetto: la sua radice, un suo worktree (stessa .git) o un clone con lo stesso origin. I valori
+# del progetto si chiedono a git una volta sola, e solo se servono.
+COMUNE_PROGETTO=''; ORIGIN_PROGETTO=''
 del_progetto() {
-  local c o
-  [ "$(minuscolo "$1")" = "$(minuscolo "$RADICE_PROGETTO")" ] && return 0
-  c=$(minuscolo "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")
-  [ -n "$c" ] && [ "$c" = "$(minuscolo "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")" ] && return 0
-  o=$(url_norm "$(git -C "$1" remote get-url origin 2>/dev/null)")
-  [ -n "$o" ] && [ "$o" = "$(url_norm "$(git remote get-url origin 2>/dev/null)")" ]
+  local c
+  minuscolo "$1"; c=$REPLY
+  minuscolo "$RADICE_PROGETTO"; [ "$c" = "$REPLY" ] && return 0
+  [ -n "$COMUNE_PROGETTO" ] || { minuscolo "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; COMUNE_PROGETTO=${REPLY:--}; }
+  minuscolo "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  [ -n "$REPLY" ] && [ "$REPLY" = "$COMUNE_PROGETTO" ] && return 0
+  [ -n "$ORIGIN_PROGETTO" ] || { url_norm "$(git remote get-url origin 2>/dev/null)"; ORIGIN_PROGETTO=${REPLY:--}; }
+  url_norm "$(git -C "$1" remote get-url origin 2>/dev/null)"
+  [ -n "$REPLY" ] && [ "$REPLY" = "$ORIGIN_PROGETTO" ]
 }
 CARTELLA=""
 if [ -n "$HOOK_FILE" ]; then
