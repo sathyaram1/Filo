@@ -687,14 +687,13 @@ export function finestraOrchestratore(linee) {
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
         if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
-        const cmd = b.input && typeof b.input.command === 'string' ? b.input.command : '';
-        if (/routine-channel\.mjs\s+release\b/.test(cmd)) rilasci.push(ms);
       }
     } else if (e.type === 'user') {
       for (const b of blocchi) {
-        if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
+        if (!b || b.type !== 'tool_result') continue;
         const testo = testoDi(b.content);
         const c = chiamate.get(b.tool_use_id);
+        if (!c) { if (rilascioRiuscito(testo)) rilasci.push(ms); continue; }
         if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || ''; continue; }
         c.fine = ms;
       }
