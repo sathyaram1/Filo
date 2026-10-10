@@ -646,6 +646,26 @@ export function sommaSottoAgente(rep, sub) {
  * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
  * col suo tool-use-id, non quel risultato. PURA.
  */
+/**
+ * L'intestazione di una notifica di Claude Code, solo dove la mette lui (coda, allegato, messaggio di testo):
+ * un turno o il risultato di uno strumento che la cita non è una notifica. Fino al riassunto, perché il
+ * rapporto di un worker riportato dentro può citare altri id. '' se la riga non è una notifica. PURA.
+ */
+export function testaNotifica(e) {
+  if (!e || typeof e !== 'object') return '';
+  const msg = e.message && typeof e.message === 'object' ? e.message : null;
+  let s = '';
+  if (e.type === 'queue-operation' && typeof e.content === 'string') s = e.content;
+  else if (e.type === 'attachment' && e.attachment && typeof e.attachment.prompt === 'string') s = e.attachment.prompt;
+  else if (e.type === 'user' && msg) {
+    s = typeof msg.content === 'string' ? msg.content
+      : Array.isArray(msg.content) ? msg.content.filter((b) => b && b.type === 'text').map((b) => String(b.text || '')).join('\n') : '';
+  }
+  s = s.trimStart();
+  if (!s.startsWith('<task-notification>')) return '';
+  return s.split(/<summary>|<result>/)[0];
+}
+
 export function finestraOrchestratore(linee) {
   const voci = [];
   for (const l of linee) {
