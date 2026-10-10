@@ -528,7 +528,7 @@ const PRINCIPALE = [
   fine('ag2', H('11:00:00')),
   // il worker 2 è morto: rilascia l'orchestratore, e quel turno sta nel rapporto di allora
   orch('o5', H('11:00:30'), { cw: 34000, tool: { type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release abc --role orchestrator' } } }),
-  fine('b1', H('11:01:00'), RILASCIATO),
+  fine('b1', H('11:01:00')),
   orch('o6', H('11:02:00'), { cr: 34000, cw: 1000 }),
   orch('o7', H('11:03:00'), { cr: 35000, tool: { type: 'tool_use', id: 'ag3', name: 'Agent', input: {} } }),
 ];
