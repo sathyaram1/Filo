@@ -181,11 +181,19 @@ export function preparaClone(principale, n, {
   return { ok: true, dir, strumenti: pin.dir, pacchetti: pacchetti.pacchetti, why: '' };
 }
 
-/** Toglie il clone del worker `n`: prima il collegamento a node_modules, poi la cartella, la voce e gli strumenti. */
-export function togliClone(principale, n, { base = baseCloni(), dest = '', basePin } = {}) {
+const stessaCartella = (a, b) => {
+  const n = (p) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p));
+  return !!a && !!b && n(a) === n(b);
+};
+
+/**
+ * Toglie il clone del worker `n`: prima il collegamento a node_modules, poi la cartella, la voce e gli strumenti. La
+ * voce del registro se ne va solo se è di quella cartella: un `dest` altrui non cancella il worker vero col suo numero.
+ */
+export function togliClone(principale, n, { base = baseCloni(), dest = '', basePin, registra = true } = {}) {
   let i;
   try { i = indiceWorker(n); } catch (e) { return { ok: false, why: e.message }; }
-  const registro = cartellaRegistro(resolve(principale));
+  const registro = registra ? cartellaRegistro(resolve(principale)) : '';
   const voce = registro ? resolve(registro, String(i)) : '';
   const daRegistro = voce ? String(leggi(voce) || '').split('\n')[0].trim() : '';
   const dir = resolve(dest || daRegistro || resolve(base, String(i)));
