@@ -405,11 +405,12 @@ const lancia = (args, temp, avanzamento = null) => new Promise((ok) => {
 async function main() {
   const argv = process.argv.slice(2);
   const listOnly = argv.includes('--list');
-  const flags = argv.filter((a) => a !== '--list');
+  const solo = argv.includes(SOLO);
+  const flags = argv.filter((a) => a !== '--list' && a !== SOLO);
 
-  const files = collectTestFiles();
+  const files = solo ? separaArgomenti(flags).posizionali.map((p) => resolve(REPO_ROOT, p)) : collectTestFiles();
   if (!files.length) {
-    console.error(`[test:unit] nessun file *.test.mjs sotto ${UNIT_DIR}: mi fermo.`);
+    console.error(solo ? `[test:unit] ${SOLO} senza file da lanciare: mi fermo.` : `[test:unit] nessun file *.test.mjs sotto ${UNIT_DIR}: mi fermo.`);
     console.error('[test:unit] zero test eseguiti non è un successo — controlla la cartella.');
     process.exitCode = 1;
     return;
