@@ -149,7 +149,7 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
     child.unref();
     mkdirSync(resolve(root, '.claude'), { recursive: true });
     writeFileSync(beatFile(root),
-      JSON.stringify({ pid: child.pid, ticket: t, since: new Date(now).toISOString() }, null, 2) + '\n',
+      JSON.stringify({ pid: child.pid, ticket: t, since: new Date(now).toISOString(), root: resolve(root) }, null, 2) + '\n',
       'utf8');
     return { started: true, why: 'started', pid: child.pid };
   } catch (e) {
