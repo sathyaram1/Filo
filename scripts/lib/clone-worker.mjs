@@ -229,8 +229,8 @@ export function togliClone(principale, n, { base = baseCloni(), dest = '', baseP
   const dir = resolve(dest || daRegistro || resolve(base, String(i)));
   if (existsSync(dir)) {
     if (!existsSync(resolve(dir, MARCATORE_WORKER))) return { ok: false, dir, why: `${dir} non ha il marcatore del worker: non lo tolgo` };
-    scollega(resolve(dir, 'node_modules'));
-    if (eLink(resolve(dir, 'node_modules'))) return { ok: false, dir, why: 'il collegamento a node_modules non si toglie: mi fermo prima della cartella' };
+    scollegaPacchetti(resolve(dir, 'node_modules'));
+    if (restaUnCollegamento(resolve(dir, 'node_modules'))) return { ok: false, dir, why: 'un collegamento a node_modules non si toglie: mi fermo prima della cartella' };
     rmSync(dir, { recursive: true, force: true });
   }
   if (voce && (!daRegistro || stessaCartella(daRegistro, dir))) rmSync(voce, { force: true });
