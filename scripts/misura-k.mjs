@@ -154,10 +154,13 @@ export function valutaCorsa(corsa, base, { rossiNoti = [], soglie = SOGLIE } = {
   const durataMs = media(corsa.durateMs);
   if (rossiInPiu.length) motivi.push(`rossi in più: ${rossiInPiu.join(', ')}`);
   // Un worker che cade senza una riga rossa riconoscibile (Playwright che non parte, un crollo) si vede solo
-  // dall'uscita: conta quando da solo il comando usciva pulito.
-  const cadute = (corsa.codici || []).map((k, i) => [k, i + 1]).filter(([k]) => k !== 0);
-  if (base && base.uscitePulite && corsa.n > 1 && cadute.length) {
-    motivi.push(`uscite diverse da zero: ${cadute.map(([k, i]) => `worker ${i} → ${k}`).join(', ')}`);
+  // dall'uscita, giudicata worker per worker: con una base già rossa, i rossi di un altro worker non lo coprono.
+  const suoi = (i) => (corsa.rossiPerWorker ? corsa.rossiPerWorker[i] || [] : corsa.rossi);
+  const cadute = (corsa.codici || []).map((k, i) => [k, i + 1])
+    .filter(([k, i]) => k !== 0 && base && (base.uscitePulite || !suoi(i - 1).length));
+  if (base && corsa.n > 1 && cadute.length) {
+    const senza = base.uscitePulite ? '' : ' senza un rosso riconoscibile';
+    motivi.push(`uscite diverse da zero${senza}: ${cadute.map(([k, i]) => `worker ${i} → ${k}`).join(', ')}`);
   }
   if (corsa.infra.length) motivi.push(`infrastruttura: ${corsa.infra.join(', ')}`);
   if (corsa.tettoMb > 0 && corsa.piccoMb >= soglie.memoria * corsa.tettoMb) {
