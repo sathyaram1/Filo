@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
+import { motiviDiLettura, rigaSporco } from './lib/biglietto-locale.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
@@ -23,7 +24,7 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 const TH = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
 const IMG = globalThis.SN_FEEDBACK_IMAGE;
-const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval'];
+const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval', 'fiducia'];
 // Un documento testuale si stampa nella cornice fino a qui; oltre va in un file (con la cornice), e la riga lo dice.
 const MAX_IN_LINEA = 60000;
 const TIPO_TESTO = /^(text\/|application\/(json|x-yaml|yaml)\b)/i;

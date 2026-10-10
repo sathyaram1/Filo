@@ -30,13 +30,10 @@
 //   node scripts/owner-feedback.mjs <n|id> <status> "nota"  [--branch <nome>]
 //                                                         [--reason <slug>]
 //                                                         [--starred|--unstar]
-//                                                         [--preapprova|--chiedi-prima]
 //                                                         [--frase "per l'utente"]
 //                                                         [--priorita <0-3>]
 //                                                         [--come-routine]
 //                                                         [--dry-run]
-//   node scripts/owner-feedback.mjs <n|id> --preapprova     (solo il segno, stato invariato)
-//   node scripts/owner-feedback.mjs <n|id> --chiedi-prima
 //   node scripts/owner-feedback.mjs <n|id> --frase "…"     (solo la frase per chi ha segnalato, stato invariato)
 //   node scripts/owner-feedback.mjs <n|id> --priorita <0-3> (solo la priorità, stato invariato)
 //   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
@@ -57,14 +54,8 @@
 //   Il sì dell'owner a un feedback di un utente o di una routine (`localApproval`, #913) qui non si dà: solo il
 //   tasto «💻 Lavoro locale» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
 //   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta. Per la
-//   stessa ragione `--riconosci`: la prova del mittente data a mano la dà solo «🙋 È mio» in Gestione.
-//
-//   `--preapprova`: «fondi senza chiedermelo» su QUESTA pratica. Se i controlli
-//   del server fermano il lavoro di una routine, il server fonde lo stesso e
-//   registra cosa era stato fermato (Gestione → Automazioni, «Fuse senza
-//   chiedere»). `--chiedi-prima` toglie il segno. Vale finché la pratica è
-//   aperta; il lavoro locale (npm run finish) non lo guarda. Salta il sì alla fusione come il lavoro locale: da qui
-//   solo sulle pratiche dell'owner o di una sessione (#957); sulle altre lo mette l'owner, in Gestione.
+//   stessa ragione la fiducia (#1148): «Segna fidato» lo dà solo l'owner, in Gestione, dopo aver letto il testo.
+//   `--riconosci`, `--preapprova` e `--chiedi-prima` non ci sono più e si rifiutano col perché.
 //
 //   `--come-routine`: la macchina a stati distingue chi scrive. L'owner decide
 //   sui feedback che aspettano lui (approvare, riaprire, archiviare); i passaggi
@@ -149,43 +140,6 @@ export function chiScrive(bearer) {
 }
 
 /**
- * Il segno «fondi senza chiedermelo» su una pratica, senza toccare lo stato.
- * `valore` true lo mette ({ by, at }), false lo toglie (cancella il campo:
- * la maschera lo nomina e i campi non lo portano). È la stessa scrittura che
- * fa la dashboard dal dettaglio della pratica.
- */
-export async function segnaPreapprovazione(id, valore, opts = {}) {
-  const bearer = opts.bearer || await acquireBearer();
-  const doc = await getDoc(id, bearer, valore ? CAMPI_PRATICA : ['statusPublic']);
-  if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
-  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
-  const pub = doc.fields?.statusPublic?.stringValue || 'open';
-  if (valore && pub === 'closed') return { ok: false, motivo: 'pratica chiusa: il segno non conterebbe' };
-  const vietata = valore ? preapprovaVietata(await praticaInChiaro(doc)) : '';
-  if (vietata) return { ok: false, motivo: vietata };
-  const fields = {};
-  const mask = ['mergePreapproved', 'updatedAt'];
-  fields.updatedAt = firmaOra();
-  const segno = valore ? { by: chiScrive(bearer), at: new Date().toISOString() } : null;
-  if (segno) fields.mergePreapproved = toFsValue(segno);
-  if (opts.dryRun) return { ok: true, dryRun: true, campi: mask, segno };
-  const qsSegno = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
-  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${qsSegno}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields }),
-  }, { fetchImpl: fetchRitentato });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, segno };
-}
-
-/** Togliere il segno si può sempre; metterlo, solo dove una sessione lavora già (MR.localSenderCheck). '' = si può. */
-function preapprovaVietata(fb) {
-  if (!fb) return 'mittente o stato non decifrabili: non so di chi è la pratica';
-  return MR.localSenderCheck(fb).ok ? '' : SOLO_DA_GESTIONE_PREAPPROVA;
-}
-
-/**
  * Da qui una sessione non sposta niente (#908). PURA. '' = si può partire.
  * I Ricevuti aspettano una decisione dell'owner; i confermati SONO una sua decisione.
  */
@@ -251,6 +205,8 @@ async function praticaInChiaro(doc) {
     status,
     ...(pipeline === undefined ? {} : { pipeline }),
     senderProof: f.senderProof?.stringValue || '',
+    // La fiducia (#1148) la scrive solo il server: è in chiaro, e decide chi lavora la pratica in locale.
+    fiducia: f.fiducia?.stringValue || '',
     statusPublic: f.statusPublic?.stringValue || 'open',
     localOnly: lo ? { by: lo.by?.stringValue || '', at: Number(lo.at?.integerValue || 0) } : undefined,
     localApproval: la ? { by: la.by?.stringValue || '', at: Number(la.at?.integerValue || 0) } : undefined,
@@ -259,7 +215,7 @@ async function praticaInChiaro(doc) {
     workingSince: f.workingSince?.stringValue || f.workingSince?.timestampValue || '',
   };
 }
-const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'localApproval', 'localMerges', 'userNote', 'beatAt', 'workingSince', 'pipeline'];
+const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'localApproval', 'localMerges', 'userNote', 'beatAt', 'workingSince', 'pipeline', 'fiducia'];
 
 /**
  * Il segno «solo in locale» (#908): `valore` true lo mette ({ by, at } in ms), false lo toglie.
@@ -314,8 +270,8 @@ export async function serveLocale(id, nota = '', opts = {}) {
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
   const fb = await praticaInChiaro(doc);
   if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica' };
-  if (MR.isProvenLocalSender(fb)) {
-    return { ok: false, motivo: 'la pratica è dell’owner o di una sessione: per lavorarla in locale usa --solo-locale' };
+  if (MR.isFidato(fb)) {
+    return { ok: false, motivo: 'la pratica è fidata: per lavorarla in locale usa --solo-locale' };
   }
   if (fb.status === 'design') return { ok: false, motivo: 'è già nei Ricevuti, in attesa di una scelta dell’owner' };
   const testo = `Richiede lavoro locale.${String(nota || '').trim() ? ` ${String(nota).trim()}` : ''}`;
@@ -462,7 +418,7 @@ export function rifiutoPratica(id, r) {
     righe.push('Se il segno l’ha tolto lui, chiediglielo prima: la vuole rivedere prima della fusione, o lasciare alle routine.');
   }
   if (r && r.senzaProva && r.segnalato) {
-    righe.push('È segnalato dai giudici: la prova del mittente la può dare solo l’owner, in Gestione («È mio»), dopo averlo guardato.');
+    righe.push('È segnalato dai giudici: se l’owner se ne fida lo segna fidato lui, in Gestione, dopo averlo guardato.');
   } else if (r && r.senzaProva) {
     // #912: il ripasso non dà più la prova al solo nome.
     righe.push(SOLO_DA_GESTIONE_MIO);
@@ -479,13 +435,10 @@ export function rifiutoPratica(id, r) {
 
 /** Il sì come lavoro locale a un feedback non dell'owner (#957): nessuno strumento delle sessioni lo scrive. */
 export const SOLO_DA_GESTIONE = 'Come lavoro locale lo approva solo l’owner, in Gestione, col tasto «💻 Lavoro locale» dei Ricevuti dopo averlo letto: da riga di comando non si può.';
-/** La prova del mittente data a mano (#957): stessa porta su L5, stesso tasto. */
-export const SOLO_DA_GESTIONE_MIO = 'La prova del mittente la dà solo l’owner, in Gestione, col tasto «🙋 È mio» dopo averlo guardato: da riga di comando non si può.';
-/** «Fondi senza chiedermelo» su una pratica non dell'owner né di una sessione: stessa porta su L5. */
-export const SOLO_DA_GESTIONE_PREAPPROVA = 'il segno «fondi senza chiedermelo» salta il sì dell’owner alla fusione: su un feedback non suo né di una sua sessione lo mette solo lui, in Gestione, dal dettaglio della pratica. Da riga di comando non si può';
-
-/** Il segno messo da qui non manda la fusione già ferma: la manda Gestione (#701). */
-export const FUSIONE_FERMA_DA_GESTIONE = 'Una fusione già ferma su questa pratica non parte da qui: la manda Gestione appena vede il segno (subito, se è aperta) e lì ne leggi l’esito. Se è ferma per blocchi nuovi, aspetta il tuo sì.';
+/** La fiducia (#1148): salta giudici e L5, quindi la dà solo l'owner, dalla finestra di Filo. */
+export const SOLO_DA_GESTIONE_MIO = 'La fiducia la dà solo l’owner, in Gestione, col tasto «🤝 Segna fidato» dopo aver letto il testo: da riga di comando non si può.';
+/** «Fondi senza chiedermelo» non esiste più: al suo posto «Segna fidato», che vale prima del lavoro (#1148). */
+export const SOLO_DA_GESTIONE_PREAPPROVA = '«fondi senza chiedermelo» non c’è più: il lavoro fidato si fonde da sé, e la fiducia la dà solo l’owner, in Gestione, col tasto «🤝 Segna fidato».';
 
 /** «910», «#910», «22.1»: un numero di feedback, non un id. PURA. */
 export function numeroDiFeedback(riferimento) {
@@ -659,13 +612,6 @@ async function notePrecedentiInChiaro(doc) {
 
 export async function scrivi(id, to, nota, opts = {}) {
   if (!ALLOWED.includes(to)) return { ok: false, motivo: `stato non valido: "${to}"` };
-  // Il segno «fondi senza chiedermelo» vale solo a pratica aperta: metterlo
-  // nello stesso comando che la chiude lo scriverebbe senza che conti (e
-  // tornerebbe a valere a una riapertura). Stesso rifiuto della forma senza
-  // stato (segnaPreapprovazione), prima di toccare la rete.
-  if (opts.preapprova === true && statusToPublic && statusToPublic(to) === 'closed') {
-    return { ok: false, motivo: `lo stato «${to}» chiude la pratica: il segno «fondi senza chiedermelo» non conterebbe. Ometti --preapprova (o usa --chiedi-prima).` };
-  }
   if (typeof opts.frase === 'string') {
     const lunga = fraseTroppoLunga(opts.frase.trim());
     if (lunga) return { ok: false, motivo: lunga };
@@ -695,10 +641,6 @@ export async function scrivi(id, to, nota, opts = {}) {
   if (vietata) return { ok: false, motivo: vietata, from };
   const lavoro = from === to ? null : await lavoroVietato(doc, to);
   if (lavoro) return { ok: false, motivo: lavoro.motivo, utente: lavoro.utente, routine: lavoro.routine, senzaProva: lavoro.senzaProva, senzaSegno: lavoro.senzaSegno, from };
-  if (opts.preapprova === true) {
-    const segno = preapprovaVietata(await praticaInChiaro(doc));
-    if (segno) return { ok: false, motivo: segno, from };
-  }
   const check = transizioneAmmessa(from, to, opts.attore || 'owner');
   if (!check.ok) return { ok: false, motivo: check.motivo, from };
 
@@ -745,12 +687,6 @@ export async function scrivi(id, to, nota, opts = {}) {
     set('priority', priorita);
     set('priorityManual', true);
   }
-  // Il segno «fondi senza chiedermelo» insieme al cambio di stato: stessa
-  // forma di segnaPreapprovazione. Toglierlo = cancellare il campo.
-  if (typeof opts.preapprova === 'boolean') {
-    if (opts.preapprova) set('mergePreapproved', { by: chiScrive(bearer), at: new Date().toISOString() });
-    else mask.push('mergePreapproved');
-  }
   if (to === 'done') set('resolvedInVersion', packageVersion());
   // Una consegna reale azzera il contatore delle interruzioni.
   if (to !== 'working' && to !== 'todo') set('workingResets', 0);
@@ -783,8 +719,7 @@ if (isMain) {
   // scritta male non deve scalare sui posizionali e far partire lo stesso il
   // cambio di stato. `--help` è legittima: chiedere aiuto non è un errore.
   const uso = () => {
-    console.error('Uso: node scripts/owner-feedback.mjs <numero|id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--priorita <0-3>] [--starred|--unstar] [--preapprova|--chiedi-prima] [--come-routine] [--dry-run]');
-    console.error('     node scripts/owner-feedback.mjs <numero|id> --preapprova | --chiedi-prima   (solo il segno, stato invariato)');
+    console.error('Uso: node scripts/owner-feedback.mjs <numero|id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--priorita <0-3>] [--starred|--unstar] [--come-routine] [--dry-run]');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --frase "riga per chi ha segnalato"   (solo la frase, stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --priorita <0-3>              (solo la priorità, decisa a mano: stato invariato, anche nei Ricevuti)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
@@ -793,7 +728,10 @@ if (isMain) {
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
   // Prima delle credenziali e del controllo sulle opzioni, che la direbbe solo «sconosciuta»; npm se la mangia nell'ambiente.
-  for (const [tolta, dove] of [['approva-locale', SOLO_DA_GESTIONE], ['riconosci', SOLO_DA_GESTIONE_MIO]]) {
+  for (const [tolta, dove] of [
+    ['approva-locale', SOLO_DA_GESTIONE], ['riconosci', SOLO_DA_GESTIONE_MIO],
+    ['preapprova', SOLO_DA_GESTIONE_PREAPPROVA], ['chiedi-prima', SOLO_DA_GESTIONE_PREAPPROVA], ['segna-fidato', SOLO_DA_GESTIONE_MIO],
+  ]) {
     if (argv.some((a) => new RegExp(`^--${tolta}(=|$)`).test(a)) || process.env[`npm_config_${tolta.replace(/-/g, '_')}`] !== undefined) {
       console.error(`RIFIUTATO: --${tolta} non c'è più. ${dove} Non ho toccato niente.`);
       process.exit(1);
@@ -801,7 +739,7 @@ if (isMain) {
   }
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--branch', '--reason', '--frase', '--priorita', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima',
+    opzioni: ['--branch', '--reason', '--frase', '--priorita', '--dry-run', '--come-routine', '--starred', '--unstar',
       '--solo-locale', '--non-locale', '--serve-locale'],
     conValore: ['--branch', '--reason', '--frase', '--priorita'],
   };
@@ -832,9 +770,6 @@ if (isMain) {
   let starred;
   if (argv.includes('--starred')) starred = true;
   else if (argv.includes('--unstar')) starred = false;
-  let preapprova;
-  if (argv.includes('--preapprova')) preapprova = true;
-  else if (argv.includes('--chiedi-prima')) preapprova = false;
 
   // Per POSTO, non per valore: come nello strumento gemello (#565). Prima si
   // toglievano le parole «uguali al valore di un'opzione», e una nota scritta
@@ -854,7 +789,7 @@ if (isMain) {
     const p = prioritaDaScrivere(flag('priorita'));
     if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo} — non ho toccato niente.`); process.exit(1); }
     priorita = p.valore;
-    const conStato = ['--frase', '--branch', '--reason', '--starred', '--unstar', '--preapprova', '--chiedi-prima', '--come-routine'];
+    const conStato = ['--frase', '--branch', '--reason', '--starred', '--unstar', '--come-routine'];
     const altre = ['--solo-locale', '--non-locale', '--serve-locale', ...(status ? [] : conStato)].filter((o) => argv.includes(o));
     if (altre.length) {
       console.error(`RIFIUTATO: --priorita ${status ? 'non va' : 'senza stato va da sola, non'} con ${altre.join(' ')}: lancia un comando per ciascuno — non ho toccato niente.`);
@@ -925,7 +860,7 @@ if (isMain) {
 
   // Solo la frase per chi ha segnalato, stato invariato: `<id> --frase "…"`.
   if (id && !status && typeof frase === 'string') {
-    if (typeof preapprova === 'boolean' || typeof starred === 'boolean' || branch !== undefined || reason !== undefined) {
+    if (typeof starred === 'boolean' || branch !== undefined || reason !== undefined) {
       console.error('RIFIUTATO: --frase senza stato va da sola — non ho toccato niente.');
       process.exit(1);
     }
@@ -937,23 +872,12 @@ if (isMain) {
     process.exit(0);
   }
 
-  // Solo il segno, stato invariato: `<id> --preapprova` / `<id> --chiedi-prima`.
-  if (id && !status && typeof preapprova === 'boolean') {
-    const r = await segnaPreapprovazione(id, preapprova, { dryRun, bearer });
-    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo}`); process.exit(3); }
-    console.log(r.dryRun
-      ? `[dry-run] ${riferimento}: ${preapprova ? 'metterei' : 'toglierei'} il segno «fondi senza chiedermelo» (${r.campi.join(', ')})`
-      : `${riferimento}: ${preapprova ? `da ora si fonde senza chiedere (segno di ${r.segno.by})` : 'da ora ti chiede prima di fondere'}`);
-    if (preapprova && !r.dryRun) console.log(FUSIONE_FERMA_DA_GESTIONE);
-    process.exit(0);
-  }
-
   if (!id || !status) {
     uso();
     process.exit(1);
   }
 
-  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, preapprova, priorita, dryRun, attore, bearer });
+  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, priorita, dryRun, attore, bearer });
   if (!r.ok) {
     console.error(r.utente || r.senzaSegno ? rifiutoPratica(riferimento, r) : `RIFIUTATO: ${r.motivo}`);
     if (attore === 'owner' && /non è un passaggio permesso/.test(r.motivo || '')) {
@@ -967,7 +891,6 @@ if (isMain) {
   console.log(r.dryRun
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${campiLeggibili(r.campi, priorita)}`
     : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}.`);
-  if (preapprova === true && !r.dryRun) console.log(FUSIONE_FERMA_DA_GESTIONE);
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
     const promemoria = await fraseDaScrivere(id, riferimento, { bearer });

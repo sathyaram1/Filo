@@ -172,6 +172,18 @@ export async function trovaBiglietto({ env, cwd, deps = {} } = {}) {
   return stati.find((b) => b.fiducia !== 'fidato') || stati[0];
 }
 
+/**
+ * Per gli strumenti che stampano testo esterno: sporca la sessione col motivo e dice in una riga com'è andata. Va
+ * chiamata PRIMA di stampare. `cosa` = cosa si sta leggendo («letto #813»), `motivi` = motiviDiLettura.
+ */
+export async function rigaSporco(cosa, motivi, opts = {}) {
+  const testo = `${cosa}: ${motivi.join('; ')}`;
+  const r = await sporca(testo, opts);
+  if (r.senzaBiglietto) return 'Nessun biglietto della sessione: era già non fidata.';
+  if (r.sporcati) return `Biglietto della sessione sporcato (${motivi.join('; ')}): da qui ciò che scrivi nasce non fidato.`;
+  return `Biglietto NON sporcato (${r.errori.join('; ')}): dichiaralo con node scripts/biglietto.mjs sporca "${cosa}".`;
+}
+
 /** 'fidato' solo con un biglietto pulito: senza biglietto, o con un guasto, 'non_fidato'. */
 export async function fiduciaLocale(opts = {}) {
   try {
