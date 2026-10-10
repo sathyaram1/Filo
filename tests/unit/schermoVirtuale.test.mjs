@@ -4,10 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { preparaLancioElectron, senzaSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
 import { shaDelRiallineamento, cambiatiPerLaScelta } from '../../scripts/finish-local.mjs';
 
@@ -102,7 +102,7 @@ test('riallineamento: la scelta include il lato arrivato da main e il file in co
     assert.deepEqual(perso.changed, ['src/pages/editor/a.js']);
     assert.match(perso.nota, /qui non c'è/, 'un commit introvabile si dice, non si salta in silenzio');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 

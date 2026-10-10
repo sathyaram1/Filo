@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 import { beatIsLive, readBeat, startBeat, stopBeat, beatFile } from '../../scripts/lib/routine-beat.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -354,13 +355,10 @@ test('il giro col biglietto fa arrivare un battito al server, senza che nessuno 
       p.on('close', fine);
     });
 
-    // Il battito è staccato: vive oltre dispatch, quindi lo si aspetta.
-    const scadenza = Date.now() + 15000;
-    while (Date.now() < scadenza && !arrivati.some((u) => u.includes('routineHeartbeat'))) {
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    assert.ok(arrivati.some((u) => u.includes('routineHeartbeat')),
-      `nessun battito è arrivato al server (chiamate viste: ${arrivati.join(', ') || 'nessuna'})`);
+    // Il battito è staccato: vive oltre dispatch, quindi lo si aspetta finché arriva (#1063).
+    await aspettaChe(() => arrivati.some((u) => u.includes('routineHeartbeat')), {
+      ogniMs: 200, cosa: () => `nessun battito è arrivato al server (chiamate viste: ${arrivati.join(', ') || 'nessuna'})`,
+    });
   } finally {
     // Il processo è staccato apposta: se non lo si ferma resta a battere.
     const m = readBeat(casa);

@@ -4,10 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   proveTolte, percorsoRipristino, esitoProveTolte, controllaProveTolte, controllaPulizia, baseDelConfronto,
   PREFISSO_RIPRISTINO, testoPuliziaFuoriNumero, numeriDelNome, nomeNumeratoStorto, numeraRilievi, puliziaDelPass,
@@ -133,7 +133,7 @@ test('in un repo vero la pulizia sa quali prove ha tolto, come, e quali c\'erano
     assert.match(testoPuliziaFuoriNumero(c, [2]), /giro1-r2-vecchia[^\n]*critica passata/);
     assert.equal(controllaPulizia({ shaCritica: critica, root: dir }).vecchie, null, 'senza avvio non lo si sa');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -178,7 +178,7 @@ test('la consegna rilancia solo le prove tolte, com\'erano, e respinge quella an
     assert.ok(visti.every((v) => v.args.includes('--retries=1')));
     assert.deepEqual(readdirSync(resolve(dir, 'tests', 'verifica')), ['679'], 'le copie se ne vanno dopo la corsa');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -192,7 +192,7 @@ test('cancellare una prova diventata verde passa, e senza prove tolte non si lan
     assert.deepEqual(controllaProveTolte({ shaPrima: critica, root: dir, lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
     assert.equal(visti.length, 1);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -209,7 +209,7 @@ test('togliere il caso rosso e tenere il file ferma la consegna come cancellare 
     assert.doesNotMatch(e.testo, /giro1-verde/, 'una prova cambiata che com\'era è verde non ferma niente');
     assert.equal(visti.length, 2);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -223,7 +223,7 @@ test('senza schermo e senza xvfb la consegna si ferma e dice perché, invece di 
     assert.equal(e.ferma, true);
     assert.match(e.testo, /xvfb-run non c'è/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -268,7 +268,7 @@ test('dopo un riallineamento le prove che ha cambiato main non entrano nel rilan
     assert.doesNotMatch(e.testo, /tests\/verifica\/99\//);
     assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-rossa.spec.mjs']);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -281,7 +281,7 @@ test('dopo un riallineamento una prova già su main che il ramo cambia entra anc
     controllaProveTolte({ shaPrima: critica, root: dir, lancia: playwrightFinto(dir, visti), prepara: preparaFinto, log: () => {} });
     assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-cambiata.spec.mjs']);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -315,7 +315,7 @@ test('la pulizia accetta solo prove o casi tolti, da una cartella del giro', () 
     assert.equal(no.ok, false);
     assert.match(no.motivo, /solo togliere prove del giro[\s\S]*src\/x\.js/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -326,7 +326,7 @@ test('una riga aggiunta a una prova del giro non è una pulizia', () => {
     g('commit', '-qam', 'marcatore');
     assert.equal(controllaPulizia({ shaCritica: critica, root: dir }).ok, false);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -351,7 +351,7 @@ test('dopo la pulizia la base è lei: la prova messa da parte non si rilancia, u
     assert.equal(e.ferma, true);
     assert.match(e.testo, /giro1-rossa\.spec\.mjs/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -398,7 +398,7 @@ test('#880: dopo un pass la pulizia sigillata è la base del riallineamento, e l
     assert.equal(vecchio.ferma, true);
     assert.match(vecchio.testo, /giro2-r1-diventato-feedback/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -413,7 +413,7 @@ test('#880 senza riaprire #679: una prova rossa tolta da chi riallinea, prima o 
     assert.doesNotMatch(e.testo, /giro2-r1-diventato-feedback/);
     assert.deepEqual(visti.map((v) => v.file.split('/').pop()), ['giro1-rotta-dal-rebase.spec.mjs']);
   } finally {
-    rmSync(dopo.dir, { recursive: true, force: true });
+    togliCartella(dopo.dir);
   }
   // Un commit che toglie solo prove, fatto da chi riallinea prima del rebase, non diventa la base nemmeno se il suo
   // rilascio (o quello di chiunque non sia il verificatore) lo sigilla.
@@ -429,7 +429,7 @@ test('#880 senza riaprire #679: una prova rossa tolta da chi riallinea, prima o 
     assert.equal(e.ferma, true);
     assert.match(e.testo, /giro1-rotta-dal-rebase/);
   } finally {
-    rmSync(prima.dir, { recursive: true, force: true });
+    togliCartella(prima.dir);
   }
 });
 
@@ -446,7 +446,7 @@ test('#880: è pulizia del pass solo un punto fermo che discende dalla critica e
     for (const storto of [[], null, [{}], [{ sha: 'non-uno-sha' }]]) assert.equal(puliziaDelPass(critica, storto, dir), '');
     assert.equal(puliziaDelPass('', punti, dir), '');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -504,7 +504,7 @@ test('con un rilievo esterno nel giro, una prova cancellata ancora rossa ferma l
     assert.match(r.testo, /giro1-rilievo\.spec\.mjs/);
     assert.equal(r.entry.verdict, 'fix-pending', 'la consegna respinta non chiude il giro');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -524,7 +524,7 @@ test('in locale la pulizia si registra, e la consegna dopo non rilancia la prova
     assert.equal(c.entry.verdict, 'fixed');
     assert.equal(c.entry.chiusura.shaPrima, pulizia, 'la verifica dopo guarda la correzione, non la pulizia');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -537,7 +537,7 @@ test('in locale la pulizia si rifiuta senza rilievi messi da parte, o se il comm
     assert.match(p.testo, /non ha messo da parte nessun rilievo/);
     assert.equal(p.entry.pending.shaPulizia, undefined);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
   const altro = giroLocaleAperto({ derived: [{ level: 1, sede: 'i', text: 'x', priority: 1 }] });
   try {
@@ -548,7 +548,7 @@ test('in locale la pulizia si rifiuta senza rilievi messi da parte, o se il comm
     assert.notEqual(p.status, 0);
     assert.match(p.testo, /codice\.js/);
   } finally {
-    rmSync(altro.dir, { recursive: true, force: true });
+    togliCartella(altro.dir);
   }
 });
 
@@ -625,7 +625,7 @@ test('una domanda per l\'owner senza prova sua non lascia uscire la prova rossa 
     assert.notEqual(c.status, 0, 'senza pulizia registrata la consegna rilancia la prova tolta, ancora rossa');
     assert.match(c.testo, /giro1-r3-c\.spec\.mjs/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -646,7 +646,7 @@ test('un rilievo esterno non allarga la pulizia fino alla prova rossa di un rili
     assert.equal(giusta.status, 0, giusta.testo);
     assert.equal(giusta.entry.pending.shaPulizia, g('rev-parse', 'HEAD'));
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -676,6 +676,6 @@ test('a una prova che copre anche un rilievo da correggere si toglie solo il cas
     assert.equal(verde.status, 0, verde.testo);
     assert.equal(verde.entry.verdict, 'fixed');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });

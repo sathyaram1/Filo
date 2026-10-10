@@ -145,7 +145,7 @@ function testoDi(content) {
 /** Il rapporto vuoto: ogni chiave al suo posto, così un server che lo legge non trova buchi. */
 export function rapportoVuoto({ role = '', ticket = '' } = {}) {
   return {
-    v: 2,
+    v: 3,
     role: String(role || ''),
     ticket: String(ticket || ''),
     sessionId: '',
@@ -155,8 +155,16 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     durationS: 0,
     turns: 0,
     coldTurns: 0,
+    // Cache scaduta anche solo in parte (scrive più di quanto legge): i
+    // sotto-agenti hanno la cache a 5 minuti, un comando lungo la fa scadere.
+    rewarmTurns: 0,
+    rewarmTokens: 0,
+    maxContextTokens: 0,
     tokens: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 },
     costUsd: 0,
+    // I turni dell'orchestratore fra il biglietto prima e questo (FUORI da
+    // costUsd): senza, un terzo del consumo vero non stava in nessun rapporto.
+    orchestrator: null,
     tools: { total: 0, byName: {}, timeouts: 0, errors: 0 },
     // Turni per sforzo dichiarato ({ xhigh: 40 }): dice se le definizioni degli
     // agenti hanno avuto effetto. Un turno senza il campo non si conta.
@@ -352,7 +360,7 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
  * tool_use di nome Agent o Task; `longestToolS` = distanza massima fra un
  * tool_use e il suo tool_result.
  */
-export async function analizzaRighe(righe, { role = '', ticket = '', since = '', finestreAgent = null } = {}) {
+export async function analizzaRighe(righe, { role = '', ticket = '', since = '', finestreAgent = null, continua = false } = {}) {
   const rep = rapportoVuoto({ role, ticket });
   // L'usage di ogni messaggio, per id: un messaggio su più righe (pensa, poi
   // chiama uno strumento) porta sulla PRIMA riga un output parziale (2, 5, 7
@@ -451,7 +459,9 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     const out = Number(u.output_tokens) || 0;
     rep.turns += 1;
     if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
-    if (rep.turns > 1 && cr === 0 && cw >= 20000) rep.coldTurns += 1;
+    if ((rep.turns > 1 || continua) && cr === 0 && cw >= 20000) rep.coldTurns += 1;
+    if ((rep.turns > 1 || continua) && cw >= 20000 && cw > cr) { rep.rewarmTurns += 1; rep.rewarmTokens += cw; }
+    rep.maxContextTokens = Math.max(rep.maxContextTokens, input + cw + cr);
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
     rep.tokens.cacheRead += cr;
@@ -608,6 +618,9 @@ export function sommaSottoAgente(rep, sub) {
   rep.costUsd = arrotonda(rep.costUsd + (Number(sub.costUsd) || 0));
   rep.turns += Number(sub.turns) || 0;
   rep.coldTurns += Number(sub.coldTurns) || 0;
+  rep.rewarmTurns += Number(sub.rewarmTurns) || 0;
+  rep.rewarmTokens += Number(sub.rewarmTokens) || 0;
+  rep.maxContextTokens = Math.max(rep.maxContextTokens, Number(sub.maxContextTokens) || 0);
   for (const k of Object.keys(rep.tokens)) rep.tokens[k] += Number(sub.tokens && sub.tokens[k]) || 0;
   const st = sub.tools || {};
   rep.tools.total += Number(st.total) || 0;
@@ -626,6 +639,176 @@ export function sommaSottoAgente(rep, sub) {
 }
 
 /**
+ * Il comando chiama il rilascio del canale, comunque sia scritto: in cloud il preflight lo consegna col percorso
+ * intero fra virgolette, e c'è chi mette davanti una variabile o un `cd`. Si leggono le parole, non la grafia. PURA.
+ */
+export function eRilascio(comando) {
+  const parole = [...String(comando || '').matchAll(/"([^"]*)"|'([^']*)'|([^\s"']+)/g)].map((m) => m[1] ?? m[2] ?? m[3]);
+  return parole.some((p, i) => /(^|[\\/])routine-channel\.mjs$/.test(p) && parole[i + 1] === 'release');
+}
+
+/**
+ * L'intestazione di una notifica di Claude Code, solo dove la mette lui (coda, allegato, messaggio di testo):
+ * un turno o il risultato di uno strumento che la cita non è una notifica. Fino al riassunto, perché il
+ * rapporto di un worker riportato dentro può citare altri id. '' se la riga non è una notifica. PURA.
+ */
+export function testaNotifica(e) {
+  if (!e || typeof e !== 'object') return '';
+  const msg = e.message && typeof e.message === 'object' ? e.message : null;
+  let s = '';
+  if (e.type === 'queue-operation' && typeof e.content === 'string') s = e.content;
+  else if (e.type === 'attachment' && e.attachment && typeof e.attachment.prompt === 'string') s = e.attachment.prompt;
+  else if (e.type === 'user' && msg) {
+    s = typeof msg.content === 'string' ? msg.content
+      : Array.isArray(msg.content) ? msg.content.filter((b) => b && b.type === 'text').map((b) => String(b.text || '')).join('\n') : '';
+  }
+  s = s.trimStart();
+  if (!s.startsWith('<task-notification>')) return '';
+  return s.split(/<summary>|<result>/)[0];
+}
+
+/**
+ * Le righe del thread principale che toccano al biglietto in corso: i turni
+ * dell'orchestratore dopo la fine del worker di prima (o dopo un suo rilascio
+ * di un biglietto morto, già contato lì) fino a adesso, cioè fino al rilascio
+ * del worker che sta lavorando. Un worker lanciato in sottofondo (il default di
+ * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
+ * col suo tool-use-id, non quel risultato. PURA.
+ */
+export function finestraOrchestratore(linee) {
+  const voci = [];
+  for (const l of linee) {
+    let e;
+    try { e = JSON.parse(l); } catch (_) { continue; }
+    const ms = e && e.timestamp ? Date.parse(e.timestamp) : NaN;
+    voci.push({ l, e: e || {}, ms });
+  }
+  const chiamate = new Map();
+  const rilasci = [];
+  const turni = [];
+  for (const { e, ms } of voci) {
+    const msg = e.message && typeof e.message === 'object' ? e.message : null;
+    if (!msg || !Number.isFinite(ms)) continue;
+    const blocchi = Array.isArray(msg.content) ? msg.content : [];
+    if (e.type === 'assistant') {
+      // Una richiesta fallita («<synthetic>», usage a zero) non ha toccato la cache: non accorcia l'attesa.
+      if (msg.usage && !/^<[^>]*>$/.test(String(msg.model || ''))) turni.push(ms);
+      for (const b of blocchi) {
+        if (!b || b.type !== 'tool_use') continue;
+        if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
+        if (b.input && eRilascio(b.input.command)) rilasci.push(ms);
+      }
+    } else if (e.type === 'user') {
+      for (const b of blocchi) {
+        if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
+        const testo = testoDi(b.content);
+        const c = chiamate.get(b.tool_use_id);
+        if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || ''; continue; }
+        c.fine = ms;
+      }
+    }
+  }
+  // Un worker in sottofondo finisce solo con la prima notifica dopo il lancio che lo NOMINA (tool-use-id della
+  // chiamata o task-id = agentId del lancio): un Monitor, un comando, un artefatto o un testo che ne parla non lo chiudono.
+  const aperta = (c, ms) => c.inizio <= ms && !(c.fine <= ms);
+  for (const { e, ms } of voci) {
+    const testa = Number.isFinite(ms) ? testaNotifica(e) : '';
+    if (!testa) continue;
+    const ids = [...testa.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)].map((m) => m[1].trim());
+    const task = [...testa.matchAll(/<task-id>([^<]+)<\/task-id>/g)].map((m) => m[1].trim());
+    for (const [id, c] of chiamate) {
+      if (aperta(c, ms) && (ids.includes(id) || (c.agentId && task.includes(c.agentId)))) c.fine = ms;
+    }
+  }
+  // La finestra arriva fino a adesso: in primo piano dopo la chiamata aperta
+  // non c'è niente, in sottofondo i turni d'attesa dopo il lancio sono suoi.
+  const confini = [...[...chiamate.values()].map((c) => c.fine), ...rilasci].filter((t) => Number.isFinite(t));
+  let inizio = confini.length ? Math.max(...confini) : -Infinity;
+  // Un turno sta su più righe con la stessa usage: il confine che ne taglia uno va dopo la sua ultima riga,
+  // o le righe scritte dopo (un'altra chiamata nello stesso turno del rilascio) lo farebbero contare due volte.
+  const messaggi = new Map();
+  for (const { e, ms } of voci) {
+    const id = e.type === 'assistant' && e.message && typeof e.message.id === 'string' ? e.message.id : '';
+    if (!id || !Number.isFinite(ms)) continue;
+    const m = messaggi.get(id) || { primo: ms, ultimo: ms };
+    messaggi.set(id, { primo: Math.min(m.primo, ms), ultimo: Math.max(m.ultimo, ms) });
+  }
+  for (const { primo, ultimo } of messaggi.values()) if (primo <= inizio && ultimo > inizio) inizio = ultimo;
+  const prima = turni.filter((t) => t <= inizio);
+  const dentro = turni.filter((t) => t > inizio);
+  return {
+    inizioMs: inizio,
+    righe: voci.filter((v) => Number.isFinite(v.ms) && v.ms > inizio).map((v) => v.l),
+    // Quanto è rimasto fermo il thread principale prima del primo turno: oltre
+    // un'ora la sua cache (a un'ora) è scaduta e il turno riscrive tutto.
+    attesaPrimaS: prima.length && dentro.length ? Math.round((Math.min(...dentro) - Math.max(...prima)) / 1000) : 0,
+    // Il primo turno della finestra non è il primo della sessione: se riscrive
+    // la cache dopo l'attesa, conta come riscaldata.
+    continua: prima.length > 0,
+  };
+}
+
+async function lineeDi(file) {
+  const linee = [];
+  for await (const l of righeDelFile(file)) if (String(l).trim()) linee.push(l);
+  return linee;
+}
+
+async function rapportoOrchestratore(principale) {
+  if (!existsSync(principale)) return null;
+  const { righe, attesaPrimaS, continua } = finestraOrchestratore(await lineeDi(principale));
+  const r = await analizzaRighe(righe, { role: 'orchestrator', continua });
+  return {
+    costUsd: r.costUsd, turns: r.turns, coldTurns: r.coldTurns, rewarmTurns: r.rewarmTurns, rewarmTokens: r.rewarmTokens,
+    maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, startedAt: r.startedAt, endedAt: r.endedAt,
+  };
+}
+
+/**
+ * Quando è nato `ticket` nel thread principale: la prima risposta di uno strumento che lo contiene (la stampa di
+ * `ticket … --json`). ISO, o '' se non c'è. Il marcatore del biglietto lo scrive il worker: se muore prima, è di un altro.
+ */
+export async function nascitaBiglietto(principale, ticket) {
+  const t = String(ticket || '').trim();
+  if (t.length < 2) return '';
+  for (const l of await lineeDi(principale)) {
+    if (!l.includes(t)) continue;
+    let e;
+    try { e = JSON.parse(l); } catch (_) { continue; }
+    const blocchi = e && e.type === 'user' && e.message && Array.isArray(e.message.content) ? e.message.content : [];
+    const ms = Date.parse(e && e.timestamp);
+    if (Number.isFinite(ms) && blocchi.some((b) => b && b.type === 'tool_result' && testoDi(b.content).includes(t))) return new Date(ms).toISOString();
+  }
+  return '';
+}
+
+/** Il confine della finestra dell'orchestratore prima di `since`: { since: ISO, o '' = dall'inizio; continua }. */
+async function inizioFinestraPrima(principale, since) {
+  const sinceMs = Date.parse(String(since));
+  if (!Number.isFinite(sinceMs)) {
+    // Senza un momento del biglietto: dall'ultimo confine prima di questo rilascio, mai dall'inizio, che è già
+    // nei rapporti di prima. Il rilascio in corso è anche lui nel transcript, ed è un confine: si guarda prima.
+    const linee = await lineeDi(principale);
+    let ultimo = linee.length;
+    for (let i = linee.length - 1; i >= 0; i -= 1) {
+      let e;
+      try { e = JSON.parse(linee[i]); } catch (_) { continue; }
+      const blocchi = e && e.type === 'assistant' && e.message && Array.isArray(e.message.content) ? e.message.content : [];
+      if (blocchi.some((b) => b && b.type === 'tool_use' && b.input && eRilascio(b.input.command))) { ultimo = i; break; }
+    }
+    const { inizioMs, continua } = finestraOrchestratore(linee.slice(0, ultimo));
+    return { since: Number.isFinite(inizioMs) ? new Date(inizioMs + 1).toISOString() : '', continua, senzaBiglietto: true };
+  }
+  const prima = (await lineeDi(principale)).filter((l) => {
+    let ms = NaN;
+    try { ms = Date.parse(JSON.parse(l).timestamp); } catch (_) { /* riga illeggibile: la scarta finestraOrchestratore */ }
+    return !Number.isFinite(ms) || ms < sinceMs;
+  });
+  const { inizioMs, continua } = finestraOrchestratore(prima);
+  return { since: Number.isFinite(inizioMs) ? new Date(inizioMs + 1).toISOString() : '', continua };
+}
+
+/**
  * Il rapporto di questa sessione, sotto-agenti compresi. Non lancia mai per
  * un transcript assente o illeggibile: torna il rapporto minimo con la nota.
  * (Un errore di programmazione qui dentro sì: lo prende chi chiama.)
@@ -639,9 +822,18 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
   }
   try {
     const finestre = [];
-    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since, finestreAgent: finestre });
-    if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
     const sottoAgente = eSottoAgente(trovato.file);
+    // L'orchestratore che rilascia per un worker morto: i suoi turni fra la fine del worker di prima e il
+    // biglietto (il primo riscrive la cache) non li porta nessun altro rapporto.
+    // I sotto-agenti restano dal biglietto: quelli di prima sono di altri biglietti. Il biglietto è quello
+    // rilasciato, nato nel transcript: il marcatore può essere del worker di prima, già contato (giro 5).
+    const perMorto = !sottoAgente && role === 'orchestrator';
+    const sinceBiglietto = perMorto ? ((await nascitaBiglietto(trovato.file, ticket)) || since) : since;
+    const finestra = perMorto ? await inizioFinestraPrima(trovato.file, sinceBiglietto) : { since, continua: false };
+    const sinceFigli = perMorto ? (sinceBiglietto || finestra.since) : since;
+    const rep = await analizzaRighe(righeDelFile(trovato.file), { role, ticket, since: finestra.since, continua: finestra.continua, finestreAgent: finestre });
+    if (!rep.turns) rep.notes.push(`nessun turno nel transcript ${trovato.file}`);
+    if (finestra.senzaBiglietto) rep.notes.push('momento del biglietto non trovato: contato dalla fine dell\'ultimo worker');
     if (sottoAgente) rep.notes.push(`sotto-agente della sessione ${basename(dirname(dirname(trovato.file)))}`);
     // Una sessione ha i suoi sotto-agenti in <sessione>/subagents/; un
     // sotto-agente li ha ACCANTO a se', e li si riconosce dal meta (o, in
@@ -649,9 +841,16 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     const figli = sottoAgente ? figliDelSottoAgente(trovato.file, finestre, rep.notes) : transcriptSottoAgenti(trovato.file);
     for (const f of figli) {
       try {
-        sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket, since }));
+        sommaSottoAgente(rep, await analizzaRighe(righeDelFile(f), { role, ticket, since: sinceFigli }));
       } catch (e) {
         rep.notes.push(`transcript di un sotto-agente illeggibile (${f}): ${String((e && e.message) || e)}`);
+      }
+    }
+    if (sottoAgente) {
+      try {
+        rep.orchestrator = await rapportoOrchestratore(`${dirname(dirname(trovato.file))}.jsonl`);
+      } catch (e) {
+        rep.notes.push(`thread principale illeggibile: ${String((e && e.message) || e)}`);
       }
     }
     return rep;
@@ -669,7 +868,7 @@ export function riassunto(rep) {
     `rapporto sessione — ruolo: ${rep.role || '(nessuno)'}, biglietto: ${rep.ticket ? `${rep.ticket.slice(0, 8)}…` : '(nessuno)'}, sessione: ${rep.sessionId || '(sconosciuta)'}`,
     `durata ${durata}, ${rep.turns} turni (${rep.coldTurns} freddi), modelli: ${rep.models.join(', ') || '(nessuno)'}, sforzo: ${Object.entries(rep.effort || {}).map(([k, n]) => `${k} ${n}`).join(', ') || '(non dichiarato)'}`,
     `token: input ${rep.tokens.input}, cache letta ${rep.tokens.cacheRead}, cache scritta ${rep.tokens.cacheWrite}, output ${rep.tokens.output}`,
-    `costo stimato: $${rep.costUsd.toFixed(4)}`,
+    `costo stimato: $${rep.costUsd.toFixed(4)}${rep.orchestrator ? ` + orchestratore $${rep.orchestrator.costUsd.toFixed(4)} (${rep.orchestrator.turns} turni, contesto ${rep.orchestrator.maxContextTokens}, ${rep.orchestrator.rewarmTurns} da riscaldare, fermo ${rep.orchestrator.attesaPrimaS}s)` : ''} · cache riscaldata ${rep.rewarmTurns} volte`,
     `strumenti: ${rep.tools.total} (timeout ${rep.tools.timeouts}, errori ${rep.tools.errors}, sotto-agenti ${rep.subagents}, il più lungo ${rep.longestToolS}s) · sotto-agenti letti: ${Number(rep.subagentRuns) || 0}, il loro costo $${(Number(rep.subagentCostUsd) || 0).toFixed(4)}${rep.notes.length ? ` — note: ${rep.notes.join(' | ')}` : ''}`,
   ];
 }

@@ -18,7 +18,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, isAbsolute, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -27,11 +27,12 @@ import {
   collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
   gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
   allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
-  conTettoDiTempo, TETTO_FILE_MS, conConcorrenza,
+  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento, guardiaFermo, orologioMacchina, conConcorrenza,
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { concorrenzaUnit } from '../../scripts/lib/dati-worker.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -104,7 +105,7 @@ describe('raccolta dei file di test', () => {
       writeFileSync(join(casa, '.cache', 'y.test.mjs'), '');
       const trovati = collectTestFiles(casa).map((f) => f.slice(casa.length + 1));
       assert.deepEqual(trovati.sort(), [join('dentro', 'due.test.mjs'), 'uno.test.mjs'].sort());
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('cartella assente o vuota: nessun file, e nessuna eccezione', () => {
@@ -112,7 +113,7 @@ describe('raccolta dei file di test', () => {
     try {
       assert.deepEqual(collectTestFiles(vuota), []);
       assert.deepEqual(collectTestFiles(join(vuota, 'non-esiste')), []);
-    } finally { rmSync(vuota, { recursive: true, force: true }); }
+    } finally { togliCartella(vuota); }
   });
 
   test('isTestFile riconosce solo i *.test.mjs', () => {
@@ -137,7 +138,7 @@ describe('il lanciatore lanciato da fuori', () => {
       // sta guardando la cartella sbagliata.
       assert.ok(righe.some((f) => f.endsWith('unitRunner.test.mjs')), 'manca il file della sentinella');
       assert.equal(REPO_ROOT, ROOT);
-    } finally { rmSync(altrove, { recursive: true, force: true }); }
+    } finally { togliCartella(altrove); }
   });
 
   test('zero test trovati = uscita ROSSA, mai un verde silenzioso', () => {
@@ -148,7 +149,7 @@ describe('il lanciatore lanciato da fuori', () => {
       });
       assert.equal(r.status, 1, 'una suite vuota deve fallire');
       assert.match(r.stderr, /nessun file/);
-    } finally { rmSync(vuota, { recursive: true, force: true }); }
+    } finally { togliCartella(vuota); }
   });
 });
 
@@ -273,12 +274,12 @@ describe('il riepilogo di una suite a gruppi', () => {
       assert.match(coda, /ROSSO: gruppo 2 di 3\.\s*$/);
 
       scrivi('b.test.mjs', false);
-      rmSync(marche, { recursive: true, force: true }); mkdirSync(marche);
+      assert.ok(togliCartella(marche), `${marche} è ancora tenuta da qualcuno`); mkdirSync(marche);
       const verde = lancia();
       assert.equal(verde.status, 0, verde.stdout + verde.stderr);
       assert.equal(readdirSync(marche).length, 3);
       assert.match(verde.stdout, /3 test, 3 passati, 0 falliti\.\s+\[test:unit\] verde: 3 gruppi, 3 file\.\s*$/);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 });
 
@@ -328,7 +329,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       assert.match(r.stdout.trim(), /^<\?xml[^>]*\?>\s*<testsuites>[\s\S]*<\/testsuites>$/);
       assert.equal((r.stdout.match(/<\?xml/g) || []).length, 1);
       for (const n of ['uno', 'due', 'tre']) assert.match(r.stdout, new RegExp(`name="caso-${n}"`));
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('un rapporto che non si può scrivere fa rosso l’esito, e il riepilogo non lo dà per riunito', () => {
@@ -341,7 +342,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       assert.doesNotMatch(r.stdout, /riuniti/);
       assert.match(r.stdout, /non è stato scritto/);
       assert.match(r.stdout.trim().split('\n').pop(), /^\[test:unit\] ROSSO: rapporto non scritto\.$/);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('a gruppi un tap su file non si dice riunito: il riepilogo dice che ha un rapporto per gruppo', () => {
@@ -355,7 +356,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       assert.ok(r.stdout.includes(`in ${dest} c'è un rapporto per gruppo, uno dopo l'altro`), r.stdout);
       assert.match(r.stdout, /i conti di tutta la suite sono in questo riepilogo/);
       assert.equal((readFileSync(dest, 'utf8').match(/^TAP version/gm) || []).length, 2);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('a gruppi un file dato a mano gira una volta, e i conti tornano', () => {
@@ -371,8 +372,8 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       assert.equal((r.stdout.match(/ok \d+ - a\b/g) || []).length, 1, 'un file già trovato non gira due volte');
       assert.match(r.stdout, /2 file: 3 test, 3 passati, 0 falliti/);
     } finally {
-      rmSync(casa, { recursive: true, force: true });
-      rmSync(fuori, { recursive: true, force: true });
+      togliCartella(casa);
+      togliCartella(fuori);
     }
   });
 
@@ -401,7 +402,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
         assert.match(junit, new RegExp(`name="caso-${n}"`));
         assert.match(readFileSync(testo, 'utf8'), new RegExp(`caso-${n}`));
       }
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('--watch a gruppi si rifiuta con la ragione, invece di fermarsi al primo gruppo per sempre', () => {
@@ -412,7 +413,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       const r = lanciaSu(casa, ['--watch'], { FILO_UNIT_TETTO_RIGA: '1' });
       assert.equal(r.status, 1);
       assert.match(r.stderr, /--watch/);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('copertura e rapporti su file a gruppi si dichiarano nel riepilogo; il rosso senza test rimanda anche al file', () => {
@@ -450,7 +451,7 @@ describe('un file trovato è un file che gira', () => {
         assert.notEqual(r.status, 0, `il file con le quadre non è girato: ${JSON.stringify(extra)}`);
         assert.match(r.stdout, /rosso-nel-nome-strano/);
       }
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('un nome con graffe che node espanderebbe ferma la corsa e lo nomina, mai un verde senza quel file', () => {
@@ -462,15 +463,19 @@ describe('un file trovato è un file che gira', () => {
       const r = lanciaSu(casa);
       assert.equal(r.status, 1);
       assert.match(r.stderr, /a\{b,c\}\.test\.mjs/);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 });
 
-// Un file appeso (col disco pieno, #717) teneva ferma la corsa per sempre, senza dire quale fosse.
-test('ogni corsa ha un tetto di tempo per file, largo, a meno che chi lancia non ne dia uno suo', () => {
-  assert.ok(TETTO_FILE_MS >= 10 * 60 * 1000, 'un tetto stretto fa rossi sui Windows lenti');
-  assert.deepEqual(conTettoDiTempo(['--test-only']), [`--test-timeout=${TETTO_FILE_MS}`, '--test-only']);
-  assert.deepEqual(conTettoDiTempo([]), [`--test-timeout=${TETTO_FILE_MS}`]);
+// Un file appeso (col disco pieno, #717) teneva ferma la corsa per sempre, senza dire quale fosse. Il tetto conta il tempo
+// senza avanzamenti: uno sulla durata del file tagliava i file sani della macchina carica (#1063).
+test('il tetto conta il tempo fermo, è largo, e quello di node resta solo dove l\'avanzamento non si vede', () => {
+  assert.ok(TETTO_FERMO_MS >= 10 * 60 * 1000, 'un tetto stretto fa rossi sui Windows lenti');
+  const conGuardia = flagsConAvanzamento([], 'A');
+  assert.ok(!conGuardia.some((a) => a.startsWith('--test-timeout')), 'con la guardia node non deve contare la durata del file');
+  assert.deepEqual(conGuardia.slice(-2), ['--test-reporter=./scripts/lib/avanzamento-unit.mjs', '--test-reporter-destination=A']);
+  assert.equal(flagsConAvanzamento(['--test-reporter=dot', '--test-reporter=tap', '--test-reporter-destination=x'], 'A'), null);
+  assert.deepEqual(conTettoDiTempo(['--test-only']), [`--test-timeout=${TETTO_FERMO_MS}`, '--test-only']);
   assert.deepEqual(conTettoDiTempo(['--test-timeout', '5000']), ['--test-timeout', '5000']);
   assert.deepEqual(conTettoDiTempo(['--test-timeout=5000']), ['--test-timeout=5000']);
 });
@@ -484,6 +489,64 @@ test('worker in parallelo (#1157): ognuno prende la sua parte di CPU, a meno che
   assert.deepEqual(conConcorrenza(['--test-concurrency=2'], 4), ['--test-concurrency=2']);
 });
 
+test('fermo è il primo file partito e non finito: gli altri aspettano lui', () => {
+  const r = [{ via: 'a' }, {}, { via: 'b' }, { via: 'c' }, { fine: 'a' }, {}, { via: 'd' }, { fine: 'c' }];
+  assert.deepEqual(fileInCorso(r), ['b', 'd']);
+  assert.deepEqual(fileInCorso([{}, {}]), []);
+  const t = testoFermo([join(ROOT, 'tests', 'unit', 'b.test.mjs'), join(ROOT, 'tests', 'unit', 'd.test.mjs')], 20 * 60 * 1000, ROOT);
+  assert.match(t, /ROSSO: tests\/unit\/b\.test\.mjs non è andato avanti per 20 minuti/);
+  assert.match(t, /senza esito: tests\/unit\/d\.test\.mjs/);
+  assert.match(testoFermo([], 3000, ROOT), /ROSSO: per 3 secondi non è andato avanti niente/);
+});
+
+test('una copia del lanciatore senza il suo reporter gira lo stesso, col tetto di node', () => {
+  const casa = cartellaTemporanea('filo-copia-lanciatore-');
+  try {
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs']) {
+      mkdirSync(dirname(join(casa, f)), { recursive: true });
+      writeFileSync(join(casa, f), readFileSync(join(ROOT, f)));
+    }
+    mkdirSync(join(casa, 'tests', 'unit'), { recursive: true });
+    writeFileSync(join(casa, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(casa, 'tests', 'unit', 'base.test.mjs'), "import { test } from 'node:test';\ntest('base', () => {});\n");
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    delete env.FILO_UNIT_DIR;
+    const r = spawnSync(process.execPath, [join(casa, 'scripts', 'run-unit-tests.mjs')], { env, cwd: casa, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^ok 1 - base$/m);
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('la guardia conta il tempo fermo dal primo evento: un file lento che avanza non arriva mai al tetto', () => {
+  const lento = guardiaFermo(1000);
+  assert.equal(lento(0, 0), false);
+  assert.equal(lento(0, 50_000), false, 'prima del primo evento node sta ancora partendo');
+  for (let t = 1; t <= 30; t++) assert.equal(lento(t * 10, 50_000 + t * 900), false, 'un evento ogni 900 ms su un tetto di 1000');
+  const appeso = guardiaFermo(1000);
+  assert.equal(appeso(10, 0), false);
+  assert.equal(appeso(10, 999), false);
+  assert.equal(appeso(10, 1000), true);
+});
+
+test('senza il tetto di node, un file appeso dopo le sue prove diventa un rosso col suo nome e la corsa finisce', () => {
+  const dir = cartellaTemporanea('filo-fermo-');
+  try {
+    writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
+    // Un tetto corto qui non fa rossi finti: qualunque cosa sia ferma, l'unico file in corso è quello appeso.
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    assert.match(r.stdout, /ROSSO: .*appeso\.test\.mjs non è andato avanti/);
+    assert.equal(r.status, 1);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
 test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
   const dir = cartellaTemporanea('filo-appeso-');
   try {
@@ -491,11 +554,81 @@ test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
     const env = { ...process.env, FILO_UNIT_DIR: dir };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts', 'run-unit-tests.mjs'), '--test-timeout=1500'],
-      { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: 60_000 });
+      { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
     assert.equal(r.status, 1);
     assert.match(r.stdout, /appeso\.test\.mjs/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
+  }
+});
+
+test('l\'orologio della guardia va alla velocità della macchina: carica quattro volte, un minuto conta un quarto', () => {
+  let lavoro = 10;
+  let ora = 0;
+  const tempo = orologioMacchina({ misura: () => lavoro, ora: () => ora });
+  assert.equal(tempo(), 0);
+  ora = 60_000;
+  assert.equal(tempo(), 60_000, 'a macchina libera conta come l\'orologio');
+  lavoro = 40;
+  ora = 120_000;
+  assert.equal(tempo(), 75_000);
+  lavoro = 10;
+  ora = 180_000;
+  assert.equal(tempo(), 135_000, 'tornata libera, torna a contare per intero');
+});
+
+test('le righe che un test stampa non sono avanzamento: un file appeso che scrive diventa un rosso col suo nome', async () => {
+  const { default: avanzamento } = await import('../../scripts/lib/avanzamento-unit.mjs');
+  async function* eventi() {
+    yield { type: 'test:stdout', data: { message: 'aspetto' } };
+    yield { type: 'test:stderr', data: { message: 'aspetto' } };
+    yield { type: 'test:diagnostic', data: { message: 'aspetto' } };
+    yield { type: 'test:pass', data: { nesting: 1, name: 'x' } };
+  }
+  const righe = [];
+  for await (const r of avanzamento(eventi())) righe.push(r);
+  assert.deepEqual(righe, ['{}\n']);
+
+  const dir = cartellaTemporanea('filo-appeso-che-stampa-');
+  try {
+    writeFileSync(join(dir, 'chiacchiera.test.mjs'), "import { test } from 'node:test';\n"
+      + "test('appeso che stampa', async () => { setInterval(() => console.log('aspetto ancora'), 100); await new Promise(() => {}); });\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    assert.match(r.stdout, /ROSSO: .*chiacchiera\.test\.mjs non è andato avanti/);
+    assert.equal(r.status, 1);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+test('--solo fa girare solo i file dati, con la guardia della corsa intera: un file fermo diventa un rosso col suo nome', () => {
+  const dir = cartellaTemporanea('filo-solo-');
+  try {
+    writeFileSync(join(dir, 'scelto.test.mjs'), "import { test } from 'node:test';\ntest('scelto', () => {});\n");
+    writeFileSync(join(dir, 'altro.test.mjs'), "import { test } from 'node:test';\ntest('altro', () => { throw new Error('non doveva girare'); });\n");
+    writeFileSync(join(dir, 'fermo.test.mjs'), "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const lancia = (...file) => spawnSync(process.execPath, [LANCIATORE, '--solo', ...file], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+
+    const scelto = lancia(join(dir, 'scelto.test.mjs'));
+    assert.equal(scelto.status, 0, scelto.stdout + scelto.stderr);
+    assert.match(scelto.stdout, /^ok 1 - scelto$/m);
+    assert.doesNotMatch(scelto.stdout, /altro|fermo/);
+
+    const fermo = lancia(join(dir, 'fermo.test.mjs'));
+    assert.notEqual(fermo.error?.code, 'ETIMEDOUT', 'la riprova è rimasta appesa');
+    assert.match(fermo.stdout, /ROSSO: .*fermo\.test\.mjs non è andato avanti/);
+    assert.equal(fermo.status, 1);
+
+    const vuoto = lancia();
+    assert.equal(vuoto.status, 1, 'zero file non è un verde');
+    assert.match(vuoto.stderr, /--solo senza file/);
+  } finally {
+    togliCartella(dir);
   }
 });

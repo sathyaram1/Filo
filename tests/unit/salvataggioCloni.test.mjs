@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { clone, git, remoto, runHookAsync, runHookRaw, scene, stdinEdit, togliScene } from '../helpers/scenaHook.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 test.after(togliScene);
 describe('#1157 — si salva solo la cartella di chi ha modificato', () => {
@@ -85,10 +86,10 @@ describe('#1157 — si salva solo la cartella di chi ha modificato', () => {
     const r = runHookRaw(work, stdinEdit(resolve(a, 'lavoro.js'), { session_id: 'sess-1157', transcript_path: transcript, cwd: work }));
     assert.equal(r.status, 0);
     let letto = null;
-    for (let i = 0; i < 240 && !letto; i += 1) {
-      try { letto = JSON.parse(readFileSync(esito, 'utf8')); } catch (_) { await new Promise((ok) => setTimeout(ok, 250)); }
-    }
-    assert.ok(letto, 'il battito del clone non e\' partito');
+    await aspettaChe(() => {
+      try { letto = JSON.parse(readFileSync(esito, 'utf8')); } catch (_) { /* non ancora scritto */ }
+      return letto;
+    }, { cosa: 'il battito del clone non e\' partito', ogniMs: 250 });
     const norm = (p) => resolve(String(p)).toLowerCase();
     assert.equal(norm(letto.cwd), norm(a), 'dalla cartella del clone');
     assert.equal(norm(letto.root), norm(a));

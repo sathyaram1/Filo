@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -128,11 +128,11 @@ test('chi svuota il node_modules del clone da dentro, come npm ci, toglie i coll
     assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
     // npm ci legge le voci di node_modules e le toglie una per una, ricorsivamente.
     const nm = resolve(dest, 'node_modules');
-    for (const voce of readdirSync(nm)) rmSync(resolve(nm, voce), { recursive: true, force: true });
+    for (const voce of readdirSync(nm)) assert.ok(togliCartella(resolve(nm, voce)));
     assert.ok(existsSync(s.canarino), 'il principale ha ancora i suoi pacchetti');
 
     // Un clone nato col collegamento intero si riallinea voce per voce.
-    rmSync(nm, { recursive: true, force: true });
+    assert.ok(togliCartella(nm));
     symlinkSync(resolve(s.principale, 'node_modules'), nm, process.platform === 'win32' ? 'junction' : 'dir');
     assert.equal(allineaPacchetti(dest, s.principale, { npmCi: npmMai }).pacchetti, 'collegati');
     assert.ok(collegato(dest));
