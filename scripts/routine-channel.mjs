@@ -1183,7 +1183,10 @@ if (isMain) {
       let primoGuastoMs = 0;
       for (;;) {
         const r = await heartbeat(biglietto);
-        if (r.ok) { primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue; }
+        if (r.ok) {
+          for (const a of r.avvisi) console.error(`misura scartata dal server (${a.campo}: ${a.reason}): ${a.detail || ''}`);
+          primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue;
+        }
         if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
         const ora = Date.now();
         if (!primoGuastoMs) primoGuastoMs = ora;
