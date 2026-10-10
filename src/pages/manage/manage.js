@@ -2327,6 +2327,47 @@
     }
   }
 
+  // Domande e le tre schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-…).
+  const DOMANDE_LABELS = { domande: 'Da rispondere', 'domande-lavoro': 'In lavorazione', 'domande-archivio': 'Archivio' };
+  function updateSezioniCounts() {
+    if (!mgSezioni) return;
+    const scrivi = (sez, testo, titolo) => {
+      const b = mgSezioni.querySelector(`.mg-sezione[data-sezione="${sez}"]`);
+      const c = b && b.querySelector('.mg-sezione-count');
+      if (!c) return null;
+      c.textContent = testo;
+      if (titolo) b.title = titolo; else b.removeAttribute('title');
+      return b;
+    };
+    const d = DOMANDE ? DOMANDE.stato() : null;
+    const nd = d && d.lette ? MR.contaDomande(d.domande) : null;
+    const bd = scrivi('domande', nd ? `(${nd.domande})` : '', nd ? `${nd.domande} da rispondere` : '');
+    if (bd) bd.classList.toggle('mg-sezione--urgente', !!(nd && MR.bloccanteAperta(d.domande)));
+    for (const tab of DOMANDE_TABS) {
+      const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
+      if (!btn) continue;
+      btn.textContent = nd ? `${DOMANDE_LABELS[tab]} ` : DOMANDE_LABELS[tab];
+      if (!nd) continue;
+      const badge = document.createElement('span');
+      badge.className = 'mg-tab-count';
+      badge.textContent = `(${nd[tab]})`;
+      btn.appendChild(badge);
+    }
+
+    // Feedback = i Ricevuti a filtro spento: il filtro è una vista della scheda, non della sezione.
+    const leggibili = dataLoaded && sezioniAttendibili();
+    const ricevuti = leggibili ? MR.listForManageTab(allFeedbacks, 'inbox', { releasedVersion, fusioni }).length : null;
+    const bf = scrivi('feedback', ricevuti === null ? '' : countText(ricevuti),
+      ricevuti === null ? '' : `${ricevuti} nei Ricevuti${loadHitCap() ? ` · ${FB.COUNT_INCOMPLETE_HINT}` : ''}`);
+    if (bf) bf.classList.toggle('mg-sezione--arrivi', sezioneAttiva !== 'feedback'
+      && allFeedbacks.some((fb) => arrivate.has(String(fb._id))));
+
+    // Routine: le fusioni senza segnalazione che aspettano il via libera in Automazioni. Zero non si scrive:
+    // la sezione non è vuota, contiene le automazioni.
+    const orfane = fusioniOk && dataLoaded ? fusioniOrfane().filter((r) => !r.used).length : 0;
+    scrivi('routine', orfane ? `(${orfane})` : '', orfane ? `${orfane} fusioni aspettano il tuo via libera in Automazioni` : '');
+  }
+
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
