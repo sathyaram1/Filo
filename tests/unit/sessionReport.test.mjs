@@ -529,7 +529,7 @@ const PRINCIPALE = [
   fine('ag2', H('11:00:00')),
   // il worker 2 è morto: rilascia l'orchestratore, e quel turno sta nel rapporto di allora
   orch('o5', H('11:00:30'), { cw: 34000, tool: { type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release abc --role orchestrator' } } }),
-  fine('b1', H('11:01:00')),
+  fine('b1', H('11:01:00'), RILASCIATO),
   orch('o6', H('11:02:00'), { cr: 34000, cw: 1000 }),
   orch('o7', H('11:03:00'), { cr: 35000, tool: { type: 'tool_use', id: 'ag3', name: 'Agent', input: {} } }),
 ];
@@ -546,6 +546,29 @@ test('finestra dell\'orchestratore: dal rilascio (o dalla fine del worker) di pr
   const secondo = finestraOrchestratore(PRINCIPALE.slice(0, 5));
   assert.deepEqual(secondo.righe.map((l) => JSON.parse(l).message.id).filter(Boolean), ['o3', 'o4']);
   assert.equal(secondo.attesaPrimaS, 1750);
+});
+
+test('il rilascio dell\'orchestratore chiude la finestra per ciò che stampa, comunque sia scritto il comando', async () => {
+  const ids = (righe) => finestraOrchestratore(righe).righe.map((l) => JSON.parse(l).message.id).filter(Boolean);
+  const conComando = (command, testo) => PRINCIPALE.map((l) => {
+    const e = JSON.parse(l);
+    if (e.message && e.message.id === 'o5') e.message.content[0].input.command = command;
+    if (e.type === 'user' && e.message.content[0].tool_use_id === 'b1') e.message.content[0].content = testo;
+    return JSON.stringify(e);
+  });
+  // In cloud il preflight consegna gli strumenti col percorso intero fra virgolette (#1116, giro 4).
+  const cloud = 'node "/tmp/filo-tools/scripts/routine-channel.mjs" release abc --role orchestrator';
+  assert.deepEqual(ids(conComando(cloud, RILASCIATO)), ['o6', 'o7']);
+  assert.deepEqual(ids(conComando(`FILO_ROUTINE=1 ${cloud}`, [{ type: 'text', text: 'OK: biglietto rilasciato, guasto dichiarato.' }])), ['o6', 'o7']);
+  // Un rilascio respinto non ha portato il rapporto al server: quei turni restano del worker dopo.
+  assert.deepEqual(ids(conComando(cloud, 'rilascio non riuscito (dead_ticket)')), ['o5', 'o6', 'o7']);
+  // Il testo riconosciuto è quello che il canale stampa davvero.
+  const { readFileSync } = await import('node:fs');
+  const canale = readFileSync(new URL('../../scripts/routine-channel.mjs', import.meta.url), 'utf8');
+  const stampati = [...canale.matchAll(/'(OK: biglietto rilasciato[^']*)'/g)].map((m) => m[1]);
+  assert.equal(stampati.length, 2);
+  for (const s of stampati) assert.ok(rilascioRiuscito(`push saltato\n${s}`), s);
+  assert.equal(rilascioRiuscito('il comando stampa «OK: biglietto rilasciato.»'), false);
 });
 
 test('il rapporto del worker porta a parte i turni dell\'orchestratore, e la cache riscaldata', async () => {
