@@ -22,6 +22,17 @@ test('dai log: i file rossi di Playwright e degli unit, senza doppioni', () => {
   assert.deepEqual(estraiRossi(log), ['tests/menu.spec.mjs', 'tests/unit/branchIntegrity.test.mjs']);
 });
 
+test('dai log: il TAP di node --test fuori da un terminale (com\'era nella prova a secco)', () => {
+  const tap = [
+    'not ok 26 - tests\\\\unit\\\\autoCommitGate.test.mjs',
+    'ok 27 - verde',
+    'not ok 3673 - due invocazioni con lo stesso biglietto accendono UN battito solo',
+    '    not ok 2 - un sotto-test, gia\' contato dal suo padre',
+    'not ok 3680 - saltato # SKIP',
+  ].join('\n');
+  assert.deepEqual(estraiRossi(tap), ['due invocazioni con lo stesso biglietto accendono UN battito solo', 'saltato', 'tests/unit/autoCommitGate.test.mjs']);
+});
+
 test('dai log: le famiglie dei guasti d\'infrastruttura', () => {
   assert.deepEqual(erroriInfrastruttura('xvfb-run: error: Xvfb failed to start\nlisten EADDRINUSE: :::8089'), ['xvfb', 'porta']);
   assert.deepEqual(erroriInfrastruttura("fatal: Unable to create '/x/.git/index.lock': File exists."), ['lock']);
