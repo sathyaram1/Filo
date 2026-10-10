@@ -73,10 +73,11 @@ test('le schede spostate caricano anche aperte dalla sezione, non solo dal loro 
   await expect.poll(() => chiamate(page)).toContain('merge_approvals_get');
 
   await page.evaluate(() => { window.__chiamate.length = 0; });
-  await page.locator('.mg-sezione[data-sezione="feedback"]').click();
-  await page.locator('.mg-sezione[data-sezione="routine"]').click();
   await page.locator('.mg-tab[data-tab="log"]').click();
+  await expect.poll(() => chiamate(page)).toContain(MSG.WORKER_LOG_GET || 'worker_log_get');
   await page.locator('.mg-sezione[data-sezione="feedback"]').click();
+  // La lettura del log in volo ignora una seconda richiesta: si aspetta che finisca.
+  await page.waitForTimeout(500);
   await page.evaluate(() => { window.__chiamate.length = 0; });
   // La sezione riapre il Log, e il Log si rilegge come a ogni sua apertura.
   await page.locator('.mg-sezione[data-sezione="routine"]').click();
