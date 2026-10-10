@@ -1,5 +1,5 @@
-// Scena delle prove degli hook coi clone dei worker (#1157): repo isolato con finto origin e la copia degli hook veri,
-// clone dello stesso origin, lancio dell'hook con lo stdin di Claude Code. Le cartelle si tolgono con togliScene().
+// Scena delle prove degli hook di salvataggio e della guardia: repo isolato con finto origin e la copia degli hook veri,
+// clone dello stesso origin (#1157), lancio dell'hook con lo stdin di Claude Code. Le cartelle si tolgono con togliScene().
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
