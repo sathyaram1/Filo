@@ -680,23 +680,17 @@ export function finestraOrchestratore(linee) {
       }
     }
   }
-  // La notifica arriva in più forme (messaggio, allegato, coda): vale la prima
-  // dopo il lancio. Si riconosce dal tool-use-id o dal task-id (l'agentId del
-  // lancio); una senza nessuno dei due chiude il worker in sottofondo più vecchio.
+  // Un worker in sottofondo finisce solo con la prima notifica dopo il lancio che lo NOMINA (tool-use-id della
+  // chiamata o task-id = agentId del lancio): un Monitor, un comando, un artefatto o un testo che ne parla non lo chiudono.
   const aperta = (c, ms) => c.inizio <= ms && !(c.fine <= ms);
-  for (const { l, ms } of voci) {
-    if (!Number.isFinite(ms) || !l.includes('task-notification')) continue;
-    const ids = [...l.matchAll(/<tool-use-id>([^<\\]+)<\/tool-use-id>/g)].map((m) => m[1]);
-    const task = [...l.matchAll(/<task-id>([^<\\]+)<\/task-id>/g)].map((m) => m[1]);
-    let chiuse = 0;
+  for (const { e, ms } of voci) {
+    const testa = Number.isFinite(ms) ? testaNotifica(e) : '';
+    if (!testa) continue;
+    const ids = [...testa.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)].map((m) => m[1].trim());
+    const task = [...testa.matchAll(/<task-id>([^<]+)<\/task-id>/g)].map((m) => m[1].trim());
     for (const [id, c] of chiamate) {
-      if (!aperta(c, ms) || !(ids.includes(id) || (c.agentId && task.includes(c.agentId)))) continue;
-      c.fine = ms;
-      chiuse += 1;
+      if (aperta(c, ms) && (ids.includes(id) || (c.agentId && task.includes(c.agentId)))) c.fine = ms;
     }
-    if (chiuse || ids.length) continue;
-    const vecchia = [...chiamate.values()].filter((c) => c.sottofondo && aperta(c, ms)).sort((a, b) => a.inizio - b.inizio)[0];
-    if (vecchia) vecchia.fine = ms;
   }
   // La finestra arriva fino a adesso: in primo piano dopo la chiamata aperta
   // non c'è niente, in sottofondo i turni d'attesa dopo il lancio sono suoi.
