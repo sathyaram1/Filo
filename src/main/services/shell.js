@@ -509,12 +509,7 @@ function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS
       const env = probeEnv ? { ...process.env, ...probeEnv } : undefined;
       proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve(false); return; }
-    // Timeout difensivo: un resolver che si impalla non deve restare appeso.
-    // Largo di proposito (10s): qui un falso negativo è il danno vero — un
-    // comando valido colorato di rosso — mentre una risposta lenta è solo
-    // lenta. Sotto carico (antivirus su node_modules fresco, suite di test in
-    // parallelo) anche `where.exe` può metterci secondi.
-    const timer = setTimeout(() => finish(false), 10000);
+    const timer = setTimeout(() => finish(false), attesaMs);
     proc.on('error', () => { clearTimeout(timer); finish(false); });
     proc.on('exit', (code) => { clearTimeout(timer); finish(code === 0); });
   });
