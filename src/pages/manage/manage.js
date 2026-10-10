@@ -161,11 +161,9 @@
 
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
-  const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
-  const mgPreapproveRevokeBtn = document.getElementById('mgPreapproveRevokeBtn');
-  const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
+  const mgFiduciaBtn = document.getElementById('mgFiduciaBtn');
+  const mgFiduciaInfo = document.getElementById('mgFiduciaInfo');
   const mgLocalBtn   = document.getElementById('mgLocalBtn');
-  const mgSenderBtn  = document.getElementById('mgSenderBtn');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
@@ -1196,6 +1194,7 @@
   // una sezione vuota che non spiega perché è peggio di nessuna sezione.
   const ROUTINE_LOG_GET = (window.SN_MSG?.MSG?.ROUTINE_LOG_GET) || 'routine_log_get';
   const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
+  const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
@@ -1315,16 +1314,12 @@
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
   let fusioniLette = false;
-  // Una richiesta si manda a fondere UNA volta per segno: un rifiuto o un
-  // conflitto non si ritentano da soli a ogni rilettura. id → { fb, segno }.
-  const fusioniTentate = new Map();
   // L'esito di quel tentativo, per richiesta: il riquadro in basso e la riga
   // del dettaglio sono un posto solo, e chi arriva dopo cancella chi c'era.
   const esitiTentati = new Map();
   // Al più un'approvazione in volo per richiesta: tasto, segno e segno da fuori aspettano la
   // stessa, e una card disegnata nel frattempo la mostra coi tasti spenti (#702).
   const approvazioniInVolo = new Map();
-  const ATTESA_SEGNO = { kind: 'wait', text: 'Pratica segnata «fondi senza chiedermelo»: chiedo al server di fondere…' };
   const IN_VOLO = { kind: 'wait', text: 'Fusione già in corso: il server ci sta lavorando…' };
   function approvaUnaVolta(req, attesa) {
     const gia = approvazioniInVolo.get(req.id);
@@ -1421,97 +1416,6 @@
     else fn();
   }
 
-  // Il segno «fondi senza chiedermelo» messo DOPO il blocco: il server la
-  // richiesta l'ha già aperta e non la riguarda, quindi la fonde questa pagina,
-  // con lo stesso gesto e lo stesso esito del tasto «Approva e fondi».
-  async function fondiCoperte(fb, opts) {
-    const UI = window.SN_MERGE_APPROVALS;
-    if (!UI || !fb || !isAdmin) return [];
-    // Decide la pratica com'è ADESSO: chi chiama può tenere una copia presa prima di
-    // un'attesa, e un segno tolto o rimesso intanto vale per quello che è (#701).
-    fb = allFeedbacks.find((f) => f._id === fb._id) || fb;
-    if (!segnoCheFonde(fb)) return [];
-    dimenticaTentativiSuperati();
-    const coperte = UI.richiesteCoperte(fusioni.pending, {
-      feedbackId: fb._id,
-      numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
-      ancheNuovi: !!(opts && opts.ancheNuovi),
-    }).filter((req) => !fusioniTentate.has(req.id) && daDecidere(req));
-    // Una già in viaggio non riparte: la rilettura dopo l'esito la ritenta se il segno è cambiato (#701).
-    const occupate = coperte.filter((req) => approvazioniInVolo.has(req.id));
-    const daFondere = coperte.filter((req) => !approvazioniInVolo.has(req.id));
-    if (daFondere.length && opts && typeof opts.avvia === 'function') opts.avvia(daFondere.length);
-    const esiti = opts && opts.ancheInVolo ? occupate.map((req) => ({
-      req,
-      msg: IN_VOLO,
-      attesa: approvazioniInVolo.get(req.id).risposta,
-    })) : [];
-    for (const req of daFondere) {
-      fusioniTentate.set(req.id, { fb: fb._id, segno: segnoCheFonde(fb) });
-      const risposta = approvaUnaVolta(req, ATTESA_SEGNO);
-      if (livelloAperto === 'l5') ridisegnaPannelloAperto();
-      const reply = await risposta;
-      const msg = UI.outcomeMessage(reply, req);
-      esitiTentati.set(req.id, msg);
-      esiti.push({ req, msg });
-    }
-    if (daFondere.length) setTimeout(loadMergeApprovals, 1200);
-    return esiti;
-  }
-
-  // Il segno che può fondere, come chiave: '' se non c'è, o se la pratica è chiusa.
-  function segnoCheFonde(fb) {
-    const UI = window.SN_MERGE_APPROVALS;
-    if (!UI || !preapprovatoPieno(fb) || !isOpenPublic(fb)) return '';
-    return UI.chiaveSegno(preapprovedOf(fb));
-  }
-
-  // Un tentativo vale per il segno che l'ha fatto partire: visto sparire o
-  // cambiare, da qui, dallo script o da un'altra finestra, il segno dopo è una
-  // decisione nuova e ritenta (#701). Una pratica che manca dalla lista non dice niente.
-  function dimenticaTentativiSuperati() {
-    for (const [id, t] of Array.from(fusioniTentate)) {
-      const fb = allFeedbacks.find((f) => f._id === t.fb);
-      if (fb && segnoCheFonde(fb) !== t.segno) fusioniTentate.delete(id);
-    }
-  }
-
-  // Le richieste ferme sulle pratiche già segnate si fondono appena la pagina
-  // vede le due cose insieme: segno e richiesta arrivano da due letture
-  // diverse, in un ordine qualunque.
-  let fusioniInCorso = false;
-  async function fondiPreapprovateInAttesa() {
-    // Prima della guardia: un segno tolto mentre una fusione è in volo va visto lo stesso.
-    if (dataLoaded) dimenticaTentativiSuperati();
-    if (fusioniInCorso || !isAdmin || !dataLoaded) return;
-    fusioniInCorso = true;
-    const righe = [];
-    try {
-      for (const fb of allFeedbacks.slice()) {
-        // Il segno da approvazione non basta: una richiesta ferma lì è nata da
-        // blocchi nuovi, che l'owner deve guardare.
-        if (!preapprovatoPieno(fb) || !isOpenPublic(fb)) continue;
-        for (const { req, msg } of await fondiCoperte(fb)) {
-          const num = window.SN_MERGE_APPROVALS.feedbackNum(req);
-          const dove = num ? ` su #${num}` : '';
-          righe.push({ testo: `Fusione ferma${dove}, pratica segnata «fondi senza chiedermelo»: ${msg.text}`, kind: msg.kind });
-        }
-      }
-    } finally {
-      fusioniInCorso = false;
-    }
-    if (!righe.length) return;
-    // Gli esiti del giro si dicono TUTTI INSIEME: il riquadro è uno solo, e uno
-    // alla volta il secondo cancella il primo prima che si possa leggere.
-    // Questa parte da sola, di solito senza nessuna pratica aperta: la riga del
-    // dettaglio lì non è sullo schermo, e un ramo fermo resterebbe fermo senza
-    // che nessuno sappia perché.
-    const testo = righe.map((r) => r.testo).join('\n');
-    const kind = righe.every((r) => r.kind === 'ok') ? 'ok' : 'err';
-    setManageMsg(testo, kind);
-    toast(testo, kind, 4500 + (righe.length - 1) * 2500);
-  }
-
   // Le richieste ferme che NON hanno una scheda in questa lista. Finché i
   // feedback non sono arrivati la lista è vuota e ci finiscono tutte: meglio
   // mostrarle due volte per un istante che perderne una.
@@ -1573,11 +1477,9 @@
     // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
     // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
     riflettiFusioni();
-    fondiPreapprovateInAttesa();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
-    // Le fuse senza chiedere: il controllo a posteriori del segno messo sulla
-    // pratica. Quando il main avvisa di un cambiamento manda solo l'elenco in
-    // attesa: quello che c'era resta finché non si rilegge.
+    // Le fuse senza chiedere: il controllo a posteriori del lavoro fidato e dei rami di prima. Quando il main avvisa
+    // di un cambiamento manda solo l'elenco in attesa: quello che c'era resta finché non si rilegge.
     if (mgMergeApprovalsPreapproved && (Array.isArray(r.preapproved) || !already)) {
       UI.renderPreapproved(mgMergeApprovalsPreapproved, {
         preapproved: r.preapproved || [],
@@ -2048,8 +1950,8 @@
     if (lavoroLocale) {
       voci.push({ testo: '💻 Approva come lavoro locale', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
     }
-    if (isAdmin && MR.mittenteDaRiconoscere(fb)) {
-      voci.push({ testo: '🙋 È mio', titolo: titoloEMio(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); setSenderProof(fb._id); } });
+    if (isAdmin && MR.fiduciaCheck(fb).ok) {
+      voci.push({ testo: '🤝 Segna fidato', titolo: titoloFiducia(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); segnaFidato(fb._id); } });
     }
     if (num) {
       voci.push({
@@ -2399,7 +2301,6 @@
         <span class="mg-item-title">${esc(title)}</span>
         ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
-        ${preapprovedHtml(fb)}
         ${localBadgeHtml(fb)}
         ${priorityDotsHtml(fb)}
       `;
@@ -2434,38 +2335,6 @@
     const label = MR.publicStateLabel(fb);
     if (!label) return '';
     return `<span class="mg-state" title="${esc(`Stato: ${label} — ${MR.PUBLIC_STATE_HINT}`)}">${esc(label)}</span>`;
-  }
-
-  // ── «Fondi senza chiedermelo» ─────────────────────────────────────────────
-  // Il segno sulla pratica: `mergePreapproved { by, at }`, in chiaro. Conta
-  // solo finché la pratica è aperta (a pratica chiusa il server non lo guarda,
-  // e qui non si mostra: sarebbe un'informazione su niente).
-  // Due specie di segno (SN_MERGE_APPROVALS.segnoPreapprovazione): quello a mano
-  // copre tutto, quello nato da un sì a una richiesta solo i blocchi già approvati.
-  function preapprovedOf(fb) {
-    const m = fb && fb.mergePreapproved;
-    if (!m || typeof m !== 'object' || !String(m.by || '').trim()) return null;
-    const UI = window.SN_MERGE_APPROVALS;
-    if (UI && UI.segnoPreapprovazione) return UI.segnoPreapprovazione(m);
-    return { tipo: 'pieno', by: String(m.by || ''), at: String(m.at || '') };
-  }
-  function preapprovatoPieno(fb) {
-    const m = preapprovedOf(fb);
-    return !!(m && m.tipo === 'pieno');
-  }
-  function isOpenPublic(fb) {
-    return String((fb && fb.statusPublic) || 'open') !== 'closed';
-  }
-  // Un lavoro locale provato si fonde comunque senza chiedere: lì il segno dorme, e resta nel dato
-  // per quando la pratica torna alle routine.
-  function preapprovedHtml(fb) {
-    const m = preapprovedOf(fb);
-    if (!m || !isOpenPublic(fb) || MR.isProvenLocalWork(fb)) return '';
-    const UI = window.SN_MERGE_APPROVALS;
-    const t = (UI && UI.segnoTesti) ? UI.segnoTesti(m)
-      : { etichetta: 'senza chiedere', titolo: `Si fonde senza chiedere: segno messo da ${m.by}` };
-    const cls = m.tipo === 'approvazione' ? 'mg-preapproved mg-preapproved--blocchi' : 'mg-preapproved';
-    return `<span class="${cls}" title="${esc(t.titolo)}">${esc(t.etichetta)}</span>`;
   }
 
   // Nei Lavori locali il segno lo dice la sezione; altrove (una pratica che aspetta
@@ -3158,9 +3027,8 @@
     mgStarBtn.setAttribute('aria-pressed', starred ? 'true' : 'false');
     mgStarBtn.textContent = starred ? '★ Preferito' : '☆ Preferito';
     mgStarBtn.title = starred ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
-    reflectPreapproved(fb);
     reflectLocal(fb);
-    reflectSender(fb);
+    reflectFiducia(fb);
   }
 
   // ── «Solo in locale» (#908) ───────────────────────────────────────────────
@@ -3171,7 +3039,7 @@
   }
   // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
   const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';
-  // Stesso avviso di «È mio»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
+  // Stesso avviso di «Segna fidato»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
   function titoloLavoroLocale(fb) {
     const c = MR.localApprovalCheck(fb, { releasedVersion, fusioni });
     return c.segnalato ? `${TITOLO_LAVORO_LOCALE} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_LAVORO_LOCALE;
@@ -3202,42 +3070,52 @@
         : `Adesso non si può: ${perche.motivo}.`);
   }
 
-  // ── «È mio» (#908) ────────────────────────────────────────────────────────
-  // Un prefisso dell'owner o di una sessione senza prova vale come un utente: solo l'owner può dire che è suo.
-  const TITOLO_E_MIO = 'L’hai aperto tu o una tua sessione: gli dai la prova del mittente, e da qui vale come tuo (anche per il lavoro locale).';
-  // Lo stesso giudizio che ferma il lettore delle sessioni, su ogni strada: un falso con quel prefisso avrebbe questa forma.
-  function titoloEMio(fb) {
-    const segnalato = MR.segnalatoComeAttacco({ status: MR.normalizeStatus(fb).status, pipeline: fb.pipeline });
-    return segnalato ? `${TITOLO_E_MIO} Attenzione: ${segnalato}, guardalo prima.` : TITOLO_E_MIO;
+  // ── «Segna fidato» (#1148) ────────────────────────────────────────────────
+  // Al posto di «Fondi senza chiedermelo» e di «È mio»: vale PRIMA del lavoro. Lo scrive il server, mai la pagina;
+  // non pulisce un ramo né le note già scritte da una sessione sporca (SPEC-DOMANDE.md §1.5).
+  const TITOLO_FIDUCIA = 'L’hai letto e ti fidi: i giudici non servono più, il lavoro passa davanti a pari priorità, e un lavoro scritto solo da sessioni pulite si fonde senza chiederti il via libera.';
+  function titoloFiducia(fb) {
+    const c = MR.fiduciaCheck(fb);
+    return c.segnalato ? `${TITOLO_FIDUCIA} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_FIDUCIA;
   }
-  function reflectSender(fb) {
-    if (!mgSenderBtn) return;
-    mgSenderBtn.hidden = !isAdmin || !MR.mittenteDaRiconoscere(fb);
-    mgSenderBtn.disabled = false;
-    mgSenderBtn.title = titoloEMio(fb);
-  }
-  async function setSenderProof(id) {
-    const fb = allFeedbacks.find((f) => f._id === id);
-    if (!fb || !MR.mittenteDaRiconoscere(fb)) return;
-    const num = FB.formatNum(fb.seq, fb.subSeq);
-    const chi = num ? ` (#${num})` : '';
-    if (selectedId === id && mgSenderBtn) mgSenderBtn.disabled = true;
-    setManageMsg('Gli do la prova del mittente…', '');
-    try {
-      const r = await sendToMain({ type: 'feedback_update', id, senderProof: 'admin' });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      fb.senderProof = 'admin';
-      if (selectedId === id) openDetail(id);
-      renderList();
-      setManageMsg(`Da ora${chi} vale come tuo.`, 'ok');
-    } catch (e) {
-      setManageMsg(`Prova non data${chi}: ${e.message || 'Errore'}`, 'err');
-    } finally {
-      if (mgSenderBtn) mgSenderBtn.disabled = false;
+  function reflectFiducia(fb) {
+    const c = MR.fiduciaCheck(fb);
+    if (mgFiduciaBtn) {
+      mgFiduciaBtn.hidden = !isAdmin || !c.ok;
+      mgFiduciaBtn.disabled = false;
+      mgFiduciaBtn.title = titoloFiducia(fb);
+    }
+    if (mgFiduciaInfo) {
+      const riga = isAdmin ? MR.fiduciaText(fb) : '';
+      mgFiduciaInfo.hidden = !riga;
+      mgFiduciaInfo.textContent = riga;
     }
   }
-  if (mgSenderBtn) {
-    mgSenderBtn.addEventListener('click', () => { if (selectedId) setSenderProof(selectedId); });
+  async function segnaFidato(id) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb || !MR.fiduciaCheck(fb).ok) return;
+    const num = FB.formatNum(fb.seq, fb.subSeq);
+    const chi = num ? ` (#${num})` : '';
+    if (selectedId === id && mgFiduciaBtn) mgFiduciaBtn.disabled = true;
+    setManageMsg('Lo segno fidato…', '');
+    try {
+      const r = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non l’ha segnato');
+      // Il server l'ha scritto: la rilettura porterà lo stesso valore, intanto la pagina lo dice subito.
+      const ora = allFeedbacks.find((f) => f._id === id) || fb;
+      ora.fiducia = 'fidato';
+      ora.fiduciaDa = { by: 'owner', at: Date.now() };
+      if (selectedId === id) reflectManage(ora);
+      renderList();
+      setManageMsg(`Da ora${chi} è fidato.`, 'ok');
+    } catch (e) {
+      setManageMsg(`Non segnato fidato${chi}: ${e.message || 'Errore'}`, 'err');
+    } finally {
+      if (mgFiduciaBtn) mgFiduciaBtn.disabled = false;
+    }
+  }
+  if (mgFiduciaBtn) {
+    mgFiduciaBtn.addEventListener('click', () => { if (selectedId) segnaFidato(selectedId); });
   }
 
   async function setLocalSign(id, valore) {
@@ -3253,7 +3131,7 @@
       const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
-      if (selectedId === id) { reflectLocal(fb); reflectPreapproved(fb); }
+      if (selectedId === id) reflectLocal(fb);
       renderList();
       const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
       const fatto = !valore
@@ -3274,109 +3152,6 @@
     });
   }
 
-  // Il tasto «Fondi senza chiedermelo» e la riga che dice chi ha messo il
-  // segno. Sulle pratiche chiuse il tasto sparisce: il segno lì non conta.
-  function reflectPreapproved(fb) {
-    if (!mgPreapproveBtn) return;
-    const segno = preapprovedOf(fb);
-    // L'interruttore è acceso solo col segno pieno: quello da approvazione non
-    // fonde i blocchi nuovi, e un clic lo fa diventare pieno.
-    const m = segno && segno.tipo === 'pieno' ? segno : null;
-    const aperta = isOpenPublic(fb) && !MR.praticaChiusa(fb, { releasedVersion, fusioni });
-    const locale = MR.isProvenLocalWork(fb);
-    mgPreapproveBtn.disabled = false;
-    mgPreapproveBtn.hidden = !aperta || locale;
-    // Il nome resta fermo (acceso = aria-pressed): cambiando, spostava i tasti accanto sotto il secondo clic.
-    mgPreapproveBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
-    mgPreapproveBtn.title = m
-      ? 'Acceso: il lavoro delle automazioni su questa pratica si fonde da solo anche se i controlli lo fermano. Un clic lo spegne, e torni a ricevere la richiesta da approvare.'
-      : 'Fondi senza chiedermelo: se i controlli di sicurezza fermano il lavoro delle automazioni su questa pratica, il server fonde lo stesso, senza aspettare il tuo click. Quello che era stato fermato lo trovi poi in Automazioni.';
-    // Il segno nato da un «Approva» si toglie da qui: con l'interruttore passerebbe prima per il pieno,
-    // che fonde subito la richiesta ferma.
-    if (mgPreapproveRevokeBtn) {
-      mgPreapproveRevokeBtn.disabled = false;
-      mgPreapproveRevokeBtn.hidden = !(aperta && !locale && segno && segno.tipo === 'approvazione');
-      mgPreapproveRevokeBtn.title = 'Chiedimi prima di fondere: toglie il sì dato col clic, e da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
-    }
-    if (mgPreapprovedInfo) {
-      const UI = window.SN_MERGE_APPROVALS;
-      mgPreapprovedInfo.hidden = !((segno || locale) && aperta);
-      mgPreapprovedInfo.textContent = !((segno || locale) && aperta) ? ''
-        : locale ? 'Lavoro locale: alla chiusura si fonde senza chiedere, i blocchi restano registrati in Automazioni.'
-          : m ? `Si fonde senza chiedere: segno messo da ${m.by}${m.at ? ` il ${formatDateTime(m.at)}` : ''}.`
-            : UI.segnoTesti(segno).riga;
-    }
-  }
-
-  // Mette o toglie il segno. Il CHI lo scrive il main dalla sessione: da qui
-  // parte solo sì/no.
-  async function togglePreapproved(forza) {
-    if (!selectedId || !mgPreapproveBtn) return;
-    const id = selectedId;
-    const fb = allFeedbacks.find((f) => f._id === id);
-    if (!fb) return;
-    const UI = window.SN_MERGE_APPROVALS;
-    const next = typeof forza === 'boolean' ? forza
-      : (UI && UI.segnoAlClic ? UI.segnoAlClic(preapprovedOf(fb)) : !preapprovedOf(fb));
-    mgPreapproveBtn.disabled = true;
-    if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.disabled = true;
-    setManageMsg(next ? 'Segno la pratica…' : 'Tolgo il segno…', '');
-    try {
-      const r = await sendToMain({ type: 'feedback_update', id, mergePreapproved: next });
-      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      // Chi e quando come li ha scritti il main: tornato dal server il segno
-      // dev'essere lo stesso, o la fusione ferma si ritenterebbe da sola.
-      fb.mergePreapproved = next ? { by: (r && r.by) || 'te', at: (r && r.at) || new Date().toISOString() } : undefined;
-      // Una rilettura arrivata durante l'attesa ha sostituito la pratica: il segno va su quella che conta.
-      const ora = allFeedbacks.find((f) => f._id === id);
-      if (ora && ora !== fb) ora.mergePreapproved = fb.mergePreapproved;
-      if (selectedId !== id) { renderList(); return; }
-      reflectPreapproved(fb);
-      renderList();
-      let testo = next ? 'Da ora si fonde senza chiedere.' : 'Da ora ti chiede prima di fondere.';
-      let kind = 'ok';
-      if (next) {
-        // Il segno messo con una richiesta già ferma davanti: si fonde adesso,
-        // anche quella aperta per i soli blocchi nuovi, che l'owner ha sotto gli occhi.
-        const avvia = () => setManageMsg(testo + ' Chiedo al server di fondere la richiesta ferma…', '');
-        const esiti = await fondiCoperte(fb, { ancheNuovi: true, ancheInVolo: true, avvia });
-        const base = testo;
-        const riga = (lista) => {
-          let t = base;
-          let k = 'ok';
-          for (const { msg } of lista) {
-            t += ` Fusione ferma su questa pratica: ${msg.text}`;
-            if (msg.kind === 'wait') { if (k === 'ok') k = ''; } else if (msg.kind !== 'ok') k = 'err';
-          }
-          return { t, k };
-        };
-        ({ t: testo, k: kind } = riga(esiti));
-        // La fusione già in viaggio, partita da un altro gesto: tornato l'esito
-        // la riga lo dice, se nessuno l'ha riscritta nel frattempo.
-        if (esiti.some((e) => e.attesa)) {
-          const detto = testo;
-          Promise.all(esiti.map((e) => e.attesa || null)).then((risposte) => {
-            if (selectedId !== id || mgManageMsg.textContent !== detto) return;
-            const fine = riga(esiti.map((e, i) => (e.attesa ? { req: e.req, msg: UI.outcomeMessage(risposte[i], e.req) } : e)));
-            setManageMsg(fine.t, fine.k);
-          });
-        }
-      }
-      if (selectedId !== id) return;
-      setManageMsg(testo, kind);
-    } catch (e) {
-      // Un rifiuto va detto anche se intanto hai aperto un'altra pratica: il
-      // segno che credevi messo non c'è, e senza questa riga nessuno lo sa.
-      const altrove = selectedId !== id && FB && typeof FB.formatNum === 'function';
-      const dove = altrove ? ` (#${FB.formatNum(fb.seq, fb.subSeq)})` : '';
-      setManageMsg(`Segno non messo${dove}: ${e.message || 'Errore'}`, 'err');
-    } finally {
-      mgPreapproveBtn.disabled = false;
-      if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.disabled = false;
-    }
-  }
-  if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', () => togglePreapproved());
-  if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.addEventListener('click', () => togglePreapproved(false));
 
   // La riga dei tasti, quando non entra, scorre di lato (#1034): la rotella normale deve bastare a raggiungerli.
   const mgOwnerTasti = mgOwnerBar && mgOwnerBar.querySelector('.mg-owner-tasti');
@@ -5067,7 +4842,6 @@
       allFeedbacks = fresh;
       dataLoaded = true;
       loadFailed = false;
-      fondiPreapprovateInAttesa();
     } catch (err) {
       if (testDataInjected) return;
       // Il guasto va RICORDATO, non solo scritto una volta: il primo click su
@@ -5142,9 +4916,6 @@
     sostituisci: (lista) => { allFeedbacks = lista; reindexByClient(); },
     decifra: () => isAdmin,
     sezioneDi: (fb) => sezioneDi(fb),
-    // Il segno «fondi senza chiedermelo» può arrivare da fuori (script
-    // dell'owner, altra finestra): senza questo giro il ramo resta fermo.
-    dopoFusione: () => fondiPreapprovateInAttesa(),
     ridisegna: ({ ids, righe, removed }) => {
       rerenderAfterLive(ids);
       fsSegueLive(righe, removed).catch(() => {});
