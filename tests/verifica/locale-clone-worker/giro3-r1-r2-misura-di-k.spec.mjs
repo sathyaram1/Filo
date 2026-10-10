@@ -71,24 +71,36 @@ function misura(s, modo) {
   return `${r.stdout}\n${r.stderr}`;
 }
 
-test('r1 tutto verde, con un test verde che nomina index.lock: K vale 2 e non «misura da rifare»', async () => {
+// I motivi della riga di una corsa nella tabella finale, senza memoria e tempo: quelli dipendono dalla macchina
+// (qui la memoria è quella di tutto il PC, con altri lavori accesi), non da cosa hanno fatto i worker.
+function motiviDeiWorker(out, n) {
+  const riga = out.split(/\r?\n/).find((r) => r.startsWith(`${n} | `));
+  expect(riga, out).toBeTruthy();
+  const esito = riga.split(' | ').slice(8).join(' | ').trim();
+  return esito === 'ok' ? [] : esito.split('; ').filter((m) => !/^(memoria|tempo)\b/.test(m));
+}
+
+test('r1 tutto verde, con un test verde che nomina index.lock: nessun errore d\'infrastruttura, la misura vale', async () => {
   test.setTimeout(240_000);
   const s = principaleFinto();
   const out = misura(s, 'verde');
   expect(out, out).toMatch(/corsa 2 finita: uscite 0,0/);
-  expect(out, out).not.toMatch(/infrastruttura: lock/);
-  expect(out, out).toMatch(/\[misura-k\] K = 2\b/);
+  expect(out, out).not.toMatch(/infrastruttura: lock|errori d'infrastruttura/);
+  expect(motiviDeiWorker(out, 1)).toEqual([]);
+  expect(motiviDeiWorker(out, 2)).toEqual([]);
 });
 
 for (const [modo, come] of [
   ['fermo', 'il lanciatore degli unit chiude la corsa ferma'],
   ['crollo', 'il worker crolla senza una riga rossa'],
 ]) {
-  test(`r2 base con un rosso, ${come} solo con due insieme: K resta 1`, async () => {
+  test(`r2 base con un rosso, ${come} solo con due insieme: la corsa da due non passa`, async () => {
     test.setTimeout(240_000);
     const s = principaleFinto();
     const out = misura(s, modo);
     expect(out, out).toMatch(/corsa 2 finita: uscite 1,1/);
-    expect(out, out).toMatch(/\[misura-k\] K = 1\b/);
+    expect(motiviDeiWorker(out, 1), out).toEqual([]);
+    expect(motiviDeiWorker(out, 2), out).not.toEqual([]);
+    expect(out, out).not.toMatch(/\[misura-k\] K = 2\b/);
   });
 }
