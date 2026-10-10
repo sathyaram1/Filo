@@ -221,12 +221,8 @@ async function main() {
     const preleva = () => { const s = { corsa: r + 1, n, ...campione() }; prelievi.push(s); appendFileSync(campioni, `${JSON.stringify(s)}\n`); };
     preleva();
     const timer = setInterval(preleva, CAMPIONE_MS);
-    // Solo le variabili del worker: FILO_NO_BEAT o FILO_REPO_ROOT ereditate arriverebbero ai test e li farebbero rossi
-    // per conto loro (provato a secco: sette rossi del battito).
-    const { FILO_NO_BEAT: _b, FILO_REPO_ROOT: _r, ...ambiente } = process.env;
-    const esiti = await Promise.all(cloni.map((clone, k) => lancia(comando, clone, {
-      ...ambiente, FILO_WORKER: String(k + 1), FILO_WORKER_PARALLELI: String(n),
-    }, join(cartella, `worker-${k + 1}.log`))));
+    const esiti = await Promise.all(cloni.map((clone, k) => lancia(comando, clone, ambienteWorker(process.env, k + 1, n, spec),
+      join(cartella, `worker-${k + 1}.log`))));
     clearInterval(timer);
     preleva();
     const logs = cloni.map((_, k) => leggi(join(cartella, `worker-${k + 1}.log`)) || '');
