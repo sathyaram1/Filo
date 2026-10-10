@@ -17,16 +17,32 @@ import { memoriaContenitore, statoContenitore } from './routine-channel.mjs';
 export const SOGLIE = Object.freeze({ memoria: 0.85, tempo: 1.5 });
 export const CORSE_PREDEFINITE = Object.freeze([1, 1, 2, 3, 4]);
 export const CAMPIONE_MS = 5000;
-// Su un ramo che non tocca niente finish:check non sceglie spec, e la misura vedrebbe solo gli unit: quattro spec di
-// aree diverse, quanti ne sceglie la mediana di un ramo vero, perché pesino Electron e i display come in un lavoro.
+// Sul ramo della misura finish:check non trova aree toccate e non corre spec: senza questi la misura vedrebbe solo gli
+// unit. Quattro spec di aree diverse, quanti ne sceglie la mediana di un ramo vero, lanciati dopo il comando come li
+// lancia finish:check, perché pesino Electron e i display come in un lavoro.
 export const SPEC_MISURA = Object.freeze(['tab-archive', 'options-default-models', 'feedback-attach-files', 'context-menu']);
 
-/** L'ambiente di un worker della corsa: il suo numero, quanti insieme, gli spec in più. PURA. */
-export function ambienteWorker(env, indice, paralleli, spec = SPEC_MISURA) {
+/** L'ambiente di un worker della corsa: il suo numero e quanti insieme. PURA. */
+export function ambienteWorker(env, indice, paralleli) {
   // FILO_NO_BEAT o FILO_REPO_ROOT ereditate arriverebbero ai test e li farebbero rossi per conto loro (provato a
   // secco: sette rossi del battito).
   const { FILO_NO_BEAT: _b, FILO_REPO_ROOT: _r, ...resto } = env || {};
-  return { ...resto, FILO_WORKER: String(indice), FILO_WORKER_PARALLELI: String(paralleli), FILO_SPEC_IN_PIU: spec.join(',') };
+  return { ...resto, FILO_WORKER: String(indice), FILO_WORKER_PARALLELI: String(paralleli) };
+}
+
+/**
+ * I passi di un worker: il comando, poi gli spec dal lancio preparato degli strumenti che girano (non da quelli del
+ * clone, che sta sul ramo della misura), con la base di display del worker. `{ ok, passi }` o `{ ok: false, motivo }`.
+ * PURA se `haXvfb` è finta.
+ */
+export function passiWorker(comando, spec, { indice, paralleli, env = {}, platform = process.platform, haXvfb } = {}) {
+  const passi = [{ cmd: comando, args: [], env, shell: true }];
+  if (!spec.length) return { ok: true, passi };
+  const file = spec.map((s) => `tests/${String(s).replace(/\\/g, '/').replace(/^tests\//, '').replace(/\.spec\.mjs$/, '')}.spec.mjs`);
+  const l = preparaLancioElectron('npx', ['playwright', 'test', ...file], { platform, env, worker: { indice, paralleli }, ...(haXvfb ? { haXvfb } : {}) });
+  if (!l.ok) return { ok: false, motivo: l.motivo, passi: [] };
+  passi.push({ cmd: l.cmd, args: l.args, env: l.env || env, shell: platform === 'win32' });
+  return { ok: true, passi };
 }
 
 const INFRASTRUTTURA = [
