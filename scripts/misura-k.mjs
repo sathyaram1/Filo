@@ -17,6 +17,17 @@ import { memoriaContenitore, statoContenitore } from './routine-channel.mjs';
 export const SOGLIE = Object.freeze({ memoria: 0.85, tempo: 1.5 });
 export const CORSE_PREDEFINITE = Object.freeze([1, 1, 2, 3, 4]);
 export const CAMPIONE_MS = 5000;
+// Su un ramo che non tocca niente finish:check non sceglie spec, e la misura vedrebbe solo gli unit: quattro spec di
+// aree diverse, quanti ne sceglie la mediana di un ramo vero, perché pesino Electron e i display come in un lavoro.
+export const SPEC_MISURA = Object.freeze(['tab-archive', 'options-default-models', 'feedback-attach-files', 'context-menu']);
+
+/** L'ambiente di un worker della corsa: il suo numero, quanti insieme, gli spec in più. PURA. */
+export function ambienteWorker(env, indice, paralleli, spec = SPEC_MISURA) {
+  // FILO_NO_BEAT o FILO_REPO_ROOT ereditate arriverebbero ai test e li farebbero rossi per conto loro (provato a
+  // secco: sette rossi del battito).
+  const { FILO_NO_BEAT: _b, FILO_REPO_ROOT: _r, ...resto } = env || {};
+  return { ...resto, FILO_WORKER: String(indice), FILO_WORKER_PARALLELI: String(paralleli), FILO_SPEC_IN_PIU: spec.join(',') };
+}
 
 const INFRASTRUTTURA = [
   ['xvfb', /Xvfb failed to start|xvfb-run: error|Cannot open display/i],
