@@ -304,6 +304,16 @@ export function conTettoDiTempo(opzioni) {
     ? opzioni : [`--test-timeout=${TETTO_FILE_MS}`, ...opzioni];
 }
 
+/**
+ * Un worker in parallelo (#1157) prende la sua parte di CPU: N `node --test` a tutte le CPU insieme fanno rossi i test
+ * sensibili ai tempi. Chi lancia con un `--test-concurrency` suo decide lui. PURA.
+ */
+export function conConcorrenza(opzioni, { worker = null, cpu } = {}) {
+  if (opzioni.some((a) => a === '--test-concurrency' || String(a).startsWith('--test-concurrency='))) return opzioni;
+  const n = worker ? concorrenzaUnit(worker.paralleli, ...(cpu === undefined ? [] : [cpu])) : 0;
+  return n ? [`--test-concurrency=${n}`, ...opzioni] : opzioni;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const listOnly = argv.includes('--list');
