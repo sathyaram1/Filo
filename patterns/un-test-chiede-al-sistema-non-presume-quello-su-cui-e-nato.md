@@ -166,8 +166,10 @@ Le forme che cadevano, e cosa le ha sostituite:
 - **Un processo o un file vero che deve arrivare** (un battito, la porta di un server finto,
   un segno scritto da un figlio): si aspetta il fatto con `aspettaChe`
   (`tests/helpers/attese.mjs`), mai «entro N secondi». Il tempo massimo di un processo vero
-  è una guardia contro l'appeso, `TETTO_ATTESA_MS`: un numero scritto a mano nelle opzioni
-  di `spawnSync` ed esecuzioni simili lo ferma una sentinella. Vale anche per il tempo
+  è una guardia contro l'appeso, `TETTO_ATTESA_MS`: un numero scritto a mano lo ferma una
+  sentinella, nelle opzioni di `spawnSync` ed esecuzioni simili, in un `setTimeout` da un
+  secondo in su, in un `timeoutMs`/`attesaMs` dato al codice provato. Il server finto di
+  `config/routines` si lancia da `tests/helpers/server-finto.mjs`, mai da una copia. Vale anche per il tempo
   massimo che sta nel codice provato: la funzione che chiede qualcosa a un programma di
   sistema prende l'attesa da chi la chiama, e la prova le passa `TETTO_ATTESA_MS` (il
   controllo del comando che esiste: dieci secondi bastano all'uso, non a una macchina carica).
