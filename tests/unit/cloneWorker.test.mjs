@@ -10,7 +10,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
-  MARCATORE_WORKER, allineaPacchetti, cartellaRegistro, chiaviAccesso, concorrenzaUnit, datiWorker, elencoCloni,
+  MARCA_COLLEGATI, MARCATORE_WORKER, allineaPacchetti, cartellaRegistro, chiaviAccesso, concorrenzaUnit, datiWorker, elencoCloni,
   preparaClone, stessoRemoto, togliClone,
 } from '../../scripts/lib/clone-worker.mjs';
 import { PINNED_PATHS, pinnedDirWorker, pinnedRepoRoot } from '../../scripts/lib/tools-pin.mjs';
