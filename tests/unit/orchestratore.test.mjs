@@ -17,6 +17,7 @@ import {
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { pidMorto } from '../helpers/processi.mjs';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..', '..');
 
