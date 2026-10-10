@@ -122,6 +122,13 @@ service cloud.firestore {
     // feedback di un utente o di una routine, e alla fusione vale quanto la prova
     // del mittente. Solo l'admin: nessun altro ramo lo nomina (sentinella
     // tests/unit/firestoreRulesLocalOnly.test.mjs). Stessa forma di localOnly.
+    // `bigliettoLocale` (#1148): l'impronta del biglietto della sessione locale che
+    // crea il feedback; il server ne legge la fiducia alla nascita.
+    function bigliettoLocaleValido(d) {
+      return !('bigliettoLocale' in d)
+        || (d.bigliettoLocale is string && d.bigliettoLocale.size() <= 64);
+    }
+
     function localApprovalValido(d) {
       return !('localApproval' in d)
         || (d.localApproval is map
