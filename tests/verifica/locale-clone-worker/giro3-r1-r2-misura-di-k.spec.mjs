@@ -1,5 +1,6 @@
-// Verifica locale #1157, giro 3, rilievo 1: con una base che esce con un rosso, la misura di K non vede un worker
-// che cade in un modo diverso (il fermo del lanciatore degli unit, o un crollo senza righe rosse) e promuove N=2.
+// Verifica locale #1157, giro 3. r1: un test VERDE col nome che contiene «index.lock» fa dire alla misura «errore
+// d'infrastruttura», e col comando predefinito K non esce mai. r2: con una base che esce con un rosso, la misura non
+// vede un worker che cade in un altro modo (fermo del lanciatore degli unit, crollo senza righe rosse) e promuove N=2.
 // Principale finto minuscolo (repo nudo locale, node_modules finto): niente rete, niente Electron, pochi secondi.
 
 import { test, expect } from '@playwright/test';
@@ -16,6 +17,26 @@ function git(cwd, ...args) {
   return execFileSync('git', ['-c', 'user.name=prova', '-c', 'user.email=prova@prova', '-c', 'core.autocrlf=false', ...args],
     { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
+
+// Il comando finto: MODO decide cosa scrive e come esce ogni worker.
+const FINTO = [
+  'const w = Number(process.env.FILO_WORKER), n = Number(process.env.FILO_WORKER_PARALLELI);',
+  'const modo = process.env.FINTO_MODO;',
+  "if (modo === 'verde') {",
+  // La riga vera che node --test scrive per un test verde degli agganci di salvataggio (autoCommitGateSessione).
+  "  console.log('    # Subtest: index.lock a terra: niente commit, e la sessione lo sa col motivo di git');",
+  "  console.log('    ok 1 - index.lock a terra: niente commit, e la sessione lo sa col motivo di git');",
+  "  console.log('# pass 1');",
+  '  process.exit(0);',
+  '}',
+  'if (w === 2 && n === 2) {',
+  "  if (modo === 'fermo') console.log('[test:unit] ROSSO: tests/unit/autoCommitGate.test.mjs non è andato avanti per 20 minuti, e la corsa è stata chiusa.');",
+  "  else console.error('Error: spawn npx ENOENT');",
+  '  process.exit(1);',
+  '}',
+  "console.log('not ok 1 - un rosso che c\\'è anche con un worker solo');",
+  'process.exit(1);',
+].join('\n');
 
 function principaleFinto() {
   const base = cartellaTemporanea('g3-misura-');
@@ -36,18 +57,8 @@ function principaleFinto() {
   git(origine, 'symbolic-ref', 'HEAD', 'refs/heads/main');
   mkdirSync(join(principale, 'node_modules', 'pacchetto'), { recursive: true });
   writeFileSync(join(principale, 'node_modules', 'pacchetto', 'index.js'), '');
-  // Da solo ogni worker esce 1 con lo stesso rosso leggibile; con due insieme il worker 2 cade in un altro modo.
   const finto = join(base, 'finto.mjs');
-  writeFileSync(finto, [
-    'const w = Number(process.env.FILO_WORKER), n = Number(process.env.FILO_WORKER_PARALLELI);',
-    'if (w === 2 && n === 2) {',
-    "  if (process.env.FINTO_MODO === 'fermo') console.log('[test:unit] ROSSO: tests/unit/autoCommitGate.test.mjs non è andato avanti per 20 minuti, e la corsa è stata chiusa.');",
-    "  else console.error('Error: spawn npx ENOENT');",
-    '  process.exit(1);',
-    '}',
-    "console.log('not ok 1 - un rosso che c\\'è anche con un worker solo');",
-    'process.exit(1);',
-  ].join('\n'));
+  writeFileSync(finto, FINTO);
   return { base, principale, finto };
 }
 
@@ -60,11 +71,20 @@ function misura(s, modo) {
   return `${r.stdout}\n${r.stderr}`;
 }
 
+test('r1 tutto verde, con un test verde che nomina index.lock: K vale 2 e non «misura da rifare»', async () => {
+  test.setTimeout(240_000);
+  const s = principaleFinto();
+  const out = misura(s, 'verde');
+  expect(out, out).toMatch(/corsa 2 finita: uscite 0,0/);
+  expect(out, out).not.toMatch(/infrastruttura: lock/);
+  expect(out, out).toMatch(/\[misura-k\] K = 2\b/);
+});
+
 for (const [modo, come] of [
   ['fermo', 'il lanciatore degli unit chiude la corsa ferma'],
   ['crollo', 'il worker crolla senza una riga rossa'],
 ]) {
-  test(`r1 base con un rosso, ${come} solo con due insieme: K resta 1`, async () => {
+  test(`r2 base con un rosso, ${come} solo con due insieme: K resta 1`, async () => {
     test.setTimeout(240_000);
     const s = principaleFinto();
     const out = misura(s, modo);
