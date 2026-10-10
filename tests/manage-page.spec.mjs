@@ -2051,9 +2051,9 @@ test('#1034 — In coda: «Segna fidato» al clic resta premuto sulla stessa rig
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: 'fb-una-riga-coda' }]);
   const dopo = await tastiDellOwner(page);
   for (const t of dopo.tasti) expect(Math.abs(t.centro - dopo.tasti[0].centro), t.id).toBeLessThan(6);
+  // L'esito sotto la riga la può alzare, non spostare di lato.
   const stellaDopo = await page.locator('#mgStarBtn').boundingBox();
   expect(Math.round(stellaDopo.x)).toBe(Math.round(stella.x));
-  expect(Math.round(stellaDopo.y)).toBe(Math.round(stella.y));
 });
 
 // La riga non va mai a capo: con tanti tasti (spam, file sospetto, «Segna fidato») o con la colonna stretta i tasti

@@ -1093,6 +1093,9 @@
       border-color: var(--sn-accent); color: var(--sn-accent);
       background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
     }
+    .mg-fiducia-btn[aria-pressed="true"]:not(:disabled):hover {
+      background: color-mix(in srgb, var(--sn-accent) 22%, var(--sn-bg, transparent));
+    }
 
     /* «Solo in locale»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
     .mg-local-btn[hidden] { display: none; }
