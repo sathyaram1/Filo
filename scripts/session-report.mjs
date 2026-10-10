@@ -754,10 +754,32 @@ async function rapportoOrchestratore(principale) {
   };
 }
 
+/**
+ * Quando è nato `ticket` nel thread principale: la prima risposta di uno strumento che lo contiene (la stampa di
+ * `ticket … --json`). ISO, o '' se non c'è. Il marcatore del biglietto lo scrive il worker: se muore prima, è di un altro.
+ */
+export async function nascitaBiglietto(principale, ticket) {
+  const t = String(ticket || '').trim();
+  if (t.length < 2) return '';
+  for (const l of await lineeDi(principale)) {
+    if (!l.includes(t)) continue;
+    let e;
+    try { e = JSON.parse(l); } catch (_) { continue; }
+    const blocchi = e && e.type === 'user' && e.message && Array.isArray(e.message.content) ? e.message.content : [];
+    const ms = Date.parse(e && e.timestamp);
+    if (Number.isFinite(ms) && blocchi.some((b) => b && b.type === 'tool_result' && testoDi(b.content).includes(t))) return new Date(ms).toISOString();
+  }
+  return '';
+}
+
 /** Il confine della finestra dell'orchestratore prima di `since`: { since: ISO, o '' = dall'inizio; continua }. */
 async function inizioFinestraPrima(principale, since) {
   const sinceMs = Date.parse(String(since));
-  if (!Number.isFinite(sinceMs)) return { since, continua: false };
+  if (!Number.isFinite(sinceMs)) {
+    // Senza un momento del biglietto: dall'ultimo confine, mai dall'inizio, che è già nei rapporti di prima.
+    const { inizioMs, continua } = finestraOrchestratore(await lineeDi(principale));
+    return { since: Number.isFinite(inizioMs) ? new Date(inizioMs + 1).toISOString() : '', continua, senzaBiglietto: true };
+  }
   const prima = (await lineeDi(principale)).filter((l) => {
     let ms = NaN;
     try { ms = Date.parse(JSON.parse(l).timestamp); } catch (_) { /* riga illeggibile: la scarta finestraOrchestratore */ }
