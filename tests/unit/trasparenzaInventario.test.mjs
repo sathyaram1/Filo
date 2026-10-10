@@ -90,6 +90,7 @@ const COLLEZIONI = {
   '/config/supportModels': CONFIGURAZIONE,
   '/config/credits': CONFIGURAZIONE,
   '/admins/{email}': { perche: 'gli indirizzi di chi amministra il server' },
+  '/domande/{id}': { frase: 'l\'agente mi scrive una domanda' },
   '/routines/{email}': { perche: 'le identità delle routine che lavorano i feedback' },
 };
 const CAMPI_PUBBLICI_SCRITTI = {
