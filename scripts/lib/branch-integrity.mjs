@@ -407,6 +407,7 @@ export const SESSION_MARKERS = Object.freeze([
   '.claude/branch-expect.json',
   '.claude/verify-local.json',
   '.claude/routine-state/',
+  '.claude/biglietti/',
 ]);
 
 /**
