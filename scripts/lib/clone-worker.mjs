@@ -120,23 +120,28 @@ const leggi = (f) => { try { return readFileSync(f, 'utf8'); } catch (_) { retur
 const lock = (dir) => { const t = leggi(resolve(dir, 'package-lock.json')); return t === null ? null : t.replace(/\r\n/g, '\n'); };
 
 /**
- * `node_modules` del clone: collegato a quello del principale se `package-lock.json` è lo stesso da cui il principale
- * ha installato; altrimenti un'installazione privata (la cache di npm resta condivisa). Da richiamare dopo che il
- * clone è sul ramo del lavoro.
+ * `node_modules` del clone: collegato pacchetto per pacchetto a quello del principale se `package-lock.json` è lo
+ * stesso da cui il principale ha installato; altrimenti un'installazione privata (la cache di npm resta condivisa).
+ * Da richiamare dopo che il clone è sul ramo del lavoro.
  */
 export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {}) {
   const nm = resolve(clone, 'node_modules');
   const lockClone = lock(clone);
   const lockPrincipale = lock(principale);
   if (lockClone !== null && lockClone === lockPrincipale) {
-    if (eLink(nm)) return { ok: true, pacchetti: 'collegati', why: '' };
-    if (esisteLink(nm)) rmSync(nm, { recursive: true, force: true }); // un'installazione privata rimasta da un ramo prima
     if (!existsSync(resolve(principale, 'node_modules'))) return { ok: false, pacchetti: '', why: 'il principale non ha node_modules' };
+    // Ogni volta da capo: il principale può aver aggiunto o tolto pacchetti da allora.
+    scollegaPacchetti(nm);
+    if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };
+    rmSync(nm, { recursive: true, force: true }); // un'installazione privata rimasta da un ramo prima
     // Al bersaglio vero: il node_modules di un worktree è già un collegamento a quello del principale.
-    collega(realpathSync(resolve(principale, 'node_modules')), nm);
+    collegaVoci(realpathSync(resolve(principale, 'node_modules')), nm);
     return { ok: true, pacchetti: 'collegati', why: '' };
   }
-  scollega(nm);
+  const daCollegati = eLink(nm) || collegatiVoceAVoce(nm);
+  scollegaPacchetti(nm);
+  if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };
+  if (daCollegati) rmSync(nm, { recursive: true, force: true });
   const r = npmCi(clone);
   return r.ok ? { ok: true, pacchetti: 'privati', why: '' } : { ok: false, pacchetti: '', why: r.why };
 }
