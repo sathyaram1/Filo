@@ -253,8 +253,7 @@ async function main() {
     const preleva = () => { const s = { corsa: r + 1, n, ...campione() }; prelievi.push(s); appendFileSync(campioni, `${JSON.stringify(s)}\n`); };
     preleva();
     const timer = setInterval(preleva, CAMPIONE_MS);
-    const esiti = await Promise.all(cloni.map((clone, k) => lancia(comando, clone, ambienteWorker(process.env, k + 1, n, spec),
-      join(cartella, `worker-${k + 1}.log`))));
+    const esiti = await Promise.all(cloni.map((clone, k) => lancia(piani[k].passi, clone, join(cartella, `worker-${k + 1}.log`))));
     clearInterval(timer);
     preleva();
     const logs = cloni.map((_, k) => leggi(join(cartella, `worker-${k + 1}.log`)) || '');
