@@ -3,6 +3,7 @@
 import { test, expect } from '@playwright/test';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
@@ -10,13 +11,15 @@ import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 const ROOT = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const git = (cwd, ...args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
 const leggi = (f) => { try { return readFileSync(f, 'utf8'); } catch (_) { return null; } };
-
-test.describe.configure({ mode: 'serial' });
+// Dopo un caso rosso Playwright riparte con un worker nuovo e rifà beforeAll: la misura (minuti) si fa una volta per corsa.
+const ESITO = join(tmpdir(), 'k-verifica-giro1.json');
 
 let esito = null;
 
 test.beforeAll(() => {
   test.setTimeout(60 * 60 * 1000);
+  const giaFatto = leggi(ESITO);
+  if (giaFatto) { esito = JSON.parse(giaFatto); return; }
   const base = cartellaTemporanea('k-verifica-');
   const canarino = join(base, 'principale');
   const sha = git(ROOT, 'rev-parse', 'origin/main').stdout.trim();
