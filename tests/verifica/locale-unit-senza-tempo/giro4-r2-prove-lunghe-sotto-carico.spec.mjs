@@ -1,4 +1,4 @@
-// Verifica locale «unit-senza-tempo», giro 3, rilievo 3: con la macchina molto carica i file con prove lunghe e sincrone
+// Verifica locale «unit-senza-tempo», giro 3 rilievo 3, ripresa come giro 4 rilievo 2: con la macchina molto carica i file con prove lunghe e sincrone
 // (la prova sulla fusione, il resto della riga di PowerShell) devono finire verdi dal lanciatore vero. Carico finto doppio
 // e per mezz'ora al massimo: il PC è condiviso con altri lavori, e al quadruplo per due ore li faceva cadere (giro 4).
 import { test, expect } from '@playwright/test';
@@ -15,7 +15,7 @@ const CARICO_PER_MS = 30 * 60_000;
 
 test.setTimeout(60 * 60_000);
 
-test('r3 sotto carico doppio le prove lunghe finiscono verdi senza essere chiuse dal tetto', async () => {
+test('r2 sotto carico doppio le prove lunghe finiscono verdi senza essere chiuse dal tetto', async () => {
   const vuota = join(cartellaTemporanea('unit-prove-lunghe-'), 'unit');
   mkdirSync(vuota);
   writeFileSync(join(vuota, 'base.test.mjs'), "import test from 'node:test';\ntest('base', () => {});\n");
