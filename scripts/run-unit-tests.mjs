@@ -363,7 +363,7 @@ async function main() {
   const destinazione = (i) => join(cartella, `gruppo-${String(i + 1).padStart(4, '0')}.jsonl`);
   const copia = (i) => (k) => join(cartella, `rapporto-${k + 1}-gruppo-${String(i + 1).padStart(4, '0')}`);
   const { opzioni: date, posizionali } = separaArgomenti(flags);
-  const opzioni = conConcorrenza(conTettoDiTempo(date), { worker: datiWorker({ root: REPO_ROOT }) });
+  const opzioni = conConcorrenza(conTettoDiTempo(date), await concorrenzaDelWorker());
   // Un file dato a mano che è già fra i trovati girerebbe due volte.
   const trovati = new Set(files.map((f) => resolve(f)));
   const extra = posizionali.filter((p) => !trovati.has(resolve(REPO_ROOT, p)));
