@@ -243,7 +243,7 @@ async function main() {
     corse.push(corsa);
     writeFileSync(join(dir, 'risultati.json'), `${JSON.stringify({ corse, comando, ramo }, null, 2)}\n`);
     console.log(`[misura-k] corsa ${r + 1} finita: uscite ${corsa.codici.join(',')}, rossi ${corsa.rossi.length}, infrastruttura ${corsa.infra.join(',') || 'niente'}`);
-    if (!tieni) for (let i = 1; i <= n; i++) togliClone(principale, i, { dest: join(cartella, `clone-${i}`), basePin: join(dir, 'strumenti') });
+    if (!tieni) for (let i = 1; i <= n; i++) togliClone(principale, i, { dest: join(cartella, `clone-${i}`), basePin: join(dir, 'strumenti'), registra: false });
   }
 
   const { k, motivo } = calcolaK(corse, { rossiNoti });
