@@ -161,6 +161,8 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la 
     const testo = readFileSync(f, 'utf8');
     assert.doesNotMatch(testo, /fieldPaths=localApproval|set\(\s*['"`]localApproval['"`]|localApproval\s*:\s*(\{\s*mapValue|toFsValue|segno)/, `${f} scrive localApproval`);
     if (!SCRIVE_LA_PROVA.has(f.split(/[\\/]/).pop())) assert.doesNotMatch(testo, /fieldPaths=senderProof/, `${f} scrive senderProof su un feedback esistente`);
+    // #1148: «Segna fidato» solo dalla finestra di Filo.
+    assert.doesNotMatch(testo, /ownerFiducia|fiducia_segna|fieldPaths=fiducia/, `${f} apre una strada alla fiducia`);
   }
 });
 
