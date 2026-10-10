@@ -167,7 +167,10 @@ Le forme che cadevano, e cosa le ha sostituite:
   un segno scritto da un figlio): si aspetta il fatto con `aspettaChe`
   (`tests/helpers/attese.mjs`), mai «entro N secondi». Il tempo massimo di un processo vero
   è una guardia contro l'appeso, `TETTO_ATTESA_MS`: un numero scritto a mano nelle opzioni
-  di `spawnSync` ed esecuzioni simili lo ferma una sentinella.
+  di `spawnSync` ed esecuzioni simili lo ferma una sentinella. Vale anche per il tempo
+  massimo che sta nel codice provato: la funzione che chiede qualcosa a un programma di
+  sistema prende l'attesa da chi la chiama, e la prova le passa `TETTO_ATTESA_MS` (il
+  controllo del comando che esiste: dieci secondi bastano all'uso, non a una macchina carica).
 - **«Non cresce con i dati»** (un messaggio con 50.000 eventi nel filo, una scheda chiusa con
   6.000 in archivio): prima si contano le operazioni sul disco (nessuna rilettura, nessuna
   riscrittura, una riga in coda; `tests/helpers/spiaDisco.mjs`), poi il lavoro in memoria si
