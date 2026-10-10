@@ -92,9 +92,7 @@ function npmCiDavvero(cartella) {
 
 const leggi = (f) => { try { return readFileSync(f, 'utf8'); } catch (_) { return null; } };
 // I fine riga non cambiano i pacchetti: un checkout con autocrlf non deve costare un'installazione.
-const lock = (dir) => { const t = leggi(resolve(dir, 'package-lock.json')); return t === null ? null : t.replace(/
-/g, '
-'); };
+const lock = (dir) => { const t = leggi(resolve(dir, 'package-lock.json')); return t === null ? null : t.replace(/\r\n/g, '\n'); };
 
 /**
  * `node_modules` del clone: collegato a quello del principale se `package-lock.json` è lo stesso da cui il principale
