@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -129,7 +130,7 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
   const lancia = (args, extra = {}) => {
     const env = { ...process.env, ...extra };
     for (const k of Object.keys(env)) if (k.startsWith('npm_config_') && !(k in extra)) delete env[k];
-    return spawnSync(process.execPath, [join(ROOT, 'scripts', 'owner-feedback.mjs'), ...args], { cwd: ROOT, env, encoding: 'utf8', timeout: 60000 });
+    return spawnSync(process.execPath, [join(ROOT, 'scripts', 'owner-feedback.mjs'), ...args], { cwd: ROOT, env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   };
   for (const [nome, r] of [
     ['opzione', lancia(['feedback-finto-957', '--approva-locale', '--dry-run'])],

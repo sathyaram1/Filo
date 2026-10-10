@@ -8,6 +8,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
@@ -111,7 +112,7 @@ globalThis.fetch = async (url, opts = {}) => {
   return new Response(JSON.stringify({ name: doc.name, fields }), { status: 200 });
 };`);
   const lancia = (...extra) => spawnSync(process.execPath, ['--import', pathToFileURL(finto).href, join(ROOT, 'scripts', 'owner-feedback.mjs'), 'u1', 'done', 'finito', '--come-routine', ...extra], {
-    encoding: 'utf8', timeout: 60000, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '' },
+    encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '' },
   });
   const senza = lancia();
   assert.equal(senza.status, 0, senza.stderr);
@@ -122,6 +123,6 @@ globalThis.fetch = async (url, opts = {}) => {
 });
 
 test('l’aiuto di npm run finish dice dove si scrive la frase', () => {
-  const aiuto = execFileSync(process.execPath, [join(ROOT, 'scripts', 'finish-local.mjs'), '--help'], { encoding: 'utf8', timeout: 60000 });
+  const aiuto = execFileSync(process.execPath, [join(ROOT, 'scripts', 'finish-local.mjs'), '--help'], { encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   assert.match(aiuto, /npm run feedback -- <N> --frase/);
 });

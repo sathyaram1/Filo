@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -17,7 +17,7 @@ const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
 
 const ATTESA = 300_000;
 const TMP = cartellaTemporanea('filo-cmd-');
-process.on('exit', () => { try { rmSync(TMP, { recursive: true, force: true }); } catch (_) {} });
+process.on('exit', () => { try { togliCartella(TMP); } catch (_) {} });
 
 // ─────────── la strada: su Windows cmd passa dalla sessione, intero ───────────
 // Qui si finge Windows e si guarda cosa arriva alla sessione: su Linux cmd non c'è, ma la scelta della strada sì.
@@ -139,7 +139,7 @@ const SOLO_FUORI = { skip: process.platform === 'win32' && 'su Windows lo provan
 test('con l\'eco spento cmd non mostra il prompt: il comando dell\'assistente parte lo stesso', SOLO_FUORI, async () => {
   const qui = join(TMP, 'senza-prompt');
   mkdirSync(qui, { recursive: true });
-  const out = await conCmdFinto(() => T.runCommand('echo x> prova.txt', { shell: 'cmd', cwd: qui, trackCwd: true, timeoutMs: 15_000 }));
+  const out = await conCmdFinto(() => T.runCommand('echo x> prova.txt', { shell: 'cmd', cwd: qui, trackCwd: true, timeoutMs: ATTESA }));
   assert.equal(out.timedOut, false, 'la sessione di cmd non è mai partita: il comando è scaduto');
   assert.equal(out.code, 0, out.stderr);
   assert.equal(readFileSync(join(qui, 'prova.txt'), 'utf8').trim(), 'x');
@@ -150,7 +150,7 @@ test('con l\'eco spento cmd non mostra il prompt: il terminale della dashboard r
   const uscita = await conCmdFinto(() => new Promise((resolve, reject) => {
     const sessione = S.createSession({ shell: 'cmd', cwd: TMP });
     let testo = '';
-    const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale con cmd non ha mai risposto')); }, 15_000);
+    const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale con cmd non ha mai risposto')); }, ATTESA);
     sessione.exec('echo ciao', {
       onData: ({ chunk }) => { testo += chunk; },
       onExit: ({ code }) => { clearTimeout(scade); sessione.kill(); resolve({ testo, code }); },
@@ -241,10 +241,12 @@ test('a cmd il comando arriva in soli caratteri ASCII, e ricomposto è quello sc
 });
 
 test('un output enorme non fa perdere esito e cartella', async () => {
-  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
+  // Poche righe lunghe: sotto carico ogni riga è un giro fra la shell e Filo, e duemila righe corte costavano minuti (#1063).
+  const riga = 'riga-di-elenco-'.repeat(64);
+  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / riga.length);
   const out = await esegui(WIN
-    ? `for /l %i in (1,1,${righe}) do @echo riga-di-elenco\ncmd /c exit 3`
-    : `for i in $(seq 1 ${righe}); do echo riga-di-elenco; done; false`);
+    ? `for /l %i in (1,1,${righe}) do @echo ${riga}\ncmd /c exit 3`
+    : `for i in $(seq 1 ${righe}); do echo ${riga}; done; false`);
   assert.equal(out.truncated, true);
   assert.notEqual(out.code, 0, 'l\'esito si è perso dietro all\'output');
   assert.equal(out.cwd, TMP);
@@ -253,10 +255,12 @@ test('un output enorme non fa perdere esito e cartella', async () => {
 test('un comando che non finisce scade, e lo dice', async () => {
   const inizio = Date.now();
   // Fuori da Windows la sessione uccide solo sh: un `sleep` lungo terrebbe aperti i tubi e fermo il test.
-  const out = await esegui(WIN ? 'ping -n 60 127.0.0.1 >nul' : 'sleep 5', { timeoutMs: 1500 });
+  // Su Windows il comando durerebbe dieci minuti: fermato, finisce molto prima anche a macchina carica (#1063).
+  const naturaleMs = WIN ? 600_000 : 5_000;
+  const out = await esegui(WIN ? `ping -n ${naturaleMs / 1000} 127.0.0.1 >nul` : 'sleep 5', { timeoutMs: 1500 });
   assert.equal(out.timedOut, true);
   assert.equal(out.code, 124);
-  assert.ok(Date.now() - inizio < 30_000, 'il tempo scaduto non ha fermato il comando');
+  assert.ok(Date.now() - inizio < (WIN ? naturaleMs / 2 : 30_000), 'il tempo scaduto non ha fermato il comando');
 });
 
 test('con cmd anche un ciclo `for` scritto come al prompt gira', { skip: !WIN && 'cmd esiste solo su Windows' }, async () => {

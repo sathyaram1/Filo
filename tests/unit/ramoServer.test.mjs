@@ -4,11 +4,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { avviaConfigRoutinesFinto } from '../helpers/server-finto.mjs';
 import {
   checkoutDelRamo, confrontaServer, soloFusioniPulite, statoRamoServer, testoServerMossoDallAvvio,
 } from '../../scripts/lib/ramo-server.mjs';
@@ -114,17 +115,9 @@ const commit = (dir, file, testo, msg) => { scrivi(dir, file, testo); g(dir, 'ad
 const identita = (dir) => { g(dir, 'config', 'user.email', 't@t'); g(dir, 'config', 'user.name', 't'); };
 
 const FINTO = await (async () => {
-  const helper = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', 'helpers', 'finto-config-routines.mjs');
-  const p = spawn(process.execPath, [helper], { env: { ...process.env, FINTO_CAPS: JSON.stringify(CAPS) }, stdio: ['ignore', 'pipe', 'pipe'] });
-  const port = await new Promise((ok, no) => {
-    let so = '';
-    p.stdout.on('data', (c) => { so += c; const m = so.match(/PORT=(\d+)/); if (m) ok(Number(m[1])); });
-    p.on('exit', (code) => no(new Error(`server finto uscito con ${code}`)));
-    setTimeout(() => no(new Error('server finto: nessuna porta entro 15 s')), 15000).unref();
-  });
-  p.unref(); p.stdout.unref(); p.stderr.unref();
-  process.on('exit', () => { try { p.kill(); } catch (_) { /* già morto */ } });
-  return `http://127.0.0.1:${port}/config/routines`;
+  const srv = await avviaConfigRoutinesFinto({ FINTO_CAPS: JSON.stringify(CAPS) });
+  process.on('exit', srv.kill);
+  return srv.url;
 })();
 
 function scenario() {

@@ -3,10 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { prepareBranch } from '../../scripts/lib/branch-integrity.mjs';
 
 const DISPATCH = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'dispatch.mjs');
@@ -66,7 +66,7 @@ test('dopo un worker su un ramo vecchio, il prossimo parte con gli agenti di mai
     assert.equal(git(clone, 'branch', '--show-current'), 'main');
     assert.deepEqual(sforzi(clone), { 'routine-nuovo-lavoro': 'xhigh', 'routine-worker': 'high', 'routine-secaudit': 'high' });
   } finally {
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
@@ -78,7 +78,7 @@ test('fuori dalle routine non scarta niente', () => {
     assert.equal(git(clone, 'branch', '--show-current'), 'worker/vecchio');
     assert.equal(readFileSync(join(clone, 'codice.txt'), 'utf8'), 'residuo\n');
   } finally {
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 

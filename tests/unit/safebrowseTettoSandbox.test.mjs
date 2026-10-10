@@ -2,9 +2,10 @@
 // coda e quanto vive ognuna. Giudizio del modello e sandbox valgono per il dominio registrabile: sottodomini sempre
 // nuovi non li fanno ripartire. Regole in src/main/services/safebrowse/sandbox.js e index.js.
 
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { scorri, inAttesa } from '../helpers/orologio.mjs';
 
 const require = createRequire(import.meta.url);
 const { createDetonator, MAX_CONCURRENT, MAX_LIFETIME_MS } = require('../../src/main/services/safebrowse/sandbox.js');
@@ -60,12 +61,21 @@ test('una pagina che tiene occupata la finestra dopo il caricamento muore comunq
     emetti('did-navigate', 'http://altrove.esempio.xyz/');
     emetti('did-stop-loading');
   });
-  const D = createDetonator({ electron: f.electron, maxConcurrent: 1, loadTimeoutMs: 10_000, maxLifetimeMs: 60 });
-  const t0 = Date.now();
-  const r = await D.detonate('http://s.esempio.xyz/', () => new Promise(() => {}));
-  assert.equal(r.expired, true);
-  assert.ok(Date.now() - t0 < 2000);
-  assert.equal(f.conta().vive, 0);
+  // Orologio finto: muore allo scadere della vita massima, non «entro un tempo» di una macchina magari carica (#1063).
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const D = createDetonator({ electron: f.electron, maxConcurrent: 1, loadTimeoutMs: 10_000, maxLifetimeMs: 60 });
+    const esito = inAttesa(D.detonate('http://s.esempio.xyz/', () => new Promise(() => {})));
+    await scorri(1);
+    await scorri(58);
+    assert.equal(esito.fatto, false, 'la pagina è caricata e la ri-valutazione non risponde: vive ancora');
+    await scorri(1);
+    assert.equal(esito.fatto, true, 'alla vita massima muore');
+    assert.equal(esito.valore.expired, true);
+    assert.equal(f.conta().vive, 0);
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test('a coda piena un link nuovo non apre niente e torna subito senza verdetto', async () => {
@@ -89,12 +99,14 @@ test('sottodomini sempre nuovi dello stesso dominio: qualche giudizio del modell
     sandbox: async () => { sandbox++; await new Promise((ok) => setTimeout(ok, 5)); return { verdict: 'clean', redirects: [] }; },
   });
   try {
-    const giro = (n) => Promise.all(Array.from({ length: n }, (_, i) => new Promise((ok) => {
-      const url = `http://x${Math.random().toString(36).slice(2)}${i}.esempio-ostile.com/`;
-      const v = SB.analyze(url, {}, ok);
-      assert.equal(v.needsLlm, true, url);
-      setTimeout(ok, 50);
-    })));
+    const giro = async (n) => {
+      for (let i = 0; i < n; i++) {
+        const url = `http://x${Math.random().toString(36).slice(2)}${i}.esempio-ostile.com/`;
+        const v = SB.analyze(url, {}, () => {});
+        assert.equal(v.needsLlm, true, url);
+      }
+      await SB._settled();
+    };
     await giro(20);  // tutti insieme, mentre il primo giudizio è ancora in volo
     await giro(20);  // e dopo, a giudizio già in memoria
     assert.equal(giudizi, SB.DEEP_BUDGET);
@@ -102,7 +114,7 @@ test('sottodomini sempre nuovi dello stesso dominio: qualche giudizio del modell
     // Un altro dominio ha il suo conto.
     await giro(1);
     SB.analyze('http://a.altro-dominio.com/', {}, () => {});
-    await new Promise((ok) => setTimeout(ok, 30));
+    await SB._settled();
     assert.equal(giudizi, SB.DEEP_BUDGET + 1);
   } finally {
     SB.setProviders({ llm: null, sandbox: null });
