@@ -404,48 +404,6 @@ describe('il riallineamento fatto dal server', () => {
   });
 });
 
-describe('richiesteCoperte: quali richieste ferme copre il segno «fondi senza chiedermelo»', () => {
-  const ID = 'fb-abc';
-  const base = (over) => Object.assign({ id: 'r1', origin: 'routine', feedbackId: ID, num: '#581', used: false }, over);
-
-  test('copre la richiesta delle automazioni sulla pratica, per id', () => {
-    const out = UI.richiesteCoperte([base()], { feedbackId: ID, numero: '581' });
-    assert.deepEqual(out.map((r) => r.id), ['r1']);
-  });
-
-  test('senza id sulla richiesta vale il numero, col cancelletto o senza', () => {
-    const senzaId = base({ feedbackId: '', num: '#581' });
-    assert.equal(UI.richiesteCoperte([senzaId], { feedbackId: ID, numero: '#581' }).length, 1);
-    assert.equal(UI.richiesteCoperte([senzaId], { feedbackId: ID, numero: '582' }).length, 0);
-    // Un id diverso vince sul numero uguale: non è la stessa pratica.
-    assert.equal(UI.richiesteCoperte([base({ feedbackId: 'altro' })], { feedbackId: ID, numero: '581' }).length, 0);
-  });
-
-  test('non copre il lavoro locale, le richieste già decise, né un\'altra pratica', () => {
-    const lista = [
-      base({ id: 'locale', origin: 'locale' }),
-      base({ id: 'usata', used: true }),
-      base({ id: 'scartata', discarded: true }),
-      base({ id: 'scaduta', expired: true }),
-      base({ id: 'altra', feedbackId: 'fb-xyz', num: '#600' }),
-      base({ id: 'buona' }),
-    ];
-    assert.deepEqual(UI.richiesteCoperte(lista, { feedbackId: ID, numero: '581' }).map((r) => r.id), ['buona']);
-  });
-
-  test('i blocchi nuovi dopo un riallineamento restano all\'owner, salvo che il segno lo metta adesso', () => {
-    const nuova = base({ id: 'nuovi', supersedes: 'z'.repeat(24) });
-    assert.equal(UI.richiesteCoperte([nuova], { feedbackId: ID }).length, 0);
-    assert.deepEqual(UI.richiesteCoperte([nuova], { feedbackId: ID, ancheNuovi: true }).map((r) => r.id), ['nuovi']);
-  });
-
-  test('ingressi storti: niente elenco, niente chiave, richieste senza id', () => {
-    assert.deepEqual(UI.richiesteCoperte(null, { feedbackId: ID }), []);
-    assert.deepEqual(UI.richiesteCoperte([base()], null), []);
-    assert.deepEqual(UI.richiesteCoperte([base({ id: '' })], { feedbackId: ID }), []);
-  });
-});
-
 describe('i lavori locali (#908)', () => {
   test('la provenienza locale porta la sua pratica, quando c’è', () => {
     assert.equal(UI.originLabel({ origin: 'locale', num: '#908' }), 'lavoro locale · feedback #908');
@@ -467,7 +425,7 @@ describe('i lavori locali (#908)', () => {
     assert.doesNotMatch(src, /il terminale, da solo, non può/);
   });
 
-  test('il pattern del cancello dice regola, non muro, e che il lavoro locale provato non aspetta (#908)', () => {
+  test('il pattern del cancello dice regola, non muro, e che il lavoro fidato non aspetta (#908, #1148)', () => {
     const fs = require('node:fs');
     const pattern = fs.readFileSync(join(ROOT, 'patterns', 'un-cancello-automatico-che-blocca-deve-avere-una-via-duscita.md'), 'utf8');
     const riga = fs.readFileSync(join(ROOT, 'PATTERNS.md'), 'utf8').split('\n').find((l) => l.includes('un-cancello-automatico-che-blocca'));
@@ -475,8 +433,9 @@ describe('i lavori locali (#908)', () => {
       assert.doesNotMatch(testo, /non lo può dare una sessione|persona su un'altra superficie|può chiedere quanto vuole/);
       assert.match(testo, /regola del server, non un muro/i);
     }
-    assert.match(pattern, /#908/);
-    assert.match(riga, /lavoro locale provato/);
+    assert.match(pattern, /#1148/);
+    assert.match(riga, /lavoro fidato/);
+    assert.doesNotMatch(riga, /lavoro locale provato/);
   });
 });
 

@@ -19,17 +19,19 @@ chiede, ma **far decidere l'owner su ciò che non viene da lui**:
   o scartata) non si riapre, ma il server ne restituisce il nome lo stesso, e
   chi chiede deve dire com'era finita e come riproporla (#486).
 - **Il sì lo dà l'owner, in Gestione: è una REGOLA del server, non un muro.**
-  Vale per il lavoro senza la prova di chi l'ha chiesto (routine, feedback
-  d'utente). Una sessione locale ha i poteri dell'owner, approvazione
-  compresa: per regola non approva, e i suoi script non lo fanno. Scriverlo
-  come impossibilità tecnica fa progettare guardie contro un muro che non c'è.
-- **Il lavoro locale provato non aspetta (#908).** L5 serve contro gli attacchi,
-  e il lavoro che l'owner chiede in sessione non lo è: pratica dell'owner o di
-  una sessione, con la prova del mittente (`senderProof: 'admin'`) e il segno
-  `localOnly`, fusa con `npm run finish -- --feedback <N>`. Il server fa girare
-  L5 solo per registrare, fonde, scrive i blocchi in una traccia («Fuse senza
-  chiedere» in Automazioni) e chiude la pratica. Il solo prefisso `local:` non
-  basta: senza prova si torna alla richiesta in attesa, col motivo.
+  Vale per il lavoro che non è fidato (routine, feedback d'utente, sessioni
+  col biglietto sporco). Una sessione locale ha i poteri dell'owner, approvazione
+  compresa: per regola non approva né segna fidato, e i suoi script non lo
+  fanno. Scriverlo come impossibilità tecnica fa progettare guardie contro un
+  muro che non c'è.
+- **Il lavoro fidato non aspetta (#908, #1148).** L5 serve contro gli attacchi,
+  e il lavoro fidato non lo è: feedback fidato (lo segna l'owner in Gestione,
+  o nasce tale da un biglietto pulito) e ramo scritto solo da biglietti puliti,
+  con lo sha fuso uguale all'ultimo registrato. Il server fa girare L5 solo per
+  registrare, fonde, scrive i blocchi in una traccia («Fuse senza chiedere» in
+  Automazioni) e chiude la pratica. Né il prefisso `local:` né la prova del
+  mittente bastano: senza fiducia si torna alla richiesta in attesa, col motivo.
+  Le pratiche migrate seguono le regole di prima finché il ramo non ha registro.
 - **Due invarianti non negoziabili, e una scadenza che non è una di loro.**
   Reggono l'eccezione: si applica solo a ciò che è stato ESAMINATO (si registra
   lo `sha`, e si fonde quello, non "il ramo"; se il ramo si muove la richiesta
