@@ -98,3 +98,13 @@ test('un rifiuto del server arriva con la sua frase; consiglio porta gli esiti',
   assert.equal(c.esiti.length, 2);
   assert.deepEqual(ricevute[0].data, { op: 'consiglio', ids: ['D-1', 'D-2'] });
 });
+
+test('archivia e riapri: al server l’operazione e l’id, alla pagina la domanda', async () => {
+  rispondi = (data) => ({ status: 200, body: { result: { ok: true, domanda: { id: data.id, stato: data.op === 'archivia' ? 'chiusa' : 'aperta' } } } });
+  const a = await chiama({ type: MSG.DOMANDA_ARCHIVIA, id: 'D-5' });
+  assert.deepEqual(a, { ok: true, domanda: { id: 'D-5', stato: 'chiusa' } });
+  assert.deepEqual(ricevute[0].data, { op: 'archivia', id: 'D-5' });
+  const r = await chiama({ type: MSG.DOMANDA_RIAPRI, id: 'D-5' });
+  assert.equal(r.domanda.stato, 'aperta');
+  assert.deepEqual(ricevute[0].data, { op: 'riapri', id: 'D-5' });
+});
