@@ -668,7 +668,10 @@ async function main() {
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
-    const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
+    const inPiu = spec.rilancia ? specInPiu() : [];
+    const inPiuMancanti = inPiu.filter((s) => !tracked.has(`${s}.spec.mjs`));
+    if (inPiu.length) console.log(`\n▸ Spec in più chiesti da FILO_SPEC_IN_PIU: ${inPiu.length}${inPiuMancanti.length ? `, non trovati e saltati: ${inPiuMancanti.join(', ')}` : ''}`);
+    const specs = [...new Set([...specsForChangedFiles(changed, [...tracked]), ...inPiu])].filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
     if (specs.length) {
       const schermo = preparaLancioElectron('npx', []);
