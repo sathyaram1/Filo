@@ -1503,6 +1503,8 @@ module.exports = function register(on, ctx) {
       domande: Array.isArray(r.domande) ? r.domande : [],
       riferimenti: r.riferimenti && typeof r.riferimenti === 'object' ? r.riferimenti : {},
       adesso: Number(r.adesso) || 0,
+      // Oltre il tetto dell'elenco il server lo dice: la pagina non deve credere di vederle tutte.
+      altre: r.altre === true,
     };
   }));
 
@@ -1533,6 +1535,16 @@ module.exports = function register(on, ctx) {
     if (!r.ok) return r;
     return { ok: true, esiti: Array.isArray(r.esiti) ? r.esiti : [] };
   }));
+
+  for (const [tipo, op] of [[MSG.DOMANDA_ARCHIVIA, 'archivia'], [MSG.DOMANDA_RIAPRI, 'riapri']]) {
+    on(tipo, ownerOnly(async (msg) => {
+      const id = String(msg?.id || '').trim();
+      if (!id) return { ok: false, error: 'Manca la domanda.' };
+      const r = await chiamaDomande({ op, id });
+      if (!r.ok) return r;
+      return { ok: true, domanda: r.domanda || null };
+    }));
+  }
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
