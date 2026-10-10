@@ -26,14 +26,15 @@ function registra() {
   return { corpi, opts: { fetchImpl, sleep: async () => {}, misureCrediti: () => ({ consumo: CONSUMO, barra: 'assente' }) } };
 }
 
-test('biglietto, sondaggio, rilascio e domanda di chiusura portano il consumo della sessione', async () => {
+test('biglietto, sondaggio, rilascio, domanda di chiusura e battito portano il consumo della sessione', async () => {
   const { corpi, opts } = registra();
   await canale.ticket('parola', opts);
   await canale.probe('parola', opts);
   await canale.release('tkt', '', opts);
   await canale.domandaChiusura({ passphrase: 'parola' }, opts);
   await canale.rispostaChiusura({ passphrase: 'parola', id: 'c1' }, 'niente', opts);
-  assert.deepEqual(corpi.map((c) => c.path), ['routineTicket', 'routineTicket', 'routineRelease', 'routineClosing', 'routineClosing']);
+  await canale.heartbeat('tkt', opts);
+  assert.deepEqual(corpi.map((c) => c.path), ['routineTicket', 'routineTicket', 'routineRelease', 'routineClosing', 'routineClosing', 'routineHeartbeat']);
   for (const c of corpi) {
     assert.deepEqual(c.body.consumo, CONSUMO, c.path);
     assert.equal(c.body.barra, 'assente', c.path);
