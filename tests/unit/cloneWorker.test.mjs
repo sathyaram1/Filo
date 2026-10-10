@@ -121,6 +121,27 @@ test('package-lock diverso dal principale: installazione privata, e il node_modu
   }
 });
 
+test('chi svuota il node_modules del clone da dentro, come npm ci, toglie i collegamenti e non i pacchetti del principale', () => {
+  const s = scena();
+  try {
+    const dest = resolve(s.base, 'lavori', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
+    // npm ci legge le voci di node_modules e le toglie una per una, ricorsivamente.
+    const nm = resolve(dest, 'node_modules');
+    for (const voce of readdirSync(nm)) rmSync(resolve(nm, voce), { recursive: true, force: true });
+    assert.ok(existsSync(s.canarino), 'il principale ha ancora i suoi pacchetti');
+
+    // Un clone nato col collegamento intero si riallinea voce per voce.
+    rmSync(nm, { recursive: true, force: true });
+    symlinkSync(resolve(s.principale, 'node_modules'), nm, process.platform === 'win32' ? 'junction' : 'dir');
+    assert.equal(allineaPacchetti(dest, s.principale, { npmCi: npmMai }).pacchetti, 'collegati');
+    assert.ok(collegato(dest));
+    assert.ok(existsSync(s.canarino));
+  } finally {
+    togliCartella(s.base);
+  }
+});
+
 test('la rimozione toglie il collegamento PRIMA della cartella: il principale resta intero', () => {
   const s = scena();
   try {
