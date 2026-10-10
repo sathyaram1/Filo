@@ -91,6 +91,10 @@ function npmCiDavvero(cartella) {
 }
 
 const leggi = (f) => { try { return readFileSync(f, 'utf8'); } catch (_) { return null; } };
+// I fine riga non cambiano i pacchetti: un checkout con autocrlf non deve costare un'installazione.
+const lock = (dir) => { const t = leggi(resolve(dir, 'package-lock.json')); return t === null ? null : t.replace(/
+/g, '
+'); };
 
 /**
  * `node_modules` del clone: collegato a quello del principale se `package-lock.json` è lo stesso da cui il principale
@@ -99,8 +103,8 @@ const leggi = (f) => { try { return readFileSync(f, 'utf8'); } catch (_) { retur
  */
 export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {}) {
   const nm = resolve(clone, 'node_modules');
-  const lockClone = leggi(resolve(clone, 'package-lock.json'));
-  const lockPrincipale = leggi(resolve(principale, 'package-lock.json'));
+  const lockClone = lock(clone);
+  const lockPrincipale = lock(principale);
   if (lockClone !== null && lockClone === lockPrincipale) {
     if (eLink(nm)) return { ok: true, pacchetti: 'collegati', why: '' };
     if (esisteLink(nm)) rmSync(nm, { recursive: true, force: true }); // un'installazione privata rimasta da un ramo prima
