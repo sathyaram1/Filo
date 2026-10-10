@@ -3063,8 +3063,13 @@
 
   if (mgSearchToggle) {
     mgSearchToggle.addEventListener('click', () => {
-      if (searchMode) closeSearch();
-      else openSearch();
+      if (searchMode) { closeSearch(); return; }
+      // I risultati prendono il posto della lista dei feedback: da un'altra scheda si torna lì prima di cercare.
+      if (!LIST_TABS.includes(schedaPerSezione[sezioneAttiva]) || sezioneAttiva !== 'feedback') {
+        const lista = LIST_TABS.includes(schedaPerSezione.feedback) ? schedaPerSezione.feedback : 'inbox';
+        selectTab(lista);
+      }
+      openSearch();
     });
   }
   if (mgSearchClose) mgSearchClose.addEventListener('click', () => closeSearch());
