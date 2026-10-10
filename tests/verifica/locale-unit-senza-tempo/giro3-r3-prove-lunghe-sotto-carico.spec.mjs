@@ -33,6 +33,7 @@ test('r3 sotto carico doppio le prove lunghe finiscono verdi senza essere chiuse
       p.on('close', (code) => ok({ code, out }));
     });
   } finally {
+    clearTimeout(basta);
     await Promise.all(carico.map((w) => w.terminate()));
   }
   const rossi = esito.out.split('\n').filter((l) => /^not ok|non è andato avanti/.test(l));
