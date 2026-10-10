@@ -55,7 +55,7 @@ test('il clone nasce con l\'origin VERO del principale, node_modules collegato, 
     const originClone = git(dest, ['remote', 'get-url', 'origin']);
     assert.ok(stessoRemoto(originClone, s.origin), `origin del clone: ${originClone}`);
     assert.ok(!stessoRemoto(originClone, s.principale), 'mai il percorso del principale: spedirebbe li\', in silenzio');
-    assert.ok(eLink(resolve(dest, 'node_modules')), 'node_modules e\' un collegamento');
+    assert.ok(collegato(dest), 'node_modules e\' una cartella sua con un collegamento per pacchetto');
     assert.ok(existsSync(resolve(dest, 'node_modules', 'pacchetto', 'canarino.txt')), 'che porta a quello del principale');
     assert.deepEqual(JSON.parse(readFileSync(resolve(dest, MARCATORE_WORKER), 'utf8')).indice, 1);
     assert.deepEqual(datiWorker({ env: {}, root: dest }), { indice: 1, paralleli: 3 });
