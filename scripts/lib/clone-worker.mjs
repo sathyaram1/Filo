@@ -119,10 +119,11 @@ export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {
 /**
  * Prepara (o riprende) il clone del worker `n`: `git clone --reference-if-able <principale> --dissociate <origin>`,
  * controllo che `origin` sia quello del principale, chiavi d'accesso copiate senza stamparle, pacchetti, marcatore,
- * voce nel registro, strumenti per worker. `pushUrl` (solo la misura di K) manda i push su un repo nudo locale.
+ * voce nel registro, strumenti per worker. `pushUrl` e `registra: false` (solo la misura di K) mandano i push su un
+ * repo nudo locale e lasciano il registro ai worker veri.
  */
 export function preparaClone(principale, n, {
-  base = baseCloni(), dest = '', paralleli = 0, pushUrl = '', strumentiDa = TOOLS_ROOT, basePin, npmCi,
+  base = baseCloni(), dest = '', paralleli = 0, pushUrl = '', strumentiDa = TOOLS_ROOT, basePin, npmCi, registra = true,
 } = {}) {
   let i;
   try { i = indiceWorker(n); } catch (e) { return { ok: false, why: e.message }; }
