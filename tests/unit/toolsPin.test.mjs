@@ -463,7 +463,7 @@ test('se la copia non riesce, il giro si FERMA invece di usare gli strumenti del
   const port = srv.address().port;
   // Una destinazione che NON si può creare: un file al posto della cartella.
   const dove = resolve(tmpdir(), `filo-strumenti-bloccata-${process.pid}`);
-  rmSync(dove, { recursive: true, force: true });
+  togliCartella(dove);
   mkdirSync(dirname(dove), { recursive: true });
 
   try {

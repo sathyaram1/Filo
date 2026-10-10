@@ -8,10 +8,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, utimesSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const {
   analizzaRighe, generaRapporto, trovaTranscript, slugProgetto, chiaveSicura,
@@ -170,7 +170,7 @@ test('senza transcript: rapporto minimo con la nota, mai un errore', async () =>
     assert.equal(rep.notes.length, 1);
     assert.match(rep.notes[0], /nessuna cartella di transcript/);
     assert.equal(riassunto(rep).length, 5);
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 test('trova il .jsonl più recente nella cartella del progetto; --transcript e FILO_TRANSCRIPT vincono', async () => {
@@ -196,7 +196,7 @@ test('trova il .jsonl più recente nella cartella del progetto; --transcript e F
     const assente = trovaTranscript({ explicit: join(casa, 'no.jsonl'), cwd, env: {} });
     assert.equal(assente.file, '');
     assert.match(assente.note, /assente/);
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 // I transcript dei sotto-agenti stanno in <sessione>/subagents/*.jsonl coi loro
@@ -231,7 +231,7 @@ test('i sotto-agenti entrano nel conto: costo, token, turni e strumenti sommati,
     const senza = await generaRapporto({ transcript: join(casa, 'altra.jsonl') });
     assert.equal(senza.subagentRuns, 0);
     assert.equal(senza.subagentCostUsd, 0);
-  } finally { rmSync(casa, { recursive: true, force: true }); }
+  } finally { togliCartella(casa); }
 });
 
 // ─── Giro 2 della verifica (16/09/2026) ──────────────────────────────────────
@@ -303,7 +303,7 @@ test('chi rilascia è un sotto-agente: il rapporto è il suo, non la sessione ma
     // Senza finestra, la sessione madre resta la somma di tutto (era così prima).
     const tutto = await generaRapporto({ cwd: progetto, configDir: config });
     assert.equal(tutto.turns, 7);
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
 
 test('da una cartella di lavoro separata (worktree) si trova la cartella dei transcript del checkout principale', async () => {
@@ -328,7 +328,7 @@ test('da una cartella di lavoro separata (worktree) si trova la cartella dei tra
     assert.equal(rep.turns, 1);
     // Dal checkout principale, come prima.
     assert.equal((await generaRapporto({ cwd: repo, configDir: config })).sessionId, 'sess');
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
 
 // ─── Giro del 14/09, terza verifica: due forme vere dei transcript ───────────
@@ -439,7 +439,7 @@ test('i sotto-agenti di un sotto-agente stanno accanto a lui: nel suo rapporto e
     // Senza una chiamata Agent nel transcript nessun fratello entra (era il caso del giro 2).
     const prima = await generaRapporto({ transcript: join(sub, 'agent-prima.jsonl'), cwd: progetto, configDir: config });
     assert.equal(prima.subagentRuns, 0);
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
 
 test('giro 6: il legame figlio → lanciatore si legge dal meta; il tempo resta un ripiego dichiarato; senza transcript indicato si risale al lanciatore', async () => {
@@ -493,7 +493,7 @@ test('giro 6: il legame figlio → lanciatore si legge dal meta; il tempo resta 
     const conOrfano = await generaRapporto({ transcript: join(sub, 'agent-worker.jsonl'), cwd: progetto, configDir: config, role: 'resolver' });
     assert.equal(conOrfano.subagentRuns, 3);
     assert.ok(conOrfano.notes.some((n) => /agent-orfano\.jsonl senza meta/.test(n) && /tempo/.test(n)), conOrfano.notes.join(' | '));
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
 
 test('giro 6: la data della prima riga si trova anche oltre i 64 KB di compito', async () => {
@@ -506,5 +506,5 @@ test('giro 6: la data della prima riga si trova anche oltre i 64 KB di compito',
     const senza = join(base, 'agent-y.jsonl');
     writeFileSync(senza, 'niente\n{"type":"user"}\n');
     assert.ok(Number.isNaN(primoTimestampMs(senza)));
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
