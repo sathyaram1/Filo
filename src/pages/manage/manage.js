@@ -2388,6 +2388,7 @@
         new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
       mgListEmpty.textContent = TAB_EMPTY.inbox;
       setListHead(SENZA_SEZIONI_LABEL, dataLoaded ? currentList.length : null);
+      updateTabCounts();
       renderListBody();
       renderFusioniOrfane();
       return;
@@ -2414,7 +2415,10 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, fusioni });
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, fusioni, livelli: livelliScelti });
+      if (currentTab === 'inbox' && livelliScelti.length) {
+        mgListEmpty.textContent = `Nessun feedback fermo a ${livelliScelti.slice().sort().map((l) => l.toUpperCase()).join(' o ')}.`;
+      }
     }
 
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
@@ -2713,13 +2717,18 @@
     mgReevalMsg.textContent = text || '';
     mgReevalMsg.className = 'mg-reeval-msg' + (kind ? ` mg-${kind}` : '');
   }
+  // Le due barre agiscono su pratiche ferme ai giudici (L2): col filtro che le nasconde agirebbero su ciò che non si vede.
+  function l2Visibili() {
+    return !livelliScelti.length || livelliScelti.includes('l2');
+  }
+
   function updateReevalBar() {
     if (!mgReevalBar) return;
     // Senza il criterio non c'è nessun "bianco": ogni segnalazione cifrata
     // ricadrebbe lì, e la barra offrirebbe di ri-giudicare anche i chiusi.
     const whites = sezioniAttendibili() ? unfilteredFeedbacks() : [];
     // Solo l'owner, solo nei Ricevuti (dove vivono i bianchi), solo se ce n'è.
-    const show = isAdmin && currentTab === 'inbox' && whites.length > 0;
+    const show = isAdmin && currentTab === 'inbox' && l2Visibili() && whites.length > 0;
     mgReevalBar.hidden = !show;
     if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
   }
@@ -2738,7 +2747,7 @@
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
     const blues = alignedFeedbacks();
-    const show = isAdmin && currentTab === 'inbox' && blues.length > 0;
+    const show = isAdmin && currentTab === 'inbox' && l2Visibili() && blues.length > 0;
     mgAlignedBar.hidden = !show;
     if (!show || !mgAlignedBtn) return;
     // Quelli col segno locale approvati vanno nei Lavori locali (#908): la freccia dice dove.
