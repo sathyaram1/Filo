@@ -28,9 +28,9 @@ test('dai log: il TAP di node --test fuori da un terminale (com\'era nella prova
     'ok 27 - verde',
     'not ok 3673 - due invocazioni con lo stesso biglietto accendono UN battito solo',
     '    not ok 2 - un sotto-test, gia\' contato dal suo padre',
-    'not ok 3680 - saltato # SKIP',
+    'not ok 3680 - ancora da fare # TODO',
   ].join('\n');
-  assert.deepEqual(estraiRossi(tap), ['due invocazioni con lo stesso biglietto accendono UN battito solo', 'saltato', 'tests/unit/autoCommitGate.test.mjs']);
+  assert.deepEqual(estraiRossi(tap), ['due invocazioni con lo stesso biglietto accendono UN battito solo', 'tests/unit/autoCommitGate.test.mjs']);
 });
 
 test('dai log: le famiglie dei guasti d\'infrastruttura', () => {
