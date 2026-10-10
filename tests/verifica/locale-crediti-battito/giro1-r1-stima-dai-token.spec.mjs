@@ -23,7 +23,7 @@ let current = null;
 let crediti = null;
 if (SERVER) {
   const fsMod = require(resolve(SERVER, 'src', 'data', 'firestore.js'));
-  fsMod.db = () => current;
+  fsMod.db = () => current();
   crediti = require(resolve(SERVER, 'src', 'routine', 'crediti.js'));
 }
 const { memFirestore } = SERVER ? require(resolve(SERVER, 'test', 'fixtures', 'firestore-mem.js')) : {};
