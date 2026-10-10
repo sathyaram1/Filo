@@ -63,7 +63,8 @@ export function erroriInfrastruttura(testo) {
 
 /**
  * I rossi di un log di `finish:check`, senza doppioni: i file di Playwright e del riepilogo degli unit, e i test di
- * primo livello del TAP che `node --test` scrive quando l'uscita non è un terminale (lì il nome del test). PURA.
+ * primo livello del TAP che `node --test` scrive quando l'uscita non è un terminale (lì il nome del test). Su Windows
+ * Playwright scrive il percorso con le barre rovesciate. PURA.
  */
 export function estraiRossi(testo) {
   const rossi = new Set();
@@ -71,8 +72,8 @@ export function estraiRossi(testo) {
     const tap = riga.match(/^not ok \d+ - (.+?)(\s+#\s*(?:TODO|SKIP)\b.*)?$/i);
     if (tap) { if (!/TODO/i.test(tap[2] || '')) rossi.add(tap[1].replace(/\\+/g, '/')); continue; }
     if (!/(✘|✖|×|^\s*\d+\)\s)/.test(riga)) continue;
-    const m = riga.match(/tests\/[\w./ -]+?\.(?:spec|test)\.mjs/);
-    if (m) rossi.add(m[0]);
+    const m = riga.match(/tests[\\/][\w.\\/ -]+?\.(?:spec|test)\.mjs/);
+    if (m) rossi.add(m[0].replace(/\\+/g, '/'));
   }
   return [...rossi].sort();
 }
