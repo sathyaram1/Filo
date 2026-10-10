@@ -111,7 +111,7 @@ test('package-lock diverso dal principale: installazione privata, e il node_modu
     assert.ok(!existsSync(resolve(s.principale, 'node_modules', 'privato')), 'e l\'installazione privata non e\' finita li\'');
     git(dest, ['checkout', '--', 'package-lock.json']);
     assert.equal(allineaPacchetti(dest, s.principale, { npmCi }).pacchetti, 'collegati', 'tornato uguale: di nuovo collegati');
-    assert.ok(eLink(resolve(dest, 'node_modules')));
+    assert.ok(collegato(dest));
   } finally {
     togliCartella(s.base);
   }
