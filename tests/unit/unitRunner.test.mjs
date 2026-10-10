@@ -27,7 +27,7 @@ import {
   collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
   gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
   allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
-  conTettoDiTempo, TETTO_FILE_MS,
+  conTettoDiTempo, TETTO_FILE_MS, conConcorrenza,
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
@@ -472,6 +472,15 @@ test('ogni corsa ha un tetto di tempo per file, largo, a meno che chi lancia non
   assert.deepEqual(conTettoDiTempo([]), [`--test-timeout=${TETTO_FILE_MS}`]);
   assert.deepEqual(conTettoDiTempo(['--test-timeout', '5000']), ['--test-timeout', '5000']);
   assert.deepEqual(conTettoDiTempo(['--test-timeout=5000']), ['--test-timeout=5000']);
+});
+
+test('worker in parallelo (#1157): ognuno prende la sua parte di CPU, a meno che chi lancia non dica la sua', () => {
+  assert.deepEqual(conConcorrenza(['--x'], { worker: { indice: 1, paralleli: 3 }, cpu: 16 }), ['--test-concurrency=5', '--x']);
+  assert.deepEqual(conConcorrenza([], { worker: { indice: 2, paralleli: 4 }, cpu: 2 }), ['--test-concurrency=1'], 'almeno uno');
+  assert.deepEqual(conConcorrenza(['--x'], { worker: null, cpu: 16 }), ['--x'], 'fuori da un worker decide node, come prima');
+  assert.deepEqual(conConcorrenza([], { worker: { indice: 1, paralleli: 1 }, cpu: 16 }), [], 'un worker solo: tutte le CPU');
+  assert.deepEqual(conConcorrenza(['--test-concurrency', '2'], { worker: { indice: 1, paralleli: 4 }, cpu: 16 }), ['--test-concurrency', '2']);
+  assert.deepEqual(conConcorrenza(['--test-concurrency=2'], { worker: { indice: 1, paralleli: 4 }, cpu: 16 }), ['--test-concurrency=2']);
 });
 
 test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
