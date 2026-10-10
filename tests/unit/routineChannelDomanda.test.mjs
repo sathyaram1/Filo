@@ -6,15 +6,15 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CANALE = join(__dirname, '..', '..', 'scripts', 'routine-channel.mjs');
 const BIGLIETTO = 'b'.repeat(43);
-const CARTELLA = mkdtempSync(join(tmpdir(), 'filo-domanda-canale-'));
+const CARTELLA = cartellaTemporanea('filo-domanda-canale-');
 
 let server;
 let base = '';
