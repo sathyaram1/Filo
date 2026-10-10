@@ -602,15 +602,10 @@ test('la riprova dei rossi sulla fusione passa dal lanciatore: un file fermo si 
     for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs', 'scripts/lib/avanzamento-unit.mjs']) {
       copyFileSync(join(ROOT, f), join(dir, f));
     }
-    writeFileSync(join(dir, 'tests', 'unit', 'fermo.test.mjs'), "import { test } from 'node:test';
-test('prima di fermarsi', () => {});
-setInterval(() => {}, 1000);
-");
+    writeFileSync(join(dir, 'tests', 'unit', 'fermo.test.mjs'), "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
     const modulo = pathToFileURL(join(ROOT, 'scripts', 'lib', 'unit-sulla-fusione.mjs')).href;
-    const codice = `import { lanciaUnit } from ${JSON.stringify(modulo)};
-`
-      + `console.log(JSON.stringify(lanciaUnit(${JSON.stringify(dir)}, ${JSON.stringify(base)}, 'riprova', { file: ['tests/unit/fermo.test.mjs'] })));
-`;
+    const codice = `import { lanciaUnit } from ${JSON.stringify(modulo)};\n`
+      + `console.log(JSON.stringify(lanciaUnit(${JSON.stringify(dir)}, ${JSON.stringify(base)}, 'riprova', { file: ['tests/unit/fermo.test.mjs'] })));\n`;
     const env = { ...process.env, FILO_UNIT_TETTO_FERMO_MS: '3000' };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, ['--input-type=module', '-e', codice], { env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
