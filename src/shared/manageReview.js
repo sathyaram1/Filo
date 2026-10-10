@@ -131,10 +131,6 @@
     const { status, statusReason } = normalizeStatus(fb);
     return status === 'unlabeled' && statusReason === 'attesa_origine';
   }
-  // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
-  function mittenteDaRiconoscere(fb) {
-    return isUnprovenSender(fb) && LOCAL_SENDER_RE.test(String(fb.clientId || ''));
-  }
 
   // Vocabolario unico della macchina a stati (src/shared/feedbackStatus.js).
   // Letto pigramente: nelle pagine filo:// va incluso PRIMA di questo file,
@@ -1770,9 +1766,9 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
-    isLocalOnly, isLocalApproved, isLocalWorkSender, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, isProvenLocalWork, judgesSkippedText,
+    isLocalOnly, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
-    segnaliDeiGiudici, segnalatoComeAttacco, mittenteDaRiconoscere,
+    segnaliDeiGiudici, segnalatoComeAttacco,
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
