@@ -100,6 +100,51 @@ test('dai log: le famiglie dei guasti d\'infrastruttura', () => {
   assert.deepEqual(erroriInfrastruttura('tutto verde'), []);
 });
 
+test('dai log: un test che nomina un guasto nel titolo o nella sua uscita non è un guasto d\'infrastruttura', () => {
+  // Con questa riga verde fra gli unit la misura col comando vero dava sempre «base da rifare» (verifica #1157 giro 3).
+  const verdi = [
+    '    # Subtest: index.lock a terra: niente commit, e la sessione lo sa col motivo di git',
+    '    ok 1 - index.lock a terra: niente commit, e la sessione lo sa col motivo di git',
+    '      ---',
+    '      duration_ms: 12.3',
+    "      error: 'listen EADDRINUSE: :::8089'",
+    '      ...',
+    "# fatal: Unable to create '/x/.git/index.lock': File exists.",
+    'not ok 2 - Killed a meta\'',
+    '  ---',
+    '  stack: ENOSPC: no space left on device',
+    '  ...',
+    '  ok  1 tests\\tab-archive.spec.mjs:15:1 › Xvfb failed to start, per finta (8.0s)',
+    '  1) tests\\menu.spec.mjs:3:1 › Process failed to launch nel titolo',
+    '  ✖ tests/unit/x.test.mjs:4  SIGKILL nel titolo  (gruppo 1)',
+  ].join('\n');
+  assert.deepEqual(erroriInfrastruttura(verdi), []);
+  // I guasti veri restano: fuori dal TAP, nel dettaglio d'errore di Playwright, dopo un blocco YAML chiuso.
+  assert.deepEqual(erroriInfrastruttura(`${verdi}\nxvfb-run: error: Xvfb failed to start`), ['xvfb']);
+  assert.deepEqual(erroriInfrastruttura(`${verdi}\n    Error: electron.launch: Process failed to launch!`), ['avvio']);
+  assert.deepEqual(erroriInfrastruttura(`${verdi}\nfatal: Unable to create '/c/.git/index.lock': File exists.`), ['lock']);
+  // Un `---` qualunque, non dopo un risultato del TAP, non apre un blocco che inghiotte il resto.
+  assert.deepEqual(erroriInfrastruttura('---\nKilled'), ['ucciso']);
+});
+
+test('dai log: il fermo del lanciatore degli unit è un rosso, col file fermo e quelli chiusi insieme', () => {
+  assert.deepEqual(estraiRossi([
+    '[test:unit] ROSSO: tests\\unit\\a.test.mjs non è andato avanti per 20 minuti, e la corsa è stata chiusa.',
+    '[test:unit] chiusi insieme, senza esito: tests/unit/b.test.mjs, tests/unit/c.test.mjs.',
+  ].join('\n')), ['tests/unit/a.test.mjs', 'tests/unit/b.test.mjs', 'tests/unit/c.test.mjs']);
+  assert.deepEqual(estraiRossi('[test:unit] ROSSO: per 20 minuti non è andato avanti niente, e la corsa è stata chiusa.'), ['test:unit fermo']);
+});
+
+test('con una base già rossa, un worker che esce con errore senza rossi suoi cade: i rossi degli altri non lo coprono', () => {
+  const sporca = { ...corsa(1, 20, { codici: [1], rossi: ['lento'] }), rossiPerWorker: [['lento']] };
+  const coperto = { ...corsa(2, 21, { codici: [1, 1], rossi: ['lento'] }), rossiPerWorker: [['lento'], []] };
+  const r = calcolaK([sporca, coperto]);
+  assert.equal(r.k, 1);
+  assert.match(r.motivo, /uscite diverse da zero senza un rosso riconoscibile: worker 2 → 1/);
+  const sani = { ...corsa(2, 21, { codici: [1, 1], rossi: ['lento'] }), rossiPerWorker: [['lento'], ['lento']] };
+  assert.equal(calcolaK([sporca, sani]).k, 2, 'lo stesso rosso della base in ogni worker non è un degrado');
+});
+
 test('pressione, cpu del cgroup e rossi noti', () => {
   assert.equal(pressione('some avg10=2.50 avg60=1.00 avg300=0.10 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0'), 2.5);
   assert.equal(pressione(null), null);
