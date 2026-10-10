@@ -311,6 +311,7 @@ async function main() {
       durateMs: esiti.map((e) => e.durataMs),
       codici: esiti.map((e) => e.codice),
       rossi: [...new Set(logs.flatMap(estraiRossi))].sort(),
+      rossiPerWorker: logs.map(estraiRossi),
       infra: [...new Set(logs.flatMap(erroriInfrastruttura))],
       piccoMb: max('usataMb') || 0,
       tettoMb: max('tettoMb') || 0,
