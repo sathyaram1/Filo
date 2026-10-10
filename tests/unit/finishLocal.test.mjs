@@ -121,6 +121,14 @@ describe('quali spec lanciare', () => {
       assert.match(SORGENTE, /specsForChangedFiles\(changed, \[\.\.\.tracked\]\)/);
     });
   });
+
+  test('FILO_SPEC_IN_PIU aggiunge spec in ogni scrittura, senza doppioni; vuota non aggiunge niente (#1157)', () => {
+    assert.deepEqual(specInPiu({ FILO_SPEC_IN_PIU: 'tab-archive, tests/context-menu.spec.mjs tests\\menu  tab-archive' }),
+      ['tests/tab-archive', 'tests/context-menu', 'tests/menu']);
+    assert.deepEqual(specInPiu({}), []);
+    assert.deepEqual(specInPiu({ FILO_SPEC_IN_PIU: ' , ' }), []);
+    assert.match(SORGENTE, /\.\.\.specsForChangedFiles\(changed, \[\.\.\.tracked\]\), \.\.\.inPiu/, 'si sommano a quelli delle aree');
+  });
 });
 
 describe('la base del confronto è la linea principale REMOTA (feedback #508)', () => {
