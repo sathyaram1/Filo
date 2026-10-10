@@ -840,7 +840,7 @@ export function testoImprontaDiversa(quale, dichiarato, punta, motivo = 'altro_c
 }
 
 /** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */
-export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda'];
 
 // Quante parole vogliono questi comandi DOPO il biglietto (che sta sempre davanti).
 const POSIZIONALI_DOPO_BIGLIETTO = { work: 0, heartbeat: 0, release: 0, compare: 2, deliver: 1 };
@@ -903,7 +903,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -928,7 +928,7 @@ if (isMain) {
   // vuol dire consegnare a vuoto.
   const CAMPI_TESTO = new Set([
     'notes', 'frase', 'text', 'title', 'critique', 'summary', 'report',
-    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role',
+    'userNote', 'guasto', 'reason', 'branch', 'sha', 'status', 'segnala', 'role', 'domanda',
   ]);
   // E quelli che un valore non lo vogliono MAI: sono interruttori. Senza
   // questo elenco `--json` finiva fra i campi con valore, spariva dai
@@ -1366,6 +1366,23 @@ if (isMain) {
         }
         data.sha = punta;
       }
+    }
+    // Una domanda all'owner (#1149) è un oggetto: arriva da file, controllata come la controlla il server.
+    if (intento === 'domanda') {
+      const altri = Object.keys(data).filter((k) => k !== 'domanda');
+      if (typeof data.domanda !== 'string' || altri.length) {
+        console.error(`deliver domanda vuole solo --domanda <file.json>${altri.length ? ` (non ${altri.map((k) => `--${k}`).join(', ')})` : ''}: non ho consegnato niente. In alternativa: node scripts/domanda.mjs chiedi <file.json>.`);
+        process.exit(1);
+      }
+      let testo = '';
+      try { testo = readFileSync(resolve(data.domanda), 'utf8'); } catch (e) {
+        console.error(`Non leggo ${data.domanda} (${e.code || e.message}): non ho consegnato niente.`);
+        process.exit(1);
+      }
+      const { leggiDomandaJson } = await import('./domanda.mjs');
+      const letta = leggiDomandaJson(testo, { conOrigine: false });
+      if (letta.errore) { console.error(letta.errore); process.exit(1); }
+      data.domanda = letta.domanda;
     }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
