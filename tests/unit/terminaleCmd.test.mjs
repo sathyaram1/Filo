@@ -139,7 +139,7 @@ const SOLO_FUORI = { skip: process.platform === 'win32' && 'su Windows lo provan
 test('con l\'eco spento cmd non mostra il prompt: il comando dell\'assistente parte lo stesso', SOLO_FUORI, async () => {
   const qui = join(TMP, 'senza-prompt');
   mkdirSync(qui, { recursive: true });
-  const out = await conCmdFinto(() => T.runCommand('echo x> prova.txt', { shell: 'cmd', cwd: qui, trackCwd: true, timeoutMs: 15_000 }));
+  const out = await conCmdFinto(() => T.runCommand('echo x> prova.txt', { shell: 'cmd', cwd: qui, trackCwd: true, timeoutMs: ATTESA }));
   assert.equal(out.timedOut, false, 'la sessione di cmd non è mai partita: il comando è scaduto');
   assert.equal(out.code, 0, out.stderr);
   assert.equal(readFileSync(join(qui, 'prova.txt'), 'utf8').trim(), 'x');
