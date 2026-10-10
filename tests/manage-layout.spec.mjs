@@ -4,6 +4,7 @@
 // ripristina e la finestra stretta non fa collassare il dettaglio centrale.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -135,7 +136,7 @@ test('le sezioni partono in alto e le aree arrivano in fondo alla finestra', asy
     const geom = await page.evaluate(() => {
       const doc = document.documentElement;
       return {
-        tabsTop: document.getElementById('mgTabs').getBoundingClientRect().top,
+        tabsTop: document.getElementById('mgSezioni').getBoundingClientRect().top,
         gridBottom: document.getElementById('mgReviewGrid').getBoundingClientRect().bottom,
         viewport: doc.clientHeight,
         scrollH: doc.scrollHeight,
@@ -254,8 +255,8 @@ test('le schede senza aree scorrono ancora fino in fondo', async ({ app, openTab
   let almenoUnaLunga = false;
   for (const tab of ['stats', 'models', 'automation', 'log']) {
     const btn = page.locator(`.mg-tab[data-tab="${tab}"]`);
-    if (!(await btn.count()) || !(await btn.isVisible())) continue;
-    await btn.click();
+    if (!(await btn.count())) continue;
+    await apriScheda(page, tab);
     await page.waitForTimeout(300);
     const r = await page.evaluate(() => {
       const doc = document.documentElement;
