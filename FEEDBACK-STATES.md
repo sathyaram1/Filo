@@ -245,12 +245,16 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   rifiuta prima di scrivere.
   La priorità invece la cambiano su ogni stato, Ricevuti compresi, perché non sposta la pratica:
   `owner-feedback.mjs <n> --priorita 0..3`, scritta come il pallino di Gestione (cifrata, `priorityManual`).
-- Alla nascita un lavoro locale provato salta i giudici (`pipeline.skipped:
+- Alla nascita un lavoro locale fidato salta i giudici (`pipeline.skipped:
   'local_proven'`, status `todo`). Alla fusione `npm run finish` manda `feedbackId`
-  (da `--feedback <N>` o da `verify-local.mjs start --feedback <N>`): se il documento
-  è un lavoro locale provato il server esegue L5 solo per registrare i blocchi
-  (`skippedL5: true`), fonde senza chiedere e chiude la pratica. Manca una condizione →
-  la richiesta aspetta il sì dell'owner in Gestione, col motivo.
+  (da `--feedback <N>` o da `verify-local.mjs start --feedback <N>`): se la pratica è
+  fidata e il ramo ha nel registro (`routine-branches`) solo sessioni col biglietto pulito,
+  con la punta che si fonde come ultima voce, il server esegue L5 solo per registrare i
+  blocchi (`skippedL5: true`, motivo `fiducia`), fonde senza chiedere e chiude la pratica.
+  `verify-local start` e `finish` scrivono la voce col biglietto della sessione
+  (`scripts/biglietto.mjs`). Manca una condizione → la richiesta aspetta il sì dell'owner in
+  Gestione, col motivo. I rami nati prima del registro, di pratiche migrate, seguono la
+  regola di prima (prova del mittente o `localApproval`) finché non si chiudono.
 
 ### 4c. Chi nasce senza giudici (#914)
 
