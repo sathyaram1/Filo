@@ -19,7 +19,7 @@ async function conRegoleVecchie(fn, campi = {}) {
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url);
     if ((init.method || 'GET') === 'GET') {
-      return new Response(JSON.stringify({ name: `x/feedback/${ID}`, fields: { statusPublic: { stringValue: 'open' } } }), { status: 200 });
+      return new Response(JSON.stringify({ name: `x/feedback/${ID}`, fields: { statusPublic: { stringValue: 'open' }, ...campi } }), { status: 200 });
     }
     patch.push({ url: u, body: JSON.parse(String(init.body || '{}')) });
     if (u.includes('updatedAt')) return new Response('{"error":{"code":403}}', { status: 403 });
