@@ -62,15 +62,18 @@ const INFRASTRUTTURA = [
  */
 export function righeFuoriDaiTest(testo) {
   const fuori = [];
+  // Il blocco YAML di node --test segue la riga del risultato, allo stesso rientro dei suoi campi, e chiude con `...`.
   let yaml = null;
+  let dopoRisultato = false;
   for (const riga of String(testo || '').split(/\r?\n/)) {
     if (yaml !== null) {
       const rientro = riga.match(/^\s*/)[0].length;
       if (riga.trim() === '...' && rientro === yaml) { yaml = null; continue; }
-      if (!riga.trim() || rientro > yaml) continue;
+      if (!riga.trim() || rientro >= yaml) continue;
       yaml = null;
     }
-    const apre = riga.match(/^(\s*)---\s*$/);
+    const apre = dopoRisultato && riga.match(/^(\s*)---\s*$/);
+    dopoRisultato = /^\s*(not )?ok \d+\b/.test(riga);
     if (apre) { yaml = apre[1].length; continue; }
     if (/^\s*(#|(not )?ok \d+\b|1\.\.\d+\s*$|TAP version)/.test(riga)) continue;
     if (/^\s*(ok|x|✓|✘|✖|×|-|°)\s+\d+\s/.test(riga) || /^\s*\d+\)\s/.test(riga) || /[✘✖×]/.test(riga)) continue;
