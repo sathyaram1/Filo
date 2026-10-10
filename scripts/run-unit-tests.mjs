@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { lottiPerRigaDiComando, costoArgomentoWindows } from './lib/riga-di-comando.mjs';
+import { datiWorker, concorrenzaUnit } from './lib/dati-worker.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
