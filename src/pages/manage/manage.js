@@ -1789,7 +1789,7 @@
       const l = b.dataset.livello;
       b.setAttribute('aria-pressed', livelliScelti.includes(l) ? 'true' : 'false');
       const c = b.querySelector('.mg-livello-count');
-      if (c) c.textContent = n ? countText(n[l]) : '';
+      if (c) c.textContent = n ? ` ${countText(n[l])}` : '';
     });
   }
 
@@ -5600,6 +5600,7 @@
     setTab(tab) { selectTab(tab); },
     setSezione(sezione) { if (schedaPerSezione[sezione]) selectTab(schedaPerSezione[sezione]); },
     sezioneAttiva() { return sezioneAttiva; },
+    apriSegnalazione(id) { fsApriSegnalazione(id); },
     // Domande finte, o { errore } per un guasto finto: il main non le rimpiazza più.
     setDomande(lista, opts) { if (DOMANDE) DOMANDE.imposta(lista, opts); },
     // Rifà la scelta d'apertura coi dati finti già in pagina; `{ comeAvvio: true }` rispetta il clic dell'utente come all'avvio.
