@@ -498,7 +498,7 @@ test('chi sceglie Bash ottiene davvero Bash, e chi non sceglie niente la shell d
   const chiedi = (shell) => new Promise((risolvi, rifiuta) => {
     const sessione = createSession({ shell });
     let uscita = '';
-    const stop = setTimeout(() => { try { sessione.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, 15000);
+    const stop = setTimeout(() => { try { sessione.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, TETTO_ATTESA_MS);
     // `$BASH_VERSION` è vuota in sh e piena in bash: è la shell stessa a dire
     // chi è, invece di fidarsi di quello che abbiamo chiesto noi.
     sessione.exec('echo "sono:${BASH_VERSION:-non-bash}"', {
