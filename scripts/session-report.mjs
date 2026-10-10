@@ -723,7 +723,17 @@ export function finestraOrchestratore(linee) {
   // La finestra arriva fino a adesso: in primo piano dopo la chiamata aperta
   // non c'è niente, in sottofondo i turni d'attesa dopo il lancio sono suoi.
   const confini = [...[...chiamate.values()].map((c) => c.fine), ...rilasci].filter((t) => Number.isFinite(t));
-  const inizio = confini.length ? Math.max(...confini) : -Infinity;
+  let inizio = confini.length ? Math.max(...confini) : -Infinity;
+  // Un turno sta su più righe con la stessa usage: il confine che ne taglia uno va dopo la sua ultima riga,
+  // o le righe scritte dopo (un'altra chiamata nello stesso turno del rilascio) lo farebbero contare due volte.
+  const messaggi = new Map();
+  for (const { e, ms } of voci) {
+    const id = e.type === 'assistant' && e.message && typeof e.message.id === 'string' ? e.message.id : '';
+    if (!id || !Number.isFinite(ms)) continue;
+    const m = messaggi.get(id) || { primo: ms, ultimo: ms };
+    messaggi.set(id, { primo: Math.min(m.primo, ms), ultimo: Math.max(m.ultimo, ms) });
+  }
+  for (const { primo, ultimo } of messaggi.values()) if (primo <= inizio && ultimo > inizio) inizio = ultimo;
   const prima = turni.filter((t) => t <= inizio);
   const dentro = turni.filter((t) => t > inizio);
   return {

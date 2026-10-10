@@ -672,6 +672,19 @@ test('una richiesta fallita («<synthetic>») dopo la fine del worker non accorc
   assert.equal(finestraOrchestratore(righe).attesaPrimaS, 8340, 'da s3 alle 10:01 a s4 alle 12:20, non fino alla richiesta fallita');
 });
 
+test('il turno che rilascia e chiama anche altro, su più righe, resta tutto nella finestra di prima', () => {
+  const riga = (ts, tool) => JSON.parse(orch('o5', ts, { cw: 34000, tool }));
+  const righe = PRINCIPALE.slice(0, 6).concat(
+    JSON.stringify(riga(H('11:00:30'), { type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release abc --role orchestrator' } })),
+    JSON.stringify(riga(H('11:00:31'), { type: 'tool_use', id: 'b2', name: 'Bash', input: { command: 'node scripts/dispatch.mjs --linea-principale' } })),
+    fine('b1', H('11:01:00')), fine('b2', H('11:01:01')),
+    PRINCIPALE[8], PRINCIPALE[9],
+  );
+  const f = finestraOrchestratore(righe);
+  assert.deepEqual(f.righe.map((l) => JSON.parse(l).message.id).filter(Boolean), ['o6', 'o7']);
+  assert.equal(f.attesaPrimaS, 89, 'dall\'ultima riga di o5 a o6');
+});
+
 test('worker morto: il rilascio dell\'orchestratore parte dalla fine del worker di prima, non dal biglietto', async () => {
   const base = cartellaTemporanea('filo-rapporto-morto-');
   try {
