@@ -1219,7 +1219,7 @@ if (isMain) {
         // rilasciare per un worker morto, la finestra lascia fuori i worker
         // dei biglietti prima.
         const { readTicketSince } = await import('./lib/routine-ticket.mjs');
-        rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT, since: readTicketSince(ROOT) });
+        rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT, since: readTicketSince(ROOT, { ticket: args[0] }) });
       } catch (e) {
         // Stessa versione di rapportoVuoto: la sentinella in routineChannelRilascio le confronta.
         rapporto = { v: 3, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
