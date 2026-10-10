@@ -2300,9 +2300,11 @@
     // Sezioni non disegnabili: non c'è niente da numerare. Uscire QUI evita di
     // lasciare "(3) (0) (0) (0)" appiccicato ai bottoni nascosti, pronto a
     // ricomparire al primo dato leggibile che non passa da renderList.
+    updateSezioniCounts();
+    updateLivelliFiltro();
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly, fusioni })
+      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly, fusioni, livelli: livelliScelti })
       : null;
     const capped = counts ? loadHitCap() : false;
     // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
