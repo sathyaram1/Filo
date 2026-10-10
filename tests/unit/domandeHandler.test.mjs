@@ -66,7 +66,7 @@ function chiama(msg) {
 test('elenco: al server va op elenco col delta, alla pagina domande, riferimenti e adesso', async () => {
   rispondi = () => ({ status: 200, body: { result: { ok: true, domande: [{ id: 'D-1' }], riferimenti: { f1: { num: '#8' } }, adesso: 1234 } } });
   const r = await chiama({ type: MSG.DOMANDE_ELENCO, dopo: 1000, extra: 'ignorato' });
-  assert.deepEqual(r, { ok: true, domande: [{ id: 'D-1' }], riferimenti: { f1: { num: '#8' } }, adesso: 1234 });
+  assert.deepEqual(r, { ok: true, domande: [{ id: 'D-1' }], riferimenti: { f1: { num: '#8' } }, adesso: 1234, altre: false });
   assert.equal(ricevute[0].path, '/ownerDomande');
   assert.deepEqual(ricevute[0].data, { op: 'elenco', dopo: 1000 });
 });
