@@ -230,7 +230,7 @@ test('negli stati del lavoro una sessione porta solo pratiche sue o dell’owner
     const r = await mod.scrivi('f3', 'done', 'fatto', { ...OPTS, attore: 'routine' });
     assert.deepEqual([r.ok, r.senzaProva, patch.length], [false, true, 0]);
     assert.doesNotMatch(mod.rifiutoPratica('f3', r), /--riconosci/, '#957: la prova a mano solo da Gestione');
-    assert.match(mod.rifiutoPratica('f3', r), /in Gestione, col tasto «🙋 È mio»/);
+    assert.match(mod.rifiutoPratica('f3', r), /in Gestione, col tasto «🤝 Segna fidato»/);
     assert.doesNotMatch(mod.rifiutoPratica('f3', r), /feedback:ripasso/, '#912: il ripasso non dà la prova al solo nome');
   });
   const segno = { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1790000000000' } } } };
@@ -358,7 +358,7 @@ test('le strade proposte dal rifiuto non rifiutano a loro volta: niente Ricevuti
       }
       if (nome === 'utente in coda') assert.match(testo, /--serve-locale/, nome);
       assert.doesNotMatch(testo, /--riconosci/, nome);
-      if (nome === 'sessione senza prova, pulita') assert.match(testo, /in Gestione, col tasto «🙋 È mio»/, nome);
+      if (nome === 'sessione senza prova, pulita') assert.match(testo, /in Gestione, col tasto «🤝 Segna fidato»/, nome);
       if (/Ricevuti/.test(nome) || /segnalata/.test(nome)) assert.match(testo, /owner/, `${nome}: dice chi decide`);
     });
     assert.deepEqual(vicoli, [], nome);
