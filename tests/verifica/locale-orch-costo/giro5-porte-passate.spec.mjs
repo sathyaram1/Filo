@@ -2,12 +2,12 @@
 // nel rapporto del worker due, su transcript costruiti con la forma di quelli veri. Non apre Filo.
 
 import { test, expect } from '@playwright/test';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const { cartellaTemporanea } = await import(pathToFileURL(resolve(ROOT, 'tests', 'helpers', 'percorsi.mjs')).href);
 const { generaRapporto } = await import(pathToFileURL(resolve(ROOT, 'scripts', 'session-report.mjs')).href);
 
 const T0 = Date.parse('2026-10-01T08:00:00Z');
@@ -22,7 +22,7 @@ const risultato = (min, id, testo) => ({ type: 'user', timestamp: iso(min), mess
 const notifica = (min, id, taskId, stato = 'completed') => ({ type: 'queue-operation', operation: 'enqueue', timestamp: iso(min), content: `<task-notification>\n<task-id>${taskId}</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>${stato}</status>\n<summary>finished</summary>\n</task-notification>` });
 
 async function rapportoDelWorkerDue(principale) {
-  const base = mkdtempSync(join(os.tmpdir(), 'orch-costo-g5p-'));
+  const base = cartellaTemporanea('orch-costo-g5p-');
   const sub = join(base, 'S', 'subagents');
   mkdirSync(sub, { recursive: true });
   writeFileSync(join(base, 'S.jsonl'), principale.map((x) => JSON.stringify(x)).join('\n') + '\n');
