@@ -3080,7 +3080,7 @@
     return c.segnalato ? `${TITOLO_FIDUCIA} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_FIDUCIA;
   }
   // Premuto: da dove viene la fiducia, e che un clic la toglie (se si può mettere si può togliere).
-  const TITOLO_TOGLI_FIDUCIA = 'Un clic la toglie: i lavori nuovi tornano a passare dai giudici, e la fusione a chiederti il via libera.';
+  const TITOLO_TOGLI_FIDUCIA = 'Un clic la toglie: quello che nasce da qui torna a passare dai giudici, e la fusione a chiederti il via libera.';
   function titoloTogliFiducia(fb) {
     return `${MR.fiduciaText(fb)} ${TITOLO_TOGLI_FIDUCIA}`;
   }
@@ -3110,7 +3110,7 @@
       ora.fiduciaDa = { by: 'owner', at: Date.now() };
       if (selectedId === id) reflectManage(ora);
       renderList();
-      setManageMsg(valore ? `Da ora${chi} è fidato.` : `Da ora${chi} non è più fidato: i lavori nuovi passano dai giudici, e la fusione chiede il tuo sì.`, 'ok');
+      setManageMsg(valore ? `Da ora${chi} è fidato.` : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');
     } catch (e) {
       setManageMsg(`${valore ? 'Non segnato fidato' : 'Fiducia non tolta'}${chi}: ${e.message || 'Errore'}`, 'err');
     } finally {

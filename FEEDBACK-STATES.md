@@ -157,7 +157,7 @@ scrive solo il server, le regole la vietano a ogni client. Alla nascita: fidato 
 dall'app (`owner:` con la prova dell'admin), una sessione col biglietto pulito
 (`bigliettoLocale`), un biglietto pulito delle routine, il server (allarmi); tutto il resto
 non fidato. Dopo, solo «🤝 Segna fidato» in Gestione (callable `ownerFiducia`; da riga di
-comando no). Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
+comando no); lo stesso tasto, premuto, la toglie: biglietti e derivati nuovi nascono non fidati, e L5 torna a valere. Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
 (fidati prima) e L5 (§4b, e ROUTINE-AUTH-SPEC.md).
 
 **La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
