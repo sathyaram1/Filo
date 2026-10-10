@@ -165,9 +165,9 @@ scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è
 ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
 Dal #1148 serve solo alle statistiche, alle raffiche e al segno di pericolo: non dà permessi.
 
-**Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:` con la prova): mai `attack`/`spam`; se un
+**Mittenti provati** (`owner:`/`routine:`/`agent:`/`local:` con la prova; per mittente fino al §10, non per fiducia): mai `attack`/`spam`; se un
 livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
-PANEL COMPLETO segnala un fidato (L2 dice attack/spam a verdetti pieni), lo status resta
+PANEL COMPLETO segnala un provato (L2 dice attack/spam a verdetti pieni), lo status resta
 `unlabeled` ma non c'è niente da ri-giudicare — la dashboard lo mostra con la categoria
 segnalata (rosso/arancio, frase "decidi tu") invece del bianco "non filtrato", e il
 bottone «Ri-valuta» lo salta (scelta owner 2026-08-29: la segnalazione resta visibile,
