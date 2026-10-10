@@ -1,5 +1,6 @@
-// Verifica locale «unit-senza-tempo», giro 2, rilievo 1: con la macchina al triplo del carico la corsa intera degli
-// unit non deve tagliare nessun file al tetto di tempo del lanciatore. Carico finto (thread a vuoto), lanciatore vero.
+// Verifica locale «unit-senza-tempo», giro 2, rilievo 1: con la macchina carica la corsa intera degli unit non deve
+// tagliare nessun file al tetto del lanciatore. Carico finto un thread per processore e per mezz'ora al massimo: il PC
+// è condiviso con altri lavori, e al triplo per due ore li faceva cadere (giro 4).
 import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { Worker } from 'node:worker_threads';
@@ -7,12 +8,14 @@ import { availableParallelism } from 'node:os';
 import { resolve } from 'node:path';
 
 const ROOT = resolve(process.cwd());
+const CARICO_PER_MS = 30 * 60_000;
 
 test.setTimeout(120 * 60_000);
 
-test('r1 sotto carico triplo la corsa intera degli unit non taglia nessun file al tetto', async () => {
-  const carico = Array.from({ length: availableParallelism() * 3 }, () => new Worker(
+test('r1 sotto carico la corsa intera degli unit non taglia nessun file al tetto', async () => {
+  const carico = Array.from({ length: availableParallelism() }, () => new Worker(
     'let x = 0; for (;;) { for (let i = 0; i < 1e7; i++) x += Math.sqrt(i); }', { eval: true }));
+  const basta = setTimeout(() => carico.forEach((w) => w.terminate()), CARICO_PER_MS);
   let esito;
   try {
     esito = await new Promise((ok) => {
