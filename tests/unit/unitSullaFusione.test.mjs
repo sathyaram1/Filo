@@ -618,3 +618,11 @@ test('la riprova dei rossi sulla fusione passa dal lanciatore: un file fermo si 
     togliCartella(casa);
   }
 });
+
+test('gli unit della prova non hanno un tempo d\'orologio sopra: li ferma solo la guardia del lanciatore', () => {
+  const testo = readFileSync(join(ROOT, 'scripts', 'lib', 'unit-sulla-fusione.mjs'), 'utf8');
+  const da = testo.indexOf('export function lanciaUnit(');
+  const corpo = testo.slice(da, testo.indexOf('\n}\n', da));
+  assert.ok(da >= 0 && corpo.includes('spawnSync('), 'la prova lancia ancora il lanciatore degli unit');
+  assert.doesNotMatch(corpo, /\btimeout\s*:/, 'con la macchina carica la corsa intera supera qualunque tempo fisso');
+});
