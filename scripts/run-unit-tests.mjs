@@ -28,6 +28,9 @@ export const TETTO_RIGA = Number(process.env.FILO_UNIT_TETTO_RIGA) || 30000;
 const REPORTER_RIEPILOGO = './scripts/lib/riepilogo-unit.mjs';
 const REPORTER_AVANZAMENTO = './scripts/lib/avanzamento-unit.mjs';
 
+/** Solo i file dati, con la stessa guardia della corsa intera: la riprova dei rossi sulla fusione (#1063). */
+export const SOLO = '--solo';
+
 /** PURA. */
 export function isTestFile(name) {
   return /\.test\.mjs$/.test(String(name || ''));
