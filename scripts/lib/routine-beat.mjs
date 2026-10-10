@@ -47,6 +47,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // descrive più niente di vivo: si riparte, non si eredita.
 export const MAX_AGE_MS = 9 * 60 * 60 * 1000;
 
+/** Due percorsi sono la stessa cartella? Su Windows le maiuscole non contano. PURA. */
+export function stessaCartella(a, b, platform = process.platform) {
+  const n = (p) => { const r = resolve(String(p || '')); return platform === 'win32' ? r.toLowerCase() : r; };
+  return n(a) === n(b);
+}
+
 export function beatFile(root) {
   return resolve(root, '.claude', 'routine-beat.json');
 }
