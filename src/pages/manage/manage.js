@@ -1330,6 +1330,7 @@
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
   let fusioniLette = false;
+  let fusioniOk = false;      // l'ultima lettura delle fusioni è riuscita: senza, Routine non dice numeri
   // Una richiesta si manda a fondere UNA volta per segno: un rifiuto o un
   // conflitto non si ritentano da soli a ogni rilettura. id → { fb, segno }.
   const fusioniTentate = new Map();
@@ -1551,6 +1552,7 @@
     if (!UI) return 0;
     const spegni = () => {
       fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+      fusioniOk = false;
       if (mgMergeApprovalsOrphans) {
         mgMergeApprovalsOrphans.replaceChildren();
         mgMergeApprovalsOrphans.hidden = true;
@@ -1580,6 +1582,7 @@
     const primaDelleFusioni = fusioniLette ? live.fotoSezioni() : null;
     fusioni = LIVE.fusioniDa(r, fusioni);
     fusioniLette = true;
+    fusioniOk = true;
     if (primaDelleFusioni && dataLoaded) segnaArrivi(primaDelleFusioni, allFeedbacks);
     // Una richiesta che non c'è più non ha un esito da raccontare.
     const vive = new Set(fusioni.pending.concat(fusioni.failed).map((req) => req.id));
@@ -1588,6 +1591,7 @@
     // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
     // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
     riflettiFusioni();
+    updateSezioniCounts();
     fondiPreapprovateInAttesa();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
     // Le fuse senza chiedere: il controllo a posteriori del segno messo sulla
@@ -1708,6 +1712,7 @@
       });
     }
     aggiornaSchedeVisibili();
+    updateSezioniCounts();
   }
 
   // Una scheda si vede se è della sezione accesa; le schede-lista anche solo se lo stato si legge (mostraSezioni).
@@ -2327,7 +2332,7 @@
     }
   }
 
-  // Domande e le tre schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-…).
+  // Domande e le tre schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md).
   const DOMANDE_LABELS = { domande: 'Da rispondere', 'domande-lavoro': 'In lavorazione', 'domande-archivio': 'Archivio' };
   function updateSezioniCounts() {
     if (!mgSezioni) return;
