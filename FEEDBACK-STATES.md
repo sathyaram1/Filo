@@ -258,16 +258,17 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
 
 ### 4c. Chi nasce senza giudici (#914)
 
-Alla nascita (solo il trigger di creazione) L1 e L2 non girano per chi porta la prova
-scritta dal server o dall'admin, mai per il solo nome (`functions/src/nascita.js`):
+Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il feedback è
+**fidato** (#1148, `functions/src/nascita.js`); il mittente decide solo dove va:
 
-- lavoro locale (§4b): `todo` nei Lavori locali, senza nemmeno L0;
-- sessione per le routine (`local:` + `senderProof: 'admin'`, senza segno: `claude-feedback.mjs
-  --non-locale`): L0, poi `todo` In coda (`pipeline.skipped: 'session_proven'`); la priorità
-  scelta con `--priorita` nasce col documento (`priorityManual`), senza scelta la decide il giudice;
-- routine (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti, derivati, allarmi della
-  costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped: 'routine_proven'`, decisione
-  dell'owner del 04/10). L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
+- lavoro locale fidato (§4b): `todo` nei Lavori locali, senza nemmeno L0;
+- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): L0, poi `todo` In
+  coda (`pipeline.skipped: 'fidato'`); la priorità scelta con `--priorita` nasce col documento
+  (`priorityManual`), senza scelta la decide il giudice;
+- ritrovamento fidato del server (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti,
+  derivati, allarmi della costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped:
+  'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
+  giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
   mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
   - origine dell'owner, di una sessione o del server (mittente provato, anche un derivato già in
     coda) → `todo`;
