@@ -1,10 +1,7 @@
 #!/usr/bin/env node
-// Comando dei clone per worker (#1157): la logica e le sue regole stanno in scripts/lib/clone-worker.mjs.
-//   node scripts/clone-worker.mjs prepara <n> [--paralleli <K>] [--dest <cartella>] [--push-url <url>]
-//   node scripts/clone-worker.mjs pacchetti <n>      (dopo che il clone è sul ramo del lavoro)
-//   node scripts/clone-worker.mjs togli <n>
-//   node scripts/clone-worker.mjs elenco
-// Stampa una riga JSON; uscita 0 = fatto, 1 = no (col motivo), 2 = uso sbagliato.
+// Comando dei clone per worker (#1157); logica e regole in scripts/lib/clone-worker.mjs. `pacchetti` va rilanciato
+// dopo che il clone è sul ramo del lavoro. Una riga JSON; uscita 0 = fatto, 1 = no (col motivo), 2 = uso sbagliato.
+//   node scripts/clone-worker.mjs prepara <n> [--paralleli K] [--dest D] [--push-url U] | pacchetti <n> | togli <n> | elenco
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
