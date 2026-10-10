@@ -163,7 +163,10 @@ deriva_di() {
   EXPECT_ROOT=$(read_field root)
   [ -n "$EXPECTED" ] || return 0
   # L'attesa vale per la directory in cui è stata scritta.
-  if [ -n "$EXPECT_ROOT" ] && [ "$(norm_path "$EXPECT_ROOT")" != "$(norm_path "$dir")" ]; then
+  local attesa
+  norm_path "$EXPECT_ROOT"; attesa=$REPLY
+  norm_path "$dir"
+  if [ -n "$EXPECT_ROOT" ] && [ "$attesa" != "$REPLY" ]; then
     return 0
   fi
   git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || return 0
