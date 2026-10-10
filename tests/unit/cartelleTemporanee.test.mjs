@@ -63,7 +63,7 @@ test('la cartella temporanea nasce con uno spazio nel nome e in forma canonica',
     assert.ok(dir.includes('filo-sentinella-'), `il prefisso di chi chiama deve restare leggibile: ${dir}`);
     assert.equal(dir, percorsoCanonico(dir), 'la cartella deve già essere nella sua forma canonica');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -167,7 +167,7 @@ test('dove il sistema lo permette, i due collegamenti portano davvero al loro co
     assert.ok(lstatSync(join(dir, 'al file.txt')).isSymbolicLink());
     assert.equal(readFileSync(join(dir, 'al file.txt'), 'utf8'), 'file');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -221,6 +221,27 @@ test('nessun test ritenta la pulizia da sé: dopo i tentativi rmSync lancia anco
   assert.deepEqual(colpevoli, [],
     'questi file ritentano la pulizia a mano: usa `togliCartella(cartella)` da ./helpers/percorsi.mjs, '
     + 'che oltre a ritentare non fa rosso il test quando Windows tiene ancora la cartella');
+});
+
+// ── Una cartella si toglie con togliCartella (#1063) ──────────────────────
+// rmSync nudo lancia EBUSY quando un figlio appena uscito o l'antivirus tengono ancora la cartella: sulla macchina
+// carica dell'owner le chiusure locali cadevano così, ogni volta su una prova giusta diversa.
+
+const TOGLIE_NUDO = /\brmSync\s*\([^;]*?\brecursive\b/;
+
+test('nessuno unit test toglie una cartella con rmSync nudo', () => {
+  assert.ok(TOGLIE_NUDO.test('rmSync(dir, { recursive: true, force: true });'));
+  assert.ok(TOGLIE_NUDO.test("fs.rmSync(join(a, 'b'), {\n  force: true, recursive: true,\n});"));
+  assert.ok(!TOGLIE_NUDO.test('rmSync(file, { force: true });'));
+  const colpevoli = [];
+  for (const p of [...fileDiTest(join(TESTS, 'unit')), ...fileDiTest(join(TESTS, 'helpers'))]) {
+    if (p === AMMESSO || p === fileURLToPath(import.meta.url)) continue;
+    if (TOGLIE_NUDO.test(readFileSync(p, 'utf8'))) colpevoli.push(relative(TESTS, p));
+  }
+  assert.deepEqual(colpevoli, [],
+    'questi file tolgono una cartella con rmSync: usa `togliCartella(cartella)` da ./helpers/percorsi.mjs, che ritenta '
+    + 'e, se Windows la tiene ancora, la toglie all\'uscita senza far rosso il test (se la prova ha bisogno che sparisca, '
+    + '`assert.ok(togliCartella(cartella))`)');
 });
 
 test('togliCartella toglie la cartella con quello che contiene', () => {

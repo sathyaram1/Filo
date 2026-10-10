@@ -9,8 +9,9 @@
 //   - resumeTimer ricalcola endsAt = adesso + remainingMs (riparte da dov'era) e
 //     rimuove il campo temporaneo;
 //   - le sveglie (kind:'alarm') NON sono mettibili in pausa (orario assoluto).
+// L'orologio è finto: il tempo passa solo quando lo dice la prova, quindi i residui si confrontano esatti (#1063).
 
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -42,7 +43,9 @@ const KEYS = globalThis.SN_CONST.STORAGE_KEYS;
 
 beforeEach(() => {
   for (const k of Object.keys(store)) delete store[k];
+  mock.timers.enable({ apis: ['Date'], now: Date.UTC(2026, 9, 7, 10) });
 });
+afterEach(() => mock.timers.reset());
 
 test('il modulo espone pauseTimer e resumeTimer', () => {
   assert.equal(typeof M.pauseTimer, 'function');
@@ -57,16 +60,14 @@ test('pauseTimer porta paused a true e congela il tempo rimanente', async () => 
   const [pausedTimer] = await M.listTimers();
   assert.equal(pausedTimer.paused, true, 'dopo pauseTimer il campo paused è true');
   assert.ok(Number.isFinite(pausedTimer.remainingMs), 'salva il tempo rimanente');
-  // ~600s residui (tolleranza generosa per il tempo di esecuzione del test).
-  assert.ok(pausedTimer.remainingMs > 590_000 && pausedTimer.remainingMs <= 600_000,
-    `remainingMs (${pausedTimer.remainingMs}) coerente coi ~600s residui`);
+  assert.equal(pausedTimer.remainingMs, 600_000, 'restano i 600 s: in pausa subito, senza che il tempo passasse');
 });
 
 test('il tempo rimanente NON scorre mentre il timer è in pausa', async () => {
   const t = await M.addTimer({ label: 'x', seconds: 300 });
   await M.pauseTimer(t.id);
   const before = (await M.listTimers())[0].remainingMs;
-  await new Promise((r) => setTimeout(r, 60));
+  mock.timers.tick(60_000);
   const after = (await M.listTimers())[0].remainingMs;
   assert.equal(before, after, 'in pausa il tempo residuo resta invariato');
 });
@@ -74,22 +75,20 @@ test('il tempo rimanente NON scorre mentre il timer è in pausa', async () => {
 test('resumeTimer riporta paused a false, ricalcola la scadenza e pulisce remainingMs', async () => {
   const t = await M.addTimer({ label: 'x', seconds: 120 });
   await M.pauseTimer(t.id);
-  await new Promise((r) => setTimeout(r, 50)); // attesa in pausa: non deve rubare tempo
+  mock.timers.tick(60_000); // un minuto in pausa: non deve rubare tempo
   await M.resumeTimer(t.id);
 
   const [resumed] = await M.listTimers();
   assert.equal(resumed.paused, false, 'dopo resume non è più in pausa');
   assert.equal(resumed.remainingMs, undefined, 'il campo temporaneo è rimosso');
   const remaining = new Date(resumed.endsAt).getTime() - Date.now();
-  // Riparte dai ~120s congelati, non da 120 - (tempo passato in pausa).
-  assert.ok(remaining > 118_000 && remaining <= 120_000,
-    `alla ripresa restano ~120s (${Math.round(remaining / 1000)}s), non scalati dall'attesa in pausa`);
+  assert.equal(remaining, 120_000, 'alla ripresa restano i 120 s congelati, non scalati dal minuto in pausa');
 });
 
 test('gcTimers non fa scattare (ringing) un timer in pausa anche se la scadenza originale è passata', async () => {
   const t = await M.addTimer({ label: 'x', seconds: 1 });
   await M.pauseTimer(t.id);
-  await new Promise((r) => setTimeout(r, 1100)); // supera la scadenza originale
+  mock.timers.tick(1100); // supera la scadenza originale
   const list = await M.gcTimers();
   const g = list.find((x) => x.id === t.id);
   assert.equal(g.paused, true);
@@ -110,8 +109,7 @@ test('addTimer rifiuta una durata non positiva o non interpretabile e non crea n
 test('addTimer crea il timer per una durata valida (>= 1s)', async () => {
   const t = await M.addTimer({ label: 'Pasta', seconds: 90 });
   assert.ok(t && t.id, 'una durata valida produce un timer');
-  const remaining = new Date(t.endsAt).getTime() - Date.now();
-  assert.ok(remaining > 88_000 && remaining <= 90_000, `~90s residui (${Math.round(remaining / 1000)}s)`);
+  assert.equal(new Date(t.endsAt).getTime() - Date.now(), 90_000, 'scade fra 90 s');
   const [stored] = await M.listTimers();
   assert.equal(stored.id, t.id, 'il timer è persistito');
 });
