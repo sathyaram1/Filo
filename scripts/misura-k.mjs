@@ -40,8 +40,8 @@ export function erroriInfrastruttura(testo) {
 export function estraiRossi(testo) {
   const rossi = new Set();
   for (const riga of String(testo || '').split(/\r?\n/)) {
-    const tap = riga.match(/^not ok \d+ - (.+?)\s*(#.*)?$/);
-    if (tap) { if (!/^#\s*TODO/i.test(tap[2] || '')) rossi.add(tap[1].replace(/\\+/g, '/')); continue; }
+    const tap = riga.match(/^not ok \d+ - (.+?)(\s+#\s*(?:TODO|SKIP)\b.*)?$/i);
+    if (tap) { if (!/TODO/i.test(tap[2] || '')) rossi.add(tap[1].replace(/\\+/g, '/')); continue; }
     if (!/(✘|✖|×|^\s*\d+\)\s)/.test(riga)) continue;
     const m = riga.match(/tests\/[\w./ -]+?\.(?:spec|test)\.mjs/);
     if (m) rossi.add(m[0]);
