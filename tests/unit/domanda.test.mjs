@@ -128,3 +128,14 @@ test('elenco a blocchi e frasi d’errore della callable', () => {
   assert.match(messaggioErrore(404, {}), /non ancora pubblicata/);
   assert.equal(messaggioErrore(400, { error: { message: 'troppe_domande: 21 aperte' } }), 'troppe_domande: 21 aperte');
 });
+
+test('archivia e riapri passano al server; un elenco oltre il tetto lo dice', async () => {
+  assert.deepEqual(leggiArgomenti(['archivia', 'D-4']), { cmd: 'archivia', id: 'D-4' });
+  assert.ok(leggiArgomenti(['riapri']).errore);
+  const f = finto({ archivia: { ok: true, domanda: { stato: 'chiusa' } }, elenco: { ok: true, domande: [{ id: 'D-1', priorita: 'bloccante', stato: 'aperta' }], altre: true } });
+  assert.equal(await esegui(['archivia', 'D-4'], f.io), 0);
+  assert.deepEqual(f.chiamate[0], { op: 'archivia', id: 'D-4' });
+  assert.match(f.out.join('\n'), /D-4 è chiusa/);
+  assert.equal(await esegui(['elenco'], f.io), 0);
+  assert.match(f.out.join('\n'), /Ce ne sono altre oltre le prime 1/);
+});
