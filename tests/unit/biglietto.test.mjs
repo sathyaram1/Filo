@@ -216,6 +216,11 @@ test('avvio: server giù → una riga, nessuna eccezione', async () => {
   try {
     const r = await B.avvio({ input: { session_id: 's' }, env: {}, cwd: dir, deps: server({}, { rompi: true }).deps, haCredenziale: conCredenziale });
     assert.match(r.riga, /non preso/);
+    // L'hook stampa solo la prima riga: un errore col corpo JSON della risposta resta su una riga.
+    const corpo = { ...server({}).deps, idToken: async () => { throw new Error('refresh admin fallito (400): {\n  "error": {\n    "message": "INVALID_REFRESH_TOKEN"\n  }\n}'); } };
+    const r2 = await B.avvio({ input: { session_id: 's2' }, env: {}, cwd: dir, deps: corpo, haCredenziale: conCredenziale });
+    assert.doesNotMatch(r2.riga, /\n/);
+    assert.match(r2.riga, /INVALID_REFRESH_TOKEN/);
   } finally { togliCartella(dir); }
 });
 
