@@ -123,6 +123,35 @@ test('un marcatore vecchio di giorni non fa ammazzare un estraneo', () => {
   }
 });
 
+test('worker in parallelo (#1157): il battito nominato da un marcatore di un\'ALTRA cartella non si spegne', () => {
+  // Due clone, due biglietti. Il marcatore finito nel clone B nomina il battito
+  // vivo di A (un clone fatto per copia se lo porta dietro): accendere quello di
+  // B non deve spegnere quello di A.
+  const a = casaFinta();
+  const b = casaFinta();
+  const uccisi = [];
+  const killVero = process.kill.bind(process);
+  process.kill = (pid, sig) => { uccisi.push(pid); if (sig === 0) return killVero(pid, sig); };
+  try {
+    startBeat(a, 'b-a', { spawnImpl: () => ({ pid: 6001, unref() {} }), alive: () => true });
+    assert.equal(readBeat(a).root, resolve(a), 'il marcatore dice di quale cartella è');
+    scriviMarcatore(b, readBeat(a));
+    const r = startBeat(b, 'b-b', { spawnImpl: () => ({ pid: 6002, unref() {} }), alive: () => true });
+    assert.equal(r.started, true);
+    assert.deepEqual(uccisi, [], 'il battito di A resta acceso');
+    assert.equal(readBeat(a).pid, 6001);
+    assert.equal(readBeat(b).pid, 6002);
+
+    // Nella stessa cartella, invece, un biglietto nuovo spegne ancora quello vecchio.
+    startBeat(b, 'b-b2', { spawnImpl: () => ({ pid: 6003, unref() {} }), alive: () => true });
+    assert.deepEqual(uccisi, [6002]);
+  } finally {
+    process.kill = killVero;
+    togliCartella(a);
+    togliCartella(b);
+  }
+});
+
 // ── Lo spegnimento: solo il proprio battito ────────────────────────────────
 
 test('rilasciare un biglietto NON spegne il battito di un altro lavoro', () => {
