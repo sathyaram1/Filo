@@ -639,11 +639,12 @@ export function sommaSottoAgente(rep, sub) {
 }
 
 /**
- * Un rilascio andato a buon fine, riconosciuto da ciò che il canale stampa e non da come è scritto il comando:
- * in cloud il preflight lo consegna col percorso intero fra virgolette. Un rilascio respinto non ha portato il rapporto. PURA.
+ * Il comando chiama il rilascio del canale, comunque sia scritto: in cloud il preflight lo consegna col percorso
+ * intero fra virgolette, e c'è chi mette davanti una variabile o un `cd`. Si leggono le parole, non la grafia. PURA.
  */
-export function rilascioRiuscito(testo) {
-  return /^OK: biglietto rilasciato\b/m.test(String(testo || ''));
+export function eRilascio(comando) {
+  const parole = [...String(comando || '').matchAll(/"([^"]*)"|'([^']*)'|([^\s"']+)/g)].map((m) => m[1] ?? m[2] ?? m[3]);
+  return parole.some((p, i) => /(^|[\\/])routine-channel\.mjs$/.test(p) && parole[i + 1] === 'release');
 }
 
 /**
@@ -695,13 +696,13 @@ export function finestraOrchestratore(linee) {
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
         if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
+        if (b.input && eRilascio(b.input.command)) rilasci.push(ms);
       }
     } else if (e.type === 'user') {
       for (const b of blocchi) {
-        if (!b || b.type !== 'tool_result') continue;
+        if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
         const testo = testoDi(b.content);
         const c = chiamate.get(b.tool_use_id);
-        if (!c) { if (rilascioRiuscito(testo)) rilasci.push(ms); continue; }
         if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || ''; continue; }
         c.fine = ms;
       }
