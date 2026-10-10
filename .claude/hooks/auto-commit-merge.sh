@@ -22,8 +22,8 @@ git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 # ─── QUELLO CHE CLAUDE CODE PASSA ALL'HOOK ──────────────────────────────────
 #
-# Un JSON su stdin, con il nome dell'evento: serve solo quello, per rispondere
-# nella forma che Claude Code ascolta (piu' sotto). Da un terminale, senza un
+# Un JSON su stdin: il nome dell'evento (per rispondere nella forma che Claude
+# Code ascolta, piu' sotto), il file toccato, cwd, transcript e sessione. Da un terminale, senza un
 # tubo, non si legge niente: resterebbe in attesa di una riga che non arriva.
 HOOK_INPUT=""
 [ -t 0 ] || HOOK_INPUT=$(cat 2>/dev/null)
