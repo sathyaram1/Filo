@@ -646,6 +646,18 @@ export function sommaSottoAgente(rep, sub) {
  * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
  * col suo tool-use-id, non quel risultato. PURA.
  */
+export function finestraOrchestratore(linee) {
+  return finestraDalleVoci(linee);
+}
+
+/**
+ * Un rilascio andato a buon fine, riconosciuto da ciò che il canale stampa e non da come è scritto il comando:
+ * in cloud il preflight lo consegna col percorso intero fra virgolette. Un rilascio respinto non ha portato il rapporto. PURA.
+ */
+export function rilascioRiuscito(testo) {
+  return /^OK: biglietto rilasciato\b/m.test(String(testo || ''));
+}
+
 /**
  * L'intestazione di una notifica di Claude Code, solo dove la mette lui (coda, allegato, messaggio di testo):
  * un turno o il risultato di uno strumento che la cita non è una notifica. Fino al riassunto, perché il
