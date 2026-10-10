@@ -584,9 +584,9 @@ describe('il no del server remoto e l\'astensione arrivano alla sessione, in un 
 // ─── Giro 5 della verifica (16/09/2026): due rilievi messi da parte ──────────
 //
 // (1) Quando è il COMMIT a non riuscire (index.lock a terra, pre-commit che
-// rifiuta) l'hook taceva: /dev/null su add e commit. (2) L'hook gira su tutte
-// le cartelle di lavoro e diceva i guai delle ALTRE con le parole di un
-// problema tuo: la sessione andava a finire il rebase di qualcun altro.
+// rifiuta) l'hook taceva: /dev/null su add e commit. (2) I guai delle ALTRE
+// cartelle arrivavano con le parole di un problema tuo: dal #1157 l'hook non
+// le guarda piu'.
 describe('un commit che non riesce, e i guai delle altre cartelle, arrivano alla sessione', () => {
   function runHookRaw(work, stdin) {
     const ambiente = { ...process.env };
