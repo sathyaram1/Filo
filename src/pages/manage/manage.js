@@ -1389,7 +1389,10 @@
     if (!fb) return;
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
-    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
+    if (sezioniAttendibili()) {
+      mostraNelFiltro(fb);
+      selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
+    }
     openDetail(fb._id);
   }
 
@@ -1686,8 +1689,14 @@
     }
     if (DOMANDE && DOMANDE_TABS.includes(tab)) DOMANDE.mostra(tab);
     // I caricamenti pigri ascoltano questo, non il clic: una scheda si mostra anche da una sezione o all'apertura.
-    document.dispatchEvent(new CustomEvent('mg-scheda', { detail: { tab } }));
+    document.dispatchEvent(new CustomEvent('mg-scheda', { detail: { tab, apertura } }));
   }
+
+  // Le domande si rileggono a ogni apertura di una loro scheda; all'avvio le ha già chieste init.
+  document.addEventListener('mg-scheda', (e) => {
+    if (DOMANDE && DOMANDE_TABS.includes(e.detail.tab) && !e.detail.apertura) DOMANDE.carica();
+  });
+  if (DOMANDE) DOMANDE.alCambio(() => updateSezioniCounts());
 
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
@@ -1766,8 +1775,8 @@
 
   // Aprire una pratica precisa (avviso, statistiche, ricerca) la deve far vedere anche col filtro acceso.
   function mostraNelFiltro(fb) {
-    if (!fb || !livelliScelti.length) return;
-    if (!MR.filtraLivelli([fb], livelliScelti, { fusioni }).length) livelliScelti = [];
+    if (!fb || !livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
+    if (!MR.filtraLivelli([fb], livelliScelti, { releasedVersion, fusioni }).length) livelliScelti = [];
   }
 
   function updateLivelliFiltro() {
@@ -5930,32 +5939,25 @@
     if (mgSmRegistryList) mgSmRegistryList.appendChild(makeRegistryRow('', {}));
   });
 
-  // Caricamento pigro: avviene la prima volta che l'utente seleziona la tab
-  // "Modelli di supporto". La funzione selectTab già esiste e gestisce il
-  // pannello; qui interceptiamo il click sulla tab models.
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'models') return;
+  // Caricamento pigro: la prima volta che la scheda "Modelli di supporto" si mostra.
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab !== 'models') return;
     if (!smLoaded && !smLoading) loadSupportModels();
   });
 
   // Tab "Log": ricarica il log dei worker a OGNI apertura (non solo la prima) —
   // vogliamo vedere gli spawn nuovi dall'ultima volta. È una singola lettura di
   // documento, quindi rileggerla a ogni click è a costo trascurabile.
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'log') return;
-    loadWorkerLog();
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab === 'log') loadWorkerLog();
   });
 
   // Tab "Ricevuti" (l'avviso da decidere) e "Automazioni" (la traccia delle
   // decisioni passate): le fusioni si rileggono a OGNI apertura — una
   // richiesta già decisa o appena arrivata renderebbe la sezione una
   // fotografia vecchia.
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || (btn.dataset.tab !== 'automation' && btn.dataset.tab !== 'inbox')) return;
-    loadMergeApprovals();
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab === 'automation' || e.detail.tab === 'inbox') loadMergeApprovals();
   });
 
   // ══ Tab "Statistiche feedback" (#496) ═══════════════════════════════════
@@ -7377,22 +7379,18 @@
   function fsApriSegnalazione(id) {
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) { toast('Questa segnalazione non è fra quelle caricate nella lista'); return; }
-    const ST = window.SN_FB_STATUS;
+    // La stessa scheda della lista (manageTabFor): con tabFor un lavoro locale si apriva «In coda», dove non c'è.
     let tab = 'inbox';
-    try {
-      const n = MR.normalizeStatus(fb) || {};
-      if (n.status && ST && ST.tabFor) tab = ST.tabFor(n.status) || 'inbox';
-    } catch (_) { /* senza stato leggibile si apre dai Ricevuti */ }
+    try { tab = MR.manageTabFor(fb, { releasedVersion, fusioni }) || 'inbox'; } catch (_) { /* senza stato leggibile si apre dai Ricevuti */ }
+    mostraNelFiltro(fb);
     selectTab(tab);
     openDetail(id);
   }
 
   // La scheda si rilegge a OGNI apertura: nel frattempo le routine possono
   // aver lavorato, e una fotografia vecchia qui è peggio di nessuna.
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'fbstats') return;
-    loadFsData();
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab === 'fbstats') loadFsData();
   });
 
   // …e anche a pagina ferma: il main avvisa quando l'elenco cambia (una

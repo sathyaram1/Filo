@@ -105,8 +105,7 @@
   });
 
   // Si rilegge a ogni apertura della scheda, e quando chi guarda entra o esce.
-  const tab = document.querySelector('.mg-tab[data-tab="stats"]');
-  if (tab) tab.addEventListener('click', () => { carica(); });
+  document.addEventListener('mg-scheda', (e) => { if (e.detail && e.detail.tab === 'stats') carica(); });
   if (window.filo && window.filo.onBroadcast) {
     window.filo.onBroadcast((m) => { if (m && m.type === (MSG.AUTH_CHANGED || 'auth_changed')) carica(); });
   }
