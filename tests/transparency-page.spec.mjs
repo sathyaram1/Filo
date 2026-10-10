@@ -162,9 +162,9 @@ test('un link a una fonte apre una scheda e non porta via la pagina interna', as
 //    privacy leggeva la politica sui modelli credendo fosse quella (#515).
 test('una sezione non ancora scritta lo dice, invece di mostrarne un\'altra al suo posto', async ({ app, openTab }) => {
   const esistenti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.ids());
-  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id));
+  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.filter((n) => !n.nota).map((n) => n.id));
   const mancante = previsti.find((i) => !esistenti.includes(i));
-  test.skip(!mancante, 'tutte le sezioni hanno il loro documento');
+  test.skip(!mancante, 'nessuna sezione mancante senza nota: quelle con la nota le prova il test del #888');
 
   const page = await openTab(`${URL}?doc=${mancante}`);
   await expect(page.locator('#title')).not.toHaveText('Politica sui modelli');
@@ -178,9 +178,9 @@ test('una sezione non ancora scritta lo dice, invece di mostrarne un\'altra al s
 // prima, dall'indirizzo si otteneva la spiegazione e dalla barra niente.
 test('una sezione non ancora scritta si spiega anche cliccandola nella barra', async ({ app, openTab }) => {
   const esistenti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.ids());
-  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id));
+  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.filter((n) => !n.nota).map((n) => n.id));
   const mancante = previsti.find((i) => !esistenti.includes(i));
-  test.skip(!mancante, 'tutte le sezioni hanno il loro documento');
+  test.skip(!mancante, 'nessuna sezione mancante senza nota: quelle con la nota le prova il test del #888');
 
   const page = await openTab(URL);
   await expect(page.locator('#title')).toHaveText('Politica sui modelli');
@@ -197,6 +197,50 @@ test('una sezione non ancora scritta si spiega anche cliccandola nella barra', a
   }));
   expect(tab.tab, 'la voce non si raggiunge con il tabulatore').toBeGreaterThanOrEqual(0);
   expect(tab.nome).toMatch(/non ancora scritta/);
+});
+
+// #888 — «Come si sostiene» resta in arrivo, ma aperta dice quando arriverà e
+// com'è oggi, con le parole dell'owner. Dall'indirizzo e dalla barra uguale.
+test('la sezione su come Filo si sostiene dice com\'è oggi, invece del solo «non ancora scritta»', async ({ app, openTab }) => {
+  const nota = await app.evaluate(() => globalThis.SN_TRANSPARENCY.nota('business'));
+  expect(nota).toContain('Fino ad allora è tutto offerto');
+
+  const page = await openTab(URL);
+  await expect(page.locator('#title')).toHaveText('Politica sui modelli');
+  const voce = page.locator('#nav a[href*="doc=business"]');
+  await expect(voce).toHaveClass(/is-soon/);
+  await voce.click();
+
+  await expect(page.locator('#title')).toHaveText('Come si sostiene');
+  await expect(page.locator('#doc-body p').first()).toHaveText(nota);
+  await expect(page.locator('#subtitle')).toHaveText('');
+  await expect(page.locator('#doc-body')).not.toContainText('non è ancora scritta');
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+  await expect(page.locator('#nav a[href*="doc=business"]')).toHaveClass(/is-soon/);
+  await expect(page.locator('#nav a[href*="doc=business"]')).toHaveClass(/is-active/);
+  await page.screenshot({ path: 'tests/.shots/888-trasparenza-business.png' });
+
+  // Dall'indirizzo, scritto come capita, la stessa pagina.
+  const diretta = await openTab(`${URL}?doc=%20Business%20`);
+  await expect(diretta.locator('#doc-body p').first()).toHaveText(nota);
+  // Col nome che si legge nella barra, la stessa sezione; e così anche un documento scritto.
+  const perNome = await openTab(`${URL}?doc=Come%20si%20sostiene`);
+  await expect(perNome.locator('#doc-body p').first()).toHaveText(nota);
+  await expect(perNome.locator('#nav a[href*="doc=business"]')).toHaveClass(/is-active/);
+  const modelli = await openTab(`${URL}?doc=Modelli`);
+  await expect(modelli.locator('#title')).toHaveText('Politica sui modelli');
+
+  // In arrivo resta raggiungibile da tastiera e lo dice anche senza mouse (#515).
+  const raggiungibile = await page.locator('#nav a[href*="doc=business"]').evaluate((el) => ({
+    tab: el.tabIndex, nome: el.getAttribute('aria-label') || '',
+  }));
+  expect(raggiungibile.tab).toBeGreaterThanOrEqual(0);
+  expect(raggiungibile.nome).toMatch(/non ancora scritta/);
+
+  // Privacy ha il suo documento: la nota non ci finisce dentro.
+  const privacy = await openTab(`${URL}?doc=privacy`);
+  await expect(privacy.locator('#title')).toHaveText('Privacy');
+  await expect(privacy.locator('#doc-body')).not.toContainText(nota);
 });
 
 test('lo stesso documento chiesto con le maiuscole resta lo stesso documento', async ({ openTab }) => {

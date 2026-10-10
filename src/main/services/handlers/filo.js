@@ -8,6 +8,7 @@ module.exports = function register(on, ctx) {
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
+  const { SN_CONST } = globalThis;
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
   const Onboarding = globalThis.SN_ONBOARDING;
@@ -395,12 +396,12 @@ module.exports = function register(on, ctx) {
   on(MSG.FILO_GET_ONBOARDING, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     if (!Onboarding) return { ok: true, onboarding: { done: true, ticked: [], thread: [] }, ready: false };
-    // Senza un modello a disposizione (nessun accesso, nessuna chiave) Filo non
-    // può sostenere una conversazione: l'intervista resta in attesa e la home
-    // mostra come attivare Filo. Aprirla comunque significherebbe accogliere
-    // l'utente con una bolla d'errore. Appena c'è la chiave, parte da sola.
+    // Senza un modello che la chat possa chiamare l'intervista resta in attesa
+    // e la home dice cosa manca: accoglierlo con una bolla d'errore sarebbe
+    // peggio. La domanda è «questa chiamata parte?», non «c'è una chiave
+    // intestata al fornitore dichiarato»: quel campo può essere vecchio (#663).
     const settings = await ctx.getEffectiveSettings();
-    const ready = !!(settings.apiKeys?.[settings.provider]);
+    const ready = SN_CONST.canServeAction(settings, SN_CONST.ACTIONS.FILO_CHAT);
     let state = await FiloMem.getOnboarding();
     // `peek`: chi legge soltanto (Preferenze, per rileggere le interviste
     // conservate) non deve aprire niente né prenotare la ripresa di un turno.
@@ -478,7 +479,24 @@ module.exports = function register(on, ctx) {
   // file dell'editor, ci scrive l'azione SALVA_APPUNTO e si leggono/modificano
   // aprendo l'editor come qualsiasi altro documento.
 
-  on(MSG.FILO_GET_TIMERS, soloFilo(async () => ({ ok: true, timers: await FiloMem.gcTimers() })));
+  // Una scadenza la vedono tutte le finestre della stessa vista (le incognito
+  // condividono l'overlay in RAM): se suonassero tutte sarebbero due copie dello
+  // stesso motivo, sfasate fra loro. Suona la più anziana, e quando si chiude il
+  // turno passa alla successiva; il pulsante che ferma resta invece in tutte.
+  const suonaQui = (win) => {
+    try {
+      if (!win || win.isDestroyed()) return false;
+      const pari = require('electron').BrowserWindow.getAllWindows().filter((w) => {
+        try { return !w.isDestroyed() && w._filoTabs && !!w._filoIncognito === !!win._filoIncognito; } catch (_) { return false; }
+      });
+      if (!pari.length) return false;
+      return pari.reduce((a, b) => (a.id <= b.id ? a : b)).id === win.id;
+    } catch (_) { return true; }
+  };
+
+  on(MSG.FILO_GET_TIMERS, soloFilo(async (msg, sender) => ({
+    ok: true, timers: await FiloMem.gcTimers(), suona: suonaQui(winOf(sender)),
+  })));
 
   on(MSG.FILO_ADD_TIMER, soloFilo(async (msg) => {
     const t = await FiloMem.addTimer({ label: msg.label, seconds: msg.seconds });

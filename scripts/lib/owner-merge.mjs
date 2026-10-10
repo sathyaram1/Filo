@@ -37,6 +37,7 @@
 // è il pezzo che decide cosa legge l'owner e con quale uscita si chiude.
 
 import { findAdminRefreshToken, mintIdToken } from './firestore-auth.mjs';
+import { fetchRitentato, descriviErroreDiRete } from './rete.mjs';
 
 // Dove vive il server. `FILO_ROUTINE_API` esiste per i test e per un eventuale
 // ambiente di prova: NON è un segreto, è solo un indirizzo.
@@ -284,8 +285,8 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
       return '✗ Non trovo le tue credenziali di proprietario su questa macchina.\n'
         + '  Servono per chiedere la fusione al server: node scripts/admin-login.mjs';
     case 'unreachable':
-      return `✗ Server non raggiungibile${r.reason ? ` (${r.reason})` : ''}: nessuna fusione è avvenuta.\n`
-        + '  Il lavoro è al sicuro sul suo ramo: riprova più tardi.';
+      return `✗ Server non raggiungibile: nessuna fusione è avvenuta.\n${r.reason ? `  ${r.reason}\n` : ''}`
+        + '  Non è un problema di credenziali. Il lavoro è al sicuro sul suo ramo: riprova più tardi.';
     default:
       return `✗ Fusione non riuscita${r.reason ? `: ${r.reason}` : ''}. Nessuna fusione è avvenuta.`;
   }
@@ -314,36 +315,30 @@ export function exitCodeForOwnerMerge(reply) {
  * La domanda al server: "fondi questo ramo, che alla mia ultima verifica era
  * questo commit". Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], provaUnit = null, fetchImpl = fetch, url = OWNER_MERGE_URL, listUrl = OWNER_MERGE_APPROVALS_URL } = {}) {
+export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], provaUnit = null, fetchImpl = fetch, mintImpl = fetch, attese = null, url = OWNER_MERGE_URL, listUrl = OWNER_MERGE_APPROVALS_URL } = {}) {
   const refresh = findAdminRefreshToken();
   if (!refresh) return { outcome: 'no_owner_credential' };
 
   let idToken;
   try {
-    idToken = await mintIdToken(refresh);
+    idToken = await mintIdToken(refresh, { fetchImpl: mintImpl, ...(attese ? { attese } : {}) });
   } catch (e) {
-    return { outcome: 'denied', reason: String((e && e.message) || e).slice(0, 200) };
+    // Solo un no esplicito alla credenziale è «non riconosciuto»; la rete che cade è «non raggiungibile» (#933).
+    if (e && e.credenziale) return { outcome: 'denied', reason: `il servizio dei token ha rifiutato la credenziale (${e.status}): ${String(e.dettaglio || '').slice(0, 160)}` };
+    return { outcome: 'unreachable', reason: String((e && (e.motivo || e.message)) || e).slice(0, 300) };
   }
 
-  const richiesta = () => fetchImpl(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ data: {
-      branch: String(branch || ''), sha: String(sha || ''),
-      ...(feedbackId ? { feedbackId: String(feedbackId) } : {}),
-      ...(feedbackId && Array.isArray(pendingParts) && pendingParts.length ? { pendingParts } : {}),
-      ...(provaUnit && typeof provaUnit === 'object' ? { provaUnit } : {}),
-    } }),
-  });
   try {
-    let res;
-    try {
-      res = await richiesta();
-    } catch (e) {
-      // Dopo minuti di test la connessione tenuta viva può essere già chiusa dall'altra parte (#933): un altro tentativo.
-      if (!erroreDiConnessione(e)) throw e;
-      res = await richiesta();
-    }
+    const res = await fetchRitentato(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ data: {
+        branch: String(branch || ''), sha: String(sha || ''),
+        ...(feedbackId ? { feedbackId: String(feedbackId) } : {}),
+        ...(feedbackId && Array.isArray(pendingParts) && pendingParts.length ? { pendingParts } : {}),
+        ...(provaUnit && typeof provaUnit === 'object' ? { provaUnit } : {}),
+      } }),
+    }, { fetchImpl, ...(attese ? { attese } : {}) });
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
@@ -353,7 +348,8 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', pendin
     return Object.assign(reply, { requestState: stato.state },
       stato.outcome ? { requestOutcome: stato.outcome } : {}, stato.motivo ? { requestCheck: stato.motivo } : {});
   } catch (e) {
-    return { outcome: 'unreachable', reason: String((e && e.message) || e).slice(0, 200) };
+    const volte = e && e.tentativi > 1 ? `, ${e.tentativi} tentativi` : '';
+    return { outcome: 'unreachable', reason: `rete verso il server: ${descriviErroreDiRete(e)}${volte}`.slice(0, 300) };
   }
 }
 

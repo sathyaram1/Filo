@@ -99,6 +99,20 @@
   // come sorgente di verità: chi legge `.value`, ascolta `change` o usa
   // Playwright `selectOption` continua a funzionare senza modifiche.
   //
+  // Il fuoco resta sull'ultimo controllo usato, che è anche quello su cui si
+  // chiede a Filo di cambiare idea: saltarlo nel riallineamento gli lascia
+  // mostrare il valore vecchio (#667). Si salta solo ciò che l'utente ha sotto le dita ADESSO.
+  const CAMPI_DI_TESTO = new Set(['text', 'search', 'url', 'email', 'password', 'tel', 'number', '']);
+  function staUsandoAdesso(el) {
+    if (!el || el.nodeType !== 1) return false;
+    try { if (el.matches(':active')) return true; } catch (_) {}
+    const doc = el.ownerDocument || document;
+    if (el !== doc.activeElement) return false;
+    if (el.isContentEditable) return true;
+    if (el.tagName === 'TEXTAREA') return true;
+    return el.tagName === 'INPUT' && CAMPI_DI_TESTO.has(String(el.type || '').toLowerCase());
+  }
+
   // Colori (richiesta esplicita dell'utente): l'opzione SELEZIONATA e quella in
   // HOVER usano lo stesso arancione (--sn-accent) a due opacità diverse
   // (maggiore per la selezionata); quando un'opzione è insieme selezionata e in
@@ -319,5 +333,5 @@
     }
   }
 
-  window.SN_PAGE_BOOTSTRAP = { applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects };
+  window.SN_PAGE_BOOTSTRAP = { applyTheme, applyTextScale, applyThemeTokens, enhanceSelect, enhanceSelects, staUsandoAdesso };
 })();

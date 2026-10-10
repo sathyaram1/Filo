@@ -63,7 +63,8 @@
   // Ignoriamo silenziosamente le ricerche oltre questo limite.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
 
-  function isOpen() { return !!root; }
+  // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
+  function isOpen() { return !!(root && root.isConnected); }
 
   function close() {
     if (!root) return;
@@ -84,7 +85,8 @@
   }
 
   function open(context) {
-    if (root) return;
+    if (isOpen()) return;
+    if (root) close();
     history = [];
     ripiegoDetto = false;
     ripiegoDaDire = '';
@@ -293,6 +295,27 @@
     conv.scrollTop = conv.scrollHeight;
     if (role === 'assistant') diciRipiego();
     return msg;
+  }
+
+  // Il tasto che porta dove si toglie l'ostacolo, sotto il messaggio d'errore.
+  // Dove si rimedia lo dice SN_CHAT_ERRORS, non un elenco di casi scritto qui.
+  function mostraRimedio(afterEl, err) {
+    const CE = globalThis.SN_CHAT_ERRORS;
+    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(err) : null;
+    if (!afterEl || !pagina) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-choices';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-choice';
+    btn.textContent = pagina.label;
+    btn.addEventListener('click', () => {
+      try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
+    });
+    wrap.appendChild(btn);
+    afterEl.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
   }
 
   // Render dei bottoni "choices" sotto un messaggio dell'assistente.
@@ -1166,7 +1189,13 @@
         payload,
         diceRipiego: true,
       });
-      if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
+      // Col suo codice: senza, la frase già scritta per l'utente («serve un
+      // invito») diventava «qualcosa è andato storto» (#663).
+      if (!res?.ok) {
+        const CE = globalThis.SN_CHAT_ERRORS;
+        throw CE ? CE.fromResponse(res, I18n.t('err_provider_failed'))
+          : new Error(res?.error || I18n.t('err_provider_failed'));
+      }
       // Risposta pagata coi crediti di Filo perché OpenRouter ha rifiutato la chiave (#662): la
       // riga della chat, una volta per serie, non a ogni passo che l'agente fa da solo.
       // Sotto la risposta, come in chat: la scrive il prossimo messaggio di Filo (o la fine del turno).
@@ -1459,6 +1488,9 @@
         : (CE ? CE.sentence(err) : raw);
       assistantEl = appendChatMessage('assistant', errText);
       assistantEl.classList.add('sn-sidebar-msg-error');
+      // La frase nomina la pagina dove si rimedia; da un sito qualunque
+      // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
+      mostraRimedio(assistantEl, err);
       // In caso d'errore, se l'utente aveva la chat collassata e questo è
       // un proseguimento automatico, ripristina lo stato precedente.
       if (wasCollapsed && !userMessage) collapse({ ai: false });

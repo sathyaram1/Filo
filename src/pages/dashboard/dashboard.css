@@ -837,6 +837,12 @@ html, body {
   font-family: inherit;
 }
 .dash-action-btn:hover { background: var(--dash-ink); color: var(--dash-paper); }
+/* #947 — il documento trovato: nome e, più piano, le cartelle in cui sta. Si trascina, quindi niente selezione. */
+.dash-file-btn { max-width: 100%; user-select: none; }
+.dash-file-btn-icona { display: inline-flex; flex-shrink: 0; }
+.dash-file-btn-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-file-btn-dove { opacity: 0.65; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-file-btn-dove[hidden] { display: none; }
 /* L'uscita dall'accoglienza: discreta, perché l'intervista è la strada principale, ma deve essere
    lì anche quando il modello non risponde. */
 .dash-skip-row {

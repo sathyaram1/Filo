@@ -180,12 +180,22 @@ export function argomentiDaNpm(env = {}, { opzioni = [], conValore = [] } = {}) 
  * @param {string[]} argv        gli argomenti, senza node e senza lo script
  * @param {string[]} opzioni     le opzioni ammesse, in forma `--nome`
  * @param {string[]} conValore   quelle che pretendono un valore dopo di sé
+ * @param {string[]} ripetibili  quelle con valore che si possono scrivere più volte (`--allega a --allega b`)
  * @returns {string|null} il messaggio da stampare, o null se è tutto a posto
  */
-export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaParoleLibere = false } = {}) {
+export function controllaArgomenti(argv, { opzioni = [], conValore = [], ripetibili = [], senzaParoleLibere = false } = {}) {
   const lista = Array.isArray(argv) ? argv.map((a) => String(a ?? '')) : [];
   const ammesse = new Set(opzioni);
   const vuole = new Set(conValore);
+  // Due valori per un'opzione che ne tiene uno: chi legge ne prenderebbe uno in silenzio (#1058).
+  const ripetibile = new Set(ripetibili);
+  const giaVista = new Set();
+  const doppia = (nome) => {
+    if (ripetibile.has(nome)) return null;
+    if (giaVista.has(nome)) return `l'opzione ${nome} è scritta più di una volta: ne vale una sola, scrivila una volta — non ho toccato niente.`;
+    giaVista.add(nome);
+    return null;
+  };
 
   for (let i = 0; i < lista.length; i += 1) {
     const arg = lista[i];
@@ -223,6 +233,8 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaPa
       if (!arg.slice(uguale + 1)) {
         return `l'opzione ${conNome} vuole un valore dopo di sé — non ho toccato niente.`;
       }
+      const due = doppia(conNome);
+      if (due) return due;
       continue;
     }
     const forma = normalizza(arg);
@@ -242,6 +254,8 @@ export function controllaArgomenti(argv, { opzioni = [], conValore = [], senzaPa
       if (dopo === undefined || sembraOpzione(dopo)) {
         return `l'opzione ${forma} vuole un valore dopo di sé — non ho toccato niente.`;
       }
+      const due = doppia(forma);
+      if (due) return due;
       i += 1; // il valore è suo: non lo si esamina come argomento a sé
     }
   }

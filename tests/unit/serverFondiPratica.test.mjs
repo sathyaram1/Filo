@@ -28,6 +28,9 @@ test('leggiArgomenti: ramo, pratica e prova a vuoto, anche quando npm si prende 
   assert.equal(npm.dryRun, true);
   assert.match(leggiArgomenti(['claude/x', '--forza']).errore, /non capiti/);
   assert.match(leggiArgomenti(['claude/x', 'claude/y']).errore, /un ramo solo/);
+  // Il nome come lo legge lo strumento del server: il verdetto si cerca su quello che si fonde (#1062).
+  for (const forma of ['origin/claude/x', 'refs/heads/claude/x', 'refs/remotes/origin/claude/x', ' claude/x ']) assert.equal(leggiArgomenti([forma]).ramo, 'claude/x', forma);
+  for (const no of ['feature/x', 'claude/../main', 'claude/x.lock']) assert.match(leggiArgomenti([no]).errore, /solo rami claude/, no);
   assert.equal(leggiArgomenti(['claude/x']).pratica, null);
 });
 
@@ -59,7 +62,9 @@ async function conRete(docs, fn) {
 const ORA = Date.parse('2026-10-03T10:00:00Z');
 const ORE = 3600 * 1000;
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [] }) {
+const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${sha.slice(0, 12)}`, togli: () => ({ ok: true }) });
+
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
@@ -67,7 +72,7 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [] }) {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
       lancia: (cartella, args, env) => { lanci.push({ cartella, args, pratica: env[PRATICA_ENV] }); return codiceServer; },
-      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA,
+      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => verdetto, fissa,
     });
     return { k, lanci, scritture, testo: righe.join('\n') };
   });
@@ -276,4 +281,41 @@ test('ramiApertiDellaPratica: il ramo dell’app con lo stesso nome di quello de
   assert.deepEqual(con('claude/fuso'), [], 'già su main');
   assert.deepEqual(con('claude/assente'), []);
   assert.deepEqual(con('main'), []);
+});
+
+// #1062: il ramo del server con un ramo dell'app omonimo in verifica si fonde solo allo sha verificato.
+test('un lavoro con l’app la cui verifica non regge non si fonde, e non si tocca niente', async () => {
+  const no = { ok: false, reason: 'il ramo del server claude/x si è mosso dopo la verifica (11111111 → 22222222)' };
+  for (const argv of [['claude/x', '--feedback', 'p'], ['claude/x', '--feedback', 'p', '--dry-run']]) {
+    const r = await giro({ docs: { p: doc('p') }, argv, verdetto: no });
+    assert.equal(r.k, 1, r.testo);
+    assert.match(r.testo, /claude\/x è un lavoro con l'app, e la sua verifica non regge: il ramo del server claude\/x si è mosso/);
+    assert.match(r.testo, /Non ho toccato niente/);
+    assert.deepEqual(r.lanci, []);
+    assert.deepEqual(r.scritture, []);
+  }
+});
+
+test('con la verifica che regge si fonde, e se main finisce su un altro sha lo si dice', async () => {
+  const si = { ok: true, reason: 'verifica superata su questo contenuto, insieme al ramo del server claude/x su aaaaaaaa', server: { ramo: 'claude/x', sha: 'a'.repeat(40) } };
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: si });
+  assert.equal(r.k, 0, r.testo);
+  assert.match(r.testo, /Verifica del lavoro: verifica superata/);
+  assert.doesNotMatch(r.testo, /Attenzione/);
+  const altro = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: { ...si, server: { ramo: 'claude/x', sha: 'b'.repeat(40) } } });
+  assert.match(altro.testo, /Attenzione: main del server è su aaaaaaaaa, non sullo sha verificato bbbbbbbbb/);
+  // Allo strumento del server va il ramo fermo sullo sha verificato, non quello che può ancora muoversi (#1062).
+  assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`]]);
+  const senzaFermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], verdetto: si, fissa: () => ({ ok: false, motivo: 'push rifiutato' }) });
+  assert.equal(senzaFermo.k, 1);
+  assert.equal(senzaFermo.lanci.length, 0, 'senza il ramo fermo lo strumento del server non parte');
+  assert.match(senzaFermo.testo, /non riesco a fermare lo sha verificato aaaaaaaaa[\s\S]*push rifiutato/);
+});
+
+test('la prova a vuoto con un verdetto guarda lo sha verificato, come la fusione vera', async () => {
+  const si = { ok: true, reason: 'verifica superata su questo contenuto, insieme al ramo del server claude/x su aaaaaaaa', server: { ramo: 'claude/x', sha: 'a'.repeat(40) } };
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--dry-run'], verdetto: si });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`, '--dry-run']]);
+  assert.deepEqual(r.scritture, []);
 });
