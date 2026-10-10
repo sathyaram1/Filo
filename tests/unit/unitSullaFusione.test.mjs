@@ -401,12 +401,11 @@ test('durante la prova i worktree non contengono collegamenti: unlock e remove -
 
 test('i resti di una prova interrotta si tolgono alla richiesta dopo anche se il ramo contiene già main', () => {
   const r = repoFinto();
-  // Nella temporanea vera, dove la prova la cerca e col nome che riconosce, col pid di un processo già finito.
+  // Nella temporanea vera, dove la prova la cerca e col nome che riconosce, col pid di un processo che non c'è più.
   const base = join(tmpdir(), `filo-fusione-t${Math.random().toString(36).slice(2).padEnd(5, '0').slice(0, 5)}`);
   mkdirSync(base);
   try {
-    const morto = spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim();
-    writeFileSync(join(base, 'pid'), morto);
+    writeFileSync(join(base, 'pid'), String(pidMorto()));
     collegaCartella(join(r.lavoro, 'node_modules'), join(base, 'node_modules'));
     r.ok(['worktree', 'add', '--detach', '--quiet', join(base, 'fusione'), 'HEAD']);
     const punta = r.ok(['rev-parse', 'HEAD']);
