@@ -21,6 +21,7 @@ const USO = [
   '  elenco [--tutte]                      le domande aperte e in lavorazione (--tutte: anche chiuse)',
   '  rispondi D-n [--scelta N] [--testo "…" | --testo -]   N è il numero dell\'opzione come lo stampa «mostra»',
   '  consiglio D-1 [D-2 …]                 applica l\'opzione consigliata',
+  '  archivia D-n | riapri D-n             la toglie senza applicare niente, o la rimette aperta',
 ].join('\n');
 
 /** Le parole della riga di comando. PURA. @returns {{ cmd, … } | { errore }} */
@@ -31,8 +32,8 @@ export function leggiArgomenti(argv) {
   if (cmd === 'chiedi') {
     return a.length === 2 && a[1] ? { cmd, file: a[1] } : { errore: `chiedi vuole un file JSON, o «-» per leggerlo da stdin.\n${USO}` };
   }
-  if (cmd === 'mostra') {
-    return a.length === 2 && idOk(a[1]) ? { cmd, id: a[1].trim() } : { errore: `mostra vuole una domanda nella forma D-12.\n${USO}` };
+  if (cmd === 'mostra' || cmd === 'archivia' || cmd === 'riapri') {
+    return a.length === 2 && idOk(a[1]) ? { cmd, id: a[1].trim() } : { errore: `${cmd} vuole una domanda nella forma D-12.\n${USO}` };
   }
   if (cmd === 'elenco') {
     if (a.length === 1) return { cmd, tutte: false };
