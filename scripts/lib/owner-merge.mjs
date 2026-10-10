@@ -255,8 +255,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
         + (r.localDetail || r.localReason
           ? `  L5 non è stato saltato: ${r.localDetail || r.localReason}.\n`
           : (ctx.feedbackId ? '' : '  Nessuna pratica collegata: con npm run finish -- --feedback <N> il lavoro locale\n'
-            + '  di un feedback tuo o di una sessione con la prova del mittente, o che hai approvato\n'
-            + '  come lavoro locale, non aspetta.\n'))
+            + '  di un feedback fidato, scritto da sessioni col biglietto pulito, non aspetta.\n'))
         + `\n${righeDellaRichiesta(r)}`;
     case 'conflict':
       return `✗ Conflitto: main è andato avanti e le modifiche non si incastrano da sole.\n`
