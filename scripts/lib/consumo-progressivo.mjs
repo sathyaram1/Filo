@@ -2,7 +2,7 @@
 // Non lancia mai: senza transcript torna consumo null con la nota. I prezzi sono quelli di session-report.mjs.
 // Stato in `.claude/routine-consumo.json` (effimero, gitignorato, in SESSION_MARKERS): perso o illeggibile = si rilegge da capo.
 
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { cartelleTranscript, eSottoAgente, transcriptSottoAgenti, trovaTranscript, valutaUso } from '../session-report.mjs';
 
@@ -191,5 +191,3 @@ export function consumoSessione({ root, env = process.env, cwd = process.cwd(), 
   }
 }
 
-// Le cartelle `subagents/` si leggono da session-report; readdirSync resta importato per chi estende il lettore.
-void readdirSync;
