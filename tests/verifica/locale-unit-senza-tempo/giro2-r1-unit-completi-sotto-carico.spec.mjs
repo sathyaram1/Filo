@@ -26,6 +26,7 @@ test('r1 sotto carico la corsa intera degli unit non taglia nessun file al tetto
       p.on('close', (code) => ok({ code, out }));
     });
   } finally {
+    clearTimeout(basta);
     await Promise.all(carico.map((w) => w.terminate()));
   }
   const righe = esito.out.split('\n');
