@@ -31,7 +31,10 @@ async function conRegoleVecchie(fn, campi = {}) {
 test('con le regole vecchie la scrittura dello script passa, senza la firma', async () => {
   const of = await import(pathToFileURL(join(SCRIPTS, 'owner-feedback.mjs')).href);
   // Togliere il segno locale: una scrittura dello script che passa da patchFirmato (#1148 ha tolto la pre-approvazione).
-  const segno = { localOnly: { mapValue: { fields: { by: { stringValue: 'owner' }, at: { integerValue: '1' } } } } };
+  const segno = {
+    clientId: { stringValue: 'local:claude' }, status: { stringValue: 'todo' },
+    localOnly: { mapValue: { fields: { by: { stringValue: 'owner' }, at: { integerValue: '1' } } } },
+  };
   await conRegoleVecchie(async (patch) => {
     const r = await of.segnaLocale(ID, false, { bearer: 'finto' });
     assert.equal(r.ok, true, r.motivo);
