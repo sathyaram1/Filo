@@ -4,13 +4,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 import { pidMorto } from '../helpers/processi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
   provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
@@ -586,4 +587,40 @@ test('storia: un approfondimento arrivato alla radice si registra come storia in
   assert.deepEqual(s.storia, { superficiale: true, approfondito: 25, intera: true });
   assert.ok(!fatti.some((f) => f.includes('--unshallow')), 'la storia è già tutta: niente altri download');
   assert.match(testoStoria(s.storia), /storia intera/);
+});
+
+// Nessun tempo d'orologio sopra gli unit della prova (#1063): con la macchina carica la corsa intera dura più di
+// un'ora e la chiusura cadeva. Un file fermo lo chiude la guardia del lanciatore, anche nella riprova dei rossi.
+test('la riprova dei rossi sulla fusione passa dal lanciatore: un file fermo si chiude col suo nome e la prova finisce', () => {
+  const casa = cartellaTemporanea('filo-929-riprova-');
+  try {
+    const dir = join(casa, 'albero');
+    const base = join(casa, 'base');
+    mkdirSync(join(dir, 'scripts', 'lib'), { recursive: true });
+    mkdirSync(join(dir, 'tests', 'unit'), { recursive: true });
+    mkdirSync(base);
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs', 'scripts/lib/avanzamento-unit.mjs']) {
+      copyFileSync(join(ROOT, f), join(dir, f));
+    }
+    writeFileSync(join(dir, 'tests', 'unit', 'fermo.test.mjs'), "import { test } from 'node:test';
+test('prima di fermarsi', () => {});
+setInterval(() => {}, 1000);
+");
+    const modulo = pathToFileURL(join(ROOT, 'scripts', 'lib', 'unit-sulla-fusione.mjs')).href;
+    const codice = `import { lanciaUnit } from ${JSON.stringify(modulo)};
+`
+      + `console.log(JSON.stringify(lanciaUnit(${JSON.stringify(dir)}, ${JSON.stringify(base)}, 'riprova', { file: ['tests/unit/fermo.test.mjs'] })));
+`;
+    const env = { ...process.env, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', codice], { env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la riprova è rimasta appesa');
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const esito = JSON.parse(r.stdout.trim().split(/?
+/).pop());
+    assert.equal(esito.ok, false, JSON.stringify(esito));
+    assert.match(esito.coda, /fermo.test.mjs non è andato avanti/);
+  } finally {
+    togliCartella(casa);
+  }
 });

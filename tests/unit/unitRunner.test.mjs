@@ -594,3 +594,31 @@ test('le righe che un test stampa non sono avanzamento: un file appeso che scriv
     togliCartella(dir);
   }
 });
+
+test('--solo fa girare solo i file dati, con la guardia della corsa intera: un file fermo diventa un rosso col suo nome', () => {
+  const dir = cartellaTemporanea('filo-solo-');
+  try {
+    writeFileSync(join(dir, 'scelto.test.mjs'), "import { test } from 'node:test';\ntest('scelto', () => {});\n");
+    writeFileSync(join(dir, 'altro.test.mjs'), "import { test } from 'node:test';\ntest('altro', () => { throw new Error('non doveva girare'); });\n");
+    writeFileSync(join(dir, 'fermo.test.mjs'), "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const lancia = (...file) => spawnSync(process.execPath, [LANCIATORE, '--solo', ...file], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+
+    const scelto = lancia(join(dir, 'scelto.test.mjs'));
+    assert.equal(scelto.status, 0, scelto.stdout + scelto.stderr);
+    assert.match(scelto.stdout, /^ok 1 - scelto$/m);
+    assert.doesNotMatch(scelto.stdout, /altro|fermo/);
+
+    const fermo = lancia(join(dir, 'fermo.test.mjs'));
+    assert.notEqual(fermo.error?.code, 'ETIMEDOUT', 'la riprova è rimasta appesa');
+    assert.match(fermo.stdout, /ROSSO: .*fermo\.test\.mjs non è andato avanti/);
+    assert.equal(fermo.status, 1);
+
+    const vuoto = lancia();
+    assert.equal(vuoto.status, 1, 'zero file non è un verde');
+    assert.match(vuoto.stderr, /--solo senza file/);
+  } finally {
+    togliCartella(dir);
+  }
+});

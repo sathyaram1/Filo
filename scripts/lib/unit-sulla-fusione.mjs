@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { sommaRiepiloghi, perLaRiga, allaLettera, NODE_LEGGE_MODELLI } from '../run-unit-tests.mjs';
+import { sommaRiepiloghi, perLaRiga, SOLO } from '../run-unit-tests.mjs';
 
 // Il reporter è quello di QUESTI strumenti, non dell'albero provato: se l'albero lo rompesse, ogni prova uscirebbe
 // «rossa anche su main» e fonderebbe tutto.
@@ -18,8 +18,6 @@ const REPORTER = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), 
 
 /** Quante volte si rifà la prova quando il server risponde che main si è mosso. */
 export const TENTATIVI = 3;
-// Ampio: in locale gli unit durano 6–20 minuti con la macchina carica. Scaduto, la prova non c'è, e lo si dice.
-export const TETTO_UNIT_MS = 60 * 60 * 1000;
 // La storia intera del repo da una rete lenta: due minuti non bastano.
 export const TETTO_STORIA_MS = 15 * 60 * 1000;
 export const ESITI = Object.freeze(['verde', 'main_contenuto', 'rosso_anche_su_main', 'rosso_sulla_fusione', 'conflitto']);
@@ -181,7 +179,7 @@ function cartellaModuli(root) {
 const NOME_BASE = /^filo-fusione-[A-Za-z0-9]{6}$/;
 const FILE_PID = 'pid';
 // Una cartella di prova senza pid (o illeggibile) si considera viva finché è più giovane di così.
-const VIVA_SENZA_PID_MS = 3 * TETTO_UNIT_MS;
+const VIVA_SENZA_PID_MS = 3 * 60 * 60 * 1000;
 
 function apriAlbero(git, base, nome, sha) {
   const dir = join(base, nome);
@@ -272,9 +270,9 @@ export function fileDellaChiave(chiave) {
  * `npm run test:unit` dell'albero provato, con l'uscita su file; con `file`, solo quei file (la riprova dei rossi).
  * { ok, rossi, coda } | { errore }.
  */
-export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS, file = null } = {}) {
+export function lanciaUnit(dir, base, nome, { file = null } = {}) {
   const runner = join(dir, 'scripts', 'run-unit-tests.mjs');
-  if (!file && !existsSync(runner)) return { errore: 'nell\'albero provato manca scripts/run-unit-tests.mjs' };
+  if (!existsSync(runner)) return { errore: 'nell\'albero provato manca scripts/run-unit-tests.mjs' };
   const dest = join(base, `${nome}.jsonl`);
   const log = join(base, `${nome}.log`);
   const fd = openSync(log, 'w');
@@ -283,12 +281,10 @@ export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS, file = 
   let r;
   try {
     const reporter = ['--test-reporter=spec', '--test-reporter-destination=stdout', `--test-reporter=${REPORTER}`, `--test-reporter-destination=${dest}`];
-    const args = file
-      ? ['--test', ...reporter, ...file.map((f) => (NODE_LEGGE_MODELLI ? allaLettera(f) : f))]
-      : [runner, ...reporter];
-    r = spawnSync(process.execPath, args, { cwd: dir, env, stdio: ['ignore', fd, fd], timeout: timeoutMs, windowsHide: true });
+    // Nessun tempo d'orologio qui sopra: un file fermo lo chiude la guardia del lanciatore, anche nella riprova (#1063).
+    const args = file ? [runner, ...reporter, SOLO, ...file] : [runner, ...reporter];
+    r = spawnSync(process.execPath, args, { cwd: dir, env, stdio: ['ignore', fd, fd], windowsHide: true });
   } finally { closeSync(fd); }
-  if (r.error && r.error.code === 'ETIMEDOUT') return { errore: `unit oltre il tetto di ${Math.round(timeoutMs / 60000)} minuti` };
   if (r.error) return { errore: `non riesco a lanciare gli unit (${r.error.message})` };
   if (r.status === null) return { errore: `unit interrotti (${r.signal || 'segnale'})` };
   return { ok: r.status === 0, rossi: rossiDa(leggiRighe(dest), dir), coda: coda(log) };
@@ -299,7 +295,7 @@ export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS, file = 
  * `lancia` è iniettabile solo per i test.
  */
 export function provaUnitSullaFusione({
-  root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s), timeoutMs = TETTO_UNIT_MS,
+  root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s),
 } = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
@@ -319,7 +315,7 @@ export function provaUnitSullaFusione({
   const storia = assicuraStoria({ git: gitStoria, mainSha, punta });
   if (storia.errore) return { errore: storia.errore, mainSha, storia: storia.storia };
   if (storia.storia.superficiale) scrivi(testoStoria(storia.storia));
-  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha }), storia: storia.storia };
+  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha }), storia: storia.storia };
 }
 
 /** Quanta storia scaricare a ogni passo prima di prenderla tutta. */
@@ -364,7 +360,7 @@ export function testoStoria(s) {
   return '▸ Clone poco profondo, ma la base comune con main c\'era già.';
 }
 
-function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha }) {
+function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha }) {
   if (git(['merge-base', '--is-ancestor', mainSha, punta]).ok) return { esito: 'main_contenuto', mainSha };
 
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
@@ -380,7 +376,6 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha
       return { errore: `non riesco a collegare node_modules nella cartella di prova (${e.message})`, mainSha };
     }
   }
-  const opz = { timeoutMs };
   try {
     const a = apriAlbero(git, base, 'fusione', mainSha);
     if (a.dir) alberi.push(a.dir);
@@ -394,7 +389,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha
       return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
     }
     scrivi(`▸ Unit sul risultato della fusione con main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`);
-    let fusione = lancia(a.dir, base, 'fusione', opz);
+    let fusione = lancia(a.dir, base, 'fusione');
     if (fusione.errore) return { errore: fusione.errore, mainSha };
     // Un rosso si riprova prima di giudicarlo: i test a tempo cedono con la macchina carica, e un instabile non è
     // colpa della fusione. Si rilanciano solo i loro file, sullo stesso albero.
@@ -402,7 +397,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha
     const daRiprovare = [...new Set((fusione.ok ? [] : fusione.rossi).map(fileDellaChiave).filter(Boolean))];
     if (daRiprovare.length) {
       scrivi(`▸ Unit rossi sulla fusione (${fusione.rossi.length}): riprovo i loro file da soli`);
-      const ri = lancia(a.dir, base, 'riprova', { ...opz, file: daRiprovare });
+      const ri = lancia(a.dir, base, 'riprova', { file: daRiprovare });
       let ancora = ri.errore || ri.ok ? [] : fusione.rossi.filter((k) => ri.rossi.includes(k));
       if (!ri.errore && (ri.ok || ancora.length)) {
         let forse = fusione.rossi.filter((k) => !ancora.includes(k));
@@ -410,7 +405,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha
           // Verde da solo non vuol dire instabile: due test che si pestano i piedi solo girando insieme passano sempre
           // da soli (verifica #929 giro 3). Instabile è solo ciò che torna verde rifacendo la suite intera.
           scrivi(`▸ Verdi da soli (${forse.length}): rifaccio la suite intera sulla fusione per distinguere un instabile da due test che si rompono solo insieme`);
-          const di = lancia(a.dir, base, 'di-nuovo', opz);
+          const di = lancia(a.dir, base, 'di-nuovo');
           if (di.errore) return { errore: di.errore, mainSha };
           const ripetuti = !di.ok && !di.rossi.length ? forse : forse.filter((k) => di.rossi.includes(k));
           ancora = [...ancora, ...ripetuti];
@@ -426,7 +421,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha
       const b = apriAlbero(git, base, 'main', mainSha);
       if (b.dir) alberi.push(b.dir);
       if (b.errore) return { errore: b.errore, mainSha };
-      const main = lancia(b.dir, base, 'main', opz);
+      const main = lancia(b.dir, base, 'main');
       if (main.errore) return { errore: main.errore, mainSha };
       d = decidiEsito({ fusione, main });
     }
