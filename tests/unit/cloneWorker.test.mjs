@@ -30,7 +30,7 @@ function scena() {
   execFileSync('git', ['clone', '-q', origin, principale], { stdio: 'ignore' });
   git(principale, ['config', 'core.autocrlf', 'false']);
   writeFileSync(resolve(principale, 'package-lock.json'), '{"lockfileVersion":3}\n', 'utf8');
-  writeFileSync(resolve(principale, '.gitignore'), 'node_modules/\n', 'utf8');
+  writeFileSync(resolve(principale, '.gitignore'), 'node_modules\n', 'utf8');
   git(principale, ['add', '-A']);
   git(principale, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'base']);
   git(principale, ['push', '-q', 'origin', 'main']);
