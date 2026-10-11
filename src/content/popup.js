@@ -993,7 +993,7 @@
     popup.inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        if (e.isTrusted) submitFollowup(popup);
+        if (global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted) submitFollowup(popup);
       }
     });
     popup.sendEl.addEventListener('click', (e) => { if (e.isTrusted) submitFollowup(popup); });
