@@ -4456,6 +4456,28 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     ricordaLettoInChat([a]);
     await segnaFonteLetta(chatId, fontiLette, a);
   }
+  // Il modello della chat rifiuta una richiesta più lunga della sua finestra: il tratto si stringe quanto dice il
+  // rifiuto e si rifà lo stesso giro. Il tetto che ha funzionato vale per i turni dopo con quel modello.
+  let strette = 0;
+  let finestraDaRicordare = null;
+  const stringiDopoRifiuto = async (e) => {
+    const FC = globalThis.SN_FILO_CONTESTO;
+    const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 ? FC.troppoLungo(e) : null;
+    if (!rifiuto) return false;
+    const caratteriDi = (msgs) => (Array.isArray(msgs) ? msgs : [])
+      .reduce((n, m) => n + String(typeof (m && m.content) === 'string' ? m.content : JSON.stringify((m && m.content) || '')).length, 0);
+    let inviati = [];
+    try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
+    const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri: caratteriDi(inviati), caratteriTratto: caratteriDi(payloadBase.filoTratto) });
+    if (token == null || token >= tettiChat.token) return false;
+    strette++;
+    tettiChat = { ...tettiChat, token };
+    try { filo = await componiFilo(tettiChat); } catch (_) { return false; }
+    payloadBase.filoTratto = filo.messaggi;
+    nascostiDellaChat = nascostiDi(filo);
+    finestraDaRicordare = token;
+    return true;
+  };
   let fermato = false;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
