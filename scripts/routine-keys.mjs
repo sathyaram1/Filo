@@ -22,6 +22,7 @@
 //   node scripts/routine-keys.mjs elenco
 //   node scripts/routine-keys.mjs crea <nome> <routine|build> ["a cosa serve"]
 //   node scripts/routine-keys.mjs revoca <nome>
+//   node scripts/routine-keys.mjs account <nome> <A|B>
 
 import { findAdminRefreshToken, mintIdToken } from './lib/firestore-auth.mjs';
 
