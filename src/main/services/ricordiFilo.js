@@ -96,12 +96,15 @@ let corsa = null;
 function indicizza(tratti, modello) {
   if (corsa) return corsa;
   corsa = (async () => {
+    const e0 = epoca;
+    const vivo = (t) => epoca === e0 && !tolte.has(t.chat);
     const blocchi = [];
     for (let i = 0; i < tratti.length; i += BLOCCO) blocchi.push(tratti.slice(i, i + BLOCCO));
     let prossimo = 0;
     const lavora = async () => {
       while (prossimo < blocchi.length) {
-        const b = blocchi[prossimo++];
+        const b = blocchi[prossimo++].filter(vivo);
+        if (!b.length) continue;
         let emb = null;
         try { emb = await app.vettori(b.map((t) => FC().testoPerIndice(t))); } catch (_) { return; }
         if (!emb || emb.model !== modello || !Array.isArray(emb.vectors)) return;
