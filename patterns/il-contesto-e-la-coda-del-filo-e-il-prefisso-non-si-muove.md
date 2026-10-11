@@ -43,8 +43,8 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   Cronologia, una volta sola, file accanto al filo, via con la sua chat, mai in incognito). La domanda ne porta al
   massimo tre sopra la soglia nel CONTESTO DI ADESSO, imbustati come archivio, e il blocco di attività lo dice come
   una ricerca («Ricordato dal filo · titolo»). Senza modello d'indicizzazione vale per parole, ed è una prova
-  debole: almeno due parole rare (in poche conversazioni vecchie), tutte nello stesso scambio; un «ok grazie» non
-  ripesca niente. L'attesa ha un tetto: oltre, il turno parte senza.
+  debole: almeno due parole rare (in poche conversazioni vecchie), tutte nello stesso scambio, e mai di cortesia
+  (rare finché dette una volta sola); un «ok grazie» o un «perfetto, grazie mille» non ripescano niente. L'attesa ha un tetto: oltre, il turno parte senza.
 - **Il tetto in token cede alla finestra del modello**: se il fornitore rifiuta la richiesta perché supera la finestra
   del modello della chat, il tratto si stringe quanto dicono le misure del rifiuto (senza misure, a metà) e lo stesso
   giro riparte; il tetto che ha retto vale per i turni dopo con quel modello (in memoria). L'utente non vede il rifiuto.
