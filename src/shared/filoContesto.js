@@ -272,8 +272,19 @@
   // Senza vettori il ricordo va per parole, che è una prova debole: servono almeno due parole rare nelle conversazioni
   // vecchie, tutte nello stesso scambio. Una parola che compare in molte conversazioni («grazie», «perfetto») non
   // distingue niente; una che torna in tutta una conversazione sola (il suo argomento) sì.
+  // Le parole di cortesia non sono mai l'argomento: rare finché sono state dette una volta sola, ripescherebbero quello
+  // scambio a ogni «grazie mille».
   const MIN_PAROLE_RICORDO = 2;
   const QUOTA_PAROLA_COMUNE = 0.05;
+  const PAROLE_DI_CORTESIA = new Set([
+    'grazie', 'mille', 'tante', 'tantissimo', 'tantissime', 'infinite', 'ringrazio', 'ringraziamo', 'perfetto', 'perfetta',
+    'perfetti', 'ottimo', 'ottima', 'benissimo', 'bene', 'okay', 'ciao', 'ciaociao', 'salve', 'prego', 'figurati',
+    'figurarsi', 'certo', 'certamente', 'esatto', 'esattamente', 'giusto', 'capito', 'chiaro', 'vabbe', 'vabene',
+    "d'accordo", 'daccordo', 'accordo', 'buongiorno', 'buonasera', 'buonanotte', 'grande', 'grandioso', 'fantastico',
+    'splendido', 'gentile', 'gentilissimo', 'gentilissima', 'bravo', 'brava', 'bravissimo', 'bravissima', 'ahah',
+    'ahahah', 'haha', 'hahaha', 'thanks', 'thank', 'great', 'cool', 'nice', 'sure', 'fine',
+  ]);
+  const diCortesia = (p) => PAROLE_DI_CORTESIA.has(String(p).replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, ''));
   function ricordiPerParole(domanda, tratti) {
     const CA = global.SN_CHAT_ARCHIVE;
     const lista = Array.isArray(tratti) ? tratti : [];
@@ -283,7 +294,7 @@
     const comune = Math.max(1, Math.floor(chat * QUOTA_PAROLA_COMUNE));
     const inQuante = (p) => new Set(lista.filter((_t, i) => pagliai[i].includes(p)).map((t) => t.chat)).size;
     const parole = [...new Set(CA.terminiCheDistinguono(CA.normalizeForSearch(domanda).split(/\s+/).filter(Boolean)))]
-      .filter((p) => inQuante(p) <= comune);
+      .filter((p) => !diCortesia(p) && inQuante(p) <= comune);
     if (parole.length < MIN_PAROLE_RICORDO) return [];
     const presi = lista.filter((_t, i) => parole.every((p) => pagliai[i].includes(p)));
     return scegliRicordi(presi.slice(-MAX_RICORDI).map((t) => ({ tratto: t, score: 1 })));
