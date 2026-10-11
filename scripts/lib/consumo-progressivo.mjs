@@ -118,8 +118,9 @@ function leggiRiga(riga, at, st, contati) {
   const u = msg.usage && typeof msg.usage === 'object' ? msg.usage : null;
   if (!u) return;
   const id = typeof msg.id === 'string' && msg.id ? msg.id : `riga@${at}`;
+  if (id !== st.ultimoId && contati.has(id)) return;
   const v = valutaUso(u, model);
-  if (id !== st.ultimoId && st.ultimo) somma(st.totali, st.ultimo);
+  if (id !== st.ultimoId && st.ultimo) { somma(st.totali, st.ultimo); contati.add(st.ultimoId); }
   st.ultimoId = id;
   st.ultimo = { input: v.input, cacheRead: v.cacheRead, cacheWrite: v.cacheWrite, output: v.output, costo: v.costo };
   if (model && !st.modelli.includes(model)) st.modelli.push(model);
