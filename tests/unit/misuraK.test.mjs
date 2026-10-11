@@ -147,6 +147,45 @@ test('con una base già rossa, un worker che esce con errore senza rossi suoi ca
   assert.equal(calcolaK([sporca, sani]).k, 2, 'lo stesso rosso della base in ogni worker non è un degrado');
 });
 
+test('dai log: i test finiti sono i conti di node --test, gruppo per gruppo, più il riepilogo di Playwright', () => {
+  const log = [
+    'TAP version 13',
+    'ok 1 - verde',
+    '# # tests 3',
+    '1..1',
+    '# tests 5364',
+    '# pass 5348',
+    '[test:unit] gruppo 2 di 2 (40 file)',
+    '# tests 10',
+    '  ok 13 tests\\tab-archive.spec.mjs:154:1 › verde (4.9s)',
+    '  1) [electron] › tests\\menu.spec.mjs:3:1 › rosso',
+    '  1 failed',
+    '  1 flaky',
+    '  11 passed (1.1m)',
+    '  2 did not run',
+  ].join('\n');
+  assert.equal(testFatti(log), 5364 + 10 + 1 + 1 + 11, 'l\'uscita di un test che stampa conti suoi e i test non partiti non contano');
+  assert.equal(testFatti('nessun conto'), 0);
+});
+
+test('un worker che scrive il rosso della base e poi cade senza finire i test non vale come sano', () => {
+  // Verifica #1157 giro 4: un gruppo unico di unit ucciso dopo il rosso della base, o un gruppo interrotto, dava K = 2.
+  const sporca = { ...corsa(1, 20, { codici: [1], rossi: ['lento'] }), rossiPerWorker: [['lento']], fattiPerWorker: [5377] };
+  const caduto = { ...corsa(2, 21, { codici: [1, 1], rossi: ['lento'] }), rossiPerWorker: [['lento'], ['lento']], fattiPerWorker: [5377, 2100] };
+  const r = calcolaK([sporca, caduto]);
+  assert.equal(r.k, 1);
+  assert.match(r.motivo, /test non finiti: worker 2 → 2100 su 5377/);
+  const sani = { ...caduto, fattiPerWorker: [5377, 5377] };
+  assert.equal(calcolaK([sporca, sani]).k, 2);
+  // Con la base pulita conta lo stesso: un worker uscito a zero con meno test non ha fatto il lavoro.
+  const pulita = { ...corsa(1, 20), fattiPerWorker: [5377] };
+  assert.equal(calcolaK([pulita, { ...corsa(2, 21), fattiPerWorker: [5377, 13] }]).k, 1);
+  // Una base che ha fatto meno test di un worker in parallelo non ha finito lei: la misura non vale.
+  const corta = calcolaK([{ ...corsa(1, 20, { codici: [1], rossi: ['lento'] }), fattiPerWorker: [3000] }, sani]);
+  assert.equal(corta.k, null);
+  assert.match(corta.motivo, /non ha finito i suoi test \(3000 su 5377\)/);
+});
+
 test('pressione, cpu del cgroup e rossi noti', () => {
   assert.equal(pressione('some avg10=2.50 avg60=1.00 avg300=0.10 total=1\nfull avg10=0.00 avg60=0.00 avg300=0.00 total=0'), 2.5);
   assert.equal(pressione(null), null);
