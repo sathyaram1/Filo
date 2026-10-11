@@ -3,7 +3,7 @@ import { _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CONFIRM_HOST } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confermaSopraPagina, confirmText } from './helpers/confirm.mjs';
 import { apriCronologia, statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
@@ -101,8 +101,11 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     // (4) "Svuota cronologia" è presente e, essendo distruttivo, chiede conferma.
     expect(stato.svuota).toBeTruthy();
     await page.mouse.click(stato.svuota.x, stato.svuota.y);
-    // Compare il dialogo di conferma di Filo (host visibile nel DOM del documento).
-    await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+    // Compare il dialogo di conferma di Filo: sopra la scheda, fuori dal documento del sito (#592.6).
+    const sopra = await confermaSopraPagina(app);
+    await expect(sopra.locator(CONFIRM_HOST)).toBeVisible();
+    expect(await confirmText(sopra)).toContain('Svuota');
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 
     await page.screenshot({ path: 'tests/.shots/clipboard-history-remove.png' });
   } finally {
