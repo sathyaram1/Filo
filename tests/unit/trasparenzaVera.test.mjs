@@ -37,6 +37,8 @@ test('a Safe Browsing escono solo prefissi dell\'impronta, e il documento non di
   const prefissi = /hashPrefixes/.test(net) && !/threatEntries/.test(net);
   legame(!prefissi, privacy, 'Safe Browsing riceve l\'indirizzo completo delle pagine che apri', 'indirizzo intero a Safe Browsing');
   legame(prefissi, privacy, 'a Google manda solo i primi 4 byte di ciascuna', 'prefissi a Safe Browsing');
+  // In nessun punto del documento, non solo nella sua voce: una frase rimasta più sotto lo contraddiceva (verifica di #813).
+  if (prefissi) assert.doesNotMatch(privacy, /Safe Browsing[^.]{0,40}\bricev\w*\s+(?:gli\s+indirizzi|l['’]indirizzo)/i);
 });
 
 test('le richieste ai modelli non chiedono la ritenzione zero, ed è fra i punti deboli', () => {
