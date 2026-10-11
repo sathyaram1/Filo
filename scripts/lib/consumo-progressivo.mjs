@@ -62,7 +62,9 @@ export function sessioneDa({ env = process.env, cwd = process.cwd(), configDir =
 
 /**
  * Avanza lo stato di UN file fino all'ultima riga intera. Vale l'ultima usage di ogni `message.id`: il messaggio
- * in corso resta in `ultimo` e si somma ai totali solo quando ne comincia un altro. File accorciato = da capo.
+ * in corso resta in `ultimo` e si somma ai totali solo quando ne comincia un altro. Uno già contato che ricompare
+ * più avanti è una copia (Claude Code riscrive in coda le righe di una sessione ripresa): non si riconta, come nel
+ * rapporto di fine sessione. File accorciato = da capo.
  */
 export function avanzaFile(file, prev) {
   let st = prev && typeof prev === 'object' && prev.totali ? prev : fileVuoto();
