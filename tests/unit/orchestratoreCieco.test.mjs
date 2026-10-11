@@ -117,6 +117,14 @@ test('cablaggio: il preflight installa prima di consegnare le istruzioni; nel pr
   assert.ok(chiamata > 0 && chiamata < dispatch.indexOf("console.log('Le tue istruzioni:"), 'il preflight installa prima di consegnare le istruzioni');
 });
 
+// Un preflight riuscito scrive nelle impostazioni utente: lanciato da un test senza isolarle, accecherebbe la sessione vera.
+test('ogni unit test che lancia il preflight isola le impostazioni utente', () => {
+  const dir = join(RADICE, 'tests', 'unit');
+  const scoperti = readdirSync(dir).filter((f) => f.endsWith('.mjs'))
+    .filter((f) => { const t = readFileSync(join(dir, f), 'utf8'); return /'--preflight'\]/.test(t) && !/process\.env\.CLAUDE_CONFIG_DIR = /.test(t); });
+  assert.deepEqual(scoperti, []);
+});
+
 function testa(n) {
   return readFileSync(join(RADICE, '.claude', 'agents', `${n}.md`), 'utf8').split(/^---$/m)[1];
 }
