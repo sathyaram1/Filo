@@ -107,6 +107,11 @@ async function main() {
       // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.
       : 'Va nel PROMPT della routine schedulata: "routine automatica. <parola d\'ordine>".\n'
         + "Mai nell'ambiente: da lì la erediterebbe ogni lavoratore che parte.");
+    // Senza account il consumo della routine non entra nella riserva dei crediti (#1156): lo si dice qui, dove nasce.
+    if (potere === 'routine') {
+      console.log(`\nPoi dille su che account claude.ai gira, o il suo consumo resta fuori dalla riserva dei crediti:\n`
+        + `    node scripts/routine-keys.mjs account ${r.slug} <A|B>`);
+    }
     return;
   }
 
