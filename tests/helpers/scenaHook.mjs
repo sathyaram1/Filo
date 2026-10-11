@@ -1,12 +1,12 @@
-// La scena delle prove degli agganci di salvataggio (tests/unit/autoCommitGate*.test.mjs): un repo con un finto
-// origin e la copia degli hook veri. Le prove stanno in più file perché girino in parallelo, ciascuno lontano dal tetto
-// di tempo per file (#1063); il repo di partenza si costruisce una volta per processo e si copia.
+// La scena delle prove degli agganci di salvataggio e della guardia: repo con finto origin, copia degli hook veri e
+// clone dello stesso origin come quelli dei worker (#1157). Le prove stanno in più file perché girino in parallelo,
+// lontane dal tetto di tempo per file (#1063); il repo di partenza si costruisce una volta per processo e si copia.
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from './percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from './percorsi.mjs';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const HOOKS_DIR = resolve(ROOT, '.claude', 'hooks');
@@ -19,6 +19,7 @@ export function git(cwd, args) {
 }
 
 let modello = null;
+const fatte = [];
 function repoDiPartenza() {
   if (modello) return modello;
   const base = cartellaTemporanea('filo-hook-modello-');
@@ -43,6 +44,7 @@ function repoDiPartenza() {
  */
 export function scene({ poison = false } = {}) {
   const base = cartellaTemporanea('filo-hook-');
+  fatte.push(base);
   cpSync(repoDiPartenza(), base, { recursive: true });
   const origin = resolve(base, 'origin.git');
   const work = resolve(base, 'work');
@@ -55,6 +57,10 @@ export function scene({ poison = false } = {}) {
   mkdirSync(resolve(work, '.claude', 'hooks'), { recursive: true });
   for (const h of HOOKS) copyFileSync(resolve(HOOKS_DIR, h), resolve(work, '.claude', 'hooks', h));
   return { base, origin, work };
+}
+
+export function togliScene() {
+  for (const d of fatte.splice(0)) togliCartella(d);
 }
 
 // Chi lancia i test NON deve poter dichiarare la sessione al posto del test: una routine si dichiara con FILO_ROUTINE=1
@@ -82,11 +88,36 @@ export function runHookStderr(work, env = {}) {
 }
 
 /** L'esito intero dell'hook di salvataggio, con lo stdin dato. */
-export function runHookRaw(work, stdin) {
+export function runHookRaw(work, stdin, env = {}) {
   return spawnSync('bash', [resolve(work, '.claude', 'hooks', 'auto-commit-merge.sh')], {
-    cwd: work, encoding: 'utf8', input: stdin, env: ambienteDelTest(work),
+    cwd: work, encoding: 'utf8', input: stdin, env: ambienteDelTest(work, env),
   });
 }
+
+/** Come runHookRaw, senza aspettare: due salvataggi insieme in due clone. */
+export function runHookAsync(work, stdin) {
+  return new Promise((ok) => {
+    const c = spawn('bash', [resolve(work, '.claude', 'hooks', 'auto-commit-merge.sh')], { cwd: work, env: ambienteDelTest(work) });
+    let out = ''; let err = '';
+    c.stdout.on('data', (d) => { out += d; });
+    c.stderr.on('data', (d) => { err += d; });
+    c.on('close', (status) => ok({ status, stdout: out, stderr: err }));
+    c.stdin.end(stdin);
+  });
+}
+
+export const stdinEdit = (file, extra = {}) => JSON.stringify({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: file, old_string: 'a', new_string: 'b' }, ...extra });
+
+/** Un clone del finto origin, come lo fa scripts/lib/clone-worker.mjs: fuori dalle worktree, stesso origin. */
+export function clone(origin, base, nome, ramo) {
+  const dir = resolve(base, nome);
+  execFileSync('git', ['clone', '-q', origin, dir], { stdio: 'ignore' });
+  git(dir, ['config', 'core.autocrlf', 'false']);
+  if (ramo) git(dir, ['checkout', '-q', '-b', ramo]);
+  return dir;
+}
+
+export const remoto = (dir, ramo) => git(dir, ['ls-remote', 'origin', `refs/heads/${ramo}`]).split(/\s/)[0] || '';
 
 export const rigaJson = (r) => String(r.stdout || '').split(/\r?\n/).find((l) => l.trim().startsWith('{'));
 

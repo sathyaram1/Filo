@@ -313,6 +313,25 @@ export function conTettoDiTempo(opzioni) {
 }
 
 /**
+ * Un worker in parallelo (#1157) prende la sua parte di CPU: N `node --test` a tutte le CPU insieme fanno rossi i test
+ * sensibili ai tempi. `n` = file insieme (0 = decide node); chi lancia con un `--test-concurrency` suo decide lui. PURA.
+ */
+export function conConcorrenza(opzioni, n = 0) {
+  if (opzioni.some((a) => a === '--test-concurrency' || String(a).startsWith('--test-concurrency='))) return opzioni;
+  return n > 0 ? [`--test-concurrency=${n}`, ...opzioni] : opzioni;
+}
+
+// Importato qui e non in testa per la stessa ragione di temporaneaDellaCorsa: le copie di questo lanciatore che
+// portano con sé solo i suoi file (le prove di unit-sulla-fusione) non hanno il modulo, e lì vale node.
+async function concorrenzaDelWorker() {
+  const modulo = join(__dirname, 'lib', 'dati-worker.mjs');
+  if (!existsSync(modulo)) return 0;
+  const { datiWorker, concorrenzaUnit } = await import(pathToFileURL(modulo).href);
+  const w = datiWorker({ root: REPO_ROOT });
+  return w ? concorrenzaUnit(w.paralleli) : 0;
+}
+
+/**
  * I file partiti e non finiti, nell'ordine di partenza. Node scrive l'esito dei file in quell'ordine: il primo è quello
  * che tiene ferma l'uscita, gli altri aspettano lui. PURA.
  */
@@ -445,7 +464,8 @@ async function main() {
   const destinazione = (i) => join(cartella, `gruppo-${String(i + 1).padStart(4, '0')}.jsonl`);
   const copia = (i) => (k) => join(cartella, `rapporto-${k + 1}-gruppo-${String(i + 1).padStart(4, '0')}`);
   const avanzamento = (i) => join(cartella, `avanzamento-${String(i + 1).padStart(4, '0')}.jsonl`);
-  const { opzioni: date, posizionali } = separaArgomenti(flags);
+  const { opzioni: dateDaChiLancia, posizionali } = separaArgomenti(flags);
+  const date = conConcorrenza(dateDaChiLancia, await concorrenzaDelWorker());
   const tty = !!process.stdout.isTTY;
   // Un file dato a mano che è già fra i trovati girerebbe due volte.
   const trovati = new Set(files.map((f) => resolve(f)));
