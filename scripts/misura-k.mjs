@@ -147,18 +147,34 @@ export function rossiNotiDa(json) {
 const media = (v) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN);
 
 /**
- * La base: le corse con un worker solo (durata media, rossi di almeno una, se tutte sono uscite a zero). null senza
- * corse da uno. PURA.
+ * La base: le corse con un worker solo (durata media, rossi di almeno una, se tutte sono uscite a zero) e i test del
+ * lavoro intero, il più alto che un worker di una corsa qualunque ha finito. null senza corse da uno. PURA.
  */
 export function baseDa(corse) {
   const uno = corse.filter((c) => c.n === 1);
   if (!uno.length) return null;
+  const testTutti = Math.max(0, ...corse.flatMap((c) => c.fattiPerWorker || []));
   return {
     durataMs: media(uno.flatMap((c) => c.durateMs)),
     rossi: [...new Set(uno.flatMap((c) => c.rossi))].sort(),
     infra: [...new Set(uno.flatMap((c) => c.infra))],
     uscitePulite: uno.every((c) => (c.codici || []).every((k) => k === 0)),
+    testTutti,
+    testBase: Math.min(...uno.map((c) => Math.min(testTutti, ...(c.fattiPerWorker || [])))),
   };
+}
+
+/**
+ * Quanti test ha finito un worker: i conti di `node --test` (`# tests N`, uno per gruppo) e il riepilogo di Playwright.
+ * Un worker caduto a metà ne ha meno degli altri, in qualunque modo sia caduto e con o senza un rosso scritto. PURA.
+ */
+export function testFatti(testo) {
+  let n = 0;
+  for (const { riga, tap } of righeDelLog(testo)) {
+    const m = tap ? riga.match(/^# tests (\d+)\s*$/) : riga.match(/^\s*(\d+) (?:passed|failed|flaky|skipped)\b/);
+    if (m) n += Number(m[1]);
+  }
+  return n;
 }
 
 /** Una corsa contro le soglie: `{ ok, motivi, rossiInPiu, durataMs }`. PURA. */
