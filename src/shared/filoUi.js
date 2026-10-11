@@ -181,6 +181,28 @@
     return t;
   }
 
+  // Da fuori un tasto scritto in un riquadro chiuso parte dall'host, che per il sito non è una casella: le sue scorciatoie,
+  // anche in cattura, si prenderebbero quello che l'utente scrive (#1071). Lo ferma il primo ascolto della pagina (il ponte
+  // in page-preload, a document_start) e al campo arriva una copia nostra che non esce dallo shadow; l'Esc resta di tutti (#514).
+  function tastoNelRiquadro(e) {
+    try {
+      if (!e || !e.isTrusted || e.key === 'Escape') return;
+      const host = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+      if (!host || !ombre.has(host)) return;
+      const campo = bersaglio(e);
+      if (!campo || campo === host) return;
+      e.stopImmediatePropagation();
+      const copia = nostro(new KeyboardEvent(e.type, {
+        key: e.key, code: e.code, location: e.location, repeat: e.repeat, isComposing: e.isComposing,
+        ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey,
+        keyCode: e.keyCode, charCode: e.charCode, which: e.which,
+        bubbles: true, cancelable: true, composed: false, view: e.view,
+      }));
+      campo.dispatchEvent(copia);
+      if (copia.defaultPrevented) e.preventDefault();
+    } catch (_) {}
+  }
+
   // La chiave di una bozza scritta in un riquadro: resta al sito dove è nata, e il main concede a ogni riquadro solo
   // quella con la sua origine (BOZZE_PER_SITO in impostazioniPerOrigine.js). Senza origine non c'è bozza (null).
   function chiaveDiBozza(nome) {
