@@ -74,16 +74,16 @@ test.describe('una lettura vecchia non cancella la spesa venuta dopo', () => {
         const out = await crediti.owner(JSON.parse(init.body).data, oraServer);
         return new Response(JSON.stringify(out.ok === false ? { error: { message: out.detail } } : { result: out }), { status: out.ok === false ? 400 : 200 });
       };
-      const input = JSON.stringify({ session_id: 'sess-owner', rate_limits: { five_hour: { used_percentage: 20, resets_at: Math.floor(NOW / 1000) + 3600 }, seven_day: { used_percentage: 60, resets_at: reset } } });
+      const input = JSON.stringify({ session_id: 'sess-owner', rate_limits: { five_hour: { used_percentage: 20, resets_at: Math.floor(NOW / 1000) + 3 * 3600 }, seven_day: { used_percentage: 60, resets_at: reset } } });
       // Le 12:00: la barra gira e invia, 60%.
       SL.barra(input, { home: casa, nowMs: NOW, lancia: () => {}, scrivi: () => {} });
       expect((await SL.invia({ home: casa, nowMs: NOW, fetchImpl, token: 't' })).ok).toBe(true);
       // Le routine su A spendono 430 $ (20 punti) mentre la sessione dell'owner è ferma.
-      await crediti.depositaBattito({ consumo: consumo('sess-a1', 1430), account: 'A', slug: 'routine-a', nowMs: NOW + 60 * MIN });
-      const prima = await pctA(NOW + 60 * MIN);
+      await crediti.depositaBattito({ consumo: consumo('sess-a1', 1430), account: 'A', slug: 'routine-a', nowMs: NOW + 30 * MIN });
+      const prima = await pctA(NOW + 30 * MIN);
       expect(prima.pct).toBeGreaterThan(79);
-      // Le 14:00: l'owner torna e la barra rigira con i numeri che Claude Code aveva dall'ultima risposta.
-      oraServer = NOW + 120 * MIN;
+      // Le 13:00: l'owner torna e la barra rigira con i numeri che Claude Code aveva dall'ultima risposta.
+      oraServer = NOW + 60 * MIN;
       SL.barra(input, { home: casa, nowMs: oraServer, lancia: () => {}, scrivi: () => {} });
       await SL.invia({ home: casa, nowMs: oraServer, fetchImpl, token: 't' });
       const dopo = await pctA(oraServer);
