@@ -73,6 +73,7 @@ export function avanzaFile(file, prev) {
   if (size < (Number(st.offset) || 0)) st = fileVuoto();
   if (size === st.offset) return st;
   st = JSON.parse(JSON.stringify(st));
+  const contati = new Set(Array.isArray(st.contati) ? st.contati : []);
   let fd = null;
   try {
     fd = openSync(file, 'r');
