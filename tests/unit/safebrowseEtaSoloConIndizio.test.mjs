@@ -28,10 +28,12 @@ beforeEach(() => {
 });
 afterEach(() => { Date.now = realNow; });
 
-const analizza = (url, ctx = {}) => new Promise((ok) => {
-  SB.analyze(url, ctx, ok);
-  setTimeout(ok, 30);
-});
+const analizza = async (url, ctx = {}) => {
+  let primo;
+  SB.analyze(url, ctx, (v) => { if (primo === undefined) primo = v; });
+  await SB._settled();
+  return primo;
+};
 
 test('una pagina pulita non manda il nome del sito ai registri; con una password sì, una volta', async () => {
   await analizza('https://forno-di-marco.com/', {});

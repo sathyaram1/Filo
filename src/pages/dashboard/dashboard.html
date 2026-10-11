@@ -24,7 +24,9 @@
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/nomiFile.js"></script>
   <script src="filo://shared/rinominaUi.js"></script>
+  <script src="filo://shared/autonomia.js"></script>
   <script src="filo://shared/wallet.js"></script>
+  <script src="filo://shared/chatErrors.js"></script>
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/filoMemory.js"></script>
   <script src="filo://shared/filoState.js"></script>
@@ -69,6 +71,8 @@
     <form class="dash-input-wrap" id="inputForm" autocomplete="off">
       <div class="dash-dir" id="dashDir" hidden></div>
       <div class="dash-img-previews" id="imgPreviews" hidden></div>
+      <!-- Il livello di autonomia si vede sempre (#530): un clic porta alla scelta, in Preferenze. -->
+      <button class="dash-autonomia" id="dashAutonomia" type="button" hidden></button>
       <textarea
         class="dash-input"
         id="input"

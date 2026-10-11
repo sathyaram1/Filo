@@ -100,10 +100,11 @@ non la lancia nessuno: gira in GitHub a ogni fusione su main.
   spec da solo prima di farne un rilievo; in dubbio confronta con `main`.
 - Un rosso d'ambiente che nel file non c'è non lo aggiungi tu: è un rilievo,
   col caso e il motivo.
-- Nel contenitore delle routine gli spec che aprono Electron vogliono davanti
-  `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a`: `finish:check` ce li mette da
-  sé, un `npx playwright test` lanciato a mano no. Un rosso all'avvio senza
-  quei due non è un rosso.
+- Nel contenitore delle routine gli spec che aprono Electron si lanciano con
+  `node scripts/lancia-electron.mjs npx playwright test <percorso>`, che mette
+  davanti `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a -n <base del worker>` come
+  `finish:check`; un `npx playwright test` lanciato a mano no. Un rosso
+  all'avvio senza quei due non è un rosso.
 
 ## La critica
 

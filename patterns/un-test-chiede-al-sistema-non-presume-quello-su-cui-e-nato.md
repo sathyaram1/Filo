@@ -154,6 +154,42 @@ torna indietro, costa centinaia di unità.
 Un timer atteso (`await` di qualcosa che scade da sé) misura il timer e non il lavoro, e
 resta in millisecondi. Sentinella: `tests/unit/tempiSottoCarico.test.mjs`.
 
+### Nessun unit dipende dalla velocità della macchina (#1063)
+
+Dieci chiusure locali di fila rosse, ogni volta per un unit diverso, tutti verdi da soli.
+Le forme che cadevano, e cosa le ha sostituite:
+
+- **Un tempo atteso dal codice provato** (tempo limite, rate limit, attesa del menu, vita
+  massima di una finestra): orologio finto (`mock.timers` con `setTimeout` e `Date`), e il
+  tempo passa a tick con `scorri`/`finoA` (`tests/helpers/orologio.mjs`). Così la prova dice
+  anche il quando esatto: «non prima di 199 ms, sì a 200».
+- **Un processo o un file vero che deve arrivare** (un battito, la porta di un server finto,
+  un segno scritto da un figlio): si aspetta il fatto con `aspettaChe`
+  (`tests/helpers/attese.mjs`), mai «entro N secondi». Il tempo massimo di un processo vero
+  è una guardia contro l'appeso, `TETTO_ATTESA_MS`: un numero scritto a mano lo ferma una
+  sentinella, nelle opzioni di `spawnSync` ed esecuzioni simili, in un `setTimeout` da un
+  secondo in su, in un `timeoutMs`/`attesaMs` dato al codice provato. Il server finto di
+  `config/routines` si lancia da `tests/helpers/server-finto.mjs`, mai da una copia. Vale anche per il tempo
+  massimo che sta nel codice provato: la funzione che chiede qualcosa a un programma di
+  sistema prende l'attesa da chi la chiama, e la prova le passa `TETTO_ATTESA_MS` (il
+  controllo del comando che esiste: dieci secondi bastano all'uso, non a una macchina carica).
+- **«Non cresce con i dati»** (un messaggio con 50.000 eventi nel filo, una scheda chiusa con
+  6.000 in archivio): prima si contano le operazioni sul disco (nessuna rilettura, nessuna
+  riscrittura, una riga in coda; `tests/helpers/spiaDisco.mjs`), poi il lavoro in memoria si
+  misura a turno contro lo stesso lavoro su dati quasi vuoti, campione per campione, col
+  minimo di ciascuno (`rapportoFraCosti`). Una finestra di tempo fra due figli che devono
+  sovrapporsi si toglie facendoli girare in fila.
+- **La pulizia**: una cartella si toglie con `togliCartella`, che ritenta e non fa rosso il
+  test quando Windows la tiene ancora; `rmSync` ricorsivo nudo nei test lo ferma una
+  sentinella (`tests/unit/cartelleTemporanee.test.mjs`). Gli script che i test lanciano
+  ritentano anche loro (`maxRetries`).
+- **Il tetto del lanciatore** (20 minuti in cui niente va avanti, non la durata del file: un
+  file sano sotto carico è lento ma avanza): una prova sola che ci si avvicina si divide, e una
+  scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
+  (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
+  risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
+  lanciatore, e la riprova dei rossi pure (`--solo`).
+
 ## Il verso opposto (#937)
 
 Una prova nata su Windows che asserisce un percorso `C:\…` cade su Linux se la

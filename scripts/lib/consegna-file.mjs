@@ -107,7 +107,7 @@ export function scaricaPayload(payload, { root, base, sempre = [], max = PAYLOAD
   const dir = cartellaConsegna(root, base);
   // Svuotata a ogni consegna: il file lasciato da un ruolo (un feedback, un diff) non deve arrivare al
   // ruolo successivo sulla stessa macchina, che per isolamento non lo deve vedere.
-  rmSync(dir, { recursive: true, force: true });
+  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   const out = structuredClone(payload && typeof payload === 'object' ? payload : {});
   let n = 0;
   const scrivi = (nome, contenuto, est = 'txt') => scriviFile(dir, `${String(++n).padStart(2, '0')}-${nome}`, contenuto, est);

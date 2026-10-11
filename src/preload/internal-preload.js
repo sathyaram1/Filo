@@ -195,7 +195,10 @@ const chromeShim = {
               if (onDisconnect) onDisconnect();
             },
             onError: (e) => {
-              if (onMessage) onMessage({ type: 'error', message: e.message, code: e.code });
+              // Tutto quello che il main ha detto sull'errore: con i soli
+              // message e code la frase già scritta per l'utente non si
+              // ricompone e arriva la riga grezza del servizio (#663).
+              if (onMessage) onMessage({ type: 'error', ...e });
               if (onDisconnect) onDisconnect();
             },
           });
@@ -317,6 +320,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'calcMarkers.js')); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   safe(path.join(CONTENT, 'extractContext.js'));
+  safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js
   safe(path.join(CONTENT, 'popup.js'));
   safe(path.join(CONTENT, 'menu.js'));

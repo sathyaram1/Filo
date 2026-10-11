@@ -64,6 +64,22 @@
     });
   }
 
+  // Ciò che la chat ha letto, come classi di fonte (#530): una chat ripresa dall'archivio non riparte pulita,
+  // perché l'archivio dei messaggi tiene solo il nome delle azioni.
+  function segnaFonti(id, fonti) {
+    if (!id) return Promise.resolve(null);
+    id = String(id);
+    return F().transazione(async (t) => {
+      const c = t.chat(id);
+      if (!c) return null;
+      const prima = Array.isArray(c.fonti) ? c.fonti : [];
+      const nuove = (Array.isArray(fonti) ? fonti : []).filter((f) => f && Number.isInteger(f.classe)
+        && !prima.some((p) => p && p.chiave === f.chiave && p.classe === f.classe));
+      if (nuove.length) await t.scrivi([t.evento(T().CHAT_FONTI, { chat: id, fonti: nuove }, { autore: 'filo' })]);
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
+    });
+  }
+
   // Ritorna la chat chiusa, o null se non c'è niente da chiudere: una home aperta e mai usata non è una conversazione.
   function close(id) {
     if (!id) return Promise.resolve(null);
@@ -195,6 +211,6 @@
 
   global.SN_FILO_CHATS = {
     list, listIndex, get, needsTriage, listDangling, listUntriaged, uuid, open, append, close, setTriage, setUserTriage,
-    remove, clear,
+    remove, clear, segnaFonti,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

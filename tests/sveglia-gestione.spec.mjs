@@ -19,6 +19,7 @@
 // dispatch la rifiuta) e al passo 1 la card non nomina i giorni.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -87,6 +88,8 @@ test('spostare una sveglia a un altro orario', async ({ app, openTab }) => {
 });
 
 test('"togli tutte le sveglie" elenca cosa sparisce e aspetta l\'OK; i timer restano', async ({ app, openTab }) => {
+  // A Conservativo togliere più sveglie (costo 2) chiede anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
   const page = await openTab(NEWTAB);
   await page.waitForLoadState('domcontentloaded');
 
@@ -121,6 +124,8 @@ test('"togli tutte le sveglie" elenca cosa sparisce e aspetta l\'OK; i timer res
 // #592: fra la domanda e l'OK la lista può cambiare. L'OK vale per le voci che
 // il popup ha mostrato, non per quelle che lo stesso riferimento trova dopo.
 test('una sveglia aggiunta mentre il popup è aperto non sparisce con l\'OK dato alle altre', async ({ app, openTab }) => {
+  // A Conservativo togliere più sveglie (costo 2) chiede anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
   const page = await openTab(NEWTAB);
   await page.waitForLoadState('domcontentloaded');
 

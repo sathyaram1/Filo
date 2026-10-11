@@ -110,6 +110,22 @@
 .sn-msg-muted .sn-msg-text { color: var(--sn-muted); font-style: italic; }
 .sn-msg-error .sn-msg-text { color: var(--sn-error); }
 
+.sn-msg-rimedio {
+  all: unset;
+  cursor: pointer;
+  /* Su una riga sua: attaccato in coda alla frase sembrava una parola in più. */
+  display: block;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  color: var(--sn-fg);
+  font-size: 12px;
+  transition: background 120ms ease;
+}
+.sn-msg-rimedio:hover { background: var(--sn-hover); }
+
 .sn-msg-text p,
 .sn-menu-inline p { margin: 0 0 8px 0; }
 .sn-msg-text p:last-child,

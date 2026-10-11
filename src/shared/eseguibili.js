@@ -123,35 +123,52 @@
     return false;
   }
 
+  // Chi ha servito il file, se non è il sito del primo indirizzo cliccato: la
+  // fiducia vale per l'uno o per l'altro (#588.3), e chi decide deve vedere
+  // anche dove il rimando l'ha portato. Un sottodominio è lo stesso sito.
+  function servitoDa(primo, ultimo) {
+    const a = comeSito(primo);
+    const b = comeSito(ultimo);
+    if (!a || !b || b === a || b.endsWith('.' + a)) return '';
+    return b;
+  }
+
   // Le frasi vivono qui perché le dicono tre superfici diverse (l'avviso della
   // barra, la pagina elenco, il pannello): devono dire la stessa cosa.
   const ETICHETTA = 'Programma';
 
   // `incerto`: il file non porta la sua origine e la pagina ha riquadri di
   // altri siti, quindi il sito della pagina non basta a dire chi l'ha fatto.
-  function provenienza(url, incerto) {
+  // `servito`: il sito che ha mandato davvero i byte dopo un rimando; `nome`
+  // serve solo all'accordo («servita» per un'immagine disco).
+  function provenienza(url, incerto, servito, nome) {
     const s = comeSito(url);
     if (!s) return '';
-    return incerto ? `da una pagina di ${s} con parti di altri siti` : `da ${s}`;
+    const base = incerto ? `da una pagina di ${s} con parti di altri siti` : `da ${s}`;
+    const altro = servitoDa(s, servito);
+    if (!altro) return base;
+    return `${base}, ${eImmagineDisco(nome) ? 'servita' : 'servito'} da ${altro}`;
   }
 
-  function daSito(url, incerto) {
-    const p = provenienza(url, incerto);
+  function daSito(url, incerto, servito, nome) {
+    const p = provenienza(url, incerto, servito, nome);
     return p ? ` ${p}` : '';
   }
 
-  function testoScarica(nome, url, incerto) {
+  function testoScarica(nome, url, incerto, servito) {
+    const da = daSito(url, incerto, servito, nome);
     if (eImmagineDisco(nome)) {
-      return `«${nomeVisibile(nome)}» è un'immagine disco${daSito(url, incerto)}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Scaricarla?`;
+      return `«${nomeVisibile(nome)}» è un'immagine disco${da}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Scaricarla?`;
     }
-    return `«${nomeVisibile(nome)}» è un programma${daSito(url, incerto)}. Se lo apri può cambiare il computer. Scaricarlo?`;
+    return `«${nomeVisibile(nome)}» è un programma${da}. Se lo apri può cambiare il computer. Scaricarlo?`;
   }
 
-  function testoApri(nome, url, incerto) {
+  function testoApri(nome, url, incerto, servito) {
+    const da = daSito(url, incerto, servito, nome);
     if (eImmagineDisco(nome)) {
-      return `«${nomeVisibile(nome)}» è un'immagine disco scaricata${daSito(url, incerto)}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Fallo solo se sai da chi arriva.`;
+      return `«${nomeVisibile(nome)}» è un'immagine disco scaricata${da}. Aperta diventa un disco, e i programmi che contiene partono con un doppio clic. Fallo solo se sai da chi arriva.`;
     }
-    return `«${nomeVisibile(nome)}» è un programma scaricato${daSito(url, incerto)}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
+    return `«${nomeVisibile(nome)}» è un programma scaricato${da}. Aprirlo vuol dire eseguirlo. Fallo solo se sai da chi arriva.`;
   }
 
   const TITOLO_APRI = 'Aprire un programma?';
@@ -170,6 +187,7 @@
     comeSito,
     normalizzaSiti,
     fidato,
+    servitoDa,
     ETICHETTA,
     provenienza,
     testoScarica,

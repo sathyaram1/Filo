@@ -137,6 +137,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_STOP: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
+    // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
+    FILO_DECIDI_PAGINA: 'autonomy-levels',
+    FILO_AIUTO_NUOVO: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
     FILO_APRI_PROPOSTA: 'agent-actions',
@@ -336,7 +339,7 @@ test('nessuna capacità promette un\'icona del menu del tasto destro che non c\'
 
 test('ogni voce del menu «App» citata dal manifesto esiste davvero nel launcher', () => {
   // Simmetrico al test precedente sul lato "positivo": il manifesto indica il
-  // menu App come strada per alcune pagine (Scaricamenti, Aperti per dopo…).
+  // menu App come strada per alcune pagine (Download, Aperti per dopo…).
   // Se quella voce non è nel launcher, l'indicazione è falsa.
   //
   // Dal 2026-09 (#583) il registro è una FUNZIONE, perché "Feedback" e

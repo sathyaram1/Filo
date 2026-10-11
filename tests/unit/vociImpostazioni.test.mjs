@@ -142,7 +142,7 @@ test('togliere un permesso dalla chat: per sito e sottodomini, per permesso o tu
   assert.deepEqual(Perm.togliPerChat('altro.it', 'microfono').tolte, []);
   assert.match(Perm.togliPerChat('altro.it', 'telepatia').errore, /non è un permesso/);
   assert.match(Perm.togliPerChat('', 'microfono').errore, /non è un sito/);
-  assert.equal(globalThis.SN_ACTION_LEVELS.levelFor({ type: 'TOGLI_PERMESSO_SITO', sito: 'a.it' }), 1);
+  assert.equal(globalThis.SN_ACTION_LEVELS.costoFor({ type: 'TOGLI_PERMESSO_SITO', sito: 'a.it' }), 1);
   const { azioneAmmessaDa } = require('../../src/main/services/impostazioniPerOrigine.js');
   assert.equal(azioneAmmessaDa({ type: 'TOGLI_PERMESSO_SITO', sito: 'a.it' }, 'https://esempio.it/'), false);
 });
@@ -183,7 +183,7 @@ test('ogni chiave scrive quello che dichiara, ha la sua riga nella descrizione e
       assert.ok(scritti.has(p), `${s.keys[0]} dichiara ${p} ma non lo scrive`);
       const voce = K.voce(p);
       assert.ok(voce, `${p}: nessuna frase per il suo evento in src/shared/cambi.js`);
-      if (!voce.segreto) assert.equal(voce.livello, s.level || 1, `${p}: l'annullo chiede un livello diverso dal cambio (${voce.livello} contro ${s.level || 1})`);
+      if (!voce.segreto) assert.equal(voce.livello, s.costo, `${p}: l'annullo chiede un livello diverso dal costo del cambio (${voce.livello} contro ${s.costo})`);
     }
   }
   assert.ok(descr.includes('LEGGI_IMPOSTAZIONI'), 'la descrizione dice come leggere il valore di adesso');
@@ -237,7 +237,7 @@ test('elenchi di siti: aggiungi, togli, solo, svuota; un nome senza estensione �
   const b = (v) => P.buildPreferencePartial('siti_bloccati', v);
   const a = b('aggiungi facebook.com e https://www.YouTube.com/watch?v=1');
   assert.deepEqual(a.elenco.voci, ['facebook.com', 'youtube.com']);
-  assert.equal(a.level, 2);
+  assert.equal(a.costo, 2);
   assert.match(a.risk, /Apri comunque/);
   assert.equal(b('togli tiktok.com').elenco.op, 'togli');
   assert.equal(b('solo a.it, b.it').elenco.op, 'sostituisci');
@@ -305,7 +305,7 @@ test('le ore di inattività con la virgola restano quelle: «1,5» non diventa 1
 
 test('LEGGI_IMPOSTAZIONI è uno strumento di sola lettura, e non lo chiede un sito', () => {
   const L = globalThis.SN_ACTION_LEVELS;
-  assert.equal(L.levelFor({ type: 'LEGGI_IMPOSTAZIONI', cerca: 'tema' }), 1);
+  assert.equal(L.costoFor({ type: 'LEGGI_IMPOSTAZIONI', cerca: 'tema' }), 0);
   assert.ok(Tools.haRisultato('LEGGI_IMPOSTAZIONI'));
   const { azioneAmmessaDa } = require('../../src/main/services/impostazioniPerOrigine.js');
   assert.equal(azioneAmmessaDa({ type: 'LEGGI_IMPOSTAZIONI' }, 'https://esempio.it/'), false);

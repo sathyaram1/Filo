@@ -90,6 +90,8 @@
     return docSel;
   }
 
+  const CONTESTO_FRASE = 600; // caratteri al massimo prima e dopo la selezione
+
   // Trova la frase che contiene la selezione, espandendo dal nodo della selezione
   // al nodo testuale completo, e ritagliando alla frase.
   function getSelectionWithSentence(target) {
@@ -118,7 +120,9 @@
           const start = startMatch ? before.length - (startMatch[0].length - 1) : 0;
           const endMatch = after.match(/^[^.!?\n]*[.!?]/);
           const end = idx + text.length + (endMatch ? endMatch[0].length : after.length);
-          sentence = fullText.slice(start, end).trim();
+          // La frase è contesto per una risposta di poche parole: senza un punto vicino (codice, tabelle, elenchi)
+          // diventava il blocco intero, pagato a ogni selezione (#1070).
+          sentence = fullText.slice(Math.max(start, idx - CONTESTO_FRASE), Math.min(end, idx + text.length + CONTESTO_FRASE)).trim();
         } else {
           sentence = fullText.slice(0, 400);
         }

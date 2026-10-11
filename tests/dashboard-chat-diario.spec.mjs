@@ -21,7 +21,7 @@
 //      successivo, che non le rifà.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, CONFIRM_HOST, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -96,11 +96,9 @@ test('A — appunto e lezione hanno la loro riga nel diario, e il riassunto le c
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato.' })).toBeVisible({ timeout: 10_000 });
 
-  // La lezione entra in ogni conversazione: passa dal popup col testo (#592).
-  const host = page.locator(CONFIRM_HOST);
-  await expect(host).toBeVisible({ timeout: 5_000 });
-  await clickConfirm(page, 'ok');
-  await expect(host).toHaveCount(0, { timeout: 5_000 });
+  // A Normale, in un compito che ha letto solo l'utente, la lezione (costo 2) si
+  // salva da sola, senza popup (#530).
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 
   // Il blocco c'è (prima: nessun blocco, nessuna traccia) e il riassunto dice
   // l'appunto.
@@ -218,10 +216,13 @@ test('C — un\'impostazione confermata entra nel diario e il modello lo sa al t
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 10_000 });
 
-  // Il popup si apre da sé: si conferma.
+  // Accendere il terminale abbassa una difesa: il box si apre da sé e vuole
+  // «conferma» digitato (#530). Si conferma.
   const host = page.locator(CONFIRM_HOST);
   await expect(host).toBeVisible({ timeout: 5_000 });
-  await clickConfirm(page, 'ok');
+  await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
   await expect(host).toHaveCount(0, { timeout: 5_000 });
 
   // La conferma lascia la sua riga nel diario (prima: niente).

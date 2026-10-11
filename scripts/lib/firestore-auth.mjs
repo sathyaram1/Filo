@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 import { pinnedRepoRoot } from './tools-pin.mjs';
+import { fetchRitentato, descriviErroreDiRete } from './rete.mjs';
 // Chi prende le credenziali di Firestore prende anche il freno sulle scansioni.
 import './freno-letture.mjs';
 
@@ -61,14 +62,32 @@ export function findAdminRefreshToken() {
   return null;
 }
 
-export async function mintIdToken(refreshToken) {
-  const res = await fetch(`${cfg.secureTokenEndpoint}?key=${cfg.firebaseApiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
-  });
+/**
+ * Il token dell'owner dal suo refresh token. L'errore dice se è la rete (`rete: true`, la credenziale non c'entra)
+ * o un rifiuto della credenziale (`credenziale: true`, `status`): sono due rimedi diversi (#933).
+ */
+export async function mintIdToken(refreshToken, { fetchImpl = fetch, attese } = {}) {
+  const dove = new URL(cfg.secureTokenEndpoint).host;
+  const nonRaggiunto = (motivo, extra) => Object.assign(
+    new Error(`${motivo}. La credenziale non c'entra: riprova quando la rete risponde.`), { rete: true, motivo }, extra);
+  let res;
+  try {
+    res = await fetchRitentato(`${cfg.secureTokenEndpoint}?key=${cfg.firebaseApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    }, { fetchImpl, ...(attese ? { attese } : {}) });
+  } catch (e) {
+    const volte = e && e.tentativi > 1 ? `, ${e.tentativi} tentativi` : '';
+    throw nonRaggiunto(`rete: token dell'owner non coniato, ${dove} non risponde (${descriviErroreDiRete(e)}${volte})`, { cause: e });
+  }
+  const testo = res.ok ? '' : String(await res.text().catch(() => '')).slice(0, 200);
+  // 429 e 5xx sono il servizio dei token che non risponde, non un no alla credenziale.
+  if (res.status === 429 || res.status >= 500) {
+    throw nonRaggiunto(`token dell'owner non coniato, ${dove} risponde HTTP ${res.status}${testo ? `: ${testo}` : ''}`, { status: res.status });
+  }
   if (!res.ok) {
-    throw new Error(`refresh admin fallito (${res.status}): ${(await res.text()).slice(0, 200)}. Rigenera il token con: node scripts/admin-login.mjs`);
+    throw Object.assign(new Error(`refresh admin fallito (${res.status}): ${testo}. Rigenera il token con: node scripts/admin-login.mjs`), { credenziale: true, status: res.status, dettaglio: testo });
   }
   return (await res.json()).id_token;
 }
@@ -113,7 +132,7 @@ export async function mintAccessTokenFromSA(sa) {
   const signature = b64url(createSign('RSA-SHA256').update(signingInput).sign(sa.private_key));
   const jwt = `${signingInput}.${signature}`;
 
-  const res = await fetch(tokenUri, {
+  const res = await fetchRitentato(tokenUri, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({

@@ -18,6 +18,7 @@
 // non sarebbero mai comparsi senza un nuovo messaggio.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -102,6 +103,8 @@ test('Filo prosegue da solo dopo un comando, fino a dichiararsi concluso', async
 test('un comando rischioso NON prosegue da solo: si ferma in attesa di conferma', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
+  // A Conservativo un comando che modifica (costo 2) chiede anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
 
   // Turno 1: comando livello 2 (mkdir) → resta in attesa di conferma, NON
   // eseguito. Il loop deve fermarsi qui. Il turno 2 (se mai raggiunto)

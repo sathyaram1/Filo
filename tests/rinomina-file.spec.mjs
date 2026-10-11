@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { cartellaTemporanea, cartellaInCasa } from './helpers/percorsi.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { confirmText, clickConfirm } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const SHOTS = join(process.cwd(), 'tests', '.shots');
 
@@ -120,8 +121,8 @@ test('tasto destro su un file trovato in chat → «Dai un nome sensato»: nome 
     await modelloDeiNomi(app);
     const page = await home(app);
     await chiedi(page, 'trova la scansione della bolletta');
-    const chip = page.locator('a.dash-action-btn');
-    await expect(chip).toHaveText('scan_00231.pdf', { timeout: 15000 });
+    const chip = page.locator('.dash-file-btn');
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('scan_00231.pdf', { timeout: 15000 });
 
     await chip.click({ button: 'right' });
     const voce = page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' });
@@ -142,15 +143,15 @@ test('tasto destro su un file trovato in chat → «Dai un nome sensato»: nome 
     expect(existsSync(join(dir, NOME_NUOVO))).toBe(true);
     expect(existsSync(vecchio)).toBe(false);
     // Il riferimento in chat segue il file: un clic dopo apre quello vero.
-    await expect(chip).toHaveText(NOME_NUOVO);
-    await expect(chip).toHaveAttribute('href', join(dir, NOME_NUOVO));
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText(NOME_NUOVO);
+    await expect(chip).toHaveAttribute('data-percorso', join(dir, NOME_NUOVO));
     await page.screenshot({ path: join(SHOTS, 'rinomina-fatto.png') });
 
     await riquadro.locator('.sn-rinomina-annulla').click();
     await expect(riquadro.locator('.sn-rinomina-esito-testo')).toHaveText('Nome di prima rimesso: scan_00231.pdf');
     expect(existsSync(vecchio)).toBe(true);
     expect(existsSync(join(dir, NOME_NUOVO))).toBe(false);
-    await expect(chip).toHaveText('scan_00231.pdf');
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('scan_00231.pdf');
   } finally {
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });
@@ -171,7 +172,7 @@ test('il nome si può correggere prima di confermare, non sovrascrive e non camb
     await modelloDeiNomi(app);
     const page = await home(app);
     await chiedi(page, 'trova la scansione');
-    const chip = page.locator('a.dash-action-btn', { hasText: 'La scansione' });
+    const chip = page.locator('.dash-file-btn', { hasText: 'La scansione' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
@@ -185,8 +186,8 @@ test('il nome si può correggere prima di confermare, non sovrascrive e non camb
     await expect(page.locator('.sn-rinomina-stato')).toContainText('già preso');
     expect(readdirSync(dir).sort()).toEqual(['Bolletta marzo (2).pdf', 'Bolletta marzo.pdf']);
     // Un'etichetta scelta dal modello resta, ma il riferimento punta al file nuovo.
-    await expect(chip).toHaveText('La scansione');
-    await expect(chip).toHaveAttribute('href', join(dir, 'Bolletta marzo (2).pdf'));
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('La scansione');
+    await expect(chip).toHaveAttribute('data-percorso', join(dir, 'Bolletta marzo (2).pdf'));
 
     // Esc chiude senza fare niente; vuoto e soli spazi non partono.
     await page.keyboard.press('Escape');
@@ -243,6 +244,7 @@ test('negli Scaricamenti: «Dai un nome sensato», la voce segue il file, e «Ri
 });
 
 test('in chat: «rinomina i file in Download» mostra vecchio → nuovo, rinomina solo dopo l\'OK, «Annulla» rimette tutto', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(120_000);
   const dir = cartellaInCasa('filo-nomi-chat-');
   writeFileSync(join(dir, 'scan_00231.pdf'), BOLLETTA);
@@ -280,6 +282,7 @@ test('in chat: «rinomina i file in Download» mostra vecchio → nuovo, rinomin
 });
 
 test('in chat, l\'utente che dice no: niente cambia sul disco', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(90_000);
   const dir = cartellaInCasa('filo-nomi-no-');
   writeFileSync(join(dir, 'scan_00231.pdf'), BOLLETTA);
@@ -408,15 +411,15 @@ test('in chat, chiuso il riquadro, «Rimetti il nome di prima» dal tasto destro
     await modelloDeiNomi(app);
     const page = await home(app);
     await chiedi(page, 'trova la bolletta');
-    const chip = page.locator('a.dash-action-btn').first();
-    await expect(chip).toHaveText('scan_00231.pdf', { timeout: 15000 });
+    const chip = page.locator('.dash-file-btn').first();
+    await expect(chip.locator('.dash-file-btn-nome')).toHaveText('scan_00231.pdf', { timeout: 15000 });
     await chip.click({ button: 'right' });
     await rinominaEChiudi(page);
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Rimetti il nome di prima' }).click();
     await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText('Nome di prima rimesso: scan_00231.pdf');
     expect(readdirSync(dir)).toEqual(['scan_00231.pdf']);
-    await expect(chip).toHaveAttribute('href', trovato);
+    await expect(chip).toHaveAttribute('data-percorso', trovato);
     // Rimesso, la voce non c'è più: non c'è un nome di prima da rimettere.
     await page.keyboard.press('Escape');
     await chip.click({ button: 'right' });
@@ -457,7 +460,7 @@ test('Invio mentre Filo legge ancora il file: rinomina col nome che arriva, non 
     await modelloDeiNomi(app, { ritardoMs: 2500 });
     const page = await home(app);
     await chiedi(page, 'trova la bolletta');
-    const chip = page.locator('a.dash-action-btn', { hasText: 'scan_00231.pdf' });
+    const chip = page.locator('.dash-file-btn', { hasText: 'scan_00231.pdf' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
@@ -515,6 +518,7 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
 });
 
 test('in chat, mentre Filo legge un lotto di file: la riga d\'attesa dice che legge i file e quanti ne ha letti', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(90_000);
   const dir = cartellaInCasa('filo-nomi-attesa-');
   for (let i = 1; i <= 3; i++) writeFileSync(join(dir, `scan_0023${i}.pdf`), pdfConTesto([`Documento numero ${i}`, 'Prova attesa']));
@@ -563,6 +567,7 @@ test('col nome automatico acceso, il nome dato a mano mentre Filo legge ancora i
 });
 
 test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tasto destro e dall\'elenco in chat', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(120_000);
   const dir = cartellaInCasa('filo-nomi-scansioni-');
   writeFileSync(join(dir, 'scan_00900.pdf'), pdfGrande(['Manuale lavatrice Bosch', 'Serie 6']));
@@ -588,7 +593,7 @@ test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tas
     });
     const page = await home(app);
     await chiedi(page, 'trova la scansione');
-    const chip = page.locator('a.dash-action-btn', { hasText: 'scan_00901.pdf' });
+    const chip = page.locator('.dash-file-btn', { hasText: 'scan_00901.pdf' });
     await expect(chip).toBeVisible({ timeout: 15000 });
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();

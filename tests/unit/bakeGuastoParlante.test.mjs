@@ -19,11 +19,10 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createServer } from 'node:http';
-import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // La cartella temporanea si chiede sempre a questo aiuto (CLAUDE.md § Run/test).
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { spiegaChiaviMancanti, descriviEsitoServer, chiaviAllarmeBake } from '../../scripts/bake-default-config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -56,7 +55,7 @@ async function costruisci(ambiente) {
     stdout = e.stdout || '';
     stderr = e.stderr || '';
   }
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
   return { uscita, registro: `${stdout}\n${stderr}` };
 }
 

@@ -151,5 +151,5 @@ if (!isInstalled()) {
   process.exit(1);
 }
 
-log(`Electron v${version} pronto in node_modules/electron/dist. Nota: in cloud (root) i test vanno lanciati con ELECTRON_DISABLE_SANDBOX=1 e xvfb-run -a.`);
+log(`Electron v${version} pronto in node_modules/electron/dist. Nota: in cloud (root) i test si lanciano con node scripts/lancia-electron.mjs <comando>, che mette davanti ELECTRON_DISABLE_SANDBOX=1 e xvfb-run -a con la base di display del worker.`);
 process.exit(0);

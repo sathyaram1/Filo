@@ -32,16 +32,20 @@
 //                                                         [--starred|--unstar]
 //                                                         [--preapprova|--chiedi-prima]
 //                                                         [--frase "per l'utente"]
+//                                                         [--priorita <0-3>]
 //                                                         [--come-routine]
 //                                                         [--dry-run]
 //   node scripts/owner-feedback.mjs <n|id> --preapprova     (solo il segno, stato invariato)
 //   node scripts/owner-feedback.mjs <n|id> --chiedi-prima
 //   node scripts/owner-feedback.mjs <n|id> --frase "…"     (solo la frase per chi ha segnalato, stato invariato)
+//   node scripts/owner-feedback.mjs <n|id> --priorita <0-3> (solo la priorità, stato invariato)
 //   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
 //
 //   <n|id>: il numero del feedback (910, #910, 22.1) o il suo id.
+//   `--priorita`: come il pallino di Gestione (cifrata, `priorityManual`: il giudice non la riabbassa). Da sola vale
+//   su ogni stato, Ricevuti compresi, perché non sposta la pratica; con uno stato segue le regole del passaggio.
 //   Un segno locale su una pratica chiusa ne toglie la scheda dalla bacheca pubblica: era un lavoro locale.
 //
 //   `--solo-locale`: la pratica la lavora solo una sessione locale, nessuna
@@ -81,9 +85,11 @@ import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
+import { fetchRitentato } from './lib/rete.mjs';
 import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
 import { PARTI, RAMO_RE, partiDaCampi } from './lib/parti-lavoro.mjs';
 import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
+import { PRIORITA_AMMESSE, parsePriorita } from './lib/priorita.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura: senza, il gate risulta spento e
@@ -168,7 +174,7 @@ export async function segnaPreapprovazione(id, valore, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true, segno };
 }
@@ -280,7 +286,7 @@ export async function segnaLocale(id, valore, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   if (!chiusa) return { ok: true, segno, tieneScheda };
   // Tolto da una pratica chiusa: la scheda la rimette l'app dell'owner alla prossima sincronizzazione della bacheca.
@@ -291,7 +297,7 @@ export async function segnaLocale(id, valore, opts = {}) {
 
 /** Un lavoro locale non sta nella bacheca pubblica: la sua scheda si toglie. '' se fatto (o non c'era), sennò il motivo. */
 async function togliScheda(id, bearer) {
-  const res = await fetch(`${FIRESTORE_BASE}/feedback-public/${encodeURIComponent(id)}`, {
+  const res = await fetchRitentato(`${FIRESTORE_BASE}/feedback-public/${encodeURIComponent(id)}`, {
     method: 'DELETE', headers: { Authorization: `Bearer ${bearer}` },
   });
   return res.ok || res.status === 404 ? '' : `la scheda nella bacheca pubblica è rimasta (${res.status})`;
@@ -400,7 +406,7 @@ export async function scriviFrase(id, frase, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true };
 }
@@ -439,7 +445,7 @@ export async function registraParte(id, parte, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true, at };
 }
@@ -496,6 +502,82 @@ export async function idDelFeedback(riferimento, { bearer, base = FIRESTORE_BASE
   return r.ok ? { ok: true, id: r.id } : { ok: false, motivo: r.motivo };
 }
 
+/** La priorità da scrivere: una della scala, mai assente (chi scrive --priorita ne vuole una). PURA. */
+export function prioritaDaScrivere(raw) {
+  const p = parsePriorita(raw);
+  if (!p.ok) return p;
+  if (p.valore === null) return { ok: false, motivo: `--priorita vuole un valore: ammessi ${PRIORITA_AMMESSE.join(', ')}` };
+  return p;
+}
+
+/** Cifrata come in Gestione (SN_FEEDBACK.updateStatus); senza cifratura non si scrive, mai in chiaro (#602). */
+async function prioritaCifrata(valore) {
+  if (!CRYPTO?.isEnabled?.()) return { ok: false, motivo: 'manca la chiave con cui si cifra: la priorità in chiaro, su un documento pubblico, non la scrivo' };
+  try {
+    const cifrata = await CRYPTO.encryptForOwner(String(valore));
+    if (!CRYPTO.isEncrypted(cifrata)) return { ok: false, motivo: 'la priorità non risulta cifrata: non la scrivo' };
+    return { ok: true, valore: cifrata };
+  } catch (e) {
+    return { ok: false, motivo: `cifratura della priorità fallita: ${e?.message || e}` };
+  }
+}
+
+/** La priorità che c'era, per dire «era N». null se non c'era o non si legge (senza chiave privata). */
+async function prioritaPrecedente(doc) {
+  const f = doc?.fields?.priority;
+  if (!f) return null;
+  if (f.integerValue !== undefined) return Number(f.integerValue);
+  if (!CRYPTO?.isEncrypted?.(f.stringValue)) return null;
+  try {
+    const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
+    const dec = await decryptFeedbackFields({ _id: doc.name, priority: f.stringValue });
+    return Number.isInteger(dec.priority) ? dec.priority : null;
+  } catch (_) { return null; }
+}
+
+/**
+ * Solo la priorità, stato invariato (`<n|id> --priorita 3`): i campi del pallino di Gestione. Nessun controllo
+ * sullo stato: un riordino non sposta la pratica, e i Ricevuti si riordinano come il resto.
+ * @returns {Promise<{ ok: true, a: number, prima: number|null, dryRun?: true, campi?: string[] } | { ok: false, motivo: string }>}
+ */
+export async function scriviPriorita(id, raw, opts = {}) {
+  const p = prioritaDaScrivere(raw);
+  if (!p.ok) return p;
+  const cifrata = await prioritaCifrata(p.valore);
+  if (!cifrata.ok) return cifrata;
+  const bearer = opts.bearer || await acquireBearer();
+  // Letto prima: una PATCH su un id che non c'è creerebbe un documento.
+  const doc = await getDoc(id, bearer, ['priority']);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const prima = await prioritaPrecedente(doc);
+  const fields = { priority: { stringValue: cifrata.valore }, priorityManual: { booleanValue: true }, updatedAt: firmaOra() };
+  const campi = Object.keys(fields);
+  if (opts.dryRun) return { ok: true, dryRun: true, a: p.valore, prima, campi };
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${campi.map((m) => `updateMask.fieldPaths=${m}`).join('&')}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  }, { fetchImpl: fetchRitentato });
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
+  return { ok: true, a: p.valore, prima };
+}
+
+// Come li legge chi lancia la prova a vuoto: il valore che avrebbero, non solo il nome.
+const CAMPI_SPIEGATI = Object.freeze({ priority: 'cifrata', priorityManual: 'true, decisa a mano', updatedAt: 'adesso' });
+export function campiLeggibili(campi, priorita) {
+  return (campi || []).map((c) => {
+    if (c === 'priority' && Number.isInteger(priorita)) return `priority (${priorita}, cifrata)`;
+    return CAMPI_SPIEGATI[c] ? `${c} (${CAMPI_SPIEGATI[c]})` : c;
+  }).join(', ');
+}
+
+/** Cosa stampa `<n|id> --priorita N`, a vuoto o per davvero. PURA. */
+export function messaggioPriorita(rif, r) {
+  const era = r.prima === null || r.prima === undefined ? '' : r.prima === r.a ? `, era già ${r.prima}` : `, era ${r.prima}`;
+  if (r.dryRun) return `(prova a vuoto) ${rif}: priorità ${r.a}${era}; stato invariato. Campi che scriverei: ${campiLeggibili(r.campi, r.a)}`;
+  return `OK: ${rif} a priorità ${r.a}${era}. Decisa a mano: il giudice non la cambia. Stato invariato.`;
+}
+
 /** La versione in costruzione: è quella in cui un fix confluisce. */
 function packageVersion() {
   try {
@@ -508,7 +590,7 @@ function packageVersion() {
 async function getDoc(id, bearer, campi = null) {
   const maschera = (Array.isArray(campi) && campi.length)
     ? `?${campi.map((f) => `mask.fieldPaths=${encodeURIComponent(f)}`).join('&')}` : '';
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}${maschera}`, {
+  const res = await fetchRitentato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}${maschera}`, {
     headers: { Authorization: `Bearer ${bearer}` },
   });
   if (res.status === 404) return null;
@@ -588,6 +670,14 @@ export async function scrivi(id, to, nota, opts = {}) {
     const lunga = fraseTroppoLunga(opts.frase.trim());
     if (lunga) return { ok: false, motivo: lunga };
   }
+  let priorita = null;
+  if (opts.priorita !== undefined) {
+    const p = prioritaDaScrivere(opts.priorita);
+    if (!p.ok) return p;
+    const cifrata = await prioritaCifrata(p.valore);
+    if (!cifrata.ok) return cifrata;
+    priorita = cifrata.valore;
+  }
   const bearer = opts.bearer || await acquireBearer();
   // La pratica coi campi di ogni altro passaggio (CAMPI_PRATICA: senza il sì dell'owner un approvato
   // sembra un utente, #913) più le note da fondere. La lettura va nel conto di chi ci ha mandato qui (#680).
@@ -651,6 +741,10 @@ export async function scrivi(id, to, nota, opts = {}) {
     set('blockReason', opts.reason.slice(0, 60));
   }
   if (typeof opts.starred === 'boolean') set('starred', opts.starred);
+  if (priorita) {
+    set('priority', priorita);
+    set('priorityManual', true);
+  }
   // Il segno «fondi senza chiedermelo» insieme al cambio di stato: stessa
   // forma di segnaPreapprovazione. Toglierlo = cancellare il campo.
   if (typeof opts.preapprova === 'boolean') {
@@ -671,7 +765,7 @@ export async function scrivi(id, to, nota, opts = {}) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
-  });
+  }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true, from, to };
 }
@@ -689,9 +783,10 @@ if (isMain) {
   // scritta male non deve scalare sui posizionali e far partire lo stesso il
   // cambio di stato. `--help` è legittima: chiedere aiuto non è un errore.
   const uso = () => {
-    console.error('Uso: node scripts/owner-feedback.mjs <numero|id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--preapprova|--chiedi-prima] [--come-routine] [--dry-run]');
+    console.error('Uso: node scripts/owner-feedback.mjs <numero|id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--priorita <0-3>] [--starred|--unstar] [--preapprova|--chiedi-prima] [--come-routine] [--dry-run]');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --preapprova | --chiedi-prima   (solo il segno, stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --frase "riga per chi ha segnalato"   (solo la frase, stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --priorita <0-3>              (solo la priorità, decisa a mano: stato invariato, anche nei Ricevuti)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
@@ -706,9 +801,9 @@ if (isMain) {
   }
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima',
+    opzioni: ['--branch', '--reason', '--frase', '--priorita', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima',
       '--solo-locale', '--non-locale', '--serve-locale'],
-    conValore: ['--branch', '--reason', '--frase'],
+    conValore: ['--branch', '--reason', '--frase', '--priorita'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
   const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
@@ -744,7 +839,7 @@ if (isMain) {
   // Per POSTO, non per valore: come nello strumento gemello (#565). Prima si
   // toglievano le parole «uguali al valore di un'opzione», e una nota scritta
   // identica alla frase per chi ha segnalato spariva senza dire niente.
-  const CON_VALORE = new Set(['--branch', '--reason', '--frase']);
+  const CON_VALORE = new Set(OPZ.conValore);
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -752,6 +847,20 @@ if (isMain) {
     posizionali.push(a);
   }
   const [riferimento, status, ...nota] = posizionali;
+
+  // Prima delle credenziali: un valore sbagliato o un'accoppiata che lascerebbe cadere la priorità non tocca niente.
+  let priorita;
+  if (argv.includes('--priorita')) {
+    const p = prioritaDaScrivere(flag('priorita'));
+    if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo} — non ho toccato niente.`); process.exit(1); }
+    priorita = p.valore;
+    const conStato = ['--frase', '--branch', '--reason', '--starred', '--unstar', '--preapprova', '--chiedi-prima', '--come-routine'];
+    const altre = ['--solo-locale', '--non-locale', '--serve-locale', ...(status ? [] : conStato)].filter((o) => argv.includes(o));
+    if (altre.length) {
+      console.error(`RIFIUTATO: --priorita ${status ? 'non va' : 'senza stato va da sola, non'} con ${altre.join(' ')}: lancia un comando per ciascuno — non ho toccato niente.`);
+      process.exit(1);
+    }
+  }
 
   // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale.
   if (argv.includes('--solo-locale') && isRoutineInstance(ROOT)) {
@@ -806,6 +915,14 @@ if (isMain) {
     process.exit(0);
   }
 
+  // Solo la priorità, stato invariato: `<id> --priorita 3`.
+  if (id && !status && priorita !== undefined) {
+    const r = await scriviPriorita(id, priorita, { dryRun, bearer });
+    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
+    console.log(messaggioPriorita(riferimento, r));
+    process.exit(0);
+  }
+
   // Solo la frase per chi ha segnalato, stato invariato: `<id> --frase "…"`.
   if (id && !status && typeof frase === 'string') {
     if (typeof preapprova === 'boolean' || typeof starred === 'boolean' || branch !== undefined || reason !== undefined) {
@@ -832,22 +949,24 @@ if (isMain) {
   }
 
   if (!id || !status) {
-    console.error('Uso: node scripts/owner-feedback.mjs <numero|id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--come-routine] [--dry-run]');
-    console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
+    uso();
     process.exit(1);
   }
 
-  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, preapprova, dryRun, attore, bearer });
+  const r = await scrivi(id, status, nota.join(' '), { branch, reason, frase, starred, preapprova, priorita, dryRun, attore, bearer });
   if (!r.ok) {
     console.error(r.utente || r.senzaSegno ? rifiutoPratica(riferimento, r) : `RIFIUTATO: ${r.motivo}`);
     if (attore === 'owner' && /non è un passaggio permesso/.test(r.motivo || '')) {
       console.error('Se stai chiudendo a mano una pratica dell\'iter di lavorazione, aggiungi --come-routine.');
     }
+    if (priorita !== undefined && r.from && partenzaVietata(r.from)) {
+      console.error(`La sola priorità si cambia anche da lì, senza spostarla: npm run feedback -- ${String(riferimento).replace(/^#+/, '')} --priorita ${priorita}`);
+    }
     process.exit(3);
   }
   console.log(r.dryRun
-    ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${r.campi.join(', ')}`
-    : `OK: ${riferimento} da "${r.from}" a "${r.to}".`);
+    ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${campiLeggibili(r.campi, priorita)}`
+    : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}.`);
   if (preapprova === true && !r.dryRun) console.log(FUSIONE_FERMA_DA_GESTIONE);
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {

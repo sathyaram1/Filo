@@ -4,10 +4,12 @@
 // gira solo nelle build installate: qui ce n'è uno finto nel main, guidato dalla prova. Foto in tests/.shots/.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
 
 const SHOTS = 'tests/.shots';
+// Su Windows alla chiusura non si installa niente, di serie (#1039): la versione nuova si installa all'apertura dopo.
+const ALLA_CHIUSURA = process.platform !== 'win32';
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
@@ -96,11 +98,11 @@ test('spenta: la versione nuova non parte da sola; «Installa» sulla carta la s
   await expect(carta.locator('.dash-carta-stato')).toHaveText('Scarico la versione 9.9.9: 37%', { timeout: 5_000 });
   await expect(carta.locator('.dash-carta-avanza')).toBeVisible();
   await expect(carta.locator('.dash-carta-az.principale')).toHaveCount(0);
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: true });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: ALLA_CHIUSURA });
   await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-scarica.png` });
 
   await app.evaluate(() => globalThis.__aggFinto.finisci());
-  await expect(carta.locator('.dash-carta-stato')).toHaveText('La versione 9.9.9 è pronta. Si installa quando chiudi Filo.', { timeout: 5_000 });
+  await expect(carta.locator('.dash-carta-stato')).toHaveText(`La versione 9.9.9 è pronta. Si installa ${ALLA_CHIUSURA ? 'quando chiudi Filo' : 'la prossima volta che apri Filo'}.`, { timeout: 5_000 });
   await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-pronta.png` });
   // Chiusa, la carta di questa versione non torna a un nuovo controllo.
   await carta.hover();
@@ -115,7 +117,7 @@ test('accesa: tutto come prima, la versione nuova si scarica da sola e in home n
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const home = await homeDi(app);
   await aggiornatoreFinto(app, { automatici: true });
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: true, autoInstallOnAppQuit: true });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: true, autoInstallOnAppQuit: ALLA_CHIUSURA });
   await home.waitForTimeout(500);
   await expect(home.locator('#accade .dash-carta[data-tipo="avviso"]')).toHaveCount(0);
 });
@@ -142,7 +144,7 @@ test('Preferenze, Impostazioni avanzate: l\'opzione è accesa di serie, spenta v
 
   await casella.check();
   await expect.poll(async () => (await impostazioni(app)).aggiornamenti?.automatici).toBe(true);
-  expect((await finto(app)).autoInstallOnAppQuit).toBe(true);
+  expect((await finto(app)).autoInstallOnAppQuit).toBe(ALLA_CHIUSURA);
 });
 
 test('la voce del tasto destro della carta porta alla preferenza, anche in fondo alla pagina', async ({ app, shell }) => {
@@ -207,7 +209,10 @@ test('«non aggiornarti da solo» in chat: la conferma spiega il rischio, e solo
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/aggiornamenti-chat-conferma.png` });
 
-  await clickConfirm(chat, 'ok');
+  // Spegnerli abbassa una difesa (#530): vuole la parola «conferma» a ogni livello.
+  await fillConfirmInput(chat, 'conferma');
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'danger');
   await expect.poll(async () => (await impostazioni(app)).aggiornamenti.automatici, { timeout: 5_000 }).toBe(false);
   expect((await finto(app)).autoInstallOnAppQuit).toBe(false);
   // La versione trovata all'avvio, che non si installerà più da sola, diventa la carta con «Installa».
@@ -236,7 +241,7 @@ test('«aggiornati» in chat, anche con la carta chiusa: la versione nuova si sc
   await chat.locator('#input').fill('installa la versione nuova');
   await chat.locator('#sendBtn').click();
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'si installa quando chiudi Filo' })).toBeVisible({ timeout: 10_000 });
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: true });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: ALLA_CHIUSURA });
   // La riga del diario, nella parte compressa «Come ha lavorato», dice la versione.
   await expect(chat.getByText('Scarico la versione 9.9.9', { exact: false }).first()).toBeAttached({ timeout: 5_000 });
   expect((await impostazioni(app)).aggiornamenti.automatici, 'installare una versione non riaccende l\'opzione').toBe(false);

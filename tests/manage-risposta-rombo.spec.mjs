@@ -144,3 +144,26 @@ test('tema scuro: la casella del pannello segue i colori della pagina', async ({
   expect([fondo, testo]).toEqual([fondoMain, testoMain]);
   await page.screenshot({ path: 'tests/.shots/1033-rombo-risposta-scuro.png' });
 });
+
+test('domande lunghe: la casella resta a vista in fondo al pannello, le domande scorrono sopra', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const lunghe = Array.from({ length: 40 }, (_, i) => `**${String.fromCharCode(65 + (i % 26))}.** Opzione ${i + 1}: una scelta descritta con calma su più righe.`).join('\n\n');
+  await apri(page, [{ ...FB_DOMANDE, notes: `--- Filo ---\nDomande per l'owner (chi risolve):\n${lunghe}` }]);
+  await apriRombo(page, FB_DOMANDE._id);
+
+  const corpo = page.locator('#mgSideBody');
+  const casella = page.locator('#mgSideRispostaText');
+  expect(await corpo.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  await expect(casella).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('#mgSideRispostaBtn')).toBeInViewport({ ratio: 1 });
+  await expect(corpo.locator('.mg-liv-testo')).toContainText('Domande per l');
+  // A pannello in cima la casella non copre l'inizio delle domande.
+  const inizio = await corpo.locator('.mg-liv-testo').boundingBox();
+  expect((await casella.boundingBox()).y).toBeGreaterThan(inizio.y + 40);
+  await page.screenshot({ path: 'tests/.shots/1033-rombo-risposta-lunga.png' });
+
+  await corpo.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await expect(corpo.locator('.mg-liv-testo')).toContainText('Opzione 40');
+  await expect(casella).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: 'tests/.shots/1033-rombo-risposta-lunga-fondo.png' });
+});

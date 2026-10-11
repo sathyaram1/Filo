@@ -29,6 +29,19 @@ const EXE = Buffer.from('MZ finto eseguibile di prova\n' + 'z'.repeat(2048));
 async function apriServer() {
   const srv = createServer((req, res) => {
     const nome = (String(req.url || '').split('?')[0].split('/').pop()) || 'file.pdf';
+    // `/rimanda/<nome>`: come github.com verso il server dei file, il file
+    // arriva da un altro nome (127.0.0.1) con un rimando.
+    if (String(req.url || '').startsWith('/rimanda/')) {
+      res.writeHead(302, { Location: `http://127.0.0.1:${srv.address().port}/${nome}` });
+      res.end();
+      return;
+    }
+    // `/verso-fidato/<nome>`: un accorciatore di link che porta al file sul sito fidato.
+    if (String(req.url || '').startsWith('/verso-fidato/')) {
+      res.writeHead(302, { Location: `http://blocked.test:${srv.address().port}/${nome}` });
+      res.end();
+      return;
+    }
     const exe = !nome.endsWith('.pdf');
     res.writeHead(200, {
       'Content-Type': exe ? 'application/octet-stream' : 'application/pdf',
@@ -284,6 +297,77 @@ test('la domanda si toglie dalle impostazioni: per un sito fidato, o del tutto',
     await page.locator('#spento').click();
     await expect.poll(() => statoDi(shell, 'spento.exe'), { timeout: 20000 }).toBe('completed');
     expect(contenuto(dir)).toContain('spento.exe');
+  } finally {
+    await srv.close();
+  }
+});
+
+// #588.3 — quasi ogni sito che distribuisce programmi rimanda il file a un
+// altro indirizzo. La fiducia vale per il primo indirizzo cliccato o per chi
+// serve il file, e la domanda nomina tutti e due i siti. Senza il fix il file dal
+// sito fidato si ferma lo stesso, e la domanda nomina solo il secondo → rosso.
+test('dopo un rimando vale il sito cliccato o quello che serve il file, e ogni domanda nomina anche chi ha servito il file (#588.3)', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  const srv = await apriServer();
+  try {
+    const dir = await cartellaDownload(app);
+    await app.evaluate(({ shell }) => {
+      globalThis.__aperti = [];
+      shell.openPath = (p) => { globalThis.__aperti.push(p); return Promise.resolve(''); };
+    });
+
+    const sec = await openTab('filo://security/');
+    await sec.locator('#sec-dl-trusted').fill('blocked.test');
+    await sec.locator('#sec-dl-trusted').press('Tab');
+    await expect.poll(() => sec.evaluate(() => window.SN_STORAGE.getSettings().then((x) => x.security.downloads.trustedSites)), { timeout: 10000 }).toEqual(['blocked.test']);
+
+    const page = await apriPagina(srv.base, { openTab, testServer },
+      `<a id="fidato" href="http://blocked.test:${srv.porta}/rimanda/dalfidato.exe">Dal sito fidato</a>
+       <a id="altro" href="http://localhost:${srv.porta}/rimanda/rimandato.exe">Da un altro sito</a>
+       <a id="via" href="http://localhost:${srv.porta}/verso-fidato/tramite.exe">Via un rimando</a>`);
+
+    // Dal sito fidato scende senza domande, anche se i byte arrivano da altri.
+    await page.locator('#fidato').click();
+    await expect.poll(() => statoDi(shell, 'dalfidato.exe'), { timeout: 20000 }).toBe('completed');
+    expect(contenuto(dir)).toContain('dalfidato.exe');
+    const fidato = await voce(shell, 'dalfidato.exe');
+    expect(fidato.site).toBe('blocked.test');
+    expect(fidato.servedBy).toBe('127.0.0.1');
+
+    // Vale anche il sito che serve i byte: un collegamento che passa da un
+    // rimando prima di arrivare al sito fidato non chiede, né scaricando né aprendo.
+    await page.locator('#via').click();
+    await expect.poll(() => statoDi(shell, 'tramite.exe'), { timeout: 20000 }).toBe('completed');
+    expect(contenuto(dir)).toContain('tramite.exe');
+    const tramite = await voce(shell, 'tramite.exe');
+    expect(tramite.servedBy).toBe('blocked.test');
+    const apriTramite = await shell.evaluate((id) => window.filoShell.downloads.openFile(id), tramite.id);
+    expect(apriTramite.needsConfirm).toBeFalsy();
+    await expect.poll(() => app.evaluate(() => globalThis.__aperti.length), { timeout: 10000 }).toBe(1);
+    await app.evaluate(() => { globalThis.__aperti = []; });
+
+    // Da un sito non fidato si ferma, e la domanda dice tutti e due i nomi.
+    const frase = 'da localhost, servito da 127.0.0.1';
+    await page.locator('#altro').click();
+    await expect.poll(() => statoDi(shell, 'rimandato.exe'), { timeout: 20000 }).toBe('pending');
+    const avviso = domanda(shell, 'rimandato.exe');
+    await expect(avviso).toBeVisible({ timeout: 10000 });
+    await expect(avviso).toContainText(`programma ${frase}.`);
+    await expect(shell.locator('#dl-panel .dl-row', { hasText: 'rimandato.exe' }).locator('.dl-row-meta')).toContainText(frase);
+
+    // L'elenco degli scaricamenti dice lo stesso.
+    const dl = await openTab('filo://downloads/downloads.html');
+    const riga = dl.locator('.dl-item[data-state="pending"]', { has: dl.locator('.dl-name', { hasText: 'rimandato.exe' }) });
+    await expect(riga.locator('.dl-meta')).toContainText(frase, { timeout: 15000 });
+    await riga.locator('.dl-btn', { hasText: /^Scarica$/ }).click();
+    await expect.poll(() => statoDi(shell, 'rimandato.exe'), { timeout: 20000 }).toBe('completed');
+
+    // E la domanda all'apertura.
+    const rec = await voce(shell, 'rimandato.exe');
+    const apri = await shell.evaluate((id) => window.filoShell.downloads.openFile(id), rec.id);
+    expect(apri.needsConfirm).toBe(true);
+    expect(apri.text).toContain(`scaricato ${frase}.`);
+    expect(await app.evaluate(() => globalThis.__aperti.slice())).toEqual([]);
   } finally {
     await srv.close();
   }

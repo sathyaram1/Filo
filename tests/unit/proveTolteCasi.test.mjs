@@ -4,10 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   supportoDelGiro, aiutiFuoriDalGiro, proveCheDipendono, casiDalReport, casiSpenti, testoCasiSpenti, controllaCasiDellaPulizia,
   controllaProveTolte, controllaPulizia, puliziaDelPass, PREFISSO_RIPRISTINO, numeriDelTitolo, casiToltiNonMessi,
@@ -157,7 +157,7 @@ test('un file di supporto cambiato rilancia tutte le prove della sua cartella, a
     t.commit('correzione vera');
     assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -175,7 +175,7 @@ test('un file aggiunto nella cartella del giro rilancia tutte le sue prove: acca
     assert.match(e.testo, /giro1-r1-a\.spec\.mjs \(usa helpers\/banco\.js\)/);
     assert.deepEqual(nomi(t.visti).sort(), ['giro1-r1-a.spec.mjs', 'giro1-r2-b.spec.mjs']);
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -194,7 +194,7 @@ test('un aiuto comune aggiunto che fa ombra a uno importato senza estensione: la
     assert.match(log.join('\n'), /in una copia del ramo a parte: tests\/helpers\/zz-ombra\.js/);
     assert.equal(t.g('worktree', 'list').split('\n').length, 1, 'la copia a parte se ne va');
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -244,7 +244,7 @@ test('un aiuto comune fuori dal giro indebolito da chi corregge: la prova si ril
     t.commit('correzione vera');
     assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -267,7 +267,7 @@ test('la configurazione di Playwright cambiata da chi corregge: tutte le prove d
     t.commit('correzione vera');
     assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -295,7 +295,7 @@ test('un file di supporto non conta come prova tolta nella pulizia', () => {
     assert.equal(c.ok, true, c.motivo);
     assert.deepEqual(c.files, [`${CARTELLA}/giro1-r2-b.spec.mjs`]);
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -308,7 +308,7 @@ test('la pulizia che toglie righe di un aiuto rilancia tutte le prove della sua 
     controllaCasiDellaPulizia({ shaCritica: t.critica, sha, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} });
     assert.deepEqual([...new Set(nomi(t.visti))].sort(), ['giro1-r1-a.spec.mjs', 'giro1-r3-c.spec.mjs']);
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -323,7 +323,7 @@ test('la pulizia che toglie da un aiuto condiviso la riga di un rilievo da corre
     assert.match(e.testo, /giro1-r1-a\.spec\.mjs \(usa helpers\/banco\.mjs\): «caso a» era rosso ed è verde/);
     assert.ok(t.visti.every((v) => v.json), 'l\'esito si chiede per caso');
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
   const giusta = giro(DUE_RILIEVI());
   try {
@@ -334,7 +334,7 @@ test('la pulizia che toglie da un aiuto condiviso la riga di un rilievo da corre
       { ferma: false, testo: '' });
     assert.deepEqual(nomi(giusta.visti), ['giro1-r1-a.spec.mjs'], 'rossa dopo la pulizia: com\'era non serve rilanciarla');
   } finally {
-    rmSync(giusta.dir, { recursive: true, force: true });
+    togliCartella(giusta.dir);
   }
 });
 
@@ -357,7 +357,7 @@ test('in una prova di due rilievi la pulizia che toglie anche la verifica di que
     const giusta = t.commit('pulizia: tolto solo il caso b');
     assert.equal(controllaCasiDellaPulizia({ shaCritica: t.critica, sha: giusta, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }).ferma, false);
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -375,7 +375,7 @@ test('in una prova di tre rilievi un caso spento si vede anche se un altro resta
     assert.match(e.testo, /«caso c» era rosso ed è verde/);
     assert.doesNotMatch(e.testo, /«caso d»/);
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -417,7 +417,7 @@ test('la pulizia che toglie per intero il caso rosso di un rilievo da correggere
     t.scrivi(file, prova(caso('r2 prima porta', 'b'), caso('r2 seconda porta', 'c')));
     assert.deepEqual(controllaCasiDellaPulizia({ ...opz, sha: t.commit('pulizia: tolto solo r1') }), { ferma: false, testo: '' });
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -437,7 +437,7 @@ test('dopo una pulizia che toglie righe da un aiuto, la consegna rilancia le pro
     t.commit('correzione di a');
     assert.deepEqual(controllaProveTolte(opz), { ferma: false, testo: '' });
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -484,7 +484,7 @@ test('dispatch --record-pulizia respinge la pulizia che spegne il caso da correg
     assert.equal(si.code, 0, si.testo);
     assert.equal(JSON.parse(readFileSync(stato, 'utf8')).puliziaSha, giusta);
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });
 
@@ -519,6 +519,6 @@ test('verify-local pulizia respinge allo stesso modo la pulizia che spegne il ca
     assert.equal(si.code, 0, si.testo);
     assert.equal(entry().pending.shaPulizia, giusta);
   } finally {
-    rmSync(t.dir, { recursive: true, force: true });
+    togliCartella(t.dir);
   }
 });

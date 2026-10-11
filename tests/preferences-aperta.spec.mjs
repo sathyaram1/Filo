@@ -3,6 +3,7 @@
 // quello: una scelta confermata a voce non torna indietro per un clic sul tema.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
 
 async function newtabPage(app) {
@@ -43,6 +44,8 @@ test('lo stile confermato in chat compare nella pagina aperta e resta dopo un ri
     });
     await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
   });
+  // A Conservativo lo stile (costo 2) passa dal popup anche a compito pulito (#530).
+  await livelloAutonomia(app, 'conservativo');
   const prefs = await apri(openTab);
   await expect(prefs.locator('#agentStyleText')).toHaveValue('');
 

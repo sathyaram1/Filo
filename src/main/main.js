@@ -75,6 +75,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoShortcuts = require('./shortcuts');
     globalThis.__filoAuth = require('./auth/google-auth');
     globalThis.__filoUpdater = require('./updater');
+    globalThis.__filoAlarmWatcher = require('./services/alarmWatcher');
   } catch (_) {}
 }
 
@@ -82,11 +83,13 @@ if (process.env.NODE_ENV === 'test') {
 // che aprono Filo fuori dalla modalità test (vedi test-servizi-chiusi.js). No-op altrimenti.
 try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
 
-const { createMainWindow, revealWindow } = require('./window');
+const {
+  createMainWindow, revealWindow, assicuraFinestraNormale, onFinestraNormale,
+} = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
 const { installaMenuApplicazione } = require('./menu');
-const { initAutoUpdater } = require('./updater');
+const { initAutoUpdater, installaAllAvvioSeServe } = require('./updater');
 
 // Permette al protocollo filo:// di caricarsi con privilegi standard (CORS
 // libero, fetch, ecc.) — deve essere chiamato PRIMA di app.whenReady.
@@ -188,6 +191,10 @@ function configureSpellchecker() {
 }
 
 app.whenReady().then(async () => {
+  // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
+  let impostazioniAvvio = {};
+  try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
+  try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
   await registerFiloProtocol();
   registerIpcHandlers();
   configureSpellchecker();
@@ -264,6 +271,9 @@ app.whenReady().then(async () => {
   // aggancia will-download così la barra in alto ne mostra l'avanzamento.
   try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
 
+  // Una finestra normale può nascere anche senza di noi (la scadenza che deve
+  // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
+  onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
 
   // Il collegamento d'invito (#651): la dichiarazione al sistema, l'indirizzo
@@ -287,9 +297,8 @@ app.whenReady().then(async () => {
   // suoneria). Senza questo, una sveglia scatta solo se la newtab è aperta.
   try { require('./services/alarmWatcher').start(); } catch (_) {}
 
-  // Auto-update: controlla le GitHub Releases e applica la nuova versione
-  // al riavvio (no-op in dev/test — vedi updater.js).
-  initAutoUpdater();
+  // Controlla le GitHub Releases e scarica in sottofondo; quando installare lo dice updater.js (no-op in dev/test).
+  initAutoUpdater(impostazioniAvvio);
 
   // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
   // verifica che i content script si caricano in quest'ultima, cattura
@@ -446,9 +455,7 @@ app.whenReady().then(async () => {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createMainWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) assicuraFinestraNormale();
   });
 });
 

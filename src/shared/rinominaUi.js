@@ -388,7 +388,7 @@
   }
 
   global.SN_RINOMINA_UI = {
-    apri, chiudi, menu, chiudiMenu, disponibile, tipoSupportato, nomeDiPrima, rimetti,
+    apri, chiudi, menu, chiudiMenu, disponibile, tipoSupportato, nomeDiPrima, rimetti, esito,
     VOCE: VOCE_MENU.label, VOCE_RIMETTI,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

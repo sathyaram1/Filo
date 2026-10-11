@@ -76,7 +76,11 @@ aggiunge lì.
 - **L'aggiornamento automatico può fermarsi, e allora lo dice.** electron-updater
   riscrive l'AppImage da cui Filo sta girando: riesce se il file è scrivibile e l'app è
   partita davvero come AppImage. Quando inciampa, `avvisaSeAggiornamentoBloccato` scrive
-  fra le notifiche che la versione nuova va presa a mano, come su Mac.
+  fra le notifiche che la versione nuova va presa a mano, come su Mac. «Riavvia e aggiorna»
+  compare solo dove l'installazione può riuscire (`haPulsante` in
+  `src/main/aggiornamentoRegole.js`): su Mac mai, su Linux solo con la cartella dell'AppImage
+  scrivibile. Lì Filo si riapre con `app.relaunch`, cioè a processo chiuso: lanciato subito, il
+  Filo nuovo troverebbe preso il lucchetto dell'istanza unica e si chiuderebbe.
 - **Il link d'invito passa dalla voce di menu.** `filo://` arriva a Filo solo se il
   `.desktop` dentro l'AppImage dichiara `x-scheme-handler/filo`, riga che
   electron-builder scrive solo perché `build.protocols` è dichiarato.

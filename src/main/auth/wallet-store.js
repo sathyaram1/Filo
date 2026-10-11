@@ -41,6 +41,13 @@ function load() {
   return cache;
 }
 
+// Questa chiave è l'unica di chi entra con un invito, e non passa dalle
+// impostazioni: senza questo avviso chi tiene il conto di «Filo può rispondere»
+// resta fermo su com'era prima del riscatto, e le home aperte con lui (#663).
+function avvisaProntezza() {
+  try { globalThis.SN_PRONTEZZA_CAMBIATA?.(); } catch (_) {}
+}
+
 function save(wallet) {
   if (!wallet || !wallet.key) return false;
   cache = {
@@ -50,6 +57,9 @@ function save(wallet) {
     // dell'invito e un saldo locale che non compra niente.
     lastServer: wallet.lastServer || (cache && cache.lastServer) || null,
   };
+  // Da qui Filo ha di che rispondere, anche se la scrittura su disco fallisce:
+  // la chiave in memoria basta per tutta la sessione.
+  avvisaProntezza();
   if (!canEncrypt()) {
     console.warn('[wallet] safeStorage non disponibile: chiave personale tenuta solo in memoria');
     return false;
@@ -67,6 +77,7 @@ function save(wallet) {
 function clear() {
   cache = null;
   try { fs.rmSync(filePath(), { force: true }); } catch (_) {}
+  avvisaProntezza();
 }
 
 // La sola chiave, o '' se non c'è. È quello che withDefaults chiede.

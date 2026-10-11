@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto,
+    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto, segnaLetturaAiuto,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
@@ -94,8 +94,25 @@ module.exports = function register(on, ctx) {
     try { return Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) { return true; }
   }
 
+  const tettoAutomatiche = require('../tettoAutomatiche').crea();
+  const { spingiAllaScheda } = require('../impostazioniPerOrigine');
+  // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
+  function fermataDalTetto(msg, sender) {
+    const wc = sender && sender.wc;
+    const fermo = tettoAutomatiche.passa(msg, wc);
+    if (!fermo) return null;
+    const I18n = globalThis.SN_I18N;
+    const frase = I18n ? I18n.t(`toast_tetto_${fermo.gruppo}`, fermo.tetto) : `${fermo.gruppo}: ${fermo.tetto}`;
+    if (fermo.primo) {
+      try { spingiAllaScheda(wc, { type: MSG.SHOW_TOAST, text: frase, duration: 9000 }, { inVista: true }); } catch (_) {}
+    }
+    return { ok: false, code: 'TROPPE_AUTOMATICHE', error: frase };
+  }
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
+    const fermata = fermataDalTetto(msg, sender);
+    if (fermata) return fermata;
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
@@ -651,6 +668,7 @@ module.exports = function register(on, ctx) {
 
   // La domanda esce verso il motore di ricerca: passa dalla porta delle uscite come la
   // ricerca della chat (#810). Solo il blocco: qui non c'è un popup per l'OK in più.
+  // La ricerca dell'Aiuto è una lettura del suo compito come CERCA_WEB in chat (#530): la stessa fonte.
   on(MSG.WEB_SEARCH, async (msg, sender) => {
     try {
       const parole = (Array.isArray(msg && msg.parole) ? msg.parole : [])
@@ -660,6 +678,7 @@ module.exports = function register(on, ctx) {
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
       const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
       return { ok: true, ...r };
     } catch (e) {
       return { ok: false, error: e.message || String(e), results: [] };
@@ -685,7 +704,7 @@ module.exports = function register(on, ctx) {
     (async () => {
       try {
         const settings = await getEffectiveSettings();
-        if (!settings.apiKeys?.[settings.provider]) return;
+        if (!SN_CONST.canServeAction(settings, SN_CONST.ACTIONS.HELP_INTENT_GUESS)) return;
         // Niente user agent e nessun identificativo del mittente (#584): nel
         // documento non ci entrano, e sistema operativo più versione più lingua
         // bastavano a rimettere insieme i percorsi della stessa installazione su

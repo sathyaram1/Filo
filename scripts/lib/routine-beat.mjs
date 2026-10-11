@@ -47,6 +47,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // descrive più niente di vivo: si riparte, non si eredita.
 export const MAX_AGE_MS = 9 * 60 * 60 * 1000;
 
+/** Due percorsi sono la stessa cartella? Su Windows le maiuscole non contano. PURA. */
+export function stessaCartella(a, b, platform = process.platform) {
+  const n = (p) => { const r = resolve(String(p || '')); return platform === 'win32' ? r.toLowerCase() : r; };
+  return n(a) === n(b);
+}
+
 export function beatFile(root) {
   return resolve(root, '.claude', 'routine-beat.json');
 }
@@ -119,15 +125,19 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
   // Un battito rimasto acceso su un ALTRO biglietto va spento ADESSO: fra una
   // riga il marcatore viene sovrascritto, e da quel momento nessuno saprebbe
   // più come raggiungerlo mentre lui continua a tenere vivo un semaforo che non
-  // serve a nessuno. (I lavoratori sono uno alla volta per costruzione: un
-  // biglietto nuovo in questa cartella vuol dire che il precedente ha finito.)
+  // serve a nessuno. In una cartella lavora un worker alla volta, quindi un
+  // biglietto nuovo qui vuol dire che il precedente ha finito; ma con i worker
+  // in parallelo (#1157) ognuno ha il suo clone, e un marcatore arrivato da
+  // un'ALTRA cartella (un clone fatto per copia) nomina il battito vivo di un
+  // altro worker: quello non si tocca.
   //
   // Ma solo se il marcatore è ancora CREDIBILE. Un marcatore vecchio di giorni
   // nomina un numero di processo che il sistema ha già riassegnato a qualcun
   // altro, e ammazzeremmo un estraneo: riprodotto dal vivo con un marcatore di
   // tre giorni prima. Il controllo d'età è lo stesso di `beatIsLive`, che è il
   // punto: due strade che decidono la stessa cosa non devono usare due criteri.
-  if (vecchio && String(vecchio.ticket || '') !== t
+  const diQui = !vecchio || !vecchio.root || stessaCartella(vecchio.root, root);
+  if (vecchio && diQui && String(vecchio.ticket || '') !== t
       && beatIsLive(vecchio, vecchio.ticket, { now, alive })) {
     try { process.kill(Number(vecchio.pid)); } catch (_) { /* già morto */ }
   }
@@ -145,7 +155,7 @@ export function startBeat(root, ticket, { now = Date.now(), spawnImpl = spawn, a
     child.unref();
     mkdirSync(resolve(root, '.claude'), { recursive: true });
     writeFileSync(beatFile(root),
-      JSON.stringify({ pid: child.pid, ticket: t, since: new Date(now).toISOString() }, null, 2) + '\n',
+      JSON.stringify({ pid: child.pid, ticket: t, since: new Date(now).toISOString(), root: resolve(root) }, null, 2) + '\n',
       'utf8');
     return { started: true, why: 'started', pid: child.pid };
   } catch (e) {

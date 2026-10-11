@@ -7,8 +7,8 @@ export const firmaOra = () => ({ timestampValue: new Date().toISOString() });
 const MASCHERA = 'updateMask.fieldPaths';
 
 /** Una PATCH su un feedback. Se le regole rifiutano la firma, la stessa scrittura riparte senza: il resto conta di più. */
-export async function patchFirmato(url, init = {}) {
-  const res = await fetch(url, init);
+export async function patchFirmato(url, init = {}, { fetchImpl = fetch } = {}) {
+  const res = await fetchImpl(url, init);
   if (res.status !== 403) return res;
   const u = new URL(String(url));
   const campi = u.searchParams.getAll(MASCHERA);
@@ -18,5 +18,5 @@ export async function patchFirmato(url, init = {}) {
   delete body.fields.updatedAt;
   u.searchParams.delete(MASCHERA);
   for (const c of campi) if (c !== 'updatedAt') u.searchParams.append(MASCHERA, c);
-  return fetch(u.toString(), { ...init, body: JSON.stringify(body) });
+  return fetchImpl(u.toString(), { ...init, body: JSON.stringify(body) });
 }

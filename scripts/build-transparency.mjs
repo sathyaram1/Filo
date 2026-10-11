@@ -341,18 +341,24 @@ function buildDocs() {
 
 // Le aree ANNUNCIATE: compaiono nella barra anche senza documento, perché dire
 // "in arrivo" è più onesto che far finta che la sezione non esista.
+// `nota`: le parole dell'owner su com'è oggi, finché il documento non c'è. La
+// leggono pagina, sito, chat e manifesto; sparisce da sola col markdown (#888).
 const AREE_ANNUNCIATE = [
   { id: 'models', label: 'Modelli', order: 1 },
   { id: 'privacy', label: 'Privacy', order: 2 },
   { id: 'security', label: 'Sicurezza', order: 3 },
-  { id: 'business', label: 'Come si sostiene', order: 4 },
+  {
+    id: 'business', label: 'Come si sostiene', order: 4,
+    nota: 'Questa pagina la scrivo quando Filo comincerà a chiedere pagamenti: dirà quanto costa, dove vanno i soldi e quanto ci guadagno. Fino ad allora è tutto offerto. Se usi una tua chiave OpenRouter, paghi solo quella.',
+  },
 ];
 
 // La barra: OGNI documento scritto, più le aree annunciate che non ne hanno
 // ancora uno. Un documento decide lui nome corto (`nav`) e posto (`order`);
 // l'area annunciata è solo il segnaposto finché il documento non c'è (#515).
 function buildNav(docs) {
-  const voci = AREE_ANNUNCIATE.filter((a) => !docs.some((d) => d.id === a.id)).map((a) => ({ ...a }));
+  const voci = AREE_ANNUNCIATE.filter((a) => !docs.some((d) => d.id === a.id))
+    .map(({ id, label, order, nota }) => ({ id, label, order, ...(nota ? { nota } : {}) }));
   for (const d of docs) {
     const area = AREE_ANNUNCIATE.find((a) => a.id === d.id);
     voci.push({
@@ -361,7 +367,7 @@ function buildNav(docs) {
       order: d.ordineDichiarato || !area ? d.order : area.order,
     });
   }
-  return voci.sort((a, b) => a.order - b.order).map(({ id, label }) => ({ id, label }));
+  return voci.sort((a, b) => a.order - b.order).map(({ order, ...v }) => v);
 }
 
 function emitModule({ docs, glossary }) {
@@ -386,8 +392,25 @@ function emitModule({ docs, glossary }) {
   const DOCS = ${JSON.stringify(payload, null, 2).replace(/\n/g, '\n  ')};
 
   function all() { return DOCS.slice(); }
-  function get(id) { return DOCS.find((d) => d.id === String(id || '').toLowerCase()) || null; }
+  // Una sezione si chiede col nome interno, con quello della barra o col titolo:
+  // il modello ripete spesso quello che legge, e «Come si sostiene» non è un altro documento (#888).
+  function idDi(nome) {
+    const key = String(nome == null ? '' : nome).replace(/\\s+/g, ' ').trim()
+      .replace(/^["'«“‘]+|["'»”’]+$/g, '').trim().toLowerCase();
+    if (!key) return '';
+    const voce = NAV.find((n) => n.id === key || String(n.label).toLowerCase() === key)
+      || DOCS.find((d) => d.id === key || String(d.title || '').toLowerCase() === key);
+    return voce ? voce.id : '';
+  }
+  function get(id) { const key = idDi(id); return DOCS.find((d) => d.id === key) || null; }
   function ids() { return DOCS.map((d) => d.id); }
+  // La nota di una sezione annunciata e non ancora scritta: '' se non ce l'ha.
+  function nota(id) {
+    const key = idDi(id);
+    const voce = NAV.find((n) => n.id === key);
+    return (voce && voce.nota) || '';
+  }
+  function conNota() { return NAV.filter((n) => n.nota).map((n) => ({ ...n })); }
 
   // Testo per l'agente. Senza id torna l'indice dei documenti disponibili, così
   // può scegliere quale leggere invece di indovinare. Con un id che NON esiste
@@ -398,16 +421,26 @@ function emitModule({ docs, glossary }) {
     const key = String(id == null ? '' : id).replace(/\\s+/g, ' ').trim().toLowerCase().slice(0, 120);
     const doc = get(key);
     if (doc) return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\\n\\n' + doc.text;
-    const elenco = DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ');
+    // La nota è la risposta voluta dall'owner: va riferita com'è, perché sui
+    // numeri non vuole impegni prima dei pagamenti (#888).
+    const voce = NAV.find((n) => n.id === idDi(key) && n.nota);
+    if (voce) {
+      return voce.label + ' — sezione non ancora scritta. Per ora l\\'autore di Filo dice solo questo: '
+        + 'riferiscilo all\\'utente così com\\'è, senza aggiungere cifre, motivazioni o promesse tue.\\n\\n' + voce.nota;
+    }
+    const note = conNota();
+    const elenco = DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ')
+      + (note.length ? '. Sezioni non ancora scritte, con una nota su com\\'è oggi: '
+        + note.map((n) => n.id + ' (' + n.label + ')').join(', ') : '');
     if (!key) return 'Documenti di trasparenza disponibili: ' + elenco + '.';
-    const previsto = NAV.some((n) => n.id === key);
+    const previsto = !!idDi(key);
     return 'Il documento "' + key + '" NON esiste'
       + (previsto ? ' ancora: è una sezione prevista, ma non è stata scritta' : '')
       + '. Non c\\'è niente da citare, e non va ricostruito a memoria: dillo all\\'utente. '
       + 'Documenti di trasparenza disponibili: ' + elenco + '.';
   }
 
-  global.SN_TRANSPARENCY = { NAV, GLOSSARY, all, get, ids, asText };
+  global.SN_TRANSPARENCY = { NAV, GLOSSARY, all, get, ids, idDi, nota, conNota, asText };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 `;
 }
@@ -487,17 +520,22 @@ ${UI_RUNTIME}
 
 // La pagina di un'area annunciata ma non ancora scritta. Sul sito una voce
 // senza pagina sarebbe un 404; dentro Filo la stessa sezione si spiega già.
+// Con una nota, la nota prende il posto di «non ancora scritta»: lo dice già lei.
 function emitSiteSoonPage(voce, { docs }, css) {
   const elenco = docs.length
-    ? 'Quello che c’è scritto: ' + docs.map((d) => `<a href="./${d.id}.html">${escapeHtml(d.title)}</a>`).join(', ') + '.'
+    ? (voce.nota ? 'Intanto puoi leggere: ' : 'Quello che c’è scritto: ')
+      + docs.map((d) => `<a href="./${d.id}.html">${escapeHtml(d.title)}</a>`).join(', ') + '.'
     : 'Non c’è ancora nessun documento di trasparenza.';
+  const descrizione = voce.nota || 'Questa sezione non è ancora scritta.';
+  const sotto = voce.nota ? '' : '\n  <p class="sn-doc-sub">Questa sezione non è ancora scritta.</p>';
+  const nota = voce.nota ? `<p>${escapeHtml(voce.nota)}</p>\n` : '';
   return `<!DOCTYPE html>
 <html lang="it">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Filo — ${escapeHtml(voce.label)}</title>
-<meta name="description" content="Questa sezione non è ancora scritta." />
+<meta name="description" content="${escapeHtml(descrizione)}" />
 <style>
 ${css}
 </style>
@@ -510,10 +548,9 @@ ${css}
       ${navSito(voce.id, docs)}
     </nav>
   </header>
-  <h1>${escapeHtml(voce.label)}</h1>
-  <p class="sn-doc-sub">Questa sezione non è ancora scritta.</p>
+  <h1>${escapeHtml(voce.label)}</h1>${sotto}
   <article id="doc-body">
-<p>${elenco}</p>
+${nota}<p>${elenco}</p>
   </article>
 </main>
 </body>

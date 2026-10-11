@@ -19,12 +19,21 @@ export function verifierScope(raw) {
 
 export const unaRiga = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 
-// Lo sha finisce dentro un comando da copiare: solo esadecimale, o niente.
+// Lo sha finisce dentro un comando da copiare: solo esadecimale, o niente. Così il nome di un ramo.
 const soloSha = (v) => (/^[0-9a-f]{7,40}$/i.test(unaRiga(v)) ? unaRiga(v) : '');
+const soloRamo = (v) => (/^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(unaRiga(v)) ? unaRiga(v) : '');
 
 // Livello E sede, come il lettore della critica li pretende: un perimetro
 // scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta.
 const formatoMinimo = (list) => list.map((f) => `- [${f.level}${(['e', 'v'].includes(String(f.sede || '').toLowerCase()) ? String(f.sede).toLowerCase() : 'i')}${f.decision ? '?' : ''}] ${unaRiga(f.text)}`).join('\n');
+
+// La correzione passata anche dal ramo omonimo del server (#1062): il suo diff sta nel checkout di filo-security.
+function lineaServer(ramo, sha) {
+  if (!ramo) return [];
+  return [sha
+    ? `La correzione è passata anche dal ramo del server ${ramo}: nel checkout di filo-security il diff è \`git diff ${sha}..${ramo}\`.`
+    : `Il ramo del server ${ramo} è nato con la correzione: nel checkout di filo-security il diff è \`git diff origin/main...${ramo}\`.`];
+}
 
 /**
  * Il perimetro di un giro stretto, scritto come testo in coda al compito: un
@@ -50,6 +59,7 @@ export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo) 
       // Un ramo riallineato fuori da qui (in cloud, o a mano) porta main nel diff: va detto.
       ...(sha ? ['Se in quel diff trovi modifiche che non c\'entrano coi rilievi, dopo la correzione il ramo è stato',
         'riallineato a `main`: ti interessano solo dove toccano la correzione.'] : []),
+      ...lineaServer(soloRamo(p.ramoServer), soloSha(p.shaPrimaServer)),
     ].join('\n');
   }
   if (scope === 'riallineamento') {

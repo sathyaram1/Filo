@@ -23,6 +23,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -497,7 +498,7 @@ test('chi sceglie Bash ottiene davvero Bash, e chi non sceglie niente la shell d
   const chiedi = (shell) => new Promise((risolvi, rifiuta) => {
     const sessione = createSession({ shell });
     let uscita = '';
-    const stop = setTimeout(() => { try { sessione.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, 15000);
+    const stop = setTimeout(() => { try { sessione.kill(); } catch (_) {} rifiuta(new Error('la shell non ha risposto')); }, TETTO_ATTESA_MS);
     // `$BASH_VERSION` è vuota in sh e piena in bash: è la shell stessa a dire
     // chi è, invece di fidarsi di quello che abbiamo chiesto noi.
     sessione.exec('echo "sono:${BASH_VERSION:-non-bash}"', {
@@ -548,6 +549,17 @@ test('su Linux le scorciatoie si chiamano e funzionano come su Windows', () => {
   assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit2'), 'linux'), null);
   assert.equal(T.riservato('Ctrl+0', 'linux'), false,
     'su Linux lo zoom arriva alla pagina: quel tasto non è riservato');
+});
+
+test('su Linux il clic centrale in un campo resta all\'incolla del sistema, non apre lo zoom', () => {
+  require('../../src/shared/zoomPagina.js');
+  const Z = globalThis.SN_ZOOM;
+  assert.equal(Z.centraleIncolla('linux'), true, 'su Linux il clic centrale incolla la selezione: lo zoom non deve prenderselo nei campi');
+  assert.equal(Z.centraleIncolla('freebsd'), true);
+  assert.equal(Z.centraleIncolla('win32'), false);
+  assert.equal(Z.centraleIncolla('darwin'), false);
+  const preload = readFileSync(join(ROOT, 'src', 'preload', 'wheel-zoom.js'), 'utf8');
+  assert.equal((preload.match(/\|\| incollaQui\(e, Z\)/g) || []).length, 2, 'la pagina e i riquadri incorporati lasciano tutti e due il clic centrale ai campi');
 });
 
 // ── Batteria, rete e Bluetooth (#873) ────────────────────────────────────────

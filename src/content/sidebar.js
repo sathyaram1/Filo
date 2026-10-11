@@ -63,7 +63,8 @@
   // Ignoriamo silenziosamente le ricerche oltre questo limite.
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
 
-  function isOpen() { return !!root; }
+  // Una pagina che si riscrive da capo porta via il pannello: staccato vale chiuso.
+  function isOpen() { return !!(root && root.isConnected); }
 
   function close() {
     if (!root) return;
@@ -84,13 +85,16 @@
   }
 
   function open(context) {
-    if (root) return;
+    if (isOpen()) return;
+    if (root) close();
     history = [];
     ripiegoDetto = false;
     ripiegoDaDire = '';
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
+    // Ciò che ha letto la conversazione di prima non vale per questa (#530).
+    try { chrome.runtime.sendMessage({ type: MSG.FILO_AIUTO_NUOVO }).catch(() => {}); } catch (_) {}
     // L'URL "iniziale" è quello al momento dell'apertura della sidebar — anche
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
@@ -291,6 +295,27 @@
     conv.scrollTop = conv.scrollHeight;
     if (role === 'assistant') diciRipiego();
     return msg;
+  }
+
+  // Il tasto che porta dove si toglie l'ostacolo, sotto il messaggio d'errore.
+  // Dove si rimedia lo dice SN_CHAT_ERRORS, non un elenco di casi scritto qui.
+  function mostraRimedio(afterEl, err) {
+    const CE = globalThis.SN_CHAT_ERRORS;
+    const pagina = CE && CE.rimedioPagina ? CE.rimedioPagina(err) : null;
+    if (!afterEl || !pagina) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-choices';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-choice';
+    btn.textContent = pagina.label;
+    btn.addEventListener('click', () => {
+      try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
+    });
+    wrap.appendChild(btn);
+    afterEl.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
   }
 
   // Render dei bottoni "choices" sotto un messaggio dell'assistente.
@@ -784,7 +809,7 @@
     // l'azione (riclassificata di nuovo nel main) via FILO_CONFIRM_ACTION.
     if (res.needsConfirm) {
       const Ui = global.SN_CONFIRM_UI;
-      const opts = { title: 'Filo chiede conferma', text: res.describe || '' };
+      const opts = { title: 'Filo chiede conferma', text: res.describe || '', avviso: res.avviso || '' };
       let ok = false;
       try {
         ok = Ui
@@ -821,32 +846,33 @@
   //
   // L'agente "Aiuto" può eseguire le stesse azioni del menu contestuale su
   // testo/immagine/link. A differenza delle azioni tipizzate di Filo (sopra),
-  // queste NON passano per il main: vivono nel content script (SN_ACTIONS in
-  // src/content/actions.js, SN_TTS in tts.js) e operano sull'elemento o sulla
-  // selezione corrente. Le azioni che ESCONO verso l'esterno (cerca sul web,
-  // condividi) chiedono conferma con lo stesso popup di Filo (SN_CONFIRM_UI);
-  // copia/leggi/salva-per-dopo sono immediate (locali).
+  // queste vivono nel content script (SN_ACTIONS in src/content/actions.js,
+  // SN_TTS in tts.js) e operano sull'elemento o sulla selezione corrente. Ognuna
+  // dichiara solo il suo COSTO: se parte, chiede o no lo decide il main con la
+  // stessa regola del dispatch (#530, MSG.FILO_DECIDI_PAGINA). Uscire verso
+  // l'esterno (cercare, condividere) costa 2; il resto resta sul computer e costa 1.
   //
   // SN_ACTIONS/SN_TTS sono caricati DOPO sidebar.js (vedi i preload), quindi li
   // risolviamo al volo dentro la funzione, non al top dell'IIFE.
   const PAGE_ACTIONS = {
     // testo / selezione
-    copy:         { target: 'text',  confirm: false, label: 'copia testo' },
-    cut:          { target: 'text',  confirm: false, label: 'taglia testo' },
-    search_text:  { target: 'text',  confirm: true,  label: 'cerca testo sul web' },
-    read_aloud:   { target: 'text',  confirm: false, label: 'leggi ad alta voce' },
-    stop_reading: { target: 'none',  confirm: false, label: 'ferma la lettura' },
-    edit_text:    { target: 'text',  confirm: false, label: 'modifica testo' },
+    copy:         { target: 'text',  costo: 1, label: 'copia testo' },
+    cut:          { target: 'text',  costo: 1, label: 'taglia testo' },
+    search_text:  { target: 'text',  costo: 2, label: 'cerca testo sul web', viaFilo: true },
+    read_aloud:   { target: 'text',  costo: 1, label: 'leggi ad alta voce' },
+    stop_reading: { target: 'none',  costo: 1, label: 'ferma la lettura' },
+    edit_text:    { target: 'text',  costo: 1, label: 'modifica testo' },
     // immagini
-    copy_image:      { target: 'image', confirm: false, label: 'copia immagine' },
-    save_image:      { target: 'image', confirm: false, label: 'salva immagine' },
-    copy_image_link: { target: 'image', confirm: false, label: 'copia link immagine' },
-    search_image:    { target: 'image', confirm: true,  label: 'cerca immagine sul web' },
-    // link
-    open_link:  { target: 'link', confirm: false, label: 'apri link in nuova scheda' },
-    copy_link:  { target: 'link', confirm: false, label: 'copia link' },
-    save_link:  { target: 'link', confirm: false, label: 'salva link per dopo' },
-    share_link: { target: 'link', confirm: true,  label: 'condividi link' },
+    copy_image:      { target: 'image', costo: 1, label: 'copia immagine' },
+    save_image:      { target: 'image', costo: 1, label: 'salva immagine' },
+    copy_image_link: { target: 'image', costo: 1, label: 'copia link immagine' },
+    search_image:    { target: 'image', costo: 2, label: 'cerca immagine sul web', viaFilo: true },
+    // `viaFilo`: passa da NAVIGA, che il dispatch decide da sé (una ricerca porta `cerca` e costa 2 anche lì).
+    // Chiedere anche qui farebbe due domande per la stessa uscita.
+    open_link:  { target: 'link', costo: 1, label: 'apri link in nuova scheda', viaFilo: true },
+    copy_link:  { target: 'link', costo: 1, label: 'copia link' },
+    save_link:  { target: 'link', costo: 1, label: 'salva link per dopo' },
+    share_link: { target: 'link', costo: 2, label: 'condividi link' },
   };
 
   // Testo bersaglio: quello fornito dall'agente, altrimenti la selezione corrente.
@@ -930,33 +956,42 @@
       }
     }
 
-    // Conferma per le azioni che escono verso l'esterno (stesso popup di Filo).
-    if (spec.confirm) {
-      const Ui = global.SN_CONFIRM_UI;
-      let detail = '';
-      if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
-      else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
-      else if (linkEl) detail = linkEl.href || '';
-      const describe = `${label}${detail ? `:\n“${detail}”` : ''}`;
-      let ok = false;
-      try {
-        ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: describe }) : global.confirm(describe);
-      } catch (_) { ok = false; }
-      if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+    // Senza risposta dal main si chiede: il caso prudente.
+    if (!spec.viaFilo) {
+      let d = null;
+      try { d = await chrome.runtime.sendMessage({ type: MSG.FILO_DECIDI_PAGINA, costo: spec.costo, campo: 'web' }); } catch (_) {}
+      const risposta = d && d.ok ? d.risposta : 'chiede';
+      if (risposta === 'no') { appendActionLog(`${label}: non applicata, ${(d && d.no) || 'Filo non la fa da solo'}`); return false; }
+      if (risposta !== 'si') {
+        const Ui = global.SN_CONFIRM_UI;
+        let detail = '';
+        if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+        else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
+        else if (linkEl) detail = linkEl.href || '';
+        const perche = d && d.perche ? `\n\n${d.perche}` : '';
+        const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}` };
+        let ok = false;
+        try {
+          ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
+        } catch (_) { ok = false; }
+        if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+      }
     }
 
     try {
       switch (page.op) {
         case 'copy': Actions?.copyToClipboard(text); break;
         case 'cut': Actions?.cutSelection(); break;
-        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text) }, { etichetta: label });
+        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text), cerca: text }, { etichetta: label });
         case 'read_aloud': await Tts?.readAloud(text); break;
         case 'stop_reading': Tts?.stopReading(); break;
         case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
         case 'copy_image': await Actions?.copyImage(imgEl); break;
         case 'save_image': Actions?.downloadImage(imgEl); break;
         case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
-        case 'search_image': return await runFiloAction({ type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl) }, { etichetta: label });
+        case 'search_image': return await runFiloAction({
+          type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl), cerca: imgEl.currentSrc || imgEl.src || 'immagine',
+        }, { etichetta: label });
         case 'open_link': {
           // "Apri in nuova scheda" è un'azione di sistema già registrata: la
           // instradiamo via il ponte di #192.1 (NAVIGA → TabManager del main).
@@ -1154,7 +1189,13 @@
         payload,
         diceRipiego: true,
       });
-      if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
+      // Col suo codice: senza, la frase già scritta per l'utente («serve un
+      // invito») diventava «qualcosa è andato storto» (#663).
+      if (!res?.ok) {
+        const CE = globalThis.SN_CHAT_ERRORS;
+        throw CE ? CE.fromResponse(res, I18n.t('err_provider_failed'))
+          : new Error(res?.error || I18n.t('err_provider_failed'));
+      }
       // Risposta pagata coi crediti di Filo perché OpenRouter ha rifiutato la chiave (#662): la
       // riga della chat, una volta per serie, non a ogni passo che l'agente fa da solo.
       // Sotto la risposta, come in chat: la scrive il prossimo messaggio di Filo (o la fine del turno).
@@ -1447,6 +1488,9 @@
         : (CE ? CE.sentence(err) : raw);
       assistantEl = appendChatMessage('assistant', errText);
       assistantEl.classList.add('sn-sidebar-msg-error');
+      // La frase nomina la pagina dove si rimedia; da un sito qualunque
+      // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).
+      mostraRimedio(assistantEl, err);
       // In caso d'errore, se l'utente aveva la chat collassata e questo è
       // un proseguimento automatico, ripristina lo stato precedente.
       if (wasCollapsed && !userMessage) collapse({ ai: false });

@@ -290,6 +290,10 @@
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
       } else if (type === 'LEGGI_DOCUMENTO') {
         if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, 'da un documento'); }
+      } else if (type === 'CERCA_DOCUMENTI') {
+        const trovati = (Array.isArray(out.risultati) ? out.risultati : []).filter(Boolean)
+          .map((r) => `${testo(r.nome)}\n${testo(r.percorso)}\n${testo(r.inizio)}\n${testo(r.squarcio)}`);
+        if (trovati.length) { nonFidato = true; pezzi.push(...trovati); daFuori(trovati.join('\n'), 'dai documenti trovati sul disco'); }
       } else if (type === 'LEGGI_FILE') {
         pezzi.push(testo(out.text));
       } else if (type === 'CERCA_CHAT') {

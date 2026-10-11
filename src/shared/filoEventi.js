@@ -11,6 +11,8 @@
     MESSAGGIO: 'messaggio',
     CHAT_CHIUSA: 'chat.chiusa',
     CHAT_TITOLO: 'chat.titolo',
+    // Ciò che la chat ha letto, come classi di fonte (#530): ripresa dall'archivio non riparte pulita.
+    CHAT_FONTI: 'chat.fonti',
     NAVIGAZIONE: 'navigazione',
     TITOLO_PAGINA: 'navigazione.titolo',
     CANCELLAZIONE: 'cancellazione',
@@ -38,6 +40,8 @@
       case TIPI.CHAT_CHIUSA:
       case TIPI.CHAT_TITOLO:
         return stringa(ev.chat);
+      case TIPI.CHAT_FONTI:
+        return stringa(ev.chat) && Array.isArray(ev.fonti);
       case TIPI.MESSAGGIO:
         return stringa(ev.chat) && !!ev.msg && typeof ev.msg === 'object' && typeof ev.msg.text === 'string'
           && (ev.msg.role === 'user' || ev.msg.role === 'filo');
@@ -184,6 +188,14 @@
         if (ev.kindByUser) c.kindByUser = true;
         if (Number.isFinite(ev.triagedCount)) c.triagedCount = ev.triagedCount;
         break;
+      case TIPI.CHAT_FONTI: {
+        if (!c) break;
+        const prima = Array.isArray(c.fonti) ? c.fonti : [];
+        const nuove = ev.fonti.filter((f) => f && typeof f === 'object' && Number.isInteger(f.classe)
+          && !prima.some((p) => p.chiave === f.chiave && p.classe === f.classe));
+        c.fonti = prima.concat(nuove.map((f) => ({ ...f })));
+        break;
+      }
       case TIPI.NAVIGAZIONE:
         if (coperto(stato, ev)) return { nuovo: true, tolti: 1 };
         stato.pagine.set(ev.id, {
@@ -248,6 +260,7 @@
   function copiaChat(c) {
     if (!c) return null;
     const out = { ...c, messages: c.messages.map((m) => ({ ...m })) };
+    if (Array.isArray(c.fonti)) out.fonti = c.fonti.map((f) => ({ ...f }));
     delete out._pos;
     return out;
   }

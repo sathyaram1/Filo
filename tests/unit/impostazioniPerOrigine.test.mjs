@@ -134,7 +134,7 @@ test('sentinella: ogni azione di Filo che la barra d\'aiuto chiede è fra quelle
   const mandate = [...siti.matchAll(/runFiloAction\(\s*\{\s*type:\s*['"]([A-Za-z_]+)['"]/g)].map((m) => m[1].toUpperCase());
   assert.ok(mandate.includes('NAVIGA'), 'la sentinella non vede più le azioni che la barra manda da sé');
   assert.deepEqual([...descritte, ...mandate].filter((t) => !W.AZIONI_WEB.has(t)), [], 'azioni della barra d\'aiuto non ammesse dai siti');
-  for (const t of W.AZIONI_WEB) assert.ok(globalThis.SN_ACTION_LEVELS.levelFor({ type: t }), `azione ammessa inesistente: ${t}`);
+  for (const t of W.AZIONI_WEB) assert.ok(globalThis.SN_ACTION_LEVELS.costoFor({ type: t }), `azione ammessa inesistente: ${t}`);
 });
 
 test('un campo nuovo non elencato non raggiunge i siti (lista di ammessi, non di esclusi)', () => {
@@ -383,7 +383,7 @@ test('sentinella: ogni campo letto dai siti dentro una sezione elencata campo pe
 // Un campo nuovo in una di queste sezioni non arriva ai siti finché qualcuno non
 // sceglie: nella lista se il codice dei siti lo usa, qui se resta a casa. I modelli
 // per funzione restano fuori: se ne aggiungono spesso e ai siti ne serve uno solo.
-const RESTANO_A_CASA = { tts: ['modelVoice'], featureFlags: ['help', 'categorize'], tabColor: [], notifications: ['soundEnabled', 'sound'], dictation: [] };
+const RESTANO_A_CASA = { tts: ['modelVoice'], featureFlags: ['help', 'categorize'], tabColor: [], notifications: ['soundEnabled', 'sound', 'soundVolume'], dictation: [] };
 test('sentinella: ogni campo delle sezioni elencate campo per campo è stato deciso', () => {
   for (const S of SEZIONI_A_CAMPI.filter((k) => k !== 'models')) {
     assert.ok(S in RESTANO_A_CASA, `sezione ${S} elencata campo per campo senza la sua decisione qui`);

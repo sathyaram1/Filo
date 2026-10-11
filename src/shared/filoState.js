@@ -100,6 +100,16 @@
     try { return (await M.statoPerChat()) || null; } catch (_) { return null; }
   }
 
+  // Il livello di autonomia che vale adesso (#530): a «a che livello sei?» il modello risponde col dato, non a naso.
+  async function readAutonomia() {
+    const A = global.SN_AUTONOMIA;
+    if (!A || !global.SN_STORAGE) return null;
+    try {
+      const s = await global.SN_STORAGE.getSettings();
+      return A.infoLivello(A.livelloAttivo(s && s.autonomia && s.autonomia.livello));
+    } catch (_) { return null; }
+  }
+
   // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
   // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
   // I cambi di stato recenti (#867): li tiene il registro del main, che qui c'è solo nel main.
@@ -116,7 +126,7 @@
   async function assemble({ creditiFreschi = false, sistema: conSistema = true } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits, cambi, sistema] = await Promise.all([
+    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits, cambi, sistema, autonomia] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
@@ -126,6 +136,7 @@
       readCredits({ fresco: creditiFreschi }),
       readCambi(),
       conSistema ? readSistema() : Promise.resolve(undefined),
+      readAutonomia(),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -178,6 +189,7 @@
       dashboard: dashboardCache,
       credits,
       sistema,
+      autonomia,
     };
 
     const stateText = renderForPrompt(state);
@@ -313,6 +325,12 @@
     if (davanti && typeof davanti.zoomPercent === 'number') {
       lines.push('ZOOM DELLA PAGINA');
       lines.push(`Scheda davanti: ${davanti.zoomPercent}% (100% = dimensione reale; si cambia con ZOOM_PAGINA)`);
+      lines.push('');
+    }
+    if (state.autonomia) {
+      lines.push('AUTONOMIA DI FILO');
+      lines.push(`Livello scelto dall'utente: ${state.autonomia.nome}. ${state.autonomia.frase}`);
+      lines.push('Lo cambia solo l\'utente, in Preferenze sotto «Autonomia di Filo».');
       lines.push('');
     }
     // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della

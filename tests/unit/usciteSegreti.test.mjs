@@ -49,7 +49,7 @@ describe('un segreto custodito da Filo non esce da nessuna uscita, a nessun live
     { type: 'CERCA_WEB', domanda: CHIAVE },
   ];
   for (const a of azioni) {
-    test(`${a.type} (livello ${L.levelFor(a)}) ${JSON.stringify(a).slice(0, 60)}`, () => {
+    test(`${a.type} (costo ${L.costoFor(a)}) ${JSON.stringify(a).slice(0, 60)}`, () => {
       const v = X.valutaUscita(a, { segreti: SEGRETI });
       assert.equal(v.blocca, true);
       assert.match(v.frase, /^non ho /);
@@ -718,7 +718,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
   test('executeFiloAction chiama la porta prima del gate dei livelli e di ogni esecuzione', () => {
     const porta = esegui.indexOf('controllaUscita(');
     assert.ok(porta > 0, 'executeFiloAction non passa dalla porta delle uscite');
-    assert.ok(porta < esegui.indexOf('Levels.levelFor(action)'), 'la porta deve venire prima del gate dei livelli');
+    assert.ok(porta < esegui.indexOf('Levels.ingressi(action'), 'la porta deve venire prima del gate dell\'autonomia');
     assert.ok(porta < esegui.indexOf('switch (type)'), 'la porta deve venire prima di ogni esecuzione');
   });
 
@@ -734,7 +734,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
       if (PRIMITIVE.some((re) => re.test(c)) && !X.USCITE[tipo]) mancanti.push(tipo);
     }
     assert.deepEqual(mancanti, [], `uscite che saltano la porta: ${mancanti.join(', ')}`);
-    for (const t of Object.keys(X.USCITE)) assert.ok(L.levelFor({ type: t }) >= 1, `${t} non è nel registro dei livelli`);
+    for (const t of Object.keys(X.USCITE)) assert.ok(L.costoFor({ type: t }) != null, `${t} non è nel registro delle azioni`);
   });
 
   // Un bottone della chat che apre un indirizzo scelto dal modello è un'uscita come NAVIGA: l'azione che lo

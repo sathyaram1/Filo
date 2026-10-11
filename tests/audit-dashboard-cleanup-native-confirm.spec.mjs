@@ -20,6 +20,8 @@ async function newtabPage(app) {
 
 test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativo', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  // Il popup c'è dove la regola chiede (#530): a Conservativo il riordino chiede sempre.
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
   const page = await newtabPage(app);
 
   let nativeDialogFired = false;

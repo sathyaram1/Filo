@@ -3,12 +3,11 @@
 // Non parla con la rete vera; ogni host nuovo va aggiunto a HOSTS.
 
 import { createServer } from 'node:http';
-import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from '@playwright/test';
 import { test as filoTest, expect, chiudiApp } from '../fixtures/electron.mjs';
-import { cartellaTemporanea } from './percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from './percorsi.mjs';
 import { argomentiScala } from './scala.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -51,7 +50,7 @@ export const test = filoTest.extend({
     const app = await avviaFilo(rete, userData);
     await use(app);
     await chiudiApp(app);
-    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+    try { togliCartella(userData); } catch (_) {}
   },
 });
 

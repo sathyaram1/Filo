@@ -254,6 +254,18 @@
     }
     .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
     .fb-num { color: var(--sn-muted); font-weight: 600; }
+    /* Il segno dei Ricevuti: la forma del livello che ha fermato la pratica, come nella gestione. */
+    .fb-segno {
+      display: inline-block; vertical-align: -1px;
+      width: var(--fb-segno-size, 11px); height: var(--fb-segno-size, 11px); color: var(--sn-muted); cursor: help;
+    }
+    .fb-segno svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .fb-segno svg path { fill: currentColor; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+    .fb-segno--vuoto svg path { fill: none; stroke-width: 1.6; stroke-dasharray: 3 2; }
+    .fb-segno--attack  { color: #c0392b; }
+    .fb-segno--spam    { color: #e08e0b; }
+    .fb-segno--design  { color: #2e9e5b; }
+    .fb-segno--aligned { color: #5b6ee0; }
     .fb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
     .fb-badge {
       font-size: 11px; padding: 1px 7px; border-radius: 999px;

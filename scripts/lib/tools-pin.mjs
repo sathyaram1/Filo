@@ -105,8 +105,12 @@ export function pinnedDir() {
  *
  * @returns {{ ok: boolean, dir: string, why: string }}
  */
-export function pinTools(repoRoot, { dest = pinnedDir(), origine = '' } = {}) {
-  const src = resolve(repoRoot);
+export function pinTools(repoRoot, { dest = pinnedDir(), origine = '', da = repoRoot } = {}) {
+  const progetto = resolve(repoRoot);
+  // `da` diverso dal progetto: la copia di un worker nasce dagli strumenti
+  // dell'orchestratore, non dal suo clone, che è già sul ramo (#1157).
+  const src = resolve(da);
+  if (resolve(dest) === src) return { ok: false, dir: '', why: 'destinazione uguale alla sorgente' };
   // NON si fissa sopra la copia che sta girando adesso. Non è prudenza: a
   // metà giro il progetto è aperto sul ramo di lavoro, quindi ricopiare da lì
   // sovrascriverebbe gli strumenti buoni con quelli del ramo — il guasto che
@@ -129,7 +133,7 @@ export function pinTools(repoRoot, { dest = pinnedDir(), origine = '' } = {}) {
       mkdirSync(dirname(resolve(dest, p)), { recursive: true });
       cpSync(resolve(src, p), resolve(dest, p), { recursive: true });
     }
-    writeFileSync(resolve(dest, REPO_MARK), `${src}\n`, 'utf8');
+    writeFileSync(resolve(dest, REPO_MARK), `${progetto}\n`, 'utf8');
     // Da DOVE viene questa copia. Serve a chi legge i log: una copia presa da
     // un checkout non aggiornato riporterebbe indietro gli strumenti con
     // un'altra causa, e senza questa riga non si distinguerebbe.
@@ -138,6 +142,24 @@ export function pinTools(repoRoot, { dest = pinnedDir(), origine = '' } = {}) {
   } catch (e) {
     return { ok: false, dir: '', why: String((e && e.message) || e) };
   }
+}
+
+/**
+ * La copia di un worker in parallelo (#1157): `filo-strumenti-<n>` accanto a
+ * quella dell'orchestratore. Una cartella a testa, così ripinnare un worker non
+ * toglie gli strumenti da sotto l'orchestratore o da sotto un altro worker.
+ */
+export function pinnedDirWorker(n, base = pinnedDir()) {
+  const i = Number(n);
+  if (!Number.isInteger(i) || i < 1 || i > 99) throw new Error(`indice del worker non valido: ${n}`);
+  return `${resolve(base)}-${i}`;
+}
+
+/** Strumenti del worker `n`, presi da quelli che girano adesso, con `.filo-repo-root` = il suo clone. */
+export function pinWorkerTools(clone, n, { da = TOOLS_ROOT, base = pinnedDir(), origine = '' } = {}) {
+  let dest;
+  try { dest = pinnedDirWorker(n, base); } catch (e) { return { ok: false, dir: '', why: e.message }; }
+  return pinTools(clone, { dest, da, origine });
 }
 
 /**

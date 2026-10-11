@@ -35,6 +35,7 @@
   // Stato per ogni editabile attualmente "agganciato" (focus). WeakMap per non
   // tenere riferimenti che impediscano GC se il sito rimuove l'elemento.
   const monitored = new WeakMap();
+  const ascoltate = new WeakSet(); // caselle con gli ascoltatori già messi
   let activeEl = null;
   let personalDict = new Set();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
@@ -66,6 +67,7 @@
     // Riallinea overlay attivo a scroll/resize della finestra.
     window.addEventListener('scroll', queueSync, true);
     window.addEventListener('resize', queueSync, true);
+    document.addEventListener('visibilitychange', riprendiScanRimandato);
 
     // Riceve i suggerimenti del correttore nativo spinti dal main al click destro.
     try {
@@ -336,6 +338,35 @@
     }, 200);
   }
 
+  function suInput(state) {
+    // 1) autocorrect istantaneo
+    tryAutocorrect(state);
+    // 2) gli issue blu hanno offset relativi al testo precedente: digitare anche
+    // un solo carattere prima della fine può sfasare l'intero set. Cancellali
+    // subito; verranno ricostruiti dal prossimo scan (debounce 1.5s). Senza
+    // questo, "Risolvi" può applicare il fix sul range sbagliato e "mangiare"
+    // la frase.
+    if (state.issues.length) {
+      state.issues = [];
+      renderOverlayContent(state);
+    }
+    // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello. Lo scan già chiesto
+    // da un gesto (un tasto tenuto premuto) si sposta soltanto: resta una chiamata, sul testo finale.
+    if (!prendeGesto(state)) {
+      if (state.timer) scheduleScan(state);
+      return;
+    }
+    // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
+    //    (boundary char), lancia subito il check ortografico così che al
+    //    click destro non ci sia attesa. Limitato e in background.
+    //    Solo il tasto con cui l'utente chiude una parola lo paga: una pagina che a ogni lettera aggiunge una parola
+    //    ne otterrebbe uno per tasto (#1070).
+    const G = global.SN_GESTO;
+    if (G.prendi('parola', G.CHIUDE, G.dentro(state.el))) prefetchJustCompletedWord(state);
+    // 4) il prossimo scan
+    scheduleScan(state);
+  }
+
   function attach(el) {
     let state = monitored.get(el);
     if (!state) {
@@ -351,26 +382,13 @@
         wordCache: new Map(),
       };
       monitored.set(el, state);
-      el.addEventListener('input', () => {
-        // 1) autocorrect istantaneo
-        tryAutocorrect(state);
-        // 2) gli issue blu hanno offset relativi al testo precedente: digitare anche
-        // un solo carattere prima della fine può sfasare l'intero set. Cancellali
-        // subito; verranno ricostruiti dal prossimo scan (debounce 1.5s). Senza
-        // questo, "Risolvi" può applicare il fix sul range sbagliato e "mangiare"
-        // la frase.
-        if (state.issues.length) {
-          state.issues = [];
-          renderOverlayContent(state);
-        }
-        // 3) prefetch parola completata: se l'utente ha appena chiuso una parola
-        //    (boundary char), lancia subito il check ortografico così che al
-        //    click destro non ci sia attesa. Limitato e in background.
-        prefetchJustCompletedWord(state);
-        // 4) il prossimo scan
-        scheduleScan(state);
-      });
-      el.addEventListener('scroll', () => syncOverlay(state));
+      // Un ascoltatore per casella, che guarda lo stato vivo: chi esce e rientra non lascia indietro uno stato morto
+      // che si prende il gesto, e una casella lasciata non lavora più (#1070).
+      if (!ascoltate.has(el)) {
+        ascoltate.add(el);
+        el.addEventListener('input', () => { const vivo = monitored.get(el); if (vivo) suInput(vivo); });
+        el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo) syncOverlay(vivo); });
+      }
       // Resize observer per cambi di dimensione (autoresize textarea, ecc.)
       try {
         state.ro = new ResizeObserver(() => syncOverlay(state));
@@ -380,7 +398,9 @@
     activeEl = el;
     ensureOverlay(state);
     syncOverlay(state);
-    scheduleScan(state);
+    // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente, col
+    // mouse sulla casella o con Tab (che cade sul campo di prima: la casella la riceve solo al rilascio).
+    if (prendeGesto(state, (l) => l.tasto === 'Tab')) scheduleScan(state);
   }
 
   function detach(el) {
@@ -507,14 +527,34 @@
   // ============================================================================
   // Scan LLM (zigzag blu)
   // ============================================================================
+  // Solo un gesto vero caduto dentro la casella apre una chiamata al modello, e una volta sola: `input` e `focus` li
+  // fabbrica anche la pagina, e scrivere nella sua ricerca non deve pagare il controllo di un'altra casella (#1070).
+  function prendeGesto(state, oppure) {
+    const G = global.SN_GESTO;
+    if (!G) return false;
+    const qui = G.dentro(state.el);
+    return G.prendi('correttore', undefined, oppure ? (l) => qui(l) || oppure(l) : qui);
+  }
+
   function scheduleScan(state) {
     if (!isEnabled()) return;
     if (state.timer) clearTimeout(state.timer);
-    state.timer = setTimeout(() => scanText(state), DEBOUNCE_MS);
+    state.timer = setTimeout(() => { state.timer = null; scanText(state); }, DEBOUNCE_MS);
+  }
+
+  // Lo scan chiesto dall'utente e arrivato a scheda nascosta parte quando la scheda torna davanti.
+  function riprendiScanRimandato() {
+    if (document.hidden || !activeEl) return;
+    const state = monitored.get(activeEl);
+    if (!state || !state.rimandato) return;
+    state.rimandato = false;
+    scheduleScan(state);
   }
 
   async function scanText(state) {
     if (!state || !state.el || !document.body.contains(state.el)) return;
+    if (document.hidden) { state.rimandato = true; return; }
+    state.rimandato = false;
     const text = getEditableText(state.el);
 
     // Reset se il testo è troppo corto o invariato
@@ -600,7 +640,7 @@
   // appena chiuso (ultimo carattere = boundary), così quando fa click destro
   // sulla parola la correzione è già pronta in cache.
   async function prefetchJustCompletedWord(state) {
-    if (!isEnabled()) return;
+    if (!isEnabled() || document.hidden) return;
     const el = state.el;
     const text = getEditableText(el);
     if (!text || text.length < 2) return;
@@ -1216,12 +1256,14 @@
   // Richiesta on-demand: parola sotto cursore → suggerimento LLM
   // ============================================================================
   // Restituisce { misspelled, correction } o null se la chiamata fallisce.
-  async function requestWordSuggestion({ word, sentence, prev, next }) {
+  // `suRichiesta`: il tasto destro dell'utente, che il tetto del main sulle chiamate automatiche non ferma.
+  async function requestWordSuggestion({ word, sentence, prev, next }, { suRichiesta = false } = {}) {
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.SPELLCHECK_WORD,
         payload: { word, sentence, prev, next },
+        ...(suRichiesta ? { suRichiesta: true } : {}),
       });
       if (!res?.ok) {
         console.error('[SN] word check — provider error:', res?.code, res?.error);
