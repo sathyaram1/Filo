@@ -52,10 +52,11 @@ async function server() {
   // Come in channel.issueTicket: chi può spingere entra nel registro con la punta che trova.
   const emissione = (fp, punta) => store.registraSulRamo({ repo: 'app', ramo: RAMO, feedbackId: 'fid', fp, sha: punta, punta, via: fiduciaRamo.VIA.EMISSIONE });
   // routine-channel deliver status --status revision_capability --notes … --frase … --branch …
-  const revisione = () => deliver.applyDelivery(live('t1'), 'status', { status: 'revision_capability', notes: 'report', userNote: 'frase', branch: RAMO }, {}, Date.now());
-  const correzione = async (fp) => {
+  // Dal giro 2 lo strumento timbra la punta anche su revisione e correzione: la prova lo segue.
+  const revisione = (sha) => deliver.applyDelivery(live('t1'), 'status', { status: 'revision_capability', notes: 'report', userNote: 'frase', branch: RAMO, sha }, {}, Date.now());
+  const correzione = async (fp, sha) => {
     await mem().doc('feedback/fid').update({ status: 'revision_capability' });
-    return deliver.applyDelivery(live(fp), 'fixed', fixedPayload({ report: 'corretto', frase: 'f', branch: RAMO }), {}, Date.now());
+    return deliver.applyDelivery(live(fp), 'fixed', fixedPayload({ report: 'corretto', frase: 'f', branch: RAMO, sha }), {}, Date.now());
   };
   return { store, fiduciaRamo, emissione, revisione, correzione };
 }
@@ -63,9 +64,9 @@ async function server() {
 test('r1 lavoro fidato scritto solo da biglietti puliti, con un giro di correzione: resta fidato', async () => {
   test.skip(!SRV, 'checkout del server non trovato accanto al repo');
   const s = await server();
-  expect((await s.revisione()).ok).toBe(true);
+  expect((await s.revisione(H1)).ok).toBe(true);
   await s.emissione('t3', H1);
-  expect((await s.correzione('t3')).ok).toBe(true);
+  expect((await s.correzione('t3', F1)).ok).toBe(true);
   // il fixer ha spinto F1: il verificatore dopo trova F1 come punta
   await s.emissione('t4', F1);
   const ramo = await s.store.readRamo('app', RAMO);
@@ -77,7 +78,7 @@ test('r1 lavoro fidato scritto solo da biglietti puliti, con un giro di correzio
 test('r1 un commit spinto fuori registro fra la revisione e la verifica non entra come pulito', async () => {
   test.skip(!SRV, 'checkout del server non trovato accanto al repo');
   const s = await server();
-  expect((await s.revisione()).ok).toBe(true);
+  expect((await s.revisione(H1)).ok).toBe(true);
   // il lavoro nuovo ha spinto H1; qualcun altro spinge X; il verificatore trova X come punta
   await s.emissione('t2', X);
   const ramo = await s.store.readRamo('app', RAMO);
