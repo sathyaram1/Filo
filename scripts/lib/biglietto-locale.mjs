@@ -227,17 +227,47 @@ export async function prendi({ sporco = false, motivo = '', sessionId = '', cwd 
   return { path, fp: r.fp, fiducia: r.fiducia === 'fidato' ? 'fidato' : 'non_fidato' };
 }
 
+// Come TETTO_COMMIT in fiduciaRamo del server: oltre non controlla e vale sporco, quindi se ne manda uno in più.
+export const TETTO_COMMIT = 5000;
+
 /**
- * Registra nel registro dei rami la punta che questa sessione ha scritto (verify-local start, finish). Mai
- * un'eccezione: senza biglietto o con un guasto il ramo resta senza la voce, cioè non fidato.
- * @returns {Promise<{ ok: boolean, ramoFidato?: boolean, senzaBiglietto?: true, errore?: string }>}
+ * I commit del ramo oltre main fino a `sha`, con la data d'autore in ms: il server ci controlla che li abbia scritti una
+ * sessione pulita registrata (fiduciaRamo.commitCoperti). null se git non risponde (il server lo legge come sporco).
  */
-export async function registraRamo({ repo, ramo, sha, feedbackId = '', env, cwd, deps = {} } = {}) {
+export function commitDelRamo(cartella, sha) {
+  try {
+    const out = execFileSync('git', ['log', '--format=%H %at', `-n${TETTO_COMMIT + 1}`, String(sha), '--not', 'origin/main'], {
+      cwd: cartella, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 16 * 1024 * 1024,
+    });
+    return out.split('\n').filter((r) => r.trim()).map((r) => {
+      const [s, t] = r.trim().split(/\s+/);
+      return { sha: s, at: Number(t) * 1000 };
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Registra nel registro dei rami la punta che questa sessione ha scritto (verify-local start, finish), coi commit del
+ * ramo letti in `cartella`. Se la sessione continua un lavoro sporco o di chi il server non sa nominare, il server la
+ * sporca (`sporcato`). Mai un'eccezione: senza biglietto o con un guasto il ramo resta senza la voce, cioè non fidato.
+ * @returns {Promise<{ ok: boolean, ramoFidato?: boolean, fiducia?: string, sporcato?: string, senzaBiglietto?: true, errore?: string }>}
+ */
+export async function registraRamo({ repo, ramo, sha, feedbackId = '', cartella, env, cwd, deps = {} } = {}) {
   try {
     const b = await trovaBiglietto({ env, cwd, deps });
     if (!b) return { ok: false, senzaBiglietto: true };
-    const r = await chiama('ramo', Object.assign({ ticket: b.ticket, repo, ramo, sha }, feedbackId ? { feedbackId } : {}), deps);
-    return { ok: true, ramoFidato: r.ramoFidato === true, fiducia: b.fiducia };
+    const commits = (deps.commitDelRamo || commitDelRamo)(cartella || cwd || process.cwd(), sha);
+    const r = await chiama('ramo', Object.assign(
+      { ticket: b.ticket, repo, ramo, sha },
+      feedbackId ? { feedbackId } : {},
+      Array.isArray(commits) ? { commits, ora: Date.now() } : {},
+    ), deps);
+    return Object.assign(
+      { ok: true, ramoFidato: r.ramoFidato === true, fiducia: r.fiducia === 'fidato' ? 'fidato' : 'non_fidato' },
+      r.sporcato ? { sporcato: String(r.sporcato) } : {},
+    );
   } catch (e) {
     return { ok: false, errore: String((e && e.message) || e) };
   }

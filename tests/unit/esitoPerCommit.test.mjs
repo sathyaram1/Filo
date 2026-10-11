@@ -46,6 +46,7 @@ const {
   applySecaudit,
   applyVerifierVerdict,
   applyFixed,
+  fixedPayload,
   defaultState,
 } = await import('../../scripts/dispatch.mjs');
 
