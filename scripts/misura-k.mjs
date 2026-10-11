@@ -120,6 +120,8 @@ export function estraiRossi(testo) {
     const chiusi = riga.match(/^\[test:unit\] chiusi insieme, senza esito: (.+?)\.?\s*$/);
     if (chiusi) { for (const f of chiusi[1].split(', ')) if (f.trim()) rossi.add(file(f)); continue; }
     if (!/(✘|✖|×|^\s*\d+\)\s)/.test(riga)) continue;
+    // Un tentativo caduto di un test passato a uno dopo: per Playwright e per finish:check è verde (verifica #1157 giro 5).
+    if (instabili.has(testDiPlaywright(riga))) continue;
     const m = riga.match(/tests[\\/][\w.\\/ -]+?\.(?:spec|test)\.mjs/);
     if (m) rossi.add(m[0].replace(/\\+/g, '/'));
   }
