@@ -59,21 +59,21 @@
       break;
     }
     if (campoDiTesto(el)) return true;
-    // Un componente a shadow DOM chiuso nasconde il suo campo (#685.1): lì si chiede al documento
-    // se il cursore è scrivibile e se sta in QUEL componente (fuori dall'ombra la selezione punta all'ospite).
-    if (el && !el.shadowRoot && String(el.localName || '').indexOf('-') !== -1) {
-      try {
-        const d = el.ownerDocument || doc;
-        if (!d.queryCommandEnabled('insertText')) return false;
-        const s = d.getSelection && d.getSelection();
-        const nodo = s && s.anchorNode;
-        if (!nodo) return false;
-        if (el.contains && el.contains(nodo)) return true;
-        const i = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.childNodes, el) : -1;
-        return nodo === el.parentNode && (s.anchorOffset === i || s.anchorOffset === i + 1);
-      } catch (_) { return false; }
-    }
-    return false;
+    // Il campo può non avere una forma riconoscibile (un'ombra chiusa su qualunque elemento, #685.1):
+    // si chiede al documento se il cursore è scrivibile e se sta nell'elemento a fuoco (fuori da
+    // un'ombra chiusa la selezione punta all'ospite, accanto a lui).
+    if (!el) return false;
+    try {
+      const d = el.ownerDocument || doc;
+      if (!d.queryCommandEnabled('insertText')) return false;
+      const radice = el.getRootNode ? el.getRootNode() : d;
+      const s = (radice && radice !== d && typeof radice.getSelection === 'function') ? radice.getSelection() : d.getSelection();
+      const nodo = s && s.anchorNode;
+      if (!nodo) return false;
+      if (el.contains && el.contains(nodo)) return true;
+      const i = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.childNodes, el) : -1;
+      return nodo === el.parentNode && (s.anchorOffset === i || s.anchorOffset === i + 1);
+    } catch (_) { return false; }
   }
 
   // La stessa domanda, in forma di sorgente da valutare dentro una pagina:
