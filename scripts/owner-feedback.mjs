@@ -178,7 +178,7 @@ function contestoDelRifiuto(fb) {
  * I campi che servono a decidere sul segno, decifrati. null se mittente o stato
  * non si leggono: senza sapere di chi è la pratica non si segna niente.
  */
-async function praticaInChiaro(doc) {
+export async function praticaInChiaro(doc) {
   const f = doc?.fields || {};
   const grezzi = { _id: doc.name, clientId: f.clientId?.stringValue || '', status: f.status?.stringValue || '' };
   let dec = grezzi;
@@ -206,7 +206,8 @@ async function praticaInChiaro(doc) {
     ...(pipeline === undefined ? {} : { pipeline }),
     senderProof: f.senderProof?.stringValue || '',
     // La fiducia (#1148) la scrive solo il server: è in chiaro, e decide chi lavora la pratica in locale.
-    fiducia: f.fiducia?.stringValue || '',
+    // Campo assente resta undefined (pratica prima della migrazione, regola di prima); presente ma non testo = '', cioè un no.
+    fiducia: f.fiducia === undefined ? undefined : (typeof f.fiducia.stringValue === 'string' ? f.fiducia.stringValue : ''),
     statusPublic: f.statusPublic?.stringValue || 'open',
     localOnly: lo ? { by: lo.by?.stringValue || '', at: Number(lo.at?.integerValue || 0) } : undefined,
     localApproval: la ? { by: la.by?.stringValue || '', at: Number(la.at?.integerValue || 0) } : undefined,

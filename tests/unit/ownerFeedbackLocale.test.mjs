@@ -449,3 +449,21 @@ test('approvato come lavoro locale: i passaggi di npm run feedback e la presa in
     assert.equal(rifiuto.utente, true);
   } finally { globalThis.fetch = vero; }
 });
+
+test('praticaInChiaro: fiducia assente resta assente (regola di prima fino alla migrazione), presente ma non testo è un no', async () => {
+  const doc = (extra) => ({
+    name: 'projects/p/databases/(default)/documents/feedback/x1',
+    fields: { clientId: { stringValue: 'local:claude' }, senderProof: { stringValue: 'admin' }, status: { stringValue: 'todo' }, ...extra },
+  });
+  const MR = globalThis.SN_MANAGE_REVIEW;
+  const assente = await mod.praticaInChiaro(doc());
+  assert.equal(assente.fiducia, undefined);
+  assert.equal(MR.localSenderCheck(assente).ok, true, 'la pratica locale prima della migrazione si lega');
+  const nulla = await mod.praticaInChiaro(doc({ fiducia: { nullValue: null } }));
+  assert.equal(nulla.fiducia, '');
+  assert.equal(MR.localSenderCheck(nulla).ok, false);
+  const nonFidata = await mod.praticaInChiaro(doc({ fiducia: { stringValue: 'non_fidato' } }));
+  assert.equal(MR.localSenderCheck(nonFidata).nonFidato, true);
+  const fidata = await mod.praticaInChiaro(doc({ fiducia: { stringValue: 'fidato' } }));
+  assert.equal(MR.localSenderCheck(fidata).ok, true);
+});
