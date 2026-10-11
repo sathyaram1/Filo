@@ -103,7 +103,7 @@ export function barra(testo, { home = os.homedir(), nowMs = Date.now(), lancia =
   } catch (_) {
     // La barra non deve mai rompere la sessione: al peggio una riga senza numeri.
   }
-  scrivi(`${riga(lettura)}\n`);
+  scrivi(`${riga(lettura, nonInviata)}\n`);
 }
 
 function lanciaInvio(home) {
