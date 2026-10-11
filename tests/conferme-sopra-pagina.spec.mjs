@@ -478,3 +478,25 @@ test('finestrella di accesso già piccola: la domanda la allarga quanto serve al
   expect(s.textScrolls, JSON.stringify(s)).toBe(false);
   expect(s.alto).toBeGreaterThanOrEqual(360);
 });
+
+// Giro 11: aperta oltre il bordo, della finestrella restava in vista solo OK; allargata nell'angolo, usciva dallo schermo.
+const inVista = (app, segno) => app.evaluate(({ BrowserWindow, screen }, segno) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes(segno));
+  const c = w.getContentBounds();
+  const a = screen.getDisplayMatching(c).workArea;
+  return { dentro: c.x >= a.x && c.y >= a.y && c.x + c.width <= a.x + a.width && c.y + c.height <= a.y + a.height, c, a };
+}, segno);
+
+test('finestrella di accesso aperta oltre il bordo dello schermo: con la domanda torna tutta in vista', async ({ app, openTab, testServer }) => {
+  const vista = await popupConDomanda(app, openTab, testServer, 'client_id=oltre', 'popup,left=-330,top=200,width=488,height=360');
+  await expect.poll(async () => (await inVista(app, 'client_id=oltre')).dentro).toBe(true);
+  const s = await testoSiVede(vista);
+  expect(s.textScrolls, JSON.stringify(s)).toBe(false);
+});
+
+test('finestrella piccola nell’angolo dello schermo: allargata per la domanda non ne esce', async ({ app, openTab, testServer }) => {
+  const a = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea);
+  const misura = `popup,left=${a.x + a.width - 270},top=${a.y + a.height - 180},width=260,height=140`;
+  await popupConDomanda(app, openTab, testServer, 'client_id=angolo', misura);
+  await expect.poll(async () => (await inVista(app, 'client_id=angolo')).dentro).toBe(true);
+});
