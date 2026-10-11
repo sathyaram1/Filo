@@ -95,3 +95,21 @@ test('Ctrl+Z resta "annulla" in un campo dentro un componente chiuso', async ({ 
   expect(page.url()).toBe(urlC);
   expect(await page.evaluate(() => window.__campo.querySelector('input').value)).toBe('');
 });
+
+// #685.1 — l'ombra chiusa si può appendere anche a un div: il campo lì dentro resta un campo.
+test('Ctrl+Z resta "annulla" in un campo dentro un\'ombra chiusa appesa a un div', async ({ openTab, testServer }) => {
+  const urlA = testServer.html(PAGE_A);
+  const urlD = testServer.html('<!doctype html><title>D</title><div id="h"></div><script>'
+    + 'window.__o = document.getElementById("h").attachShadow({ mode: "closed" }); window.__o.innerHTML = "<input style=width:300px>";</script>');
+  const page = await testServer.openReady(openTab, PAGE_A);
+  await navigateAndReady(page, urlA);
+  await navigateAndReady(page, urlD);
+
+  await page.evaluate(() => window.__o.querySelector('input').focus());
+  await page.keyboard.type('scrivo');
+  await page.waitForTimeout(600);
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(1_000);
+  expect(page.url()).toBe(urlD);
+  expect(await page.evaluate(() => window.__o.querySelector('input').value)).toBe('');
+});

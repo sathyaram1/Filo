@@ -137,7 +137,11 @@ test('i tasti arrivano sia dalla pagina sia dalla barra di Filo', () => {
   // Cmd+freccia su Mac: anche lei da tutte e due le porte, e sempre dopo aver chiesto se si scrive.
   const fuori = tabs.match(/comandoNavigazioneFuoriDalCampo\(/g) || [];
   assert.ok(fuori.length >= 2, `Cmd+freccia è ascoltata in ${fuori.length} punto/i su due`);
-  assert.match(tabs, /staScrivendo\(wc\)\) return;\s*\} catch \(_\) \{ return; \}\s*this\.navigaCronologia/);
+  assert.match(tabs, /staScrivendo\(wc\)\) return false;\s*\} catch \(_\) \{ return false; \}\s*this\.navigaCronologia/);
+  // La barra laterale aperta da tastiera tiene il fuoco: Cmd+freccia passa anche da lì, con la stessa domanda.
+  const barra = sorgente('src', 'main', 'barraLaterale.js');
+  assert.match(barra, /comandoNavigazioneFuoriDalCampo\?\.\(input\)/, 'dalla barra laterale Cmd+freccia non arriva');
+  assert.match(barra, /_navigaSeNonScrive\(wc, verso, attiva\.id\)/, 'la barra laterale naviga senza chiedere se si scrive');
 });
 
 // #685.1 — sulla pagina Cmd+freccia è prima della pagina, come in Safari e Chrome:

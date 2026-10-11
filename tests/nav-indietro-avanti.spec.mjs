@@ -12,6 +12,7 @@
 // nel content script.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { barraPage, statoBarra, premi } from './helpers/barra.mjs';
 
 // Il tasto si inietta sulla webContents che lo riceverebbe davvero: è lo stesso
 // cammino del tasto reale (before-input-event nel main), ma deterministico in
@@ -296,4 +297,39 @@ test('su Mac Cmd+← vale anche sulle pagine di Filo', async ({ app, openTab }) 
   await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
   await premiNellaPagina(app, 'Left', ['meta']);
   await page.waitForURL(partenza, { timeout: 8_000 });
+});
+
+// Un'ombra chiusa si può appendere anche a un div (lo fa Filo stesso per la ricerca negli appunti): il
+// campo lì dentro non ha una forma riconoscibile, e la domanda «si scrive qui?» la deve vedere lo stesso (#685.1 giro 5).
+const OMBRA_SU_DIV = '<!doctype html><title>O</title><div id="c"></div><div id="t"></div><script>'
+  + 'window.__c = document.getElementById("c").attachShadow({ mode: "closed" }); window.__c.innerHTML = "<input style=width:300px>";'
+  + 'window.__t = document.getElementById("t").attachShadow({ mode: "closed" }); window.__t.innerHTML = "<button>ok</button>";</script>';
+
+test('su Mac Cmd+← in un campo dentro un\'ombra chiusa appesa a un div non porta via la pagina; sul pulsante accanto sì', async ({ app, openTab, testServer }) => {
+  const { page, url } = await schedaSu(app, { openTab, testServer }, OMBRA_SU_DIV);
+  await page.evaluate(() => window.__c.querySelector('input').focus());
+  await page.keyboard.type('scrivo qui');
+  expect(await page.evaluate(() => window.__c.querySelector('input').value)).toBe('scrivo qui');
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await page.waitForTimeout(1_200);
+  expect(page.url()).toBe(url);
+
+  await page.evaluate(() => window.__t.querySelector('button').focus());
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await expect.poll(() => page.url(), { timeout: 8_000 }).not.toBe(url);
+});
+
+// La barra laterale aperta da tastiera tiene il fuoco: lì Cmd+← vale come Cmd+[ (#685.1 giro 4).
+test('su Mac Cmd+← dalla barra laterale aperta da tastiera torna indietro e la chiude', async ({ app, openTab, testServer }) => {
+  const { urlA } = await scheda_con_A_e_B({ openTab, testServer });
+  await diventaMac(app);
+  await premi(app, 'tab', 'B', ['meta', 'shift']);
+  await barraPage(app);
+  await expect.poll(async () => (await statoBarra(app)).motivo).toBe('tasto');
+  await premi(app, 'barra', 'Left', ['meta']);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.getURL();
+  }), { timeout: 8_000 }).toBe(urlA);
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
 });
