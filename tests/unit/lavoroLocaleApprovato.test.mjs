@@ -93,7 +93,9 @@ test('l’avviso della sessione segue la fiducia: approvato e fidato in lavorazi
   assert.equal(MR.manageTabFor(approvato), 'local');
   assert.equal(MR.localSenderCheck(approvato).ok, true);
   assert.equal(avvisoDaCampi({ fiducia: { stringValue: 'fidato' }, localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), '');
-  assert.match(avvisoDaCampi({ localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), /manca la fiducia/);
+  // Senza il campo (prima della migrazione) il sì dell'owner basta come prima; un non_fidato scritto no.
+  assert.equal(avvisoDaCampi({ localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), '');
+  assert.match(avvisoDaCampi({ fiducia: { stringValue: 'non_fidato' }, localOnly: { mapValue: {} }, localApproval: { mapValue: {} }, statusPublic: { stringValue: 'open' } }), /manca la fiducia/);
 });
 
 test('il lettore dice chi l’ha scritto anche dopo il sì: resta un utente', () => {

@@ -63,7 +63,12 @@ export function estraiOpzioneFeedback(argv) {
 export function avvisoDaCampi(fields, ora = Date.now()) {
   const f = fields || {};
   const mancano = [];
-  if (f.fiducia?.stringValue !== 'fidato') mancano.push('la fiducia (la dà l’owner, in Gestione, con «Segna fidato»)');
+  if (!f.fiducia || f.fiducia.nullValue !== undefined) {
+    // Campo che la migrazione non ha ancora scritto: vale la regola di prima, come per il server (decisione dell'owner, 11/10).
+    if (f.senderProof?.stringValue !== 'admin' && !f.localApproval?.mapValue) {
+      mancano.push('la prova del mittente (senderProof admin) o l’approvazione dell’owner come lavoro locale');
+    }
+  } else if (f.fiducia.stringValue !== 'fidato') mancano.push('la fiducia (la dà l’owner, in Gestione, con «Segna fidato»)');
   if (!f.localOnly?.mapValue) mancano.push('il segno «solo in locale»');
   let tardiva = '';
   if (f.statusPublic?.stringValue === 'closed') {
