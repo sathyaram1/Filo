@@ -333,3 +333,17 @@ test('su Mac Cmd+← dalla barra laterale aperta da tastiera torna indietro e la
   }), { timeout: 8_000 }).toBe(urlA);
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
 });
+
+// Un sito che dopo l'Invio toglie il fuoco alla ricerca lascia la selezione nel campo: lì non si scrive più (#685.1 giro 6).
+const PAGE_RICERCA = '<!doctype html><title>R</title><input id="cerca">'
+  + '<script>document.getElementById("cerca").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });</script>';
+
+test('su Mac Cmd+← torna indietro dopo che la pagina ha tolto il fuoco al campo', async ({ app, openTab, testServer }) => {
+  const { page, urlA } = await schedaSu(app, { openTab, testServer }, PAGE_RICERCA);
+  await page.locator('#cerca').click();
+  await page.keyboard.type('gatti');
+  await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await page.waitForURL(urlA, { timeout: 8_000 });
+});
