@@ -35,19 +35,45 @@
       if (el.tagName === 'INPUT' && nonTesto.indexOf(tipo) !== -1) return false;
       return !el.disabled && !el.readOnly;
     }
-    return !!(el.closest && el.closest('[contenteditable=""], [contenteditable="true"]'));
+    // `isContentEditable` conta anche plaintext-only ed eredità; il selettore regge un elemento staccato.
+    if (el.isContentEditable) return true;
+    return !!(el.closest && el.closest('[contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]'));
   }
 
-  // L'utente sta scrivendo in QUESTO documento? Il fuoco può essere annidato
-  // dentro uno shadow DOM (un componente web che si porta dietro il suo campo):
-  // `activeElement` lì fuori è l'ospite, non il campo, quindi si scende.
+  // L'utente sta scrivendo in QUESTO documento? Il fuoco può essere annidato in
+  // uno shadow DOM o in un riquadro (gli editor di documenti ricevono i tasti in
+  // un iframe): si scende fino al campo. Torna null se il fuoco è in un riquadro
+  // d'altra origine, che da qui non si vede: la domanda va fatta a lui.
   function scriveQui(doc) {
     let el = doc && doc.activeElement;
     let giri = 0;
-    while (el && el.shadowRoot && el.shadowRoot.activeElement && giri++ < 32) {
-      el = el.shadowRoot.activeElement;
+    while (el && giri++ < 32) {
+      if (el.shadowRoot && el.shadowRoot.activeElement) { el = el.shadowRoot.activeElement; continue; }
+      if (/^i?frame$/i.test(el.tagName || '')) {
+        let dentro = null;
+        try { dentro = el.contentDocument; } catch (_) { dentro = null; }
+        if (!dentro) return null;
+        el = dentro.activeElement;
+        continue;
+      }
+      break;
     }
-    return campoDiTesto(el);
+    if (campoDiTesto(el)) return true;
+    // Un componente a shadow DOM chiuso nasconde il suo campo (#685.1): lì si chiede al documento
+    // se il cursore è scrivibile e se sta in QUEL componente (fuori dall'ombra la selezione punta all'ospite).
+    if (el && !el.shadowRoot && String(el.localName || '').indexOf('-') !== -1) {
+      try {
+        const d = el.ownerDocument || doc;
+        if (!d.queryCommandEnabled('insertText')) return false;
+        const s = d.getSelection && d.getSelection();
+        const nodo = s && s.anchorNode;
+        if (!nodo) return false;
+        if (el.contains && el.contains(nodo)) return true;
+        const i = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.childNodes, el) : -1;
+        return nodo === el.parentNode && (s.anchorOffset === i || s.anchorOffset === i + 1);
+      } catch (_) { return false; }
+    }
+    return false;
   }
 
   // La stessa domanda, in forma di sorgente da valutare dentro una pagina:

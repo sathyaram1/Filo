@@ -59,7 +59,7 @@
     {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
       desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda. Sui pulsanti della barra laterale il tasto destro elenca le pagine della scheda, dalla più vicina, e ci salta con un clic.',
-      invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: i pulsanti "Indietro" e "Avanti" in cima alla barra laterale, spenti quando non c\u2019\u00e8 dove andare, e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',
+      invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore; su Mac anche Cmd+\u2190 e Cmd+\u2192, ma solo quando non stai scrivendo in un campo di testo, dove portano il cursore a inizio o fine riga), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: i pulsanti "Indietro" e "Avanti" in cima alla barra laterale, spenti quando non c\u2019\u00e8 dove andare, e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',
       doesNot: 'Se non c\u2019\u00e8 nessuna pagina dove andare non succede niente. Lo scorrimento a due dita funziona solo se \u00e8 acceso nelle impostazioni del Mac.',
     },
     {

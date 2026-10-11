@@ -17,6 +17,7 @@
         'Nella pagina Trasparenza, «Come si sostiene» adesso dice come stanno le cose oggi. Finché Filo non chiede pagamenti è tutto offerto, e se usi una tua chiave OpenRouter paghi solo quella. Se chiedi a Filo quanto costa, ti risponde con le stesse parole.',
         'La suoneria del timer e delle sveglie ha il suo volume, in Preferenze accanto alla scelta del motivo, e lo stesso vale per il suono delle notifiche. Puoi girare le manopole o chiederlo a Filo: "abbassa il volume della suoneria", "metti la suoneria delicata", "azzera il volume delle notifiche". A zero resta muta.',
         'La pagina dei file scaricati adesso si chiama «Download»: nella home, nel menu App e sulla scheda. E nella home non trovi più il tasto dei download in alto, che ripeteva quello che vedi già nelle carte.',
+        'Su Mac Cmd+← e Cmd+→ tornano indietro e vanno avanti come in Safari e in Chrome, quando non stai scrivendo. In un campo di testo portano il cursore a inizio o fine riga, come sempre.',
       ],
       fixes: [
         'La spiegazione che Filo prepara mentre selezioni e il correttore partono solo quando selezioni o scrivi tu. Un sito non li può più far partire da solo, e i tuoi crediti vanno solo a quello che usi.',

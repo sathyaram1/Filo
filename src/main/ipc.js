@@ -203,6 +203,17 @@ function registerIpcHandlers() {
     } catch (_) {}
   });
 
+  // #685.1 — Cmd+freccia che la pagina non ha usato: decide la scheda (tabs.cmdFrecciaNonUsata).
+  ipcMain.on('filo:cmd-freccia', (event, verso) => {
+    if (verso !== 'indietro' && verso !== 'avanti') return;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w._filoTabs?.tabs?.some((t) => t.view.webContents === event.sender)) {
+        try { w._filoTabs.cmdFrecciaNonUsata(event.sender, verso); } catch (_) {}
+        return;
+      }
+    }
+  });
+
   // È la chiave a essere stata rifiutata (credito finito compreso, moderazione
   // no)? Lo decide SN_WALLET, una volta sola; qui viaggia con l'errore perché
   // chi lo mostra possa offrire la pagina Crediti invece del solo «Riprova».

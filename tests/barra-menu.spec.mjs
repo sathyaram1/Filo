@@ -123,6 +123,29 @@ test('«Annulla» mentre si scrive annulla il testo e NON porta via la pagina', 
   }).not.toBe('una riga appena scritta');
 });
 
+// #685.1 — gli editor di documenti online ricevono i tasti in un riquadro, e un clic
+// sul foglio non toglie il fuoco al campo: «Annulla» deve vedere che lì si scrive.
+test('«Annulla» in un editor dentro un riquadro, dopo un clic sul foglio, non porta via la pagina', async ({ app, shell, openTab, testServer }) => {
+  const partenza = testServer.html('<html><body><h1>partenza</h1></body></html>');
+  const doc = testServer.html('<html><body><div id="foglio" style="height:200px">foglio</div>'
+    + '<iframe id="fr" srcdoc="<div id=ed contenteditable=true style=min-height:40px></div>"></iframe>'
+    + '<script>document.getElementById("foglio").addEventListener("mousedown", e => e.preventDefault());</script></body></html>');
+
+  const page = await openTab(partenza);
+  await page.goto(doc);
+  await expect.poll(async () => (await stato(app)).urlAttiva).toBe(doc);
+
+  const ed = page.frameLocator('#fr').locator('#ed');
+  await ed.click();
+  await page.keyboard.type('una riga');
+  await page.waitForTimeout(700);
+  await page.click('#foglio');
+
+  await voceDellaBarra(app, 'Annulla');
+  await page.waitForTimeout(1_000);
+  expect((await stato(app)).urlAttiva).toBe(doc);
+});
+
 // #685 — indietro e avanti sono arrivati nella barra insieme alla scorciatoia:
 // su Mac è da lì che passa il tasto (Cmd+[ e Cmd+]), quindi la voce deve fare
 // la stessa cosa che fa Alt+freccia altrove.

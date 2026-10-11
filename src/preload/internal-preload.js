@@ -30,6 +30,7 @@ const IS_FILO_ORIGIN = (() => {
 // non nostro finisse a girare qui (il caso che teme il gate qui sopra) se lo
 // scriverebbe da sé per rendersi impossibile da ingrandire (#686).
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
+try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] cmd-freccia', e); }
 
 let streamCounter = 0;
 

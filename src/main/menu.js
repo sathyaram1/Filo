@@ -79,20 +79,21 @@ function contenutoAFuoco() {
 
 // L'utente sta scrivendo in un campo di testo? La regola è una sola e sta in
 // src/shared/campoTesto.js: qui la mandiamo a valutare dentro la pagina.
-// #405: la domanda va fatta al RIQUADRO con cui l'utente ha interagito per
-// ultimo (un commento dentro un iframe è un campo di testo tanto quanto uno
-// nella pagina che lo ospita).
+// Si parte sempre dalla pagina principale, che segue il fuoco fin dentro i
+// riquadri della sua origine; un riquadro d'altra origine (null) si interroga a
+// parte (#405, #685.1): l'ultimo riquadro toccato non è dove sta il fuoco.
 async function staScrivendo(wc) {
   if (!wc) return false;
-  let dove = wc;
-  try {
-    const frame = wc._filoActiveFrame;
-    if (frame && !frame.detached) dove = frame;
-  } catch (_) { dove = wc; }
   const sorgente = globalThis.SN_CAMPO_TESTO && globalThis.SN_CAMPO_TESTO.sorgenteScriveQui();
   if (!sorgente) return true;
   try {
-    return !!(await dove.executeJavaScript(sorgente, false));
+    const qui = await wc.executeJavaScript(sorgente, false);
+    if (qui !== null) return !!qui;
+    const riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || [];
+    const risposte = await Promise.all(riquadri
+      .filter((f) => f !== wc.mainFrame && !f.detached)
+      .map((f) => f.executeJavaScript(sorgente, false).catch(() => true)));
+    return risposte.some((r) => r === true);
   } catch (_) {
     // Nel dubbio si annulla, non si naviga: annullare quando non c'è niente da
     // annullare non fa nulla, mentre andare indietro mentre si scrive porta via

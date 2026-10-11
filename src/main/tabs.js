@@ -27,7 +27,7 @@ const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
-const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
+const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
@@ -1853,6 +1853,26 @@ class TabManager {
     else this.goBack(target);
   }
 
+  // Cmd+freccia su Mac dalla barra di Filo, che non ha un preload che lo rimandi:
+  // diventa indietro/avanti solo se lì non si scrive.
+  async _navigaSeNonScrive(wc, verso, id) {
+    try {
+      if (await require('./menu').staScrivendo(wc)) return;
+    } catch (_) { return; }
+    this.navigaCronologia(verso, id);
+  }
+
+  // Cmd+freccia che la pagina non ha usato (src/preload/cmd-freccia.js). Vale solo
+  // per un tasto vero appena visto passare dal main su quella scheda: è lui che sa
+  // se siamo su Mac, e una pagina non deve poter navigare da sé con questo messaggio.
+  cmdFrecciaNonUsata(wc, verso) {
+    const visto = wc && wc._filoCmdFreccia;
+    if (!visto || visto.verso !== verso || Date.now() - visto.t > 3000) return;
+    wc._filoCmdFreccia = null;
+    const tab = this.tabs.find((t) => t.view && t.view.webContents === wc);
+    if (tab) this.navigaCronologia(verso, tab.id);
+  }
+
   // I tasti del browser (#404, #685) da qualunque vista della finestra abbia il fuoco: la scheda, e la barra
   // laterale aperta da tastiera (#871 giro 9). `tab` è la scheda su cui agire. true = preso.
   tastoDelBrowser(input, tab) {
@@ -2097,9 +2117,13 @@ class TabManager {
     shellWc.on('before-input-event', (event, input) => {
       if (input.type !== 'keyDown') return;
       const verso = comandoNavigazione(input);
-      if (!verso) return;
-      event.preventDefault();
-      this.navigaCronologia(verso);
+      if (verso) {
+        event.preventDefault();
+        this.navigaCronologia(verso);
+        return;
+      }
+      const fuoriDalCampo = comandoNavigazioneFuoriDalCampo(input);
+      if (fuoriDalCampo) this._navigaSeNonScrive(shellWc, fuoriDalCampo);
     });
   }
 
@@ -2245,7 +2269,12 @@ class TabManager {
           return;
         }
       }
-      if (this.tastoDelBrowser(input, tab)) event.preventDefault();
+      if (this.tastoDelBrowser(input, tab)) { event.preventDefault(); return; }
+      // Cmd+freccia resta alla pagina: se non la usa, la rimanda il suo preload (`cmdFrecciaNonUsata`).
+      if (input.type === 'keyDown') {
+        const fuoriDalCampo = comandoNavigazioneFuoriDalCampo(input);
+        if (fuoriDalCampo) wc._filoCmdFreccia = { verso: fuoriDalCampo, t: Date.now() };
+      }
     });
     // Navigazione main-frame iniziata dalla pagina (click su link,
     // window.location). Due casi richiedono di RICREARE la view invece di
