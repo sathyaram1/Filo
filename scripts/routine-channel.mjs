@@ -1418,6 +1418,18 @@ if (isMain) {
         data.sha = punta;
       }
     }
+    // Chi può aver spinto sul ramo dice fin dove arriva (#1148): il registro del ramo confronta con questa la punta che
+    // troverà dopo, e una consegna senza impronta il server la segna come buco. Una dichiarata vale solo se è la punta.
+    if (intento === 'fixed' || intento === 'status') {
+      const punta = headSha(ROOT);
+      const conferma = confermaImpronta(data.sha, punta);
+      if (punta && !conferma.ok) {
+        console.error(testoImprontaDiversa('consegna non registrata', data.sha, punta, conferma.motivo));
+        process.exit(1);
+      }
+      if (punta) data.sha = punta;
+      else delete data.sha;
+    }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
     // stato dato. Non è un doppione dello sha appena spedito: è la memoria su
