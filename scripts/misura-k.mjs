@@ -97,6 +97,35 @@ export function erroriInfrastruttura(testo) {
 }
 
 /**
+ * Un test di Playwright in una riga: file, posizione e titolo, senza durata, tentativo e tratti di chiusura, così che
+ * la riga del tentativo, l'elenco degli errori e il riepilogo diano lo stesso testo. '' se la riga non ne nomina. PURA.
+ */
+export function testDiPlaywright(riga) {
+  const m = String(riga || '').match(/(tests[\\/][\w.\\/ -]+?\.spec\.mjs)(:\d+:\d+)?(?:\s+›\s+(.*))?$/);
+  if (!m) return '';
+  let titolo = String(m[3] || '').replace(/[\s─]+$/, '');
+  for (let prima = ''; prima !== titolo;) {
+    prima = titolo;
+    titolo = titolo.replace(/\s*\((?:retry #\d+|\d+(?:\.\d+)?(?:ms|s|m|h))\)$/, '').replace(/[\s─]+$/, '');
+  }
+  return `${m[1].replace(/\\+/g, '/')}${m[2] || ''} › ${titolo}`;
+}
+
+/** I test che il riepilogo di Playwright elenca sotto «N flaky»: caduti a un tentativo e passati a uno dopo. PURA. */
+export function instabiliDiPlaywright(righe) {
+  const instabili = new Set();
+  let sezione = '';
+  for (const riga of righe) {
+    const titolo = riga.match(/^\s*\d+ (failed|flaky|interrupted|skipped|did not run|passed)\b/);
+    if (titolo) { sezione = titolo[1]; continue; }
+    if (!/^\s{4}/.test(riga)) { sezione = ''; continue; }
+    const t = sezione === 'flaky' ? testDiPlaywright(riga) : '';
+    if (t) instabili.add(t);
+  }
+  return instabili;
+}
+
+/**
  * I rossi di un log di `finish:check`, senza doppioni: i file di Playwright e del riepilogo degli unit, e i test di
  * primo livello del TAP che `node --test` scrive quando l'uscita non è un terminale (lì il nome del test). Su Windows
  * Playwright scrive il percorso con le barre rovesciate. PURA.
