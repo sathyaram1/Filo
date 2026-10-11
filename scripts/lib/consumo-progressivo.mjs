@@ -19,7 +19,7 @@ function totaliVuoti() {
 }
 
 function fileVuoto() {
-  return { offset: 0, ultimoId: '', ultimo: null, totali: totaliVuoti(), modelli: [] };
+  return { offset: 0, ultimoId: '', ultimo: null, totali: totaliVuoti(), modelli: [], contati: [] };
 }
 
 function somma(t, v) {
