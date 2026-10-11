@@ -94,7 +94,7 @@ async function semina(app, { chat = [], pagine = [] }) {
 }
 
 
-test('r1 una chat cancellata mentre si indicizzano le conversazioni vecchie non va più al modello dei vettori e non lascia il suo indice', async ({ app }) => {
+test('una chat cancellata mentre si indicizzano le conversazioni vecchie non va più al modello dei vettori e non lascia il suo indice', async ({ app }) => {
   test.setTimeout(120_000);
   await primaScheda(app);
   await preparaModello(app, []);
