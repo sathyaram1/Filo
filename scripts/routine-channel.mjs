@@ -1401,24 +1401,22 @@ if (isMain) {
       // contenuto mai esaminato (verifica del giro 1 su questo lavoro).
       // Anche correzione e revisione (#1148): il registro del ramo confronta questa punta con quella che troverà chi
       // viene dopo, e una consegna senza impronta il server la segna come buco.
-      {
-        const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato' : 'consegna non registrata';
-        const punta = headSha(ROOT);
-        if (!punta) {
-          console.error(`${quale}: non riesco a farmi dire su quale commit è la directory, e un esito vale per il contenuto esaminato, non per il nome del ramo.`);
-          console.error('Niente è stato consegnato: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia lo stesso comando.');
-          process.exit(1);
-        }
-        // Confermare vuol dire riconoscere la stessa versione, non ricopiarla
-        // lettera per lettera: la forma corta che gli strumenti stampano
-        // dappertutto, e le maiuscole, sono lo stesso commit.
-        const conferma = confermaImpronta(data.sha, punta);
-        if (!conferma.ok) {
-          console.error(testoImprontaDiversa(quale, data.sha, punta, conferma.motivo));
-          process.exit(1);
-        }
-        data.sha = punta;
+      const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato' : 'consegna non registrata';
+      const punta = headSha(ROOT);
+      if (!punta) {
+        console.error(`${quale}: non riesco a farmi dire su quale commit è la directory, e un esito vale per il contenuto esaminato, non per il nome del ramo.`);
+        console.error('Niente è stato consegnato: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia lo stesso comando.');
+        process.exit(1);
       }
+      // Confermare vuol dire riconoscere la stessa versione, non ricopiarla
+      // lettera per lettera: la forma corta che gli strumenti stampano
+      // dappertutto, e le maiuscole, sono lo stesso commit.
+      const conferma = confermaImpronta(data.sha, punta);
+      if (!conferma.ok) {
+        console.error(testoImprontaDiversa(quale, data.sha, punta, conferma.motivo));
+        process.exit(1);
+      }
+      data.sha = punta;
     }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
