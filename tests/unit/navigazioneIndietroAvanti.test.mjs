@@ -177,9 +177,9 @@ test('si scrive anche in un campo "solo testo" e in un campo dentro un riquadro'
   assert.equal(C.scriveQui({ activeElement: fermo }), false);
   // Componente a shadow DOM chiuso: decide il documento, che vede dove sta il cursore.
   // Fuori dall'ombra la selezione punta all'ospite: (genitore, suo indice).
-  const chiuso = (scrivibile, cursoreQui = true) => {
+  const chiuso = (scrivibile, cursoreQui = true, nome = 'x-campo') => {
     const genitore = { childNodes: [] };
-    const el = { tagName: 'X-CAMPO', localName: 'x-campo', shadowRoot: null, isContentEditable: false, parentNode: genitore,
+    const el = { tagName: nome.toUpperCase(), localName: nome, shadowRoot: null, isContentEditable: false, parentNode: genitore,
       matches: () => false, closest: () => null, contains: () => false,
       ownerDocument: { queryCommandEnabled: (c) => c === 'insertText' && scrivibile,
         getSelection: () => ({ anchorNode: genitore, anchorOffset: cursoreQui ? 1 : 0 }) } };
@@ -191,7 +191,7 @@ test('si scrive anche in un campo "solo testo" e in un campo dentro un riquadro'
   assert.equal(C.scriveQui({ activeElement: chiuso(true, false) }), false,
     'il cursore scrivibile sta in un altro componente: qui non si scrive');
   // L'ombra chiusa si appende anche a un div (la ricerca negli appunti di Filo): la forma non conta, decide il cursore.
-  const suDiv = (cursoreQui) => ({ ...chiuso(true, cursoreQui), tagName: 'DIV', localName: 'div' });
+  const suDiv = (cursoreQui) => chiuso(true, cursoreQui, 'div');
   assert.equal(C.scriveQui({ activeElement: suDiv(true) }), true, 'un campo in un\'ombra chiusa su un div non si vede');
   assert.equal(C.scriveQui({ activeElement: suDiv(false) }), false);
 });
