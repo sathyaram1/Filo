@@ -2227,14 +2227,11 @@ if (isMainModule) {
               `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
               + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
           }
-          // Chi ha passato il preflight è l'orchestratore: il marcatore accende il
-          // gancio dell'orchestratore cieco (.claude/hooks/orchestratore-cieco.mjs), che gli toglie il testo dei worker.
-          try {
-            mkdirSync(resolve(ROOT, '.claude'), { recursive: true });
-            writeFileSync(resolve(ROOT, '.claude', 'routine-orchestratore.json'),
-              JSON.stringify({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '', creato: Date.now() }));
-          } catch (e) {
-            console.error(`[dispatch] GUASTO (transient): marcatore dell'orchestratore non scritto (${e?.message || e})`);
+          // Chi ha passato il preflight è l'orchestratore: da qui la sua sessione non riceve il testo dei worker
+          // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
+          const cieco = installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '' });
+          if (!cieco.ok) {
+            console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
             process.exit(3);
           }
           console.log('Le tue istruzioni:\n');
