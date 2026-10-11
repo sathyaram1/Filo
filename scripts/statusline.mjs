@@ -51,15 +51,23 @@ function scriviAtomico(file, valore) {
   renameSync(tmp, file);
 }
 
+function stessiNumeri(a, b) {
+  return !!a && !!b && ['pct7d', 'reset7dAtS', 'pct5h', 'reset5hAtS'].every((k) => a[k] === b[k]);
+}
+
 /**
  * Aggiorna il file delle letture: la sessione che ha girato la barra ci compare sempre (il battito ne deduce
- * `barra:'presente'`), la lettura solo se c'è. Torna il contenuto scritto.
+ * `barra:'presente'`), la lettura solo se c'è. Claude Code rimostra i numeri dell'ultima risposta anche ore dopo:
+ * coi numeri uguali la lettura tiene l'ora della prima volta che la sessione li ha visti, o il server la
+ * prenderebbe per nuova e cancellerebbe i dollari spesi nel frattempo. Torna il contenuto scritto.
  */
-export function registra(file, { sessionId, lettura, nowMs = Date.now() }) {
+export function registra(file, { sessionId, lettura: vista, nowMs = Date.now() }) {
   const cur = leggiJson(file) || {};
   const sessioni = cur.sessioni && typeof cur.sessioni === 'object' ? Object.assign({}, cur.sessioni) : {};
+  let lettura = vista;
   if (sessionId) {
     const prima = sessioni[sessionId] || {};
+    if (stessiNumeri(prima.lettura, vista)) lettura = Object.assign({}, vista, { letturaAtMs: prima.lettura.letturaAtMs });
     sessioni[sessionId] = Object.assign({}, prima, { vistaAtMs: nowMs }, lettura ? { lettura } : {});
   }
   const tenute = Object.entries(sessioni).sort((a, b) => (b[1].vistaAtMs || 0) - (a[1].vistaAtMs || 0)).slice(0, SESSIONI_MAX);
