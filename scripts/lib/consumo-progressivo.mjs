@@ -103,10 +103,11 @@ export function avanzaFile(file, prev) {
   } finally {
     if (fd !== null) { try { closeSync(fd); } catch (_) { /* già chiuso */ } }
   }
+  st.contati = [...contati];
   return st;
 }
 
-function leggiRiga(riga, at, st) {
+function leggiRiga(riga, at, st, contati) {
   if (!riga.includes('"assistant"')) return;
   let e;
   try { e = JSON.parse(riga); } catch (_) { return; }
