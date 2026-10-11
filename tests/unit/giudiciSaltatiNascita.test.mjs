@@ -72,9 +72,11 @@ test('«richiede lavoro locale» dice il vero secondo la fiducia del feedback', 
   const routine = MR.judgesNote(rimandato({ clientId: 'routine:residuo', senderProof: 'server' })).text;
   const utente = MR.judgesNote(rimandato({ clientId: 'utente-1' })).text;
   const senzaProva = MR.judgesNote(rimandato({ clientId: 'owner:me' })).text;
-  const mioNonFidato = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin' })).text;
+  const mioNonFidato = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin', fiducia: 'non_fidato' })).text;
+  // Prima della migrazione il campo manca: col mittente provato vale la regola di prima.
+  const primaDellaMigrazione = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin' })).text;
   const approvato = MR.judgesNote(rimandato({ clientId: 'utente-2', localApproval: { by: 'owner', at: 1 } })).text;
-  for (const t of [owner, sessione, approvato]) {
+  for (const t of [owner, sessione, approvato, primaDellaMigrazione]) {
     assert.match(t, /Solo lavoro locale/);
     assert.doesNotMatch(t, /💻 Lavoro locale/);
   }
