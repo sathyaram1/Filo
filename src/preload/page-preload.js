@@ -156,6 +156,9 @@ if (!IS_SUBFRAME) {
   try { require('./wheel-zoom.js').riquadro(webFrame, { ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom riquadro', e); }
 }
 
+// In ogni frame, riquadri compresi: il tasto arriva solo al frame che ha il fuoco.
+try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] cmd-freccia', e); }
+
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
 //
 // Inietta nel MAIN WORLD (prima degli script di pagina) gli override di
