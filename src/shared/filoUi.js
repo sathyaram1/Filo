@@ -241,6 +241,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, nostro, veroONostro,
-    ombra, ombraDi, bersaglio, chiaveDiBozza, _test,
+    ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
