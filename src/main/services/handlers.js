@@ -4253,11 +4253,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // le ore, entro i due tetti. Quello che la scheda ha e il filo no (un turno interrotto, una ripresa) viene dopo.
   // Se il filo non si legge, si risponde con la conversazione della scheda come prima.
   let filo = null;
+  let tettiChat = null;
+  let modelloChat = '';
+  const componiFilo = (tetti) => ContestoFilo.componi({
+    chatId, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
+  });
   try {
-    const tetti = globalThis.SN_FILO_CONTESTO.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo);
-    filo = await ContestoFilo.componi({
-      chatId, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
-    });
+    const settingsChat = await getEffectiveSettings();
+    tettiChat = globalThis.SN_FILO_CONTESTO.tetti(settingsChat.contestoFilo, Defaults.get().contestoFilo);
+    try { modelloChat = String(modelForAction(settingsChat, ACTIONS.FILO_CHAT) || ''); } catch (_) {}
+    const finestra = finestreDeiModelli.get(modelloChat);
+    if (finestra != null && finestra < tettiChat.token) tettiChat = { ...tettiChat, token: finestra };
+    filo = await componiFilo(tettiChat);
   } catch (e) { console.warn('[Filo] tratto del filo non letto, rispondo con la sola scheda:', e?.message || e); }
   const codaScheda = filo && chatId ? filo.coda : cleanHistory;
   const vistiDalFilo = filo ? filo.visti : [];
