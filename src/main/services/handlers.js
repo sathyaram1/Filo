@@ -4153,6 +4153,8 @@ function fileNominatiDallaRisposta(textReply, azioni) {
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
 // #868 — quanto si aspettano i pezzi vecchi del filo: oltre, il turno parte senza (l'attesa è attrito).
 const ATTESA_RICORDI_MS = 2500;
+// Il tetto in token che il modello della chat ha retto dopo un rifiuto per finestra troppo piccola, per modello.
+const finestreDeiModelli = new Map();
 function entroIl(p, ms, ripiego) {
   let timer = null;
   return Promise.race([p, new Promise((ok) => { timer = setTimeout(() => ok(ripiego), ms); })])
