@@ -316,7 +316,7 @@
     if (!ct) return null;
     let restano = ct / 2;
     if (max && chiesti && chiesti > max && caratteri > 0) {
-      restano = Math.min(restano, (caratteri * (max / chiesti) * MARGINE_FINESTRA) - (caratteri - ct));
+      restano = Math.min(ct * 0.9, (caratteri * (max / chiesti) * MARGINE_FINESTRA) - (caratteri - ct));
     }
     return Math.max(0, Math.floor(Math.max(0, restano) / CARATTERI_PER_TOKEN));
   }
