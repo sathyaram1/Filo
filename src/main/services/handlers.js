@@ -4474,14 +4474,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       .reduce((n, m) => n + String(typeof (m && m.content) === 'string' ? m.content : JSON.stringify((m && m.content) || '')).length, 0);
     let inviati = [];
     try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
-    const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri: caratteriDi(inviati), caratteriTratto: caratteriDi(payloadBase.filoTratto) });
+    const caratteri = caratteriDi(inviati);
+    const caratteriTratto = caratteriDi(payloadBase.filoTratto);
+    const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
     if (token == null || token >= tettiChat.token) return false;
     strette++;
     tettiChat = { ...tettiChat, token };
     try { filo = await componiFilo(tettiChat); } catch (_) { return false; }
     payloadBase.filoTratto = filo.messaggi;
     nascostiDellaChat = nascostiDi(filo);
-    finestraDaRicordare = token;
+    // Si ricorda solo quando a sforare era il tratto: un messaggio enorme o una rilettura lunga di questo turno non
+    // devono lasciare un tratto minuscolo ai turni dopo.
+    if (caratteriTratto >= caratteri - caratteriTratto) finestraDaRicordare = token;
     return true;
   };
   let fermato = false;
