@@ -302,17 +302,19 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
     const source = String((input && input.source) || '').trim();
     let path = '';
     let fiducia = '';
-    const ereditato = String(env[ENV_FILE] || '').trim() ? leggiFile(String(env[ENV_FILE]).trim()) : null;
-    if (ereditato) {
-      // Un figlio dell'orchestratore locale: eredita la fiducia del padre adesso (§12.2).
-      const s = await chiama('stato', { ticket: ereditato.ticket }, deps).catch(() => null);
+    const daEnv = String(env[ENV_FILE] || '').trim();
+    if (daEnv) {
+      // Un figlio dell'orchestratore locale: eredita la fiducia del padre adesso (§12.2). Padre chiuso, file sparito o
+      // server che non risponde: non si sa da cosa nasce, quindi nasce sporco; senza server resta il padre, se c'è.
+      const ereditato = leggiFile(daEnv);
+      const s = ereditato ? await chiama('stato', { ticket: ereditato.ticket }, deps).catch(() => null) : null;
       if (s && s.chiuso !== true) {
         path = ereditato.path;
         fiducia = s.fiducia === 'fidato' ? 'fidato' : 'non_fidato';
       } else {
-        // Padre illeggibile o chiuso: non si sa da cosa nasce, quindi nasce sporco; senza server resta il suo (sporco).
-        const motivo = s ? 'biglietto del padre chiuso' : 'biglietto del padre illeggibile';
+        const motivo = !ereditato ? 'file del biglietto del padre illeggibile' : s ? 'biglietto del padre chiuso' : 'biglietto del padre illeggibile';
         const p = await prendi({ sporco: true, motivo, sessionId, cwd, nowMs, deps }).catch(() => null);
+        if (!p && !ereditato) throw new Error(`${motivo}, e il server non dà un biglietto nato sporco`);
         path = p ? p.path : ereditato.path;
         fiducia = p ? p.fiducia : 'non_fidato';
       }
