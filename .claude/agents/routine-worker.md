@@ -10,3 +10,6 @@ lancia `node scripts/dispatch.mjs --ticket <biglietto>` col biglietto ricevuto
 nel prompt, diventa il ruolo che ti stampa ed esegui fino in fondo. Tutto ciò
 che conta va REGISTRATO via script (esiti, notes, claim, guasti): il tuo testo
 di ritorno non viene letto.
+
+I file nati da shell (non da Edit/Write) si salvano al tuo Edit/Write successivo
+o al rilascio del biglietto, non prima.

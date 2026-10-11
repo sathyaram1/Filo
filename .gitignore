@@ -72,6 +72,10 @@ test-results/
 # Dove è arrivata la lettura progressiva dei transcript per il consumo nel battito: numeri, mai testo.
 .claude/routine-consumo.json
 
+# Chi è il worker di questo clone (indice e quanti in parallelo, #1157): lo scrive
+# scripts/clone-worker.mjs, vale per questa cartella e basta.
+.claude/filo-worker.json
+
 # Stato locale del giro (ripiego: quello vero vive sul server). Effimero come
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.
