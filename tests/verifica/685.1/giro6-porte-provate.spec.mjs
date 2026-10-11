@@ -1,4 +1,5 @@
-// #685.1 giro 6 — esplorazione: porte nuove di Cmd+freccia su Mac (barra laterale, conferma scritta, riquadri d'altra origine).
+// #685.1 giro 6 — porte ri-provate e nuove porte provate, tutte chiuse: barra laterale, conferma scritta,
+// riquadri d'altra origine, nessuna pagina precedente. Mac simulato nel main.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { premi, barraPage, statoBarra } from '../../helpers/barra.mjs';
@@ -72,23 +73,6 @@ for (const [nome, tasto, mod, mac] of [['Cmd+freccia sinistra su Mac', 'Left', [
   });
 }
 
-test('riquadro d\'altra origine, fuoco su un pulsante dentro: Cmd+freccia sinistra torna indietro', async ({ app, openTab, testServer }) => {
-  const dentro = testServer.html('<!doctype html><button id="k">gioca</button>', { pubblico: true });
-  const { page, a } = await daAaB(app, openTab, testServer, `<!doctype html><h1>B</h1><iframe id="fr" src="${dentro}"></iframe>`);
-  await page.frameLocator('#fr').locator('#k').click();
-  await premi(app, 'tab', 'Left', ['meta']);
-  await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toBe(a);
-});
-
-test('riquadro d\'altra origine che usa Cmd+freccia per sé: vince il riquadro', async ({ app, openTab, testServer }) => {
-  const dentro = testServer.html('<!doctype html><button id="k">gioca</button><script>window.__n=0;'
-    + 'addEventListener("keydown", e => { if (e.metaKey && e.key === "ArrowLeft") { e.preventDefault(); } });</script>', { pubblico: true });
-  const { page, b } = await daAaB(app, openTab, testServer, `<!doctype html><h1>B</h1><iframe id="fr" src="${dentro}"></iframe>`);
-  await page.frameLocator('#fr').locator('#k').click();
-  await premi(app, 'tab', 'Left', ['meta']);
-  await restaSu(app, b);
-});
-
 test('senza pagina precedente Cmd+freccia sinistra non fa niente, e la scheda resta viva', async ({ app, openTab, testServer }) => {
   const a = testServer.html('<!doctype html><title>A</title><h1 id="a">A</h1>');
   const page = await openTab(a);
@@ -106,10 +90,36 @@ test('senza pagina precedente Cmd+freccia sinistra non fa niente, e la scheda re
   await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toBe(a);
 });
 
-test('Cmd+freccia sinistra su un campo in sola lettura e su una pagina intera in designMode', async ({ app, openTab, testServer }) => {
+test('pagina intera in designMode: Cmd+freccia sinistra resta', async ({ app, openTab, testServer }) => {
   const { page, b } = await daAaB(app, openTab, testServer, '<!doctype html><body><p id="p">testo</p><script>document.designMode="on"</script></body>');
   await page.locator('#p').click();
   await page.keyboard.type('xx');
   await premi(app, 'tab', 'Left', ['meta']);
   await restaSu(app, b);
 });
+
+// sendInputEvent non arriva a un riquadro d'altra origine: il tasto lo porta Playwright, e il «visto passare» del main si segna a mano.
+const tastoNelRiquadro = async (app, page) => {
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    t.view.webContents._filoCmdFreccia = { verso: 'indietro', t: Date.now() };
+  });
+  await page.keyboard.press('Meta+ArrowLeft');
+};
+for (const [nome, corpo, resta] of [
+  ['pulsante', '<button id="k">gioca</button>', false],
+  ['campo di testo', '<input id="k">', true],
+  ['gioco che usa il tasto', '<button id="k">gioca</button><script>addEventListener("keydown", e => { if (e.metaKey && e.key === "ArrowLeft") e.preventDefault(); })</script>', true],
+]) {
+  test(`riquadro d'altra origine, tasto vero: ${nome}`, async ({ app, openTab, testServer }) => {
+    const dentro = testServer.html('<!doctype html>' + corpo, { pubblico: true });
+    const { page, a, b } = await daAaB(app, openTab, testServer, `<!doctype html><h1>B</h1><iframe id="fr" src="${dentro}"></iframe>`);
+    await page.frameLocator('#fr').locator('#k').click();
+    if (resta && nome.startsWith('campo')) await page.keyboard.type('riga');
+    await page.waitForTimeout(500);
+    await tastoNelRiquadro(app, page);
+    if (resta) await restaSu(app, b);
+    else await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toBe(a);
+  });
+}
