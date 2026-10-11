@@ -907,6 +907,12 @@ class BarraLaterale {
       if (attiva && typeof this.tabs.tastoDelBrowser === 'function' && this.tabs.tastoDelBrowser(input, attiva)) {
         event.preventDefault();
         this.chiudi();
+        return;
+      }
+      // Cmd+freccia su Mac vale qui come Cmd+[ (#685.1): naviga se nella barra non si scrive.
+      const verso = input.type === 'keyDown' && globalThis.SN_TASTI?.comandoNavigazioneFuoriDalCampo?.(input);
+      if (attiva && verso && typeof this.tabs._navigaSeNonScrive === 'function') {
+        this.tabs._navigaSeNonScrive(wc, verso, attiva.id).then((fatto) => { if (fatto) this.chiudi(); }, () => {});
       }
     });
     collegaScorciatoie(wc, this.win);
