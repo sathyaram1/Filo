@@ -231,18 +231,18 @@ test('la tabella: una riga per corsa, con lavori all\'ora ed esito', () => {
 test('dai log: uno spec caduto a un tentativo e passato a uno dopo non è un rosso; uno caduto a ogni tentativo sì', () => {
   // Verifica #1157 giro 5: Playwright lo segna «flaky» ed esce a zero, ma il tentativo caduto lascia le sue righe.
   const windows = [
-    '  x  1 tests\a.spec.mjs:2:1 › instabile (9ms)',
-    '  ok 2 tests\a.spec.mjs:2:1 › instabile (retry #1) (7ms)',
-    '  1) tests\a.spec.mjs:4:33 › ciclo due ─────────',
-    '  2) tests\a.spec.mjs:2:1 › instabile ──────────',
-    '  3) tests\a.spec.mjs:4:33 › ciclo uno ─────────',
-    '  4) tests\b.spec.mjs:2:1 › solo instabile ',
+    '  x  1 tests\\a.spec.mjs:2:1 › instabile (9ms)',
+    '  ok 2 tests\\a.spec.mjs:2:1 › instabile (retry #1) (7ms)',
+    '  1) tests\\a.spec.mjs:4:33 › ciclo due ─────────',
+    '  2) tests\\a.spec.mjs:2:1 › instabile ──────────',
+    '  3) tests\\a.spec.mjs:4:33 › ciclo uno ─────────',
+    '  4) tests\\b.spec.mjs:2:1 › solo instabile ',
     '  1 failed',
-    '    tests\a.spec.mjs:4:33 › ciclo due ──────────',
+    '    tests\\a.spec.mjs:4:33 › ciclo due ──────────',
     '  3 flaky',
-    '    tests\a.spec.mjs:2:1 › instabile ───────────',
-    '    tests\a.spec.mjs:4:33 › ciclo uno ──────────',
-    '    tests\b.spec.mjs:2:1 › solo instabile ─',
+    '    tests\\a.spec.mjs:2:1 › instabile ───────────',
+    '    tests\\a.spec.mjs:4:33 › ciclo uno ──────────',
+    '    tests\\b.spec.mjs:2:1 › solo instabile ─',
     '  9 passed (1.2m)',
   ].join('\n');
   assert.deepEqual(estraiRossi(windows), ['tests/a.spec.mjs'], 'due casi di un ciclo stanno sulla stessa riga: conta il titolo');
@@ -263,7 +263,7 @@ test('dai log: uno spec caduto a un tentativo e passato a uno dopo non è un ros
 
 test('i rossi noti scritti senza estensione valgono per i rossi dei log, e spiegano l\'uscita del worker', () => {
   // Verifica #1157 giro 5: l'elenco del progetto scrive «tests/transparency-page», i log «tests/transparency-page.spec.mjs».
-  const rossiNoti = rossiNotiDa({ contenitore: { specs: [{ spec: 'tests/transparency-page' }, 'tests\x.spec.mjs'] } });
+  const rossiNoti = rossiNotiDa({ contenitore: { specs: [{ spec: 'tests/transparency-page' }, 'tests\\x.spec.mjs'] } });
   assert.deepEqual(rossiNoti, ['tests/transparency-page.spec.mjs', 'tests/x.spec.mjs']);
   const noto = 'tests/transparency-page.spec.mjs';
   const base = { ...corsa(1, 20), rossiPerWorker: [[]], fattiPerWorker: [13] };
