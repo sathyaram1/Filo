@@ -986,12 +986,13 @@ export function rigaRegistro(repo, r) {
 
 /**
  * Questa sessione ha scritto la punta di adesso (#1148): una voce nel registro dei rami, con la fiducia del suo
- * biglietto in questo momento. La chiamano start e finish. Mai un'eccezione: senza voce il lavoro non è fidato.
+ * biglietto in questo momento e i commit del ramo letti nel suo deposito. La chiamano start e finish. Mai un'eccezione:
+ * senza voce il lavoro non è fidato.
  */
-export async function registraNelRegistro({ ramo, sha, feedbackId = '', server = null }, registra = registraRamo) {
-  const righe = [rigaRegistro('app', await registra({ repo: 'app', ramo, sha, feedbackId }))];
+export async function registraNelRegistro({ ramo, sha, feedbackId = '', server = null, root = ROOT }, registra = registraRamo) {
+  const righe = [rigaRegistro('app', await registra({ repo: 'app', ramo, sha, feedbackId, cartella: root }))];
   if (server && server.ramo && server.sha) {
-    righe.push(rigaRegistro('server', await registra({ repo: 'server', ramo: server.ramo, sha: server.sha, feedbackId })));
+    righe.push(rigaRegistro('server', await registra({ repo: 'server', ramo: server.ramo, sha: server.sha, feedbackId, cartella: server.radice || server.checkout || '' })));
   }
   return righe;
 }
