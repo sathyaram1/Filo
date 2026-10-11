@@ -39,7 +39,7 @@ test('coi valori predefiniti ogni worker, dopo il comando, corre spec Electron: 
 test('gli spec della misura esistono e non stanno fra i rossi noti', () => {
   assert.deepEqual(SPEC_FILE.filter((f) => !existsSync(resolve(ROOT, f))), []);
   const noti = new Set(rossiNotiDa(JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'))));
-  assert.deepEqual(SPEC_MISURA.filter((s) => noti.has(`tests/${s}`)), [], 'misurerebbero il contenitore, non il carico');
+  assert.deepEqual(SPEC_MISURA.filter((s) => noti.has(`tests/${s}.spec.mjs`)), [], 'misurerebbero il contenitore, non il carico');
 });
 
 const corsa = (n, minuti, { rossi = [], infra = [], piccoMb = 4000, tettoMb = 16000, codici = Array(n).fill(0) } = {}) => ({
@@ -226,4 +226,50 @@ test('la tabella: una riga per corsa, con lavori all\'ora ed esito', () => {
   assert.match(t[0], /^N \| durata media \| lavori\/ora/);
   assert.match(t[1], /^1 \| 20\.0 min \| 3\.0 \| 4000\/16000 \| .* \| ok$/);
   assert.match(t[3], /^2 \| 24\.0 min \| 5\.0 \| .* \| 1 \| — \| rossi in più: tests\/nuovo\.spec\.mjs$/);
+});
+
+test('dai log: uno spec caduto a un tentativo e passato a uno dopo non è un rosso; uno caduto a ogni tentativo sì', () => {
+  // Verifica #1157 giro 5: Playwright lo segna «flaky» ed esce a zero, ma il tentativo caduto lascia le sue righe.
+  const windows = [
+    '  x  1 tests\a.spec.mjs:2:1 › instabile (9ms)',
+    '  ok 2 tests\a.spec.mjs:2:1 › instabile (retry #1) (7ms)',
+    '  1) tests\a.spec.mjs:4:33 › ciclo due ─────────',
+    '  2) tests\a.spec.mjs:2:1 › instabile ──────────',
+    '  3) tests\a.spec.mjs:4:33 › ciclo uno ─────────',
+    '  4) tests\b.spec.mjs:2:1 › solo instabile ',
+    '  1 failed',
+    '    tests\a.spec.mjs:4:33 › ciclo due ──────────',
+    '  3 flaky',
+    '    tests\a.spec.mjs:2:1 › instabile ───────────',
+    '    tests\a.spec.mjs:4:33 › ciclo uno ──────────',
+    '    tests\b.spec.mjs:2:1 › solo instabile ─',
+    '  9 passed (1.2m)',
+  ].join('\n');
+  assert.deepEqual(estraiRossi(windows), ['tests/a.spec.mjs'], 'due casi di un ciclo stanno sulla stessa riga: conta il titolo');
+  const linux = [
+    '  ✘  1 [electron] › tests/b.spec.mjs:2:1 › solo instabile (9.1s)',
+    '  ✓  2 [electron] › tests/b.spec.mjs:2:1 › solo instabile (retry #1) (4.2s)',
+    '  1) [electron] › tests/b.spec.mjs:2:1 › solo instabile ──────────',
+    '  1 flaky',
+    '    [electron] › tests/b.spec.mjs:2:1 › solo instabile ───────────',
+    '  12 passed (1.3m)',
+  ].join('\n');
+  assert.deepEqual(estraiRossi(linux), []);
+  assert.equal(testFatti(linux), 13);
+  const verde = { ...corsa(1, 20), rossiPerWorker: [[]], fattiPerWorker: [13] };
+  const instabile = { ...corsa(2, 21, { rossi: estraiRossi(linux) }), rossiPerWorker: [[], estraiRossi(linux)], fattiPerWorker: [13, 13] };
+  assert.equal(calcolaK([verde, verde, instabile]).k, 2);
+});
+
+test('i rossi noti scritti senza estensione valgono per i rossi dei log, e spiegano l\'uscita del worker', () => {
+  // Verifica #1157 giro 5: l'elenco del progetto scrive «tests/transparency-page», i log «tests/transparency-page.spec.mjs».
+  const rossiNoti = rossiNotiDa({ contenitore: { specs: [{ spec: 'tests/transparency-page' }, 'tests\x.spec.mjs'] } });
+  assert.deepEqual(rossiNoti, ['tests/transparency-page.spec.mjs', 'tests/x.spec.mjs']);
+  const noto = 'tests/transparency-page.spec.mjs';
+  const base = { ...corsa(1, 20), rossiPerWorker: [[]], fattiPerWorker: [13] };
+  const due = (suoi) => ({ ...corsa(2, 21, { codici: [0, 1], rossi: suoi }), rossiPerWorker: [[], suoi], fattiPerWorker: [13, 13] });
+  assert.equal(calcolaK([base, due([noto])], { rossiNoti }).k, 2);
+  assert.equal(calcolaK([base, due([noto])]).k, 1, 'senza l\'elenco lo stesso rosso è in più');
+  assert.match(calcolaK([base, due([])], { rossiNoti }).motivo, /uscite diverse da zero: worker 2 → 1/, 'un\'uscita senza rossi resta una caduta');
+  assert.match(calcolaK([base, due([noto, 'tests/nuovo.spec.mjs'])], { rossiNoti }).motivo, /rossi in più: tests\/nuovo\.spec\.mjs/);
 });

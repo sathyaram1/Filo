@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import {
   MARCA_COLLEGATI, MARCATORE_WORKER, allineaPacchetti, cartellaRegistro, chiaviAccesso, concorrenzaUnit, datiWorker, elencoCloni,
@@ -212,4 +212,20 @@ test('il marcatore del worker e\' un file di sessione: in .gitignore e fra i mar
   assert.ok(SESSION_MARKERS.includes(MARCATORE_WORKER));
   const ignorati = readFileSync(resolve(ROOT, '.gitignore'), 'utf8').split(/\r?\n/).map((l) => l.trim());
   assert.ok(ignorati.includes(MARCATORE_WORKER), `${MARCATORE_WORKER} manca in .gitignore`);
+});
+
+test('il clone nasce anche quando il principale ha l\'indice dei commit sulla cima del ramo', () => {
+  // Verifica #1157 giro 5: col prestito e il distacco l'indice faceva fallire l'apertura dei file. Con l'origin scritto
+  // come percorso git copia gli oggetti da sé e il caso non si vede: qui è un indirizzo, come quello di GitHub.
+  const s = scena();
+  try {
+    git(s.principale, ['remote', 'set-url', 'origin', pathToFileURL(s.origin).href]);
+    git(s.principale, ['commit-graph', 'write', '--reachable']);
+    const dest = resolve(s.base, 'lavori', '1');
+    const r = preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai, registra: false });
+    assert.equal(r.ok, true, r.why);
+    assert.ok(existsSync(resolve(dest, 'package-lock.json')), 'i file del ramo ci sono');
+  } finally {
+    togliCartella(s.base);
+  }
 });
