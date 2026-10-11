@@ -120,22 +120,32 @@ test('Ctrl+Z resta "annulla" in un campo dentro un\'ombra chiusa appesa a un div
   expect(await page.evaluate(() => window.__o.querySelector('input').value)).toBe('');
 });
 
-// Un sito che dopo l'Invio toglie il fuoco alla ricerca lascia la selezione nel campo: lì Ctrl+Z torna indietro (#685.1 giro 6).
-test('Ctrl+Z torna indietro dopo che la pagina ha tolto il fuoco al campo', async ({ openTab, testServer }) => {
-  const urlA = testServer.html(PAGE_A);
-  const urlR = testServer.html('<!doctype html><title>R</title><input id="cerca">'
-    + '<script>document.getElementById("cerca").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });</script>');
-  const page = await testServer.openReady(openTab, PAGE_A);
-  await navigateAndReady(page, urlA);
-  await navigateAndReady(page, urlR);
+// Una pagina che all'Invio toglie il fuoco al campo (al body, o a un contenitore che lo racchiude) lascia la
+// selezione nel campo: lì non si scrive più, e Ctrl+Z torna indietro (#685.1 giri 6 e 7).
+const PAGINE_FUOCO_LASCIATO = {
+  'al body': '<!doctype html><title>R</title><input id="cerca">'
+    + '<script>cerca.addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });</script>',
+  'al contenitore principale': '<!doctype html><title>R</title><main id="m" tabindex="-1"><form><input id="cerca"></form></main>'
+    + '<script>cerca.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); m.focus(); } });</script>',
+  'alla scheda del commento': '<!doctype html><title>R</title><section id="m" tabindex="-1"><div id="cerca" contenteditable>x</div></section>'
+    + '<script>cerca.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); m.focus(); } });</script>',
+};
+for (const [dove, html] of Object.entries(PAGINE_FUOCO_LASCIATO)) {
+  test(`Ctrl+Z torna indietro dopo che la pagina ha dato il fuoco ${dove}`, async ({ openTab, testServer }) => {
+    const urlA = testServer.html(PAGE_A);
+    const urlR = testServer.html(html);
+    const page = await testServer.openReady(openTab, PAGE_A);
+    await navigateAndReady(page, urlA);
+    await navigateAndReady(page, urlR);
 
-  await page.locator('#cerca').click();
-  await page.keyboard.type('gatti');
-  await page.keyboard.press('Enter');
-  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
-  await page.keyboard.press('Control+z');
-  await page.waitForURL(urlA, { timeout: 8_000 });
-});
+    await page.locator('#cerca').click();
+    await page.keyboard.type('gatti');
+    await page.keyboard.press('Enter');
+    expect(await page.evaluate(() => document.activeElement.id !== 'cerca')).toBe(true);
+    await page.keyboard.press('Control+z');
+    await page.waitForURL(urlA, { timeout: 8_000 });
+  });
+}
 
 // #685.1 — la ricerca negli appunti (tasto destro → freccetta di Incolla) sta in un'ombra chiusa appesa a un div:
 // è un campo di testo, e i tasti che lì muovono il cursore o annullano non portano via la pagina.
