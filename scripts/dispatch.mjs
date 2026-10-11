@@ -85,6 +85,7 @@ import {
   testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
@@ -2226,6 +2227,17 @@ if (isMainModule) {
             process.stderr.write(
               `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
               + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
+          }
+          // Chi ha passato il preflight è l'orchestratore: da qui la sua sessione non riceve il testo dei worker
+          // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
+          // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
+          const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
+            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '' })
+            : { ok: true, saltato: true };
+          if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
+          if (!cieco.ok) {
+            console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
+            process.exit(3);
           }
           console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)
