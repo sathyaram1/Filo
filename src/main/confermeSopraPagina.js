@@ -311,7 +311,7 @@ function confermeDi(wc, { crea = false } = {}) {
     c = new ConfermeSopraPagina(win, {
       sotto: () => (win.isDestroyed() ? null : win.webContents),
       area: () => {
-        allargaPerLaDomanda(win);
+        mettiInVistaPerLaDomanda(win);
         const [width, height] = win.getContentSize();
         return { x: 0, y: 0, width, height };
       },
