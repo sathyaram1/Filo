@@ -334,16 +334,24 @@ test('su Mac Cmd+← dalla barra laterale aperta da tastiera torna indietro e la
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
 });
 
-// Un sito che dopo l'Invio toglie il fuoco alla ricerca lascia la selezione nel campo: lì non si scrive più (#685.1 giro 6).
-const PAGE_RICERCA = '<!doctype html><title>R</title><input id="cerca">'
-  + '<script>document.getElementById("cerca").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });</script>';
-
-test('su Mac Cmd+← torna indietro dopo che la pagina ha tolto il fuoco al campo', async ({ app, openTab, testServer }) => {
-  const { page, urlA } = await schedaSu(app, { openTab, testServer }, PAGE_RICERCA);
-  await page.locator('#cerca').click();
-  await page.keyboard.type('gatti');
-  await page.keyboard.press('Enter');
-  expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
-  await premiNellaPagina(app, 'Left', ['meta']);
-  await page.waitForURL(urlA, { timeout: 8_000 });
-});
+// Una pagina che all'Invio toglie il fuoco al campo (al body, o a un contenitore che lo racchiude) lascia la
+// selezione nel campo: lì non si scrive più (#685.1 giri 6 e 7).
+const PAGINE_FUOCO_LASCIATO = {
+  'al body': '<!doctype html><title>R</title><input id="cerca">'
+    + '<script>cerca.addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });</script>',
+  'al contenitore principale': '<!doctype html><title>R</title><main id="m" tabindex="-1"><form><input id="cerca"></form></main>'
+    + '<script>cerca.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); m.focus(); } });</script>',
+  'alla scheda del commento': '<!doctype html><title>R</title><section id="m" tabindex="-1"><div id="cerca" contenteditable>x</div></section>'
+    + '<script>cerca.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); m.focus(); } });</script>',
+};
+for (const [dove, html] of Object.entries(PAGINE_FUOCO_LASCIATO)) {
+  test(`su Mac Cmd+← torna indietro dopo che la pagina ha dato il fuoco ${dove}`, async ({ app, openTab, testServer }) => {
+    const { page, urlA } = await schedaSu(app, { openTab, testServer }, html);
+    await page.locator('#cerca').click();
+    await page.keyboard.type('gatti');
+    await page.keyboard.press('Enter');
+    expect(await page.evaluate(() => document.activeElement.id !== 'cerca')).toBe(true);
+    await premiNellaPagina(app, 'Left', ['meta']);
+    await page.waitForURL(urlA, { timeout: 8_000 });
+  });
+}
