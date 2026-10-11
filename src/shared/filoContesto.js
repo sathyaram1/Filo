@@ -273,7 +273,7 @@
   // vecchie, tutte nello stesso scambio. Una parola che compare in molte conversazioni («grazie», «perfetto») non
   // distingue niente; una che torna in tutta una conversazione sola (il suo argomento) sì.
   // Le parole di cortesia non sono mai l'argomento: rare finché sono state dette una volta sola, ripescherebbero quello
-  // scambio a ogni «grazie mille».
+  // scambio a ogni «grazie mille». Fuori le parole che possono esserlo («chiaro» del tema, «accordo», «fine»).
   const MIN_PAROLE_RICORDO = 2;
   const QUOTA_PAROLA_COMUNE = 0.05;
   const PAROLE_DI_CORTESIA = new Set([
