@@ -9,7 +9,6 @@ const path = require('node:path');
 const Disco = require('../shim/storage');
 
 const FC = () => globalThis.SN_FILO_CONTESTO;
-const CA = () => globalThis.SN_CHAT_ARCHIVE;
 const FILE = 'ricordi.jsonl';
 const BLOCCO = 32;
 const IN_PARALLELO = 3;
