@@ -124,15 +124,9 @@ function indicizza(tratti, modello, e0 = epoca) {
   return corsa;
 }
 
-// Senza un modello d'indicizzazione: per parole, e solo se ci sono tutte quelle che distinguono.
+// Senza un modello d'indicizzazione vale per parole (regola in src/shared/filoContesto.js).
 function perParole(domanda, tratti) {
-  const parole = CA().terminiCheDistinguono(CA().normalizeForSearch(domanda).split(/\s+/).filter(Boolean));
-  if (!parole.length) return [];
-  const presi = tratti.filter((t) => {
-    const h = CA().normalizeForSearch(`${t.titolo} ${t.testo}`);
-    return parole.every((p) => h.includes(p));
-  });
-  return FC().scegliRicordi(presi.slice(-FC().MAX_RICORDI).map((t) => ({ tratto: t, score: 1 })));
+  return FC().ricordiPerParole(domanda, tratti);
 }
 
 // `vecchi`: i messaggi del filo più vecchi della finestra. `davanti`: quelli che il modello ha già, che non si ripescano.
