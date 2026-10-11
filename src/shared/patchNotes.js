@@ -32,6 +32,7 @@
         'Il riquadro che sceglie la tonalità esatta di un colore cambia solo il suo: gli altri colori che hai cambiato mentre era aperto restano dove li hai messi.',
         'Col blocco dei popup acceso, una pagina non ti apre più schede nuove da sola, né il programma di posta. Ne apre una per ogni tuo clic, anche le finestrelle di condivisione, e quelle fermate le apri dall\'avviso con «Apri». Il collegamento che scegli si apre sempre, anche sui siti che a ogni clic provano ad aprire una pubblicità. Anche lo schermo intero lo prende solo dopo un tuo clic.',
         'I pulsanti che aprono una ricevuta, un report o un pagamento in una finestra nuova funzionano: la scheda mostra quello che il sito ci scrive, e il sito la può richiudere. Una pagina che chiede di chiudersi chiude solo la sua scheda, non più tutto Filo.',
+        'Filo ti avvisa quando un sito si spaccia per un marchio famoso anche se sta su un servizio che ospita i siti di altri, come Weebly, Wix o Google Traduttore. Prima se ne accorgeva solo su pochi servizi, come GitHub Pages. Le immagini di Discord e le pagine dei marchi stessi su GitHub, come quelle di Google o Microsoft, non hanno più l\'avviso.',
       ],
     },
     {
