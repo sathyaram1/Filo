@@ -111,6 +111,8 @@ import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-
 import { leggiTestoLivello } from './lib/livelli.mjs';
 import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
+import { consumoSessione } from './lib/consumo-progressivo.mjs';
+import { quotaFile } from './statusline.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -200,7 +202,7 @@ export function readTicketReply(status, body) {
 }
 
 export async function ticket(passphrase, opts) {
-  const { status, body } = await call('routineTicket', { passphrase }, opts);
+  const { status, body } = await call('routineTicket', { passphrase, ...creditiDi(opts) }, opts);
   return readTicketReply(status, body);
 }
 
@@ -216,7 +218,7 @@ export async function ticket(passphrase, opts) {
  * @returns {{ outcome:'work'|'nothing'|'fault', reason?: string }}
  */
 export async function probe(passphrase, opts) {
-  const { status, body } = await call('routineTicket', { passphrase, probe: true }, opts);
+  const { status, body } = await call('routineTicket', { passphrase, probe: true, ...creditiDi(opts) }, opts);
   const b = body || {};
   if (status === 200 && b.ok && b.work === true) return { outcome: 'work' };
   if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
@@ -398,9 +400,37 @@ export function attesaBattito(expiresAt, now = Date.now()) {
   return Math.min(BEAT_EVERY_MS, Math.max(1000, Math.floor(resta / 3)));
 }
 
+/**
+ * I campi dei crediti nel battito (SPEC-DOMANDE.md §8.1): `consumo` cumulativo della sessione, `quota` (lettura
+ * della barra di stato, se è di questa sessione) e `barra`. Best-effort: un campo che non si legge non parte.
+ * La sessione la dicono FILO_TRANSCRIPT / FILO_SESSION_ID (dall'hook); il ripiego del transcript più recente vale
+ * solo per una routine dichiarata o con un biglietto in cartella, dove non c'è la sessione di un altro da sbagliare.
+ */
+export function misureCrediti({ root = ROOT, env = process.env, cwd = process.cwd(), configDir = '', home = os.homedir(), nowMs = Date.now() } = {}) {
+  const out = {};
+  const routine = (Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0') || existsSync(join(root, '.claude', 'routine-ticket.json'));
+  const { consumo } = consumoSessione({ root, env, cwd, configDir, ripiego: routine, nowMs });
+  if (consumo) out.consumo = consumo;
+  let letture = null;
+  try { letture = JSON.parse(readFileSync(quotaFile(home), 'utf8')); } catch (_) { /* barra mai girata qui */ }
+  const mia = consumo && letture && letture.sessioni && typeof letture.sessioni === 'object' ? letture.sessioni[consumo.sessionId] : null;
+  if (consumo) out.barra = mia ? 'presente' : 'assente';
+  if (mia && mia.lettura && typeof mia.lettura === 'object') out.quota = mia.lettura;
+  return out;
+}
+
+/**
+ * Le misure dei crediti da allegare a ogni chiamata della sessione (battito, biglietto, rilascio, chiusura): il
+ * consumo dopo l'ultimo battito arriva così. Mai un motivo per non fare la chiamata.
+ */
+export function creditiDi(opts = {}) {
+  const o = opts || {};
+  try { return (o.misureCrediti || misureCrediti)(o); } catch (_) { return {}; }
+}
+
 export async function heartbeat(t, opts = {}) {
-  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts) }, opts);
-  if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
+  const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts), ...creditiDi(opts) }, opts);
+  if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt, avvisi: Array.isArray(body.avvisi) ? body.avvisi : [] };
   const reason = String((body && body.reason) || `http_${status}`);
   return { ok: false, reason, final: BATTITO_FINITO.has(reason) };
 }
@@ -421,6 +451,7 @@ export async function release(t, fault = '', opts, report = null) {
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
   if (report && typeof report === 'object') payload.report = report;
+  Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
 }
@@ -511,7 +542,7 @@ export async function domandaChiusura(cred, opts) {
   // Un id per invocazione, uguale in tutti i ritentativi di call(): il server ritrova lo
   // stesso documento invece di crearne uno orfano per ogni 5xx arrivato dopo la scrittura.
   const requestId = cred.passphrase ? randomUUID() : '';
-  const { status, body } = await call('routineClosing', corpoChiusura('question', { ...cred, requestId }), opts);
+  const { status, body } = await call('routineClosing', { ...corpoChiusura('question', { ...cred, requestId }), ...creditiDi(opts) }, opts);
   const r = leggiRispostaChiusura(status, body);
   // Senza testo, o senza l'id con cui rispondere, non c'è una domanda a cui rispondere.
   if (r.esito === 'ok' && (!r.question.trim() || (cred.passphrase && !r.id))) return { esito: 'assente', reason: 'busta_incompleta' };
@@ -519,7 +550,7 @@ export async function domandaChiusura(cred, opts) {
 }
 
 export async function rispostaChiusura(cred, answer, opts) {
-  const { status, body } = await call('routineClosing', corpoChiusura('answer', { ...cred, answer }), opts);
+  const { status, body } = await call('routineClosing', { ...corpoChiusura('answer', { ...cred, answer }), ...creditiDi(opts) }, opts);
   return leggiRispostaChiusura(status, body);
 }
 
@@ -1146,6 +1177,7 @@ if (isMain) {
       const r = await heartbeat(biglietto);
       if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
       console.log(`OK: semaforo vivo fino a ${r.expiresAt}`);
+      for (const a of r.avvisi) console.error(`misura scartata dal server (${a.campo}: ${a.reason}): ${a.detail || ''}`);
     } else {
       // Sessioni lunghe: si batte finché il biglietto vale. Quando il server
       // dice che è morto (rilasciato o semaforo caduto) il ciclo finisce da solo
@@ -1159,7 +1191,10 @@ if (isMain) {
       let primoGuastoMs = 0;
       for (;;) {
         const r = await heartbeat(biglietto);
-        if (r.ok) { primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue; }
+        if (r.ok) {
+          for (const a of r.avvisi) console.error(`misura scartata dal server (${a.campo}: ${a.reason}): ${a.detail || ''}`);
+          primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue;
+        }
         if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
         const ora = Date.now();
         if (!primoGuastoMs) primoGuastoMs = ora;

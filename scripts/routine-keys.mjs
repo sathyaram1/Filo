@@ -22,6 +22,7 @@
 //   node scripts/routine-keys.mjs elenco
 //   node scripts/routine-keys.mjs crea <nome> <routine|build> ["a cosa serve"]
 //   node scripts/routine-keys.mjs revoca <nome>
+//   node scripts/routine-keys.mjs account <nome> <A|B>
 
 import { findAdminRefreshToken, mintIdToken } from './lib/firestore-auth.mjs';
 
@@ -61,7 +62,7 @@ async function main() {
   // sembra un'opzione — «--dry-run», che ogni strumento vicino accetta —
   // veniva ignorata in silenzio e la parola d'ordine revocata davvero
   // (feedback #565).
-  const USO = 'Uso: node scripts/routine-keys.mjs [elenco | crea <nome> <potere> "<descrizione>" | revoca <nome>]';
+  const USO = 'Uso: node scripts/routine-keys.mjs [elenco | crea <nome> <potere> "<descrizione>" | revoca <nome> | account <nome> <A|B>]';
   // Chiedere aiuto non è un errore, e questo è lo strumento dove sbagliare
   // costa di più: l'aiuto si stampa e basta (feedback #565).
   if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) { console.log(USO); return; }
@@ -82,7 +83,9 @@ async function main() {
       // revoca) faceva sembrare attive anche quelle spente — e su un elenco di
       // credenziali quello e' l'errore peggiore possibile.
       const stato = k.revoked ? 'REVOCATA' : 'attiva';
-      console.log(`${String(k.slug).padEnd(24)} ${String(k.scope || '?').padEnd(8)} ${stato}`
+      // L'account claude.ai della routine: senza, il suo consumo non va su nessun account (crediti, #1156).
+      const account = k.scope === 'routine' ? `account ${k.account || '—'}`.padEnd(10) : ''.padEnd(10);
+      console.log(`${String(k.slug).padEnd(24)} ${String(k.scope || '?').padEnd(8)} ${account} ${stato}`
         + (k.lastUsedAt ? `  ultimo uso ${quando(k.lastUsedAt)}` : '')
         + (k.label ? `  — ${k.label}` : ''));
     }
@@ -105,6 +108,11 @@ async function main() {
       // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.
       : 'Va nel PROMPT della routine schedulata: "routine automatica. <parola d\'ordine>".\n'
         + "Mai nell'ambiente: da lì la erediterebbe ogni lavoratore che parte.");
+    // Senza account il consumo della routine non entra nella riserva dei crediti (#1156): lo si dice qui, dove nasce.
+    if (potere === 'routine') {
+      console.log(`\nPoi dille su che account claude.ai gira, o il suo consumo resta fuori dalla riserva dei crediti:\n`
+        + `    node scripts/routine-keys.mjs account ${r.slug} <A|B>`);
+    }
     return;
   }
 
@@ -115,7 +123,17 @@ async function main() {
     return;
   }
 
-  console.error('Uso: node scripts/routine-keys.mjs <elenco|crea|revoca> …');
+  if (cmd === 'account') {
+    if (!nome || (potere !== 'A' && potere !== 'B') || resto.length) {
+      console.error('Uso: node scripts/routine-keys.mjs account <nome> <A|B>');
+      process.exit(1);
+    }
+    await chiama({ op: 'account', slug: nome, account: potere });
+    console.log(`"${nome}" gira sull'account ${potere}: da adesso il suo consumo conta lì.`);
+    return;
+  }
+
+  console.error('Uso: node scripts/routine-keys.mjs <elenco|crea|revoca|account> …');
   process.exit(1);
 }
 

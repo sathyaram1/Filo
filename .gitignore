@@ -69,6 +69,9 @@ test-results/
 # data: serve a non battere più di una volta ogni cinque minuti).
 .claude/routine-beat-hook.stamp
 
+# Dove è arrivata la lettura progressiva dei transcript per il consumo nel battito: numeri, mai testo.
+.claude/routine-consumo.json
+
 # Chi è il worker di questo clone (indice e quanti in parallelo, #1157): lo scrive
 # scripts/clone-worker.mjs, vale per questa cartella e basta.
 .claude/filo-worker.json

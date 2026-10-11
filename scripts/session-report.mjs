@@ -124,6 +124,21 @@ export function famigliaPrezzo(model) {
   return { key, known: !!v && VERSIONI[v[1]][v[3] ? `${v[2]}-${v[3]}` : v[2]] === key };
 }
 
+/**
+ * Token e costo di UNA usage (l'ultima di un messaggio). PURA. La usano il rapporto di fine sessione e il
+ * lettore progressivo del battito (lib/consumo-progressivo.mjs): un prezzo solo, scritto in un posto solo.
+ */
+export function valutaUso(u, model) {
+  const input = Number(u && u.input_tokens) || 0;
+  const { cw5m, cw1h } = scrittureCache(u);
+  const cacheRead = Number(u && u.cache_read_input_tokens) || 0;
+  const output = Number(u && u.output_tokens) || 0;
+  const fam = famigliaPrezzo(model);
+  const p = PREZZI[fam.key];
+  const costo = (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cacheRead * p.cacheRead + output * p.output) / 1e6;
+  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam };
+}
+
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
 export function slugProgetto(percorso) {
   return String(percorso || '').replace(/[^A-Za-z0-9]/g, '-');
@@ -315,11 +330,8 @@ export function ultimoAssistantMs(file) {
  * Torna { file, note } — `file` vuoto se non c'è niente, con la nota che
  * spiega dove si è guardato.
  */
-export function trovaTranscript({ explicit = '', env = process.env, cwd = process.cwd(), configDir = '' } = {}) {
-  const dichiarato = String(explicit || env.FILO_TRANSCRIPT || '').trim();
-  if (dichiarato) {
-    return existsSync(dichiarato) ? { file: dichiarato, note: '' } : { file: '', note: `transcript indicato ma assente: ${dichiarato}` };
-  }
+/** Le cartelle dei transcript di questa cartella di lavoro (e del checkout principale, da un worktree). */
+export function cartelleTranscript({ env = process.env, cwd = process.cwd(), configDir = '' } = {}) {
   const base = configDir || env.CLAUDE_CONFIG_DIR || join(os.homedir(), '.claude');
   const cartelle = [];
   for (const dir of [resolve(cwd), checkoutPrincipale(cwd)]) {
@@ -327,6 +339,15 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
     const c = join(base, 'projects', slugProgetto(dir));
     if (!cartelle.includes(c)) cartelle.push(c);
   }
+  return cartelle;
+}
+
+export function trovaTranscript({ explicit = '', env = process.env, cwd = process.cwd(), configDir = '' } = {}) {
+  const dichiarato = String(explicit || env.FILO_TRANSCRIPT || '').trim();
+  if (dichiarato) {
+    return existsSync(dichiarato) ? { file: dichiarato, note: '' } : { file: '', note: `transcript indicato ma assente: ${dichiarato}` };
+  }
+  const cartelle = cartelleTranscript({ env, cwd, configDir });
   const guardate = [];
   const candidati = [];
   for (const cartella of cartelle) {
@@ -452,11 +473,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // di prima comparsa: il primo turno non è mai «freddo»).
   let costo = 0;
   for (const { u, model, effort } of usi.values()) {
-    const input = Number(u.input_tokens) || 0;
-    const { cw5m, cw1h } = scrittureCache(u);
-    const cw = cw5m + cw1h;
-    const cr = Number(u.cache_read_input_tokens) || 0;
-    const out = Number(u.output_tokens) || 0;
+    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c } = valutaUso(u, model);
     rep.turns += 1;
     if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
     if ((rep.turns > 1 || continua) && cr === 0 && cw >= 20000) rep.coldTurns += 1;
@@ -467,10 +484,8 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     rep.tokens.cacheRead += cr;
     rep.tokens.output += out;
     if (typeof model === 'string' && model) modelli.add(model);
-    const fam = famigliaPrezzo(model);
     if (!fam.known && model) sconosciuti.set(String(model), fam.key);
-    const p = PREZZI[fam.key];
-    costo += (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cr * p.cacheRead + out * p.output) / 1e6;
+    costo += c;
   }
 
   rep.models = [...modelli];
