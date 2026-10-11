@@ -190,8 +190,10 @@ test('si scrive anche in un campo "solo testo" e in un campo dentro un riquadro'
   assert.equal(C.scriveQui({ activeElement: chiuso(false) }), false);
   assert.equal(C.scriveQui({ activeElement: chiuso(true, false) }), false,
     'il cursore scrivibile sta in un altro componente: qui non si scrive');
-  assert.equal(C.scriveQui({ activeElement: { ...fermo, localName: 'div', ownerDocument: { queryCommandEnabled: () => true } } }), false,
-    'un elemento qualunque non è un componente chiuso: lì la regola resta quella del campo');
+  // L'ombra chiusa si appende anche a un div (la ricerca negli appunti di Filo): la forma non conta, decide il cursore.
+  const suDiv = (cursoreQui) => ({ ...chiuso(true, cursoreQui), tagName: 'DIV', localName: 'div' });
+  assert.equal(C.scriveQui({ activeElement: suDiv(true) }), true, 'un campo in un\'ombra chiusa su un div non si vede');
+  assert.equal(C.scriveQui({ activeElement: suDiv(false) }), false);
 });
 
 test('i tasti laterali del mouse e lo scorrimento a due dita sono attaccati', () => {
