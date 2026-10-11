@@ -88,7 +88,9 @@ export function daInviare(fileInvio, nowMs = Date.now()) {
 /** Il giro della barra: legge, registra, stampa, e se è ora lancia l'invio staccato. Non lancia mai. */
 export function barra(testo, { home = os.homedir(), nowMs = Date.now(), lancia = lanciaInvio, scrivi = (s) => process.stdout.write(s) } = {}) {
   let lettura = null;
+  let nonInviata = false;
   try {
+    nonInviata = (leggiJson(invioFile(home)) || {}).ok === false;
     const input = JSON.parse(String(testo || '{}'));
     lettura = letturaDa(input, nowMs);
     const sessionId = typeof input.session_id === 'string' ? input.session_id : '';
