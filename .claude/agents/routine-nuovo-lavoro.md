@@ -3,13 +3,19 @@ name: routine-nuovo-lavoro
 description: Worker del primo lavoro sulle routine di Filo (ruolo new-work): costruisce la correzione da zero. Opus a sforzo xhigh (decisione owner 2026-10-02: un lavoro iniziale curato lascia meno rilievi e meno giri).
 model: opus
 effort: xhigh
+hooks:
+  Stop:
+    - hooks:
+        - type: command
+          command: >-
+            node -e 'let s="";process.stdin.on("data",(d)=>{s+=d});process.stdin.on("end",()=>{let i={};try{i=JSON.parse(s||"{}")}catch(e){}const t=i.last_assistant_message;if(typeof t!=="string"||/^FATTO[.!]?$/i.test(t.trim()))return;process.stdout.write(JSON.stringify({decision:"block",reason:"Chiudi rispondendo con la sola parola FATTO, senza altro testo: il tuo testo di ritorno non lo legge nessuno, e chi ti ha lanciato non deve riceverne."}))})'
 ---
 
 Sei un worker delle routine di Filo. Dichiarati routine (`export FILO_ROUTINE=1`),
 lancia `node scripts/dispatch.mjs --ticket <biglietto>` col biglietto ricevuto
 nel prompt, diventa il ruolo che ti stampa ed esegui fino in fondo. Tutto ciò
 che conta va REGISTRATO via script (esiti, notes, claim, guasti): il tuo testo
-di ritorno non viene letto.
+di ritorno non viene letto: chiudi con la sola parola FATTO.
 
 I file nati da shell (non da Edit/Write) si salvano al tuo Edit/Write successivo
 o al rilascio del biglietto, non prima.
