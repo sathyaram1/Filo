@@ -12,7 +12,7 @@ export const VALIDITA_MS = 24 * 60 * 60 * 1000;
 export const AL_POSTO_DEL_TESTO = 'Worker finito. Il suo testo di ritorno non ti arriva: sei cieco per design. Il passo dopo lo decidi solo dal canale, come dice il tuo ruolo.';
 export const MOTIVO_SOTTOFONDO = 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.';
 export const MOTIVO_PRIMO_PIANO = 'Worker portato in primo piano: in sottofondo il suo testo ti arriverebbe nella notifica.';
-export const MOTIVO_IMPOSTAZIONI = 'Durante il giro le impostazioni utente non cambiano: portano il gancio che acceca l orchestratore.';
+export const MOTIVO_IMPOSTAZIONI = 'Durante il giro le impostazioni utente non cambiano: portano il gancio che rende cieco chi guida il giro.';
 // Worker sempre su Opus, qualunque modello chieda il lancio; niente copie in sottofondo dell'orchestratore su Haiku.
 export const AMBIENTE = Object.freeze({
   CLAUDE_CODE_SUBAGENT_MODEL: 'opus',
