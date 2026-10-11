@@ -75,9 +75,15 @@ function riscrivi() {
   });
 }
 
+// Le cancellazioni arrivate mentre un giro d'indicizzazione ha già in mano i testi: quel giro non li manda più al
+// modello e non ne scrive i vettori (privacy: cancellare una chat cancella anche il suo indice).
+const tolte = new Set();
+let epoca = 0;
+
 // Una chat cancellata porta via anche i suoi vettori; senza id, tutti.
 async function dimentica(chat) {
   if (Disco.inIncognito()) return;
+  if (chat) tolte.add(chat); else epoca++;
   await carica().catch(() => null);
   if (!indice) return;
   let tolti = 0;
