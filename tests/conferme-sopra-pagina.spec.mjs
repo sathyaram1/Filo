@@ -390,9 +390,13 @@ test('con la domanda a schermo le finestre aperte dal sito si nascondono, e torn
   const finestre = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
     .filter((w) => !w._filoTabs && /^https?:/.test(w.webContents.getURL()))
     .map((w) => ({ nome: w.webContents.getURL().includes('nome=prima') ? 'prima' : 'dopo', visibile: w.isVisible() })));
-  const apri = (nome) => page.evaluate(({ u, nome }) => {
-    window[nome] = window.open(`${u}?client_id=a&redirect_uri=b&nome=${nome}`, nome, 'popup,left=500,top=400,width=440,height=100');
-  }, { u: finto, nome });
+  // Col blocco dei popup una finestra la apre solo un clic vero (#737.1): il sito lo spende appena lo riceve.
+  const apri = async (nome) => {
+    await page.mouse.click(5, 5);
+    await page.evaluate(({ u, nome }) => {
+      window[nome] = window.open(`${u}?client_id=a&redirect_uri=b&nome=${nome}`, nome, 'popup,left=500,top=400,width=440,height=100');
+    }, { u: finto, nome });
+  };
   await apri('prima');
   await expect.poll(finestre).toEqual([{ nome: 'prima', visibile: true }]);
   await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Prova' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
@@ -426,6 +430,7 @@ test('una domanda lasciata aperta in un’altra finestra di Filo non nasconde il
   await expect.poll(() => nelMondoDiFilo(app, altrove, 'typeof SN_CONFIRM_UI').catch(() => ''), { timeout: 15_000 }).toBe('object');
   await nelMondoDiFilo(app, altrove, `(() => { SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }); return 1; })()`);
   await confermaSopraPagina(app);
+  await page.mouse.click(5, 5);
   await page.evaluate((u) => { window.open(`${u}?client_id=a&redirect_uri=b`, 'g', 'popup,width=440,height=500'); }, accesso);
   const finestre = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
     .filter((w) => !w._filoTabs && /^https?:/.test(w.webContents.getURL()))
@@ -439,6 +444,8 @@ test('una domanda lasciata aperta in un’altra finestra di Filo non nasconde il
 async function popupConDomanda(app, openTab, testServer, segno, misura) {
   const sito = await testServer.openReady(openTab, '<h1>sito con «Accedi con…»</h1>');
   const login = `${testServer.html('<h1>accedi</h1>')}?${segno}&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
+  // La finestrella di accesso la apre il clic dell'utente (#737.1).
+  await sito.mouse.click(5, 5);
   await sito.evaluate(({ u, misura }) => { window.open(u, '_blank', misura); }, { u: login, misura });
   await expect.poll(() => app.evaluate(async ({ BrowserWindow }, segno) => {
     const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes(segno));
