@@ -119,7 +119,8 @@ test('una chat cancellata mentre si indicizzano le conversazioni vecchie non va 
   await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'parlami di lisbona', threadHistory: [], chatId: 'scheda-x' }));
   // L'utente cancella dalla Cronologia la conversazione più recente fra quelle vecchie, mentre l'indice si fa.
   const tCanc = await app.evaluate(async () => { await globalThis.SN_FILO_CHATS.remove('vecchia-0'); return Date.now(); });
-  await expect.poll(() => app.evaluate(() => globalThis.__embedTesti.length), { timeout: 40_000 }).toBeGreaterThanOrEqual(30);
+  // La domanda più 28 blocchi da 32 scambi: l'ultimo, fatto solo della chat cancellata, non parte più.
+  await expect.poll(() => app.evaluate(() => globalThis.__embedTesti.length), { timeout: 40_000 }).toBeGreaterThanOrEqual(29);
   await new Promise((r) => setTimeout(r, 3000));
   const info = await app.evaluate((_e, tCanc) => ({
     f: globalThis.SN_RICORDI_FILO.file(),
