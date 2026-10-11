@@ -160,3 +160,11 @@ test('i worker chiudono solo con FATTO, sia come ultimo testo sia come rapporto 
     assert.equal(JSON.parse(consegna(no)).hookSpecificOutput.permissionDecision, 'deny', JSON.stringify(no));
   }
 });
+
+test('il preflight installa il gancio nelle impostazioni utente solo in cloud, mai sulla macchina dell\'owner', () => {
+  const src = readFileSync(join(RADICE, 'scripts', 'dispatch.mjs'), 'utf8');
+  const chiamata = src.indexOf('installaCecita({');
+  const guardia = src.lastIndexOf("process.env.CLAUDE_CODE_REMOTE === 'true'", chiamata);
+  assert.ok(chiamata > 0 && guardia > 0 && chiamata - guardia < 200, 'installaCecita deve stare dietro la guardia del cloud');
+  assert.equal(src.split('installaCecita(').length - 1, 1, 'una chiamata sola, quella guardata');
+});
