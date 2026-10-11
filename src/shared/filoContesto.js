@@ -269,6 +269,58 @@
       .sort((a, b) => Date.parse(a.tratto.ts) - Date.parse(b.tratto.ts));
   }
 
+  // Senza vettori il ricordo va per parole, che è una prova debole: servono almeno due parole rare negli scambi
+  // vecchi, tutte nello stesso scambio. Una parola che compare dappertutto («grazie», «perfetto») non distingue niente.
+  const MIN_PAROLE_RICORDO = 2;
+  const QUOTA_PAROLA_COMUNE = 0.05;
+  function ricordiPerParole(domanda, tratti) {
+    const CA = global.SN_CHAT_ARCHIVE;
+    const lista = Array.isArray(tratti) ? tratti : [];
+    if (!CA || !lista.length) return [];
+    const pagliai = lista.map((t) => CA.normalizeForSearch(`${t.titolo || ''} ${t.testo || ''}`));
+    const comune = Math.max(1, Math.floor(lista.length * QUOTA_PAROLA_COMUNE));
+    const parole = [...new Set(CA.terminiCheDistinguono(CA.normalizeForSearch(domanda).split(/\s+/).filter(Boolean)))]
+      .filter((p) => pagliai.filter((h) => h.includes(p)).length <= comune);
+    if (parole.length < MIN_PAROLE_RICORDO) return [];
+    const presi = lista.filter((_t, i) => parole.every((p) => pagliai[i].includes(p)));
+    return scegliRicordi(presi.slice(-MAX_RICORDI).map((t) => ({ tratto: t, score: 1 })));
+  }
+
+  // ── La finestra del modello ───────────────────────────────────────────────
+  // Il rifiuto di un fornitore perché la richiesta supera la finestra del modello: null se è un altro errore.
+  // Le misure, quando il messaggio le dice, servono a stringere il tratto quanto basta e non di più.
+  const NUMERO = '(\\d[\\d,.\']*)';
+  const numeroDa = (s, re) => {
+    const m = s.match(re);
+    const n = m ? Number(String(m[1]).replace(/[,.']/g, '')) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  function troppoLungo(err) {
+    const st = Number(err && err.status);
+    if (Number.isFinite(st) && st > 0 && ![400, 413, 422].includes(st)) return null;
+    const s = String((err && (err.message || err.error)) || err || '');
+    if (!/maximum context|context[ _-]?(length|window)|too many tokens|prompt is too long|input is too long|reduce the length of the (messages|prompt)/i.test(s)) return null;
+    return {
+      max: numeroDa(s, new RegExp(`maximum context (?:length|window) (?:is|of) ${NUMERO}`, 'i'))
+        || numeroDa(s, new RegExp(`context (?:length|window|limit)[^0-9]{0,24}${NUMERO}`, 'i')),
+      chiesti: numeroDa(s, new RegExp(`requested (?:about )?${NUMERO}`, 'i'))
+        || numeroDa(s, new RegExp(`(?:prompt|input) (?:is|has|contains) ${NUMERO}`, 'i')),
+    };
+  }
+
+  // Il tetto in token con cui riprovare dopo quel rifiuto. `caratteri`: tutta la richiesta; `caratteriTratto`: la
+  // parte che si può stringere. Con le misure si va un po' sotto la finestra; senza, il tratto si dimezza.
+  const MARGINE_FINESTRA = 0.85;
+  function tettoDopoRifiuto({ max = null, chiesti = null, caratteri = 0, caratteriTratto = 0 } = {}) {
+    const ct = Math.max(0, Number(caratteriTratto) || 0);
+    if (!ct) return null;
+    let restano = ct / 2;
+    if (max && chiesti && chiesti > max && caratteri > 0) {
+      restano = Math.min(restano, (caratteri * (max / chiesti) * MARGINE_FINESTRA) - (caratteri - ct));
+    }
+    return Math.max(0, Math.floor(Math.max(0, restano) / CARATTERI_PER_TOKEN));
+  }
+
   function testoRicordo(t) {
     const s = String(t.testo || '');
     if (s.length <= CARATTERI_RICORDO) return s;
