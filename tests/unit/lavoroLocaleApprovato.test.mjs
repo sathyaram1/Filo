@@ -169,7 +169,7 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la 
     // #1148: «Segna fidato» solo dalla finestra di Filo.
     if (SOLO_MIGRAZIONE.has(f.split(/[\\/]/).pop())) {
       assert.doesNotMatch(testo, /['"`](segna|togli)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve chiedere solo la migrazione`);
-      assert.deepEqual([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]), ['migra'], `${f}: l'unica op è «migra»`);
+      assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['migra'], `${f}: l'unica op è «migra»`);
     } else {
       assert.doesNotMatch(testo, /ownerFiducia|fiducia_segna|fieldPaths=fiducia/, `${f} apre una strada alla fiducia`);
     }
