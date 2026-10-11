@@ -194,6 +194,21 @@ test('si scrive anche in un campo "solo testo" e in un campo dentro un riquadro'
   const suDiv = (cursoreQui) => chiuso(true, cursoreQui, 'div');
   assert.equal(C.scriveQui({ activeElement: suDiv(true) }), true, 'un campo in un\'ombra chiusa su un div non si vede');
   assert.equal(C.scriveQui({ activeElement: suDiv(false) }), false);
+  // La pagina ha dato il fuoco a un contenitore del campo (#685.1 giro 7): la selezione scrivibile
+  // resta nel campo lasciato, dentro il contenitore o subito dopo di lui, non sull'ospite.
+  const contenitore = (anchor) => {
+    const genitore = { childNodes: [] };
+    const testo = { nodeType: 3 };
+    const el = { tagName: 'MAIN', shadowRoot: null, isContentEditable: false, parentNode: genitore,
+      matches: () => false, closest: () => null, contains: (n) => n === testo,
+      ownerDocument: { queryCommandEnabled: () => true,
+        getSelection: () => (anchor === 'dentro' ? { anchorNode: testo, anchorOffset: 2, focusNode: testo, focusOffset: 2 }
+          : { anchorNode: genitore, anchorOffset: 2, focusNode: genitore, focusOffset: 2 }) } };
+    genitore.childNodes.push({}, el, { tagName: 'INPUT' });
+    return el;
+  };
+  assert.equal(C.scriveQui({ activeElement: contenitore('dentro') }), false, 'il campo lasciato sta dentro il contenitore a fuoco');
+  assert.equal(C.scriveQui({ activeElement: contenitore('dopo') }), false, 'il campo lasciato sta subito dopo l\'elemento a fuoco');
 });
 
 test('i tasti laterali del mouse e lo scorrimento a due dita sono attaccati', () => {
