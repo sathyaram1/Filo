@@ -779,7 +779,12 @@ test('localSignCheck: pratica segnalata o in mano a una routine → no', () => {
 test('localSenderCheck: la pratica da legare a un lavoro locale, segno o no', () => {
   assert.equal(MR.localSenderCheck(locale({ localOnly: SEGNO })).ok, true);
   assert.equal(MR.localSenderCheck(locale({ clientId: 'owner:me' })).ok, true);
-  assert.equal(MR.localSenderCheck(locale({ fiducia: undefined })).nonFidato, true);
+  assert.equal(MR.localSenderCheck(locale({ fiducia: 'non_fidato' })).nonFidato, true);
+  // Prima della migrazione il campo non c'è: per una sessione col mittente provato vale la regola di prima.
+  const vecchia = MR.localSenderCheck(locale({ fiducia: undefined }));
+  assert.deepEqual([vecchia.ok, vecchia.primaDellaMigrazione], [true, true]);
+  assert.equal(MR.localSenderCheck(locale({ fiducia: null })).ok, true);
+  assert.equal(MR.localSenderCheck(locale({ fiducia: 'qualcosa' })).ok, false, 'un valore ignoto non è assente: resta un no');
   const utente = MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined, fiducia: undefined }));
   assert.deepEqual([utente.ok, utente.utente], [false, true]);
   assert.equal(MR.localSenderCheck(locale({ senderProof: undefined, fiducia: undefined })).utente, true);
