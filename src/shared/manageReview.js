@@ -730,6 +730,9 @@
     if (isFidato(fb)) return { ok: true };
     if (isLocalApproved(fb)) return { ok: true, approvato: true };
     if (isProvenLocalSender(fb)) {
+      // Campo assente = pratica nata prima della migrazione (§1.7), che lo scrive dopo il deploy del server: fino ad allora
+      // vale la regola di prima, mittente provato. Un non_fidato scritto resta un no. Sì dell'owner in chat, 11/10/2026.
+      if (fb.fiducia === undefined || fb.fiducia === null) return { ok: true, primaDellaMigrazione: true };
       return { ok: false, nonFidato: true, motivo: 'è tuo o di una tua sessione, ma non è fidato: segnalo fidato, o approvalo come lavoro locale' };
     }
     const cid = String(fb.clientId || '');
