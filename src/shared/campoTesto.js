@@ -65,6 +65,8 @@
     if (!el) return false;
     try {
       const d = el.ownerDocument || doc;
+      // Fuoco sulla pagina intera: non si scrive, anche se la selezione resta nel campo che la pagina ha lasciato (#685.1 giro 6).
+      if (el === d.body || el === d.documentElement) return false;
       if (!d.queryCommandEnabled('insertText')) return false;
       const radice = el.getRootNode ? el.getRootNode() : d;
       const s = (radice && radice !== d && typeof radice.getSelection === 'function') ? radice.getSelection() : d.getSelection();
