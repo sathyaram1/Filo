@@ -434,3 +434,47 @@ test('una domanda lasciata aperta in un’altra finestra di Filo non nasconde il
   await new Promise((r) => setTimeout(r, 1500));
   expect(await finestre()).toEqual([true]);
 });
+
+// Una domanda dentro una finestrella di accesso: il sito non la rimpicciolisce fino a togliere il testo (giro 10).
+async function popupConDomanda(app, openTab, testServer, segno, misura) {
+  const sito = await testServer.openReady(openTab, '<h1>sito con «Accedi con…»</h1>');
+  const login = `${testServer.html('<h1>accedi</h1>')}?${segno}&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
+  await sito.evaluate(({ u, misura }) => { window.open(u, '_blank', misura); }, { u: login, misura });
+  await expect.poll(() => app.evaluate(async ({ BrowserWindow }, segno) => {
+    const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes(segno));
+    if (!w) return 'no';
+    try { return await w.webContents.executeJavaScript('document.documentElement.dataset.filoReady || "no"'); } catch (_) { return 'no'; }
+  }, segno), { timeout: 15000 }).toBe('1');
+  await app.evaluate(({ BrowserWindow }, segno) => {
+    const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes(segno));
+    w.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: `SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Filo vuole inviare agli sviluppatori il testo che hai scritto. FINE' }); 1` }]);
+  }, segno);
+  return confermaSopraPagina(app);
+}
+
+const testoSiVede = (vista) => vista.evaluate(() => {
+  const s = window.SN_CONFIRM_UI._test.state();
+  return { ...s, alto: innerHeight };
+});
+
+test('finestrella di accesso con la domanda: il codice del sito non la rimpicciolisce', async ({ app, openTab, testServer }) => {
+  const vista = await popupConDomanda(app, openTab, testServer, 'client_id=dopo', 'width=480,height=600');
+  await new Promise((r) => setTimeout(r, 600));
+  await app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes('client_id=dopo'));
+    await w.webContents.executeJavaScript('window.resizeTo(260, 140); window.moveTo(0, 0); 1');
+  });
+  await new Promise((r) => setTimeout(r, 600));
+  const s = await testoSiVede(vista);
+  expect(s.textScrolls, JSON.stringify(s)).toBe(false);
+  expect(s.text).toContain('FINE');
+  expect(s.alto).toBeGreaterThan(300);
+});
+
+test('finestrella di accesso già piccola: la domanda la allarga quanto serve al suo testo', async ({ app, openTab, testServer }) => {
+  const vista = await popupConDomanda(app, openTab, testServer, 'client_id=prima', 'width=260,height=140');
+  await new Promise((r) => setTimeout(r, 600));
+  const s = await testoSiVede(vista);
+  expect(s.textScrolls, JSON.stringify(s)).toBe(false);
+  expect(s.alto).toBeGreaterThanOrEqual(360);
+});

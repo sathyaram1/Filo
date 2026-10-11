@@ -48,7 +48,9 @@ nella pagina, in uno Shadow DOM chiuso.
 - **Segue la sua scheda.** Una domanda si vede solo sopra la scheda che l'ha fatta, quando è davanti;
   le altre aspettano. Tornando davanti si ridisegna da capo, e il mezzo secondo riparte. Scheda chiusa,
   pagina nuova, frame che naviga, renderer morto: la domanda vale un Annulla. Da un popup di accesso
-  (una finestra vera con dentro un sito, #589.3) copre quella finestra.
+  (una finestra vera con dentro un sito, #589.3) copre quella finestra; finché la domanda aspetta,
+  `resizeTo`/`moveTo` del sito non valgono, e una finestrella più piccola del riquadro col suo testo si
+  allarga: rimpicciolita, mostrava titolo e OK senza il testo (giro 10).
 - **La tastiera.** La vista se la prende solo se ce l'aveva la pagina che chiede (chi scrive nella
   barra la tiene), e finché la domanda è a schermo la pagina sotto non se la riprende. Chi stava
   scrivendo nella pagina continua a scrivere nel suo campo: la vista gli rimanda i tasti
