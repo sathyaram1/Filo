@@ -1,6 +1,7 @@
 // Barra di stato di Claude Code: l'unico posto dove arriva la percentuale vera del piano (SPEC-DOMANDE.md §8.1).
 // Salva la lettura per sessione in ~/.claude/filo-quota.json, stampa una riga corta, non lancia mai e non aspetta la rete:
-// l'invio a ownerCrediti (account A, solo col token admin) parte staccato al massimo ogni cinque minuti (`--invia`).
+// l'invio a ownerCrediti (solo col token admin; A o B lo dice il rinnovo) parte staccato al massimo ogni cinque minuti
+// (`--invia`), e finché l'ultimo non è arrivato la riga lo dice: una lettura che non arriva non resta muta.
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
