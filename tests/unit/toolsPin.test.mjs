@@ -27,6 +27,9 @@ import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
+// Il preflight riuscito installa il gancio dell'orchestratore cieco nelle impostazioni utente: mai in quelle vere.
+process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
+
 // Un percorso alla unix, su Windows, viene ancorato al disco corrente. L'atteso
 // si costruisce con la stessa normalizzazione dello strumento, o il controllo
 // fallirebbe per il sistema operativo invece che per il codice.
