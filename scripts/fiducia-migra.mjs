@@ -1,7 +1,6 @@
-// fiducia-migra.mjs — la migrazione della fiducia sui feedback che non ce l'hanno (SPEC-DOMANDE.md §1.7, #1148), con
-// le credenziali dell'owner. La regola e le scritture le fa il server (ownerFiducia {op:'migra'}): qui solo i lotti.
-// Uso: npm run fiducia:migra            (a secco: conta e basta)
-//      npm run fiducia:migra -- --dal-vero
+// fiducia-migra.mjs — la migrazione della fiducia sui feedback che non ce l'hanno (SPEC-DOMANDE.md §1.7, #1148). Regola e
+// scritture le fa il server (ownerFiducia {op:'migra'}), qui solo i lotti, con le credenziali dell'owner.
+// Uso: npm run fiducia:migra (a secco, conta e basta) | npm run fiducia:migra -- --dal-vero. Prove: tests/unit/fiduciaMigra.test.mjs.
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
