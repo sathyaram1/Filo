@@ -8,7 +8,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   calcolaK, cpuDelCgroup, erroriInfrastruttura, estraiRossi, pressione, rossiNotiDa, tabella, valutaCorsa, baseDa,
-  ambienteWorker, passiWorker, SPEC_MISURA,
+  ambienteWorker, passiWorker, SPEC_MISURA, testFatti,
 } from '../../scripts/misura-k.mjs';
 import { specsForChangedFiles } from '../../scripts/finish-local.mjs';
 
