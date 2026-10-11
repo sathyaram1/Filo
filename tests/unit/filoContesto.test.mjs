@@ -296,6 +296,24 @@ test('senza vettori il ricordo per parole vuole due parole rare nello stesso sca
   assert.equal(FC.ricordiPerParole('grazie per il ristorante di Lisbona', tratti)[0].tratto.chat, 'lisbona');
 });
 
+test('una frase di cortesia detta una volta sola in una conversazione vecchia non la ripesca a ogni ripetizione', () => {
+  require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
+  const vecchi = [
+    ...scambio('mutuo', 24 * 8, 'quanto pago di rata del mutuo?', 'La rata è di 640 euro al mese.'),
+    ...scambio('mutuo', 24 * 8 - 0.1, 'perfetto grazie mille', 'Figurati!'),
+    ...scambio('tema', 24 * 9, 'metti il tema chiaro', 'Fatto, tema chiaro.'),
+  ];
+  for (let i = 0; i < 10; i++) vecchi.push(...scambio(`altro-${i}`, 24 * 5 + i, `domanda numero ${i}`, `risposta ${i}`));
+  vecchi.sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  const tratti = FC.tratti(vecchi);
+  for (const q of ['grazie mille', 'perfetto grazie', 'ok perfetto, grazie mille!', 'Perfetto! Grazie mille']) {
+    assert.deepEqual(FC.ricordiPerParole(q, tratti), [], q);
+  }
+  // Una parola che può essere l'argomento resta: «tema chiaro» ritrova il suo scambio.
+  assert.equal(FC.ricordiPerParole('il tema chiaro', tratti)[0].tratto.chat, 'tema');
+  assert.equal(FC.ricordiPerParole('grazie, la rata del mutuo', tratti)[0].tratto.chat, 'mutuo');
+});
+
 test('il rifiuto per finestra del modello si riconosce, e il tratto si stringe quanto basta', () => {
   const or = { status: 400, message: 'OpenRouter 400: {"error":{"message":"This endpoint\'s maximum context length is 32768 tokens. However, you requested about 70000 tokens (69000 of text input, 1000 in the output). Please reduce the length of the messages or completion."}}' };
   assert.deepEqual(FC.troppoLungo(or), { max: 32768, chiesti: 70000 });
