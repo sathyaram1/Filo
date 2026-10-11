@@ -334,7 +334,7 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
     console.error('[updater] errore', err ? (err.stack || err).toString() : 'sconosciuto');
     if (stato.fase !== 'pronto') stato.fase = 'errore';
     // Dove l'installazione si ferma da sé l'avviso di Mac e Linux, che dice cosa fare, prende il posto della carta.
-    if (AGGIORNAMENTO_BLOCCATO[process.platform] && stato.versioneTrovata) {
+    if (AGGIORNAMENTO_BLOCCATO[dip.piattaforma()] && stato.versioneTrovata) {
       stato.scaricamento = null;
       dimenticaRichiesta();
       togliCarte(() => true);
@@ -760,7 +760,7 @@ async function scriviAvviso(caso, versione) {
 
 // Solo dove l'installazione automatica può fermarsi (Mac e Linux), e solo se una versione nuova esiste davvero.
 async function avvisaSeAggiornamentoBloccato(versione) {
-  const caso = AGGIORNAMENTO_BLOCCATO[process.platform];
+  const caso = AGGIORNAMENTO_BLOCCATO[dip.piattaforma()];
   if (!caso || !versione) return;
   await scriviAvviso(caso, versione);
 }

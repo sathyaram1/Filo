@@ -24,10 +24,10 @@ import { createServer } from 'node:http';
 import { execFile, execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 import '../../src/shared/feedbackThread.js';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
@@ -98,7 +98,7 @@ test('il canale manda DUE testi distinti: il report e la frase', async () => {
     assert.equal(d.frase, undefined,
       'un campo che il server non conosce verrebbe scartato in silenzio: la frase sarebbe persa');
     assert.notEqual(d.notes, d.userNote, 'sono due testi, non lo stesso testo due volte');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('la correzione consegna il report E la frase (non solo il report)', async () => {
@@ -138,7 +138,7 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
       'senza questa, a chi ha segnalato arriva "risolto" e basta');
     assert.equal(String(d.report).includes('--frase'), false,
       'la frase non deve finire dentro il report: sarebbero due testi impastati in uno');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('un report a elenco puntato arriva intero anche dalla correzione, come dal canale', async () => {
@@ -163,7 +163,7 @@ test('un report a elenco puntato arriva intero anche dalla correzione, come dal 
     assert.ok(consegna, `la correzione deve arrivare al server (uscita ${r.code}, stderr: ${r.se})`);
     assert.equal(consegna.body.data?.report, PUNTI);
     assert.equal(consegna.body.data?.userNote, 'Ora il pulsante salva.');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('a chi ha segnalato arriva la frase, mai il report cifrato', () => {

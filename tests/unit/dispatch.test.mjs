@@ -14,10 +14,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { rmSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea, fuoriDa } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, fuoriDa, togliCartella } from '../helpers/percorsi.mjs';
 
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
 const TMP = cartellaTemporanea('filo-dispatch-');
@@ -985,7 +985,7 @@ test('CLI: --help, argomento sconosciuto e --ticket senza codice NON toccano il 
         `un flag (${finto}) scambiato per biglietto non deve sovrascrivere il promemoria`);
     }
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
+    togliCartella(sandbox);
   }
 });
 
@@ -1054,7 +1054,7 @@ test('CLI #565: un esito senza motivo non si registra (e «fail» da sola non pr
       'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto, non ho trovato niente da segnalare.']);
     assert.notEqual(vera.status, 1, `una critica vera non è un errore d'uso: ${vera.stderr}`);
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
+    togliCartella(sandbox);
   }
 });
 
@@ -1079,6 +1079,6 @@ test('#507: il ramo lo dice il biglietto, e le fini di giro sigillano', () => {
 });
 
 test('cleanup STATE_DIR temporanea', () => {
-  rmSync(TMP, { recursive: true, force: true });
+  togliCartella(TMP);
   assert.ok(!existsSync(TMP));
 });

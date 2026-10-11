@@ -202,3 +202,12 @@ test('nel report di una correzione un trattino con uno spazio dopo è un elenco 
   assert.equal(sembraOpzioneNelReport('-3 errori corretti'), false);
   assert.equal(sembraOpzioneNelReport('Report.'), false);
 });
+
+test('#1058 un\'opzione con valore scritta due volte si rifiuta, salvo quelle ripetibili', () => {
+  const OPZ = { opzioni: ['--priorita', '--frase', '--allega', '--dry-run'], conValore: ['--priorita', '--frase', '--allega'], ripetibili: ['--allega'] };
+  for (const riga of [['12', '--priorita', '3', '--priorita', '1'], ['12', '--priorita=3', '--priorita', '1'], ['12', 'todo', 'n', '--frase', 'a', '--frase', 'b']]) {
+    assert.match(controllaArgomenti(riga, OPZ) || '', /più di una volta.*non ho toccato niente/, riga.join(' '));
+  }
+  assert.equal(controllaArgomenti(['t', 'x', '--allega', 'a.md', '--allega', 'b.md'], OPZ), null);
+  assert.equal(controllaArgomenti(['12', '--dry-run', '--dry-run', '--priorita', '3'], OPZ), null);
+});

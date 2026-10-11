@@ -84,9 +84,9 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lent
 // L'aggiornatore finto risponde in microtask: un giro del ciclo li esaurisce tutti, compresa la fila degli avvisi.
 const calma = () => new Promise((r) => setImmediate(r));
 
-async function avvia(u, automatici) {
+async function avvia(u, automatici, { modo } = {}) {
   // Ogni prova parte senza un «Installa» lasciato da quella prima.
-  await U.avviaAggiornatore(u, { automatici, chiesta: null });
+  await U.avviaAggiornatore(u, { automatici, chiesta: null, modo });
   await calma();
 }
 
@@ -98,11 +98,27 @@ function conPiattaforma(p, fn) {
   });
 }
 
+// La piattaforma si inietta, mai quella che esegue la prova: nata su Linux, la prova era rossa solo su Windows.
+// Su Windows di serie la versione pronta si installa all'apertura dopo, con la barra visibile; alla chiusura solo
+// se l'utente l'ha scelto (#1039). Mac e Linux installano alla chiusura.
+const SISTEMI = [
+  { nome: 'Linux', piattaforma: 'linux', allaChiusura: true },
+  { nome: 'Mac', piattaforma: 'darwin', allaChiusura: true },
+  { nome: 'Windows, scelta la chiusura', piattaforma: 'win32', modo: 'chiusura', allaChiusura: true },
+  { nome: 'Windows, di serie', piattaforma: 'win32', allaChiusura: false },
+];
+function perOgniSistema(titolo, fn) {
+  for (const s of SISTEMI) test(`${titolo} (${s.nome})`, () => conPiattaforma(s.piattaforma, () => fn(s)));
+}
+// Cambiare «automatici» dalle Preferenze non deve riportare Windows al modo di serie.
+const impostazioni = (s, automatici) => ({ aggiornamenti: { automatici, ...(s.modo ? { installa: s.modo } : {}) } });
+const pronta = (s) => (s.allaChiusura ? { pronta: true } : { pronta: true, allApertura: true });
+
 beforeEach(() => memoriaFinta());
 
-test('spento: la versione nuova non si scarica e non si installa, e in home c\'è la sua carta con «Installa»', async () => {
+perOgniSistema('spento: la versione nuova non si scarica e non si installa, e in home c\'è la sua carta con «Installa»', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, false);
+  await avvia(u, false, s);
   assert.equal(u.scaricamenti, 0, 'da spento la versione nuova è partita da sola');
   assert.equal(u.autoDownload, false);
   assert.equal(u.autoInstallOnAppQuit, false, 'da spento si installerebbe alla chiusura');
@@ -113,20 +129,25 @@ test('spento: la versione nuova non si scarica e non si installa, e in home c\'�
   assert.ok(!/aggiornamento-disponibile/.test(vive()[0].text), 'il marcatore interno è finito nel testo');
 });
 
-test('acceso: tutto come prima, scarica da solo, si installa alla chiusura e non scrive carte', async () => {
+perOgniSistema('acceso: scarica da solo, si installa quando lo prevede il sistema e non scrive carte «Installa»', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, true);
+  await avvia(u, true, s);
   assert.equal(u.autoDownload, true);
-  assert.equal(u.autoInstallOnAppQuit, true);
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   assert.equal(u.scaricamenti, 1);
-  assert.deepEqual(carte, []);
+  assert.deepEqual(vive(), []);
+  u.chiudi();
+  assert.equal(u.installata, s.allaChiusura, s.allaChiusura ? 'acceso, alla chiusura non si è installata'
+    : 'su Windows di serie si è installata alla chiusura, senza farsi vedere (#1039)');
 });
 
-test('«Installa» scarica, la carta mostra a che punto è e poi che si installa alla chiusura', async () => {
+perOgniSistema('«Installa» scarica, la carta mostra a che punto è e poi quando si installa', async (s) => {
   const u = aggiornatoreFinto();
   let stati = [];
   await U.avviaAggiornatore(u, {
     automatici: false,
+    chiesta: null,
+    modo: s.modo,
     annuncia: () => { stati.push(U.conStatoAggiornamento(vive())[0]?.aggiornamento || null); },
   });
   await calma();
@@ -136,11 +157,12 @@ test('«Installa» scarica, la carta mostra a che punto è e poi che si installa
   assert.equal(r.versione, '0.3.0');
   await calma();
   assert.equal(u.scaricamenti, 1);
-  assert.equal(u.autoInstallOnAppQuit, true, 'premuto «Installa», alla chiusura non si installerebbe');
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   u.chiudi();
-  assert.equal(u.installata, true, 'premuto «Installa», alla chiusura non si è installata');
-  assert.ok(stati.some((s) => s && s.percento === 42), `la carta non ha mai mostrato lo scaricamento: ${JSON.stringify(stati)}`);
-  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  assert.equal(u.installata, s.allaChiusura, s.allaChiusura ? 'premuto «Installa», alla chiusura non si è installata'
+    : 'su Windows di serie si è installata alla chiusura invece che all\'apertura dopo');
+  assert.ok(stati.some((x) => x && x.percento === 42), `la carta non ha mai mostrato lo scaricamento: ${JSON.stringify(stati)}`);
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s), 'la carta non dice quando si installa');
   // Premere due volte non scarica due volte.
   await U.installaAggiornamento();
   await calma();
@@ -164,54 +186,56 @@ test('una versione più nuova prende il posto della carta di quella prima', asyn
   assert.deepEqual(vive().map((n) => n.action.versione), ['0.3.1']);
 });
 
-test('spento a sessione aperta: quello già scaricato non si installa alla chiusura, e la carta lo propone', async () => {
+perOgniSistema('spento a sessione aperta: quello già scaricato non si installa da solo, e la carta lo propone', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, true);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await avvia(u, true, s);
+  U.seguiImpostazioni(impostazioni(s, false));
   await calma();
   assert.equal(u.autoInstallOnAppQuit, false, 'spento dopo lo scaricamento dell\'avvio, si installerebbe lo stesso');
   assert.equal(vive().length, 1);
   assert.equal(U.conStatoAggiornamento(vive())[0].aggiornamento, undefined, 'la carta dice che si installa, ma non succederà');
   await U.installaAggiornamento();
   await calma();
-  assert.equal(u.autoInstallOnAppQuit, true);
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   assert.equal(u.scaricamenti, 1, 'una versione già scaricata non si riscarica');
-  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
 });
 
-test('spento a metà dello scaricamento dell\'avvio, «Installa» la installa davvero alla chiusura', async () => {
+perOgniSistema('spento a metà dello scaricamento dell\'avvio, «Installa» la installa davvero', async (s) => {
   const u = aggiornatoreFinto({ lento: true });
-  await avvia(u, true);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await avvia(u, true, s);
+  U.seguiImpostazioni(impostazioni(s, false));
   await calma();
   u.finisci();
   await calma();
   assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, undefined, 'spenta, la carta chiede ancora «Installa»');
   await U.installaAggiornamento();
   await calma();
-  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
   u.chiudi();
-  assert.equal(u.installata, true, 'la carta dice «pronta», ma alla chiusura non si è installata');
+  assert.equal(u.installata, s.allaChiusura, s.allaChiusura ? 'la carta dice «pronta», ma alla chiusura non si è installata'
+    : 'su Windows di serie si è installata alla chiusura invece che all\'apertura dopo');
   assert.equal(u.scaricamenti, 1, 'una versione già scaricata non si riscarica');
 });
 
-test('spento a metà dello scaricamento e poi riacceso: si installa alla chiusura', async () => {
+perOgniSistema('spento a metà dello scaricamento e poi riacceso: si installa come da acceso', async (s) => {
   const u = aggiornatoreFinto({ lento: true });
-  await avvia(u, true);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await avvia(u, true, s);
+  U.seguiImpostazioni(impostazioni(s, false));
   await calma();
   u.finisci();
   await calma();
-  U.seguiImpostazioni({ aggiornamenti: { automatici: true } });
+  U.seguiImpostazioni(impostazioni(s, true));
   await calma();
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   u.chiudi();
-  assert.equal(u.installata, true);
+  assert.equal(u.installata, s.allaChiusura);
 });
 
-test('spento a metà dello scaricamento e lasciato spento: alla chiusura non si installa', async () => {
+perOgniSistema('spento a metà dello scaricamento e lasciato spento: alla chiusura non si installa', async (s) => {
   const u = aggiornatoreFinto({ lento: true });
-  await avvia(u, true);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await avvia(u, true, s);
+  U.seguiImpostazioni(impostazioni(s, false));
   await calma();
   u.finisci();
   await calma();
@@ -219,17 +243,18 @@ test('spento a metà dello scaricamento e lasciato spento: alla chiusura non si 
   assert.equal(u.installata, false);
 });
 
-test('chiusa la carta, chiedendolo (a Filo) la versione si installa lo stesso', async () => {
+perOgniSistema('chiusa la carta, chiedendolo (a Filo) la versione si installa lo stesso', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, false);
+  await avvia(u, false, s);
   vive()[0].dismissed = true;
   const r = await U.installaAggiornamento();
   await calma();
   assert.equal(r.ok, true);
   assert.equal(r.versione, '0.3.0');
   assert.equal(u.scaricamenti, 1);
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   u.chiudi();
-  assert.equal(u.installata, true);
+  assert.equal(u.installata, s.allaChiusura);
 });
 
 // La richiesta di «Installa» sta nel disco: un riavvio a metà scaricamento non la perde.
@@ -242,21 +267,21 @@ async function conDiscoFinto(fn) {
   };
   try { await fn(disco); } finally { delete globalThis.SN_STORAGE; }
 }
-async function riavvia(versioneInUso, { automatici = false, versione = '0.3.0' } = {}) {
+async function riavvia(versioneInUso, { automatici = false, versione = '0.3.0', modo } = {}) {
   await U.togliAvvisiSuperati(versioneInUso);
   const u = aggiornatoreFinto({ versione, lento: true });
-  await U.avviaAggiornatore(u, { automatici, chiesta: await U.richiestaValida(versioneInUso) });
+  await U.avviaAggiornatore(u, { automatici, chiesta: await U.richiestaValida(versioneInUso), modo });
   await calma();
   await calma();
   return u;
 }
 
-test('spento, «Installa» e Filo chiuso a metà scaricamento: al riavvio la versione chiesta riprende e si installa', async () => {
+perOgniSistema('spento, «Installa» e Filo chiuso a metà scaricamento: al riavvio la versione chiesta riprende e si installa', async (s) => {
   for (const via of ['carta', 'chat']) {
     await conDiscoFinto(async () => {
       memoriaFinta();
       const prima = aggiornatoreFinto({ lento: true });
-      await avvia(prima, false);
+      await avvia(prima, false, s);
       if (via === 'chat') vive()[0].dismissed = true;
       await U.installaAggiornamento();
       await calma();
@@ -264,7 +289,7 @@ test('spento, «Installa» e Filo chiuso a metà scaricamento: al riavvio la ver
       prima.chiudi();
       assert.equal(prima.installata, false);
 
-      const dopo = await riavvia('0.2.0');
+      const dopo = await riavvia('0.2.0', { modo: s.modo });
       assert.equal(dopo.scaricamenti, 1, `${via}: al riavvio la versione chiesta non riprende a scaricare`);
       if (via === 'carta') {
         const [carta] = U.conStatoAggiornamento(vive());
@@ -272,8 +297,9 @@ test('spento, «Installa» e Filo chiuso a metà scaricamento: al riavvio la ver
       }
       dopo.finisci();
       await calma();
+      if (via === 'carta') assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
       dopo.chiudi();
-      assert.equal(dopo.installata, true, `${via}: dopo il riavvio la versione chiesta non si installa alla chiusura`);
+      assert.equal(dopo.installata, s.allaChiusura, `${via}: dopo il riavvio la versione chiesta non si installa quando deve`);
     });
   }
 });
@@ -311,14 +337,14 @@ test('chiesto quando non c\'è niente di nuovo, l\'esito lo dice e non scarica n
   assert.equal(u.scaricamenti, 0);
 });
 
-test('riacceso a sessione aperta: scarica come all\'avvio e si installa alla chiusura', async () => {
+perOgniSistema('riacceso a sessione aperta: scarica come all\'avvio e si installa come da acceso', async (s) => {
   const u = aggiornatoreFinto();
-  await avvia(u, false);
-  U.seguiImpostazioni({ aggiornamenti: { automatici: true } });
+  await avvia(u, false, s);
+  U.seguiImpostazioni(impostazioni(s, true));
   await calma();
   assert.equal(u.scaricamenti, 1);
-  assert.equal(u.autoInstallOnAppQuit, true);
-  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, pronta(s));
 });
 
 test('su Windows uno scaricamento che non riesce resta sulla carta, con «Installa» per riprovare', async () => {

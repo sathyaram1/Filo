@@ -47,6 +47,8 @@ test-results/
 # Esito della verifica indipendente del lavoro locale: riguarda questa macchina
 # e questo momento (ramo + commit verificato), non ha senso versionarlo.
 .claude/verify-local.json
+# La sua copia per i lavori con il server, nel checkout principale: server:fondi la legge a worktree tolto (#1062).
+.claude/verdetti-server.json
 # Ruolo dell'istanza al lavoro (esplorazione/sviluppo/verifica): stessa natura,
 # lo scrive il dispatcher e lo rilegge chi accoda un feedback per firmarlo.
 .claude/routine-role.json
@@ -68,6 +70,13 @@ test-results/
 # Orologio del battito di riserva lanciato dall'hook di salvataggio (solo una
 # data: serve a non battere più di una volta ogni cinque minuti).
 .claude/routine-beat-hook.stamp
+
+# Dove è arrivata la lettura progressiva dei transcript per il consumo nel battito: numeri, mai testo.
+.claude/routine-consumo.json
+
+# Chi è il worker di questo clone (indice e quanti in parallelo, #1157): lo scrive
+# scripts/clone-worker.mjs, vale per questa cartella e basta.
+.claude/filo-worker.json
 
 # Stato locale del giro (ripiego: quello vero vive sul server). Effimero come
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il

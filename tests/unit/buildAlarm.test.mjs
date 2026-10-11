@@ -8,10 +8,10 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFileSync, rmSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const esegui = promisify(execFile);
 const { testoEntroIlTetto, TETTO_TESTO } = await import('../../scripts/build-alarm.mjs');
@@ -130,7 +130,7 @@ describe('le chiavi arrivano al server', () => {
       return { ricevute, stdout: r.stdout };
     } finally {
       await new Promise((ok) => srv.close(ok));
-      rmSync(dir, { recursive: true, force: true });
+      togliCartella(dir);
     }
   }
 

@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { rmSync, unlinkSync, writeFileSync, mkdirSync, truncateSync, statSync, existsSync, symlinkSync } from 'node:fs';
 import fsp from 'node:fs/promises';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { cartellaDellaProva, BOLLETTA_MARZO, pdf, docx } from '../helpers/documentiFinti.mjs';
 
 const require = createRequire(import.meta.url);
@@ -33,7 +33,7 @@ before(() => {
     estrai: (p) => Testo.estrai(p),
   });
 });
-after(() => { if (CASA) rmSync(CASA, { recursive: true, force: true }); });
+after(() => { if (CASA) togliCartella(CASA); });
 
 test('le idee della richiesta: le parole di contorno restano fuori, i sinonimi entrano', () => {
   const c = Ricerca.concetti('Mi serve la bolletta della luce di marzo. Dov\'è?');
@@ -130,7 +130,7 @@ test('una cartella tolta dall\'elenco esce dalla ricerca e dal disco; una cartel
 });
 
 test('fermata durante la lettura: la ricerca torna subito, e il giro continua in sottofondo', async () => {
-  rmSync(DATI, { recursive: true, force: true });
+  assert.ok(togliCartella(DATI));
   Indice._azzera();
   const ctrl = new AbortController();
   let visti = 0;
@@ -176,7 +176,7 @@ test('un file che sta solo nel cloud (nessun blocco sul disco) non si scarica pe
 
 test('su Mac le cartelle protette non si leggono in sottofondo prima della prima ricerca chiesta dall\'utente', async () => {
   const piattaforma = Object.getOwnPropertyDescriptor(process, 'platform');
-  rmSync(DATI, { recursive: true, force: true });
+  assert.ok(togliCartella(DATI));
   Indice._azzera();
   let letti = 0;
   Indice.configura({ estrai: (q) => { letti += 1; return Testo.estrai(q); } });
@@ -242,10 +242,10 @@ test('i segnaposto di OneDrive, che l\'elenco di Windows dà per collegamenti, s
     assert.equal((await Indice.cerca('preventivo giardiniere')).risultati.length, 0, 'un collegamento vero porta fuori dalle cartelle scelte');
   } finally {
     fsp.readdir = vero;
-    rmSync(sotto, { recursive: true, force: true });
+    assert.ok(togliCartella(sotto));
     rmSync(join(DOC, 'scan_od_002.txt'), { force: true });
     rmSync(join(DOC, 'collegamento'), { force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(fuori);
   }
 });
 
@@ -466,7 +466,7 @@ test('i candidati lontani dal migliore, trovati per una parola sola, non arrivan
 test('un file salvato mentre l\'indice sta leggendo si trova alla ricerca chiesta subito dopo', async () => {
   const nuovo = join(DOC, 'scan_00777.txt');
   Indice._azzera();
-  rmSync(DATI, { recursive: true, force: true });
+  assert.ok(togliCartella(DATI));
   Indice.configura({ estrai: async (p) => { await new Promise((ok) => setTimeout(ok, 15)); return Testo.estrai(p); } });
   try {
     const sottofondo = Indice.aggiorna();
