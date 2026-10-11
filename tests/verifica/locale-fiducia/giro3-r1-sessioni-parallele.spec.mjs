@@ -1,5 +1,5 @@
-// Verifica locale «fiducia» (#1148), giro 2, rilievo 1: una sessione pulita viva da prima copre i commit che una
-// sessione sporca ha scritto in parallelo sullo stesso ramo. Server vero (callable localTicket), Firestore in memoria.
+// Verifica locale «fiducia» (#1148), giro 3 (dal giro 2), rilievo 1: il registro attribuisce i commit per finestra di
+// tempo e non per chi li ha scritti, quindi una sessione pulita copre i commit di una sporca. Server vero (callable localTicket), Firestore in memoria.
 import { test, expect } from './../../fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
@@ -58,4 +58,23 @@ test('r1 i commit di una sessione sporca, ripresi da una sessione pulita già vi
   const r = await s.op(ora, 'ramo', { ticket: pulita.ticket, repo: 'app', ramo: RAMO, sha: X, feedbackId: 'fb1', commits: [{ sha: X, at: T0 + 20 * MIN }], ora });
   expect(r.ok).toBe(true);
   expect(r.ramoFidato, 'X l’ha scritto una sessione sporca: il lavoro non può risultare fidato').toBe(false);
+});
+
+test('r1 un commit di una sessione sporca con la data d’autore spostata indietro non entra come lavoro fidato', async () => {
+  test.skip(!SRV, 'checkout del server non trovato accanto al repo');
+  const s = server();
+  const C1 = 'b'.repeat(40);
+  const C2 = 'c'.repeat(40);
+  // 8:00-8:30 una sessione pulita scrive C1 e registra il ramo, poi chiude.
+  const prima = await s.op(T0, 'prendi');
+  const r1 = await s.op(T0 + 30 * MIN, 'ramo', { ticket: prima.ticket, repo: 'app', ramo: RAMO, sha: C1, feedbackId: 'fb1', commits: [{ sha: C1, at: T0 + 10 * MIN }], ora: T0 + 30 * MIN });
+  expect(r1.ramoFidato).toBe(true);
+  await s.op(T0 + 31 * MIN, 'chiudi', { ticket: prima.ticket });
+  // 9:00 una sessione sporca scrive C2 con la data d'autore delle 8:15 (git commit --date) e spinge senza registrare.
+  // 10:00 una sessione pulita nuova riprende il ramo e registra la punta C2.
+  const dopo = await s.op(T0 + 120 * MIN, 'prendi');
+  const ora = T0 + 125 * MIN;
+  const r2 = await s.op(ora, 'ramo', { ticket: dopo.ticket, repo: 'app', ramo: RAMO, sha: C2, feedbackId: 'fb1', commits: [{ sha: C2, at: T0 + 15 * MIN }, { sha: C1, at: T0 + 10 * MIN }], ora });
+  expect(r2.ok).toBe(true);
+  expect(r2.ramoFidato, 'C2 l’ha scritto una sessione sporca: la data d’autore la sceglie chi scrive il commit').toBe(false);
 });
