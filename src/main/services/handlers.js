@@ -4472,6 +4472,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         r = await (KW && KW.conRipiegoDetto ? KW.conRipiegoDetto(giro) : giro());
       } catch (e) {
         if (turno.fermato) { fermato = true; break; }
+        if (await stringiDopoRifiuto(e)) { round--; continue; }
         throw e;
       }
       if (r && r.keyFallback) keyFallback = r.keyFallback;
