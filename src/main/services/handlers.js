@@ -4497,6 +4497,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         if (await stringiDopoRifiuto(e)) { round--; continue; }
         throw e;
       }
+      if (finestraDaRicordare != null) { finestreDeiModelli.set(modelloChat, finestraDaRicordare); finestraDaRicordare = null; }
       if (r && r.keyFallback) keyFallback = r.keyFallback;
       costEur += Number(r.costEur) || 0;
       let text = String(r.text || '');
