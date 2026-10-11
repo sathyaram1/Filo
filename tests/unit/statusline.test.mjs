@@ -45,6 +45,31 @@ test('barra: scrive la lettura per sessione, stampa la riga, lancia l invio al m
   } finally { togliCartella(home); }
 });
 
+test('barra: coi numeri uguali la lettura tiene l ora della prima volta che la sessione li ha visti', () => {
+  const home = cartellaTemporanea('filo-barra-');
+  try {
+    const opts = { home, nowMs: NOW, lancia: () => {}, scrivi: () => {} };
+    barra(JSON.stringify(STDIN), opts);
+    // Due ore dopo Claude Code rimostra i numeri dell'ultima risposta: non è una lettura nuova.
+    barra(JSON.stringify(STDIN), Object.assign({}, opts, { nowMs: NOW + 2 * 3600e3 }));
+    let f = JSON.parse(readFileSync(quotaFile(home), 'utf8'));
+    assert.equal(f.sessioni['sess-a'].lettura.letturaAtMs, NOW);
+    assert.equal(f.ultima.letturaAtMs, NOW);
+    assert.equal(f.sessioni['sess-a'].vistaAtMs, NOW + 2 * 3600e3, 'la barra è girata, e il battito lo vede');
+    // Numeri cambiati: lettura nuova, con la sua ora.
+    const cambiati = JSON.parse(JSON.stringify(STDIN));
+    cambiati.rate_limits.seven_day.used_percentage = 62;
+    barra(JSON.stringify(cambiati), Object.assign({}, opts, { nowMs: NOW + 3 * 3600e3 }));
+    f = JSON.parse(readFileSync(quotaFile(home), 'utf8'));
+    assert.equal(f.ultima.letturaAtMs, NOW + 3 * 3600e3);
+    assert.equal(f.ultima.pct7d, 62);
+    // Un'altra sessione con gli stessi numeri ha la sua ora.
+    barra(JSON.stringify(Object.assign({}, cambiati, { session_id: 'sess-c' })), Object.assign({}, opts, { nowMs: NOW + 4 * 3600e3 }));
+    f = JSON.parse(readFileSync(quotaFile(home), 'utf8'));
+    assert.equal(f.sessioni['sess-c'].lettura.letturaAtMs, NOW + 4 * 3600e3);
+  } finally { togliCartella(home); }
+});
+
 test('barra: senza limiti la sessione si registra (barra presente) ma la lettura buona non si perde', () => {
   const home = cartellaTemporanea('filo-barra-');
   try {
