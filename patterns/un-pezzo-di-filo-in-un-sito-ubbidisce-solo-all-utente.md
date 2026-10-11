@@ -101,8 +101,14 @@ faceva spendere una chiamata.
   `src/shared/campoTesto.js`): Ctrl/Cmd+Z annulla, non porta via la pagina.
   Lo stesso vale per il sito, che da fuori vede l'host e non un campo: le sue
   scorciatoie a un tasto («k» pausa, «/» alla ricerca) si prenderebbero quello
-  che l'utente scrive. I tasti si fermano alla radice del riquadro, in bolla;
-  l'Esc no (chiude in cattura, e serve allo schermo intero, #514). Un ascoltatore
+  che l'utente scrive, anche ascoltando in cattura (#1071, giro 3: fermarli alla
+  radice del riquadro copriva solo chi ascolta dopo). Un tasto vero scritto in un
+  riquadro lo prende Filo per primo, col ponte di `page-preload.js` registrato a
+  document_start, e `SN_FILO_UI.tastoNelRiquadro` consegna al campo una copia
+  segnata come nostra che non esce dallo shadow (chi la ascolta dentro guarda
+  `veroONostro`, non `isTrusted`); se la copia viene annullata si annulla anche
+  l'originale. L'Esc passa come prima (chiude in cattura, e serve allo schermo
+  intero, #514). Un ascoltatore
   di quelli che dal nodo vero **fa** qualcosa (aprire un collegamento) accetta
   solo il gesto vero: un clic finto sull'host, con le coordinate giuste, ci
   arriva.
