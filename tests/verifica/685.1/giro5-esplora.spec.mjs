@@ -133,15 +133,42 @@ test('pagine di Filo: Cmd+freccia sinistra torna indietro, e non dentro il campo
   await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toMatch(/^filo:\/\/history/);
 });
 
-test('barra degli indirizzi a fuoco: Cmd+freccia sinistra non porta via la pagina', async ({ app, shell, openTab, testServer }) => {
-  const { b } = await daAaB(app, openTab, testServer, '<!doctype html><title>B</title><h1>B</h1>');
-  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs); w.webContents.focus(); });
-  const campo = await shell.evaluateHandle(() => {
-    const el = document.querySelector('input#url, input[type="text"], input:not([type])');
-    el.focus();
-    return el;
-  });
-  expect(await campo.evaluate((el) => document.activeElement === el)).toBe(true);
-  await premi(app, 'shell', 'Left', ['meta']);
-  await restaSu(app, b);
+test('controllo: barra laterale aperta da tastiera, Cmd+[ torna indietro', async ({ app, openTab, testServer }) => {
+  const { a } = await daAaB(app, openTab, testServer, '<!doctype html><title>B</title><h1>B</h1>');
+  await premi(app, 'tab', 'B', ['meta', 'shift']);
+  await barraPage(app);
+  await expect.poll(async () => (await statoBarra(app)).motivo).toBe('tasto');
+  await premi(app, 'barra', '[', ['meta']);
+  await expect.poll(() => urlAttiva(app), { timeout: 5_000 }).toBe(a);
 });
+
+test('home di Filo: scrivendo nella chat Cmd+freccia sinistra non porta via la pagina', async ({ app, openTab, testServer }) => {
+  const a = testServer.html('<!doctype html><title>A</title><h1>A</h1>');
+  const page0 = await openTab(a);
+  await page0.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  await vai(app, 'filo://newtab/');
+  await expect.poll(() => urlAttiva(app), { timeout: 10_000 }).toMatch(/^filo:\/\//);
+  const home = await urlAttiva(app);
+  await diventaMac(app);
+  const page = app.windows().find((w) => w.url() === home);
+  const campo = page.locator('textarea:visible, [contenteditable="true"]:visible, input[type="text"]:visible').first();
+  await campo.click();
+  await page.keyboard.type('ciao');
+  expect(await page.evaluate(() => { const e = document.activeElement; return e && (e.tagName + (e.isContentEditable ? 'ce' : '')); })).toMatch(/TEXTAREA|INPUT|ce/);
+  await premi(app, 'tab', 'Left', ['meta']);
+  await restaSu(app, home);
+});
+
+for (const [nome, tasto] of [['Cmd+freccia', 'Left'], ['Cmd+[', '[']]) {
+  test(`due ${nome} di fila a 200 ms tornano indietro di due pagine`, async ({ app, openTab, testServer }) => {
+    const { page, a } = await daAaB(app, openTab, testServer, '<!doctype html><title>B</title><h1>B</h1>');
+    const c = testServer.html('<!doctype html><title>C</title><h1 id="c">C</h1>');
+    await vai(app, c);
+    await expect.poll(() => urlAttiva(app), { timeout: 10_000 }).toBe(c);
+    await new Promise((r) => setTimeout(r, 1000));
+    await premi(app, 'tab', tasto, ['meta']);
+    await new Promise((r) => setTimeout(r, 200));
+    await premi(app, 'tab', tasto, ['meta']);
+    await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toBe(a);
+  });
+}
