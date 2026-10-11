@@ -279,6 +279,12 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
       if (s && s.chiuso !== true) {
         path = ereditato.path;
         fiducia = s.fiducia === 'fidato' ? 'fidato' : 'non_fidato';
+      } else {
+        // Padre illeggibile o chiuso: non si sa da cosa nasce, quindi nasce sporco; senza server resta il suo (sporco).
+        const motivo = s ? 'biglietto del padre chiuso' : 'biglietto del padre illeggibile';
+        const p = await prendi({ sporco: true, motivo, sessionId, cwd, nowMs, deps }).catch(() => null);
+        path = p ? p.path : ereditato.path;
+        fiducia = p ? p.fiducia : 'non_fidato';
       }
     }
     if (!path && (source === 'resume' || source === 'compact')) {
