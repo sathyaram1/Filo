@@ -1,4 +1,4 @@
-// #1072 giro 4 — un percorso di rete che nel comando non c'è scritto ma che un comando "innocuo" calcola
+// #1072 giro 4 (ripreso al giro 5) — un percorso di rete che nel comando non c'è scritto ma che un comando "innocuo" calcola
 // (Join-Path, Split-Path -NoQualifier, Get-Date -Format) e poi apre, o passa nel tubo a cd/Test-Path/ls.
 import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
