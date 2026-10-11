@@ -239,3 +239,55 @@ test('l’hook di avvio chiama il biglietto solo fuori dalle routine, e non esce
   assert.match(src, /exit 0\s*$/);
   assert.doesNotMatch(src, /\r\n/, 'fine riga LF');
 });
+
+// ── Chi continua un lavoro ne eredita la sporcizia (#1148, rilievo 2 del giro 1) ──
+
+test('commitDelRamo: i commit oltre origin/main con la data d’autore in ms; git che non risponde → null', () => {
+  const dir = repo();
+  try {
+    const g = (args, env = {}) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: { ...process.env, ...env } }).trim();
+    g(['config', 'user.email', 't@t']); g(['config', 'user.name', 't']);
+    writeFileSync(join(dir, 'a.txt'), 'base\n');
+    g(['add', '-A']); g(['commit', '-qm', 'base']);
+    g(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    g(['checkout', '-qb', 'claude/x']);
+    writeFileSync(join(dir, 'b.txt'), 'uno\n');
+    g(['add', '-A']); g(['commit', '-qm', 'uno'], { GIT_AUTHOR_DATE: '2026-10-01T10:00:00Z' });
+    const punta = g(['rev-parse', 'HEAD']);
+    assert.deepEqual(B.commitDelRamo(dir, punta), [{ sha: punta, at: Date.parse('2026-10-01T10:00:00Z') }]);
+    assert.equal(B.commitDelRamo(join(dir, 'non-esiste'), punta), null);
+  } finally { togliCartella(dir); }
+});
+
+test('registraNelRegistro: i commit si leggono nel deposito di ciascun ramo, e la sessione sporcata lo dice', async () => {
+  const { registraNelRegistro } = await import('../../scripts/verify-local.mjs');
+  const viste = [];
+  const registra = async (a) => { viste.push([a.repo, a.cartella]); return a.repo === 'app' ? { ok: true, ramoFidato: false, fiducia: 'non_fidato', sporcato: 'ripreso il ramo claude/x: scritto da un biglietto sporco' } : { ok: true, ramoFidato: false, fiducia: 'non_fidato' }; };
+  const righe = await registraNelRegistro({ ramo: 'claude/x', sha: 'a'.repeat(40), server: { ramo: 'claude/x', sha: 'b'.repeat(40), radice: '/srv' }, root: '/app' }, registra);
+  assert.deepEqual(viste, [['app', '/app'], ['server', '/srv']]);
+  assert.match(righe[0], /si è sporcata \(ripreso il ramo claude\/x/);
+  assert.doesNotMatch(righe[1], /sporcata/);
+});
+
+test('avvio: il figlio il cui biglietto del padre non si legge (file sparito, o stato che non risponde) nasce sporco', async () => {
+  const dir = repo();
+  try {
+    const s = server();
+    const r = await B.avvio({ input: { session_id: 'figlio', source: 'startup' }, env: { FILO_BIGLIETTO_FILE: join(dir, 'sparito.json') }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    assert.match(r.riga, /sporco/);
+    const presa = s.chiamate.find((c) => c.op === 'prendi');
+    assert.deepEqual([presa.sporco, presa.motivo], [true, 'file del biglietto del padre illeggibile']);
+    // Stato del padre che non risponde (funzione fredda): sporco anche se il padre era pulito.
+    const padre = scriviBiglietto(dir, 'padre', SEGRETO('p'), FP('3'));
+    const t = server({ [SEGRETO('p')]: { fiducia: 'fidato' } });
+    const lento = { ...t.deps, fetchImpl: async (url, init) => (JSON.parse(init.body).data.op === 'stato' ? Promise.reject(new TypeError('fetch failed')) : t.deps.fetchImpl(url, init)) };
+    const r2 = await B.avvio({ input: { session_id: 'figlio2', source: 'startup' }, env: { FILO_BIGLIETTO_FILE: padre }, cwd: dir, deps: lento, haCredenziale: conCredenziale });
+    assert.match(r2.riga, /sporco/);
+    assert.notEqual(r2.path, padre);
+    // File sparito e server giù: nessun biglietto (non fidato), mai uno pulito preso dopo.
+    const giu = server({}, { rompi: true });
+    const r3 = await B.avvio({ input: { session_id: 'figlio3' }, env: { FILO_BIGLIETTO_FILE: join(dir, 'sparito.json') }, cwd: dir, deps: giu.deps, haCredenziale: conCredenziale });
+    assert.match(r3.riga, /non preso/);
+    assert.equal(giu.chiamate.filter((c) => c.op === 'prendi' && !c.sporco).length, 0);
+  } finally { togliCartella(dir); }
+});
