@@ -142,9 +142,13 @@ test('prendi scrive il file; registra il ramo col biglietto più sporco; chiudi 
     assert.equal(p.path, join(B.cartellaBiglietti(dir), 'sess-1.json'));
     assert.deepEqual(JSON.parse(readFileSync(p.path, 'utf8')).natoIl, 7);
     assert.equal(s.chiamate[0].sessione, 'sess-1');
-    const r = await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', env: {}, cwd: dir, deps: s.deps });
+    const commits = [{ sha: 'a'.repeat(40), at: 1000 }];
+    const conCommit = { ...s.deps, commitDelRamo: (cartella, sha) => (cartella === dir && sha === 'a'.repeat(40) ? commits : null) };
+    const r = await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', env: {}, cwd: dir, deps: conCommit });
     assert.deepEqual(r, { ok: true, ramoFidato: true, fiducia: 'fidato' });
-    assert.deepEqual(s.chiamate.at(-1), { op: 'ramo', ticket: s.chiamate.length && JSON.parse(readFileSync(p.path, 'utf8')).ticket, repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1' });
+    const { ora, ...resto } = s.chiamate.at(-1);
+    assert.ok(Math.abs(ora - Date.now()) < 60000, 'l’ora della macchina, per portare le date dei commit sull’orologio del server');
+    assert.deepEqual(resto, { op: 'ramo', ticket: JSON.parse(readFileSync(p.path, 'utf8')).ticket, repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', commits });
     const c = await B.chiudi({ env: {}, cwd: dir, deps: s.deps });
     assert.equal(c.chiusi, 1);
     assert.equal(existsSync(p.path), false);
