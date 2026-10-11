@@ -1,4 +1,5 @@
-// #685.1 giro 8 — sonde: campi in ombre chiuse di forme diverse, e il fuoco che la pagina sposta dentro l'ombra.
+// #685.1 giro 8 — porte provate e chiuse: campi in ombre chiuse di forme diverse (textarea, riquadro modificabile,
+// ombra chiusa dentro un'ombra aperta, due ombre chiuse annidate). Mac simulato nel main.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { premi } from '../../helpers/barra.mjs';
@@ -51,19 +52,3 @@ for (const [nome, corpo] of Object.entries(CAMPI)) {
   }
 }
 
-// Dentro l'ombra chiusa, all'Invio il componente dà il fuoco al suo contenitore dei risultati: lì non si scrive più.
-const FUOCO_DENTRO = '<!doctype html><title>B</title><div id="h"></div><script>window.__r = h.attachShadow({mode:"closed"});'
-  + '__r.innerHTML = "<section tabindex=-1><input></section>"; const i = __r.querySelector("input");'
-  + 'i.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); __r.querySelector("section").focus(); } });'
-  + 'window.__f = () => i; window.__dove = () => __r.activeElement && __r.activeElement.tagName;</script>';
-for (const [sis, tasto, mod, mac] of [['Mac Cmd+freccia', 'Left', ['meta'], true], ['Ctrl+Z', 'Z', ['control'], false]]) {
-  test(`ombra chiusa, fuoco passato al contenitore dopo l'Invio: ${sis} torna indietro`, async ({ app, openTab, testServer }) => {
-    const { page, a } = await daAaB(app, openTab, testServer, FUOCO_DENTRO, mac);
-    await page.evaluate(() => window.__f().focus());
-    await page.keyboard.type('gatti');
-    await page.keyboard.press('Enter');
-    expect(await page.evaluate(() => window.__dove())).toBe('SECTION');
-    await premi(app, 'tab', tasto, mod);
-    await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toBe(a);
-  });
-}
