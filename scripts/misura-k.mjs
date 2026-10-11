@@ -104,7 +104,9 @@ export function erroriInfrastruttura(testo) {
 export function estraiRossi(testo) {
   const rossi = new Set();
   const file = (f) => f.trim().replace(/\\+/g, '/');
-  for (const { riga, tap: delTap } of righeDelLog(testo)) {
+  const righe = righeDelLog(testo);
+  const instabili = instabiliDiPlaywright(righe.filter((r) => !r.tap).map((r) => r.riga));
+  for (const { riga, tap: delTap } of righe) {
     if (delTap) {
       // Del TAP contano solo i risultati di primo livello: la diagnostica è l'uscita dei test, anche dei verdi.
       const tap = riga.match(/^not ok \d+ - (.+?)(\s+#\s*(?:TODO|SKIP)\b.*)?$/i);
