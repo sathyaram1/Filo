@@ -290,7 +290,8 @@ export async function chiudi({ env, cwd, deps = {} } = {}) {
 
 /**
  * L'hook di avvio (contratto #1148 §1.3). `input` = lo stdin dell'hook ({ session_id, source }). Solo con la
- * credenziale dell'owner e fuori dalle routine. Eredita un biglietto vivo; alla ripresa riusa il suo, o ne prende
+ * credenziale dell'owner e fuori dalle routine. Eredita il biglietto del padre (che non si legge: nasce sporco); alla
+ * ripresa riusa il suo, o ne prende
  * uno nato sporco; altrimenti uno pulito. Scrive FILO_BIGLIETTO_FILE in CLAUDE_ENV_FILE. Mai un'eccezione.
  * @returns {Promise<{ riga: string, path?: string }>} la riga da stampare ('' = niente)
  */
