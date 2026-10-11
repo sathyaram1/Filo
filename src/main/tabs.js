@@ -1853,13 +1853,14 @@ class TabManager {
     else this.goBack(target);
   }
 
-  // Cmd+freccia su Mac dalla barra di Filo, che non ha un preload che lo rimandi:
-  // diventa indietro/avanti solo se lì non si scrive.
+  // Cmd+freccia su Mac dalle viste di Filo senza un preload che lo rimandi (la barra in alto, la
+  // barra laterale): diventa indietro/avanti solo se lì non si scrive. true = ha navigato.
   async _navigaSeNonScrive(wc, verso, id) {
     try {
-      if (await require('./menu').staScrivendo(wc)) return;
-    } catch (_) { return; }
+      if (await require('./menu').staScrivendo(wc)) return false;
+    } catch (_) { return false; }
     this.navigaCronologia(verso, id);
+    return true;
   }
 
   // Cmd+freccia che la pagina non ha usato (src/preload/cmd-freccia.js). Vale solo
