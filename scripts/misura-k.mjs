@@ -13,8 +13,8 @@ import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { pinnedRepoRoot, TOOLS_ROOT } from './lib/tools-pin.mjs';
 import { memoriaContenitore, statoContenitore } from './routine-channel.mjs';
 
-// Per ogni N: ogni worker finisce tutti i test, nessun rosso in più di un worker solo (rossi noti esclusi), nessun guasto d'infrastruttura, picco di
-// memoria sotto l'85% del tetto, tempo medio entro 1,5 volte quello di uno solo.
+// Per ogni N: ogni worker finisce tutti i test, nessun rosso in più di un worker solo (rossi noti esclusi), nessun
+// guasto d'infrastruttura, picco di memoria sotto l'85% del tetto, tempo medio entro 1,5 volte quello di uno solo.
 export const SOGLIE = Object.freeze({ memoria: 0.85, tempo: 1.5 });
 export const CORSE_PREDEFINITE = Object.freeze([1, 1, 2, 3, 4]);
 export const CAMPIONE_MS = 5000;
