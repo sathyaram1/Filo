@@ -96,3 +96,28 @@ test('parole d ordine: l account si scrive e si vede, e un account sbagliato non
     assert.match(r.out, /Uso: node scripts\/routine-keys\.mjs account <nome> <A\|B>/);
   }
 });
+
+test('parole d ordine: creando quella di una routine lo strumento dice come darle l account; a una di costruzione no', async () => {
+  const dir = cartellaTemporanea('filo-chiavi-');
+  try {
+    // Server finto caricato prima dello script: il token e routineKeys rispondono senza rete.
+    const finto = join(dir, 'finto.mjs');
+    writeFileSync(finto, `globalThis.fetch = async (url, init) => {
+  if (!String(url).includes('routineKeys')) return new Response(JSON.stringify({ id_token: 'idt', expires_in: '3600', user_id: 'u' }), { status: 200 });
+  const d = JSON.parse(String(init.body)).data;
+  return new Response(JSON.stringify({ result: { ok: true, slug: d.slug, scope: d.scope, passphrase: 'parola-finta' } }), { status: 200 });
+};
+`);
+    const crea = (nome, potere) => new Promise((ok) => {
+      execFile(process.execPath, [`--import=${pathToFileURL(finto).href}`, join(ROOT, 'scripts', 'routine-keys.mjs'), 'crea', nome, potere, 'prova'],
+        { env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto' } }, (err, so, se) => ok({ code: err ? (err.code ?? 1) : 0, out: `${so}${se}` }));
+    });
+    const r = await crea('routine-nuova', 'routine');
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /parola-finta/);
+    assert.match(r.out, /node scripts\/routine-keys\.mjs account routine-nuova <A\|B>/);
+    const b = await crea('costruzione', 'build');
+    assert.equal(b.code, 0, b.out);
+    assert.doesNotMatch(b.out, /account/);
+  } finally { togliCartella(dir); }
+});
