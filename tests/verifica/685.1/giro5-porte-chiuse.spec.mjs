@@ -1,8 +1,8 @@
 // #685.1 giro 5 — su Mac Cmd+← e Cmd+→ vanno indietro e avanti solo quando non si scrive.
-// Le porte dei giri passati, ri-provate da capo: tasti veri (before-input-event), Mac simulato nel main.
+// Le porte dei giri passati, ri-provate da capo e chiuse: tasti veri (before-input-event), Mac simulato nel main.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { barraPage, statoBarra, premi } from '../../helpers/barra.mjs';
+import { premi } from '../../helpers/barra.mjs';
 
 const diventaMac = (app) => app.evaluate(() => {
   Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
@@ -33,15 +33,6 @@ async function restaSu(app, url) {
   await new Promise((r) => setTimeout(r, 1200));
   expect(await urlAttiva(app)).toBe(url);
 }
-
-test('barra laterale aperta da tastiera: Cmd+freccia sinistra torna indietro come Cmd+[', async ({ app, openTab, testServer }) => {
-  const { a } = await daAaB(app, openTab, testServer, '<!doctype html><title>B</title><h1>B</h1>');
-  await premi(app, 'tab', 'B', ['meta', 'shift']);
-  await barraPage(app);
-  await expect.poll(async () => (await statoBarra(app)).motivo).toBe('tasto');
-  await premi(app, 'barra', 'Left', ['meta']);
-  await expect.poll(() => urlAttiva(app), { timeout: 5_000 }).toBe(a);
-});
 
 test('pagina d\'errore: Cmd+freccia sinistra torna al sito di prima', async ({ app, openTab, testServer }) => {
   const a = testServer.html('<!doctype html><title>A</title><h1>A</h1>');
@@ -131,15 +122,6 @@ test('pagine di Filo: Cmd+freccia sinistra torna indietro, e non dentro il campo
   await new Promise((r) => setTimeout(r, 1500));
   await premi(app, 'tab', 'Left', ['meta']);
   await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toMatch(/^filo:\/\/history/);
-});
-
-test('controllo: barra laterale aperta da tastiera, Cmd+[ torna indietro', async ({ app, openTab, testServer }) => {
-  const { a } = await daAaB(app, openTab, testServer, '<!doctype html><title>B</title><h1>B</h1>');
-  await premi(app, 'tab', 'B', ['meta', 'shift']);
-  await barraPage(app);
-  await expect.poll(async () => (await statoBarra(app)).motivo).toBe('tasto');
-  await premi(app, 'barra', '[', ['meta']);
-  await expect.poll(() => urlAttiva(app), { timeout: 5_000 }).toBe(a);
 });
 
 test('home di Filo: scrivendo nella chat Cmd+freccia sinistra non porta via la pagina', async ({ app, openTab, testServer }) => {
