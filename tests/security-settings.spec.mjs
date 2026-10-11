@@ -194,7 +194,9 @@ test('popup blocker: window.open() automatico viene bloccato', async ({ openTab,
   expect(popupTab, `il tab del popup non deve esistere — snap: ${JSON.stringify(snap.tabs.map((x) => ({ t: x.title, u: x.url })))}`).toBeFalsy();
 });
 
-test('popup blocker: i popup di login (OAuth) restano consentiti col blocco attivo (#209)', async ({ openTab, testServer, app, shell }) => {
+test('popup blocker: i popup di login (OAuth) chiesti col clic restano finestre vere col blocco attivo (#209)', async ({ openTab, testServer, app, shell }) => {
+  // Dal #737.1 anche la finestra di accesso la apre solo il clic dell'utente: qui la chiede il pulsante «Accedi».
+
   // Il blocco-popup è ON di default. Un popup verso un endpoint di
   // autenticazione (parametri OAuth client_id+redirect_uri) NON è pubblicità:
   // deve aprirsi come VERA finestra (così l'opener riceve l'esito del login),
@@ -203,13 +205,15 @@ test('popup blocker: i popup di login (OAuth) restano consentiti col blocco atti
     + '?client_id=abc&redirect_uri=https%3A%2F%2Fapp.example%2Fcb&response_type=code';
   const opener = testServer.html(`
     <title>OPENER_AUTH</title>
+    <button id="b" style="width:200px;height:60px">Accedi</button>
     <script>
-      setTimeout(() => { window.open(${JSON.stringify(authTarget)}, '_blank', 'popup,width=480,height=640'); }, 200);
+      document.getElementById('b').onclick = () => { window.open(${JSON.stringify(authTarget)}, '_blank', 'popup,width=480,height=640'); };
     </script>
     <p>opener</p>
   `);
 
-  await openTab(opener);
+  const pagina = await openTab(opener);
+  await pagina.click('#b');
 
   // Il popup OAuth si apre come BrowserWindow reale: compare tra le window.
   let popupWin = null;

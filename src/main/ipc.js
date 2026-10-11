@@ -176,6 +176,33 @@ function registerIpcHandlers() {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
+  // Sincroni: devono arrivare prima della finestra che la pagina chiede nello stesso clic (#737.1 giri 6 e 7).
+  ipcMain.on('filo:gesto-pagina', (event, tasto) => {
+    require('./services/permessiPagine').gestoDellaPagina(event.sender, event.senderFrame, tasto);
+    event.returnValue = true;
+  });
+  ipcMain.on('filo:gesto-di-filo', (event) => {
+    require('./services/permessiPagine').gestoDiFilo(event.sender);
+    event.returnValue = true;
+  });
+  ipcMain.on('filo:apertura-scelta', (event, url) => {
+    require('./services/permessiPagine').aperturaScelta(event.sender, url);
+    event.returnValue = true;
+  });
+
+  // window.close() di una pagina web (page-preload.js): chiude la sua scheda, mai la finestra di Filo; una finestrella
+  // di accesso, che è una finestra sua, si chiude come prima.
+  ipcMain.on('filo:chiudi-pagina', (event) => {
+    try {
+      if (!event.senderFrame || event.senderFrame.parent) return;
+      const wc = event.sender;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      if (win) { win._filoTabs.chiusaDallaPagina(wc); return; }
+      const propria = BrowserWindow.fromWebContents(wc);
+      if (propria && !propria._filoTabs && propria.webContents === wc) propria.close();
+    } catch (_) {}
+  });
+
   // È la chiave a essere stata rifiutata (credito finito compreso, moderazione
   // no)? Lo decide SN_WALLET, una volta sola; qui viaggia con l'errore perché
   // chi lo mostra possa offrire la pagina Crediti invece del solo «Riprova».

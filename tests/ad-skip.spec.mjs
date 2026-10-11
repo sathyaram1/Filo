@@ -215,6 +215,25 @@ test('un video di YouTube incorporato in un altro sito salta la pubblicità, e i
   }
 });
 
+// #737.1 giro 2 — il clic di Filo sul lettore non vale come gesto per le finestre del sito ospite.
+test('il «Salta» premuto da Filo nel lettore incorporato non apre al sito che lo ospita la scheda che chiede di continuo', async ({ app, openTab, testServer }) => {
+  const bersaglio = testServer.html('<title>PUBBLICITA OSPITE</title>');
+  const dentro = suYouTube(testServer.html(lettore({ dopoMs: -1 })));
+  const html = ospite(dentro).replace('</body>', `<script>setInterval(function(){window.open(${JSON.stringify(bersaglio)})},300)</script></body>`);
+  const page = await apri(openTab, testServer.html(html, { pubblico: true }));
+  const frame = await riquadro(page, dentro);
+  await frame.waitForFunction(() => typeof window.__mostra === 'function');
+  // Il gesto di Playwright che apre la scheda deve essere scaduto.
+  await page.waitForTimeout(5500);
+  await frame.evaluate(() => window.__mostra());
+  await expect.poll(() => frame.evaluate(() => window.__saltata), { timeout: 6_000 }).toBe(true);
+  expect((await frame.evaluate(() => window.__clic)).every((c) => c.vero)).toBe(true);
+  await page.waitForTimeout(2500);
+  const aperte = await app.evaluate(({ BrowserWindow }, b) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs
+    .filter((t) => { try { return t.view.webContents.getURL() === b; } catch (_) { return false; } }).length, bersaglio);
+  expect(aperte).toBe(0);
+});
+
 test('se il sito che ospita il lettore ci mette sopra un suo elemento, quell\'elemento non riceve il clic vero', async ({ openTab, testServer }) => {
   const dentro = suYouTube(testServer.html(lettore({ dopoMs: -1 })));
   const page = await apri(openTab, testServer.html(ospite(dentro, { sopra: true })));

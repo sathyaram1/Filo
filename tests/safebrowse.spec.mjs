@@ -850,6 +850,13 @@ const urlAttiva = (app) => app.evaluate(({ BrowserWindow }) => {
 for (const [dove, js] of [['nella stessa scheda', 'location.href=u'], ['in una scheda nuova', 'window.open(u)']]) {
   test(`la pagina in lista si riscrive in una sua copia blob (${dove}): l'avviso resta e i tasti non le arrivano`, async ({ app, shell }) => {
     const h = `conto-blob-${js.length}.com`;
+    // Senza un clic la scheda nuova la ferma il blocco dei popup (#737.1): qui conta chi l'ha spento.
+    if (js.startsWith('window.open')) {
+      await app.evaluate(({ BrowserWindow }) => {
+        const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+        tm.security.blockPopups = false;
+      });
+    }
     await serviInCaricamento(app, { [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>var F='
       + JSON.stringify(BLOB_MODULO).replace(/<\//g, '<\\/')
       + ';setTimeout(function(){var u=URL.createObjectURL(new Blob([F],{type:"text/html"}));' + js + '},2500)</script>' }, { gsbListed: true });
@@ -865,10 +872,16 @@ for (const [dove, js] of [['nella stessa scheda', 'location.href=u'], ['in una s
   });
 }
 
+// Senza un clic anche la finestrella di accesso la ferma il blocco dei popup (#737.1): qui conta chi l'ha spento.
+const senzaBloccoPopup = (app) => app.evaluate(({ BrowserWindow }) => {
+  BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.security.blockPopups = false;
+});
+
 const finestreFuoriDaFilo = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
   .filter((w) => !w._filoTabs && !w.isDestroyed() && w.isVisible() && /^https?:/.test(w.webContents.getURL())).map((w) => w.webContents.getURL()));
 
 test('la pagina in lista apre da sola una finestrella di accesso del suo sito: diventa una scheda sotto l\'avviso', async ({ app, shell }) => {
+  await senzaBloccoPopup(app);
   const h = 'conto-finestrella.com';
   await serviInCaricamento(app, {
     [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>setTimeout(function(){'
@@ -888,6 +901,7 @@ test('la pagina in lista apre da sola una finestrella di accesso del suo sito: d
 });
 
 test('una finestrella di accesso che apre un sito in lista torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
+  await senzaBloccoPopup(app);
   const h = 'conto-in-finestrella.com';
   await serviInCaricamento(app, {
     'pagina-con-accesso.it/': '<title>Negozio</title><script>setTimeout(function(){'
@@ -919,6 +933,7 @@ async function gsbInRitardo(app, host, ms) {
 }
 
 test('finestrella aperta prima del verdetto e poi riscritta dal sito in lista in una pagina vuota: torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
+  await senzaBloccoPopup(app);
   const h = 'conto-vuota.com';
   const idp = 'accesso-esempio.org';
   await serviInCaricamento(app, {
@@ -941,6 +956,7 @@ test('finestrella aperta prima del verdetto e poi riscritta dal sito in lista in
 });
 
 test('finestrella del sito in lista che cambia indirizzo sul posto prima del verdetto: torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
+  await senzaBloccoPopup(app);
   const h = 'conto-sposta.com';
   await serviInCaricamento(app, {
     [h + '/login']: `<title>Attendere</title><p>Caricamento…</p><script>if(!localStorage.aperta){localStorage.aperta=1;window.open("https://${h}/oauth/authorize?client_id=1&redirect_uri=x","p","width=500,height=600")}</script>`,
