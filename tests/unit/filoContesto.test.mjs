@@ -283,6 +283,7 @@ test('senza vettori il ricordo per parole vuole due parole rare nello stesso sca
     ...scambio('mutuo', 24 * 8 - 0.1, 'grazie', 'Figurati!'),
     ...scambio('medico', 24 * 9, 'ho la visita dal dermatologo martedì, grazie per avermelo ricordato', 'Di niente.'),
     ...scambio('lisbona', 24 * 10, 'segnati il ristorante di Lisbona: Taberna da Rua', 'Fatto.'),
+    ...scambio('lisbona', 24 * 10 - 0.1, 'a Lisbona prendo il tram 28?', 'Sì, parte da Martim Moniz.'),
   ];
   const tratti = FC.tratti(vecchi);
   for (const q of ['ok grazie', 'grazie mille', 'perfetto', 'ciao', 'va bene grazie']) {
@@ -291,7 +292,7 @@ test('senza vettori il ricordo per parole vuole due parole rare nello stesso sca
   const presi = FC.ricordiPerParole('il ristorante di Lisbona', tratti);
   assert.equal(presi.length, 1);
   assert.equal(presi[0].tratto.chat, 'lisbona');
-  // Una parola che compare in molti scambi non distingue: con altre due rare il ricordo resta quello giusto.
+  // «Lisbona» torna in tutta la sua conversazione e distingue lo stesso; «grazie», in tante conversazioni, no.
   assert.equal(FC.ricordiPerParole('grazie per il ristorante di Lisbona', tratti)[0].tratto.chat, 'lisbona');
 });
 
