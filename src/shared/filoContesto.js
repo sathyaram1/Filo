@@ -279,10 +279,10 @@
   const PAROLE_DI_CORTESIA = new Set([
     'grazie', 'mille', 'tante', 'tantissimo', 'tantissime', 'infinite', 'ringrazio', 'ringraziamo', 'perfetto', 'perfetta',
     'perfetti', 'ottimo', 'ottima', 'benissimo', 'bene', 'okay', 'ciao', 'ciaociao', 'salve', 'prego', 'figurati',
-    'figurarsi', 'certo', 'certamente', 'esatto', 'esattamente', 'giusto', 'capito', 'chiaro', 'vabbe', 'vabene',
-    "d'accordo", 'daccordo', 'accordo', 'buongiorno', 'buonasera', 'buonanotte', 'grande', 'grandioso', 'fantastico',
-    'splendido', 'gentile', 'gentilissimo', 'gentilissima', 'bravo', 'brava', 'bravissimo', 'bravissima', 'ahah',
-    'ahahah', 'haha', 'hahaha', 'thanks', 'thank', 'great', 'cool', 'nice', 'sure', 'fine',
+    'figurarsi', 'certo', 'certamente', 'esatto', 'esattamente', 'giusto', 'capito', 'vabbe', 'vabene',
+    "d'accordo", 'daccordo', 'buongiorno', 'buonasera', 'buonanotte', 'grandioso', 'fantastico',
+    'splendido', 'gentilissimo', 'gentilissima', 'bravo', 'brava', 'bravissimo', 'bravissima', 'ahah',
+    'ahahah', 'haha', 'hahaha', 'thanks', 'thank', 'great', 'cool', 'sure',
   ]);
   const diCortesia = (p) => PAROLE_DI_CORTESIA.has(String(p).replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, ''));
   function ricordiPerParole(domanda, tratti) {
