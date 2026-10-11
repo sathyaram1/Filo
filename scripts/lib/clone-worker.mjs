@@ -207,8 +207,11 @@ export function preparaClone(principale, n, {
     // Da un principale poco profondo git rifiuta di prendere gli oggetti in prestito: lì si scarica tutto.
     const comune = gitIn(radice, ['rev-parse', '--path-format=absolute', '--git-common-dir']).out;
     const shallow = gitIn(radice, ['rev-parse', '--is-shallow-repository']).out === 'true';
+    // Col prestito git legge anche l'indice dei commit del principale (commit-graph, lo scrive la sua manutenzione):
+    // dopo il distacco l'apertura dei file fallisce con «unable to parse commit» (verifica #1157 giro 5).
     const prestito = comune && !shallow ? ['--reference-if-able', comune, '--dissociate'] : [];
-    const c = gitIn(dirname(dir), ['clone', '--quiet', ...prestito, url, dir], { env: envAccesso });
+    const senzaIndice = prestito.length ? ['-c', 'core.commitGraph=false'] : [];
+    const c = gitIn(dirname(dir), [...senzaIndice, 'clone', '--quiet', ...prestito, url, dir], { env: envAccesso });
     if (!c.ok) {
       rmSync(dir, { recursive: true, force: true });
       return { ok: false, why: `git clone fallito: ${c.err.split('\n').filter((l) => !/^warning/i.test(l))[0] || ''}` };
