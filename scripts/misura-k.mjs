@@ -172,9 +172,11 @@ export function cpuDelCgroup(testo) {
 
 /** I rossi noti dei due elenchi di tests/rossi-noti.json, come nomi di file. PURA. */
 export function rossiNotiDa(json) {
-  const nome = (x) => (typeof x === 'string' ? x : String((x && (x.spec || x.file)) || ''));
+  const nome = (x) => (typeof x === 'string' ? x : String((x && (x.spec || x.file)) || '')).replace(/\\+/g, '/');
+  // L'elenco scrive gli spec senza estensione («tests/transparency-page»), i rossi letti dai log la portano.
+  const comeNeiLog = (n) => (/\.m?js$/.test(n) ? n : `${n}.spec.mjs`);
   const j = json || {};
-  return [...(j.specs || []), ...((j.contenitore && j.contenitore.specs) || [])].map(nome).filter(Boolean);
+  return [...(j.specs || []), ...((j.contenitore && j.contenitore.specs) || [])].map(nome).filter(Boolean).map(comeNeiLog);
 }
 
 const media = (v) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN);
