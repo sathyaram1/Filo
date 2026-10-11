@@ -49,8 +49,9 @@ nella pagina, in uno Shadow DOM chiuso.
   le altre aspettano. Tornando davanti si ridisegna da capo, e il mezzo secondo riparte. Scheda chiusa,
   pagina nuova, frame che naviga, renderer morto: la domanda vale un Annulla. Da un popup di accesso
   (una finestra vera con dentro un sito, #589.3) copre quella finestra; finché la domanda aspetta,
-  `resizeTo`/`moveTo` del sito non valgono, e una finestrella più piccola del riquadro col suo testo si
-  allarga: rimpicciolita, mostrava titolo e OK senza il testo (giro 10).
+  `resizeTo`/`moveTo` del sito non valgono, e la finestrella si porta grande quanto il riquadro col suo
+  testo e tutta dentro il suo schermo: rimpicciolita (giro 10) o aperta oltre il bordo (giro 11) lasciava
+  in vista OK senza il testo. Una regola sola su misura e posizione, non un caso per porta.
 - **La tastiera.** La vista se la prende solo se ce l'aveva la pagina che chiede (chi scrive nella
   barra la tiene), e finché la domanda è a schermo la pagina sotto non se la riprende. Chi stava
   scrivendo nella pagina continua a scrivere nel suo campo: la vista gli rimanda i tasti
