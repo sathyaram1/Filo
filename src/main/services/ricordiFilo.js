@@ -111,7 +111,7 @@ function indicizza(tratti, modello) {
         const nuove = [];
         b.forEach((t, i) => {
           const v = emb.vectors[i];
-          if (!Array.isArray(v) || !v.length) return;
+          if (!Array.isArray(v) || !v.length || !vivo(t)) return;
           const voce = { k: t.chiave, c: t.chat, m: modello, v: app.quantizza(v) };
           indice.set(t.chiave, voce);
           nuove.push(voce);
