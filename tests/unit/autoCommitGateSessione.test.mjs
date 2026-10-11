@@ -13,9 +13,9 @@ import {
 // ─── Giro 5 della verifica (16/09/2026): due rilievi messi da parte ──────────
 //
 // (1) Quando è il COMMIT a non riuscire (index.lock a terra, pre-commit che
-// rifiuta) l'hook taceva: /dev/null su add e commit. (2) L'hook gira su tutte
-// le cartelle di lavoro e diceva i guai delle ALTRE con le parole di un
-// problema tuo: la sessione andava a finire il rebase di qualcun altro.
+// rifiuta) l'hook taceva: /dev/null su add e commit. (2) I guai delle ALTRE
+// cartelle arrivavano con le parole di un problema tuo: dal #1157 l'hook non
+// le guarda piu'.
 describe('un commit che non riesce, e i guai delle altre cartelle, arrivano alla sessione', () => {
   const contesto = (r) => {
     const riga = rigaJson(r);
@@ -55,7 +55,7 @@ describe('un commit che non riesce, e i guai delle altre cartelle, arrivano alla
     assert.doesNotMatch(ctx, /committato in locale ma NON e' su origin/);
   });
 
-  test('una fusione a meta\' in un\'ALTRA cartella si dice come altrui, in una riga, senza ordini; nella propria come oggi', () => {
+  test('una fusione a meta\' in un\'ALTRA cartella non si tocca e non si nomina; nella propria si dice come oggi', () => {
     const { work, base } = scene();
     git(work, ['config', 'core.autocrlf', 'false']);
     const altra = resolve(base, 'altra');
@@ -67,38 +67,30 @@ describe('un commit che non riesce, e i guai delle altre cartelle, arrivano alla
     git(work, ['checkout', '-q', '-b', 'claude/mia']);
     writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
 
-    // La sessione sta in `work`: il guaio di `altra` e' altrui.
-    const r = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', cwd: work }));
+    const r = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', cwd: work, tool_input: { file_path: resolve(work, 'lavoro.js') } }));
     assert.equal(r.status, 0);
-    assert.equal(shaOf(work, 'claude/mia'), git(work, ['rev-parse', 'HEAD']));
     assert.equal(git(work, ['ls-remote', 'origin', 'refs/heads/claude/mia']).split(/\s/)[0], git(work, ['rev-parse', 'HEAD']), 'il proprio lavoro si salva e si spedisce');
-    const ctx = contesto(r);
-    const righe = ctx.split('\n').filter((l) => /altra/.test(l));
-    assert.equal(righe.length, 1, `un guaio altrui e' UNA riga, trovato: «${ctx}»`);
-    assert.match(righe[0], /un'altra cartella di lavoro, non la tua: '.*altra'/);
-    assert.match(righe[0], /a meta'/);
-    assert.doesNotMatch(ctx, /Finiscilo|NON committo/, 'mai come ordini, mai come un problema tuo');
-    assert.doesNotMatch(ctx, /committato in locale ma NON e' su origin/, 'la coda che dice di spedire riguarda solo la propria cartella');
+    assert.equal(rigaJson(r), undefined, `niente da dire alla sessione, trovato: «${r.stdout}»`);
+    assert.doesNotMatch(String(r.stderr), /altra/, 'l\'altra cartella non e\' nemmeno guardata');
 
-    // La sessione sta in `altra`: lo stesso guaio e' suo, con le parole di oggi.
+    // Senza file, la sessione che sta in `altra`: lo stesso guaio e' suo, con le parole di oggi.
     const r2 = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse', cwd: altra }));
     const ctx2 = contesto(r2);
     assert.match(ctx2, /a meta'/);
     assert.match(ctx2, /NON committo/);
-    assert.doesNotMatch(ctx2, /non la tua/);
   });
 
-  test('senza il campo cwd nello stdin ogni cartella e\' «tua», com\'era prima', () => {
+  test('senza file ne\' cwd nello stdin si salva solo la cartella del progetto, mai le altre', () => {
     const { work, base } = scene();
-    git(work, ['config', 'core.autocrlf', 'false']);
     const altra = resolve(base, 'altra');
     git(work, ['worktree', 'add', '-q', altra, '-b', 'claude/altra2']);
-    commitFile(altra, 'a.txt', 'mio\n');
-    commitFile(work, 'a.txt', 'loro\n');
-    spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', 'main'], { cwd: altra, encoding: 'utf8' });
+    writeFileSync(resolve(altra, 'sporco.txt'), 'x\n', 'utf8');
+    git(work, ['checkout', '-q', '-b', 'claude/mia2']);
+    writeFileSync(resolve(work, 'lavoro.js'), 'x\n', 'utf8');
     const r = runHookRaw(work, JSON.stringify({ hook_event_name: 'PostToolUse' }));
-    const ctx = contesto(r);
-    assert.match(ctx, /non la tua: '.*altra'/);
-    assert.doesNotMatch(ctx, /NON committo/);
+    assert.equal(r.status, 0);
+    assert.equal(git(work, ['status', '--porcelain']), '', 'la cartella del progetto e\' salvata');
+    assert.match(git(altra, ['status', '--porcelain']), /sporco\.txt/, 'l\'altra resta com\'era');
+    assert.equal(git(work, ['ls-remote', 'origin', 'refs/heads/claude/altra2']), '', 'e il suo ramo non parte');
   });
 });

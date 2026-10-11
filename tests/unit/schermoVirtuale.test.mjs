@@ -3,8 +3,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -29,6 +29,17 @@ test('Linux senza schermo con xvfb: xvfb-run -a davanti e la sandbox spenta', ()
   assert.equal(l.env.ELECTRON_DISABLE_SANDBOX, '1');
   assert.equal(l.env.PATH, '/bin', 'il resto dell\'ambiente passa intatto');
   assert.match(l.nota, /xvfb-run -a/);
+});
+
+test('worker in parallelo (#1157): ognuno cerca il display da una base sua; senza indice il comando resta com\'era', () => {
+  const lancio = (worker) => preparaLancioElectron('npx', ['playwright', 'test'], { platform: 'linux', env: { PATH: '/bin' }, haXvfb: () => true, worker });
+  assert.deepEqual(lancio({ indice: 1, paralleli: 3 }).args, ['-a', '-n', '110', 'npx', 'playwright', 'test']);
+  assert.deepEqual(lancio({ indice: 2, paralleli: 3 }).args, ['-a', '-n', '120', 'npx', 'playwright', 'test']);
+  assert.match(lancio({ indice: 2, paralleli: 3 }).nota, /xvfb-run -a -n 120/);
+  assert.deepEqual(lancio(null).args, ['-a', 'npx', 'playwright', 'test']);
+  assert.deepEqual(preparaLancioElectron('npx', [], { platform: 'linux', env: { FILO_WORKER: '3' }, haXvfb: () => true }).args, ['-a', '-n', '130', 'npx'],
+    'l\'indice arriva anche dall\'ambiente');
+  assert.deepEqual(preparaLancioElectron('npx', [], { platform: 'win32', env: {}, haXvfb: mai, worker: { indice: 1 } }).args, [], 'fuori da Linux senza schermo niente cambia');
 });
 
 test('Linux senza schermo e senza xvfb: si ferma e dice cosa manca', () => {
@@ -93,4 +104,26 @@ test('riallineamento: la scelta include il lato arrivato da main e il file in co
   } finally {
     togliCartella(dir);
   }
+});
+
+// #1157: `xvfb-run -a` senza base parte da :99 in ogni worker, e due lanci a mano nello stesso momento prendono lo
+// stesso display. Le ricette mandano al lanciatore, che mette la base del worker come finish:check.
+test('ogni lancio a mano di xvfb-run -a che CLAUDE.md e i ruoli chiedono porta la base di display del worker', () => {
+  const file = ['CLAUDE.md', ...readdirSync(resolve(ROOT, 'routines', 'roles')).filter((f) => f.endsWith('.md')).map((f) => `routines/roles/${f}`)];
+  const senzaBase = [];
+  for (const f of file) {
+    readFileSync(resolve(ROOT, f), 'utf8').split(/\r?\n/).forEach((riga, i) => {
+      if (/xvfb-run\s+-a\b/.test(riga) && !/\s-n\s/.test(riga)) senzaBase.push(`${f}:${i + 1}: ${riga.trim().slice(0, 120)}`);
+    });
+  }
+  assert.deepEqual(senzaBase, []);
+});
+
+test('il lanciatore a mano, dove lo schermo c\'è, esegue il comando com\'è e ne restituisce l\'uscita', () => {
+  const r = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'lancia-electron.mjs'), process.execPath, '-e', 'process.exit(7)'], {
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, DISPLAY: ':0' },
+  });
+  assert.equal(r.status, 7, r.stderr);
+  const vuoto = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'lancia-electron.mjs')], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(vuoto.status, 2, 'senza comando dice come si usa');
 });

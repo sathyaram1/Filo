@@ -27,12 +27,13 @@ import {
   collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
   gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
   allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
-  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento, guardiaFermo, orologioMacchina,
+  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento, guardiaFermo, orologioMacchina, conConcorrenza,
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { concorrenzaUnit } from '../../scripts/lib/dati-worker.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
@@ -477,6 +478,15 @@ test('il tetto conta il tempo fermo, è largo, e quello di node resta solo dove 
   assert.deepEqual(conTettoDiTempo(['--test-only']), [`--test-timeout=${TETTO_FERMO_MS}`, '--test-only']);
   assert.deepEqual(conTettoDiTempo(['--test-timeout', '5000']), ['--test-timeout', '5000']);
   assert.deepEqual(conTettoDiTempo(['--test-timeout=5000']), ['--test-timeout=5000']);
+});
+
+test('worker in parallelo (#1157): ognuno prende la sua parte di CPU, a meno che chi lancia non dica la sua', () => {
+  assert.deepEqual(conConcorrenza(['--x'], concorrenzaUnit(3, 16)), ['--test-concurrency=5', '--x']);
+  assert.deepEqual(conConcorrenza([], concorrenzaUnit(4, 2)), ['--test-concurrency=1'], 'almeno uno');
+  assert.deepEqual(conConcorrenza(['--x'], 0), ['--x'], 'fuori da un worker decide node, come prima');
+  assert.deepEqual(conConcorrenza([], concorrenzaUnit(1, 16)), [], 'un worker solo: tutte le CPU');
+  assert.deepEqual(conConcorrenza(['--test-concurrency', '2'], 4), ['--test-concurrency', '2']);
+  assert.deepEqual(conConcorrenza(['--test-concurrency=2'], 4), ['--test-concurrency=2']);
 });
 
 test('fermo è il primo file partito e non finito: gli altri aspettano lui', () => {
