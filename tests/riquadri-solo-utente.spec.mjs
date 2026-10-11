@@ -365,6 +365,11 @@ test('nei riquadri su un sito con scorciatoie da tastiera quello che l\'utente s
   await page.keyboard.type('ok kiwi / poi', { delay: 20 });
   expect((await statoDi(app, page, '.sn-editbox-instruction')).valore).toBe('ok kiwi / poi');
   await sitoFermo();
+  // L'Invio dell'utente arriva ancora al riquadro: riscrive, e nella casella non va a capo.
+  const prima = await chiamate(app);
+  await page.keyboard.press('Enter');
+  await expect.poll(() => chiamate(app)).toBe(prima + 1);
+  expect((await statoDi(app, page, '.sn-editbox-instruction')).valore).toBe('ok kiwi / poi');
 });
 
 test('spiegazione su un sito: il clic finto del sito non apre i collegamenti della risposta, quello dell\'utente sì', async ({ app, openTab, testServer }) => {
