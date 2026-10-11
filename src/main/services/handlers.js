@@ -4269,10 +4269,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const codaScheda = filo && chatId ? filo.coda : cleanHistory;
   const vistiDalFilo = filo ? filo.visti : [];
   // La parte della conversazione di questa scheda che il modello non ha davanti: la ricerca la trova (#868).
-  const chiaviDavanti = new Set(vistiDalFilo.map((m) => globalThis.SN_FILO_CONTESTO.chiave(m)));
-  const nascostiDellaChat = filo && chatId
-    ? filo.tutti.filter((m) => m.chat === chatId && !chiaviDavanti.has(globalThis.SN_FILO_CONTESTO.chiave(m)))
-    : [];
+  const nascostiDi = (f) => {
+    if (!f || !chatId) return [];
+    const davanti = new Set(f.visti.map((m) => globalThis.SN_FILO_CONTESTO.chiave(m)));
+    return f.tutti.filter((m) => m.chat === chatId && !davanti.has(globalThis.SN_FILO_CONTESTO.chiave(m)));
+  };
+  let nascostiDellaChat = nascostiDi(filo);
   // I pezzi vecchi si cercano mentre si prepara il resto (memorie, stato, file): arrivano in coda, prima della domanda.
   const ricordiP = filo && !internal && !onbActive && RicordiFilo
     ? RicordiFilo.cerca(String(userMessage || ''), { vecchi: filo.vecchi, davanti: filo.visti }).catch(() => [])
