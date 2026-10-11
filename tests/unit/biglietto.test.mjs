@@ -44,7 +44,11 @@ function server(biglietti = {}, { rompi = false, status = 200 } = {}) {
     if (data.op === 'stato') return ris({ ok: true, fiducia: b.chiuso ? 'non_fidato' : b.fiducia, sporcatoDa: b.sporcatoDa || [], chiuso: !!b.chiuso });
     if (data.op === 'sporca') { b.fiducia = 'non_fidato'; return ris({ ok: true, fiducia: 'non_fidato' }); }
     if (data.op === 'chiudi') { b.chiuso = true; return ris({ ok: true }); }
-    if (data.op === 'ramo') return ris({ ok: true, ramoFidato: b.fiducia === 'fidato' });
+    if (data.op === 'ramo') {
+      // Come il server vero: senza l'elenco dei commit non si sa chi li ha scritti, e la sessione si sporca.
+      if (!Array.isArray(data.commits) && b.fiducia === 'fidato') { b.fiducia = 'non_fidato'; return ris({ ok: true, ramoFidato: false, fiducia: 'non_fidato', sporcato: 'senza l’elenco dei commit del ramo' }); }
+      return ris({ ok: true, ramoFidato: b.fiducia === 'fidato', fiducia: b.fiducia });
+    }
     return ris({ ok: false, reason: 'op_sconosciuta' });
   };
   return { chiamate, biglietti, deps: { fetchImpl, idToken: async () => 'token-finto' } };
