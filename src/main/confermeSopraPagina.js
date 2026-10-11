@@ -277,14 +277,24 @@ class ConfermeSopraPagina {
 
 const perPopup = new WeakMap();
 
-// Il riquadro è largo 440 più i margini, e il testo ha l'altezza della finestra meno 160: sotto questa misura
-// la domanda si vedrebbe senza il suo testo. Una finestrella già piccola prima della domanda si allarga.
+// Una regola sola per la finestrella che porta la domanda: grande abbastanza per il testo (il riquadro è largo
+// 440 più i margini, il testo alto quanto la finestra meno 160) e tutta dentro il suo schermo. Il sito la
+// rimpiccioliva (giro 10) o la apriva oltre il bordo (giro 11): restava in vista OK e non il testo.
 const MINIMO_DOMANDA = { width: 488, height: 360 };
-function allargaPerLaDomanda(win) {
+function mettiInVistaPerLaDomanda(win) {
   if (!win || win.isDestroyed()) return;
   const [w, h] = win.getContentSize();
-  if (w >= MINIMO_DOMANDA.width && h >= MINIMO_DOMANDA.height) return;
-  try { win.setContentSize(Math.max(w, MINIMO_DOMANDA.width), Math.max(h, MINIMO_DOMANDA.height)); } catch (_) {}
+  if (w < MINIMO_DOMANDA.width || h < MINIMO_DOMANDA.height) {
+    try { win.setContentSize(Math.max(w, MINIMO_DOMANDA.width), Math.max(h, MINIMO_DOMANDA.height)); } catch (_) {}
+  }
+  let b; let a;
+  try { b = win.getBounds(); a = require('electron').screen.getDisplayMatching(b).workArea; } catch (_) { return; }
+  const width = Math.min(b.width, a.width);
+  const height = Math.min(b.height, a.height);
+  const x = Math.min(Math.max(b.x, a.x), a.x + a.width - width);
+  const y = Math.min(Math.max(b.y, a.y), a.y + a.height - height);
+  if (x === b.x && y === b.y && width === b.width && height === b.height) return;
+  try { win.setBounds({ x, y, width, height }); } catch (_) {}
 }
 
 // La domanda di una pagina web va sopra la sua scheda; da un popup di accesso, che è una finestra vera
