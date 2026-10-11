@@ -314,6 +314,14 @@ const SCORCIATOIE = `<script>
     if (e.key === 'k') { e.preventDefault(); window.__comandi.push('pausa'); }
     if (e.key === '/') { e.preventDefault(); cerca().focus(); }
   });
+  // Chi ascolta prima della casella, sul documento o sulla finestra: vede solo l'host del riquadro.
+  for (const dove of [document, window]) {
+    dove.addEventListener('keydown', (e) => {
+      const t = e.target;
+      if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (e.key === 'k' || e.key === ' ') { e.preventDefault(); window.__comandi.push('in cattura ' + e.key); }
+    }, true);
+  }
 </script>`;
 
 test('nei riquadri su un sito con scorciatoie da tastiera quello che l\'utente scrive resta nella casella', async ({ app, openTab, testServer }) => {
