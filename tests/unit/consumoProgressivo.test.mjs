@@ -48,6 +48,25 @@ test('un messaggio diviso fra due letture vale la sua ULTIMA usage, come nel rap
   } finally { togliCartella(casa); }
 });
 
+test('le righe che Claude Code riscrive in coda riprendendo una sessione non si ricontano, anche lette a pezzi', async () => {
+  const { casa, principale } = progetto();
+  try {
+    writeFileSync(principale, riga('m1', 200) + utente + riga('m2', 300));
+    let st = avanzaFile(principale, null);
+    // La ripresa: metadati, le stesse righe di prima identiche, poi un turno nuovo.
+    appendFileSync(principale, `${JSON.stringify({ type: 'bridge-session', bridgeSessionId: 'b' })}\n${riga('m1', 200)}${utente}${riga('m2', 300)}`);
+    st = avanzaFile(principale, st);
+    appendFileSync(principale, riga('m3', 40));
+    st = avanzaFile(principale, st);
+    const t = totaliDi(st);
+    assert.equal(t.turni, 3);
+    assert.equal(t.output, 540);
+    const rep = await rapportoDi(principale);
+    assert.equal(t.output, rep.tokens.output);
+    assert.equal(Math.round(t.costo * 10000) / 10000, rep.costUsd);
+  } finally { togliCartella(casa); }
+});
+
 test('una riga a metà si legge solo quando è intera; un file accorciato si rilegge da capo', () => {
   const { casa, principale } = progetto();
   try {

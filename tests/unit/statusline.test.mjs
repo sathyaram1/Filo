@@ -115,6 +115,26 @@ test('invia: la lettura va a ownerCrediti op:lettura col token; l esito resta sc
   } finally { togliCartella(home); }
 });
 
+test('barra: finché l ultimo invio non è arrivato la riga lo dice; senza numeri da inviare no', async () => {
+  const home = cartellaTemporanea('filo-barra-');
+  try {
+    const righe = [];
+    const giro = (stdin, ms) => barra(JSON.stringify(stdin), { home, nowMs: ms, lancia: () => {}, scrivi: (s) => righe.push(s) });
+    const rifiuto = async () => ({ ok: false, status: 400, json: async () => ({ error: { message: 'il rinnovo non è di nessun account' } }) });
+    giro(STDIN, NOW);
+    assert.equal(righe.at(-1), '5h 34% · 7g 61%\n');
+    await invia({ home, nowMs: NOW + 1, token: 'tok', fetchImpl: rifiuto });
+    giro(STDIN, NOW + 2);
+    assert.equal(righe.at(-1), '5h 34% · 7g 61% · non inviata\n');
+    await invia({ home, nowMs: NOW + 3, token: 'tok', fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ result: { ok: true, account: 'B' } }) }) });
+    giro(STDIN, NOW + 4);
+    assert.equal(righe.at(-1), '5h 34% · 7g 61%\n');
+    await invia({ home, nowMs: NOW + 5, token: 'tok', fetchImpl: rifiuto });
+    giro({ session_id: 'sess-b' }, NOW + 6);
+    assert.equal(righe.at(-1), '5h – · 7g –\n');
+  } finally { togliCartella(home); }
+});
+
 test('lo script vero: stdin finto, una riga, il file nella casa indicata', async () => {
   const home = cartellaTemporanea('filo-barra-');
   try {
