@@ -368,6 +368,7 @@
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
-    ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, testoRicordo, rendiRicordi, coda, assembla,
+    ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
+    coda, assembla, troppoLungo, tettoDopoRifiuto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
