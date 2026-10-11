@@ -30,7 +30,8 @@ const CASI = [
   ['utente segnato fidato', { clientId: 'utente-7', status: 'todo', localOnly: SEGNO, fiducia: 'fidato' }, true],
   ['sessione col biglietto pulito', { clientId: 'local:claude', senderProof: 'admin', status: 'todo', localOnly: SEGNO, fiducia: 'fidato' }, true],
   ['sessione con la prova ma non fidata', { clientId: 'local:claude', senderProof: 'admin', status: 'todo', localOnly: SEGNO, fiducia: 'non_fidato' }, false],
-  ['owner con la prova, fiducia assente', { clientId: 'owner:app', senderProof: 'admin', status: 'working', localOnly: SEGNO }, false],
+  ['owner con la prova, prima della migrazione (fiducia assente): regola di prima', { clientId: 'owner:app', senderProof: 'admin', status: 'working', localOnly: SEGNO }, true],
+  ['owner con la prova, non fidato', { clientId: 'owner:app', senderProof: 'admin', status: 'working', localOnly: SEGNO, fiducia: 'non_fidato' }, false],
   ['routine senza approvazione', { clientId: 'routine:worker', senderProof: 'server', status: 'todo', localOnly: SEGNO }, false],
   ['routine approvata dall’owner', { clientId: 'routine:worker', senderProof: 'server', status: 'todo', localOnly: SEGNO, localApproval: SI }, true],
   ['prefisso di sessione senza prova', { clientId: 'local:claude', status: 'todo', localOnly: SEGNO }, false],
@@ -39,7 +40,7 @@ const CASI = [
   ['approvazione non mappa', { clientId: 'utente-7', status: 'todo', localOnly: SEGNO, localApproval: true }, false],
 ];
 
-test('una sessione lavora in locale solo il fidato o l’approvato dall’owner; la prova del mittente da sola no (#1148)', () => {
+test('una sessione lavora in locale solo il fidato o l’approvato dall’owner; la prova del mittente da sola no (#1148), salvo prima della migrazione', () => {
   for (const [nome, fb, atteso] of CASI) {
     assert.equal(MR.localSenderCheck(fb).ok, atteso, nome);
   }
@@ -52,7 +53,8 @@ test('i rifiuti dicono perché e la strada: utente, routine, e il proprio non fi
   assert.match(MR.localSenderCheck({ clientId: 'utente-7' }).motivo, /approva come lavoro locale/);
   const routine = MR.localSenderCheck({ clientId: 'routine:worker', senderProof: 'server' });
   assert.deepEqual([routine.ok, routine.routine], [false, true]);
-  const mio = MR.localSenderCheck({ clientId: 'local:claude', senderProof: 'admin' });
+  assert.equal(MR.localSenderCheck({ clientId: 'local:claude', senderProof: 'admin' }).ok, true, 'prima della migrazione');
+  const mio = MR.localSenderCheck({ clientId: 'local:claude', senderProof: 'admin', fiducia: 'non_fidato' });
   assert.deepEqual([mio.ok, mio.nonFidato], [false, true]);
   assert.match(mio.motivo, /non è fidato/);
   assert.deepEqual(MR.localSenderCheck({ clientId: 'utente-7', localApproval: SI }), { ok: true, approvato: true });

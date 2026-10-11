@@ -726,11 +726,12 @@ test('localSignCheck: il segno si mette su un fidato o un approvato, mai sulla s
   assert.equal(MR.localSignCheck(locale(), true).ok, true);
   assert.equal(MR.localSignCheck(locale({ clientId: 'owner:me' }), true).ok, true);
   assert.equal(MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined }), true).ok, true, 'un utente segnato fidato');
-  // Con la prova ma senza fiducia: è suo, e la risposta dice la strada.
-  const mio = MR.localSignCheck(locale({ fiducia: undefined }), true);
+  // Con la prova ma non fidato: è suo, e la risposta dice la strada.
+  const mio = MR.localSignCheck(locale({ fiducia: 'non_fidato' }), true);
   assert.deepEqual([mio.ok, mio.nonFidato], [false, true]);
   assert.match(mio.motivo, /non è fidato/);
-  assert.equal(MR.localSignCheck(locale({ fiducia: 'non_fidato' }), true).ok, false);
+  // Prima della migrazione il campo non c'è: col mittente provato vale la regola di prima.
+  assert.equal(MR.localSignCheck(locale({ fiducia: undefined }), true).ok, true);
   // Il solo prefisso: vale come un utente.
   const senzaProva = MR.localSignCheck(locale({ senderProof: undefined, fiducia: undefined }), true);
   assert.deepEqual([senzaProva.ok, senzaProva.utente], [false, true]);
@@ -748,8 +749,8 @@ test('localSignCheck: una pratica chiusa si segna (era un lavoro locale: fuori d
     const r = MR.localSignCheck(locale({ status, statusPublic: 'closed' }), true);
     assert.deepEqual([r.ok, r.chiusa], [true, true], status);
   }
-  // Senza fiducia non si segna nemmeno a pratica chiusa.
-  assert.equal(MR.localSignCheck(locale({ status: 'done', statusPublic: 'closed', fiducia: undefined }), true).ok, false);
+  // Non fidata non si segna nemmeno a pratica chiusa.
+  assert.equal(MR.localSignCheck(locale({ status: 'done', statusPublic: 'closed', fiducia: 'non_fidato' }), true).ok, false);
   assert.equal(MR.localSignCheck(locale({ status: 'attack_confirmed', statusPublic: 'closed' }), true).ok, false);
 });
 
