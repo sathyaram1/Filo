@@ -269,8 +269,9 @@
       .sort((a, b) => Date.parse(a.tratto.ts) - Date.parse(b.tratto.ts));
   }
 
-  // Senza vettori il ricordo va per parole, che è una prova debole: servono almeno due parole rare negli scambi
-  // vecchi, tutte nello stesso scambio. Una parola che compare dappertutto («grazie», «perfetto») non distingue niente.
+  // Senza vettori il ricordo va per parole, che è una prova debole: servono almeno due parole rare nelle conversazioni
+  // vecchie, tutte nello stesso scambio. Una parola che compare in molte conversazioni («grazie», «perfetto») non
+  // distingue niente; una che torna in tutta una conversazione sola (il suo argomento) sì.
   const MIN_PAROLE_RICORDO = 2;
   const QUOTA_PAROLA_COMUNE = 0.05;
   function ricordiPerParole(domanda, tratti) {
@@ -278,9 +279,11 @@
     const lista = Array.isArray(tratti) ? tratti : [];
     if (!CA || !lista.length) return [];
     const pagliai = lista.map((t) => CA.normalizeForSearch(`${t.titolo || ''} ${t.testo || ''}`));
-    const comune = Math.max(1, Math.floor(lista.length * QUOTA_PAROLA_COMUNE));
+    const chat = new Set(lista.map((t) => t.chat)).size;
+    const comune = Math.max(1, Math.floor(chat * QUOTA_PAROLA_COMUNE));
+    const inQuante = (p) => new Set(lista.filter((_t, i) => pagliai[i].includes(p)).map((t) => t.chat)).size;
     const parole = [...new Set(CA.terminiCheDistinguono(CA.normalizeForSearch(domanda).split(/\s+/).filter(Boolean)))]
-      .filter((p) => pagliai.filter((h) => h.includes(p)).length <= comune);
+      .filter((p) => inQuante(p) <= comune);
     if (parole.length < MIN_PAROLE_RICORDO) return [];
     const presi = lista.filter((_t, i) => parole.every((p) => pagliai[i].includes(p)));
     return scegliRicordi(presi.slice(-MAX_RICORDI).map((t) => ({ tratto: t, score: 1 })));

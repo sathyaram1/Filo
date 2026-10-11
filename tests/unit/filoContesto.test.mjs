@@ -275,3 +275,40 @@ test('il testo di fuori resta una lettura anche quando torna dall\'archivio: ric
   assert.match(X.contestoDaAzioni([nome]).letto, /fattura\.pdf/);
   assert.deepEqual(FC.daFuoriDi([{ role: 'user', text: 'x', esterno: 'finto' }, { role: 'filo', text: 'y' }]), [], 'solo le righe di Filo segnate da fuori');
 });
+
+test('senza vettori il ricordo per parole vuole due parole rare nello stesso scambio: un «ok grazie» non ripesca niente', () => {
+  require(join(ROOT, 'src', 'shared', 'chatArchive.js'));
+  const vecchi = [
+    ...scambio('mutuo', 24 * 8, 'quanto pago di rata del mutuo?', 'La rata è di 640 euro al mese.'),
+    ...scambio('mutuo', 24 * 8 - 0.1, 'grazie', 'Figurati!'),
+    ...scambio('medico', 24 * 9, 'ho la visita dal dermatologo martedì, grazie per avermelo ricordato', 'Di niente.'),
+    ...scambio('lisbona', 24 * 10, 'segnati il ristorante di Lisbona: Taberna da Rua', 'Fatto.'),
+  ];
+  const tratti = FC.tratti(vecchi);
+  for (const q of ['ok grazie', 'grazie mille', 'perfetto', 'ciao', 'va bene grazie']) {
+    assert.deepEqual(FC.ricordiPerParole(q, tratti), [], q);
+  }
+  const presi = FC.ricordiPerParole('il ristorante di Lisbona', tratti);
+  assert.equal(presi.length, 1);
+  assert.equal(presi[0].tratto.chat, 'lisbona');
+  // Una parola che compare in molti scambi non distingue: con altre due rare il ricordo resta quello giusto.
+  assert.equal(FC.ricordiPerParole('grazie per il ristorante di Lisbona', tratti)[0].tratto.chat, 'lisbona');
+});
+
+test('il rifiuto per finestra del modello si riconosce, e il tratto si stringe quanto basta', () => {
+  const or = { status: 400, message: 'OpenRouter 400: {"error":{"message":"This endpoint\'s maximum context length is 32768 tokens. However, you requested about 70000 tokens (69000 of text input, 1000 in the output). Please reduce the length of the messages or completion."}}' };
+  assert.deepEqual(FC.troppoLungo(or), { max: 32768, chiesti: 70000 });
+  assert.deepEqual(FC.troppoLungo({ status: 400, message: 'prompt is too long' }), { max: null, chiesti: null });
+  assert.equal(FC.troppoLungo({ status: 400, message: 'Invalid tool schema' }), null);
+  assert.equal(FC.troppoLungo({ status: 503, message: 'maximum context length is 32768 tokens' }), null);
+  // Con le misure: la richiesta intera rientra sotto la finestra, e a stringersi è solo il tratto.
+  const caratteri = 250000;
+  const caratteriTratto = 230000;
+  const t = FC.tettoDopoRifiuto({ max: 32768, chiesti: 70000, caratteri, caratteriTratto });
+  const totale = (caratteri - caratteriTratto) + t * FC.CARATTERI_PER_TOKEN;
+  assert.ok(totale <= caratteri * (32768 / 70000), `${totale}`);
+  assert.ok(t > 0);
+  // Senza misure il tratto si dimezza; senza tratto non c'è niente da stringere.
+  assert.equal(FC.tettoDopoRifiuto({ caratteriTratto: 70000 }), Math.floor(35000 / FC.CARATTERI_PER_TOKEN));
+  assert.equal(FC.tettoDopoRifiuto({ max: 1000, chiesti: 2000, caratteri: 100, caratteriTratto: 0 }), null);
+});

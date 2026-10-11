@@ -582,3 +582,48 @@ test('una chat cancellata mentre si indicizzano le conversazioni vecchie non par
   expect(righe.filter((v) => v.c === 'vecchia-0')).toHaveLength(0);
   expect(righe.filter((v) => v.c === 'vecchia-1').length).toBeGreaterThan(0);
 });
+
+test('un modello della chat con la finestra più piccola di tre giorni di filo risponde lo stesso, e dal turno dopo non viene più rifiutato', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await primaScheda(app);
+  await preparaModello(app, []);
+  const chat = [];
+  for (let c = 0; c < 20; c++) {
+    const scambi = [];
+    for (let i = 0; i < 6; i++) scambi.push([`domanda ${c}.${i} ${'parole '.repeat(60)}`, `risposta ${c}.${i} ${'testo della risposta '.repeat(60)}`]);
+    chat.push({ id: `ieri-${c}`, oreFa: 40 - c, scambi });
+  }
+  await semina(app, { chat });
+  // Circa 250.000 caratteri di ieri, sotto il tetto di serie; il fornitore rifiuta oltre 110.000, come un modello da 32.000 token.
+  await app.evaluate(() => {
+    globalThis.__rifiutate = 0;
+    globalThis.__accettate = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
+      const n = messages.reduce((s, m) => s + String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content)).length, 0);
+      if (n > 110000) {
+        globalThis.__rifiutate++;
+        const e = new Error("OpenRouter 400: {\"error\":{\"message\":\"This endpoint's maximum context length is 32768 tokens. However, you requested about 70000 tokens. Please reduce the length of the messages.\",\"code\":400}}");
+        e.status = 400;
+        throw e;
+      }
+      globalThis.__accettate.push(messages.map((m) => String(typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n'));
+      try { onDelta && onDelta('Eccomi.'); } catch (_) {}
+      return { ...base, text: 'Eccomi.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
+  await scrivi(page, 'ci sei?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Eccomi.' })).toBeVisible({ timeout: 20_000 });
+  expect(await app.evaluate(() => globalThis.__rifiutate)).toBe(1);
+  await scrivi(page, 'e adesso?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Eccomi.' })).toHaveCount(2, { timeout: 20_000 });
+  expect(await app.evaluate(() => globalThis.__rifiutate)).toBe(1);
+  // Il tratto stretto tiene le conversazioni più recenti, non si svuota.
+  const [, secondo] = await app.evaluate(() => globalThis.__accettate);
+  expect(secondo).toContain('domanda 19.5');
+  expect(secondo).toContain('ci sei?');
+});
