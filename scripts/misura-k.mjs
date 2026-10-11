@@ -217,6 +217,9 @@ export function calcolaK(corse, { rossiNoti = [], soglie = SOGLIE } = {}) {
   const base = baseDa(corse);
   if (!base) return { k: null, motivo: 'nessuna corsa con un worker solo: manca la base' };
   if (base.infra.length) return { k: null, motivo: `la base ha errori d'infrastruttura (${base.infra.join(', ')}): misura da rifare` };
+  if (base.testBase < base.testTutti) {
+    return { k: null, motivo: `una corsa con un worker solo non ha finito i suoi test (${base.testBase} su ${base.testTutti}): misura da rifare` };
+  }
   if (!base.uscitePulite && !base.rossi.length) {
     return { k: null, motivo: 'la base esce con errore senza un rosso riconoscibile: la misura non vedrebbe cosa cade, da rifare' };
   }
