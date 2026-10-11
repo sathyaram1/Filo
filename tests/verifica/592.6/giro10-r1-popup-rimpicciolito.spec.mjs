@@ -30,3 +30,12 @@ test('r1 il sito rimpicciolisce la finestrella di accesso con la domanda aperta:
   // O il testo sta tutto nel riquadro, o OK aspetta che lo si faccia scorrere fino in fondo.
   expect(!s.textScrolls || s.okDisabled, `testo nascosto e OK pronto: ${JSON.stringify(s)}`).toBe(true);
 });
+
+test('r1 esplora: una scheda normale prova a ridimensionare la finestra di Filo', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<h1>scheda</h1>');
+  const prima = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).getBounds());
+  await page.evaluate(() => { window.resizeTo(300, 200); window.moveTo(5, 5); });
+  await new Promise((r) => setTimeout(r, 800));
+  const dopo = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).getBounds());
+  console.log('FINESTRA', JSON.stringify(prima), JSON.stringify(dopo));
+});
