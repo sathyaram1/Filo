@@ -59,22 +59,20 @@
       break;
     }
     if (campoDiTesto(el)) return true;
-    // Il campo può non avere una forma riconoscibile (un'ombra chiusa su qualunque elemento, #685.1):
-    // si chiede al documento se il cursore è scrivibile e se sta nell'elemento a fuoco (fuori da
-    // un'ombra chiusa la selezione punta all'ospite, accanto a lui).
+    // Resta il campo dentro un'ombra chiusa (#685.1): da fuori la selezione scrivibile punta
+    // ESATTAMENTE alla posizione dell'ospite a fuoco. Una selezione altrove è di un campo che la
+    // pagina ha lasciato (fuoco passato a un contenitore, al body…): lì non si scrive più.
     if (!el) return false;
     try {
       const d = el.ownerDocument || doc;
-      // Fuoco sulla pagina intera: non si scrive, anche se la selezione resta nel campo che la pagina ha lasciato (#685.1 giro 6).
-      if (el === d.body || el === d.documentElement) return false;
+      if (el === d.body || el === d.documentElement || !el.parentNode) return false;
       if (!d.queryCommandEnabled('insertText')) return false;
       const radice = el.getRootNode ? el.getRootNode() : d;
       const s = (radice && radice !== d && typeof radice.getSelection === 'function') ? radice.getSelection() : d.getSelection();
-      const nodo = s && s.anchorNode;
-      if (!nodo) return false;
-      if (el.contains && el.contains(nodo)) return true;
-      const i = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.childNodes, el) : -1;
-      return nodo === el.parentNode && (s.anchorOffset === i || s.anchorOffset === i + 1);
+      if (!s) return false;
+      const i = Array.prototype.indexOf.call(el.parentNode.childNodes, el);
+      return (s.anchorNode === el.parentNode && s.anchorOffset === i)
+        || (s.focusNode === el.parentNode && s.focusOffset === i);
     } catch (_) { return false; }
   }
 
