@@ -2469,11 +2469,15 @@ async function eseguiAzioneFilo(action, {
           if (id) {
             const chat = await FiloChats.get(id);
             if (!chat) return { executed: false, kept: true, output: { chatRead: id, found: false } };
-            // Una rilettura vale al più quanto tutto il contesto della chat: oltre, testa, coda e il resto a pezzi.
+            // Una rilettura vale al più quanto tutto il contesto della chat, finestra del modello compresa: oltre, testa,
+            // coda e il resto a pezzi.
             let cap = 8000;
             try {
               const FC = globalThis.SN_FILO_CONTESTO;
-              cap = Math.max(cap, Math.floor(FC.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo).token * FC.CARATTERI_PER_TOKEN));
+              const s = await getEffectiveSettings();
+              const finestra = finestreDeiModelli.get(String(modelForAction(s, ACTIONS.FILO_CHAT) || ''));
+              const token = Math.min(FC.tetti(s.contestoFilo, Defaults.get().contestoFilo).token, finestra ?? Infinity);
+              cap = Math.max(cap, Math.floor(token * FC.CARATTERI_PER_TOKEN));
             } catch (_) {}
             const daFuori = globalThis.SN_FILO_CONTESTO.daFuoriDi(chat.messages);
             return {
