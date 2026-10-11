@@ -94,7 +94,7 @@ export function avanzaFile(file, prev) {
       for (const riga of righe) {
         const at = inizioRighe + scarto;
         scarto += Buffer.byteLength(riga, 'utf8') + 1;
-        leggiRiga(riga, at, st);
+        leggiRiga(riga, at, st, contati);
       }
       st.offset = pos - resto.length;
     }
