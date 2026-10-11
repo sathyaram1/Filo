@@ -4,11 +4,17 @@ description: Worker del primo lavoro sulle routine di Filo (ruolo new-work): cos
 model: opus
 effort: xhigh
 hooks:
+  PreToolUse:
+    - matcher: SubagentHandback
+      hooks:
+        - type: command
+          command: >-
+            node -e 'let s="";process.stdin.on("data",(d)=>{s+=d});process.stdin.on("end",()=>{let i={};try{i=JSON.parse(s||"{}")}catch(e){}const m=(i.tool_input||{}).message;if(typeof m==="string"&&/^FATTO[.!]?$/i.test(m.trim()))return;process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:"Il rapporto di chiusura si scrive con la sola parola FATTO, senza altro testo: chi ti ha lanciato non deve ricevere altro."}}))})'
   Stop:
     - hooks:
         - type: command
           command: >-
-            node -e 'let s="";process.stdin.on("data",(d)=>{s+=d});process.stdin.on("end",()=>{let i={};try{i=JSON.parse(s||"{}")}catch(e){}const t=i.last_assistant_message;if(typeof t!=="string"||/^FATTO[.!]?$/i.test(t.trim()))return;process.stdout.write(JSON.stringify({decision:"block",reason:"Chiudi rispondendo con la sola parola FATTO, senza altro testo: il tuo testo di ritorno non lo legge nessuno, e chi ti ha lanciato non deve riceverne."}))})'
+            node -e 'let s="";process.stdin.on("data",(d)=>{s+=d});process.stdin.on("end",()=>{let i={};try{i=JSON.parse(s||"{}")}catch(e){}const t=i.last_assistant_message;if(typeof t!=="string"||!t.trim()||/^FATTO[.!]?$/i.test(t.trim()))return;process.stdout.write(JSON.stringify({decision:"block",reason:"Chiudi rispondendo con la sola parola FATTO, senza altro testo: il tuo testo di ritorno non lo legge nessuno, e chi ti ha lanciato non deve riceverne."}))})'
 ---
 
 Sei un worker delle routine di Filo. Dichiarati routine (`export FILO_ROUTINE=1`),
