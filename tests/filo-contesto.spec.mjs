@@ -4,7 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
-import { writeFileSync, rmSync } from 'node:fs';
+import { writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ORA_MS = 60 * 60 * 1000;
@@ -544,4 +544,41 @@ test('un frammento trovato cercando dentro l\'esito di un comando fa chiedere co
   const naviga = r.actions.find((x) => x.type === 'NAVIGA');
   expect(naviga._executed).toBe(false);
   expect(naviga._confirm).toBeTruthy();
+});
+
+test('una chat cancellata mentre si indicizzano le conversazioni vecchie non parte più verso i vettori e non lascia il suo indice', async ({ app }) => {
+  test.setTimeout(90_000);
+  await primaScheda(app);
+  await preparaModello(app, []);
+  // Dodici conversazioni di dieci giorni fa mai indicizzate: il primo messaggio le manda tutte, a blocchi.
+  const chat = [];
+  for (let i = 0; i < 12; i++) {
+    const scambi = [];
+    for (let k = 0; k < 30; k++) scambi.push([`chat ${i} domanda ${k} PAROLA-${i}`, `risposta ${k}`]);
+    chat.push({ id: `vecchia-${i}`, oreFa: 24 * 10 + i, scambi });
+  }
+  await semina(app, { chat });
+  await app.evaluate(() => {
+    const orig = globalThis.SN_PROVIDER_OPENROUTER.embed;
+    globalThis.__embedTesti = [];
+    globalThis.SN_PROVIDER_OPENROUTER.embed = async (a) => {
+      globalThis.__embedTesti.push({ t: Date.now(), testi: a.texts.slice() });
+      await new Promise((r) => setTimeout(r, 1200));
+      return orig(a);
+    };
+  });
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'parlami di lisbona', threadHistory: [], chatId: 'scheda-x' }));
+  // La più recente fra le vecchie è nell'ultimo blocco: la si cancella mentre i primi sono ancora in volo.
+  const tCanc = await app.evaluate(async () => { await globalThis.SN_FILO_CHATS.remove('vecchia-0'); return Date.now(); });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_RICORDI_FILO.indicizza([], '')), { timeout: 30_000 }).toBeUndefined();
+  const info = await app.evaluate((_e, tCanc) => ({
+    f: globalThis.SN_RICORDI_FILO.file(),
+    mandatiDopo: globalThis.__embedTesti.filter((e) => e.t > tCanc && e.testi.some((s) => /PAROLA-0(?!\d)/.test(s))).length,
+    altriDopo: globalThis.__embedTesti.filter((e) => e.t > tCanc).length,
+  }), tCanc);
+  const righe = existsSync(info.f) ? readFileSync(info.f, 'utf8').split('\n').filter(Boolean).map((x) => JSON.parse(x)) : [];
+  expect(info.altriDopo).toBeGreaterThan(0);
+  expect(info.mandatiDopo).toBe(0);
+  expect(righe.filter((v) => v.c === 'vecchia-0')).toHaveLength(0);
+  expect(righe.filter((v) => v.c === 'vecchia-1').length).toBeGreaterThan(0);
 });

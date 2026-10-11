@@ -93,10 +93,10 @@ async function dimentica(chat) {
 
 let corsa = null;
 // Un solo giro d'indicizzazione alla volta: chi arriva mentre gira aspetta quello.
-function indicizza(tratti, modello) {
+// `e0`: l'epoca in cui i testi sono stati letti dal filo, così una pulizia arrivata dopo vale anche per loro.
+function indicizza(tratti, modello, e0 = epoca) {
   if (corsa) return corsa;
   corsa = (async () => {
-    const e0 = epoca;
     const vivo = (t) => epoca === e0 && !tolte.has(t.chat);
     const blocchi = [];
     for (let i = 0; i < tratti.length; i += BLOCCO) blocchi.push(tratti.slice(i, i + BLOCCO));
@@ -138,6 +138,7 @@ function perParole(domanda, tratti) {
 // `vecchi`: i messaggi del filo più vecchi della finestra. `davanti`: quelli che il modello ha già, che non si ripescano.
 async function cerca(domanda, { vecchi = [], davanti = [] } = {}) {
   const q = String(domanda || '').trim();
+  const e0 = epoca;
   if (!q || Disco.inIncognito() || !vecchi.length) return [];
   const gia = new Set(davanti.map((m) => `${m.chat}|${m.ts}`));
   const tratti = FC().tratti(vecchi).filter((t) => !gia.has(t.chiave));
@@ -152,7 +153,7 @@ async function cerca(domanda, { vecchi = [], davanti = [] } = {}) {
   if (mancano.length) {
     let timer = null;
     await Promise.race([
-      indicizza(mancano, modello).catch(() => {}),
+      indicizza(mancano, modello, e0).catch(() => {}),
       new Promise((ok) => { timer = setTimeout(ok, ATTESA_INDICE_MS); }),
     ]);
     clearTimeout(timer);
