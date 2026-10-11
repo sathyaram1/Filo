@@ -277,6 +277,16 @@ class ConfermeSopraPagina {
 
 const perPopup = new WeakMap();
 
+// Il riquadro è largo 440 più i margini, e il testo ha l'altezza della finestra meno 160: sotto questa misura
+// la domanda si vedrebbe senza il suo testo. Una finestrella già piccola prima della domanda si allarga.
+const MINIMO_DOMANDA = { width: 488, height: 360 };
+function allargaPerLaDomanda(win) {
+  if (!win || win.isDestroyed()) return;
+  const [w, h] = win.getContentSize();
+  if (w >= MINIMO_DOMANDA.width && h >= MINIMO_DOMANDA.height) return;
+  try { win.setContentSize(Math.max(w, MINIMO_DOMANDA.width), Math.max(h, MINIMO_DOMANDA.height)); } catch (_) {}
+}
+
 // La domanda di una pagina web va sopra la sua scheda; da un popup di accesso, che è una finestra vera
 // con dentro un sito (#589.3), sopra la finestra. Da chiunque altro non si apre niente.
 function confermeDi(wc, { crea = false } = {}) {
