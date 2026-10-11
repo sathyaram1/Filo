@@ -61,7 +61,6 @@ function misura(scenario) {
   return { risultati, uscita: `${r.stdout}\n${r.stderr}` };
 }
 
-test.describe.configure({ mode: 'serial' });
 test.setTimeout(180_000);
 
 test('r1 con la base rossa, un worker che scrive il rosso della base e poi muore senza riepilogo, come un unico gruppo di unit ucciso in cloud, porta K a 1', () => {
