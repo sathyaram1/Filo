@@ -291,12 +291,16 @@ function confermeDi(wc, { crea = false } = {}) {
     c = new ConfermeSopraPagina(win, {
       sotto: () => (win.isDestroyed() ? null : win.webContents),
       area: () => {
+        allargaPerLaDomanda(win);
         const [width, height] = win.getContentSize();
         return { x: 0, y: 0, width, height };
       },
     });
     perPopup.set(win, c);
     win.on('resize', () => c.posa());
+    // Il sito rimpiccioliva la sua finestrella appena compariva la domanda: il testo spariva e OK restava pronto
+    // (#592.6, giro 10). Finché una domanda aspetta, resizeTo/moveTo della pagina non valgono.
+    win.webContents.on('content-bounds-updated', (e) => { if (c.coda.length) e.preventDefault(); });
   }
   return c || null;
 }
