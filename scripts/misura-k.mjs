@@ -226,10 +226,11 @@ export function valutaCorsa(corsa, base, { rossiNoti = [], soglie = SOGLIE } = {
     motivi.push(`test non finiti: ${corti.map(([f, i]) => `worker ${i} → ${f} su ${base.testTutti}`).join(', ')}`);
   }
   // Senza i conti dei test (un comando che non li scrive) un worker caduto si vede solo dall'uscita, giudicata worker
-  // per worker: la spiega solo un rosso suo già messo in conto, della base o noto; i rossi degli altri non la coprono.
+  // per worker: la spiega solo un rosso suo, che se non è della base o noto è già un rosso in più; i rossi degli altri
+  // worker non la coprono.
   const suoi = (i) => (corsa.rossiPerWorker ? corsa.rossiPerWorker[i] || [] : corsa.rossi);
   const cadute = (corsa.codici || []).map((k, i) => [k, i + 1])
-    .filter(([k, i]) => k !== 0 && base && !suoi(i - 1).some((r) => noti.has(r)));
+    .filter(([k, i]) => k !== 0 && base && !suoi(i - 1).length);
   if (base && corsa.n > 1 && cadute.length) {
     const senza = base.uscitePulite ? '' : ' senza un rosso riconoscibile';
     motivi.push(`uscite diverse da zero${senza}: ${cadute.map(([k, i]) => `worker ${i} → ${k}`).join(', ')}`);
