@@ -36,9 +36,9 @@ export function letturaDa(input, nowMs = Date.now()) {
 }
 
 /** La riga stampata. PURA. */
-export function riga(lettura) {
+export function riga(lettura, nonInviata = false) {
   const p = (v) => (v === null || v === undefined ? '–' : `${Math.round(v)}%`);
-  return `5h ${p(lettura && lettura.pct5h)} · 7g ${p(lettura && lettura.pct7d)}`;
+  return `5h ${p(lettura && lettura.pct5h)} · 7g ${p(lettura && lettura.pct7d)}${lettura && nonInviata ? ' · non inviata' : ''}`;
 }
 
 function leggiJson(file) {
