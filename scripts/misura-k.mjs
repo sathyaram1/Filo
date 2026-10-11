@@ -184,8 +184,14 @@ export function valutaCorsa(corsa, base, { rossiNoti = [], soglie = SOGLIE } = {
   const rossiInPiu = corsa.rossi.filter((r) => !noti.has(r));
   const durataMs = media(corsa.durateMs);
   if (rossiInPiu.length) motivi.push(`rossi in più: ${rossiInPiu.join(', ')}`);
-  // Un worker che cade senza una riga rossa riconoscibile (Playwright che non parte, un crollo) si vede solo
-  // dall'uscita, giudicata worker per worker: con una base già rossa, i rossi di un altro worker non lo coprono.
+  // Un worker è sano solo se ha finito tutti i test: un rosso suo, anche quello della base, non copre i test che non
+  // ha fatto (verifica #1157 giro 4).
+  const corti = (corsa.fattiPerWorker || []).map((f, i) => [f, i + 1]).filter(([f]) => base && f < base.testTutti);
+  if (base && corsa.n > 1 && corti.length) {
+    motivi.push(`test non finiti: ${corti.map(([f, i]) => `worker ${i} → ${f} su ${base.testTutti}`).join(', ')}`);
+  }
+  // Senza i conti dei test (un comando che non li scrive) un worker caduto si vede solo dall'uscita, giudicata worker
+  // per worker: con una base già rossa, i rossi di un altro worker non lo coprono.
   const suoi = (i) => (corsa.rossiPerWorker ? corsa.rossiPerWorker[i] || [] : corsa.rossi);
   const cadute = (corsa.codici || []).map((k, i) => [k, i + 1])
     .filter(([k, i]) => k !== 0 && base && (base.uscitePulite || !suoi(i - 1).length));
