@@ -2787,7 +2787,7 @@ class TabManager {
         this._notifyPopupBlocked(tab.id, url, wc);
         return { action: 'deny' };
       }
-      if (accesso) {
+      if (accesso && gesto) {
         if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
         // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
         // finestrella diventa una scheda, dove l'avviso c'è.
