@@ -101,6 +101,11 @@ function finestra(parent) {
     }
   });
   win.on('closed', () => { if (s.win === win) { s.win = null; s.pronta = false; } });
+  // Col processo morto la carta non comparirebbe più: si butta, e la prossima ne fa una nuova.
+  wc.on('render-process-gone', () => {
+    if (s.win === win) { s.win = null; s.pronta = false; }
+    if (!win.isDestroyed()) win.destroy();
+  });
   win.loadURL('filo://shell/anteprima.html');
   return s;
 }
