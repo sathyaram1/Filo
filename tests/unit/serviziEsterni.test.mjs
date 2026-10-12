@@ -515,7 +515,7 @@ test('prova: un host intero seguito da un’espressione è un indirizzo fisso, e
 
 test('prova: una richiesta con l’host nelle opzioni, in un file già nell’elenco, è rossa', () => {
   const a = conFile(WALLET, SORGENTI[WALLET] + "\nrequire('electron').net.request({ protocol: 'https:', hostname: 'nuovo.example', path: '/' });\n");
-  assert.deepEqual(indirizziScoperti(a).map((x) => x.replace(/:\d+ /, ' ')), [`${WALLET} https://nuovo.example`]);
+  assert.deepEqual(nuovi(indirizziScoperti, a).map((x) => x.replace(/:\d+ /, ' ')), [`${WALLET} https://nuovo.example`]);
 });
 
 test('prova: un servizio tolto da un file che ne serve altri sullo stesso server rende rossa la sua voce', () => {
