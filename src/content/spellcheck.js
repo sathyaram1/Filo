@@ -1180,15 +1180,18 @@
   // perderli (riscrivere il valore cancella tutto lo zigzag rosso del campo, #1111), e Ctrl+Z annulla la correzione.
   // Falso se il campo è rimasto com'era: allora lo si riscrive.
   function sostituisciComeBattuta(el, range, testo, cursorMode) {
+    testo = String(testo ?? '');
     const prima = el.value;
     const caret = el.selectionEnd;
+    // Una battuta rispetta maxlength e taglierebbe la correzione a metà.
+    if (el.maxLength >= 0 && prima.length - (range.end - range.start) + testo.length > el.maxLength) return false;
     try {
       const radice = el.getRootNode();
       if (radice.activeElement !== el) el.focus({ preventScroll: true });
       if (radice.activeElement !== el) return false;
       el.setSelectionRange(range.start, range.end);
       if (testo) document.execCommand('insertText', false, testo);
-      else document.execCommand('delete', false);
+      else if (range.end > range.start) document.execCommand('delete', false);
     } catch (_) {}
     if (el.value === prima) return false;
     if (cursorMode === 'preserve' && typeof caret === 'number') {

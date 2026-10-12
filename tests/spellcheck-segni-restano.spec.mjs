@@ -2,6 +2,7 @@
 // correttore di Filo mentre si ricontrolla, né il rosso del correttore di sistema dopo una correzione dal menu.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi, clicca, nelMondoDiFilo } from './helpers/riquadri.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px">
@@ -15,7 +16,11 @@ async function apri(app, openTab, testServer) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash' },
+      models: {
+        [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash',
+        [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash',
+        [C.ACTIONS.EDIT_TEXT]: 'deepseek-flash',
+      },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__scan = 0;
@@ -26,6 +31,8 @@ async function apri(app, openTab, testServer) {
         const parole = [...new Set(t.match(/xq[a-z]+\d+/g) || [])];
         return { text: JSON.stringify({ annotated: parole.map((w) => `**${w}**`).join(' '), issues: parole.map(() => ({ type: 'grammar', explanation: 'x', correction: 'y' })) }), model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
       }
+      // «Correggi» nel riquadro Modifica, sulla prima riga della prova del rosso.
+      if (t.includes('Correggi eventuali errori')) return { text: 'ciao amico mio', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
       return { text: '{"misspelled":false,"correction":""}', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
     };
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
@@ -74,6 +81,7 @@ test('correggendo a mano una parola, i segni blu delle altre restano al loro pos
 
   await seleziona(page, 'xqseconda2');
   await page.keyboard.type('seconda');
+  await page.screenshot({ path: 'tests/.shots/1111-blu-dopo-correzione.png' }).catch(() => {});
   // Fino allo scan dopo (1,5 s di pausa): la parola corretta non è più segnata, le altre sì, sulla parola giusta.
   expect(await restanoPer(page, ['xqprima1', 'xqterza3'], 1200)).toEqual([]);
   await expect.poll(() => scan(app), { timeout: 6000 }).toBe(prima + 1);
@@ -119,11 +127,11 @@ async function puntoInRiga(page, riga, col) {
   }, [riga, col]);
 }
 
-test('correggendo dal menu una parola rossa, il rosso delle altre parole resta', async ({ app, openTab, testServer }) => {
-  test.setTimeout(90_000);
+// Diciotto righe: «ciiao» in cima e «staii» in fondo, abbastanza lontane perché il correttore di sistema, dopo un
+// cambio in cima, non torni da sé subito a ricontrollare il fondo. Torna quando tutte e due sono segnate di rosso.
+async function dueParoleRosse(app, page) {
   const piattaforma = await app.evaluate(() => process.platform);
   test.skip(piattaforma === 'darwin', 'su Mac il correttore è quello del sistema');
-  const page = await apri(app, openTab, testServer);
   await expect.poll(() => app.evaluate(() => globalThis.__filoDizionari.stato().inizializzati), { timeout: 20_000 })
     .toContain('it-IT');
   await page.locator('#ta').evaluate((ta) => { ta.style.lineHeight = '24px'; ta.style.height = '520px'; ta.style.padding = '4px'; });
@@ -131,17 +139,58 @@ test('correggendo dal menu una parola rossa, il rosso delle altre parole resta',
   const righe = ['ciiao amico mio', ...Array.from({ length: 16 }, () => riempi), 'staii bene oggi'];
   await page.locator('#ta').click();
   await page.keyboard.insertText(righe.join('\n'));
-
   const staii = await puntoInRiga(page, 17, 1);
   const ciiao = await puntoInRiga(page, 0, 1);
   await expect.poll(() => segnataDalSistema(app, page, staii.x, staii.y), { timeout: 20_000, intervals: [1000] }).toBe('staii');
   await expect.poll(() => segnataDalSistema(app, page, ciiao.x, ciiao.y), { timeout: 20_000, intervals: [1000] }).toBe('ciiao');
+  return { staii, ciiao };
+}
+
+test('correggendo dal menu una parola rossa, il rosso delle altre parole resta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await apri(app, openTab, testServer);
+  const { staii, ciiao } = await dueParoleRosse(app, page);
 
   await page.mouse.click(ciiao.x, ciiao.y, { button: 'right' });
   const corr = page.locator('.sn-menu-correction:visible').first();
   await expect(corr).not.toBeEmpty({ timeout: 4000 });
   await corr.click();
   await expect(page.locator('#ta')).toHaveValue(/^(?!ciiao )\p{L}+ amico mio\n/u);
+  await page.screenshot({ path: 'tests/.shots/1111-rosso-dopo-correzione.png' }).catch(() => {});
+  expect(await segnataDalSistema(app, page, staii.x, staii.y)).toBe('staii');
+  // La correzione è una battuta: Ctrl+Z la annulla.
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#ta')).toHaveValue(/^ciiao amico mio\n/);
+});
+
+test('una correzione automatica mentre si scrive lascia il rosso alle altre parole e il cursore dopo lo spazio', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await apri(app, openTab, testServer);
+  const { staii } = await dueParoleRosse(app, page);
+  await nelMondoDiFilo(app, page, () => globalThis.SN_SPELLCHECK.setAutocorrect('cmq', 'comunque'));
+
+  await page.evaluate(() => { const ta = document.getElementById('ta'); ta.focus(); ta.setSelectionRange(15, 15); });
+  await page.keyboard.type(' cmq ok');
+  await expect(page.locator('#ta')).toHaveValue(/^ciiao amico mio comunque ok\nla casa/);
+  expect(await segnataDalSistema(app, page, staii.x, staii.y)).toBe('staii');
+});
+
+test('con «Correggi» del riquadro Modifica su una riga, il rosso delle altre righe resta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await apri(app, openTab, testServer);
+  const { staii } = await dueParoleRosse(app, page);
+
+  await page.evaluate(() => { const ta = document.getElementById('ta'); ta.focus(); ta.setSelectionRange(0, 'ciiao amico mio'.length); });
+  const amico = await puntoInRiga(page, 0, 8);
+  await page.mouse.click(amico.x, amico.y, { button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 10_000 });
+  await menu.locator('.sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox'))?.visibile, { timeout: 10_000 }).toBe(true);
+  await clicca(app, page, '.sn-editbox button[data-sc="fix"]');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-editbox-replace'))?.disabilitato, { timeout: 10_000 }).toBe(false);
+  await clicca(app, page, '.sn-editbox-replace');
+  await expect(page.locator('#ta')).toHaveValue(/^ciao amico mio\nla casa/);
   expect(await segnataDalSistema(app, page, staii.x, staii.y)).toBe('staii');
 });
 
