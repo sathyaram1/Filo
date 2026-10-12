@@ -35,6 +35,43 @@ test('corpo: una credenziale sola, e l\'id viaggia solo con la parola d\'ordine'
   assert.throws(() => canale.corpoChiusura('question', {}));
 });
 
+test('corpo: il rapporto della chiusura viaggia solo con la risposta dell\'orchestratore (#1170)', () => {
+  const report = { v: 3, role: 'orchestrator', closing: true, turns: 2 };
+  assert.deepEqual(canale.corpoChiusura('answer', { passphrase: 'p', id: 'c1', answer: 'niente', report }),
+    { passphrase: 'p', op: 'answer', id: 'c1', answer: 'niente', report });
+  assert.equal('report' in canale.corpoChiusura('answer', { ticket: 't', answer: 'x', report }), false, 'il worker l\'ha già allegato al rilascio');
+  assert.equal('report' in canale.corpoChiusura('question', { passphrase: 'p', report }), false);
+});
+
+test('risposta col rapporto: un server che non lo prende riceve la risposta senza, e lo si dice; answer_too_big no (#1170)', async () => {
+  const report = { v: 3, role: 'orchestrator', closing: true, turns: 2 };
+  const servito = (risposte) => {
+    const corpi = [];
+    const fetchImpl = async (u, init) => { corpi.push(JSON.parse(init.body)); return risposte[Math.min(corpi.length, risposte.length) - 1]; };
+    return { corpi, fetchImpl };
+  };
+  const preso = servito([reply(200, { ok: true })]);
+  assert.deepEqual(await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'niente', { fetchImpl: preso.fetchImpl, ...piano }, report), { esito: 'ok', question: '', id: '' });
+  assert.deepEqual(preso.corpi.map((c) => c.report), [report]);
+  for (const rifiuto of [reply(400, { ok: false, reason: 'report_malformed', detail: 'turns' }), reply(413, { ok: false, reason: 'report_too_big' }), reply(400, { ok: false, reason: 'bad_request' })]) {
+    const s = servito([rifiuto, reply(200, { ok: true })]);
+    const r = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'niente', { fetchImpl: s.fetchImpl, ...piano }, report);
+    assert.equal(r.esito, 'ok');
+    assert.match(r.avviso, /SENZA rapporto/);
+    assert.deepEqual(s.corpi.map((c) => 'report' in c), [true, false]);
+    assert.equal(s.corpi[1].answer, 'niente');
+  }
+  const lunga = servito([reply(413, { ok: false, reason: 'answer_too_big', bytes: 50001, max: 32768 })]);
+  const r = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'x', { fetchImpl: lunga.fetchImpl, ...piano }, report);
+  assert.equal(r.reason, 'answer_too_big');
+  assert.equal(lunga.corpi.length, 1, 'la risposta la accorcia chi scrive');
+  // Il no che non dipende dal rapporto resta un no, senza avviso.
+  const no = servito([reply(404, { ok: false, reason: 'bad_closing' })]);
+  const n = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'x', { fetchImpl: no.fetchImpl, ...piano }, report);
+  assert.equal(n.reason, 'bad_closing');
+  assert.equal(n.avviso, undefined);
+});
+
 // ─── lettura delle risposte ed exit ─────────────────────────────────────────
 
 test('endpoint che non esiste (404 senza motivo del server), rete giù, 5xx → nessuna domanda, exit 2', () => {
