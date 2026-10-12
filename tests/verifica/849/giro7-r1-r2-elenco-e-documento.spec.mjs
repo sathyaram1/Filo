@@ -20,6 +20,7 @@ test('r1 ogni parte della home che mostra icone dal servizio di Google è nella 
   // I collegamenti che Filo apre dalla chat mostrano l'icona chiesta a Google col nome del sito.
   expect(usano).toContain('src/pages/dashboard/dashboard-attivita.js');
   for (const f of usano) expect(voce.dove, f).toContain(f);
+  expect(voce.occasione).toMatch(/chat/i);
 });
 
 test('r2 ogni contatto che l\'elenco dichiara ha la sua frase nel documento sulla privacy', () => {
