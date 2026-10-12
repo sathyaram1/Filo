@@ -222,8 +222,10 @@
     // invito al login sono promesse vuote, e si tolgono. Restano per chi ha
     // ancora una chiave di fabbrica o una propria.
     // Vale anche con la chiave personale ancora qui ma l'identità annullata
-    // sul server: quella chiave non compra più niente.
-    const noKey = !has && (w.keySource === 'none' || Boolean(w.identity && w.identity.lost));
+    // sul server: quella chiave non compra più niente. E con la personale e il
+    // server non letto: il saldo è del server, e il conteggio locale al suo
+    // posto sarebbe un numero che sparisce alla lettura dopo (#1138).
+    const noKey = !has && (w.keySource === 'none' || w.keySource === 'personal' || Boolean(w.identity && w.identity.lost));
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
     if (noKey) $('offlineHint').hidden = true;
