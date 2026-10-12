@@ -539,7 +539,6 @@ function nomeDaWindows(scelta, candidati, connessioni) {
   const nome = (c) => (c && typeof c.nome === 'string' && c.nome.trim() ? c.nome : null);
   const stessa = scelta.id && connessioni.find((c) => guidWindows(c.id) === scelta.id);
   if (stessa) return nome(stessa);
-  if (connessioni.some((c) => guidWindows(c.id))) return null;
   const conInternet = connessioni.filter((c) => c.internet === true);
   if (!scelta.internet || conInternet.length !== 1 || candidati.filter((c) => c.internet).length !== 1) return null;
   return nome(conInternet[0]);
