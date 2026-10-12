@@ -578,8 +578,8 @@ function avviaInSottofondo() {
 
 module.exports = {
   configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
-  cartellaDiSerie, elimina, comeDarePermesso, doveSta, DI_SERIE,
+  cartellaDiSerie, elimina, dimentica, comeDarePermesso, doveSta, DI_SERIE,
   // per gli unit test
   _giroInSottofondo: giroInSottofondo,
-  _azzera: () => { voci = null; caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; negate = new Set(); },
+  _azzera: () => { voci = null; occasionali = new Map(); caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; negate = new Set(); },
 };
