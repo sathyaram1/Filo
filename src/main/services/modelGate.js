@@ -61,6 +61,13 @@
     return P.keyInfo({ apiKey, signal });
   }
 
+  // Chi servirebbe il modello è tutto ammesso? Non spende: legge solo l'elenco degli host (#1141).
+  async function hostVerdict({ provider = 'openrouter', apiKey, model, providerRouting } = {}) {
+    const P = providerOf(provider);
+    if (!P || typeof P.hostVerdict !== 'function') return { ok: true };
+    return P.hostVerdict({ apiKey, model, providerRouting });
+  }
+
   function limitError() {
     const I18n = global.SN_I18N;
     return codeError(I18n ? I18n.t('err_limit_reached') : 'Limite di spesa mensile raggiunto.', 'LIMIT_REACHED');
@@ -322,8 +329,8 @@
       throw ultimo || codeError('Il classificatore non ha risposto', 'DECIDE_FAILED');
     }
 
-    return { complete, stream, text, call, decideAll, ensureUnderLimit, supports, hasProvider, keyInfo };
+    return { complete, stream, text, call, decideAll, ensureUnderLimit, supports, hasProvider, keyInfo, hostVerdict };
   }
 
-  global.SN_MODEL_GATE = { create, hasProvider, supports, keyInfo, limitError, PAID };
+  global.SN_MODEL_GATE = { create, hasProvider, supports, keyInfo, hostVerdict, limitError, PAID };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

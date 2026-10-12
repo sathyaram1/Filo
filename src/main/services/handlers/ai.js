@@ -568,17 +568,17 @@ module.exports = function register(on, ctx) {
       const raw = (s.modelRegistry || {})[String(msg.nickname || '').trim()];
       if (raw) entry = registryEntryToSingle(raw);
     }
-    const OR = globalThis.SN_PROVIDER_OPENROUTER;
-    if (!OR || !entry || entry.provider !== 'openrouter' || !entry.model) return { ok: true, verdict: 'na' };
-    const v = await OR.hostVerdict({
-      apiKey: (s.apiKeys && s.apiKeys.openrouter) || '', model: entry.model, providerRouting: routing,
+    if (!entry || !entry.model) return { ok: true, verdict: 'na' };
+    const v = await modelGate.hostVerdict({
+      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing,
     });
     if (v.ok) return { ok: true, verdict: 'ok' };
     const many = v.excluded.length > 1 ? '_many' : '';
     const key = v.reason === 'unknown' ? 'audio_host_warn_unknown' : `audio_host_warn_${v.reason}${many}`;
     const I18n = globalThis.SN_I18N;
     const label = String((typeof msg.label === 'string' && msg.label.trim()) || msg.nickname || entry.model).slice(0, 120);
-    const warning = I18n ? I18n.t(key, label, I18n.t(fn), OR.joinNames(v.excluded)) : key;
+    const nomi = new Intl.ListFormat('it', { type: 'conjunction' }).format(v.excluded);
+    const warning = I18n ? I18n.t(key, label, I18n.t(fn), nomi) : key;
     return { ok: true, verdict: v.reason, hosts: v.excluded, warning };
   });
 
