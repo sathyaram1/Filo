@@ -379,7 +379,7 @@
         ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
       };
       threadHistory.push(isUser
-        ? { role: 'user', text, ...(m.daModello ? { daModello: true } : {}) }
+        ? { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) }
         : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
     }
     Term.nuovaChat(chat.messages.some((m) => (
