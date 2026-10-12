@@ -494,9 +494,8 @@ function tipoSchedaWindows(t) {
   return /ethernet/i.test(s) ? 'cavo' : null;
 }
 
-// Le connessioni vive con Internet o un gateway; vince chi ha Internet, poi chi sa come esce, poi quella che Windows usa.
-// I profili di Windows legano la connessione al suo adattatore con un Guid vero; il gestore delle reti è la riserva, e
-// dà i nomi. #1114: il suo Guid attraverso PowerShell può mancare, e la rete restava «collegata» senza dire il Wi-Fi.
+// Vince chi ha Internet, poi chi sa come esce, poi quella che Windows usa. L'adattatore lo legano i profili di Windows
+// (Guid vero); il gestore delle reti è la riserva e dà i nomi, ma via PowerShell il suo Guid può mancare (#1114).
 function reteDaWindows(r) {
   const schede = new Map();
   for (const s of elencoWindows(r.schede) || []) {
@@ -548,10 +547,7 @@ function datiDaWindows(riga) {
   let j;
   try { j = JSON.parse(String(riga || '').trim()); } catch (_) { return null; }
   if (!j || typeof j !== 'object' || Array.isArray(j)) return null;
-  const r = j.rete && typeof j.rete === 'object' && !Array.isArray(j.rete) ? j.rete : null;
-  let rete = null;
-  if (r && ('profili' in r || 'connessioni' in r)) rete = reteDaWindows(r);
-  else if (r) rete = r.uscita === false ? { uscita: false } : { tipo: r.tipo || null, nome: r.nome || null };
+  const rete = j.rete && typeof j.rete === 'object' && !Array.isArray(j.rete) ? reteDaWindows(j.rete) : null;
   let bluetooth = j.bluetooth && typeof j.bluetooth === 'object' ? { ...j.bluetooth } : null;
   // Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}: si riprende l'elenco.
   const d = bluetooth && bluetooth.dispositivi;

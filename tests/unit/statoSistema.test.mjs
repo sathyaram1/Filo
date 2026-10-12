@@ -251,7 +251,7 @@ test('#874 — Linux: il volume da wpctl, pactl o amixer, e la radio del Wi-Fi d
 test('Windows: una riga del PowerShell diventa una lettura; una riga storta non cancella quella buona', () => {
   const riga = JSON.stringify({
     batteria: { livello: 73, inCarica: true, collegata: true },
-    rete: { tipo: 'wifi', nome: 'Caffè' },
+    rete: { profili: [{ id: '0f8a6b4f-1c2d-4e5f-8a9b-0c1d2e3f4a5b', livello: 3, iana: 71 }], connessioni: [{ id: null, internet: true, nome: 'Caffè' }] },
     bluetooth: { acceso: true, dispositivi: ['Cuffie'] },
   });
   assert.deepEqual(L.datiDaWindows(riga), {
@@ -295,7 +295,8 @@ test('Windows: un processo solo, nascosto, che scrive a pezzi; il lettore aspett
   assert.ok(args[args.length - 1].includes('$genitore = 4242'), 'il PowerShell esce quando Filo non c\'è più');
   const pronto = w.pronto(5000);
   // La riga arriva spezzata, e la «è» a metà fra due pezzi non si perde.
-  const riga = Buffer.from('{"batteria":{"livello":55,"inCarica":false,"collegata":false},"rete":{"tipo":"wifi","nome":"Caffè"},"bluetooth":null}\n', 'utf8');
+  const rete = { profili: [{ id: '0f8a6b4f-1c2d-4e5f-8a9b-0c1d2e3f4a5b', livello: 3, iana: 71 }], connessioni: [{ id: null, internet: true, nome: 'Caffè' }] };
+  const riga = Buffer.from(`${JSON.stringify({ batteria: { livello: 55, inCarica: false, collegata: false }, rete, bluetooth: null })}\n`, 'utf8');
   const taglio = riga.indexOf(0xc3) + 1;
   f.stdout.write(riga.subarray(0, taglio));
   f.stdout.write(riga.subarray(taglio));
@@ -416,16 +417,16 @@ test('nessuna strada verso fuori vuol dire offline anche se Chromium dice online
   const mac = (route) => L.leggiMac(async (file) => ({ pmset: '', route, defaults: null })[file] ?? null);
   assert.deepEqual(L.componi(await mac(''), true).rete, { online: false });
   assert.deepEqual(L.componi(await mac(null), true).rete, { online: true, tipo: null, nome: null });
-  // Windows: lo script scrive {uscita:false} quando nessuna connessione ha Internet o un gateway.
-  assert.deepEqual(L.componi(L.datiDaWindows('{"batteria":null,"rete":{"uscita":false},"bluetooth":null}'), true).rete, { online: false });
-  assert.deepEqual(L.componi(L.datiDaWindows('{"batteria":null,"rete":{"tipo":"cavo","nome":null},"bluetooth":null}'), true).rete,
-    { online: true, tipo: 'cavo', nome: null });
-  // Le connessioni senza Internet e senza gateway (gli adattatori virtuali lato computer) non si scelgono.
+  // Windows: nessuna connessione con Internet o un gateway (gli adattatori virtuali lato computer non ne hanno).
   assert.match(L.SCRIPT_WINDOWS, /GatewayAddresses/);
   const veth = 'a1b2c3d4-0000-4000-8000-00000000abcd';
+  const cavo = '5e6f7a8b-1111-4222-8333-444455556666';
   const vEthernet = { id: veth, tipo: 'Ethernet', gateway: false };
-  assert.deepEqual(L.reteDaWindows({ schede: [vEthernet], profili: [{ id: veth, livello: 1, iana: 6 }], connessioni: [] }), { uscita: false });
-  assert.deepEqual(L.reteDaWindows({ schede: [vEthernet], profili: null, connessioni: [{ id: veth, internet: false, nome: 'Rete non identificata' }] }), { uscita: false });
+  const solaVeth = { schede: [vEthernet], profili: [{ id: veth, livello: 1, iana: 6 }], principale: null, connessioni: [] };
+  assert.deepEqual(L.componi(L.datiDaWindows(JSON.stringify({ rete: solaVeth })), true).rete, { online: false });
+  assert.deepEqual(L.reteDaWindows({ ...solaVeth, profili: null, connessioni: [{ id: veth, internet: false, nome: 'Rete non identificata' }] }), { uscita: false });
+  const conCavo = { schede: [vEthernet, { id: cavo, tipo: 'Ethernet', gateway: true }], profili: [...solaVeth.profili, { id: cavo, livello: 3, iana: 6 }], principale: cavo, connessioni: [] };
+  assert.deepEqual(L.componi(L.datiDaWindows(JSON.stringify({ rete: conCavo })), true).rete, { online: true, tipo: 'cavo', nome: null });
 });
 
 // ── Windows: quale connessione e come esce (#1114) ──
@@ -441,8 +442,8 @@ const schedaVeth = { id: VETH, tipo: 'Ethernet', gateway: false };
 const rigaWindows = (rete) => JSON.stringify({ batteria: { livello: 43, inCarica: false, collegata: false }, rete, bluetooth: { acceso: true, dispositivi: [] }, volume: { livello: 62, muto: false }, wifi: { acceso: true } });
 
 test('#1114 Windows: col Guid del gestore delle reti illeggibile la home dice il Wi-Fi col suo nome, non il globo', () => {
-  // Il caso della segnalazione: portatile sul Wi-Fi più l'adattatore virtuale di Hyper-V, e il gestore delle reti
-  // che attraverso PowerShell non dice l'adattatore delle sue connessioni.
+  // Il caso della segnalazione: portatile sul Wi-Fi con l'adattatore virtuale di Hyper-V, e un gestore delle reti
+  // che via PowerShell non dice l'adattatore delle sue connessioni. Prima la riga dava il globo.
   const riga = rigaWindows({
     schede: [schedaWifi, schedaVeth],
     profili: [{ id: WIFI, livello: 3, iana: 71 }, { id: VETH, livello: 1, iana: 6 }],
