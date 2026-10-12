@@ -320,7 +320,9 @@ test('il main ferma le chiamate automatiche oltre il tetto per scheda, avvisa un
     const C = globalThis.SN_CONST;
     const M = globalThis.SN_MSG.MSG;
     let chiamate = 0;
-    globalThis.SN_PROVIDERS.completeWithFallback = async () => {
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ messages }) => {
+      // La home aperta scrive il suo saluto col modello: non è una chiamata di questa scheda.
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
       chiamate += 1;
       return { text: 'ok', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
     };
