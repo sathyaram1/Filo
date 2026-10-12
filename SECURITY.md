@@ -273,15 +273,19 @@ Le regole (Firebase Security Rules) dicono:
   vecchio link non apre più niente.
 - Quello che tutti possono vedere è la **bacheca dei miglioramenti**, e sono
   solo i campi pensati per stare lì: il titolo breve di un problema già
-  risolto, il suo numero, la versione in cui è uscito, la frase scritta per chi
-  l'aveva segnalato, i voti. Non il testo, non l'indirizzo della pagina, non
-  gli screenshot, non le note di lavorazione. Quei campi vivono in una raccolta
-  separata — una vetrina — riempita da chi gestisce i feedback: la raccolta
-  vera resta chiusa.
-- **Solo gli amministratori** (un elenco ristretto di email autorizzate)
-  possono **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
-  cancellarli. Un utente normale non può toccare i feedback altrui né mettere
-  in coda lavoro.
+  risolto, il suo numero, le date, lo stato, la versione in cui è uscito, la
+  frase scritta per chi l'aveva segnalato, il premio, i voti e le richieste di
+  riapertura. Non il testo, non l'indirizzo della pagina, non gli screenshot,
+  non le note di lavorazione. Quei campi vivono in una raccolta separata — una
+  vetrina — riempita da chi gestisce i feedback: la raccolta vera resta
+  chiusa.
+- **Gli amministratori** (un elenco ristretto di email autorizzate) possono
+  **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
+  cancellarli. Gli agenti autorizzati possono solo farli avanzare di stato e
+  scriverci le note di lavorazione: niente priorità, niente archivio, niente
+  cancellazioni. Un utente qualunque, su un feedback altrui, può solo
+  aggiungere il proprio voto o chiedere che un problema risolto venga
+  riaperto; lo stato lo cambia solo chi gestisce i feedback.
 - La lista degli amministratori è una raccolta dedicata sul server: per
   aggiungere un collaboratore basta aggiungere la sua email, senza modificare
   il codice dell'app.
