@@ -77,8 +77,8 @@ test('dopo un uso normale nessun valore resta cambiato senza essere scritto, e i
     const S = globalThis.__filoStorage;
     await S.set({ __sonda: { n: Date.now() } });
     await S.whenSettled();
-    const fs = process.mainModule.require('fs');
-    const path = process.mainModule.require('path');
+    const fs = process.getBuiltinModule('fs');
+    const path = process.getBuiltinModule('path');
     const file = JSON.parse(fs.readFileSync(path.join(process.env.FILO_USER_DATA, 'storage.json'), 'utf8'));
     const mem = await S.get(null);
     const diverse = Object.keys(mem).filter((k) => k !== 'settings' && JSON.stringify(mem[k]) !== JSON.stringify(file[k]));
