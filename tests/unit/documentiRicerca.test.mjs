@@ -501,3 +501,98 @@ test('dove sta un file: le cartelle di serie col loro nome, niente cartella dell
     if (prima == null) delete process.env.FILO_DOWNLOAD_DIR; else process.env.FILO_DOWNLOAD_DIR = prima;
   }
 });
+
+// #947.3: una cartella che l'utente indica per l'occasione, fuori elenco, non si rilegge da capo a ogni richiesta.
+test('una cartella cercata per l\'occasione resta nell\'indice finché i file non cambiano, si vede e si dimentica', async () => {
+  const archivio = join(CASA, 'Archivio');
+  mkdirSync(archivio, { recursive: true });
+  writeFileSync(join(archivio, 'affitto.txt'), 'Contratto di locazione ad uso abitativo, canone mensile 650 euro');
+  writeFileSync(join(archivio, 'luce-2019.txt'), 'Bolletta energia elettrica gennaio 2019');
+  let letti = 0;
+  Indice.configura({ estrai: (p) => { letti += 1; return Testo.estrai(p); } });
+  try {
+    assert.equal((await Indice.cerca('bolletta luce', { cartella: archivio })).risultati[0].nome, 'luce-2019.txt');
+    assert.equal(letti, 2);
+    // Il giro delle cartelle di sempre (una richiesta qualsiasi, o quello della mezz'ora) non la toglie.
+    await Indice.cerca('bolletta');
+    await Indice.aggiorna();
+    letti = 0;
+    assert.equal((await Indice.cerca('contratto affitto', { cartella: archivio })).risultati[0].nome, 'affitto.txt');
+    assert.equal(letti, 0, 'nessun documento dell\'Archivio si rilegge');
+    Indice._azzera();
+    await Indice.aggiorna();
+    letti = 0;
+    assert.equal((await Indice.cerca('contratto affitto', { cartella: archivio })).risultati[0].nome, 'affitto.txt');
+    assert.equal(letti, 0, 'nemmeno dopo un riavvio: sta sul disco');
+    writeFileSync(join(archivio, 'affitto.txt'), 'Contratto di locazione ad uso abitativo, canone mensile 700 euro, rinnovo');
+    letti = 0;
+    assert.equal((await Indice.cerca('rinnovo locazione', { cartella: archivio })).risultati[0].nome, 'affitto.txt');
+    assert.equal(letti, 1, 'si rilegge solo il file cambiato');
+    // Fuori dalle cartelle di sempre: la ricerca senza cartella non ci guarda.
+    assert.ok(!(await Indice.cerca('contratto affitto')).risultati.some((x) => x.nome === 'affitto.txt'));
+    const o = (await Indice.stato()).occasionali.find((x) => x.percorso === archivio);
+    assert.ok(o, 'in Preferenze si vede');
+    assert.equal(o.nome, 'Archivio');
+    assert.equal(o.documenti, 2);
+    assert.deepEqual(await Indice.dimentica(archivio), { tolta: true, documenti: 2 });
+    assert.ok(!(await Indice.stato()).occasionali.some((x) => x.percorso === archivio));
+    Indice._azzera();
+    assert.ok(!(await Indice.stato()).occasionali.some((x) => x.percorso === archivio), 'dimenticata anche sul disco');
+    letti = 0;
+    await Indice.cerca('contratto affitto', { cartella: archivio });
+    assert.equal(letti, 2, 'dimenticata, la si rilegge da capo');
+    // Entrata nell'elenco la segue l'elenco; tolta dall'elenco, esce dall'indice come ogni cartella tolta.
+    cartelle = [DOC, archivio];
+    await Indice.aggiorna();
+    assert.ok(!(await Indice.stato()).occasionali.some((x) => x.percorso === archivio));
+    cartelle = [DOC];
+    await Indice.aggiorna();
+    letti = 0;
+    await Indice.cerca('contratto affitto', { cartella: archivio });
+    assert.equal(letti, 2, 'tolta dall\'elenco, non resta nell\'indice');
+  } finally {
+    cartelle = [DOC];
+    Indice.configura({ estrai: (p) => Testo.estrai(p) });
+    await Indice.dimentica(archivio);
+    togliCartella(archivio);
+  }
+});
+
+// #947.3: la Libreria del Mac (e AppData) la lettura di un file la tratta da privata; la ricerca in blocco non ci entra.
+test('cercando in tutta la cartella personale la ricerca non entra nelle cartelle dei programmi; chiesta per nome sì', async () => {
+  const os = await import('node:os');
+  const posta = join(CASA, 'Library', 'Mail');
+  const roaming = join(CASA, 'AppData', 'Roaming');
+  const lavori = join(CASA, 'Lavori');
+  for (const d of [posta, roaming, lavori]) mkdirSync(d, { recursive: true });
+  writeFileSync(join(posta, 'allegato.txt'), 'Preventivo idraulico per la caldaia, allegato della posta');
+  writeFileSync(join(roaming, 'appunti.txt'), 'Preventivo idraulico salvato da un programma');
+  writeFileSync(join(lavori, 'preventivo.txt'), 'Preventivo idraulico per il bagno');
+  let letti = 0;
+  Indice.configura({ casa: () => CASA, estrai: (p) => { letti += 1; return Testo.estrai(p); } });
+  try {
+    const nomi = (r) => r.risultati.map((x) => x.nome);
+    const casa = await Indice.cerca('preventivo idraulico', { cartella: CASA });
+    assert.ok(nomi(casa).includes('preventivo.txt'));
+    assert.ok(!nomi(casa).includes('allegato.txt'), 'la Libreria resta fuori');
+    assert.ok(!nomi(casa).includes('appunti.txt'), 'AppData resta fuori');
+    const lib = await Indice.cerca('preventivo idraulico', { cartella: join(CASA, 'Library') });
+    assert.deepEqual(nomi(lib), ['allegato.txt'], 'chiesta per nome, la Libreria si legge');
+    const ancora = await Indice.cerca('preventivo idraulico', { cartella: CASA });
+    assert.ok(!nomi(ancora).includes('allegato.txt'), 'quello letto nella Libreria non torna con la cartella personale');
+    letti = 0;
+    assert.deepEqual(nomi(await Indice.cerca('preventivo idraulico', { cartella: join(CASA, 'Library') })), ['allegato.txt']);
+    assert.equal(letti, 0, 'e resta nell\'indice per la richiesta nella Libreria');
+    // Anche nell'elenco delle cartelle di sempre: la cartella personale aggiunta in Preferenze non porta dentro la Libreria.
+    cartelle = [CASA];
+    const elenco = await Indice.cerca('preventivo idraulico');
+    assert.ok(nomi(elenco).includes('preventivo.txt'));
+    assert.ok(!nomi(elenco).includes('allegato.txt'));
+  } finally {
+    cartelle = [DOC];
+    Indice.configura({ casa: () => os.homedir(), estrai: (p) => Testo.estrai(p) });
+    await Indice.dimentica(CASA);
+    await Indice.dimentica(join(CASA, 'Library'));
+    for (const d of [join(CASA, 'Library'), join(CASA, 'AppData'), lavori]) togliCartella(d);
+  }
+});
