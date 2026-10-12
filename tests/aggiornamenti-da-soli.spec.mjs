@@ -1,15 +1,19 @@
-// #786 — «Installa gli aggiornamenti da solo»: spenta, Filo non scarica né installa la versione nuova e mette in
-// home una carta con «Installa»; premuto, la scarica mostrando a che punto è e la installa alla chiusura. La stessa
-// scelta si fa dalle Preferenze o chiedendola a Filo, che chiede conferma spiegando il rischio. L'aggiornatore vero
-// gira solo nelle build installate: qui ce n'è uno finto nel main, guidato dalla prova. Foto in tests/.shots/.
+// #786 — «Installa gli aggiornamenti da solo» spenta: niente parte da sola, la carta in home ha «Installa», che scarica
+// e installa quando il sistema lo prevede. Si sceglie anche in Preferenze o in chat, con conferma. L'aggiornatore è
+// finto, nel main; foto in tests/.shots/. Regola della piattaforma: patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
 
 const SHOTS = 'tests/.shots';
-// Su Windows alla chiusura non si installa niente, di serie (#1039): la versione nuova si installa all'apertura dopo.
-const ALLA_CHIUSURA = process.platform !== 'win32';
+// La piattaforma la sceglie la prova, mai quella che la esegue: il caso Windows (installa all'apertura dopo, #1039)
+// era provato solo sul Windows dell'owner (#1171).
+const SISTEMI = [
+  { nome: 'Linux', piattaforma: 'linux', allaChiusura: true },
+  { nome: 'Windows', piattaforma: 'win32', allaChiusura: false },
+];
+const suSistema = (app, s) => app.evaluate((_e, p) => { globalThis.__filoUpdater.perProva({ piattaforma: p }); }, s.piattaforma);
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
