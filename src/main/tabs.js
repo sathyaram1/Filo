@@ -1047,10 +1047,46 @@ class TabManager {
     return id;
   }
 
+  // Chi ha aperto una scheda per seguirne il percorso (l'accesso a Google, #1123) riceve i suoi indirizzi e la sua
+  // chiusura, anche attraverso le viste ricreate. `fn(evento, dati)`; null smette.
+  sorveglia(id, fn) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return false;
+    tab._sorvegliante = typeof fn === 'function' ? fn : null;
+    return true;
+  }
+
+  _avvisaSorvegliante(tab, evento, dati = {}) {
+    const fn = tab && tab._sorvegliante;
+    if (!fn) return;
+    if (evento === 'chiusa') tab._sorvegliante = null;
+    try { fn(evento, dati); } catch (_) {}
+  }
+
+  _seguiPercorso(tab, wc) {
+    const avvisa = (url, principale) => { if (principale && url) this._avvisaSorvegliante(tab, 'naviga', { url }); };
+    try {
+      wc.on('did-start-navigation', (_e, url, _inPagina, principale) => avvisa(url, principale));
+      wc.on('did-redirect-navigation', (_e, url, _inPagina, principale) => avvisa(url, principale));
+      wc.on('did-fail-load', (_e, code, _desc, url, principale) => {
+        if (principale && code !== -3) this._avvisaSorvegliante(tab, 'fallita', { url, code });
+      });
+    } catch (_) {}
+  }
+
+  // Una scheda aperta da Filo per un passaggio (la pagina d'accesso) se ne va senza finire nell'archivio.
+  chiudiDiServizio(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return false;
+    tab._sorvegliante = null;
+    return this._dropTab(tab);
+  }
+
   closeTab(id) {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
+    this._avvisaSorvegliante(tab, 'chiusa');
     // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
     // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
     // acceso con la deroga dell'Esc appesa a una pagina che non esiste più:
@@ -1176,6 +1212,7 @@ class TabManager {
   // si chiude l'ultima scheda: la finestra resta, con una scheda vuota).
   closeAllTabs() {
     for (const tab of this.tabs) {
+      this._avvisaSorvegliante(tab, 'chiusa');
       this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
@@ -1540,6 +1577,7 @@ class TabManager {
     });
 
     for (const { tab, reason } of toArchive) {
+      this._avvisaSorvegliante(tab, 'chiusa');
       this._archiveClosedTab(tab, reason);
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
@@ -2254,6 +2292,7 @@ class TabManager {
     installZoom(wc);
     this._registraPermessoRichieste(tab);
     try { wc.once('destroyed', () => this.visite.chiusa(wc)); } catch (_) {}
+    this._seguiPercorso(tab, wc);
     const update = (patch) => {
       Object.assign(tab, patch);
       this._broadcast();
@@ -3163,6 +3202,7 @@ class TabManager {
   _dropTab(tab) {
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return false;
+    this._avvisaSorvegliante(tab, 'chiusa');
     this._esitoApertura(tab, null);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
