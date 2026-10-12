@@ -210,8 +210,15 @@
       const r = await chrome.runtime.sendMessage({ type: MSG.REMOVE_HISTORY_ENTRY, id: it.id });
       items = r?.items || items.filter((x) => x.id !== it.id);
       // Un tipo d'azione può essere scomparso del tutto: riallinea il filtro.
+      const prima = $('filter').value;
       buildFilterOptions();
-      render();
+      if ($('filter').value !== prima) { render(); return; }
+      // Ridisegnare da capo riporterebbe in cima chi ha scorso fino a questa voce: si toglie solo lei.
+      const i = shown.indexOf(it);
+      if (i >= 0) { shown = shown.filter((x) => x !== it); if (i < drawn) drawn--; }
+      wrap.remove();
+      if (!shown.length) showEmpty();
+      else drawMore();
     });
     right.appendChild(remove);
 
