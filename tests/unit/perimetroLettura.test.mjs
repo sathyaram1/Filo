@@ -326,6 +326,18 @@ test('#1072 — il testo cercato non si apre: due barre nel modello non sono ret
   }
 });
 
+test('#1072 — stampare un testo con due barre non apre niente; usato da un altro comando (tubo, gruppo) sì', () => {
+  for (const cmd of ['echo "//commento"', 'echo //evil', 'Write-Output "\\\\server\\cartella"', 'Write-Host "//commento"',
+    "Out-String -InputObject '\\\\evil\\x'", 'echo //x; ls']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN), { level: 1, motivo: '' }, cmd);
+  }
+  assert.equal(lvl('echo //evil/x', LINUX), 1);
+  for (const cmd of ['echo \\\\evil\\x | cd', 'Write-Output \\\\evil\\x | Get-ChildItem', 'echo \\\\evil\\x | Test-Path',
+    'cd (echo \\\\evil\\x)', 'cd $(echo \\\\evil\\x)', "Test-Path (Write-Output '\\\\evil\\x')", "Out-String -InputObject '\\\\evil\\x' | cd"]) {
+    assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+});
+
 test('#1072 — su Windows si legge il comando come lo spezza PowerShell: virgolette tipografiche, trattini lunghi, `\\` in coda', () => {
   for (const cmd of ['cd “\\\\evil\\x”', 'cd ‘\\\\evil\\x’', 'Test-Path „\\\\evil\\x”', 'Get-ChildItem ‛\\\\evil\\x‛', 'cd -Path:“\\\\evil\\x”',
     'Set-Location —Path:\\\\evil\\x', 'Get-ChildItem –LiteralPath:\\\\evil\\x', 'findstr a src\\ \\\\evil\\x\\a', 'dir C:\\ \\\\evil\\x',
