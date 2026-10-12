@@ -4379,7 +4379,6 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     threadMessages.push(msg);
   }
   const indiceDomanda = threadMessages.length;
-  const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
   const giaLetta = origineGiaLettaInChat(chatId);
   if (imageList.length) {
     const parts = [];
