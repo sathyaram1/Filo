@@ -922,6 +922,168 @@
     return scriviEsito(label, action, res);
   }
 
+  // ---------- Documenti dell'utente (#947.3) ----------
+  // La ricerca la fa il main, su un sito solo dopo il sì nel popup di Filo sopra la scheda. Qui arrivano nomi,
+  // cartelle coi nomi di Filo e chiavi a caso: le chiavi restano in questo mondo, nel documento del sito c'è il bottone.
+  const MAX_DOCUMENTI_PER_SESSIONE = 4;
+  const NOTA_DOCUMENTI = 'ho cercato fra i documenti dell\'utente come avevi chiesto; i candidati te li rimando qui sotto come '
+    + 'contenuto esterno, fra le marcature. Procedi ora con il JSON normale e, se uno è quello giusto, aggiungi "file": <il suo numero>';
+  let documenti = null;
+  let letturaDocumenti = null;
+
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.AIUTO_DOCUMENTI_AVANZAMENTO || !letturaDocumenti) return;
+      letturaDocumenti(Number(msg.fatti) || 0, Number(msg.totali) || 0);
+    });
+  } catch (_) {}
+
+  const breve = (t, max) => { const s = String(t || ''); return s.length > max ? `${s.slice(0, max - 1)}…` : s; };
+
+  // La riga che dice quanti documenti nuovi sta leggendo l'indice, con «Ferma»: compare solo se la lettura c'è.
+  function rigaLettura() {
+    let riga = null;
+    let testo = null;
+    const aggiorna = (fatti, totali) => {
+      if (!totali) return;
+      if (!riga) {
+        riga = appendActionLog('');
+        if (!riga) return;
+        riga.classList.add('sn-sidebar-log-intera');
+        testo = document.createElement('span');
+        const ferma = document.createElement('button');
+        ferma.type = 'button';
+        ferma.className = 'sn-sidebar-log-ferma';
+        ferma.textContent = 'Ferma';
+        ferma.title = 'Cerca solo fra quelli già letti';
+        ferma.addEventListener('click', (e) => {
+          if (!gestoVero(e)) return;
+          ferma.disabled = true;
+          Promise.resolve().then(() => chrome.runtime.sendMessage({ type: MSG.AIUTO_DOCUMENTI_FERMA })).catch(() => {});
+        });
+        riga.textContent = '· ';
+        riga.append(testo, ' ', ferma);
+      }
+      testo.textContent = `leggo i documenti nuovi: ${Math.min(fatti, totali)} di ${totali}`;
+    };
+    return { aggiorna, togli: () => { if (riga) riga.remove(); } };
+  }
+
+  async function cercaDocumenti(p) {
+    appendActionLog(`cerco fra i tuoi documenti «${breve(p.cosa, 80)}»`);
+    const lettura = rigaLettura();
+    letturaDocumenti = lettura.aggiorna;
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({ type: MSG.AIUTO_CERCA_DOCUMENTI, cosa: p.cosa, cartella: p.cartella || '' });
+    } catch (_) { r = null; }
+    if (letturaDocumenti === lettura.aggiorna) letturaDocumenti = null;
+    lettura.togli();
+    return r;
+  }
+
+  function esitoDocumenti(r) {
+    if (r.cartellaMancante) return `cartella non trovata: ${breve(r.cartellaMancante, 80)}`;
+    const n = Array.isArray(r.candidati) ? r.candidati.length : 0;
+    return `cercato fra i tuoi documenti: ${n ? (n === 1 ? 'uno trovato' : `${n} trovati`) : 'nessuno trovato'}${r.fermata ? ' (fermata da te)' : ''}`;
+  }
+
+  // I documenti da mostrare sotto la risposta: quelli che indica col numero; se non ne indica, quelli che nomina.
+  function fileDaMostrare(parsed, dopoDocumenti) {
+    const candidati = (documenti && documenti.candidati) || [];
+    if (!candidati.length) return [];
+    if (parsed.file && parsed.file.length) return parsed.file.map((n) => candidati.find((c) => c.n === n)).filter(Boolean);
+    if (!dopoDocumenti) return [];
+    const detto = String(parsed.display || '').toLowerCase();
+    return candidati.filter((c) => c.nome && detto.includes(String(c.nome).toLowerCase())).slice(0, 3);
+  }
+
+  async function azioneFile(btn, type, c, fallita) {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type, chiave: c.chiave }); } catch (_) { r = null; }
+    if (r && r.ok) return true;
+    const frase = (r && r.frase) || fallita;
+    btn.title = frase;
+    appendActionLog(`${breve(c.nome, 60)}: ${frase}`)?.classList.add('sn-sidebar-log-intera');
+    return false;
+  }
+
+  // Un clic lo apre col programma del sistema; trascinato, è il file vero (la pagina lo riceve come da una cartella,
+  // per esempio nel campo per caricarlo); col tasto destro, anche «Mostra nella cartella».
+  function bottoneFile(c) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-file';
+    btn.draggable = true;
+    const icona = document.createElement('span');
+    icona.className = 'sn-sidebar-file-icona';
+    icona.setAttribute('aria-hidden', 'true');
+    const ICONE = global.SN_ICONS;
+    if (ICONE && typeof ICONE.readDocument === 'function') icona.innerHTML = ICONE.readDocument(15);
+    const nome = document.createElement('span');
+    nome.className = 'sn-sidebar-file-nome';
+    nome.textContent = c.nome || 'Documento';
+    btn.append(icona, nome);
+    if (c.dove) {
+      const dove = document.createElement('span');
+      dove.className = 'sn-sidebar-file-dove';
+      dove.textContent = c.dove;
+      btn.appendChild(dove);
+    }
+    btn.title = 'Apri, o trascinalo nella pagina';
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
+      azioneFile(btn, MSG.AIUTO_APRI_FILE, c, 'Il file non si è aperto');
+    });
+    btn.addEventListener('dragstart', (e) => {
+      // Il trascinamento lo fa il sistema col file vero: quello della pagina porterebbe solo il testo del bottone.
+      e.preventDefault();
+      if (!gestoVero(e)) return;
+      azioneFile(btn, MSG.AIUTO_TRASCINA_FILE, c, 'Non sono riuscito a prendere il file');
+    });
+    let menu = null;
+    const apriMenu = (e) => {
+      e.preventDefault();
+      if (!gestoVero(e)) return;
+      if (menu) { menu.remove(); menu = null; return; }
+      menu = document.createElement('div');
+      menu.className = 'sn-sidebar-choices sn-sidebar-file-menu';
+      for (const [label, type, fallita] of [
+        ['Apri', MSG.AIUTO_APRI_FILE, 'Il file non si è aperto'],
+        ['Mostra nella cartella', MSG.AIUTO_MOSTRA_FILE, 'La cartella non si è aperta'],
+      ]) {
+        const voce = document.createElement('button');
+        voce.type = 'button';
+        voce.className = 'sn-sidebar-choice';
+        voce.textContent = label;
+        voce.addEventListener('click', (ev) => {
+          if (!gestoVero(ev)) return;
+          if (menu) { menu.remove(); menu = null; }
+          azioneFile(btn, type, c, fallita);
+        });
+        menu.appendChild(voce);
+      }
+      btn.insertAdjacentElement('afterend', menu);
+      const primo = menu.querySelector('button');
+      if (primo) try { primo.focus({ preventScroll: true }); } catch (_) {}
+    };
+    btn.addEventListener('contextmenu', apriMenu);
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) apriMenu(e);
+    });
+    return btn;
+  }
+
+  function mostraFile(afterEl, candidati) {
+    if (!afterEl || !candidati.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-files';
+    for (const c of candidati) wrap.appendChild(bottoneFile(c));
+    afterEl.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
   // Un rifiuto spiegato dal main (uno stile oltre il tetto) arriva all'utente col
   // suo perché, come nel diario della chat: «non riuscita» e basta non dice cosa
   // cambiare (#592).
