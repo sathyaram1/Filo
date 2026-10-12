@@ -1,12 +1,11 @@
-// #1108 giro 3 — una copia dei dati del server rimasta in un commit locale non deve arrivare su origin da nessuna strada
-// che spedisce: il prossimo lavoro sullo stesso ramo la parcheggia e la spedisce; il salvataggio, quando non spedisce, dice di fare git push.
+// #1108 giro 4 — il salvataggio automatico, l'unico automatismo che gira in ogni sessione, non mette il controllo prima
+// del push: un push a mano (quello che il suo stesso messaggio suggerisce) spedisce la copia finché finish, verifica o dispatch non l'hanno messo.
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
-import { prepareBranch } from '../../../scripts/lib/branch-integrity.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const RAMO = 'worker/prova-1108';
@@ -18,6 +17,9 @@ const COPIA = JSON.stringify({ documents: [{
 function git(cwd, ...args) {
   return execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
+const gitProva = (cwd, ...args) => {
+  try { git(cwd, ...args); return true; } catch (_) { return false; }
+};
 
 function scena() {
   const dir = cartellaTemporanea('filo-1108-');
@@ -37,15 +39,23 @@ function scena() {
   return { dir, origin, wt };
 }
 
+function salvataggio(wt, file) {
+  const ingresso = JSON.stringify({ hook_event_name: 'PostToolUse', tool_input: { file_path: join(wt, file) }, cwd: wt });
+  return execFileSync('bash', [join(REPO, '.claude/hooks/auto-commit-merge.sh')], {
+    cwd: wt, input: ingresso, encoding: 'utf8', env: { ...process.env, FILO_ROUTINE: '1', CLAUDE_PROJECT_DIR: wt },
+  });
+}
+
 const suOrigin = (origin) => git(origin, 'log', '--all', '--format=', '--name-only');
 
-test('r1 un commit locale con la copia, lasciato da una sessione morta, non arriva su origin quando il lavoro riparte sul ramo', () => {
+test('r1 dopo un salvataggio automatico, una copia committata a mano non parte con un git push a mano', () => {
   const { dir, origin, wt } = scena();
   try {
+    writeFileSync(join(wt, 'b.txt'), 'b2\n');
+    salvataggio(wt, 'b.txt');
     writeFileSync(join(wt, 'feedback.json'), COPIA);
     git(wt, 'add', '-A'); git(wt, 'commit', '-qm', 'copia a mano');
-    const esito = prepareBranch({ root: wt, branch: RAMO, checkpoint: null });
-    expect(esito.ok).toBe(true);
+    gitProva(wt, 'push', '-q', 'origin', `refs/heads/${RAMO}:refs/heads/${RAMO}`);
     expect(suOrigin(origin)).not.toContain('feedback.json');
   } finally { togliCartella(dir); }
 });
@@ -62,11 +72,7 @@ test('r1 quando il salvataggio non spedisce per una copia, non suggerisce di spe
     git(wt, 'checkout', '-q', RAMO);
     git(wt, 'merge', '-q', '--no-edit', 'main');
     writeFileSync(join(wt, 'b.txt'), 'b2\n');
-    const ingresso = JSON.stringify({ hook_event_name: 'PostToolUse', tool_input: { file_path: join(wt, 'b.txt') }, cwd: wt });
-    const out = execFileSync('bash', [join(REPO, '.claude/hooks/auto-commit-merge.sh')], {
-      cwd: wt, input: ingresso, encoding: 'utf8', env: { ...process.env, FILO_ROUTINE: '1', CLAUDE_PROJECT_DIR: wt },
-    });
-    const contesto = JSON.parse(out).hookSpecificOutput.additionalContext;
+    const contesto = JSON.parse(salvataggio(wt, 'b.txt')).hookSpecificOutput.additionalContext;
     expect(contesto).toContain('NON spedisco il ramo');
     expect(contesto).not.toMatch(/git push del ramo/);
   } finally { togliCartella(dir); }
