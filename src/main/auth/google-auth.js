@@ -431,5 +431,5 @@ module.exports = {
   isAdmin,
   accessoOwnerCaduto,
   // esportati per i test
-  _internals: { decodeJwtPayload, startLoopback },
+  _internals: { decodeJwtPayload, startLoopback, nuovoFlusso },
 };
