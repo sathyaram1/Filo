@@ -108,6 +108,17 @@ test('dal backup esce solo ciò che è scaduto: una ricorrente punta sulla pross
   assert.ok(!(K.FILO_TIMERS in vuoto.merged));
 });
 
+test('una sveglia singola di domani e un timer in corso o in pausa arrivano dal backup com\'erano', () => {
+  const adesso = Date.parse('2026-10-12T10:00:00Z');
+  const backup = [
+    { id: 'a1', kind: 'alarm', label: 'dentista', endsAt: '2026-10-13T07:00:00.000Z', paused: false },
+    { id: 't1', label: 'forno', endsAt: '2026-10-12T10:40:00.000Z', paused: false },
+    { id: 't2', label: 'tè', endsAt: '2026-01-01T00:00:00.000Z', paused: true, remainingMs: 120000 },
+  ];
+  const { merged } = mergeImportedData({}, { [K.FILO_TIMERS]: backup }, { prossimaSveglia: () => null, adesso });
+  assert.deepEqual(merged[K.FILO_TIMERS], backup);
+});
+
 test('pagine salvate: una per indirizzo, dalla più recente, e quelle oltre il tetto si contano', () => {
   const pagina = (id, url, giorno) => ({ id, url, title: id, savedAt: `2026-10-${String(giorno).padStart(2, '0')}T10:00:00.000Z` });
   const qui = [pagina('q3', 'https://c.example/', 9), pagina('q2', 'https://b.example/', 5), pagina('q1', 'https://a.example/', 1)];
