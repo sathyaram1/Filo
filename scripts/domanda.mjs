@@ -234,6 +234,7 @@ async function leggiStdin() {
 export async function esegui(argv, io = {}) {
   const {
     chiama = chiamaOwner, consegna = consegnaDomanda, biglietto = bigliettoDelGiro,
+    bigliettoLocale = segretoLocale, sporca = sporcaSessione,
     leggiFile = (p) => readFileSync(p, 'utf8'), stdin = leggiStdin,
     scrivi = (s) => console.log(s), errore = (s) => console.error(s),
   } = io;
