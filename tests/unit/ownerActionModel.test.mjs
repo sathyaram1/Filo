@@ -63,6 +63,26 @@ test('slot svuotato di proposito: nessun modello, la scelta di prima non ritorna
   assert.equal(s.models[A.MANAGE_SEARCH], '');
 });
 
+test('il classificatore della ricerca mai impostato parte con Jev; svuotato resta spento (#1118)', async () => {
+  for (const getter of [cfg({ manageSearchClassifier: null }), async () => null, async () => { throw new Error('giù'); }]) {
+    const s = await settingsForOwnerAction(EFFECTIVE, A.MANAGE_SEARCH_CLASSIFY, getter);
+    assert.equal(s.models[A.MANAGE_SEARCH_CLASSIFY], 'typesafe/jev-1.13');
+    const attempts = C.buildModelAttempts(C.parseModelRefs(s.models[A.MANAGE_SEARCH_CLASSIFY]), s.modelRegistry, ['openrouter'], s.apiKeys);
+    assert.deepEqual(attempts.map((a) => a.model), ['typesafe/jev-1.13']);
+  }
+  const spento = await settingsForOwnerAction(EFFECTIVE, A.MANAGE_SEARCH_CLASSIFY, cfg({ manageSearchClassifier: '' }));
+  assert.equal(spento.models[A.MANAGE_SEARCH_CLASSIFY], '');
+  const scelto = await settingsForOwnerAction(EFFECTIVE, A.MANAGE_SEARCH_CLASSIFY, cfg({ manageSearchClassifier: 'altro/clf' }));
+  assert.equal(scelto.models[A.MANAGE_SEARCH_CLASSIFY], 'altro/clf');
+  // Una scelta già fatta per quella funzione fuori dallo slot vince sulla scelta iniziale.
+  const prima = { ...EFFECTIVE, models: { ...EFFECTIVE.models, [A.MANAGE_SEARCH_CLASSIFY]: 'mio/clf' } };
+  assert.equal((await settingsForOwnerAction(prima, A.MANAGE_SEARCH_CLASSIFY, cfg({}))).models[A.MANAGE_SEARCH_CLASSIFY], 'mio/clf');
+  // L'editor mostra quello che la ricerca usa davvero, come lettura e non come scelta.
+  const ed = fillMovedSlots({ manageSearch: '' }, EFFECTIVE);
+  assert.equal(ed.manageSearchClassifier, 'typesafe/jev-1.13');
+  assert.deepEqual(ed.movedUnset, ['manageSearchClassifier']);
+});
+
 test('le funzioni di tutti non leggono gli slot di supporto', async () => {
   let letto = false;
   const s = await settingsForOwnerAction(EFFECTIVE, A.EXPLAIN, async () => { letto = true; return {}; });
@@ -71,7 +91,7 @@ test('le funzioni di tutti non leggono gli slot di supporto', async () => {
 });
 
 test('l\'editor mostra la catena in uso negli slot spostati mai salvati, e non tocca quelli salvati', () => {
-  const mai = fillMovedSlots({ sanitizer: '', manageSearch: null }, EFFECTIVE);
+  const mai = fillMovedSlots({ sanitizer: '', manageSearch: null, manageSearchClassifier: '' }, EFFECTIVE);
   assert.equal(mai.manageSearch, 'vecchio');
   assert.equal(mai.sanitizer, '');
   assert.equal(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).manageSearch, '');
@@ -79,7 +99,9 @@ test('l\'editor mostra la catena in uso negli slot spostati mai salvati, e non t
   assert.equal(fillMovedSlots({ manageSearch: null }, null).manageSearch, '');
   // Solo quelli riempiti sono una lettura, non una scelta: l'editor non li riscrive se non cambiano.
   assert.deepEqual(mai.movedUnset, ['manageSearch']);
-  assert.deepEqual(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).movedUnset, []);
+  assert.deepEqual(fillMovedSlots({ manageSearch: '', manageSearchClassifier: 'jev' }, EFFECTIVE).movedUnset, []);
+  // Anche il classificatore della ricerca (#1118) è uno slot dell'app: mai salvato, si legge dalla catena in uso.
+  assert.deepEqual(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).movedUnset, ['manageSearchClassifier']);
 });
 
 test('lo store distingue lo slot mai scritto (null) da quello svuotato (\'\')', async () => {

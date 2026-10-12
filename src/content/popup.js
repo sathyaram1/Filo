@@ -108,10 +108,14 @@
   const inPaginaDiFilo = location.protocol === 'filo:';
   const suCollegamento = (e) => {
     if (e.type === 'auxclick' && e.button !== 1) return;
-    const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
+    const t = global.SN_FILO_UI?.bersaglio ? global.SN_FILO_UI.bersaglio(e) : e.target;
+    const a = t && t.closest && t.closest('a.filo-md-link');
     if (!a) return;
     e.preventDefault();
     e.stopPropagation();
+    // Sui siti un clic fabbricato sull'host di un riquadro chiuso arriva qui col bersaglio sotto le sue coordinate:
+    // il collegamento lo apre solo il clic dell'utente (#1071).
+    if (!inPaginaDiFilo && !global.SN_FILO_UI?.veroONostro?.(e)) return;
     if (inPaginaDiFilo) { try { window.open(a.getAttribute('href'), '_blank', 'noopener'); } catch (_) {} return; }
     apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
   };
@@ -119,6 +123,43 @@
   else {
     window.addEventListener('click', suCollegamento, true);
     window.addEventListener('auxclick', suCollegamento, true);
+  }
+
+  // In un sito i riquadri che portano parole dell'utente o dei modelli stanno in uno shadow root chiuso, chiusi ai gesti
+  // finti: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md. L'host non genera un box.
+  const FOGLI_RIQUADRO = ['theme.css', 'menu.css', 'popup.css', 'feedback.css', 'redteam-attack.css', 'spellcheck.css'];
+  const FONT_SOLO_GENERICO = '*, ::before, ::after, ::placeholder { font-family: system-ui, sans-serif !important; }';
+  let fogliRiquadro = null;
+  function fogliDelRiquadro() {
+    if (fogliRiquadro) return fogliRiquadro;
+    let testo = '';
+    try {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      testo = FOGLI_RIQUADRO.map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
+    } catch (_) {}
+    testo += '\n' + FONT_SOLO_GENERICO;
+    const foglio = new CSSStyleSheet();
+    try { foglio.replaceSync(testo); } catch (_) {}
+    fogliRiquadro = [foglio];
+    return fogliRiquadro;
+  }
+  function riquadro(contenuto) {
+    if (inPaginaDiFilo) return contenuto;
+    const UI = global.SN_FILO_UI;
+    const host = document.createElement('div');
+    UI?.mark(host);
+    host.style.cssText = 'all:initial!important;display:contents!important;';
+    const radice = UI?.ombra ? UI.ombra(host) : host.attachShadow({ mode: 'closed' });
+    try { radice.adoptedStyleSheets = fogliDelRiquadro(); } catch (_) {}
+    // I tasti scritti qui dentro il sito non li vede: SN_FILO_UI.tastoNelRiquadro.
+    UI?.soloGestiVeri(contenuto);
+    radice.appendChild(contenuto);
+    return host;
+  }
+  function togliRiquadro(contenuto) {
+    const host = contenuto && contenuto.getRootNode && contenuto.getRootNode().host;
+    try { (host || contenuto).remove(); } catch (_) {}
   }
 
   // ----------------------------------------------------------------
@@ -847,7 +888,7 @@
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
     try { popup.pose?.dispose(); } catch (_) {}
-    popup.root.remove();
+    togliRiquadro(popup.root);
     const idx = popups.indexOf(popup);
     if (idx >= 0) popups.splice(idx, 1);
     // Rimette la selezione che il fuoco della riga per scrivere aveva spento:
@@ -916,7 +957,7 @@
       </div>
     `;
     root.querySelector('.sn-popup-title').textContent = title;
-    document.documentElement.appendChild(root);
+    document.documentElement.appendChild(riquadro(root));
 
     const cleanupZoom = attachZoomCompensation(root);
     const pose = attachPose(root, anchor);
@@ -947,14 +988,15 @@
     // Quando l'utente clicca dentro il popup, portalo in primo piano
     root.addEventListener('mousedown', () => bringToFront(popup), true);
 
-    // Send su Enter (senza Shift); Shift+Enter inserisce nuova riga
+    // Send su Enter (senza Shift); Shift+Enter inserisce nuova riga. Una domanda spende una chiamata: parte solo
+    // da un tasto o da un clic dell'utente, mai da uno fabbricato (#1071).
     popup.inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        submitFollowup(popup);
+        if (global.SN_FILO_UI?.veroONostro ? global.SN_FILO_UI.veroONostro(e) : e.isTrusted) submitFollowup(popup);
       }
     });
-    popup.sendEl.addEventListener('click', () => submitFollowup(popup));
+    popup.sendEl.addEventListener('click', (e) => { if (e.isTrusted) submitFollowup(popup); });
     // Auto-grow textarea
     popup.inputEl.addEventListener('input', () => {
       autoGrow(popup.inputEl);
@@ -1396,6 +1438,8 @@
     renderMarkdown,
     resolveCalcMarkers,
     registerStack,
+    riquadro,
+    togliRiquadro,
     apriCollegamento,
     scaricaCollegamento,
     frasePerLUtente,

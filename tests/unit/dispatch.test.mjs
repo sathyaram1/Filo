@@ -25,6 +25,8 @@ process.env.FILO_DISPATCH_STATE_DIR = TMP;
 // Anche la ROOT: emit() ci scrive il marcatore di ruolo (#443) e non deve
 // sporcare il checkout vero durante i test.
 process.env.FILO_REPO_ROOT = TMP;
+// Il preflight riuscito installa il gancio dell'orchestratore cieco nelle impostazioni utente: mai in quelle vere.
+process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
 // E la radice degli STRUMENTI, che dal 2026-08-24 è una cosa diversa dalla
 // radice del progetto: le ricette dei ruoli seguono gli strumenti, perché
 // quelle del progetto sono quelle del ramo su cui si sta lavorando

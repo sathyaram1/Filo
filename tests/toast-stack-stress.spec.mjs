@@ -106,7 +106,7 @@ test('finestra bassissima: gli avvisi restano dentro la finestra e il più recen
   const page = await testServer.openReady(openTab, PAGE);
 
   const restore = await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows()[0];
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const b = w.getBounds();
     w.setBounds({ ...b, height: 260 });
     return b;
@@ -130,7 +130,7 @@ test('finestra bassissima: gli avvisi restano dentro la finestra e il più recen
     expect(last.y, 'il più recente esce dal bordo superiore della finestra').toBeGreaterThanOrEqual(0);
   } finally {
     await app.evaluate(async ({ BrowserWindow }, b) => {
-      BrowserWindow.getAllWindows()[0].setBounds(b);
+      BrowserWindow.getAllWindows().find((x) => x._filoTabs).setBounds(b);
     }, restore);
   }
 });

@@ -41,18 +41,21 @@ const CARTELLA_DATI = {
   'segreti-letti.bin': { frase: 'E per un mese i segreti letti' },
   'archivio-schede': { frase: 'le schede aperte e quelle archiviate' },
   'segnalazioni-mie': { frase: 'una copia delle segnalazioni che hai mandato' },
+  'cronologia-ai': { frase: 'l\'elenco delle richieste fatte ai modelli con domanda e risposta' },
   filo: { frase: 'le chat, l\'elenco delle richieste fatte ai modelli' },
   quarantena: { frase: 'i download' },
   adblock: { frase: 'le liste per bloccare la pubblicità' },
   'firmatari-c2pa': { frase: 'l\'elenco dei firmatari riconosciuti delle credenziali sulle immagini' },
+  Dictionaries: { frase: 'i dizionari del correttore ortografico' },
 };
 
 test('ogni file nella cartella dei dati è nel documento sulla privacy', () => {
   const trovati = new Map();
-  const base = /^(?:[\w.]*getPath\('userData'\)|root|base|cartellaDati\(\))$/;
+  // sessionData è la cartella dei dati delle sessioni: di serie la stessa, ed è lì che Chromium cerca i dizionari.
+  const base = /^(?:[\w.]*getPath\('(?:userData|sessionData)'\)|root|base|cartellaDati\(\))$/;
   for (const f of sorgenti(join(ROOT, 'src', 'main'), /\.js$/)) {
     const s = readFileSync(f, 'utf8');
-    if (!/getPath\('userData'\)|FILO_USER_DATA/.test(s)) continue;
+    if (!/getPath\('(?:userData|sessionData)'\)|FILO_USER_DATA/.test(s)) continue;
     for (const m of s.matchAll(/path\.join\(\s*([^,]+?)\s*,\s*'([^']+)'/g)) {
       if (base.test(m[1].trim())) trovati.set(m[2], relative(ROOT, f));
     }

@@ -33,6 +33,13 @@ tests/agent/reports/
 test-results/
 .DS_Store
 *.log
+# Copie di lavoro dei dati del server (feedback, collezioni Firestore): il repo è pubblico e il
+# salvataggio spedisce tutto. Vanno in os.tmpdir(). Questi nomi li ferma git; con un altro nome la copia
+# la riconosce dalla forma il salvataggio automatico (scripts/copie-in-scena.mjs), e la sentinella dopo.
+*dump*.json
+*dump*.jsonl
+filo-copie/
+filo-feedback/
 # Scarti dei comandi andati storti: nascono in radice, restano vuoti, e finiscono
 # committati per sbaglio insieme al resto (`nf2.err` ha viaggiato in ogni copia
 # del repo per due settimane).

@@ -10,6 +10,7 @@
 // montaggio pigro nel page-preload) tornano tutti rossi.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi, conta } from './helpers/riquadri.mjs';
 
 const INNER = `<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif">
   <p id="inner-text">Testo dentro il riquadro incorporato, lungo abbastanza da poterlo selezionare e spiegare.</p>
@@ -136,8 +137,9 @@ test('Alt+E sul testo selezionato DENTRO il riquadro arriva al riquadro', async 
   });
   // La spiegazione si apre DENTRO il riquadro, sul testo selezionato lì.
   // Prima la scorciatoia finiva sempre nel frame principale, che non ha
-  // nessuna selezione: non succedeva nulla.
-  await expect(frameLoc.locator('.sn-popup')).toBeVisible({ timeout: 8000 });
+  // nessuna selezione: non succedeva nulla. Sui siti il riquadro sta in uno shadow root chiuso (#1071).
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup', frame))?.visibile, { timeout: 8000 }).toBe(true);
+  expect(await conta(app, page, '.sn-popup')).toBe(0);
 });
 
 test('un solo menu alla volta: aprirlo nel riquadro chiude quello della pagina', async ({ openTab, testServer }) => {

@@ -2075,7 +2075,7 @@ for (const larghezza of [1280, 960]) {
       await page.waitForLoadState('domcontentloaded');
       await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
       await app.evaluate(({ BrowserWindow }, w) => {
-        const win = BrowserWindow.getAllWindows()[0];
+        const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
         win.setSize(w, win.getSize()[1]);
       }, larghezza);
       await page.waitForFunction((w) => Math.abs(window.outerWidth - w) < 40, larghezza);
@@ -2115,7 +2115,7 @@ test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto'
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
-  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setSize(960, win.getSize()[1]); });
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs); win.setSize(960, win.getSize()[1]); });
   await page.waitForFunction(() => Math.abs(window.outerWidth - 960) < 40);
   await page.evaluate(() => {
     const orig = window.filo.message.bind(window.filo);
@@ -2344,10 +2344,11 @@ test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEd
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
-  // 8 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
-  // priorità, e la ricerca fra i feedback spostata qui dalle Opzioni, #465).
-  await expect(page.locator('.mg-sm-slot')).toHaveCount(8);
+  // 9 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
+  // priorità, la ricerca fra i feedback spostata qui dalle Opzioni, #465, e il suo classificatore, #1118).
+  await expect(page.locator('.mg-sm-slot')).toHaveCount(9);
   await expect(page.locator('[data-slot="manageSearch"] label')).toHaveText('Ricerca fra i feedback');
+  await expect(page.locator('[data-slot="manageSearchClassifier"] label')).toHaveText('Classificatore della ricerca');
   await expect(page.locator('[data-slot="sanitizer"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge1"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge2"]')).toBeVisible();

@@ -100,6 +100,9 @@ html[data-chrome-compact="1"] .addr {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
+  /* Il posto del piedino destro della scheda attiva quando è l'ultima: senza, la striscia scorreva di 8px
+     e la curva finiva fuori vista (#429). */
+  padding-right: 8px;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
@@ -133,10 +136,10 @@ html[data-chrome-compact="1"] .addr {
   align-items: center;
   gap: 6px;
   height: 32px;
-  flex: 1 1 0;
+  /* Crescita = larghezza chiesta, messa da shell.js: la striscia dà a ognuna la sua e, se si stringe, toglie
+     di più alle più larghe (#429). */
+  flex: var(--tab-crescita, 1) 1 0;
   min-width: 40px;
-  /* Larghezza scelta per far stare il titolo e l'icona audio a fine riga senza stringere troppo. */
-  max-width: 260px;
   padding: 0 8px 0 10px;
   /* Sfondo effettivo della tab: di default il neutro della barra, ma le tab inattive lo sovrascrivono
      inline con la tinta identità del sito. Passa da una variabile così l'hover sotto resta coerente. */
@@ -155,9 +158,9 @@ html[data-chrome-compact="1"] .addr {
   transition: background 0.1s ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
-  /* Contenitore delle priorità delle icone (sotto); la larghezza del contenuto gliela misura shell.js. */
+  /* Contenitore delle priorità delle icone (sotto); la larghezza che chiede alla striscia la calcola shell.js. */
   container: tab / inline-size;
-  contain-intrinsic-inline-size: var(--tab-naturale, none);
+  contain-intrinsic-inline-size: var(--tab-chiesta, none);
 }
 
 .tab.audible {
@@ -194,10 +197,9 @@ html[data-chrome-compact="1"] .addr {
   color: var(--fg);
   margin-bottom: 0;
   z-index: 1;
-  /* La scheda selezionata è più larga e "stacca" leggermente, in stile Chrome (richiesta esplicita). */
-  flex-grow: 1.8;
+  /* La scheda selezionata è più larga e "stacca" leggermente, in stile Chrome (richiesta esplicita): di quanto
+     lo decide shell.js, che non le mette un tetto fisso (#429). */
   min-width: 110px;
-  max-width: 320px;
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
 }
 
@@ -263,7 +265,9 @@ html[data-chrome-compact="1"] .addr {
   white-space: nowrap;
 }
 .tab .close {
+  /* La larghezza oltre alla base: la scheda misurata col contenuto conta la larghezza, non la base (#429). */
   flex: 0 0 18px;
+  width: 18px;
   height: 18px;
   border-radius: 50%;
   display: inline-flex;
@@ -277,6 +281,13 @@ html[data-chrome-compact="1"] .addr {
 .tab:hover .close,
 .tab.active .close { opacity: 1; }
 .tab .close:hover { background: color-mix(in srgb, var(--border) 60%, transparent); color: var(--fg); }
+/* Sulle schede dietro la X non tiene posto: compare al passaggio sopra la fine del nome, che sfuma sotto di lei,
+   così con la fila piena il nome arriva al bordo (#429). Con l'avviso audio resta in fila: gli starebbe sopra. */
+.tab:not(.active):not(.misura):not(:has(> .tab-alert)) > .close {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+}
 .tab .favicon {
   width: 16px; height: 16px;
   flex: 0 0 16px;
@@ -288,6 +299,8 @@ html[data-chrome-compact="1"] .addr {
 .tab .spinner {
   flex: 0 0 12px;
   width: 12px; height: 12px;
+  /* Lo stesso posto del favicon: la scheda che carica non cambia la larghezza chiesta da tutte (#429). */
+  margin: 0 2px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
@@ -298,6 +311,7 @@ html[data-chrome-compact="1"] .addr {
 /* Avviso audio (suona o mutata) dopo il titolo, come in Chrome, col colore delle scritte della scheda (#431). */
 .tab .tab-alert {
   flex: 0 0 16px;
+  width: 16px;
   height: 16px;
   display: inline-flex;
   align-items: center;
@@ -347,8 +361,18 @@ html[data-chrome-compact="1"] .addr {
   .tab:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
 }
 @container tab (width < 46px) {
-  .tab:not(:has(> .tab-alert)) > .title { display: none; }
-  .tab:not(:has(> .tab-alert)) > .close { margin-left: auto; }
+  .tab.active:not(:has(> .tab-alert)) > .title { display: none; }
+  .tab.active:not(:has(> .tab-alert)) > .close { margin-left: auto; }
+}
+/* Dietro la X non è in fila: il nome vive finché accanto all'icona ne sta un pezzo leggibile. */
+@container tab (width < 34px) {
+  .tab:not(.active):not(:has(> .tab-alert)) > .title { display: none; }
+}
+@container tab (width >= 40px) {
+  .tab:not(.active):not(:has(> .tab-alert)):hover > .title {
+    -webkit-mask-image: linear-gradient(to left, transparent 20px, #000 28px);
+    mask-image: linear-gradient(to left, transparent 20px, #000 28px);
+  }
 }
 @container tab (width < 40px) {
   .tab:not(.active):not(:has(> .tab-alert)) > .close { display: none; }

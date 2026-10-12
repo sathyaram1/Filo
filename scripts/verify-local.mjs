@@ -82,6 +82,7 @@ import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
 import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import { installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
 } from './lib/ramo-server.mjs';
@@ -945,6 +946,8 @@ function realignBeforeStart(root = ROOT) {
   // frattempo sullo stesso ramo. La destinazione è nel refspec, per intero:
   // non la sceglie la configurazione locale di git (stessa forma di ogni altra
   // spedizione del repo).
+  // Il riallineamento spedisce anche i commit locali non ancora partiti: il pre-push ferma una copia dei dati (#1108).
+  try { installaControlloSpedizione(root); } catch (_) { /* senza, il push parte come prima */ }
   const push = tryGit(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`], root);
   if (!push.ok) {
     console.error(`Ramo riallineato qui, ma non riesco a rispedirlo su origin:\n${push.out.slice(0, 300)}`);

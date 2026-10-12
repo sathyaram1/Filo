@@ -21,6 +21,8 @@ module.exports = function register(on, ctx) {
   // impostazioni, salvare dizionario/draft/layout) resta consentito.
   const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
   const ARCHIVE_KEY = SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
+  // La cronologia AI ha file suoi (services/historyStore.js): nel backup torna sotto la chiave di sempre.
+  const HISTORY_KEY = SN_CONST.STORAGE_KEYS.HISTORY;
   // Verso un'origine web passa solo ciò che è nelle liste di impostazioniPerOrigine
   // (campi letti e scritti, scomparti del magazzino): le stesse delle spinte.
   const {
@@ -31,20 +33,24 @@ module.exports = function register(on, ctx) {
   const AppuntiDaiSiti = require('../appuntiDaiSiti');
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
+  // L'origine vera del riquadro che chiede (anche un about:blank ha quella di chi l'ha aperto): la bozza per sito.
+  const origineRiquadro = (sender) => { try { return String(sender?.frame?.origin || ''); } catch (_) { return ''; } };
+
   on('_storage:get', async (msg, sender, origin) => {
-    const value = await globalThis.chrome.storage.local.get(chiaviStoragePerOrigine(msg.keys ?? null, origin));
+    const chiavi = chiaviStoragePerOrigine(msg.keys ?? null, origin, origineRiquadro(sender));
+    const value = await globalThis.chrome.storage.local.get(chiavi);
     return { ok: true, value: storagePerOrigine(value, origin, SETTINGS_KEY, indirizziDelMittente(sender)) };
   });
 
   on('_storage:set', async (msg, sender, origin) => {
     const obj = msg.obj || {};
-    if (!scritturaStorageAmmessa(Object.keys(obj), origin)) return vietato;
+    if (!scritturaStorageAmmessa(Object.keys(obj), origin, origineRiquadro(sender))) return vietato;
     await globalThis.chrome.storage.local.set(obj);
     return { ok: true };
   });
 
   on('_storage:remove', async (msg, sender, origin) => {
-    if (!scritturaStorageAmmessa(msg.keys, origin)) return vietato;
+    if (!scritturaStorageAmmessa(msg.keys, origin, origineRiquadro(sender))) return vietato;
     await globalThis.chrome.storage.local.remove(msg.keys);
     return { ok: true };
   });
@@ -123,6 +129,8 @@ module.exports = function register(on, ctx) {
       // L'archivio delle schede ha file suoi: nel backup torna sotto la chiave di sempre.
       const archivio = await globalThis.SN_ARCHIVED_TABS.list();
       if (archivio.length) allData[ARCHIVE_KEY] = archivio;
+      const cronologia = await History.list();
+      if (cronologia.length) allData[HISTORY_KEY] = cronologia;
       const Mie = globalThis.SN_SEGNALAZIONI_MIE;
       const mie = Mie ? await Mie.elenco() : null;
       if (mie && mie.length) allData[Mie.CHIAVE_BACKUP] = mie;
@@ -238,6 +246,8 @@ module.exports = function register(on, ctx) {
       const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
       const archivio = await ArchivedTabs.list();
       if (archivio.length) current[ARCHIVE_KEY] = archivio;
+      const cronologia = await History.list();
+      if (cronologia.length) current[HISTORY_KEY] = cronologia;
       const Mie = globalThis.SN_SEGNALAZIONI_MIE;
       const MIE_KEY = Mie ? Mie.CHIAVE_BACKUP : null;
       const mie = Mie ? await Mie.elenco() : null;
@@ -261,13 +271,14 @@ module.exports = function register(on, ctx) {
       }
       const rest = {};
       for (const k of Object.keys(merged)) {
-        if (k === SETTINGS_KEY || k === ARCHIVE_KEY || k === MIE_KEY) continue;
+        if (k === SETTINGS_KEY || k === ARCHIVE_KEY || k === HISTORY_KEY || k === MIE_KEY) continue;
         if (JSON.stringify(merged[k]) !== JSON.stringify(current[k])) rest[k] = merged[k];
       }
       // I cambi che l'importazione porta entrano nel filo come suoi, e si annullano come gli altri (#867).
       await require('../registroCambi').con({ via: 'importazione' }, async () => {
         if (Object.keys(rest).length) await DiskStorage.set(rest);
         await ArchivedTabs.importa(merged[ARCHIVE_KEY]);
+        await History.importa(merged[HISTORY_KEY]);
         if (Mie) await Mie.importa(merged[MIE_KEY]);
         if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
       });
@@ -371,7 +382,7 @@ module.exports = function register(on, ctx) {
   // pagina web deve poterli leggere, scrivere o cancellare. Solo filo://.
   on(MSG.GET_HISTORY, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
-    return { ok: true, items: await History.list() };
+    return { ok: true, items: (await History.list()).map(History.vistaPagina) };
   });
 
   on(MSG.APPEND_HISTORY, async (msg, sender, origin) => {
@@ -387,7 +398,7 @@ module.exports = function register(on, ctx) {
   on(MSG.REMOVE_HISTORY_ENTRY, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
     const items = await History.remove(msg.id);
-    return { ok: true, items };
+    return { ok: true, items: items.map(History.vistaPagina) };
   });
 
   on(MSG.CLEAR_HISTORY, async (msg, sender, origin) => {

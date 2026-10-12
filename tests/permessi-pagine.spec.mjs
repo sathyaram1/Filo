@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
 import { chiudiApp } from './fixtures/electron.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -156,7 +157,7 @@ async function avvia() {
     cwd: APP_ROOT,
     env: { ...process.env, PATH: join(userData, 'bin-finto') + delimiter + process.env.PATH, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  shell = await app.firstWindow();
+  shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
 }
 test.afterEach(async () => {
@@ -500,4 +501,21 @@ test('le risposte ricordate le legge e le toglie solo una pagina di Filo, non un
   expect(out.leggeSito).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
   expect(out.togliSito).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
   expect(out.leggeFilo).toEqual({ ok: true, scelte: [] });
+});
+
+// La domanda per la rete locale arriva con Electron 44 (#1068): la cornice la dice con le sue parole, non con quelle
+// del microfono, che sono quelle di ripiego per un tipo che non conosce.
+test('un sito che chiede la rete locale si vede chiedere proprio quella, col suo nome', async () => {
+  await apri('/vuota');
+  await expect.poll(() => app.windows().some((w) => w.url().startsWith(origine)), { timeout: 10_000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.webContents.send('tabs:permesso', {
+      id: 'prova-rete', tabId: w._filoTabs.activeId, host: 'router.example', sotto: '', dominio: 'router.example', tipo: 'rete', parti: ['rete'],
+    });
+  });
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  await expect(barra()).toContainText('router.example');
+  await expect(barra()).toContainText('vuole collegarsi agli apparecchi della tua rete');
+  await expect(barra()).not.toContainText('microfono');
 });

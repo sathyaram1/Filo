@@ -201,6 +201,9 @@
     err_unknown_model_for_action: '«%s» usa un modello che non esiste (%s): forse è stato rinominato o eliminato. %s',
     err_open_weights_only_no_model:
       '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Opzioni → Modelli per azione, oppure spegnere «Solo modelli a pesi aperti».',
+    // Le funzioni di chi gestisce Filo non stanno nelle Opzioni: il modello si cambia in Gestione (#1118).
+    err_open_weights_only_no_model_owner:
+      '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Gestione → Modelli di supporto, oppure spegnere «Solo modelli a pesi aperti».',
     err_open_weights_only_provider_blocked:
       'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_open_weights_only_model_blocked:
@@ -443,6 +446,12 @@
     admin_defaults_delicate_posta: 'Posta',
     admin_defaults_delicate_banche: 'Banche',
     admin_defaults_delicate_sanita: 'Sanità',
+    // Quanto filo ha davanti la chat (#868)
+    admin_defaults_contesto: 'Quanto ricorda la chat',
+    admin_defaults_contesto_desc:
+      'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
+    admin_defaults_contesto_giorni: 'Giorni',
+    admin_defaults_contesto_token: 'Tetto in token',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
@@ -613,6 +622,10 @@
     options_cookies_riquadri_title: 'Contenuti incorporati con i cookie riattivati',
     options_cookies_riquadri_desc: 'Post, video e mappe di questi servizi, dentro le pagine di altri siti, tengono i loro cookie.',
     options_cookies_riquadri_remove: 'Togli',
+    options_cookies_riquadri_modello: 'Riconosci con un modello i contenuti incorporati rotti',
+    options_cookies_riquadri_modello_desc:
+      'Se un post, un video o una mappa di un altro sito resta vuoto e Filo non lo conosce, a un modello va la foto ' +
+      'del solo riquadro. Spento, quel riquadro lo riattivi col tasto destro.',
     riquadro_cookie_domanda: 'Attivo i cookie di %s per questo contenuto?',
     riquadro_cookie_si: 'Sì',
     riquadro_cookie_no: 'No',
@@ -639,6 +652,7 @@
     options_site_perms_part_schermi: 'Schermi',
     options_site_perms_part_presenza: 'Presenza al computer',
     options_site_perms_part_strumenti: 'Strumenti musicali',
+    options_site_perms_part_rete: 'Rete locale',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

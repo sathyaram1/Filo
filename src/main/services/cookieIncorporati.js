@@ -152,9 +152,17 @@ function urlDi(c) {
   return (c.secure ? 'https://' : 'http://') + dominio + (c.path || '/');
 }
 
+// Quello che serve per riscrivere un cookie al suo posto, senza valore né scadenza.
+function posto(c) {
+  return {
+    url: urlDi(c), name: c.name, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly, sameSite: c.sameSite,
+    ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
+  };
+}
+
 // Il cookie torna identico ma senza scadenza: vale per la visita e non oltre. Si riscrive il valore di adesso (un
-// avviso superato da uno più nuovo rimetterebbe uno stato che il riquadro aveva sostituito). Un partizionato si vede
-// solo per dominio, accanto all'eventuale cookie normale con lo stesso nome: torna 'partizionato' e quello non si tocca.
+// avviso superato da uno più nuovo rimetterebbe uno stato che il riquadro aveva sostituito). Un partizionato la
+// riscrittura non lo tocca: torna 'partizionato' e resta com'è.
 async function declassa(ses, c0) {
   const percorso = c0.path || '/';
   const stesso = (x) => x.name === c0.name && x.domain === c0.domain && (x.path || '/') === percorso;
@@ -164,17 +172,14 @@ async function declassa(ses, c0) {
     if (lista.some((x) => stesso(x) && !x.session && (!c || x.value !== c.value))) return 'partizionato';
   }
   if (!c || c.session) return false;
-  const dominio = String(c.domain || '').replace(/^\./, '');
-  await ses.cookies.set({
-    url: urlDi(c),
-    name: c.name,
-    value: c.value,
-    path: c.path || '/',
-    secure: !!c.secure,
-    httpOnly: !!c.httpOnly,
-    sameSite: c.sameSite,
-    ...(c.hostOnly ? {} : { domain: dominio }),
-  });
+  await ses.cookies.set({ ...posto(c), value: c.value });
+  // Da Electron 44 anche la ricerca per indirizzo trova i partizionati: se l'originale è ancora lì era partizionato, e
+  // la copia appena nata, un cookie di terza parte che varrebbe su ogni sito, si scade subito.
+  const dopo = await ses.cookies.get({ domain: String(c.domain || '').replace(/^\./, '') });
+  if (dopo.some((x) => stesso(x) && !x.session && x.value === c.value)) {
+    await ses.cookies.set({ ...posto(c), value: '', expirationDate: 1 });
+    return 'partizionato';
+  }
   return true;
 }
 
@@ -222,25 +227,29 @@ function navigazione(url) {
   paginaDiAccesso(url);
 }
 
-// La rimozione per indirizzo toglie anche il cookie normale con lo stesso nome: quello con scadenza si rimette.
+// La rimozione per indirizzo toglie anche il cookie normale con lo stesso nome, e nessuna lettura dice quale dei due è
+// partizionato. Lo dice una scrittura: un set già scaduto toglie solo il normale, quello che resta è partizionato e si
+// toglie per indirizzo. I normali con scadenza si rimettono com'erano.
 async function togliPartizionati(ses, sito, nomi) {
   let lista = [];
   try { lista = await ses.cookies.get({ domain: sito }); } catch (_) { return; }
+  const uguali = (a, b) => a.domain === b.domain && (a.path || '/') === (b.path || '/') && a.value === b.value
+    && !!a.session === !!b.session && a.expirationDate === b.expirationDate;
   for (const nome of nomi) {
-    for (const url of new Set(lista.filter((c) => c.name === nome).map(urlDi))) {
-      let normali = [];
-      try { normali = (await ses.cookies.get({ url, name: nome })).filter((c) => !c.session); } catch (_) {}
-      try { await ses.cookies.remove(url, nome); } catch (_) {}
-      for (const c of normali) {
-        preesistenti.set(chiaveCookie(c), Date.now());
-        try {
-          await ses.cookies.set({
-            url: urlDi(c), name: c.name, value: c.value, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly,
-            sameSite: c.sameSite, expirationDate: c.expirationDate,
-            ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
-          });
-        } catch (_) {}
-      }
+    const tutti = lista.filter((c) => c.name === nome);
+    for (const c of tutti) { try { await ses.cookies.set({ ...posto(c), value: '', expirationDate: 1 }); } catch (_) {} }
+    let partizionati = [];
+    try { partizionati = (await ses.cookies.get({ domain: sito })).filter((c) => c.name === nome); } catch (_) {}
+    for (const url of new Set(partizionati.map(urlDi))) { try { await ses.cookies.remove(url, nome); } catch (_) {} }
+    const restati = [...partizionati];
+    const normali = tutti.filter((c) => {
+      const i = restati.findIndex((p) => uguali(p, c));
+      if (i >= 0) { restati.splice(i, 1); return false; }
+      return !c.session;
+    });
+    for (const c of normali) {
+      preesistenti.set(chiaveCookie(c), Date.now());
+      try { await ses.cookies.set({ ...posto(c), value: c.value, expirationDate: c.expirationDate }); } catch (_) {}
     }
   }
 }

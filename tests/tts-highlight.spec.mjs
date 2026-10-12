@@ -25,7 +25,7 @@ test('avviando "Leggi", la prima parola viene evidenziata sulla pagina', async (
   // Pre-condizione: l'API di evidenziazione esiste in questo runtime.
   const apiOk = await page.evaluate(() => typeof CSS !== 'undefined'
     && !!CSS.highlights && typeof window.Highlight === 'function');
-  expect(apiOk, 'CSS Custom Highlight API disponibile in Electron 33').toBe(true);
+  expect(apiOk, 'CSS Custom Highlight API disponibile nel Chromium di Electron').toBe(true);
 
   // Seleziona l'intero paragrafo.
   await page.evaluate(() => {

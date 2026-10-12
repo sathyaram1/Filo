@@ -53,6 +53,8 @@
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
+        contestoGiorni: 'contestoFilo.giorni',
+        contestoToken: 'contestoFilo.token',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle' },
       fuori: {},
@@ -62,6 +64,7 @@
         FILO_MEMORY_VIEW: 'DIMENTICA',
         FILO_MEMORY_FORGET: 'DIMENTICA',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
+        DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei due tetti della chat per mostrarli accanto ai campi: non salva niente',
         FILO_RESTART_ONBOARDING: 'pulsante che fa un’azione (rifà l’intervista di benvenuto): resta nella pagina',
         RESET_SETTINGS: 'pulsante che fa un’azione (ripristina tutte le impostazioni): resta nella pagina',
         TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
@@ -88,6 +91,7 @@
         'sec-delicate': 'security.pagineDelicate.enabled',
         'sec-delicate-sites': 'security.pagineDelicate.siti',
         'sec-auto-feedback': 'security.autoFeedback',
+        'sec-riquadri-modello': 'security.riquadriRotti.modello',
         'cookie-mode-manual': 'security.cookies.mode',
         'cookie-mode-default': 'security.cookies.mode',
         'cookie-mode-privacy': 'security.cookies.mode',
@@ -150,7 +154,7 @@
     permessiSiti: {
       nome: 'permessi dei siti (risposte ricordate)',
       come: 'TOGLI_PERMESSO_SITO per toglierne una',
-      parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti consentito negato',
+      parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti rete consentito negato',
     },
   };
 

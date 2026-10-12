@@ -7,6 +7,7 @@ const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
 const RedteamGate = require('./services/redteamGate');
+const { tastoPremuto } = require('./tastoDelMouse');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -290,7 +291,7 @@ class BarraLaterale {
       this.puntoFermo = this._punto();
       this._guarda();
     } else if (t === 'mouseMove') {
-      this.tasti[chi] = (input.modifiers || []).some((m) => /buttondown$/i.test(String(m)));
+      this.tasti[chi] = Boolean(tastoPremuto(input));
     }
   }
 
@@ -681,7 +682,9 @@ class BarraLaterale {
       { label: 'Copia data e ora', action: 'barra:copia-ora' },
     ];
     const scegli = (a) => {
-      if (a === 'barra:copia-ora') { try { require('electron').clipboard.writeText(`${data} ${orario}`); } catch (_) {} }
+      if (a === 'barra:copia-ora') {
+        try { Promise.resolve(require('electron').clipboard.writeText(`${data} ${orario}`)).catch(() => {}); } catch (_) {}
+      }
     };
     return { voci, scegli };
   }
@@ -907,6 +910,12 @@ class BarraLaterale {
       if (attiva && typeof this.tabs.tastoDelBrowser === 'function' && this.tabs.tastoDelBrowser(input, attiva)) {
         event.preventDefault();
         this.chiudi();
+        return;
+      }
+      // Cmd+freccia su Mac vale qui come Cmd+[ (#685.1): naviga se nella barra non si scrive.
+      const verso = input.type === 'keyDown' && globalThis.SN_TASTI?.comandoNavigazioneFuoriDalCampo?.(input);
+      if (attiva && verso && typeof this.tabs._navigaSeNonScrive === 'function') {
+        this.tabs._navigaSeNonScrive(wc, verso, attiva.id).then((fatto) => { if (fatto) this.chiudi(); }, () => {});
       }
     });
     collegaScorciatoie(wc, this.win);

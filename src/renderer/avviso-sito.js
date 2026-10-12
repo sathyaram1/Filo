@@ -43,8 +43,13 @@
     try { (pericoloso ? parola : carta).focus(); } catch (_) {}
   }
 
+  // Due verdetti a pochi millisecondi (sospetto, poi Google) possono arrivare invertiti: vale l'ultimo mandato.
+  let giro = 0;
   api.onStato((s) => {
     if (!s || typeof s !== 'object') return;
+    const n = Number(s.giro) || 0;
+    if (n && n <= giro) return;
+    giro = n || giro;
     disegna({
       scheda: String(s.scheda || ''),
       level: s.level === 'pericoloso' ? 'pericoloso' : 'sospetto',

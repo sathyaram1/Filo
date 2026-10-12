@@ -75,33 +75,70 @@
         // punteggiatura JSON, facendo "trovare" parole che l'utente non vede
         // da nessuna parte. Qui usiamo l'input formattato come in lista,
         // l'etichetta dell'azione, il modello, l'output e l'origine.
-        const haystack = [
-          formatActionLabel(it.action),
-          formatInput(it.input),
-          it.output || '',
-          it.origin || '',
-          it.model || '',
-        ].join(' ').toLowerCase();
-        return haystack.includes(q);
+        return haystackOf(it).includes(q);
       });
     }
 
+    shown = filtered;
+    drawn = 0;
     if (!filtered.length) {
-      // Distingui "cronologia realmente vuota" da "nessun risultato per la
-      // ricerca/filtro": mostrare il testo di vuoto assoluto durante una
-      // ricerca fa credere che la cronologia sia stata cancellata.
-      const empty = $('empty');
-      if (items.length && q) empty.textContent = I18n.t('history_no_results');
-      else if (items.length && filter) empty.textContent = I18n.t('history_no_results_filter');
-      else empty.textContent = I18n.t('history_empty');
-      empty.hidden = false;
+      showEmpty();
       return;
     }
     $('empty').hidden = true;
+    drawMore();
+  }
 
-    for (const it of filtered) {
-      list.appendChild(renderItem(it));
+  // Distingui "cronologia realmente vuota" da "nessun risultato per la
+  // ricerca/filtro": mostrare il testo di vuoto assoluto durante una
+  // ricerca fa credere che la cronologia sia stata cancellata.
+  function showEmpty() {
+    const q = ($('search').value || '').trim();
+    const empty = $('empty');
+    if (fondo) fondo.hidden = true;
+    if (items.length && q) empty.textContent = I18n.t('history_no_results');
+    else if (items.length && $('filter').value) empty.textContent = I18n.t('history_no_results_filter');
+    else empty.textContent = I18n.t('history_empty');
+    empty.hidden = false;
+  }
+
+  // La cronologia non ha tetto (#1065): disegnarla tutta a ogni apertura e a ogni lettera della ricerca
+  // blocca la pagina per secondi con qualche migliaio di voci. Si disegna un lotto, il resto mentre si scorre.
+  const LOTTO = 100;
+  let shown = [];
+  let drawn = 0;
+  let fondo = null;
+
+  function drawMore() {
+    const frag = document.createDocumentFragment();
+    const fine = Math.min(shown.length, drawn + LOTTO);
+    for (; drawn < fine; drawn++) frag.appendChild(renderItem(shown[drawn]));
+    $('list').appendChild(frag);
+    if (!fondo) return;
+    fondo.hidden = drawn >= shown.length;
+    // Una finestra alta può avere il fondo ancora in vista dopo il lotto: l'osservatore non riscatta da solo.
+    if (!fondo.hidden) { osservatore.unobserve(fondo); osservatore.observe(fondo); }
+  }
+
+  const osservatore = new IntersectionObserver((voci) => {
+    if (voci.some((v) => v.isIntersecting) && drawn < shown.length) drawMore();
+  }, { rootMargin: '1200px 0px' });
+
+  // Il testo in cui cerca una voce si compone una volta sola, non a ogni lettera per ogni voce.
+  const haystacks = new WeakMap();
+  function haystackOf(it) {
+    let h = haystacks.get(it);
+    if (h === undefined) {
+      h = [
+        formatActionLabel(it.action),
+        formatInput(it.input),
+        it.output || '',
+        it.origin || '',
+        it.model || '',
+      ].join(' ').toLowerCase();
+      haystacks.set(it, h);
     }
+    return h;
   }
 
   function renderItem(it) {
@@ -174,8 +211,14 @@
       const r = await chrome.runtime.sendMessage({ type: MSG.REMOVE_HISTORY_ENTRY, id: it.id });
       items = r?.items || items.filter((x) => x.id !== it.id);
       // Un tipo d'azione può essere scomparso del tutto: riallinea il filtro.
+      const prima = $('filter').value;
       buildFilterOptions();
-      render();
+      if ($('filter').value !== prima) { render(); return; }
+      // Ridisegnare da capo riporterebbe in cima chi ha scorso fino a questa voce: si toglie solo lei.
+      const i = shown.indexOf(it);
+      if (i >= 0) { shown = shown.filter((x) => x !== it); if (i < drawn) drawn--; }
+      wrap.remove();
+      if (!shown.length) showEmpty();
     });
     right.appendChild(remove);
 
@@ -229,10 +272,16 @@
   // Conteggi di token nel formato dei numeri italiano (1.234), per il
   // suggerimento del riuso.
   function formatTokens(n) {
-    return Number(n || 0).toLocaleString('it-IT');
+    return Number(n || 0).toLocaleString('it-IT', { useGrouping: true });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    fondo = document.createElement('div');
+    fondo.className = 'sn-history-fondo';
+    fondo.hidden = true;
+    fondo.style.height = '1px';
+    $('list').after(fondo);
+    osservatore.observe(fondo);
     load();
     $('search').addEventListener('input', render);
     $('filter').addEventListener('change', render);

@@ -344,8 +344,17 @@
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
-      if (text.trim()) {
+      // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
+      const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
+      if (text.trim() || fotoViste.length) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        fotoViste.forEach((src, i) => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.className = 'dash-bubble-img';
+          attachImageLightbox(img, src);
+          b.insertBefore(img, b.childNodes[i] || null);
+        });
         bubblesEl.appendChild(b);
         if (isUser) bollaUtente = b;
       }
@@ -357,13 +366,15 @@
       // capisce più di cosa si parlasse — un taglio silenzioso su quello che
       // aveva mandato lui.
       const quante = Number(m.images) || 0;
-      if (quante > 0) {
+      const perse = Math.max(0, quante - fotoViste.length);
+      if (perse > 0) {
         const nota = document.createElement('div');
         nota.className = 'dash-bubble-note';
         nota.dataset.replay = '1';
-        nota.textContent = quante === 1
-          ? '1 immagine, non conservata'
-          : `${quante} immagini, non conservate`;
+        const altre = fotoViste.length > 0;
+        nota.textContent = perse === 1
+          ? (altre ? 'un\'altra immagine, non conservata' : '1 immagine, non conservata')
+          : `${perse} ${altre ? 'altre ' : ''}immagini, non conservate`;
         bubblesEl.appendChild(nota);
       }
       if (!isUser && types.length) {
@@ -379,7 +390,7 @@
         ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
       };
       threadHistory.push(isUser
-        ? { role: 'user', text, ...(m.daModello ? { daModello: true } : {}) }
+        ? { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) }
         : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
     }
     Term.nuovaChat(chat.messages.some((m) => (
@@ -981,8 +992,13 @@
     // Prima query dalla home → entra in stato thread.
     if (body.dataset.state !== 'thread') goThread();
 
-    // Bolla utente
-    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}) });
+    // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
+    const domanda = text || 'Descrivi questa immagine.';
+    threadHistory.push({
+      role: 'user', text: domanda,
+      ...(imagesToSend.length ? { images: imagesToSend.length } : {}),
+      ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}),
+    });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     imagesToSend.forEach((src, i) => {
@@ -994,7 +1010,7 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello, daFuori });
+    await runTurnAndContinue({ userMessage: domanda, images: imagesToSend, daModello, daFuori });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra

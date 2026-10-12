@@ -117,6 +117,7 @@ import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticke
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
+import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -598,7 +599,7 @@ export function comandoRisposta(io, cred, id) {
  * git rifiuta, ed è giusto così. Un fallimento torna con la causa: chi chiama
  * NON rilascia.
  */
-export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
+export function pushRamoCorrente(root, { exec = execFileSync, env = process.env } = {}) {
   const run = (args) => {
     try {
       return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
@@ -616,8 +617,17 @@ export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
   if (isProtectedBranch(ramo, principale)) return { ok: true, skipped: true, branch: ramo, reason: `'${ramo}' è un ramo protetto: non si spedisce da qui` };
   // La destinazione si dichiara sulla riga stessa (sorgente:destinazione),
   // come nell'hook: una sentinella negli unit test la cerca lì.
+  // Come l'hook: una copia dei dati del server nei commit da spedire si toglie dalla loro storia, o il ramo non parte (#1108).
+  let copie = { stato: 'pulito', avviso: '' };
+  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
+  try {
+    copie = spedibileSenzaCopie(root, routine ? { nome: 'claude-routine', email: 'claude@routine' } : {});
+  } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
+  if (copie.stato === 'fermo') return { ok: false, skipped: false, branch: ramo, reason: copie.avviso };
+  try { installaControlloSpedizione(root); } catch (_) { /* il controllo qui sopra c'è già stato */ }
+  const avviso = copie.avviso ? { avviso: copie.avviso } : {};
   const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
-  if (push.ok) return { ok: true, skipped: false, branch: ramo };
+  if (push.ok) return { ok: true, skipped: false, branch: ramo, ...avviso };
   // «! [remote rejected]» è il SERVER che dice di no (un pre-receive, una
   // regola del repo, il push protection): non è storia divergente, un rebase
   // non lo cura e il lease non si tenta (verifica del giro 4, stessa regola
@@ -632,7 +642,7 @@ export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
     // Con --force-if-includes git rifiuta se quel commit non è mai passato
     // dalla storia locale di questo ramo.
     const lease = run(['push', '--force-with-lease', '--force-if-includes', 'origin', `HEAD:refs/heads/${ramo}`]);
-    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true };
+    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
@@ -671,13 +681,23 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
   if (!st.lines.length) return { ok: true, skipped: false, committed: [], reason: '' };
   const add = run(['add', '-A']);
   if (!add.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(add.out) };
+  // Un file nato da shell è il modo più comune di scaricare una copia dei dati del server: come l'hook, resta fuori (#1108).
+  let fuori = [];
+  try { fuori = copieInScena(root).map((c) => c.file); } catch (_) { /* la spedizione ricontrolla i commit */ }
+  for (const f of fuori) if (!run(['reset', '-q', '--', f]).ok) run(['rm', '-q', '--cached', '--', f]);
+  let restano = st.lines;
+  if (fuori.length) {
+    try { escludiInLocale(root, fuori); } catch (_) { /* l'avviso parte lo stesso */ }
+    restano = run(['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
+    if (!restano.length) return { ok: true, skipped: false, committed: [], fuori, reason: '' };
+  }
   const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
   const nome = routine ? 'claude-routine' : 'claude-local';
   const email = routine ? 'claude@routine' : 'claude@local';
-  const elenco = `${st.lines.slice(0, 3).join(', ')}${st.lines.length > 3 ? ` (+${st.lines.length - 3} file)` : ''}`;
+  const elenco = `${restano.slice(0, 3).join(', ')}${restano.length > 3 ? ` (+${restano.length - 3} file)` : ''}`;
   const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: rilascio — ${elenco}`]);
   if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
-  return { ok: true, skipped: false, committed: st.lines, reason: '' };
+  return { ok: true, skipped: false, committed: restano, fuori, reason: '' };
 }
 
 /**
@@ -1249,12 +1269,16 @@ if (isMain) {
       if (c.committed.length) {
         console.error(`committate ${c.committed.length} modifiche rimaste fuori dai commit: ${c.committed.slice(0, 3).join(', ')}${c.committed.length > 3 ? ` (+${c.committed.length - 3} file)` : ''}`);
       }
+      if (c.fuori && c.fuori.length) {
+        console.error(`NON committo e NON spedisco ${c.fuori.join(', ')}: ha la forma di una copia dei dati del server e il repo è pubblico. Resta nella cartella, invisibile a git: spostalo nella cartella temporanea del sistema (os.tmpdir()).`);
+      }
       const p = pushRamoCorrente(ROOT);
       if (!p.ok) {
         console.error(`Il ramo${p.branch ? ` '${p.branch}'` : ''} NON è arrivato su origin: ${p.reason}`);
         console.error('Non ho rilasciato niente: sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
         process.exit(1);
       }
+      if (p.avviso) console.error(p.avviso);
       console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
     }
     // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da

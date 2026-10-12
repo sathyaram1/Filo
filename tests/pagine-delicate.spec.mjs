@@ -352,7 +352,8 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
     !!BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
   const IBAN = 'IT60X0542811101000000123456';
   const url = testServer.html(`<!doctype html><title>Bonifico</title><body><p id="p">Il mio IBAN è ${IBAN} per il bonifico.</p></body>`, { pubblico: true });
-  const seleziona = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito }) => {
+  // Un doppio clic vero sull'IBAN: una selezione fatta da script non prepara niente in nessuna finestra (#1070).
+  const seleziona = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito, IBAN }) => {
     const win = BrowserWindow.getAllWindows().find((w) => !!w._filoIncognito === incognito && w._filoTabs);
     const tm = win._filoTabs;
     const id = tm.openTab(url);
@@ -361,21 +362,35 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
     while (Date.now() - t0 < 10_000) {
       tab = tm.tabs.find((t) => t.id === id);
       const pronta = tab && tab.view && await tab.view.webContents.executeJavaScript(
-        'document.documentElement.dataset.filoReady === "1"').catch(() => false);
+        'document.documentElement.dataset.filoContentReady === "1"').catch(() => false);
       if (pronta) break;
       await new Promise((r) => setTimeout(r, 100));
     }
-    await tab.view.webContents.executeJavaScript(`(function(){const t=document.getElementById('p').firstChild;
-      const r=document.createRange();r.setStart(t,13);r.setEnd(t,40);const s=getSelection();s.removeAllRanges();s.addRange(r);})()`);
-  }, { url, incognito });
+    const wc = tab.view.webContents;
+    const q = await wc.executeJavaScript(`(function(){const t=document.getElementById('p').firstChild;
+      const da=t.textContent.indexOf(${JSON.stringify(IBAN)});const r=document.createRange();r.setStart(t,da);r.setEnd(t,da+${IBAN.length});
+      const b=r.getBoundingClientRect();return {x:Math.round(b.left+b.width/2),y:Math.round(b.top+b.height/2)};})()`);
+    for (const clickCount of [1, 2]) {
+      wc.sendInputEvent({ type: 'mouseDown', x: q.x, y: q.y, button: 'left', clickCount });
+      wc.sendInputEvent({ type: 'mouseUp', x: q.x, y: q.y, button: 'left', clickCount });
+    }
+    const t1 = Date.now();
+    let scelta = '';
+    while (Date.now() - t1 < 3000 && scelta !== IBAN) {
+      scelta = await wc.executeJavaScript('getSelection().toString()');
+      if (scelta !== IBAN) await new Promise((r) => setTimeout(r, 50));
+    }
+    return scelta;
+  }, { url, incognito, IBAN });
   const spiegazioni = async () => (await mandato(app)).filter((m) => m.testo.includes(IBAN));
 
-  await seleziona(true);
+  // Lo stesso gesto nelle due finestre: in incognito a fermarlo è solo l'incognito.
+  expect(await seleziona(true)).toBe(IBAN);
   // La preparazione parte dopo 400 ms dalla selezione: oltre il secondo e mezzo non è partita.
   await new Promise((r) => setTimeout(r, 1500));
   expect(await spiegazioni()).toEqual([]);
 
-  await seleziona(false);
+  expect(await seleziona(false)).toBe(IBAN);
   await expect.poll(async () => (await spiegazioni()).length, { timeout: 8_000 }).toBe(1);
 });
 

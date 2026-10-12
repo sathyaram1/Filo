@@ -401,12 +401,25 @@ function chiudiAlbero(c) {
   }
 }
 
+/**
+ * Chi è la sessione che lancia i test: non arriva ai test. In una routine li faceva misurare il consumo vero, che finiva
+ * nei corpi confrontati e nelle cartelle di prova: rossi anche su main, solo lì (#949.1). Chi serve un test lo mette lui.
+ */
+export const IDENTITA_SESSIONE = Object.freeze(['FILO_ROUTINE', 'FILO_ROUTINE_TICKET', 'FILO_ROUTINE_ROLE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID']);
+
+/** L'ambiente dei test. PURA. */
+export function ambientePerITest(base, temp = '') {
+  // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
+  const { FILO_UNIT_DIR: _d, FILO_UNIT_TETTO_RIGA: _t, FILO_UNIT_TETTO_FERMO_MS: _f, ...env } = base || {};
+  for (const k of IDENTITA_SESSIONE) delete env[k];
+  if (temp) Object.assign(env, { TMPDIR: temp, TEMP: temp, TMP: temp });
+  return env;
+}
+
 // Con `avanzamento` (il file del suo reporter) un lancio che non va avanti per il tetto si chiude, e dice chi era fermo.
 const lancia = (args, temp, avanzamento = null) => new Promise((ok) => {
   // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
-  // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
-  const { FILO_UNIT_DIR: _d, FILO_UNIT_TETTO_RIGA: _t, FILO_UNIT_TETTO_FERMO_MS: _f, ...env } = process.env;
-  if (temp) Object.assign(env, { TMPDIR: temp, TEMP: temp, TMP: temp });
+  const env = ambientePerITest(process.env, temp);
   const c = spawn(process.execPath, args, { stdio: 'inherit', cwd: REPO_ROOT, env });
   let fermo = null;
   const eFermo = guardiaFermo();

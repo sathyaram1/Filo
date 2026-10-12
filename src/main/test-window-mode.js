@@ -93,6 +93,14 @@ function hideForTests(win, { main = false } = {}) {
   return true;
 }
 
+// Fuori schermo, da Electron 44 su X11 la finestra disegna un fotogramma e poi aspetta un vsync che non arriva:
+// requestAnimationFrame si ferma, e Playwright, che prima di un clic aspetta due fotogrammi fermi, non clicca più.
+// Va chiesto prima di `ready`, quando nasce il processo che disegna.
+function disegnaAncheFuoriSchermo(app, { nascoste = HIDDEN } = {}) {
+  if (!nascoste || !app) return false;
+  try { app.commandLine.appendSwitch('disable-frame-rate-limit'); return true; } catch (_) { return false; }
+}
+
 // NIENTE APERTURE DI SISTEMA DURANTE I TEST.
 //
 // `shell.openExternal(url)` e `shell.openPath(p)` chiedono al sistema di aprire
@@ -134,7 +142,14 @@ function silenziaApertureDiSistema(shell, {
   return true;
 }
 
+// Nelle macchine dei test non c'è una scheda grafica, e da Electron 44 Chromium non ripiega più da solo sul disegno
+// in software: WebGL mancherebbe, e le prove della protezione dal fingerprinting non avrebbero niente da provare.
+function webglAncheSenzaScheda(app, { inTest = inModalitaTest() } = {}) {
+  if (!inTest || !app) return false;
+  try { app.commandLine.appendSwitch('enable-unsafe-swiftshader'); return true; } catch (_) { return false; }
+}
+
 module.exports = {
-  HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests,
-  inModalitaTest, silenziaApertureDiSistema,
+  HIDDEN, coordinataFuoriSchermo, posizioneFuoriSchermo, hideForTests, disegnaAncheFuoriSchermo,
+  inModalitaTest, silenziaApertureDiSistema, webglAncheSenzaScheda,
 };

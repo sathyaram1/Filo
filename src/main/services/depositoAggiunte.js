@@ -188,19 +188,29 @@ function creaDeposito({ cartella, meseDi }) {
   function togli(ids, ripulisci) {
     const via = new Set((Array.isArray(ids) ? ids : []).filter((id) => record.has(id)));
     if (!via.size) return 0;
+    sostituisci(via, ripulisci);
+    return via.size;
+  }
+
+  // Una correzione che deve cancellare un testo dal disco non può accodare una riga: il mese si riscrive.
+  function riscrivi(ripulisci) {
+    return sostituisci(new Set(), ripulisci);
+  }
+
+  function sostituisci(via, ripulisci) {
     const toccati = new Set([...via].map((id) => record.get(id).mese));
     const sostituti = new Map();
     if (typeof ripulisci === 'function') {
       for (const [id, v] of record) {
         if (via.has(id)) continue;
         const nuovo = ripulisci(v.r);
-        if (nuovo && nuovo !== v.r) { sostituti.set(id, nuovo); toccati.add(v.mese); }
+        if (nuovo && nuovo !== v.r) { sostituti.set(id, { ...nuovo, id }); toccati.add(v.mese); }
       }
     }
     for (const mese of toccati) {
       riscriviMese(mese, (id, v) => (via.has(id) ? null : (sostituti.get(id) || v.r)));
     }
-    return via.size;
+    return sostituti.size;
   }
 
   function svuota() {
@@ -220,7 +230,7 @@ function creaDeposito({ cartella, meseDi }) {
   }
 
   return {
-    carica, tutti, prendi, aggiungi, aggiungiMolti, aggiorna, togli, svuota,
+    carica, tutti, prendi, aggiungi, aggiungiMolti, aggiorna, togli, riscrivi, svuota,
     numero: () => record.size,
     cartella: () => cartella,
   };

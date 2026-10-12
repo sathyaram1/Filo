@@ -803,6 +803,7 @@
     variabili: "legge le variabili d'ambiente",
     sistema: 'legge dati del sistema che non sono file',
     processi: 'mostra i programmi aperti con i loro argomenti',
+    rete: 'si collega a un altro computer della rete',
   };
   // Stampano il contenuto dei file che ricevono come operandi.
   const LETTORI = new Set(['cat', 'type', 'more', 'head', 'tail', 'nl', 'cut', 'uniq', 'column', 'get-content', 'gc']);
@@ -819,6 +820,22 @@
   // Le righe di comando degli altri programmi portano token e password (`ps e` anche l'ambiente).
   const PROCESSI = new Set(['ps', 'get-process', 'gps', 'w']);
   const SPOSTAMENTI = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'popd']);
+  // Stampano i loro argomenti e basta: il testo conta solo se qualcuno lo usa (tubo, gruppo).
+  const STAMPANO = new Set(['echo', 'write-output', 'write-host', 'out-string', 'out-host']);
+  // Usano gli operandi come percorsi (i lettori hanno il loro controllo, `fuoriDa`).
+  const PRENDONO_PERCORSI = new Set([...ELENCHI, ...SPOSTAMENTI, 'split-path', 'join-path']);
+  // I cmdlet che legano al percorso ciò che arriva dal tubo (`cat`/`ls`/`cd` sono loro alias in PowerShell).
+  const PERCORSO_DAL_TUBO = new Set([
+    'test-path', 'get-childitem', 'gci', 'ls', 'dir', 'get-item', 'gi', 'get-itemproperty', 'gp',
+    'get-itempropertyvalue', 'resolve-path', 'convert-path', 'get-filehash', 'set-location', 'sl', 'cd',
+    'chdir', 'pushd', 'split-path', 'join-path', 'cat', 'type', 'gc', 'get-content',
+  ]);
+  // Danno valori che si leggono nel comando (o elencano file già misurati), non testo preso da un file.
+  const FONTI_NOTE = new Set([
+    ...ELENCA_OGGETTI, ...SPOSTAMENTI, 'echo', 'write-output', 'join-path', 'split-path', 'resolve-path',
+    'convert-path', 'get-location', 'gl', 'pwd', 'test-path', 'get-date', 'where-object', 'where', '?',
+    'sort-object', 'select-object', 'select', 'measure-object', 'measure',
+  ]);
   // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
   const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
   const JOLLY = /[*?[\]{}\uFFFD]/;
@@ -852,7 +869,8 @@
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
   // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
-  function argomenti(raw) {
+  // Su Windows `\` prima di uno spazio è la fine di un percorso (`src\ \\host\x` sono due operandi), non un escape.
+  function argomenti(raw, win) {
     const out = [];
     const s = String(raw);
     let cur = '';
@@ -882,7 +900,7 @@
       // così `.ss\x68/config` fa comunque affiorare il pezzo `.ss` riservato.
       if (ch === '$' && (s[i + 1] === '\'' || s[i + 1] === '"')) { aperto = true; continue; }
       if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
-      if (ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
+      if (!win && ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
       cur += ch;
       espande += ch;
@@ -912,7 +930,14 @@
     const p = p0.replace(/^(\$env:userprofile|\$env:home|\$home|%userprofile%|%homedrive%%homepath%)(?=$|[\\/])/i, '~');
     const nomi = nomiVariabili(p);
     if (nomi.length) return nomi.every((n) => VAR_INNOCUE.has(n)) ? MOTIVI.ignoto : MOTIVI.variabili;
-    if (/^[\\/]{2}/.test(p)) return MOTIVI.fuori; // UNC, `\\?\`, `//server`
+    // `FileSystem::x` per PowerShell è il percorso `x`: stesse regole, rete compresa (#1072).
+    const prov = /^(?:microsoft\.powershell\.core\\)?filesystem::/i.exec(p);
+    if (prov) return dove(p.slice(prov[0].length), c);
+    // `\\?\C:\…` è il disco locale; ogni altro doppio separatore (UNC, `\\?\UNC\`, `//server`) e
+    // `\??\` fanno contattare a Windows un altro computer: anche solo guardarci chiede un OK (#1072, #810.13).
+    if (/^(?:[\\/]{2}[?.]|[\\/]\?\?)[\\/][A-Za-z]:/.test(p)) return MOTIVI.fuori;
+    // Senza il nome di un computer dopo le barre (`//`, `// TODO` cercato in un file) non si contatta nessuno.
+    if (/^(?:[\\/]{2,}|[\\/]\?\?[\\/]+)[^\s\\/]/.test(p)) return MOTIVI.rete;
     if (/^[A-Za-z][A-Za-z0-9]+:/.test(p)) return MOTIVI.sistema; // `env:`, `HKCU:`, `Registry::`
     let r;
     if (p === '~' || /^~[\\/]/.test(p)) {
@@ -928,13 +953,19 @@
     } else if (/^[\\/]/.test(p)) {
       if (!c.win) r = { radice: '/', segs: pezzi(p) };
       else if (c.cwd && c.cwd.radice) r = { radice: c.cwd.radice, segs: pezzi(p) };
-      else return MOTIVI.fuori;
+      else return c.cwd && c.cwd.rete ? MOTIVI.rete : MOTIVI.fuori;
     } else {
       if (!c.cwd) return MOTIVI.ignoto;
       if (c.cwd.provider) return MOTIVI.sistema;
+      if (c.cwd.rete) return MOTIVI.rete;
       r = { radice: c.cwd.radice, segs: c.cwd.segs.concat(pezzi(p)) };
     }
-    return { radice: r.radice, segs: normalizza(r.segs) };
+    // Una lettera d'unità che punta a un altro computer (`pushd \\host\x` in cmd ne crea una) è rete anche lei.
+    if (c.reti && c.reti.has(r.radice)) return MOTIVI.rete;
+    const segs = normalizza(r.segs);
+    // Su macOS `/net/<host>` monta da solo le cartelle condivise di quel computer.
+    if (!c.win && r.radice === '/' && segs.length > 1 && segs[0] === 'net') return MOTIVI.rete;
+    return { radice: r.radice, segs };
   }
 
   function dentroCasa(r, c) {
@@ -949,15 +980,22 @@
       .replace(/[ .]+$/, '').toLowerCase();
   }
 
+  function cartellaDa(r) {
+    if (r === MOTIVI.sistema) return { provider: true };
+    if (r === MOTIVI.rete) return { rete: true };
+    return r && typeof r === 'object' ? r : null;
+  }
+
   function contesto(ctx) {
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null };
+    const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti) };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
     if (cw) {
       const r = dove(cw, c);
-      c.cwd = r === MOTIVI.sistema ? { provider: true } : (r && typeof r === 'object' ? r : null);
+      c.cwd = cartellaDa(r);
     }
     return c;
   }
@@ -1115,39 +1153,64 @@
     return primoFuori(percorsi, c);
   }
 
+  // In git il testo cercato (`-S`, `--grep`, il modello di `git grep`) non si apre come percorso.
+  const TESTO_GIT = /^(?:-[SG]|--(?:grep|author|committer|format|pretty))$/;
+  function testiGit(testi) {
+    const sub = testi.findIndex((x) => !x.startsWith('-'));
+    if (sub >= 0 && testi[sub].toLowerCase() === 'grep') return testi.slice(0, sub).concat(operandiGrep(testi.slice(sub + 1)).file);
+    return testi.filter((t, i) => !/^(?:-[SG].|--(?:grep|author|committer|format|pretty)=)/.test(t) && !(i > 0 && TESTO_GIT.test(testi[i - 1])));
+  }
+
+  // Un percorso di rete scritto per intero, come operando o valore di un flag
+  // (`-Path:x`, `--from=x`, `-fx`), per QUALUNQUE lettura: anche `echo` lo passa a un tubo.
+  function scriveRete(testi, c) {
+    const assoluto = { ...c, cwd: null };
+    return testi.some((t) => {
+      const m = /^-{1,2}[A-Za-z][\w-]*[=:]?(.*)$/.exec(t);
+      const v = m ? m[1] : t;
+      return v.split(',').some((x) => dove(x, assoluto) === MOTIVI.rete);
+    });
+  }
+
   // Livello di un comando già riconosciuto come lettura (livello 1 di base).
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw).slice(1);
-    if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
-    if (PROCESSI.has(prog)) return due(MOTIVI.processi);
-    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    const args = argomenti(raw, c.win).slice(1);
     const testi = args.map((a) => a.testo);
-    if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     let cerca = null;
     if (prog === 'grep') cerca = operandiGrep(testi);
     else if (prog === 'findstr') cerca = operandiFindstr(testi);
     else if (prog === 'select-string' || prog === 'sls') cerca = operandiSls(testi);
+    // Il testo cercato non si apre mai: `grep "//TODO" a.js` non contatta nessuno, `echo //nota` che nessuno usa neanche.
+    const stampaSoltanto = c.stampaLibera && STAMPANO.has(prog);
+    if (!stampaSoltanto && scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
+    if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
+    if (PROCESSI.has(prog)) return due(MOTIVI.processi);
+    if (prog === 'git') return gitPerimetro(dequote(raw), c);
+    if (LETTORI.has(prog)) return primoFuori(operandiLettore(prog, testi), c);
     if (cerca) {
       if (cerca.ricorsivo) return due(MOTIVI.ricorsivo);
       if (cerca.ignoto) return due(MOTIVI.ignoto);
       return primoFuori(cerca.file, c);
     }
-    if (ELENCHI.has(prog)) {
+    if (PRENDONO_PERCORSI.has(prog)) {
       const ops = [];
       for (const t of testi) {
         const v = valoreDuePunti(t);
         if (v) ops.push(...v.split(','));
         else if (t && !t.startsWith('-')) ops.push(...t.split(','));
       }
+      const elenco = ELENCHI.has(prog);
       for (const t of ops) {
-        // Il valore di un gruppo può essere `env:` o `HKCU:`; Test-Path ne dice solo se esiste.
-        if (t.includes(SEGNAPOSTO) && prog !== 'test-path') return due(MOTIVI.ignoto);
+        // Il valore di un gruppo può essere `env:` o `HKCU:`; Test-Path ne dice solo se esiste,
+        // ma se viene dal contenuto di un file può essere un percorso di rete (#1072).
+        if (t.includes(SEGNAPOSTO) && ((elenco && prog !== 'test-path') || c.valoriIgnoti)) return due(MOTIVI.ignoto);
         const d = dove(t, c);
-        if (d === MOTIVI.sistema) return due(d);
+        if (d === MOTIVI.rete || (elenco && d === MOTIVI.sistema)) return due(d);
       }
       if (!ops.length && ELENCA_CARTELLA.has(prog)) {
         if (c.cwd && c.cwd.provider) return due(MOTIVI.sistema);
+        if (c.cwd && c.cwd.rete) return due(MOTIVI.rete);
         if (!c.cwd) return due(MOTIVI.ignoto);
       }
     }
@@ -1162,7 +1225,7 @@
   // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
   function spostati(raw, c) {
     const prog = programOf(dequote(raw));
-    const args = argomenti(raw).slice(1);
+    const args = argomenti(raw, c.win).slice(1);
     if (prog === 'popd' || args.some((a) => a.variabile)) return { ...c, cwd: null };
     let dest = null;
     for (let i = 0; i < args.length; i++) {
@@ -1174,14 +1237,13 @@
       break;
     }
     if (dest === null) return { ...c, cwd: null };
-    const r = dove(dest, c);
-    if (r === MOTIVI.sistema) return { ...c, cwd: { provider: true } };
-    return { ...c, cwd: r && typeof r === 'object' ? r : null };
+    return { ...c, cwd: cartellaDa(dove(dest, c)) };
   }
 
   function chiaveCwd(c) {
     if (!c.cwd) return '?';
-    return c.cwd.provider ? 'P' : `${c.cwd.radice}/${c.cwd.segs.join('/')}`;
+    if (c.cwd.provider) return 'P';
+    return c.cwd.rete ? 'R' : `${c.cwd.radice}/${c.cwd.segs.join('/')}`;
   }
 
   // ── Gruppi, sottoespressioni e `if` di PowerShell (#516) ─────────────────
@@ -1386,6 +1448,11 @@
   const gruppiAlPosto = (testo) => testo.split(/;|&&|\|\|/).every((istr) => istr.split('|')
     .every((seg, i) => !seg.includes(SEGNAPOSTO) || (i === 0 && gruppoComeArgomento(programOf(dequote(seg))))));
 
+  function valoreNoto(testo) {
+    if (/[({]/.test(String(testo).replace(/'[^']*'|"[^"]*"/g, ''))) return false;
+    return String(testo).split(/;|&&|\|\|?/).every((seg) => !seg.trim() || FONTI_NOTE.has(programOf(dequote(seg.trim()))));
+  }
+
   function classifica(cmd, c, prof) {
     const trimmed = String(cmd).trim();
     if (!trimmed || prof > PROF_MAX) return TRE;
@@ -1394,13 +1461,16 @@
     // Il testo lasciato fuori non passa dai controlli dei separatori: non ne deve avere, neanche fra virgolette.
     if (sm === TRE || /[;|&<>]/.test(sm.lasciato)) return TRE;
     if (!gruppiAlPosto(sm.testo)) return TRE;
+    // Un gruppo che prende testo da un file può valere un percorso di rete (#1072).
+    if (sm.pezzi.some((p) => !valoreNoto(p.testo))) c = { ...c, valoriIgnoti: true };
     const ignota = { ...c, cwd: null };
     let det = classificaPiatta(sm.testo.trim(), sm.mosso ? ignota : c);
     if (nomiVariabili(sm.lasciato).some((n) => !VAR_INNOCUE.has(n))) det = peggiore(det, due(MOTIVI.variabili));
     for (const p of sm.pezzi) {
       if (det.level === 3) break;
       const t = p.testo.trim();
-      const cc = p.spostato ? ignota : c;
+      // Ciò che un gruppo stampa diventa l'argomento del comando attorno.
+      const cc = { ...(p.spostato ? ignota : c), stampaLibera: false };
       // Il corpo di un `if` può essere vuoto o un valore solo (stringa, numero, variabile), che PowerShell stampa.
       if (p.corpo && !t) continue;
       const sub = p.corpo && VALORE_RE.test(t) ? `Write-Output ${t}` : t;
@@ -1410,9 +1480,19 @@
   }
 
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
+  // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
+  // devono vedere il comando che la shell esegue, non la sua grafia (#1072).
+  function comeLaShell(cmd, c) {
+    if (!c.win) return cmd;
+    return cmd.replace(/[\u201C-\u201F]/g, '"')
+      .replace(/[\u2018-\u201B]/g, "'")
+      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-');
+  }
+
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
-    return classifica(cmd, contesto(ctx), 0);
+    const c = { ...contesto(ctx), stampaLibera: true };
+    return classifica(comeLaShell(cmd, c), c, 0);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
@@ -1449,10 +1529,14 @@
       const cp = progs.some((x) => SPOSTAMENTI.has(x)) ? { ...c, cwd: null } : c;
       let det = UNO;
       let elenco = false;
+      let noto = true;
       pipe.forEach((p, i) => {
         if (elenco && LETTI_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
+        // Testo letto da un file, dato come percorso, può portare in rete (#1072).
+        if (!noto && PERCORSO_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
+        if (!FONTI_NOTE.has(progs[i]) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
         if (ELENCA_OGGETTI.has(progs[i]) || p.includes(SEGNAPOSTO)) elenco = true;
-        if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, cp));
+        if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, i < pipe.length - 1 ? { ...cp, stampaLibera: false } : cp));
       });
       return det;
     }

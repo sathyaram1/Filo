@@ -283,6 +283,11 @@
     for (const a of Array.isArray(actions) ? actions : []) {
       const out = a && a._output;
       if (!out || typeof out !== 'object') continue;
+      // Testo venuto da fuori che il filo riporta (#868), da qualunque azione: la lettura che era.
+      for (const x of Array.isArray(out.daFuori) ? out.daFuori : []) {
+        const t = testo(x && x.testo);
+        if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, testo(x.fonte) || 'da fuori'); }
+      }
       const type = String(a.type || '').toUpperCase();
       if (type === 'ESEGUI_COMANDO') {
         if (out.blocked) continue;
@@ -302,8 +307,14 @@
         for (const r of Array.isArray(out.results) ? out.results : []) {
           if (r) letti.push(`${testo(r.title)}\n${testo(r.snippet)}`);
         }
+        // I cambi del filo sono dati del computer; le pagine visitate si riaprono tali e quali, come i link di
+        // una ricerca, e quello che ci hanno scritto i siti conta come testo di fuori (#868).
+        for (const c of Array.isArray(out.cambi) ? out.cambi : []) if (c) letti.push(testo(c.frase));
         pezzi.push(...letti);
         daFuori(letti.filter(Boolean).join('\n'), 'da una conversazione archiviata');
+        const pagine = (Array.isArray(out.pagine) ? out.pagine : []).filter(Boolean);
+        for (const p of pagine) if (p.url) linkNoti.add(chiaveLink(p.url));
+        daFuori(pagine.map((p) => `${testo(p.title)}\n${testo(p.url)}\n${testo(p.riassunto)}`).join('\n'), 'dalle pagine visitate');
       } else if (type === 'CERCA_WEB') {
         const results = Array.isArray(out.results) ? out.results : [];
         if (results.length) nonFidato = true;

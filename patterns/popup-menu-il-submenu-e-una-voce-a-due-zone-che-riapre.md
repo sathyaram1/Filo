@@ -12,5 +12,9 @@ nello stesso punto con le voci del secondo livello.
 - **Perché:** un hover-submenu richiederebbe una seconda finestra sincronizzata
   (posizione, blur, z-order) per un beneficio minimo; riaprire lo stesso popup
   è coerente, robusto e riusa tutto (stile, selezione, chiusura su blur).
-- **Dove:** rendering in `buildHTML` (`.row` + `.subarrow`); esempio d'uso in
+- **Dove:** rendering in `vociHTML` (`.row` + `.subarrow`); esempio d'uso in
   `openTabContextMenu` / `openProxyCountryMenu` in `src/renderer/shell.js`.
+- **La riapertura è immediata:** il main chiude il menu PRIMA di chiamare chi ha
+  scelto, quindi il secondo livello riusa la stessa finestra anche se arriva
+  nello stesso istante
+  ([pattern](una-finestra-a-comparsa-nasce-una-volta-e-si-riusa.md)).

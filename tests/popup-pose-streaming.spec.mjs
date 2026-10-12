@@ -16,6 +16,13 @@
 // casella di testo dentro il viewport diventa rosso.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { nelMondoDiFilo, statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+
+// Sui siti il riquadro sta in uno shadow root chiuso (#1071): le misure si prendono nel mondo dei content script, dove
+// SN_FILO_UI._test lo raggiunge; sulle pagine di Filo è nel documento e le stesse funzioni lo trovano lì.
+const valuta = (app, page, fn, frame = null) => nelMondoDiFilo(app, page, fn, null, frame);
+const testoDi = async (app, page, sel, frame = null) => (await statoDi(app, page, sel, frame))?.testo || '';
+const valoreDi = async (app, page, sel, frame = null) => (await statoDi(app, page, sel, frame))?.valore ?? null;
 
 // Provider finto: manda una risposta lunga a pezzi, con una pausa fra uno e
 // l'altro. La lunghezza serve a portare il riquadro al suo tetto d'altezza; le
@@ -62,17 +69,21 @@ async function ripristinaProvider(app) {
 // L'apertura ha una sua animazione (dissolvenza con 2px di scivolata): non è la
 // posa, è l'ingresso. Chi misura prima che finisca legge una posizione che
 // nessuno ha deciso. Aspettiamo che sia finita e poi guardiamo.
-const attendiIngresso = async (page) => {
-  await page.evaluate(async () => {
-    const root = document.querySelector('.sn-popup');
+const attendiIngresso = async (app, page, frame = null) => {
+  await valuta(app, page, async () => {
+    const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+    const root = T ? T.trova('.sn-popup') : document.querySelector('.sn-popup');
     if (!root?.getAnimations) return;
     await Promise.all(root.getAnimations().map((a) => a.finished.catch(() => {})));
-  });
+  }, frame);
 };
 
 // Legge la posa corrente: ingombro del riquadro e della riga per scrivere.
 const misura = () => {
-  const root = document.querySelector('.sn-popup');
+  const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+  const trova = (sel) => (T ? T.trova(sel) : document.querySelector(sel));
+  const daPunto = (x, y) => (T ? T.daPunto(x, y) : document.elementFromPoint(x, y));
+  const root = trova('.sn-popup');
   if (!root) return null;
   const input = root.querySelector('.sn-popup-input');
   const send = root.querySelector('.sn-popup-send');
@@ -132,11 +143,14 @@ const fuoriDaiBordi = (m) => {
 // La riga per scrivere non è solo "dentro le coordinate": sotto il cursore, al
 // centro della casella, ci deve essere davvero la casella.
 const casellaCliccabile = () => {
-  const root = document.querySelector('.sn-popup');
+  const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+  const trova = (sel) => (T ? T.trova(sel) : document.querySelector(sel));
+  const daPunto = (x, y) => (T ? T.daPunto(x, y) : document.elementFromPoint(x, y));
+  const root = trova('.sn-popup');
   if (!root) return false;
   const input = root.querySelector('.sn-popup-input');
   const r = input.getBoundingClientRect();
-  const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  const el = daPunto(r.left + r.width / 2, r.top + r.height / 2);
   return !!el && (el === input || input.contains(el));
 };
 
@@ -163,9 +177,9 @@ test('spiegazione approfondita su selezione in basso: la riga per scrivere resta
   });
 
   // Il riquadro nasce vuoto: è questa l'altezza su cui il vecchio codice posava.
-  await page.waitForSelector('.sn-popup', { timeout: 8000 });
-  await attendiIngresso(page);
-  const daVuoto = await page.evaluate(misura);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 8000 }).toBeGreaterThan(0);
+  await attendiIngresso(app, page);
+  const daVuoto = await valuta(app, page, misura);
   expect(daVuoto).not.toBeNull();
   // La misura è presa DAVVERO da vuoto: se la risposta fosse già arrivata il
   // test non guarderebbe più la crescita, e passerebbe senza provare niente.
@@ -177,26 +191,26 @@ test('spiegazione approfondita su selezione in basso: la riga per scrivere resta
   const finoA = Date.now() + 12_000;
   let cresciuto = daVuoto.height;
   while (Date.now() < finoA) {
-    const m = await page.evaluate(misura);
+    const m = await valuta(app, page, misura);
     if (!m) break;
     cresciuto = Math.max(cresciuto, m.height);
     if (m.bottom > m.vh + 1 || m.top < -1 || m.left < -1 || m.right > m.vw + 1) {
       sconfinamenti.push(m);
     }
-    const fatto = await page.locator('.sn-popup .sn-popup-meta').textContent().catch(() => '');
+    const fatto = await testoDi(app, page, '.sn-popup .sn-popup-meta');
     if (fatto && fatto.includes('€')) break;
     await page.waitForTimeout(60);
   }
 
   // Il turno è chiuso: quello che vediamo è la risposta finale, non un fotogramma.
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 15_000 });
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta'), { timeout: 15_000 }).toContain('€');
   await expect(page.locator('.sn-popup .sn-msg-assistant .sn-msg-text').last())
     .toContainText('Paragrafo 12', { timeout: 5000 });
 
   // Lo scenario è quello vero: il riquadro è cresciuto parecchio dopo l'apertura.
   expect(cresciuto).toBeGreaterThan(daVuoto.height + 100);
 
-  const finale = await page.evaluate(misura);
+  const finale = await valuta(app, page, misura);
 
   // SUCCESSO 1 — la riga per scrivere la domanda successiva è dentro lo schermo.
   expect(finale.inputBottom).toBeLessThanOrEqual(finale.vh);
@@ -217,9 +231,8 @@ test('spiegazione approfondita su selezione in basso: la riga per scrivere resta
   expect(cliccabile).toBe(true);
 
   // SUCCESSO 3 — e ci si può davvero scrivere dentro.
-  await page.locator('.sn-popup .sn-popup-input').click();
-  await page.locator('.sn-popup .sn-popup-input').fill('e questo cosa vuol dire?');
-  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e questo cosa vuol dire?');
+  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e questo cosa vuol dire?');
+  await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e questo cosa vuol dire?');
 
   // Nessuno sconfinamento nemmeno a metà streaming.
   expect(sconfinamenti, `posa fuori dallo schermo durante lo streaming: ${JSON.stringify(sconfinamenti.slice(0, 3))}`).toEqual([]);
@@ -255,27 +268,27 @@ test('selezione a metà finestra: il riquadro si accorcia invece di sbordare, e 
     });
   });
 
-  await page.waitForSelector('.sn-popup', { timeout: 8000 });
-  await attendiIngresso(page);
-  const daVuoto = await page.evaluate(misura);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 8000 }).toBeGreaterThan(0);
+  await attendiIngresso(app, page);
+  const daVuoto = await valuta(app, page, misura);
   expect(daVuoto.height, 'la risposta è arrivata prima della misura da vuoto').toBeLessThan(350);
 
   const cime = new Set();
   const finoA = Date.now() + 12_000;
   while (Date.now() < finoA) {
-    const m = await page.evaluate(misura);
+    const m = await valuta(app, page, misura);
     if (!m) break;
     cime.add(Math.round(m.top));
     // Nemmeno per un fotogramma: se sborda, qui il test è già rosso.
     expect(m.bottom, `riquadro fuori dal fondo a metà risposta (vh=${m.vh})`).toBeLessThanOrEqual(m.vh + 1);
-    const fatto = await page.locator('.sn-popup .sn-popup-meta').textContent().catch(() => '');
+    const fatto = await testoDi(app, page, '.sn-popup .sn-popup-meta');
     if (fatto && fatto.includes('€')) break;
     await page.waitForTimeout(60);
   }
 
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 15_000 });
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta'), { timeout: 15_000 }).toContain('€');
 
-  const finale = await page.evaluate(misura);
+  const finale = await valuta(app, page, misura);
   // Il lato scelto è "sotto" e non cambia: la cima non si è mai mossa, niente
   // salto a metà risposta.
   expect([...cime]).toEqual([Math.round(daVuoto.top)]);
@@ -328,9 +341,9 @@ test('Alt+E su una parola in basso in una pagina vera: la riga per scrivere rest
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
 
-  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
-  await attendiIngresso(page);
-  const daVuoto = await page.evaluate(misura);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 10_000 }).toBeGreaterThan(0);
+  await attendiIngresso(app, page);
+  const daVuoto = await valuta(app, page, misura);
   expect(daVuoto).not.toBeNull();
   // La misura è presa DAVVERO da vuoto: se la risposta fosse già arrivata il
   // test non guarderebbe più la crescita, e passerebbe senza provare niente.
@@ -341,20 +354,20 @@ test('Alt+E su una parola in basso in una pagina vera: la riga per scrivere rest
   let cresciuto = daVuoto.height;
   const finoA = Date.now() + 20_000;
   while (Date.now() < finoA) {
-    const m = await page.evaluate(misura);
+    const m = await valuta(app, page, misura);
     if (!m) break;
     cresciuto = Math.max(cresciuto, m.height);
     if (m.bottom > m.vh + 1 || m.top < -1) sconfinamenti.push(m);
-    const fatto = await page.locator('.sn-popup .sn-popup-meta').textContent().catch(() => '');
+    const fatto = await testoDi(app, page, '.sn-popup .sn-popup-meta');
     if (fatto && fatto.includes('€')) break;
     await page.waitForTimeout(60);
   }
 
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta'), { timeout: 20_000 }).toContain('€');
   // Lo scenario è quello vero: il riquadro è cresciuto parecchio dopo l'apertura.
   expect(cresciuto).toBeGreaterThan(daVuoto.height + 100);
 
-  const finale = await page.evaluate(misura);
+  const finale = await valuta(app, page, misura);
   expect(finale.bottom).toBeLessThanOrEqual(finale.vh + 1);
   expect(finale.top).toBeGreaterThanOrEqual(-1);
   expect(finale.inputBottom).toBeLessThanOrEqual(finale.vh);
@@ -363,9 +376,8 @@ test('Alt+E su una parola in basso in una pagina vera: la riga per scrivere rest
 
   // E la domanda successiva si può davvero fare: la casella si clicca e accetta
   // testo. È questo che l'utente non riusciva più a fare.
-  await page.locator('.sn-popup .sn-popup-input').click();
-  await page.locator('.sn-popup .sn-popup-input').fill('e questo cosa vuol dire?');
-  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e questo cosa vuol dire?');
+  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e questo cosa vuol dire?');
+  await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e questo cosa vuol dire?');
 
   await ripristinaProvider(app);
 });
@@ -397,9 +409,9 @@ test('trascinato mentre la risposta arriva: si sposta, non si stira e non torna 
       title: 'Approfondisci',
     });
   });
-  await page.waitForSelector('.sn-popup', { timeout: 8000 });
-  await attendiIngresso(page);
-  const prima = await page.evaluate(misura);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 8000 }).toBeGreaterThan(0);
+  await attendiIngresso(app, page);
+  const prima = await valuta(app, page, misura);
 
   // Trascina l'intestazione verso l'alto a sinistra, come farebbe un utente.
   const header = page.locator('.sn-popup-header');
@@ -409,7 +421,7 @@ test('trascinato mentre la risposta arriva: si sposta, non si stira e non torna 
   await page.mouse.move(hb.x + hb.width / 2 - 60, hb.y + hb.height / 2 - 120, { steps: 10 });
   await page.mouse.up();
 
-  const dopo = await page.evaluate(misura);
+  const dopo = await valuta(app, page, misura);
   // Si è spostato davvero…
   expect(Math.round(dopo.top)).toBeLessThan(Math.round(prima.top));
   expect(Math.round(dopo.left)).toBeLessThan(Math.round(prima.left));
@@ -418,8 +430,8 @@ test('trascinato mentre la risposta arriva: si sposta, non si stira e non torna 
   expect(dopo.height).toBeLessThan(dopo.vh - 50);
 
   // La risposta finisce di arrivare: il riquadro resta dove l'utente l'ha messo.
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
-  const finale = await page.evaluate(misura);
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta'), { timeout: 20_000 }).toContain('€');
+  const finale = await valuta(app, page, misura);
   expect(Math.round(finale.left)).toBe(Math.round(dopo.left));
   expect(finale.bottom).toBeLessThanOrEqual(finale.vh + 1);
   expect(finale.top).toBeGreaterThanOrEqual(-1);
@@ -466,17 +478,17 @@ test('selezione che prosegue sotto la piega: il riquadro nasce dentro lo schermo
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
 
-  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
-  await attendiIngresso(page);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 10_000 }).toBeGreaterThan(0);
+  await attendiIngresso(app, page);
 
   // Già da vuoto è dentro lo schermo.
-  const daVuoto = await page.evaluate(misura);
+  const daVuoto = await valuta(app, page, misura);
   expect(daVuoto.bottom, 'il riquadro nasce già fuori dal fondo').toBeLessThanOrEqual(daVuoto.vh + 1);
   expect(daVuoto.top).toBeGreaterThanOrEqual(-1);
 
   // E ci resta quando la risposta lo fa crescere.
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
-  const finale = await page.evaluate(misura);
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta'), { timeout: 20_000 }).toContain('€');
+  const finale = await valuta(app, page, misura);
   expect(finale.bottom).toBeLessThanOrEqual(finale.vh + 1);
   expect(finale.top).toBeGreaterThanOrEqual(-1);
   expect(finale.inputBottom).toBeLessThanOrEqual(finale.vh);
@@ -537,10 +549,10 @@ async function riquadroPosato(app, page, frazione = 0.75) {
       title: 'Approfondisci',
     });
   }, frazione);
-  await page.waitForSelector('.sn-popup', { timeout: 8000 });
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
-  await attendiIngresso(page);
-  return page.evaluate(misura);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 8000 }).toBeGreaterThan(0);
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta'), { timeout: 20_000 }).toContain('€');
+  await attendiIngresso(app, page);
+  return valuta(app, page, misura);
 }
 
 test('zoom della pagina col riquadro aperto: resta dentro lo schermo, e tornando allo zoom di prima torna alto com\'era', async ({ app, openTab }) => {
@@ -562,16 +574,15 @@ test('zoom della pagina col riquadro aperto: resta dentro lo schermo, e tornando
   // fotogramma il riquadro è ancora posato sulla finestra di prima. Quello che
   // conta è dove si ferma — senza il rimedio ci resta e basta.
   await expect.poll(
-    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    async () => fuoriDaiBordi(await valuta(app, page, misura)),
     { timeout: 5000, message: 'dopo lo zoom il riquadro è rimasto fuori dallo schermo' },
   ).toEqual([]);
 
-  const zoomato = await page.evaluate(misura);
+  const zoomato = await valuta(app, page, misura);
   // È questo che l'utente non riusciva più a fare.
-  expect(await page.evaluate(casellaCliccabile)).toBe(true);
-  await page.locator('.sn-popup .sn-popup-input').click();
-  await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
-  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+  expect(await valuta(app, page, casellaCliccabile)).toBe(true);
+  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e adesso?');
+  await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e adesso?');
 
   // Quando lo spazio torna, il riquadro deve poter tornare alto com'era: non
   // resta stretto per sempre solo perché per un momento c'era meno posto.
@@ -579,12 +590,12 @@ test('zoom della pagina col riquadro aperto: resta dentro lo schermo, e tornando
   await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
     .toBeGreaterThan(zoomato.vh + 50);
   await expect.poll(
-    async () => (await page.evaluate(misura)).height,
+    async () => (await valuta(app, page, misura)).height,
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
   ).toBeGreaterThan(prima.height - 3);
 
-  expect(fuoriDaiBordi(await page.evaluate(misura))).toEqual([]);
-  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+  expect(fuoriDaiBordi(await valuta(app, page, misura))).toEqual([]);
+  expect(await valuta(app, page, casellaCliccabile)).toBe(true);
 
   await zoomScheda(app, 1);
   await ripristinaProvider(app);
@@ -605,18 +616,17 @@ test('finestra rimpicciolita col riquadro aperto: resta dentro lo schermo e la r
   ).toBeLessThan(prima.vh - 50);
 
   await expect.poll(
-    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    async () => fuoriDaiBordi(await valuta(app, page, misura)),
     { timeout: 5000, message: 'dopo il ridimensionamento il riquadro è rimasto fuori dallo schermo' },
   ).toEqual([]);
-  expect(await page.evaluate(casellaCliccabile)).toBe(true);
-  await page.locator('.sn-popup .sn-popup-input').click();
-  await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
-  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+  expect(await valuta(app, page, casellaCliccabile)).toBe(true);
+  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e adesso?');
+  await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e adesso?');
 
   // Riallargata, il riquadro torna alto com'era.
   await altezzaFinestra(page, alta);
   await expect.poll(
-    async () => (await page.evaluate(misura)).height,
+    async () => (await valuta(app, page, misura)).height,
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
   ).toBeGreaterThan(prima.height - 3);
 
@@ -638,10 +648,9 @@ for (const altezza of [380, 260]) {
 
     const posato = await riquadroPosato(app, page);
     expect(fuoriDaiBordi(posato), 'il riquadro nasce fuori da una finestra bassa').toEqual([]);
-    expect(await page.evaluate(casellaCliccabile)).toBe(true);
-    await page.locator('.sn-popup .sn-popup-input').click();
-    await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
-    await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+    expect(await valuta(app, page, casellaCliccabile)).toBe(true);
+    await scrivi(app, page, '.sn-popup .sn-popup-input', 'e adesso?');
+    await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e adesso?');
 
     // Il testo non è andato perduto con l'altezza: il corpo scorre.
     await expect(page.locator('.sn-popup .sn-msg-assistant .sn-msg-text').last())
@@ -719,12 +728,12 @@ for (const alto of [130, 180, 240]) {
       globalThis.__filoShortcuts.dispatch('explain-selection', win);
     });
 
-    await frame.waitForSelector('.sn-popup', { timeout: 10_000 });
-    await attendiIngresso(frame);
+    await expect.poll(() => conta(app, page, '.sn-popup', frame), { timeout: 10_000 }).toBeGreaterThan(0);
+    await attendiIngresso(app, page, frame);
 
     // Lo scenario è quello vero: il popup vive dentro il riquadro, e il riquadro
     // è più basso del tetto d'altezza del popup.
-    const daVuoto = await frame.evaluate(misura);
+    const daVuoto = await valuta(app, page, misura, frame);
     expect(daVuoto.vh, 'il popup non sta nel frame del riquadro').toBeLessThanOrEqual(alto);
 
     // SUCCESSO 1 — già da vuoto è tutto dentro il riquadro: intestazione e riga
@@ -734,33 +743,24 @@ for (const alto of [130, 180, 240]) {
 
     // …e ci resta quando la risposta lo fa crescere.
     await expect
-      .poll(() => frame.evaluate(() => document.querySelector('.sn-popup-meta')?.textContent || ''), { timeout: 20_000 })
+      .poll(() => testoDi(app, page, '.sn-popup-meta', frame), { timeout: 20_000 })
       .toContain('€');
-    const finale = await frame.evaluate(misura);
+    const finale = await valuta(app, page, misura, frame);
     expect(fuoriDaiBordi(finale), 'il popup è uscito dal riquadro incorporato quando la risposta è arrivata').toEqual([]);
 
     // SUCCESSO 2 — la riga per scrivere si clicca davvero, e accetta testo: è
     // questo che dentro un riquadro basso non si riusciva più a fare.
-    expect(await frame.evaluate(casellaCliccabile)).toBe(true);
-    const casella = page.frameLocator('#riquadro').locator('.sn-popup .sn-popup-input');
-    await casella.click();
-    await casella.fill('e questo cosa vuol dire?');
-    await expect(casella).toHaveValue('e questo cosa vuol dire?');
+    expect(await valuta(app, page, casellaCliccabile, frame)).toBe(true);
+    await scrivi(app, page, '.sn-popup .sn-popup-input', 'e questo cosa vuol dire?', { frame });
+    await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input', frame)).toBe('e questo cosa vuol dire?');
 
     // SUCCESSO 3 — il tasto di invio c'è ed è cliccabile.
-    const inviaDentro = await frame.evaluate(() => {
-      const b = document.querySelector('.sn-popup .sn-popup-send');
-      if (!b) return false;
-      const r = b.getBoundingClientRect();
-      if (r.bottom > window.innerHeight || r.top < 0 || r.width === 0) return false;
-      const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return !!el && (el === b || b.contains(el));
-    });
+    const inviaDentro = await valuta(app, page, invioCliccabile, frame);
     expect(inviaDentro, 'il tasto di invio è fuori dal riquadro incorporato').toBe(true);
 
     // SUCCESSO 4 — la risposta non è andata perduta con l'altezza: il corpo
     // scorre, e il testo completo è lì dentro.
-    const testo = await frame.evaluate(() => document.querySelector('.sn-popup .sn-msg-assistant .sn-msg-text')?.textContent || '');
+    const testo = await testoDi(app, page, '.sn-popup .sn-msg-assistant .sn-msg-text', frame);
     expect(testo).toContain('Paragrafo 12');
 
     await ripristinaProvider(app);
@@ -832,25 +832,22 @@ for (const alto of [240, 300, 340, 420]) {
       globalThis.__filoShortcuts.dispatch('explain-selection', win);
     });
 
-    await frame.waitForSelector('.sn-popup', { timeout: 10_000 });
-    await attendiIngresso(frame);
+    await expect.poll(() => conta(app, page, '.sn-popup', frame), { timeout: 10_000 }).toBeGreaterThan(0);
+    await attendiIngresso(app, page, frame);
     await expect
-      .poll(() => frame.evaluate(() => document.querySelector('.sn-popup-meta')?.textContent || ''), { timeout: 20_000 })
+      .poll(() => testoDi(app, page, '.sn-popup-meta', frame), { timeout: 20_000 })
       .toContain('€');
 
     // Lo scenario è quello vero: il box è più basso del tetto del riquadro, e
     // la parola sta a metà — nessuno dei due lati basta.
-    const m = await frame.evaluate(misura);
+    const m = await valuta(app, page, misura, frame);
     expect(m.vh, 'il popup non sta nel frame del riquadro').toBeLessThanOrEqual(alto);
 
     // SUCCESSO 1 — della spiegazione se ne legge almeno il minimo comodo: non
     // una fessura da scorrere con la rotella.
     const comodo = await frame.evaluate(minimoComodoDelCorpo);
     expect(comodo, 'il minimo comodo del corpo non si legge dal foglio di stile').toBeGreaterThan(0);
-    const corpo = await frame.evaluate(() => {
-      const b = document.querySelector('.sn-popup .sn-popup-body');
-      return b ? b.getBoundingClientRect().height : 0;
-    });
+    const corpo = (await statoDi(app, page, '.sn-popup .sn-popup-body', frame))?.height || 0;
     expect(
       Math.round(corpo),
       `della spiegazione si leggono ${Math.round(corpo)}px in un riquadro alto ${alto}px, con ${Math.round(m.vh - m.height)}px di riquadro vuoto`,
@@ -859,16 +856,14 @@ for (const alto of [240, 300, 340, 420]) {
     // SUCCESSO 2 — e niente esce dal bordo del box né dal bordo del riquadro:
     // lo spazio guadagnato non si paga con la riga per scrivere tagliata.
     expect(fuoriDaiBordi(m), 'il popup è uscito dal riquadro incorporato').toEqual([]);
-    expect(await frame.evaluate(casellaCliccabile)).toBe(true);
+    expect(await valuta(app, page, casellaCliccabile, frame)).toBe(true);
 
     // SUCCESSO 3 — la conversazione continua: la domanda dopo si scrive.
-    const casella = page.frameLocator('#riquadro').locator('.sn-popup .sn-popup-input');
-    await casella.click();
-    await casella.fill('e questo cosa vuol dire?');
-    await expect(casella).toHaveValue('e questo cosa vuol dire?');
+    await scrivi(app, page, '.sn-popup .sn-popup-input', 'e questo cosa vuol dire?', { frame });
+    await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input', frame)).toBe('e questo cosa vuol dire?');
 
     // SUCCESSO 4 — la risposta è tutta lì: il corpo scorre.
-    const testo = await frame.evaluate(() => document.querySelector('.sn-popup .sn-msg-assistant .sn-msg-text')?.textContent || '');
+    const testo = await testoDi(app, page, '.sn-popup .sn-msg-assistant .sn-msg-text', frame);
     expect(testo).toContain('Paragrafo 12');
 
     // Traccia visiva della run (gitignorata).
@@ -901,43 +896,42 @@ for (const largo of [320, 280]) {
       globalThis.__filoShortcuts.dispatch('explain-selection', win);
     });
 
-    await frame.waitForSelector('.sn-popup', { timeout: 10_000 });
-    await attendiIngresso(frame);
+    await expect.poll(() => conta(app, page, '.sn-popup', frame), { timeout: 10_000 }).toBeGreaterThan(0);
+    await attendiIngresso(app, page, frame);
 
     // Lo scenario è quello vero: il riquadro incorporato è più STRETTO della
     // larghezza naturale del popup.
-    const daVuoto = await frame.evaluate(misura);
+    const daVuoto = await valuta(app, page, misura, frame);
     expect(daVuoto.vw, 'il riquadro incorporato non è più stretto del popup').toBeLessThan(380);
 
     // SUCCESSO 1 — già da vuoto è tutto dentro, tasto di invio compreso.
     expect(fuoriDaiBordi(daVuoto), 'il popup nasce fuori dal bordo del riquadro stretto').toEqual([]);
 
     await expect
-      .poll(() => frame.evaluate(() => document.querySelector('.sn-popup-meta')?.textContent || ''), { timeout: 20_000 })
+      .poll(() => testoDi(app, page, '.sn-popup-meta', frame), { timeout: 20_000 })
       .toContain('€');
-    expect(fuoriDaiBordi(await frame.evaluate(misura)), 'il popup è uscito dal riquadro stretto quando la risposta è arrivata').toEqual([]);
+    expect(fuoriDaiBordi(await valuta(app, page, misura, frame)), 'il popup è uscito dal riquadro stretto quando la risposta è arrivata').toEqual([]);
 
     // SUCCESSO 2 — la riga per scrivere accetta testo…
-    expect(await frame.evaluate(casellaCliccabile)).toBe(true);
-    const casella = page.frameLocator('#riquadro').locator('.sn-popup .sn-popup-input');
-    await casella.click();
-    await casella.fill('e questo cosa vuol dire?');
-    await expect(casella).toHaveValue('e questo cosa vuol dire?');
+    expect(await valuta(app, page, casellaCliccabile, frame)).toBe(true);
+    await scrivi(app, page, '.sn-popup .sn-popup-input', 'e questo cosa vuol dire?', { frame });
+    await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input', frame)).toBe('e questo cosa vuol dire?');
 
     // SUCCESSO 3 — …e il tasto di invio si clicca davvero: è lui che in un
     // riquadro stretto finiva tagliato via.
-    const inviaCliccabile = await frame.evaluate(() => {
-      const b = document.querySelector('.sn-popup .sn-popup-send');
+    const inviaCliccabile = await valuta(app, page, () => {
+      const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+      const b = T ? T.trova('.sn-popup .sn-popup-send') : document.querySelector('.sn-popup .sn-popup-send');
       if (!b) return false;
       const r = b.getBoundingClientRect();
       if (r.right > window.innerWidth || r.left < 0 || r.bottom > window.innerHeight || r.width === 0) return false;
-      const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      const el = T ? T.daPunto(r.left + r.width / 2, r.top + r.height / 2) : document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return !!el && (el === b || b.contains(el));
-    });
+    }, frame);
     expect(inviaCliccabile, 'il tasto di invio è fuori dal bordo del riquadro stretto').toBe(true);
 
     // SUCCESSO 4 — la risposta è tutta lì: il testo va a capo, non viene tagliato.
-    const testo = await frame.evaluate(() => document.querySelector('.sn-popup .sn-msg-assistant .sn-msg-text')?.textContent || '');
+    const testo = await testoDi(app, page, '.sn-popup .sn-msg-assistant .sn-msg-text', frame);
     expect(testo).toContain('Paragrafo 12');
 
     await ripristinaProvider(app);
@@ -962,17 +956,17 @@ test('finestra ristretta col riquadro aperto: si stringe per starci, e riallarga
   ).toBeLessThan(380);
 
   await expect.poll(
-    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    async () => fuoriDaiBordi(await valuta(app, page, misura)),
     { timeout: 5000, message: 'ristretta la finestra, il riquadro è rimasto fuori dal bordo' },
   ).toEqual([]);
-  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+  expect(await valuta(app, page, casellaCliccabile)).toBe(true);
 
   // Tornato lo spazio, torna anche la larghezza: un rimedio che stringe e basta
   // lascerebbe il riquadro mingherlino per sempre.
   await page.setViewportSize({ width: Math.round(prima.vw), height: alta });
   await expect.poll(
     async () => {
-      const m = await page.evaluate(misura);
+      const m = await valuta(app, page, misura);
       return Math.round(m.larghezzaDiLayout);
     },
     { timeout: 5000, message: 'tornato lo spazio, il riquadro è rimasto stretto' },
@@ -1016,7 +1010,7 @@ test('riquadro spostato dall\'utente e finestra abbassata: si accorcia per starc
 
   // L'utente lo sposta dove gli fa comodo, a risposta arrivata.
   await trascina(page, -80, -140);
-  const spostato = await page.evaluate(misura);
+  const spostato = await valuta(app, page, misura);
   expect(Math.round(spostato.top), 'il trascinamento non ha spostato niente')
     .toBeLessThan(Math.round(prima.top));
   expect(fuoriDaiBordi(spostato)).toEqual([]);
@@ -1032,11 +1026,11 @@ test('riquadro spostato dall\'utente e finestra abbassata: si accorcia per starc
 
     // SUCCESSO — tutto dentro lo schermo, riga per scrivere compresa.
     await expect.poll(
-      async () => fuoriDaiBordi(await page.evaluate(misura)),
+      async () => fuoriDaiBordi(await valuta(app, page, misura)),
       { timeout: 5000, message: `con la finestra a ${h}px il riquadro spostato è rimasto fuori dallo schermo` },
     ).toEqual([]);
     // E non "dentro le coordinate" e basta: cliccabile davvero.
-    expect(await page.evaluate(casellaCliccabile), `con la finestra a ${h}px la riga per scrivere non si clicca`).toBe(true);
+    expect(await valuta(app, page, casellaCliccabile), `con la finestra a ${h}px la riga per scrivere non si clicca`).toBe(true);
     await page.locator('.sn-popup .sn-popup-input').click();
     await page.locator('.sn-popup .sn-popup-input').fill(`e adesso a ${h}?`);
     await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue(`e adesso a ${h}?`);
@@ -1052,12 +1046,12 @@ test('riquadro spostato dall\'utente e finestra abbassata: si accorcia per starc
     { timeout: 5000 },
   ).toBeGreaterThan(700);
   await expect.poll(
-    async () => (await page.evaluate(misura)).height,
+    async () => (await valuta(app, page, misura)).height,
     { timeout: 5000, message: 'tornato lo spazio, il riquadro spostato è rimasto schiacciato' },
   ).toBeGreaterThan(prima.height - 3);
 
-  expect(fuoriDaiBordi(await page.evaluate(misura))).toEqual([]);
-  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+  expect(fuoriDaiBordi(await valuta(app, page, misura))).toEqual([]);
+  expect(await valuta(app, page, casellaCliccabile)).toBe(true);
 
   await ripristinaProvider(app);
 });
@@ -1131,29 +1125,28 @@ for (const { zoom, sintomo } of CASI_ZOOM_TRASCINATO) {
       { timeout: 5000, message: 'lo zoom non ha allargato la finestra: lo scenario non è quello vero' },
     ).toBeGreaterThan(prima.vh + 50);
     await expect.poll(
-      async () => fuoriDaiBordi(await page.evaluate(misura)),
+      async () => fuoriDaiBordi(await valuta(app, page, misura)),
       { timeout: 5000 },
     ).toEqual([]);
     await attendiPosaFerma(page);
 
     // L'utente lo prende per la barra del titolo e lo porta in fondo.
     await trascinaInFondo(page);
-    const spostato = await page.evaluate(misura);
+    const spostato = await valuta(app, page, misura);
     expect(Math.round(spostato.top), 'il trascinamento non lo ha portato in basso: lo scenario non è quello vero')
       .toBeGreaterThan(Math.round(prima.top) + 50);
 
     // SUCCESSO — niente è finito fuori, e non "dopo qualche secondo": subito e
     // per sempre. (`expect.poll` per non leggere un fotogramma a metà.)
     await expect.poll(
-      async () => fuoriDaiBordi(await page.evaluate(misura)),
+      async () => fuoriDaiBordi(await valuta(app, page, misura)),
       { timeout: 5000, message: `trascinato in fondo al ${Math.round(zoom * 100)}% il riquadro è rimasto fuori dallo schermo` },
     ).toEqual([]);
     // E la riga per scrivere si clicca e accetta la domanda dopo: è questo che
     // l'utente non riusciva più a fare.
-    expect(await page.evaluate(casellaCliccabile)).toBe(true);
-    await page.locator('.sn-popup .sn-popup-input').click();
-    await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
-    await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+    expect(await valuta(app, page, casellaCliccabile)).toBe(true);
+    await scrivi(app, page, '.sn-popup .sn-popup-input', 'e adesso?');
+    await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e adesso?');
 
     await zoomScheda(app, 1);
     await ripristinaProvider(app);
@@ -1185,12 +1178,12 @@ test('riquadro posato sopra la parola, pagina al 50% e trascinamento: non salta 
     { timeout: 5000, message: 'lo zoom non ha allargato la finestra: lo scenario non è quello vero' },
   ).toBeGreaterThan(prima.vh + 50);
   await attendiPosaFerma(page);
-  const primaDelPresa = await page.evaluate(misura);
+  const primaDelPresa = await valuta(app, page, misura);
 
   // Una presa e uno spostamento piccolo: quello che deve succedere è che il
   // riquadro segua il mouse, non che salti da un'altra parte.
   await trascina(page, 0, 60);
-  const dopo = await page.evaluate(misura);
+  const dopo = await valuta(app, page, misura);
   expect(Math.abs(dopo.top - (primaDelPresa.top + 60)), 'il riquadro è saltato invece di seguire il mouse')
     .toBeLessThan(24);
   expect(fuoriDaiBordi(dopo)).toEqual([]);
@@ -1198,10 +1191,10 @@ test('riquadro posato sopra la parola, pagina al 50% e trascinamento: non salta 
   // E poi fino in fondo, come nell'altro caso.
   await trascinaInFondo(page);
   await expect.poll(
-    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    async () => fuoriDaiBordi(await valuta(app, page, misura)),
     { timeout: 5000, message: 'trascinato in fondo il riquadro posato sopra è rimasto fuori dallo schermo' },
   ).toEqual([]);
-  expect(await page.evaluate(casellaCliccabile)).toBe(true);
+  expect(await valuta(app, page, casellaCliccabile)).toBe(true);
 
   await zoomScheda(app, 1);
   await ripristinaProvider(app);
@@ -1221,13 +1214,13 @@ test('pagina ingrandita al 150% e riquadro trascinato in fondo: arriva davvero a
     { timeout: 5000, message: 'lo zoom non ha accorciato la finestra: lo scenario non è quello vero' },
   ).toBeLessThan(700);
   await expect.poll(
-    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    async () => fuoriDaiBordi(await valuta(app, page, misura)),
     { timeout: 5000 },
   ).toEqual([]);
   await attendiPosaFerma(page);
 
   await trascinaInFondo(page);
-  const m = await page.evaluate(misura);
+  const m = await valuta(app, page, misura);
   expect(fuoriDaiBordi(m)).toEqual([]);
   // SUCCESSO — il fondo del riquadro è appoggiato al bordo, non decine di pixel
   // più su: lo spazio che l'utente vede è lo spazio che può usare.
@@ -1256,26 +1249,26 @@ test('aperta con la scorciatoia: si può scrivere la domanda dopo senza toccare 
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
 
-  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 10_000 }).toBeGreaterThan(0);
 
   // Il cursore è nella riga per scrivere, senza aver toccato niente.
   await expect.poll(
-    () => page.evaluate(() => {
-      const input = document.querySelector('.sn-popup .sn-popup-input');
-      return !!input && document.activeElement === input;
+    () => valuta(app, page, () => {
+      const input = globalThis.SN_FILO_UI._test.trova('.sn-popup .sn-popup-input');
+      return !!input && input.getRootNode().activeElement === input;
     }),
     { timeout: 5000, message: 'dopo la scorciatoia il cursore non è nella riga per scrivere' },
   ).toBe(true);
 
   // E si scrive davvero: tastiera e basta, niente clic e niente Tab.
   await page.keyboard.type('e questo cosa vuol dire?');
-  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e questo cosa vuol dire?');
+  await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e questo cosa vuol dire?');
 
   // Il fuoco nella casella spegne la selezione della pagina, che è una sola.
   // Chiuso il riquadro la parola deve tornare selezionata: da lì l'utente ci
   // fa la cosa dopo (tradurre, copiare, cercare) senza rifare la selezione.
   await page.keyboard.press('Escape');
-  await expect(page.locator('.sn-popup')).toHaveCount(0);
+  await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect
     .poll(() => page.evaluate(() => String(window.getSelection())), {
       timeout: 3000,
@@ -1317,11 +1310,11 @@ test('la parola su cui hai chiesto la spiegazione resta scoperta', async ({ app,
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
-  await attendiIngresso(page);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 10_000 }).toBeGreaterThan(0);
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta'), { timeout: 20_000 }).toContain('€');
+  await attendiIngresso(app, page);
 
-  const m = await page.evaluate(misura);
+  const m = await valuta(app, page, misura);
   // Lo scenario è quello vero: il riquadro si è posato SOPRA la parola (in
   // basso nella pagina non ci sta sotto). È lì che il difetto si vedeva.
   expect(m.bottom, 'il riquadro non si è posato sopra la parola').toBeLessThan(parola.bottom);
@@ -1365,21 +1358,20 @@ test('zoom al massimo con la parola in basso: la riga per scrivere sta dentro il
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  await page.waitForSelector('.sn-popup', { timeout: 10_000 });
-  await expect(page.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
-  await attendiIngresso(page);
+  await expect.poll(() => conta(app, page, '.sn-popup'), { timeout: 10_000 }).toBeGreaterThan(0);
+  await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta'), { timeout: 20_000 }).toContain('€');
+  await attendiIngresso(app, page);
 
-  const m = await page.evaluate(misura);
+  const m = await valuta(app, page, misura);
   // SUCCESSO 1 — niente sporge: né dal bordo del riquadro né dalla finestra.
   expect(fuoriDaiBordi(m), 'a zoom massimo qualcosa sporge').toEqual([]);
   // SUCCESSO 2 — e la riga per scrivere si clicca e accetta la domanda dopo.
-  expect(await page.evaluate(casellaCliccabile)).toBe(true);
-  await page.locator('.sn-popup .sn-popup-input').click();
-  await page.locator('.sn-popup .sn-popup-input').fill('e adesso?');
-  await expect(page.locator('.sn-popup .sn-popup-input')).toHaveValue('e adesso?');
+  expect(await valuta(app, page, casellaCliccabile)).toBe(true);
+  await scrivi(app, page, '.sn-popup .sn-popup-input', 'e adesso?');
+  await expect.poll(() => valoreDi(app, page, '.sn-popup .sn-popup-input')).toBe('e adesso?');
   // SUCCESSO 3 — il tasto di invio si vede intero, non a metà.
-  const inviaIntero = await page.evaluate(() => {
-    const root = document.querySelector('.sn-popup');
+  const inviaIntero = await valuta(app, page, () => {
+    const root = globalThis.SN_FILO_UI._test.trova('.sn-popup');
     const b = root.querySelector('.sn-popup-send');
     const r = b.getBoundingClientRect();
     const rr = root.getBoundingClientRect();
@@ -1409,11 +1401,15 @@ test('zoom al massimo con la parola in basso: la riga per scrivere sta dentro il
 // Il tasto di invio non basta che sia "dentro le coordinate": ci si deve poter
 // cliccare sopra davvero.
 const invioCliccabile = () => {
-  const root = document.querySelector('.sn-popup');
+  const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
+  const trova = (sel) => (T ? T.trova(sel) : document.querySelector(sel));
+  const daPunto = (x, y) => (T ? T.daPunto(x, y) : document.elementFromPoint(x, y));
+  const root = trova('.sn-popup');
   if (!root) return false;
   const b = root.querySelector('.sn-popup-send');
   const r = b.getBoundingClientRect();
-  const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  if (r.bottom > window.innerHeight || r.top < 0 || r.width === 0) return false;
+  const el = daPunto(r.left + r.width / 2, r.top + r.height / 2);
   return !!el && (el === b || b.contains(el));
 };
 
@@ -1421,7 +1417,12 @@ const invioCliccabile = () => {
 // la casella si allunga fino al suo tetto. `pressSequentially` batte `fill`
 // perché fa scattare l'auto-grow a ogni carattere, come una vera digitazione.
 const TESTO_DOMANDA = 'e questo invece cosa vorrebbe dire nel contesto della frase che avevo selezionato prima, e in che modo cambia se la frase parlasse di altro? aggiungi anche un esempio pratico che si capisca subito';
-async function domandaLunga(page) {
+async function domandaLunga(page, { app = null, frame = null } = {}) {
+  if (frame) {
+    await clicca(app, page, '.sn-popup .sn-popup-input', { frame });
+    await page.keyboard.type(TESTO_DOMANDA, { delay: 0 });
+    return;
+  }
   const input = page.locator('.sn-popup .sn-popup-input');
   await input.click();
   await input.fill('');
@@ -1463,12 +1464,12 @@ for (const { altezza, frazione, sporgeva } of CASI_DOMANDA) {
     });
     expect(cresciuta, 'la casella non si è allungata: lo scenario non è quello vero').toBeGreaterThan(80);
 
-    const m = await page.evaluate(misura);
+    const m = await valuta(app, page, misura);
     // SUCCESSO — niente sporge: né dal bordo arrotondato del riquadro né dalla
     // finestra. È la riga per scrivere a essere in gioco, quindi si guarda lei.
     expect(fuoriDaiBordi(m), 'scritta la domanda, qualcosa sporge').toEqual([]);
-    expect(await page.evaluate(casellaCliccabile), 'la casella non si clicca più').toBe(true);
-    expect(await page.evaluate(invioCliccabile), 'il tasto di invio non si clicca più').toBe(true);
+    expect(await valuta(app, page, casellaCliccabile), 'la casella non si clicca più').toBe(true);
+    expect(await valuta(app, page, invioCliccabile), 'il tasto di invio non si clicca più').toBe(true);
 
     // E la domanda si può mandare col tasto, non solo indovinando l'Invio.
     await page.locator('.sn-popup .sn-popup-send').click();
@@ -1500,27 +1501,20 @@ for (const alto of [420, 320, 240]) {
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
       globalThis.__filoShortcuts.dispatch('explain-selection', win);
     });
-    await frame.waitForSelector('.sn-popup', { timeout: 10_000 });
-    await expect(frame.locator('.sn-popup .sn-popup-meta')).toContainText('€', { timeout: 20_000 });
-    await frame.evaluate(async () => {
-      const root = document.querySelector('.sn-popup');
-      if (!root?.getAnimations) return;
-      await Promise.all(root.getAnimations().map((a) => a.finished.catch(() => {})));
-    });
+    await expect.poll(() => conta(app, page, '.sn-popup', frame), { timeout: 10_000 }).toBeGreaterThan(0);
+    await expect.poll(() => testoDi(app, page, '.sn-popup .sn-popup-meta', frame), { timeout: 20_000 }).toContain('€');
+    await attendiIngresso(app, page, frame);
 
-    expect(fuoriDaiBordi(await frame.evaluate(misura)), 'sborda già prima della domanda').toEqual([]);
+    expect(fuoriDaiBordi(await valuta(app, page, misura, frame)), 'sborda già prima della domanda').toEqual([]);
 
-    await domandaLunga(frame);
-    const cresciuta = await frame.evaluate(() => {
-      const i = document.querySelector('.sn-popup .sn-popup-input');
-      return i.getBoundingClientRect().height;
-    });
+    await domandaLunga(page, { app, frame });
+    const cresciuta = (await statoDi(app, page, '.sn-popup .sn-popup-input', frame))?.height || 0;
     expect(cresciuta, 'la casella non si è allungata: lo scenario non è quello vero').toBeGreaterThan(45);
 
-    const m = await frame.evaluate(misura);
+    const m = await valuta(app, page, misura, frame);
     expect(fuoriDaiBordi(m), 'scritta la domanda, qualcosa sporge dal riquadro incorporato').toEqual([]);
-    expect(await frame.evaluate(casellaCliccabile), 'la casella non si clicca più').toBe(true);
-    expect(await frame.evaluate(invioCliccabile), 'il tasto di invio non si clicca più').toBe(true);
+    expect(await valuta(app, page, casellaCliccabile, frame), 'la casella non si clicca più').toBe(true);
+    expect(await valuta(app, page, invioCliccabile, frame), 'il tasto di invio non si clicca più').toBe(true);
 
     await ripristinaProvider(app);
   });
@@ -1563,7 +1557,7 @@ test('cancellata la domanda lunga, la risposta si riprende lo spazio', async ({ 
     { timeout: 5000, message: 'cancellata la domanda, il corpo è rimasto schiacciato' },
   ).toBeGreaterThan(corpoPrima - 5);
 
-  expect(fuoriDaiBordi(await page.evaluate(misura))).toEqual([]);
+  expect(fuoriDaiBordi(await valuta(app, page, misura))).toEqual([]);
   await ripristinaProvider(app);
 });
 
@@ -1582,17 +1576,17 @@ test('domanda lunga col riquadro spostato a mano in una finestra bassa: resta tu
   await expect.poll(() => page.evaluate(() => window.innerHeight), { timeout: 5000 })
     .toBeLessThanOrEqual(460);
   await expect.poll(
-    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    async () => fuoriDaiBordi(await valuta(app, page, misura)),
     { timeout: 5000, message: 'il riquadro spostato è già fuori prima della domanda' },
   ).toEqual([]);
 
   await domandaLunga(page);
   await expect.poll(
-    async () => fuoriDaiBordi(await page.evaluate(misura)),
+    async () => fuoriDaiBordi(await valuta(app, page, misura)),
     { timeout: 5000, message: 'scritta la domanda, il riquadro spostato è finito fuori' },
   ).toEqual([]);
-  expect(await page.evaluate(casellaCliccabile), 'la casella non si clicca più').toBe(true);
-  expect(await page.evaluate(invioCliccabile), 'il tasto di invio non si clicca più').toBe(true);
+  expect(await valuta(app, page, casellaCliccabile), 'la casella non si clicca più').toBe(true);
+  expect(await valuta(app, page, invioCliccabile), 'il tasto di invio non si clicca più').toBe(true);
 
   await ripristinaProvider(app);
 });

@@ -55,7 +55,7 @@
     return POINTS_META[n];
   }
   function formatInt(n) {
-    return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
+    return new Intl.NumberFormat('it-IT', { useGrouping: true }).format(Math.round(Number(n) || 0));
   }
 
   // Tempo relativo da un epoch ms (spec §6.1, colonna "Ora").

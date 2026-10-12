@@ -54,7 +54,7 @@
   }
 
   function numeroLeggibile(n) {
-    try { return new Intl.NumberFormat('it-IT').format(n); } catch (_) { return String(n); }
+    try { return new Intl.NumberFormat('it-IT', { useGrouping: true }).format(n); } catch (_) { return String(n); }
   }
 
   /**

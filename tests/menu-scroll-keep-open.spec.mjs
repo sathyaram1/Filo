@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback alpha: "lo scroll non funziona — quando uso la rotella si chiude il
 // box invece di mostrare gli appunti più vecchi". La cronologia incolla è
@@ -49,7 +50,7 @@ test('rotella sulla cronologia incolla: scorre e NON chiude il menu', async ({ t
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const page = await findTabPage(app, host);

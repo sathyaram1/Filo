@@ -64,6 +64,7 @@ test('livello 2: senza fornitore 403 e pagina quasi vuota non chiamano il modell
     // Spia sul fornitore di modelli: conta solo le chiamate del classificatore.
     await app.evaluate(async () => {
       const C = globalThis.SN_CONST;
+      await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
       await globalThis.SN_STORAGE.updateSettings({
         useDefaultModels: false,
         apiKeys: { openrouter: 'k-test' },
@@ -122,6 +123,7 @@ test('chat senza fornitore: niente regola salvata né scheda instradata, e il mo
   await expect(page.locator('#input')).toBeVisible();
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -186,6 +188,7 @@ test('chat senza fornitore con l\'ultimo giro muto: la frase «fatto» non resta
   await expect(page.locator('#input')).toBeVisible();
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -239,6 +242,7 @@ test('chat senza fornitore con l\'ultimo giro muto: la frase «fatto» non resta
 async function copioneGiri(app, turni) {
   await app.evaluate(async (_e, turni) => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -342,6 +346,7 @@ test('chat nel formato vecchio: l\'esito «non disponibile» torna al modello e 
   await expect(page.locator('#input')).toBeVisible();
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },

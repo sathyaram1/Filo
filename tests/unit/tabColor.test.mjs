@@ -214,6 +214,17 @@ test('adattamento: tinta del sito coi parametri, acromatico inalterato, riapplic
   assert.equal(TC.inactiveTabBackground('non-un-colore', BARRE.chiaro, TC.defaultParams()), null);
 });
 
+test('un marchio bianco al buio, o nero in chiaro, non fa la scheda più accesa di una tinta (#429)', () => {
+  const p = TC.defaultParams();
+  const tinta = TC.relativeLuminance(TC.inactiveTabBackground(TC.hslToRgb(0, 1, 0.5), BARRE.scuro, p));
+  const bianco = TC.inactiveTabBackground('rgb(250, 250, 250)', BARRE.scuro, p);
+  assert.ok(TC.relativeLuminance(bianco) <= tinta + 0.03, `bianco al buio ${bianco}`);
+  vicino(TC.inactiveTabBackground('rgb(24, 23, 23)', BARRE.scuro, p), TC.inactiveTabBackground('rgb(24, 23, 23)', BARRE.scuro, { ...p, luminosita_tab: 1 }), 'nero al buio resta com\'è');
+  const nero = TC.inactiveTabBackground('rgb(24, 23, 23)', BARRE.chiaro, p);
+  assert.ok(nero[0] >= 160, `nero in chiaro ${nero}`);
+  vicino(TC.inactiveTabBackground('rgb(250, 250, 250)', BARRE.chiaro, p), TC.inactiveTabBackground('rgb(250, 250, 250)', BARRE.chiaro, { ...p, luminosita_tab: 0 }), 'bianco in chiaro resta com\'è');
+});
+
 test('il titolo regge 4,5:1 su ogni colore, a riposo e in hover, nei due temi', () => {
   const temi = {
     chiaro: { barra: BARRE.chiaro, pagina: [253, 246, 236], fg: [42, 34, 26] },
