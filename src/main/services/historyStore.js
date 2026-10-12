@@ -196,8 +196,27 @@
     if (typeof inp === 'string') return { ...it, input: inp.slice(0, ESTRATTO) };
     if (!isVoce(inp)) return it;
     const breve = {};
-    for (const k of ['selection', 'userMessage', 'title', 'url']) if (inp[k]) breve[k] = String(inp[k]).slice(0, ESTRATTO);
+    for (const k of ['selection', 'title', 'url']) if (inp[k]) breve[k] = String(inp[k]).slice(0, ESTRATTO);
+    const domanda = domandaDi(inp);
+    if (domanda) breve.userMessage = domanda.slice(0, ESTRATTO);
     return { ...it, input: breve };
+  }
+
+  // Quello che l'utente ha chiesto, ovunque la richiesta lo tenga: una voce della chat lo ha fra i messaggi del turno.
+  function domandaDi(inp) {
+    if (inp.userMessage) return String(inp.userMessage);
+    if (inp.instruction) return String(inp.instruction);
+    const giro = Array.isArray(inp.threadMessages) ? inp.threadMessages : Array.isArray(inp.messages) ? inp.messages : [];
+    const i = Number.isInteger(inp.indiceDomanda) && giro[inp.indiceDomanda] && giro[inp.indiceDomanda].role === 'user'
+      ? inp.indiceDomanda
+      : giro.map((m) => m && m.role).lastIndexOf('user');
+    return i >= 0 ? testoDi(giro[i].content) : '';
+  }
+
+  function testoDi(c) {
+    if (typeof c === 'string') return c;
+    if (Array.isArray(c)) return c.filter((p) => p && p.type === 'text' && typeof p.text === 'string').map((p) => p.text).join('\n');
+    return '';
   }
 
   global.SN_HISTORY = {
