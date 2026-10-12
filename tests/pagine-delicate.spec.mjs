@@ -365,9 +365,18 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
       if (pronta) break;
       await new Promise((r) => setTimeout(r, 100));
     }
-    await tab.view.webContents.executeJavaScript(`(function(){const t=document.getElementById('p').firstChild;
-      const r=document.createRange();r.setStart(t,13);r.setEnd(t,40);const s=getSelection();s.removeAllRanges();s.addRange(r);})()`);
-  }, { url, incognito });
+    // Un doppio clic vero sull'IBAN: una selezione fatta da uno script non prepara niente in nessuna finestra (#1070),
+    // e in incognito non deve partire nemmeno dietro il gesto dell'utente.
+    const p = await tab.view.webContents.executeJavaScript(`(function(){const t=document.getElementById('p').firstChild;
+      const r=document.createRange();r.setStart(t,14);r.setEnd(t,20);const q=r.getBoundingClientRect();
+      return {x:Math.round(q.left+q.width/2),y:Math.round(q.top+q.height/2)};})()`);
+    for (const clickCount of [1, 2]) {
+      tab.view.webContents.sendInputEvent({ type: 'mouseDown', x: p.x, y: p.y, button: 'left', clickCount });
+      tab.view.webContents.sendInputEvent({ type: 'mouseUp', x: p.x, y: p.y, button: 'left', clickCount });
+    }
+    const scelto = await tab.view.webContents.executeJavaScript('String(getSelection()).trim()');
+    if (scelto !== IBAN) throw new Error(`il doppio clic ha selezionato «${scelto}»`);
+  }, { url, incognito, IBAN });
   const spiegazioni = async () => (await mandato(app)).filter((m) => m.testo.includes(IBAN));
 
   await seleziona(true);
