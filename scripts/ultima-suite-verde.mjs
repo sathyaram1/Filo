@@ -76,12 +76,12 @@ export function verdePiuNuovoDelTag(verde, tagSha, eAntenato) {
  * Da quante ore c'è su main un commit verde più nuovo dell'ultima versione: conta il PRIMO diventato verde,
  * perché da allora ogni giro aveva qualcosa da pubblicare. NaN se non ce n'è. PURA (con la domanda iniettata).
  */
-export function oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato, adesso = Date.now()) {
+export function oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato, adesso = Date.now(), valida = () => true) {
   const main = new Set(Array.isArray(primoGenitore) ? primoGenitore : []);
   let primo = NaN;
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || !corseVerdi([r]).size || !main.has(r.head_sha)) continue;
-    if (!verdePiuNuovoDelTag(r.head_sha, tagSha, eAntenato)) continue;
+    if (!verdePiuNuovoDelTag(r.head_sha, tagSha, eAntenato) || !valida(r)) continue;
     const quando = Date.parse(r.updated_at || r.created_at || '');
     if (Number.isFinite(quando) && !(quando >= primo)) primo = quando;
   }
