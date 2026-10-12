@@ -1085,6 +1085,8 @@
         sel.disabled = !isAdmin;
         sel.addEventListener('change', () => saveRoleModel(r.id, campo, sel.value));
         mgRoleModels.append(sel);
+        // Non letto finché il server non risponde: la prima voce sarebbe già una risposta.
+        sel.selectedIndex = -1;
         roleSelects.set(`${r.id}.${campo}`, sel);
       }
     }
