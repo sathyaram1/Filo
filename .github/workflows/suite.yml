@@ -25,6 +25,9 @@ jobs:
   # d'ambiente di tests/rossi-noti.json (contenitore.specs) non contano, e nemmeno un flaky ripassato.
   suite:
     runs-on: ubuntu-latest
+    # Il segreto dell'avviso sta nell'ambiente `rilascio`, aperto al solo main: un ramo, che l'avviso non lo
+    # apre, dichiarandolo verrebbe respinto prima di partire (#1073).
+    environment: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}
     timeout-minutes: 240
     steps:
       - name: Checkout del commit da provare (con la storia, per l'elenco dei commit dell'avviso)
