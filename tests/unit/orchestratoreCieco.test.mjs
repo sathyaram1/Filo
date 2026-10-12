@@ -81,8 +81,8 @@ test('mai un worker col modello sbagliato: biglietto assente, doppio, ignoto o s
   assert.equal(rifiuto(prima(false), opz(registro(voce({ model: 'gpt' })))), MOTIVO_IGNOTO);
   assert.equal(rifiuto(prima(false), opz(registro(voce({ model: 'Opus' })))), MOTIVO_IGNOTO);
   assert.equal(rifiuto(prima(false), opz(registro(voce({ effort: 'altissimo' })))), MOTIVO_IGNOTO);
-  assert.match(rifiuto(prima(false), opz({ errore: 'ENOENT' })), new RegExp(`^${MOTIVO_REGISTRO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} Dettaglio: ENOENT`));
-  for (const rotto of [{ testo: '{non json' }, { testo: '{"altro":1}' }, null, undefined]) {
+  assert.equal(rifiuto(prima(false), opz({ errore: 'ENOENT' })), `${MOTIVO_REGISTRO} Dettaglio: ENOENT.`);
+  for (const rotto of [{ testo: '{non json' }, { testo: '{"altro":1}' }, { testo: 'null' }, {}, null]) {
     assert.ok(rifiuto(prima(false), opz(rotto)).startsWith(MOTIVO_REGISTRO), JSON.stringify(rotto));
   }
   assert.equal(rifiuto(prima(false), opz(undefined, { impronta: null })), MOTIVO_SCONOSCIUTO, 'senza impronta nessuna voce combacia');
