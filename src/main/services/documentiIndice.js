@@ -263,7 +263,7 @@ async function elenca(cartelle) {
       } catch (_) {}
     }
   }
-  for (const c of cartelle) { radice = c; await giro(c, 0); }
+  for (const c of cartelle) { radicePrivata = privata(c); await giro(c, 0); }
   return { trovati, pieno, negate };
 }
 
