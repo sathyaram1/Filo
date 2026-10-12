@@ -234,9 +234,10 @@
     $('ownerLink').hidden = !w.isOwner;
 
     if (has) {
-      // Il saldo vero è quello del server: sostituisce il conteggio locale.
+      // Il saldo vero è quello del server: sostituisce il conteggio locale, anche
+      // quando il server non lo manda (meglio un trattino del vecchio numero).
       const b = server.balance || {};
-      if (b.credits != null) $('balance').textContent = formatCredits(b.credits);
+      $('balance').textContent = b.credits != null ? formatCredits(b.credits) : '—';
       $('offlineHint').hidden = true;
       const daily = Number(server.dailyCredits) || 0;
       $('refillHint').textContent = daily > 0
