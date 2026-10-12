@@ -23,21 +23,34 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
 
 ## In breve (per chi usa Filo)
 
-- **Accedi con Google.** Non creiamo né conserviamo password per il tuo
-  account Filo: l'accesso passa per Google, che gestisce 2FA e recupero.
-- **Le tue credenziali di accesso restano sul tuo dispositivo**, cifrate dal
-  sistema operativo. Non vengono mai mandate a pagine web che visiti.
-- **I tuoi dati personali (le "memorie" di Filo, gli appunti) restano sul
-  dispositivo.** Per ora non li sincronizziamo da nessuna parte: nemmeno noi
-  possiamo vederli. Quando attiveremo la sincronizzazione multi-dispositivo,
-  lo faremo in modo che restino cifrati e illeggibili per noi.
-- **I feedback che invii** (testo + eventuali screenshot) vengono salvati sui
-  nostri server per permetterci di correggere i bug. Non includere in un
-  feedback informazioni che non vuoi condividere.
+- **L'accesso è facoltativo.** Filo funziona anche senza account: crea da sé
+  un'identità anonima per la tua installazione, ed è su quella che poggiano
+  crediti e portafoglio. Se vuoi, puoi accedere con Google: non creiamo né
+  conserviamo password, e 2FA e recupero li gestisce Google (§1).
+- **Le tue credenziali restano sul tuo dispositivo**, cifrate dal sistema
+  operativo: l'accesso Google, l'identità anonima e la chiave personale dei
+  modelli. Non vengono mai mandate alle pagine web che visiti (§2, §3).
+- **Memorie, appunti e cronologia sono salvati solo sul tuo dispositivo**, e
+  i server di Filo non li ricevono. Ai modelli invece arrivano: quando Filo
+  usa un modello gli manda quello che serve per rispondere, cioè le memorie,
+  gli appunti, il testo delle pagine. Quei messaggi vanno a OpenRouter e al
+  fornitore che serve il modello (§4).
+- **Il server di Filo riceve** i feedback che mandi, il portafoglio dei
+  crediti con una riga per ogni chiamata ai modelli (funzione, modello, token
+  e costo, senza il testo), i voti della bacheca e, se partecipi al red team,
+  i tuoi tentativi. Se accedi con Google, anche email, nome e quanto usi ogni
+  funzione (§4, §6).
+- **I feedback che invii** (testo, indirizzo della pagina, allegati) partono
+  cifrati per l'owner del progetto. Li leggono lui, gli agenti che lavorano
+  la segnalazione e i giudici automatici, cioè dei modelli che la
+  classificano. Non includere in un feedback informazioni che non vuoi
+  condividere (§6).
 - **Quando l'Aiuto ti guida su un sito**, i passi che fai restano sul tuo
   computer: per ora Filo non li raccoglie e non li manda a nessuno (vedi §8).
-- **Trasparenza:** questa pagina elenca esattamente cosa raccogliamo e cosa
-  no. Se qualcosa cambia, cambia anche qui.
+- **Trasparenza:** questa pagina dice come Filo protegge i tuoi dati e cosa
+  esce dal tuo computer. L'elenco completo di cosa raccogliamo, campo per
+  campo, sta nel documento sulla privacy (`transparency/privacy.md`, lo stesso
+  della pagina Trasparenza dentro Filo). Se qualcosa cambia, cambia anche qui.
 
 ---
 
