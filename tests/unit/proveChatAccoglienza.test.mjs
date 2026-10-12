@@ -17,31 +17,77 @@ const DICHIARA = /\bfilo_onboarding\b|\bFILO_ONBOARDING\b|\bsetOnboarding\s*\(/;
 // Le prove dell'intervista la vogliono aperta.
 const SULL_ACCOGLIENZA = /accoglienza|benvenuto|intervista|onboarding/i;
 
-/** PURA. Il blocco che parte dalla graffa in `i`, saltando stringhe e commenti. */
-export function blocco(testo, i) {
-  let d = 0;
-  for (let j = i; j < testo.length; j++) {
-    const c = testo[j];
-    if (c === '"' || c === "'" || c === '`') {
-      for (j++; j < testo.length && testo[j] !== c; j++) if (testo[j] === '\\') j++;
-    } else if (c === '/' && testo[j + 1] === '/') {
-      while (j < testo.length && testo[j] !== '\n') j++;
-    } else if (c === '/' && testo[j + 1] === '*') {
-      j = testo.indexOf('*/', j + 2);
-      if (j < 0) return testo.slice(i);
-      j++;
-    } else if (c === '{') d++;
-    else if (c === '}' && --d === 0) return testo.slice(i, j + 1);
+/**
+ * PURA. Due copie lunghe quanto il testo: `codice` senza commenti né contenuto di stringhe e regex (per contare le
+ * graffe), `senzaCommenti` con le stringhe intatte (per cercare). Gli indici restano quelli del testo.
+ */
+export function maschere(testo) {
+  const codice = testo.split('');
+  const senzaCommenti = testo.split('');
+  const n = testo.length;
+  const vuota = (da, a, anche) => {
+    for (let k = da; k < a; k++) {
+      if (testo[k] === '\n') continue;
+      codice[k] = ' ';
+      if (anche) senzaCommenti[k] = ' ';
+    }
+  };
+  let prima = '';
+  let i = 0;
+  while (i < n) {
+    const c = testo[i];
+    if (c === '/' && testo[i + 1] === '/') {
+      const fine = testo.indexOf('\n', i);
+      const a = fine < 0 ? n : fine;
+      vuota(i, a, true);
+      i = a;
+    } else if (c === '/' && testo[i + 1] === '*') {
+      const fine = testo.indexOf('*/', i + 2);
+      const a = fine < 0 ? n : fine + 2;
+      vuota(i, a, true);
+      i = a;
+    } else if (c === '"' || c === "'" || c === '`' || (c === '/' && /^$|[(,=:[!&|?{};>]/.test(prima))) {
+      let j = i + 1;
+      let classe = false;
+      while (j < n && (testo[j] !== c || classe)) {
+        if (testo[j] === '\\') j++;
+        else if (c === '/' && testo[j] === '[') classe = true;
+        else if (c === '/' && testo[j] === ']') classe = false;
+        else if (c !== '`' && testo[j] === '\n') break;
+        j++;
+      }
+      vuota(i + 1, Math.min(j, n), false);
+      i = j + 1;
+      prima = c;
+    } else {
+      if (!/\s/.test(c)) prima = c;
+      i++;
+    }
   }
-  return testo.slice(i);
+  return { codice: codice.join(''), senzaCommenti: senzaCommenti.join('') };
+}
+
+function chiusa(codice, i, apre, chiude) {
+  let d = 0;
+  for (let j = i; j < codice.length; j++) {
+    if (codice[j] === apre) d++;
+    else if (codice[j] === chiude && --d === 0) return j;
+  }
+  return codice.length - 1;
 }
 
 /** PURA. I titoli delle prove che mettono un modello e scrivono in chat senza dire com'è l'accoglienza. */
 export function proveScoperte(testo, nomeFile = '') {
   if (SULL_ACCOGLIENZA.test(nomeFile)) return [];
+  const { codice, senzaCommenti } = maschere(testo);
+  // Il corpo che comincia dopo la lista dei parametri aperta in `par`.
+  const corpoDopo = (par) => {
+    const graffa = codice.indexOf('{', chiusa(codice, par, '(', ')'));
+    return graffa < 0 ? '' : senzaCommenti.slice(graffa, chiusa(codice, graffa, '{', '}') + 1);
+  };
   const funzioni = new Map();
-  for (const m of testo.matchAll(/(?:function\s+([A-Za-z_$][\w$]*)\s*\(|(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>\s*)[^{]*?\{/g)) {
-    funzioni.set(m[1] || m[2], blocco(testo, m.index + m[0].length - 1));
+  for (const m of codice.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(|\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g)) {
+    funzioni.set(m[1] || m[2], corpoDopo(m.index + m[0].length - 1));
   }
   // Il corpo della prova più quello delle funzioni del file che chiama, a ogni profondità.
   const raggiunto = (corpo) => {
@@ -60,10 +106,15 @@ export function proveScoperte(testo, nomeFile = '') {
     return tutto;
   };
   const scoperte = [];
-  for (const m of testo.matchAll(/\btest\(\s*(['"`])((?:\\.|(?!\1)[\s\S])*?)\1\s*,[^{]*?\{/g)) {
-    const titolo = m[2];
+  for (const m of codice.matchAll(/\btest(?:\.(?:only|skip|fixme|fail))?\(\s*(['"`])/g)) {
+    const apre = m.index + m[0].length - 1;
+    const chiude = codice.indexOf(m[1], apre + 1);
+    const titolo = testo.slice(apre + 1, chiude);
     if (SULL_ACCOGLIENZA.test(titolo)) continue;
-    const tutto = raggiunto(blocco(testo, m.index + m[0].length - 1));
+    const freccia = codice.slice(chiude).search(/=>\s*\{/);
+    if (freccia < 0) continue;
+    const graffa = codice.indexOf('{', chiude + freccia);
+    const tutto = raggiunto(senzaCommenti.slice(graffa, chiusa(codice, graffa, '{', '}') + 1));
     if (METTE_MODELLO.test(tutto) && SCRIVE_IN_CHAT.test(tutto) && !DICHIARA.test(tutto)) scoperte.push(titolo);
   }
   return scoperte;
@@ -80,21 +131,28 @@ test('ogni prova che mette un modello e scrive nella chat della home dice com\'�
     + 'Se la prova è sull\'intervista di benvenuto, il titolo lo dica.');
 });
 
-test('la sentinella riconosce la prova scoperta e quella che dichiara, anche dentro le funzioni che chiama', () => {
-  const configura = `async function configura(app) {
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k' } }); });
-}`;
-  const dichiara = `const accolto = async (app) => { await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true })); };`;
-  const prova = (titolo, corpo) => `test('${titolo}', async ({ app }) => {\n${corpo}\n});`;
-  const scrivi = `  await page.locator('#input').fill('ciao { non chiusa');`;
-  const file = [
-    configura, dichiara,
-    prova('scoperta', `  await configura(app);\n${scrivi}`),
-    prova('dichiarata', `  await accolto(app);\n  await configura(app);\n${scrivi}`),
-    prova('senza chat', '  await configura(app);'),
-    prova('l\\\'intervista riparte', `  await configura(app);\n${scrivi}`),
-    prova('commento', `  // setOnboarding( in un commento non vale\n  await configura(app);\n${scrivi}`),
-  ].join('\n');
-  assert.deepEqual(proveScoperte(file, 'x.spec.mjs'), ['scoperta', 'commento']);
+test('la sentinella vede la prova scoperta anche dietro funzioni, graffe nelle stringhe e commenti', () => {
+  const file = String.raw`
+async function configura(app, { chiave = 'k}' } = {}) {
+  await app.evaluate(async (_e, k) => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: k } }); }, chiave);
+}
+const accolto = async (app) => { await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true })); };
+const scrivi = (page) => page.locator('#input').fill('ciao { non chiusa');
+test('scoperta', async ({ app, page }) => {
+  expect(testo).toMatch(/l'utente {/);
+  await configura(app);
+  await scrivi(page);
+});
+test('dichiarata', async ({ app, page }) => { await accolto(app); await configura(app); await scrivi(page); });
+test('senza chat', async ({ app }) => { await configura(app); });
+test('l\'intervista riparte', async ({ app, page }) => { await configura(app); await scrivi(page); });
+test('nel commento non vale', async ({ app, page }) => {
+  // accolto(app) e setOnboarding( qui non contano
+  await configura(app);
+  await scrivi(page);
+});
+test.skip(` + '`saltata ${1}`' + String.raw`, async ({ app, page }) => { await configura(app); await scrivi(page); });
+`;
+  assert.deepEqual(proveScoperte(file, 'x.spec.mjs'), ['scoperta', 'nel commento non vale', 'saltata ${1}']);
   assert.deepEqual(proveScoperte(file, 'onboarding-x.spec.mjs'), []);
 });
