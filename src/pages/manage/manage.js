@@ -142,16 +142,15 @@
   const mgReopenConfirm = document.getElementById('mgReopenConfirmBtn');
   const mgSegnoConferma = document.getElementById('mgSegnoConferma');
 
-  // Risposta ai chiarimenti (owner-only)
-  const mgClarify     = document.getElementById('mgClarify');
-  const mgClarifyText = document.getElementById('mgClarifyText');
-  const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
-  const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
-  // La casella sotto la conversazione e quella nel pannello del rombo verde
-  // (#1033) sono la stessa risposta: una bozza per pratica, fuori dai nodi che
-  // i ridisegni ricostruiscono, e un solo invio per volta.
+  // Risposta alle domande di Claude (owner-only), nel pannello del rombo verde:
+  // bozza ed esito stanno fuori dai nodi che i ridisegni ricostruiscono, un
+  // solo invio per volta per pratica.
   const bozzeRisposta = new Map();
   const rispostaInVolo = new Set();
+  let esitoRisposta = { text: '', kind: '' };
+  // La pratica che aveva già le domande al disegno prima: il pannello si apre
+  // da sé quando arrivano, non a ogni ridisegno dopo che l'owner l'ha chiuso.
+  let attesaDisegnata = null;
   // Frase per chi ha segnalato: il modulo (`mgUserNote`) sta chiuso finché non
   // lo si apre col tasto della barra (`mgUserNoteToggle`).
   const mgUserNote       = document.getElementById('mgUserNote');
@@ -1838,7 +1837,6 @@
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
-      mgClarify.hidden = true;
       collassaFrase();
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
@@ -3410,10 +3408,7 @@
     // pratica che potrebbe essere già chiusa è peggio che non offrire niente.
     renderActions(fb);
     disegnaSegnoTestata(fb);
-    mgClarify.hidden = !rispostaOfferta(fb);
-    mgClarifyText.value = bozzeRisposta.get(fb._id) || '';
     if (!ridisegno) setClarifyMsg('', '');
-    mgClarifyBtn.disabled = rispostaInVolo.has(fb._id);
 
     // Gestione (⭐ + archivia/ripristina): visibile per l'owner su QUALUNQUE
     // feedback selezionato, accanto alle azioni contestuali.
@@ -3453,13 +3448,17 @@
     // pratica) la forma che l'owner stava leggendo resta aperta e si riempie
     // di nuovo, come già fa quando cambia l'elenco delle fusioni; a chiuderlo
     // era ogni ridisegno, e con una segnalazione lunga si perdeva il punto.
-    // Cambiando pratica si chiude, come sempre.
+    // Cambiando pratica si chiude, come sempre. Su una pratica che aspetta la
+    // risposta dell'owner si apre invece il rombo verde: lì si risponde (#1061).
+    const domandeGiaDisegnate = ridisegno && attesaDisegnata === fb._id;
+    attesaDisegnata = rispostaOfferta(fb) ? fb._id : null;
     if (ridisegno && livelloAperto) {
       quandoPannelloLibero(() => {
         if (selectedId !== fb._id || !livelloAperto) return;
         riapriPannelloLivello(allFeedbacks.find((f) => f._id === fb._id) || fb);
       });
-    } else closeSidebar();
+    } else if (attesaDisegnata && !domandeGiaDisegnate) openSidebarLivello(fb, 'l3');
+    else closeSidebar();
   }
 
   // Riapre il pannello sulla forma già scelta, tenendo il punto di scorrimento.
@@ -3882,7 +3881,6 @@
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
-      mgClarify.hidden = true;
       collassaFrase();
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
@@ -4273,33 +4271,27 @@
 
   mgStarBtn.addEventListener('click', toggleStarred);
 
-  // Le due caselle e il rombo verde della fila nascono dalla stessa domanda.
+  // La casella della risposta e il rombo verde della fila nascono dalla stessa domanda.
   function rispostaOfferta(fb) {
     return !!(isAdmin && fb && statoLeggibile(fb) && MR.aspettaRisposta(fb));
   }
-  function caselleRisposta() {
-    return [mgClarifyText, document.getElementById('mgSideRispostaText')].filter(Boolean);
-  }
-  function scriviBozzaRisposta(origine) {
+  function scriviBozzaRisposta(casella) {
     if (!selectedId) return;
-    const v = origine.value || '';
+    const v = casella.value || '';
     if (v) bozzeRisposta.set(selectedId, v); else bozzeRisposta.delete(selectedId);
-    for (const c of caselleRisposta()) if (c !== origine) c.value = v;
-  }
-  function bottoniRisposta(disabled) {
-    for (const b of [mgClarifyBtn, document.getElementById('mgSideRispostaBtn')]) if (b) b.disabled = disabled;
   }
   function tastiRisposta(e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendClarifyReply(e.currentTarget); }
   }
 
+  function riflettiEsitoRisposta(el) {
+    el.textContent = esitoRisposta.text;
+    el.className = 'mg-action-msg' + (esitoRisposta.kind ? ` mg-${esitoRisposta.kind}` : '');
+  }
   function setClarifyMsg(text, kind) {
-    const side = document.getElementById('mgSideRispostaMsg');
-    for (const el of [mgClarifyMsg, side]) {
-      if (!el) continue;
-      el.textContent = text || '';
-      el.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
-    }
+    esitoRisposta = { text: text || '', kind: kind || '' };
+    const el = document.getElementById('mgSideRispostaMsg');
+    if (el) riflettiEsitoRisposta(el);
   }
 
   // Risposta dell'owner a un feedback in `clarify`: la risposta si appende alle
@@ -4309,9 +4301,8 @@
     if (!selectedId) return;
     const id = selectedId;
     if (rispostaInVolo.has(id)) return;
-    const casella = (origine && origine.tagName === 'TEXTAREA') ? origine : mgClarifyText;
     const reply = (bozzeRisposta.get(id) || '').trim();
-    if (!reply) { casella.focus(); return; }
+    if (!reply) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
@@ -4338,7 +4329,7 @@
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
 
     rispostaInVolo.add(id);
-    bottoniRisposta(true);
+    bottoneRisposta();
     setClarifyMsg('Invio in corso…', '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, status: 'todo', notes: newNotes });
@@ -4354,7 +4345,6 @@
       selectedId = null;
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
-      mgClarify.hidden = true;
       collassaFrase();
       if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
@@ -4364,15 +4354,17 @@
       setClarifyMsg(e.message || 'Errore nell\'invio', 'err');
     } finally {
       rispostaInVolo.delete(id);
-      bottoniRisposta(false);
+      bottoneRisposta();
     }
   }
 
-  mgClarifyBtn.addEventListener('click', () => sendClarifyReply(mgClarifyText));
-  mgClarifyText.addEventListener('input', () => scriviBozzaRisposta(mgClarifyText));
-  mgClarifyText.addEventListener('keydown', tastiRisposta);
+  // Il tasto è uno solo e segue la pratica che il pannello mostra ADESSO.
+  function bottoneRisposta() {
+    const b = document.getElementById('mgSideRispostaBtn');
+    if (b) b.disabled = rispostaInVolo.has(selectedId);
+  }
 
-  // La stessa casella dentro il pannello del rombo verde, sotto le domande.
+  // Nel pannello del rombo verde, sotto le domande: l'unico posto dove si risponde (#1061).
   function pannelloRisposta(fb) {
     const box = document.createElement('div');
     box.className = 'mg-liv-risposta';
@@ -4397,9 +4389,7 @@
     const msg = document.createElement('span');
     msg.id = 'mgSideRispostaMsg';
     msg.setAttribute('role', 'status');
-    // Un esito solo per le due caselle: il pannello lo riprende da quella sotto la conversazione.
-    msg.className = mgClarifyMsg.className;
-    msg.textContent = mgClarifyMsg.textContent;
+    riflettiEsitoRisposta(msg);
     riga.appendChild(btn); riga.appendChild(msg);
     box.appendChild(t); box.appendChild(riga);
     return box;
@@ -5569,12 +5559,16 @@
     if (ridisegnoRimandato === null) return;
     ridisegnaRispettandoLaBozza(ridisegnoRimandato);
   }
-  if (mgDetail) {
+  {
     // `focusout` arriva mentre il fuoco è ancora sul campo che lo perde: il
     // rinvio di un giro fa trovare a detailBeingEdited() la situazione vera.
+    // Anche il pannello: la risposta alle domande si scrive lì.
     const piuTardi = () => setTimeout(riprendiRidisegnoRimandato, 0);
-    mgDetail.addEventListener('input', piuTardi);
-    mgDetail.addEventListener('focusout', piuTardi);
+    for (const el of [mgDetail, mgSide]) {
+      if (!el) continue;
+      el.addEventListener('input', piuTardi);
+      el.addEventListener('focusout', piuTardi);
+    }
   }
 
   // La scheda aperta non è più in pagina: il pannello non può mostrare un
