@@ -188,7 +188,9 @@ function configureSpellchecker() {
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
-    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale());
+    // Su Linux c'è solo Hunspell, e si scaricano solo i dizionari inclusi in Filo: un inglese non incluso resterebbe vuoto.
+    const inclusi = process.platform === 'linux' ? require('./services/dizionari').lingue() : [];
+    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale(), inclusi);
     if (want.length) ses.setSpellCheckerLanguages(want);
   } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
 }
