@@ -2,13 +2,14 @@
 // Il 02/07/2026 una copia di lavoro di 300 feedback (testi, user agent, identificativi) è stata committata e spedita
 // dal salvataggio automatico: tolta dall'albero, resta nella storia. La forma la riconosce scripts/lib/copie-di-dati.mjs.
 
-import { test, describe } from 'node:test';
+import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { scene, togliScene, runHookRaw, stdinEdit, git as gitScena } from '../helpers/scenaHook.mjs';
 import { copieNelRepo, motivoCopia, motivoCopiaTesto, CARTELLA_FINTI } from '../../scripts/lib/copie-di-dati.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -28,6 +29,8 @@ const FEEDBACK_IN_CHIARO = [
 ];
 
 describe('copie di dati del server fuori dal repo', () => {
+  after(togliScene);
+
   test('nessun file tracciato ha la forma di una copia di dati del server', () => {
     const trovate = copieNelRepo(ROOT);
     assert.deepEqual(trovate, [],
@@ -101,5 +104,22 @@ describe('copie di dati del server fuori dal repo', () => {
     for (const testo of ['', '   ', 'testo normale', '// commento\nexport const a = 1;', '{ rotto', '[1, 2, 3]']) {
       assert.equal(motivoCopiaTesto(testo), '', `${JSON.stringify(testo)} non è una copia`);
     }
+  });
+
+  test('il salvataggio automatico non spedisce una copia, qualunque nome abbia, e spedisce il resto', () => {
+    const { origin, work } = scene();
+    gitScena(work, ['checkout', '-q', '-b', 'claude/prova']);
+    mkdirSync(join(work, 'scripts', 'lib'), { recursive: true });
+    for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(work, f));
+    writeFileSync(join(work, 'scripts', 'feedback.json'), JSON.stringify(RISPOSTA_FIRESTORE, null, 2));
+    writeFileSync(join(work, 'export.txt'), FEEDBACK_IN_CHIARO.map((f) => JSON.stringify(f)).join('\n'));
+    writeFileSync(join(work, 'README.md'), 'lavoro\n');
+    const r = runHookRaw(work, stdinEdit(join(work, 'README.md')), { FILO_ROUTINE: '1' });
+    assert.equal(r.status, 0);
+    const spediti = gitScena(origin, ['ls-tree', '-r', '--name-only', 'claude/prova']).split('\n');
+    assert.ok(spediti.includes('README.md') && spediti.includes('scripts/copie-in-scena.mjs'), `il resto del lavoro parte: ${spediti}`);
+    assert.ok(!spediti.includes('scripts/feedback.json') && !spediti.includes('export.txt'),
+      `una copia spedita resta nella storia pubblica anche se tolta subito: ${spediti}`);
+    assert.match(r.stdout, /feedback\.json.*export\.txt|export\.txt.*feedback\.json/, 'la sessione sa cosa non è partito e perché');
   });
 });
