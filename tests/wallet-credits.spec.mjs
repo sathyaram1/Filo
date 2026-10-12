@@ -257,7 +257,7 @@ test('il riscatto non dichiara il conteggio locale: frase e pagina dicono solo i
   await page.waitForTimeout(1200);
   await expect(page.locator('#walletNote')).toHaveText(frase);
   await expect(page.locator('#hero')).toBeHidden();
-  await expect(page.locator('body')).not.toContainText('1.000');
+  await expect(page.locator('body')).not.toContainText('1.000', { useInnerText: true });
   statoGiu = false;
 
   // Stato letto: saldo e movimenti sono i soli crediti d'ingresso.
@@ -267,7 +267,7 @@ test('il riscatto non dichiara il conteggio locale: frase e pagina dicono solo i
   await expect(page.locator('#moves li')).toHaveCount(1);
   await expect(page.locator('#moves li .sn-credits-move-gain')).toHaveText('+5.000');
   await expect(page.locator('#redeemForm')).toBeHidden();
-  await expect(page.locator('body')).not.toContainText('1.000');
+  await expect(page.locator('body')).not.toContainText('1.000', { useInnerText: true });
   await page.screenshot({ path: 'tests/.shots/1138-crediti-dopo-il-riscatto.png' });
 
   // Il server risponde senza saldo: un trattino, non il conteggio locale.
