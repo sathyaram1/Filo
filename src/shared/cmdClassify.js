@@ -1586,5 +1586,11 @@
     return fuoriDa(p, contesto(ctx));
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, programOf, subcommandOf, comeCmd };
+  // Nella cartella personale ma privato per la lettura (nascosto, cartella di profilo come la Libreria del Mac): chi
+  // legge in blocco non ci entra se la cartella chiesta non è già lì dentro (#947.3).
+  function privato(percorso, ctx) {
+    return fuoriPerimetro(percorso, ctx) === MOTIVI.nascosto;
+  }
+
+  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, programOf, subcommandOf, comeCmd };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
