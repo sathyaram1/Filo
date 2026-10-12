@@ -5,7 +5,7 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
 
-async function preparaServer(app, { routines = {}, owner = true, getGiu = false } = {}) {
+async function preparaServer(app, { routines = {}, owner = true, getGiu = false, ritardoGet = 0 } = {}) {
   await app.evaluate(async (electron, cfg) => {
     const { createRequire } = process.getBuiltinModule('module');
     const path = process.getBuiltinModule('path');
@@ -70,13 +70,14 @@ async function preparaServer(app, { routines = {}, owner = true, getGiu = false 
       if (v === undefined) delete cur[segs[segs.length - 1]];
       else cur[segs[segs.length - 1]] = v;
     };
-    const g = globalThis.__g1193 = { doc: { fields: toFs(cfg.routines).mapValue.fields }, maschere: [], ritardi: [], getGiu: cfg.getGiu };
+    const g = globalThis.__g1193 = { doc: { fields: toFs(cfg.routines).mapValue.fields }, maschere: [], ritardi: [], getGiu: cfg.getGiu, ritardoGet: cfg.ritardoGet };
     const risposta = (ok, corpo, status) => ({ ok, status: status || (ok ? 200 : 404), headers: new Map(), async json() { return corpo; }, async text() { return JSON.stringify(corpo); } });
     globalThis.fetch = async (url, init = {}) => {
       const u = String(url);
       if (!/documents\/config\/routines\?/.test(u)) return risposta(false, {}, 503);
       if ((init.method || 'GET') !== 'PATCH') {
         if (g.getGiu) throw new Error('offline');
+        await new Promise((r) => setTimeout(r, g.ritardoGet));
         return risposta(true, JSON.parse(JSON.stringify(g.doc)));
       }
       const maschera = new URL(u).searchParams.getAll('updateMask.fieldPaths');
@@ -88,7 +89,7 @@ async function preparaServer(app, { routines = {}, owner = true, getGiu = false 
       await new Promise((r) => setTimeout(r, g.ritardi.shift() || 0));
       return risposta(true, JSON.parse(JSON.stringify(g.doc)));
     };
-  }, { routines, owner, getGiu });
+  }, { routines, owner, getGiu, ritardoGet });
 }
 
 // Il documento del server finto, in chiaro.
@@ -240,4 +241,23 @@ test('chi non è owner vede le tendine spente, e non si aprono', async ({ app, o
   await t.locator('.sn-select-button').click({ force: true });
   await expect(t.locator('.sn-select-pop')).toBeHidden();
   expect(await app.evaluate(() => globalThis.__g1193.maschere)).toEqual([]);
+});
+
+test('prima che il server risponda nessun controllo delle automazioni dice un valore', async ({ app, openTab }) => {
+  await preparaServer(app, { routines: { accountAOff: true, roleModels: { secaudit: { model: 'sonnet' } } }, ritardoGet: 3000 });
+  const page = await openTab(URL);
+  await page.waitForFunction(() => window.__mgTest && window.SN_ROUTINE_MODELLI);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await expect(page.locator('#panel-automation')).toHaveAttribute('aria-busy', 'true');
+  // «Definizione dell'agente» e una levetta accesa sarebbero già risposte, e non le abbiamo ancora.
+  await expect(tendina(page, 'secaudit', 'model').locator('.sn-select-value')).toHaveText('');
+  const pallina = page.locator('#mgAccountA + .mg-switch-track .mg-switch-thumb');
+  await expect(pallina).toBeHidden();
+  await page.locator('.mg-auto-cols').screenshot({ path: 'tests/.shots/1193-in-lettura.png' });
+
+  await expect(tendina(page, 'secaudit', 'model').locator('.sn-select-value')).toHaveText('Sonnet', { timeout: 15000 });
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await expect(page.locator('#panel-automation')).not.toHaveAttribute('aria-busy', 'true');
+  await expect(pallina).toBeVisible();
+  await expect(page.locator('#mgAccountA')).not.toBeChecked();
 });
