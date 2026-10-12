@@ -52,6 +52,34 @@
     return Math.ceil(String(testo == null ? '' : testo).length / CARATTERI_PER_TOKEN);
   }
 
+  // Un contenuto a parti (testo e immagini): le immagini contano per quello che costano, non per i caratteri del data URL.
+  const parti = (c) => (Array.isArray(c) ? c.filter((p) => p && typeof p === 'object') : null);
+  const soloImmagini = (p) => p.type === 'image_url';
+  function tokenDi(content) {
+    const ps = parti(content);
+    if (!ps) return stimaToken(content);
+    return ps.reduce((n, p) => n + (soloImmagini(p) ? TOKEN_PER_IMMAGINE : stimaToken(p.text)), 0);
+  }
+  function caratteriDi(messaggi) {
+    return (Array.isArray(messaggi) ? messaggi : []).reduce((n, m) => {
+      const c = m && m.content;
+      const ps = parti(c);
+      if (ps) return n + ps.reduce((k, p) => k + (soloImmagini(p) ? TOKEN_PER_IMMAGINE * CARATTERI_PER_TOKEN : String(p.text || '').length), 0);
+      return n + (typeof c === 'string' ? c.length : JSON.stringify(c || '').length);
+    }, 0);
+  }
+
+  function numeroImmagini(m) {
+    const n = Math.floor(Number(m && m.images) || 0);
+    return n > 0 ? Math.min(n, 999) : 0;
+  }
+  // Al posto delle immagini che non tornano: senza, il modello rinnegava quello che ne aveva letto (#1166).
+  function notaImmagini(n) {
+    return n === 1
+      ? "(qui l'utente aveva mandato un'immagine che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederla, chiedi di rimandarla.)"
+      : `(qui l'utente aveva mandato ${n} immagini che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederle, chiedi di rimandarle.)`;
+  }
+
   // Il taglio per giorni si muove a scatti (un'ora per un giorno, sei ore oltre i tre): fra uno scatto e l'altro due
   // turni vedono lo stesso inizio. Arrotondato in avanti, così la finestra non supera mai il tetto.
   function passoTaglio(giorni) {
