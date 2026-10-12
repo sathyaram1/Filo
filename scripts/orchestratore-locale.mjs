@@ -50,6 +50,7 @@ export const OPZIONI_DI = Object.freeze({
   stato: {},
   riprendi: {},
   togli: {},
+  'fusioni-server': { '--dry-run': SI },
 });
 // Il trattino lungo è quello che un correttore automatico fa di «--».
 const TRATTINI = '\u2010-\u2015\u2212';
