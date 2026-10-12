@@ -660,9 +660,9 @@ I numeri restano dell'owner, in Routine → Crediti.
   barra di stato entrano nel conto da sole. L'account B può arrivare al 100%.
 - **Passo:** ogni giorno si spende al massimo il rimasto diviso i giorni che
   mancano al rinnovo, così la settimana non finisce il martedì.
-- **Ordine:**
-  1. i compiti fidati (risposte, ricorrenti);
-  2. i feedback per priorità.
+- **Ordine:** quello della coda, cioè l'urgenza dei compiti (§ 6.3). Il passo
+  e la riserva dicono quanto si spende, non cosa viene prima: la priorità 3
+  resta sopra le risposte e i ricorrenti.
 - **Fine settimana:** nelle ultime 24 ore prima del rinnovo la quota non spesa
   si perderebbe, quindi si apre alle priorità basse (0 e 1).
 - **Controllo:** il monitoraggio confronta speso e passo, e apre una domanda se
