@@ -135,6 +135,11 @@ function tagAccettato(info) {
   return String(info.tag) === `v${info.version}`;
 }
 
+// Il tag della release più recente come lo dice GitHub: il «tag:» di latest.yml lo scrive chi crea la release (#1073).
+function tagDiGitHubAccettato(tag, versione) {
+  return typeof tag === 'string' && !!parti(versione) && tag === `v${versione}`;
+}
+
 function segmento(s) {
   try { return decodeURIComponent(s); } catch { return null; }
 }
