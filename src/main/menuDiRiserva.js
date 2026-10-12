@@ -1,5 +1,5 @@
-// Il menu del tasto destro quando quello di Filo nella pagina non si è potuto costruire (#1122): l'utente ha sempre
-// almeno le azioni del browser. Lo chiede il page-preload; voci e posizione vengono dal `context-menu` di Chromium.
+// Il menu del tasto destro quando quello di Filo nella pagina non parte (guasto, caricamento, Filo spento, Shift: #1122):
+// l'utente ha sempre almeno le azioni del browser. Lo chiede il page-preload; voci e posizione dal `context-menu`.
 
 const { BrowserWindow, clipboard } = require('electron');
 const { showPopupMenu } = require('./popup-menu');

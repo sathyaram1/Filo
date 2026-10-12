@@ -191,7 +191,7 @@ function registerIpcHandlers() {
     event.returnValue = true;
   });
 
-  // Il menu di Filo nella pagina non si è costruito (page-preload.js): si apre quello di riserva (#1122).
+  // Il menu di Filo nella pagina non è partito (page-preload.js): si apre quello di riserva (#1122).
   ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
     try { MenuDiRiserva.chiesto(event, richiesta); } catch (_) {}
   });

@@ -1,7 +1,8 @@
 // #1122 — Su una pagina che impone Trusted Types (accounts.google.com, Gmail, YouTube…) il tasto destro apre il menu di
 // Filo con le sue voci e i riquadri di Filo si aprono, anche se la pagina limita i nomi delle policy o tocca un riquadro
-// prima che carichi; e se il menu non si costruisce comunque, compare quello di riserva invece di niente.
+// prima che carichi; e se il menu di Filo non parte (guasto, caricamento, Filo spento, Shift) compare quello di riserva.
 
+import http from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { statoDi } from './helpers/riquadri.mjs';
 
@@ -148,4 +149,63 @@ test('il menu di riserva su un collegamento lo apre e lo copia', async ({ app, o
   await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toContain('Apri in nuova tab');
   await scegliDiRiserva(app, 'Apri in nuova tab');
   await expect.poll(() => app.evaluate(({ webContents }, u) => webContents.getAllWebContents().some((w) => w.getURL() === u), meta)).toBe(true);
+});
+
+// Ogni tasto destro dell'utente apre un menu: anche quando quello di Filo non parte senza un guasto (verifica #1122, r1).
+const riservaAperta = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+  .some((x) => !x.isDestroyed() && x.isVisible() && x.webContents.getURL().startsWith('data:text/html')));
+
+test('col menu di Filo che si apre, quello di riserva non compare', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, HTML);
+  await page.locator('#paragraph').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible();
+  await page.waitForTimeout(1200);
+  expect(await riservaAperta(app)).toBe(false);
+});
+
+test('tasto destro mentre la pagina carica ancora: compare il menu di riserva', async ({ app, shell }) => {
+  let rilascia;
+  const lento = new Promise((r) => { rilascia = r; });
+  const srv = http.createServer(async (req, res) => {
+    if (req.url === '/lento.js') { await lento; res.writeHead(200, { 'Content-Type': 'text/javascript' }); res.end(''); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end('<!doctype html><body style="padding:40px"><p id="p" style="font-size:30px">Testo che compare subito</p><script src="/lento.js"></script></body>');
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+    const url = `http://127.0.0.1:${srv.address().port}/`;
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith(url)); return !!page; }, { timeout: 10000 }).toBe(true);
+    await page.locator('#p').waitFor();
+    await page.locator('#p').click({ button: 'right' });
+    await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toContain('Ricarica');
+  } finally { rilascia(); srv.close(); }
+});
+
+test('Shift + tasto destro: compare il menu di riserva, ma non sopra il menu della pagina', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, HTML.replace('</body>', `<div id="suo" style="padding:20px">menu suo</div>
+    <script>document.getElementById('suo').addEventListener('contextmenu', (e) => { e.preventDefault(); e.target.dataset.aperto = '1'; });</script></body>`));
+  await page.keyboard.down('Shift');
+  await page.locator('#suo').click({ button: 'right' });
+  await page.keyboard.up('Shift');
+  await expect(page.locator('#suo')).toHaveAttribute('data-aperto', '1');
+  await page.waitForTimeout(1200);
+  expect(await riservaAperta(app)).toBe(false);
+
+  await page.keyboard.down('Shift');
+  await page.locator('#email').click({ button: 'right' });
+  await page.keyboard.up('Shift');
+  await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toContain('Seleziona tutto');
+  await expect(page.locator('.sn-menu')).toHaveCount(0);
+});
+
+test('su un sito dove Filo è spento il tasto destro apre il menu di riserva', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['127.0.0.1'] }); });
+  const page = await openTab(testServer.html(HTML));
+  await page.waitForFunction(() => document.readyState === 'complete');
+  await page.waitForTimeout(500);
+  await page.locator('#paragraph').click({ button: 'right' });
+  await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toContain('Ricarica');
+  await expect(page.locator('.sn-menu')).toHaveCount(0);
 });
