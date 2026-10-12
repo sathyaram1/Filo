@@ -261,16 +261,22 @@
       .replace(SOPRANNOME_RE, (_m, prima) => `${prima}[ID]`);
   }
 
-  // Di un campo si pulisce il doppio di quello che può restarne più una forma
-  // intera, non tutto: un documento della raccolta può portare elementi da
-  // centinaia di migliaia di caratteri, e pulirli interi per tenerne cinquecento
-  // fermava l'Aiuto (#1173). Il taglio non lascia in fondo mezza forma (email,
-  // codice, numero), che la pulizia non riconoscerebbe più. Prove sui bordi:
-  // tests/unit/percorsiLunghi.test.mjs.
+  // Di un campo si pulisce un pezzo poco più lungo di quello che può restarne, non
+  // tutto: elementi da centinaia di migliaia di caratteri fermavano l'Aiuto (#1173).
+  // Se la pulizia lo accorcia sotto il tetto il pezzo cresce: la coda (quale
+  // pulsante, dove si va) arriva come prima. Il taglio non lascia in fondo mezza
+  // forma (email, codice, numero). Prove: tests/unit/percorsiLunghi.test.mjs.
   const FORMA_MAX = 320; // un indirizzo email non supera i 254 caratteri
 
-  function tagliaPrimaDiPulire(testo, max) {
-    const tetto = max * 2 + FORMA_MAX;
+  function aTetto(testo, max, taglia, pulisci) {
+    for (let tetto = max * 2 + FORMA_MAX; ; tetto *= 4) {
+      const pezzo = taglia(testo, tetto);
+      const out = pulisci(pezzo);
+      if (pezzo === testo || out.length >= max + FORMA_MAX) return out.slice(0, max);
+    }
+  }
+
+  function tagliaPrimaDiPulire(testo, tetto) {
     if (testo.length <= tetto) return testo;
     let fine = tetto;
     const nellaForma = (c) => carattereLocale(c) || c === 64;
