@@ -84,12 +84,13 @@ test('crediti, schede aperte, registro dei cambi, code, avvisi e bandierine rest
   assert.equal(stats.added, 1);
 });
 
-test('dal backup entrano solo le sveglie ricorrenti, puntate sulla prossima volta: un timer passato non suona', () => {
+test('dal backup esce solo ciò che è scaduto: una ricorrente punta sulla prossima volta, un timer passato non suona', () => {
   const adesso = Date.parse('2026-10-12T10:00:00');
   const backup = [
     { id: 't1', label: 'pasta', endsAt: '2026-01-01T12:10:00.000Z', paused: false },
     { id: 'a1', kind: 'alarm', label: 'domani', endsAt: '2026-01-02T07:00:00.000Z', paused: false },
     { id: 'a2', kind: 'alarm', label: 'palestra', repeat: ['mon', 'wed'], atTime: '07:30', endsAt: '2026-01-05T07:30:00.000Z', ringing: true },
+    { id: 't2', label: 'scaduto e suona', endsAt: '2026-10-12T11:00:00.000Z', ringing: true },
   ];
   const qui = [{ id: 'q1', label: 'tè', endsAt: '2026-10-12T10:05:00.000Z', paused: false }];
   const { merged } = mergeImportedData({ [K.FILO_TIMERS]: qui }, { [K.FILO_TIMERS]: backup }, {
