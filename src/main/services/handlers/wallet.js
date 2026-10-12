@@ -412,7 +412,7 @@ module.exports = function register(on, ctx) {
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
     // Il conteggio locale non passa al portafoglio (#1138): il server non si fida
-    // dei crediti che il PC dichiara, e 0 non lascia niente da tagliare.
+    // di crediti dichiarati dal PC, e al riscatto si entra coi soli crediti d'ingresso.
     const localCredits = 0;
     // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
     // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
