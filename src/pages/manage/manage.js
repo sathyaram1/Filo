@@ -375,7 +375,7 @@
   // Vero da quando l'avvio ha chiesto le impostazioni: un accesso arrivato dopo le richiede di nuovo.
   let impostazioniAvviate = false;
   function caricaImpostazioni() {
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadJudgeTimeout(), loadMergeApprovals()]);
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()]);
   }
 
   async function refreshAuth() {
@@ -5727,6 +5727,8 @@
     loadCaps,
     // Ri-legge le scelte sulle sessioni delle routine (IPC) — per i test.
     loadSessions,
+    // Ri-legge modello e sforzo per fase (IPC) — per i test.
+    loadRoleModels,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
