@@ -794,6 +794,72 @@ export async function sporca(t, motivo, opts) {
   return { outcome: status >= 500 || status === 0 ? 'fault' : 'refused', reason: String((body && body.reason) || `http_${status}`) };
 }
 
+// ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ────────────────────
+
+export const REPO_SERVER = 'sathyaram1/filo-security';
+
+/** Le righe `chiave=valore` che git manda a un aiutante di credenziali. PURA. */
+export function leggiRichiestaGit(testo) {
+  const out = {};
+  for (const riga of String(testo || '').split(/\r?\n/)) {
+    const i = riga.indexOf('=');
+    if (i > 0) out[riga.slice(0, i)] = riga.slice(i + 1);
+  }
+  return out;
+}
+
+/**
+ * La richiesta è per filo-security, in https su github.com? Il percorso lo manda git solo con
+ * `credential.useHttpPath=true` (nel clone): senza, si risponde a nessuno. PURA.
+ */
+export function richiestaPerServer(r) {
+  const x = r || {};
+  return x.protocol === 'https' && String(x.host || '').toLowerCase() === 'github.com'
+    && /^sathyaram1\/filo-security(\.git)?\/?$/i.test(String(x.path || ''));
+}
+
+/** Le righe con cui git riceve il token. `scadeIl` in ms. PURA. */
+export function rigaCredenziali(token, scadeIl) {
+  const righe = ['username=x-access-token', `password=${token}`];
+  const s = Math.floor(Number(scadeIl) / 1000);
+  if (Number.isFinite(s) && s > 0) righe.push(`password_expiry_utc=${s}`);
+  return `${righe.join('\n')}\n`;
+}
+
+/** Il token di filo-lavori per il biglietto (routineGitToken). → { outcome:'ok', token, scadeIl } | { outcome, reason } */
+export async function gitToken(t, opts) {
+  const { status, body } = await call('routineGitToken', { ticket: t, repo: 'server' }, opts);
+  if (status === 200 && body && body.ok && body.token) return { outcome: 'ok', token: String(body.token), scadeIl: Number(body.scadeIl) || 0 };
+  if (status === 404 && !(body && body.reason)) return { outcome: 'fault', reason: 'routineGitToken non è ancora pubblicata sul server' };
+  return {
+    outcome: status >= 500 || status === 0 ? 'fault' : 'refused',
+    reason: String((body && body.reason) || `http_${status}`),
+    detail: String((body && body.detail) || ''),
+  };
+}
+
+/** Il ramo spinto su filo-security entra nel registro (routineRamoServer). → { outcome, sha?, ramoFidato?, reason? } */
+export async function ramoServer(t, ramo, sha, opts) {
+  const { status, body } = await call('routineRamoServer', { ticket: t, ramo: String(ramo || ''), sha: String(sha || '') }, opts);
+  if (status === 200 && body && body.ok) return { outcome: 'ok', sha: String(body.sha || ''), ramoFidato: body.ramoFidato === true, fiducia: body.fiducia };
+  if (status === 404 && !(body && body.reason)) return { outcome: 'fault', reason: 'routineRamoServer non è ancora pubblicata sul server' };
+  return {
+    outcome: status >= 500 || status === 0 ? 'fault' : 'refused',
+    reason: String((body && body.reason) || `http_${status}`),
+    detail: String((body && body.detail) || ''),
+  };
+}
+
+function leggiStdin() {
+  return new Promise((ok) => {
+    let testo = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (c) => { testo += c; });
+    process.stdin.on('end', () => ok(testo));
+    process.stdin.on('error', () => ok(testo));
+  });
+}
+
 /**
  * Chiede al SERVER di fondere il ramo su main (SPEC-RIDISEGNO-MAX.md §10).
  *
