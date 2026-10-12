@@ -246,5 +246,7 @@ jobs:
         if: always() && !cancelled() && github.ref != 'refs/heads/main' && (steps.unit.outcome == 'failure' || failure())
         shell: bash
         run: |
-          echo "::error::Unit test rossi su Windows (o non partiti) su ${GITHUB_REF}: nessun feedback, l'elenco sta nel registro qui sopra."
+          echo "::error::Unit test rossi su Windows (o non partiti) su ${GITHUB_REF}: nessun feedback."
+          # In coda al registro: in mezzo a trentamila righe i rossi non li trova nessuno.
+          grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || echo "(nessuna riga not ok: gli unit non sono partiti, guarda i passi sopra)"
           exit 1
