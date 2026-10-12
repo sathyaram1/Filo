@@ -207,6 +207,35 @@ describe('copie di dati del server fuori dal repo', () => {
     const chiaro = JSON.stringify(Array.from({ length: 30 }, () => FEEDBACK_IN_CHIARO[0]), null, 2);
     assert.notEqual(motivoCopiaTesto(chiaro.slice(0, chiaro.length / 2)), '', 'elenco di feedback in chiaro interrotto');
     assert.equal(motivoCopiaTesto('{"a": {"b": "}"}, "c": {"text": "x"'), '', 'graffe dentro le stringhe e oggetti innocui non bastano');
+    // Più corta del primo documento: nessun oggetto chiuso, ma testo e identificativi di una persona ci sono già (#1108 giro 4).
+    const unoSolo = (testo) => testo.slice(0, testo.indexOf('c-1') + 4);
+    assert.notEqual(motivoCopiaTesto(unoSolo(firestore)), '', 'risposta di Firestore interrotta dentro il primo documento');
+    assert.notEqual(motivoCopiaTesto(unoSolo(JSON.stringify({ documents: [{ fields: RISPOSTA_FIRESTORE.documents[0].fields }] }))), '',
+      'campi di Firestore interrotti, senza il nome del documento');
+    assert.notEqual(motivoCopiaTesto(unoSolo(chiaro)), '', 'feedback in chiaro interrotto dentro il primo');
+    assert.equal(motivoCopiaTesto('{"text": "x", "titolo": "y"'), '', 'un testo interrotto senza chi l\'ha scritto non basta');
+  });
+
+  // Il salvataggio gira in ogni sessione: è lui a mettere il controllo prima del push, che vale per ogni altra strada.
+  test('dopo un salvataggio un push a mano non spedisce una copia, e il messaggio non suggerisce di spedire', () => {
+    const s = ramoConStrumenti();
+    writeFileSync(join(s.work, 'README.md'), 'lavoro\n');
+    assert.equal(runHookRaw(s.work, stdinEdit(join(s.work, 'README.md')), { FILO_ROUTINE: '1' }).status, 0);
+    writeFileSync(join(s.work, 'feedback.json'), JSON.stringify(RISPOSTA_FIRESTORE, null, 2));
+    commitAMano(s.work, 'copia');
+    assert.throws(() => gitScena(s.work, ['push', '-q', 'origin', 'claude/prova']), /copia dei dati del server/);
+    assert.ok(!spediti(s.origin).includes('feedback.json'));
+    // Con una fusione dopo la copia il salvataggio si ferma: la coda del messaggio non deve dire di spedire a mano.
+    gitScena(s.work, ['checkout', '-q', '-b', 'laterale', 'HEAD~1']);
+    writeFileSync(join(s.work, 'b.txt'), 'b\n');
+    commitAMano(s.work, 'laterale');
+    gitScena(s.work, ['checkout', '-q', 'claude/prova']);
+    gitScena(s.work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-edit', 'laterale']);
+    writeFileSync(join(s.work, 'README.md'), 'lavoro 2\n');
+    const r = runHookRaw(s.work, stdinEdit(join(s.work, 'README.md')), { FILO_ROUTINE: '1' });
+    assert.match(r.stdout, /NON spedisco il ramo/);
+    assert.doesNotMatch(r.stdout, /git push del ramo/);
+    assert.ok(!spediti(s.origin).includes('feedback.json'));
   });
 
   // Una regola sola per ogni strada che spedisce, anche quelle che nessuno ha pensato: il pre-push di git (#1108 giro 3).
