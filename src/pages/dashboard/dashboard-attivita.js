@@ -975,6 +975,11 @@
     return riga;
   }
 
+  // #1188 — nell'intervista Filo mostra i livelli di autonomia e l'utente sceglie: la scelta la disegna l'accoglienza.
+  function sceltaAutonomia(a) {
+    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaAutonomia === true;
+  }
+
   // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
   // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
   function apribileComunque(a) {
