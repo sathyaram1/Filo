@@ -6,7 +6,7 @@ import { rmSync, mkdirSync, writeFileSync, chmodSync, readFileSync, existsSync }
 import { createServer } from 'node:http';
 import { resolve, dirname, join, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { cartellaTemporanea, cartellaInCasa } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
 import { chiudiApp } from './fixtures/electron.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
@@ -547,4 +547,59 @@ test('un sito che chiede la rete locale si vede chiedere proprio quella, col suo
   await expect(barra()).toContainText('router.example');
   await expect(barra()).toContainText('vuole collegarsi agli apparecchi della tua rete');
   await expect(barra()).not.toContainText('microfono');
+});
+
+// #1069 — la cartella data da leggere non diventa scrivibile senza un sì. La si dà al sito trascinandola, come con il
+// selettore: la lettura è concessa, la scrittura no. Il trascinamento è quello vero del sistema, via DevTools.
+async function daiLaCartella() {
+  await apri('/cartella');
+  let pagina = null;
+  await expect.poll(() => { pagina = paginaDi(origine + '/cartella'); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
+  await pagina.waitForLoadState('domcontentloaded');
+  const lasciato = await trascina(pagina, 'foto da caricare');
+  return { pagina, lasciato };
+}
+
+// Nella cartella personale: Chromium nasconde ai siti la cartella dei dati di Filo e quelle accanto, dove stanno le temporanee.
+async function trascina(pagina, nome) {
+  const dir = join(cartellaInCasa('filo-test-cartella-'), nome);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'mare.jpg'), 'foto');
+  const prima = esiti.length;
+  const s = await pagina.context().newCDPSession(pagina);
+  const data = { items: [], files: [dir], dragOperationsMask: 1 };
+  for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x: 60, y: 60, data });
+  await expect.poll(() => esiti.slice(prima), { timeout: 10_000 }).toEqual(['cartella:directory:granted/prompt']);
+  return join(dir, 'lasciato.txt');
+}
+
+test('una cartella data da leggere: il sito che vuole scriverci lo chiede col nome della cartella, e con Consenti scrive', async () => {
+  test.setTimeout(60_000);
+  const { pagina, lasciato } = await daiLaCartella();
+  await expect(barra()).toBeHidden();
+  await pagina.locator('#carica').click();
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  await expect(barra()).toContainText(new URL(origine).host);
+  await expect(barra()).toContainText('vuole creare, modificare e cancellare file in «foto da caricare»');
+  await new Promise((ok) => setTimeout(ok, 500));
+  expect(esiti.slice(1), 'nessuna scrittura prima della risposta').toEqual([]);
+  expect(existsSync(lasciato)).toBe(false);
+  await shell.screenshot({ path: 'tests/.shots/permesso-cartella.png' });
+  await barra().getByRole('button', { name: 'Consenti', exact: true }).click();
+  await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['scrittura:granted', 'scritto']);
+  expect(readFileSync(lasciato, 'utf8')).toBe('cifrato');
+  await expect(barra()).toBeHidden();
+});
+
+test('Non consentire: il sito non scrive nella cartella data da leggere, e per quel sito la domanda non torna', async () => {
+  test.setTimeout(60_000);
+  const { pagina, lasciato } = await daiLaCartella();
+  await pagina.locator('#carica').click();
+  await expect(barra()).toBeVisible({ timeout: 10_000 });
+  await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
+  await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['scrittura:denied']);
+  await pagina.locator('#carica').click();
+  await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['scrittura:denied', 'scrittura:denied']);
+  await expect(barra()).toBeHidden();
+  expect(existsSync(lasciato)).toBe(false);
 });
