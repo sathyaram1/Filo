@@ -186,6 +186,6 @@
   }
 
   global.SN_HISTORY = {
-    list, append, patch, remove, clear, redigi, importa, prepara, resetIncognito, vistaPagina, cartella, CHIAVE,
+    list, append, patch, remove, clear, redigi, importa, prepara, resetIncognito, vistaPagina, cartella,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

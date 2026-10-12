@@ -104,6 +104,26 @@ test('togliere con ripulisci riscrive anche i record che restano', async () => {
   togliCartella(cartella);
 });
 
+test('riscrivi: il testo corretto sparisce dal disco, e si riscrivono solo i mesi toccati', async () => {
+  const { cartella, d } = nuovo();
+  d.aggiungi({ ...scheda(1, '2026-05'), summary: 'segreto-866 nel riassunto' });
+  d.aggiungi(scheda(2, '2026-06'));
+  d.aggiorna('id-1', { snippet: 'anche qui segreto-866' });
+  const giugno = readFileSync(join(cartella, '2026-06.jsonl'), 'utf8');
+  const togli = (r) => (JSON.stringify(r).includes('segreto-866')
+    ? { ...r, summary: '[tolto]', snippet: '[tolto]' } : r);
+  const visto = await spiaDiscoSincrono(cartella, () => assert.equal(d.riscrivi(togli), 1));
+  assert.deepEqual(visto.map(({ n }) => n), ['writeFileSync', 'renameSync'], JSON.stringify(visto));
+  assert.ok(!testoDiTutto(cartella).includes('segreto-866'));
+  assert.equal(readFileSync(join(cartella, '2026-06.jsonl'), 'utf8'), giugno);
+  assert.equal(d.riscrivi(togli), 0);
+  const r = await riapri(cartella);
+  assert.equal(r.prendi('id-1').summary, '[tolto]');
+  assert.equal(r.prendi('id-1').url, 'https://sito-1.test/pagina');
+  assert.deepEqual(r.tutti().map((x) => x.id), ['id-2', 'id-1']);
+  togliCartella(cartella);
+});
+
 test('svuota toglie tutti i file; togliere l\'ultimo record di un mese toglie il file', async () => {
   const { cartella, d } = nuovo();
   d.aggiungi(scheda(1, '2026-07'));
