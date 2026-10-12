@@ -23,7 +23,6 @@ const ARCHIVE = 'filo://archive/archive.html';
 async function configura(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },

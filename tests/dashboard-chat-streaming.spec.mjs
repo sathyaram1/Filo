@@ -30,7 +30,6 @@ async function newtabPage(app) {
 async function configureModel(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },

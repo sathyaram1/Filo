@@ -30,7 +30,6 @@ async function configureModel(app) {
     });
     // Fuori dall'intervista di benvenuto: lì a fine turno la conversazione si
     // ridisegna dal salvato e il diario del turno sparisce.
-    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
   });
   // Il popup di un costo 2 a compito pulito si vede a Conservativo: a Normale partirebbe da solo (#530).
   await livelloAutonomia(app, 'conservativo');

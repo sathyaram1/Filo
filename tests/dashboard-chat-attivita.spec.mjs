@@ -35,7 +35,6 @@ async function newtabPage(app) {
 async function configureModel(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
-    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
