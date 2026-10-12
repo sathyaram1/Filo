@@ -661,7 +661,7 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   const page = await newtabPage(app);
   await configureModel(app);
   await senzaAccoglienza(app, page);
-  await ricercaLenta(app, 4_000);
+  await ricercaLenta(app);
   await copione(app, [
     { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'm1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['La ricerca c\'è già. '], ogni: 100, testo: 'Ecco gli orari.' },
@@ -671,8 +671,13 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await expect(page.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
   await ricercaPartita(app);
   await page.locator('#stopBtn').click();
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#sendBtn').click();
+  // Premuto con la ricerca ancora in volo: la ripresa la aspetta invece di rifarla o di partire senza saperne l'esito.
+  await expect(page.locator('#sendBtn')).toBeHidden();
+  await page.waitForTimeout(500);
+  expect(await app.evaluate(() => [globalThis.__ricercheFinite, globalThis.__messaggi.length])).toEqual([0, 1]);
+  await lasciaLaRicerca(app);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco gli orari.' })).toBeVisible({ timeout: 10_000 });
   expect(await app.evaluate(() => globalThis.__ricerche)).toBe(1);
   expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(2);
