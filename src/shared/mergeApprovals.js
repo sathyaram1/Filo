@@ -616,9 +616,12 @@
       if (armed && e && e.detail > 1) return;
       if (!armed) {
         // Conferma sul posto: un click solo non manda niente su main. Il secondo
-        // clic cade dove è caduto il primo: il tasto armato non si accorcia, o Scarta gli scivola sotto (#550).
+        // clic cade dove è caduto il primo: il tasto armato non si accorcia, o Scarta gli scivola sotto (#550);
+        // né si abbassa, se in un pannello stretto «Approva e fondi» andava su due righe.
         armed = true;
-        approveBtn.style.minWidth = approveBtn.getBoundingClientRect().width + 'px';
+        var scatola = approveBtn.getBoundingClientRect();
+        approveBtn.style.minWidth = scatola.width + 'px';
+        approveBtn.style.minHeight = scatola.height + 'px';
         approveBtn.textContent = 'Confermi?';
         approveBtn.classList.add('is-armed');
         armTimer = setTimeout(disarm, 5000);
