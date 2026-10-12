@@ -4174,6 +4174,8 @@ function fileNominatiDallaRisposta(textReply, azioni) {
 const ATTESA_RICORDI_MS = 2500;
 // Il tetto in token che il modello della chat ha retto dopo un rifiuto per finestra troppo piccola, per modello.
 const finestreDeiModelli = new Map();
+// I modelli della chat che hanno rifiutato le immagini dei turni passati: da lì in avanti ricevono la nota (#1166).
+const modelliSenzaFoto = new Set();
 function entroIl(p, ms, ripiego) {
   let timer = null;
   return Promise.race([p, new Promise((ok) => { timer = setTimeout(() => ok(ripiego), ms); })])
