@@ -8,7 +8,7 @@
   const providers = () => global.SN_PROVIDERS;
 
   // Le chiamate che fanno lavorare un modello, e quindi costano.
-  const PAID = new Set(['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed', 'decide']);
+  const PAID = new Set(['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed', 'decisions']);
 
   // Cosa fare di un errore di un classificatore che gira su tanti lavori insieme (decideAll). `risposto`: il modello
   // ha già risposto almeno una volta, quindi un 400 è colpa di quella richiesta e non del modello.
@@ -250,7 +250,7 @@
     // mai risposto. `onAnswer(indice, answers)` arriva appena una richiesta ha risposto.
     async function decideAll({ action, settings, attempts, requests, parallel, onAnswer, signal } = {}) {
       const { s, chain } = await chainFor({ action, settings, attempts });
-      const usable = chain.filter((a) => supports(a.provider, 'decide') && a.model);
+      const usable = chain.filter((a) => supports(a.provider, 'decisions') && a.model);
       if (!usable.length) throw codeError('Nessun fornitore della catena sa classificare', 'PROVIDER_METHOD_MISSING');
       const Coda = global.SN_CODA_ADATTIVA;
       if (!Coda) throw codeError('Coda dei lavori non caricata', 'GATE_METHOD');
@@ -268,7 +268,7 @@
         let risposte = 0;
         let servedBy = null;
         const fai = async (req) => {
-          const r = (await P.decide({
+          const r = (await P.decisions({
             apiKey: a.apiKey, model: a.model, state: req.state, questions: req.questions,
             providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s), signal,
           })) || {};

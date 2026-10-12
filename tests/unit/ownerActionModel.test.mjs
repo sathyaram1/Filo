@@ -71,7 +71,7 @@ test('le funzioni di tutti non leggono gli slot di supporto', async () => {
 });
 
 test('l\'editor mostra la catena in uso negli slot spostati mai salvati, e non tocca quelli salvati', () => {
-  const mai = fillMovedSlots({ sanitizer: '', manageSearch: null }, EFFECTIVE);
+  const mai = fillMovedSlots({ sanitizer: '', manageSearch: null, manageSearchClassifier: '' }, EFFECTIVE);
   assert.equal(mai.manageSearch, 'vecchio');
   assert.equal(mai.sanitizer, '');
   assert.equal(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).manageSearch, '');
@@ -79,7 +79,9 @@ test('l\'editor mostra la catena in uso negli slot spostati mai salvati, e non t
   assert.equal(fillMovedSlots({ manageSearch: null }, null).manageSearch, '');
   // Solo quelli riempiti sono una lettura, non una scelta: l'editor non li riscrive se non cambiano.
   assert.deepEqual(mai.movedUnset, ['manageSearch']);
-  assert.deepEqual(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).movedUnset, []);
+  assert.deepEqual(fillMovedSlots({ manageSearch: '', manageSearchClassifier: 'jev' }, EFFECTIVE).movedUnset, []);
+  // Anche il classificatore della ricerca (#1118) è uno slot dell'app: mai salvato, si legge dalla catena in uso.
+  assert.deepEqual(fillMovedSlots({ manageSearch: '' }, EFFECTIVE).movedUnset, ['manageSearchClassifier']);
 });
 
 test('lo store distingue lo slot mai scritto (null) da quello svuotato (\'\')', async () => {

@@ -689,7 +689,7 @@
   // Un classificatore non scrive: a ogni domanda chiusa di `questions` (per nome) risponde con una probabilità,
   // dopo aver letto `state`. Le risposte tornano per nome in `answers`, tali e quali; il costo lo dice il router.
   // `retryAfterMs` sull'errore è l'attesa chiesta da un 429, per chi rimette la richiesta in coda.
-  async function decide({ apiKey, model, state, questions, providerRouting, signal }) {
+  async function decisions({ apiKey, model, state, questions, providerRouting, signal }) {
     await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, state, questions };
     const pb = providerBlock(providerRouting, model);
@@ -783,7 +783,7 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, synthesizeSpeech, transcribe, embed, decide, lookupServedBy, keyInfo, fetchWithKey,
+    cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
     modelHosts, forgetModelHosts, forgetReasoningRefusals,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
