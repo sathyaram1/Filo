@@ -153,7 +153,7 @@ try {
 // Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
 // fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
 // i dati che l'handler legge, così il menu si apre sull'elemento giusto.
-function replayContextMenu(e) {
+function replayContextMenu(e, clic) {
   let node = null;
   try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
   catch (_) { node = e.target; }
