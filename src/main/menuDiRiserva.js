@@ -1,0 +1,90 @@
+// Il menu del tasto destro quando quello di Filo nella pagina non si è potuto costruire (#1122): l'utente ha sempre
+// almeno le azioni del browser. Lo chiede il page-preload; voci e posizione vengono dal `context-menu` di Chromium.
+
+const { BrowserWindow, clipboard } = require('electron');
+const { showPopupMenu } = require('./popup-menu');
+
+const ULTIMI = new WeakMap(); // webContents → { params, alle }
+const IN_ATTESA = new WeakMap(); // webContents → chi aspetta il prossimo `context-menu`
+// Il guasto arriva di solito dopo il `context-menu` (il menu fallisce dopo un'attesa), ma se fallisce subito può
+// precederlo: un `context-menu` più vecchio di così è di un clic precedente, e si aspetta quello nuovo.
+const FRESCO_MS = 1500;
+const ATTESA_MS = 1000;
+
+function segui(wc) {
+  wc.on('context-menu', (_e, params) => {
+    ULTIMI.set(wc, { params, alle: Date.now() });
+    const chi = IN_ATTESA.get(wc);
+    if (chi) { IN_ATTESA.delete(wc); chi(params); }
+  });
+}
+
+function t(chiave, riserva) {
+  try { return globalThis.SN_I18N.t(chiave) || riserva; } catch (_) { return riserva; }
+}
+
+function voci(params, wc) {
+  const f = params.editFlags || {};
+  const out = [];
+  if (params.isEditable) {
+    if (f.canCut) out.push({ label: t('menu_cut', 'Taglia'), action: 'cut' });
+    if (f.canCopy) out.push({ label: t('menu_copy', 'Copia'), action: 'copy' });
+    if (f.canPaste) out.push({ label: t('menu_paste', 'Incolla'), action: 'paste' });
+    if (f.canSelectAll) out.push({ label: t('menu_select_all', 'Seleziona tutto'), action: 'selectAll' });
+  } else if (f.canCopy && params.selectionText) {
+    out.push({ label: t('menu_copy', 'Copia'), action: 'copy' });
+  }
+  if (/^https?:/i.test(params.linkURL || '')) {
+    out.push({ label: t('menu_open_in_new_tab', 'Apri in nuova tab'), action: 'link-apri' });
+    out.push({ label: t('menu_copy_link', 'Copia URL'), action: 'link-copia' });
+  }
+  if (out.length) out.push({ type: 'separator' });
+  const h = wc.navigationHistory;
+  if (h && h.canGoBack()) out.push({ label: t('menu_back', 'Indietro'), action: 'indietro' });
+  if (h && h.canGoForward()) out.push({ label: t('menu_forward', 'Avanti'), action: 'avanti' });
+  out.push({ label: t('menu_reload', 'Ricarica'), action: 'ricarica' });
+  return out;
+}
+
+function esegui(azione, params, wc, schede, tab) {
+  if (wc.isDestroyed()) return;
+  if (['cut', 'copy', 'paste', 'selectAll'].includes(azione)) { wc[azione](); return; }
+  if (azione === 'link-copia') { clipboard.writeText(params.linkURL); return; }
+  if (azione === 'link-apri') {
+    if (schede) schede.apriDaCollegamento(params.linkURL);
+    else wc.loadURL(params.linkURL);
+    return;
+  }
+  const nav = { indietro: ['goBack', 'goBack'], avanti: ['goForward', 'goForward'], ricarica: ['reload', 'reload'] }[azione];
+  if (!nav) return;
+  if (schede && tab) schede[nav[0]](tab.id);
+  else if (azione === 'ricarica') wc.reload();
+  else wc.navigationHistory[nav[1]]();
+}
+
+function mostra(wc, params) {
+  if (wc.isDestroyed()) return;
+  let win = null; let schede = null; let tab = null;
+  for (const w of BrowserWindow.getAllWindows()) {
+    const trovata = w._filoTabs && w._filoTabs.tabs && w._filoTabs.tabs.find((s) => s.view.webContents === wc);
+    if (trovata) { win = w; schede = w._filoTabs; tab = trovata; break; }
+  }
+  if (!win) win = BrowserWindow.fromWebContents(wc);
+  if (!win || win.isDestroyed()) return;
+  const b = tab ? tab.view.getBounds() : { x: 0, y: 0 };
+  showPopupMenu(win, voci(params, wc), b.x + (params.x || 0), b.y + (params.y || 0), (scelta) => {
+    const m = /^@action:([a-zA-Z-]{1,20})$/.exec(String(scelta || ''));
+    if (m) { try { esegui(m[1], params, wc, schede, tab); } catch (_) {} }
+  });
+}
+
+function chiesto(event, motivo) {
+  const wc = event.sender;
+  console.error('[menu di riserva] il menu di Filo non si è aperto:', String(motivo || '').slice(0, 2000));
+  const ultimo = ULTIMI.get(wc);
+  if (ultimo && Date.now() - ultimo.alle < FRESCO_MS) { mostra(wc, ultimo.params); return; }
+  const scade = setTimeout(() => IN_ATTESA.delete(wc), ATTESA_MS);
+  IN_ATTESA.set(wc, (params) => { clearTimeout(scade); mostra(wc, params); });
+}
+
+module.exports = { segui, chiesto, voci };
