@@ -8,7 +8,25 @@
   const providers = () => global.SN_PROVIDERS;
 
   // Le chiamate che fanno lavorare un modello, e quindi costano.
-  const PAID = new Set(['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed']);
+  const PAID = new Set(['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed', 'decide']);
+
+  // Cosa fare di un errore di un classificatore che gira su tanti lavori insieme (decideAll). `risposto`: il modello
+  // ha già risposto almeno una volta, quindi un 400 è colpa di quella richiesta e non del modello.
+  function esitoDecisione(err, risposto) {
+    const s = Number(err && err.status);
+    if (err && (err.name === 'AbortError' || err.code === 'ABORT_ERR')) return 'fatale';
+    if (s === 429) return 'lento';
+    if (s >= 500 || s === 408) return 'passeggero';
+    if (!s) {
+      const CE = global.SN_CHAT_ERRORS;
+      const rete = CE && typeof CE.isTransientNetwork === 'function'
+        ? CE.isTransientNetwork(err)
+        : /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|socket hang up/i.test(String((err && err.message) || ''));
+      return rete ? 'passeggero' : 'fatale';
+    }
+    if (s === 400 && risposto) return 'scarta';
+    return 'fatale';
+  }
 
   // Il router rende leggibile una generazione qualche secondo dopo: tre tentativi, poi si lascia perdere.
   const AUDIT_DELAYS_MS = [4000, 10000, 25000];
