@@ -22,6 +22,7 @@ const FILE_ESCLUSI = {
   'src/shared/transparency.js': 'testi e fonti dei documenti di trasparenza',
   'src/shared/patchNotes.js': 'testo del changelog',
 };
+const DATI_DI_TERZI = { cartella: 'src/vendor/', perche: 'regole e licenze impacchettate: i loro indirizzi sono selettori di pagina' };
 
 // Indirizzi che non portano in rete, in qualunque file.
 const NON_DI_RETE = [
@@ -44,7 +45,7 @@ const CHIAMATE_LOCALI = {
   'src/main/test-servizi-chiusi.js': 'la fetch finta delle prove',
 };
 
-const ESTENSIONI = ['.js', '.mjs', '.cjs', '.html', '.css'];
+const ESTENSIONI = ['.js', '.mjs', '.cjs', '.html', '.css', '.json'];
 const URL_RE = /\b(?:https?|wss?):\/\/[^\s'"`<>()\\]*/gi;
 // safeFetch e fetchList sono gli involucri del progetto che fanno rete per conto di un altro file.
 const CHIAMATA_RE = /\bfetch\s*\(|\bnet\s*\.\s*(?:request|fetch|connect|createConnection)\b|\bglobalThis\s*\.\s*fetch\b|\bnew\s+(?:WebSocket|EventSource|XMLHttpRequest)\b|\bsendBeacon\s*\(|\b(?:safeFetch|fetchList)\s*\(/;
@@ -68,9 +69,8 @@ function contaRighe(testo) {
 function leggiJs(testo) {
   const sc = ts.createScanner(ts.ScriptTarget.ESNext, false, ts.LanguageVariant.Standard, testo);
   const frammenti = [];
-  const senzaCommenti = testo.split('');
-  const codice = testo.split('');
-  const vuota = (arr, da, a) => { for (let i = da; i < a; i++) if (arr[i] !== '\n') arr[i] = ' '; };
+  const commenti = [];
+  const letterali = [];
   const riga = contaRighe(testo);
   const pila = [];
   let prima = null, primaTesto = '';
@@ -79,8 +79,7 @@ function leggiJs(testo) {
     if (k === K.EndOfFileToken) break;
     const da = sc.getTokenStart();
     if (k === K.SingleLineCommentTrivia || k === K.MultiLineCommentTrivia) {
-      vuota(senzaCommenti, da, sc.getTextPos());
-      vuota(codice, da, sc.getTextPos());
+      commenti.push([da, sc.getTextPos()]);
       continue;
     }
     if (k === K.WhitespaceTrivia || k === K.NewLineTrivia || k === K.ShebangTrivia) continue;
@@ -95,14 +94,27 @@ function leggiJs(testo) {
     }
     if (LETTERALI.has(k)) {
       frammenti.push({ valore: sc.getTokenValue(), riga: riga(da), segue: k === K.TemplateHead || k === K.TemplateMiddle });
-      vuota(codice, da + 1, sc.getTextPos() - 1);
+      letterali.push([da + 1, sc.getTextPos() - 1]);
     } else if (k === K.RegularExpressionLiteral) {
-      vuota(codice, da + 1, sc.getTextPos() - 1);
+      letterali.push([da + 1, sc.getTextPos() - 1]);
     }
     prima = k;
     primaTesto = sc.getTokenText();
   }
-  return { frammenti, codice: codice.join(''), senzaCommenti: senzaCommenti.join('') };
+  const tutti = [...commenti, ...letterali].sort((x, y) => x[0] - y[0]);
+  return { frammenti, codice: svuota(testo, tutti), senzaCommenti: svuota(testo, commenti) };
+}
+
+// I tratti diventano spazi e le righe restano dove sono, così una posizione vale in tutte e tre le versioni del testo.
+function svuota(testo, tratti) {
+  let out = '', pos = 0;
+  for (const [da, a] of tratti) {
+    if (a <= pos) continue;
+    const inizio = Math.max(da, pos);
+    out += testo.slice(pos, inizio) + testo.slice(inizio, a).replace(/[^\n]/g, ' ');
+    pos = a;
+  }
+  return out + testo.slice(pos);
 }
 
 function leggiMarkup(testo, commento) {
@@ -114,6 +126,7 @@ function leggiMarkup(testo, commento) {
 function leggi(file, testo) {
   if (file.endsWith('.html')) return leggiMarkup(testo, /<!--[\s\S]*?-->/g);
   if (file.endsWith('.css')) return leggiMarkup(testo, /\/\*[\s\S]*?\*\//g);
+  if (file.endsWith('.json')) return leggiMarkup(testo, /(?!)/g);
   return leggiJs(testo);
 }
 
@@ -192,7 +205,8 @@ function sorgentiDi(dir, acc = {}) {
     if (statSync(p).isDirectory()) { sorgentiDi(p, acc); continue; }
     if (!ESTENSIONI.some((x) => nome.endsWith(x))) continue;
     const rel = relative(ROOT, p).replace(/\\/g, '/');
-    if (!FILE_ESCLUSI[rel]) acc[rel] = readFileSync(p, 'utf8');
+    if (FILE_ESCLUSI[rel] || (rel.endsWith('.json') && rel.startsWith(DATI_DI_TERZI.cartella))) continue;
+    acc[rel] = readFileSync(p, 'utf8');
   }
   return acc;
 }
@@ -219,6 +233,7 @@ test('ogni voce dell’elenco è ancora usata dal codice', () => {
 
 test('le esclusioni dichiarate qui servono ancora', () => {
   for (const f of Object.keys(FILE_ESCLUSI)) assert.ok(existsSync(join(ROOT, f)), `${f} escluso ma non esiste più`);
+  assert.ok(existsSync(join(ROOT, DATI_DI_TERZI.cartella)), `${DATI_DI_TERZI.cartella} esclusa ma non esiste più`);
   for (const e of ESEMPI) {
     assert.ok(ANALISI.indirizzi.some((u) => u.file === e.file && SE.copre(e.url, u.url)), `l’esempio ${e.url} non è più in ${e.file}: togli l’esclusione`);
   }
@@ -319,6 +334,11 @@ test('prova: commenti, host dinamici, regex e markup si leggono per quello che s
 });
 
 test('prova: un servizio che sparisce dal codice rende rossa la sua voce', () => {
-  const senza = analizza({ ...SORGENTI, 'src/main/services/fxRates.js': '' });
+  const f = 'src/main/services/fxRates.js';
+  const senza = {
+    indirizzi: ANALISI.indirizzi.filter((u) => u.file !== f),
+    chiamate: new Set([...ANALISI.chiamate].filter((x) => x !== f)),
+    testi: new Map([...ANALISI.testi, [f, leggi(f, '')]]),
+  };
   assert.ok(vociMorte(senza).some((m) => m.startsWith('cambi-valuta:')), 'la voce dei cambi resta verde senza il suo codice');
 });
