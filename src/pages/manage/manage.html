@@ -227,6 +227,7 @@
     /* La barra di ricerca appartiene alla barra delle sezioni — la apre la lente che sta lì dentro — quindi le sta
        più vicina che al contenuto. Il margine negativo RIASSORBE quell'aria invece di ripeterne il numero. */
     .mg-searchbar {
+      position: relative;
       display: flex; align-items: center; gap: 8px;
       margin: calc(var(--mg-search-gap) - var(--mg-tabs-gap)) 0 20px;
       padding: 8px 12px;
@@ -234,6 +235,17 @@
       background: var(--sn-overlay-bg);
     }
     .mg-searchbar[hidden] { display: none; }
+    /* Quanti feedback ha già letto il classificatore: un filo sul bordo basso della barra, che si riempie. */
+    .mg-search-progress {
+      position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px;
+      border-radius: 2px; overflow: hidden; pointer-events: none;
+      background: color-mix(in srgb, var(--sn-accent) 18%, transparent);
+    }
+    .mg-search-progress[hidden] { display: none; }
+    .mg-search-progress-fill {
+      display: block; height: 100%; width: 0;
+      background: var(--sn-accent); transition: width 0.2s ease-out;
+    }
     .mg-search-ico { display: inline-flex; color: var(--sn-muted); flex: 0 0 auto; }
     .mg-search-ico svg { display: block; }
     .mg-search-input {
@@ -1330,6 +1342,8 @@
       <span class="mg-search-msg" id="mgSearchMsg" role="status"></span>
       <button type="button" class="mg-search-close" id="mgSearchClose"
         title="Chiudi ricerca" aria-label="Chiudi ricerca">×</button>
+      <span class="mg-search-progress" id="mgSearchProgress" role="progressbar" aria-label="Feedback letti dal classificatore"
+        aria-valuemin="0" hidden><span class="mg-search-progress-fill" id="mgSearchProgressFill"></span></span>
     </div>
 
     <!-- Layout condiviso: la lista a sinistra è filtrata per tab, dettaglio e pannello laterale sono comuni. -->

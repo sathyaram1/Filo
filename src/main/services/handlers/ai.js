@@ -144,9 +144,11 @@ module.exports = function register(on, ctx) {
     try { g.controller.abort(); } catch (_) {}
   }
 
+  // Errori la cui frase è già per chi legge (dicono anche dove si imposta il modello).
+  const GIA_SCRITTI = ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'NO_API_KEY', 'NO_ALLOWED_HOST', 'LIMIT_REACHED', 'PROVIDER_METHOD_MISSING'];
   function fraseErrore(e) {
     const CE = globalThis.SN_CHAT_ERRORS;
-    if (e && e.code && /^(NO_|LIMIT_)/.test(String(e.code))) return String(e.message || e.code);
+    if (e && GIA_SCRITTI.includes(e.code)) return String(e.message || e.code);
     return CE && typeof CE.sentence === 'function' ? CE.sentence(e) : String((e && e.message) || e || 'errore');
   }
 
@@ -211,16 +213,16 @@ module.exports = function register(on, ctx) {
     giriRicerca.set(id, g);
     // La pagina chiusa a metà non paga il resto del giro.
     try { if (sender && sender.wc && typeof sender.wc.once === 'function') sender.wc.once('destroyed', () => fermaGiro(id)); } catch (_) {}
-    const conta = (req, letti, senza) => { g.done += req.ids.length; g.skipped += senza; void letti; };
+    const conta = (req, senza) => { g.done += req.ids.length; g.skipped += senza; };
     modelGate.decideAll({
       action, settings, attempts, requests, parallel: S.CLASSIFIER.PARALLEL, signal: g.controller.signal,
       onAnswer: (i, answers) => {
         const r = S.hitsFromAnswers(requests[i], answers, S.CLASSIFIER.THRESHOLD);
         g.hits.push(...r.hits);
-        conta(requests[i], r.letti, r.senza);
+        conta(requests[i], r.senza);
       },
     }).then((r) => {
-      for (const i of r.skipped || []) conta(requests[i], 0, requests[i].ids.length);
+      for (const i of r.skipped || []) conta(requests[i], requests[i].ids.length);
       if (r.model) g.model = r.model;
       if (r.error) { g.error = fraseErrore(r.error); g.code = r.error.code || 'PARTIAL'; }
     }).catch((e) => {
