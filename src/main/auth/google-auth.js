@@ -2,8 +2,9 @@
 //
 // Flusso (vedi Filo/SECURITY.md §1):
 //   Fase 1 — Google OAuth 2.0 Authorization Code + PKCE:
-//     apre il consenso nel browser di SISTEMA, riceve il codice su un
-//     micro-server loopback temporaneo, lo scambia per un id_token Google.
+//     apre il consenso in una SCHEDA di Filo (così l'account Google entra anche
+//     nelle schede, #1123; se Google la rifiuta, nel browser di sistema), riceve
+//     il codice su un micro-server loopback temporaneo, lo scambia per un id_token.
 //   Fase 2 — Firebase Identity Toolkit (signInWithIdp):
 //     scambia l'id_token Google per un Firebase ID token + refresh token.
 //     Solo il Firebase ID token popola request.auth nelle regole Firestore.
@@ -16,9 +17,7 @@
 const http = require('node:http');
 // Niente require('electron') a livello di modulo: questo file viene richiesto
 // (transitivamente, via defaultsStore/supportModelsStore) anche dagli unit test
-// node:test che girano fuori da Electron. `shell` e `net` servono solo dentro signIn(),
-// quindi si richiede lazy lì (vedi CLAUDE.md — pattern usato anche altrove,
-// es. adblock.js/proxyTab.js).
+// node:test che girano fuori da Electron: `shell` e `net` si chiedono dentro le funzioni.
 const cfg = require('./config');
 const pkce = require('./pkce');
 const store = require('./token-store');
@@ -239,17 +238,17 @@ async function signIn() {
   if (!cfg.isConfigured()) {
     throw erroreAccesso('non-configurato', 'Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
   }
-  const { shell, net } = require('electron');
+  const { net } = require('electron');
   if (net && typeof net.isOnline === 'function' && !net.isOnline()) {
     throw erroreAccesso('rete', 'nessuna connessione');
   }
-  // Un accesso alla volta: chi lo chiede mentre uno aspetta il browser riapre la
-  // STESSA pagina e ne condivide l'esito, così qualunque scheda completi arriva a Filo.
+  // Un accesso alla volta: chi lo chiede mentre uno aspetta riporta davanti la
+  // STESSA pagina e ne condivide l'esito, così qualunque strada completi arriva a Filo.
   if (flussoInCorso) {
     const f = await flussoInCorso;
     if (f.aspettaBrowser) {
       f.rinnovaAttesa();
-      await apriBrowser(shell, f.url);
+      await mostraAccesso(f);
     }
     return f.esito;
   }
@@ -265,7 +264,7 @@ async function signIn() {
   }
   f.esito.then(libera, libera);
   try {
-    await apriBrowser(shell, f.url);
+    await mostraAccesso(f);
   } catch (e) {
     f.loop.abort(e);
     throw e;
@@ -273,9 +272,44 @@ async function signIn() {
   return f.esito;
 }
 
-async function apriBrowser(shell, url) {
+const AVVISO_NEL_BROWSER = 'Google non accetta l\'accesso dentro Filo: continua nel browser. Filo si collega, i prodotti Google nelle schede no.';
+
+// Prima in una scheda della finestra normale: lì l'accesso a Google vale anche per YouTube, Gmail e Drive (#1123).
+// Il browser di sistema resta il ripiego, quando Google rifiuta la scheda o una finestra normale non c'è.
+async function mostraAccesso(f) {
+  if (f.scheda && f.scheda.riporta()) return;
+  if (!f.nelBrowser) {
+    let scheda = null;
+    try {
+      scheda = require('./accessoInScheda').apri(f.url, {
+        hostAccesso: hostDi(cfg.authEndpoint),
+        suChiusa: () => f.loop.abort(erroreAccesso('annullato', 'scheda di accesso chiusa')),
+        suRifiuto: (motivo) => passaAlBrowser(f, motivo),
+      });
+    } catch (_) {}
+    if (scheda) { f.scheda = scheda; return; }
+  }
+  f.nelBrowser = true;
+  await apriBrowser(f.url);
+}
+
+// Lo stesso indirizzo, quindi lo stesso codice e lo stesso loopback: l'accesso a Filo riesce comunque.
+function passaAlBrowser(f, motivo) {
+  f.scheda = null;
+  f.nelBrowser = true;
+  console.warn('[auth] Google non accetta la scheda (' + motivo + '): accesso nel browser di sistema');
+  try { require('./prodottiGoogle').googleRifiutaLeSchede(); } catch (_) {}
+  try { require('../services/avvisoFinestra').avvisoNellaFinestra(AVVISO_NEL_BROWSER, { chiave: 'accesso-nel-browser' }); } catch (_) {}
+  apriBrowser(f.url).catch((e) => f.loop.abort(e));
+}
+
+function hostDi(url) {
+  try { return new URL(String(url)).hostname.toLowerCase(); } catch (_) { return ''; }
+}
+
+async function apriBrowser(url) {
   try {
-    await shell.openExternal(url);
+    await require('electron').shell.openExternal(url);
   } catch (e) {
     throw erroreAccesso('browser', 'browser non aperto: ' + (e?.message || e));
   }
@@ -299,7 +333,7 @@ async function nuovoFlusso() {
     prompt: 'select_account',
   }).toString();
 
-  const f = { url: authUrl.toString(), loop, aspettaBrowser: true };
+  const f = { url: authUrl.toString(), loop, aspettaBrowser: true, scheda: null, nelBrowser: false };
   let timer = null;
   // Il tetto riparte a ogni riapertura: chi riapre il browser ricomincia da capo.
   f.rinnovaAttesa = () => {
@@ -314,6 +348,8 @@ async function nuovoFlusso() {
     } finally {
       clearTimeout(timer);
       f.aspettaBrowser = false;
+      // Arrivato il codice (o finita l'attesa) la scheda resterebbe su una pagina morta del loopback.
+      if (f.scheda) { f.scheda.chiudi(); f.scheda = null; }
     }
     const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
     if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');

@@ -75,7 +75,7 @@ test('doppio clic sul pollice: una sola pagina di accesso, e risponde', async ({
   await page.waitForTimeout(500);
   expect(await app.evaluate(() => globalThis.__aperture.length)).toBe(1);
   expect(await rispondiDalBrowser(app, 0, 'error=access_denied')).toBe(200);
-  await expect(scheda(page, 'fb-a').locator('.bd-card-msg')).toHaveText('Accesso annullato nel browser: riprova quando vuoi.');
+  await expect(scheda(page, 'fb-a').locator('.bd-card-msg')).toHaveText('Accesso annullato: riprova quando vuoi.');
 });
 
 test('«Riapri il browser» riapre la stessa pagina: risponde anche la prima scheda', async ({ app, openTab }) => {

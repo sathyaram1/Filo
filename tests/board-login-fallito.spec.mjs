@@ -63,10 +63,10 @@ test('voto da anonimo, accesso senza rete: la scheda dice perché il voto non è
   const page = await apri(openTab);
   await card(page).locator('.bd-vote-works').click();
 
-  await expect(card(page).locator('.bd-card-msg')).toHaveText(/Completa l'accesso nel browser: poi il voto parte da solo/);
-  await expect(page.locator('#bdAuthMsg')).toHaveText(/Completa l'accesso nel browser/);
+  await expect(card(page).locator('.bd-card-msg')).toHaveText(/Completa l'accesso: poi il voto parte da solo/);
+  await expect(page.locator('#bdAuthMsg')).toHaveText(/Completa l'accesso/);
   await expect(page.locator('#bdAuthSpin')).toBeVisible();
-  await expect(page.locator('#bdSignIn')).toHaveText('Riapri il browser');
+  await expect(page.locator('#bdSignIn')).toHaveText('Torna all\'accesso');
 
   await page.evaluate((frase) => window.__chiudiAccesso({ ok: false, code: 'rete', error: frase }), RETE);
 
@@ -104,10 +104,10 @@ test('«Ancora rotto?» da anonimo, il canale dell\'accesso cade: frase sulla sc
 test('«Accedi» in testa: un accesso annullato lo dice in testa e offre «Riprova»', async ({ openTab }) => {
   const page = await apri(openTab);
   await page.locator('#bdSignIn').click();
-  await expect(page.locator('#bdAuthMsg')).toHaveText(/Completa l'accesso nel browser/);
-  await page.evaluate(() => window.__chiudiAccesso({ ok: false, code: 'annullato', error: 'Accesso annullato nel browser: riprova quando vuoi.' }));
+  await expect(page.locator('#bdAuthMsg')).toHaveText(/Completa l'accesso/);
+  await page.evaluate(() => window.__chiudiAccesso({ ok: false, code: 'annullato', error: 'Accesso annullato: riprova quando vuoi.' }));
 
-  await expect(page.locator('#bdAuthMsg')).toHaveText('Accesso annullato nel browser: riprova quando vuoi.');
+  await expect(page.locator('#bdAuthMsg')).toHaveText('Accesso annullato: riprova quando vuoi.');
   await expect(page.locator('#bdAuthMsg')).toHaveClass(/bd-auth-ko/);
   await expect(page.locator('#bdSignIn')).toHaveText('Riprova');
   await expect(card(page).locator('.bd-card-msg')).toHaveCount(0);
@@ -123,14 +123,14 @@ test('voto ripremuto durante l\'attesa: nessun secondo browser, parte l\'ultima 
   await card(page).locator('.bd-vote-works').click();
   await card(page).locator('.bd-vote-broken').click();
   expect(await page.evaluate(() => window.__accessi.length)).toBe(1);
-  await expect(card(page).locator('.bd-card-msg')).toHaveText(/Completa l'accesso nel browser/);
+  await expect(card(page).locator('.bd-card-msg')).toHaveText(/Completa l'accesso/);
 
   await page.evaluate(() => window.__chiudiAccesso({ ok: true }, 0));
   await expect.poll(() => page.evaluate(() => window.__gesti.map((g) => g.vote))).toEqual(['broken']);
   await expect(card(page).locator('.bd-vote-broken')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('«Riapri il browser» chiede di nuovo lo stesso accesso: il voto che aspettava parte una volta sola', async ({ openTab }) => {
+test('«Torna all\'accesso» chiede di nuovo lo stesso accesso: il voto che aspettava parte una volta sola', async ({ openTab }) => {
   const page = await apri(openTab);
   await card(page).locator('.bd-vote-works').click();
   await page.locator('#bdSignIn').click();

@@ -24,9 +24,11 @@ function finestraNormale() {
 }
 
 // `hostAccesso`: dove Google mostra i suoi rifiuti. `fino(url)`: vero quando la scheda è arrivata dove l'accesso
-// finisce, e da lì non si segue più. Torna null se nessuna finestra normale può aprire la scheda.
-function apri(url, { hostAccesso = hostDi(url), suChiusa, suRifiuto, fino } = {}) {
-  const win = finestraNormale();
+// finisce, e da lì non si segue più. `finestra`: quella da cui è partito il gesto, se è normale.
+// Torna null se nessuna finestra normale può aprire la scheda.
+function apri(url, { hostAccesso = hostDi(url), suChiusa, suRifiuto, fino, finestra = null } = {}) {
+  let win = finestra;
+  try { if (!win || win.isDestroyed() || !win._filoTabs || win._filoIncognito) win = finestraNormale(); } catch (_) { win = finestraNormale(); }
   if (!win) return null;
   const tabs = win._filoTabs;
   const id = tabs.openTab(url, { activate: true });
