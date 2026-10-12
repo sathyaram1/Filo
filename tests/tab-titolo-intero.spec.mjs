@@ -150,4 +150,35 @@ test('#429 — la scheda attiva segue la cima della pagina anche quando cambia d
   await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(17, 17, 17)');
   await p.evaluate(() => { document.getElementById('h').style.background = '#1f7a3a'; });
   await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(31, 122, 58)');
+  // Lo stile che cambia senza toccare un elemento: una regola aggiunta al foglio, un foglio sostituito.
+  await p.evaluate(() => { const s = document.createElement('style'); s.textContent = 'body{}'; document.head.appendChild(s); });
+  await p.waitForTimeout(800);
+  await p.evaluate(() => document.styleSheets[document.styleSheets.length - 1].insertRule('header{background:#0a3d62 !important}', 0));
+  await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(10, 61, 98)');
+  await p.evaluate(() => { const s = new CSSStyleSheet(); s.replaceSync('header{background:#7a1f1f !important}'); document.adoptedStyleSheets = [s]; });
+  await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(122, 31, 31)');
+});
+
+test('#429 — la scheda attiva segue un\'intestazione che si colora con un\'animazione d\'ingresso', async ({ shell, openTab, testServer }) => {
+  await openTab(testServer.html(`<title>Ingresso</title><style>body{margin:0;background:#fff}@keyframes v{from{background:#fff}to{background:#1f7a3a}}
+    header{height:80px;animation:v .4s ease-out 1.6s both}</style><body><header></header>x</body>`));
+  const fondo = () => shell.evaluate(() => getComputedStyle(document.querySelector('.tab.active')).backgroundColor);
+  await expect.poll(fondo, { timeout: 8_000 }).toBe('rgb(31, 122, 58)');
+});
+
+// Una cima in due colori (una barra laterale scura che arriva in alto) dà il colore che prevale, non la media.
+test('#429 — con la cima in due colori la scheda attiva prende quello che prevale', async ({ shell, openTab, testServer }) => {
+  await openTab(testServer.html('<title>Mezzo</title><body style="margin:0;background:#fff"><div style="display:flex;height:60px"><div style="width:30%;background:#202124"></div><div style="flex:1;background:#fff"></div></div>x</body>'));
+  const fondo = () => shell.evaluate(() => getComputedStyle(document.querySelector('.tab.active')).backgroundColor);
+  await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(255, 255, 255)');
+});
+
+// L'attiva si stacca dalle altre solo con lo spazio che avanza: un vuoto suo non taglia il nome della vicina.
+test('#429 — la scheda attiva non tiene un vuoto che serve a un nome tagliato', async ({ shell, openTab, testServer }) => {
+  await openTab(testServer.html('<title>Meteo Italia previsioni del tempo</title><body>x</body>'));
+  await openTab(testServer.html('<title>Previsioni meteo per Milano e tutta la Lombardia aggiornate ogni ora con radar</title><body>x</body>'));
+  await openTab('filo://manage/manage.html');
+  await shell.mouse.move(600, 500);
+  await expect(shell.locator('.tab.active .title')).toHaveText('Gestione');
+  await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
 });
