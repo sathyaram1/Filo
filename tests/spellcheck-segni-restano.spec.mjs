@@ -85,6 +85,67 @@ test('correggendo a mano una parola, i segni blu delle altre restano al loro pos
   expect(await restanoPer(page, ['xqprima1', 'xqterza3'], 600)).toEqual([]);
 });
 
+// La parola che il correttore di sistema segna sotto il punto, chiesta come la chiede il menu: col tasto destro.
+async function segnataDalSistema(app, page, x, y) {
+  const host = new URL(page.url()).host;
+  await app.evaluate(({ webContents }, h) => {
+    globalThis.__segnata = null;
+    for (const wc of webContents.getAllWebContents()) {
+      let qui = false;
+      try { qui = new URL(wc.getURL()).host === h; } catch (_) {}
+      if (qui) wc.once('context-menu', (_e, p) => { globalThis.__segnata = p.misspelledWord; });
+    }
+  }, host);
+  await page.mouse.click(x, y, { button: 'right' });
+  await expect.poll(() => app.evaluate(() => globalThis.__segnata), { timeout: 3000 }).not.toBeNull();
+  const parola = await app.evaluate(() => globalThis.__segnata);
+  await page.keyboard.press('Escape');
+  return parola;
+}
+
+// Il punto della riga `riga` (righe da 24 px), colonna `col`, nella casella.
+async function puntoInRiga(page, riga, col) {
+  return page.evaluate(([riga, col]) => {
+    const ta = document.getElementById('ta');
+    const r = ta.getBoundingClientRect();
+    const cs = getComputedStyle(ta);
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = cs.font;
+    const w = c.measureText('m').width;
+    return {
+      x: r.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft) + (col + 2) * w,
+      y: r.top + parseFloat(cs.borderTopWidth) + parseFloat(cs.paddingTop) + riga * 24 + 12 - ta.scrollTop,
+    };
+  }, [riga, col]);
+}
+
+test('correggendo dal menu una parola rossa, il rosso delle altre parole resta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const piattaforma = await app.evaluate(() => process.platform);
+  test.skip(piattaforma === 'darwin', 'su Mac il correttore è quello del sistema');
+  const page = await apri(app, openTab, testServer);
+  await expect.poll(() => app.evaluate(() => globalThis.__filoDizionari.stato().inizializzati), { timeout: 20_000 })
+    .toContain('it-IT');
+  await page.locator('#ta').evaluate((ta) => { ta.style.lineHeight = '24px'; ta.style.height = '520px'; ta.style.padding = '4px'; });
+  const riempi = 'la casa sul lago era bella e il sole splendeva sopra le montagne';
+  const righe = ['ciiao amico mio', ...Array.from({ length: 16 }, () => riempi), 'staii bene oggi'];
+  await page.locator('#ta').click();
+  await page.keyboard.insertText(righe.join('\n'));
+
+  const staii = await puntoInRiga(page, 17, 1);
+  const ciiao = await puntoInRiga(page, 0, 1);
+  await expect.poll(() => segnataDalSistema(app, page, staii.x, staii.y), { timeout: 20_000, intervals: [1000] }).toBe('staii');
+  await expect.poll(() => segnataDalSistema(app, page, ciiao.x, ciiao.y), { timeout: 20_000, intervals: [1000] }).toBe('ciiao');
+
+  await page.mouse.click(ciiao.x, ciiao.y, { button: 'right' });
+  const corr = page.locator('.sn-menu-correction:visible').first();
+  await expect(corr).not.toBeEmpty({ timeout: 4000 });
+  const scelta = (await corr.textContent()).trim();
+  await corr.click();
+  await expect(page.locator('#ta')).toHaveValue(new RegExp(`^${scelta} amico mio\\n`));
+  expect(await segnataDalSistema(app, page, staii.x, staii.y)).toBe('staii');
+});
+
 test('con «Risolvi» dal tasto destro sul blu, le altre parole blu restano segnate', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer);
