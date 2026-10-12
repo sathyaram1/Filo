@@ -1556,6 +1556,10 @@
           const refiner = buildAestheticRefiner(a);
           if (refiner) btn.after(refiner);
         }
+        if (r && r.executed && r.output && r.output.sceltaAutonomia === true) {
+          const scelta = sceltaAutonomiaEl({ ...a, _output: r.output });
+          if (scelta) btn.after(scelta);
+        }
       }
       btn._runConfirm = runConfirm;
       btn.addEventListener('click', runConfirm);
