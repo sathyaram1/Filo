@@ -92,7 +92,8 @@
 //   node scripts/routine-channel.mjs domanda <parola-d-ordine> | domanda --biglietto <biglietto>
 //       → la domanda di fine sessione e il comando per rispondere. Exit 0 = domanda, 2 = nessuna (chiudi e basta), 4 = rifiutato.
 //   node scripts/routine-channel.mjs risposta <parola-d-ordine> <id> | risposta --biglietto <biglietto>   (testo da stdin)
-//       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo.
+//       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo. Con la parola
+//         d'ordine allega da solo il rapporto dei turni dell'orchestratore dopo l'ultimo biglietto.
 //
 //   La FUSIONE su main non ha un sottocomando qui: passa da
 //   `scripts/merge-gate.mjs <branch>`, che usa merge() di questo modulo. Il
