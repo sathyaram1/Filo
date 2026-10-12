@@ -2798,7 +2798,7 @@ class TabManager {
         if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
         // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
         // finestrella diventa una scheda, dove l'avviso c'è.
-        if (!tab.sbAvviso) return this._allowAuthPopup(url);
+        if (!tab.sbAvviso) return this._allowAuthPopup(url, details.features);
       }
       // #170.3 — la lista dei siti bloccati la applica openTab; un «Apri comunque»
       // dato qui vale anche per le schede che apre sullo stesso sito.
