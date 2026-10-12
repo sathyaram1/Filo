@@ -208,6 +208,13 @@ function isOsDelegatedScheme(rawUrl) {
 const RIAPERTURA_ACCESSO_MS = 5000;
 const MONDO_RIAPERTURA = 1003;
 
+// Il dominio registrato, la parte che chi attacca non sceglie; una pagina scritta dal sito (about:blank, blob:) è sua.
+function titoloFinestrella(url, origine = '') {
+  const da = /^https?:/i.test(origine) ? origine : String(url || '');
+  if (!/^https?:/i.test(da)) return da.split(/[?#]/)[0] || 'about:blank';
+  return Permessi.nomeDaMostrare(da).dominio;
+}
+
 // Consegna all'OS un link mailto:/tel:/sms: (best-effort). Da chiamare SOLO dopo
 // aver bloccato la navigazione in-app, e SOLO per gli schemi dell'allowlist.
 function openExternalScheme(rawUrl) {
