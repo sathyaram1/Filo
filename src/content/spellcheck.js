@@ -536,6 +536,49 @@
     o.appendChild(frag);
   }
 
+  // Chi corregge una parola perde il segno di quella: gli altri restano dov'erano finché lo scan dopo non li rinnova
+  // (#1111), sugli offset giusti per «Risolvi».
+  function seguiIlTesto(state) {
+    const ora = getEditableText(state.el);
+    if (ora === state.testoIssues) return;
+    const prima = state.testoIssues;
+    state.testoIssues = ora;
+    if (!state.issues.length) return;
+    const { issues, perse } = riallineaIssues(state.issues, prima, ora);
+    state.issues = issues;
+    // Un segno perso torna solo da uno scan, anche se il testo ritorna quello già controllato.
+    if (perse) state.lastScannedText = '';
+    renderOverlayContent(state);
+  }
+
+  // Prima del cambio resta, dopo scorre; chi tocca il cambio, o la cui parola il cambio allunga o fonde con un'altra
+  // (un bordo che passa da separatore a lettera), si perde.
+  function riallineaIssues(issues, vecchio, nuovo) {
+    const lista = Array.isArray(issues) ? issues : [];
+    vecchio = String(vecchio ?? '');
+    nuovo = String(nuovo ?? '');
+    if (!lista.length || vecchio === nuovo) return { issues: lista, perse: false };
+    const corto = Math.min(vecchio.length, nuovo.length);
+    let p = 0;
+    while (p < corto && vecchio[p] === nuovo[p]) p++;
+    let s = 0;
+    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
+    const fineCambio = vecchio.length - s;
+    const delta = nuovo.length - vecchio.length;
+    const out = [];
+    for (const it of lista) {
+      let da;
+      if (it.end <= p) da = it.start;
+      else if (it.start >= fineCambio) da = it.start + delta;
+      else continue;
+      const a = da + (it.end - it.start);
+      if (isWordCharLocal(vecchio[it.start - 1]) !== isWordCharLocal(nuovo[da - 1])) continue;
+      if (isWordCharLocal(vecchio[it.end]) !== isWordCharLocal(nuovo[a])) continue;
+      out.push(da === it.start ? it : { ...it, start: da, end: a });
+    }
+    return { issues: out, perse: out.length !== lista.length };
+  }
+
   // ============================================================================
   // Scan LLM (zigzag blu)
   // ============================================================================
