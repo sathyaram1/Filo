@@ -34,6 +34,6 @@ test("l'«In breve» non fa passare per completo un elenco più corto di quello 
   const voceModelli = breve.slice(breve.indexOf('Memorie, appunti e cronologia'), breve.indexOf('Il server di Filo riceve'));
   assert.match(voceModelli, /per esempio/);
   assert.match(voceModelli, /terminale/);
-  assert.match(voceModelli, /Safe Browsing/);
+  assert.match(voceModelli, /Safe\s+Browsing/);
   assert.match(voceModelli, /transparency\/privacy\.md/);
 });
