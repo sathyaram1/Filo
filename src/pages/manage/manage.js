@@ -4302,7 +4302,7 @@
     const id = selectedId;
     if (rispostaInVolo.has(id)) return;
     const reply = (bozzeRisposta.get(id) || '').trim();
-    if (!reply) { if (origine && origine.isConnected) origine.focus(); return; }
+    if (!reply) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
