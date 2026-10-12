@@ -1231,7 +1231,7 @@ class TabManager {
   // newtab (non sono "siti" da ritrovare). Senza store caricato, è un no-op.
   _archiveClosedTab(tab, reason = 'manual') {
     try {
-      if (!tab || this.incognito) return;
+      if (!tab || this.incognito || tab._passaggio) return;
       const Archive = globalThis.SN_ARCHIVED_TABS;
       if (!Archive) return;
       const url = tab.url || '';
