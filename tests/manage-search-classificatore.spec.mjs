@@ -72,6 +72,11 @@ async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWei
           if (rispostaDecisioni === 'uno-giu' && n === 1) return risposta(false, { error: { message: 'upstream' } }, 502);
           await pausa(latenza);
           if (rispostaDecisioni === 'piano' && n <= 4) return risposta(false, { error: { message: 'rate limited' } }, 429, { 'retry-after': '0.3' });
+          // Troppe richieste per i primi due secondi, con l'attesa chiesta o senza: il servizio c'è, si aspetta.
+          if (n === 1) g.primo = Date.now();
+          if (/^piano-2s/.test(rispostaDecisioni) && Date.now() - g.primo < 2000) {
+            return risposta(false, { error: { message: 'rate limited' } }, 429, rispostaDecisioni === 'piano-2s' ? { 'retry-after': '2' } : {});
+          }
           if (rispostaDecisioni === 'rifiuta') return risposta(false, { error: { message: 'not a decisions model' } }, 400);
           if (rispostaDecisioni === 'guasto') return risposta(false, { error: { message: 'upstream error' } }, 503);
           if (rispostaDecisioni === 'rete') throw new TypeError('fetch failed');
@@ -195,7 +200,12 @@ for (const guasto of ['guasto', 'rete']) {
   });
 }
 
-for (const [intoppo, rispostaDecisioni] of [['troppe richieste alla prima ondata', 'piano'], ['una sola richiesta in errore prima delle altre', 'uno-giu']]) {
+for (const [intoppo, rispostaDecisioni] of [
+  ['troppe richieste alla prima ondata', 'piano'],
+  ['troppe richieste per due secondi, con attesa chiesta di due secondi', 'piano-2s'],
+  ['troppe richieste per due secondi, senza attesa chiesta', 'piano-2s-muto'],
+  ['una sola richiesta in errore prima delle altre', 'uno-giu'],
+]) {
   test(`${intoppo}: si riprova, e i risultati li dà il classificatore`, async ({ app, openTab }) => {
     await preparaOwner(app, { supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13', manageSearch: 'vendor/testo' }, rispostaDecisioni });
     const page = await openTab(URL);

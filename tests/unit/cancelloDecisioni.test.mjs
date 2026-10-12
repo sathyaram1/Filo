@@ -137,10 +137,9 @@ test('nessun modello della catena risponde: l\'errore risale', async () => {
   assert.equal(registrazioni.length, 0);
 });
 
-test('prima della prima risposta un intoppo passeggero ha un solo tentativo in più, ad attesa corta: un servizio giù ripiega presto', async () => {
+test('prima della prima risposta un guasto passeggero ha un solo tentativo in più, ad attesa corta: un servizio giù ripiega presto', async () => {
   for (const errore of [
     Object.assign(new Error('OpenRouter 503: upstream'), { status: 503 }),
-    Object.assign(new Error('OpenRouter 429: piano'), { status: 429, retryAfterMs: 5000 }),
     new TypeError('fetch failed'),
   ]) {
     viste = [];
@@ -163,6 +162,22 @@ test('troppe richieste alla prima ondata: si aspetta e si riprova, e risponde il
   const r = await cancello(UNO).decideAll({ action: AZIONE, requests: richieste(6), parallel: 2 });
   assert.equal(r.answered, 6);
   assert.equal(r.error, null);
+});
+
+test('troppe richieste per i primi secondi, con o senza attesa chiesta: si aspetta quanto chiede e risponde il classificatore', async () => {
+  for (const retryAfterMs of [1800, undefined]) {
+    viste = [];
+    // Il servizio rifiuta finché non scade il suo timer, più lungo dell'attesa corta del ripiego svelto.
+    let aperto = false;
+    setTimeout(() => { aperto = true; }, 1800);
+    rispondi = () => {
+      if (!aperto) throw Object.assign(new Error('OpenRouter 429: piano'), { status: 429, retryAfterMs });
+      return { answers: { f1: { noul: 0.1 } }, usage: { costUsd: 0.001 } };
+    };
+    const r = await cancello(UNO).decideAll({ action: AZIONE, requests: richieste(3), parallel: 3 });
+    assert.equal(r.answered, 3, `attesa chiesta ${retryAfterMs}`);
+    assert.equal(r.error, null);
+  }
 });
 
 test('una richiesta che cade due volte mentre le altre sono ancora in volo non ferma il giro', async () => {
