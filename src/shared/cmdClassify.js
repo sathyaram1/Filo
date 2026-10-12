@@ -1469,7 +1469,8 @@
     for (const p of sm.pezzi) {
       if (det.level === 3) break;
       const t = p.testo.trim();
-      const cc = p.spostato ? ignota : c;
+      // Ciò che un gruppo stampa diventa l'argomento del comando attorno.
+      const cc = { ...(p.spostato ? ignota : c), stampaLibera: false };
       // Il corpo di un `if` può essere vuoto o un valore solo (stringa, numero, variabile), che PowerShell stampa.
       if (p.corpo && !t) continue;
       const sub = p.corpo && VALORE_RE.test(t) ? `Write-Output ${t}` : t;
