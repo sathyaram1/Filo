@@ -35,7 +35,7 @@ function voci(params, wc, conSchede) {
     out.push({ label: t('menu_copy', 'Copia'), action: 'copy' });
   }
   if (/^https?:/i.test(params.linkURL || '')) {
-    out.push({ label: t('menu_open_in_new_tab', 'Apri in nuova tab'), action: 'link-apri' });
+    if (conSchede) out.push({ label: t('menu_open_in_new_tab', 'Apri in nuova tab'), action: 'link-apri' });
     out.push({ label: t('menu_copy_link', 'Copia URL'), action: 'link-copia' });
   }
   if (out.length) out.push({ type: 'separator' });
