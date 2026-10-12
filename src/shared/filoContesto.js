@@ -215,9 +215,27 @@
       const fuori = letturaDaFuori(lista[i], comandi[i]);
       return fuori ? { ...(e || {}), azioni: [...((e && e.azioni) || []), fuori] } : e;
     };
+    // Le immagini tornano con la vita delle letture, dalle più nuove: oltre i tetti quelle prima lasciano la nota.
+    const fotoDi = new Map();
+    if (typeof immagini === 'function') {
+      let quante = 0;
+      let caratteri = 0;
+      for (let i = n - 1; i >= 0; i--) {
+        const m = lista[i];
+        if (!recente[i] || m.role !== 'user' || !numeroImmagini(m)) continue;
+        const urls = (Array.isArray(immagini(m)) ? immagini(m) : []).filter((u) => typeof u === 'string' && u);
+        if (!urls.length) continue;
+        const peso = urls.reduce((k, u) => k + u.length, 0);
+        if (quante + urls.length > MAX_IMMAGINI_RIMANDATE || caratteri + peso > MAX_CARATTERI_IMMAGINI) break;
+        quante += urls.length;
+        caratteri += peso;
+        fotoDi.set(i, urls);
+      }
+    }
+    const rendiIl = (i, prima) => rendi(lista[i], prima, { tetto: token, esito: esitoDi(i), osserva, foto: fotoDi.get(i) || null });
     const memo = new Map();
     const pesa = (i) => {
-      if (!memo.has(i)) memo.set(i, stimaToken(rendi(lista[i], lista[i - 1], { tetto: token, esito: esitoDi(i), osserva }).content));
+      if (!memo.has(i)) memo.set(i, tokenDi(rendiIl(i, lista[i - 1]).content));
       return memo.get(i);
     };
     // La conversazione di questa scheda, se è ripresa da prima dei tetti: i suoi ultimi messaggi restano davanti,
