@@ -58,7 +58,7 @@ export async function closeFilo(app) {
 
 export async function bringToFront(app) {
   await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (!win) return;
     win.show(); win.moveTop(); win.focus();
   });
@@ -67,7 +67,7 @@ export async function bringToFront(app) {
 
 export async function contentBounds(app) {
   return app.evaluate(async ({ BrowserWindow, screen }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const b = win.getContentBounds();
     const d = screen.getDisplayMatching(b);
     return { ...b, scale: d.scaleFactor || 1 };
@@ -318,7 +318,7 @@ function resolveExecutable(name) {
 // Trova la Page della tab attiva interrogando il main per l'URL attivo.
 export async function activeView(app, shell) {
   const activeUrl = await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const tabs = win._filoTabs;
     if (!tabs) return null;
     const t = tabs.tabs.find((x) => x.id === tabs.activeId);

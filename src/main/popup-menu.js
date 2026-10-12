@@ -88,6 +88,13 @@ const ICON_PATHS = {
   user:
     '<circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/>',
 
+  // Moneta forata col filo nel foro: COPIA di `credits` in src/shared/icons.js. Voce «Crediti» del menu Profilo.
+  credits:
+    '<circle cx="12" cy="13.5" r="7"/>' +
+    '<rect x="9.75" y="11.25" width="4.5" height="4.5" rx="0.5"/>' +
+    '<path d="M12 11.25V5.5"/>' +
+    '<path d="M12 5.5a2 2 0 1 0 0.01 0"/>',
+
   incognito:
     '<path d="M3 13h18"/>' +
     '<path d="M6 13l1.4-3.8A2.2 2.2 0 0 1 9.5 7.8h5a2.2 2.2 0 0 1 2.1 1.4L18 13"/>' +

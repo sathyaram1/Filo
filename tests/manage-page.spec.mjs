@@ -2072,7 +2072,7 @@ for (const larghezza of [1280, 960]) {
       await page.waitForLoadState('domcontentloaded');
       await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
       await app.evaluate(({ BrowserWindow }, w) => {
-        const win = BrowserWindow.getAllWindows()[0];
+        const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
         win.setSize(w, win.getSize()[1]);
       }, larghezza);
       await page.waitForFunction((w) => Math.abs(window.outerWidth - w) < 40, larghezza);
@@ -2114,7 +2114,7 @@ test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto'
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
-  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setSize(960, win.getSize()[1]); });
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs); win.setSize(960, win.getSize()[1]); });
   await page.waitForFunction(() => Math.abs(window.outerWidth - 960) < 40);
   await page.evaluate(() => {
     const orig = window.filo.message.bind(window.filo);

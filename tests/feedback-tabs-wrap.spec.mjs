@@ -22,7 +22,7 @@ const FEEDBACK_URL = 'filo://feedback/feedback.html';
 test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato', async ({ app, openTab }) => {
   // Restringe la BrowserWindow al caso segnalato (~720 punti di larghezza).
   await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows()[0];
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (w) w.setContentSize(720, 800);
   });
 
