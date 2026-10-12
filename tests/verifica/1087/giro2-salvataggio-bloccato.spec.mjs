@@ -39,8 +39,7 @@ test('cartella dei dati bloccata: file di prima intatto, avviso, poi salvataggio
   let bloccata = false;
   try {
     app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env: { ...process.env, FILO_USER_DATA: dati, NODE_ENV: 'test' } });
-    const vista = await finestra(app, (u) => u.startsWith('filo://shell/avvisi.html'));
-    expect(vista).toBeTruthy();
+    await app.firstWindow();
     await app.evaluate(async () => { await globalThis.SN_STORAGE.getRaw('sn_nota_prova', null); });
     // Le scritture dell'avvio (schede, impostazioni) vanno finite prima di bloccare.
     await new Promise((r) => setTimeout(r, 3000));
@@ -48,6 +47,9 @@ test('cartella dei dati bloccata: file di prima intatto, avviso, poi salvataggio
     execFileSync('chattr', ['+i', dati]);
     bloccata = true;
     await app.evaluate(async () => { await globalThis.SN_STORAGE.setRaw('sn_nota_prova', 'dopo'); });
+    // La vista degli avvisi nasce col primo avviso.
+    const vista = await finestra(app, (u) => u.startsWith('filo://shell/avvisi.html'));
+    expect(vista, 'la vista degli avvisi nasce').toBeTruthy();
 
     const carta = vista.locator('.shell-notif.show', { hasText: 'non riesce a salvare' });
     await expect(carta).toBeVisible({ timeout: 10_000 });
