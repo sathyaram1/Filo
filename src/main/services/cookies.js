@@ -154,15 +154,24 @@ function baseDelSito(reg) {
   return 'filo-priv-' + String(reg || '').replace(/[^a-z0-9.-]/gi, '_');
 }
 
+// I domini di Google sono un sito solo per la fiducia: ne basta uno nell'elenco (#1123).
+function fidatoIn(sito, trusted) {
+  if (Sito.voceSalvata(sito, trusted)) return true;
+  return Google.diGoogle(sito) && Google.googleNellElenco(trusted);
+}
+
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
   // 'persist:' → jar isolato per-sito ma persistente (resta connesso). È del sito anche quando la voce fidata è un
   // suffisso (co.uk, gov.it): un jar per voce metterebbe tutti i siti sotto di lei insieme (#796).
   // Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
-  const base = baseDelSito(reg);
-  if (Sito.voceSalvata(url, trusted instanceof Set ? trusted : null)) return 'persist:' + base;
-  sitoDelJar.set(base, reg);
+  // Google e YouTube stanno in un jar solo: l'accesso fatto su uno vale sull'altro (#1123).
+  const sito = Google.sitoDelContenitore(reg);
+  const base = baseDelSito(sito);
+  if (Sito.voceSalvata(url, trusted instanceof Set ? trusted : null)
+    || (sito === Google.SITO_GOOGLE && Google.googleNellElenco(trusted))) return 'persist:' + base;
+  sitoDelJar.set(base, sito);
   const g = jarGen.get(base);
   return g && g.n ? `${base}~${g.n}` : base;
 }
