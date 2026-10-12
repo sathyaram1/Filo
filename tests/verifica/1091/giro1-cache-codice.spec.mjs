@@ -24,21 +24,21 @@ function vociFilo(userData) {
   return out;
 }
 
-async function apriEChiudi(app, shell, url, volte) {
+async function apriERicarica(app, shell, url, volte) {
   const host = new URL(url).hostname;
-  for (let i = 0; i < volte; i++) {
-    await shell.evaluate((u) => window.filoShell.tabs.open(u, { allowDuplicate: true }), url);
-    const scad = Date.now() + 15_000;
-    let page = null;
-    while (Date.now() < scad && !page) {
-      page = app.windows().find((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } });
-      if (!page) await new Promise((r) => setTimeout(r, 100));
-    }
-    expect(page, url).toBeTruthy();
-    await page.waitForLoadState('load').catch(() => {});
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  const scad = Date.now() + 15_000;
+  let page = null;
+  while (Date.now() < scad && !page) {
+    page = app.windows().find((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } });
+    if (!page) await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(page, url).toBeTruthy();
+  await page.waitForLoadState('load').catch(() => {});
+  await page.waitForTimeout(1500);
+  for (let i = 1; i < volte; i++) {
+    await page.reload({ waitUntil: 'load' }).catch(() => {});
     await page.waitForTimeout(1500);
-    await page.close().catch(() => {});
-    await new Promise((r) => setTimeout(r, 500));
   }
 }
 
@@ -53,8 +53,8 @@ test('le pagine interne riaperte lasciano i loro script nella cache del codice',
       const app = await avvia();
       const shell = await app.firstWindow();
       await shell.waitForLoadState('domcontentloaded');
-      await apriEChiudi(app, shell, 'filo://newtab/', 2);
-      await apriEChiudi(app, shell, 'filo://preferences/', 2);
+      await apriERicarica(app, shell, 'filo://newtab/', 2);
+      await apriERicarica(app, shell, 'filo://preferences/', 2);
       await new Promise((r) => setTimeout(r, 3000));
       await chiudiApp(app, { tetto: 10_000 });
     }
