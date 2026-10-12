@@ -31,6 +31,7 @@ test('r1 con 3000 voci in cronologia un tasto nella ricerca risponde in meno di 
   });
   expect(ms, `un tasto nella ricerca ha bloccato la pagina per ${Math.round(ms)} ms`).toBeLessThan(500);
   // Tutte le voci restano raggiungibili: la ricerca della più vecchia la trova.
-  await page.locator('#search').fill('domanda 0 ');
-  await expect(page.locator('.sn-history-item', { hasText: 'domanda 0 ' }).first()).toBeVisible({ timeout: 20_000 });
+  await page.locator('#search').fill('domanda 0');
+  await expect(page.locator('.sn-history-item')).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.locator('.sn-history-item')).toContainText('domanda 0');
 });
