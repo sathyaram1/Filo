@@ -41,6 +41,11 @@ function googleNellElenco(voci) {
   return false;
 }
 
+// Un elenco di siti che risponde a has() per tutti i domini di Google appena ne contiene uno.
+class ElencoConGoogle extends Sito.ElencoSiti {
+  has(sito) { return super.has(sito) || (diGoogle(sito) && googleNellElenco(this)); }
+}
+
 // I cookie che dicono che c'è un account Google dentro, su qualunque dominio del gruppo.
 const NOMI_ACCESSO = new Set(['SID', '__Secure-1PSID', '__Secure-3PSID']);
 function cookieDiAccesso(c) {
