@@ -291,7 +291,17 @@
       // per rifarla. Si spegne appena l'utente l'ha letto.
       notice: s.notice === 'early' ? 'early' : '',
       ...(s.fermato ? { fermato: true } : {}),
+      ...(s.autonomiaInSospeso === true ? { autonomiaInSospeso: true } : {}),
     };
+  }
+
+  // #1188 — la scelta dell'autonomia è a schermo e l'utente non ha ancora scritto: finché è così l'intervista
+  // non si chiude e la voce non si spunta, da qualunque azione arrivi. Il primo messaggio dell'utente la scioglie.
+  function mostraSceltaAutonomia(state) {
+    return { ...normalize(state), autonomiaInSospeso: true };
+  }
+  function autonomiaInSospeso(state) {
+    return normalize(state).autonomiaInSospeso === true;
   }
 
   function isActive(state) {
@@ -413,7 +423,9 @@
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';
     const text = String((turn && turn.text) || '');
     if (!text) return normalize(state);
-    const cur = togliFermato(state);
+    const tutto = togliFermato(state);
+    const { autonomiaInSospeso: _sospesa, ...senza } = tutto;
+    const cur = role === 'user' ? senza : tutto;
     const last = cur.thread[cur.thread.length - 1];
     const nuovi = segni({ ...turn, role });
     if (last && last.role === role && last.text.trim() === text.trim()) {
@@ -462,7 +474,7 @@
   function shouldForceClose(state) {
     const cur = normalize(state);
     if (cur.done) return false;
-    return isComplete(cur) || userTurns(cur) >= HARD_MAX_EXCHANGES;
+    return (isComplete(cur) && !cur.autonomiaInSospeso) || userTurns(cur) >= HARD_MAX_EXCHANGES;
   }
 
   // Elenco per il prompt: che cosa resta da scoprire e da dire, con la spunta
@@ -484,6 +496,7 @@
     ITEMS, ITEM_IDS, STOP_PHRASES, DECLINE_PHRASES,
     emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
     remaining, isComplete, appendTurn, haTestoDiAltri, userTurns, hasPendingTurn, segnaFermato, togliFermato, shouldForceClose,
+    mostraSceltaAutonomia, autonomiaInSospeso,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
     chatId,
   };
