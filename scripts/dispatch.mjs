@@ -71,7 +71,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { basename, dirname, resolve, relative, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve, relative, sep } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, withCheckpoint,
@@ -1922,6 +1923,11 @@ async function finalizeBucket(bucket, fromServer) {
     prepareForProber();
     emit(bucket, {});
     return { exit: 0 };
+  }
+
+  // Un lavoro server clona filo-security: dentro il checkout di Filo l'hook di salvataggio lo pubblicherebbe (#1159).
+  if (fromServer && fromServer.payload && fromServer.payload.lavoroServer && cloneDentroIlRepo(cartellaCloneServer(), ROOT)) {
+    return emitHalt('permanent', `il clone di filo-security (${cartellaCloneServer()}) cadrebbe dentro il checkout di Filo (${ROOT}), che si pubblica: imposta FILO_SERVER_CLONE fuori dal repo`);
   }
 
   // Il semaforo è del SERVER: l'ha preso lui rilasciando il biglietto, e vale
