@@ -4,6 +4,7 @@
 
 import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, readFileSync, rmSync } from 'node:fs';
@@ -39,7 +40,7 @@ async function avvia(items) {
     args: [...argomentiScala, '.'], cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   const ctx = {
     app, shell, userData,

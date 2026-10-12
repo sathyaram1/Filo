@@ -21,6 +21,7 @@
 
 import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync } from 'node:fs';
@@ -73,7 +74,7 @@ test('Sicurezza: senza ricerca la conferma dello svuotamento non parla di ricerc
   const userData = conCronologia('conf-senza-', voci(5));
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const page = await findTabPage(app, 'security');
@@ -115,7 +116,7 @@ test('Sicurezza: con una ricerca in corso la conferma dichiara quante ne sta mos
   const userData = conCronologia('conf-con-', items);
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const page = await findTabPage(app, 'security');
@@ -145,7 +146,7 @@ test('Sicurezza: da tastiera, tolta una voce resta qualcosa sotto le dita', asyn
   const userData = conCronologia('fuoco-sec-', voci(5));
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const page = await findTabPage(app, 'security');
@@ -197,7 +198,7 @@ test('menu Incolla: da tastiera, tolta una voce il fuoco passa alla "x" successi
   const srv = await serviPagina();
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), srv.url);
     const web = await findTabPage(app, '127.0.0.1');
@@ -236,7 +237,7 @@ test('Sicurezza: un\'immagine che non si disegna mostra l\'icona di Filo, non qu
   ]);
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const page = await findTabPage(app, 'security');

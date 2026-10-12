@@ -15,6 +15,7 @@
 
 import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync } from 'node:fs';
@@ -73,7 +74,7 @@ test('Sicurezza: un doppio clic su "Rimuovi" toglie UNA voce, non due', async ()
   const userData = conCronologia('clip-dbl-sec-', otto());
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const page = await findTabPage(app, 'security');
@@ -111,7 +112,7 @@ test('Sicurezza: una copia in un\'altra scheda non sposta la riga che stai miran
   const userData = conCronologia('clip-shift-sec-', otto());
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const page = await findTabPage(app, 'security');
@@ -158,7 +159,7 @@ test('Sicurezza: la conferma dello svuotamento dice quante voci spariscono, rice
   const userData = conCronologia('clip-conf-sec-', items);
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const page = await findTabPage(app, 'security');
@@ -184,7 +185,7 @@ test('Sicurezza: cliccare una voce la rimette negli appunti', async () => {
   const userData = conCronologia('clip-copy-sec-', [{ type: 'text', text: 'testo-da-riprendere', ts: 1 }]);
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
     const page = await findTabPage(app, 'security');
@@ -211,7 +212,7 @@ test('menu Incolla: un doppio clic sulla × toglie UNA voce, e due immagini si d
   const srv = await serviPagina();
   const app = await avvia(userData);
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), srv.url);
     const web = await findTabPage(app, '127.0.0.1');
