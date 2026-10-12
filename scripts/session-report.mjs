@@ -73,6 +73,10 @@ export const PREZZI = Object.freeze({
   sonnet: { input: 2, cacheWrite: 2.5, cacheWrite1h: 4, cacheRead: 0.2, output: 10 },
   'sonnet-4': { input: 3, cacheWrite: 3.75, cacheWrite1h: 6, cacheRead: 0.3, output: 15 },
   haiku: { input: 1, cacheWrite: 1.25, cacheWrite1h: 2, cacheRead: 0.1, output: 5 },
+  'haiku-5-5': {
+    input: 0.1, cacheWrite: 0.125, cacheWrite1h: 0.2, cacheRead: 0.01, output: 0.5,
+    soglia: 100000, oltre: { input: 0.5, cacheWrite: 0.625, cacheWrite1h: 1, cacheRead: 0.05, output: 2.5 },
+  },
   fable: { input: 10, cacheWrite: 12.5, cacheWrite1h: 20, cacheRead: 0.25, output: 50 },
   'fable-5': { input: 10, cacheWrite: 12.5, cacheWrite1h: 20, cacheRead: 1, output: 50 },
 });
