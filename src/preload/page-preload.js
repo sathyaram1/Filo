@@ -94,6 +94,15 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
 // ha bisogno di settings/spellcheck/Menu) si installa più tardi via
 // __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
 let contextMenuHandler = null;
+// Un menu di Filo che non si costruisce non lascia l'utente senza niente: il main apre quello di riserva (#1122).
+function apriMenuDiFilo(e) {
+  let esito;
+  try { esito = contextMenuHandler(e); } catch (err) { esito = Promise.reject(err); }
+  Promise.resolve(esito).catch((err) => {
+    console.error('[Filo CS] menu del tasto destro', err);
+    try { ipcRenderer.send('filo:menu-di-riserva', String((err && err.stack) || err).slice(0, 2000)); } catch (_) {}
+  });
+}
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
@@ -103,7 +112,7 @@ try {
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
-      contextMenuHandler(e);
+      apriMenuDiFilo(e);
       if (!e.shiftKey) { try { e.stopImmediatePropagation(); } catch (_) {} }
       return;
     }
