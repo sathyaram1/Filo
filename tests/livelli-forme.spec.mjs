@@ -632,6 +632,54 @@ test('salta il controllo: il secondo clic nello stesso punto conferma, e un dopp
   await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta']);
 });
 
+// Nel pannello di larghezza normale «Approva e fondi» non si spezza su due righe: se non sta accanto a Scarta
+// scende intero. Col pannello stretto al minimo si spezza per forza, e armato tiene comunque l'altezza (#603.1).
+test('confermare la fusione: Approva sta su una riga, e col pannello al minimo il tasto armato non cambia altezza', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+
+  const corpo = page.locator('#mgSideBody');
+  const go = corpo.locator('.sn-mac-btn-go');
+  const scarta = corpo.locator('.sn-mac-btn-quiet');
+  await expect(go).toBeVisible();
+  await go.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/fusione-pannello.png' });
+  expect(Math.abs((await go.boundingBox()).height - (await scarta.boundingBox()).height), 'Approva spezzato su due righe').toBeLessThan(0.5);
+
+  // Il pannello stretto fino al minimo, come lo stringe l'utente: dalla tastiera sul divisore.
+  await page.locator('#mgDividerRight').focus();
+  for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await page.locator('#mgSideCol').boundingBox()).width).toBeLessThan(200);
+  await go.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/fusione-pannello-stretto.png' });
+  // Al minimo la provenienza va a capo dentro la card: non esce, e il pannello non scorre di lato.
+  const fuori = await corpo.locator('.sn-mac-card').first().evaluate((card) => {
+    const c = card.getBoundingClientRect();
+    const o = card.querySelector('.sn-mac-origin').getBoundingClientRect();
+    const scorre = [];
+    for (let n = card; n && n.id !== 'mgSideCol'; n = n.parentElement) if (n.scrollWidth > n.clientWidth + 1) scorre.push(n.className || n.id);
+    return { pastiglia: Math.max(0, o.right - c.right), scorre };
+  });
+  expect(fuori).toEqual({ pastiglia: 0, scorre: [] });
+
+  const prima = await go.boundingBox();
+  expect(prima.height, 'al minimo l’etichetta va a capo: è il caso che il blocco dell’altezza deve reggere')
+    .toBeGreaterThan((await scarta.boundingBox()).height + 5);
+  // Verso il fondo del tasto: è la parte che un tasto armato di una riga sola non copre più.
+  const punto = { x: prima.x + prima.width / 2, y: prima.y + prima.height - 6 };
+  await page.mouse.click(punto.x, punto.y);
+  await expect(go).toHaveText('Confermi?');
+  await page.screenshot({ path: 'tests/.shots/fusione-pannello-stretto-armato.png' });
+  const armato = await go.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(armato[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+  expect(await page.evaluate(() => window.__chiamate)).toEqual([]);
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
+});
+
 // Le riletture automatiche (un cambio di stato, una richiesta nuova) ridisegnavano il
 // pannello sotto il cursore e la conferma armata si perdeva: il secondo clic riarmava (#550).
 test('quadrato: una rilettura fra il primo clic e la conferma non si mangia la conferma', async ({ openTab }) => {
