@@ -2340,10 +2340,11 @@ test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEd
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
-  // 8 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
-  // priorità, e la ricerca fra i feedback spostata qui dalle Opzioni, #465).
-  await expect(page.locator('.mg-sm-slot')).toHaveCount(8);
+  // 9 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
+  // priorità, la ricerca fra i feedback spostata qui dalle Opzioni, #465, e il suo classificatore, #1118).
+  await expect(page.locator('.mg-sm-slot')).toHaveCount(9);
   await expect(page.locator('[data-slot="manageSearch"] label')).toHaveText('Ricerca fra i feedback');
+  await expect(page.locator('[data-slot="manageSearchClassifier"] label')).toHaveText('Classificatore della ricerca');
   await expect(page.locator('[data-slot="sanitizer"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge1"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge2"]')).toBeVisible();
