@@ -2892,7 +2892,10 @@ class TabManager {
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
+        ...senzaOpzioniDellaPagina(features),
         title: titoloFinestrella(url),
+        frame: true,
+        titleBarStyle: 'default',
         webPreferences: {
           preload: PAGE_PRELOAD,
           contextIsolation: true,
