@@ -80,6 +80,14 @@
       applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Si imposta subito e l’utente vede lo stile con il suo Annulla: non chiedergli conferma a parole.',
     },
     {
+      // #1188: il livello di autonomia si sceglie qui e in Preferenze, non più dalla casella della home.
+      id: 'autonomia',
+      kind: 'scoprire',
+      label: 'Quanto vuole che Filo faccia da solo',
+      detail: 'Se preferisce che gli chieda prima di quasi tutto, che faccia da solo quello che si rimedia, o anche di più.',
+      applica: 'Chiediglielo con parole tue e nello stesso turno emetti ONBOARDING con "autonomia": true: sotto la tua risposta compaiono i livelli e sceglie lui con un clic. Il livello lo cambia solo lui, tu non hai un’azione per farlo: non dire di averlo cambiato. Se risponde a parole, rimostra la scelta e digli quale livello corrisponde a quello che ha detto.',
+    },
+    {
       id: 'estetica',
       kind: 'dire',
       label: 'L’aspetto si cambia parlando',
