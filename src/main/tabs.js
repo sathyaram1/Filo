@@ -2696,6 +2696,7 @@ class TabManager {
       try { callback(false); } catch (_) {}
     });
 
+    MenuDiRiserva.segui(wc);
     // Spellcheck nativo: Electron è l'unico a conoscere i suggerimenti
     // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
     // content script perché li mostri nel menu di correzione custom.
