@@ -121,11 +121,12 @@ for (const s of SISTEMI) test(`spenta: la versione nuova non parte da sola; «In
   await expect(home.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' })).toHaveCount(0);
 });
 
-test('accesa: tutto come prima, la versione nuova si scarica da sola e in home non compare niente', async ({ app, shell }) => {
+for (const s of SISTEMI) test(`accesa: tutto come prima, la versione nuova si scarica da sola e in home non compare niente (${s.nome})`, async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const home = await homeDi(app);
+  await suSistema(app, s);
   await aggiornatoreFinto(app, { automatici: true });
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: true, autoInstallOnAppQuit: ALLA_CHIUSURA });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: true, autoInstallOnAppQuit: s.allaChiusura });
   await home.waitForTimeout(500);
   await expect(home.locator('#accade .dash-carta[data-tipo="avviso"]')).toHaveCount(0);
 });
