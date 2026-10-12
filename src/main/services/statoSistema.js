@@ -338,9 +338,9 @@ async function leggiMac(esec = esegui) {
 }
 
 // ── Windows: un PowerShell solo, che resta aperto e scrive una riga quando qualcosa cambia ──
-// Ogni lettura con le API del sistema che non chiedono niente: lo stato di alimentazione, la rete secondo
-// il gestore delle reti (non le API del Wi-Fi, che da Windows 11 24H2 vogliono la posizione), le radio.
-// L'uscita è JSON tutto ASCII: la codifica della console non può storpiare un nome.
+// Ogni lettura con le API del sistema che non chiedono niente: lo stato di alimentazione, le connessioni e i loro
+// nomi (non le API del Wi-Fi, che da Windows 11 24H2 vogliono la posizione), le radio. Lo script raccoglie i fatti
+// della rete, la scelta la fa reteDaWindows. L'uscita è JSON tutto ASCII: la console non può storpiare un nome.
 
 const SCRIPT_WINDOWS = String.raw`
 $ErrorActionPreference = 'SilentlyContinue'
