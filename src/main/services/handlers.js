@@ -4691,6 +4691,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       // Quello di un giro di soli bottoni invece resta nella bolla.
       const diRisposta = !!text.trim() && giroDiSoliBottoni(results);
+      const fraLeNote = !!text.trim() && !diRisposta;
       if (diRisposta) {
         risposta.push(text.trim());
         noteAllaRisposta = notes.length;
