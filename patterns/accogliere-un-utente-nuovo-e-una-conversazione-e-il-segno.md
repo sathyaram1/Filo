@@ -60,3 +60,8 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   `tests/onboarding-ripresa.spec.mjs` (la riga sulla home dopo una chiusura a
   metà), `tests/verifica/524/verify-524-g2.spec.mjs` (rifiutare una proposta, rilanci a
   vuoto, testo ostile, tre schede).
+- **Nelle prove della chat l'accoglienza si dichiara**: una home aperta in un
+  profilo nuovo comincia l'intervista appena Filo ha un modello, anche a metà
+  prova, e il messaggio scritto subito dopo finisce lì dentro, o no, secondo i
+  tempi. Chi mette un modello e poi scrive in chat segna prima l'utente come già
+  accolto. Sentinella: `tests/unit/proveChatAccoglienza.test.mjs`.
