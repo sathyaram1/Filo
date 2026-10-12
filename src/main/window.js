@@ -237,6 +237,7 @@ function createIncognitoWindow() {
     if (!stillOpen) {
       try { require('./shim/storage').resetIncognito(); } catch (_) {}
       try { require('./services/ilFilo').resetIncognito(); } catch (_) {}
+      try { require('./services/contestoFilo').dimenticaIncognito(); } catch (_) {}
       try { globalThis.SN_HISTORY.resetIncognito(); } catch (_) {}
       try { require('./services/cookies').resetIncognito(); } catch (_) {}
       try { require('./services/fingerprint').resetIncognito(); } catch (_) {}
