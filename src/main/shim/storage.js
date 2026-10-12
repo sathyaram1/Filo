@@ -513,6 +513,7 @@ module.exports = {
   whenSettled,
   flushNow,
   maxFlushOverlap,
+  verificaMutazioni,
   setSync,
   runIncognito,
   runNormale,
