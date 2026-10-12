@@ -4854,7 +4854,9 @@
       btn.style.minHeight = '';
       if (timer) { clearTimeout(timer); timer = null; }
     };
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+      // La coda di un doppio clic non è la conferma: salterebbe l'audit in un gesto solo.
+      if (armato && e && e.detail > 1) return;
       if (!armato) {
         armato = true;
         // «Confermi?» è più corto: senza la scatola ferma il secondo clic sul lato destro cadeva fuori dal tasto.
