@@ -58,8 +58,9 @@ const COMPOSTI = [
   { file: 'src/shared/urlExfil.js', testo: 'new URL(`https://${url}`)', perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
 ];
 
-// Chiamate di rete che non escono dal computer.
+// Chiamate di rete che non contattano un servizio.
 const CHIAMATE_LOCALI = {
+  'src/main/services/hostResolve.js': 'net solo per isIP; se un host esiste lo chiede al resolver del sistema',
   'src/main/protocol.js': 'net.fetch sui file delle pagine filo://',
   'src/main/test-servizi-chiusi.js': 'la fetch finta delle prove',
   'src/pages/security/security.js': 'fetch su un data: URL, per rimettere un’immagine negli appunti',
