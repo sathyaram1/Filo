@@ -388,32 +388,49 @@ while ($true) {
       $o.batteria = [ordered]@{ livello = [int][math]::Round($l * 100); inCarica = (($f -band 8) -ne 0); collegata = ([int]$p.PowerLineStatus -eq 1) }
     }
   } catch {}
+  $rete = [ordered]@{ schede = $null; profili = $null; principale = $null; connessioni = $null }
   try {
-    $tipi = @{}
-    $uscite = @{}
+    $schede = New-Object System.Collections.ArrayList
     foreach ($n in [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
-      $id = ([string]$n.Id).Trim('{}').ToLower()
-      $tipi[$id] = [string]$n.NetworkInterfaceType
+      if (([string]$n.OperationalStatus -ne 'Up') -or ([string]$n.NetworkInterfaceType -eq 'Loopback')) { continue }
       $gw = 0
       try { $gw = @($n.GetIPProperties().GatewayAddresses | Where-Object { $_.Address -and -not $_.Address.Equals([System.Net.IPAddress]::Any) -and -not $_.Address.Equals([System.Net.IPAddress]::IPv6Any) }).Count } catch {}
-      $uscite[$id] = $gw -gt 0
+      $null = $schede.Add([ordered]@{ id = ([string]$n.Id).Trim('{}').ToLower(); tipo = [string]$n.NetworkInterfaceType; gateway = ($gw -gt 0) })
     }
-    if ($nlm) {
-      $scelta = $null
+    $rete.schede = $schede
+  } catch {}
+  if ($infoReti) {
+    try {
+      $profili = New-Object System.Collections.ArrayList
+      foreach ($pr in @($infoReti::GetConnectionProfiles())) {
+        $ad = $pr.NetworkAdapter
+        if ($null -eq $ad) { continue }
+        $liv = [int]$pr.GetNetworkConnectivityLevel()
+        if ($liv -lt 1) { continue }
+        $null = $profili.Add([ordered]@{ id = ([string]$ad.NetworkAdapterId).Trim('{}').ToLower(); livello = $liv; iana = [int]$ad.IanaInterfaceType })
+      }
+      $rete.profili = $profili
+    } catch {}
+    try {
+      $ip = $infoReti::GetInternetConnectionProfile()
+      if ($ip -and $ip.NetworkAdapter) { $rete.principale = ([string]$ip.NetworkAdapter.NetworkAdapterId).Trim('{}').ToLower() }
+    } catch {}
+  }
+  if ($nlm) {
+    try {
+      $connessioni = New-Object System.Collections.ArrayList
       foreach ($c in @($nlm.GetNetworkConnections())) {
         if (-not $c.IsConnected) { continue }
-        $a = ([string]$c.GetAdapterId()).Trim('{}').ToLower()
-        if ((-not $c.IsConnectedToInternet) -and (-not $uscite[$a])) { continue }
-        $t = $tipi[$a]
-        $v = @{ tipo = $null; nome = $null; peso = 0 }
-        if ($t -eq 'Wireless80211') { $v.tipo = 'wifi' } elseif ($t -like '*Ethernet*') { $v.tipo = 'cavo' }
-        if ($v.tipo -eq 'wifi') { try { $v.nome = [string]$c.GetNetwork().GetName() } catch {} }
-        $v.peso = ([int][bool]$c.IsConnectedToInternet) * 2 + [int][bool]$v.tipo
-        if ((-not $scelta) -or ($v.peso -gt $scelta.peso)) { $scelta = $v }
+        $a = $null
+        try { $a = ([string]$c.GetAdapterId()).Trim('{}').ToLower() } catch {}
+        $nome = $null
+        try { $nome = [string]$c.GetNetwork().GetName() } catch {}
+        $null = $connessioni.Add([ordered]@{ id = $a; internet = [bool]$c.IsConnectedToInternet; nome = $nome })
       }
-      if ($scelta) { $o.rete = [ordered]@{ tipo = $scelta.tipo; nome = $scelta.nome } } else { $o.rete = [ordered]@{ uscita = $false } }
-    }
-  } catch {}
+      $rete.connessioni = $connessioni
+    } catch {}
+  }
+  if ($rete.profili -or $rete.connessioni) { $o.rete = $rete }
   if ($attendi) {
     $letto = $false
     try {
