@@ -738,6 +738,13 @@ async function main() {
   //    spedito, ma se per qualsiasi motivo non è andato, il server guarderebbe
   //    una versione vecchia — o un ramo che per lui non esiste.
   const cur = git(['rev-parse', 'HEAD']).out;
+  // Una copia dei dati del server nei commit da spedire ferma: qui la storia non si riscrive, è quella controllata (#1108).
+  let copie = [];
+  try { copie = copieDaSpedire(ROOT); } catch (_) { /* senza elenco si spedisce: la sentinella resta la seconda rete */ }
+  if (copie.length) {
+    console.error(`\n✗ ${avvisoSpedizione(copie)}`);
+    process.exit(1);
+  }
   {
     // Ultimo controllo prima dell'unica riga di questo script che scrive su
     // origin: qualunque cosa sia successa sopra, quello che si spedisce non
