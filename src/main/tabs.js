@@ -2960,11 +2960,7 @@ class TabManager {
     win.on('page-title-updated', (e) => e.preventDefault());
     pwc._filoFinestrella = true;
     const rientra = (b) => {
-      if (win.isDestroyed()) return;
-      try {
-        const d = dentroLoSchermo(b);
-        if (d.x !== b.x || d.y !== b.y || d.width !== b.width || d.height !== b.height || b !== win.getBounds()) win.setBounds(d);
-      } catch (_) {}
+      if (!win.isDestroyed()) try { win.setBounds(dentroLoSchermo(b)); } catch (_) {}
     };
     rientra(win.getBounds());
     // window.moveTo/resizeTo della pagina: lo spostamento dell'utente, col mouse, resta libero.
