@@ -182,3 +182,25 @@ test('foto non più in memoria (Filo riaperto): al loro posto il modello legge c
   const u = secondo.find((m) => m.role === 'user' && testo(m).includes('leggi le etichette'));
   expect(testo(u)).toContain('3 immagini che non hai più davanti: quello che ne hai scritto dopo l\'avevi letto da lì');
 });
+
+test('le foto di una chat in incognito se ne vanno con l\'incognito, quelle delle altre chat restano', async ({ app }) => {
+  test.setTimeout(60_000);
+  await preparaModello(app, []);
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const n = await app.evaluate(async (_e, png) => {
+    const S = globalThis.__filoStorage;
+    const chat = (chatId, userMessage, images) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage, threadHistory: [], chatId, ...(images ? { images } : {}) });
+    await chat('c-normale', 'guarda questa', [png]);
+    await S.runIncognito(() => chat('c-segreta', 'e questa?', [png]));
+    // Quello che fa la chiusura dell'ultima finestra in incognito, prima di buttare il suo filo.
+    globalThis.SN_CONTESTO_FILO.dimenticaIncognito();
+    const prima = globalThis.__chiamate.length;
+    await S.runIncognito(() => chat('c-segreta', 'cosa c\'era?'));
+    await chat('c-normale', 'e adesso?');
+    return prima;
+  }, png);
+  const [segreta, normale] = (await chiamate(app)).slice(n);
+  expect(JSON.stringify(segreta)).not.toContain('data:image');
+  expect(testo(segreta.find((m) => testo(m).includes('e questa?')))).toContain('un\'immagine che non hai più davanti');
+  expect(normale.filter((m) => fotoDi(m).length).flatMap(fotoDi)).toEqual([png]);
+});

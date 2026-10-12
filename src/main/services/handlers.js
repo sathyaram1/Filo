@@ -4361,8 +4361,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const role = m.role === 'filo' ? 'assistant' : 'user';
     const fuori = FCx.letturaDaFuori(m);
     let content = fuori ? '' : String(m.text || '');
-    // Le immagini della scheda non viaggiano con la sua storia: il modello deve sapere che c'erano (#1166).
-    const quanteFoto = role === 'user' ? FCx.numeroImmagini(m) : 0;
+    // Le immagini della scheda non viaggiano con la sua storia: il modello deve sapere che c'erano (#1166). Non la
+    // domanda che si riprova dopo un turno interrotto: le sue immagini arrivano con lei, qui sotto.
+    const riprovata = imageList.length && String(m.text || '') === String(userMessage || '');
+    const quanteFoto = role === 'user' && !riprovata ? FCx.numeroImmagini(m) : 0;
     if (quanteFoto) content = `${content}\n${FCx.notaImmagini(quanteFoto)}`;
     const msg = { role, content };
     if (role === 'assistant') {
