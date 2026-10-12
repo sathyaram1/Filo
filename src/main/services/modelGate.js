@@ -298,7 +298,7 @@
           classifica: (err, tentativo) => esitoDecisione(err, risposte > 0, tentativo, inVolo > 0),
           attesa: (tentativo, err) => {
             const ms = Coda.attesaPredefinita(tentativo, err);
-            return risposte > 0 ? ms : Math.min(ms, ATTESA_PRIMA_RISPOSTA_MS);
+            return risposte > 0 || Number(err && err.status) === 429 ? ms : Math.min(ms, ATTESA_PRIMA_RISPOSTA_MS);
           },
           suEsito: (r, _req, i) => { if (onAnswer) onAnswer(i, (r && r.answers) || {}); },
         });
