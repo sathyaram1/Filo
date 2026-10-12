@@ -40,8 +40,8 @@ function gancioCheSporca(strumento) {
   const hooks = (JSON.parse(readFileSync(f, 'utf8')).hooks) || {};
   for (const fase of ['PreToolUse', 'PostToolUse']) {
     for (const voce of hooks[fase] || []) {
-      let prende = false;
-      try { prende = new RegExp(`^(?:${voce.matcher || '.*'})$`).test(strumento) || voce.matcher === '*'; } catch (_) {}
+      let prende = voce.matcher === '*';
+      try { prende = prende || new RegExp(`^(?:${voce.matcher || '.*'})$`).test(strumento); } catch (_) {}
       if (!prende) continue;
       for (const h of voce.hooks || []) {
         const cmd = String(h.command || '');
