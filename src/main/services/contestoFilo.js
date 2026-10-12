@@ -216,5 +216,5 @@ function azzeraAncore() {
   ancore.incognito = null;
 }
 
-module.exports = { ricordaEsiti, ricordaImmagini, dimentica, dimenticaIncognito, messaggiDelFilo, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
+module.exports = { ricordaEsiti, ricordaImmagini, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
 globalThis.SN_CONTESTO_FILO = module.exports;
