@@ -4859,7 +4859,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (onbActive) {
     let after = await FiloMem.getOnboarding();
     if (textReply && textReply !== '(vuoto)') {
-      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply, ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}) });
+      after = Onboarding.appendTurn(after, {
+        role: 'filo', text: textReply,
+        ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}),
+        ...(renderedActions.some((x) => x && x._output && x._output.sceltaAutonomia) ? { autonomia: true } : {}),
+      });
     }
     if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
     await saveOnboarding(after);
