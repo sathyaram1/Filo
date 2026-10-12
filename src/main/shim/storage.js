@@ -482,11 +482,11 @@ function onScrittura(fn) {
   return () => STATE.scritture.delete(fn);
 }
 
-// Flush sincrono best-effort prima della chiusura.
+// Flush sincrono best-effort prima della chiusura: riserializza tutto, così niente cambiato senza set resta fuori.
 function flushSync() {
   try {
     if (!STATE.loaded) return;
-    fs.writeFileSync(filePath(), JSON.stringify(serializeForDisk(STATE.data)), 'utf8');
+    fs.writeFileSync(filePath(), testoDelFile({ tutte: true }), 'utf8');
   } catch (e) { /* ignore */ }
 }
 
