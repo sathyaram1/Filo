@@ -64,7 +64,7 @@
     },
     'contestoFilo.token': {
       nome: 'tetto in token di quello che la chat ricorda',
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT')} token`),
+      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
       livello: 2,
     },
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
@@ -91,7 +91,11 @@
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
     'modelRegistry.*': { nome: (k) => `modello «${k}»`, valore: (v) => (v && v.model ? v.model : 'non c\'è'), livello: 2 },
-    monthlyLimitEur: { nome: 'limite di spesa mensile', valore: (v) => `${numero(v)} €`, livello: 2 },
+    monthlyLimitEur: {
+      nome: 'limite di spesa mensile',
+      valore: (v) => `${Number(v).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(Number(v)) ? 0 : 2, maximumFractionDigits: 2 })} €`,
+      livello: 2,
+    },
     'security.protectIpLeak': { nome: 'protezione dell\'IP locale (WebRTC)', valore: ATTIVA, livello: 2 },
     'security.blockPopups': { nome: 'blocco dei popup non richiesti', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.enabled': { nome: 'avviso sui siti pericolosi', valore: ATTIVO, livello: 2 },

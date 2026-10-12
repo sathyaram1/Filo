@@ -2980,7 +2980,7 @@
     Promise.resolve().then(() => sendToMain({ type: CLASSIFY_MSG, op: 'stop', jobId })).catch(() => {});
   }
 
-  const numIt = (n) => Number(n || 0).toLocaleString('it-IT');
+  const numIt = (n) => Number(n || 0).toLocaleString('it-IT', { useGrouping: true });
 
   // null nasconde la barra; altrimenti quanti feedback ha già letto il classificatore, su quanti.
   function showClassifyProgress(state) {
