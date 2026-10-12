@@ -578,6 +578,13 @@ async function main(argv) {
     if (existsSync(lock) && vivo(Number(readFileSync(lock, 'utf8')))) throw new Error(`un orchestratore è già in corso (pid ${readFileSync(lock, 'utf8').trim()})`);
     writeFileSync(lock, String(process.pid));
     try {
+      // Prima i lavori server passati in cloud: un guasto qui (callable non pubblicata, rete) non ferma i lavori locali.
+      try {
+        const esito = await fusioniServer(depFusioni(log));
+        for (const r of righeFerme(esito)) log(r);
+      } catch (e) {
+        log(`lavori server in attesa del PC non letti: ${String((e && e.message) || e).slice(0, 200)}`);
+      }
       const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
       for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
       // 2 = qualche lavoro fermo: chi ha lanciato in sottofondo lo sa dal codice, senza leggere le righe.
