@@ -526,6 +526,19 @@ const PROVE = {
       assert.deepEqual(senzaRiga(nuovi(indirizziScoperti, a, base)), [`${SCRYFALL} https://nuovo.example`], via);
     }
   },
+  'un file nuovo fa rete per qualunque strada prenda il modulo di rete': (base) => {
+    const f = 'src/main/services/zzModuloDiRete.js';
+    for (const via of [
+      "require('node:net').connect(443, HOST);",
+      "const { connect } = require('node:net');\nconnect(443, HOST);",
+      "const { request } = require('electron').net;\nrequest({ protocol: 'https:', hostname: HOST, path: '/' });",
+      "const { shell, net: rete } = require('electron');\nrete.request({ hostname: HOST });",
+    ]) {
+      const a = conFile(f, `const HOST = 'nuovo.example';\n${via}\n`, base);
+      assert.deepEqual(senzaRiga(nuovi(indirizziScoperti, a, base)), [`${f} https://nuovo.example`], via);
+      assert.deepEqual(nuovi(chiamateScoperte, a, base), [f], via);
+    }
+  },
   'una richiesta con l’host calcolato nelle opzioni va dichiarata come indirizzo composto': (base) => {
     const a = aggiungiA(FX, base, "\nrequire('node:tls').connect({ host: scegliHost(), port: 443 });\n");
     const r = nuovi(compostiScoperti, a, base);
