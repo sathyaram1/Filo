@@ -44,6 +44,7 @@
         'La bozza di un feedback lasciata a metà resta sul sito dove l\'hai cominciata, e la ritrovi riaprendo il feedback lì. E sui siti la spiegazione, la Modifica e il feedback non prendono più lo stile della pagina: niente bottoni tutti maiuscoli o lettere spaziate.',
         'In Opzioni, se scegli per una funzione un modello che non la sa fare, come una voce per le spiegazioni, sotto il campo resta scritto perché. Prima il campo tornava com\'era senza dire niente.',
         'L\'Aiuto prende le istruzioni per assistenti solo dal sito su cui sei. Un sito non può più fargli leggere quello che c\'è sul tuo router o su altri dispositivi della rete di casa.',
+        'Preferenze, Modelli e le altre pagine di Filo si aprono un po\' più svelte dalla terza volta in poi. Filo tiene da parte il loro codice già preparato e non lo rifà a ogni apertura.',
       ],
     },
     {
