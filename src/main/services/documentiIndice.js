@@ -188,9 +188,12 @@ function accoda(righe) {
   });
 }
 
+const rigaOccasionale = (c, q) => JSON.stringify(q === false ? { o: c, via: true } : { o: c, q });
+
 function compatta() {
   if (righeSuDisco <= Math.max(voci.size * 2, 200)) return scrittura;
   const righe = [];
+  for (const [c, q] of occasionali) righe.push(rigaOccasionale(c, q));
   for (const [p, v] of voci) righe.push(rigaDi(p, v));
   righeSuDisco = righe.length;
   return inFila(async () => {
