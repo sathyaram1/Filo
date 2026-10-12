@@ -469,6 +469,8 @@
         authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
         authRemembered = m.remembered !== false;
         if (!authProfile || authRemembered) NOTIFS.dismissKey('accesso-non-ricordato');
+        // «Continua nel browser» (#1123) non serve più a chi è entrato.
+        if (authProfile) NOTIFS.dismissKey('accesso-nel-browser');
         renderAccount();
       });
     }
