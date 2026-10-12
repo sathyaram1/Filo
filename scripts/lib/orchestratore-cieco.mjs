@@ -1,6 +1,6 @@
-// Orchestratore cieco: nella sessione di un giro il testo dei worker non entra nel suo contesto. Il preflight installa
-// il gancio nelle impostazioni dell'UTENTE, dove cambio di ramo e worker non arrivano; mai nella cartella del progetto.
-// Regole: tests/unit/orchestratoreCieco.test.mjs.
+// Orchestratore cieco: nella sessione di un giro il testo dei worker non entra nel suo contesto. Il gancio sta nelle
+// impostazioni dell'UTENTE, mai nel progetto, e per tutto il giro tiene ferme impostazioni e skill che un worker riscrive
+// da shell. Regole: tests/unit/orchestratoreCieco.test.mjs. Copioni dei ganci e programmi restano aperti (#1182).
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -12,7 +12,7 @@ export const VALIDITA_MS = 24 * 60 * 60 * 1000;
 export const AL_POSTO_DEL_TESTO = 'Worker finito. Il suo testo di ritorno non ti arriva: sei cieco per design. Il passo dopo lo decidi solo dal canale, come dice il tuo ruolo.';
 export const MOTIVO_SOTTOFONDO = 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.';
 export const MOTIVO_PRIMO_PIANO = 'Worker portato in primo piano: in sottofondo il suo testo ti arriverebbe nella notifica.';
-export const MOTIVO_IMPOSTAZIONI = 'Durante il giro le impostazioni utente non cambiano: portano il gancio che rende cieco chi guida il giro.';
+export const MOTIVO_IMPOSTAZIONI = 'Durante il giro impostazioni e skill restano quelle di partenza: un worker non deve poter spegnere o affiancare il gancio che rende cieco chi guida il giro.';
 // Worker sempre su Opus, qualunque modello chieda il lancio; niente copie in sottofondo dell'orchestratore su Haiku.
 export const AMBIENTE = Object.freeze({
   CLAUDE_CODE_SUBAGENT_MODEL: 'opus',
@@ -21,12 +21,13 @@ export const AMBIENTE = Object.freeze({
 });
 
 // Il corpo finisce fra apici singoli nella shell del gancio: solo virgolette doppie, niente apostrofi nemmeno nei
-// commenti, niente barre rovesciate (la riga di comando di Windows le mangia).
+// commenti, niente barre rovesciate (la riga di comando di Windows le mangia). Si ferma ogni fonte di configurazione,
+// anche ignota: il progetto vince sull'utente, e un disableAllHooks scritto lì spegnerebbe il gancio (#1182).
 export function decidi(input, { sessione = "", creato = 0, adesso = Date.now() } = {}) {
   if (!input || !(adesso - Number(creato) < VALIDITA_MS)) return null;
   if (sessione && input.session_id && input.session_id !== sessione) return null;
   if (input.hook_event_name === "ConfigChange") {
-    if (!sessione || (input.source && input.source !== "user_settings")) return null;
+    if (!sessione || input.source === "policy_settings") return null;
     return { decision: "block", reason: MOTIVO_IMPOSTAZIONI };
   }
   const strumento = input.tool_name;
@@ -73,9 +74,11 @@ export function installa({ dir = dirImpostazioniUtente(), sessione = '', creato 
   }
   const cmd = comando({ sessione, creato });
   const hooks = { ...(s.hooks || {}) };
-  const voci = { PreToolUse: 'Agent|Task', PostToolUse: 'Agent|Task', ConfigChange: 'user_settings' };
+  // ConfigChange senza matcher: ogni fonte arriva a decidi, che sceglie cosa fermare.
+  const voci = { PreToolUse: 'Agent|Task', PostToolUse: 'Agent|Task', ConfigChange: '' };
   for (const [ev, matcher] of Object.entries(voci)) {
-    hooks[ev] = [...(hooks[ev] || []).filter((g) => !nostro(g)), { matcher, hooks: [{ type: 'command', command: cmd }] }];
+    const gruppo = { ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: cmd }] };
+    hooks[ev] = [...(hooks[ev] || []).filter((g) => !nostro(g)), gruppo];
   }
   const nuovo = { ...s, env: { ...(s.env || {}), ...AMBIENTE }, hooks };
   try {
