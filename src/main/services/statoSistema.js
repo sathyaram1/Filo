@@ -516,7 +516,7 @@ function reteDaWindows(r) {
     // 1 solo la rete locale, 2 Internet limitata (un portale da accettare), 3 Internet.
     if (!id || !(livello >= 1)) continue;
     if (livello < 2 && !esce(id)) continue;
-    daiProfili.push({ id, internet: livello === 3, tipo: TIPO_IANA[Number(p.iana)] || tipoDi(id) });
+    daiProfili.push({ id, internet: livello === 3, tipo: TIPO_IANA[Number(p.iana)] || tipoDi(id), nome: p.nome });
   }
   const daiCollegamenti = [];
   for (const c of connessioni || []) {
@@ -534,12 +534,13 @@ function reteDaWindows(r) {
   return { tipo: scelta.tipo, nome: scelta.tipo === 'wifi' ? nomeDaWindows(scelta, candidati, connessioni || []) : null };
 }
 
-// Il nome della rete lo dà il gestore delle reti, per adattatore. Se non dice quale, il nome è certo solo quando
-// una connessione sola esce su Internet, da tutte e due le parti.
+// Il nome lo dà il gestore delle reti per adattatore, se dice quale; se no il profilo di Windows legato all'adattatore
+// (con una VPN accesa escono su Internet in due, #1114). Senza nessuno dei due è certo solo con un'uscita sola.
 function nomeDaWindows(scelta, candidati, connessioni) {
   const nome = (c) => (c && typeof c.nome === 'string' && c.nome.trim() ? c.nome : null);
   const stessa = scelta.id && connessioni.find((c) => guidWindows(c.id) === scelta.id);
-  if (stessa) return nome(stessa);
+  if (stessa && nome(stessa)) return nome(stessa);
+  if (nome(scelta)) return nome(scelta);
   const conInternet = connessioni.filter((c) => c.internet === true);
   if (!scelta.internet || conInternet.length !== 1 || candidati.filter((c) => c.internet).length !== 1) return null;
   return nome(conInternet[0]);

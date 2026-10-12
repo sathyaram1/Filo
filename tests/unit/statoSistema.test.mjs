@@ -482,11 +482,14 @@ test('Windows: fra due uscite vince chi ha Internet, poi chi sa come esce, poi q
   assert.equal(L.reteDaWindows({ ...entrambe, principale: CAVO }).tipo, 'cavo');
   assert.equal(L.reteDaWindows({ ...entrambe, principale: WIFI }).tipo, 'wifi');
   // Una VPN che Windows usa per Internet non nasconde il Wi-Fi sotto; il nome, con due reti su Internet, si dice
-  // solo se il gestore lega la connessione all'adattatore.
+  // solo se il gestore lega la connessione all'adattatore o se lo porta il profilo del Wi-Fi.
   const vpn = { schede: [schedaWifi, schedaVpn], profili: [{ id: VPN, livello: 3, iana: 23 }, { id: WIFI, livello: 3, iana: 71 }], principale: VPN };
   const nomi = [{ id: null, internet: true, nome: 'Ufficio VPN' }, { id: null, internet: true, nome: 'Casa' }];
   assert.deepEqual(L.reteDaWindows({ ...vpn, connessioni: nomi }), { tipo: 'wifi', nome: null });
   assert.deepEqual(L.reteDaWindows({ ...vpn, connessioni: [{ ...nomi[0], id: VPN }, { ...nomi[1], id: WIFI }] }), { tipo: 'wifi', nome: 'Casa' });
+  const conNomeProfilo = { ...vpn, profili: [{ id: VPN, livello: 3, iana: 23, nome: 'Ufficio VPN' }, { id: WIFI, livello: 3, iana: 71, nome: 'Casa' }] };
+  assert.deepEqual(L.reteDaWindows({ ...conNomeProfilo, connessioni: nomi }), { tipo: 'wifi', nome: 'Casa' });
+  assert.match(L.SCRIPT_WINDOWS, /\$pr\.ProfileName/);
   // Un portale da accettare (Internet limitata) è comunque una strada fuori: Wi-Fi, non offline.
   assert.equal(L.reteDaWindows({ schede: [schedaWifi], profili: [{ id: WIFI, livello: 2, iana: 71 }], connessioni: [] }).tipo, 'wifi');
   // Un adattatore Wi-Fi che si presenta senza il numero IANA lo dice il suo tipo.
