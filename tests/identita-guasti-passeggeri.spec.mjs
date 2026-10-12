@@ -10,6 +10,7 @@ import { _electron as electron } from '@playwright/test';
 import { test, expect, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { argomentiScala } from './helpers/scala.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -158,8 +159,7 @@ test('identità illeggibile con un portafoglio su disco: nessuna identità nuova
     env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
   });
   try {
-    const shell = await app.firstWindow();
-    await shell.waitForLoadState('domcontentloaded');
+    const shell = await primaFinestra(app);
     await shell.evaluate((u) => window.filoShell.tabs.open(u), 'filo://credits/credits.html');
     await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://credits/')), { timeout: 10000 }).toBe(true);
     const page = app.windows().find((w) => w.url().startsWith('filo://credits/'));
