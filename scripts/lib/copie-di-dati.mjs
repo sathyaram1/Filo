@@ -156,8 +156,12 @@ export function spedibileSenzaCopie(root, { nome = 'claude-local', email = 'clau
     });
     if (restano.length) g(['reset', '-q', base, '--', ...restano]);
     try { escludiInLocale(root, restano); } catch (_) { /* il controllo sui file in scena li rivede */ }
-    g(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '--allow-empty', '-m',
-      `${soggetti.join(' + ').slice(0, 200)} (senza la copia dei dati: ${file.join(', ')})`]);
+    let vuoto = true;
+    try { g(['diff', '--cached', '--quiet']); } catch (_) { vuoto = false; }
+    if (!vuoto) {
+      g(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m',
+        `${soggetti.join(' + ').slice(0, 200)} (senza la copia dei dati: ${file.join(', ')})`]);
+    }
   } catch (_) {
     try { g(['reset', '-q', '--soft', testa]); } catch (__) { /* resta il messaggio */ }
     return fermo;
