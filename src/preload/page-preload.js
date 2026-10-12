@@ -132,12 +132,8 @@ try {
     // ancora montati (li montiamo solo all'uso). Montali ORA e rigioca questo
     // stesso clic appena l'handler è pronto, così il primo tentativo apre il
     // menu invece di andare perso — l'utente non deve cliccare due volte.
-    if (!IS_SUBFRAME) return;
-    // Shift resta la via di fuga anche qui: con Shift premuto non tocchiamo
-    // l'evento e lasciamo che il riquadro faccia quello che farebbe da solo.
-    if (e.shiftKey) return;
     try { e.stopImmediatePropagation(); } catch (_) {}
-    replayContextMenu(e);
+    replayContextMenu(e, clic);
     ensureContentScripts();
   }, { capture: true });
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
