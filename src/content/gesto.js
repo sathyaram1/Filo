@@ -32,6 +32,22 @@
     return tipi;
   }
 
+  function famigliaDi(e) {
+    return String(e.type).startsWith('touch') || e.pointerType === 'touch' ? 'dito' : 'puntatore';
+  }
+
+  // Un clic semplice non seleziona niente: se dopo compare una selezione l'ha fatta la pagina (#1070.1). Mouse e dito
+  // selezionano trascinando, col doppio o triplo clic, con Maiusc+clic, e il dito con una pressione lunga.
+  function selezionaColPuntatore(e, luogo, pressione, adesso) {
+    if (e.shiftKey || (Number(e.detail) || 0) >= 2) return true;
+    if (!RILASCI.has(e.type) || !pressione) return false;
+    const famiglia = famigliaDi(e);
+    if (pressione.famiglia !== famiglia) return false;
+    if (luogo.x !== null && pressione.x !== null
+      && Math.hypot(luogo.x - pressione.x, luogo.y - pressione.y) > SPOSTAMENTO_PX[famiglia]) return true;
+    return famiglia === 'dito' && adesso - pressione.t >= PRESSIONE_LUNGA_MS;
+  }
+
   // Dove ha toccato un gesto: l'elemento vero (anche dentro un componente) e, per mouse e dito, il punto.
   function luogoDi(e) {
     let el = null;
