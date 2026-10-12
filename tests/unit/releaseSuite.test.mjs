@@ -174,6 +174,66 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
   });
 });
 
+// #1184: il cancello di pubblicazione rifà gli unit su Windows; se la suite non li prova, il «verde» scelto può essere
+// un commit che il cancello rifiuta a ogni giro, e la pubblicazione si ferma per giorni.
+describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubblicazione', () => {
+  const lavoro = senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML));
+  const elenco = passi(lavoro);
+  const unit = elenco.find((p) => p.id === 'unit');
+
+  test('il lavoro ha il nome che la scelta del verde chiede alle corse, e gira su Windows', () => {
+    assert.match(lavoro, /runs-on:\s*windows-latest/);
+    assert.doesNotMatch(lavoro, /^ {4}name:/m, 'nelle corse un lavoro si chiama come la sua chiave: rinominato, la scelta non lo troverebbe');
+    assert.match(lavoro, /timeout-minutes:\s*\d+/);
+  });
+
+  test('niente lo salta o lo tollera: rosso lui, rossa la corsa', () => {
+    assert.doesNotMatch(lavoro, /^ {4}if:/m, 'saltato, la corsa sarebbe verde senza averlo passato');
+    assert.doesNotMatch(lavoro, /^ {4}continue-on-error:/m, 'tollerato, la corsa sarebbe verde a unit rossi');
+  });
+
+  test('prova il commit della spinta, con lo stesso comando e lo stesso Node del cancello', () => {
+    assert.match(lavoro, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
+    assert.match(lavoro, /fetch-depth:\s*0/, 'l\'avviso elenca i commit dopo l\'ultimo verde');
+    const cancello = passi(senzaCommenti(job('release'))).find((p) => p.id === 'gate');
+    const comando = 'npm run test:unit 2>&1 | tee unit.log';
+    assert.ok(cancello.corpo.includes(comando), 'il cancello di pubblicazione è cambiato: questo lavoro va allineato');
+    assert.ok(unit?.corpo.includes(comando));
+    assert.match(unit.corpo, /set -o pipefail/, 'senza, l\'esito sarebbe quello di tee');
+    assert.match(unit.corpo, /continue-on-error:\s*true/, 'il passo dopo deve poter aprire il feedback');
+    const node = (t) => (t.match(/node-version:\s*(\S+)/) || [])[1];
+    assert.equal(node(lavoro), node(senzaCommenti(job('release'))));
+    assert.match(lavoro, /node scripts\/npm-ci-ritenta\.mjs/);
+  });
+
+  test('un rosso su main apre un feedback con le chiavi del cancello; su un ramo la corsa resta rossa', () => {
+    const allarme = elenco.find((p) => /build-alarm\.mjs/.test(p.corpo));
+    assert.ok(allarme, 'un rosso che non diventa un feedback ferma la pubblicazione in silenzio');
+    assert.match(allarme.corpo, /if:[^\n]*github\.ref == 'refs\/heads\/main'[^\n]*steps\.unit\.outcome == 'failure' \|\| failure\(\)/,
+      'anche un npm ci rosso prima degli unit deve diventare un feedback');
+    assert.match(allarme.corpo, /--chiavi-unit unit\.log/, 'le chiavi del cancello: lo stesso rosso visto qui e là apre un feedback solo');
+    assert.match(allarme.corpo, /--chiave unit-windows:non-partiti/);
+    assert.match(allarme.corpo, /secrets\.FILO_BUILD_PASSPHRASE/);
+    assert.match(allarme.corpo, /GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
+    assert.match(allarme.corpo, /node scripts\/ultima-suite-verde\.mjs --stampa/);
+    assert.match(allarme.corpo, /head -80/);
+    assert.match(allarme.corpo, /N_TUTTE - 80/);
+    assert.match(allarme.corpo, /exit 1/);
+    for (const p of elenco.filter((x) => /secrets\./.test(x.corpo))) {
+      assert.match(p.corpo, /github\.ref == 'refs\/heads\/main'/, `il passo «${p.nome}» porta una credenziale fuori da main`);
+    }
+    const ramo = elenco.find((p) => /github\.ref != 'refs\/heads\/main'/.test(p.corpo));
+    assert.ok(ramo);
+    assert.match(ramo.corpo, /steps\.unit\.outcome == 'failure' \|\| failure\(\)/);
+    assert.match(ramo.corpo, /exit 1/);
+  });
+
+  test('la scelta del verde chiede alle corse se questo lavoro è passato', () => {
+    assert.ok(SCEGLI_JS.includes('/actions/runs/${r.id}/jobs'), 'senza chiedere i lavori, un verde di prima del lavoro passerebbe');
+    assert.match(SCEGLI_JS, /scegliUltimoVerde\(runs, primoGenitore, valida\)/);
+  });
+});
+
 describe('release.yml: si pubblica il commit più nuovo di main con la suite verde', () => {
   const release = () => senzaCommenti(job('release'));
   const scegli = senzaCommenti(job('scegli'));
