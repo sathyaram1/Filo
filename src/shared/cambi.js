@@ -11,7 +11,7 @@
   const sino = (si, no) => (v) => (v ? si : no);
   const ATTIVO = sino('attivo', 'spento');
   const ATTIVA = sino('attiva', 'spenta');
-  // Decimali come li ha scritti chi imposta (niente arrotondamento), ma le migliaia col punto: 1.500 €, non 1500 €.
+  // Decimali come li ha scritti chi imposta (niente arrotondamento), ma le migliaia col punto: 1.500, non 1500.
   const numero = (v) => {
     const [intera, decimali] = String(Number(v)).split('.');
     return intera.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (decimali ? `,${decimali}` : '');
