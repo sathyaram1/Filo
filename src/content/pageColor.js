@@ -40,13 +40,25 @@
       const w = Math.max(1, window.innerWidth);
       const xs = [w * 0.2, w * 0.5, w * 0.8];
       const ys = [6, 16, 28];
-      const acc = [0, 0, 0]; let n = 0;
+      const campioni = [];
       for (const y of ys) for (const x of xs) {
         let el = null;
         try { el = document.elementFromPoint(x, y); } catch (_) {}
         const c = el ? bgOf(el) : null;
-        if (c) { acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2]; n++; }
+        if (c) campioni.push(c);
       }
+      // Il colore che prevale, non la media: una cima in due colori darebbe un grigio che sulla pagina non c'è (#429).
+      // Senza un gruppo di almeno un terzo (sfumature, foto) la media resta la stima migliore.
+      const vicini = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2])) <= 24;
+      let scelti = campioni;
+      let meglio = [];
+      for (const c of campioni) {
+        const gruppo = campioni.filter((d) => vicini(c, d));
+        if (gruppo.length > meglio.length) meglio = gruppo;
+      }
+      if (meglio.length * 3 >= campioni.length && meglio.length > campioni.length / 2 - 0.01) scelti = meglio;
+      const acc = [0, 0, 0]; let n = 0;
+      for (const c of scelti) { acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2]; n++; }
       if (!n) {
         const c = parseRGB(getComputedStyle(document.body || document.documentElement).backgroundColor)
           || parseRGB(getComputedStyle(document.documentElement).backgroundColor);
