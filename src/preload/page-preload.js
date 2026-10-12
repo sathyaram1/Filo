@@ -171,8 +171,8 @@ function replayContextMenu(e, clic) {
   };
   const deadline = Date.now() + 3000;
   const tick = () => {
-    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy); return; }
-    if (Date.now() > deadline) return;
+    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
+    if (globalThis.__snFiloSpento === true || Date.now() > deadline) { menuDiRiserva(clic); return; }
     setTimeout(tick, 16);
   };
   setTimeout(tick, 16);
