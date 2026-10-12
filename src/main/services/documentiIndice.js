@@ -293,26 +293,26 @@ async function eseguiGiro(extra) {
   // l'occasione resta anche se questo giro non ci passa.
   const percorsa = sottoUna(cartelle);
   const tenuta = sottoUna(Array.from(occasionali.keys()));
-  const tolti = [];
+  const righe = [];
   for (const p of Array.from(voci.keys())) {
     if (trovati.has(p) || (percorsa(p) ? (pieno && fs.existsSync(p)) : tenuta(p))) continue;
     voci.delete(p);
-    tolti.push(JSON.stringify({ p, via: true }));
+    righe.push(JSON.stringify({ p, via: true }));
   }
   const ora = Date.now();
   for (const o of Array.from(occasionali.keys())) {
     // Entrata nell'elenco: da lì in poi la segue l'elenco, e se ne esce, esce dall'indice.
-    if (lista.some((r) => !esclusa(o, r))) { occasionali.delete(o); tolti.push(rigaOccasionale(o, false)); }
+    if (lista.some((r) => !esclusa(o, r))) { occasionali.delete(o); righe.push(rigaOccasionale(o, false)); }
   }
   for (const c of nuove) {
     if (negate.has(path.resolve(c)) || Array.from(occasionali.keys()).some((o) => !esclusa(c, o))) continue;
     for (const o of Array.from(occasionali.keys())) {
-      if (!esclusa(o, c)) { occasionali.delete(o); tolti.push(rigaOccasionale(o, false)); }
+      if (!esclusa(o, c)) { occasionali.delete(o); righe.push(rigaOccasionale(o, false)); }
     }
     occasionali.set(c, ora);
-    tolti.push(rigaOccasionale(c, ora));
+    righe.push(rigaOccasionale(c, ora));
   }
-  accoda(tolti);
+  accoda(righe);
   const daLeggere = [];
   for (const [p, st] of trovati) {
     const v = voci.get(p);

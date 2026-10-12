@@ -70,7 +70,7 @@ async function chiediAllAiuto(page, testo) {
 const testoDi = (messaggi) => (messaggi || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
 
 const RISPOSTE = [
-  ['DOCUMENTI_TROVATI', JSON.stringify({ text: 'È la bolletta dell\'energia elettrica di marzo: trascinala nel campo «Bolletta».', file: 1, status: 'done' })],
+  ['ho cercato fra i documenti', JSON.stringify({ text: 'È la bolletta dell\'energia elettrica di marzo: trascinala nel campo «Bolletta».', file: 1, status: 'done' })],
   ['', JSON.stringify({ action: 'documenti', cosa: 'bolletta luce energia elettrica marzo', text: 'La cerco fra i tuoi documenti.' })],
 ];
 
@@ -176,8 +176,9 @@ test('le porte dell’Aiuto: chiavi a caso valide solo nella loro scheda, mai un
   writeFileSync(join(dir, 'fattura-luce.txt'), 'Fattura energia elettrica marzo');
   try {
     await shellCheRegistra(app);
-    const a = await testServer.openReady(openTab, PAGINA);
+    // La domanda si vede sopra la scheda che cerca quando è davanti: quella si apre per ultima.
     const b = await testServer.openReady(openTab, PAGINA.replace('Fornitore Energia', 'Altro sito'));
+    const a = await testServer.openReady(openTab, PAGINA);
     // Il messaggio arriva come da ciascuna scheda, col suo webContents vero; il sì al popup lo dà la prova.
     const daScheda = (titolo, msg, { riquadro = false } = {}) => app.evaluate(async ({ BrowserWindow }, [titolo, msg, riquadro]) => {
       for (const w of BrowserWindow.getAllWindows()) {
@@ -226,7 +227,7 @@ test('mentre l’indice legge i documenti nuovi la riga dice quanti ne mancano, 
     const page = await testServer.openReady(openTab, PAGINA);
     await preparaModelli(app);
     await aiutoFinto(app, [
-      ['DOCUMENTI_TROVATI', JSON.stringify({ text: 'Ho guardato solo quelli già letti.', status: 'done' })],
+      ['ho cercato fra i documenti', JSON.stringify({ text: 'Ho guardato solo quelli già letti.', status: 'done' })],
       ['', JSON.stringify({ action: 'documenti', cosa: 'documento numero 42' })],
     ]);
     await apriAiuto(shell, page);
