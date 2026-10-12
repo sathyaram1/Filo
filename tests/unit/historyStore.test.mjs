@@ -206,6 +206,25 @@ test('la pagina riceve un estratto dell\'ingresso, non il testo della pagina', a
   await H.remove(v.id);
 });
 
+test('la pagina riceve la domanda anche quando la richiesta la tiene fra i messaggi (chat, voci già salvate)', () => {
+  const domandaVista = (input) => H.vistaPagina({ id: 'd', input }).input.userMessage;
+  const giro = [
+    { role: 'user', content: 'domanda di prima' },
+    { role: 'assistant', content: 'risposta di prima' },
+    { role: 'user', content: 'A che ora apre il museo?' },
+    { role: 'assistant', content: '', tool_calls: [] },
+    { role: 'user', content: 'sollecito interno' },
+  ];
+  assert.equal(domandaVista({ threadMessages: giro, indiceDomanda: 2, profilo: 'x'.repeat(5000) }), 'A che ora apre il museo?');
+  assert.equal(domandaVista({ threadMessages: giro.slice(0, 3) }), 'A che ora apre il museo?');
+  assert.equal(domandaVista({ threadMessages: [{ role: 'user', content: [{ type: 'text', text: 'cos\'è?' }, { type: 'image_url', image_url: { url: 'data:x' } }] }], indiceDomanda: 0 }), 'cos\'è?');
+  assert.equal(domandaVista({ messages: [{ role: 'system', content: 'regole' }, { role: 'user', content: 'mazzo rosso?' }] }), 'mazzo rosso?');
+  assert.equal(domandaVista({ original: 'testo', instruction: 'più formale' }), 'più formale');
+  assert.equal(domandaVista({ userMessage: 'scritta', threadMessages: giro, indiceDomanda: 0 }), 'scritta');
+  assert.equal(domandaVista({ threadMessages: [{ role: 'user', content: 'y'.repeat(3000) }] }).length, 1000);
+  assert.equal(domandaVista({ lang: 'it', seconds: 3 }), undefined);
+});
+
 test('l\'incognito tiene le sue voci in RAM: non vede la cronologia e non scrive su disco', async () => {
   const prima = (await H.list()).length;
   const dentro = await Disco.runIncognito(async () => {
