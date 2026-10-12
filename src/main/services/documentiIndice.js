@@ -282,18 +282,35 @@ function avvisa(stato) {
 async function eseguiGiro(extra) {
   await carica();
   const rs = await radici();
-  const cartelle = daPercorrere(rs).concat((extra || []).filter((c) => !daPercorrere(rs).some((r) => dentro(c, r))));
+  const lista = daPercorrere(rs);
+  const nuove = (extra || []).filter((c) => lista.every((r) => esclusa(c, r)));
+  const cartelle = lista.concat(nuove);
   avvisa({ fase: 'elenco', fatti: 0, totali: 0, nome: '' });
   const { trovati, pieno, negate: rifiutate } = await elenca(cartelle);
   troppi = pieno;
   negate = new Set(rifiutate.map((c) => path.resolve(c)));
-  // Via quello che non c'è più, o che sta in una cartella tolta dall'elenco.
+  // Via quello che non c'è più, o che sta in una cartella tolta dall'elenco. Quello di una cartella cercata per
+  // l'occasione resta anche se questo giro non ci passa.
+  const percorsa = sottoUna(cartelle);
+  const tenuta = sottoUna(Array.from(occasionali.keys()));
   const tolti = [];
   for (const p of Array.from(voci.keys())) {
-    if (!trovati.has(p) && !(pieno && cartelle.some((c) => dentro(p, c)) && fs.existsSync(p))) {
-      voci.delete(p);
-      tolti.push(JSON.stringify({ p, via: true }));
+    if (trovati.has(p) || (percorsa(p) ? (pieno && fs.existsSync(p)) : tenuta(p))) continue;
+    voci.delete(p);
+    tolti.push(JSON.stringify({ p, via: true }));
+  }
+  const ora = Date.now();
+  for (const o of Array.from(occasionali.keys())) {
+    // Entrata nell'elenco: da lì in poi la segue l'elenco, e se ne esce, esce dall'indice.
+    if (lista.some((r) => !esclusa(o, r))) { occasionali.delete(o); tolti.push(rigaOccasionale(o, false)); }
+  }
+  for (const c of nuove) {
+    if (negate.has(path.resolve(c)) || Array.from(occasionali.keys()).some((o) => !esclusa(c, o))) continue;
+    for (const o of Array.from(occasionali.keys())) {
+      if (!esclusa(o, c)) { occasionali.delete(o); tolti.push(rigaOccasionale(o, false)); }
     }
+    occasionali.set(c, ora);
+    tolti.push(rigaOccasionale(c, ora));
   }
   accoda(tolti);
   const daLeggere = [];
