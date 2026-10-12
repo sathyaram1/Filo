@@ -924,6 +924,8 @@
       // c'è testo ma ci sono azioni, la bolla in streaming non esiste (non è mai
       // arrivato un delta) e cadiamo nel ramo "solo azioni" come prima.
       let filoBubble;
+      // La nota che il main ha fatto diventare risposta esce dal blocco: la frase sta nella bolla e basta.
+      if (r.notaRisposta) pending.dropNote(r.notaRisposta);
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         if (r.text) {
