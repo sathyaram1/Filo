@@ -5,6 +5,7 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const path = require('node:path');
 const Psl = require('./safebrowse/psl');
 const { tastoPremuto } = require('../tastoDelMouse');
 
