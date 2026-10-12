@@ -777,23 +777,21 @@
   function formatKnownPathsForPrompt(rawPaths) {
     if (!Array.isArray(rawPaths) || !rawPaths.length) return '';
     const seen = new Set();
-    const dedup = [];
-    for (const p of rawPaths) {
-      if (!p || typeof p !== 'object') continue;
-      const k = clusterKey(p);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      dedup.push(p);
-    }
     const blocchi = [];
     let chars = 0;
-    for (const p of dedup) {
+    for (const p of rawPaths) {
+      if (!p || typeof p !== 'object') continue;
       const steps = sanitizeSteps(p.steps);
       // Un percorso senza passi non insegna niente: sarebbe solo una frase di
       // ignoto autore dentro il prompt di qualcun altro.
       if (!steps.length) continue;
-      const intent = sanitizeIntent(p.intent) || '(intento ignoto)';
       const init = sanitizeInitialUrl(p.initialUrl, p.domain);
+      // I doppioni si cercano su quello che il prompt vedrà: la chiave sul
+      // documento grezzo copiava e confrontava campi interi da un mega (#1173).
+      const k = clusterKey({ initialUrl: init, steps });
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const intent = sanitizeIntent(p.intent) || '(intento ignoto)';
       const header = `## "${intent}" (da ${init})`;
       const stepLines = steps.map((s, i) =>
         `  ${i + 1}. ${s.action} su ${s.selector}${s.retracted ? ' [poi corretto]' : ''}`);
