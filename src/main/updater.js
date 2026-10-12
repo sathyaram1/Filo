@@ -294,8 +294,24 @@ function segnalaPronto() {
   avvisaPronto(testo, versione);
 }
 
+// Il cancello sta dove electron-updater decide se c'è una versione nuova: ogni strada (controllo, «Installa», da soli)
+// ci passa prima di scaricare. Un errore e non «aggiornato»: la release più recente non è nostra.
+function soloTagDiRilascio(au) {
+  if (typeof au.isUpdateAvailable !== 'function' || au.isUpdateAvailable.filoTag) return;
+  const originale = au.isUpdateAvailable;
+  const cancello = async function (info) {
+    if (!R.tagAccettato(info)) {
+      throw new Error(`release ${info.tag} rifiutata: il tag non è v${info.version}`);
+    }
+    return originale.call(this, info);
+  };
+  cancello.filoTag = true;
+  au.isUpdateAvailable = cancello;
+}
+
 function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = () => {}, modo = R.MODO_PREDEFINITO } = {}) {
   updater = au;
+  soloTagDiRilascio(au);
   Object.assign(stato, nuovoStato(), { attivo: true, automatici, chiesta, annuncia, modo });
   regola();
   au.on('checking-for-update', () => { if (stato.fase !== 'pronto') stato.fase = 'controllo'; });
