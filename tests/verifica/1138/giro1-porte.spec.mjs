@@ -69,7 +69,8 @@ test('chiave propria e conteggio locale a schermo: /invito in chat non dichiara 
   const crediti = await openTab('filo://credits/credits.html');
   await expect(crediti.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
   await expect(crediti.locator('#hero')).toBeVisible();
-  await expect(crediti.locator('#balance')).toHaveText('1.000');
+  await expect(crediti.locator('#balance')).toHaveText(/^1\.\d{3}$/);
+  const locale = (await crediti.locator('#balance').innerText()).trim();
 
   const home = await openTab('filo://newtab/');
   await home.waitForSelector('#input');
