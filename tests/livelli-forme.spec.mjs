@@ -680,6 +680,35 @@ test('confermare la fusione: Approva sta su una riga, e col pannello al minimo i
   await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
 });
 
+
+// A finestra stretta l'etichetta che non andava a capo usciva dalla scheda, tagliata dal pannello (#530.5).
+for (const larghezza of [768, 700, 560]) {
+  test(`finestra larga ${larghezza}: «Approva e fondi», anche armato, resta dentro la scheda e fermo sotto il cursore`, async ({ openTab }) => {
+    const page = await openTab(MANAGE);
+    await page.setViewportSize({ width: larghezza, height: 800 });
+    await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
+    await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+    await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+    const corpo = page.locator('#mgSideBody');
+    const scheda = corpo.locator('.sn-mac-card').first();
+    const go = corpo.locator('.sn-mac-btn-go');
+    await expect(go).toBeVisible();
+    const dentro = async () => {
+      const [s, g, c] = await Promise.all([scheda.boundingBox(), go.boundingBox(), corpo.boundingBox()]);
+      expect(g.x, 'il tasto esce a sinistra della scheda').toBeGreaterThanOrEqual(s.x - 0.5);
+      expect(g.x + g.width, 'il tasto esce a destra della scheda').toBeLessThanOrEqual(s.x + s.width + 0.5);
+      expect(g.x, 'il pannello taglia il tasto').toBeGreaterThanOrEqual(c.x - 0.5);
+      return g;
+    };
+    const prima = await dentro();
+    await go.click();
+    await expect(go).toHaveText('Confermi?');
+    const armato = await dentro();
+    for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(armato[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+    await page.screenshot({ path: `tests/.shots/livelli-forme-approva-${larghezza}.png` });
+  });
+}
+
 // Le riletture automatiche (un cambio di stato, una richiesta nuova) ridisegnavano il
 // pannello sotto il cursore e la conferma armata si perdeva: il secondo clic riarmava (#550).
 test('quadrato: una rilettura fra il primo clic e la conferma non si mangia la conferma', async ({ openTab }) => {
