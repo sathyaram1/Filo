@@ -2895,6 +2895,7 @@ class TabManager {
     installZoom(pwc);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
+    MenuDiRiserva.segui(pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
