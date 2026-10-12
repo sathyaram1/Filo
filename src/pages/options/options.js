@@ -591,14 +591,14 @@
     populateNicknames(registry);
   }
 
-  // Oltre al registry valido, ritorna le righe DOM scartate (nickname mancante
-  // o duplicato di una riga precedente) così save() può segnalarle sul posto
-  // invece di ignorarle in silenzio dietro un "Salvato" che non le riguarda
-  // (#216: l'utente perdeva la riga senza nessun avviso).
   function avvisoModello(action, ref) {
     return ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref]);
   }
 
+  // Oltre al registry valido, ritorna le righe DOM scartate (nickname mancante
+  // o duplicato di una riga precedente) così save() può segnalarle sul posto
+  // invece di ignorarle in silenzio dietro un "Salvato" che non le riguarda
+  // (#216: l'utente perdeva la riga senza nessun avviso).
   function collectModelRegistry() {
     const host = $('modelRegistryList');
     const out = {};

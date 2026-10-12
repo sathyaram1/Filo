@@ -160,13 +160,13 @@
       id: 'read-aloud', title: 'Leggi ad alta voce', category: 'reading',
       desc: 'Legge ad alta voce il testo selezionato con una voce naturale (un modello di sintesi vocale, con una voce della lingua del testo), evidenziando le parole mentre le pronuncia. Se la voce naturale non è raggiungibile, legge con quella del sistema.',
       invoke: 'Seleziona il testo e dal menu del tasto destro scegli "Leggi". Per fermare: "Interrompi lettura" (anche da un’altra scheda).',
-      doesNot: 'La voce naturale, quella di riserva del sistema, la velocità e il tono si regolano in Preferenze.',
+      doesNot: 'La voce naturale, quella di riserva del sistema, la velocità e il tono si regolano in Preferenze. La voce naturale non parte se fra chi serve il modello c’è anche un fornitore che Filo esclude, o se non si sa chi lo serve: legge con quella del sistema e dice perché.',
     },
     {
       id: 'dictate', title: 'Detta', category: 'writing',
       desc: 'Detta in un campo di testo: il testo compare mentre parli, frase dopo frase, nel punto dove sta il cursore. Trascrive con un modello a pesi aperti, nella lingua che parli.',
       invoke: 'In un campo modificabile, dal menu del tasto destro scegli "Detta"; clicca il riquadro rosso per fermare. La freccetta accanto sceglie il modello. Nella casella di una chat di Filo "Detta" fa quello che fa il suo microfono (vedi «Parla a Filo»).',
-      doesNot: 'Si ferma da sola dopo cinque minuti. Le frasi provvisorie si vedono nel riquadro, nel campo entrano solo quelle chiuse da una pausa. Se il microfono non ha il permesso, non c’è, o la trascrizione non riesce, un avviso dice cosa fare.',
+      doesNot: 'Si ferma da sola dopo cinque minuti. Le frasi provvisorie si vedono nel riquadro, nel campo entrano solo quelle chiuse da una pausa. Se il microfono non ha il permesso, non c’è, o la trascrizione non riesce, un avviso dice cosa fare. Non parte se fra chi serve il modello c’è anche un fornitore che Filo esclude, o se non si sa chi lo serve: lo dice l’avviso, e lo dice già la scelta del modello (freccetta o Opzioni).',
     },
     {
       id: 'search-web', title: 'Cerca sul web', category: 'selection',
