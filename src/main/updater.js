@@ -322,6 +322,16 @@ function soloTagDiRilascio(au) {
     }
     const opz = r.provider && r.provider.options;
     if (opz && opz.provider === 'github') {
+      // electron-updater lascia che il «tag:» di latest.yml copra quello vero: si richiede a GitHub, come fa lui.
+      // Una release di prova, che Filo non pubblica, non è sotto /latest e viene rifiutata.
+      if (typeof r.provider.getLatestTagName !== 'function') {
+        throw new Error('aggiornamenti fermi: il provider GitHub di electron-updater non ha getLatestTagName');
+      }
+      const { CancellationToken } = require('electron-updater');
+      const vero = await r.provider.getLatestTagName(new CancellationToken());
+      if (!R.tagDiGitHubAccettato(vero, info.version)) {
+        throw new Error(`release ${vero} rifiutata: il tag non è v${info.version}`);
+      }
       const urls = r.provider.resolveFiles(info)
         .flatMap((f) => [f.url && f.url.href, f.packageInfo && f.packageInfo.path])
         .filter(Boolean);
