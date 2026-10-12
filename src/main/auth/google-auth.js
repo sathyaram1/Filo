@@ -50,6 +50,13 @@ function erroreAccesso(code, message) {
 const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
 let flussoInCorso = null;
 
+// A tempo costante: un tentativo sbagliato non chiude più l'ascolto, quindi i tentativi sono illimitati.
+function stessoState(ricevuto, atteso) {
+  const a = Buffer.from(String(ricevuto ?? ''));
+  const b = Buffer.from(String(atteso));
+  return a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+}
+
 // Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, abort }.
 function startLoopback(expectedState) {
   return new Promise((resolve, reject) => {
