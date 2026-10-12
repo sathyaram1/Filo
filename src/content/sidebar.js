@@ -58,6 +58,7 @@
       rawUserMessages: [],
       feedbackShown: false,
       webSearchCount: 0,
+      documentiCount: 0,
     };
   }
   // Cap difensivo: anche se il prompt dice "max 2", l'AI potrebbe insistere.
@@ -80,6 +81,7 @@
     root.remove();
     root = null;
     history = [];
+    documenti = null;
     collapsed = false;
     aiPrefersOpen = false;
     session = null;
@@ -89,6 +91,7 @@
     if (isOpen()) return;
     if (root) close();
     history = [];
+    documenti = null;
     ripiegoDetto = false;
     ripiegoDaDire = '';
     collapsed = false;
@@ -1399,7 +1402,7 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false } = {}) {
+  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false } = {}) {
     if (!root) return;
     const wasCollapsed = collapsed;
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
@@ -1520,6 +1523,52 @@
         return;
       }
 
+      // Caso speciale: un documento dell'utente (#947.3). La ricerca la fa il main; il turno dopo il modello ha i
+      // candidati e ne indica uno col numero.
+      if (parsed.kind === 'documenti') {
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        if (parsed.display) {
+          appendChatMessage('assistant', parsed.display);
+          history.push({ role: 'assistant', content: parsed.display });
+        }
+        history.push({ role: 'assistant', content: `(ho chiesto di cercare fra i documenti dell'utente: "${Esterno.perCanaleSistema(parsed.cosa)}")` });
+        if (session && session.documentiCount >= MAX_DOCUMENTI_PER_SESSIONE) {
+          appendActionLog('ricerca fra i documenti: limite raggiunto, ignorata');
+          setTimeout(() => submit({
+            userAction: 'limite di ricerche fra i documenti raggiunto per questa conversazione. Rispondi ora con il JSON normale usando solo ciò che già sai',
+            preActionUrl: location.href,
+          }), 50);
+          return;
+        }
+        if (session) session.documentiCount += 1;
+        const r = await cercaDocumenti(parsed);
+        if (!r || !r.ok) {
+          appendActionLog(r && r.annullata ? 'ricerca fra i documenti: annullata' : 'ricerca fra i documenti: non riuscita');
+          if (r && r.annullata) {
+            history.push({
+              role: 'user',
+              kind: 'action',
+              content: PROMPTS.turnoAutomaticoAiuto({ nota: 'l\'utente non ha dato l\'OK alla ricerca fra i suoi documenti: non riproporla se non te la richiede lui', perCronologia: true }),
+            });
+          }
+          expand({ ai: true });
+          diciRipiego();
+          return;
+        }
+        documenti = { cercato: r.cercato, candidati: Array.isArray(r.candidati) ? r.candidati : [] };
+        appendActionLog(esitoDocumenti(r));
+        // Il main rimette i candidati interi; questi, senza chiavi, sono quelli che la cronologia ricorda.
+        const perCronologia = {
+          cercato: r.cercato,
+          risultati: documenti.candidati.map(({ chiave, ...c }) => c),
+          indice: r.indice || null,
+          fermata: !!r.fermata,
+          cartellaMancante: r.cartellaMancante || '',
+        };
+        setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: location.href, dopoDocumenti: true }), 50);
+        return;
+      }
+
       // Caso speciale: l'AI vuole azionare un comando rapido della barra di Filo
       // (le icone in alto: home, impostazioni, app, account, schermo intero,
       // riduci a icona). Lo eseguiamo in autonomia, come per reveal/hover, senza
@@ -1600,7 +1649,8 @@
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
       // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
-      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : '(risposta vuota)');
+      const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
+      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
       assistantEl = appendChatMessage('assistant', displayText);
 
       // Aggiorna la storia AI
@@ -1620,6 +1670,8 @@
       if (parsed.choices && parsed.choices.length) {
         renderChoices(assistantEl, parsed.choices);
       }
+      // Dopo le scelte: inserito subito sotto il messaggio, il documento resta sopra di loro.
+      mostraFile(assistantEl, daMostrare);
 
       // Highlight. Il tooltip on-page usa SOLO highlight.note (testo dedicato),
       // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
