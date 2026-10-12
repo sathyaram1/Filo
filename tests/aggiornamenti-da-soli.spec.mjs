@@ -66,16 +66,19 @@ async function tema(page, t) {
   await expect(page.locator('html')).toHaveAttribute('data-sn-theme', t);
 }
 
-test('spenta: la versione nuova non parte da sola; «Installa» sulla carta la scarica, mostra a che punto è e la installa alla chiusura', async ({ app, shell }) => {
+for (const s of SISTEMI) test(`spenta: la versione nuova non parte da sola; «Installa» sulla carta la scarica, mostra a che punto è e la installa quando il sistema lo prevede (${s.nome})`, async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const home = await homeDi(app);
+  await suSistema(app, s);
   await aggiornatoreFinto(app, { automatici: false });
+  const quando = s.allaChiusura ? 'quando chiudi Filo' : 'la prossima volta che apri Filo';
 
   const carta = home.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' });
   await expect(carta).toBeVisible({ timeout: 8_000 });
   await expect(carta.locator('.dash-carta-tit')).toHaveText('Aggiornamento');
   await expect(carta.locator('.dash-carta-stato')).toContainText('C\'è la versione 9.9.9 di Filo.');
+  await expect(carta).toContainText(`si installa ${quando}`);
   await expect(carta.locator('.dash-carta-az.principale')).toHaveText('Installa');
   await expect(carta.locator('.dash-carta-az.secondaria')).toHaveText('Chiudi');
   expect(await finto(app)).toEqual({ scaricamenti: 0, autoDownload: false, autoInstallOnAppQuit: false });
