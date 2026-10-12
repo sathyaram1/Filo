@@ -28,6 +28,7 @@
   let paroleUtente = () => [];
   let apriProposta = () => {};
   let archiviaAzione = () => {};
+  let sceltaAutonomiaEl = () => null;
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
