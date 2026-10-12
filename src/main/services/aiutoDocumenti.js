@@ -162,9 +162,7 @@ function ferma(wc) {
 /** L'ultima ricerca della scheda com'è per il modello (PROMPTS.documentiTrovati, per 'aiuto'), o null. */
 function perIlModello(wc) {
   const s = wc && perScheda.get(wc);
-  if (!s || !s.dati) return null;
-  const { percorsi, ...dati } = s.dati;
-  return dati;
+  return (s && s.dati) || null;
 }
 
 /** Il testo che il modello ha visto dei candidati: lo guarda la porta delle uscite (#810). */
