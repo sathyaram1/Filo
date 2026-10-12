@@ -34,6 +34,8 @@ function apri(url, { hostAccesso = hostDi(url), suChiusa, suRifiuto, fino, fines
   const tabs = win._filoTabs;
   const id = tabs.openTab(url, { activate: true });
   if (!id) return null;
+  // Chi lo chiede da una finestra incognito deve vedere la scheda, che sta nella finestra normale.
+  try { if (win.isMinimized()) win.restore(); win.focus(); } catch (_) {}
   let finita = false;
   const smetti = () => {
     if (finita) return;
