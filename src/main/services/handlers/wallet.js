@@ -53,10 +53,6 @@ module.exports = function register(on, ctx) {
     } catch (_) { /* la home resta com'è: non è un motivo per fallire un riscatto */ }
   }
 
-  // Il conteggio locale già dichiarato al server a un riscatto (per non
-  // portarlo due volte). Sopravvive al riscatto e all'annullamento dell'identità.
-  const DECLARED_KEY = 'walletLocalDeclared';
-
   // Ultimi parametri del server (euro per credito, cambio, quota): servono a
   // scalare i crediti nelle righe del registro e a comporre i messaggi.
   let lastServer = null;
