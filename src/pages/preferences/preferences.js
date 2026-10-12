@@ -1340,7 +1340,12 @@
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_SCEGLI_CARTELLA }); } catch (_) { r = null; }
     if (!r || !r.ok || !r.percorso) return;
-    if ((cartelleSalvate || []).includes(r.percorso)) { flashSaved('documentiHint'); return; }
+    if ((cartelleSalvate || []).includes(r.percorso)) {
+      const hint = $('documentiHint');
+      if (hint) hint.textContent = 'Salvato';
+      flashSaved('documentiHint');
+      return;
+    }
     await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
   }
 
