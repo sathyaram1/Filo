@@ -70,6 +70,8 @@ async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWei
         try {
           await pausa(latenza);
           if (rispostaDecisioni === 'rifiuta') return risposta(false, { error: { message: 'not a decisions model' } }, 400);
+          if (rispostaDecisioni === 'guasto') return risposta(false, { error: { message: 'upstream error' } }, 503);
+          if (rispostaDecisioni === 'rete') throw new TypeError('fetch failed');
           const answers = {};
           for (const [nome, q] of Object.entries(body.questions || {})) {
             const t = String(q.instructions || '');
