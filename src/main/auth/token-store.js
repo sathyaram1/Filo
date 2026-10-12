@@ -82,8 +82,8 @@ function clear() {
   inMemoria = null;
   try {
     fs.rmSync(filePath(), { force: true });
+    guasti.togliDaParte(filePath(), 'illeggibile-');
   } catch (_) {}
-  guasti.togliDaParte(filePath(), 'illeggibile-');
 }
 
 module.exports = { save, load, clear, canEncrypt };
