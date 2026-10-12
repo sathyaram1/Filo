@@ -285,6 +285,16 @@
     return out;
   }
 
+  // Un ciclo e non `/^[…]+|[…]+$/g`: quella riprova la coda da ogni carattere
+  // di una fila in mezzo al testo, e il costo cresce col quadrato (#1173).
+  function togliAiBordi(s, caratteri) {
+    let a = 0;
+    let b = s.length;
+    while (a < b && caratteri.includes(s[a])) a++;
+    while (b > a && caratteri.includes(s[b - 1])) b--;
+    return s.slice(a, b);
+  }
+
   // L'intento è UNA riga: la produce un LLM e la rilegge un altro LLM dentro il
   // prompt di un'altra persona. Togliamo il wrapping markdown, teniamo la prima
   // riga, tagliamo a MAX_INTENT_LEN.
