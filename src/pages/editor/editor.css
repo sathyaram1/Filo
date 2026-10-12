@@ -358,7 +358,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-sr-row button:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
 .ed-sr-count { font-size: 11px; color: var(--sn-muted); margin-bottom: 4px; }
 
-.ed-chat { padding: 8px; }
+/* Contenitore di misura: il tetto della casella si legge sull'altezza del modulo, che sceglie l'utente. */
+.ed-chat { padding: 8px; container-type: size; }
 .ed-chat-log { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
 .ed-chat-msg { font-size: 12px; padding: 6px 9px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; }
 .ed-chat-msg.user { align-self: flex-end; background: var(--sn-accent); color: #fff; }
