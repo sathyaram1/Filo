@@ -138,6 +138,43 @@ test('il comando installato, dalla shell, acceca e mette la decisione del server
   } finally { togliCartella(vuota); togliCartella(utente); }
 });
 
+// Il giro come in cloud: preflight che installa, comando ticket che registra, gancio installato che legge. Le due metà
+// devono trovarsi nella stessa cartella delle impostazioni utente.
+test('giro simulato: preflight, ticket e lancio del worker con modello e sforzo del server', async () => {
+  const { createServer } = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const utente = cartellaTemporanea('filo-cieco-giro-');
+  const srv = createServer((req, res) => {
+    req.resume();
+    req.on('end', () => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: true, work: true, ticket: B, role: 'new-work', model: 'sonnet', effort: 'xhigh' })); });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  try {
+    assert.equal(installa({ dir: utente, sessione: 's1' }).ok, true);
+    const t = await new Promise((ok) => {
+      const p = spawn(process.execPath, [join(RADICE, 'scripts', 'routine-channel.mjs'), 'ticket', 'parola', '--json'], {
+        env: { ...process.env, FILO_ROUTINE_TICKET: '', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, CLAUDE_CONFIG_DIR: utente },
+      });
+      let so = ''; let se = '';
+      p.stdout.on('data', (c) => { so += c; });
+      p.stderr.on('data', (c) => { se += c; });
+      p.on('close', (code) => ok({ code, so, se }));
+    });
+    assert.equal(t.code, 0, t.se);
+    const s = JSON.parse(readFileSync(join(utente, 'settings.json'), 'utf8'));
+    const cmd = s.hooks.PreToolUse.find((g) => g.hooks[0].command.includes(ETICHETTA)).hooks[0].command;
+    const prompt = `Dichiarati routine: \`export FILO_ROUTINE=1\`. Poi lancia \`node "/tmp/filo-strumenti/scripts/dispatch.mjs" --ticket ${JSON.parse(t.so).ticket}\`.`;
+    const r = spawnSync('bash', ['-c', cmd], { input: JSON.stringify(prima(false, {}, { prompt, model: 'opus', effort: 'low' })), encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    const h = JSON.parse(r.stdout).hookSpecificOutput;
+    assert.equal(h.permissionDecision, 'allow');
+    assert.deepEqual([h.updatedInput.model, h.updatedInput.effort], ['sonnet', 'xhigh']);
+  } finally {
+    await new Promise((ok) => srv.close(ok));
+    togliCartella(utente);
+  }
+});
+
 test('il comando non dipende dalla macchina: niente apostrofi dentro, niente barre rovesciate, sessione ripulita', () => {
   const cmd = comando({ sessione: "s1'; rm -rf ~ #", creato: 1, registro: 'C:\\Users\\agenti AI\\.claude\\filo-decisioni-worker.json' });
   assert.equal((cmd.match(/'/g) || []).length, 2, 'un apostrofo nel corpo chiude gli apici della shell');
