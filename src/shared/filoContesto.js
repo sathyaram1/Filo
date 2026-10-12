@@ -74,7 +74,12 @@
     return n > 0 ? Math.min(n, 999) : 0;
   }
   // Al posto delle immagini che non tornano: senza, il modello rinnegava quello che ne aveva letto (#1166).
-  function notaImmagini(n) {
+  function notaImmagini(n, { altre = false } = {}) {
+    if (altre) {
+      return n === 1
+        ? "(qui l'utente aveva mandato anche un'altra immagine che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederla, chiedi di rimandarla.)"
+        : `(qui l'utente aveva mandato anche altre ${n} immagini che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederle, chiedi di rimandarle.)`;
+    }
     return n === 1
       ? "(qui l'utente aveva mandato un'immagine che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederla, chiedi di rimandarla.)"
       : `(qui l'utente aveva mandato ${n} immagini che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì. Se ti serve rivederle, chiedi di rimandarle.)`;
