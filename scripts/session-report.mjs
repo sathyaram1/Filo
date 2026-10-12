@@ -894,7 +894,7 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
   }
 }
 
-/** «claude-haiku-5-5 3, …» o '' (un rapporto vecchio non ha il campo). PURA. */
+/** «claude-haiku-5-5 3, …», o '' se nessuna richiesta ha passato la soglia. PURA. */
 function testoOltreSoglia(o) {
   return Object.entries(o || {}).filter(([, n]) => Number(n) > 0).map(([m, n]) => `${m} ${n}`).join(', ');
 }
