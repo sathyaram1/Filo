@@ -1,4 +1,4 @@
-// Sonde del verificatore #1193, giro 2: lettura lenta o fallita, scelta durante la lettura, tema scuro.
+// Sonde del verificatore #1193, giro 2: lettura lenta o fallita, scelta durante la lettura.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { server, tendina, PAGINA } from './aiuti.mjs';
 
@@ -18,13 +18,11 @@ test('lettura lenta: nessuna tendina né interruttore mostra un valore prima del
       expect(vis === 'hidden' || testo === '', `${r}.${c} mostra «${testo}» durante la lettura`).toBe(true);
     }
   }
-  await page.screenshot({ path: 'tests/.shots/v1193-g2-lettura.png' });
   await page.evaluate(() => window.__mgTest.whenReady());
   await expect(page.locator('#panel-automation')).not.toHaveClass(/mg-in-lettura/);
   await expect(valore(page, 'secaudit', 'model')).toHaveText('Sonnet');
   await expect(valore(page, 'secaudit', 'model')).toBeVisible();
   await expect(valore(page, 'verifier', 'model')).toHaveText('Definizione dell\'agente');
-  await page.screenshot({ path: 'tests/.shots/v1193-g2-letto.png' });
 });
 
 test('scelta fatta mentre la lettura è per strada: resta quella, la lettura vecchia non la riscrive', async ({ app, openTab }) => {
@@ -34,13 +32,12 @@ test('scelta fatta mentre la lettura è per strada: resta quella, la lettura vec
   await page.locator('.mg-tab[data-tab="automation"]').click();
   const t = tendina(page, 'fixer', 'model');
   await t.locator('.sn-select-button').click();
-  const pop = t.locator('.sn-select-pop');
-  if (await pop.isVisible()) {
-    await t.locator('.sn-select-option', { hasText: 'Haiku' }).click();
-    await page.evaluate(() => window.__mgTest.whenReady());
-    await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Correzione: salvato.');
-    await expect(valore(page, 'fixer', 'model')).toHaveText('Haiku');
-  }
+  await expect(t.locator('.sn-select-pop')).toBeVisible();
+  await t.locator('.sn-select-option', { hasText: 'Haiku' }).click();
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Correzione: salvato.');
+  await expect(valore(page, 'fixer', 'model')).toHaveText('Haiku');
+  expect((await app.evaluate(() => globalThis.__v1193.doc.fields.roleModels.mapValue.fields.fixer.mapValue.fields.model.stringValue))).toBe('haiku');
 });
 
 test('lettura fallita: le tendine restano senza valore e la pagina dice che non le ha lette', async ({ app, openTab }) => {
@@ -52,19 +49,4 @@ test('lettura fallita: le tendine restano senza valore e la pagina dice che non 
   await page.locator('.mg-tab[data-tab="automation"]').click();
   await expect(valore(page, 'fixer', 'model')).toHaveText('');
   await expect(page.locator('#mgRoleModelsMsg')).not.toHaveText('');
-  console.log('msg fallita:', await page.locator('#mgRoleModelsMsg').textContent());
-  await page.screenshot({ path: 'tests/.shots/v1193-g2-fallita.png' });
-});
-
-test('tema scuro: la sezione si legge', async ({ app, openTab }) => {
-  await server(app, { routines: { roleModels: { secaudit: { model: 'sonnet', effort: 'high' } } } });
-  const page = await openTab(PAGINA);
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.waitForFunction(() => window.__mgTest && window.SN_ROUTINE_MODELLI);
-  await page.evaluate(() => window.__mgTest.whenReady());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
-  await page.locator('#mgRoleModelsBlock').scrollIntoViewIfNeeded();
-  await page.locator('#mgRoleModelsBlock').screenshot({ path: 'tests/.shots/v1193-g2-scuro.png' });
-  await page.emulateMedia({ colorScheme: 'light' });
-  await page.locator('#mgRoleModelsBlock').screenshot({ path: 'tests/.shots/v1193-g2-chiaro.png' });
 });
