@@ -57,13 +57,14 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
     const letto = registro || {};
     let voci = null;
     try { voci = JSON.parse(letto.testo).voci; } catch (_) { voci = null; }
-    if (!Array.isArray(voci)) return nega(MOTIVO_REGISTRO + " (" + (letto.errore || "contenuto non valido") + ")");
+    if (!Array.isArray(voci)) return nega(MOTIVO_REGISTRO + " Dettaglio: " + (letto.errore || "contenuto non valido") + ".");
     const mia = typeof impronta === "function" ? impronta(visti[0]) : "";
     const voce = voci.find((v) => v && mia && v.impronta === mia && adesso - Date.parse(v.ora) < DURATA_VOCE_MS);
     if (!voce) return nega(MOTIVO_SCONOSCIUTO);
     if ((voce.model && !MODELLI.includes(voce.model)) || (voce.effort && !SFORZI.includes(voce.effort))) return nega(MOTIVO_IGNOTO);
-    const { model, effort, ...resto } = ti;
-    const nuovo = { ...resto, run_in_background: false };
+    const nuovo = { ...ti, run_in_background: false };
+    delete nuovo.model;
+    delete nuovo.effort;
     if (voce.model) nuovo.model = voce.model;
     if (voce.effort) nuovo.effort = voce.effort;
     return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: MOTIVO_LANCIO, updatedInput: nuovo } };
