@@ -403,7 +403,7 @@ jobs:
         # l'URL .../releases/latest/download/Filo-Setup.exe punti a questa.
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         shell: bash
         # --target: il tag nasce sul commit costruito, non sulla punta di main
         # al momento della pubblicazione (il confronto "c'e' qualcosa di nuovo"
