@@ -317,7 +317,7 @@ export function provaUnitSullaFusione({
   const storia = assicuraStoria({ git: gitStoria, mainSha, punta });
   if (storia.errore) return { errore: storia.errore, mainSha, storia: storia.storia };
   if (storia.storia.superficiale) scrivi(testoStoria(storia.storia));
-  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha }), storia: storia.storia };
+  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto }), storia: storia.storia };
 }
 
 /** Quanta storia scaricare a ogni passo prima di prenderla tutta. */
