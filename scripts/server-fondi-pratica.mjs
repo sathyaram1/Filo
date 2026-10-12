@@ -232,6 +232,11 @@ export async function esegui(argv, deps = {}) {
       err(`La pratica ${chi} non è fidata: un lavoro sul server si fonde solo su una pratica fidata. La segna fidata l’owner, in Gestione, dopo averne letto il testo. Non ho toccato niente.`);
       return 3;
     }
+    const ramoServer = await controllaRamoServer({ ramo: a.ramo, feedbackId: r.id, verdetto, cartella }, { lavoroDelRamo: deps.lavoroDelRamo, puntaRamo: deps.puntaRamo });
+    if (!ramoServer.ok) { err(`server:fondi: ${ramoServer.motivo}. Non ho toccato niente.`); return ramoServer.codice; }
+    if (ramoServer.legacy) log(`Il ramo ${a.ramo} non ha un registro: lavoro locale di prima del registro dei rami, vale la fiducia della pratica.`);
+    // Il registro garantisce uno sha: si fonde quello, anche senza una verifica locale (#1062, #1159).
+    const daFondere = verdetto || (ramoServer.sha ? { ok: true, server: { sha: ramoServer.sha } } : null);
     const letta = await of.partiDellaPratica(r.id, { bearer });
     if (!letta.ok) { err(`La pratica ${chi} non si legge (${letta.motivo}). Non ho toccato niente.`); return 3; }
     // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915).
