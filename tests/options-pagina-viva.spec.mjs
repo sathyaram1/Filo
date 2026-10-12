@@ -37,7 +37,9 @@ test('il modello scelto altrove resta scelto dopo un campo toccato in Opzioni', 
   expect(dopo.models.transcribe_audio, 'il modello scelto altrove resta').toBe('dettatore-scelto');
 });
 
-const cella = (page, etichetta) => page.locator('#modelsGrid > div').filter({ hasText: etichetta });
+// Per l'etichetta della cella: la tendina aperta di un'altra funzione elenca modelli con le stesse parole.
+const cella = (page, etichetta) => page.locator('#modelsGrid > div')
+  .filter({ has: page.locator(':scope > label', { hasText: etichetta }) });
 
 // #667.7: il cambio da fuori riscrive la catena che è cambiata, non tutta la griglia; ridisegnarla intera portava
 // via la spiegazione del modello appena respinto in un'altra funzione.
@@ -69,6 +71,7 @@ test('mentre si scrive in una funzione, il modello cambiato da fuori per un\'alt
 
   const spiega = cella(opts, 'Spiega (inline)').locator('.sn-chain-input').first();
   await spiega.click();
+  await opts.keyboard.press('End');
   await spiega.pressSequentially('abc');
 
   await daFuori(altrove, { transcribe_audio: 'dettatore-scelto' });
