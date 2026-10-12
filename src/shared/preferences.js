@@ -1162,8 +1162,9 @@
       nome: 'Controlli di rete sui siti',
       stati: ['attivi', 'spenti'],
       aiuto: 'true | false (chiede a servizi pubblici l\'età del dominio e del certificato, per riconoscere le truffe)',
-      risk: 'Controlla le richieste a servizi pubblici sull’età del dominio e del certificato, un forte segnale di truffa. '
-        + 'Spegnerle rende meno probabile l’avviso su un sito nato da pochi giorni per ingannarti.',
+      risk: 'Quando un sito ha già un indizio sospetto, Filo ne manda il nome a due servizi pubblici (rdap.org e crt.sh) '
+        + 'per sapere da quanto esistono il dominio e il suo certificato: un sito nato da pochi giorni è un forte segnale '
+        + 'di truffa. Spenti, quel nome non esce dal computer, ma l’avviso su un sito appena nato per ingannarti diventa meno probabile.',
     }),
     interruttore({
       keys: ['giudizio_ai_siti', 'giudizio ai', 'giudizio ai sui siti', 'giudizio ai sui casi sospetti'],
