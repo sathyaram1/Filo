@@ -73,6 +73,7 @@ import { readMarker } from './lib/routine-role.mjs';
 import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
 import { chiediConProva, pulisciResti, gitIn } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
+import { copieDaSpedire, avvisoSpedizione } from './lib/copie-di-dati.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
