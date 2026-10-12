@@ -994,17 +994,28 @@
     });
   }
 
-  // La scheda è un contenitore (le icone cedono il posto per priorità, shell.css) e così non darebbe
-  // più alla striscia la larghezza del suo contenuto: la si misura con tutto in vista e la si restituisce.
-  function misuraLarghezzeNaturali() {
+  // La scheda è un contenitore (le icone cedono il posto per priorità, shell.css) e non dà più alla
+  // striscia la larghezza del suo contenuto: la si misura con tutto in vista. Le schede si dividono la
+  // striscia in parti uguali (l'attiva di più), quindi ognuna chiede la sua parte di una striscia dove ci
+  // sta il titolo più lungo, non la propria larghezza: la somma delle proprie lasciava a metà i titoli
+  // lunghi con la finestra mezza vuota (#429). Il passo non dipende da quale è attiva.
+  function misuraLarghezzeChieste() {
     const schede = [...tabsEl.children];
     if (!schede.length) return;
+    const px = (v, ripiego) => { const n = parseFloat(v); return Number.isFinite(n) ? n : ripiego; };
+    const regole = schede.map((el) => {
+      const cs = getComputedStyle(el);
+      return { peso: px(cs.flexGrow, 1) || 1, min: px(cs.minWidth, 0), max: px(cs.maxWidth, Infinity) };
+    });
     schede.forEach((el) => el.classList.add('misura'));
     const pad = getComputedStyle(schede[0]);
     const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
     const larghe = schede.map((el) => el.getBoundingClientRect().width);
+    const passo = Math.max(...larghe.map((w, i) => Math.min(w, regole[i].max)));
     schede.forEach((el, i) => {
-      el.style.setProperty('--tab-naturale', `${Math.max(0, Math.ceil(larghe[i] - bordi))}px`);
+      const { peso, min, max } = regole[i];
+      const chiesta = Math.min(max, Math.max(min, passo * peso));
+      el.style.setProperty('--tab-chiesta', `${Math.max(0, Math.ceil(chiesta - bordi))}px`);
       el.classList.remove('misura');
     });
   }
