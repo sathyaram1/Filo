@@ -164,6 +164,8 @@ jobs:
   # Niente `if:` né `continue-on-error` sul lavoro: saltato o tollerato, la corsa sarebbe verde senza averlo passato.
   unit-windows:
     runs-on: windows-latest
+    # Come `suite`: il segreto dell'avviso sta nell'ambiente `rilascio`, aperto al solo main (#1073).
+    environment: ${{ github.ref == 'refs/heads/main' && 'rilascio' || '' }}
     timeout-minutes: 60
     steps:
       - name: Checkout del commit da provare (con la storia, per l'elenco dei commit dell'avviso)
