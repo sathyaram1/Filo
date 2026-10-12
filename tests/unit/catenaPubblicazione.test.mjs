@@ -115,7 +115,8 @@ describe('il tag v* lo crea l\'app di pubblicazione, quando c\'è', () => {
     assert.match(ps[iApp], /if:[^\n]*vars\.FILO_RILASCIO_APP_ID != ''/,
       'senza la condizione sulla variabile il passo fallisce finché l\'app non esiste, e non esce più niente');
     assert.match(ps[iApp], /private-key:\s*\$\{\{\s*secrets\.FILO_RILASCIO_APP_KEY\s*\}\}/);
-    assert.ok(iBuild > iApp, 'il token va coniato prima della build, che crea la bozza');
+    assert.ok(iNumero > iApp && iBuild > iNumero,
+      'il token va coniato prima del numero di versione: un\'app configurata male non deve consumarne uno');
   });
 
   test('build, controllo e pubblicazione usano il token dell\'app, e senza app il GITHUB_TOKEN', () => {
