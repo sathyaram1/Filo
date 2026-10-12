@@ -22,6 +22,7 @@ const http = require('node:http');
 const cfg = require('./config');
 const pkce = require('./pkce');
 const store = require('./token-store');
+const guasti = require('./guastiAccesso');
 
 let session = null; // { refreshToken, idToken, idTokenExp, email, name, picture }
 // Se la sessione sopravviverà alla chiusura: senza cifratura del sistema resta
