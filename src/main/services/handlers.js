@@ -4208,6 +4208,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // L'intervista comincia col benvenuto di Filo: un messaggio scritto prima (senza crediti) non ne è una risposta, e
   // metterlo nella conversazione la faceva ripartire da lì, senza che Filo si presentasse mai.
   const onbActive = !!(Onboarding && !onbBefore.done && onbBefore.thread.length > 0);
+  const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
 
   // #525 — la chat si scrive su disco ADESSO, non alla chiusura: se l'app
   // muore a metà discussione, la discussione c'è lo stesso. I turni interni
