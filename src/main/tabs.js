@@ -2882,7 +2882,7 @@ class TabManager {
   // aperta su quella URL (Cookies.MODES.PRIVACY → partizione per-sito;
   // altrimenti null = sessione condivisa), per non spezzare un eventuale
   // login Google già presente in Filo.
-  _allowAuthPopup(url) {
+  _allowAuthPopup(url, features = '') {
     // #758 — l'accesso fatto nella finestrella conta come quello fatto in una scheda: i contenuti del provider
     // incorporati altrove devono tenere i cookie.
     try { require('./services/cookieIncorporati').paginaDiAccesso(url); } catch (_) {}
