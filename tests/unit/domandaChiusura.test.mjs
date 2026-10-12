@@ -21,7 +21,8 @@ const owner = await import('../../scripts/routine-domanda.mjs');
 const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
 
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
-const piano = { sleep: async () => {} };
+// Senza le misure dei crediti (le prova creditiNelleChiamate): in un contenitore di routine leggerebbero il consumo vero.
+const piano = { sleep: async () => {}, misureCrediti: () => ({}) };
 
 // ─── corpi delle richieste ──────────────────────────────────────────────────
 
