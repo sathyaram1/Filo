@@ -1351,6 +1351,13 @@ function perimetroLettura(sender) {
   return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
 }
 
+// La shell delle Preferenze che eseguirà i comandi dell'assistente, già risolta per questo sistema.
+async function shellDeiComandi() {
+  let settings = {};
+  try { settings = await Storage.getSettings(); } catch (_) {}
+  return require('./terminal').resolveShell(settings.terminal && settings.terminal.shell);
+}
+
 async function segretiCustoditi() {
   let salvate = {};
   let effettive = {};
@@ -2009,6 +2016,8 @@ async function eseguiAzioneFilo(action, {
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
+  // Il comando si giudica come lo legge la shell che lo eseguirà, e parte con quella stessa (#1072.1: cmd toglie i `^`).
+  if (type === 'ESEGUI_COMANDO') action._perimetro.shell = await shellDeiComandi();
 
   // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
   // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
@@ -2809,9 +2818,7 @@ async function eseguiAzioneFilo(action, {
         // che il gate ha valutato e ciò che lanciamo (stessa stringa `comando`).
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim();
         if (!cmd) return { executed: false, kept: true, output: { command: '', blocked: 'empty' } };
-        let settings = {};
-        try { settings = await Storage.getSettings(); } catch (_) {}
-        const shell = settings.terminal && settings.terminal.shell;
+        const shell = (action._perimetro && action._perimetro.shell) || await shellDeiComandi();
         const { runCommand } = require('./terminal');
         // cwd PERSISTENTE: partiamo dalla cartella corrente dell'assistente e
         // catturiamo quella risultante, così un `cd` resta valido per il comando

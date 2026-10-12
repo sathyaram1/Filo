@@ -989,7 +989,8 @@
   function contesto(ctx) {
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
     const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti) };
+    const shell = String(x.shell || '').toLowerCase();
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
@@ -1479,11 +1480,36 @@
     return det;
   }
 
+  // cmd toglie ogni `^` fuori dalle virgolette prima di passare il comando: `^.ssh` è `.ssh`, `^\^\host` è
+  // `\\host`, `-^-force` è `--force` (#1072.1). null dove qui non si legge come cmd: un `^` in coda (si
+  // prende la riga dopo), su un separatore (diventa testo), accanto alle espansioni `%` (fatte prima) e `!`.
+  function comeCmd(cmd) {
+    let out = '';
+    let virgolette = false;
+    let tolti = false;
+    for (let i = 0; i < cmd.length; i++) {
+      const ch = cmd[i];
+      if (ch !== '^' || virgolette) {
+        if (ch === '"') virgolette = !virgolette;
+        out += ch;
+        continue;
+      }
+      const dopo = cmd[i + 1];
+      if (dopo === undefined || /[&|<>()%\r\n]/.test(dopo)) return null;
+      out += dopo; // `^"` non apre né chiude le virgolette
+      i += 1;
+      tolti = true;
+    }
+    if ((tolti && out.includes('%')) || (out.includes('!') && out.includes('^'))) return null;
+    return out;
+  }
+
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
   // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
-  // devono vedere il comando che la shell esegue, non la sua grafia (#1072).
+  // devono vedere il comando che la shell esegue, non la sua grafia (#1072). Per cmd quei segni sono testo.
   function comeLaShell(cmd, c) {
     if (!c.win) return cmd;
+    if (c.shell === 'cmd') return comeCmd(cmd);
     return cmd.replace(/[\u201C-\u201F]/g, '"')
       .replace(/[\u2018-\u201B]/g, "'")
       .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-');
@@ -1492,7 +1518,8 @@
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
-    return classifica(comeLaShell(cmd, c), c, 0);
+    const letto = comeLaShell(cmd, c);
+    return letto == null ? TRE : classifica(letto, c, 0);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
@@ -1559,5 +1586,5 @@
     return fuoriDa(p, contesto(ctx));
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, programOf, subcommandOf };
+  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, programOf, subcommandOf, comeCmd };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
