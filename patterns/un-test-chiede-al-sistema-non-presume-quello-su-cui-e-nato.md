@@ -131,7 +131,10 @@ sceglie lei e gira per ognuna (`perOgniSistema` in
 Windows: `conPiattaforma` cambia `process.platform` per la durata del caso e lo
 rimette com'era. Regge solo perché il codice la chiede al momento, da un punto solo
 (`dip.piattaforma()`), mai fissata in una costante al caricamento del modulo: lì la
-prova non arriverebbe più, e il caso Windows girerebbe da Linux.
+prova non arriverebbe più, e il caso Windows girerebbe da Linux. Uno spec in Electron
+fa lo stesso: la piattaforma la sceglie `perProva` nel main, e lo spec gira per ognuna
+(`tests/aggiornamenti-da-soli.spec.mjs`). Un `process.platform` letto dallo spec
+dà un ramo che la suite in GitHub non corre mai (#1171).
 
 ## Il collegamento simbolico (#742)
 
