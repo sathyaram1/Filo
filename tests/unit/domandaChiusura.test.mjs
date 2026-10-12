@@ -191,8 +191,9 @@ function fintoServer(status, risposta) {
 }
 
 // spawn ASINCRONO: il server finto vive in questo processo.
-function cli(port, args, stdin = '') {
-  const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+// FILO_TRANSCRIPT: la risposta dell'orchestratore allega il rapporto della chiusura, che non legge i transcript di chi lancia i test.
+function cli(port, args, stdin = '', altro = {}) {
+  const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_TRANSCRIPT: resolve(QUI, 'non-c-e.jsonl'), ...altro };
   return new Promise((risolvi) => {
     const p = spawn(process.execPath, [CANALE, ...args], { env });
     let stdout = ''; let stderr = '';
