@@ -3,7 +3,7 @@
 // La shell parla con il main via IPC (tabs:* canali); il main risponde con
 // broadcast tabs:updated alla shell perché ridisegni la barra.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
@@ -100,6 +100,8 @@ function installaPermessi(ses) {
   Permessi.installa(ses, {
     prima: (wc, permission, callback) => {
       if (permission !== 'fullscreen') return false;
+      // A schermo intero la finestrella di accesso perderebbe la barra col sito (#1066).
+      if (wc && wc._filoFinestrella) { callback(false); return true; }
       const t = tabDiWebContents(wc);
       if (t && t._ultimoInputEsc) { callback(false); return true; }
       return false;
@@ -207,6 +209,38 @@ function isOsDelegatedScheme(rawUrl) {
 
 const RIAPERTURA_ACCESSO_MS = 5000;
 const MONDO_RIAPERTURA = 1003;
+
+// Il dominio registrato, la parte che chi attacca non sceglie; una pagina scritta dal sito (about:blank, blob:) è sua.
+function titoloFinestrella(url, origine = '') {
+  const da = /^https?:/i.test(origine) ? origine : String(url || '');
+  if (!/^https?:/i.test(da)) return da.split(/[?#]/)[0] || 'about:blank';
+  return Permessi.nomeDaMostrare(da).dominio;
+}
+
+// La pagina sceglie misure e posizione, ma la finestrella sta tutta nello schermo, come in Chrome: fuori, con la barra
+// del titolo, uscirebbe l'unico posto dove si legge il sito (#1066 giro 1). Windows non la rimette dentro da solo.
+function dentroLoSchermo(b) {
+  const a = screen.getDisplayMatching(b).workArea;
+  const width = Math.min(b.width, a.width);
+  const height = Math.min(b.height, a.height);
+  return {
+    width, height,
+    x: Math.min(Math.max(b.x, a.x), a.x + a.width - width),
+    y: Math.min(Math.max(b.y, a.y), a.y + a.height - height),
+  };
+}
+
+// Electron passa alla finestra ogni chiave delle `features` di window.open (frame=no, fullscreen, titleBarStyle…):
+// alla pagina restano solo le misure, il resto torna com'è di suo, o il titolo col sito sparirebbe (#1066).
+const MISURE_FINESTRELLA = new Set(['width', 'height', 'left', 'top', 'x', 'y']);
+function senzaOpzioniDellaPagina(features) {
+  const via = {};
+  for (const coppia of String(features || '').split(',')) {
+    const chiave = coppia.split('=')[0].trim();
+    if (chiave && !MISURE_FINESTRELLA.has(chiave)) via[chiave] = undefined;
+  }
+  return via;
+}
 
 // Consegna all'OS un link mailto:/tel:/sms: (best-effort). Da chiamare SOLO dopo
 // aver bloccato la navigazione in-app, e SOLO per gli schemi dell'allowlist.
@@ -2777,17 +2811,21 @@ class TabManager {
       const accesso = tab.isInternal === false && isAuthPopup(url);
       // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
       const riaperta = accesso && this._riaperturaDiAccesso(tab, url);
-      if (tab.isInternal === false && this.security.blockPopups && !riaperta && !Permessi.perUnaFinestra(wc, url, referrer)) {
+      // Una finestra senza barra dell'indirizzo la apre solo il clic, anche a blocco spento: da sola la pagina
+      // fingerebbe l'accesso di un altro sito (#1066), e la sua richiesta segue la strada delle altre.
+      const gesto = riaperta || (tab.isInternal === false && (this.security.blockPopups || accesso)
+        && Permessi.perUnaFinestra(wc, url, referrer));
+      if (tab.isInternal === false && this.security.blockPopups && !gesto) {
         // «Apri» sull'avviso la fa ripartire dalla pagina, perché l'accesso possa tornarle l'esito.
         if (accesso) tab._accessoBloccato = { url, nome: details.frameName || '', misure: details.features || '', pagina: wc.getURL() };
         this._notifyPopupBlocked(tab.id, url, wc);
         return { action: 'deny' };
       }
-      if (accesso) {
+      if (accesso && gesto) {
         if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
         // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
         // finestrella diventa una scheda, dove l'avviso c'è.
-        if (!tab.sbAvviso) return this._allowAuthPopup(url);
+        if (!tab.sbAvviso) return this._allowAuthPopup(url, details.features);
       }
       // #170.3 — la lista dei siti bloccati la applica openTab; un «Apri comunque»
       // dato qui vale anche per le schede che apre sullo stesso sito.
@@ -2871,7 +2909,7 @@ class TabManager {
   // aperta su quella URL (Cookies.MODES.PRIVACY → partizione per-sito;
   // altrimenti null = sessione condivisa), per non spezzare un eventuale
   // login Google già presente in Filo.
-  _allowAuthPopup(url) {
+  _allowAuthPopup(url, features = '') {
     // #758 — l'accesso fatto nella finestrella conta come quello fatto in una scheda: i contenuti del provider
     // incorporati altrove devono tenere i cookie.
     try { require('./services/cookieIncorporati').paginaDiAccesso(url); } catch (_) {}
@@ -2881,6 +2919,10 @@ class TabManager {
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
+        ...senzaOpzioniDellaPagina(features),
+        title: titoloFinestrella(url),
+        frame: true,
+        titleBarStyle: 'default',
         webPreferences: {
           preload: PAGE_PRELOAD,
           contextIsolation: true,
@@ -2910,6 +2952,23 @@ class TabManager {
   _hardenAuthPopup(win, origine = null) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    // Senza barra dell'indirizzo il titolo è l'unico posto dove si legge il sito: lo scrive Filo, mai la pagina (#1066).
+    const mostraSito = () => {
+      if (win.isDestroyed() || pwc.isDestroyed()) return;
+      let o = '';
+      try { o = pwc.mainFrame.origin; } catch (_) {}
+      try { win.setTitle(titoloFinestrella(pwc.getURL(), o)); } catch (_) {}
+    };
+    win.on('page-title-updated', (e) => e.preventDefault());
+    pwc._filoFinestrella = true;
+    const rientra = (b) => {
+      if (!win.isDestroyed()) try { win.setBounds(dentroLoSchermo(b)); } catch (_) {}
+    };
+    rientra(win.getBounds());
+    // window.moveTo/resizeTo della pagina: lo spostamento dell'utente, col mouse, resta libero.
+    pwc.on('content-bounds-updated', (e, b) => { e.preventDefault(); rientra(b); });
+    pwc.on('did-navigate', mostraSito);
+    pwc.on('did-navigate-in-page', mostraSito);
     installZoom(pwc);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
@@ -2952,18 +3011,20 @@ class TabManager {
       if (event.isMainFrame === false) return;
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
-    pwc.setWindowOpenHandler(({ url, referrer }) => {
+    pwc.setWindowOpenHandler(({ url, referrer, features }) => {
       if (isWebUnsafeNav(url)) {
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, referrer);
         return { action: 'deny' };
       }
-      if (this.security.blockPopups && !Permessi.perUnaFinestra(pwc, url, referrer)) {
+      const accesso = isAuthPopup(url);
+      const gesto = (this.security.blockPopups || accesso) && Permessi.perUnaFinestra(pwc, url, referrer);
+      if (this.security.blockPopups && !gesto) {
         this._notifyPopupBlocked(origine ? origine.id : null, url, pwc);
         return { action: 'deny' };
       }
-      if (isAuthPopup(url)) {
+      if (accesso && gesto) {
         if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
-        return this._allowAuthPopup(url);
+        return this._allowAuthPopup(url, features);
       }
       this.openTab(url, {
         activate: true,
