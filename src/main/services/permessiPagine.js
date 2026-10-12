@@ -577,7 +577,7 @@ function togliPerChat(sito, permesso) {
   const p = String(permesso || '').trim().toLowerCase();
   const tutti = !p || /^(tutt[oiea]|ogni|qualsiasi|all)$/.test(p);
   const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
-  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete)` };
+  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete, file)` };
   const delSito = scelteRicordate().filter((s) => {
     let h = '';
     try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }
