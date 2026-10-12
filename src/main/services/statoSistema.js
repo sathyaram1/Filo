@@ -407,7 +407,9 @@ while ($true) {
         if ($null -eq $ad) { continue }
         $liv = [int]$pr.GetNetworkConnectivityLevel()
         if ($liv -lt 1) { continue }
-        $null = $profili.Add([ordered]@{ id = ([string]$ad.NetworkAdapterId).Trim('{}').ToLower(); livello = $liv; iana = [int]$ad.IanaInterfaceType })
+        $nomeProfilo = $null
+        try { $nomeProfilo = [string]$pr.ProfileName } catch {}
+        $null = $profili.Add([ordered]@{ id = ([string]$ad.NetworkAdapterId).Trim('{}').ToLower(); livello = $liv; iana = [int]$ad.IanaInterfaceType; nome = $nomeProfilo })
       }
       $rete.profili = $profili
     } catch {}
