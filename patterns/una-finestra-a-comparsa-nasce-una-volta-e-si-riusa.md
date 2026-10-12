@@ -14,6 +14,11 @@ documento.
   finestra ha finito di caricarsi (`preparaMenu` in `src/main/window.js`), col
   documento e il preload già caricati. Chi lo distrugge (uno spec, la chiusura
   della madre) non rompe niente: la prossima apertura lo ricrea.
+- **Col processo morto si butta e rinasce.** Riusata, una finestra il cui
+  renderer è morto lascerebbe la madre senza menu (o fumetto, o carta) fino al
+  riavvio: su `render-process-gone` si distrugge, la prossima apertura la
+  ricrea, e il menu che stava per comparire si riapre una volta. Sentinella:
+  `tests/unit/popupRinasce.test.mjs`.
 - **Quello che resta si collega alla nascita.** Scorciatoie, invisibilità nei test
   e l'ascoltatore dei messaggi della pagina si attaccano una volta. Il gestore
   dei messaggi è unico e risolve la scelta del menu aperto adesso.
