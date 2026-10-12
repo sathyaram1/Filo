@@ -206,9 +206,6 @@ html[data-chrome-compact="1"] .addr {
   flex: none;
   width: max-content;
 }
-/* Col titolo a base 0 Chromium misurava la scheda un gap più stretta del suo testo (#429). */
-.tab.misura > .title { flex: none; }
-
 .tab.active.audible {
   animation: tab-glow-pulse 2.4s ease-in-out infinite;
 }
