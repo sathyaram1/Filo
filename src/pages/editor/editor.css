@@ -368,9 +368,10 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
 .ed-chat-input .sn-voce-btn { margin-bottom: 2px; }
 /* La casella cresce con quello che contiene (anche il suggerimento, che col microfono accanto va a capo):
-   la barra di scorrimento (sottile) compare solo oltre il tetto di altezza. */
+   il tetto è lo spazio del modulo meno qualche riga di conversazione, perché con un font largo un tetto
+   fisso faceva scorrere una domanda di due righe sopra un registro vuoto; la barra (sottile) solo oltre. */
 .ed-chat-input textarea {
-  flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px; max-height: 84px;
+  flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px; max-height: max(84px, calc(100cqh - 72px));
   overflow-y: auto; scrollbar-width: thin; padding: 7px 8px; line-height: 1.4;
   border: 1px solid var(--sn-border); border-radius: 8px;
   background: var(--sn-bg); color: var(--sn-fg); font-size: 12px;
