@@ -107,7 +107,6 @@ test('nome lungo con markup ed emoji: si legge come testo, accorciato; aspetto c
   await shell.screenshot({ path: 'tests/.shots/v1069-chiaro.png' });
   await shell.emulateMedia({ colorScheme: 'dark' });
   await shell.screenshot({ path: 'tests/.shots/v1069-scuro.png' });
-  await shell.setViewportSize?.({ width: 520, height: 600 }).catch(() => {});
 });
 
 test('la risposta sulla modifica dei file si vede nella pagina Sicurezza e si toglie', async () => {
