@@ -110,7 +110,17 @@
       dellIncognito.unshift(full);
       return full;
     }
-    return (await apri()).aggiungi(full) || full;
+    try {
+      return (await apri()).aggiungi(full) || full;
+    } catch (e) {
+      nonSalvata(e);
+      return full;
+    }
+  }
+
+  // Chi scrive la cronologia sta consegnando una risposta già pagata: un disco pieno o un file bloccato perde la voce, mai la risposta.
+  function nonSalvata(e) {
+    console.warn('[Filo cronologia AI] voce non salvata:', (e && e.message) || e);
   }
 
   // Una voce sola, senza svuotare tutto: il suo mese si riscrive, e il testo sparisce dal disco.
