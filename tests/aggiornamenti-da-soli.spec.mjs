@@ -252,7 +252,7 @@ for (const s of SISTEMI) test(`«aggiornati» in chat, anche con la carta chiusa
   await chat.locator('#input').fill('installa la versione nuova');
   await chat.locator('#sendBtn').click();
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'si installa quando chiudi Filo' })).toBeVisible({ timeout: 10_000 });
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: ALLA_CHIUSURA });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: s.allaChiusura });
   // La riga del diario, nella parte compressa «Come ha lavorato», dice la versione.
   await expect(chat.getByText('Scarico la versione 9.9.9', { exact: false }).first()).toBeAttached({ timeout: 5_000 });
   expect((await impostazioni(app)).aggiornamenti.automatici, 'installare una versione non riaccende l\'opzione').toBe(false);
