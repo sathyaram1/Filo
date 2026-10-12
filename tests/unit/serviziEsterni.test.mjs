@@ -285,6 +285,10 @@ function vociMorte(analisi) {
     if (prove.length && !v.dove.some((f) => prove.some((p) => analisi.testi.get(f)?.senzaCommenti.includes(p)))) {
       out.push(`${v.id}: «${prove.join('», «')}» non compare più in ${v.dove.join(', ')}`);
     }
+    // Un indirizzo rimasto in una costante non è un uso: senza una chiamata nei suoi file serve la «prova» di come parte.
+    if (SE.SERVIZI.includes(v) && !v.nellaLibreria && !prove.length && !v.dove.some((f) => analisi.chiamate.has(f))) {
+      out.push(`${v.id}: nessun file del suo «dove» fa chiamate di rete; se parte in un altro modo (un'immagine, una finestra) scrivilo nella «prova»`);
+    }
     if (v.nellaLibreria) continue;
     for (const b of v.base) if (!fissi.some((u) => SE.copre(b, u.url))) out.push(`${v.id}: nessun indirizzo del codice sta più sotto ${b}`);
   }
