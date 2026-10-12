@@ -50,13 +50,13 @@ export function corseVerdi(runs) {
 }
 
 /**
- * Il primo sha di `primoGenitore` (main, dal più nuovo) che ha una corsa verde,
- * o ''. Un verde su un commit fuori da quella storia non conta: non è main. PURA.
+ * Il primo sha di `primoGenitore` (main, dal più nuovo) che ha una corsa verde accettata da `valida`,
+ * o ''. Un verde su un commit fuori da quella storia non conta: non è main. PURA (con la domanda iniettata).
  */
-export function scegliUltimoVerde(runs, primoGenitore) {
+export function scegliUltimoVerde(runs, primoGenitore, valida = () => true) {
   const verdi = corseVerdi(runs);
   for (const sha of Array.isArray(primoGenitore) ? primoGenitore : []) {
-    if (verdi.has(sha)) return sha;
+    if (verdi.has(sha) && valida(verdi.get(sha))) return sha;
   }
   return '';
 }
