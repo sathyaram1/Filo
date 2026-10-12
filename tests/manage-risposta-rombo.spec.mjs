@@ -185,7 +185,7 @@ test('tema scuro: la casella del pannello segue i colori della pagina', async ({
     const cs = getComputedStyle(el);
     return [cs.backgroundColor, cs.color];
   });
-  const [fondoMain, testoMain] = await page.locator('#mgClarifyText').evaluate((el) => {
+  const [fondoMain, testoMain] = await page.locator('#mgAcceptComment').evaluate((el) => {
     const cs = getComputedStyle(el);
     return [cs.backgroundColor, cs.color];
   });
