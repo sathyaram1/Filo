@@ -785,16 +785,10 @@
           }
         } else if (data.kind === 'round') {
           // Dopo lo stop la bolla è di apriTurnoFermato: il testo a metà resta dov'è.
-          if (turno.fermato) {
-            // niente da spostare
-          } else if (data.risposta) {
+          if (turno.fermato) streamBubble = streamBubble;
+          else if (data.risposta) {
             rispostaPrima = unisci(rispostaPrima, data.text || testoDelGiro());
-            if (!streamBubble) {
-              streamBubble = document.createElement('div');
-              streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
-              bubblesEl.appendChild(streamBubble);
-            }
-            streamBubble.textContent = rispostaPrima;
+            bollaDellaRisposta().textContent = rispostaPrima;
           } else if (streamBubble && rispostaPrima) {
             pending.aggiungiNota(testoDelGiro());
             streamBubble.textContent = rispostaPrima;
