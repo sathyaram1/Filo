@@ -940,8 +940,7 @@
           bubblesEl.appendChild(filoBubble);
         }
       } else {
-        // Se il testo è la nota dell'ultimo giro con azioni (il giro finale era
-        // muto), la nota esce dal blocco: la frase sta nella bolla e basta.
+        // Il testo uguale all'ultima nota (formato vecchio) non resta anche nel blocco.
         if (r.text) pending.dropNote(r.text);
         filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true });
         bubblesEl.appendChild(filoBubble);
