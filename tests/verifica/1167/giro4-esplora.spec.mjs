@@ -71,7 +71,7 @@ test('due-bottoni: due giri di soli bottoni, poi un giro di lavoro con nota, poi
   try {
     await modelloFinto(app, [
       { text: RISPOSTA, toolCalls: [apriFile(file)] },
-      { text: 'La seconda rata scade il 2 dicembre.', toolCalls: [{ id: 'c1', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ titolo: 'Rata TARI', inizio: '2026-12-02T09:00:00' }) }] },
+      { text: 'La seconda rata scade il 2 dicembre.', toolCalls: [{ id: 'c1', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ data: '2026-12-02', ora: '09:00', titolo: 'Rata TARI' }) }] },
       { text: 'Cerco anche il bollettino.', toolCalls: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"TARI"}' }] },
       { text: '' },
     ]);
