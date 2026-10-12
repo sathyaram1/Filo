@@ -17,6 +17,7 @@ function ricordaEsiti(chat, ts, { azioni, reasoningDetails } = {}) {
   const lista = (Array.isArray(azioni) ? azioni : []).filter((a) => a && a.type);
   const rd = Array.isArray(reasoningDetails) && reasoningDetails.length ? reasoningDetails : null;
   if (!lista.length && !rd) return;
+  if (require('../shim/storage').inIncognito()) chatIncognito.add(chat);
   const k = `${chat}|${ts}`;
   esiti.delete(k);
   esiti.set(k, { azioni: lista, ...(rd ? { reasoningDetails: rd } : {}) });
