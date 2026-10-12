@@ -92,7 +92,7 @@ function decifra(file) {
 
 // Un file che non si decifra (portachiavi sbagliato su Linux, DPAPI di un altro profilo su Windows) si
 // mette da parte, non si cancella. Se il portafoglio aspetta proprio quell'identità, all'avvio dopo si
-// riprova il più recente: tornata la chiave giusta, tutto riparte da solo.
+// riprovano le copie messe da parte: tornata la chiave giusta, tutto riparte da solo.
 function load() {
   if (!canEncrypt()) return null;
   const file = filePath();
