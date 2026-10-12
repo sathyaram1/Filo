@@ -999,7 +999,7 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello, daFuori });
+    await runTurnAndContinue({ userMessage: domanda, images: imagesToSend, daModello, daFuori });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
