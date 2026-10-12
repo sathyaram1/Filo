@@ -11,15 +11,14 @@
   const CHIUDE = 'chiude'; // chiude una parola: il controllo della parola appena scritta
   const TUTTI = Object.freeze([SELEZIONA, CHIUDE]);
   // Niente mousemove: passarci sopra non è chiedere qualcosa, e una pagina ci si aggancerebbe.
-  const TIPI_EVENTO = Object.freeze({
-    mousedown: [SELEZIONA], mouseup: [SELEZIONA], pointerdown: [SELEZIONA], pointerup: [SELEZIONA],
-    touchstart: [SELEZIONA], touchend: [SELEZIONA], dblclick: [SELEZIONA],
-    paste: [CHIUDE], drop: [CHIUDE], compositionend: [CHIUDE],
-  });
-  const EVENTI = Object.freeze(['keydown', 'keyup', ...Object.keys(TIPI_EVENTO)]);
+  const TIPI_EVENTO = Object.freeze({ dblclick: [SELEZIONA], paste: [CHIUDE], drop: [CHIUDE], compositionend: [CHIUDE] });
   const PRESSIONI = new Set(['mousedown', 'pointerdown', 'touchstart']);
   const RILASCI = new Set(['mouseup', 'pointerup', 'touchend']);
+  const EVENTI = Object.freeze(['keydown', 'keyup', ...PRESSIONI, ...RILASCI, ...Object.keys(TIPI_EVENTO)]);
   const SPOSTA = /^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/;
+  // Oltre il tremolio di un clic (e di un tocco, che Chromium tiene fermo fino a 15 px): sotto, nessun trascinamento.
+  const SPOSTAMENTO_PX = Object.freeze({ puntatore: 3, dito: 15 });
+  const PRESSIONE_LUNGA_MS = 400;
 
   // Seleziona solo Maiusc con un tasto di spostamento o «seleziona tutto»; chiude una parola uno spazio, una
   // punteggiatura, Invio. Le tastiere che non dicono il tasto (virtuali, IME) possono aver chiuso una parola.
