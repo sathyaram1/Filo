@@ -1561,6 +1561,36 @@ if (isMain) {
     if (r.outcome === 'ok') { console.log('Biglietto sporcato: da qui ciò che scrivi nasce non fidato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
+  } else if (cmd === 'git-credenziali') {
+    // Lo chiama git, mai una persona: stdout porta solo le credenziali, e un no è uno stdout vuoto (git non si autentica).
+    const azione = args[0];
+    const richiesta = await leggiStdin();
+    if (azione !== 'get') process.exit(0);
+    if (!richiestaPerServer(leggiRichiestaGit(richiesta))) process.exit(0);
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const biglietto = mano.ticket || readTicket(ROOT);
+    if (!biglietto) { console.error('git-credenziali: nessun biglietto del giro, niente token per filo-security.'); process.exit(0); }
+    const r = await gitToken(biglietto);
+    if (r.outcome !== 'ok') {
+      console.error(`git-credenziali: niente token per filo-security (${r.reason}${r.detail ? `: ${r.detail}` : ''}).`);
+      process.exit(0);
+    }
+    process.stdout.write(rigaCredenziali(r.token, r.scadeIl));
+    process.exit(0);
+  } else if (cmd === 'ramo-server') {
+    const ramo = String(args[0] || '').trim();
+    const sha = String(args[1] || data.sha || '').trim();
+    if (!ramo) { console.error('ramo-server vuole il ramo spinto su filo-security. Il server non è stato chiamato.'); process.exit(1); }
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const biglietto = mano.ticket || readTicket(ROOT);
+    if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
+    const r = await ramoServer(biglietto, ramo, sha);
+    if (r.outcome === 'ok') {
+      console.log(`Ramo del server registrato: ${ramo} a ${r.sha.slice(0, 12)}${r.ramoFidato ? '' : ' (il registro dice: non fidato)'}.`);
+      process.exit(0);
+    }
+    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
+    console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {
     const r = await compare(args[0], { role: args[1] || '', num: args[2] || '' });
     if (!r.ok) { console.error('confronto non registrato'); process.exit(0); }
