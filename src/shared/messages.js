@@ -204,7 +204,7 @@
     //   server o illeggibile qui (il portafoglio legato a essa non si
     //   raggiunge): l'utente sceglie di ricominciare con un'identità nuova e
     //   un nuovo invito. I file di prima restano accanto.
-    //   { confermato: true } → { ok, state } | { ok:false, status:'needs_confirm'|'identity_ok' }
+    //   { confermato: true } → { ok, state } | { ok:false, status:'needs_confirm'|'identity_ok'|'not_reachable' }
     WALLET_RESET_IDENTITY: 'wallet_reset_identity',
     // WALLET_OWN_KEY_INFO (#629): spesa e residuo che OpenRouter dichiara per
     //   la chiave OpenRouter scritta dall'utente (la pagina Crediti li mostra;
