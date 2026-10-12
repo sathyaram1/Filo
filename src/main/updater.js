@@ -863,6 +863,8 @@ function perProva({ piattaforma = 'win32', versione = '0.2.233', appImage = null
   const registro = { lanciati: [], chiusure: 0, uscite: 0, riaperture: [], installazioni: 0, controlli: 0, risposta: null, avvisi: [] };
   const finto = new EventEmitter();
   finto.install = () => { registro.installazioni++; return true; };
+  // Il punto a cui si aggancia il cancello dei tag: senza, il finto verrebbe fermato come un electron-updater rinominato.
+  finto.getUpdateInfoAndProvider = async () => ({ info: null, provider: null });
   finto.checkForUpdates = async () => {
     registro.controlli++;
     const r = registro.risposta;
