@@ -177,6 +177,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
       return { azioni: s.azioni.length ? s.azioni : ((e && e.azioni) || []), reasoningDetails: (e && e.reasoningDetails) || s.reasoningDetails };
     },
     osserva,
+    immagini: immagini ? (m) => foto.get(FC().chiave(m)) || null : null,
   });
   ancore[lato] = f.ancora;
   return {
