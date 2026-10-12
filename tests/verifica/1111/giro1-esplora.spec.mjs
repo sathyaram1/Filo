@@ -100,26 +100,6 @@ test('textarea: correggo a tastiera una parola, gli altri segni restano mentre l
   await expect(segni(page)).toHaveText(['xqprima1']);
 });
 
-test('textarea: correzione dal correttore di Filo (Risolvi), gli altri restano e Ctrl+Z la annulla', async ({ app, openTab, testServer }) => {
-  test.setTimeout(90_000);
-  const page = await apri(app, openTab, testServer);
-  await page.locator('#ta').click();
-  await page.keyboard.type('oggi xqprima1 poi xqseconda2 e xqterza3 fine ');
-  await expect(segni(page)).toHaveText(['xqprima1', 'xqseconda2', 'xqterza3'], { timeout: 8000 });
-  await app.evaluate(() => { globalThis.__ritardo = 2500; });
-  await sorveglia(page, '#ta');
-  await page.evaluate(() => {
-    const ta = document.getElementById('ta'); const i = ta.value.indexOf('xqseconda2');
-    globalThis.SN_SPELLCHECK.applyFix(ta, { start: i, end: i + 10 }, 'seconda', { expectedSegment: 'xqseconda2' });
-  });
-  expect(await page.locator('#ta').inputValue()).toBe('oggi xqprima1 poi seconda e xqterza3 fine ');
-  await pausa(5000);
-  controllaStati(await stati(page), ['xqprima1', 'xqterza3']);
-  await page.keyboard.press('Control+z');
-  expect(await page.locator('#ta').inputValue()).toBe('oggi xqprima1 poi xqseconda2 e xqterza3 fine ');
-  await expect(segni(page)).toHaveText(['xqprima1', 'xqseconda2', 'xqterza3'], { timeout: 8000 });
-});
-
 test('textarea: tasto destro sul segno e clic sulla correzione nel menu, gli altri segni restano', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await apri(app, openTab, testServer);
@@ -136,6 +116,16 @@ test('textarea: tasto destro sul segno e clic sulla correzione nel menu, gli alt
   await expect(page.locator('#ta')).toHaveValue('oggi xqprima1 poi seconda e xqterza3 fine ');
   await pausa(5000);
   controllaStati(await stati(page), ['xqprima1', 'xqterza3']);
+  await expect(segni(page)).toHaveText(['xqprima1', 'xqterza3']);
+  // Due correzioni di fila a scan in volo, poi annulla: i segni non toccati restano sempre.
+  await sorveglia(page, '#ta');
+  const c = await segni(page).nth(1).boundingBox();
+  await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2, { button: 'right' });
+  await page.locator('.sn-menu').getByText('terza', { exact: true }).first().click();
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#ta')).toHaveValue('oggi xqprima1 poi seconda e xqterza3 fine ');
+  await pausa(5000);
+  controllaStati(await stati(page), ['xqprima1']);
   await expect(segni(page)).toHaveText(['xqprima1', 'xqterza3']);
 });
 
