@@ -42,7 +42,6 @@
     if (e.shiftKey || (Number(e.detail) || 0) >= 2) return true;
     if (!RILASCI.has(e.type) || !pressione) return false;
     const famiglia = famigliaDi(e);
-    if (pressione.famiglia !== famiglia) return false;
     if (luogo.x !== null && pressione.x !== null
       && Math.hypot(luogo.x - pressione.x, luogo.y - pressione.y) > SPOSTAMENTO_PX[famiglia]) return true;
     return famiglia === 'dito' && adesso - pressione.t >= PRESSIONE_LUNGA_MS;
