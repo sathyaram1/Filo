@@ -108,12 +108,16 @@ test('le domande arrivate mentre la pratica è aperta aprono il pannello; chiuso
   await expect(page.locator('#mgSide')).toBeHidden();
 
   // Il lavoro si ferma su una domanda mentre l'owner guarda la pratica.
-  await page.evaluate((fb) => window.__mgTest.applyLiveDelta({ upserts: [fb], removedIds: [] }), FB_DOMANDE);
+  const arriva = (fb) => page.evaluate((f) => {
+    window.__mgTest.setData([f]);
+    return window.__mgTest.rerenderIfIdle(f._id);
+  }, fb);
+  expect(await arriva(FB_DOMANDE)).toBe(true);
   await expect(page.locator('#mgSideRispostaText')).toBeVisible();
   await expect(page.locator('#mgSideBody')).toContainText('Quale pulsante X intendi?');
 
   await page.locator('#mgSideClose').click();
-  await page.evaluate((fb) => window.__mgTest.applyLiveDelta({ upserts: [{ ...fb, name: 'Pulsante X (rinominato)' }], removedIds: [] }), FB_DOMANDE);
+  expect(await arriva({ ...FB_DOMANDE, name: 'Pulsante X rinominato' })).toBe(true);
   await expect(page.locator('#mgDetail')).toBeVisible();
   await expect(page.locator('#mgSide')).toBeHidden();
 });
