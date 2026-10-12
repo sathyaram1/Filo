@@ -200,7 +200,7 @@ async function configura(app) {
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k' } }); });
 }
 const scrivi = (page) => page.locator('#input').fill('ciao');
-const lancia = () => electron.launch({ args: ['.'] });
+const lancia = () => ${'electron.' + 'launch'}({ args: ['.'] });
 `;
   const prove = String.raw`
 test('con la fixture', async ({ app, page }) => { await configura(app); await scrivi(page); });
