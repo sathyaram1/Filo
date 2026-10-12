@@ -619,6 +619,10 @@
     options_cookies_riquadri_title: 'Contenuti incorporati con i cookie riattivati',
     options_cookies_riquadri_desc: 'Post, video e mappe di questi servizi, dentro le pagine di altri siti, tengono i loro cookie.',
     options_cookies_riquadri_remove: 'Togli',
+    options_cookies_riquadri_modello: 'Riconosci con un modello i contenuti incorporati rotti',
+    options_cookies_riquadri_modello_desc:
+      'Se un post, un video o una mappa di un altro sito resta vuoto e Filo non lo conosce, a un modello va la foto ' +
+      'del solo riquadro. Spento, quel riquadro lo riattivi col tasto destro.',
     riquadro_cookie_domanda: 'Attivo i cookie di %s per questo contenuto?',
     riquadro_cookie_si: 'Sì',
     riquadro_cookie_no: 'No',
