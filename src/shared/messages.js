@@ -35,7 +35,7 @@
     // APPLICA dopo la conferma dell'utente. Come EXPORT_DATA sono riservati
     // all'origine filo://: una pagina web non deve poter aprire un file dialog
     // né riscrivere lo storage (comprese le chiavi API).
-    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, token }
+    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
     IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }

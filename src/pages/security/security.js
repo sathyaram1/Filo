@@ -187,10 +187,13 @@
       const prev = await chrome.runtime.sendMessage({ type: MSG.IMPORT_DATA_PREVIEW });
       if (!prev || !prev.ok) {
         if (prev && prev.canceled) return; // dialog annullato: nessun messaggio
-        showImportHint(
-          I18n.t(prev && prev.error === 'invalid_file' ? 'security_import_invalid' : 'security_import_fail'),
-          true,
-        );
+        const errori = {
+          invalid_file: 'security_import_invalid',
+          damaged_file: 'security_import_damaged',
+          compressed_file: 'security_import_compressed',
+          encrypted_file: 'security_import_encrypted',
+        };
+        showImportHint(I18n.t(errori[prev && prev.error] || 'security_import_fail'), true);
         return;
       }
 
@@ -209,12 +212,23 @@
         prev.chats ? conta(prev.chats, 'chat con Filo', 'chat con Filo') : '',
         prev.pagine ? conta(prev.pagine, 'pagina visitata', 'pagine visitate') : '',
       ].filter(Boolean).join(' e ');
+      // Quello che del file non entra si dice prima del sì, col numero (#1088).
+      const manca = [
+        prev.immaginiPerse ? I18n.t('security_import_images_lost').replace('%1', String(prev.immaginiPerse)) : '',
+        prev.filoPerso ? I18n.t('security_import_filo_lost') : '',
+        prev.pagineFuori ? I18n.t('security_import_pages_out')
+          .replace('%1', String(prev.pagineFuori))
+          .replace('%2', String(prev.tettoPagine || ''))
+          + (prev.pagineMieFuori ? ' ' + I18n.t('security_import_pages_out_mine').replace('%1', String(prev.pagineMieFuori)) : '') : '',
+      ].filter(Boolean);
       const text = I18n.t('security_import_confirm_text')
+        .replace('%6', I18n.t(prev.pagineMieFuori ? 'security_import_escono_mie' : 'security_import_nulla_perso'))
         .replace('%1', prev.fileName || '')
         .replace('%2', when)
         .replace('%3', sezioni)
         .replace('%4', immagini)
-        .replace('%5', delFilo ? `, più ${delFilo}` : '');
+        .replace('%5', delFilo ? `, più ${delFilo}` : '')
+        + (manca.length ? `\n\n${manca.join('\n')}` : '');
 
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({

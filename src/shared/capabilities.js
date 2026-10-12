@@ -307,7 +307,7 @@
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
       invoke: 'Alt+S (Ctrl+Alt+S su Mac), oppure menu del tasto destro → "Salva per dopo".',
-      doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla.',
+      doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla. Ne tiene al massimo 1000: oltre, la più vecchia esce dall’elenco e un avviso nella finestra dice quale.',
     },
     {
       id: 'open-for-later', title: 'Aperti per dopo', category: 'save',
@@ -604,7 +604,7 @@
     },
     {
       id: 'data-export-import', title: 'Esporta e importa i tuoi dati', category: 'settings',
-      desc: 'Salva tutto quello che Filo sa di te (memorie degli agenti, pagine salvate, cronologia, appunti copiati, costi e impostazioni) in un unico file .zip, e lo ricarica quando vuoi — sullo stesso computer come backup, o su un altro per portarti dietro il tuo Filo. Le immagini copiate finiscono nell\'archivio come file veri, sfogliabili, e al ritorno tornano al loro posto. Prima di scrivere qualsiasi cosa, l\'importazione ti dice cosa contiene il file scelto (di quando è il backup, quante sezioni e quante immagini) e chiede conferma: quello che hai già non viene cancellato, le liste si uniscono senza duplicati e, dove lo stesso dato esiste da entrambe le parti, vince quello del backup. Le impostazioni ripristinate (tema, sicurezza, cookie) diventano attive subito, senza riavviare.',
+      desc: 'Salva tutto quello che Filo sa di te (memorie degli agenti, pagine salvate, cronologia, appunti copiati, costi e impostazioni) in un unico file .zip, e lo ricarica quando vuoi — sullo stesso computer come backup, o su un altro per portarti dietro il tuo Filo. Le immagini copiate finiscono nell\'archivio come file veri, sfogliabili, e al ritorno tornano al loro posto. Prima di scrivere qualsiasi cosa, l\'importazione ti dice cosa contiene il file scelto (di quando è il backup, quante sezioni e quante immagini) e chiede conferma: quello che hai già non viene cancellato, le liste si uniscono senza duplicati e, dove lo stesso dato esiste da entrambe le parti, vince quello del backup. Le impostazioni ripristinate (tema, sicurezza, cookie) diventano attive subito, senza riavviare. Della spesa resta, mese per mese, la più alta fra adesso e il backup; i crediti, le schede aperte e gli avvisi restano quelli di adesso, e dei timer e delle sveglie tornano quelli che devono ancora suonare (le ricorrenti puntate sulla prossima volta). Se una parte del file non si legge (immagini, chat e pagine visitate) o se le pagine salvate supererebbero le 1000, la conferma lo dice col numero prima del sì.',
       invoke: 'Impostazioni → Sicurezza, in fondo: "Esporta dati (.zip)" e "Importa dati (.zip)".',
       doesNot: 'Non è un backup automatico né in cloud: il file lo salvi tu, dove vuoi. Importando non si cancella nulla di quello che c\'è già, quindi non è un modo per riportare Filo a uno stato passato esatto. Legge solo archivi esportati da Filo, non backup di altri browser.',
     },
