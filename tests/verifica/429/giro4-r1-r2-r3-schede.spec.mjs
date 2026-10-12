@@ -19,9 +19,8 @@ test('r1 un titolo d\'articolo non resta tagliato mentre la scheda attiva accant
   const s = await schede(shell);
   const attiva = s.find((x) => x.att);
   const lunga = s.find((x) => x.nome.startsWith('Previsioni'));
-  // Il nome mancante (156 px) sta nel vuoto della scheda attiva: o il nome è intero, o l'attiva non ha vuoto da cedere.
-  const vuotoAttiva = attiva.w - (attiva.testo > attiva.posto ? attiva.w : 0) - 64 - 63;
-  expect(lunga.testo - lunga.posto <= 0.5 || vuotoAttiva < 24,
+  // Con la fila libera Gestione attiva è larga 127 px: o il nome lungo è intero, o l'attiva non ha vuoto da cedere.
+  expect(lunga.testo - lunga.posto <= 0.5 || attiva.w <= 150,
     `«Previsioni…» ${lunga.posto}/${lunga.testo} px, Gestione attiva larga ${attiva.w} px`).toBe(true);
 });
 
