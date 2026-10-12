@@ -48,9 +48,9 @@ async function chiudiConEsc(app) {
 }
 
 // Clic nella pagina (o nella barra) e tempo fino al menu in vista, sullo stesso orologio di sistema.
-async function apriEMisura(app, pagina, clic, testo) {
+async function apriEMisura(app, pagina, clic, testo, arg = null) {
   await azzera(app);
-  const t0 = await pagina.evaluate(clic);
+  const t0 = await pagina.evaluate(clic, arg);
   await expect.poll(() => comparsoAlle(app), { timeout: 5000 }).toBeGreaterThan(0);
   const ms = (await comparsoAlle(app)) - t0;
   const menu = await menuAperto(app);
@@ -59,9 +59,11 @@ async function apriEMisura(app, pagina, clic, testo) {
   return { ms, ...(await infoMenu(app)) };
 }
 
-const clicSullaHome = (comando) => new Function(
-  `const t = Date.now(); document.querySelector('#dashControls .dash-ctrl[data-command="${comando}"]').click(); return t;`,
-);
+const clicSullaHome = (comando) => {
+  const t = Date.now();
+  document.querySelector(`#dashControls .dash-ctrl[data-command="${comando}"]`).click();
+  return t;
+};
 
 const tastoDestroSullaScheda = () => {
   const el = document.querySelector('.tab.active') || document.querySelector('.tab');
@@ -86,11 +88,11 @@ test('dalla home Impostazioni e Profilo compaiono subito, nella finestra nata co
   const nato = await infoMenu(app);
   await osserva(app);
 
-  const impostazioni = await apriEMisura(app, home, clicSullaHome('settings'), 'Preferenze');
+  const impostazioni = await apriEMisura(app, home, clicSullaHome, 'Preferenze', 'settings');
   await chiudiConEsc(app);
-  const profilo = await apriEMisura(app, home, clicSullaHome('account'), 'Nuova finestra incognito');
+  const profilo = await apriEMisura(app, home, clicSullaHome, 'Nuova finestra incognito', 'account');
   await chiudiConEsc(app);
-  const ancora = await apriEMisura(app, home, clicSullaHome('settings'), 'Preferenze');
+  const ancora = await apriEMisura(app, home, clicSullaHome, 'Preferenze', 'settings');
   console.log(`[#1090] dalla home: ${impostazioni.ms} ms, ${profilo.ms} ms, ${ancora.ms} ms`);
 
   for (const m of [impostazioni, profilo, ancora]) expect(m.id, 'ogni apertura riusa la stessa finestra').toBe(nato.id);
@@ -164,7 +166,7 @@ test('chiuso e subito riaperto, il menu resta in vista e la scelta funziona', as
   const home = await homeAperta(openTab);
   await expect.poll(async () => { const m = await infoMenu(app); return !!m && m.carica; }, { timeout: 8000 }).toBe(true);
   await osserva(app);
-  await apriEMisura(app, home, clicSullaHome('settings'), 'Preferenze');
+  await apriEMisura(app, home, clicSullaHome, 'Preferenze', 'settings');
   // Esc e, nell'istante in cui la finestra si nasconde, di nuovo Impostazioni.
   const esito = await app.evaluate(async ({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
@@ -193,11 +195,11 @@ test('il menu riusato segue il tema chiaro e scuro a ogni apertura', async ({ ap
   const sfondo = async () => (await menuAperto(app)).evaluate(() => getComputedStyle(document.querySelector('.menu')).backgroundColor);
   try {
     await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
-    await apriEMisura(app, home, clicSullaHome('settings'), 'Preferenze');
+    await apriEMisura(app, home, clicSullaHome, 'Preferenze', 'settings');
     expect(await sfondo()).toBe('rgba(30, 29, 27, 0.98)');
     await chiudiConEsc(app);
     await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'light'; });
-    await apriEMisura(app, home, clicSullaHome('settings'), 'Preferenze');
+    await apriEMisura(app, home, clicSullaHome, 'Preferenze', 'settings');
     expect(await sfondo()).toBe('rgba(248, 246, 240, 0.98)');
     await chiudiConEsc(app);
   } finally {
