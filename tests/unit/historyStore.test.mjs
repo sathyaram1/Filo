@@ -143,6 +143,32 @@ test('patch accoda una riga, e il dato c\'è anche dopo un riavvio', async () =>
   assert.equal(await H.patch('inesistente', { servedBy: 'x' }), null);
 });
 
+test('il disco che rifiuta la riga perde la voce, non la richiesta: append e patch non falliscono', async () => {
+  const v = await H.append(domanda('prima del guasto'));
+  const prima = (await H.list()).length;
+  const vero = fs.appendFileSync;
+  const avvisi = console.warn;
+  console.warn = () => {};
+  fs.appendFileSync = () => { const e = new Error('ENOSPC: no space left on device'); e.code = 'ENOSPC'; throw e; };
+  let nuova;
+  let patch;
+  try {
+    nuova = await H.append(domanda('col disco pieno'));
+    patch = await H.patch(v.id, { servedBy: 'DeepInfra' });
+  } finally {
+    fs.appendFileSync = vero;
+    console.warn = avvisi;
+  }
+  assert.equal(typeof nuova.id, 'string');
+  assert.equal(nuova.output, 'risposta a col disco pieno');
+  assert.equal(patch, null);
+  const dopo = await H.list();
+  assert.equal(dopo.length, prima, 'la voce non scritta non compare come salvata');
+  // Tornato il disco, la cronologia riprende.
+  await H.append(domanda('dopo il guasto'));
+  assert.equal((await H.list())[0].input.userMessage, 'dopo il guasto');
+});
+
 test('una voce tolta dalla Cronologia non resta in nessun file della cartella dati', async () => {
   const v = await H.append(domanda('IBAN-privato-1065'));
   await H.patch(v.id, { servedBy: 'Fornitore' });
