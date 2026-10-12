@@ -110,7 +110,7 @@ const VERSIONI = Object.freeze({
 /** Il nome di ogni tariffa, per la nota del rapporto. */
 export const NOMI_TARIFFA = Object.freeze({
   opus: 'Opus 5', 'opus-5-5': 'Opus 5.5', sonnet: 'Sonnet 5', 'sonnet-4': 'Sonnet 4.6',
-  haiku: 'Haiku 4.5', fable: 'Fable 5.1', 'fable-5': 'Fable 5',
+  haiku: 'Haiku 4.5', 'haiku-5-5': 'Haiku 5.5', fable: 'Fable 5.1', 'fable-5': 'Fable 5',
 });
 
 /**
