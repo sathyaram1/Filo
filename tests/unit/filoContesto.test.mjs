@@ -396,10 +396,10 @@ test('un messaggio con più foto di quante ne stiano nei tetti tiene le prime ch
   const memoria = { [`c|${tante[0].ts}`]: [0, 1, 2, 3, 4].map(pesante) };
   const f = FC.finestra(tante, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(memoria) });
   const u = f.messaggi.find((m) => m.role === 'user');
-  const n = Math.floor(FC.MAX_CARATTERI_IMMAGINI / pesante(0).length);
-  assert.ok(n > 0 && n < 5);
-  assert.deepEqual(fotoNel(u), [0, 1, 2, 3, 4].slice(0, n).map(pesante));
-  assert.match(u.content[u.content.length - 1].text, new RegExp(`anche altre ${5 - n} immagini che non hai più davanti`));
+  assert.equal(Math.floor(FC.MAX_CARATTERI_IMMAGINI / pesante(0).length), 4);
+  assert.deepEqual(fotoNel(u), [0, 1, 2, 3].map(pesante));
+  assert.match(u.content[u.content.length - 1].text, /anche un'altra immagine che non hai più davanti/);
+  assert.match(FC.notaImmagini(3, { altre: true }), /anche altre 3 immagini che non hai più davanti/);
   // Più di sedici foto in un messaggio: tornano le prime sedici, una la dice la nota.
   const diciassette = conFoto(scambio('c', 1, 'tutte', 'Viste.'), 17);
   const mem17 = { [`c|${diciassette[0].ts}`]: Array.from({ length: 17 }, (_, k) => `data:image/png;base64,${k}`) };

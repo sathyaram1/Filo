@@ -204,3 +204,32 @@ test('le foto di una chat in incognito se ne vanno con l\'incognito, quelle dell
   expect(testo(segreta.find((m) => testo(m).includes('e questa?')))).toContain('un\'immagine che non hai più davanti');
   expect(normale.filter((m) => fotoDi(m).length).flatMap(fotoDi)).toEqual([png]);
 });
+
+test('la chat riaperta con Filo ancora acceso mostra le foto che il modello ha ancora davanti', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await preparaModello(app, [{ text: 'Vedo ceci e farina.' }, { text: 'Ancora ceci.' }]);
+  const home = await apriHome(openTab);
+  await incollaFoto(home, ['#c0392b', '#2e86c1']);
+  await scrivi(home, 'cosa vedi?');
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Vedo ceci' })).toBeVisible({ timeout: 15_000 });
+  const [primo] = await chiamate(app);
+  const mandate = fotoDi(primo[primo.length - 1]);
+  const id = await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list()).map((c) => c.id).find(Boolean));
+  // La stessa chat riaperta (dalla Cronologia, o la home ricaricata).
+  await home.goto(`filo://newtab/?chat=${encodeURIComponent(id)}`);
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Vedo ceci' })).toBeVisible({ timeout: 15_000 });
+  const viste = home.locator('.dash-bubble-user img.dash-bubble-img');
+  await expect(viste).toHaveCount(2);
+  expect(await viste.evaluateAll((els) => els.map((e) => e.getAttribute('src')))).toEqual(mandate);
+  await expect(home.locator('.dash-bubble-note', { hasText: 'non conservat' })).toHaveCount(0);
+  await scrivi(home, 'e adesso?');
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Ancora' })).toBeVisible({ timeout: 15_000 });
+  const [, secondo] = await chiamate(app);
+  expect(secondo.filter((m) => fotoDi(m).length).flatMap(fotoDi)).toEqual(mandate);
+
+  // Tolte dalla memoria (Filo riaperto), la chat torna a dire quante erano.
+  await app.evaluate((_e, id) => globalThis.SN_CONTESTO_FILO.dimentica(id), id);
+  await home.goto(`filo://newtab/?chat=${encodeURIComponent(id)}`);
+  await expect(home.locator('.dash-bubble-note', { hasText: '2 immagini, non conservate' })).toBeVisible({ timeout: 15_000 });
+  await expect(viste).toHaveCount(0);
+});
