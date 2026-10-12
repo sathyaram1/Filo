@@ -1705,12 +1705,12 @@
     // #711 — l'esito delle etichette di origine delle immagini che l'utente ha davanti
     // quando chiede all'Aiuto. Il payload può scriverlo chiunque parli al canale: dei
     // numeri si tengono solo i numeri, e le frasi (nomi scritti da chi ha fatto il file) viaggiano imbustate.
-    // #946 — gli esiti delle immagini allegate in messaggi precedenti della chat della Home: le immagini
-    // non tornano nei turni dopo, l'esito sì. I blocchi li ha composti il main, con le frasi del file già imbustate.
+    // #946 — gli esiti delle immagini allegate in messaggi precedenti della chat della Home: le etichette stanno nei
+    // byte del file, non nei pixel che tornano al modello (#1166). I blocchi li ha composti il main, con le frasi del file già imbustate.
     origineGiaLettaInChat: (blocchi) => {
       const lista = (Array.isArray(blocchi) ? blocchi : []).filter((b) => typeof b === 'string' && b);
       if (!lista.length) return '';
-      const testa = `(Sistema: ${esterno().perCanaleSistema('nei messaggi precedenti di questa chat l’utente ha allegato immagini che in questo turno non ti arrivano; qui sotto l’esito delle loro etichette di origine, letto allora, dal messaggio più vecchio')}.)`;
+      const testa = `(Sistema: ${esterno().perCanaleSistema('nei messaggi precedenti di questa chat l’utente ha allegato immagini; qui sotto l’esito delle loro etichette di origine, lette allora dal file e non dai pixel, dal messaggio più vecchio')}.)`;
       return [testa, ...lista.map((b, i) => `— Messaggio con immagini n. ${i + 1}:\n${b}`)].join('\n\n');
     },
     origineImmaginiAiuto: (o) => {
