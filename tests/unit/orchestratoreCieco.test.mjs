@@ -67,6 +67,10 @@ test('il comando installato, dalla shell, acceca qualunque sia la cartella del p
     assert.equal(JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
     assert.equal(JSON.parse(run(JSON.stringify(prima(true))).stdout).hookSpecificOutput.permissionDecision, 'deny');
     assert.equal(JSON.parse(run(JSON.stringify(cambio())).stdout).decision, 'block');
+    for (const source of ['project_settings', 'local_settings', 'skills']) {
+      assert.equal(JSON.parse(run(JSON.stringify(cambio({ source }))).stdout).decision, 'block', source);
+    }
+    assert.equal(run(JSON.stringify(cambio({ source: 'policy_settings' }))).stdout, '');
     assert.equal(run(JSON.stringify(dopo({ agent_id: 'w1' }))).stdout, '');
     assert.equal(run(JSON.stringify(dopo({ session_id: 's2' }))).stdout, '');
     assert.equal(run('non json').status, 0);
