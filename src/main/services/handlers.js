@@ -1130,6 +1130,15 @@ const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo
 const SOLLECITO_DOPO_RIFIUTO = '[Il tuo ultimo messaggio è vuoto. Il testo che hai scritto insieme alle azioni l\'utente non l\'ha letto come risposta, '
   + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra.]';
 
+// Azioni che mettono un bottone in chat e basta: il loro esito si sa già quando le si chiama.
+const AZIONI_SOLO_BOTTONE = new Set(['APRI_FILE']);
+// Un giro di sole azioni così non dà al modello niente da leggere: il testo scritto insieme è già la risposta, non una
+// nota di lavoro, anche se il giro dopo aggiunge una frase («ti ho messo il bottone», #1167).
+const giroDiSoliBottoni = (results) => results.length > 0 && results.every(({ action, res }) => !!res
+  && !res.rejected && res.executed && res.kept && !res.needsConfirm && !(res.output && res.output.blocked)
+  && AZIONI_SOLO_BOTTONE.has(String((action && action.type) || '').toUpperCase()));
+const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
 function refreshProxyRulesAllWindows() {
