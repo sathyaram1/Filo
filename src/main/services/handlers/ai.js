@@ -95,7 +95,6 @@ module.exports = function register(on, ctx) {
   }
 
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
-  const { daFilo } = require('./origine');
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
   // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
   function fermataDalTetto(msg, sender) {
