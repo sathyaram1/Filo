@@ -35,11 +35,12 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
   usa un modello gli manda quello che serve per rispondere, cioè le memorie,
   gli appunti, il testo delle pagine. Quei messaggi vanno a OpenRouter e al
   fornitore che serve il modello (§4).
-- **Il server di Filo riceve** i feedback che mandi, il portafoglio dei
-  crediti con una riga per ogni chiamata ai modelli (funzione, modello, token
-  e costo, senza il testo), i voti della bacheca e, se partecipi al red team,
-  i tuoi tentativi. Se accedi con Google, anche email, nome e quanto usi ogni
-  funzione (§4, §6).
+- **Il server di Filo riceve** i feedback che mandi, l'identità anonima
+  dell'installazione, il portafoglio dei crediti con una riga per ogni
+  chiamata ai modelli (funzione, modello, token e costo, senza il testo), i
+  voti della bacheca, il nome del sito su cui usi l'Aiuto e, se partecipi al
+  red team, i tuoi tentativi. Se accedi con Google, anche email, nome e quanto
+  usi ogni funzione (§6).
 - **I feedback che invii** (testo, indirizzo della pagina, allegati) partono
   cifrati per l'owner del progetto. Li leggono lui, gli agenti che lavorano
   la segnalazione e i giudici automatici, cioè dei modelli che la
@@ -172,14 +173,13 @@ sono i dati **più sensibili** che l'app tocca. La nostra posizione:
   quando ne usa uno gli manda quello che serve per rispondere: le memorie
   (`src/shared/filoMemory.js`, `renderMemoryForPrompt`), gli appunti e i
   titoli delle schede aperte nel messaggio della home
-  (`src/shared/constants.js`), il testo delle pagine su cui lavori
-  (l'elenco funzione per funzione sta in `transparency/privacy.md`, «I
-  modelli»), i
+  (`src/shared/constants.js`), il testo delle pagine su cui lavori (l'elenco
+  funzione per funzione sta in `transparency/privacy.md`, «I modelli»), i
   candidati di una ricerca fra i tuoi documenti
   (`src/main/services/documentiIndice.js`), il testo delle schede che chiudi,
   per il riassunto con cui la cronologia le ritrova
-  (`src/main/services/handlers.js`, `enrichArchivedTab`). Quei messaggi vanno a OpenRouter, che
-  li passa al fornitore che serve il modello
+  (`src/main/services/handlers.js`, `enrichArchivedTab`). Quei messaggi vanno
+  a OpenRouter, che li passa al fornitore che serve il modello
   (`src/main/services/providers/openrouter.js`). Cosa ne fanno lo dicono le
   loro condizioni: questo documento non promette niente al posto loro.
 - **Quando attiveremo il multi-dispositivo** (telefono, TV…), il principio
@@ -232,8 +232,9 @@ Accanto viaggiano l'impronta dell'identificativo (`clientIdHash`), che serve a
 riconoscere i tuoi feedback senza decifrarli, e, se questa copia di Filo ha un
 portafoglio, il suo pseudonimo, che serve a darti il premio per la
 segnalazione. Restano in chiaro anche il titolo breve, il titolo della
-pagina, lo user agent e i nomi dei file allegati. "In chiaro" vuol dire non cifrato, non pubblico: chi può
-leggere il documento lo dicono le regole del §7.
+pagina, lo user agent e i nomi dei file allegati. "In chiaro" vuol dire non
+cifrato, non pubblico: chi può leggere il documento lo dicono le regole del
+§7.
 
 Questi dati vengono salvati su Google Firebase (Firestore + Storage) e ci
 servono solo per correggere bug e migliorare l'app. Oltre alle persone il
@@ -244,10 +245,31 @@ lavorano la segnalazione. **Non includere in un feedback dati che non vuoi
 condividere.**
 
 Filo stesso, quando si accorge di non saper fare una cosa che gli chiedi o
-che qualcosa non ha funzionato, può mandare da solo una segnalazione generica: senza le tue parole e senza
-l'indirizzo della pagina, con un avviso che ti lascia annullarla. Si spegne
-in Sicurezza, «Segnalazione automatica dei problemi»
-(`src/shared/autoFeedback.js`).
+che qualcosa non ha funzionato, può mandare da solo una segnalazione
+generica: senza le tue parole e senza l'indirizzo della pagina, con un avviso
+che ti lascia annullarla. Si spegne in Sicurezza, «Segnalazione automatica dei
+problemi» (`src/shared/autoFeedback.js`).
+
+### Cos'altro riceve il server di Filo
+
+I feedback non sono l'unica cosa che arriva al server. Ci sono anche:
+
+- l'**identità anonima** dell'installazione (§1) e, se usi i crediti, il
+  **portafoglio**, con una riga per ogni chiamata ai modelli fatta con la
+  chiave personale: funzione, modello, chi l'ha servita, token e costo, senza
+  il testo della richiesta né della risposta
+  (`src/main/services/handlers/wallet.js`, regole `wallet-usage` in
+  `firestore.rules`);
+- i **voti** e le richieste di riapertura che lasci sulla bacheca
+  (`firestore.rules`, `feedback-public`);
+- se partecipi al **red team**, i tuoi tentativi
+  (`src/main/services/handlers/redteam.js`);
+- se accedi con Google, **email e nome** dell'account e quanto usi ogni
+  funzione (`src/main/services/handlers/credits.js`);
+- quando usi l'Aiuto, il **nome del sito** di cui chiede i percorsi (§8).
+
+L'elenco completo, campo per campo, con cosa ne facciamo e per quanto lo
+teniamo, sta nel documento sulla privacy (`transparency/privacy.md`).
 
 ---
 
