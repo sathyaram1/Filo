@@ -23,7 +23,7 @@ function t(chiave, riserva) {
   try { return globalThis.SN_I18N.t(chiave) || riserva; } catch (_) { return riserva; }
 }
 
-function voci(params, wc) {
+function voci(params, wc, conSchede) {
   const f = params.editFlags || {};
   const out = [];
   if (params.isEditable) {
