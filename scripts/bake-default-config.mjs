@@ -58,23 +58,11 @@ const OUT_PATH = process.env.FILO_BAKE_OUT
 const CANALE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
-// La chiave Safe Browsing sta in `config/secrets` FUORI dalla mappa `apiKeys`
-// (campo `safeBrowsingKey`). La risposta del server può quindi portarla in due
-// posti a seconda di come la funzione è fatta: accettiamo entrambi invece di
-// scommettere su uno solo — sbagliare significherebbe spegnere in silenzio il
-// primo stadio del rilevamento siti pericolosi per tutti.
+// Un campo solo, di primo livello, come in `config/secrets` (FONTE_SAFE_BROWSING):
+// quattro candidati nascondevano che il server non la consegnava affatto (#1074).
 function pickSafeBrowsing(json) {
-  if (!json || typeof json !== 'object') return '';
-  const candidati = [
-    json.safeBrowsingKey,
-    json.safeBrowsing,
-    json.apiKeys && json.apiKeys.safeBrowsingKey,
-    json.apiKeys && json.apiKeys.safeBrowsing,
-  ];
-  for (const c of candidati) {
-    if (typeof c === 'string' && c.trim()) return c.trim();
-  }
-  return '';
+  const v = json && json.safeBrowsingKey;
+  return typeof v === 'string' ? v.trim() : '';
 }
 
 // Il motivo del rifiuto arriva sotto nomi diversi a seconda di com'è scritta la
