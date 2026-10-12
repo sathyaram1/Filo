@@ -100,6 +100,8 @@ function installaPermessi(ses) {
   Permessi.installa(ses, {
     prima: (wc, permission, callback) => {
       if (permission !== 'fullscreen') return false;
+      // A schermo intero la finestrella di accesso perderebbe la barra col sito (#1066).
+      if (wc && wc._filoFinestrella) { callback(false); return true; }
       const t = tabDiWebContents(wc);
       if (t && t._ultimoInputEsc) { callback(false); return true; }
       return false;
