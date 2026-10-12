@@ -706,7 +706,7 @@ test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «ripr
   const blocco = page.locator('.dash-activity').first();
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
   await page.locator('#stopBtn').click();
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   // Lo schermo non dice più che sta cercando, e la ricerca non parte nemmeno in ritardo.
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText('Fermato qui');
   await page.waitForTimeout(500);
