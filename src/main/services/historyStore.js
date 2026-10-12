@@ -143,7 +143,12 @@
       return dellIncognito[i];
     }
     if (Disco.inIncognito()) return null;
-    return (await apri()).aggiorna(id, fields);
+    try {
+      return (await apri()).aggiorna(id, fields);
+    } catch (e) {
+      nonSalvata(e);
+      return null;
+    }
   }
 
   async function clear() {
