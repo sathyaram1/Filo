@@ -713,9 +713,11 @@
     const s = String(raw || '').trim();
     if (!s) return '/';
     if (/^https?:\/\//i.test(s)) return normalizedPath(s) || '/';
-    const ripulito = neutralizzaMarcature(tagliaPercorsoPrimaDiPulire(s, MAX_URL_LEN)).trim().replace(/\s+/g, '');
-    if (!ripulito.startsWith('/')) return '/';
-    return redigiPercorso(ripulito, domain || '').slice(0, MAX_URL_LEN) || '/';
+    if (!s.startsWith('/')) return '/';
+    return aTetto(s, MAX_URL_LEN, tagliaPercorsoPrimaDiPulire, (pezzo) => {
+      const ripulito = neutralizzaMarcature(pezzo).trim().replace(/\s+/g, '');
+      return ripulito.startsWith('/') ? redigiPercorso(ripulito, domain || '') : '';
+    }) || '/';
   }
 
   // LA pulizia: quella che il client applica prima di inviare e che il server
