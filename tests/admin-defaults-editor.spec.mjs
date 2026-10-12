@@ -316,9 +316,7 @@ test('ogni fornitore escluso dice perché, e il perché si salva', async ({ open
 // #541 giro 1: il nome che il menu scrive per Novita è quello del catalogo; la
 // pagina deve riconoscerlo come la voce del codice, e dargli il suo motivo.
 test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e il motivo segue', async ({ openTab }) => {
-  const page = await openStubbedEditor(openTab, {
-    excludedProviders: ['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI'],
-  });
+  const page = await openStubbedEditor(openTab, { codiceSenza: ['Novita'] });
   await expect(page.locator('#excludedDriftText')).toContainText('Novita');
   await page.click('#addExcludedRow');
   const row = page.locator('#excludedList .sn-excluded-row').last();
