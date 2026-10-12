@@ -196,6 +196,6 @@ test('il motivo dello sporco: pochi id e mai oltre il tetto del server', () => {
   assert.deepEqual(nonFidate([{ id: 'D-1', fiducia: 'fidato' }, { id: 'D-2', fiducia: 'boh' }, null]), ['D-2']);
   const tanti = Array.from({ length: 400 }, (_, i) => `D-${i + 1}`);
   const m = motivoNonFidate(tanti);
-  assert.match(m, /^testo di 400 domande non fidate (D-1, .*D-10, …)$/);
+  assert.match(m, /^testo di 400 domande non fidate \(D-1, .*D-10, …\)$/);
   assert.ok(`elenco delle domande: ${m}`.length <= 300);
 });
