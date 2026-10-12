@@ -91,6 +91,10 @@ test('dalla home Impostazioni e Profilo compaiono subito, nella finestra nata co
   const impostazioni = await apriEMisura(app, home, clicSullaHome, 'Preferenze', 'settings');
   await chiudiConEsc(app);
   const profilo = await apriEMisura(app, home, clicSullaHome, 'Nuova finestra incognito', 'account');
+  // Ogni voce del Profilo ha la sua icona: «Crediti» restava senza, fuori colonna.
+  const senzaIcona = await (await menuAperto(app)).evaluate(() => [...document.querySelectorAll('button.item')]
+    .filter((b) => !b.querySelector('.ico svg')).map((b) => b.textContent.trim()));
+  expect(senzaIcona).toEqual([]);
   await chiudiConEsc(app);
   const ancora = await apriEMisura(app, home, clicSullaHome, 'Preferenze', 'settings');
   console.log(`[#1090] dalla home: ${impostazioni.ms} ms, ${profilo.ms} ms, ${ancora.ms} ms`);
