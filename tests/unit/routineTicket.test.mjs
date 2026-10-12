@@ -339,7 +339,7 @@ test('#565 ticket --json stampa biglietto E ruolo (e il biglietto non si spreca)
 test('#1189 ticket porta model ed effort del server e registra la decisione per il gancio, con l\'impronta', async () => {
   const { createServer } = await import('node:http');
   const { spawn } = await import('node:child_process');
-  const { readFileSync, chmodSync } = await import('node:fs');
+  const { readFileSync } = await import('node:fs');
   const { impronta, FILE_REGISTRO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
   const VERO = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
   let risposta = { ok: true, work: true, ticket: VERO, role: 'new-work', model: 'fable', effort: 'max' };
@@ -386,7 +386,6 @@ test('#1189 ticket porta model ed effort del server e registra la decisione per 
     assert.equal(no.so, '');
     assert.match(no.se, /non registrata per il gancio/);
     assert.match(no.se, new RegExp(`release ZZZZ${VERO.slice(4)} --role orchestrator`));
-    void chmodSync;
   } finally {
     await new Promise((ok) => srv.close(ok));
     togliCartella(utente);
