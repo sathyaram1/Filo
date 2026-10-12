@@ -69,7 +69,7 @@ function mostra(wc, params) {
   if (!win) win = BrowserWindow.fromWebContents(wc);
   if (!win || win.isDestroyed()) return;
   const b = tab ? tab.view.getBounds() : { x: 0, y: 0 };
-  showPopupMenu(win, voci(params, wc), b.x + (params.x || 0), b.y + (params.y || 0), (scelta) => {
+  showPopupMenu(win, voci(params, wc, !!schede), b.x + (params.x || 0), b.y + (params.y || 0), (scelta) => {
     const m = /^@action:([a-zA-Z-]{1,20})$/.exec(String(scelta || ''));
     if (m) { try { esegui(m[1], params, wc, schede, tab); } catch (_) {} }
   });
