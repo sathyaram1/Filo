@@ -142,10 +142,10 @@ lo può scrivere anche un agente pulito.
   dei figli, poi l'età. Finché i compiti (§ 13, punto 5) non ci sono, lo
   stesso ordine fa da spareggio provvisorio a pari priorità, al posto di
   `senderClass` in `selectTodoWinner` (filo-security
-  `functions/src/routine/select.js`), e la precedenza assoluta dei rami in
-  revisione (`REVIEW_RANK`) resta com'è. Con i compiti spariscono tutti e
-  due: un feedback iniziato passa davanti a uno nuovo solo con un gradino di
-  priorità in più, e la priorità 3 passa sopra tutto.
+  `functions/src/routine/select.js`); fino ad allora non si tocca nemmeno la
+  precedenza assoluta dei rami in revisione (`REVIEW_RANK`). Con i compiti
+  spariscono tutti e due: un feedback iniziato passa davanti a uno nuovo solo
+  con un gradino di priorità in più, e la priorità 3 passa sopra tutto.
 
 ### 1.7 Dati
 
