@@ -2501,7 +2501,8 @@
         // Un nome lunghissimo non spinge giù la pagina di righe: si accorcia in mezzo, l'estensione resta, intero al passaggio.
         const n = document.createElement('strong');
         n.className = 'permesso-oggetto';
-        n.textContent = '«' + (cosa.nome.length > 60 ? cosa.nome.slice(0, 40) + '…' + cosa.nome.slice(-19) : cosa.nome) + '»';
+        const c = Array.from(cosa.nome);
+        n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
         n.title = String(cosa.percorso || cosa.nome);
         msg.append(' ', n);
       }
