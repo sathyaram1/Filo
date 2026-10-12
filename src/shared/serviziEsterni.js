@@ -316,8 +316,8 @@
     },
   ];
 
-  // Vero se `url` sta sotto `base`: stesso prefisso, e la base finisce dove finisce un pezzo dell'indirizzo
-  // (così https://crt.sh non copre https://crt.sh.esempio.it).
+  // Vero se `url` sta sotto `base`: stesso prefisso, e la base finisce dove finisce un pezzo dell'indirizzo,
+  // così un host che ne allunga un altro non passa per lui.
   function copre(base, url) {
     const b = String(base || '').toLowerCase();
     const u = String(url || '').toLowerCase();
