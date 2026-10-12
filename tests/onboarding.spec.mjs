@@ -464,6 +464,50 @@ test('nel benvenuto la scelta dell’autonomia resta a schermo finché l’utent
   expect((await onbState(app)).ticked).toContain('autonomia');
 });
 
+// #1188 — in un'intervista che scorre fino in fondo la frase sotto i livelli non cambia altezza al passaggio del
+// cursore: se la cambiasse la chat salterebbe, il pulsante scivolerebbe via e il clic andrebbe a vuoto.
+test('nel benvenuto lungo, il cursore fermo su un livello non fa saltare la scelta e il clic sceglie al primo colpo', async ({ app, shell }) => {
+  test.setTimeout(150_000);
+  const page = await apriIntervista(app, shell);
+  const lungo = 'Piacere Anna! Ti dico due cose su di me. La privacy è già protetta: cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Se vuoi cambiare qualcosa dimmelo. L’aspetto si cambia parlando: se preferisci il tema scuro, chiedimelo.';
+  for (const [i, t] of ['sono Anna, insegnante', 'scrivimi breve', 'ok grazie'].entries()) {
+    await queueChat(app, { text: `${lungo} (${i})`, actions: [] });
+    await page.locator('#input').fill(t);
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: `(${i})` })).toBeVisible({ timeout: 30_000 });
+  }
+  const scelta = await chiediAutonomia(page, app);
+  await page.waitForTimeout(1500);
+  const altezza = async () => Math.round((await scelta.boundingBox()).height);
+  const ferma = await altezza();
+  const bottone = scelta.locator('.dash-autonomia-livello', { hasText: 'Conservativo' });
+  for (const nome of ['Conservativo', 'Automatico']) {
+    await scelta.locator('.dash-autonomia-livello', { hasText: nome }).hover();
+    await expect(scelta.locator('.dash-autonomia-frase')).not.toHaveText(/ti chiede prima di ciò che non si disfa/);
+    expect(await altezza(), `il passaggio su ${nome} non cambia l'altezza della scelta`).toBe(ferma);
+  }
+
+  for (const fy of [0.2, 0.5]) {
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(300);
+    const b = await bottone.boundingBox();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height * fy);
+    const viste = [];
+    for (let i = 0; i < 12; i++) { viste.push(await scelta.locator('.dash-autonomia-frase').textContent()); await page.waitForTimeout(80); }
+    expect(new Set(viste.slice(2)).size, `cursore fermo a ${fy} dell'altezza: la frase resta quella del livello sotto il cursore`).toBe(1);
+  }
+
+  await queueChat(app, { text: 'Va bene.', actions: [{ type: 'ONBOARDING', spunta: ['autonomia'] }] });
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(300);
+  const b = await bottone.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height * 0.3);
+  await page.waitForTimeout(300);
+  await page.mouse.down(); await page.waitForTimeout(90); await page.mouse.up();
+  await expect.poll(() => livelloAutonomia(app), { timeout: 5_000 }).toBe('conservativo');
+  await expect(bolleUtente(page).last()).toHaveText('Scelgo Conservativo.');
+});
+
 // #1188 — il blocco di attività dice «Non partita» solo di un'azione nominata e mai arrivata: la riga della scelta
 // (o dello stile) è partita, e il posto rimasto vuoto della nota diventata risposta non è un'azione.
 test('nel benvenuto il blocco di attività non dice «Non partita» sotto la scelta dell’autonomia né sotto lo stile', async ({ app, shell }) => {
