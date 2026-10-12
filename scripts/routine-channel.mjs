@@ -1149,9 +1149,20 @@ if (isMain) {
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'ticket') {
     const r = await ticket(args[0]);
-    // `--json`: biglietto E ruolo, per chi deve scegliere il worker prima di
-    // lanciarlo. Senza flag resta la sola stringa, come sempre.
-    if (r.outcome === 'work') { console.log(data.json === true ? JSON.stringify({ ticket: r.ticket, role: r.role || '' }) : r.ticket); process.exit(0); }
+    if (r.outcome === 'work') {
+      // Senza la decisione registrata il gancio rifiuta il lancio: meglio fermarsi qui che con un worker rifiutato.
+      const reg = registraDecisione(r);
+      if (!reg.ok) {
+        const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
+        console.error(`guasto: decisione del server non registrata per il gancio in ${reg.file} (${reg.why}), il lancio del worker verrebbe rifiutato. Rilascia il biglietto: node "${io}" release ${r.ticket} --role orchestrator`);
+        process.exit(3);
+      }
+      // `--json`: biglietto E ruolo, per chi deve scegliere il worker prima di
+      // lanciarlo. Senza flag resta la sola stringa, come sempre.
+      const decisi = { ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}) };
+      console.log(data.json === true ? JSON.stringify({ ticket: r.ticket, role: r.role || '', ...decisi }) : r.ticket);
+      process.exit(0);
+    }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'work') {
