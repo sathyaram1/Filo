@@ -707,7 +707,7 @@ test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «ripr
   await ripristina(app);
 });
 
-test('M —accoglienza fermata: una scheda nuova o la pagina ricaricata non rifà il turno, e «riprendi» c\'è anche lì', async ({ app, shell }) => {
+test('M — accoglienza fermata: una scheda nuova o la pagina ricaricata non rifà il turno, e «riprendi» c\'è anche lì', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
