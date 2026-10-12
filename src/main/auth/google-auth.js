@@ -22,6 +22,7 @@ const http = require('node:http');
 const cfg = require('./config');
 const pkce = require('./pkce');
 const store = require('./token-store');
+const guasti = require('./guastiAccesso');
 
 let session = null; // { refreshToken, idToken, idTokenExp, email, name, picture }
 // Se la sessione sopravviverà alla chiusura: senza cifratura del sistema resta
@@ -330,7 +331,10 @@ async function refreshIfNeeded() {
     body,
   });
   if (!res.ok) {
-    // Refresh token revocato/scaduto → sessione non più valida.
+    // Si esce solo se il servizio dice che il refresh token non vale più: un 503 o un proxy
+    // che risponde 403 lasciano sessione e auth.bin come sono, e il prossimo tentativo riesce.
+    const testo = await res.text().catch(() => '');
+    if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
     const eraOwner = isAdmin();
     chiudiSessione();
     if (eraOwner) segnaOwnerCaduto(true);
