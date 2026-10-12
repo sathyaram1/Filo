@@ -174,9 +174,9 @@ sono i dati **più sensibili** che l'app tocca. La nostra posizione:
   titoli delle schede aperte nel messaggio della home
   (`src/shared/constants.js`), il testo delle pagine su cui lavori, i
   candidati di una ricerca fra i tuoi documenti
-  (`src/main/services/documentiIndice.js`), il contenuto delle schede che
-  chiudi, per il riassunto con cui la cronologia le ritrova
-  (`src/main/services/archivedTabs.js`). Quei messaggi vanno a OpenRouter, che
+  (`src/main/services/documentiIndice.js`), il testo delle schede che chiudi,
+  per il riassunto con cui la cronologia le ritrova
+  (`src/main/services/handlers.js`, `enrichArchivedTab`). Quei messaggi vanno a OpenRouter, che
   li passa al fornitore che serve il modello
   (`src/main/services/providers/openrouter.js`). Cosa ne fanno lo dicono le
   loro condizioni: questo documento non promette niente al posto loro.
