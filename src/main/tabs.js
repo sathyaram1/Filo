@@ -3572,11 +3572,13 @@ class TabManager {
   // content script ricalcolino il colore di ogni sito. Campo aggiuntivo: un
   // ripristino vecchio senza `colors` continua a funzionare (viene ignorato).
   sessionState() {
+    // Una scheda seguita da Filo (l'accesso a Google, #1123) è un passaggio: riaperta dopo un riavvio porterebbe a un
+    // ritorno che non ascolta più. Quando Filo smette di seguirla diventa dell'utente e si salva.
     const kept = this.tabs
-      .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank');
+      .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank' && !t._sorvegliante);
     const tabs = kept.map((t) => t.url);
     const colors = kept.map((t) => t.identityColor || null);
-    let activeIndex = this.tabs.findIndex((t) => t.id === this.activeId);
+    let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
     return { tabs, colors, activeIndex };
   }
