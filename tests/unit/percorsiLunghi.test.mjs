@@ -164,7 +164,7 @@ test('#1173 un indirizzo si taglia fra un pezzo e l’altro: un’email cifrata 
   const pezzo = '12345678901234567890/';
   const dato = 'mario.rossi%40gmail.com';
   for (const dentro of [1, 6, 12, 14, 15, 18, dato.length - 1]) {
-    const prima = pezzo.repeat(Math.ceil(tetto / pezzo.length)).slice(0, tetto - dentro).replace(/[^/]+$/, (m) => '0'.repeat(m.length));
+    const prima = pezzo.repeat(Math.ceil(tetto / pezzo.length)).slice(0, tetto - dentro).replace(/[^/]+$/, (m) => '0'.repeat(m.length - 1) + '/');
     for (const indirizzo of [`https://esempio.it/${prima}${dato}/fine`, `/${prima}${dato}/fine`]) {
       const fuori = I.sanitizeInitialUrl(indirizzo, 'esempio.it');
       assert.ok(fuori.length <= MAX_URL_LEN);
