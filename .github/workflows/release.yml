@@ -291,9 +291,9 @@ jobs:
         run: node scripts/bake-default-config.mjs
 
       # Prima del numero, come i cancelli: un'app configurata male ferma il giro
-      # senza consumare una versione. Il token vale un'ora, e build e
-      # pubblicazione ne prendono una ventina di minuti. Mac e Linux allegano a
-      # una release che c'e' gia', senza creare tag: a loro basta il GITHUB_TOKEN.
+      # senza consumare una versione. Il token vale un'ora, e la build parte
+      # subito dopo. Mac e Linux allegano a una release che c'e' gia', senza
+      # creare tag: a loro basta il GITHUB_TOKEN.
       - name: Token dell'app di pubblicazione (se configurata)
         id: app
         if: steps.check.outputs.should_release == 'true' && vars.FILO_RILASCIO_APP_ID != ''
