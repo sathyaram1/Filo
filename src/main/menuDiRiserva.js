@@ -81,11 +81,14 @@ function mostra(wc, params) {
   });
 }
 
-function chiesto(event, motivo) {
+function chiesto(event, richiesta) {
   const wc = event.sender;
-  console.error('[menu di riserva] il menu di Filo non si è aperto:', String(motivo || '').slice(0, 2000));
+  const r = richiesta && typeof richiesta === 'object' ? richiesta : {};
+  const ora = Date.now();
+  const clic = Number.isFinite(r.clic) && r.clic <= ora ? r.clic : ora;
+  if (r.motivo) console.error('[menu di riserva] il menu di Filo non si è aperto:', String(r.motivo).slice(0, 2000));
   const ultimo = ULTIMI.get(wc);
-  if (ultimo && Date.now() - ultimo.alle < FRESCO_MS) { mostra(wc, ultimo.params); return; }
+  if (ultimo && ultimo.alle >= clic - MARGINE_MS) { mostra(wc, ultimo.params); return; }
   const scade = setTimeout(() => IN_ATTESA.delete(wc), ATTESA_MS);
   IN_ATTESA.set(wc, (params) => { clearTimeout(scade); mostra(wc, params); });
 }
