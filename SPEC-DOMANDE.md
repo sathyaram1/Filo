@@ -137,10 +137,15 @@ lo può scrivere anche un agente pulito.
   il worker si ferma e il feedback va in Ricevuti come «chiede di diventare
   fidato».
 - **Giudici alla nascita (L2):** restano per i soli non fidati.
-- **Spareggio della coda:** a pari priorità prima i fidati, poi la
-  generazione, poi l'età. Sostituisce `senderClass` in `selectTodoWinner`
-  (filo-security `functions/src/routine/select.js`). La regola «prima si
-  finisce un ramo in revisione» (`REVIEW_RANK`) resta.
+- **Ordine della coda:** fiducia e figli sono gradini dell'urgenza dentro la
+  casella di priorità e fase (§ 6.3): prima i fidati, poi i principali prima
+  dei figli, poi l'età. Finché i compiti (§ 13, punto 5) non ci sono, lo
+  stesso ordine fa da spareggio provvisorio a pari priorità, al posto di
+  `senderClass` in `selectTodoWinner` (filo-security
+  `functions/src/routine/select.js`), e la precedenza assoluta dei rami in
+  revisione (`REVIEW_RANK`) resta com'è. Con i compiti spariscono tutti e
+  due: un feedback iniziato passa davanti a uno nuovo solo con un gradino di
+  priorità in più, e la priorità 3 passa sopra tutto.
 
 ### 1.7 Dati
 
