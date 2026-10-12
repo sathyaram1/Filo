@@ -1340,7 +1340,7 @@
         if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
         else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
         const token = Math.round(contestoFilo().numeroIn(n, contestoFilo().LIMITI.token));
-        return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT')}` };
+        return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
       },
     },
     // ── #1004: cosa delle pagine va ai modelli senza che l'utente lo chieda ──
