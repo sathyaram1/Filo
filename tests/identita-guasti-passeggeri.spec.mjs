@@ -3,8 +3,15 @@
 // offre di ricominciare, e ricominciare chiede il sì sul posto. Server e identità sono un HTTP locale.
 
 import { createServer } from 'node:http';
-import { mkdirSync } from 'node:fs';
-import { test, expect } from './fixtures/electron.mjs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { _electron as electron } from '@playwright/test';
+import { test, expect, chiudiApp } from './fixtures/electron.mjs';
+import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
+import { argomentiScala } from './helpers/scala.mjs';
+
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 let server;
 let modoToken = 'ok';
@@ -138,4 +145,43 @@ test('un token revocato: la pagina offre di ricominciare, chiede il sì, «Annul
   await expect(ricomincia).toBeHidden();
   await expect(domanda).toBeHidden();
   expect(visti.signUp).toBe(nate + 1);
+});
+
+// La cartella dati va preparata PRIMA dell'avvio (l'identità si legge lì), quindi Filo si lancia qui.
+test('identità illeggibile con un portafoglio su disco: nessuna identità nuova in silenzio, la pagina lo dice, e ricominciare mette da parte il portafoglio', async () => {
+  const userData = cartellaTemporanea('filo-identita-illeggibile-');
+  writeFileSync(join(userData, 'identity.bin'), Buffer.from('cifrato da un altro portachiavi'));
+  writeFileSync(join(userData, 'wallet.bin'), Buffer.from('anche questo'));
+  const app = await electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
+  });
+  try {
+    const shell = await app.firstWindow();
+    await shell.waitForLoadState('domcontentloaded');
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), 'filo://credits/credits.html');
+    await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://credits/')), { timeout: 10000 }).toBe(true);
+    const page = app.windows().find((w) => w.url().startsWith('filo://credits/'));
+    const nate = visti.signUp;
+
+    await expect(page.locator('#walletNote')).toContainText('non riesce più a leggere', { timeout: 15000 });
+    await expect(page.locator('#resetIdentityBtn')).toBeVisible();
+    await expect(page.locator('#redeemForm')).toBeHidden();
+    expect(visti.signUp).toBe(nate);
+    expect(existsSync(join(userData, 'wallet.bin'))).toBe(true);
+
+    await page.click('#resetIdentityBtn');
+    await page.click('#resetIdentityYes');
+    await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('#walletNote')).toBeHidden();
+    expect(visti.signUp).toBe(nate + 1);
+    // Niente è stato cancellato: il portafoglio e l'identità di prima stanno accanto, con un altro nome.
+    expect(existsSync(join(userData, 'wallet.bin'))).toBe(false);
+    expect(existsSync(join(userData, 'wallet.bin.prev'))).toBe(true);
+    expect(readdirSync(userData).some((n) => n.startsWith('identity.bin.'))).toBe(true);
+  } finally {
+    await chiudiApp(app);
+    try { togliCartella(userData); } catch (_) {}
+  }
 });

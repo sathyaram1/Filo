@@ -278,7 +278,7 @@
       form.hidden = true;
       note.textContent = w.identity.lost
         ? 'L\'identità di questa installazione è stata annullata sul server, e con lei i crediti che aveva. Puoi ricominciare con un nuovo invito.'
-        : 'Questo computer non riesce più a leggere l\'identità di Filo salvata qui, e quindi i suoi crediti: la cifratura del sistema è cambiata. Se torna com\'era, al prossimo avvio riparte tutto da solo; altrimenti puoi ricominciare con un nuovo invito.';
+        : 'Questo computer non riesce più a leggere l\'identità di Filo salvata qui, e con lei i crediti. Succede quando cambia la cifratura del sistema. Se torna com\'era, al prossimo avvio Filo riparte da solo. Altrimenti puoi ricominciare con un nuovo invito.';
       note.hidden = false;
       if (domandaAperta) resetConfirm.hidden = false;
       else resetBtn.hidden = false;
@@ -286,7 +286,7 @@
       note.textContent = w.identity.offline
         ? 'Sei offline: per riscattare un invito serve la connessione.'
         : w.identity.unreachable
-          ? 'Il servizio di accesso non risponde adesso: riprova fra poco.'
+          ? 'Il servizio di accesso non risponde adesso. Riprova fra poco.'
           : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
