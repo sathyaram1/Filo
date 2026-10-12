@@ -87,6 +87,26 @@ test('la finta pagina di accesso aperta col clic porta nel titolo il suo sito, e
     .toEqual([{ url: GOOGLE, titolo: 'google.com', pagina: 'Accedi - Account Google' }]);
 });
 
+test('la pagina non toglie alla finestrella la cornice col titolo, né la mette a schermo intero o sopra le altre', async ({ app, openTab, testServer }) => {
+  await servi(app, { 'login.sito-finto.it/login': FINTA_HTML });
+  const misure = 'width=420,height=520,frame=no,titleBarStyle=hidden,title=Accedi - Google,fullscreen=yes,kiosk=yes,alwaysOnTop=yes,skipTaskbar=yes,transparent=yes,type=splash';
+  const page = await testServer.openReady(openTab, `<button id="b" style="width:220px;height:60px"
+    onclick="window.open('${FINTA}','login','${misure}')">Accedi</button>`);
+  await app.evaluate(({ webContents }, u) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL() === u);
+    wc.once('did-create-window', (_w, d) => { globalThis.__opzioniFinestrella = d.options; });
+  }, page.url());
+  await page.click('#b');
+  await expect.poll(() => finestrelle(app), { timeout: 8000 }).toEqual([{ url: FINTA, titolo: 'sito-finto.it', pagina: 'Accedi - Google' }]);
+  const o = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && x.webContents.getURL().includes('sito-finto'));
+    const d = globalThis.__opzioniFinestrella || {};
+    return { frame: d.frame, titleBarStyle: d.titleBarStyle, fullscreen: d.fullscreen, kiosk: d.kiosk, transparent: d.transparent,
+      type: d.type, skipTaskbar: d.skipTaskbar, width: d.width, schermoIntero: w.isFullScreen(), chiosco: w.isKiosk(), sopra: w.isAlwaysOnTop() };
+  });
+  expect(o).toEqual({ frame: true, titleBarStyle: 'default', width: 420, schermoIntero: false, chiosco: false, sopra: false });
+});
+
 test('la finestrella svuotata e riscritta dalla pagina che l\'ha aperta porta nel titolo il sito di quella pagina', async ({ app, openTab, testServer }) => {
   const accesso = `${testServer.html('<title>ACCESSO</title>')}?client_id=a&response_type=code`;
   const page = await testServer.openReady(openTab, `<button id="b" style="width:220px;height:60px" onclick="var p=window.open(
