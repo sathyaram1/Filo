@@ -4513,6 +4513,20 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     if (caratteriTratto >= caratteri - caratteriTratto) finestraDaRicordare = token;
     return true;
   };
+  // Un modello che non prende immagini (o non tante) rifiutava anche le domande senza: quelle dei turni passati
+  // lasciano il posto alla nota e lo stesso giro riparte. Vale per i turni dopo con quel modello (#1166).
+  const senzaFotoDopoRifiuto = async (e) => {
+    const FC = globalThis.SN_FILO_CONTESTO;
+    if (!filo || !fotoNelTratto || !FC.rifiutaImmagini(e)) return false;
+    const conFoto = (payloadBase.filoTratto || []).some((m) => Array.isArray(m && m.content) && m.content.some((p) => p && p.type === 'image_url'));
+    if (!conFoto) return false;
+    fotoNelTratto = false;
+    modelliSenzaFoto.add(modelloChat);
+    try { filo = await componiFilo(tettiChat); } catch (_) { return false; }
+    payloadBase.filoTratto = filo.messaggi;
+    nascostiDellaChat = nascostiDi(filo);
+    return true;
+  };
   let fermato = false;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
