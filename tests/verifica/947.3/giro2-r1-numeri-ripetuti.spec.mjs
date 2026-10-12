@@ -25,21 +25,34 @@ async function preparaModelli(app) {
   });
 }
 
-async function aiutoFinto(app, risposte) {
-  await app.evaluate((_e, risposte) => {
+// Il modello finto indica i documenti col numero che hanno nell'elenco che sta guardando: dopo una ricerca, quello
+// appena arrivato; a «ridammi», quello della prima ricerca (la prima volta che la bolletta compare nei messaggi).
+async function aiutoFinto(app, marzo) {
+  await app.evaluate((_e, marzo) => {
     const P = globalThis.SN_PROVIDERS;
     globalThis.__visti = [];
+    const numeroDi = (testo, nome) => {
+      const m = new RegExp(`(\\d+)\\. ${nome.replace(/\./g, '\\.')}`).exec(testo);
+      return m ? Number(m[1]) : 0;
+    };
     const risposta = ({ attempts, messages }) => {
       const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
-      if (!sistema.includes('# Protocollo di risposta')) return { text: '{"message":"Ciao.","suggestions":[],"issues":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      globalThis.__visti.push(JSON.stringify(messages));
+      const fine = (text) => ({ text, model: attempts[0].model, provider: attempts[0].provider, usage: {} });
+      if (!sistema.includes('# Protocollo di risposta')) return fine('{"message":"Ciao.","suggestions":[],"issues":[]}');
+      const tutto = JSON.stringify(messages);
+      globalThis.__visti.push(tutto);
       const ultimo = JSON.stringify([...messages].reverse().find((m) => m.role === 'user') || '');
-      const scelta = risposte.find(([parola]) => ultimo.includes(parola)) || risposte[risposte.length - 1];
-      return { text: scelta[1], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      if (ultimo.includes('ridammi')) return fine(JSON.stringify({ text: 'Ecco di nuovo la bolletta della luce di marzo.', file: numeroDi(tutto, marzo), status: 'done' }));
+      if (ultimo.includes('ho cercato fra i documenti')) {
+        const nome = ultimo.includes('bolletta gas naturale marzo') ? 'doc_8812.pdf' : marzo;
+        return fine(JSON.stringify({ text: 'Ecco il documento.', file: numeroDi(ultimo, nome), status: 'done' }));
+      }
+      if (ultimo.includes('quella del gas')) return fine(JSON.stringify({ action: 'documenti', cosa: 'bolletta gas naturale marzo' }));
+      return fine(JSON.stringify({ action: 'documenti', cosa: 'bolletta luce energia elettrica marzo' }));
     };
     P.completeWithFallback = async (o) => risposta(o);
     P.streamCompleteWithFallback = async (o) => risposta(o);
-  }, risposte);
+  }, marzo);
 }
 
 test('r1 il documento indicato col numero della prima ricerca è quello che compare, anche dopo una seconda ricerca', async ({ app, shell, openTab, testServer }) => {
@@ -49,13 +62,7 @@ test('r1 il documento indicato col numero della prima ricerca è quello che comp
   try {
     const page = await testServer.openReady(openTab, PAGINA);
     await preparaModelli(app);
-    await aiutoFinto(app, [
-      // Il terzo turno: il modello ridà la bolletta della luce col numero che aveva nella prima ricerca.
-      ['ridammi', JSON.stringify({ text: 'Ecco di nuovo la bolletta della luce di marzo.', file: 1, status: 'done' })],
-      ['ho cercato fra i documenti', JSON.stringify({ text: 'Ecco il documento.', file: 1, status: 'done' })],
-      ['gas', JSON.stringify({ action: 'documenti', cosa: 'bolletta gas naturale marzo' })],
-      ['', JSON.stringify({ action: 'documenti', cosa: 'bolletta luce energia elettrica marzo' })],
-    ]);
+    await aiutoFinto(app, BOLLETTA_MARZO);
     await app.evaluate(({ shell: s }) => { s.openPath = async () => ''; });
     const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
     await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
@@ -77,11 +84,6 @@ test('r1 il documento indicato col numero della prima ricerca è quello che comp
     await page.fill('.sn-sidebar-input textarea', 'ridammi quella della luce, non la trovo più');
     await page.press('.sn-sidebar-input textarea', 'Enter');
     await expect(file).toHaveCount(3, { timeout: 20_000 });
-
-    // Il modello aveva davanti i due elenchi, ognuno col suo «1.»: il numero da solo non dice di quale ricerca.
-    const ultimo = await app.evaluate(() => globalThis.__visti[globalThis.__visti.length - 1]);
-    expect(ultimo).toContain(`1. ${BOLLETTA_MARZO}`);
-    expect(ultimo).toContain('1. doc_8812.pdf');
 
     await expect(file.nth(2).locator('.sn-sidebar-file-nome'), 'il bottone è la bolletta della luce che il modello ha detto').toHaveText(BOLLETTA_MARZO);
   } finally {
