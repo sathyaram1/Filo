@@ -894,9 +894,16 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
   }
 }
 
+/** «claude-haiku-5-5 3, …» o '' (un rapporto vecchio non ha il campo). PURA. */
+function testoOltreSoglia(o) {
+  return Object.entries(o || {}).filter(([, n]) => Number(n) > 0).map(([m, n]) => `${m} ${n}`).join(', ');
+}
+
 /** Le cinque righe per chi guarda lo schermo. PURA. */
 export function riassunto(rep) {
   const durata = `${Math.floor(rep.durationS / 60)}m${String(rep.durationS % 60).padStart(2, '0')}s`;
+  const oltre = testoOltreSoglia(rep.oltreSoglia);
+  const oltreOrch = rep.orchestrator ? testoOltreSoglia(rep.orchestrator.oltreSoglia) : '';
   return [
     `rapporto sessione — ruolo: ${rep.role || '(nessuno)'}, biglietto: ${rep.ticket ? `${rep.ticket.slice(0, 8)}…` : '(nessuno)'}, sessione: ${rep.sessionId || '(sconosciuta)'}`,
     `durata ${durata}, ${rep.turns} turni (${rep.coldTurns} freddi), modelli: ${rep.models.join(', ') || '(nessuno)'}, sforzo: ${Object.entries(rep.effort || {}).map(([k, n]) => `${k} ${n}`).join(', ') || '(non dichiarato)'}`,
