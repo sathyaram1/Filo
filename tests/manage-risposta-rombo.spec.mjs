@@ -70,14 +70,60 @@ test('dal rombo verde si risponde: la risposta entra in conversazione e la prati
   await expect(page.locator('.mg-item').filter({ hasText: 'Pulsante X' })).toHaveCount(1);
 });
 
-test('la bozza è una sola: scritta sotto la conversazione si ritrova nel pannello, e Ctrl+Invio la manda', async ({ openTab }) => {
+test('aprendo la pratica il pannello delle domande è già aperto, e sotto la conversazione non c’è un’altra casella', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_DOMANDE, FB_SEGNALATO]);
+  await page.locator(`.mg-item[data-id="${FB_DOMANDE._id}"]`).first().click();
+
+  await expect(page.locator('#mgSideTitle')).toHaveText('Domande di Claude');
+  await expect(page.locator('#mgSideBody')).toContainText('Quale pulsante X intendi?');
+  await expect(page.locator('#mgSideRispostaText')).toBeVisible();
+  await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]')).toHaveClass(/mg-forma--scelta/);
+  await expect(page.locator('#mgDetail textarea:visible')).toHaveCount(0);
+  await expect(page.locator('#mgDetail')).not.toContainText('Invia risposta');
+  await page.screenshot({ path: 'tests/.shots/1061-domande-aperte.png' });
+
+  // Chiuso a mano, si riapre dal rombo con la bozza dov'era.
+  await page.locator('#mgSideRispostaText').fill('Quello in alto');
+  await page.locator('#mgSideClose').click();
+  await expect(page.locator('#mgSide')).toBeHidden();
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+  await expect(page.locator('#mgSideRispostaText')).toHaveValue('Quello in alto');
+
+  // Una pratica che non aspetta niente non apre il pannello da sé.
+  await page.evaluate((i) => window.__mgTest.openDetail(i), FB_SEGNALATO._id);
+  await expect(page.locator('#mgSide')).toBeHidden();
+  await expect(page.locator('#mgSideEmpty')).toBeVisible();
+  // Tornando sulla prima, il pannello è di nuovo aperto e la bozza c'è ancora.
+  await page.evaluate((i) => window.__mgTest.openDetail(i), FB_DOMANDE._id);
+  await expect(page.locator('#mgSideRispostaText')).toHaveValue('Quello in alto');
+});
+
+test('le domande arrivate mentre la pratica è aperta aprono il pannello; chiuso dall’owner, un ridisegno non lo riapre', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const inCoda = { ...FB_DOMANDE, status: 'todo', statusReason: null };
+  await apri(page, [inCoda]);
+  await page.evaluate(() => window.__mgTest.selectTab('queue'));
+  await page.evaluate((i) => window.__mgTest.openDetail(i), inCoda._id);
+  await expect(page.locator('#mgSide')).toBeHidden();
+
+  // Il lavoro si ferma su una domanda mentre l'owner guarda la pratica.
+  await page.evaluate((fb) => window.__mgTest.applyLiveDelta({ upserts: [fb], removedIds: [] }), FB_DOMANDE);
+  await expect(page.locator('#mgSideRispostaText')).toBeVisible();
+  await expect(page.locator('#mgSideBody')).toContainText('Quale pulsante X intendi?');
+
+  await page.locator('#mgSideClose').click();
+  await page.evaluate((fb) => window.__mgTest.applyLiveDelta({ upserts: [{ ...fb, name: 'Pulsante X (rinominato)' }], removedIds: [] }), FB_DOMANDE);
+  await expect(page.locator('#mgDetail')).toBeVisible();
+  await expect(page.locator('#mgSide')).toBeHidden();
+});
+
+test('la bozza resta fra un ridisegno e l’altro, e Ctrl+Invio la manda', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_DOMANDE]);
   await page.evaluate((i) => window.__mgTest.openDetail(i), FB_DOMANDE._id);
-  await page.locator('#mgClarifyText').fill('<b>Quello rosso</b> 🔴');
-  await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
   const casella = page.locator('#mgSideRispostaText');
-  await expect(casella).toHaveValue('<b>Quello rosso</b> 🔴');
+  await casella.fill('<b>Quello rosso</b> 🔴');
 
   // Un ridisegno del pannello (una fusione che cambia) non porta via testo né cursore.
   await casella.focus();
