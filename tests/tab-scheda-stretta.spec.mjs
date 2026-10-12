@@ -88,7 +88,8 @@ test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva
           expect(icona, dove).toBe(true);
           expect(ha('close'), dove).toBe(s.width >= 58);
         }
-        expect(ha('title'), dove).toBe(s.width >= 64);
+        // Il titolo vive da 6px di gap più 12 di testo dopo l'icona; sull'attiva anche la X in fila.
+        expect(ha('title'), dove).toBe(s.width >= (s.active ? 64 : 52));
         if (s.id === ids[2] || s.id === ids[3]) expect(ha('proxy-ind'), dove).toBe(s.width >= 96);
         // La spinner non si schiaccia: resta un cerchio.
         const spin = s.figli.find((f) => f.cls === 'spinner');
