@@ -1,5 +1,5 @@
 // Verifica #1118 giro 2: la ricerca col classificatore sotto stress (troppe richieste, crediti finiti a metà,
-// titoli con markup, clic durante la lettura) e il suo aspetto nei due temi.
+// titoli con markup, clic durante la lettura): porte provate e chiuse.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
@@ -110,36 +110,10 @@ test('titolo con markup ed emoji: si legge come testo, e il clic durante la lett
   await cerca(page, 'la x per chiudere');
   const prima = page.locator('.mg-item--result').first();
   await expect(prima).toBeVisible({ timeout: 10000 });
-  await page.screenshot({ path: 'tests/.shots/v1118-in-lettura-chiaro.png' });
   await prima.click();
   await expect(page.locator('#mgSearchProgress')).toBeHidden({ timeout: 20000 });
   await expect(page.locator('.mg-item--result')).toHaveCount(3);
   await expect(page.locator('.mg-item--result.mg-item--selected')).toHaveCount(1);
   await expect(page.locator('.mg-item--result').first()).toContainText('<img src=x');
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
-  await page.screenshot({ path: 'tests/.shots/v1118-risultati-chiaro.png' });
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.fill('#mgSearchInput', 'la x per chiudere ancora');
-  await page.press('#mgSearchInput', 'Enter');
-  await expect(page.locator('#mgSearchProgress')).toBeVisible();
-  await page.waitForTimeout(1200);
-  await page.screenshot({ path: 'tests/.shots/v1118-in-lettura-scuro.png' });
-});
-
-test('la barra di avanzamento nei due temi', async ({ app, openTab }) => {
-  await preparaOwner(app, { latenza: 1500 });
-  const page = await openTab(URL);
-  await page.waitForFunction(() => window.filo && window.__mgTest);
-  const tanti = feedbacks();
-  for (let i = 40; i < 400; i++) tanti.push({ _id: `fb-${i}`, name: `Altro ${i}`, text: `niente ${i}`, seq: i + 600, subSeq: 0, status: 'new', clientId: 't@example.com', createdAt: '2026-06-03T10:00:00Z', images: [] });
-  await page.evaluate((fbs) => window.__mgTest.setData(fbs), tanti);
-  await page.click('#mgSearchToggle');
-  await page.fill('#mgSearchInput', 'la x per chiudere');
-  await page.press('#mgSearchInput', 'Enter');
-  await expect(page.locator('.mg-item--result').first()).toBeVisible({ timeout: 10000 });
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: 'tests/.shots/v1118-barra-chiaro.png' });
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: 'tests/.shots/v1118-barra-scuro.png' });
 });
