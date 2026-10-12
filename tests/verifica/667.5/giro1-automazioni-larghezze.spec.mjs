@@ -1,4 +1,4 @@
-// Verifica #667.5 giro 1: in Automazioni il tasto «Approva e fondi» armato tiene la scatola a ogni larghezza della finestra.
+// Verifica #667.5 giro 1: in Automazioni il tasto «Approva e fondi» armato tiene la scatola a ogni larghezza del riquadro, anche quando va a capo.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
@@ -22,7 +22,7 @@ async function apri(page) {
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
-      if (t === 'merge_approvals_get') return { ok: true, pending, failed: [], recent: [], ttlMs: 7 * GIORNO };
+      if (t === 'merge_approvals_get') return { ok: true, pending, failed: [], recent: [], ttlMs: 7 * 86400000 };
       if (t === 'merge_approval_approve') { window.__macCalls.push({ op: 'approve', id: msg.id }); return { ok: true, result: 'merged', sha: 'deadbeefcafe' }; }
       return orig(msg);
     };
@@ -33,14 +33,16 @@ async function apri(page) {
   await page.locator('.mg-tab[data-tab="automation"]').click();
 }
 
-test('a ogni larghezza della finestra, Confermi? sta nella scatola di Approva e il secondo clic nello stesso punto fonde', async ({ app, openTab }) => {
+test('a ogni larghezza del riquadro, Confermi? sta nella scatola di Approva e il secondo clic nello stesso punto fonde', async ({ openTab }) => {
   test.setTimeout(240_000);
-  for (const larga of [1400, 1000, 760, 560, 420]) {
-    await app.evaluate(({ BrowserWindow }, w) => { const win = BrowserWindow.getAllWindows()[0]; win.setSize(w, 820); }, larga);
-    const page = await openTab(MANAGE);
+  const page = await openTab(MANAGE);
+  for (const larga of [1000, 560, 320, 240, 180, 150, 130, 110]) {
+    if (larga !== 1000) await page.reload({ waitUntil: 'load' });
     await apri(page);
     const go = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
     await expect(go).toBeVisible({ timeout: 8000 });
+    // La finestra di prova non si ridimensiona: si stringe il riquadro delle fusioni.
+    await page.evaluate((w) => { document.querySelector('#mgMergeApprovalsOrphans').style.width = w + 'px'; }, larga);
     await go.scrollIntoViewIfNeeded();
     const prima = await go.boundingBox();
     const punto = { x: prima.x + prima.width / 2, y: prima.y + prima.height - 3 };
@@ -53,6 +55,5 @@ test('a ogni larghezza della finestra, Confermi? sta nella scatola di Approva e 
     await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-status')).toContainText(/su main/i, { timeout: 8000 });
     expect(await page.evaluate(() => window.__macCalls), `larga ${larga}`).toEqual([{ op: 'approve', id: 'ab12cd34ef56ab12cd34ef56' }]);
     await page.screenshot({ path: `tests/.shots/v667-5-${larga}.png` }).catch(() => {});
-    await page.close();
   }
 });
