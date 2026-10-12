@@ -7,8 +7,8 @@ import { clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd } from
 import { mkdirSync } from 'node:fs';
 
 const SHOTS = 'tests/.shots';
-// La piattaforma la sceglie la prova, mai quella che la esegue: il caso Windows (installa all'apertura dopo, #1039)
-// era provato solo sul Windows dell'owner (#1171).
+// La piattaforma la sceglie la prova, mai quella che la esegue: così il caso Windows (installa all'apertura dopo,
+// #1039) gira anche dove gira la suite, e non diventa rosso solo sulla macchina dell'owner (#1171).
 const SISTEMI = [
   { nome: 'Linux', piattaforma: 'linux', allaChiusura: true },
   { nome: 'Windows', piattaforma: 'win32', allaChiusura: false },
