@@ -1461,6 +1461,7 @@
     getInputWordAt,
     requestWordSuggestion,
     applyFix,
+    sostituisciComeBattuta,
     riallineaIssues,
     addToDictionary,
     isInDictionary,
