@@ -131,8 +131,9 @@ for (const s of SISTEMI) test(`accesa: tutto come prima, la versione nuova si sc
   await expect(home.locator('#accade .dash-carta[data-tipo="avviso"]')).toHaveCount(0);
 });
 
-test('Preferenze, Impostazioni avanzate: l\'opzione è accesa di serie, spenta vale subito e si riaccende', async ({ app, shell, openTab }) => {
+for (const s of SISTEMI) test(`Preferenze, Impostazioni avanzate: l'opzione è accesa di serie, spenta vale subito e si riaccende (${s.nome})`, async ({ app, shell, openTab }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await suSistema(app, s);
   await aggiornatoreFinto(app, { automatici: true });
   const pref = await openTab('filo://preferences/preferences.html');
   const casella = pref.locator('#sec-advanced #sec-aggiornamenti #aggiornamentiAutomatici');
