@@ -362,7 +362,7 @@ automatismo le pubblica: si fa a mano, da main allineato a origin/main (la
 guardia rifiuta un ramo o una modifica non fusa), con
 
 ```bash
-npm run regole:pubblica    # regole e indici di Firestore, regole dello storage
+npm run regole:pubblica    # regole e indici di Firestore, regole dello storage, pagina delle approvazioni
 ```
 
 La guardia sta anche dentro `firebase.json` (predeploy): un `firebase deploy`
