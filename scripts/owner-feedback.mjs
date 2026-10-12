@@ -52,7 +52,7 @@
 //   se richiede lavoro locale, `--serve-locale` lo riporta nei Ricevuti
 //   (stato design, nota «Richiede lavoro locale») e decide l'owner.
 //   Il sì dell'owner a un feedback di un utente o di una routine (`localApproval`, #913) qui non si dà: solo il
-//   tasto «💻 Lavoro locale» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
+//   tasto «💻 Lavoro server» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
 //   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta. Per la
 //   stessa ragione la fiducia (#1148): «Segna fidato» lo dà solo l'owner, in Gestione, dopo aver letto il testo.
 //   `--riconosci`, `--preapprova` e `--chiedi-prima` non ci sono più e si rifiutano col perché.
@@ -438,7 +438,7 @@ export function rifiutoPratica(id, r) {
 }
 
 /** Il sì come lavoro locale a un feedback non dell'owner (#957): nessuno strumento delle sessioni lo scrive. */
-export const SOLO_DA_GESTIONE = 'Come lavoro locale lo approva solo l’owner, in Gestione, col tasto «💻 Lavoro locale» dei Ricevuti dopo averlo letto: da riga di comando non si può.';
+export const SOLO_DA_GESTIONE = 'Come lavoro server lo approva solo l’owner, in Gestione, col tasto «💻 Lavoro server» dei Ricevuti dopo averlo letto: da riga di comando non si può.';
 /** La fiducia (#1148): salta giudici e L5, quindi la dà solo l'owner, dalla finestra di Filo. */
 export const SOLO_DA_GESTIONE_MIO = 'La fiducia la dà solo l’owner, in Gestione, col tasto «🤝 Segna fidato» dopo aver letto il testo: da riga di comando non si può.';
 /** «Fondi senza chiedermelo» non esiste più: al suo posto «Segna fidato», che vale prima del lavoro (#1148). */

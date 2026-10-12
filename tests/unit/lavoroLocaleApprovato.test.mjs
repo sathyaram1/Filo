@@ -50,7 +50,7 @@ test('una sessione lavora in locale solo il fidato o l’approvato dall’owner;
 test('i rifiuti dicono perché e la strada: utente, routine, e il proprio non fidato', () => {
   assert.equal(MR.localSenderCheck({ clientId: 'utente-7' }).ok, false);
   assert.equal(MR.localSenderCheck({ clientId: 'utente-7' }).utente, true);
-  assert.match(MR.localSenderCheck({ clientId: 'utente-7' }).motivo, /approva come lavoro locale/);
+  assert.match(MR.localSenderCheck({ clientId: 'utente-7' }).motivo, /approva come lavoro server/);
   const routine = MR.localSenderCheck({ clientId: 'routine:worker', senderProof: 'server' });
   assert.deepEqual([routine.ok, routine.routine], [false, true]);
   assert.equal(MR.localSenderCheck({ clientId: 'local:claude', senderProof: 'admin' }).ok, true, 'prima della migrazione');
@@ -146,7 +146,7 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
     const mio = /riconosci/.test(nome);
     assert.equal(r.status, 1, `${nome}: ${r.stderr}`);
     assert.match(r.stderr, mio ? /RIFIUTATO: --riconosci non c'è più/ : /RIFIUTATO: --approva-locale non c'è più/, nome);
-    assert.match(r.stderr, mio ? /in Gestione, col tasto «🤝 Segna fidato»/ : /in Gestione, col tasto «💻 Lavoro locale»/, nome);
+    assert.match(r.stderr, mio ? /in Gestione, col tasto «🤝 Segna fidato»/ : /in Gestione, col tasto «💻 Lavoro server»/, nome);
     assert.doesNotMatch(r.stdout, /^Auth:/m, `${nome}: non deve nemmeno prendere le credenziali`);
   }
 });
@@ -201,7 +201,7 @@ test('approvato: start/finish --feedback e i passaggi del lavoro lo accettano; s
     assert.equal(r.utente, true);
     const rifiuto = of.rifiutoPratica('913', r);
     assert.doesNotMatch(rifiuto, /--approva-locale/);
-    assert.match(rifiuto, /in Gestione, col tasto «💻 Lavoro locale».*da riga di comando non si può/);
+    assert.match(rifiuto, /in Gestione, col tasto «💻 Lavoro server».*da riga di comando non si può/);
   });
   const routine = documento('r1', { clientId: 'routine:worker', senderProof: 'server', status: 'design', statusPublic: 'open' });
   await conRete(routine, async () => {

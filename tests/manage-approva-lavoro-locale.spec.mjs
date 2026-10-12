@@ -65,16 +65,16 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
 
   const btn = page.locator('#mgAcceptLocalBtn');
   await expect(btn).toBeVisible();
-  await expect(btn).toHaveText('💻 Lavoro locale');
+  await expect(btn).toHaveText('💻 Lavoro server');
   await expect(btn).toHaveAttribute('title', /nessuna routine/i);
   // Rimandato perché richiede lavoro locale: è la scelta attesa, quindi il tasto principale.
   await expect(btn).not.toHaveClass(/sn-btn-secondary/);
   await expect(page.locator('#mgAcceptBtn')).toHaveClass(/sn-btn-secondary/);
 
   await btn.click();
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori locali (1)');
+  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
   await expect(tabBtn(page, 'inbox')).toHaveText('Ricevuti (0)');
-  await expect(page.locator('#mgToast')).toContainText('Lavori locali');
+  await expect(page.locator('#mgToast')).toContainText('Lavori server');
   const updates = await page.evaluate(() => window.__updates);
   expect(updates).toHaveLength(1);
   expect(scrittura(updates[0])).toEqual({ status: 'todo', reviewDecision: 'accepted', localOnly: true, localApproval: true });
@@ -87,7 +87,7 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /^Fidato: l’hai segnato tu/);
   const segno = page.locator('#mgLocalBtn');
   await expect(segno).toBeVisible();
-  await expect(segno).toHaveAttribute('title', /Approvato come lavoro locale da .*l'approvazione resta/);
+  await expect(segno).toHaveAttribute('title', /Approvato come lavoro server da .*l'approvazione resta/);
 
   // Se si può mettere si può togliere, e rimettere: il sì resta, e il segno torna senza passare dai Ricevuti.
   await segno.click();
@@ -97,7 +97,7 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   await expect(segno).toBeVisible();
   await expect(segno).toHaveAttribute('aria-pressed', 'false');
   await segno.click();
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori locali (1)');
+  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
   const ancora = await page.evaluate(() => window.__updates);
   expect(ancora[2]).toEqual({ type: 'feedback_update', id: 'u-913', localOnly: true });
 });
@@ -119,12 +119,12 @@ test('tasto destro sulla scheda nei Ricevuti: «Approva come lavoro locale», e 
   const page = await openTab(MANAGE);
   await apri(page, [fb({ clientId: 'routine:worker', senderProof: 'server' })]);
   await page.locator('.mg-item').click({ button: 'right' });
-  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Approva come lavoro locale' });
+  const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Approva come lavoro server' });
   await expect(voce).toBeVisible();
   await expect(voce).toHaveAttribute('title', /nessuna routine/i);
   await voce.click();
   await expect(page.locator('.mg-ctxmenu')).toHaveCount(0);
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori locali (1)');
+  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
   const updates = await page.evaluate(() => window.__updates);
   expect(scrittura(updates[0])).toEqual({ status: 'todo', reviewDecision: 'accepted', localOnly: true, localApproval: true });
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: 'u-913' }]);
@@ -135,7 +135,7 @@ test('se il server non lo segna fidato, il lavoro locale resta e il messaggio lo
   await apri(page, [fb()], 'inbox', 'feedback inesistente');
   await page.locator('.mg-item').click();
   await page.locator('#mgAcceptLocalBtn').click();
-  await expect(tabBtn(page, 'local')).toHaveText('Lavori locali (1)');
+  await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
   await expect(page.locator('#mgToast')).toContainText('Non segnato fidato: feedback inesistente');
   await tabBtn(page, 'local').click();
   await page.locator('.mg-item').click();
@@ -157,7 +157,7 @@ test('la pagina gemella dei feedback offre la stessa azione e scrive gli stessi 
   await stubMain(page);
   await page.evaluate((items) => { window.__fbTest.setAdmin && window.__fbTest.setAdmin(true); window.__fbTest.setData(items); }, [fb()]);
   const btn = page.locator('.fb-act[data-local="1"]');
-  await expect(btn).toHaveText('💻 Lavoro locale');
+  await expect(btn).toHaveText('💻 Lavoro server');
   await btn.click();
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
   const updates = await page.evaluate(() => window.__updates);
