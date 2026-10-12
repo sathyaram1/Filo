@@ -223,9 +223,10 @@ function destinazioniNelCodice(file, testo, righe) {
         if (!p.name || !CHIAVI_HOST.has(p.name.text)) continue;
         const espr = ts.isShorthandPropertyAssignment(p) ? p.name : ts.isPropertyAssignment(p) ? p.initializer : null;
         if (!espr || testoDi(espr) !== null) continue; // il letterale lo legge già il lexer
-        const riga = sf.getLineAndCharacterOfPosition(p.getStart(sf)).line + 1;
+        const riga = rigaDi(p);
         const testoRiga = righe[riga - 1] || '';
         const host = ts.isIdentifier(espr) ? costanti.get(espr.text) : null;
+        if (host && eDominio(host)) continue; // la costante l'ha già presa la regola dei nomi di dominio
         if (host && /^[a-z0-9.-]+(:\d+)?$/i.test(host)) out.push({ url: `https://${host}`, host: host.toLowerCase(), riga, dinamico: false, composto: false, testoRiga });
         else out.push({ url: 'https://', host: '', riga, dinamico: true, composto: true, testoRiga });
       }
