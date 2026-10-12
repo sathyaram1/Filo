@@ -52,6 +52,7 @@
         'L\'Aiuto prende le istruzioni per assistenti solo dal sito su cui sei. Un sito non può più fargli leggere quello che c\'è sul tuo router o su altri dispositivi della rete di casa.',
         'Su Linux il correttore ortografico non scarica più i dizionari da Google, e su Windows nemmeno per le lingue che il sistema non corregge: quelli di italiano e inglese sono dentro Filo e funzionano anche senza rete.',
         'Quando riscatti un invito, la conferma dice quanti crediti d’ingresso ricevi. Prima nominava anche i crediti contati sul tuo computer, e sembrava che te li togliesse.',
+        '«Accedi con Google» ti fa entrare anche su un secondo computer. Prima confermavi nel browser, ma Filo restava fuori e non te lo diceva; su Linux senza portachiavi succedeva a ogni riapertura. E il browser non ti chiede più il consenso a ogni accesso, solo quale account usare.',
       ],
     },
     {
