@@ -139,6 +139,7 @@ function scena({ sullaPunta = false } = {}) {
   writeFileSync(join(origine, 'scripts', 'rossi-sulla-punta.mjs'), [
     "import { writeFileSync } from 'node:fs';",
     "writeFileSync(process.env.FINTO_PUNTA, process.argv.slice(2).join(' '));",
+    "if (process.env.FINTO_ESITO === 'rotto') throw new Error('controllo rotto');",
     'if (process.env.FINTO_VERDI) process.stdout.write(process.env.FINTO_VERDI);',
     'process.exitCode = Number(process.env.FINTO_ESITO);',
     '',
@@ -234,7 +235,7 @@ describe('il passo «Controlli falliti» di release.yml', { skip: !haBash && 'se
   test('il controllo della punta che si rompe: il feedback si apre', () => {
     const s = scena();
     try {
-      const r = eseguiPasso(s, { esito: 'non-un-numero', verdi: '' });
+      const r = eseguiPasso(s, { esito: 'rotto', verdi: 'tests/unit/aggiornamentiAutomatici.test.mjs\n' });
       assert.equal(r.status, 1);
       assert.ok(r.allarme, 'un controllo rotto ha spento l\'allarme');
       assert.equal(r.copiaRimasta, false);

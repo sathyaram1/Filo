@@ -133,6 +133,15 @@ rimette com'era. Regge solo perché il codice la chiede al momento, da un punto 
 (`dip.piattaforma()`), mai fissata in una costante al caricamento del modulo: lì la
 prova non arriverebbe più, e il caso Windows girerebbe da Linux.
 
+**Il commit provato è vecchio** (#1185). Il cancello prova l'ultimo commit di main con
+la suite verde, che può stare giorni dietro la punta: gli stessi otto rossi, corretti
+su main da un giorno, hanno riaperto il loro feedback appena il primo si era chiuso.
+Prima di aprirlo il cancello rifà ogni file rosso sulla punta di main
+(`scripts/rossi-sulla-punta.mjs`): verdi tutti, nessun feedback e la corsa resta rossa;
+altrimenti il feedback dice il commit provato e quali file sono già verdi. Nel dubbio
+(main irraggiungibile, rosso senza file, controllo rotto) si apre come prima.
+Sentinella: `tests/unit/rossiSullaPunta.test.mjs`.
+
 ## Il collegamento simbolico (#742)
 
 Su Windows un collegamento simbolico lo crea solo l'amministratore o chi ha la
