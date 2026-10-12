@@ -637,7 +637,7 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     // Con --force-if-includes git rifiuta se quel commit non è mai passato
     // dalla storia locale di questo ramo.
     const lease = run(['push', '--force-with-lease', '--force-if-includes', 'origin', `HEAD:refs/heads/${ramo}`]);
-    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true };
+    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
