@@ -266,7 +266,8 @@ I feedback non sono l'unica cosa che arriva al server. Ci sono anche:
   (`src/main/services/handlers/redteam.js`);
 - se accedi con Google, **email e nome** dell'account e quanto usi ogni
   funzione (`src/main/services/handlers/credits.js`);
-- quando usi l'Aiuto, il **nome del sito** di cui chiede i percorsi (§8).
+- quando usi l'Aiuto, il **nome del sito** di cui chiede i percorsi (§8,
+  `src/shared/paths.js`).
 
 L'elenco completo, campo per campo, con cosa ne facciamo e per quanto lo
 teniamo, sta nel documento sulla privacy (`transparency/privacy.md`).
@@ -340,9 +341,10 @@ tutti i progetti Firebase, è pubblica per design e visibile nel client): sta
 **interamente nelle regole** descritte sopra, che sono il vero confine.
 
 Da qui segue una cosa che non è ovvia: **aver fatto il login non è un
-permesso**. La chiave è pubblica e per entrare basta un account Google
-qualunque, quindi una regola che chiede solo di essere autenticati lascia
-passare chiunque, anche chi Filo non l'ha mai installato. Le credenziali
+permesso**. La chiave è pubblica e per entrare basta un account qualunque,
+anche uno anonimo creato al momento (è così che nasce l'identità di ogni
+installazione, §1), quindi una regola che chiede solo di essere autenticati
+lascia passare chiunque, anche chi Filo non l'ha mai installato. Le credenziali
 condivise, cioè le chiavi dei servizi AI che Filo usa per conto tuo, le legge
 **solo un amministratore**. Le chiavi di default, quelle che fanno funzionare
 Filo appena installato, il tuo computer non le scarica: arrivano già dentro
@@ -574,8 +576,8 @@ chiudi, se lo scegli in Preferenze → Impostazioni avanzate → «Quando
 installarla» (`src/main/aggiornamentoRegole.js`). Su Mac e su Linux prova a
 installarla quando chiudi Filo, ma lì l'installazione può fermarsi: in quel
 caso Filo te lo dice con una notifica, che spiega come installare la versione
-nuova a mano. Gli aggiornamenti vengono
-pubblicati come release ufficiali del progetto. Puoi disattivare gli
+nuova a mano. Gli aggiornamenti vengono pubblicati come release ufficiali del
+progetto. Puoi disattivare gli
 aggiornamenti automatici dalle impostazioni (Preferenze → Impostazioni
 avanzate → «Installa gli aggiornamenti da solo»), o chiedendolo a Filo, se
 preferisci controllarli a mano. Filo continua a controllare e ti avvisa
