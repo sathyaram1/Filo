@@ -174,13 +174,18 @@ export function frontmatter(testo) {
   return out;
 }
 
-export function modelloDelRuolo(ruolo, root = ROOT) {
+/** Modello e sforzo di un ruolo: quelli che il server ha deciso per il lavoro (#1189), campo per campo, se ci sono; altrimenti il frontmatter. */
+export function modelloDelRuolo(ruolo, root = ROOT, dalServer = null) {
   const nome = AGENTE_DEL_RUOLO[ruolo];
   const f = join(root, '.claude', 'agents', `${nome}.md`);
   if (!existsSync(f)) throw new Error(`manca ${f}: modello e sforzo del ${ruolo} si leggono da lì`);
   const fm = frontmatter(readFileSync(f, 'utf8'));
   if (!fm.model || !fm.effort) throw new Error(`${f} senza model o effort nel frontmatter`);
-  return { model: fm.model, effort: fm.effort };
+  const d = dalServer || {};
+  // Un valore che non conosciamo non ripiega in silenzio sul frontmatter: sarebbe un'istanza col modello sbagliato.
+  if (d.model && !MODELLI.includes(d.model)) throw new Error(`modello deciso dal server sconosciuto: «${d.model}» (noti: ${MODELLI.join(', ')})`);
+  if (d.effort && !SFORZI.includes(d.effort)) throw new Error(`sforzo deciso dal server sconosciuto: «${d.effort}» (noti: ${SFORZI.join(', ')})`);
+  return { model: d.model || fm.model, effort: d.effort || fm.effort };
 }
 
 const confrontaVersioni = (a, b) => {
