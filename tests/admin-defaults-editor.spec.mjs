@@ -29,9 +29,13 @@ async function openStubbedEditor(openTab, overrides = {}) {
       excludedProviders: null,
       ...over,
     };
+    // `__defaultsMinus`: la lista del codice tranne quelle voci, letta dal codice e
+    // non ricopiata, così una voce di serie nuova non sposta l'avviso del test.
     if (fakeConfig.excludedProviders == null) {
+      const minus = new Set(fakeConfig.__defaultsMinus || []);
       Object.defineProperty(fakeConfig, 'excludedProviders', {
-        get: () => (window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [],
+        get: () => ((window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [])
+          .filter((n) => !minus.has(n)),
       });
     }
     window.__sent = [];
