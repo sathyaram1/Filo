@@ -34,7 +34,8 @@ test-results/
 .DS_Store
 *.log
 # Copie di lavoro dei dati del server (feedback, collezioni Firestore): il repo è pubblico e il
-# salvataggio spedisce tutto. Vanno in os.tmpdir(); con un altro nome le ferma tests/unit/copieDiDatiFuoriDalRepo.test.mjs.
+# salvataggio spedisce tutto. Vanno in os.tmpdir(). Questi nomi li ferma git; con un altro nome la copia
+# la riconosce dalla forma tests/unit/copieDiDatiFuoriDalRepo.test.mjs.
 *dump*.json
 *dump*.jsonl
 filo-copie/
