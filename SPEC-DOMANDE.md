@@ -51,7 +51,7 @@ Feedback, domande, compiti e biglietti hanno un campo `fiducia`: `fidato` o
 - **un'approvazione dell'owner**: un feedback che l'owner segna come fidato
   dopo aver letto il testo originale (in Ricevuti, § 2.2);
 - **un biglietto pulito** (§ 1.2);
-- **il server**: allarmi, compiti ricorrenti nati da un modello dell'owner.
+- **il server**: allarmi, istanze dei compiti ricorrenti scritti dall'owner.
 
 Tutto il resto è **non fidato**: i feedback degli utenti, quelli che Filo apre
 per conto di un utente, e ogni cosa scritta da un biglietto sporco.
