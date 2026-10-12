@@ -2974,7 +2974,7 @@ class TabManager {
       if (event.isMainFrame === false) return;
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
-    pwc.setWindowOpenHandler(({ url, referrer }) => {
+    pwc.setWindowOpenHandler(({ url, referrer, features }) => {
       if (isWebUnsafeNav(url)) {
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, referrer);
         return { action: 'deny' };
@@ -2987,7 +2987,7 @@ class TabManager {
       }
       if (accesso && gesto) {
         if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
-        return this._allowAuthPopup(url);
+        return this._allowAuthPopup(url, features);
       }
       this.openTab(url, {
         activate: true,
