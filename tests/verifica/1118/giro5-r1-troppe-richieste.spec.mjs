@@ -1,5 +1,5 @@
-// Verifica #1118 giro 5: la ricerca col classificatore su tanti feedback (come quelli dell'owner), con troppe
-// richieste all'avvio o di continuo, col posto del classificatore svuotato, e il suo aspetto nei due temi.
+// Verifica #1118 giro 5, rilievo 1: la ricerca col classificatore su tanti feedback (come quelli dell'owner), con
+// troppe richieste all'avvio (poi si torna a leggere in parallelo) o di continuo (si ripiega presto sul modello).
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
@@ -53,7 +53,7 @@ async function preparaOwner(app, { supportDoc, modo = 'ok', latenza = 400 }) {
         if (!g.primo) g.primo = Date.now();
         g.decisioni++;
         g.inVolo++; g.picco = Math.max(g.picco, g.inVolo);
-        if (Date.now() - g.primo > 3000) g.piccoDopo = Math.max(g.piccoDopo, g.inVolo);
+        if (Date.now() - g.primo > 4500) g.piccoDopo = Math.max(g.piccoDopo, g.inVolo);
         try {
           await pausa(latenza);
           if (modo === 'raffica' && Date.now() - g.primo < 2000) return risposta(false, { error: { message: 'rate limited' } }, 429, {});
@@ -87,7 +87,7 @@ async function cerca(page, testo, n) {
   await page.press('#mgSearchInput', 'Enter');
 }
 
-test('raffica di troppe richieste all\'avvio su 800 feedback: passata la raffica si torna a leggere in parallelo', async ({ app, openTab }) => {
+test('r1 raffica di troppe richieste all\'avvio su 800 feedback: passata la raffica si torna a leggere in parallelo', async ({ app, openTab }) => {
   await preparaOwner(app, { supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13', manageSearch: 'vendor/testo' }, modo: 'raffica' });
   const page = await openTab(URL);
   await page.waitForFunction(() => window.filo && window.__mgTest);
@@ -101,45 +101,15 @@ test('raffica di troppe richieste all\'avvio su 800 feedback: passata la raffica
   expect(g.piccoDopo, 'dopo la raffica le richieste tornano a partire insieme').toBeGreaterThanOrEqual(6);
 });
 
-test('troppe richieste di continuo su 800 feedback: quanto si aspetta prima di vedere qualcosa', async ({ app, openTab }) => {
-  test.setTimeout(400000);
+test('r1 troppe richieste di continuo su 800 feedback: quanto si aspetta prima di vedere qualcosa', async ({ app, openTab }) => {
+  test.setTimeout(60000);
   await preparaOwner(app, { supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13', manageSearch: 'vendor/testo' }, modo: 'sempre429' });
   const page = await openTab(URL);
   await page.waitForFunction(() => window.filo && window.__mgTest);
   const t0 = Date.now();
   await cerca(page, 'la x per chiudere', 800);
-  await expect(page.locator('.mg-item--result').first()).toBeVisible({ timeout: 360000 });
+  await expect(page.locator('.mg-item--result').first()).toBeVisible({ timeout: 25000 });
   const secondi = (Date.now() - t0) / 1000;
   console.log(`sempre429: primo risultato dopo ${secondi.toFixed(1)} s; messaggio: ${await page.locator('#mgSearchMsg').textContent()}`);
   expect(secondi).toBeLessThan(20);
-});
-
-test('posto del classificatore svuotato: la ricerca usa il modello e non parla del classificatore', async ({ app, openTab }) => {
-  await preparaOwner(app, { supportDoc: { manageSearchClassifier: '', manageSearch: 'vendor/testo' } });
-  const page = await openTab(URL);
-  await page.waitForFunction(() => window.filo && window.__mgTest);
-  await cerca(page, 'la x per chiudere', 40);
-  await expect(page.locator('.mg-item--result')).toHaveCount(1, { timeout: 10000 });
-  await expect(page.locator('#mgSearchMsg')).toHaveText('');
-  const g = await app.evaluate(() => globalThis.__v1118g5);
-  expect(g.decisioni).toBe(0);
-  expect(g.chat).toBe(1);
-});
-
-test('aspetto nei due temi: barra di avanzamento e risultati', async ({ app, openTab }) => {
-  await preparaOwner(app, { supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13' }, latenza: 1500 });
-  const page = await openTab(URL);
-  await page.waitForFunction(() => window.filo && window.__mgTest);
-  for (const tema of ['light', 'dark']) {
-    await page.evaluate(async (t) => {
-      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } });
-    }, tema);
-    await page.waitForTimeout(300);
-    if (tema === 'light') await cerca(page, 'la x per chiudere', 400);
-    else { await page.fill('#mgSearchInput', 'pulsante chiusura'); await page.press('#mgSearchInput', 'Enter'); }
-    await expect(page.locator('.mg-item--result').first()).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: `tests/.shots/v1118-g5-corsa-${tema}.png` });
-    await expect(page.locator('#mgSearchProgress')).toBeHidden({ timeout: 30000 });
-    await page.screenshot({ path: `tests/.shots/v1118-g5-fine-${tema}.png` });
-  }
 });
