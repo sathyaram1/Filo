@@ -179,8 +179,11 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-status[data-kind='err']  { color: var(--sn-error); }
 
 
+/* Se i tasti non stanno affiancati va a capo la fila, non la scritta: una pillola su due righe è brutta
+   e cambia altezza quando l'etichetta armata sta in una. */
 .sn-mac-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 }

@@ -594,7 +594,7 @@ test('fusione col pannello stretto al minimo: armato, Approva non si muove e il 
 
   const corpo = page.locator('#mgSideBody');
   const go = corpo.locator('.sn-mac-btn-go');
-  await expect(go).toBeVisible();
+  await go.scrollIntoViewIfNeeded();
   const prima = await go.boundingBox();
   const punto = { x: prima.x + 3, y: prima.y + prima.height - 4 };
 
