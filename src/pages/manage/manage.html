@@ -1124,11 +1124,8 @@
       color: var(--sn-muted);
       white-space: nowrap;
     }
-    /* Pronto e fermo per il PC: la tinta d'accento lo stacca dal segno «server», che è solo una sezione. */
-    .mg-attesa-badge {
-      border-color: color-mix(in srgb, var(--sn-accent, var(--sn-fg)) 55%, transparent);
-      color: var(--sn-accent, var(--sn-fg));
-    }
+    /* Pronto e fermo per il PC (#1159): la tinta d'accento lo stacca dalle righe di chi sta lavorando. */
+    .mg-attesa-server { color: var(--sn-accent, var(--sn-fg)); }
 
     /* Una fusione ferma sulla scheda: stessa forma del segno qui sopra, tinta del blocco di sicurezza. Senza, una
        decisione che aspetta l'owner non si distinguerebbe scorrendo la lista. */
