@@ -104,7 +104,7 @@
   function crea(ora = () => Date.now()) {
     let ultimo = 0;
     let corrente = null; // il gesto in corso: una pressione, anche tenuta, è un gesto solo
-    let pressione = null; // l'ultima pressione di mouse o dito: il rilascio tocca anche dove è cominciata
+    const pressioni = new Map(); // famiglia → l'ultima pressione: il rilascio tocca anche dove è cominciata
     let contatore = 0;
     const ultimoDi = new Map(); // tipo → l'ultimo gesto che lo chiede
     const premuti = new Map(); // tasto → il gesto della sua pressione
