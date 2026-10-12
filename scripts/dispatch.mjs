@@ -1910,6 +1910,8 @@ export function serverCtx(bucket, fromServer, diff = '') {
       ripresa: payload && payload.ripresa && typeof payload.ripresa === 'object' ? payload.ripresa : null,
       ...(role === 'fixer' && typeof (payload && payload.critique) === 'string' ? { critique: payload.critique } : {}),
       ...(role === 'verifier' ? { scope: payload && payload.scope, perimetro: (payload && payload.perimetro) || null } : {}),
+      // Il lavoro tocca anche filo-security (busta del server, #1159): le istruzioni del clone si accodano al ruolo.
+      ...(payload && payload.lavoroServer && typeof payload.lavoroServer === 'object' ? { lavoroServer: payload.lavoroServer } : {}),
     };
   }
   return {};
