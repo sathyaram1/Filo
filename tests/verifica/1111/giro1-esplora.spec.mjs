@@ -121,6 +121,25 @@ test('textarea: correzione dal correttore di Filo (Risolvi), gli altri restano e
   await expect(segni(page)).toHaveText(['xqprima1', 'xqseconda2', 'xqterza3'], { timeout: 8000 });
 });
 
+test('textarea: tasto destro sul segno e clic sulla correzione nel menu, gli altri segni restano', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await apri(app, openTab, testServer);
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi xqprima1 poi xqseconda2 e xqterza3 fine ');
+  await expect(segni(page)).toHaveText(['xqprima1', 'xqseconda2', 'xqterza3'], { timeout: 8000 });
+  await app.evaluate(() => { globalThis.__ritardo = 2500; });
+  await sorveglia(page, '#ta');
+  const b = await segni(page).nth(1).boundingBox();
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible();
+  await pausa(600);
+  await page.locator('.sn-menu').getByText('seconda', { exact: true }).first().click();
+  await expect(page.locator('#ta')).toHaveValue('oggi xqprima1 poi seconda e xqterza3 fine ');
+  await pausa(5000);
+  controllaStati(await stati(page), ['xqprima1', 'xqterza3']);
+  await expect(segni(page)).toHaveText(['xqprima1', 'xqterza3']);
+});
+
 test('contenteditable: correggo a tastiera una parola, gli altri segni restano', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await apri(app, openTab, testServer);
