@@ -135,8 +135,9 @@ export function famigliaPrezzo(model) {
 }
 
 /**
- * Token e costo di UNA usage (l'ultima di un messaggio). PURA. La usano il rapporto di fine sessione e il
- * lettore progressivo del battito (lib/consumo-progressivo.mjs): un prezzo solo, scritto in un posto solo.
+ * Token e costo di UNA usage (l'ultima di un messaggio): una richiesta, quindi la soglia del listino vale qui.
+ * PURA. La usano il rapporto di fine sessione e il lettore progressivo del battito
+ * (lib/consumo-progressivo.mjs): un prezzo solo, scritto in un posto solo.
  */
 export function valutaUso(u, model) {
   const input = Number(u && u.input_tokens) || 0;
@@ -144,9 +145,11 @@ export function valutaUso(u, model) {
   const cacheRead = Number(u && u.cache_read_input_tokens) || 0;
   const output = Number(u && u.output_tokens) || 0;
   const fam = famigliaPrezzo(model);
-  const p = PREZZI[fam.key];
+  const listino = PREZZI[fam.key];
+  const oltreSoglia = !!listino.oltre && input + cw5m + cw1h + cacheRead > listino.soglia;
+  const p = oltreSoglia ? listino.oltre : listino;
   const costo = (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cacheRead * p.cacheRead + output * p.output) / 1e6;
-  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam };
+  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam, oltreSoglia };
 }
 
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
