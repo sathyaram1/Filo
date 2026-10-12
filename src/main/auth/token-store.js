@@ -12,6 +12,7 @@
 // servono solo dentro le funzioni, quindi si richiedono lazy lì.
 const fs = require('node:fs');
 const path = require('node:path');
+const guasti = require('./guastiAccesso');
 
 // La sessione dell'avvio in corso. Senza cifratura del sistema il disco resta
 // vuoto, ma salvare e poi rileggere `null` nello stesso processo farebbe
@@ -66,10 +67,11 @@ function load() {
     const json = safeStorage.decryptString(raw);
     return JSON.parse(json);
   } catch (e) {
-    // Blob corrotto o cifrato con un'altra chiave OS (es. altro utente):
-    // trattalo come "non loggato" e ripulisci.
-    console.warn('[auth] sessione illeggibile, la elimino:', e?.message || e);
-    clear();
+    // Blob corrotto o cifrato con un'altra chiave OS (portachiavi diverso, profilo ricreato): si è
+    // fuori, ma il file resta da parte, perché quella chiave può tornare (#1085).
+    console.warn('[auth] sessione illeggibile, la metto da parte:', e?.message || e);
+    inMemoria = null;
+    guasti.metteDaParte(filePath(), 'illeggibile-' + guasti.timbro());
     return null;
   }
 }
