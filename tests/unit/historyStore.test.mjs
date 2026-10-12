@@ -5,7 +5,8 @@
 // voci, nello stesso ordine, fuori da storage.json; oltre 5000 voci e oltre
 // 4 MB senza che la prima sparisca; una richiesta nuova che costa una riga e
 // non riserializza la cronologia; una voce tolta o una chat cancellata che non
-// lasciano testo su disco; l'incognito che tiene le sue voci in RAM.
+// lasciano testo su disco; la pagina che riceve solo l'estratto che mostra;
+// l'incognito che tiene le sue voci in RAM.
 // Electron è finto (come in archivedTabsStore.test.mjs), il disco è vero.
 
 import { test } from 'node:test';
