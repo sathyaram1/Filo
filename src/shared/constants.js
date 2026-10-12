@@ -8,6 +8,8 @@
   const STORAGE_KEYS = {
     SETTINGS: 'settings',
     SAVED_PAGES: 'savedPages',
+    // Dove stava la cronologia AI prima di avere file propri: serve alla migrazione
+    // e al backup, in services/historyStore.js. Nessuno la scrive in storage.json.
     HISTORY: 'aiHistory',
     // #410.1 — cronologia degli scaricamenti "nativi" della navigazione (clic su
     // un link a un file). Sopravvive al riavvio: la pagina elenco (#410.3) la
@@ -2806,10 +2808,6 @@
     return copy;
   }
 
-  // chrome.storage.local ha una quota di ~10 MB per estensione (senza
-  // "unlimitedStorage" nel manifest), condivisa con aiCache/savedPages/costs.
-  // Lasciamo abbondante margine per gli altri consumer.
-  const HISTORY_LIMIT_BYTES = 4 * 1024 * 1024; // 4MB
   const SAVED_PAGES_LIMIT = 1000;
   // §3.2 ricerca semantica: dimensione del vettore di indicizzazione
   // (Matryoshka: 256 dim = buon compromesso qualità/peso), quantizzato a int8.
@@ -2823,7 +2821,6 @@
   // della conversazione, così anche una chat lunghissima resta riconoscibile
   // (vedi SN_CHAT_ARCHIVE.transcriptForTriage).
   const FILO_CHAT_TRIAGE_CHARS = 4000;
-  const HISTORY_ITEMS_HARD_CAP = 5000;
   const AI_CACHE_MAX_ENTRIES = 200;
   const CLIPBOARD_HISTORY_MAX = 50;
 
@@ -2912,8 +2909,6 @@
     descriviSistema,
     unaRigaDiDati,
     PROMPTS,
-    HISTORY_LIMIT_BYTES,
-    HISTORY_ITEMS_HARD_CAP,
     FILO_CHAT_TRIAGE_CHARS,
     SAVED_PAGES_LIMIT,
     EMBED_DIM,

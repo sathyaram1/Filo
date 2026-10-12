@@ -27,6 +27,7 @@ const chromeShim = {
       clear: async () => {
         await storage.clear();
         await globalThis.SN_ARCHIVED_TABS?.clear();
+        await globalThis.SN_HISTORY?.clear();
         await globalThis.SN_SEGNALAZIONI_MIE?.svuota();
       },
     },
