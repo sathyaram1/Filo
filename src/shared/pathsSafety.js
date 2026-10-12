@@ -712,7 +712,7 @@
     const s = String(raw || '').trim();
     if (!s) return '/';
     if (/^https?:\/\//i.test(s)) return normalizedPath(s) || '/';
-    const ripulito = neutralizzaMarcature(tagliaPrimaDiPulire(s, MAX_URL_LEN, nelPezzoDiIndirizzo)).trim().replace(/\s+/g, '');
+    const ripulito = neutralizzaMarcature(tagliaPercorsoPrimaDiPulire(s, MAX_URL_LEN)).trim().replace(/\s+/g, '');
     if (!ripulito.startsWith('/')) return '/';
     return redigiPercorso(ripulito, domain || '').slice(0, MAX_URL_LEN) || '/';
   }
