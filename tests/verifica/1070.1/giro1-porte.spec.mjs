@@ -1,4 +1,4 @@
-// #1070.1 giro 1 — porte vicine al clic semplice: tastiera, dito, clic ripetuti, clic sporco; le strade vere
+// #1070.1 giro 1 — porte vicine al clic semplice: tastiera e dito; le strade vere
 // (Ctrl+A, selezione trascinata nel campo, tasto destro sulla selezione della pagina) restano.
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -84,7 +84,6 @@ test('tastiera: Invio sul pulsante e sul collegamento non paga la selezione dell
   }
   expect(viste.size).toBeGreaterThan(4);
   await pausa(800);
-  console.log('tastiera', await conti(app));
   expect((await conti(app)).spiega).toBe(0);
   await page.evaluate(() => document.activeElement && document.activeElement.blur());
   await page.locator('#pv').click();
@@ -93,7 +92,9 @@ test('tastiera: Invio sul pulsante e sul collegamento non paga la selezione dell
   await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(1);
 });
 
-test('dito: cinque tocchi sul pulsante, sul collegamento e sul campo non pagano spiegazioni', async ({ app, openTab, testServer }) => {
+// Sul campo già selezionato il tocco apre il menu di Filo come il tasto destro (tocco su una selezione): quella
+// spiegazione è chiesta, non anticipata, e qui non si conta.
+test('dito: cinque tocchi sul pulsante e sul collegamento non pagano spiegazioni', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer);
   const cdp = await page.context().newCDPSession(page);
@@ -103,31 +104,13 @@ test('dito: cinque tocchi sul pulsante, sul collegamento e sul campo non pagano 
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   };
   const viste = new Set();
-  for (const sel of ['#bp', '#al', '#ic']) {
+  for (const sel of ['#bp', '#al']) {
     const p = await centro(page, sel);
     for (let i = 0; i < 5; i++) { await tocca(p); await pausa(700); viste.add(await page.evaluate(() => window.__sel())); }
   }
-  console.log('dito viste', viste.size, await conti(app));
-  expect(viste.size).toBeGreaterThan(5);
+  expect(viste.size).toBe(10);
   await pausa(800);
   expect((await conti(app)).spiega).toBe(0);
-});
-
-test('clic ripetuti in fretta e clic sporco sul pulsante', async ({ app, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const page = await apri(app, openTab, testServer);
-  const p = await centro(page, '#bp');
-  // cinque clic di fila, come chi insiste su un pulsante
-  for (let i = 0; i < 5; i++) await page.mouse.click(p.x, p.y, { clickCount: i + 1 });
-  await pausa(1200);
-  const raffica = (await conti(app)).spiega;
-  // tre doppi clic sul pulsante, distanziati
-  for (let i = 0; i < 3; i++) { await page.mouse.click(p.x, p.y, { clickCount: 1 }); await page.mouse.click(p.x, p.y, { clickCount: 2 }); await pausa(900); }
-  const doppi = (await conti(app)).spiega - raffica;
-  // clic con la mano che trema di 5 px
-  for (let i = 0; i < 3; i++) { await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(p.x + 5, p.y, { steps: 2 }); await page.mouse.up(); await pausa(900); }
-  const sporchi = (await conti(app)).spiega - raffica - doppi;
-  console.log('raffica', raffica, 'doppi', doppi, 'sporchi', sporchi);
 });
 
 test('strade vere: trascinare dentro il campo; tasto destro sulla selezione fatta dalla pagina', async ({ app, openTab, testServer }) => {
@@ -152,6 +135,5 @@ test('strade vere: trascinare dentro il campo; tasto destro sulla selezione fatt
   await page.mouse.down();
   await page.mouse.move(Math.round(b.x + 300), y, { steps: 6 });
   await page.mouse.up();
-  console.log('campo sel', await page.evaluate(() => window.__sel()));
   await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(2);
 });
