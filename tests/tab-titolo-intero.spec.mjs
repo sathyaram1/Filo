@@ -180,5 +180,8 @@ test('#429 — la scheda attiva non tiene un vuoto che serve a un nome tagliato'
   await openTab('filo://manage/manage.html');
   await shell.mouse.move(600, 500);
   await expect(shell.locator('.tab.active .title')).toHaveText('Gestione');
-  await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
+  // Le quattro schede alla loro larghezza naturale ci stanno: nessun nome resta tagliato.
+  await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab .title')]
+    .filter((t) => t.scrollWidth > t.clientWidth + 0.5).map((t) => `${t.textContent} ${t.clientWidth}/${t.scrollWidth}`)), { timeout: 10_000 })
+    .toEqual([]);
 });
