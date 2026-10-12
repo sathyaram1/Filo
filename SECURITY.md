@@ -97,8 +97,9 @@ sito web. Seguiamo lo standard **RFC 8252 ("OAuth 2.0 for Native Apps")**:
   vettore di phishing (e Google stesso le blocca). Così puoi sempre verificare
   nella barra degli indirizzi del browser che stai parlando davvero con Google.
 - **Redirect su loopback locale** (`http://127.0.0.1:<porta>`): Filo apre un
-  micro-server temporaneo solo su `localhost` per ricevere il codice di
-  autorizzazione, poi lo chiude. Niente di questo è esposto in rete.
+  micro-server temporaneo solo su `127.0.0.1` per ricevere il codice di
+  autorizzazione, poi lo chiude. Niente di questo è esposto in rete
+  (`src/main/auth/google-auth.js`).
 
 ---
 
