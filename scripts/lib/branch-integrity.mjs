@@ -31,6 +31,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { installaControlloSpedizione } from './copie-di-dati.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
@@ -480,6 +481,8 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // non decidono più la sorte dei marcatori di sessione (vedi il commento su
   // SESSION_MARKERS). Best-effort: un fallimento non ferma la preparazione.
   ensureSessionExcludes(root);
+  // Prima del ramo di scarto spedito più sotto: i commit locali di una sessione morta possono portare una copia dei dati (#1108).
+  try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
 
   if (create) {
     const wanted = base || mainBranch;

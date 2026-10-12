@@ -16,6 +16,12 @@
 # stderr e prosegue.
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+# Gli script accanto a questo hook, letti prima del cd (un percorso relativo vale dalla cartella di partenza).
+case "${BASH_SOURCE[0]}" in
+  /*|?:*) HOOK_SCRIPTS="${BASH_SOURCE[0]%/*}/../../scripts" ;;
+  */*) HOOK_SCRIPTS="$PWD/${BASH_SOURCE[0]%/*}/../../scripts" ;;
+  *) HOOK_SCRIPTS="$PWD/../../scripts" ;;
+esac
 cd "$PROJECT_DIR" || exit 0
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
@@ -247,9 +253,62 @@ else
   COMMIT_AS_EMAIL="claude@local"
 fi
 
+# ─── UNA COPIA DEI DATI DEL SERVER NON PARTE (#1108) ─────────────────────────
+#
+# Il repo e' pubblico: un file spedito resta nella storia anche se tolto subito, quindi la forma si
+# controlla qui, sui file in scena, e non dopo. La riconosce scripts/copie-in-scena.mjs (quello della
+# cartella salvata, o in mancanza quello accanto a questo hook); il resto del lavoro si salva comunque.
+controllo_copie() {
+  local controllo="$1/scripts/copie-in-scena.mjs"
+  [ -f "$controllo" ] || controllo="$HOOK_SCRIPTS/copie-in-scena.mjs"
+  [ -f "$controllo" ] && command -v node >/dev/null 2>&1 && printf '%s' "$controllo"
+}
+# Vero se fra i nomi letti (separati da NUL) c'e' qualcosa che non e' codice o immagine: solo allora si paga node.
+forse_dati() {
+  local f
+  while IFS= read -r -d '' f; do
+    case "$f" in
+      ''|*.js|*.mjs|*.cjs|*.ts|*.css|*.html|*.md|*.sh|*.ps1|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.ico) ;;
+      *) return 0 ;;
+    esac
+  done
+  return 1
+}
+togli_copie_di_dati() {
+  local wt="$1" f elenco="" controllo
+  controllo=$(controllo_copie "$wt") || return 0
+  git diff --cached --name-only -z --diff-filter=ACMR 2>/dev/null | forse_dati || return 0
+  while IFS= read -r -d '' f; do
+    git reset -q -- "$f" >/dev/null 2>&1 || git rm -q --cached -- "$f" >/dev/null 2>&1
+    elenco="$elenco${elenco:+, }$f"
+  done < <(node "$controllo" "$wt" 2>/dev/null)
+  [ -n "$elenco" ] && segnala_avviso "$wt" "NON committo e NON spedisco $elenco: ha la forma di una copia dei dati del server (documenti Firestore o feedback con testo e identificativi), e il repo e' pubblico. Spostalo nella cartella temporanea del sistema (os.tmpdir()); i dati finti per le prove vanno in tests/fixtures/. In questa cartella git non lo vede piu'; il resto del lavoro e' salvato."
+  return 0
+}
+# Il controllo che conta e' sulla spedizione: un commit fatto a mano, o dal rilascio, non passa da quello sopra.
+# Toglie le copie dai commit da spedire e stampa cosa ha fatto; esce 3 se il ramo non puo' partire.
+copie_da_spedire() {
+  local wt="$1" ramo="$2" controllo
+  controllo=$(controllo_copie "$wt") || return 0
+  git log --format= --name-only -z --diff-filter=ACMR "refs/heads/$ramo" --not --remotes=origin 2>/dev/null | forse_dati || return 0
+  node "$controllo" --spedizione "$wt" "$COMMIT_AS_NAME" "$COMMIT_AS_EMAIL" 2>/dev/null
+}
+# Questo hook gira in ogni sessione: mette il pre-push che ferma la copia su ogni altra strada (push a mano, nota
+# diagnostica). Un pre-push che c'e' gia', nostro o altrui, o una cartella di hook condivisa: node non si paga.
+metti_controllo_spedizione() {
+  local dove controllo
+  [ -n "$(git config --get core.hooksPath 2>/dev/null)" ] && return 0
+  dove=$(git rev-parse --git-path hooks/pre-push 2>/dev/null) || return 0
+  [ -e "$dove" ] && return 0
+  controllo=$(controllo_copie "$1") || return 0
+  node "$controllo" --installa "$1" >/dev/null 2>&1
+  return 0
+}
+
 salva_cartella() {
   local wt="$1"
   cd "$wt" || return 0
+  metti_controllo_spedizione "$wt"
 
   BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
@@ -304,6 +363,7 @@ salva_cartella() {
     segnala_avviso "$wt" "le modifiche NON sono state committate (git add e' fallito): $(motivo_git "$ESITO_ADD"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella: se e' un index.lock a terra e nessun git e' in corso, si toglie; al primo salvataggio dopo si riprova."
     return 0
   }
+  togli_copie_di_dati "$wt"
   if git diff --cached --quiet 2>/dev/null; then
     return 0
   fi
@@ -350,7 +410,12 @@ salva_cartella() {
   # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
   # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
   if is_spedibile "$BRANCH"; then
-    spedisci_ramo "$BRANCH" "$wt" || true
+    if COPIE_NEL_RAMO=$(copie_da_spedire "$wt" "$BRANCH"); then
+      [ -n "$COPIE_NEL_RAMO" ] && segnala_avviso "$wt" "$COPIE_NEL_RAMO"
+      spedisci_ramo "$BRANCH" "$wt" || true
+    else
+      segnala_fallimento "$wt" "$COPIE_NEL_RAMO"
+    fi
   fi
 }
 salva_cartella "$CARTELLA"
@@ -431,6 +496,9 @@ if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
   TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null | stringa_json)
   CODA=""
   [ -s "$FALLIMENTI_FILE" ] && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."
+  # Con una copia dei dati nei commit il push e' proprio cio' che non va fatto: prima la copia esce dalla storia.
+  grep -q 'NON spedisco il ramo:' "$FALLIMENTI_FILE" 2>/dev/null \
+    && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: prima togli la copia dalla storia come detto sopra, poi il salvataggio spedisce da solo; un push a mano viene fermato dallo stesso controllo."
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"SALVATAGGIO: %s%s"}}\n' "$HOOK_EVENT" "$TESTO" "$CODA"
 fi
 rm -f "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null

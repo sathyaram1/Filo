@@ -73,6 +73,7 @@ import { readMarker } from './lib/routine-role.mjs';
 import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
 import { chiediConProva, pulisciResti, gitIn } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
+import { copieDaSpedire, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -737,6 +738,14 @@ async function main() {
   //    spedito, ma se per qualsiasi motivo non è andato, il server guarderebbe
   //    una versione vecchia — o un ramo che per lui non esiste.
   const cur = git(['rev-parse', 'HEAD']).out;
+  // Una copia dei dati del server nei commit da spedire ferma: qui la storia non si riscrive, è quella controllata (#1108).
+  let copie = [];
+  try { installaControlloSpedizione(ROOT); } catch (_) { /* per i push a mano dopo: questo lo controlla la riga sotto */ }
+  try { copie = copieDaSpedire(ROOT); } catch (_) { /* senza elenco si spedisce: la sentinella resta la seconda rete */ }
+  if (copie.length) {
+    console.error(`\n✗ ${avvisoSpedizione(copie)}`);
+    process.exit(1);
+  }
   {
     // Ultimo controllo prima dell'unica riga di questo script che scrive su
     // origin: qualunque cosa sia successa sopra, quello che si spedisce non
