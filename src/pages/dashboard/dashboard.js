@@ -737,14 +737,17 @@
       offAnswer = window.filo.onAnswer((data) => {
         if (!data || data.reqId !== reasoningReqId) return;
         if (data.reset) {
-          // Fallback provider a metà: butta ciò che era già a schermo, non accodare.
+          // Fallback provider a metà: butta ciò che il giro aveva già messo a schermo, non accodare.
           streamedText = '';
-          if (streamBubble) streamBubble.textContent = '';
+          if (streamBubble) streamBubble.textContent = rispostaPrima;
           return;
         }
         if (!data.delta || turno.fermato) return;
-        if (!streamBubble) {
+        if (!giroIniziato) {
+          giroIniziato = true;
           pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
+        }
+        if (!streamBubble) {
           streamBubble = document.createElement('div');
           streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
           bubblesEl.appendChild(streamBubble);
@@ -752,9 +755,7 @@
         streamedText += data.delta;
         // Il marker del conto si vede già come numero mentre scorre: la
         // risposta finale lo avrà risolto nel main, e le due non devono differire.
-        streamBubble.textContent = globalThis.SN_CALC
-          ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
-          : streamedText;
+        streamBubble.textContent = rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro();
         followBottomIfNear();
       });
     }
