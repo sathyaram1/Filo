@@ -57,7 +57,7 @@ test('la segnalazione: la risposta scritta col bottone del file resta nella boll
     const esito = chiamate[1].find((m) => m.role === 'tool' && m.tool_call_id === 'f1');
     expect(esito.content).toContain('non ripeterla');
 
-    // L'archivio ha la risposta intera: la chat riaperta dice lo stesso, col bottone.
+    // L'archivio ha la risposta intera: la chat riaperta dice lo stesso.
     await expect.poll(async () => ((await ultimaChat(app)) || { messages: [] }).messages.length, { timeout: 5_000 }).toBe(2);
     const chat = await ultimaChat(app);
     expect(chat.messages[1].text).toBe(`${RISPOSTA}\n\n${DOPO}`);
