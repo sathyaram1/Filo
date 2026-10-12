@@ -165,13 +165,6 @@ function perIlModello(wc) {
   return (s && s.dati) || null;
 }
 
-/** Il testo che il modello ha visto dei candidati: lo guarda la porta delle uscite (#810). */
-function testoLetto(wc) {
-  const d = perIlModello(wc);
-  if (!d) return '';
-  return d.risultati.map((x) => `${x.nome || ''}\n${x.inizio || ''}\n${x.squarcio || ''}`).join('\n');
-}
-
 function percorsoDi(wc, chiave) {
   const s = wc && perScheda.get(wc);
   if (!s || typeof chiave !== 'string' || !chiave) return '';
