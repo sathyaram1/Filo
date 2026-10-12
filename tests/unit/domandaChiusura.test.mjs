@@ -247,6 +247,25 @@ test('CLI: answer_too_big → exit 4 coi numeri stampati', async () => {
   } finally { srv.close(); }
 });
 
+test('CLI: la risposta dell\'orchestratore allega da sola il rapporto della chiusura; quella del worker no (#1170)', async () => {
+  const base = cartellaTemporanea('filo-cli-chiusura-');
+  const { srv, richieste, port } = await fintoServer(200, { ok: true });
+  try {
+    const file = join(base, 'orch.jsonl');
+    const turno = (id, ts, cw, cr) => JSON.stringify({ type: 'assistant', timestamp: ts, sessionId: 'orch', message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: 10 }, content: [{ type: 'text', text: id }] } });
+    writeFileSync(file, [turno('p1', '2026-10-07T09:00:00.000Z', 30000, 0), turno('p2', '2026-10-07T09:00:20.000Z', 0, 30000)].join('\n') + '\n');
+    const r = await cli(port, ['risposta', 'parola', 'c1'], 'niente\n', { FILO_TRANSCRIPT: file });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(richieste[0].body.report.closing, true);
+    assert.equal(richieste[0].body.report.role, 'orchestrator');
+    assert.equal(richieste[0].body.report.turns, 2);
+    assert.match(r.stderr, /chiusura dell'orchestratore: \$0\.\d{4} \(2 turni/);
+    const w = await cli(port, ['risposta', '--biglietto', TK], 'niente\n', { FILO_TRANSCRIPT: file });
+    assert.equal(w.status, 0, w.stderr);
+    assert.equal('report' in richieste[1].body, false);
+  } finally { srv.close(); togliCartella(base); }
+});
+
 test('CLI: risposta vuota → non manda niente', async () => {
   const { srv, richieste, port } = await fintoServer(200, { ok: true });
   try {
