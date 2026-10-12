@@ -256,17 +256,23 @@ export async function esegui(argv, io = {}) {
         if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
         errore(`guasto del canale delle routine (${visibile(r.reason)}): la domanda non è partita.`); return 3;
       }
-      const r = await chiama({ op: 'chiedi', domanda: letta.domanda });
+      const segreto = await bigliettoLocale();
+      const r = await chiama(Object.assign({ op: 'chiedi', domanda: letta.domanda }, segreto ? { biglietto: segreto } : {}));
       scrivi(`OK: domanda ${visibile(r.id || '')} aperta (${fiduciaDetta(r.fiducia)}).`);
       return 0;
     }
+    // Il testo di una domanda non fidata è testo esterno: la sessione si sporca PRIMA di stamparlo (#1148).
     if (a.cmd === 'mostra') {
       const r = await chiama({ op: 'mostra', id: a.id });
+      const nf = nonFidate([r.domanda]);
+      if (nf.length) errore(await sporca(`letta ${visibile(a.id)}`, [motivoNonFidate(nf)]));
       scrivi(formattaDomanda(r.domanda, r.riferimenti));
       return 0;
     }
     if (a.cmd === 'elenco') {
       const r = await chiama(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
+      const nf = nonFidate(r.domande);
+      if (nf.length) errore(await sporca('elenco delle domande', [motivoNonFidate(nf)]));
       scrivi(formattaElenco(r.domande));
       if (r.altre) scrivi(`\nCe ne sono altre oltre le prime ${(r.domande || []).length}: il server non le ha mandate tutte.`);
       return 0;
