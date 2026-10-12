@@ -261,25 +261,31 @@
       .replace(SOPRANNOME_RE, (_m, prima) => `${prima}[ID]`);
   }
 
-  // Di un campo si pulisce il doppio di quello che può restarne, più una forma
-  // intera: un documento della raccolta può portare elementi da centinaia di
-  // migliaia di caratteri, e pulirli interi per tenerne cinquecento fermava
-  // l'Aiuto (#1173). Il taglio torna indietro fino all'inizio della forma che
-  // spezzerebbe (email, codice, pezzo d'indirizzo), che spezzata la pulizia
-  // non riconoscerebbe più; la prova sui bordi sta in tests/unit/percorsiLunghi.test.mjs.
-  const FORMA_MAX = 320;
-  function nellaForma(c) { return carattereLocale(c) || c === 64; }
-  function nelPezzoDiIndirizzo(c) { return c !== 47; }
+  // Di un campo si pulisce il doppio di quello che può restarne più una forma
+  // intera, non tutto: un documento della raccolta può portare elementi da
+  // centinaia di migliaia di caratteri, e pulirli interi per tenerne cinquecento
+  // fermava l'Aiuto (#1173). Il taglio non lascia in fondo mezza forma (email,
+  // codice, numero), che la pulizia non riconoscerebbe più. Prove sui bordi:
+  // tests/unit/percorsiLunghi.test.mjs.
+  const FORMA_MAX = 320; // un indirizzo email non supera i 254 caratteri
 
-  function tagliaPrimaDiPulire(testo, max, formaContinua = nellaForma) {
+  function tagliaPrimaDiPulire(testo, max) {
     const tetto = max * 2 + FORMA_MAX;
     if (testo.length <= tetto) return testo;
     let fine = tetto;
-    while (fine > tetto - FORMA_MAX && formaContinua(testo.charCodeAt(fine - 1))) fine--;
-    // Mai mezzo carattere: la metà alta di una coppia non è un testo.
+    const nellaForma = (c) => carattereLocale(c) || c === 64;
+    while (fine > tetto - FORMA_MAX && nellaForma(testo.charCodeAt(fine - 1))) fine--;
     const c = testo.charCodeAt(fine - 1);
     if (c >= 0xD800 && c <= 0xDBFF) fine--;
     return testo.slice(0, fine);
+  }
+
+  // Un indirizzo si taglia a una barra: un pezzo spezzato può non decodificarsi
+  // più, e la pulizia lo leggerebbe cifrato (`%40` al posto della chiocciola).
+  function tagliaPercorsoPrimaDiPulire(path, max) {
+    const tetto = max * 2 + FORMA_MAX;
+    if (path.length <= tetto) return path;
+    return path.slice(0, path.lastIndexOf('/', tetto) + 1);
   }
 
   // Un elemento toccato, pronto per la raccolta: senza dati personali, senza
