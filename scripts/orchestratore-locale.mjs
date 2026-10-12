@@ -351,9 +351,13 @@ function depVere(P, opz, log) {
   return {
     store: negozio(join(P.note, 'stato.json')),
     esegui,
-    async claude({ ruolo, prompt, cwd, addDirs, nome }) {
+    async claude({ ruolo, prompt, cwd, addDirs, nome, dalServer }) {
+      let scelta;
+      try { scelta = dalServer ? modelloDelRuolo(ruolo, ROOT, dalServer) : ruoli[ruolo]; } catch (e) {
+        return { ok: false, testo: '', costo: 0, errore: e.message };
+      }
       for (const d of addDirs || []) mkdirSync(d, { recursive: true });
-      const r = await esegui(bin, argomentiClaude({ ...ruoli[ruolo], nome, addDirs, budget: opz.budgetIstanza }), {
+      const r = await esegui(bin, argomentiClaude({ ...scelta, nome, addDirs, budget: opz.budgetIstanza }), {
         cwd, input: prompt, env, timeoutMs: opz.oreIstanza * 60 * 60_000,
       });
       const f = join(P.note, 'log', `${nome.replace(/[^a-z0-9]+/gi, '-')}-${new Date().toISOString().replace(/[:.]/g, '')}.json`);
