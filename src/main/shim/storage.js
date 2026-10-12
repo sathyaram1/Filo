@@ -460,8 +460,15 @@ async function clear() {
     changes[k] = { oldValue: STATE.data[k], newValue: undefined };
   }
   STATE.data = {};
+  for (const k of Object.keys(changes)) dimenticaTesto(k);
   scheduleFlush();
   emitChange(changes);
+}
+
+function dimenticaTesto(k) {
+  STATE.testi.delete(k);
+  STATE.suDisco.delete(k);
+  STATE.sporche.delete(k);
 }
 
 function onChanged(fn) {
