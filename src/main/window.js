@@ -109,6 +109,11 @@ function wireWindowCommon(win, tabs) {
   // Spiega, Traduci, Salva per dopo e Aiuto anche col fuoco sulla barra.
   collegaScorciatoie(win.webContents, win);
 
+  // Il menu a comparsa nasce con la barra, dopo il ripristino delle schede: il primo clic lo trova già caricato (#1090).
+  win.webContents.once('did-finish-load', () => {
+    setTimeout(() => { try { require('./popup-menu').preparaMenu(win); } catch (_) {} }, 0);
+  });
+
   // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono
   // mai — Electron manda gli app-command su Windows e Linux, lo swipe su Mac —
   // quindi si ascoltano tutte e due senza ramo di piattaforma: una `if` su
