@@ -790,8 +790,9 @@ Da sistemare prima dei worker in parallelo:
 Ogni punto è un feedback fidato. Finché il § 7 non è fatto, i punti *server* si
 lavorano in locale.
 
-1. *server*: biglietti che si sporcano, campo `fiducia`, migrazione, spareggio,
-   L5 decisa dalla fiducia, fine di `mergePreapproved`.
+1. *server*: biglietti che si sporcano, campo `fiducia`, migrazione, spareggio
+   provvisorio (§ 1.6; lo sostituisce l'urgenza al punto 5), L5 decisa dalla
+   fiducia, fine di `mergePreapproved`.
 2. *server*: collezione `domande`, regole, operazioni, azioni strutturate.
 3. App: barra delle sezioni, sezione Domande, Ricevuti coi filtri L1–L5.
 4. Le attese di oggi diventano domande (§ 3.8); `domanda.mjs` per tutti.
