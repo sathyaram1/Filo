@@ -51,8 +51,8 @@
     + 'Se cambi idea la rifacciamo quando vuoi, da Preferenze → «Rifai '
     + 'l’intervista di benvenuto».';
 
-  // Cinque scambi in tutto, non di più, salvo che sia l'utente ad allungare.
-  const MAX_EXCHANGES = 5;
+  // Sei scambi in tutto, non di più, salvo che sia l'utente ad allungare: uno per voce da scoprire più le cose da dire.
+  const MAX_EXCHANGES = 6;
   // Tetto duro: l'intervista non può diventare infinita nemmeno se il modello
   // si dimentica di chiuderla. Oltre questo, la chiude il codice.
   const HARD_MAX_EXCHANGES = 12;
