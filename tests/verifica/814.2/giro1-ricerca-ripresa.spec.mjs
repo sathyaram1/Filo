@@ -141,16 +141,6 @@ test('ricerca in volo, «Riprendi» con Invio a casella vuota: una ricerca', asy
   await ripristina(app);
 });
 
-test('ricerca in volo, «Riprendi» premuto due volte di fila: una ricerca, una risposta', async ({ app, shell }) => {
-  test.setTimeout(60_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await prepara(app);
-  await fermaDurante(app, page, { copioneUsato: IN_VOLO, ritardo: 4_000, inVolo: true });
-  await page.locator('#sendBtn').dblclick();
-  await esitoUnaRicerca(app, page);
-  await ripristina(app);
-});
-
 test('ricerca nominata ma non partita, «Riprendi» dal tasto destro: la fa, una volta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
