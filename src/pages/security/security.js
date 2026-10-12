@@ -10,6 +10,9 @@
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   // Si salva la forma «xn--…», si mostra il nome come l'utente l'ha scritto (münchen.de).
   const leggibile = window.SN_NOMI_SITO.leggibile;
+  // Le caselle di siti leggono come la chat (#835): la regola sta in nomiSito.js.
+  const cleanDomain = window.SN_NOMI_SITO.dominio;
+  const parseBlacklist = window.SN_NOMI_SITO.righeSiti;
 
   function $(id) { return document.getElementById(id); }
 
