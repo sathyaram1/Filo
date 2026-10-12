@@ -619,7 +619,7 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   const page = await newtabPage(app);
   await configureModel(app);
   await senzaAccoglienza(app, page);
-  await ricercaLenta(app, 5_000);
+  await ricercaLenta(app);
   await copione(app, [
     { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'l1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['Il tempo: rispondo. '], ogni: 100, testo: 'Oggi sole.' },
@@ -631,15 +631,18 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   await ricercaPartita(app);
   await page.locator('#stopBtn').click();
   await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
-  // La chat è di nuovo dell'utente subito, non a ricerca finita.
+  // La chat è di nuovo dell'utente con la ricerca ancora in volo, non a ricerca finita.
   await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 1_000 });
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#input').fill('lascia stare, che tempo fa?');
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-bubble-user')).toHaveCount(2, { timeout: 1_000 });
-  // Il seguito sta sotto la riga del fermo, e la risposta arriva dopo che la ricerca in volo è finita e raccontata.
+  // Il seguito sta sotto la riga del fermo, e il modello parte solo dopo che la ricerca in volo è finita e raccontata.
   const ordine = await page.evaluate(() => [...document.querySelectorAll('.dash-bubble-fermato, .dash-bubble-user')].map((e) => (e.classList.contains('dash-bubble-user') ? 'utente' : 'fermo')));
   expect(ordine).toEqual(['utente', 'fermo', 'utente']);
+  await page.waitForTimeout(500);
+  expect(await app.evaluate(() => [globalThis.__ricercheFinite, globalThis.__messaggi.length])).toEqual([0, 1]);
+  await lasciaLaRicerca(app);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Oggi sole.' })).toBeVisible({ timeout: 10_000 });
   await expect(blocco.first().locator('.dash-activity-seg-head').first()).toHaveText(/Cercato sul web/);
   await expect(blocco.first().locator('.dash-activity-label')).toHaveText(/^Fermato · /);
