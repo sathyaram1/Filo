@@ -975,8 +975,8 @@
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n) || n < 0) return null;
         n = Math.min(10000, n);
-        const eur = Number.isInteger(n) ? String(n) : n.toFixed(2);
-        return { partial: { monthlyLimitEur: n }, label: `Limite di spesa mensile → ${eur}€` };
+        const eur = n.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
+        return { partial: { monthlyLimitEur: n }, label: `Limite di spesa mensile → ${eur} €` };
       },
     },
 
