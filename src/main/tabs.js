@@ -215,6 +215,18 @@ function titoloFinestrella(url, origine = '') {
   return Permessi.nomeDaMostrare(da).dominio;
 }
 
+// Electron passa alla finestra ogni chiave delle `features` di window.open (frame=no, fullscreen, titleBarStyle…):
+// alla pagina restano solo le misure, il resto torna com'è di suo, o il titolo col sito sparirebbe (#1066).
+const MISURE_FINESTRELLA = new Set(['width', 'height', 'left', 'top', 'x', 'y']);
+function senzaOpzioniDellaPagina(features) {
+  const via = {};
+  for (const coppia of String(features || '').split(',')) {
+    const chiave = coppia.split('=')[0].trim();
+    if (chiave && chiave !== 'webPreferences' && !MISURE_FINESTRELLA.has(chiave)) via[chiave] = undefined;
+  }
+  return via;
+}
+
 // Consegna all'OS un link mailto:/tel:/sms: (best-effort). Da chiamare SOLO dopo
 // aver bloccato la navigazione in-app, e SOLO per gli schemi dell'allowlist.
 function openExternalScheme(rawUrl) {
