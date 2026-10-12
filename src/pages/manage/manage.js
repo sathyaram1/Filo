@@ -621,6 +621,33 @@
     });
   }
 
+  // ── Lavori server alle routine (#1159) ─────────────────────────────────────
+  // Spento (o mai scritto): i lavori server restano alle sessioni locali, come prima.
+  let lavoriServerScelte = 0;
+  if (mgLavoriServer) {
+    mgLavoriServer.addEventListener('change', () => {
+      const want = mgLavoriServer.checked;
+      const mia = ++lavoriServerScelte;
+      if (mgLavoriServerMsg) { mgLavoriServerMsg.textContent = ''; mgLavoriServerMsg.classList.remove('mg-err'); }
+      return salvaAuto('lavoriServer', async () => {
+        try {
+          const r = await sendToMain({ type: AUTOMATION_SET, lavoriServer: want });
+          if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+          if (mia !== lavoriServerScelte) return;
+          mgLavoriServer.checked = r.lavoriServer === true;
+        } catch (err) {
+          console.error('[manage] salvataggio lavori server fallito:', err);
+          if (mia !== lavoriServerScelte) return;
+          mgLavoriServer.checked = !want;
+          if (mgLavoriServerMsg) {
+            mgLavoriServerMsg.textContent = 'Salvataggio fallito: l\'impostazione NON è cambiata.';
+            mgLavoriServerMsg.classList.add('mg-err');
+          }
+        }
+      });
+    });
+  }
+
   function applyAutoModeGate() {
     mgAutoToggle.disabled = !isAdmin;
     mgAutoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
