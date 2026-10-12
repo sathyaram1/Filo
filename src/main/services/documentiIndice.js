@@ -37,6 +37,7 @@ const deps = {
   impostazioni: async () => (globalThis.SN_STORAGE ? globalThis.SN_STORAGE.getSettings() : {}),
   cartellaDati: () => process.env.FILO_USER_DATA || require('electron').app.getPath('userData'),
   estrai: (p) => require('./documentiLettore').estrai(p),
+  casa: () => os.homedir(),
 };
 function configura(d) { Object.assign(deps, d || {}); }
 
