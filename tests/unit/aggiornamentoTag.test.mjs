@@ -67,16 +67,21 @@ test('collegato due volte, il cancello non si impila', async () => {
 // Il cammino vero col provider GitHub di electron-updater: feed, «/latest» e latest.yml finti, il resto suo.
 const { GitHubProvider } = require('electron-updater/out/providers/GitHubProvider');
 
-function conGitHub({ tagVero, yml }) {
+// `latest`: le risposte successive di «/latest», per una release più recente che cambia fra due domande.
+function conGitHub({ tagVero, yml, piattaforma = 'win32', latest = null }) {
   const feed = `<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"><entry><id>1</id>` +
     `<link rel="alternate" type="text/html" href="https://github.com/sathyaram1/Filo/releases/tag/${tagVero}"/>` +
     `<title>${tagVero}</title><content>n</content><updated>2026-10-12T00:00:00Z</updated></entry></feed>`;
   const { au, visti } = aggiornatore(null);
   au.allowPrerelease = false;
   const gh = new GitHubProvider({ provider: 'github', owner: 'sathyaram1', repo: 'Filo' }, au, {
-    isUseMultipleRangeRequest: true, platform: 'win32', executor: { request: async () => yml },
+    isUseMultipleRangeRequest: true, platform: piattaforma, executor: { request: async () => yml },
   });
-  gh.httpRequest = async (url) => (String(url).endsWith('.atom') ? feed : JSON.stringify({ tag_name: tagVero }));
+  const risposte = latest ? [...latest] : [];
+  gh.httpRequest = async (url) => {
+    if (String(url).endsWith('.atom')) return feed;
+    return JSON.stringify({ tag_name: risposte.length ? risposte.shift() : tagVero });
+  };
   // Il getUpdateInfoAndProvider vero del prototipo, non uno finto: il cancello deve agganciarsi a quello che gira.
   delete au.getUpdateInfoAndProvider;
   Object.assign(au, {
