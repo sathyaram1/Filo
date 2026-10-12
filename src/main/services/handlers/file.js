@@ -112,7 +112,7 @@ module.exports = function register(on, ctx) {
     const wc = sender && sender.wc;
     const frame = sender && sender.frame;
     let principale = false;
-    try { principale = !!wc && !wc.isDestroyed() && (!frame || frame === wc.mainFrame); } catch (_) { principale = false; }
+    try { principale = !!wc && !wc.isDestroyed() && (!frame || !frame.parent); } catch (_) { principale = false; }
     if (!principale) return { ok: false, code: 'forbidden', error: 'forbidden' };
     return fn(msg || {}, sender, wc);
   };
