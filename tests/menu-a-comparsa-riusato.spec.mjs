@@ -210,3 +210,34 @@ test('il menu riusato segue il tema chiaro e scuro a ogni apertura', async ({ ap
     await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'system'; });
   }
 });
+
+test('se il processo del menu muore, il clic dopo e quello in corso lo fanno comparire lo stesso', async ({ app, openTab }) => {
+  await homeAperta(openTab);
+  const nuovo = async (vecchio) => { const m = await infoMenu(app); return !!m && m.id !== vecchio && m.carica; };
+  const crolla = (subito) => app.evaluate(({ BrowserWindow }, s) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
+    const m = win.getChildWindows().find((c) => decodeURIComponent(c.webContents.getURL()).includes('popupApi'));
+    process.kill(m.webContents.getOSProcessId(), 'SIGKILL');
+    // Il clic arriva mentre il processo muore: l'apertura in corso non si perde.
+    if (s) win.webContents.send('shell:trigger-button', { command: 'apps' });
+  }, subito);
+
+  // Morto a menu chiuso: il clic successivo lo mostra, in una finestra nuova.
+  await expect.poll(async () => { const m = await infoMenu(app); return !!m && m.carica; }, { timeout: 8000 }).toBe(true);
+  const primo = await infoMenu(app);
+  await crolla(false);
+  await expect.poll(async () => (await infoMenu(app))?.id ?? null, { timeout: 5000 }).not.toBe(primo.id);
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).webContents.send('shell:trigger-button', { command: 'settings' });
+  });
+  await expect.poll(async () => (await infoMenu(app))?.visibile, { timeout: 8000 }).toBe(true);
+  await expect((await menuAperto(app)).locator('.menu')).toContainText('Preferenze');
+  await chiudiConEsc(app);
+
+  // Morto mentre il menu sta per comparire: compare lo stesso, con le voci chieste.
+  await expect.poll(() => nuovo(primo.id), { timeout: 8000 }).toBe(true);
+  await crolla(true);
+  await expect.poll(async () => (await infoMenu(app))?.visibile, { timeout: 8000 }).toBe(true);
+  await expect((await menuAperto(app)).locator('.menu')).toContainText('Download');
+  await chiudiConEsc(app);
+});
