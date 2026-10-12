@@ -157,7 +157,7 @@ test('la fixture apre Filo su un profilo già accolto, se la prova non chiede qu
   assert.match(f, /PROFILO_ACCOLTO = \{ filo_onboarding: \{ done: true \} \}/);
 });
 
-test('ogni prova che mette un modello e scrive nella chat della home dice com\'è l\'accoglienza', () => {
+test('ogni prova che mette un modello e scrive nella chat della home parte già accolta', () => {
   const scoperte = [];
   for (const f of readdirSync(TESTS).filter((n) => n.endsWith('.spec.mjs'))) {
     for (const t of proveScoperte(readFileSync(join(TESTS, f), 'utf8'), f)) scoperte.push(`${f} › ${t}`);
