@@ -192,6 +192,50 @@
       .replace(/PERCORSI_CONDIVISI/gi, 'percorsi-condivisi');
   }
 
+  // Gli indirizzi email, cercati partendo dalle chiocciole. Scritta come
+  // espressione (`[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}`, i) la regola
+  // riprovava da ogni lettera e costava il quadrato della lunghezza: un
+  // elemento da trentamila caratteri, un secondo nel processo principale
+  // (#1173). Dà lo stesso testo dell'espressione: una sentinella le confronta.
+  function lettera(c) { return (c >= 65 && c <= 90) || (c >= 97 && c <= 122); }
+  function cifra(c) { return c >= 48 && c <= 57; }
+  function carattereDominio(c) { return lettera(c) || cifra(c) || c === 46 || c === 45; }
+  function carattereLocale(c) { return carattereDominio(c) || c === 95 || c === 37 || c === 43; }
+
+  function redigiEmail(testo) {
+    let chiocciola = testo.indexOf('@');
+    if (chiocciola === -1) return testo;
+    const n = testo.length;
+    let out = '';
+    let da = 0;
+    while (chiocciola !== -1) {
+      let inizio = chiocciola;
+      while (inizio > da && carattereLocale(testo.charCodeAt(inizio - 1))) inizio--;
+      let fine = -1;
+      if (inizio < chiocciola) {
+        let coda = chiocciola + 1;
+        while (coda < n && carattereDominio(testo.charCodeAt(coda))) coda++;
+        // L'ultimo punto seguito da due lettere, con almeno un carattere fra
+        // la chiocciola e lui: è quello che l'espressione trova tornando indietro.
+        for (let p = coda - 3; p >= chiocciola + 2; p--) {
+          if (testo.charCodeAt(p) === 46 && lettera(testo.charCodeAt(p + 1)) && lettera(testo.charCodeAt(p + 2))) {
+            fine = p + 3;
+            while (fine < n && lettera(testo.charCodeAt(fine))) fine++;
+            break;
+          }
+        }
+      }
+      if (fine === -1) {
+        chiocciola = testo.indexOf('@', chiocciola + 1);
+      } else {
+        out += testo.slice(da, inizio) + '[EMAIL]';
+        da = fine;
+        chiocciola = testo.indexOf('@', fine);
+      }
+    }
+    return out + testo.slice(da);
+  }
+
   // Cancella i dati personali da un testo diretto alla raccolta pubblica.
   //
   // Passa di qui OGNI campo che esce dal computer di chi naviga: gli elementi
