@@ -53,7 +53,23 @@ test.beforeAll(async () => {
 
       if (url === '/walletState') {
         seen.states += 1;
+        if (statoGiu) return json(res, 503, { error: { message: 'unavailable' } });
         if (!redeemed) return json(res, 200, { result: { hasWallet: false, invitesOpen: true, configured: true } });
+        if (soloIngresso || saldoIgnoto) {
+          return json(res, 200, {
+            result: {
+              hasWallet: true, pseudonym: 'abcdef0123456789',
+              balance: saldoIgnoto ? { creditsGranted: 5000 } : { credits: 5000, creditsGranted: 5000, limitUsd: 4.2, usageUsd: 0, remainingUsd: 4.2, eurUsd: 1.2, eurPerCredit: 0.0007 },
+              stale: false, dailyCredits: 100,
+              grants: [{ at: '2026-10-08T10:00:00.000Z', credits: 5000, why: 'entry' }],
+              invites: [
+                { code: 'AAAA-2222', used: false, usedAt: null },
+                { code: 'BBBB-3333', used: false, usedAt: null },
+                { code: 'CCCC-4444', used: false, usedAt: null },
+              ],
+            },
+          });
+        }
         return json(res, 200, {
           result: {
             hasWallet: true, pseudonym: 'abcdef0123456789',
