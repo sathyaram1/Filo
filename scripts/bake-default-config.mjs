@@ -147,17 +147,19 @@ function envKey(name) {
 //
 // `server` è il campo ESATTO del documento dei segreti: un guasto che dice
 // «manca» senza dire dove si rimedia costa a chi legge un giro d'indagine (#642).
-const CHIAVI_DEL_PACCHETTO = [
-  { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' },
-];
+// Esportate con FONTE_SAFE_BROWSING: `buildKeys` consegna solo questi campi, e
+// la sentinella del server confronta con queste liste (#1074).
+export const CHIAVI_DEL_PACCHETTO = Object.freeze([
+  Object.freeze({ nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' }),
+]);
 
 // Fuori dalla lista sopra perché non è una chiave di provider e la sua assenza
 // non ferma la pubblicazione: qui serve solo a spiegarla con le stesse parole.
-const FONTE_SAFE_BROWSING = {
+export const FONTE_SAFE_BROWSING = Object.freeze({
   nome: 'safeBrowsing',
   env: 'FILO_DEFAULT_SAFEBROWSING_KEY',
   server: 'config/secrets.safeBrowsingKey',
-};
+});
 
 /** Perché il server non ha dato la chiave, in una frase. PURA. */
 export function descriviEsitoServer(esito) {
