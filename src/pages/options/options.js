@@ -921,7 +921,8 @@
       // Si confrontano solo le azioni che la griglia mostra: le impostazioni ne hanno altre, e col confronto
       // dell'oggetto intero ogni salvataggio ridisegnava, portando via l'avviso del modello appena respinto.
       const catena = (v) => String(v == null ? '' : v).split(',').map((x) => x.trim()).filter(Boolean).join(', ');
-      const diversa = Object.keys(modelChains || {}).some((a) => catena(modelChains[a].getValue()) !== catena(s.models[a]));
+      const diversa = Boolean(s.models)
+        && Object.keys(modelChains || {}).some((a) => catena(modelChains[a].getValue()) !== catena(s.models[a]));
       if (s.models && griglia && !(inUso && griglia.contains(inUso)) && diversa) {
         modelChains = ModelChain.renderGrid(griglia, {
           models: s.models,
