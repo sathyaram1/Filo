@@ -4711,7 +4711,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         continue;
       }
       threadMessages.push(Tools.assistantMessage({ text, toolCalls, reasoningDetails: r.reasoningDetails }));
-      for (const x of results) threadMessages.push(Tools.toolMessage(x.action._callId, toolResultText(x)));
+      for (const x of results) threadMessages.push(Tools.toolMessage(x.action._callId, toolResultText(x, { risposta: diRisposta, testo: !!text.trim() })));
     }
   } catch (e) {
     // Il turno è fallito (rete, provider, crediti): la prenotazione della
