@@ -85,10 +85,12 @@ Filo è un'app **desktop**, e le app desktop hanno regole OAuth diverse da un
 sito web. Seguiamo lo standard **RFC 8252 ("OAuth 2.0 for Native Apps")**:
 
 - **Authorization Code Flow con PKCE** (Proof Key for Code Exchange). Le app
-  native non possono custodire un "client secret", quindi non ne usiamo uno:
-  PKCE lega la richiesta di login alla risposta tramite un segreto generato
-  al volo (`code_verifier`), impedendo l'intercettazione del codice di
-  autorizzazione.
+  native non possono custodire un "client secret": quello che Google dà ai
+  client desktop sta dentro l'app e non è un segreto, quindi non ci contiamo.
+  A proteggere il login è PKCE, che lega la richiesta alla risposta tramite
+  un segreto generato al volo (`code_verifier`), impedendo l'intercettazione
+  del codice di autorizzazione (`src/main/auth/pkce.js`,
+  `src/main/auth/config.js`).
 - **Consenso nel browser di sistema, non in una webview interna.** La
   schermata di login Google si apre nel tuo browser predefinito. Non la
   mostriamo dentro una finestra di Filo: le webview embeddate sono un classico
