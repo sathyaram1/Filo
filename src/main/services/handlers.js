@@ -3953,10 +3953,9 @@ function toolResultText({ action, res, rendered }) {
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
-  // Il testo scritto insieme al bottone l'utente lo legge già come risposta: un giro in più per annunciarlo è rumore (#1167).
-  if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta. ${NON_RIPETERE_LA_RISPOSTA}`;
+  if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
   if (soloBottone(type) && res.kept && !res.needsConfirm) {
-    return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}. ${NON_RIPETERE_LA_RISPOSTA}`;
+    return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}.${doveStaIlTesto(giro)}`;
   }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
