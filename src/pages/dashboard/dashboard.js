@@ -766,6 +766,19 @@
     // e la bolla riparte vuota per il giro dopo. Gli id delle chiamate già
     // raccontate qui non si ripetono a fine turno (renderActions).
     const shown = new Set();
+    // Il testo di un giro di soli bottoni resta nella bolla; quello degli altri giri va nel blocco.
+    const chiudiGiro = (data) => {
+      if (data.risposta) {
+        rispostaPrima = unisci(rispostaPrima, data.text || testoDelGiro());
+        bollaDellaRisposta().textContent = rispostaPrima;
+      } else if (streamBubble && rispostaPrima) {
+        pending.aggiungiNota(testoDelGiro());
+        streamBubble.textContent = rispostaPrima;
+      } else if (streamBubble) {
+        if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
+        streamBubble = null;
+      }
+    };
     let offAction = null;
     if (window.filo?.onAction) {
       offAction = window.filo.onAction((data) => {
