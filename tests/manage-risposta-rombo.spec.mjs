@@ -103,7 +103,7 @@ test('le domande arrivate mentre la pratica è aperta aprono il pannello; chiuso
   const page = await openTab(MANAGE);
   const inCoda = { ...FB_DOMANDE, status: 'todo', statusReason: null };
   await apri(page, [inCoda]);
-  await page.evaluate(() => window.__mgTest.selectTab('queue'));
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
   await page.evaluate((i) => window.__mgTest.openDetail(i), inCoda._id);
   await expect(page.locator('#mgSide')).toBeHidden();
 
