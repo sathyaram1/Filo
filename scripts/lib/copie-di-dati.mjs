@@ -231,3 +231,52 @@ export function escludiInLocale(root, file) {
   if (!nuove.length) return;
   appendFileSync(dove, `${attuale && !attuale.endsWith('\n') ? '\n' : ''}${nuove.join('\n')}\n`);
 }
+
+const VUOTO = /^0+$/;
+
+/**
+ * Il controllo di git prima di ogni push (hook pre-push): `righe` è ciò che git passa su stdin. Le copie nei commit che
+ * il push porterebbe dove non sono ancora; [] se non ce ne sono. È l'unica regola che vale per ogni strada che spedisce.
+ */
+export function copieNelPush(root, righe) {
+  const trovate = [];
+  for (const riga of String(righe || '').split(/\r?\n/)) {
+    const [, locale, , remoto] = riga.trim().split(/\s+/);
+    if (!locale || VUOTO.test(locale)) continue;
+    const giaLa = ['--remotes'];
+    if (remoto && !VUOTO.test(remoto)) {
+      try { gitTesto(root, ['cat-file', '-e', `${remoto}^{commit}`]); giaLa.push(remoto); } catch (_) { /* non l'abbiamo: conta --remotes */ }
+    }
+    trovate.push(...copieDaSpedire(root, locale, { giaLa }));
+  }
+  return trovate;
+}
+
+// Il segno che riconosce il pre-push di Filo: uno con un altro contenuto è di qualcun altro e non si tocca.
+export const SEGNO_PRE_PUSH = 'filo-copie-di-dati';
+const PRE_PUSH = `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: una copia dei dati del server non parte per nessuna strada, nemmeno un git push a mano (#1108).
+# Lo scrive scripts/lib/copie-di-dati.mjs; il controllo è quello della cartella che spedisce.
+radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+controllo="$radice/scripts/copie-in-scena.mjs"
+[ -f "$controllo" ] && command -v node >/dev/null 2>&1 || exit 0
+exec node "$controllo" --pre-push "$radice"
+`;
+
+/**
+ * Mette il controllo prima di ogni push nella copia del repo di `root` (gli hook di git valgono per tutte le sue cartelle).
+ * 'installato' | 'presente' | 'altrui' (un pre-push non nostro: non si tocca) | 'altrove' (core.hooksPath: la cartella
+ * degli hook è condivisa con altri repo, non ci si scrive).
+ */
+export function installaControlloSpedizione(root) {
+  try { if (gitTesto(root, ['config', '--get', 'core.hooksPath']).trim()) return 'altrove'; } catch (_) { /* non impostato */ }
+  const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', 'hooks/pre-push']).trim());
+  let attuale = null;
+  try { attuale = readFileSync(dove, 'utf8'); } catch (_) { /* non c'è */ }
+  if (attuale === PRE_PUSH) return 'presente';
+  if (attuale !== null && !attuale.includes(SEGNO_PRE_PUSH)) return 'altrui';
+  mkdirSync(dirname(dove), { recursive: true });
+  writeFileSync(dove, PRE_PUSH, { mode: 0o755 });
+  try { chmodSync(dove, 0o755); } catch (_) { /* su Windows git lo lancia comunque */ }
+  return 'installato';
+}
