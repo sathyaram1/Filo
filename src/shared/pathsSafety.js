@@ -269,7 +269,7 @@
   // documenti ostili. Il taglio non lascia in fondo mezza forma (email, codice,
   // numero). Prove: tests/unit/percorsiLunghi.test.mjs.
   const FORMA_MAX = 320; // un indirizzo email non supera i 254 caratteri
-  const CRESCITA_MAX = 32;
+  const CRESCITA_MAX = 8;
 
   function aTetto(testo, max, taglia, pulisci) {
     for (let tetto = max * 2 + FORMA_MAX; ; tetto *= 4) {
