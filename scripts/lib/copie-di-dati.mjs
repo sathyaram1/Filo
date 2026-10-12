@@ -101,3 +101,62 @@ export function copieNelRepo(root) {
 export function copieInScena(root) {
   return copieFra(root, elencoGit(root, ['diff', '--cached', '--name-only', '--diff-filter=ACMR']));
 }
+
+const gitTesto = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+
+/**
+ * Le copie nei commit che spedire `rif` porterebbe su origin (quelli che nessun ramo di origin conosce),
+ * dal commit più vecchio: [{ commit, file, motivo }]. Ogni strada che spedisce lo chiede prima del push.
+ */
+export function copieDaSpedire(root, rif = 'HEAD') {
+  const commit = gitTesto(root, ['rev-list', '--reverse', rif, '--not', '--remotes=origin']).split('\n').filter(Boolean);
+  const trovate = [];
+  const lette = new Map();
+  for (const c of commit) {
+    const voci = gitTesto(root, ['diff-tree', '-r', '--root', '--no-commit-id', '--raw', '-z', '--diff-filter=ACMR', c]).split('\0');
+    for (let i = 0; i < voci.length - 1;) {
+      const meta = voci[i].split(' ');
+      const rinomina = /^[RC]/.test(meta[4] || '');
+      const file = voci[i + (rinomina ? 2 : 1)];
+      i += rinomina ? 3 : 2;
+      if (!file || file.startsWith(CARTELLA_FINTI)) continue;
+      const blob = meta[3];
+      if (!lette.has(blob)) {
+        const byte = execFileSync('git', ['cat-file', 'blob', blob], { cwd: root, maxBuffer: 1024 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+        lette.set(blob, sembraJson(byte) ? motivoCopiaTesto(byte.toString('utf8')) : '');
+      }
+      if (lette.get(blob)) trovate.push({ commit: c, file, motivo: lette.get(blob) });
+    }
+  }
+  return trovate;
+}
+
+const citaShell = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+
+/** Cosa dire a chi spedisce quando copieDaSpedire ha trovato qualcosa: il ramo non parte, e come toglierle dalla storia. */
+export function avvisoSpedizione(copie) {
+  const file = [...new Set(copie.map((c) => c.file))];
+  const primo = copie[0].commit.slice(0, 10);
+  return `NON spedisco il ramo: ${file.join(', ')} (dal commit ${primo}) ha la forma di una copia dei dati del server `
+    + `(${copie[0].motivo}), e il repo e' pubblico: una volta spedita resta nella storia anche se tolta dopo. `
+    + `Toglila dalla storia del ramo e sposta la copia nella cartella temporanea del sistema (os.tmpdir()): `
+    + `git reset --soft ${primo}~1 && git rm -q --cached --ignore-unmatch -- ${file.map(citaShell).join(' ')} && git commit -m "lavoro senza la copia dei dati" `
+    + `(rifa' in un commit solo i commit da li' in poi, il lavoro resta). Poi il salvataggio spedisce.`;
+}
+
+// Un nome in .gitignore: le / restano, i caratteri speciali e gli spazi in coda si citano.
+const comeEsclusione = (f) => `/${f.replace(/[\\*?[]/g, '\\$&').replace(/ $/, '\\ ')}`;
+
+/**
+ * Toglie dalla vista di git, in questa copia soltanto (info/exclude, non versionato), le copie lasciate nella
+ * cartella: senza, «git add -A» — che la consegna chiede davanti a una cartella sporca — le rimetteva nel commit.
+ */
+export function escludiInLocale(root, file) {
+  const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', 'info/exclude']).trim());
+  let attuale = '';
+  try { attuale = readFileSync(dove, 'utf8'); } catch (_) { mkdirSync(dirname(dove), { recursive: true }); }
+  const righe = new Set(attuale.split(/\r?\n/));
+  const nuove = file.filter((f) => !/[\r\n]/.test(f)).map(comeEsclusione).filter((r) => !righe.has(r));
+  if (!nuove.length) return;
+  appendFileSync(dove, `${attuale && !attuale.endsWith('\n') ? '\n' : ''}${nuove.join('\n')}\n`);
+}
