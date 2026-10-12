@@ -684,7 +684,8 @@
   function normalizedPath(rawUrl) {
     const u = parseUrl(rawUrl);
     if (!u) return '';
-    let path = redigiPercorso(u.pathname || '/', u.hostname) || '/';
+    const pezzo = tagliaPrimaDiPulire(u.pathname || '/', MAX_URL_LEN, nelPezzoDiIndirizzo);
+    let path = redigiPercorso(pezzo, u.hostname) || '/';
     if (path.length > MAX_URL_LEN) path = path.slice(0, MAX_URL_LEN);
     return path;
   }
