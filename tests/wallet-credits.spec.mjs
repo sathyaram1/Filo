@@ -101,11 +101,13 @@ test.beforeAll(async () => {
           return json(res, 200, { result: { status: 'invalid_code' } });
         }
         redeemed = true;
+        // Come il server vero col tetto migrabile a 0 (#1138): passano solo i
+        // crediti d'ingresso, e quello che il PC dichiara torna «tagliato».
+        const dichiarati = Math.max(0, Math.floor(Number(body.data && body.data.localCredits) || 0));
         return json(res, 200, {
           result: {
-            status: 'ok', key: 'sk-or-v1-test-personal', pseudonym: 'abcdef0123456789', credits: 6010,
-            // Il conteggio locale dichiarato dall'app (1.010: benvenuto più bonus), tutto passato.
-            entryCredits: 5000, migrated: 1010, localRequested: 1010, cutReason: null,
+            status: 'ok', key: 'sk-or-v1-test-personal', pseudonym: 'abcdef0123456789', credits: 5000,
+            entryCredits: 5000, migrated: 0, localRequested: dichiarati, cutReason: dichiarati > 0 ? 'migrate_cap' : null,
             inviteCodes: ['AAAA-2222', 'BBBB-3333', 'CCCC-4444'],
           },
         });
