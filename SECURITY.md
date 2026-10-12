@@ -160,13 +160,26 @@ solo quello che c'è scritto qui sopra.
 
 ## 4. I tuoi dati personali (memorie, appunti, cronologia)
 
-**Stato: 💭 (local-first ora; sincronizzazione cifrata in futuro)**
+**Stato: ✅ salvati solo sul tuo dispositivo; 💭 sincronizzazione cifrata fra
+dispositivi, rimandata**
 
 Le "memorie" che Filo raccoglie su di te, gli appunti copiati e la cronologia
 sono i dati **più sensibili** che l'app tocca. La nostra posizione:
 
-- **Oggi restano sul tuo dispositivo.** Non c'è sincronizzazione attiva:
-  questi dati non lasciano il computer, quindi nemmeno noi possiamo vederli.
+- **Oggi sono salvati solo sul tuo dispositivo.** Non c'è sincronizzazione, e
+  i server di Filo non li ricevono.
+- **Ai modelli invece arrivano.** Filo funziona con modelli linguistici, e
+  quando ne usa uno gli manda quello che serve per rispondere: le memorie
+  (`src/shared/filoMemory.js`, `renderMemoryForPrompt`), gli appunti e i
+  titoli delle schede aperte nel messaggio della home
+  (`src/shared/constants.js`), il testo delle pagine su cui lavori, i
+  candidati di una ricerca fra i tuoi documenti
+  (`src/main/services/documentiIndice.js`), il contenuto delle schede che
+  chiudi, per il riassunto con cui la cronologia le ritrova
+  (`src/main/services/archivedTabs.js`). Quei messaggi vanno a OpenRouter, che
+  li passa al fornitore che serve il modello
+  (`src/main/services/providers/openrouter.js`). Cosa ne fanno lo dicono le
+  loro condizioni: questo documento non promette niente al posto loro.
 - **Quando attiveremo il multi-dispositivo** (telefono, TV…), il principio
   guida sarà la **cifratura end-to-end**: i dati verranno cifrati sul tuo
   dispositivo prima di partire, e i nostri server custodiranno solo blocchi
