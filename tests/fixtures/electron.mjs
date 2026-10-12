@@ -94,7 +94,7 @@ export const test = base.extend({
     // il percorso che l'app riporta.
     const userData = cartellaTemporanea('filo-test-');
     if (typeof accoglienzaFatta !== 'boolean') throw new Error(`accoglienzaFatta vuole true o false, non ${JSON.stringify(accoglienzaFatta)}`);
-    if (accoglienzaFatta) writeFileSync(join(userData, 'storage.json'), JSON.stringify(PROFILO_ACCOLTO));
+    if (accoglienzaFatta) seminaProfiloAccolto(userData);
     const app = await electron.launch({
       // host-resolver-rules:
       //  • "blocked.test" al loopback, così l'e2e del blocco siti
