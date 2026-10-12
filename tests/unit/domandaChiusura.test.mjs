@@ -21,11 +21,12 @@ const owner = await import('../../scripts/routine-domanda.mjs');
 const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
 const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
 
+const { senzaSessione } = await import('../helpers/sessione.mjs');
+
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 // Il biglietto nella cartella di una routine fa misurare la sessione vera anche senza il suo ambiente (#949.1):
-// misure finte qui, e per il figlio un transcript che non c'è.
+// misure finte qui, e per il figlio senzaSessione().
 const piano = { sleep: async () => {}, misureCrediti: () => ({}) };
-const NESSUN_TRANSCRIPT = resolve(QUI, 'transcript-che-non-esiste.jsonl');
 
 // ─── corpi delle richieste ──────────────────────────────────────────────────
 
