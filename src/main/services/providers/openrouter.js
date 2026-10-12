@@ -489,7 +489,8 @@
   // Sugli endpoint audio il router ignora il blocco `provider` (#713): l'esclusione si applica qui, sugli host
   // dichiarati. Regole: patterns/voce-dettatura-e-vettori-passano-dal-router-come-le-chat.md.
   const HOSTS_FRESH_MS = 60 * 60 * 1000;
-  const HOSTS_RETRY_MS = 5 * 60 * 1000;
+  // Host ignoti fermano la voce (#1141): si rilegge presto, ma non a ogni frase di una dettatura.
+  const HOSTS_RETRY_MS = 15 * 1000;
   const HOSTS_TIMEOUT_MS = 10 * 1000;
   const HOSTS_MAX_MODELS = 500;
   const hostsCache = new Map(); // id → { until, hosts, pending }
@@ -518,8 +519,7 @@
     return hosts;
   }
 
-  // [{ name, tag }] o null se non si sa. Un elenco scaduto si usa mentre si rilegge;
-  // una lettura fallita si ritenta dopo qualche minuto, non a ogni frase dettata.
+  // [{ name, tag }] o null se non si sa. Un elenco scaduto si usa mentre si rilegge.
   async function modelHosts({ apiKey, model } = {}) {
     const key = String(model == null ? '' : model).trim();
     if (!key) return null;
@@ -552,27 +552,49 @@
     return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
   }
 
-  async function ensureAllowedHost({ apiKey, model, providerRouting }) {
-    const C = global.SN_CONST;
-    if (!C || typeof C.hostPolicyViolation !== 'function') return;
-    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
-    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
-    if (!excluded.length && !C.producerOnlyRule(model)) return;
-    const hosts = await modelHosts({ apiKey, model });
-    if (!Array.isArray(hosts) || !hosts.length) return;
-    if (hosts.some((h) => !C.hostPolicyViolation(h, model, excluded))) return;
+  function uniqueNames(hosts) {
     const names = [];
     for (const h of hosts) {
       const n = h.name || h.tag;
       if (!names.some((x) => x.toLowerCase() === n.toLowerCase())) names.push(n);
     }
+    return names;
+  }
+
+  // Voce e dettatura partono solo se chi serve il modello è noto e TUTTO ammesso (#1141): con host misti il
+  // router sceglie per prezzo e può dare l'audio proprio a quello escluso.
+  // { ok: true } | { ok: false, reason: 'unknown' | 'mixed' | 'excluded', excluded: [nomi] }
+  async function hostVerdict({ apiKey, model, providerRouting }) {
+    const C = global.SN_CONST;
+    if (!C || typeof C.hostPolicyViolation !== 'function') return { ok: true };
+    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
+    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    if (!excluded.length && !C.producerOnlyRule(model)) return { ok: true };
+    const hosts = await modelHosts({ apiKey, model });
+    if (!Array.isArray(hosts) || !hosts.length) return { ok: false, reason: 'unknown', excluded: [] };
+    const bad = hosts.filter((h) => C.hostPolicyViolation(h, model, excluded));
+    if (!bad.length) return { ok: true };
+    return { ok: false, reason: bad.length === hosts.length ? 'excluded' : 'mixed', excluded: uniqueNames(bad) };
+  }
+
+  const NO_HOST_KEYS = {
+    unknown: ['err_audio_hosts_unknown', 'err_audio_hosts_unknown'],
+    mixed: ['err_audio_mixed_host', 'err_audio_mixed_host_many'],
+    excluded: ['err_audio_no_allowed_host', 'err_audio_no_allowed_host_many'],
+  };
+
+  async function ensureAllowedHost({ apiKey, model, providerRouting }) {
+    const v = await hostVerdict({ apiKey, model, providerRouting });
+    if (v.ok) return;
     const I18n = global.SN_I18N;
-    const chiave = names.length > 1 ? 'err_audio_no_allowed_host_many' : 'err_audio_no_allowed_host';
-    const err = new Error(I18n ? I18n.t(chiave, model, joinNames(names)) : `NO_ALLOWED_HOST ${model}`);
+    const [one, many] = NO_HOST_KEYS[v.reason];
+    const chiave = v.excluded.length > 1 ? many : one;
+    const err = new Error(I18n ? I18n.t(chiave, model, joinNames(v.excluded)) : `NO_ALLOWED_HOST ${model}`);
     err.code = 'NO_ALLOWED_HOST';
+    err.reason = v.reason;
     err.provider = 'openrouter';
     err.model = model;
-    err.hosts = names;
+    err.hosts = v.excluded;
     throw err;
   }
 
@@ -785,7 +807,7 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
-    modelHosts, forgetModelHosts, forgetReasoningRefusals,
+    modelHosts, forgetModelHosts, hostVerdict, joinNames, forgetReasoningRefusals,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
     GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,

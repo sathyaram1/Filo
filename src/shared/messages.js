@@ -354,6 +354,9 @@
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }
+    // Voce o dettatura partirebbero col modello scelto? (#1141) { action, nickname } da chiunque (la scelta di
+    // «Detta» vive nei siti); { action, provider, model } solo da filo://. → { verdict, hosts?, warning? }
+    AUDIO_HOST_CHECK: 'audio_host_check',
     // Test di un modello del registry PREDEFINITO con le chiavi predefinite.
     // { nickname } → risolve nel registry predefinito (lista read-only Opzioni);
     // { provider, model } → testa la riga così com'è scritta, anche non ancora

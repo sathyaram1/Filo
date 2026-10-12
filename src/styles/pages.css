@@ -741,6 +741,9 @@ section:has(#dictList) .sn-spell-add-row {
 }
 .sn-chain-opt-nick { font-weight: 600; }
 .sn-chain-opt-label { color: var(--sn-muted); margin-left: 8px; }
+/* Sotto la pillola, non dentro: il modello resta scelto ma la funzione con lui non parte. */
+.sn-chain-warn { color: var(--sn-error); font-size: 12px; line-height: 1.4; margin-top: 4px; }
+.sn-chain-warn p { margin: 2px 0 0; }
 
 .sn-page .sn-cookie-modes {
   display: flex;

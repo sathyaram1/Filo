@@ -98,6 +98,18 @@
     // Voce e dettatura: nessun host ammesso, la richiesta non parte (#713).
     err_audio_no_allowed_host: 'Il modello «%s» lo serve solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
     err_audio_no_allowed_host_many: 'Il modello «%s» lo servono solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
+    // Host misti o ignoti (#1141): sugli endpoint audio il router sceglie per prezzo, anche l'host escluso.
+    err_audio_mixed_host: 'Il modello «%s» lo serve anche %s, che Filo esclude, e con l\'audio non posso impedire che tocchi a lui. Non ho mandato niente: scegli un altro modello.',
+    err_audio_mixed_host_many: 'Il modello «%s» lo servono anche %s, che Filo esclude, e con l\'audio non posso impedire che tocchi a loro. Non ho mandato niente: scegli un altro modello.',
+    err_audio_hosts_unknown: 'Non so chi serve il modello «%s»: potrebbe essere un fornitore che Filo esclude. Non ho mandato niente: riprova fra poco o scegli un altro modello.',
+    // Lo stesso verdetto mentre si sceglie il modello (Opzioni, «Detta» dal tasto destro). %s = modello, funzione, host.
+    audio_host_fn_tts: 'la lettura ad alta voce',
+    audio_host_fn_stt: 'la dettatura',
+    audio_host_warn_excluded: 'Con «%s» %s non parte: lo serve solo %s, che Filo esclude.',
+    audio_host_warn_excluded_many: 'Con «%s» %s non parte: lo servono solo %s, che Filo esclude.',
+    audio_host_warn_mixed: 'Con «%s» %s non parte: lo serve anche %s, che Filo esclude.',
+    audio_host_warn_mixed_many: 'Con «%s» %s non parte: lo servono anche %s, che Filo esclude.',
+    audio_host_warn_unknown: 'Con «%s» %s non parte finché non so chi lo serve, e ora non riesco a saperlo.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
