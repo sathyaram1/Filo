@@ -3949,9 +3949,9 @@ function toolResultText({ action, res, rendered }) {
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
   // Il testo scritto insieme al bottone l'utente lo legge già come risposta: un giro in più per annunciarlo è rumore (#1167).
-  if (type === 'APRI_FILE' && res.executed) {
-    return 'Bottone del file mostrato all\'utente, sotto la tua risposta. Se insieme a questa chiamata hai già scritto la risposta, '
-      + 'l\'utente la sta leggendo: non ripeterla e non annunciare il bottone. Se non hai altro da fare, chiudi senza scrivere altro.';
+  if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta. ${NON_RIPETERE_LA_RISPOSTA}`;
+  if (soloBottone(type) && res.kept && !res.needsConfirm) {
+    return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}. ${NON_RIPETERE_LA_RISPOSTA}`;
   }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
