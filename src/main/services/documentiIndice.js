@@ -207,6 +207,7 @@ function compatta() {
 
 async function elimina() {
   voci = new Map();
+  occasionali = new Map();
   caricamento = Promise.resolve(voci);
   righeSuDisco = 0;
   await inFila(() => fsp.rm(fileIndice(), { force: true }));
