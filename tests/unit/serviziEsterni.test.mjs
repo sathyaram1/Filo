@@ -363,6 +363,17 @@ test('ogni voce dell’elenco è ancora usata dal codice', () => {
   assert.deepEqual(morte, [], `Voci che il codice non usa più:\n  ${morte.join('\n  ')}\nToglile da src/shared/serviziEsterni.js, o correggi «base», «dove» o «prova».`);
 });
 
+// Un indirizzo costruito da una funzione che altri file ricevono come dipendenza: chi la chiama manda la richiesta.
+test('ogni file che chiama la funzione che costruisce l’indirizzo di un servizio è nel suo «dove»', () => {
+  for (const v of VOCI.filter((x) => x.via)) {
+    const re = new RegExp(`\\b${v.via}\\s*\\(`);
+    const usano = Object.keys(SORGENTI).filter((f) => re.test(ANALISI.testi.get(f).codice)).sort();
+    assert.ok(usano.length, `${v.id}: nessun file chiama più ${v.via}(): togli «via»`);
+    const fuori = usano.filter((f) => !v.dove.includes(f));
+    assert.deepEqual(fuori, [], `${v.id}: questi file chiamano ${v.via}() e mandano la richiesta; aggiungili al «dove» e scrivi l’occasione`);
+  }
+});
+
 test('le esclusioni dichiarate qui servono ancora', () => {
   for (const f of Object.keys(FILE_ESCLUSI)) assert.ok(existsSync(join(ROOT, f)), `${f} escluso ma non esiste più`);
   assert.ok(existsSync(join(ROOT, DATI_DI_TERZI.cartella)), `${DATI_DI_TERZI.cartella} esclusa ma non esiste più`);

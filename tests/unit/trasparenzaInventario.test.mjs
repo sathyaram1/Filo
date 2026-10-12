@@ -144,12 +144,13 @@ test('ogni collezione del database del server è nel documento sulla privacy, co
 });
 
 // Gli host non hanno una tabella qui: l'elenco dei servizi esterni è l'unico, e ogni voce dice la sua frase.
-test('ogni servizio esterno con un indirizzo fisso ha la sua frase nel documento sulla privacy', () => {
+// Anche un servizio senza indirizzo fisso (il sito della pagina, un proxy) è un contatto, e il documento si dice completo.
+test('ogni servizio esterno ha la sua frase nel documento sulla privacy', () => {
   require(join(ROOT, 'src', 'shared', 'serviziEsterni.js'));
   const SE = globalThis.SN_SERVIZI_ESTERNI;
   for (const v of [...SE.SERVIZI, ...SE.LINK_APERTI]) {
     const frasi = [].concat(v.frase || []);
-    if (SE.SERVIZI.includes(v) && v.base.length) assert.ok(frasi.length, `${v.id}: manca «frase», il punto del documento sulla privacy che ne parla`);
+    if (SE.SERVIZI.includes(v)) assert.ok(frasi.length, `${v.id}: manca «frase», il punto del documento sulla privacy che ne parla`);
     for (const f of frasi) assert.ok(privacy.includes(f), `${v.id}: il documento sulla privacy non dice più «${f}»`);
   }
 });

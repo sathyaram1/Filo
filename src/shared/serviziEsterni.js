@@ -21,7 +21,8 @@
   // `prova`: pezzi di codice che mostrano l'uso, uno basta. Serve quando nei file della voce non c'è una chiamata di rete
   // riconoscibile (un'immagine, una finestra), e in un file che serve più servizi, dove chiamate e indirizzo non dicono quale.
   // `nellaLibreria`: l'indirizzo lo scrive la libreria (o Electron), non src/.
-  // `frase`: dove ne parla il documento sulla privacy (transparency/privacy.md), parola per parola; obbligatoria con `base`.
+  // `via`: la funzione che costruisce l'indirizzo e passa da un file all'altro; chi la chiama sta nel «dove».
+  // `frase`: dove ne parla il documento sulla privacy (transparency/privacy.md), parola per parola; obbligatoria.
   const SERVIZI = [
     {
       id: 'modelli-openrouter', nome: 'OpenRouter, per i modelli',
@@ -165,6 +166,7 @@
       quando: 'pagina',
       occasione: 'quando una pagina che apri ha un sospetto che i controlli non chiudono: la si carica in una finestra nascosta e isolata per vedere dove porta',
       riceve: 'una visita all’indirizzo completo, da una finestra che non ha i tuoi dati di navigazione',
+      frase: 'la carica anche in una finestra nascosta e isolata',
       dove: ['src/main/services/safebrowse/sandbox.js'], prova: 'loadURL(',
     },
     {
@@ -200,6 +202,7 @@
       quando: 'funzione',
       occasione: 'quando salvi, copi, fai descrivere o controlli l’origine di un’immagine o di un video della pagina',
       riceve: 'la richiesta del file, con i cookie di quel sito, come la fa la pagina',
+      frase: 'Filo lo chiede al sito che lo ospita',
       dove: ['src/main/services/handlers/misc.js', 'src/content/actions.js'], prova: ["require('node:https')", 'fetch(src)'],
     },
     {
@@ -208,6 +211,7 @@
       quando: 'pagina',
       occasione: 'quando una pagina non dichiara il suo colore ma ha un manifest, per tingere la scheda',
       riceve: 'una richiesta del manifest del sito, senza cookie',
+      frase: 'gli chiede il suo manifest',
       dove: ['src/content/pageColor.js'],
     },
     {
@@ -223,10 +227,11 @@
       id: 'icone-google', nome: 'Il servizio di icone di Google',
       base: ['https://www.google.com/s2/favicons'],
       quando: 'funzione',
-      occasione: 'quando la home mostra i siti che Filo ti suggerisce',
+      occasione: 'quando la home mostra i siti che Filo ti suggerisce, e in chat i siti che Filo apre per te, anche riaprendo una chat vecchia',
       riceve: 'il nome di quei siti',
-      frase: 'Il servizio di icone di Google',
-      dove: ['src/pages/dashboard/dashboard.js'], prova: 'faviconUrl: (url) => faviconUrl(url)',
+      frase: 'e di quelli che apre per te dalla chat',
+      dove: ['src/pages/dashboard/dashboard.js', 'src/pages/dashboard/dashboard-attivita.js', 'src/pages/dashboard/dashboard-carte.js'],
+      via: 'faviconUrl', prova: 'faviconUrl(',
     },
     {
       id: 'aggiornamenti', nome: 'GitHub, per gli aggiornamenti',
@@ -296,6 +301,7 @@
       quando: 'funzione',
       occasione: 'solo se ne hai impostato uno, nelle schede che apri da un altro paese',
       riceve: 'tutto il traffico di quelle schede',
+      frase: 'Il proxy che imposti tu.',
       dove: ['src/main/tabs.js'], prova: 'setProxy(',
     },
   ];
