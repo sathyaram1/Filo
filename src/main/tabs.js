@@ -3426,16 +3426,24 @@ class TabManager {
     return globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
   }
 
-  // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon),
-  // collassiamo le scritture ravvicinate.
+  // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon), e titolo, icona e
+  // caricamento non cambiano la sessione: se è uguale a quella scritta non si riscrive (#1089).
   _persistSession() {
     if (this.incognito) return; // incognito: nessuna sessione salvata su disco
     if (this._restoring) return; // non sovrascrivere mentre stiamo ripristinando
     clearTimeout(this._sessionTimer);
+    this._sessionTimer = null;
+    if (JSON.stringify(this.sessionState()) === sessioneScritta) return;
     this._sessionTimer = setTimeout(() => {
+      this._sessionTimer = null;
+      const stato = this.sessionState();
+      const testo = JSON.stringify(stato);
+      if (testo === sessioneScritta) return;
+      sessioneScritta = testo;
       try {
-        globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), this.sessionState());
-      } catch (_) {}
+        Promise.resolve(globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), stato))
+          .catch(() => { if (sessioneScritta === testo) sessioneScritta = null; });
+      } catch (_) { sessioneScritta = null; }
     }, 400);
   }
 
