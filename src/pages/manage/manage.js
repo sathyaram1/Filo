@@ -508,7 +508,10 @@
         if (ancoraVera(foto, 'autoApprove')) reflectAutoApprove(r.autoApprove);
         if (ancoraVera(foto, 'routinesEnabled')) reflectRoutines(r.routinesEnabled !== false);
         if (mgProberIdle && ancoraVera(foto, 'proberWhenIdle')) mgProberIdle.checked = r.proberWhenIdle !== false;
-        if (mgLavoriServer && ancoraVera(foto, 'lavoriServer')) mgLavoriServer.checked = r.lavoriServer === true;
+        if (mgLavoriServer && ancoraVera(foto, 'lavoriServer') && mgLavoriServer.checked !== (r.lavoriServer === true)) {
+          mgLavoriServer.checked = r.lavoriServer === true;
+          renderList();
+        }
       }
     } catch (_) { /* resta la cache */ }
   }
