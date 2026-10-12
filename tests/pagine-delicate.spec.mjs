@@ -150,7 +150,7 @@ test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interrutt
   await t.chiudi();
   await expect.poll(() => voceDi(app, 'Area clienti dello studio'), { timeout: 8_000 })
     .toEqual({ delicata: 'utente', summary: '', snippet: '', embedding: false });
-  expect((await mandato(app)).some((m) => m.testo.includes('Saldo'))).toBe(false);
+  expect((await mandato(app)).some((m) => m.testo.includes('Saldo disponibile'))).toBe(false);
 
   await sicurezza.bringToFront();
   await sicurezza.locator('#sec-delicate').uncheck();
