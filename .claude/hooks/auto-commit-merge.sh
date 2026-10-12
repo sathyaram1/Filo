@@ -247,6 +247,33 @@ else
   COMMIT_AS_EMAIL="claude@local"
 fi
 
+# ─── UNA COPIA DEI DATI DEL SERVER NON PARTE (#1108) ─────────────────────────
+#
+# Il repo e' pubblico: un file spedito resta nella storia anche se tolto subito, quindi la forma si
+# controlla qui, sui file in scena, e non dopo. La riconosce scripts/copie-in-scena.mjs (quello della
+# cartella salvata, o in mancanza quello accanto a questo hook); il resto del lavoro si salva comunque.
+togli_copie_di_dati() {
+  local wt="$1" f elenco="" c
+  local controllo="$wt/scripts/copie-in-scena.mjs"
+  [ -f "$controllo" ] || controllo="$HOOK_SCRIPTS/copie-in-scena.mjs"
+  [ -f "$controllo" ] && command -v node >/dev/null 2>&1 || return 0
+  # Il codice e le immagini non sono copie: per loro non si paga l'avvio di node a ogni salvataggio.
+  c=""
+  while IFS= read -r -d '' f; do
+    case "$f" in
+      *.js|*.mjs|*.cjs|*.ts|*.css|*.html|*.md|*.sh|*.ps1|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.svg|*.ico) ;;
+      *) c=1; break ;;
+    esac
+  done < <(git diff --cached --name-only -z --diff-filter=ACMR 2>/dev/null)
+  [ -n "$c" ] || return 0
+  while IFS= read -r -d '' f; do
+    git reset -q -- "$f" >/dev/null 2>&1 || git rm -q --cached -- "$f" >/dev/null 2>&1
+    elenco="$elenco${elenco:+, }$f"
+  done < <(node "$controllo" "$wt" 2>/dev/null)
+  [ -n "$elenco" ] && segnala_avviso "$wt" "NON committo e NON spedisco $elenco: ha la forma di una copia dei dati del server (documenti Firestore o feedback con testo e identificativi), e il repo e' pubblico. Spostalo nella cartella temporanea del sistema (os.tmpdir()); i dati finti per le prove vanno in tests/fixtures/. Il resto del lavoro e' salvato."
+  return 0
+}
+
 salva_cartella() {
   local wt="$1"
   cd "$wt" || return 0
