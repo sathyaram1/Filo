@@ -278,7 +278,7 @@ test('backup rovinato e vecchio: la conferma dice cosa manca, e spesa e crediti 
     await app.evaluate(({ dialog }, p) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
     }, zipPath);
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://security/'));
     const page = await findInternalPage(app, 'security');
@@ -320,7 +320,7 @@ async function importaDaSicurezza(zipPath, userData) {
   await app.evaluate(({ dialog }, p) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
   }, zipPath);
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   await shell.evaluate(() => window.filoShell.tabs.open('filo://security/'));
   const page = await findInternalPage(app, 'security');
