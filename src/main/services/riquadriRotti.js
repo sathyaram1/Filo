@@ -348,6 +348,8 @@ function avvisaRiquadri() {
 let firma = '';
 function configureFromSettings(settings) {
   try { if (require('../shim/storage').inIncognito()) return; } catch (_) {}
+  modelloAcceso = !(settings && settings.security && settings.security.riquadriRotti
+    && settings.security.riquadriRotti.modello === false);
   riattivati = new Set(Cookies().getEmbedSites(settings));
   const ora = `${Cookies().getMode(settings)}|${[...riattivati].join(',')}`;
   if (firma && ora !== firma) avvisaRiquadri();
