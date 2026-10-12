@@ -63,6 +63,11 @@ export async function unitConRiprova(registro, { lanciatore = process.env.FILO_U
   if (prima.codice === 0) return { codice: 0, rossi: [], flaky: [] };
   const rossi = fileRossi(prima.testo, RADICE);
   if (!rossi.length) return { codice: prima.codice, rossi: [], flaky: [] };
+  const incompleta = corsaIncompleta(prima.testo);
+  if (incompleta) {
+    console.log(`\n[unit] nessuna riprova: ${incompleta}, quindi i file rossi non sono tutti i rossi.`);
+    return { codice: prima.codice || 1, rossi, flaky: [] };
+  }
   // La prima corsa resta accanto al registro; il registro, che l'allarme legge, tiene solo i rossi rimasti.
   writeFileSync(registro.replace(/(\.\w+)?$/, '-prima$1'), prima.testo);
   console.log(`\n[unit] riprova dei soli file rossi, una volta: ${rossi.join(', ')}`);
