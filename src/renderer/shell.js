@@ -2497,6 +2497,14 @@
       testo.className = 'permesso-cosa';
       testo.textContent = cosa.testo;
       msg.append(chi, ' ', testo);
+      if (cosa.nome) {
+        // Un nome lunghissimo non spinge giù la pagina di righe: si accorcia in mezzo, l'estensione resta, intero al passaggio.
+        const n = document.createElement('strong');
+        n.className = 'permesso-oggetto';
+        n.textContent = '«' + (cosa.nome.length > 60 ? cosa.nome.slice(0, 40) + '…' + cosa.nome.slice(-19) : cosa.nome) + '»';
+        n.title = String(cosa.percorso || cosa.nome);
+        msg.append(' ', n);
+      }
       const si = document.createElement('button');
       si.type = 'button';
       si.className = 'permesso-btn permesso-si';
