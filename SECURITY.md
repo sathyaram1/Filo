@@ -39,11 +39,12 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
   fornitore che serve il modello (§4).
 - **Alcuni servizi esterni ricevono pezzi della tua navigazione**: Google Safe
   Browsing un frammento dell'impronta degli indirizzi che apri, non gli
-  indirizzi; il motore di ricerca dell'agente le ricerche che formula; i
-  registri dei domini il nome dei siti che sembrano sospetti; il servizio di
-  icone di Google il nome dei siti che la home ti suggerisce. L'elenco intero
-  sta nel documento sulla privacy (`transparency/privacy.md`, «Gli altri
-  servizi»).
+  indirizzi, e i registri dei domini il nome dei siti che sembrano sospetti
+  (`src/main/services/safebrowse/net.js`); il motore di ricerca dell'agente
+  le ricerche che formula (`src/main/services/webSearch.js`); il servizio di
+  icone di Google il nome dei siti che la home ti suggerisce
+  (`src/pages/dashboard/dashboard.js`). L'elenco intero sta nel documento
+  sulla privacy (`transparency/privacy.md`, «Gli altri servizi»).
 - **Il server di Filo riceve** i feedback che mandi, l'identità anonima
   dell'installazione, il portafoglio dei crediti con una riga per ogni
   chiamata ai modelli (funzione, modello, token e costo, senza il testo), i
