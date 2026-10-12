@@ -79,7 +79,7 @@ function save(wallet) {
 // copia di Filo, ma il file resta accanto: chiave e crediti di prima non si buttano mai (#1085).
 function metteDaParte() {
   cache = null;
-  guasti.metteDaParte(filePath(), 'prev');
+  try { guasti.metteDaParte(filePath(), 'prev'); } catch (_) {}
   avvisaProntezza();
 }
 

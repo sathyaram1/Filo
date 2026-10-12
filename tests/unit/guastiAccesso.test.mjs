@@ -66,7 +66,7 @@ const file = (nome) => join(userData, nome);
 const messiDaParte = (nome, etichetta) => readdirSync(userData).filter((n) => n.startsWith(`${nome}.${etichetta}`));
 
 function svuota() {
-  for (const n of readdirSync(userData)) rmSync(join(userData, n), { force: true, recursive: true });
+  for (const n of readdirSync(userData)) rmSync(join(userData, n), { force: true });
 }
 
 beforeEach(() => {

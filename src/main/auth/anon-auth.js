@@ -192,6 +192,8 @@ async function getIdToken() {
   if (inflight) return inflight;
   inflight = (async () => {
     try {
+      // Il portachiavi può sbloccarsi dopo l'avvio: prima di arrendersi si rilegge il disco.
+      if (!session?.refreshToken && walletStore.suDisco()) restore();
       if (session?.refreshToken) return await refresh();
       if (isUnreadable()) throw erroreIdentita('identity_unreadable');
       await signUpAnonymous();
