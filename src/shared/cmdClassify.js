@@ -838,6 +838,9 @@
   ]);
   // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
   const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
+  // Dentro la Libreria del Mac stanno anche i documenti nel cloud dell'utente (iCloud Drive; Dropbox, OneDrive e
+  // Google Drive da macOS 12): si leggono come Documenti (#947.3).
+  const PROFILO_APERTE = { library: ['Mobile Documents', 'CloudStorage'] };
   const JOLLY = /[*?[\]{}\uFFFD]/;
   // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
   const SEGNAPOSTO = '$_\uE000';
@@ -1025,7 +1028,8 @@
       }
       if (i === 0) {
         const n = nomeNorm(s);
-        if (PROFILO.has(n) || n.startsWith('ntuser')) return MOTIVI.nascosto;
+        const aperta = sotto.length > 1 && (PROFILO_APERTE[n] || []).some((a) => nomeNorm(a) === nomeNorm(sotto[1]));
+        if ((PROFILO.has(n) || n.startsWith('ntuser')) && !aperta) return MOTIVI.nascosto;
       }
     }
     return '';
@@ -1592,5 +1596,13 @@
     return fuoriPerimetro(percorso, ctx) === MOTIVI.nascosto;
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, programOf, subcommandOf, comeCmd };
+  // Le cartelle aperte dentro `percorso`, se è proprio una cartella di profilo: chi legge in blocco scende solo lì.
+  function aperteDentro(percorso, ctx) {
+    const c = contesto(ctx);
+    const r = dove(String(percorso == null ? '' : percorso).trim(), c);
+    if (!r || typeof r !== 'object' || !dentroCasa(r, c) || r.segs.length !== c.home.segs.length + 1) return [];
+    return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
+  }
+
+  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, aperteDentro, programOf, subcommandOf, comeCmd };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

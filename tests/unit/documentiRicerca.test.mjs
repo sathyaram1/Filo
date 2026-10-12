@@ -583,6 +583,27 @@ test('cercando in tutta la cartella personale la ricerca non entra nelle cartell
     letti = 0;
     assert.deepEqual(nomi(await Indice.cerca('preventivo idraulico', { cartella: join(CASA, 'Library') })), ['allegato.txt']);
     assert.equal(letti, 0, 'e resta nell\'indice per la richiesta nella Libreria');
+    // iCloud Drive e le cartelle di Dropbox, OneDrive e Google Drive stanno nella Libreria del Mac: sono documenti.
+    const icloud = join(CASA, 'Library', 'Mobile Documents', 'com~apple~CloudDocs', 'Bollette');
+    const dropbox = join(CASA, 'Library', 'CloudStorage', 'Dropbox', 'Idraulico');
+    for (const d of [icloud, dropbox]) mkdirSync(d, { recursive: true });
+    writeFileSync(join(icloud, 'preventivo-icloud.txt'), 'Preventivo idraulico salvato in iCloud Drive');
+    writeFileSync(join(dropbox, 'preventivo-dropbox.txt'), 'Preventivo idraulico salvato in Dropbox');
+    const cloud = nomi(await Indice.cerca('preventivo idraulico', { cartella: CASA }));
+    assert.ok(cloud.includes('preventivo-icloud.txt'), 'iCloud Drive si cerca con la cartella personale');
+    assert.ok(cloud.includes('preventivo-dropbox.txt'), 'le cartelle cloud si cercano con la cartella personale');
+    assert.ok(!cloud.includes('allegato.txt'), 'il resto della Libreria resta fuori');
+    const C = globalThis.SN_CMD_CLASSIFY;
+    const ctx = { home: CASA, win: false, maiuscole: true };
+    assert.equal(C.privato(join(icloud, 'preventivo-icloud.txt'), ctx), false, 'leggerlo da solo non chiede più di un documento');
+    assert.equal(C.privato(join(CASA, 'library', 'cloudstorage', 'x.pdf'), ctx), false);
+    assert.equal(C.privato(join(CASA, 'Library', 'Mail', 'x.txt'), ctx), true);
+    assert.equal(C.privato(join(CASA, 'Library', 'Mobile Documents', '..', 'Mail', 'x.txt'), ctx), true);
+    assert.equal(C.privato(join(CASA, 'Library', 'Mobile Documents', '.Trash', 'x.txt'), ctx), true);
+    assert.equal(C.privato(join(CASA, 'Library'), ctx), true);
+    assert.deepEqual(C.aperteDentro(join(CASA, 'Library'), ctx), ['Mobile Documents', 'CloudStorage']);
+    assert.deepEqual(C.aperteDentro(join(CASA, 'Library', 'Mail'), ctx), []);
+    assert.deepEqual(C.aperteDentro(join(CASA, 'Documenti', 'Library'), ctx), []);
     // Anche nell'elenco delle cartelle di sempre: la cartella personale aggiunta in Preferenze non porta dentro la Libreria.
     cartelle = [CASA];
     const elenco = await Indice.cerca('preventivo idraulico');

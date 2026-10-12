@@ -75,10 +75,16 @@ function dentro(figlio, padre) {
 
 // Le cartelle che la lettura di un file tratta da private (la Libreria del Mac, AppData) la ricerca non le percorre,
 // se non è dentro una di loro che l'utente ha chiesto di cercare: la regola è quella della lettura, in cmdClassify.
-function privata(cartella) {
+function classifica() {
   const C = globalThis.SN_CMD_CLASSIFY || (require('../../shared/cmdClassify.js'), globalThis.SN_CMD_CLASSIFY);
   const win = process.platform === 'win32';
-  try { return C.privato(cartella, { home: deps.casa(), win, maiuscole: win || process.platform === 'darwin' }); } catch (_) { return false; }
+  return { C, ctx: { home: deps.casa(), win, maiuscole: win || process.platform === 'darwin' } };
+}
+function privata(cartella) {
+  try { const { C, ctx } = classifica(); return C.privato(cartella, ctx); } catch (_) { return false; }
+}
+function aperteDentro(cartella) {
+  try { const { C, ctx } = classifica(); return C.aperteDentro(cartella, ctx); } catch (_) { return []; }
 }
 function esclusa(cartella, radice) {
   return !dentro(cartella, radice) || (privata(cartella) && !privata(radice));
@@ -233,7 +239,12 @@ async function elenca(cartelle) {
   let pieno = false;
   let radicePrivata = false;
   async function giro(dir, prof) {
-    if (pieno || prof > PROFONDITA_MAX || (prof > 0 && !radicePrivata && privata(dir))) return;
+    if (pieno || prof > PROFONDITA_MAX) return;
+    if (prof > 0 && !radicePrivata && privata(dir)) {
+      // Della Libreria del Mac solo le cartelle dei documenti nel cloud: elencarne il resto fa chiedere al sistema.
+      for (const n of aperteDentro(dir)) await giro(path.join(dir, n), prof + 1);
+      return;
+    }
     let elenco;
     try { elenco = await fsp.readdir(dir, { withFileTypes: true }); } catch (e) {
       if (prof === 0 && e && NEGATO.has(e.code)) negate.push(dir);

@@ -73,10 +73,6 @@ test('alla pagina tornano nomi, cartelle coi nomi di Filo e chiavi: nessun perco
   assert.equal(Aiuto.percorsoDi(wc, 'inventata'), '');
   const modello = Aiuto.perIlModello(wc);
   assert.ok(!JSON.stringify(modello).includes(CASA), 'nemmeno il modello, che risponde nella pagina, vede percorsi');
-  // Una ricerca nuova chiude le chiavi della vecchia.
-  const vecchia = r.candidati[0].chiave;
-  await Aiuto.cerca(wc, { cosa: 'gas', origine: 'https://fornitore.example/' });
-  assert.equal(Aiuto.percorsoDi(wc, vecchia), '');
 });
 
 test('da una pagina di Filo non si chiede, se la cartella non esce dal perimetro; fuori dal perimetro sì, col perché', async () => {
@@ -137,4 +133,18 @@ test('una domanda alla volta per scheda: chi chiede ancora mentre il popup aspet
   assert.equal(domande.length, 2, 'risposta la prima, se ne può fare un\'altra');
   rispondi(false);
   assert.deepEqual(await dopo, { ok: false, annullata: true });
+});
+
+test('i bottoni di una ricerca di prima aprono ancora il loro file dopo una ricerca nuova; una pagina nuova li spegne', async () => {
+  finto();
+  const ascolta = {};
+  const wc = { isDestroyed: () => false, on(ev, f) { ascolta[ev] = f; }, once() {} };
+  const prima = await Aiuto.cerca(wc, { cosa: 'bolletta luce marzo', origine: 'filo://newtab/' });
+  const dopo = await Aiuto.cerca(wc, { cosa: 'bolletta gas marzo', origine: 'filo://newtab/' });
+  assert.equal(Aiuto.percorsoDi(wc, prima.candidati[0].chiave), BOLLETTA, 'il primo bottone apre ancora la bolletta');
+  assert.equal(Aiuto.percorsoDi(wc, dopo.candidati[1].chiave), GAS);
+  assert.notEqual(prima.candidati[0].chiave, dopo.candidati[0].chiave);
+  ascolta['did-navigate']();
+  assert.equal(Aiuto.percorsoDi(wc, prima.candidati[0].chiave), '');
+  assert.equal(Aiuto.percorsoDi(wc, dopo.candidati[0].chiave), '');
 });

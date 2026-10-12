@@ -13,6 +13,9 @@ const COSA_MAX = 500;
 const CARTELLA_MAX = 2000;
 // Nel popup la richiesta la scrive il modello, che può averla copiata dalla pagina: si mostra corta e su una riga.
 const COSA_NEL_POPUP = 160;
+// I bottoni delle ricerche di prima restano in chat e devono aprire ancora il loro file: le chiavi si tengono tutte
+// finché la pagina non cambia; il tetto è solo una guardia (quattro ricerche per conversazione da otto candidati).
+const CHIAVI_MAX = 1000;
 
 const deps = {
   chiediSi: (wc, richiesta) => require('../confermeSopraPagina').chiediDalMain(wc, richiesta),
@@ -133,13 +136,15 @@ async function cerca(wc, { cosa, cartella = '', origine = '', avanzamento = null
     try { dove = await deps.doveSta(x.percorso); } catch (_) {}
     risultati.push({ ...x, dove });
   }
-  const chiavi = new Map();
   const candidati = risultati.map((x, i) => {
     const chiave = crypto.randomBytes(16).toString('base64url');
-    chiavi.set(chiave, x.percorso);
+    s.chiavi.set(chiave, x.percorso);
     return { n: i + 1, nome: x.nome, dove: x.dove, tipo: x.tipo, data: x.data, pagine: x.pagine || 0, scansione: !!x.scansione, chiave };
   });
-  s.chiavi = chiavi;
+  for (const k of s.chiavi.keys()) {
+    if (s.chiavi.size <= CHIAVI_MAX) break;
+    s.chiavi.delete(k);
+  }
   s.dati = {
     cercato: q,
     risultati: risultati.map(({ percorso, cartella: _c, ...resto }) => resto),
