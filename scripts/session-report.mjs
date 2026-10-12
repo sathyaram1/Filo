@@ -124,7 +124,11 @@ export function famigliaPrezzo(model) {
   if (/fable|mythos/.test(m)) key = /(fable|mythos)-5(?![-\d])/.test(m) ? 'fable-5' : 'fable';
   else if (m.includes('opus')) key = /opus-5-5(?!\d)/.test(m) ? 'opus-5-5' : 'opus';
   else if (m.includes('sonnet')) key = /sonnet-4/.test(m) ? 'sonnet-4' : 'sonnet';
-  else if (m.includes('haiku')) key = 'haiku';
+  else if (m.includes('haiku')) {
+    // Una Haiku di quinta generazione o dopo è più vicina al listino di 5.5 che a quello di 4.5 (dieci volte tanto).
+    const g = /haiku-(\d{1,2})(?!\d)/.exec(m);
+    key = g && Number(g[1]) >= 5 ? 'haiku-5-5' : 'haiku';
+  }
   // La minore ha una o due cifre: un suffisso di data (otto) non è una versione.
   const v = /(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d{1,2})(?!\d))?/.exec(m);
   return { key, known: !!v && VERSIONI[v[1]][v[3] ? `${v[2]}-${v[3]}` : v[2]] === key };
