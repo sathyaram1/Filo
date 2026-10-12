@@ -7,10 +7,15 @@ import { test, expect } from './fixtures/electron.mjs';
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Accedi</h1>
   <p id="paragraph">Usa il tuo account per continuare: una frase da selezionare e spiegare.</p>
-  <input id="email" type="email" value="mario.rossi@example.com" style="width:300px">
+  <input id="email" type="text" spellcheck="false" value="mario.rossi@example.com" style="width:300px">
 </body></html>`;
 
 const CSP = {
+  // Le intestazioni che manda la pagina di accesso di Google (ottobre 2026), una riga per intestazione.
+  'come accounts.google.com': [
+    "script-src 'report-sample' 'nonce-xK_ILijz3EKLktHBWcdeMg' 'unsafe-inline';object-src 'none';base-uri 'self';report-uri /cspreport;worker-src 'self'",
+    "require-trusted-types-for 'script';report-uri /cspreport",
+  ],
   'solo obbligo': "require-trusted-types-for 'script'",
   'nessun nome ammesso': "require-trusted-types-for 'script'; trusted-types 'none'",
   'solo i nomi della pagina': "require-trusted-types-for 'script'; trusted-types goog#html",
@@ -74,11 +79,10 @@ test('se il menu di Filo non si costruisce compare quello di riserva, e le sue v
   }, testServer.origin);
 
   await page.locator('#email').click({ button: 'right' });
-  const voci = await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x.webContents.getURL().startsWith('data:text/html'));
     return w ? w.webContents.executeJavaScript("[...document.querySelectorAll('.item .lbl')].map((n) => n.textContent)") : [];
   }), { timeout: 5000 }).toEqual(expect.arrayContaining(['Seleziona tutto', 'Ricarica']));
-  void voci;
   await expect(page.locator('.sn-menu')).toHaveCount(0);
 
   await app.evaluate(({ BrowserWindow }) => {
