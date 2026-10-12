@@ -222,8 +222,10 @@
     // invito al login sono promesse vuote, e si tolgono. Restano per chi ha
     // ancora una chiave di fabbrica o una propria.
     // Vale anche con la chiave personale ancora qui ma l'identità annullata
-    // sul server: quella chiave non compra più niente.
-    const noKey = !has && (w.keySource === 'none' || Boolean(w.identity && w.identity.lost));
+    // sul server: quella chiave non compra più niente. E con la personale e il
+    // server non letto: il saldo è del server, e il conteggio locale al suo
+    // posto sarebbe un numero che sparisce alla lettura dopo (#1138).
+    const noKey = !has && (w.keySource === 'none' || w.keySource === 'personal' || Boolean(w.identity && w.identity.lost));
     $('hero').hidden = noKey;
     $('refillHint').hidden = noKey;
     if (noKey) $('offlineHint').hidden = true;
@@ -232,9 +234,10 @@
     $('ownerLink').hidden = !w.isOwner;
 
     if (has) {
-      // Il saldo vero è quello del server: sostituisce il conteggio locale.
+      // Il saldo vero è quello del server: sostituisce il conteggio locale, anche
+      // quando il server non lo manda (meglio un trattino del vecchio numero).
       const b = server.balance || {};
-      if (b.credits != null) $('balance').textContent = formatCredits(b.credits);
+      $('balance').textContent = b.credits != null ? formatCredits(b.credits) : '—';
       $('offlineHint').hidden = true;
       const daily = Number(server.dailyCredits) || 0;
       $('refillHint').textContent = daily > 0
@@ -276,7 +279,9 @@
         : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
-      note.textContent = 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
+      note.textContent = noKey
+        ? 'Il server dei crediti non risponde adesso: riprova fra poco.'
+        : 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
       note.hidden = false;
     } else if (server && server.invitesOpen === false) {
       note.textContent = 'Per ora i posti sono finiti: il tuo codice resta valido, riprova fra qualche giorno.';
@@ -501,8 +506,8 @@
     if (r && r.ok) {
       msg.textContent = r.message || 'Fatto.';
       msg.classList.add('is-ok');
-      // Il modulo dell'invito sparisce col portafoglio: la frase (con quanti
-      // crediti sono passati) resta nella nota, fuori dal modulo.
+      // Il modulo dell'invito sparisce col portafoglio: la frase (coi crediti
+      // d'ingresso) resta nella nota, fuori dal modulo.
       showConfirmation(r.message || 'Fatto.');
       // Il saldo grande e i codici arrivano dallo stato nuovo. La vista owner
       // sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.

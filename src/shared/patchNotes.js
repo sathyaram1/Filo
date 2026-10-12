@@ -47,6 +47,7 @@
         'In Opzioni, se scegli per una funzione un modello che non la sa fare, come una voce per le spiegazioni, sotto il campo resta scritto perché. Prima il campo tornava com\'era senza dire niente.',
         'L\'Aiuto prende le istruzioni per assistenti solo dal sito su cui sei. Un sito non può più fargli leggere quello che c\'è sul tuo router o su altri dispositivi della rete di casa.',
         'Su Linux il correttore ortografico non scarica più i dizionari da Google, e su Windows nemmeno per le lingue che il sistema non corregge: quelli di italiano e inglese sono dentro Filo e funzionano anche senza rete.',
+        'Quando riscatti un invito, la conferma dice quanti crediti d’ingresso ricevi. Prima nominava anche i crediti contati sul tuo computer, e sembrava che te li togliesse.',
       ],
     },
     {
