@@ -1300,10 +1300,10 @@
         }
       }
     }
-    // Rimuovi l'issue dallo stato e ridisegna; il prossimo scan rivaluterà.
+    // L'issue corretto cade col testo che cambia (anche se l'input non è arrivato); il prossimo scan rivaluterà.
     const state = monitored.get(el);
     if (state) {
-      state.issues = (state.issues || []).filter((i) => !(i.start === range.start && i.end === range.end));
+      seguiIlTesto(state);
       state.lastScannedText = '';
       renderOverlayContent(state);
       scheduleScan(state);
