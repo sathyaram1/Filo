@@ -143,6 +143,7 @@ async function carica() {
   if (!caricamento) {
     caricamento = (async () => {
       const m = new Map();
+      const o = new Map();
       let righe = 0;
       try {
         const testo = await fsp.readFile(fileIndice(), 'utf8');
@@ -151,11 +152,13 @@ async function carica() {
           let v = null;
           try { v = JSON.parse(riga); } catch (_) { continue; }
           righe += 1;
+          if (v && typeof v.o === 'string') { if (v.via) o.delete(v.o); else o.set(v.o, Number(v.q) || 0); continue; }
           if (!v || typeof v.p !== 'string') continue;
           if (v.via) m.delete(v.p); else m.set(v.p, v);
         }
       } catch (_) { /* nessun indice ancora: si fa */ }
       voci = m;
+      occasionali = o;
       righeSuDisco = righe;
       return m;
     })();
