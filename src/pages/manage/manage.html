@@ -1253,6 +1253,14 @@
       background: var(--sn-bg-input, var(--sn-bg, #fff)); color: inherit;
     }
     .mg-auto-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* Modello e sforzo per fase: una riga per fase, le tendine in colonna fra una riga e l'altra. */
+    .mg-role-models {
+      display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr);
+      gap: 8px 10px; align-items: center; margin-top: 12px;
+    }
+    .mg-role-head { font-size: 12px; font-weight: 600; color: var(--sn-muted); }
+    .mg-role-name { font-size: 13px; font-weight: 600; color: var(--sn-fg); }
+    .mg-role-models .sn-select-button { padding: 6px 10px; }
 
     /* Fusioni ferme senza una segnalazione alle spalle: l'aspetto sta tutto in mergeApprovals.css, qui solo la
        spaziatura. Niente tetto: stanno in Automazioni, che scorre da sé. */
