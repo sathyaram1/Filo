@@ -166,6 +166,7 @@ const dataUrl = (buf) => `data:image/png;base64,${Buffer.from(buf).toString('bas
 async function configuraModello(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -311,6 +312,7 @@ test('la stessa immagine firmata, ricompressa senza metadati, non fa comparire n
 test('un’immagine servita da un altro dominio fa comparire la riga e la descrizione parte', async ({ app, openTab, testServer }) => {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -344,6 +346,7 @@ test('un’immagine servita da un altro dominio fa comparire la riga e la descri
 async function modelloFinto(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -576,6 +579,7 @@ test('una domanda qualsiasi all’Aiuto, con l’immagine ripetitiva visibile: F
 test('un’immagine finta che punta a un documento di un altro sito non viene scaricata né descritta', async ({ app, openTab, testServer }) => {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
