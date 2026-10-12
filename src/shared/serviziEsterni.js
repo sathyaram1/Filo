@@ -266,7 +266,7 @@
       quando: 'funzione',
       occasione: 'solo se ne hai impostato uno, nelle schede che apri da un altro paese',
       riceve: 'tutto il traffico di quelle schede',
-      dove: ['src/main/tabs.js', 'src/main/services/proxyTab.js'], prova: 'setProxy(',
+      dove: ['src/main/tabs.js'], prova: 'setProxy(',
     },
   ];
 

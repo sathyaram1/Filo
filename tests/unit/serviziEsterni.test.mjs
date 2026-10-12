@@ -18,6 +18,7 @@ const VOCI = [...SE.SERVIZI, ...SE.LINK_APERTI];
 
 // Testi da leggere, non chiamate: il link di una fonte o del changelog lo apre solo chi lo segue.
 const FILE_ESCLUSI = {
+  'src/shared/serviziEsterni.js': 'l’elenco stesso: i suoi indirizzi non provano che il codice li usi',
   'src/shared/transparency.js': 'testi e fonti dei documenti di trasparenza',
   'src/shared/patchNotes.js': 'testo del changelog',
 };
@@ -54,10 +55,13 @@ const PAROLE_PRIMA_DI_REGEX = new Set(['return', 'typeof', 'case', 'do', 'else',
 const PRIMA_DI_DIVISIONE = new Set([K.Identifier, K.NumericLiteral, K.BigIntLiteral, K.StringLiteral, K.NoSubstitutionTemplateLiteral, K.TemplateTail, K.CloseParenToken, K.CloseBracketToken, K.ThisKeyword, K.TrueKeyword, K.FalseKeyword, K.NullKeyword, K.PlusPlusToken, K.MinusMinusToken, K.CloseBraceToken]);
 const LETTERALI = new Set([K.StringLiteral, K.NoSubstitutionTemplateLiteral, K.TemplateHead, K.TemplateMiddle, K.TemplateTail]);
 
-function riga(testo, pos) {
-  let n = 1;
-  for (let i = 0; i < pos; i++) if (testo.charCodeAt(i) === 10) n++;
-  return n;
+// Contatore che avanza soltanto: le posizioni arrivano in ordine, e ricontare da capo costava secondi.
+function contaRighe(testo) {
+  let pos = 0, n = 1;
+  return (fino) => {
+    for (; pos < fino; pos++) if (testo.charCodeAt(pos) === 10) n++;
+    return n;
+  };
 }
 
 // Il lexer di TypeScript separa commenti, stringhe, template e regex: una regex sul testo grezzo li confonde.
@@ -67,6 +71,7 @@ function leggiJs(testo) {
   const senzaCommenti = testo.split('');
   const codice = testo.split('');
   const vuota = (arr, da, a) => { for (let i = da; i < a; i++) if (arr[i] !== '\n') arr[i] = ' '; };
+  const riga = contaRighe(testo);
   const pila = [];
   let prima = null, primaTesto = '';
   for (;;) {
@@ -89,7 +94,7 @@ function leggiJs(testo) {
       else if (pila.at(-1) === 'tpl') { k = sc.reScanTemplateToken(false); if (k === K.TemplateTail) pila.pop(); }
     }
     if (LETTERALI.has(k)) {
-      frammenti.push({ valore: sc.getTokenValue(), riga: riga(testo, da), segue: k === K.TemplateHead || k === K.TemplateMiddle });
+      frammenti.push({ valore: sc.getTokenValue(), riga: riga(da), segue: k === K.TemplateHead || k === K.TemplateMiddle });
       vuota(codice, da + 1, sc.getTextPos() - 1);
     } else if (k === K.RegularExpressionLiteral) {
       vuota(codice, da + 1, sc.getTextPos() - 1);
