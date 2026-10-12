@@ -110,13 +110,13 @@ test('gesto: una chiamata col tipo la paga solo il gesto che la chiede, non un t
     assert.equal(g.prendi('parola', G.CHIUDE), false);
     ev('keyup', k);
   }
-  // Maiusc+frecce, Ctrl/Cmd+A, il mouse e il dito selezionano; la freccia senza Maiusc no.
+  // Maiusc+frecce, Ctrl/Cmd+A e il doppio clic selezionano; la freccia senza Maiusc no. Il mouse e il dito: il test dopo.
   ev('keydown', 'ArrowRight');
   assert.equal(g.prendi('spiega', G.SELEZIONA), false);
   ev('keyup', 'ArrowRight');
   for (const [type, key, extra] of [['keydown', 'ArrowRight', { shiftKey: true }], ['keydown', 'End', { shiftKey: true }],
     ['keydown', 'a', { ctrlKey: true, code: 'KeyA' }], ['keydown', 'a', { metaKey: true, code: 'KeyA' }],
-    ['mouseup'], ['dblclick'], ['touchend']]) {
+    ['dblclick']]) {
     ev(type, key, extra);
     assert.equal(g.prendi('spiega', G.SELEZIONA), true, `${type} ${key || ''} seleziona`);
     if (key) ev('keyup', key, extra);
