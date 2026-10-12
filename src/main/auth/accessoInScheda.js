@@ -29,7 +29,7 @@ function apri(url, { hostAccesso = hostDi(url), suChiusa, suRifiuto, fino } = {}
   const win = finestraNormale();
   if (!win) return null;
   const tabs = win._filoTabs;
-  const id = tabs.openTab(url, { activate: true, allowDuplicate: true });
+  const id = tabs.openTab(url, { activate: true });
   if (!id) return null;
   let finita = false;
   const smetti = () => {
