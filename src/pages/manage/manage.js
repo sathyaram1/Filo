@@ -5559,12 +5559,16 @@
     if (ridisegnoRimandato === null) return;
     ridisegnaRispettandoLaBozza(ridisegnoRimandato);
   }
-  if (mgDetail) {
+  {
     // `focusout` arriva mentre il fuoco è ancora sul campo che lo perde: il
     // rinvio di un giro fa trovare a detailBeingEdited() la situazione vera.
+    // Anche il pannello: la risposta alle domande si scrive lì.
     const piuTardi = () => setTimeout(riprendiRidisegnoRimandato, 0);
-    mgDetail.addEventListener('input', piuTardi);
-    mgDetail.addEventListener('focusout', piuTardi);
+    for (const el of [mgDetail, mgSide]) {
+      if (!el) continue;
+      el.addEventListener('input', piuTardi);
+      el.addEventListener('focusout', piuTardi);
+    }
   }
 
   // La scheda aperta non è più in pagina: il pannello non può mostrare un
