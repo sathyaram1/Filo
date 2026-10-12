@@ -253,6 +253,7 @@ test('prima che il server risponda nessun controllo delle automazioni dice un va
   await expect(tendina(page, 'secaudit', 'model').locator('.sn-select-value')).toHaveText('');
   const pallina = page.locator('#mgAccountA + .mg-switch-track .mg-switch-thumb');
   await expect(pallina).toBeHidden();
+  await expect(page.locator('#mgRoutinesSwitch .mg-switch-state')).toBeHidden();
   await page.locator('.mg-auto-cols').screenshot({ path: 'tests/.shots/1193-in-lettura.png' });
 
   await expect(tendina(page, 'secaudit', 'model').locator('.sn-select-value')).toHaveText('Sonnet', { timeout: 15000 });
