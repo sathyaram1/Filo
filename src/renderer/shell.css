@@ -155,9 +155,9 @@ html[data-chrome-compact="1"] .addr {
   transition: background 0.1s ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
-  /* Contenitore delle priorità delle icone (sotto); la larghezza del contenuto gliela misura shell.js. */
+  /* Contenitore delle priorità delle icone (sotto); la larghezza che chiede alla striscia la calcola shell.js. */
   container: tab / inline-size;
-  contain-intrinsic-inline-size: var(--tab-naturale, none);
+  contain-intrinsic-inline-size: var(--tab-chiesta, none);
 }
 
 .tab.audible {
