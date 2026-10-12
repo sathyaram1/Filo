@@ -4665,10 +4665,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       if (fermato) break;
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
-      if (text.trim()) notes.push(text.trim());
+      // Quello di un giro di soli bottoni invece resta nella bolla.
+      const diRisposta = !!text.trim() && giroDiSoliBottoni(results);
+      if (diRisposta) {
+        risposta.push(text.trim());
+        noteAllaRisposta = notes.length;
+        // Scritto dopo aver letto ogni esito: un «non disponibile» precedente non lo smentisce più.
+        noteAlRifiuto = -1;
+      } else if (text.trim()) notes.push(text.trim());
       if (roundRendered.some(esitoNonDisponibile)) noteAlRifiuto = notes.length;
-      push('filo:action', { kind: 'round', text });
-      textReply = text;
+      push('filo:action', { kind: 'round', text, ...(diRisposta ? { risposta: true } : {}) });
+      textReply = diRisposta ? '' : text;
       reasoningDetails = r.reasoningDetails || [];
       if (legacy) {
         // Formato vecchio: si prosegue solo se un esito deve tornare al modello
