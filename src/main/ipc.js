@@ -12,6 +12,7 @@ const { ipcMain, BrowserWindow, app, session } = require('electron');
 const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
+const MenuDiRiserva = require('./menuDiRiserva');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
 const CartaAnteprima = require('./popup-anteprima');
 const { createSession, defaultCwd, commandExists } = require('./services/shell');
