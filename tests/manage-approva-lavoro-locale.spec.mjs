@@ -66,7 +66,7 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   const btn = page.locator('#mgAcceptLocalBtn');
   await expect(btn).toBeVisible();
   await expect(btn).toHaveText('💻 Lavoro server');
-  await expect(btn).toHaveAttribute('title', /nessuna routine/i);
+  await expect(btn).toHaveAttribute('title', /Diventa un lavoro server/);
   // Rimandato perché richiede lavoro locale: è la scelta attesa, quindi il tasto principale.
   await expect(btn).not.toHaveClass(/sn-btn-secondary/);
   await expect(page.locator('#mgAcceptBtn')).toHaveClass(/sn-btn-secondary/);
@@ -121,7 +121,7 @@ test('tasto destro sulla scheda nei Ricevuti: «Approva come lavoro locale», e 
   await page.locator('.mg-item').click({ button: 'right' });
   const voce = page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Approva come lavoro server' });
   await expect(voce).toBeVisible();
-  await expect(voce).toHaveAttribute('title', /nessuna routine/i);
+  await expect(voce).toHaveAttribute('title', /Diventa un lavoro server/);
   await voce.click();
   await expect(page.locator('.mg-ctxmenu')).toHaveCount(0);
   await expect(tabBtn(page, 'local')).toHaveText('Lavori server (1)');
