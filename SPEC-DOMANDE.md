@@ -776,9 +776,11 @@ Da sistemare prima dei worker in parallelo:
   livelli sotto la sessione principale) per il lavoro interno: esplorazioni,
   raccolte, prove. Quando invece un lavoro va diviso in pezzi che contano nei
   posti e hanno un biglietto loro (una revisione grande, per esempio), il worker
-  chiede al server dei biglietti figli, col ruolo e i numeri, mai testo libero, come per l'unione (§ 1.3).
-  L'orchestratore li lancia come gli altri, dentro N e K. I figli ereditano la
-  fiducia del padre in quel momento. Il padre aspetta i loro esiti dal server.
+  chiede al server dei compiti figli (§ 6), col ruolo e i numeri, mai testo
+  libero, come per l'unione (§ 1.3). Ognuno ha il suo biglietto, e
+  l'orchestratore li lancia come gli altri, dentro N e K. I figli ereditano
+  l'urgenza del padre e la sua fiducia in quel momento. Il padre aspetta i loro
+  esiti dal server.
   Le chiusure a metà e i crash li segue il monitoraggio.
 - **Le prove** non devono contendersi display virtuali, porte o cartelle: vanno
   provate con 2, 3 e 4 worker insieme.
