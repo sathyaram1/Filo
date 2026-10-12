@@ -2071,35 +2071,6 @@
     }
   }
 
-  // #530 — il livello di autonomia attivo, sempre in vista accanto a dove si scrive.
-  function mostraAutonomia(aut) {
-    const A = self.SN_AUTONOMIA;
-    if (!autonomiaEl || !A) return;
-    const info = A.infoLivello(A.livelloAttivo(aut && aut.livello));
-    const livelli = A.livelliSelezionabili();
-    const n = livelli.findIndex((l) => l.id === info.id) + 1;
-    const tacche = document.createElement('span');
-    tacche.className = 'dash-autonomia-tacche';
-    tacche.setAttribute('aria-hidden', 'true');
-    for (let i = 1; i <= livelli.length; i++) {
-      const t = document.createElement('span');
-      t.className = `dash-autonomia-tacca${i <= n ? ' piena' : ''}`;
-      tacche.appendChild(t);
-    }
-    const nome = document.createElement('span');
-    nome.textContent = info.nome;
-    autonomiaEl.replaceChildren(tacche, nome);
-    autonomiaEl.dataset.livello = info.id;
-    autonomiaEl.title = 'Quanto Filo fa da solo · clic per cambiarlo';
-    autonomiaEl.setAttribute('aria-label', `Autonomia di Filo: ${info.nome}. Clic per cambiarla.`);
-    autonomiaEl.hidden = false;
-  }
-  if (autonomiaEl) {
-    autonomiaEl.addEventListener('click', () => {
-      send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#autonomia' });
-    });
-  }
-
   (async function init() {
     renderControls();
     await applySavedTheme();
