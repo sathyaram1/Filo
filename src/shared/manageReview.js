@@ -1180,11 +1180,11 @@
       case 'credit':
         return 'Il credito OpenRouter della chiave dei giudici è esaurito: ricaricalo per far girare i giudici.';
       case 'auth':
-        return 'La chiave OpenRouter dei giudici è assente o non valida: reimpostala nei Modelli di supporto.';
+        return 'La chiave OpenRouter dei giudici è assente o non valida: reimpostala in Automazioni, fra i Modelli di supporto.';
       case 'rate_limit':
         return 'Il provider dei giudici è sovraccarico (limite di richieste): riprova tra poco.';
       case 'bad_request':
-        return 'Un modello dei giudici non è valido o non esiste più: controlla i modelli nei Modelli di supporto.';
+        return 'Un modello dei giudici non è valido o non esiste più: controlla i modelli in Automazioni, fra i Modelli di supporto.';
       case 'timeout':
         return 'I giudici non hanno risposto in tempo: alza il "Timeout dei giudici" in Automazioni se usi modelli lenti.';
       default:
@@ -1633,8 +1633,8 @@
         titolo,
         righe: versione ? [riga('Uscito nella versione', versione)] : [],
         testo: !preapproved.length ? 'Il lavoro è entrato in main.'
-          : preapproved[0].motivo === 'fiducia' ? 'Lavoro fidato: controllo registrato in Automazioni.'
-            : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati in Automazioni.'
+          : preapproved[0].motivo === 'fiducia' ? 'Lavoro fidato: controllo registrato nel Log.'
+            : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati nel Log.'
               : 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
         azioni: [],
       }, { richiesta: preapproved[0] || null, richieste: preapproved, conflitto: false });

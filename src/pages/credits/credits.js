@@ -207,8 +207,12 @@
     const box = $('wallet');
     const reissue = $('reissueBtn');
     const resetBtn = $('resetIdentityBtn');
+    const resetConfirm = $('resetIdentityConfirm');
+    // Un ridisegno che arriva mentre la domanda è aperta non la richiude sotto il dito.
+    const domandaAperta = !resetConfirm.hidden;
     reissue.hidden = true;
     resetBtn.hidden = true;
+    resetConfirm.hidden = true;
     const server = w && w.ok ? w.server : null;
     const has = Boolean(server && server.hasWallet);
     // Quello del server vince: è il nome con cui la persona compare all'owner.
@@ -248,7 +252,9 @@
         note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
         note.hidden = false;
       } else if (server.cached) {
-        note.textContent = 'Ultimo saldo letto: il server dei crediti non risponde adesso.';
+        note.textContent = w.identity && w.identity.unreadable
+          ? 'Ultimo saldo letto: questo computer non riesce più a leggere l\'identità di Filo salvata qui.'
+          : 'Ultimo saldo letto: il server dei crediti non risponde adesso.';
         note.hidden = false;
       } else if (server.stale) {
         note.textContent = 'Saldo dell\'ultima lettura: il servizio dei modelli non risponde adesso.';
@@ -266,17 +272,22 @@
     $('invitesSection').hidden = true;
     const form = $('redeemForm');
     form.hidden = false;
-    if (w.identity && !w.identity.ok && w.identity.lost) {
-      // Il server ha annullato l'identità: il portafoglio legato a essa non
-      // si raggiunge più. Si dice, e ricominciare è una scelta dell'utente.
+    if (w.identity && !w.identity.ok && (w.identity.lost || w.identity.unreadable)) {
+      // Il portafoglio legato all'identità non si raggiunge: si dice, e
+      // ricominciare è una scelta dell'utente, confermata.
       form.hidden = true;
-      note.textContent = 'L\'identità di questa installazione è stata annullata sul server, e con lei i crediti che aveva. Puoi ricominciare con un nuovo invito.';
+      note.textContent = w.identity.lost
+        ? 'L\'identità di questa installazione è stata annullata sul server, e con lei i crediti che aveva. Puoi ricominciare con un nuovo invito.'
+        : 'Questo computer non riesce più a leggere l\'identità di Filo salvata qui, e con lei i crediti. Succede quando cambia la cifratura del sistema. Se torna com\'era, al prossimo avvio Filo riparte da solo. Altrimenti puoi ricominciare con un nuovo invito.';
       note.hidden = false;
-      resetBtn.hidden = false;
+      if (domandaAperta) resetConfirm.hidden = false;
+      else resetBtn.hidden = false;
     } else if (w.identity && !w.identity.ok) {
       note.textContent = w.identity.offline
         ? 'Sei offline: per riscattare un invito serve la connessione.'
-        : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
+        : w.identity.unreachable
+          ? 'Il servizio di accesso non risponde adesso. Riprova fra poco.'
+          : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
       note.textContent = noKey
@@ -476,12 +487,20 @@
   }
 
   async function resetIdentity() {
-    const btn = $('resetIdentityBtn');
-    btn.disabled = true;
+    const yes = $('resetIdentityYes');
+    yes.disabled = true;
     let r = null;
-    try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_RESET_IDENTITY }); } catch (_) { r = null; }
-    btn.disabled = false;
-    if (r && r.ok) render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state || null);
+    try { r = await chrome.runtime.sendMessage({ type: MSG.WALLET_RESET_IDENTITY, confermato: true }); } catch (_) { r = null; }
+    yes.disabled = false;
+    $('resetIdentityConfirm').hidden = true;
+    if (r && r.state) {
+      render(await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }) || {}, r.state);
+      return;
+    }
+    $('resetIdentityBtn').hidden = false;
+    const note = $('walletNote');
+    note.textContent = 'Non ci sono riuscito: riprova.';
+    note.hidden = false;
   }
 
   async function redeem(ev) {
@@ -694,7 +713,21 @@
     ev.preventDefault();
     apriMenuPseudonimo(ev.clientX, ev.clientY);
   });
-  $('resetIdentityBtn').addEventListener('click', () => { resetIdentity().catch(() => {}); });
+  // Ricominciare stacca il portafoglio di prima: chiede il sì sul posto, col fuoco su «Annulla».
+  $('resetIdentityBtn').addEventListener('click', () => {
+    $('resetIdentityBtn').hidden = true;
+    $('resetIdentityConfirm').hidden = false;
+    $('resetIdentityNo').focus();
+  });
+  $('resetIdentityNo').addEventListener('click', () => {
+    $('resetIdentityConfirm').hidden = true;
+    $('resetIdentityBtn').hidden = false;
+  });
+  // La coda di un doppio clic sul «Ricomincia» non è un sì.
+  $('resetIdentityYes').addEventListener('click', (ev) => {
+    if (ev.detail > 1) return;
+    resetIdentity().catch(() => {});
+  });
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
   if (chrome.runtime && chrome.runtime.onMessage) {

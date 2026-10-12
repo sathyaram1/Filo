@@ -18,6 +18,13 @@ porte divergono, e la prossima porta si dimentica di registrare.
   `src/main/shim/storage.js`). `src/main/services/registroCambi.js` confronta e
   scrive l'evento dalla stessa parte: disco per le finestre normali, RAM per
   l'incognito.
+- Le chiavi che il registro confronta le dichiara a `onScrittura`, e da lì lo
+  shim non le presta più vive: chi le legge e chi le scrive riceve una copia.
+  Prima `addTimer` aggiungeva in cima alla lista letta e poi la salvava, quindi
+  il registro vedeva prima uguale a dopo: dal secondo timer niente segno, e
+  «annulla» toglieva il timer sbagliato (#1088). La regola sta sulla lettura e
+  non su ogni funzione che scrive, così la prossima che muta la lista non la
+  rompe. Prova: `tests/unit/cambiOggettoVivo.test.mjs`.
 - La provenienza è un contesto (`con`): l'IPC lo mette per ogni pagina, la chat
   lo sovrascrive col suo, l'importazione col suo. Una strada che non lo dichiara
   finisce «da Filo», ma finisce nel registro.

@@ -3,8 +3,8 @@
 // layout a 3 colonne (lista filtrata per tab / dettaglio / pannello laterale):
 // la lista a sinistra mostra il sottoinsieme di feedback della tab corrente,
 // il dettaglio al centro ne mostra la conversazione + azioni contestuali
-// (sblocco per i bloccati, risposta per i chiarimenti). Le tab "Statistiche
-// Red Team" e "Modelli di supporto" sono segnaposto per ora.
+// (sblocco per i bloccati, risposta per i chiarimenti). "Automazioni" tiene
+// anche i Modelli di supporto (#1110); la traccia delle fusioni sta nel Log.
 
 (function () {
   'use strict';
@@ -384,6 +384,8 @@
     applyAutoModeGate();
     // Sbloccati, i campi mostrerebbero ciò che si è letto da non owner (cioè niente): si rilegge dal server.
     if (isAdmin && !eraAdmin && impostazioniAvviate) await caricaImpostazioni();
+    // Stessa pagina, stessa regola: i Modelli di supporto rifiutati da non owner si rileggono anche loro.
+    if (isAdmin && !eraAdmin) rileggiModelliRifiutati();
   }
 
   mgSignInBtn.addEventListener('click', () => {
@@ -1301,11 +1303,24 @@
   // una scheda dove vivere, e finiscono in Automazioni con gli stessi tasti.
   // Nasconderle sarebbe un ramo fermo per sempre senza dirlo.
   //
-  // Le decisioni già prese restano elencate in Automazioni: un'eccezione ai
-  // controlli di sicurezza deve lasciare una traccia che si può guardare.
+  // Le decisioni già prese restano elencate nel Log: un'eccezione ai controlli
+  // di sicurezza deve lasciare una traccia che si può guardare. In Automazioni
+  // costringevano a scorrere prima delle impostazioni (#1110).
   const mgMergeApprovalsOrphans = document.getElementById('mgMergeApprovalsOrphans');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
   const mgMergeApprovalsPreapproved = document.getElementById('mgMergeApprovalsPreapproved');
+  const mgFusioniSection = document.getElementById('mgFusioniSection');
+  const mgFusioniEmpty = document.getElementById('mgFusioniEmpty');
+
+  // La colonna delle fusioni decise si mostra solo con un elenco letto davvero:
+  // prima, o a lettura fallita, un «nessuna» sarebbe un dato inventato.
+  function aggiornaSezioneFusioni(letto) {
+    if (!mgFusioniSection) return;
+    mgFusioniSection.hidden = !letto;
+    if (!mgFusioniEmpty) return;
+    const vuota = [mgMergeApprovalsRecent, mgMergeApprovalsPreapproved].every((el) => !el || el.hidden);
+    mgFusioniEmpty.hidden = !vuota;
+  }
 
   // Gli elenchi del server, così come sono arrivati: il quadrato di ogni scheda
   // e il bordo delle card in lista li leggono da qui. Restano in memoria fra un
@@ -1368,6 +1383,8 @@
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
     if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
+    // Dal Log o da Automazioni il dettaglio sta in un pannello che non è a schermo.
+    else if (!LIST_TABS.includes(schedaAttiva())) selectTab(currentTab);
     openDetail(fb._id);
   }
 
@@ -1451,6 +1468,7 @@
         mgMergeApprovalsPreapproved.replaceChildren();
         mgMergeApprovalsPreapproved.hidden = true;
       }
+      aggiornaSezioneFusioni(false);
       riflettiFusioni();
       return 0;
     };
@@ -1486,6 +1504,7 @@
         onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
       });
     }
+    aggiornaSezioneFusioni(true);
     return n;
   }
 
@@ -1557,6 +1576,11 @@
       closeSidebar();
       renderList();
     }
+  }
+
+  function schedaAttiva() {
+    const btn = mgTabs.querySelector('.mg-tab.mg-tab--active');
+    return btn ? btn.dataset.tab : '';
   }
 
   mgTabs.addEventListener('click', (e) => {
@@ -5628,6 +5652,10 @@
     }
   }
 
+  function rileggiModelliRifiutati() {
+    if (!smLoaded && !smLoading && mgSmDenied && !mgSmDenied.hidden) loadSupportModels();
+  }
+
   // Render dell'editor (chiave + registro giudici + nickname + slot) e reveal.
   // Estratta da loadSupportModels così i test possono esercitarla senza il canale.
   function renderSupportModelsEditor(models) {
@@ -5681,12 +5709,10 @@
     if (mgSmRegistryList) mgSmRegistryList.appendChild(makeRegistryRow('', {}));
   });
 
-  // Caricamento pigro: avviene la prima volta che l'utente seleziona la tab
-  // "Modelli di supporto". La funzione selectTab già esiste e gestisce il
-  // pannello; qui interceptiamo il click sulla tab models.
+  // Caricamento pigro: alla prima apertura di "Automazioni", che li ospita (#1110).
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'models') return;
+    if (!btn || btn.dataset.tab !== 'automation') return;
     if (!smLoaded && !smLoading) loadSupportModels();
   });
 
@@ -5699,13 +5725,13 @@
     loadWorkerLog();
   });
 
-  // Tab "Ricevuti" (l'avviso da decidere) e "Automazioni" (la traccia delle
-  // decisioni passate): le fusioni si rileggono a OGNI apertura — una
+  // "Ricevuti" e "Automazioni" (le richieste da decidere) e "Log" (la traccia
+  // delle decisioni passate): le fusioni si rileggono a OGNI apertura — una
   // richiesta già decisa o appena arrivata renderebbe la sezione una
   // fotografia vecchia.
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
-    if (!btn || (btn.dataset.tab !== 'automation' && btn.dataset.tab !== 'inbox')) return;
+    if (!btn || !['automation', 'inbox', 'log'].includes(btn.dataset.tab)) return;
     loadMergeApprovals();
   });
 

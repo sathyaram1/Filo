@@ -252,7 +252,7 @@ test('le schede senza aree scorrono ancora fino in fondo', async ({ app, openTab
   await page.waitForTimeout(300);
 
   let almenoUnaLunga = false;
-  for (const tab of ['stats', 'models', 'automation', 'log']) {
+  for (const tab of ['stats', 'automation', 'log']) {
     const btn = page.locator(`.mg-tab[data-tab="${tab}"]`);
     if (!(await btn.count()) || !(await btn.isVisible())) continue;
     await btn.click();

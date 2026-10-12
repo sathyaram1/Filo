@@ -76,16 +76,20 @@ test('clic sull\'icona audio: silenzia e al suo posto compare il tasto per riatt
     return !!w._filoTabs.tabs.find((x) => x.id === id).muted;
   }, id);
 
+  // Posizione letta in un colpo solo nella barra: un ridisegno (l'icona che arriva) fra trova e misura dava null.
+  const xDi = (sel) => shell.evaluate(([id, s]) => document.querySelector(`.tab[data-id="${id}"] ${s}`)?.getBoundingClientRect().x ?? null, [id, sel]);
   await expect(tab.locator('.audio-ind')).toHaveCount(1, { timeout: 10_000 });
-  const prima = await tab.locator('.audio-ind').boundingBox();
+  await expect.poll(() => xDi('.audio-ind')).not.toBeNull();
+  const prima = await xDi('.audio-ind');
   await tab.locator('.audio-ind').click();
   await expect.poll(muted, { timeout: 10_000 }).toBe(true);
 
   await expect(tab.locator('.mute-ind')).toHaveCount(1);
   await expect(tab.locator('.audio-ind')).toHaveCount(0);
   await expect(tab).not.toHaveClass(/audible/);
-  const dopo = await tab.locator('.mute-ind').boundingBox();
-  expect(Math.abs(dopo.x - prima.x)).toBeLessThanOrEqual(1);
+  await expect.poll(() => xDi('.mute-ind')).not.toBeNull();
+  const dopo = await xDi('.mute-ind');
+  expect(Math.abs(dopo - prima)).toBeLessThanOrEqual(1);
   const colori = await tab.evaluate((el) => [getComputedStyle(el.querySelector('.mute-ind')).color, getComputedStyle(el.querySelector('.title')).color]);
   expect(colori[0]).toBe(colori[1]);
 

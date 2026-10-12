@@ -35,7 +35,7 @@
     // APPLICA dopo la conferma dell'utente. Come EXPORT_DATA sono riservati
     // all'origine filo://: una pagina web non deve poter aprire un file dialog
     // né riscrivere lo storage (comprese le chiavi API).
-    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, token }
+    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
     IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
@@ -200,10 +200,11 @@
     //   è su questo computer: il server ne emette un'altra (la vecchia si
     //   spegne, il saldo resta). { } → { ok, status, message, state? }
     WALLET_REISSUE: 'wallet_reissue',
-    // WALLET_RESET_IDENTITY: l'identità dell'installazione è stata annullata
-    //   sul server (il portafoglio legato a essa non si raggiunge più):
-    //   l'utente sceglie di ricominciare con un'identità nuova e un nuovo
-    //   invito. { } → { ok, state }
+    // WALLET_RESET_IDENTITY: l'identità dell'installazione è annullata sul
+    //   server o illeggibile qui (il portafoglio legato a essa non si
+    //   raggiunge): l'utente sceglie di ricominciare con un'identità nuova e
+    //   un nuovo invito. I file di prima restano accanto.
+    //   { confermato: true } → { ok, state } | { ok:false, status:'needs_confirm'|'identity_ok'|'not_reachable' }
     WALLET_RESET_IDENTITY: 'wallet_reset_identity',
     // WALLET_OWN_KEY_INFO (#629): spesa e residuo che OpenRouter dichiara per
     //   la chiave OpenRouter scritta dall'utente (la pagina Crediti li mostra;
@@ -758,6 +759,13 @@
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',
+    // Broadcast alle sole pagine filo:// quando la cronologia appunti cambia
+    // (copia nuova, voce tolta, svuotamento, descrizione di un'immagine
+    // arrivata). Non porta le voci con sé: chi lo riceve rilegge la cronologia
+    // con GET_CLIPBOARD_HISTORY. Così una scheda ferma sulla pagina della
+    // sicurezza non mostra più una lista vecchia, e nessun elenco di ciò che
+    // l'utente ha copiato viaggia verso schede che non l'hanno chiesto.
+    CLIPBOARD_HISTORY_UPDATED: 'clipboard_history_updated',
 
     // Categorie (Fase 2)
     GET_CATEGORIES: 'get_categories',

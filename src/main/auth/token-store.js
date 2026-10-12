@@ -12,6 +12,7 @@
 // servono solo dentro le funzioni, quindi si richiedono lazy lì.
 const fs = require('node:fs');
 const path = require('node:path');
+const guasti = require('./guastiAccesso');
 
 // La sessione dell'avvio in corso. Senza cifratura del sistema il disco resta
 // vuoto, ma salvare e poi rileggere `null` nello stesso processo farebbe
@@ -52,32 +53,36 @@ function save(session) {
   }
 }
 
+function decifra(file) {
+  try {
+    const { safeStorage } = require('electron');
+    const j = JSON.parse(safeStorage.decryptString(fs.readFileSync(file)));
+    return j && j.refreshToken ? j : null;
+  } catch (_) { return null; }
+}
+
 // Carica la sessione cifrata, o null se assente/illeggibile.
 function load() {
   if (!canEncrypt()) return inMemoria;
-  let raw;
-  try {
-    raw = fs.readFileSync(filePath());
-  } catch (_) {
-    return inMemoria; // file assente: non loggato, o salvato solo per questo avvio
+  const file = filePath();
+  if (fs.existsSync(file)) {
+    const dati = decifra(file);
+    if (dati) return dati;
+    // Blob corrotto o cifrato con un'altra chiave OS (portachiavi diverso, profilo ricreato): il file
+    // resta da parte, perché quella chiave può tornare (#1085).
+    console.warn('[auth] sessione illeggibile, la metto da parte');
+    inMemoria = null;
+    guasti.metteDaParte(file, 'illeggibile-' + guasti.timbro());
   }
-  try {
-    const { safeStorage } = require('electron');
-    const json = safeStorage.decryptString(raw);
-    return JSON.parse(json);
-  } catch (e) {
-    // Blob corrotto o cifrato con un'altra chiave OS (es. altro utente):
-    // trattalo come "non loggato" e ripulisci.
-    console.warn('[auth] sessione illeggibile, la elimino:', e?.message || e);
-    clear();
-    return null;
-  }
+  // Salvata solo per questo avvio, o una copia messa da parte che con la chiave di adesso si legge.
+  return inMemoria || guasti.riprendiDaParte(file, 'illeggibile-', decifra);
 }
 
 function clear() {
   inMemoria = null;
   try {
     fs.rmSync(filePath(), { force: true });
+    guasti.togliDaParte(filePath(), 'illeggibile-');
   } catch (_) {}
 }
 

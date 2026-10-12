@@ -293,7 +293,7 @@ test('il riscatto non dichiara il conteggio locale: frase e pagina dicono solo i
     const Module = process.getBuiltinModule('module');
     const path = process.getBuiltinModule('path');
     const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
-    req('./auth/wallet-store').clear();
+    req('./auth/wallet-store').metteDaParte();
   });
   await page.reload();
   await expect(page.locator('#reissueBtn')).toBeVisible({ timeout: 15000 });

@@ -1130,6 +1130,24 @@ const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo
 const SOLLECITO_DOPO_RIFIUTO = '[Il tuo ultimo messaggio è vuoto. Il testo che hai scritto insieme alle azioni l\'utente non l\'ha letto come risposta, '
   + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra.]';
 
+// Azioni che mettono un bottone in chat e basta: il loro esito si sa già quando le si chiama. Il bottone dell'evento
+// lo aziona l'utente, quindi non risulta «eseguito»: conta che sia in chat.
+const AZIONI_SOLO_BOTTONE = new Set(['APRI_FILE', 'EVENTO_CALENDARIO']);
+const soloBottone = (type) => AZIONI_SOLO_BOTTONE.has(String(type || '').toUpperCase());
+// Un giro di sole azioni così non dà al modello niente da leggere: il testo scritto insieme è già la risposta, non una
+// nota di lavoro, anche se il giro dopo aggiunge una frase («ti ho messo il bottone», #1167).
+const giroDiSoliBottoni = (results) => results.length > 0 && results.every(({ action, res }) => !!res
+  && !res.rejected && res.kept && !res.needsConfirm && !(res.output && res.output.blocked)
+  && soloBottone(action && action.type));
+// Al modello si dice sempre dove è finito il testo del giro: «l'utente la sta leggendo» solo se è rimasto nella bolla.
+// Un testo finito fra le note senza dirglielo restava sepolto lì, con qualunque azione nel giro (#1167).
+const NON_RIPETERE_LA_RISPOSTA = 'Il testo che hai scritto insieme a questa chiamata l\'utente lo sta leggendo come risposta: non ripeterlo e non '
+  + 'annunciare il bottone. Se non hai altro da fare, chiudi senza scrivere altro.';
+const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate l\'utente lo vede fra le note di lavoro, non come risposta: '
+  + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
+const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
+const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
 function refreshProxyRulesAllWindows() {
@@ -3816,7 +3834,7 @@ const LEGACY_CONTINUE_NUDGE =
 // conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
 // esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
 // e un modello che la ritenta lo farebbe comparire due volte.
-function toolResultText({ action, res, rendered }) {
+function toolResultText({ action, res, rendered }, giro = null) {
   const type = String(action.type || '').toUpperCase();
   const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
   // `rejected` è il solo «non è un'azione» (fuori registro, argomenti rotti,
@@ -3934,6 +3952,10 @@ function toolResultText({ action, res, rendered }) {
     const saltati = Array.isArray(o.saltati) && o.saltati.length
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
+  }
+  if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
+  if (soloBottone(type) && res.kept && !res.needsConfirm) {
+    return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}.${doveStaIlTesto(giro)}`;
   }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
@@ -4456,6 +4478,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const rawActions = [];
   const renderedActions = [];
   const notes = [];
+  // I testi dei giri di soli bottoni, in ordine: aprono la risposta (#1167). Una nota scritta prima dell'ultimo di
+  // loro non diventa risposta a giro finale muto.
+  const risposta = [];
+  let noteAllaRisposta = 0;
   // Quante note erano già scritte all'ultimo «non disponibile»: quelle lo
   // davano per fatto, una nota successiva è scritta sapendolo (#771).
   let noteAlRifiuto = -1;
@@ -4529,6 +4555,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     payloadBase.filoTratto = filo.messaggi;
     nascostiDellaChat = nascostiDi(filo);
     return true;
+  };
+  // Turno finito prima del suo ultimo giro (fermato, o un guasto): nell'archivio restano le azioni successe davvero e la
+  // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
+  const archiviaGiaFatto = async () => {
+    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
+    const giaScritta = unisciTesti(risposta);
+    if (!chatId || (!successe.length && !giaScritta)) return;
+    const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
+    if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
   let fermato = false;
   try {
@@ -4652,10 +4689,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       if (fermato) break;
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
-      if (text.trim()) notes.push(text.trim());
+      // Quello di un giro di soli bottoni invece resta nella bolla.
+      const diRisposta = !!text.trim() && giroDiSoliBottoni(results);
+      const fraLeNote = !!text.trim() && !diRisposta;
+      if (diRisposta) {
+        risposta.push(text.trim());
+        noteAllaRisposta = notes.length;
+        // Scritto dopo aver letto ogni esito: un «non disponibile» precedente non lo smentisce più.
+        noteAlRifiuto = -1;
+      } else if (text.trim()) notes.push(text.trim());
       if (roundRendered.some(esitoNonDisponibile)) noteAlRifiuto = notes.length;
-      push('filo:action', { kind: 'round', text });
-      textReply = text;
+      push('filo:action', { kind: 'round', text, ...(diRisposta ? { risposta: true } : {}) });
+      textReply = diRisposta ? '' : text;
       reasoningDetails = r.reasoningDetails || [];
       if (legacy) {
         // Formato vecchio: si prosegue solo se un esito deve tornare al modello
@@ -4663,11 +4708,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         const obs = observationsForPrompt(roundRendered);
         if (!obs || roundRendered.some((x) => x._confirm)) { exhausted = false; break; }
         threadMessages.push({ role: 'assistant', content: r.text });
-        threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}` });
+        threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}${fraLeNote ? `\n\n${RISPOSTA_FRA_LE_NOTE}` : ''}` });
         continue;
       }
       threadMessages.push(Tools.assistantMessage({ text, toolCalls, reasoningDetails: r.reasoningDetails }));
-      for (const x of results) threadMessages.push(Tools.toolMessage(x.action._callId, toolResultText(x)));
+      results.forEach((x, i) => {
+        const esito = toolResultText(x, { risposta: diRisposta });
+        threadMessages.push(Tools.toolMessage(x.action._callId, fraLeNote && i === results.length - 1 ? `${esito} ${RISPOSTA_FRA_LE_NOTE}` : esito));
+      });
     }
   } catch (e) {
     // Il turno è fallito (rete, provider, crediti): la prenotazione della
@@ -4678,6 +4726,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // c'è). Viaggiano con l'errore, così un «Riprova» riparte sapendo cosa era
     // già stato fatto invece di rifarlo.
     try { e.filoActions = renderedActions; } catch (_) {}
+    // La risposta scritta coi bottoni era già arrivata: un giro dopo che fallisce non la toglie dalla chat (#1167).
+    if (unisciTesti(risposta)) {
+      try { await archiviaGiaFatto(); } catch (err) { console.warn('[Filo] archivio della risposta prima del guasto:', err?.message || err); }
+    }
     throw e;
   } finally {
     if (reasoningReqId && turniInCorso.get(String(reasoningReqId)) === turno) turniInCorso.delete(String(reasoningReqId));
@@ -4686,15 +4738,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // Lo stop resta scritto nell'intervista: una scheda nuova o una pagina ricaricata non rifà il turno fermato.
     if (onbActive) await saveOnboarding(Onboarding.segnaFermato(await FiloMem.getOnboarding()));
     if (onbActive && !internal) releaseOnboardingResume();
-    // Nell'archivio della chat restano le azioni che sono successe davvero: riaperta, la chat racconta cosa era stato
-    // fatto prima che l'utente fermasse.
-    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
-    if (chatId && successe.length) {
-      const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
-      const dopo = await appendToChatArchive(chatId, { role: 'filo', text: '', actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
-      const fermo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
-      if (fermo && fermo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, fermo.ts, { azioni: successe });
-    }
+    await archiviaGiaFatto();
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
       model: r && r.model, provider: r && r.provider,
@@ -4705,23 +4749,29 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // placeholder confuso ("hai scritto tu vuoto o è stato prodotto da filo?").
   // Il fallback "(vuoto)" resta SOLO per la risposta davvero vuota (niente
   // testo E niente azioni), che sarebbe altrimenti una bolla muta.
+  // La nota che diventa risposta: la scheda la toglie dal blocco, dove l'aveva già messa.
+  let notaRisposta = '';
   if (exhausted) {
     const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
-    const last = String(textReply || '').trim();
+    const last = unisciTesti([...risposta, textReply]);
     textReply = last ? `${last}\n\n${stop}` : stop;
   } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
     // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
     // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
-    const prima = notes.pop();
-    textReply = prima
+    const prima = notes.length > noteAllaRisposta ? notes.pop() : '';
+    if (prima) notaRisposta = prima;
+    textReply = unisciTesti([...risposta, prima
       ? `${RISPOSTA_PROXY_NON_DISPONIBILE}\n\nPrima di saperlo avevo scritto: «${prima}»`
-      : RISPOSTA_PROXY_NON_DISPONIBILE;
-  } else if (!String(textReply || '').trim() && notes.length) {
+      : RISPOSTA_PROXY_NON_DISPONIBILE]);
+  } else if (!String(textReply || '').trim() && notes.length > noteAllaRisposta) {
     // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
     // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non
     // una nota di lavoro. Lasciarla nel blocco chiuso voleva dire un turno
     // senza nessuna bolla. Torna alla scheda come testo, e non più come nota.
-    textReply = notes.pop();
+    notaRisposta = notes.pop();
+    textReply = unisciTesti([...risposta, notaRisposta]);
+  } else {
+    textReply = unisciTesti([...risposta, textReply]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
@@ -4827,6 +4877,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // giro: la scheda li tiene con la conversazione, e il ragionamento torna
     // al modello al turno dopo.
     notes, reasoningDetails,
+    ...(notaRisposta ? { notaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(keyFallback ? { keyFallback } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di

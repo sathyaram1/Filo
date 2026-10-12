@@ -224,7 +224,7 @@
 .sn-wallet-scheda .sn-wallet-invites { gap: 10px; }
 .sn-wallet-scheda .sn-wallet-invite-link { font-size: 12px; }
 .sn-wallet-scheda .sn-wallet-code { font-size: 13px; }
-#resetIdentityBtn { margin-top: 8px; }
+#resetIdentityBtn, #resetIdentityConfirm { margin-top: 8px; }
 
 /* Il campo della chiave OpenRouter ha la stessa riga del codice d'invito, ma è una chiave e non un codice:
    niente maiuscole né spaziatura. */

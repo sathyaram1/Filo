@@ -58,9 +58,9 @@ test('#495 — le quattro schede che elencano feedback dicono quante ne contengo
   await expect(tab(page, 'resolved')).toHaveText('Risolti (4)');
   await expect(tab(page, 'archived')).toHaveText('Archiviati (1)');
 
-  // Le altre quattro schede non elencano feedback: un numero lì non vorrebbe
-  // dire niente, e infatti non c'è.
-  for (const name of ['stats', 'models', 'automation', 'log']) {
+  // Le altre schede non elencano feedback: un numero lì non vorrebbe dire
+  // niente, e infatti non c'è.
+  for (const name of ['stats', 'automation', 'log']) {
     await expect(tab(page, name)).not.toHaveText(/\d/);
   }
 

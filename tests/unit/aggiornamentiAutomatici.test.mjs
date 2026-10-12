@@ -52,8 +52,10 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lent
         u.emit('update-not-available', {});
         return { isUpdateAvailable: false };
       }
-      u.emit('update-available', { version: versione });
-      return { updateInfo: { version: versione }, downloadPromise: u.autoDownload ? u.downloadUpdate() : null };
+      // Come GitHubProvider: l'etichetta della release accanto al numero di latest.yml (#1119).
+      const info = { version: versione, tag: `v${versione}` };
+      u.emit('update-available', info);
+      return { updateInfo: info, downloadPromise: u.autoDownload ? u.downloadUpdate() : null };
     },
     checkForUpdatesAndNotify() { return u.checkForUpdates(); },
     async downloadUpdate() {
@@ -132,7 +134,7 @@ perOgniSistema('spento: la versione nuova non si scarica e non si installa, e in
 perOgniSistema('acceso: scarica da solo, si installa quando lo prevede il sistema e non scrive carte «Installa»', async (s) => {
   const u = aggiornatoreFinto();
   await avvia(u, true, s);
-  assert.equal(u.autoDownload, true);
+  assert.equal(u.autoDownload, false, 'electron-updater scaricherebbe prima del confronto fra numero ed etichetta (#1119)');
   assert.equal(u.autoInstallOnAppQuit, s.allaChiusura);
   assert.equal(u.scaricamenti, 1);
   assert.deepEqual(vive(), []);

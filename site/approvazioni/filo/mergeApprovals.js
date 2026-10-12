@@ -23,7 +23,7 @@
 //
 //   Il modulo resta separato dalla pagina perché tiene insieme le due rese —
 //   l'avviso da decidere (Ricevuti) e la traccia delle decisioni passate
-//   (Automazioni) — e la parte PURA che gli unit test coprono.
+//   (Log) — e la parte PURA che gli unit test coprono.
 //
 //   Le frasi che spiegano COSA è stato bloccato NON stanno qui: le manda il
 //   server, che è l'unico posto dove la tabella dei controlli vive. Questo file
@@ -817,7 +817,7 @@
   /**
    * Le decisioni passate, in righe minute. Traccia dell'eccezione: un'apertura
    * di questo tipo che non lascia segno non è verificabile.
-   * Vive in Gestione → Automazioni — fra le cose da decidere sarebbe rumore.
+   * Vive in Gestione → Log — fra le cose da decidere sarebbe rumore.
    */
   function renderRecent(host, opts) {
     if (!host) return 0;
@@ -989,7 +989,7 @@
    * segnalato si mostra PER INTERO — ogni gate, ogni file, ogni riga — non
    * nelle righe minute delle decisioni: la decisione l'owner l'ha presa prima,
    * senza leggere; questa è l'unica occasione in cui legge.
-   * Vive in Gestione → Automazioni.
+   * Vive in Gestione → Log.
    */
   function renderPreapproved(host, opts) {
     if (!host) return 0;
