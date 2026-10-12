@@ -331,3 +331,90 @@ test('il rifiuto per finestra del modello si riconosce, e il tratto si stringe q
   assert.equal(FC.tettoDopoRifiuto({ caratteriTratto: 70000 }), Math.floor(35000 / FC.CARATTERI_PER_TOKEN));
   assert.equal(FC.tettoDopoRifiuto({ max: 1000, chiesti: 2000, caratteri: 100, caratteriTratto: 0 }), null);
 });
+
+// #1166 — le immagini mandate in chat tornano col loro messaggio finché vive come una lettura; poi, o se non sono più
+// in memoria, al loro posto c'è una nota che dice che c'erano.
+const FOTO_A = 'data:image/png;base64,AAAA';
+const FOTO_B = 'data:image/jpeg;base64,BBBB';
+const immaginiDi = (mappa) => (m) => mappa[`${m.chat}|${m.ts}`] || null;
+const conFoto = (msgs, n) => msgs.map((m, i) => (i === 0 ? { ...m, images: n } : m));
+const fotoNel = (m) => (Array.isArray(m.content) ? m.content.filter((p) => p.type === 'image_url').map((p) => p.image_url.url) : []);
+
+test('le foto del messaggio di prima tornano attaccate a lui, e dal turno dopo il prefisso non si muove', () => {
+  const primo = conFoto(scambio('c', 1, 'cosa c\'è nella dispensa?', 'Vedo farina, uova e un barattolo di ceci.'), 2);
+  const memoria = { [`c|${primo[0].ts}`]: [FOTO_A, FOTO_B] };
+  const t1 = FC.finestra(primo, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(memoria) });
+  const domanda = t1.messaggi.find((m) => m.role === 'user');
+  assert.deepEqual(fotoNel(domanda), [FOTO_A, FOTO_B]);
+  assert.match(domanda.content[0].text, /cosa c'è nella dispensa\?/);
+  assert.doesNotMatch(JSON.stringify(t1.messaggi), /non hai più davanti/);
+  const dopo = [...primo, ...scambio('c', 0.5, 'e con i ceci cosa faccio?', 'Un hummus.')];
+  const t2 = FC.finestra(dopo, { ora: ORA + 60000, ...TETTI, ancora: t1.ancora, chatCorrente: 'c', immagini: immaginiDi(memoria) });
+  assert.equal(prefissoComune(t1.messaggi, t2.messaggi), t1.messaggi.length);
+  // Le foto pesano per i tetti quanto costano, non per i caratteri del data URL.
+  assert.equal(FC.tokenDi(domanda.content), FC.stimaToken(domanda.content[0].text) + 2 * FC.TOKEN_PER_IMMAGINE);
+});
+
+test('senza le foto in memoria, o venti messaggi dopo, resta la nota con quante erano', () => {
+  const primo = conFoto(scambio('c', 12, 'leggi queste etichette', 'Farina 00, scade a marzo.'), 3);
+  const senza = FC.finestra(primo, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: () => null });
+  const u = senza.messaggi.find((m) => m.role === 'user');
+  assert.equal(typeof u.content, 'string');
+  assert.match(u.content, /leggi queste etichette\n\(qui l'utente aveva mandato 3 immagini che non hai più davanti: quello che ne hai scritto dopo l'avevi letto da lì/);
+  const una = FC.finestra(conFoto(scambio('c', 12, 'e questa?', 'Una mela.'), 1), { ora: ORA, ...TETTI, chatCorrente: 'c' });
+  assert.match(una.messaggi[0].content, /un'immagine che non hai più davanti/);
+  // Ventidue messaggi dopo le foto non tornano più, nemmeno se sono ancora in memoria.
+  const memoria = { [`c|${primo[0].ts}`]: [FOTO_A] };
+  const lungo = [...primo];
+  for (let i = 0; i < 11; i++) lungo.push(...scambio('c', 11 - i * 0.5, `altro ${i}`, `ok ${i}`));
+  const tardi = FC.finestra(lungo, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(memoria) });
+  assert.doesNotMatch(JSON.stringify(tardi.messaggi), /data:image/);
+  assert.match(tardi.messaggi[0].content, /3 immagini che non hai più davanti/);
+});
+
+test('oltre il tetto delle foto rimandate tornano le più nuove, le più vecchie lasciano la nota', () => {
+  const filo = [];
+  const memoria = {};
+  for (let i = 0; i < 6; i++) {
+    const s = conFoto(scambio('c', 6 - i * 0.5, `foto ${i}`, `vista ${i}`), 4);
+    memoria[`c|${s[0].ts}`] = [1, 2, 3, 4].map((k) => `data:image/png;base64,${i}${k}`);
+    filo.push(...s);
+  }
+  const f = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(memoria) });
+  const tornate = f.messaggi.reduce((n, m) => n + fotoNel(m).length, 0);
+  assert.equal(tornate, FC.MAX_IMMAGINI_RIMANDATE);
+  assert.match(f.messaggi[0].content, /^\[.*\] foto 0\n\(qui l'utente aveva mandato 4 immagini/);
+  assert.equal(fotoNel(f.messaggi[f.messaggi.length - 2]).length, 4, 'le foto dell\'ultimo messaggio devono tornare');
+  // Il conto dei caratteri per il rifiuto di finestra pesa la foto come i suoi token.
+  assert.equal(FC.caratteriDi([{ role: 'user', content: [{ type: 'text', text: 'abc' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,' + 'x'.repeat(100000) } }] }]),
+    3 + FC.TOKEN_PER_IMMAGINE * FC.CARATTERI_PER_TOKEN);
+});
+
+test('un messaggio con più foto di quante ne stiano nei tetti tiene le prime che ci stanno, e la nota dice le altre', () => {
+  const pesante = (k) => `data:image/jpeg;base64,${String(k).repeat(5_400_000)}`;
+  const tante = conFoto(scambio('c', 1, 'ecco la dispensa', 'Cinque scaffali.'), 5);
+  const memoria = { [`c|${tante[0].ts}`]: [0, 1, 2, 3, 4].map(pesante) };
+  const f = FC.finestra(tante, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(memoria) });
+  const u = f.messaggi.find((m) => m.role === 'user');
+  assert.equal(Math.floor(FC.MAX_CARATTERI_IMMAGINI / pesante(0).length), 4);
+  assert.deepEqual(fotoNel(u), [0, 1, 2, 3].map(pesante));
+  assert.match(u.content[u.content.length - 1].text, /anche un'altra immagine che non hai più davanti/);
+  assert.match(FC.notaImmagini(3, { altre: true }), /anche altre 3 immagini che non hai più davanti/);
+  // Più di sedici foto in un messaggio: tornano le prime sedici, una la dice la nota.
+  const diciassette = conFoto(scambio('c', 1, 'tutte', 'Viste.'), 17);
+  const mem17 = { [`c|${diciassette[0].ts}`]: Array.from({ length: 17 }, (_, k) => `data:image/png;base64,${k}`) };
+  const g = FC.finestra(diciassette, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(mem17) });
+  const v = g.messaggi.find((m) => m.role === 'user');
+  assert.equal(fotoNel(v).length, FC.MAX_IMMAGINI_RIMANDATE);
+  assert.match(v.content[v.content.length - 1].text, /anche un'altra immagine che non hai più davanti/);
+});
+
+test('il rifiuto delle immagini si riconosce; quello per la finestra o per i crediti no', () => {
+  assert.equal(FC.rifiutaImmagini({ status: 404, message: 'OpenRouter 404: {"error":{"message":"No endpoints found that support image input","code":404}}' }), true);
+  assert.equal(FC.rifiutaImmagini({ status: 400, message: 'Failed to deserialize the JSON body: messages[1]: unknown variant `image_url`, expected `text`' }), true);
+  assert.equal(FC.rifiutaImmagini({ status: 400, message: 'At most 1 image(s) may be provided in one request.' }), true);
+  assert.equal(FC.rifiutaImmagini({ status: 413, message: 'Request Entity Too Large' }), true);
+  assert.equal(FC.rifiutaImmagini({ status: 400, message: 'This endpoint\'s maximum context length is 32768 tokens.' }), false);
+  assert.equal(FC.rifiutaImmagini({ status: 402, message: 'Insufficient credits for image input' }), false);
+  assert.equal(FC.rifiutaImmagini({ status: 404, message: 'No endpoints found for moonshotai/kimi' }), false);
+});

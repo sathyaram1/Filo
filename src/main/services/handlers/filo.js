@@ -266,7 +266,9 @@ module.exports = function register(on, ctx) {
     const chat = await FiloChats.get(msg.id);
     // Riaperta (anche dopo un riavvio), la chat torna a dire cosa aveva letto da fuori prima di ogni clic (#810).
     try { ricordaLettoInChat([], (chat && chat.messages) || []); } catch (_) {}
-    return { ok: true, chat };
+    let conFoto = chat;
+    try { conFoto = global.SN_CONTESTO_FILO ? global.SN_CONTESTO_FILO.conFotoInMemoria(chat) : chat; } catch (_) {}
+    return { ok: true, chat: conFoto };
   });
 
   // Chiusura di una chat. La risposta NON aspetta il classificatore: chi ha

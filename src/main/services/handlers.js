@@ -112,7 +112,8 @@ async function noteProvenienzaImmagini(dataUrls) {
   return blocchi.join('\n\n');
 }
 
-// Le immagini non tornano nei turni dopo: senza, «ed è fatta con l'AI?» al messaggio seguente non aveva più l'esito (#946).
+// Le etichette di origine stanno nel file, non nei pixel che tornano al modello: senza, «ed è fatta con l'AI?» al
+// messaggio seguente non aveva più l'esito (#946).
 const MAX_CHAT_CON_ORIGINE = 200;
 const MAX_ESITI_PER_CHAT = 20;
 const origineDelleChat = new Map();
@@ -4174,6 +4175,8 @@ function fileNominatiDallaRisposta(textReply, azioni) {
 const ATTESA_RICORDI_MS = 2500;
 // Il tetto in token che il modello della chat ha retto dopo un rifiuto per finestra troppo piccola, per modello.
 const finestreDeiModelli = new Map();
+// I modelli della chat che hanno rifiutato le immagini dei turni passati: da lì in avanti ricevono la nota (#1166).
+const modelliSenzaFoto = new Set();
 function entroIl(p, ms, ripiego) {
   let timer = null;
   return Promise.race([p, new Promise((ok) => { timer = setTimeout(() => ok(ripiego), ms); })])
@@ -4208,6 +4211,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // L'intervista comincia col benvenuto di Filo: un messaggio scritto prima (senza crediti) non ne è una risposta, e
   // metterlo nella conversazione la faceva ripartire da lì, senza che Filo si presentasse mai.
   const onbActive = !!(Onboarding && !onbBefore.done && onbBefore.thread.length > 0);
+  const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
 
   // #525 — la chat si scrive su disco ADESSO, non alla chiusura: se l'app
   // muore a metà discussione, la discussione c'è lo stesso. I turni interni
@@ -4225,12 +4229,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // pagare un titolo a ogni ricaricamento per una conversazione in corso.
     if (sender && sender.wc && !onbActive) affidaChat(chatId, sender.wc);
     if (onbActive) await archiviaAperturaAccoglienza(chatId, onbBefore);
-    await appendToChatArchive(chatId, {
+    const archiviata = await appendToChatArchive(chatId, {
       role: 'user',
       text: String(userMessage || ''),
-      images: Array.isArray(images) ? images.length : (image ? 1 : 0),
+      images: imageList.length,
       ...(daModello ? { daModello: true } : {}),
     }, { onboarding: onbActive });
+    // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
+    const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
+    if (imageList.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, imageList);
   }
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
   // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
@@ -4276,8 +4283,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let filo = null;
   let tettiChat = null;
   let modelloChat = '';
+  let fotoNelTratto = true;
   const componiFilo = (tetti) => ContestoFilo.componi({
     chatId, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
+    immagini: fotoNelTratto && !modelliSenzaFoto.has(modelloChat),
   });
   try {
     const settingsChat = await getEffectiveSettings();
@@ -4352,6 +4361,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const role = m.role === 'filo' ? 'assistant' : 'user';
     const fuori = FCx.letturaDaFuori(m);
     let content = fuori ? '' : String(m.text || '');
+    // Le immagini della scheda non viaggiano con la sua storia: il modello deve sapere che c'erano (#1166). Non la
+    // domanda che si riprova dopo un turno interrotto: le sue immagini arrivano con lei, qui sotto.
+    const riprovata = imageList.length && String(m.text || '') === String(userMessage || '');
+    const quanteFoto = role === 'user' && !riprovata ? FCx.numeroImmagini(m) : 0;
+    if (quanteFoto) content = `${content}\n${FCx.notaImmagini(quanteFoto)}`;
     const msg = { role, content };
     if (role === 'assistant') {
       const parts = [];
@@ -4375,7 +4389,6 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     threadMessages.push(msg);
   }
   const indiceDomanda = threadMessages.length;
-  const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
   const giaLetta = origineGiaLettaInChat(chatId);
   if (imageList.length) {
     const parts = [];
@@ -4487,12 +4500,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const FC = globalThis.SN_FILO_CONTESTO;
     const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 ? FC.troppoLungo(e) : null;
     if (!rifiuto) return false;
-    const caratteriDi = (msgs) => (Array.isArray(msgs) ? msgs : [])
-      .reduce((n, m) => n + String(typeof (m && m.content) === 'string' ? m.content : JSON.stringify((m && m.content) || '')).length, 0);
     let inviati = [];
     try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
-    const caratteri = caratteriDi(inviati);
-    const caratteriTratto = caratteriDi(payloadBase.filoTratto);
+    const caratteri = FC.caratteriDi(inviati);
+    const caratteriTratto = FC.caratteriDi(payloadBase.filoTratto);
     const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
     if (token == null || token >= tettiChat.token) return false;
     strette++;
@@ -4503,6 +4514,20 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // Si ricorda solo quando a sforare era il tratto: un messaggio enorme o una rilettura lunga di questo turno non
     // devono lasciare un tratto minuscolo ai turni dopo.
     if (caratteriTratto >= caratteri - caratteriTratto) finestraDaRicordare = token;
+    return true;
+  };
+  // Un modello che non prende immagini (o non tante) rifiutava anche le domande senza: quelle dei turni passati
+  // lasciano il posto alla nota e lo stesso giro riparte. Vale per i turni dopo con quel modello (#1166).
+  const senzaFotoDopoRifiuto = async (e) => {
+    const FC = globalThis.SN_FILO_CONTESTO;
+    if (!filo || !fotoNelTratto || !FC.rifiutaImmagini(e)) return false;
+    const conFoto = (payloadBase.filoTratto || []).some((m) => Array.isArray(m && m.content) && m.content.some((p) => p && p.type === 'image_url'));
+    if (!conFoto) return false;
+    fotoNelTratto = false;
+    modelliSenzaFoto.add(modelloChat);
+    try { filo = await componiFilo(tettiChat); } catch (_) { return false; }
+    payloadBase.filoTratto = filo.messaggi;
+    nascostiDellaChat = nascostiDi(filo);
     return true;
   };
   let fermato = false;
@@ -4521,6 +4546,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         r = await (KW && KW.conRipiegoDetto ? KW.conRipiegoDetto(giro) : giro());
       } catch (e) {
         if (turno.fermato) { fermato = true; break; }
+        if (await senzaFotoDopoRifiuto(e)) { round--; continue; }
         if (await stringiDopoRifiuto(e)) { round--; continue; }
         throw e;
       }
