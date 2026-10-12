@@ -100,7 +100,8 @@ test('su una pratica chiusa il segno non c’è, né dal dettaglio né dal tasto
 
 test('nel Log il lavoro fidato fuso senza chiedere si legge per intero, e porta alla segnalazione', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await apri(page, [fb()], { tab: 'log' });
+  await apri(page, [fb()]);
+  await page.locator('.mg-tab[data-tab="log"]').click();
   const host = page.locator('#mgMergeApprovalsPreapproved');
   await expect(host).toBeVisible();
   await expect(host).toContainText('Fuse senza chiedere');
