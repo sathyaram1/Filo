@@ -180,6 +180,40 @@ function indirizziDi(frammenti, righe) {
   return out;
 }
 
+const METODI_RICHIESTA = new Set(['request', 'get', 'connect', 'createConnection']);
+const testoDi = (e) => (e && (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e)) ? e.text : null);
+
+// `https.request({ hostname: HOST })`: l'host sta in una proprietà delle opzioni, non in un indirizzo. Una costante
+// stringa del file vale come l'host scritto lì; qualunque altra espressione è un host composto, da dichiarare.
+function hostNelleOpzioni(file, testo, righe) {
+  const sf = ts.createSourceFile(file, testo, ts.ScriptTarget.ESNext, true, ts.ScriptKind.JS);
+  const costanti = new Map();
+  const out = [];
+  (function giro(n) {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && testoDi(n.initializer) !== null) costanti.set(n.name.text, testoDi(n.initializer));
+    ts.forEachChild(n, giro);
+  })(sf);
+  (function giro(n) {
+    const callee = ts.isCallExpression(n) ? n.expression : null;
+    const metodo = callee && (ts.isPropertyAccessExpression(callee) ? callee.name.text : ts.isIdentifier(callee) ? callee.text : '');
+    for (const arg of (metodo && METODI_RICHIESTA.has(metodo) ? n.arguments : [])) {
+      if (!ts.isObjectLiteralExpression(arg)) continue;
+      for (const p of arg.properties) {
+        if (!p.name || !CHIAVI_HOST.has(p.name.text)) continue;
+        const espr = ts.isShorthandPropertyAssignment(p) ? p.name : ts.isPropertyAssignment(p) ? p.initializer : null;
+        if (!espr || testoDi(espr) !== null) continue; // il letterale lo legge già il lexer
+        const riga = sf.getLineAndCharacterOfPosition(p.getStart(sf)).line + 1;
+        const testoRiga = righe[riga - 1] || '';
+        const host = ts.isIdentifier(espr) ? costanti.get(espr.text) : null;
+        if (host && /^[a-z0-9.-]+(:\d+)?$/i.test(host)) out.push({ url: `https://${host}`, host: host.toLowerCase(), riga, dinamico: false, composto: false, testoRiga });
+        else out.push({ url: 'https://', host: '', riga, dinamico: true, composto: true, testoRiga });
+      }
+    }
+    ts.forEachChild(n, giro);
+  })(sf);
+  return out;
+}
+
 function analizza(sorgenti) {
   const indirizzi = [];
   const chiamate = new Set();
@@ -189,7 +223,10 @@ function analizza(sorgenti) {
     testi.set(file, l);
     const righe = testo.split('\n');
     for (const u of indirizziDi(l.frammenti, righe)) indirizzi.push({ file, ...u });
-    if (CHIAMATA_RE.test(l.codice) || MODULO_RETE_RE.test(l.senzaCommenti)) chiamate.add(file);
+    if (CHIAMATA_RE.test(l.codice) || MODULO_RETE_RE.test(l.senzaCommenti)) {
+      chiamate.add(file);
+      if (/\.[cm]?js$/.test(file)) for (const u of hostNelleOpzioni(file, testo, righe)) indirizzi.push({ file, ...u });
+    }
   }
   return { indirizzi, chiamate, testi };
 }
