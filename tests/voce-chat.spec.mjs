@@ -489,6 +489,34 @@ test('editor: con la finestra piccola la casella della chat prende tutta la riga
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-stretta.png` });
 });
 
+// In una chat bassa la casella si ferma prima di spingere fuori i tasti messi sotto (#256.4).
+for (const [w, h] of [[900, 520], [800, 500]]) {
+  test(`editor: a ${w}x${h} microfono e invio restano dentro la chat anche con una richiesta lunga`, async ({ app, shell, openTab }) => {
+    test.setTimeout(60_000);
+    await app.evaluate(({ BrowserWindow }, [w, h]) => { BrowserWindow.getAllWindows()[0].setSize(w, h); }, [w, h]);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const ed = await openTab('filo://editor/editor.html');
+    await ed.waitForSelector('.ed-module[data-type="switch"]');
+    await ed.locator('.ed-switch-icon').nth(1).click();
+    const chat = ed.locator('.ed-module[data-type="chat"]');
+    await expect(chat.locator('.sn-voce-btn')).toBeVisible();
+    const casella = chat.locator('[data-chat="input"]');
+    const dentro = () => ed.evaluate(() => {
+      const mod = document.querySelector('.ed-module[data-type="chat"]');
+      const fondo = mod.getBoundingClientRect().bottom + 0.5;
+      const sta = (s) => mod.querySelector(s).getBoundingClientRect().bottom <= fondo;
+      return { casella: sta('[data-chat="input"]'), invio: sta('[data-chat="send"]'), microfono: sta('.sn-voce-btn') };
+    });
+    for (const testo of ['riassumi il secondo paragrafo e dimmi se il tono è adatto a una lettera', 'una richiesta lunga '.repeat(30)]) {
+      await casella.fill(testo);
+      expect(await dentro()).toEqual({ casella: true, invio: true, microfono: true });
+    }
+    await chat.locator('[data-chat="send"]').click({ trial: true });
+    mkdirSync(SHOTS, { recursive: true });
+    await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-bassa-${w}.png` });
+  });
+}
+
 // Il tetto della casella segue il modulo, non i caratteri del sistema (#256.4): oltre scorre, ma resta dentro la chat,
 // il registro non sparisce e l'ultima risposta non scivola fuori vista mentre si scrive.
 test('editor: una richiesta lunghissima ferma la casella entro la chat, e l\'ultima risposta resta in vista', async ({ app, shell, openTab }) => {
