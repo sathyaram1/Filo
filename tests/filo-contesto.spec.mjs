@@ -41,7 +41,6 @@ async function schedaNuova(app, shell) {
 async function preparaModello(app, copione) {
   await app.evaluate(async (_e, copione) => {
     const C = globalThis.SN_CONST;
-    // L'intervista di benvenuto ha il suo blocco nelle istruzioni: qui si prova il filo di tutti i giorni.
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
