@@ -2777,7 +2777,11 @@ class TabManager {
       const accesso = tab.isInternal === false && isAuthPopup(url);
       // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
       const riaperta = accesso && this._riaperturaDiAccesso(tab, url);
-      if (tab.isInternal === false && this.security.blockPopups && !riaperta && !Permessi.perUnaFinestra(wc, url, referrer)) {
+      // Una finestra senza barra dell'indirizzo la apre solo il clic, anche a blocco spento: da sola la pagina
+      // fingerebbe l'accesso di un altro sito (#1066), e la sua richiesta segue la strada delle altre.
+      const gesto = riaperta || (tab.isInternal === false && (this.security.blockPopups || accesso)
+        && Permessi.perUnaFinestra(wc, url, referrer));
+      if (tab.isInternal === false && this.security.blockPopups && !gesto) {
         // «Apri» sull'avviso la fa ripartire dalla pagina, perché l'accesso possa tornarle l'esito.
         if (accesso) tab._accessoBloccato = { url, nome: details.frameName || '', misure: details.features || '', pagina: wc.getURL() };
         this._notifyPopupBlocked(tab.id, url, wc);
