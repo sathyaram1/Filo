@@ -10,6 +10,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CANALE = join(__dirname, '..', '..', 'scripts', 'routine-channel.mjs');
