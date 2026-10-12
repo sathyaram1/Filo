@@ -219,14 +219,35 @@ Filo permette di inviare feedback (col tasto destro, da qualsiasi pagina). Un
 feedback contiene:
 
 - il **testo** che scrivi;
-- eventuali **screenshot** che alleghi;
+- eventuali **screenshot** e file che alleghi;
 - l'**URL** e il titolo della pagina da cui scrivi, lo **user agent** (per
-  riprodurre il bug) e un **identificativo anonimo del dispositivo**
-  (`clientId`, un codice casuale che **non** è collegato alla tua identità).
+  riprodurre il bug) e un **identificativo del dispositivo** (`clientId`, un
+  codice casuale dell'installazione);
+- un **titolo breve**, che un modello scrive partendo dal testo.
+
+Testo, indirizzo della pagina, identificativo e allegati partono **cifrati**
+con una chiave che apre solo l'owner del progetto; se la cifratura non è
+disponibile, il feedback non parte (`src/shared/feedback.js`, `submit`).
+Accanto viaggiano l'impronta dell'identificativo (`clientIdHash`), che serve a
+riconoscere i tuoi feedback senza decifrarli, e, se questa copia di Filo ha un
+portafoglio, il suo pseudonimo, che serve a darti il premio per la
+segnalazione. Restano in chiaro anche il titolo breve, il titolo della pagina
+e lo user agent. "In chiaro" vuol dire non cifrato, non pubblico: chi può
+leggere il documento lo dicono le regole del §7.
 
 Questi dati vengono salvati su Google Firebase (Firestore + Storage) e ci
-servono solo per correggere bug e migliorare l'app. **Non includere in un
-feedback dati che non vuoi condividere.**
+servono solo per correggere bug e migliorare l'app. Oltre alle persone il
+testo lo leggono i **giudici automatici**, modelli scelti fra quelli ammessi
+dalla politica sui modelli, che decidono se un feedback è legittimo, spam o un
+attacco (`FEEDBACK-STATES.md`, `filo-model-policy.md`), e gli **agenti** che
+lavorano la segnalazione. **Non includere in un feedback dati che non vuoi
+condividere.**
+
+Filo stesso, quando si accorge di non saper fare una cosa che gli chiedi, può
+mandare da solo una segnalazione generica: senza le tue parole e senza
+l'indirizzo della pagina, con un avviso che ti lascia annullarla. Si spegne
+in Sicurezza, «Segnalazione automatica dei problemi»
+(`src/shared/autoFeedback.js`).
 
 ---
 
