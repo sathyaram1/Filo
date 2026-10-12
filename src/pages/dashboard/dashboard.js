@@ -371,7 +371,7 @@
         const nota = document.createElement('div');
         nota.className = 'dash-bubble-note';
         nota.dataset.replay = '1';
-        const altre = fotoViste.length ? 'altr' : '';
+        const altre = fotoViste.length > 0;
         nota.textContent = perse === 1
           ? (altre ? 'un\'altra immagine, non conservata' : '1 immagine, non conservata')
           : `${perse} ${altre ? 'altre ' : ''}immagini, non conservate`;
