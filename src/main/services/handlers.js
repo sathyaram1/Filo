@@ -2306,7 +2306,10 @@ async function eseguiAzioneFilo(action, {
           ? Onboarding.close(ticked)
           : ticked;
         await saveOnboarding(next);
-        return { executed: true, kept: false };
+        if (!sceltaAutonomia) return { executed: true, kept: false };
+        let livello = '';
+        try { livello = globalThis.SN_AUTONOMIA.livelloAttivo(((await Storage.getSettings()) || {}).autonomia?.livello); } catch (_) {}
+        return { executed: true, kept: true, output: { sceltaAutonomia: true, livello } };
       }
       case 'SALVA_LEZIONE': {
         // Qui ci si arriva solo dopo l'OK dell'utente sul testo esatto (livello
