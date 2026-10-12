@@ -282,10 +282,12 @@
 
   // Un indirizzo si taglia a una barra: un pezzo spezzato può non decodificarsi
   // più, e la pulizia lo leggerebbe cifrato (`%40` al posto della chiocciola).
+  // Al posto di quello che non si guarda resta il segnaposto, come per un codice.
   function tagliaPercorsoPrimaDiPulire(path, max) {
     const tetto = max * 2 + FORMA_MAX;
     if (path.length <= tetto) return path;
-    return path.slice(0, path.lastIndexOf('/', tetto) + 1);
+    const barra = path.lastIndexOf('/', tetto);
+    return barra === -1 ? '' : `${path.slice(0, barra + 1)}[ID]`;
   }
 
   // Un elemento toccato, pronto per la raccolta: senza dati personali, senza
