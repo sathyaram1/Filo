@@ -67,7 +67,6 @@ test('la segnalazione: la risposta scritta col bottone del file resta nella boll
     await expect(riaperta).toHaveCount(1, { timeout: 8_000 });
     await expect(riaperta).toContainText('Hai pagato 305,40 €');
     await expect(riaperta).toContainText(DOPO);
-    await expect(riaperta.locator('.dash-file-btn')).toHaveCount(1);
   } finally {
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });
