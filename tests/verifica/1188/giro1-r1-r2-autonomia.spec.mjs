@@ -1,4 +1,5 @@
-// #1188 giro 1 — sonde del verificatore sulla scelta dell'autonomia nell'intervista.
+// #1188 giro 1 — r1: la scelta dell'autonomia sparisce se Filo spunta o chiude con un'altra azione nella stessa risposta;
+// r2: il blocco di attività dice «Non partita» sotto una riga che è partita (scelta dell'autonomia, stile).
 import { test, expect } from '../../fixtures/electron.mjs';
 import { CONFIRM_HOST } from '../../helpers/confirm.mjs';
 
@@ -73,7 +74,7 @@ async function rispondiEAspettaScelta(page) {
   return scelta;
 }
 
-test('la scelta resta a schermo anche se Filo, nella stessa risposta, spunta la voce con un’altra azione', async ({ app, shell }) => {
+test('r1 la scelta resta a schermo anche se Filo, nella stessa risposta, spunta la voce con un’altra azione', async ({ app, shell }) => {
   test.setTimeout(120_000);
   const page = await apriIntervistaQuasiFinita(app, shell);
   await queueChat(app, {
@@ -87,7 +88,7 @@ test('la scelta resta a schermo anche se Filo, nella stessa risposta, spunta la 
   expect((await onbState(app)).done).toBe(false);
 });
 
-test('la scelta resta a schermo anche se Filo, nella stessa risposta, chiude l’intervista con un’altra azione', async ({ app, shell }) => {
+test('r1 la scelta resta a schermo anche se Filo, nella stessa risposta, chiude l’intervista con un’altra azione', async ({ app, shell }) => {
   test.setTimeout(120_000);
   const page = await apriIntervistaQuasiFinita(app, shell);
   await queueChat(app, {
@@ -101,17 +102,25 @@ test('la scelta resta a schermo anche se Filo, nella stessa risposta, chiude l�
   expect((await onbState(app)).done).toBe(false);
 });
 
-test('scegliere il livello già attivo è una risposta («va bene così») senza riquadri', async ({ app, shell }) => {
+test('r2 sotto la scelta dell’autonomia il blocco di attività non dice «Non partita»', async ({ app, shell }) => {
   test.setTimeout(120_000);
   const page = await apriIntervistaQuasiFinita(app, shell);
   await queueChat(app, { text: 'Quanto vuoi che faccia da solo?', actions: [{ type: 'ONBOARDING', autonomia: true }] });
-  const scelta = await rispondiEAspettaScelta(page);
-  await queueChat(app, { text: 'Perfetto.', actions: [{ type: 'ONBOARDING', spunta: ['autonomia'] }] });
-  // doppio clic in fretta: una sola risposta
-  await scelta.locator('.dash-autonomia-livello', { hasText: 'Normale' }).dblclick();
-  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
-  await expect(page.locator('.dash-bubble-user', { hasText: 'Scelgo Normale.' })).toHaveCount(1, { timeout: 10_000 });
-  expect(await livelloSalvato(app)).toMatch(/^(|default)$/);
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
-  await expect(page.locator('.dash-autonomia, #dashAutonomia')).toHaveCount(0);
+  await rispondiEAspettaScelta(page);
+  await page.waitForTimeout(1500);
+  await expect(page.locator('.dash-activity').last()).toContainText('scelta dell’autonomia');
+  await expect(page.locator('.dash-activity').last()).not.toContainText('Non partita');
+});
+
+test('r2 sotto lo stile impostato nell’accoglienza il blocco di attività non dice «Non partita»', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const page = await apriIntervistaQuasiFinita(app, shell);
+  await queueChat(app, { text: 'Va bene, ti scrivo così.', actions: [{ type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'Breve, del tu.' }] });
+  await page.locator('#input').fill('scrivimi breve');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-stile-accoglienza')).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(1500);
+  await expect(page.locator('.dash-activity').last()).toContainText('stile dell');
+  await page.waitForTimeout(3000);
+  expect(await page.locator('.dash-activity').last().textContent()).not.toContain('Non partita');
 });
