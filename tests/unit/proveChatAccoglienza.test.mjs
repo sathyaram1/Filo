@@ -127,6 +127,13 @@ export function proveScoperte(testo, nomeFile = '') {
     }
     return tutto;
   };
+  // Dove vale il profilo nuovo: il gruppo che lo chiede, o tutto il file se lo chiede fuori da ogni gruppo.
+  const gruppi = [...codice.matchAll(/\btest\.describe(?:\.\w+)?\(/g)]
+    .map((m) => [m.index, chiusa(codice, m.index + m[0].length - 1, '(', ')')]);
+  const nuovo = [...codice.matchAll(PROFILO_NUOVO)].map((m) => gruppi
+    .filter(([a, b]) => a < m.index && m.index < b)
+    .sort((x, y) => (x[1] - x[0]) - (y[1] - y[0]))[0] || [0, testo.length]);
+  const fixture = USA_LA_FIXTURE.test(senzaCommenti);
   const scoperte = [];
   for (const m of codice.matchAll(/\btest(?:\.(?:only|skip|fixme|fail))?\(\s*(['"`])/g)) {
     const apre = m.index + m[0].length - 1;
@@ -137,10 +144,18 @@ export function proveScoperte(testo, nomeFile = '') {
     if (freccia < 0) continue;
     const graffa = codice.indexOf('{', chiude + freccia);
     const tutto = raggiunto(senzaCommenti.slice(graffa, chiusa(codice, graffa, '{', '}') + 1));
-    if (METTE_MODELLO.test(tutto) && SCRIVE_IN_CHAT.test(tutto) && !DICHIARA.test(tutto)) scoperte.push(titolo);
+    const accolta = fixture && !APRE_DA_SE.test(tutto) && !nuovo.some(([a, b]) => a < m.index && m.index < b);
+    if (!accolta && METTE_MODELLO.test(tutto) && SCRIVE_IN_CHAT.test(tutto) && !DICHIARA.test(tutto)) scoperte.push(titolo);
   }
   return scoperte;
 }
+
+test('la fixture apre Filo su un profilo già accolto, se la prova non chiede quello nuovo', () => {
+  const f = readFileSync(FIXTURE, 'utf8');
+  assert.match(f, /\baccoglienzaFatta:\s*\[\s*true\s*,\s*\{\s*option:\s*true\s*\}\s*\]/);
+  assert.match(f, /if \(accoglienzaFatta\) writeFileSync\(join\(userData, 'storage\.json'\), JSON\.stringify\(PROFILO_ACCOLTO\)\)/);
+  assert.match(f, /PROFILO_ACCOLTO = \{ filo_onboarding: \{ done: true \} \}/);
+});
 
 test('ogni prova che mette un modello e scrive nella chat della home dice com\'è l\'accoglienza', () => {
   const scoperte = [];
