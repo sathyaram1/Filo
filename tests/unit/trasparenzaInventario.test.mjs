@@ -1,6 +1,6 @@
-// L'inventario di dove vanno i dati: ogni file nella cartella dei dati, ogni collezione del database del server (anche
-// quelle in cui scrive solo il server) e ogni indirizzo esterno nel codice ha la sua frase nel documento sulla privacy
-// (#951). Una voce nuova fa rosso finché non entra qui CON la frase; «perche» solo per ciò che non porta dati tuoi.
+// L'inventario di dove vanno i dati: ogni file nella cartella dei dati e ogni collezione del database del server (anche
+// quelle in cui scrive solo il server) ha la sua frase nel documento sulla privacy (#951); gli indirizzi esterni li tiene
+// serviziEsterni.test.mjs. Una voce nuova fa rosso finché non entra qui CON la frase; «perche» solo per ciò che non porta dati tuoi.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -139,56 +139,4 @@ test('ogni collezione del database del server è nel documento sulla privacy, co
   }
   confronta(collezioni, COLLEZIONI, 'collezione del server');
   confronta(campi, CAMPI_PUBBLICI_SCRITTI, 'campo pubblico scritto dall\'app');
-});
-
-const INDIRIZZI = {
-  'openrouter.ai': { frase: 'passa da OpenRouter' },
-  'europe-west1-filo-8b9cb.cloudfunctions.net': { frase: 'nella regione europe-west1' },
-  'firestore.googleapis.com': { frase: 'Filo ha un server, su Firebase' },
-  'firebasestorage.googleapis.com': { frase: 'gli screenshot e i file che hai allegato' },
-  'identitytoolkit.googleapis.com': { frase: 'un account anonimo che Filo crea da solo' },
-  'securetoken.googleapis.com': { frase: 'un account anonimo che Filo crea da solo' },
-  'accounts.google.com': { frase: 'L\'accesso Google si apre nel browser' },
-  'oauth2.googleapis.com': { frase: 'L\'accesso Google si apre nel browser' },
-  'safebrowsing.googleapis.com': { frase: 'Google Safe Browsing.' },
-  'rdap.org': { frase: '(rdap.org e crt.sh)' },
-  'crt.sh': { frase: '(rdap.org e crt.sh)' },
-  'api.tavily.com': { frase: 'Tavily, o DuckDuckGo senza chiave' },
-  'html.duckduckgo.com': { frase: 'Tavily, o DuckDuckGo senza chiave' },
-  'www.google.com': { frase: 'Il servizio di icone di Google' },
-  'lens.google.com': { frase: 'apre Google Lens' },
-  'raw.githubusercontent.com': { frase: 'GitHub, EasyList e Fanboy' },
-  'github.com': { frase: 'All\'avvio GitHub riceve la richiesta della versione più recente' },
-  'redirector.gvt1.com': { frase: 'Google, per i dizionari del correttore.' },
-  'easylist.to': { frase: 'GitHub, EasyList e Fanboy' },
-  'secure.fanboy.co.nz': { frase: 'GitHub, EasyList e Fanboy' },
-  'easylist-downloads.adblockplus.org': { frase: 'EasyList la pubblica su adblockplus.org' },
-  'api.frankfurter.dev': { frase: 'Cambi valuta e carte Magic' },
-  'api.scryfall.com': { frase: 'Cambi valuta e carte Magic' },
-  'cards.scryfall.io': { frase: 'Cambi valuta e carte Magic' },
-  'filo.red': { frase: 'Se apri un link d\'invito sul sito di Filo' },
-  'app.tavily.com': { perche: 'un link nelle Opzioni, che apri tu' },
-  'scryfall.com': { perche: 'una scheda che apri tu dal tasto destro su una lista del deck builder, con la stessa ricerca che va già ad api.scryfall.com' },
-  'filo.local': { perche: 'l\'intestazione con cui OpenRouter sa chi chiama: nessuno lo contatta' },
-  'singolarita.com': { perche: 'il contatto scritto nell\'intestazione verso Scryfall: nessuno lo contatta' },
-  'filo.app': { perche: 'un esempio in un commento' },
-  'llmstxt.org': { perche: 'un riferimento in un commento' },
-  'sito.it': { perche: 'un esempio' },
-  'www.Gmail.com': { perche: 'un esempio' },
-  'www.youtube.com': { perche: 'un esempio in un commento' },
-  'paypal.com': { perche: 'un marchio nell\'elenco dei siti imitati dai truffatori' },
-  'www.w3.org': { perche: 'lo spazio dei nomi di SVG: nessuno lo contatta' },
-  'ns.adobe.com': { perche: 'lo spazio dei nomi dei metadati XMP letti dalle immagini: nessuno lo contatta' },
-};
-
-test('ogni indirizzo esterno scritto nel codice è nel documento sulla privacy', () => {
-  const trovati = new Map();
-  const fuori = /[\\/](transparency|patchNotes)\.js$/;
-  for (const f of sorgenti(join(ROOT, 'src'))) {
-    if (fuori.test(f)) continue;
-    for (const m of readFileSync(f, 'utf8').matchAll(/https?:\/\/([a-zA-Z0-9.-]+\.[a-z]{2,})/g)) {
-      if (!trovati.has(m[1])) trovati.set(m[1], relative(ROOT, f));
-    }
-  }
-  confronta(trovati, INDIRIZZI, 'indirizzo esterno');
 });

@@ -15,6 +15,7 @@ function sentinellaSu(modifica) {
   try {
     cpSync(join(ROOT, 'src'), join(dir, 'src'), { recursive: true });
     cpSync(join(ROOT, 'package.json'), join(dir, 'package.json'));
+    cpSync(join(ROOT, 'transparency'), join(dir, 'transparency'), { recursive: true });
     mkdirSync(join(dir, 'tests', 'unit'), { recursive: true });
     cpSync(join(ROOT, SENTINELLA), join(dir, SENTINELLA));
     symlinkSync(join(ROOT, 'node_modules'), join(dir, 'node_modules'), 'junction');

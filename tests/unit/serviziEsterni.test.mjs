@@ -39,6 +39,25 @@ const ESEMPI = [
   { file: 'src/main/services/scryfall.js', url: 'https://singolarita.com', perche: 'recapito nello User-Agent' },
 ];
 
+// Indirizzi con l'host composto da un'espressione: quale servizio contattano, o perché non contattano niente.
+// Ognuno si riconosce dal file e da un pezzo della sua riga; uno nuovo fa rosso finché non è qui.
+const COMPOSTI = [
+  { file: 'src/main/services/llmsTxt.js', testo: '`https://${domain}/llms.txt`', servizio: 'llms-txt' },
+  { file: 'src/main/services/geoBlockClassifier.js', testo: 'SB.ownerOf(url || `https://${host}/`', perche: 'chiave del conto dei giudizi per sito' },
+  { file: 'src/main/services/handlers.js', testo: 'url : `https://${url}`', perche: 'chiede al blocco dei siti di un indirizzo scritto senza schema' },
+  { file: 'src/main/services/handlers.js', testo: 'sito ? `https://${sito}/`', perche: 'l’indirizzo mostrato al posto di una pagina delicata' },
+  { file: 'src/main/services/permessiPagine.js', testo: '`http://${t}`).hostname', perche: 'ne estrae il nome del sito' },
+  { file: 'src/main/services/safebrowse/normalize.js', testo: "new URL('http://' + s)", perche: 'normalizza l’indirizzo da controllare' },
+  { file: 'src/main/services/siteBlock.js', testo: 'new URL(`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
+  { file: 'src/main/tabs.js', testo: '? src : `https://${src}`', perche: 'il nome del sito delle regole del proxy' },
+  { file: 'src/pages/dashboard/dashboard-comandi.js', testo: 'raw : `https://${raw}`', perche: 'il sito scritto dall’utente, che si apre in una scheda' },
+  { file: 'src/pages/security/security.js', testo: "new URL('http://' + s).hostname", perche: 'ne estrae il nome del sito' },
+  { file: 'src/shared/eseguibili.js', testo: 's : `https://${s}`', perche: 'ne estrae il nome del sito' },
+  { file: 'src/shared/preferences.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
+  { file: 'src/shared/urlExfil.js', testo: "new URL('https://' + url)", perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
+  { file: 'src/shared/urlExfil.js', testo: 'new URL(`https://${url}`)', perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
+];
+
 // Chiamate di rete che non escono dal computer.
 const CHIAMATE_LOCALI = {
   'src/main/protocol.js': 'net.fetch sui file delle pagine filo://',
@@ -46,6 +65,8 @@ const CHIAMATE_LOCALI = {
 };
 
 const CHIAVI_HOST = new Set(['host', 'hostname']);
+// Un host già intero seguito da un'espressione (`https://api.x.it${percorso}`) è un indirizzo fisso, non dinamico.
+const HOST_INTERO_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(:\d+)?$/;
 
 const ESTENSIONI = ['.js', '.mjs', '.cjs', '.html', '.css', '.json'];
 const URL_RE = /\b(?:https?|wss?):\/\/[^\s'"`<>()\\]*/gi;
@@ -150,8 +171,9 @@ function indirizziDi(frammenti, righe) {
       const resto = url.slice(url.indexOf('://') + 3);
       const host = resto.split(/[/?#]/)[0].toLowerCase();
       const finoAllaFine = m.index + url.length === fr.valore.length;
-      const dinamico = !host || (fr.segue && finoAllaFine && !/[/?#]/.test(resto));
-      const composto = dinamico && finoAllaFine && !!(fr.segue || fr.concat);
+      const continua = finoAllaFine && !!(fr.segue || fr.concat) && !/[/?#]/.test(resto);
+      const dinamico = !host || (continua && !HOST_INTERO_RE.test(host));
+      const composto = dinamico && continua;
       out.push({ url, host, riga: fr.riga, dinamico, composto, testoRiga: righe[fr.riga - 1] || '' });
     }
   }
@@ -186,28 +208,48 @@ function indirizziScoperti(analisi) {
   return out;
 }
 
+const compostoDi = (u) => COMPOSTI.find((c) => c.file === u.file && u.testoRiga.includes(c.testo));
+
+function compostiScoperti(analisi) {
+  return analisi.indirizzi.filter((u) => u.composto && !nonDiRete(u.host) && !compostoDi(u))
+    .map((u) => `${u.file}:${u.riga} ${u.testoRiga.trim()}`);
+}
+
 function chiamateScoperte(analisi) {
   return [...analisi.chiamate].filter((f) => !CHIAMATE_LOCALI[f] && !SE.SERVIZI.some((v) => v.dove.includes(f))).sort();
+}
+
+const proveDi = (v) => [].concat(v.prova || []);
+
+// In un file che serve più servizi la chiamata e l'indirizzo condiviso non dicono quale: vale la «prova» della voce,
+// o un indirizzo sotto la sua base che nessun'altra voce di quel file copre.
+function vivaNelFile(v, f, analisi, fissi) {
+  const l = analisi.testi.get(f);
+  const prove = proveDi(v);
+  const conProva = prove.some((p) => l.senzaCommenti.includes(p));
+  const suoi = fissi.filter((u) => u.file === f && v.base.some((b) => SE.copre(b, u.url)));
+  const vicine = SE.SERVIZI.filter((x) => x !== v && x.dove.includes(f));
+  if (SE.SERVIZI.includes(v) && vicine.length) {
+    if (prove.length) return conProva;
+    return suoi.some((u) => !vicine.some((x) => x.base.some((b) => SE.copre(b, u.url))));
+  }
+  return suoi.length > 0 || (SE.SERVIZI.includes(v) && analisi.chiamate.has(f)) || conProva;
 }
 
 function vociMorte(analisi) {
   const out = [];
   const fissi = analisi.indirizzi.filter((u) => !u.dinamico);
   for (const v of VOCI) {
-    const servizio = SE.SERVIZI.includes(v);
     for (const f of v.dove) {
-      const l = analisi.testi.get(f);
-      if (!l) { out.push(`${v.id}: «${f}» non esiste fra i sorgenti guardati`); continue; }
-      const suo = fissi.some((u) => u.file === f && v.base.some((b) => SE.copre(b, u.url)));
-      const chiama = servizio && analisi.chiamate.has(f);
-      const prova = v.prova && l.senzaCommenti.includes(v.prova);
-      if (!suo && !chiama && !prova) out.push(`${v.id}: in «${f}» non c'è più niente che lo usi`);
+      if (!analisi.testi.get(f)) { out.push(`${v.id}: «${f}» non esiste fra i sorgenti guardati`); continue; }
+      if (!vivaNelFile(v, f, analisi, fissi)) out.push(`${v.id}: in «${f}» non c'è più niente che lo usi`);
     }
-    if (v.prova) {
-      if (!v.dove.some((f) => analisi.testi.get(f)?.senzaCommenti.includes(v.prova))) out.push(`${v.id}: «${v.prova}» non compare più in ${v.dove.join(', ')}`);
-    } else {
-      for (const b of v.base) if (!fissi.some((u) => SE.copre(b, u.url))) out.push(`${v.id}: nessun indirizzo del codice sta più sotto ${b}`);
+    const prove = proveDi(v);
+    if (prove.length && !v.dove.some((f) => prove.some((p) => analisi.testi.get(f)?.senzaCommenti.includes(p)))) {
+      out.push(`${v.id}: «${prove.join('», «')}» non compare più in ${v.dove.join(', ')}`);
     }
+    if (v.nellaLibreria) continue;
+    for (const b of v.base) if (!fissi.some((u) => SE.copre(b, u.url))) out.push(`${v.id}: nessun indirizzo del codice sta più sotto ${b}`);
   }
   return out;
 }
@@ -234,6 +276,11 @@ test('ogni indirizzo di rete scritto in src/ sta nell’elenco, con il file che 
   assert.deepEqual(scoperti, [], `Indirizzi che l’elenco non dichiara:\n  ${scoperti.join('\n  ')}\n${COME_SI_CORREGGE}`);
 });
 
+test('ogni indirizzo con l’host composto dichiara il servizio che contatta, o che non ne contatta nessuno', () => {
+  const scoperti = compostiScoperti(ANALISI);
+  assert.deepEqual(scoperti, [], `Indirizzi con l’host composto che nessuno dichiara:\n  ${scoperti.join('\n  ')}\n${COME_SI_CORREGGE}`);
+});
+
 test('ogni file che fa chiamate di rete è nel «dove» di un servizio dell’elenco', () => {
   const scoperte = chiamateScoperte(ANALISI);
   assert.deepEqual(scoperte, [], `File con chiamate di rete che nessuna voce nomina:\n  ${scoperte.join('\n  ')}\n${COME_SI_CORREGGE}`);
@@ -249,6 +296,13 @@ test('le esclusioni dichiarate qui servono ancora', () => {
   assert.ok(existsSync(join(ROOT, DATI_DI_TERZI.cartella)), `${DATI_DI_TERZI.cartella} esclusa ma non esiste più`);
   for (const e of ESEMPI) {
     assert.ok(ANALISI.indirizzi.some((u) => u.file === e.file && SE.copre(e.url, u.url)), `l’esempio ${e.url} non è più in ${e.file}: togli l’esclusione`);
+  }
+  for (const c of COMPOSTI) {
+    assert.ok(ANALISI.indirizzi.some((u) => u.composto && compostoDi(u) === c), `l’indirizzo composto «${c.testo}» non è più in ${c.file}: togli l’esclusione`);
+    if (c.servizio) {
+      const v = SE.SERVIZI.find((x) => x.id === c.servizio);
+      assert.ok(v && v.dove.includes(c.file), `«${c.testo}»: il servizio ${c.servizio} non esiste o non ha ${c.file} nel suo «dove»`);
+    } else assert.ok(c.perche, `«${c.testo}»: senza servizio serve il perché`);
   }
   for (const f of Object.keys(CHIAMATE_LOCALI)) {
     assert.ok(ANALISI.chiamate.has(f), `${f} non fa più chiamate: togli l’esclusione`);
@@ -273,6 +327,17 @@ test('le voci sono complete e ben formate', () => {
     for (const f of v.dove) assert.ok(existsSync(join(ROOT, f)), `${v.id}: «${f}» non esiste`);
   }
   for (const v of SE.SERVIZI) assert.ok(SE.QUANDO[v.quando], `${v.id}: «quando» sconosciuto: ${v.quando}`);
+  for (const v of VOCI.filter((x) => x.nellaLibreria)) assert.ok(proveDi(v).length, `${v.id}: un indirizzo scritto nella libreria vuole la «prova» del suo uso`);
+});
+
+// L'unico elenco degli host: il documento sulla privacy si confronta con queste voci, non con una tabella sua.
+test('ogni servizio con un indirizzo fisso ha la sua frase nel documento sulla privacy', () => {
+  const privacy = readFileSync(join(ROOT, 'transparency', 'privacy.md'), 'utf8').replace(/\s+/g, ' ');
+  for (const v of VOCI) {
+    const frasi = [].concat(v.frase || []);
+    if (SE.SERVIZI.includes(v) && v.base.length) assert.ok(frasi.length, `${v.id}: manca «frase», il punto del documento sulla privacy che ne parla`);
+    for (const f of frasi) assert.ok(privacy.includes(f), `${v.id}: il documento sulla privacy non dice più «${f}»`);
+  }
 });
 
 test('l’elenco nomina ogni servizio della richiesta #849', () => {
@@ -354,4 +419,44 @@ test('prova: un servizio che sparisce dal codice rende rossa la sua voce', () =>
     testi: new Map([...ANALISI.testi, [f, leggi(f, '')]]),
   };
   assert.ok(vociMorte(senza).some((m) => m.startsWith('cambi-valuta:')), 'la voce dei cambi resta verde senza il suo codice');
+});
+
+// Rianalizza un file di src/ con un testo diverso, lasciando il resto com'è.
+function conFile(f, testo) {
+  const nuovo = analizza({ [f]: testo });
+  const chiamate = new Set([...ANALISI.chiamate].filter((x) => x !== f));
+  if (nuovo.chiamate.has(f)) chiamate.add(f);
+  return {
+    indirizzi: [...ANALISI.indirizzi.filter((u) => u.file !== f), ...nuovo.indirizzi],
+    chiamate,
+    testi: new Map([...ANALISI.testi, [f, nuovo.testi.get(f)]]),
+  };
+}
+
+const WALLET = 'src/main/services/handlers/wallet.js';
+
+test('prova: un host nuovo composto da una costante, in un file già nell’elenco, è rosso', () => {
+  const a = conFile(WALLET, SORGENTI[WALLET] + "\nconst HOST_NUOVO = 'nuovo.example';\nfetch(`https://${HOST_NUOVO}/api`);\nfetch('https://' + HOST_NUOVO);\n");
+  const r = compostiScoperti(a);
+  assert.equal(r.length, 2, r.join('\n'));
+  assert.ok(r.every((x) => x.startsWith(WALLET)));
+});
+
+test('prova: un host intero seguito da un’espressione è un indirizzo fisso, e si confronta con l’elenco', () => {
+  const a = analizza({ 'src/main/nuovo.js': "fetch(`https://api.nuovo.example${percorso}`); fetch('https://api.nuovo.example' + p);" });
+  assert.equal(indirizziScoperti(a).length, 2);
+});
+
+test('prova: una richiesta con l’host nelle opzioni, in un file già nell’elenco, è rossa', () => {
+  const a = conFile(WALLET, SORGENTI[WALLET] + "\nrequire('electron').net.request({ protocol: 'https:', hostname: 'nuovo.example', path: '/' });\n");
+  assert.deepEqual(indirizziScoperti(a).map((x) => x.replace(/:\d+ /, ' ')), [`${WALLET} https://nuovo.example`]);
+});
+
+test('prova: un servizio tolto da un file che ne serve altri sullo stesso server rende rossa la sua voce', () => {
+  const testo = SORGENTI[WALLET];
+  const tolto = "callable('walletPendingInvite')";
+  assert.ok(testo.includes(tolto), 'la richiesta dell’invito in attesa non è più scritta così: aggiorna la prova');
+  const morte = vociMorte(conFile(WALLET, testo.replace(tolto, 'null')));
+  assert.deepEqual(morte.filter((m) => m.startsWith('invito-in-attesa:')).length > 0, true, morte.join('\n'));
+  assert.ok(!morte.some((m) => m.startsWith('crediti:')), 'i crediti usano ancora lo stesso server');
 });

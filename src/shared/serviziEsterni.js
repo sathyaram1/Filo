@@ -18,7 +18,10 @@
   const RINNOVO_ACCESSO = 'https://securetoken.googleapis.com/v1/token';
 
   // `base` vuoto vuol dire che l'indirizzo lo decide la pagina o l'utente, e allora `indirizzo` dice quale.
-  // `prova`: il pezzo di codice che mostra l'uso quando in src/ non c'è né l'indirizzo né una fetch riconoscibile.
+  // `prova`: pezzi di codice che mostrano l'uso, uno basta. Serve quando in src/ non c'è né l'indirizzo né una fetch
+  // riconoscibile, e in un file che serve più servizi, dove chiamate e indirizzo condiviso non dicono quale.
+  // `nellaLibreria`: l'indirizzo lo scrive la libreria (o Electron), non src/.
+  // `frase`: dove ne parla il documento sulla privacy (transparency/privacy.md), parola per parola; obbligatoria con `base`.
   const SERVIZI = [
     {
       id: 'modelli-openrouter', nome: 'OpenRouter, per i modelli',
@@ -26,6 +29,7 @@
       quando: 'funzione',
       occasione: 'a ogni funzione che usa un modello (chat, spiegazioni, traduzione, correttore, voce, immagini), e quando scegli un modello o guardi il saldo della chiave',
       riceve: 'quello che serve alla funzione per rispondere: testo, immagini o audio, con la chiave dei crediti di Filo o la tua',
+      frase: 'passa da OpenRouter',
       dove: ['src/main/services/providers/openrouter.js', 'src/main/services/handlers/ai.js', 'src/pages/options/options.js'],
     },
     {
@@ -34,7 +38,8 @@
       quando: 'avvio',
       occasione: 'la prima volta che serve un’identità, poi a ogni rinnovo del suo accesso',
       riceve: 'niente di tuo: crea e rinnova un account anonimo, senza email né password',
-      dove: ['src/main/auth/anon-auth.js', 'src/main/auth/config.js'],
+      frase: 'un account anonimo che Filo crea da solo',
+      dove: ['src/main/auth/anon-auth.js', 'src/main/auth/config.js'], prova: 'secureTokenEndpoint',
     },
     {
       id: 'configurazione-condivisa', nome: 'Il server di Filo, per la configurazione condivisa',
@@ -42,6 +47,7 @@
       quando: 'avvio',
       occasione: 'a ogni avvio, e di nuovo quando la copia in memoria è vecchia',
       riceve: 'niente di tuo: legge quale modello usa ogni funzione e le altre impostazioni di serie',
+      frase: 'legge la configurazione condivisa',
       dove: ['src/main/services/defaultsStore.js'],
     },
     {
@@ -50,7 +56,8 @@
       quando: 'avvio',
       occasione: 'all’avvio per lo stato dei crediti, poi quando usi un invito o guardi il saldo',
       riceve: 'l’identità anonima dell’installazione, e il codice d’invito quando lo usi',
-      dove: ['src/main/services/handlers/wallet.js'],
+      frase: 'lo stato dei suoi crediti',
+      dove: ['src/main/services/handlers/wallet.js'], prova: ["callable('walletState')", "callable('walletRedeem'", "callable('walletReissue'"],
     },
     {
       id: 'invito-in-attesa', nome: 'Il server di Filo, per l’invito in attesa',
@@ -58,7 +65,8 @@
       quando: 'avvio',
       occasione: 'all’avvio, nel primo giorno e finché non hai i crediti: chiede se un invito aperto dal sito aspetta questa installazione',
       riceve: 'l’identità anonima dell’installazione; il server confronta l’impronta del tuo indirizzo IP con quella lasciata dal link d’invito',
-      dove: ['src/main/services/handlers/wallet.js'],
+      frase: "il primo giorno chiede anche se c'è un invito che lo aspetta",
+      dove: ['src/main/services/handlers/wallet.js'], prova: "callable('walletPendingInvite')",
     },
     {
       id: 'registro-uso', nome: 'Il server di Filo, per il registro d’uso dei crediti',
@@ -66,7 +74,8 @@
       quando: 'funzione',
       occasione: 'dopo le chiamate ai modelli fatte con i crediti di Filo, a gruppi',
       riceve: 'per ogni chiamata pseudonimo, ora, funzione, modello, chi l’ha servita, token e costo; mai il testo',
-      dove: ['src/main/services/handlers/wallet.js'],
+      frase: "Filo scrive anche un registro d'uso",
+      dove: ['src/main/services/handlers/wallet.js'], prova: '/wallet-usage/',
     },
     {
       id: 'feedback', nome: 'Il server di Filo, per i feedback',
@@ -74,7 +83,8 @@
       quando: 'funzione',
       occasione: 'quando mandi un feedback, o lasci partire la segnalazione che Filo ti propone',
       riceve: 'il feedback: testo, indirizzo della pagina e allegati cifrati verso l’owner; in chiaro titolo della pagina, browser e sistema, titolo breve',
-      dove: ['src/shared/feedback.js'],
+      frase: 'Quando mandi un feedback',
+      dove: ['src/shared/feedback.js'], prova: 'async function submit(',
     },
     {
       id: 'bacheca', nome: 'Il server di Filo, per la bacheca dei feedback',
@@ -82,7 +92,8 @@
       quando: 'funzione',
       occasione: 'quando apri la bacheca, voti una scheda o chiedi di riaprirla',
       riceve: 'per leggere niente di tuo; con un voto, il codice interno del tuo account',
-      dove: ['src/shared/feedback.js', 'src/main/services/handlers/board.js'],
+      frase: "Sulla bacheca pubblica dentro l'app",
+      dove: ['src/shared/feedback.js', 'src/main/services/handlers/board.js'], prova: ['async function listDirect(', 'async function castVote('],
     },
     {
       id: 'accesso-google', nome: 'Google, per il login',
@@ -90,6 +101,7 @@
       quando: 'funzione',
       occasione: 'quando fai il login con Google, e a ogni rinnovo dell’accesso',
       riceve: 'il codice d’accesso che Google ha dato a Filo nel browser di sistema',
+      frase: "L'accesso Google si apre nel browser",
       dove: ['src/main/auth/google-auth.js', 'src/main/auth/config.js'],
     },
     {
@@ -98,6 +110,7 @@
       quando: 'funzione',
       occasione: 'solo con il login Google: a ogni chiamata ai modelli e quando apri la pagina Crediti',
       riceve: 'email e nome dell’account, saldo, chiamate e crediti per funzione, costo; mai il testo',
+      frase: "Con il login Google c'è un secondo documento.",
       dove: ['src/main/services/handlers/credits.js'],
     },
     {
@@ -106,6 +119,7 @@
       quando: 'funzione',
       occasione: 'quando apri l’Aiuto su una pagina o gli fai una domanda; l’invio dei percorsi riusciti è spento',
       riceve: 'il nome del sito (per esempio posta.esempio.it), senza il resto dell’indirizzo',
+      frase: 'Filo chiede al server i percorsi già noti per quel sito',
       dove: ['src/shared/paths.js'],
     },
     {
@@ -114,15 +128,18 @@
       quando: 'funzione',
       occasione: 'solo se partecipi al red team, che oggi è in pausa',
       riceve: 'il testo dell’attacco e il nome in classifica che scegli tu',
+      frase: 'Chi vuole può attaccare i giudici di Filo',
       dove: ['src/main/services/handlers/redteam.js'],
     },
     {
       id: 'gestione-owner', nome: 'Il server di Filo, per la gestione',
       base: [FUNZIONI, FIRESTORE, STORAGE],
       quando: 'funzione',
-      occasione: 'solo per l’owner, nella Gestione: feedback, modelli di serie, automazioni',
+      occasione: 'solo per l’owner, nella Gestione: feedback, modelli di serie, automazioni, crediti degli utenti',
       riceve: 'le decisioni dell’owner; degli altri utenti niente',
-      dove: ['src/main/services/handlers/auth.js', 'src/main/services/supportModelsStore.js'],
+      frase: 'Filo ha un server, su Firebase',
+      dove: ['src/main/services/handlers/auth.js', 'src/main/services/supportModelsStore.js', 'src/main/services/handlers/wallet.js'],
+      prova: ['{ asOwner: true }'],
     },
     {
       id: 'safe-browsing', nome: 'Google Safe Browsing',
@@ -130,6 +147,7 @@
       quando: 'pagina',
       occasione: 'quando apri una pagina, se la risposta per quell’indirizzo non è già in memoria',
       riceve: 'i primi 4 byte dell’impronta dell’indirizzo e delle sue parti più corte: mai l’indirizzo',
+      frase: 'Google Safe Browsing.',
       dove: ['src/main/services/safebrowse/net.js'],
     },
     {
@@ -138,6 +156,7 @@
       quando: 'sito',
       occasione: 'la prima volta che un sito mostra un segnale sospetto, per sapere da quanto esiste',
       riceve: 'il nome del sito (il dominio registrato, per esempio esempio.it)',
+      frase: '(rdap.org e crt.sh)',
       dove: ['src/main/services/safebrowse/net.js'],
     },
     {
@@ -154,6 +173,7 @@
       quando: 'funzione',
       occasione: 'quando l’agente cerca sul web',
       riceve: 'la ricerca che l’agente ha formulato',
+      frase: 'Tavily, o DuckDuckGo senza chiave',
       dove: ['src/main/services/webSearch.js'],
     },
     {
@@ -162,6 +182,7 @@
       quando: 'funzione',
       occasione: 'quando apri l’Aiuto, al massimo una volta al giorno per sito',
       riceve: 'una richiesta del file llms.txt, senza il resto dell’indirizzo',
+      frase: "Quando apri l'Aiuto, Filo gli chiede le sue istruzioni per agenti",
       dove: ['src/main/services/llmsTxt.js'],
     },
     {
@@ -170,7 +191,8 @@
       quando: 'funzione',
       occasione: 'quando fai tasto destro su un link; non parte se l’indirizzo sembra portare fuori dati riservati',
       riceve: 'una richiesta della pagina del link, senza i tuoi cookie',
-      dove: ['src/main/services/handlers/misc.js', 'src/main/services/safe-fetch.js'],
+      frase: 'Filo chiede subito a quel sito titolo e descrizione della pagina',
+      dove: ['src/main/services/handlers/misc.js', 'src/main/services/safe-fetch.js'], prova: 'safeFetch(url',
     },
     {
       id: 'file-della-pagina', nome: 'Il sito di un’immagine o di un video',
@@ -178,7 +200,7 @@
       quando: 'funzione',
       occasione: 'quando salvi, copi, fai descrivere o controlli l’origine di un’immagine o di un video della pagina',
       riceve: 'la richiesta del file, con i cookie di quel sito, come la fa la pagina',
-      dove: ['src/main/services/handlers/misc.js', 'src/content/actions.js'],
+      dove: ['src/main/services/handlers/misc.js', 'src/content/actions.js'], prova: ["require('node:https')", 'fetch(src)'],
     },
     {
       id: 'colore-del-sito', nome: 'Il sito che stai visitando, per il suo colore',
@@ -194,6 +216,7 @@
       quando: 'funzione',
       occasione: 'quando la home mostra i siti che Filo ti suggerisce',
       riceve: 'il nome di quei siti',
+      frase: 'Il servizio di icone di Google',
       dove: ['src/pages/dashboard/dashboard.js'],
     },
     {
@@ -202,7 +225,8 @@
       quando: 'avvio',
       occasione: 'all’avvio e quando chiedi se c’è una versione nuova; il file dell’aggiornamento arriva dall’archivio di GitHub',
       riceve: 'la richiesta della versione più recente',
-      dove: ['src/main/updater.js'], prova: "require('electron-updater')",
+      frase: "All'avvio GitHub riceve la richiesta della versione più recente",
+      dove: ['src/main/updater.js'], prova: "require('electron-updater')", nellaLibreria: true,
     },
     {
       id: 'liste-pubblicita', nome: 'EasyList, StevenBlack e le liste nazionali, per bloccare la pubblicità',
@@ -215,6 +239,7 @@
       quando: 'avvio',
       occasione: 'col blocco della pubblicità acceso: all’avvio se la copia ha più di una settimana, poi una volta alla settimana',
       riceve: 'niente di tuo',
+      frase: ['le liste per bloccare la pubblicità', 'EasyList la pubblica su adblockplus.org'],
       dove: ['src/main/services/adblock.js'],
     },
     {
@@ -226,6 +251,7 @@
       quando: 'avvio',
       occasione: 'come le liste della pubblicità, una volta alla settimana',
       riceve: 'niente di tuo',
+      frase: 'i banner dei cookie',
       dove: ['src/main/services/cookieBanners.js'],
     },
     {
@@ -234,6 +260,7 @@
       quando: 'avvio',
       occasione: 'in sottofondo, una volta al giorno, e quando controlli l’origine di un’immagine con l’elenco vecchio',
       riceve: 'niente di tuo: il confronto con l’immagine avviene sul computer',
+      frase: "l'elenco dei firmatari riconosciuti delle credenziali sulle immagini",
       dove: ['src/main/services/firmatariC2pa.js'],
     },
     {
@@ -242,6 +269,7 @@
       quando: 'funzione',
       occasione: 'quando una spiegazione converte una valuta, al massimo una volta al giorno',
       riceve: 'niente di tuo',
+      frase: 'Cambi valuta e carte Magic',
       dove: ['src/main/services/fxRates.js'],
     },
     {
@@ -250,6 +278,7 @@
       quando: 'funzione',
       occasione: 'nei mazzi di Magic, quando cerchi o apri una carta; le immagini arrivano dal suo archivio',
       riceve: 'il nome della carta che cerchi',
+      frase: 'Cambi valuta e carte Magic',
       dove: ['src/main/services/scryfall.js'],
     },
     {
@@ -258,7 +287,8 @@
       quando: 'avvio',
       occasione: 'la prima volta per ogni lingua del correttore, su Windows e Linux: su Mac il correttore è quello del sistema',
       riceve: 'la lingua del dizionario che manca',
-      dove: ['src/main/main.js'], prova: 'setSpellCheckerLanguages(',
+      frase: 'Google, per i dizionari del correttore.',
+      dove: ['src/main/main.js'], prova: 'setSpellCheckerLanguages(', nellaLibreria: true,
     },
     {
       id: 'proxy-altro-paese', nome: 'Il proxy che imposti tu',
@@ -277,6 +307,7 @@
       base: ['https://www.google.com/search'],
       occasione: 'quando scrivi nella barra qualcosa che non è un indirizzo, o scegli «cerca» dal tasto destro',
       riceve: 'la ricerca',
+      frase: 'la ricerca si apre sulla pagina dei risultati di Google',
       dove: ['src/shared/urlNav.js', 'src/content/actions.js'],
     },
     {
@@ -284,6 +315,7 @@
       base: ['https://lens.google.com/uploadbyurl'],
       occasione: 'quando cerchi un’immagine dal tasto destro',
       riceve: 'l’indirizzo dell’immagine',
+      frase: 'apre Google Lens',
       dove: ['src/content/actions.js'],
     },
     {
@@ -291,6 +323,7 @@
       base: ['https://accounts.google.com/o/oauth2/v2/auth'],
       occasione: 'quando fai il login, nel browser di sistema',
       riceve: 'quello che scrivi a Google per entrare',
+      frase: "L'accesso Google si apre nel browser",
       dove: ['src/main/auth/config.js'],
     },
     {
@@ -312,6 +345,7 @@
       base: ['https://filo.red'],
       occasione: 'quando apri la pagina per scaricare Filo, o qualcuno apre un tuo link d’invito',
       riceve: 'la visita; dal link d’invito anche il codice',
+      frase: "Se apri un link d'invito sul sito di Filo",
       dove: ['src/main/updater.js', 'src/pages/dashboard/dashboard-carte.js', 'src/shared/wallet.js'],
     },
   ];
