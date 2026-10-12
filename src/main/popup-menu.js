@@ -160,7 +160,7 @@ function computeMenuWidth(entries) {
   const ICON_COL = 28;    // icona (18px) + gap (10px) quando presente
   let needed = MENU_MIN_W;
   for (const e of entries || []) {
-    if (e.type === 'separator') continue;
+    if (!e || e.type === 'separator') continue;
     const label = String(e.label || '');
     // L'email (voce disabled senza icona) usa font 12px, le altre 13px. Stima
     // generosa (~0.6 * font-size per carattere) per non troncare mai.
@@ -343,7 +343,9 @@ function sfocato(s, win) {
 // ── Mostra il menu ────────────────────────────────────────────────────────
 function showPopupMenu(parentWin, entries, x, y, onSelect) {
   if (!parentWin || parentWin.isDestroyed()) return;
-  const voci = Array.isArray(entries) ? entries : [];
+  const voci = (Array.isArray(entries) ? entries : []).filter((e) => e && typeof e === 'object');
+  // Senza voci non c'è niente da mostrare: la pagina risponderebbe col vuoto e il menu resterebbe «aperto» senza comparire.
+  if (!voci.length) return;
   if (inVista && inVista.parent !== parentWin) chiudi(inVista);
   const s = finestraDi(parentWin);
   if (!s) return;

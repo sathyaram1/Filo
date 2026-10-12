@@ -5,7 +5,7 @@
 const path = require('node:path');
 const { BrowserWindow, nativeTheme } = require('electron');
 const { hideForTests } = require('./test-window-mode');
-const { menuAperto } = require('./popup-menu');
+const { menuAperto, quandoChiuso } = require('./popup-menu');
 
 // Il margine trasparente tiene l'ombra; sopra è sottile perché la carta sfiora la barra delle schede.
 const MARGINE = { su: 2, lati: 10, giu: 14 };
@@ -156,10 +156,9 @@ function mostra(parent, dati) {
   const n = ++s.giri;
   s.voluta = { n, id, x: Math.round(Number(dati.x) || 0), y: Math.round(Number(dati.y) || 0), dati };
   // Col menu del tasto destro aperto la carta aspetta che si chiuda: gli finirebbe sotto, mezza coperta.
-  const menu = menuAperto(parent);
-  if (menu) {
+  if (menuAperto(parent)) {
     if (s.win.isVisible()) { invia(s, 'anteprima:nascondi', {}); s.win.hide(); }
-    dopoIlMenu(parent, s, menu);
+    dopoIlMenu(parent, s);
     return true;
   }
   const davanti = id === tabs.activeId;
@@ -178,11 +177,11 @@ function mostra(parent, dati) {
   return true;
 }
 
-function dopoIlMenu(parent, s, menu) {
-  if (s.menu === menu) return;
-  s.menu = menu;
-  menu.once('closed', () => {
-    if (s.menu === menu) s.menu = null;
+function dopoIlMenu(parent, s) {
+  if (s.aspettaMenu) return;
+  s.aspettaMenu = true;
+  quandoChiuso(parent, () => {
+    s.aspettaMenu = false;
     if (s.voluta && s.voluta.dati && !parent.isDestroyed()) mostra(parent, s.voluta.dati);
   });
 }
