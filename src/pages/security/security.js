@@ -80,6 +80,8 @@
     $('sec-cookies-accessi-desc').textContent = I18n.t('options_cookies_accessi_desc');
     $('sec-cookies-riquadri-title').textContent = I18n.t('options_cookies_riquadri_title');
     $('sec-cookies-riquadri-desc').textContent = I18n.t('options_cookies_riquadri_desc');
+    $('sec-riquadri-modello-label').textContent = I18n.t('options_cookies_riquadri_modello');
+    $('sec-riquadri-modello-desc').textContent = I18n.t('options_cookies_riquadri_modello_desc');
     $('sec-cookies-banners-title').textContent = I18n.t('options_cookies_banners_title');
     $('sec-cookies-done-title').textContent = I18n.t('options_cookies_done_title');
     $('sec-fp-title').textContent = I18n.t('options_fp_title');
@@ -334,6 +336,7 @@
     cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
     cookieLoggedSites = Array.isArray(cookies.loggedSites) ? cookies.loggedSites.slice() : [];
     cookieEmbedSites = Array.isArray(cookies.embedSites) ? cookies.embedSites.slice() : [];
+    $('sec-riquadri-modello').checked = !(sec.riquadriRotti && sec.riquadriRotti.modello === false);
     renderWhitelist();
     renderBannerSites();
     renderLoggedSites();
@@ -397,6 +400,9 @@
     $('cookie-wl-input').disabled = !conta;
     $('cookie-wl-add-btn').disabled = !conta;
     for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !conta;
+    // In Manuale Filo non rifiuta cookie, quindi nessun riquadro si rompe per colpa sua e il modello non parte.
+    $('sec-riquadri-modello-row').style.opacity = conta ? '1' : '0.45';
+    $('sec-riquadri-modello').disabled = !conta;
   }
 
   // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
@@ -849,6 +855,7 @@
       },
       // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
       autoFeedback: !!$('sec-auto-feedback').checked,
+      riquadriRotti: { modello: !!$('sec-riquadri-modello').checked },
     };
   }
 
@@ -1023,6 +1030,7 @@
     $('sec-safebrowse-llm').addEventListener('change', save);
     $('sec-safebrowse-sandbox').addEventListener('change', save);
     $('sec-auto-feedback').addEventListener('change', save);
+    $('sec-riquadri-modello').addEventListener('change', save);
     for (const r of document.querySelectorAll('input[name="cookie-mode"]')) {
       r.addEventListener('change', () => { syncCookieMode(); saveCookies(); });
     }
