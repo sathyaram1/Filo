@@ -40,6 +40,9 @@ test-results/
 *dump*.jsonl
 filo-copie/
 filo-feedback/
+# Il clone del server di un lavoro server (#1159) sta fuori dal repo: se finisse dentro, il salvataggio automatico
+# pubblicherebbe il codice privato di filo-security. Difese anche in dispatch (cloneDentroIlRepo).
+filo-security/
 # Scarti dei comandi andati storti: nascono in radice, restano vuoti, e finiscono
 # committati per sbaglio insieme al resto (`nf2.err` ha viaggiato in ogni copia
 # del repo per due settimane).
