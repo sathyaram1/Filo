@@ -163,8 +163,8 @@ test('ogni prova che mette un modello e scrive nella chat della home dice com\'�
     for (const t of proveScoperte(readFileSync(join(TESTS, f), 'utf8'), f)) scoperte.push(`${f} › ${t}`);
   }
   assert.deepEqual(scoperte, [],
-    'Prima di mettere il modello, segna l\'utente come già accolto: '
-    + 'SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }). '
+    'Questa prova apre Filo da sé o chiede il profilo nuovo: prima di mettere il modello segna l\'utente come già '
+    + 'accolto (SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] })), o usa la fixture così com\'è. '
     + 'Se la prova è sull\'intervista di benvenuto, il titolo lo dica.');
 });
 
