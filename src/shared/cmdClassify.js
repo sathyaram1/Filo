@@ -1480,6 +1480,30 @@
     return det;
   }
 
+  // cmd toglie ogni `^` fuori dalle virgolette prima di passare il comando: `^.ssh` è `.ssh`, `^\^\host` è
+  // `\\host`, `-^-force` è `--force` (#1072.1). null dove qui non si legge come cmd: un `^` in coda (si
+  // prende la riga dopo), su un separatore (diventa testo), accanto alle espansioni `%` (fatte prima) e `!`.
+  function comeCmd(cmd) {
+    let out = '';
+    let virgolette = false;
+    let tolti = false;
+    for (let i = 0; i < cmd.length; i++) {
+      const ch = cmd[i];
+      if (ch !== '^' || virgolette) {
+        if (ch === '"') virgolette = !virgolette;
+        out += ch;
+        continue;
+      }
+      const dopo = cmd[i + 1];
+      if (dopo === undefined || /[&|<>()%\r\n]/.test(dopo)) return null;
+      out += dopo; // `^"` non apre né chiude le virgolette
+      i += 1;
+      tolti = true;
+    }
+    if ((tolti && out.includes('%')) || (out.includes('!') && out.includes('^'))) return null;
+    return out;
+  }
+
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
   // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
   // devono vedere il comando che la shell esegue, non la sua grafia (#1072). Per cmd quei segni sono testo.
