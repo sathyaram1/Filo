@@ -656,8 +656,9 @@
     // Solo l'essere owner decide: nessuna impostazione dipende da un'altra
     // accesa, perché si preparano prima di riaccendere (richiesta owner).
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
+    if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
-      mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
+      mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgAccountA, mgAccountB, ...mgPriorityRadios, mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
       if (el) el.disabled = !isAdmin;
     }
