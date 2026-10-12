@@ -20,10 +20,10 @@ function rinnovoRifiutato(testo) {
   return RIFIUTI_DEFINITIVI.has(codiceRifiuto(testo));
 }
 
-// Niente «(503)» fra parentesi: chi legge lo stato HTTP dal messaggio lo scambierebbe per la risposta
-// della chiamata che stava facendo (un 403 della bacheca vuol dire «scheda sparita»).
+// Nessun numero di stato nel testo: chi legge lo stato dal messaggio lo scambierebbe per la risposta della
+// chiamata che stava facendo (un 403 in Gestione diventa «non sei amministratore»). Lo stato sta in httpStatus.
 function nonRaggiungibile(status) {
-  const e = new Error(`servizio di accesso non raggiungibile (HTTP ${status})`);
+  const e = new Error('il servizio di accesso non risponde adesso: riprova fra poco');
   e.code = 'servizio_non_raggiungibile';
   e.httpStatus = status;
   return e;
