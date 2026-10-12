@@ -55,7 +55,7 @@ test('la segnalazione: la risposta scritta col bottone del file resta nella boll
     // Al modello l'esito del bottone dice che la risposta l'utente la sta già leggendo.
     const chiamate = await chiamateAlModello(app);
     const esito = chiamate[1].find((m) => m.role === 'tool' && m.tool_call_id === 'f1');
-    expect(esito.content).toContain('non ripeterla');
+    expect(esito.content).toContain('non ripeterlo');
 
     // L'archivio ha la risposta intera: la chat riaperta dice lo stesso.
     await expect.poll(async () => ((await ultimaChat(app)) || { messages: [] }).messages.length, { timeout: 5_000 }).toBe(2);
@@ -124,6 +124,31 @@ test('dopo la risposta col bottone il modello lavora ancora: la frase di lavoro 
   }
 });
 
+test('bottone del file e un\'altra azione nello stesso giro: il modello sa che il testo è fra le note e la risposta arriva nella bolla', async ({ app }) => {
+  test.setTimeout(60_000);
+  const { dir, file } = await bollettaTari(app);
+  try {
+    // Il secondo giro fa quello che l'esito gli chiede: riscrive la risposta per intero.
+    await modelloFinto(app, [
+      { text: RISPOSTA, toolCalls: [apriFile(file), { id: 't1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"TARI"}' }] },
+      { text: `${RISPOSTA} Il promemoria suona tra 5 minuti.` },
+    ]);
+    const page = await home(app);
+    await chiedi(page, 'quanto ho pagato di tari? e ricordamelo tra 5 minuti');
+    const bolla = page.locator('.dash-bubble-filo');
+    await expect(bolla).toContainText('Il promemoria suona', { timeout: 15_000 });
+    const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 'f1');
+    expect(esito.content).not.toContain('non ripeterlo');
+    expect(esito.content).toContain('riscrivila per intero');
+    await expect(bolla).toHaveCount(1);
+    expect((await bolla.evaluate((el) => el.textContent)).split('305,40').length - 1).toBe(1);
+    await expect(bolla.locator('.dash-file-btn')).toHaveCount(1);
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('una nota scritta prima della risposta col bottone resta nota anche se l\'ultimo giro è muto', async ({ app }) => {
   test.setTimeout(60_000);
   const { dir, file } = await bollettaTari(app);
@@ -167,7 +192,7 @@ test('anche il bottone dell\'evento di calendario: la risposta scritta con lui r
     expect(testo.indexOf(VISITA)).toBeLessThan(testo.indexOf('Ti ho messo il bottone'));
     await expect(page.locator('.dash-activity-note')).toHaveCount(0);
     const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 'e1');
-    expect(esito.content).toContain('non ripeterla');
+    expect(esito.content).toContain('non ripeterlo');
   } finally {
     await ripristina(app);
   }
