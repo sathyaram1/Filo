@@ -390,6 +390,25 @@ test('oltre il tetto delle foto rimandate tornano le più nuove, le più vecchie
     3 + FC.TOKEN_PER_IMMAGINE * FC.CARATTERI_PER_TOKEN);
 });
 
+test('un messaggio con più foto di quante ne stiano nei tetti tiene le prime che ci stanno, e la nota dice le altre', () => {
+  const pesante = (k) => `data:image/jpeg;base64,${String(k).repeat(5_400_000)}`;
+  const tante = conFoto(scambio('c', 1, 'ecco la dispensa', 'Cinque scaffali.'), 5);
+  const memoria = { [`c|${tante[0].ts}`]: [0, 1, 2, 3, 4].map(pesante) };
+  const f = FC.finestra(tante, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(memoria) });
+  const u = f.messaggi.find((m) => m.role === 'user');
+  const n = Math.floor(FC.MAX_CARATTERI_IMMAGINI / pesante(0).length);
+  assert.ok(n > 0 && n < 5);
+  assert.deepEqual(fotoNel(u), [0, 1, 2, 3, 4].slice(0, n).map(pesante));
+  assert.match(u.content[u.content.length - 1].text, new RegExp(`anche altre ${5 - n} immagini che non hai più davanti`));
+  // Più di sedici foto in un messaggio: tornano le prime sedici, una la dice la nota.
+  const diciassette = conFoto(scambio('c', 1, 'tutte', 'Viste.'), 17);
+  const mem17 = { [`c|${diciassette[0].ts}`]: Array.from({ length: 17 }, (_, k) => `data:image/png;base64,${k}`) };
+  const g = FC.finestra(diciassette, { ora: ORA, ...TETTI, chatCorrente: 'c', immagini: immaginiDi(mem17) });
+  const v = g.messaggi.find((m) => m.role === 'user');
+  assert.equal(fotoNel(v).length, FC.MAX_IMMAGINI_RIMANDATE);
+  assert.match(v.content[v.content.length - 1].text, /anche un'altra immagine che non hai più davanti/);
+});
+
 test('il rifiuto delle immagini si riconosce; quello per la finestra o per i crediti no', () => {
   assert.equal(FC.rifiutaImmagini({ status: 404, message: 'OpenRouter 404: {"error":{"message":"No endpoints found that support image input","code":404}}' }), true);
   assert.equal(FC.rifiutaImmagini({ status: 400, message: 'Failed to deserialize the JSON body: messages[1]: unknown variant `image_url`, expected `text`' }), true);
