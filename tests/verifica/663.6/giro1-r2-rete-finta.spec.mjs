@@ -3,7 +3,7 @@
 import { test, expect } from '../../helpers/reteFinta.mjs';
 import { home, modelloFinto, ripristina, chiedi } from '../../helpers/chatFinta.mjs';
 
-test('r1 rete finta: modello messo a home aperta, domanda dopo due secondi, risponde la chat e non l’intervista', async ({ app }) => {
+test('r2 rete finta: modello messo a home aperta, domanda dopo due secondi, risponde la chat e non l’intervista', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
   const benvenuto = await app.evaluate(() => globalThis.SN_ONBOARDING.WELCOME_MESSAGE.split('.')[0]);
