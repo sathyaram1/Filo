@@ -2961,11 +2961,13 @@ class TabManager {
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, referrer);
         return { action: 'deny' };
       }
-      if (this.security.blockPopups && !Permessi.perUnaFinestra(pwc, url, referrer)) {
+      const accesso = isAuthPopup(url);
+      const gesto = (this.security.blockPopups || accesso) && Permessi.perUnaFinestra(pwc, url, referrer);
+      if (this.security.blockPopups && !gesto) {
         this._notifyPopupBlocked(origine ? origine.id : null, url, pwc);
         return { action: 'deny' };
       }
-      if (isAuthPopup(url)) {
+      if (accesso && gesto) {
         if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
         return this._allowAuthPopup(url);
       }
