@@ -481,8 +481,9 @@ test('una scrittura in cache a un\'ora è prezzata a 2× l\'input, quella a cinq
   const d = await analizzaRighe(storto);
   assert.equal(d.costUsd, Math.round((40000 * 10 + 60000 * 6.25) / 1e6 * 10000) / 10000);
   assert.equal(d.tokens.cacheWrite, 100000);
-  for (const k of ['opus', 'sonnet', 'sonnet-4', 'haiku', 'fable', 'fable-5']) {
+  for (const k of ['opus', 'opus-5-5', 'sonnet', 'sonnet-4', 'haiku', 'haiku-5-5', 'fable', 'fable-5']) {
     assert.equal(PREZZI[k].cacheWrite1h, PREZZI[k].input * 2, `${k}: la scrittura a un'ora è 2× l'input`);
+    if (PREZZI[k].oltre) assert.equal(PREZZI[k].oltre.cacheWrite1h, PREZZI[k].oltre.input * 2, `${k}: anche oltre la soglia`);
   }
 });
 
