@@ -199,6 +199,7 @@ test('il giro dopo il bottone fallisce: la risposta già scritta resta nella bol
     await expect(errore).toHaveCount(1);
     const [yRisposta, yErrore] = await Promise.all([risposta.boundingBox(), errore.boundingBox()]).then((b) => b.map((x) => x.y));
     expect(yRisposta).toBeLessThan(yErrore);
+    await page.screenshot({ path: 'tests/.shots/chat-risposta-col-bottone-guasto.png' });
     await expect.poll(async () => ((await ultimaChat(app)) || { messages: [] }).messages.length, { timeout: 5_000 }).toBe(2);
     expect((await ultimaChat(app)).messages[1].text).toBe(RISPOSTA);
   } finally {
