@@ -85,6 +85,9 @@ test.beforeAll(async () => {
         // (la home si rigenera con la conversazione dentro), e quelle non sono
         // il turno di chat.
         const msgs = Array.isArray(body.messages) ? body.messages : [];
+        // Il saluto della home non arriva, come a rete giù: non è una chiamata di queste prove, e non deve né
+        // pagare coi crediti né far ricordare o dimenticare un rifiuto della chiave propria.
+        if (JSON.stringify(msgs).includes('preparare la dashboard')) { req.socket.destroy(); return; }
         const last = msgs[msgs.length - 1] || {};
         seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
         const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? personalKeyStatus : 401);
