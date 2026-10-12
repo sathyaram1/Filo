@@ -7,6 +7,7 @@
 const { session } = require('electron');
 const R = require('./cookieIncorporatiRegole');
 const Sito = require('./stessoSito');
+const Google = require('./dominiGoogle');
 require('../../shared/authPopup');
 
 // «Qualche minuto» dopo l'ultima scheda che ospitava il riquadro: chi riapre l'articolo un attimo dopo non perde
@@ -61,8 +62,9 @@ function sitoDi(url) {
 
 // Mentre si sta guardando un accesso a un sito (la sua pagina di accesso è aperta, o la finestrella «Continua
 // con…»), i suoi cookie non si toccano: declassare quelli del giro di accesso lo farebbe uscire al riavvio.
+// I domini di Google sono un accesso solo (#1123): protetto uno, lo sono tutti.
 function protetti() {
-  const out = new Sito.ElencoSiti(accessi);
+  const out = new Google.ElencoConGoogle(accessi);
   for (const d of fidati) out.add(d);
   for (const d of riattivati) out.add(d);
   const ora = Date.now();
@@ -504,6 +506,7 @@ module.exports = {
   navigazione,
   paginaDiAccesso,
   credenziali,
+  accessoOsservato: segnaAccesso,
   giroDiPulizia,
   allUscita,
   margineTest,
