@@ -611,6 +611,7 @@
     }
     const allIssues = buildIssues(parseIssues(res.text), text);
     state.issues = allIssues;
+    state.testoIssues = text;
     state.lastScannedText = text;
     renderOverlayContent(state);
     // Prefetch delle correzioni a singola parola: per ogni issue blu su 1 parola
