@@ -1,6 +1,6 @@
-// Sentinella #663.5: una prova che mette un modello e poi scrive nella chat della home dice com'è l'accoglienza.
-// Senza, la home apre l'intervista di benvenuto (subito, o quando arriva l'avviso di prontezza) e il messaggio
-// finisce lì: la prova verifica l'intervista invece della chat, e passa o no secondo i tempi.
+// Sentinella #663.5 e #663.6: una prova che mette un modello e scrive nella chat della home parte già accolta, o la
+// home apre l'intervista e il messaggio finisce lì. La fixture apre Filo già accolto; dichiara chi apre Filo da sé o
+// chiede il profilo nuovo. Racconto: patterns/accogliere-un-utente-nuovo-e-una-conversazione-e-il-segno.md.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +16,10 @@ const SCRIVE_IN_CHAT = /locator\(\s*['"]#input['"]\s*\)\s*\.\s*(?:fill|press|typ
 const DICHIARA = /\bfilo_onboarding\b|\bFILO_ONBOARDING\b|\bsetOnboarding\s*\(/;
 // Le prove dell'intervista la vogliono aperta.
 const SULL_ACCOGLIENZA = /accoglienza|benvenuto|intervista|onboarding/i;
+const USA_LA_FIXTURE = /^import\s[^;]*from\s+['"]\.\/fixtures\/electron\.mjs['"]/m;
+const PROFILO_NUOVO = /\btest\.use\(\s*\{[^}]*\baccoglienzaFatta\s*:\s*false/g;
+const APRE_DA_SE = /\belectron\.launch\s*\(/;
+const FIXTURE = join(TESTS, 'fixtures', 'electron.mjs');
 
 /**
  * PURA. Due copie lunghe quanto il testo: `codice` senza commenti né contenuto di stringhe e regex (per contare le
@@ -123,6 +127,13 @@ export function proveScoperte(testo, nomeFile = '') {
     }
     return tutto;
   };
+  // Dove vale il profilo nuovo: il gruppo che lo chiede, o tutto il file se lo chiede fuori da ogni gruppo.
+  const gruppi = [...codice.matchAll(/\btest\.describe(?:\.\w+)?\(/g)]
+    .map((m) => [m.index, chiusa(codice, m.index + m[0].length - 1, '(', ')')]);
+  const nuovo = [...codice.matchAll(PROFILO_NUOVO)].map((m) => gruppi
+    .filter(([a, b]) => a < m.index && m.index < b)
+    .sort((x, y) => (x[1] - x[0]) - (y[1] - y[0]))[0] || [0, testo.length]);
+  const fixture = USA_LA_FIXTURE.test(senzaCommenti);
   const scoperte = [];
   for (const m of codice.matchAll(/\btest(?:\.(?:only|skip|fixme|fail))?\(\s*(['"`])/g)) {
     const apre = m.index + m[0].length - 1;
@@ -133,19 +144,33 @@ export function proveScoperte(testo, nomeFile = '') {
     if (freccia < 0) continue;
     const graffa = codice.indexOf('{', chiude + freccia);
     const tutto = raggiunto(senzaCommenti.slice(graffa, chiusa(codice, graffa, '{', '}') + 1));
-    if (METTE_MODELLO.test(tutto) && SCRIVE_IN_CHAT.test(tutto) && !DICHIARA.test(tutto)) scoperte.push(titolo);
+    const accolta = fixture && !APRE_DA_SE.test(tutto) && !nuovo.some(([a, b]) => a < m.index && m.index < b);
+    if (!accolta && METTE_MODELLO.test(tutto) && SCRIVE_IN_CHAT.test(tutto) && !DICHIARA.test(tutto)) scoperte.push(titolo);
   }
   return scoperte;
 }
 
-test('ogni prova che mette un modello e scrive nella chat della home dice com\'è l\'accoglienza', () => {
+// Il profilo accolto non lo semina un aiuto per volta: ogni Filo aperto da una prova eredita FILO_TEST_ACCOLTO dalla
+// configurazione, e lo spec che apre Filo con un suo lancio (rete finta, banchi dei giri) parte accolto come la fixture.
+test('ogni Filo aperto da una prova parte già accolto, se la prova non chiede il profilo nuovo', () => {
+  const ROOT = join(TESTS, '..');
+  assert.match(readFileSync(join(ROOT, 'playwright.config.js'), 'utf8'), /^process\.env\.FILO_TEST_ACCOLTO = '1';$/m);
+  assert.match(readFileSync(join(ROOT, 'src', 'main', 'shim', 'storage.js'), 'utf8'),
+    /if \(err\.code === 'ENOENT' && process\.env\.FILO_TEST_ACCOLTO === '1'\) STATE\.data = \{ filo_onboarding: \{ done: true \} \};/);
+  const f = readFileSync(FIXTURE, 'utf8');
+  assert.match(f, /\baccoglienzaFatta:\s*\[\s*true\s*,\s*\{\s*option:\s*true\s*\}\s*\]/);
+  assert.match(f, /FILO_TEST_ACCOLTO: accoglienzaFatta \? '1' : '0'/);
+  assert.match(readFileSync(join(TESTS, 'helpers', 'reteFinta.mjs'), 'utf8'), /FILO_TEST_ACCOLTO: accolto \? '1' : '0'/);
+});
+
+test('ogni prova che mette un modello e scrive nella chat della home parte già accolta', () => {
   const scoperte = [];
   for (const f of readdirSync(TESTS).filter((n) => n.endsWith('.spec.mjs'))) {
     for (const t of proveScoperte(readFileSync(join(TESTS, f), 'utf8'), f)) scoperte.push(`${f} › ${t}`);
   }
   assert.deepEqual(scoperte, [],
-    'Prima di mettere il modello, segna l\'utente come già accolto: '
-    + 'SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }). '
+    'Questa prova apre Filo da sé o chiede il profilo nuovo: prima di mettere il modello segna l\'utente come già '
+    + 'accolto (SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] })), o usa la fixture così com\'è. '
     + 'Se la prova è sull\'intervista di benvenuto, il titolo lo dica.');
 });
 
@@ -173,4 +198,30 @@ test.skip(` + '`saltata ${1}`' + String.raw`, async ({ app, page }) => { await c
 `;
   assert.deepEqual(proveScoperte(file, 'x.spec.mjs'), ['scoperta', 'nel commento non vale', 'saltata ${1}']);
   assert.deepEqual(proveScoperte(file, 'onboarding-x.spec.mjs'), []);
+});
+
+test('con la fixture così com\'è la prova è già accolta; chi apre Filo da sé o chiede il profilo nuovo dichiara', () => {
+  // Il lancio è spezzato: scritto per intero, le sentinelle dei lanci leggerebbero questo file come uno che apre Filo.
+  const testa = String.raw`import { test, expect } from './fixtures/electron.mjs';
+async function configura(app) {
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k' } }); });
+}
+const scrivi = (page) => page.locator('#input').fill('ciao');
+const lancia = () => ${'electron.' + 'launch'}({ args: ['.'] });
+`;
+  const prove = String.raw`
+test('con la fixture', async ({ app, page }) => { await configura(app); await scrivi(page); });
+test('aperta da sé', async ({ page }) => { const app = await lancia(); await configura(app); await scrivi(page); });
+test.describe(() => {
+  test.use({ accoglienzaFatta: false });
+  test('nel gruppo del profilo nuovo', async ({ app, page }) => { await configura(app); await scrivi(page); });
+});
+`;
+  assert.deepEqual(proveScoperte(testa + prove, 'x.spec.mjs'), ['aperta da sé', 'nel gruppo del profilo nuovo']);
+  assert.deepEqual(proveScoperte(`${testa}test.use({ accoglienzaFatta: false });\n${prove}`, 'x.spec.mjs'),
+    ['con la fixture', 'aperta da sé', 'nel gruppo del profilo nuovo']);
+  assert.deepEqual(proveScoperte(`// test.use({ accoglienzaFatta: false });\n${testa}${prove}`, 'x.spec.mjs'),
+    ['aperta da sé', 'nel gruppo del profilo nuovo']);
+  assert.deepEqual(proveScoperte(testa.replace('./fixtures/electron.mjs', '@playwright/test') + prove, 'x.spec.mjs'),
+    ['con la fixture', 'aperta da sé', 'nel gruppo del profilo nuovo']);
 });

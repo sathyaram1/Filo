@@ -124,6 +124,8 @@ async function prepara(app, { risposta = '{"rotto": true, "servizio": "Cosmo"}' 
     globalThis.SN_URL_NAV.isHomeNetworkUrl = () => false;
     globalThis.__chiamateRiquadri = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // La home aperta scrive il suo saluto col modello: non è una chiamata dei riquadri.
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       const u = messages.find((m) => m.role === 'user');
       const img = Array.isArray(u.content) ? u.content.find((p) => p.type === 'image_url') : null;
       let misura = null;

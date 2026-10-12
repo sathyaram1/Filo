@@ -46,9 +46,9 @@ export const test = filoTest.extend({
     try { server.closeAllConnections?.(); } catch (_) {}
     await new Promise((r) => server.close(r));
   },
-  app: async ({ rete }, use) => {
+  app: async ({ rete, accoglienzaFatta }, use) => {
     const userData = cartellaTemporanea('filo-test-');
-    const app = await avviaFilo(rete, userData);
+    const app = await avviaFilo(rete, userData, { accolto: accoglienzaFatta });
     await use(app);
     await chiudiApp(app);
     try { togliCartella(userData); } catch (_) {}
@@ -56,13 +56,13 @@ export const test = filoTest.extend({
 });
 
 // Filo sulla rete finta con una cartella dati scelta da chi chiama: due avvii sulla stessa
-// cartella sono una riapertura di Filo.
-export function avviaFilo(rete, userData) {
+// cartella sono una riapertura di Filo. Come nella fixture, parte già accolto se non chiede il profilo nuovo.
+export function avviaFilo(rete, userData, { accolto = true } = {}) {
   const rules = HOSTS.map((h) => `MAP ${h} 127.0.0.1:${rete.port}`).join(', ');
   return electron.launch({
     args: [...argomentiScala, `--host-resolver-rules=${rules}`, '.'],
     cwd: APP_ROOT,
-    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test', FILO_TEST_ACCOLTO: accolto ? '1' : '0' },
   });
 }
 
