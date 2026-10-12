@@ -20,6 +20,8 @@ const LATO_MAX = 768;
 
 let riattivati = new Set();
 let chiamaModello = null;
+// Spento in Sicurezza, nessuna foto parte verso un modello: restano le regole e il tasto destro (#1084).
+let modelloAcceso = true;
 const proposte = new Map();   // gettone → { wcId, ftn, servizio, ospite, nome, url, origin, segno }
 const visti = new Set();      // riquadri già proposti o già guardati: una volta per riquadro
 const rifiutate = new Set();  // servizio|ospite a cui l'utente ha detto no, per questa sessione di Filo
