@@ -156,7 +156,7 @@
       const famiglia = famigliaDi(e);
       const da = RILASCI.has(e.type) ? pressioni.get(famiglia) || null : null;
       const g = segna(selezionaColPuntatore(e, luogo, da, ora()) ? [SELEZIONA] : [], luogo);
-      if (PRESSIONI.has(e.type)) pressioni.set(famiglia, { famiglia, x: luogo.x, y: luogo.y, t: g.t, g });
+      if (PRESSIONI.has(e.type)) pressioni.set(famiglia, { x: luogo.x, y: luogo.y, t: g.t, g });
       else if (da) for (const l of da.g.luoghi) if (!g.luoghi.includes(l)) g.luoghi.push(l);
     }
     function ascolta(target) {
