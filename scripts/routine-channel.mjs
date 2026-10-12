@@ -38,8 +38,9 @@
 //
 //   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json]
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
-//         Con `--json` stampa biglietto E ruolo insieme: serve a chi guida per
-//         scegliere il tipo di worker PRIMA di lanciarlo.
+//         Con `--json` stampa biglietto E ruolo insieme (più `model` ed `effort` se il server li ha decisi):
+//         il ruolo serve a chi guida per scegliere il tipo di worker PRIMA di lanciarlo. In tutte e due le forme
+//         registra la decisione per il gancio dell'orchestratore cieco, che mette modello e sforzo al lancio.
 //         Exit 0 = biglietto, 2 = niente da fare, 3 = guasto (il giro si ferma).
 //
 //   node scripts/routine-channel.mjs work <biglietto>
