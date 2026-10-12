@@ -9,7 +9,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { chiaviDelRegistroUnit } from '../../scripts/build-alarm.mjs';
-import { fileRossi, ripassati } from '../../scripts/unit-con-riprova.mjs';
+import { corsaIncompleta, fileRossi, ripassati } from '../../scripts/unit-con-riprova.mjs';
+import { testoFermo, testoRiepilogo } from '../../scripts/run-unit-tests.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = join(ROOT, 'scripts', 'unit-con-riprova.mjs');
