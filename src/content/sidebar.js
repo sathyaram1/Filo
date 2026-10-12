@@ -972,8 +972,9 @@
     return { aggiorna, togli: () => { if (riga) riga.remove(); } };
   }
 
+  // La riga dice cosa cerca; finita la ricerca, la stessa riga dice com'è andata.
   async function cercaDocumenti(p) {
-    appendActionLog(`cerco fra i tuoi documenti «${breve(p.cosa, 80)}»`);
+    const riga = appendActionLog(`cerco fra i tuoi documenti «${breve(p.cosa, 80)}»`);
     const lettura = rigaLettura();
     letturaDocumenti = lettura.aggiorna;
     let r = null;
@@ -982,13 +983,21 @@
     } catch (_) { r = null; }
     if (letturaDocumenti === lettura.aggiorna) letturaDocumenti = null;
     lettura.togli();
+    const esito = !r || !r.ok
+      ? `ricerca fra i documenti ${r && r.annullata ? 'annullata' : 'non riuscita'}`
+      : (r.cartellaMancante ? `cartella non trovata: ${breve(r.cartellaMancante, 80)}`
+        : `${esitoDocumenti(r)} fra i tuoi documenti «${breve(p.cosa, 60)}»${r.fermata ? ', fermata da te' : ''}`);
+    const fatta = riga || appendActionLog('');
+    if (fatta) {
+      fatta.textContent = `· ${esito}`;
+      fatta.classList.add('sn-sidebar-log-intera');
+    }
     return r;
   }
 
   function esitoDocumenti(r) {
-    if (r.cartellaMancante) return `cartella non trovata: ${breve(r.cartellaMancante, 80)}`;
     const n = Array.isArray(r.candidati) ? r.candidati.length : 0;
-    return `cercato fra i tuoi documenti: ${n ? (n === 1 ? 'uno trovato' : `${n} trovati`) : 'nessuno trovato'}${r.fermata ? ' (fermata da te)' : ''}`;
+    return n ? (n === 1 ? 'uno trovato' : `${n} trovati`) : 'nessuno trovato';
   }
 
   // I documenti da mostrare sotto la risposta: quelli che indica col numero; se non ne indica, quelli che nomina.
@@ -1525,7 +1534,6 @@
         if (session) session.documentiCount += 1;
         const r = await cercaDocumenti(parsed);
         if (!r || !r.ok) {
-          appendActionLog(r && r.annullata ? 'ricerca fra i documenti: annullata' : 'ricerca fra i documenti: non riuscita');
           if (r && r.annullata) {
             history.push({
               role: 'user',
@@ -1538,7 +1546,6 @@
           return;
         }
         documenti = { cercato: r.cercato, candidati: Array.isArray(r.candidati) ? r.candidati : [] };
-        appendActionLog(esitoDocumenti(r));
         // Il main rimette i candidati interi; questi, senza chiavi, sono quelli che la cronologia ricorda.
         const perCronologia = {
           cercato: r.cercato,

@@ -100,12 +100,16 @@ async function cerca(wc, { cosa, cartella = '', origine = '', avanzamento = null
   const c = String(cartella == null ? '' : cartella).trim().slice(0, CARTELLA_MAX);
   const perche = fuoriPerimetro(c);
   const sito = !daFilo(origine);
+  const s = statoDi(wc);
   if (sito || perche) {
+    // Una domanda alla volta per scheda: chi ne chiede altre mentre una aspetta non accoda popup all'utente.
+    if (s.chiede) return { ok: false, errore: 'in attesa' };
+    s.chiede = true;
     let si = false;
     try { si = await deps.chiediSi(wc, domanda({ cosa: q, cartella: c, host: sito ? (hostDi(origine) || 'questo sito') : '', perche })); } catch (_) { si = false; }
+    s.chiede = false;
     if (si !== true) return { ok: false, annullata: true };
   }
-  const s = statoDi(wc);
   if (s.ferma) s.ferma.abort();
   const ctrl = new AbortController();
   s.ferma = ctrl;

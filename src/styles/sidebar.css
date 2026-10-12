@@ -187,6 +187,8 @@
   line-height: 1.3;
   cursor: grab;
   user-select: none;
+  /* `all: unset` toglie anche il trascinamento che `draggable` dà al bottone. */
+  -webkit-user-drag: element;
   transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
 }
 .sn-sidebar-file:hover { border-color: var(--sn-accent); background: var(--sn-hover, rgba(127,127,127,0.10)); }
