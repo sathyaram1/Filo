@@ -1,6 +1,6 @@
-// Sentinella #663.5: una prova che mette un modello e poi scrive nella chat della home dice com'è l'accoglienza.
-// Senza, la home apre l'intervista di benvenuto (subito, o quando arriva l'avviso di prontezza) e il messaggio
-// finisce lì: la prova verifica l'intervista invece della chat, e passa o no secondo i tempi.
+// Sentinella #663.5 e #663.6: una prova che mette un modello e scrive nella chat della home parte già accolta, o la
+// home apre l'intervista e il messaggio finisce lì. La fixture apre Filo già accolto; dichiara chi apre Filo da sé o
+// chiede il profilo nuovo. Racconto: patterns/accogliere-un-utente-nuovo-e-una-conversazione-e-il-segno.md.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
