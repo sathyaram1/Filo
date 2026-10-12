@@ -73,6 +73,27 @@ function dentro(figlio, padre) {
   return r === '' || (!!r && !r.startsWith('..') && !path.isAbsolute(r));
 }
 
+// Le cartelle che la lettura di un file tratta da private (la Libreria del Mac, AppData) la ricerca non le percorre,
+// se non è dentro una di loro che l'utente ha chiesto di cercare: la regola è quella della lettura, in cmdClassify.
+function privata(cartella) {
+  const C = globalThis.SN_CMD_CLASSIFY || (require('../../shared/cmdClassify.js'), globalThis.SN_CMD_CLASSIFY);
+  const win = process.platform === 'win32';
+  try { return C.privato(cartella, { home: deps.casa(), win, maiuscole: win || process.platform === 'darwin' }); } catch (_) { return false; }
+}
+function esclusa(cartella, radice) {
+  return !dentro(cartella, radice) || (privata(cartella) && !privata(radice));
+}
+// Un documento sta sotto una delle cartelle `cs` e il giro ce lo legge. La risposta si tiene per cartella: i file
+// accanto hanno la stessa.
+function sottoUna(cs) {
+  const visto = new Map();
+  return (p) => {
+    const dir = path.dirname(p);
+    if (!visto.has(dir)) visto.set(dir, cs.some((c) => !esclusa(dir, c)));
+    return visto.get(dir);
+  };
+}
+
 /** Le cartelle da leggere adesso: [{ voce, percorso, nome, esiste }]. */
 async function radici(impostazioni) {
   const s = impostazioni || await deps.impostazioni();
