@@ -187,7 +187,7 @@ function chiaveFunziona(c) { return `${senzaFrammento(c.urlTop)}|${senzaFramment
 const FOTO_MANCATA = { fotoMancata: true };
 
 async function guarda(c, segno) {
-  if (typeof chiamaModello !== 'function') return null;
+  if (!modelloAcceso || typeof chiamaModello !== 'function') return null;
   const quando = funziona.get(chiaveFunziona(c));
   if (quando && Date.now() - quando < FUNZIONA_MS) return null;
   if (diCasa(c.urlFrame) || diCasa(c.urlTop)) return null;
