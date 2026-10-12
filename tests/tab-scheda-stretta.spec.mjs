@@ -72,7 +72,10 @@ test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva
           expect(f.left, dove).toBeGreaterThanOrEqual(s.left - 0.5);
           expect(f.right, dove).toBeLessThanOrEqual(s.right + 0.5);
         }
-        const piene = s.figli.filter((f) => f.width > 0);
+        // Sulle inattive la X non è in fila: sta sopra la fine del nome, contro il bordo destro (#429).
+        const xSopra = !s.active && s.figli.find((f) => f.cls === 'close');
+        if (xSopra) expect(Math.round(s.right - xSopra.right), dove).toBe(8);
+        const piene = s.figli.filter((f) => f.width > 0 && f !== xSopra);
         for (let i = 1; i < piene.length; i++) expect(piene[i].left, dove).toBeGreaterThanOrEqual(piene[i - 1].right - 0.5);
 
         const ha = (c) => s.figli.some((f) => f.cls === c);
