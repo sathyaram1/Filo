@@ -11,10 +11,12 @@
   const PAID = new Set(['complete', 'streamComplete', 'synthesizeSpeech', 'transcribe', 'embed', 'decisions']);
 
   // Cosa fare di un errore di un classificatore che gira su tanti lavori insieme (decideAll). `risposto`: il modello
-  // ha già risposto almeno una volta, quindi un 400 è colpa di quella richiesta e non del modello.
+  // ha già risposto almeno una volta, quindi un 400 è colpa di quella richiesta e non del modello. Prima della prima
+  // risposta non si ritenta niente: chi cerca aspetta, e il ripiego risponde subito (#1118, otto secondi di attesa).
   function esitoDecisione(err, risposto) {
     const s = Number(err && err.status);
     if (err && (err.name === 'AbortError' || err.code === 'ABORT_ERR')) return 'fatale';
+    if (!risposto) return 'fatale';
     if (s === 429) return 'lento';
     if (s >= 500 || s === 408) return 'passeggero';
     if (!s) {
