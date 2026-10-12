@@ -164,7 +164,7 @@ una **barra di sezioni**, ciascuna con le sue schede:
 |---|---|---|
 | **Domande** | Da rispondere · In lavorazione · Risposte automatiche · Archivio | adesso |
 | **Feedback** | Ricevuti · In coda · Lavori server · Risolti · Archiviati · Statistiche · Red Team | adesso (spostate) |
-| **Routine** | Automazioni · Crediti · Monitoraggio · Log · Compiti ricorrenti | adesso (spostate più le nuove) |
+| **Routine** | Automazioni · Crediti · Monitoraggio · Log · Compiti · Compiti ricorrenti | adesso (spostate più le nuove) |
 | **Impostazioni predefinite** | Modelli di supporto, poi tutte le impostazioni predefinite di Filo | ora solo lo spostamento |
 | **Statistiche d'uso** | — | lavoro a parte |
 
