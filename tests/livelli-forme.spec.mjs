@@ -582,6 +582,17 @@ test('fusione: se i tasti non stanno affiancati va a capo la fila, non la scritt
   });
   expect(await righeDi(go)).toBe(1);
   expect(await righeDi(corpo.locator('.sn-mac-btn-quiet'))).toBe(1);
+
+  const prima = await go.boundingBox();
+  // Verso il fondo del tasto: è la parte che un tasto armato più basso non copre più.
+  const punto = { x: prima.x + prima.width / 2, y: prima.y + prima.height - 6 };
+  await page.mouse.click(punto.x, punto.y);
+  await expect(go).toHaveText('Confermi?');
+  const armato = await go.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(armato[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+  expect(await page.evaluate(() => window.__chiamate)).toEqual([]);
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
 });
 
 // Il pannello di destra si stringe fino a 180px: lì «Approva e fondi» va su due righe per forza, e il tasto
