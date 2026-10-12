@@ -165,11 +165,12 @@ test('troppe richieste alla prima ondata: si aspetta e si riprova, e risponde il
 });
 
 test('troppe richieste per i primi secondi, con o senza attesa chiesta: si aspetta quanto chiede e risponde il classificatore', async () => {
-  for (const retryAfterMs of [1800, undefined]) {
+  const FINESTRA_PIANO_MS = 1800;
+  for (const retryAfterMs of [FINESTRA_PIANO_MS, undefined]) {
     viste = [];
     // Il servizio rifiuta finché non scade il suo timer, più lungo dell'attesa corta del ripiego svelto.
     let aperto = false;
-    setTimeout(() => { aperto = true; }, 1800);
+    setTimeout(() => { aperto = true; }, FINESTRA_PIANO_MS);
     rispondi = () => {
       if (!aperto) throw Object.assign(new Error('OpenRouter 429: piano'), { status: 429, retryAfterMs });
       return { answers: { f1: { noul: 0.1 } }, usage: { costUsd: 0.001 } };
