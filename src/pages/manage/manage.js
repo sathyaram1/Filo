@@ -1837,7 +1837,6 @@
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
-      mgClarify.hidden = true;
       collassaFrase();
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
