@@ -1618,6 +1618,7 @@
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
+    if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
