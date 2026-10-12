@@ -120,6 +120,24 @@ test('senza quel punto gli aggiornamenti si fermano, non partono senza cancello'
   assert.deepEqual(visti, []);
 });
 
+test('gli aggiornatori veri di ogni sistema passano dal cancello, un finto delle prove no', async () => {
+  const EU = require('electron-updater');
+  for (const nome of ['NsisUpdater', 'MacUpdater', 'AppImageUpdater']) {
+    const au = Object.create(EU[nome].prototype);
+    au.getUpdateInfoAndProvider = undefined;
+    au._logger = { info() {}, warn() {}, error() {} };
+    au.isUpdaterActive = () => true;
+    await U.avviaAggiornatore(au, { automatici: false });
+    await assert.rejects(au.checkForUpdates(), /aggiornamenti fermi/, `${nome} senza punto d'aggancio non si ferma`);
+  }
+  const ascolta = new (require('node:events').EventEmitter)();
+  let controlli = 0;
+  ascolta.checkForUpdates = async () => { controlli++; return null; };
+  await U.avviaAggiornatore(ascolta, { automatici: false });
+  await ascolta.checkForUpdates();
+  assert.equal(controlli, 1, 'un aggiornatore finto, fuori da electron-updater, viene fermato come una libreria rinominata');
+});
+
 const yml = (righe, file) => `version: 99.0.0\n${righe}files:\n  - url: ${file}\n    sha512: AAAA\n    size: 1\npath: ${file}\nsha512: AAAA\n`;
 
 test('il tag e i percorsi scritti nel latest.yml di una release non nostra non la fanno passare', async () => {
