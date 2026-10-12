@@ -244,7 +244,10 @@ test('Opzioni: scegliendo per voce o dettatura un modello che non partirebbe com
   await expect(seg).toHaveValue('ascolto-misto');
   mkdirSync(SHOTS, { recursive: true });
   await modelli.screenshot({ path: `${SHOTS}/voce-dettatura-host-avviso-opzioni.png` });
-  await ascolto.screenshot({ path: `${SHOTS}/voce-dettatura-host-avviso-cella.png` });
+  await modelli.keyboard.press('Escape');
+  await modelli.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
+  await voce.screenshot({ path: `${SHOTS}/voce-dettatura-host-avviso-cella-scura.png` });
+  await modelli.evaluate(() => { delete document.documentElement.dataset.snTheme; });
 
   // Un modello con host tutti ammessi toglie l'avviso; uno ignoto lo dice a modo suo.
   const segVoce = voce.locator('.sn-chain-input').first();
