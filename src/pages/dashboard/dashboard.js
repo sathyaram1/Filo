@@ -785,17 +785,7 @@
           }
         } else if (data.kind === 'round') {
           // Dopo lo stop la bolla è di apriTurnoFermato: il testo a metà resta dov'è.
-          if (turno.fermato) streamBubble = streamBubble;
-          else if (data.risposta) {
-            rispostaPrima = unisci(rispostaPrima, data.text || testoDelGiro());
-            bollaDellaRisposta().textContent = rispostaPrima;
-          } else if (streamBubble && rispostaPrima) {
-            pending.aggiungiNota(testoDelGiro());
-            streamBubble.textContent = rispostaPrima;
-          } else if (streamBubble) {
-            if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
-            streamBubble = null;
-          }
+          if (!turno.fermato) chiudiGiro(data);
           streamedText = '';
           giroIniziato = false;
           pending.fineGiro();
