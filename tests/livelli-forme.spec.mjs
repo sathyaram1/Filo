@@ -546,6 +546,91 @@ test('confermare la fusione: il secondo clic nello stesso punto approva, e Scart
   expect(Math.abs((await go.boundingBox()).y - prima.y)).toBeLessThan(0.5);
 });
 
+/** Le righe su cui sta la scritta di un tasto. */
+const righeDi = (loc) => loc.evaluate((b) => {
+  const r = document.createRange();
+  r.selectNodeContents(b);
+  return new Set([...r.getClientRects()].map((q) => Math.round(q.top))).size;
+});
+
+async function stringiPannello(page) {
+  const box = await page.locator('#mgDividerRight').boundingBox();
+  const y = box.y + Math.min(200, box.height / 2);
+  await page.mouse.move(box.x + box.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 400, y, { steps: 8 });
+  await page.mouse.up();
+}
+
+// Con un font più largo di Segoe UI «Approva e fondi» non stava accanto a Scarta e andava a capo: armato,
+// «Confermi?» ci stava in una riga e il tasto si abbassava di una riga (#256.3).
+test('fusione: se i tasti non stanno affiancati va a capo la fila, non la scritta di Approva', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+
+  const corpo = page.locator('#mgSideBody');
+  const go = corpo.locator('.sn-mac-btn-go');
+  await expect(go).toBeVisible();
+  // La fila più stretta di quanto chiedono i due tasti con questo font: così vale con qualunque font.
+  await corpo.locator('.sn-mac-actions').evaluate((a) => {
+    const [s, g] = a.querySelectorAll('.sn-mac-btn');
+    const w = (b) => { b.style.width = 'max-content'; const x = b.getBoundingClientRect().width; b.style.width = ''; return x; };
+    a.style.width = (w(s) + w(g)) + 'px';
+  });
+  expect(await righeDi(go)).toBe(1);
+  expect(await righeDi(corpo.locator('.sn-mac-btn-quiet'))).toBe(1);
+});
+
+// Il pannello di destra si stringe fino a 180px: lì «Approva e fondi» va su due righe per forza, e il tasto
+// armato deve tenere anche l'altezza, non solo la larghezza.
+test('fusione col pannello stretto al minimo: armato, Approva non si muove e il secondo clic approva', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+  await stringiPannello(page);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+
+  const corpo = page.locator('#mgSideBody');
+  const go = corpo.locator('.sn-mac-btn-go');
+  await expect(go).toBeVisible();
+  const prima = await go.boundingBox();
+  const punto = { x: prima.x + 3, y: prima.y + prima.height - 4 };
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect(go).toHaveText('Confermi?');
+  const armato = await go.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(armato[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
+});
+
+// «Salta il controllo» sta a sinistra e «Confermi?» è più corto: il secondo clic sul lato destro del tasto
+// cadeva nel vuoto e la conferma scadeva senza dire niente.
+test('salta il controllo: il secondo clic nello stesso punto conferma, e un doppio clic non salta niente', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_BOCCIATO]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+
+  const btn = page.locator('#mgSaltaL4Btn');
+  await expect(btn).toBeVisible();
+  const prima = await btn.boundingBox();
+  const punto = { x: prima.x + prima.width - 3, y: prima.y + prima.height / 2 };
+
+  await page.mouse.dblclick(punto.x, punto.y);
+  await expect(btn).toHaveText('Confermi?');
+  expect(await page.evaluate(() => window.__chiamate)).toEqual([]);
+  const armato = await btn.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(armato[k] - prima[k]), `Salta si è mosso (${k})`).toBeLessThan(0.5);
+
+  await page.waitForTimeout(600);
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['livello4_salta']);
+});
+
 // Le riletture automatiche (un cambio di stato, una richiesta nuova) ridisegnavano il
 // pannello sotto il cursore e la conferma armata si perdeva: il secondo clic riarmava (#550).
 test('quadrato: una rilettura fra il primo clic e la conferma non si mangia la conferma', async ({ openTab }) => {
