@@ -728,6 +728,14 @@
     const testoDelGiro = () => (globalThis.SN_CALC
       ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
       : streamedText);
+    const bollaDellaRisposta = () => {
+      if (!streamBubble) {
+        streamBubble = document.createElement('div');
+        streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
+        bubblesEl.appendChild(streamBubble);
+      }
+      return streamBubble;
+    };
     const followBottomIfNear = () => {
       const nearBottom = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 48;
       if (nearBottom) bubblesEl.scrollTop = bubblesEl.scrollHeight;
