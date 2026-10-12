@@ -77,7 +77,7 @@ test('#429 — un titolo che cambia non sposta la scheda sotto il puntatore, poi
   await openTab(testServer.html('<title>Gestione</title><body>uno</body>'));
   const url = testServer.html('<title>Una pagina col titolo più lungo di tutti</title><body>due</body>');
   await openTab(url);
-  // openTab cerca la vista per nome di host, e le due pagine stanno sullo stesso.
+  // openTab cerca la vista per nome di host, e le due pagine stanno sullo stesso: quella giusta la dice l'indirizzo.
   let lunga = null;
   await expect.poll(() => { lunga = app.windows().find((w) => w.url().startsWith(url)); return Boolean(lunga); }).toBe(true);
   await expect(shell.locator('.tab .title', { hasText: 'titolo più lungo' })).toBeVisible();
