@@ -1,6 +1,7 @@
 // L'orchestratore dei lavori locali (#956): worktree, lavoratore, verificatori, chiusura e deploy, senza una sessione in mezzo.
 // La sessione resta per le decisioni: legge `stato` e risponde con `riprendi`. Logica e regole in scripts/lib/orchestratore.mjs.
 // Uso: npm run orchestra -- aggiungi <N>… | avvia [opzioni] [--dry-run] | stato | riprendi <N> ["risposta"] | togli <N>
+//      | fusioni-server [--dry-run] (i lavori server passati in cloud: fusione e deploy dal PC, #1159; li fa anche avvia)
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import {
