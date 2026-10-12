@@ -93,7 +93,7 @@ test('Trusted Types: la spiegazione di una parola si apre e mostra la risposta f
   await page.evaluate(() => {
     const p = document.getElementById('paragraph');
     const r = document.createRange();
-    r.setStart(p.firstChild, 7); r.setEnd(p.firstChild, 21);
+    r.setStart(p.firstChild, 11); r.setEnd(p.firstChild, 18);
     getSelection().removeAllRanges(); getSelection().addRange(r);
   });
   await app.evaluate(({ BrowserWindow }) => {

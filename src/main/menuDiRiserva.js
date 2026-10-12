@@ -38,6 +38,10 @@ function voci(params, wc, conSchede) {
     if (conSchede) out.push({ label: t('menu_open_in_new_tab', 'Apri in nuova tab'), action: 'link-apri' });
     out.push({ label: t('menu_copy_link', 'Copia URL'), action: 'link-copia' });
   }
+  if (params.mediaType === 'image') {
+    out.push({ label: t('menu_copy_image', 'Copia immagine'), action: 'immagine-copia' });
+    if (/^https?:/i.test(params.srcURL || '')) out.push({ label: t('menu_copy_image_link', 'Copia URL immagine'), action: 'immagine-url' });
+  }
   if (out.length) out.push({ type: 'separator' });
   const h = wc.navigationHistory;
   if (h && h.canGoBack()) out.push({ label: t('menu_back', 'Indietro'), action: 'indietro' });
