@@ -4226,12 +4226,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // pagare un titolo a ogni ricaricamento per una conversazione in corso.
     if (sender && sender.wc && !onbActive) affidaChat(chatId, sender.wc);
     if (onbActive) await archiviaAperturaAccoglienza(chatId, onbBefore);
-    await appendToChatArchive(chatId, {
+    const archiviata = await appendToChatArchive(chatId, {
       role: 'user',
       text: String(userMessage || ''),
-      images: Array.isArray(images) ? images.length : (image ? 1 : 0),
+      images: imageList.length,
       ...(daModello ? { daModello: true } : {}),
     }, { onboarding: onbActive });
+    // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
+    const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
+    if (imageList.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, imageList);
   }
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
   // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
