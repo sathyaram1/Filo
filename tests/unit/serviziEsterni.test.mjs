@@ -375,6 +375,10 @@ test('le esclusioni dichiarate qui servono ancora', () => {
   for (const f of Object.keys(CHIAMATE_LOCALI)) {
     assert.ok(ANALISI.chiamate.has(f), `${f} non fa più chiamate: togli l’esclusione`);
   }
+  for (const n of NOMI_NON_CONTATTATI) {
+    const dichiarata = new RegExp(`\\b(?:const|let|var)\\s+${n.costante}\\b`).test(ANALISI.testi.get(n.file)?.codice || '');
+    assert.ok(dichiarata && ANALISI.chiamate.has(n.file), `${n.costante} non è più in ${n.file}, o il file non fa più rete: togli l’esclusione`);
+  }
 });
 
 test('le voci sono complete e ben formate', () => {
@@ -469,18 +473,8 @@ test('prova: commenti, host dinamici, regex e markup si leggono per quello che s
   assert.equal(a.indirizzi.filter((u) => u.dinamico).length, 2);
 });
 
-test('prova: un servizio che sparisce dal codice rende rossa la sua voce', () => {
-  const f = 'src/main/services/fxRates.js';
-  const senza = {
-    indirizzi: ANALISI.indirizzi.filter((u) => u.file !== f),
-    chiamate: new Set([...ANALISI.chiamate].filter((x) => x !== f)),
-    testi: new Map([...ANALISI.testi, [f, leggi(f, '')]]),
-  };
-  assert.ok(vociMorte(senza).some((m) => m.startsWith('cambi-valuta:')), 'la voce dei cambi resta verde senza il suo codice');
-});
-
-// Rianalizza un file di src/ con un testo diverso, lasciando il resto com'è.
-function conFile(f, testo, base = ANALISI) {
+// Rianalizza un file con un testo diverso, lasciando il resto della base com'è.
+function conFile(f, testo, base) {
   const nuovo = analizza({ [f]: testo });
   const chiamate = new Set([...base.chiamate].filter((x) => x !== f));
   if (nuovo.chiamate.has(f)) chiamate.add(f);
@@ -488,68 +482,103 @@ function conFile(f, testo, base = ANALISI) {
     indirizzi: [...base.indirizzi.filter((u) => u.file !== f), ...nuovo.indirizzi],
     chiamate,
     testi: new Map([...base.testi, [f, nuovo.testi.get(f)]]),
+    sorgenti: { ...base.sorgenti, [f]: testo },
   };
 }
 
 // Le prove guardano solo quello che il loro cambio aggiunge: un rosso vero altrove in src/ resta del suo test.
-const nuovi = (controllo, a, base = ANALISI) => {
+const nuovi = (controllo, a, base) => {
   const prima = new Set(controllo(base));
   return controllo(a).filter((x) => !prima.has(x));
 };
+const senzaRiga = (righe) => righe.map((x) => x.replace(/:\d+ /, ' '));
+const aggiungiA = (f, base, testo) => conFile(f, base.sorgenti[f] + testo, base);
 
 const WALLET = 'src/main/services/handlers/wallet.js';
 const FX = 'src/main/services/fxRates.js';
+const SCRYFALL = 'src/main/services/scryfall.js';
 
-test('prova: un host nuovo composto da una costante, in un file già nell’elenco, è rosso', () => {
-  const a = conFile(WALLET, SORGENTI[WALLET] + "\nconst HOST_NUOVO = 'nuovo.example';\nfetch(`https://${HOST_NUOVO}/api`);\nfetch('https://' + HOST_NUOVO);\n");
-  const r = nuovi(compostiScoperti, a);
-  assert.equal(r.length, 2, r.join('\n'));
-  assert.ok(r.every((x) => x.startsWith(WALLET)));
-});
+// Ogni prova riceve la base su cui lavorare: girano su src/ di oggi e, più sotto, su un src/ cambiato.
+const PROVE = {
+  'un servizio che sparisce dal codice rende rossa la sua voce': (base) => {
+    const senza = conFile(FX, '', base);
+    assert.ok(vociMorte(senza).some((m) => m.startsWith('cambi-valuta:')), 'la voce dei cambi resta verde senza il suo codice');
+  },
+  'un host nuovo composto da una costante, in un file già nell’elenco, è rosso': (base) => {
+    const a = aggiungiA(WALLET, base, "\nconst HOST_NUOVO = 'nuovo.example';\nfetch(`https://${HOST_NUOVO}/api`);\nfetch('https://' + HOST_NUOVO);\n");
+    const r = nuovi(compostiScoperti, a, base);
+    assert.equal(r.length, 2, r.join('\n'));
+    assert.ok(r.every((x) => x.startsWith(WALLET)));
+  },
+  'una richiesta con l’host in una costante, scritta con le opzioni, in un file già nell’elenco, è rossa': (base) => {
+    const a = aggiungiA(FX, base, "\nconst HOST_NUOVO = 'nuovo.example';\nrequire('node:https').request({ hostname: HOST_NUOVO, path: '/api' });\n");
+    assert.deepEqual(senzaRiga(nuovi(indirizziScoperti, a, base)), [`${FX} https://nuovo.example`]);
+    const b = aggiungiA(FX, base, "\nconst host = 'nuovo.example';\nrequire('https').get({ host, path: '/' });\n");
+    assert.deepEqual(senzaRiga(nuovi(indirizziScoperti, b, base)), [`${FX} https://nuovo.example`]);
+  },
+  'l’host in una costante è rosso per qualunque strada arrivi alla chiamata': (base) => {
+    for (const via of [
+      "const opzioni = { hostname: HOST_NUOVO, path: '/api' };\nrequire('node:https').request(opzioni);",
+      "function opzioni() { return { hostname: HOST_NUOVO, path: '/' }; }\nrequire('electron').net.request(opzioni());",
+      "fetch(['https://', HOST_NUOVO, '/api'].join(''));",
+      "fetch('https://'.concat(HOST_NUOVO));",
+    ]) {
+      const a = aggiungiA(SCRYFALL, base, `\nconst HOST_NUOVO = 'nuovo.example';\n${via}\n`);
+      assert.deepEqual(senzaRiga(nuovi(indirizziScoperti, a, base)), [`${SCRYFALL} https://nuovo.example`], via);
+    }
+  },
+  'una richiesta con l’host calcolato nelle opzioni va dichiarata come indirizzo composto': (base) => {
+    const a = aggiungiA(FX, base, "\nrequire('node:tls').connect({ host: scegliHost(), port: 443 });\n");
+    const r = nuovi(compostiScoperti, a, base);
+    assert.equal(r.length, 1, r.join('\n'));
+    assert.ok(r[0].startsWith(FX) && r[0].includes('scegliHost()'));
+  },
+  'un indirizzo rimasto in una costante senza più chiamate rende rossa la sua voce': (base) => {
+    const morte = vociMorte(conFile(FX, "const URL = 'https://api.frankfurter.dev/v1/latest?base=EUR';\nmodule.exports = { URL };\n", base));
+    assert.ok(morte.some((m) => m.startsWith('cambi-valuta:')), morte.join('\n'));
+  },
+  'una richiesta in più verso un servizio già dichiarato non accende niente': (base) => {
+    const a = aggiungiA(FX, base, "\nrequire('node:https').get('https://api.frankfurter.dev/v1/currencies');\n");
+    for (const c of [indirizziScoperti, compostiScoperti, chiamateScoperte, vociMorte]) assert.deepEqual(nuovi(c, a, base), [], c.name);
+  },
+  'un nome di dominio fuori da un file che fa rete, un nome di file e un nome da confrontare non sono destinazioni': (base) => {
+    const a = conFile('src/shared/zzNomi.js', "const SITI = ['nuovo.example'];\n", base);
+    assert.deepEqual(nuovi(indirizziScoperti, a, base), []);
+    const b = aggiungiA(FX, base, "\nconst FILE = 'cambi.json';\n");
+    assert.deepEqual(nuovi(indirizziScoperti, b, base), []);
+    const adblock = 'src/main/services/adblock.js';
+    const c = conFile(adblock, base.sorgenti[adblock].replace("'google.com',", "'google.com', 'nuovo.example',"), base);
+    assert.notEqual(c.sorgenti[adblock], base.sorgenti[adblock], 'l’elenco dei siti mai bloccati non è più scritto così: aggiorna la prova');
+    assert.deepEqual(nuovi(indirizziScoperti, c, base), []);
+  },
+  'un host intero seguito da un’espressione è un indirizzo fisso, e si confronta con l’elenco': () => {
+    const a = analizza({ 'src/main/nuovo.js': "fetch(`https://api.nuovo.example${percorso}`); fetch('https://api.nuovo.example' + p);" });
+    assert.equal(indirizziScoperti(a).length, 2);
+  },
+  'una richiesta con l’host nelle opzioni, in un file già nell’elenco, è rossa': (base) => {
+    const a = aggiungiA(WALLET, base, "\nrequire('electron').net.request({ protocol: 'https:', hostname: 'nuovo.example', path: '/' });\n");
+    assert.deepEqual(senzaRiga(nuovi(indirizziScoperti, a, base)), [`${WALLET} https://nuovo.example`]);
+  },
+  'un servizio tolto da un file che ne serve altri sullo stesso server rende rossa la sua voce': (base) => {
+    const testo = base.sorgenti[WALLET];
+    const tolto = "callable('walletPendingInvite')";
+    assert.ok(testo.includes(tolto), 'la richiesta dell’invito in attesa non è più scritta così: aggiorna la prova');
+    const morte = nuovi(vociMorte, conFile(WALLET, testo.replace(tolto, 'null'), base), base);
+    assert.ok(morte.some((m) => m.startsWith('invito-in-attesa:')), morte.join('\n'));
+    assert.ok(!morte.some((m) => m.startsWith('crediti:')), 'i crediti usano ancora lo stesso server');
+  },
+};
 
-test('prova: una richiesta con l’host in una costante, scritta con le opzioni, in un file già nell’elenco, è rossa', () => {
-  const a = conFile(FX, SORGENTI[FX] + "\nconst HOST_NUOVO = 'nuovo.example';\nrequire('node:https').request({ hostname: HOST_NUOVO, path: '/api' });\n");
-  assert.deepEqual(nuovi(indirizziScoperti, a).map((x) => x.replace(/:\d+ /, ' ')), [`${FX} https://nuovo.example`]);
-  const b = conFile(FX, SORGENTI[FX] + "\nconst host = 'nuovo.example';\nrequire('https').get({ host, path: '/' });\n");
-  assert.deepEqual(nuovi(indirizziScoperti, b).map((x) => x.replace(/:\d+ /, ' ')), [`${FX} https://nuovo.example`]);
-});
+for (const [nome, prova] of Object.entries(PROVE)) test(`prova: ${nome}`, () => prova(ANALISI));
 
-test('prova: una richiesta con l’host calcolato nelle opzioni va dichiarata come indirizzo composto', () => {
-  const a = conFile(FX, SORGENTI[FX] + "\nrequire('node:tls').connect({ host: scegliHost(), port: 443 });\n");
-  const r = nuovi(compostiScoperti, a);
-  assert.equal(r.length, 1, r.join('\n'));
-  assert.ok(r[0].startsWith(FX) && r[0].includes('scegliHost()'));
-});
-
-test('prova: un indirizzo rimasto in una costante senza più chiamate rende rossa la sua voce', () => {
-  const testo = SORGENTI[FX].replace(/\bfetch\s*\(/g, 'nonChiama(');
-  assert.notEqual(testo, SORGENTI[FX], 'i cambi non chiamano più con fetch: aggiorna la prova');
-  const morte = vociMorte(conFile(FX, testo));
-  assert.ok(morte.some((m) => m.startsWith('cambi-valuta:')), morte.join('\n'));
-});
-
-test('prova: un indirizzo nuovo vero accende la sentinella, non le prove qui sopra', () => {
-  const base = conFile('src/main/services/zzNuovo.js', "module.exports = () => fetch('https://nuovo-servizio.example/api');\n");
-  assert.equal(indirizziScoperti(base).length, 1);
-  const a = conFile(WALLET, SORGENTI[WALLET] + "\nrequire('electron').net.request({ protocol: 'https:', hostname: 'altro.example', path: '/' });\n", base);
-  assert.deepEqual(nuovi(indirizziScoperti, a, base).map((x) => x.replace(/:\d+ /, ' ')), [`${WALLET} https://altro.example`]);
-});
-
-test('prova: un host intero seguito da un’espressione è un indirizzo fisso, e si confronta con l’elenco', () => {
-  const a = analizza({ 'src/main/nuovo.js': "fetch(`https://api.nuovo.example${percorso}`); fetch('https://api.nuovo.example' + p);" });
-  assert.equal(indirizziScoperti(a).length, 2);
-});
-
-test('prova: una richiesta con l’host nelle opzioni, in un file già nell’elenco, è rossa', () => {
-  const a = conFile(WALLET, SORGENTI[WALLET] + "\nrequire('electron').net.request({ protocol: 'https:', hostname: 'nuovo.example', path: '/' });\n");
-  assert.deepEqual(nuovi(indirizziScoperti, a).map((x) => x.replace(/:\d+ /, ' ')), [`${WALLET} https://nuovo.example`]);
-});
-
-test('prova: un servizio tolto da un file che ne serve altri sullo stesso server rende rossa la sua voce', () => {
-  const testo = SORGENTI[WALLET];
-  const tolto = "callable('walletPendingInvite')";
-  assert.ok(testo.includes(tolto), 'la richiesta dell’invito in attesa non è più scritta così: aggiorna la prova');
-  const morte = vociMorte(conFile(WALLET, testo.replace(tolto, 'null')));
-  assert.deepEqual(morte.filter((m) => m.startsWith('invito-in-attesa:')).length > 0, true, morte.join('\n'));
-  assert.ok(!morte.some((m) => m.startsWith('crediti:')), 'i crediti usano ancora lo stesso server');
+// Un servizio nuovo scoperto in src/ deve accendere solo i controlli qui sopra, mai le prove (#849, giro 3).
+test('le prove reggono su un src/ con un servizio non dichiarato e una richiesta in più a uno dichiarato', () => {
+  let cambiata = conFile('src/main/services/zzNonDichiarato.js', "module.exports = () => fetch('https://non-dichiarato.example/v1');\n", ANALISI);
+  cambiata = aggiungiA(FX, cambiata, "\nrequire('node:https').get('https://api.frankfurter.dev/v1/currencies');\n");
+  assert.equal(nuovi(indirizziScoperti, cambiata, ANALISI).length, 1, 'il cambio non ha aggiunto il servizio non dichiarato');
+  const cadute = [];
+  for (const [nome, prova] of Object.entries(PROVE)) {
+    try { prova(cambiata); } catch (e) { cadute.push(`${nome}: ${e.message.split('\n')[0]}`); }
+  }
+  assert.deepEqual(cadute, []);
 });
