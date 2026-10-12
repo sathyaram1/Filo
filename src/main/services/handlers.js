@@ -2293,9 +2293,11 @@ async function eseguiAzioneFilo(action, {
         const state = await FiloMem.getOnboarding();
         if (state.done) return { executed: false, kept: false };
         const raw = action.spunta ?? action.spunte ?? action.fatto ?? action.done_items ?? action.ids;
-        const ids = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-        const { state: ticked } = Onboarding.tick(state, ids);
         const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+        // #1188 — la scelta dell'autonomia la fa l'utente sotto la risposta: qui si mostra e basta, il livello no.
+        const sceltaAutonomia = truthy(action.autonomia);
+        const ids = [...(Array.isArray(raw) ? raw : (raw ? [raw] : [])), ...(sceltaAutonomia ? ['autonomia'] : [])];
+        const { state: ticked } = Onboarding.tick(state, ids);
         // L'intervista finisce quando lo dice Filo, quando l'elenco è finito, o
         // quando è andata troppo per le lunghe: chiudere è comunque lo stato in
         // cui l'utente vuole trovarsi, e da Preferenze la si rilancia.
