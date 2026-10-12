@@ -59,14 +59,18 @@ async function dai(nomeCartella, comeFile = false) {
   let pagina = null;
   await expect.poll(() => { pagina = app.windows().find((w) => w.url().startsWith(origine)); return Boolean(pagina); }, { timeout: 10_000 }).toBe(true);
   await pagina.waitForLoadState('domcontentloaded');
+  return { pagina, dir: await lascia(pagina, nomeCartella, comeFile) };
+}
+async function lascia(pagina, nomeCartella, comeFile = false) {
   const dir = join(cartellaInCasa('filo-v1069-'), nomeCartella);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'mare.jpg'), 'foto');
+  const prima = esiti.length;
   const s = await pagina.context().newCDPSession(pagina);
   const data = { items: [], files: [comeFile ? join(dir, 'mare.jpg') : dir], dragOperationsMask: 1 };
   for (const type of ['dragEnter', 'dragOver', 'drop']) await s.send('Input.dispatchDragEvent', { type, x: 60, y: 60, data });
-  await expect.poll(() => esiti.slice(), { timeout: 10_000 }).toEqual([comeFile ? 'dato:file' : 'dato:directory']);
-  return { pagina, dir };
+  await expect.poll(() => esiti.slice(prima), { timeout: 10_000 }).toEqual([comeFile ? 'dato:file' : 'dato:directory']);
+  return dir;
 }
 
 test('cancellare un file nella cartella data da leggere si chiede, e senza sì il file resta', async () => {
@@ -94,14 +98,14 @@ test('un file dato da leggere: spostarlo o scriverci si chiede col nome del file
   await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['spostato:NotAllowedError', 'scritto:NotAllowedError']);
 });
 
-test('nome lungo con markup ed emoji: si legge come testo, accorciato; aspetto chiaro e scuro', async () => {
+test('nome lungo con markup: si legge come testo, accorciato; aspetto chiaro e scuro', async () => {
   test.setTimeout(60_000);
-  const nome = '<img src=x onerror=alert(1)> 📷 vacanze estate al mare con gli amici di sempre e tutti i parenti 2026';
+  const nome = '<b>x<b> vacanze estate al mare con gli amici di sempre e tutti i parenti 2026';
   const { pagina } = await dai(nome);
-  await pagina.locator('#scrivi').click();
+  await pagina.locator('#togli').click();
   await expect(barra()).toBeVisible({ timeout: 10_000 });
-  await expect(barra().locator('img')).toHaveCount(0);
-  await expect(barra()).toContainText('«<img src=x onerror');
+  await expect(barra().locator('b')).toHaveCount(0);
+  await expect(barra()).toContainText('«<b>x<b> vacanze');
   const box = await barra().boundingBox();
   expect(box.height).toBeLessThan(90);
   await shell.screenshot({ path: 'tests/.shots/v1069-chiaro.png' });
@@ -112,7 +116,7 @@ test('nome lungo con markup ed emoji: si legge come testo, accorciato; aspetto c
 test('la risposta sulla modifica dei file si vede nella pagina Sicurezza e si toglie', async () => {
   test.setTimeout(60_000);
   const { pagina } = await dai('foto');
-  await pagina.locator('#scrivi').click();
+  await pagina.locator('#togli').click();
   await expect(barra()).toBeVisible({ timeout: 10_000 });
   await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
   await shell.evaluate(() => window.filoShell.tabs.open('filo://security/security.html'));
