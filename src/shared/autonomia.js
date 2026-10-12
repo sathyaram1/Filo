@@ -168,6 +168,16 @@
     if (!selezionabile(a)) return 'no';
     return indice(a) > indice(livelloDa(da)) ? 'conferma' : 'si';
   }
+  // Il riquadro che chiede «conferma» quando l'utente alza il livello: lo stesso in Preferenze e nell'intervista di benvenuto.
+  function confermaAlzata(id) {
+    const info = infoLivello(id);
+    return {
+      title: `Autonomia: ${info.nome}`,
+      text: `Filo farà da solo più cose di adesso.\n\n${info.frase}`,
+      avviso: 'Così Filo si fida di più.',
+      okLabel: 'Cambia',
+    };
+  }
   function richiestaSpostamentoFonte(da, a) {
     if (!classeValida(a)) return 'no';
     return classeValida(da) && a < da ? 'conferma' : 'si';
