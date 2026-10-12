@@ -4345,7 +4345,6 @@
       selectedId = null;
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
-      mgClarify.hidden = true;
       collassaFrase();
       if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
@@ -4355,15 +4354,17 @@
       setClarifyMsg(e.message || 'Errore nell\'invio', 'err');
     } finally {
       rispostaInVolo.delete(id);
-      bottoniRisposta(false);
+      bottoneRisposta();
     }
   }
 
-  mgClarifyBtn.addEventListener('click', () => sendClarifyReply(mgClarifyText));
-  mgClarifyText.addEventListener('input', () => scriviBozzaRisposta(mgClarifyText));
-  mgClarifyText.addEventListener('keydown', tastiRisposta);
+  // Il tasto è uno solo e segue la pratica che il pannello mostra ADESSO.
+  function bottoneRisposta() {
+    const b = document.getElementById('mgSideRispostaBtn');
+    if (b) b.disabled = rispostaInVolo.has(selectedId);
+  }
 
-  // La stessa casella dentro il pannello del rombo verde, sotto le domande.
+  // Nel pannello del rombo verde, sotto le domande: l'unico posto dove si risponde (#1061).
   function pannelloRisposta(fb) {
     const box = document.createElement('div');
     box.className = 'mg-liv-risposta';
