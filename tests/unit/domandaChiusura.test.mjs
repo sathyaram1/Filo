@@ -20,7 +20,10 @@ const owner = await import('../../scripts/routine-domanda.mjs');
 const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
 
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
-const piano = { sleep: async () => {} };
+// Senza misure finte, in un contenitore delle routine il corpo si porta dietro il consumo della sessione vera (#949.1).
+const piano = { sleep: async () => {}, misureCrediti: () => ({}) };
+// Un transcript che non c'è: il figlio non legge (né riscrive) il conto della sessione che lancia i test.
+const NESSUN_TRANSCRIPT = resolve(QUI, 'transcript-che-non-esiste.jsonl');
 
 // ─── corpi delle richieste ──────────────────────────────────────────────────
 
