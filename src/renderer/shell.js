@@ -1023,10 +1023,7 @@
     const dietro = naturali.filter((_, i) => i !== ia);
     const ordinate = [...dietro].sort((a, b) => a - b);
     const tipica = ordinate.length ? ordinate[Math.floor((ordinate.length - 1) / 2)] : 0;
-    const attivaCon = (tetto) => {
-      const minima = Math.max(MIN_ATTIVA, Math.ceil(Math.min(tetto, tipica) * STACCO));
-      return Math.max(minima, Math.min(ia >= 0 ? naturali[ia] : 0, Math.ceil(tetto * STACCO_MAX)));
-    };
+    const attivaCon = (tetto) => Math.max(MIN_ATTIVA, Math.min(ia >= 0 ? naturali[ia] : 0, Math.ceil(tetto * STACCO_MAX)));
     const totale = (tetto) => dietro.reduce((s, w) => s + Math.max(MIN_SCHEDA, Math.min(w, tetto)), 0) + (ia >= 0 ? attivaCon(tetto) : 0);
     let tetto = Math.max(MIN_SCHEDA, ...naturali);
     if (totale(tetto) > posto) {
@@ -1034,7 +1031,11 @@
       for (let k = 0; k < 24 && hi - lo > 0.5; k++) { const m = (lo + hi) / 2; if (totale(m) > posto) hi = m; else lo = m; }
       tetto = lo;
     }
-    return naturali.map((w, i) => (i === ia ? attivaCon(tetto) : Math.max(MIN_SCHEDA, Math.min(w, tetto))));
+    const attiva = attivaCon(tetto);
+    const stacco = Math.ceil(Math.min(tetto, tipica) * STACCO) - attiva;
+    const avanzo = Math.floor(posto - totale(tetto));
+    const conStacco = attiva + Math.max(0, Math.min(stacco, avanzo));
+    return naturali.map((w, i) => (i === ia ? conStacco : Math.max(MIN_SCHEDA, Math.min(w, tetto))));
   }
   function misuraLarghezzeChieste() {
     const schede = [...tabsEl.children];
