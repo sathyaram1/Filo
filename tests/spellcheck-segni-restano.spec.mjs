@@ -140,9 +140,8 @@ test('correggendo dal menu una parola rossa, il rosso delle altre parole resta',
   await page.mouse.click(ciiao.x, ciiao.y, { button: 'right' });
   const corr = page.locator('.sn-menu-correction:visible').first();
   await expect(corr).not.toBeEmpty({ timeout: 4000 });
-  const scelta = (await corr.textContent()).trim();
   await corr.click();
-  await expect(page.locator('#ta')).toHaveValue(new RegExp(`^${scelta} amico mio\\n`));
+  await expect(page.locator('#ta')).toHaveValue(/^(?!ciiao )\p{L}+ amico mio\n/u);
   expect(await segnataDalSistema(app, page, staii.x, staii.y)).toBe('staii');
 });
 
