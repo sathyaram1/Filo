@@ -233,10 +233,11 @@ test('«non aggiornarti da solo» in chat: la conferma spiega il rischio, e solo
   await expect(pref.locator('#aggiornamentiAutomatici')).not.toBeChecked({ timeout: 5_000 });
 });
 
-test('«aggiornati» in chat, anche con la carta chiusa: la versione nuova si scarica e si installerà alla chiusura', async ({ app, shell }) => {
+for (const s of SISTEMI) test(`«aggiornati» in chat, anche con la carta chiusa: la versione nuova si scarica e si installerà quando il sistema lo prevede (${s.nome})`, async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);
+  await suSistema(app, s);
   await aggiornatoreFinto(app, { automatici: false });
   const carta = chat.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' });
   await expect(carta).toBeVisible({ timeout: 8_000 });
