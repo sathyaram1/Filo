@@ -178,7 +178,15 @@ function persist() {
   });
 }
 
+// Una risposta 200 può non essere un accesso (FEDERATED_USER_ID_ALREADY_LINKED, needConfirmation): senza i due
+// token non c'è sessione, e salvarla farebbe credere a un accesso riuscito.
+function rispostaConSessione(fb) {
+  return Boolean(fb && !fb.errorMessage && fb.idToken && fb.refreshToken);
+}
+
 function setSession(fb) {
+  // Prima di toccare la sessione o il segno dell'owner caduto (#912): un accesso non avvenuto non li cambia.
+  if (!rispostaConSessione(fb)) throw new Error('accesso senza sessione: risposta di Firebase senza token');
   session = {
     refreshToken: fb.refreshToken,
     idToken: fb.idToken,
