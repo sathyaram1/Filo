@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -97,6 +98,8 @@ test('OpenRouter streaming: il riuso arriva col conteggio finale', async () => {
 // ── Il dato sopravvive fino alla cronologia ──────────────────────────────────
 
 test('cronologia: il conteggio del riuso viene salvato con la voce', async () => {
+  // La cronologia ha file suoi nella cartella dati: qui una temporanea.
+  process.env.FILO_USER_DATA = cartellaTemporanea('filo-riuso-');
   const store = {};
   global.chrome = {
     storage: {

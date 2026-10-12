@@ -22,7 +22,7 @@ Tutto quello che Filo sa di te vive nella sua cartella dei dati, dentro la tua c
 
 Questi file li legge in chiaro chi ha accesso al tuo computer, come qualunque documento tuo. Fanno eccezione le chiavi (quelle che scrivi nelle Opzioni, la chiave dei crediti e il tuo accesso Google) e i segreti letti, che Filo cifra con il portachiavi del sistema operativo. Se il portachiavi non c'è (succede su alcuni Linux), l'accesso Google e la chiave dei crediti non vengono salvati affatto, mentre le chiavi delle Opzioni e i segreti letti restano in chiaro.
 
-Dalle impostazioni di Sicurezza esporti tutto in un archivio .zip, e lo reimporti anche su un altro computer. Cancellare si può per parti: le pagine visitate anche tutte insieme, le chat una per una, le richieste ai modelli dalla Cronologia AI, le memorie dalle Preferenze, le segnalazioni dalla Bacheca. In una finestra in incognito Filo non salva le pagine visitate, le chat, le schede né la copia delle segnalazioni; quello che spendi lì invece resta nel conto del mese.
+Dalle impostazioni di Sicurezza esporti tutto in un archivio .zip, e lo reimporti anche su un altro computer. Cancellare si può per parti: le pagine visitate anche tutte insieme, le chat una per una, le richieste ai modelli dalla Cronologia AI, le memorie dalle Preferenze, le segnalazioni dalla Bacheca. In una finestra in incognito Filo non salva le pagine visitate, le chat, le richieste ai modelli, le schede né la copia delle segnalazioni; quello che spendi lì invece resta nel conto del mese.
 
 Filo non ha un sistema che segnala i crash da solo. Quello che contatta senza che tu glielo chieda, e quando, è scritto più sotto, nelle sezioni sul server e sugli altri servizi.
 
