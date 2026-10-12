@@ -153,6 +153,35 @@ function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
 
+/** La punta di `ramo` su origin del server, appena letta: '' se il ramo non c'è o la rete non risponde. */
+function puntaRamoServer(cartella, ramo) {
+  const radice = dirname(cartella);
+  if (!gitEsito(radice, ['fetch', '--quiet', 'origin', `+refs/heads/${ramo}:refs/remotes/origin/${ramo}`]).ok) return '';
+  const r = gitEsito(radice, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${ramo}`]);
+  return r.ok ? String(r.out).trim() : '';
+}
+
+/**
+ * Il ramo del server è un lavoro fidato secondo il registro dei rami (#1159, mappa §1.6)? Vale anche per un ramo con
+ * voci sporche o un buco; un ramo senza registro passa solo se la pratica non è un lavoro delle routine in attesa del PC
+ * (i lavori locali di prima del registro). → { ok:true, sha } (sha = da fondere esattamente, '' = la punta del momento)
+ * | { ok:false, codice, motivo }
+ */
+export async function controllaRamoServer({ ramo, feedbackId, verdetto, cartella }, { lavoroDelRamo, puntaRamo = puntaRamoServer } = {}) {
+  const sha = verdetto && verdetto.server && verdetto.server.sha ? String(verdetto.server.sha) : puntaRamo(cartella, ramo);
+  if (!sha) return { ok: false, codice: 1, motivo: `non trovo ${ramo} su origin del server: spingilo prima (o controlla la rete)` };
+  let r;
+  try {
+    r = await (lavoroDelRamo || (await import('./lib/biglietto-locale.mjs')).lavoroDelRamo)({ repo: 'server', ramo, sha, feedbackId });
+  } catch (e) {
+    return { ok: false, codice: 4, motivo: `il registro dei rami non risponde (${String((e && e.message) || e).slice(0, 200)}): senza, un ramo del server non va su main` };
+  }
+  if (r && r.registro && r.lavoroFidato === true) return { ok: true, sha };
+  if (r && r.registro) return { ok: false, codice: 3, motivo: `il ramo ${ramo} del server non è un lavoro fidato: ${r.motivo || 'motivo non detto'}. Decide l’owner` };
+  if (r && r.attesa === 'fusione_server') return { ok: false, codice: 3, motivo: `il ramo ${ramo} è di un lavoro delle routine ma non ha registro: nessuno sa chi l’ha scritto. Decide l’owner` };
+  return { ok: true, sha: '', legacy: true };
+}
+
 /**
  * Tutto il giro; ritorna il codice d'uscita (0 fatto, 1 fermo, 2 uso, 3 pratica rifiutata, 4 server non raggiungibile).
  * Le dipendenze si iniettano nei test; la rete passa dal fetch globale, come negli strumenti delle pratiche.
