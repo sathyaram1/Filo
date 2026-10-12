@@ -713,7 +713,6 @@
     const s = String(raw || '').trim();
     if (!s) return '/';
     if (/^https?:\/\//i.test(s)) return normalizedPath(s) || '/';
-    if (!s.startsWith('/')) return '/';
     return aTetto(s, MAX_URL_LEN, tagliaPercorsoPrimaDiPulire, (pezzo) => {
       const ripulito = neutralizzaMarcature(pezzo).trim().replace(/\s+/g, '');
       return ripulito.startsWith('/') ? redigiPercorso(ripulito, domain || '') : '';
