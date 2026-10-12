@@ -286,12 +286,12 @@ togli_copie_di_dati() {
   return 0
 }
 # Il controllo che conta e' sulla spedizione: un commit fatto a mano, o dal rilascio, non passa da quello sopra.
-# Stampa perche' il ramo non puo' partire, o niente.
+# Toglie le copie dai commit da spedire e stampa cosa ha fatto; esce 3 se il ramo non puo' partire.
 copie_da_spedire() {
   local wt="$1" ramo="$2" controllo
   controllo=$(controllo_copie "$wt") || return 0
   git log --format= --name-only -z --diff-filter=ACMR "refs/heads/$ramo" --not --remotes=origin 2>/dev/null | forse_dati || return 0
-  node "$controllo" --spedizione "$wt" 2>/dev/null
+  node "$controllo" --spedizione "$wt" "$COMMIT_AS_NAME" "$COMMIT_AS_EMAIL" 2>/dev/null
 }
 
 salva_cartella() {
