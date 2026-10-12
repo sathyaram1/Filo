@@ -169,7 +169,6 @@ const INDIRIZZI = {
   'filo.app': { perche: 'un esempio in un commento' },
   'llmstxt.org': { perche: 'un riferimento in un commento' },
   'sito.it': { perche: 'un esempio' },
-  'www.Gmail.com': { perche: 'un esempio' },
   'www.youtube.com': { perche: 'un esempio in un commento' },
   'paypal.com': { perche: 'un marchio nell\'elenco dei siti imitati dai truffatori' },
   'www.w3.org': { perche: 'lo spazio dei nomi di SVG: nessuno lo contatta' },
