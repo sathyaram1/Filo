@@ -696,6 +696,10 @@ test('la regola risponde uguale da entrambe le strade', () => {
   assert.equal(CT.campoDiTesto(el('div', { dentroContenteditable: true })), true);
   assert.equal(CT.campoDiTesto(el('div')), false);
   assert.equal(CT.campoDiTesto(null), false);
+  // #1071 — il fuoco dentro un riquadro chiuso di Filo: da fuori si vede l'host, e Cmd+Z deve annullare, non tornare indietro.
+  const host = (fuoco) => ({ ...el('div'), matches: (sel) => fuoco && sel === '[data-sn-riquadro]:focus-within' });
+  assert.equal(CT.campoDiTesto(host(true)), true, 'col fuoco dentro il riquadro di Filo si sta scrivendo');
+  assert.equal(CT.campoDiTesto(host(false)), false);
 
   // La forma che il processo principale spedisce nella pagina deve essere
   // autosufficiente: se si porta dietro un riferimento a questo file, dentro la

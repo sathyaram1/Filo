@@ -130,6 +130,17 @@ try {
   }, { capture: true });
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
+// Un tasto scritto in un riquadro chiuso di Filo lo prende Filo prima di ogni script del sito, anche in cattura (#1071):
+// per questo l'ascolto nasce qui, a document_start. Lo smista SN_FILO_UI.tastoNelRiquadro (src/shared/filoUi.js).
+try {
+  for (const tipo of ['keydown', 'keypress', 'keyup']) {
+    window.addEventListener(tipo, (e) => {
+      const UI = globalThis.SN_FILO_UI;
+      if (UI && typeof UI.tastoNelRiquadro === 'function') UI.tastoNelRiquadro(e);
+    }, { capture: true });
+  }
+} catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
+
 // Copia inerte del clic destro da rigiocare quando l'handler vero è pronto.
 // Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
 // fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e

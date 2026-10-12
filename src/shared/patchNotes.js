@@ -37,6 +37,7 @@
         'I pulsanti che aprono una ricevuta, un report o un pagamento in una finestra nuova funzionano: la scheda mostra quello che il sito ci scrive, e il sito la può richiudere. Una pagina che chiede di chiudersi chiude solo la sua scheda, non più tutto Filo.',
         'Filo ti avvisa quando un sito si spaccia per un marchio famoso anche se sta su un servizio che ospita i siti di altri, come Weebly, Wix o Google Traduttore. Prima se ne accorgeva solo su pochi servizi, come GitHub Pages. Le immagini di Discord e le pagine dei marchi stessi su GitHub, come quelle di Google o Microsoft, non hanno più l\'avviso.',
         'Il controllo dei siti pericolosi non manda più a Google gli indirizzi che visiti.',
+        'La bozza di un feedback lasciata a metà resta sul sito dove l\'hai cominciata, e la ritrovi riaprendo il feedback lì. E sui siti la spiegazione, la Modifica e il feedback non prendono più lo stile della pagina: niente bottoni tutti maiuscoli o lettere spaziate.',
       ],
     },
     {
