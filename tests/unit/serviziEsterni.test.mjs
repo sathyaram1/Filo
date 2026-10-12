@@ -130,7 +130,7 @@ function leggi(file, testo) {
   return leggiJs(testo);
 }
 
-// Un indirizzo è dinamico quando il suo host lo completa un'espressione: `https://${dominio}/llms.txt`, 'https://' + host.
+// Un indirizzo è dinamico quando il suo host lo completa un'espressione: `https://${dominio}/x`, 'https://' + host.
 function indirizziDi(frammenti) {
   const out = [];
   for (const fr of frammenti) {
