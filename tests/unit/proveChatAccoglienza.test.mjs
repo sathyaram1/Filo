@@ -16,6 +16,10 @@ const SCRIVE_IN_CHAT = /locator\(\s*['"]#input['"]\s*\)\s*\.\s*(?:fill|press|typ
 const DICHIARA = /\bfilo_onboarding\b|\bFILO_ONBOARDING\b|\bsetOnboarding\s*\(/;
 // Le prove dell'intervista la vogliono aperta.
 const SULL_ACCOGLIENZA = /accoglienza|benvenuto|intervista|onboarding/i;
+const USA_LA_FIXTURE = /^import\s[^;]*from\s+['"]\.\/fixtures\/electron\.mjs['"]/m;
+const PROFILO_NUOVO = /\btest\.use\(\s*\{[^}]*\baccoglienzaFatta\s*:\s*false/g;
+const APRE_DA_SE = /\belectron\.launch\s*\(/;
+const FIXTURE = join(TESTS, 'fixtures', 'electron.mjs');
 
 /**
  * PURA. Due copie lunghe quanto il testo: `codice` senza commenti né contenuto di stringhe e regex (per contare le
