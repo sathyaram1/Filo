@@ -396,6 +396,7 @@
       // Registry LIVE (dalle righe correnti, anche non salvate) così la
       // validazione modello↔funzione riflette subito le modifiche.
       getRegistry: () => collectModelRegistry().registry,
+      avvisoDi: avvisoModello,
     });
 
     // Costi
@@ -588,6 +589,10 @@
       }
     }
     populateNicknames(registry);
+  }
+
+  function avvisoModello(action, ref) {
+    return ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref]);
   }
 
   // Oltre al registry valido, ritorna le righe DOM scartate (nickname mancante
@@ -928,7 +933,11 @@
           models: s.models,
           onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
           getRegistry: () => collectModelRegistry().registry,
+          avvisoDi: avvisoModello,
         });
+      } else if (modelChains) {
+        // Il modello di una riga del registro può cambiare sotto lo stesso nome: l'avviso si rifà.
+        ModelChain.ricontrolla(modelChains);
       }
     });
   }
