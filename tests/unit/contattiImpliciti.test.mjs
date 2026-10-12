@@ -1,7 +1,6 @@
-// I contatti che nessun indirizzo scritto nel codice rivela: li fa il motore (Electron, Chromium) o una libreria da sé,
-// per un'impostazione di serie (#1084). Qui ognuno è legato al punto del codice che lo accende o lo spegne e alla frase
-// del documento sulla privacy che lo racconta. Gli indirizzi scritti e gli aggiornamenti da GitHub stanno nell'elenco dei
-// servizi esterni (src/shared/serviziEsterni.js), che serviziEsterni.test.mjs confronta col codice e con package.json.
+// I contatti del motore (Electron, Chromium) che nessun indirizzo nel codice rivela, spenti di serie (#1084): ognuno legato
+// al punto che lo spegne e alla frase del documento sulla privacy. I servizi che Filo contatta, aggiornamenti compresi,
+// stanno nell'elenco dei servizi esterni, che serviziEsterni.test.mjs confronta col codice.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
