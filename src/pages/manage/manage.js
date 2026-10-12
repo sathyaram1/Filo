@@ -1063,7 +1063,7 @@
       s.textContent = testo;
       return s;
     };
-    mgRoleModels.append(cella('mg-role-head', ''), ...RM.CAMPI.map((c) => cella('mg-role-head', RM.NOME_CAMPO[c])));
+    mgRoleModels.append(...RM.CAMPI.map((c) => cella('mg-role-head', RM.NOME_CAMPO[c])));
     for (const r of RM.RUOLI) {
       mgRoleModels.append(cella('mg-role-name', r.nome));
       for (const campo of RM.CAMPI) {
