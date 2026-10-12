@@ -137,9 +137,9 @@ test('bottone del file e un\'altra azione nello stesso giro: il modello sa che i
     await chiedi(page, 'quanto ho pagato di tari? e ricordamelo tra 5 minuti');
     const bolla = page.locator('.dash-bubble-filo');
     await expect(bolla).toContainText('Il promemoria suona', { timeout: 15_000 });
-    const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 'f1');
-    expect(esito.content).not.toContain('non ripeterlo');
-    expect(esito.content).toContain('riscrivila per intero');
+    const esiti = (await chiamateAlModello(app))[1].filter((m) => m.role === 'tool').map((m) => m.content).join('\n');
+    expect(esiti).not.toContain('non ripeterlo');
+    expect(esiti.split('riscrivila per intero').length - 1).toBe(1);
     await expect(bolla).toHaveCount(1);
     expect((await bolla.evaluate((el) => el.textContent)).split('305,40').length - 1).toBe(1);
     await expect(bolla.locator('.dash-file-btn')).toHaveCount(1);
