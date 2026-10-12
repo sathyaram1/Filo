@@ -344,8 +344,17 @@
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
-      if (text.trim()) {
+      // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
+      const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
+      if (text.trim() || fotoViste.length) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        fotoViste.forEach((src, i) => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.className = 'dash-bubble-img';
+          attachImageLightbox(img, src);
+          b.insertBefore(img, b.childNodes[i] || null);
+        });
         bubblesEl.appendChild(b);
         if (isUser) bollaUtente = b;
       }
