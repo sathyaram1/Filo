@@ -1356,6 +1356,18 @@
         return { partial: { riassuntoSchede: { enabled: b } }, label: `Riassunto delle schede chiuse → ${b ? 'attivo' : 'spento'}` };
       },
     },
+    {
+      scrive: ['security.riquadriRotti.modello'],
+      aiuto: 'true | false (un contenuto incorporato di un altro sito rimasto vuoto, che Filo non riconosce da solo, va in foto a un modello per capire se sono i cookie rifiutati; spento, nessuna foto parte e quel riquadro si riattiva col tasto destro)',
+      costo: 1,
+      keys: ['riquadri_rotti_modello', 'contenuti incorporati rotti', 'riconoscimento dei contenuti incorporati rotti',
+        'riconosci con un modello i contenuti incorporati rotti', 'riquadri rotti', 'riquadri rotti dai cookie', 'foto dei riquadri'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { riquadriRotti: { modello: b } } }, label: `Contenuti incorporati rotti guardati da un modello → ${b ? 'sì' : 'no'}` };
+      },
+    },
     interruttore({
       keys: ['pagine_delicate', 'pagine delicate', 'non mandare ai modelli le pagine delicate', 'proteggi le pagine delicate',
         'pagine riservate'],

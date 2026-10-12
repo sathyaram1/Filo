@@ -14,6 +14,9 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// Prima di qualsiasi sessione, che caricherebbe subito i dizionari del correttore scaricandoli da Google (#1084).
+try { require('./services/dizionari').prepara(app); } catch (_) {}
+
 // Su Windows serve un AppUserModelID esplicito perché la taskbar mostri
 // l'icona giusta (e non quella di Electron di default).
 if (process.platform === 'win32') {
@@ -69,6 +72,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
     globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
     globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
+    globalThis.__filoDizionari = require('./services/dizionari');
     globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
@@ -169,23 +173,17 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// Configura le lingue del correttore ortografico NATIVO (Hunspell) di Electron.
-// Senza questa chiamata Electron usa solo la lingua di sistema: su molte
-// configurazioni i suggerimenti dietro lo zigzag rosso non arrivano (il main
-// li inoltra al menu di correzione via `_spell:native`, vedi tabs.js). La
-// vecchia estensione Chrome aveva i dizionari pronti d'ufficio; qui li
-// attiviamo esplicitamente — italiano (l'app è italiana) + lingua di sistema —
-// così la correzione in cima al menu funziona anche senza chiave LLM. NON
-// forziamo più l'inglese (#169): con il dizionario inglese sempre attivo le
-// parole italiane errate ricevevano suggerimenti inglesi ("funzion"→"function").
-// Su macOS la chiamata è ignorata (Electron usa NSSpellChecker), nessun problema.
+// Le lingue del correttore nativo: senza, Electron usa solo quella di sistema e la correzione in cima al menu
+// (`_spell:native`, tabs.js) manca sulle parole italiane. La scelta e il perché niente inglese forzato: spellLanguages.js.
 function configureSpellchecker() {
   try {
     const ses = session.defaultSession;
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
-    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale());
+    // Su Linux c'è solo Hunspell e si caricano solo i dizionari inclusi in Filo: un inglese non incluso resterebbe vuoto.
+    const inclusi = process.platform === 'linux' ? require('./services/dizionari').lingue() : [];
+    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale(), inclusi);
     if (want.length) ses.setSpellCheckerLanguages(want);
   } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
 }

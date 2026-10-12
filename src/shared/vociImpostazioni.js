@@ -91,6 +91,7 @@
         'sec-delicate': 'security.pagineDelicate.enabled',
         'sec-delicate-sites': 'security.pagineDelicate.siti',
         'sec-auto-feedback': 'security.autoFeedback',
+        'sec-riquadri-modello': 'security.riquadriRotti.modello',
         'cookie-mode-manual': 'security.cookies.mode',
         'cookie-mode-default': 'security.cookies.mode',
         'cookie-mode-privacy': 'security.cookies.mode',

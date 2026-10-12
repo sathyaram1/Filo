@@ -19,6 +19,7 @@
         'La suoneria del timer e delle sveglie ha il suo volume, in Preferenze accanto alla scelta del motivo, e lo stesso vale per il suono delle notifiche. Puoi girare le manopole o chiederlo a Filo: "abbassa il volume della suoneria", "metti la suoneria delicata", "azzera il volume delle notifiche". A zero resta muta.',
         'La pagina dei file scaricati adesso si chiama «Download»: nella home, nel menu App e sulla scheda. E nella home non trovi più il tasto dei download in alto, che ripeteva quello che vedi già nelle carte.',
         'Su Mac Cmd+← e Cmd+→ tornano indietro e vanno avanti come in Safari e in Chrome, quando non stai scrivendo. In un campo di testo portano il cursore a inizio o fine riga, come sempre.',
+        'Quando un post o un video di un altro sito resta vuoto e Filo non lo conosce, la foto che manda a un modello per capire se sono i cookie la puoi spegnere: in Sicurezza, sotto i cookie, «Riconosci con un modello i contenuti incorporati rotti», o chiedendolo a Filo. Da spento quel riquadro lo riattivi col tasto destro.',
       ],
       fixes: [
         'Mentre scorri o scrivi in una pagina, Filo non ridisegna più la barra delle schede e non risalva i suoi dati a ogni movimento. Menu e chat rispondono senza scatti e la batteria dura di più.',
@@ -44,6 +45,7 @@
         'La bozza di un feedback lasciata a metà resta sul sito dove l\'hai cominciata, e la ritrovi riaprendo il feedback lì. E sui siti la spiegazione, la Modifica e il feedback non prendono più lo stile della pagina: niente bottoni tutti maiuscoli o lettere spaziate.',
         'In Opzioni, se scegli per una funzione un modello che non la sa fare, come una voce per le spiegazioni, sotto il campo resta scritto perché. Prima il campo tornava com\'era senza dire niente.',
         'L\'Aiuto prende le istruzioni per assistenti solo dal sito su cui sei. Un sito non può più fargli leggere quello che c\'è sul tuo router o su altri dispositivi della rete di casa.',
+        'Su Linux il correttore ortografico non scarica più i dizionari da Google, e su Windows nemmeno per le lingue che il sistema non corregge: quelli di italiano e inglese sono dentro Filo e funzionano anche senza rete.',
       ],
     },
     {

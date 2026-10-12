@@ -124,3 +124,18 @@ test('il lavoro sui feedback va sul repository pubblico mentre si fa, e i due do
   legame(pubblico, sicurezza, '**La correzione di un problema si vede prima che arrivi a te.**', 'correzione pubblica fra i punti deboli');
   legame(false, sicurezza, 'Vale la regola che applico a me stesso: sulla bacheca', 'la regola della divulgazione vale anche per la bacheca');
 });
+
+test('i riquadri rotti vanno in foto a un modello da soli, col tetto e l\'interruttore che il documento sulla privacy dice', () => {
+  const R = leggi('src', 'main', 'services', 'riquadriRotti.js');
+  const ora = Number((/const VISIONI_ORA = (\d+);/.exec(R) || [])[1]);
+  const lato = Number((/const LATO_MAX = (\d+);/.exec(R) || [])[1]);
+  const numeri = { 10: 'dieci', 20: 'venti', 30: 'trenta' };
+  assert.ok(numeri[ora], `tetto orario dei riquadri ${ora}: scrivilo nel documento e qui`);
+  legame(true, privacy, `al massimo ${numeri[ora]} riquadri l'ora`, 'tetto orario dei riquadri');
+  legame(true, privacy, `al massimo ${lato} pixel di lato`, 'lato della foto del riquadro');
+  // L'interruttore: di serie acceso, e il documento lo chiama col nome che ha nella pagina Sicurezza.
+  assert.match(leggi('src', 'shared', 'constants.js'), /riquadriRotti: \{\s*modello: true,/);
+  assert.match(R, /if \(!modelloAcceso \|\| typeof chiamaModello !== 'function'\) return null;/);
+  const nome = (/options_cookies_riquadri_modello: '([^']+)'/.exec(leggi('src', 'shared', 'i18n.js')) || [])[1];
+  legame(true, privacy, `Si spegne da Sicurezza («${nome}»)`, 'interruttore dei riquadri rotti');
+});

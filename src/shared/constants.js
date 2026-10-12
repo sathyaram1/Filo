@@ -2586,6 +2586,11 @@
         // Tolti in Sicurezza fra i siti che Filo ha segnato per un campo password o carta: valgono solo per quel motivo.
         nonDelicati: [],
       },
+      // #1084 — un riquadro di terzi che sembra rotto dai cookie e che le regole non riconoscono lo guarda un modello
+      // (foto del solo riquadro). Spento, restano le regole e il tasto destro sul riquadro. Regola: riquadriRotti.js.
+      riquadriRotti: {
+        modello: true,
+      },
     },
     // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
     // disco?», e nella home un `/comando` va alla shell. Accesa di serie (#892):
