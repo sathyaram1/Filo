@@ -4850,11 +4850,17 @@
     const disarma = () => {
       armato = false;
       btn.textContent = 'Salta il controllo';
+      btn.style.minWidth = '';
+      btn.style.minHeight = '';
       if (timer) { clearTimeout(timer); timer = null; }
     };
     btn.addEventListener('click', async () => {
       if (!armato) {
         armato = true;
+        // «Confermi?» è più corto: senza la scatola ferma il secondo clic sul lato destro cadeva fuori dal tasto.
+        const scatola = btn.getBoundingClientRect();
+        btn.style.minWidth = scatola.width + 'px';
+        btn.style.minHeight = scatola.height + 'px';
         btn.textContent = 'Confermi?';
         timer = setTimeout(disarma, 5000);
         return;
