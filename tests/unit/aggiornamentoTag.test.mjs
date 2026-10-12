@@ -67,8 +67,7 @@ test('collegato due volte, il cancello non si impila', async () => {
 // Il cammino vero col provider GitHub di electron-updater: feed, «/latest» e latest.yml finti, il resto suo.
 const { GitHubProvider } = require('electron-updater/out/providers/GitHubProvider');
 
-// `latest`: le risposte successive di «/latest», per una release più recente che cambia fra due domande.
-function conGitHub({ tagVero, yml, piattaforma = 'win32', latest = null }) {
+function conGitHub({ tagVero, yml, piattaforma = 'win32' }) {
   const feed = `<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"><entry><id>1</id>` +
     `<link rel="alternate" type="text/html" href="https://github.com/sathyaram1/Filo/releases/tag/${tagVero}"/>` +
     `<title>${tagVero}</title><content>n</content><updated>2026-10-12T00:00:00Z</updated></entry></feed>`;
@@ -77,11 +76,7 @@ function conGitHub({ tagVero, yml, piattaforma = 'win32', latest = null }) {
   const gh = new GitHubProvider({ provider: 'github', owner: 'sathyaram1', repo: 'Filo' }, au, {
     isUseMultipleRangeRequest: true, platform: piattaforma, executor: { request: async () => yml },
   });
-  const risposte = latest ? [...latest] : [];
-  gh.httpRequest = async (url) => {
-    if (String(url).endsWith('.atom')) return feed;
-    return JSON.stringify({ tag_name: risposte.length ? risposte.shift() : tagVero });
-  };
+  gh.httpRequest = async (url) => (String(url).endsWith('.atom') ? feed : JSON.stringify({ tag_name: tagVero }));
   // Il getUpdateInfoAndProvider vero del prototipo, non uno finto: il cancello deve agganciarsi a quello che gira.
   delete au.getUpdateInfoAndProvider;
   Object.assign(au, {
@@ -180,4 +175,78 @@ test('fileDiRilascio: solo https, il nostro repo, la cartella v<versione>, un no
   assert.equal(ok('https://evil.test/o/r/releases/download/v1.2.3/Filo-Setup.exe'), false);
   assert.equal(R.fileDiRilascio({ ...base, urls: [] }), false);
   assert.equal(R.fileDiRilascio({ ...base, owner: '', urls: ['https://github.com//r/releases/download/v1.2.3/a'] }), false);
+});
+
+function memoriaFinta() {
+  const carte = [];
+  let id = 0;
+  globalThis.SN_FILO_MEMORY = {
+    listNotifications: async ({ includeDismissed = false } = {}) => carte.filter((n) => includeDismissed || !n.dismissed),
+    addNotification: async (n) => { const e = { ...n, id: `n${++id}`, dismissed: false }; carte.unshift(e); return e; },
+    dismissNotification: async (nid) => { const n = carte.find((x) => x.id === nid); if (n) n.dismissed = true; return carte; },
+  };
+  return carte;
+}
+
+// Annunciata, una versione che non esiste fallisce lo scaricamento, e su Mac e Linux l'avviso manda a filo.red, che dà
+// la release più recente qualunque tag abbia: quella che si è dichiarata v<versione> nel suo latest.yml.
+test('il tag che conta è quello che dice GitHub: un «tag:» nel latest.yml non fa annunciare né consigliare la release', async () => {
+  const dichiarata = yml('tag: v99.0.0\n', 'Filo-Mac.zip');
+  try {
+    for (const piattaforma of ['darwin', 'linux', 'win32']) {
+      for (const [tagVero, cosa] of [
+        ['x1', 'release sotto x1'],
+        ['v0.2.100', 'release vecchia riscritta e rimarcata come più recente'],
+      ]) {
+        U.perProva({ piattaforma, versione: '0.2.233', avvisoVero: false });
+        const carte = memoriaFinta();
+        const { au, visti } = conGitHub({ tagVero, yml: dichiarata, piattaforma });
+        await U.avviaAggiornatore(au, { automatici: true });
+        await assert.rejects(au.doCheckForUpdates(), /rifiutata/, `${piattaforma}, passa: ${cosa}`);
+        au.emit('error', new Error('HttpError: 404'));
+        await new Promise((r) => setTimeout(r, 20));
+        assert.deepEqual(visti, [], `${piattaforma}, annunciata: ${cosa}`);
+        assert.deepEqual(carte.map((n) => n.text), [], `${piattaforma}, avviso per una versione non nostra: ${cosa}`);
+      }
+    }
+  } finally {
+    U.perProva({ piattaforma: 'win32' });
+    delete globalThis.SN_FILO_MEMORY;
+  }
+});
+
+test('senza la domanda a GitHub sul tag vero gli aggiornamenti si fermano, e un tag che non arriva non passa', async () => {
+  const { au } = conGitHub({ tagVero: 'v99.0.0', yml: yml('', 'Filo-Setup.exe') });
+  const gh = await au.clientPromise;
+  // Il provider la usa per sé: sparisce solo dopo, come in una libreria che l'ha rinominata.
+  gh.getLatestVersion = async function () {
+    const r = await GitHubProvider.prototype.getLatestVersion.call(this);
+    this.getLatestTagName = undefined;
+    return r;
+  };
+  await U.avviaAggiornatore(au, { automatici: false });
+  await assert.rejects(au.doCheckForUpdates(), /aggiornamenti fermi/);
+
+  const altro = conGitHub({ tagVero: 'v99.0.0', yml: yml('', 'Filo-Setup.exe') });
+  const ghAltro = await altro.au.clientPromise;
+  ghAltro.getLatestVersion = async function () {
+    const r = await GitHubProvider.prototype.getLatestVersion.call(this);
+    this.getLatestTagName = async () => null;
+    return r;
+  };
+  await U.avviaAggiornatore(altro.au, { automatici: false });
+  await assert.rejects(altro.au.doCheckForUpdates(), /rifiutata/);
+  assert.deepEqual(altro.visti, []);
+
+  assert.equal(typeof GitHubProvider.prototype.getLatestTagName, 'function',
+    'electron-updater non ha più getLatestTagName: il cancello dei tag ferma tutti gli aggiornamenti');
+});
+
+test('tagDiGitHubAccettato: solo v più la versione, e niente tag non passa', () => {
+  assert.equal(R.tagDiGitHubAccettato('v1.2.3', '1.2.3'), true);
+  assert.equal(R.tagDiGitHubAccettato('1.2.3', '1.2.3'), false);
+  assert.equal(R.tagDiGitHubAccettato('V1.2.3', '1.2.3'), false);
+  assert.equal(R.tagDiGitHubAccettato(null, '1.2.3'), false);
+  assert.equal(R.tagDiGitHubAccettato(undefined, undefined), false);
+  assert.equal(R.tagDiGitHubAccettato('vundefined', undefined), false);
 });
