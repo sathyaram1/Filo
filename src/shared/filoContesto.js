@@ -20,6 +20,11 @@
   const CARATTERI_PER_TOKEN = 3.5;
   // Oltre il tetto il taglio scende un quarto sotto: i turni dopo trovano lo stesso inizio, e la cache lo riusa.
   const RIENTRO = 0.75;
+  // Le immagini mandate in chat tornano col loro messaggio finché vive come una lettura (#1166). Una foto pesa per i
+  // tetti quanto una media fra i fornitori; i due tetti tengono la richiesta sotto i limiti dei fornitori.
+  const TOKEN_PER_IMMAGINE = 1500;
+  const MAX_IMMAGINI_RIMANDATE = 16;
+  const MAX_CARATTERI_IMMAGINI = 24 * 1024 * 1024;
 
   function numeroIn(v, [min, max]) {
     if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
