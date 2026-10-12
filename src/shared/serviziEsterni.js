@@ -18,7 +18,7 @@
   const RINNOVO_ACCESSO = 'https://securetoken.googleapis.com/v1/token';
 
   // `base` vuoto vuol dire che l'indirizzo lo decide la pagina o l'utente, e allora `indirizzo` dice quale.
-  // `prova`: il testo di codice che mostra l'uso quando l'indirizzo non sta scritto in src/ (lo mette Electron).
+  // `prova`: il pezzo di codice che mostra l'uso quando in src/ non c'è né l'indirizzo né una fetch riconoscibile.
   const SERVIZI = [
     {
       id: 'modelli-openrouter', nome: 'OpenRouter, per i modelli',
