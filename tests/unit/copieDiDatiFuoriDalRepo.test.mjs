@@ -10,7 +10,7 @@ import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { scene, togliScene, runHookRaw, stdinEdit, git as gitScena } from '../helpers/scenaHook.mjs';
-import { copieNelRepo, motivoCopia, motivoCopiaTesto, CARTELLA_FINTI } from '../../scripts/lib/copie-di-dati.mjs';
+import { copieNelRepo, motivoCopia, motivoCopiaTesto, CARTELLA_FINTI, installaControlloSpedizione } from '../../scripts/lib/copie-di-dati.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
