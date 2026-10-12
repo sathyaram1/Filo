@@ -275,6 +275,11 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    fondo = document.createElement('div');
+    fondo.className = 'sn-history-fondo';
+    fondo.hidden = true;
+    $('list').after(fondo);
+    osservatore.observe(fondo);
     load();
     $('search').addEventListener('input', render);
     $('filter').addEventListener('change', render);
