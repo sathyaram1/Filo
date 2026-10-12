@@ -141,6 +141,24 @@ test('con la cronologia che non si può scrivere la chat mostra comunque la risp
   }
 });
 
+test('la domanda fatta alla chat compare nella sua voce e la ricerca la trova', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  try {
+    await modelloFinto(app, [{ text: 'Il museo apre alle nove.' }]);
+    const page = await home(app);
+    await chiedi(page, 'A che ora apre il museo civico?');
+    await expect(page.getByText('Il museo apre alle nove.')).toBeVisible({ timeout: 20_000 });
+  } finally {
+    await ripristina(app);
+  }
+  const h = await openTab('filo://history/history.html');
+  const voce = h.locator('.sn-history-item', { hasText: 'Il museo apre alle nove.' });
+  await expect(voce).toHaveCount(1, { timeout: 20_000 });
+  await expect(voce).toContainText('A che ora apre il museo civico?');
+  await h.locator('#search').fill('museo civico');
+  await expect(h.locator('.sn-history-item')).toHaveCount(1);
+});
+
 test('con 3000 voci la pagina si apre e cerca senza bloccarsi, e scorrendo e cercando le voci ci sono tutte', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   const N = 3000;
