@@ -807,7 +807,7 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
-    modelHosts, forgetModelHosts, hostVerdict, joinNames, forgetReasoningRefusals,
+    modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
     GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
