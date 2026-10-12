@@ -2,50 +2,49 @@
 // lingua inclusa viene chiesta alla rete. Su Mac il correttore è del sistema e non c'è niente da guardare.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
-test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli alla rete, e correggono l\'italiano', async ({ app, openTab }) => {
-  const prima = await app.evaluate(async ({ app: a }) => {
-    const fs = require('node:fs');
-    const path = require('node:path');
-    const dir = path.join(a.getPath('sessionData'), 'Dictionaries');
-    return {
-      piattaforma: process.platform,
-      inclusi: globalThis.__filoDizionari.inclusi(),
-      lingue: globalThis.__filoDizionari.lingue(),
-      presenti: fs.existsSync(dir) ? fs.readdirSync(dir).sort() : [],
-    };
-  }).catch(async () => app.evaluate(async ({ app: a }) => ({
+test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli alla rete, e correggono l\'italiano', async ({ app, openTab, testServer }) => {
+  const prima = await app.evaluate(({ app: a }) => ({
     piattaforma: process.platform,
+    dati: a.getPath('sessionData'),
     inclusi: globalThis.__filoDizionari.inclusi(),
     lingue: globalThis.__filoDizionari.lingue(),
-    presenti: null,
-    dati: a.getPath('sessionData'),
-  })));
+  }));
   test.skip(prima.piattaforma === 'darwin', 'su Mac il correttore è quello del sistema');
   expect(prima.inclusi).toEqual(['en-GB-10-1.bdic', 'en-US-10-1.bdic', 'it-IT-3-0.bdic']);
-  if (prima.presenti) expect(prima.presenti).toEqual(expect.arrayContaining(prima.inclusi));
+  expect(readdirSync(join(prima.dati, 'Dictionaries'))).toEqual(expect.arrayContaining(prima.inclusi));
 
-  const page = await openTab('data:text/html,' + encodeURIComponent('<!doctype html><meta charset="utf-8"><textarea id="t" spellcheck="true" style="font-size:28px;width:500px;height:120px"></textarea>'));
+  const url = testServer.html(`<!doctype html><html><body style="margin:0">
+    <div id="ce" contenteditable="true" spellcheck="true" style="font:16px monospace;padding:8px;width:400px;height:120px"></div>
+  </body></html>`);
+  const page = await openTab(url);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   await expect.poll(() => app.evaluate(() => globalThis.__filoDizionari.stato().inizializzati), { timeout: 20_000 })
     .toContain('it-IT');
   const stato = await app.evaluate(() => globalThis.__filoDizionari.stato());
   expect(stato.chiesti.filter((l) => prima.lingue.includes(l))).toEqual([]);
 
-  // La prova che il dizionario c'è davvero: la parola sbagliata ha i suggerimenti italiani.
-  await page.locator('#t').click();
-  await page.keyboard.type('funzion ');
-  const suggerimenti = await app.evaluate(async ({ webContents }) => {
-    const wc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('data:text/html'));
-    return new Promise((ok) => {
-      const fine = setTimeout(() => ok(null), 8000);
-      wc.once('context-menu', (_e, p) => { clearTimeout(fine); ok({ parola: p.misspelledWord, voci: p.dictionarySuggestions }); });
-      setTimeout(() => {
-        wc.sendInputEvent({ type: 'mouseDown', x: 40, y: 22, button: 'right', clickCount: 1 });
-        wc.sendInputEvent({ type: 'mouseUp', x: 40, y: 22, button: 'right', clickCount: 1 });
-      }, 1500);
-    });
-  });
-  expect(suggerimenti).not.toBeNull();
-  expect(suggerimenti.parola).toBe('funzion');
-  expect(suggerimenti.voci).toContain('funzione');
+  // Il successo per chi scrive: senza chiave per i modelli, la correzione in cima al menu può venire solo dal dizionario.
+  // Quale suggerimento sta in cima dipende dalla lingua del sistema (#169); fra quelli del dizionario c'è l'italiano.
+  const host = new URL(url).host;
+  await page.locator('#ce').click();
+  await page.keyboard.type('funzion ciao ');
+  const box = await page.locator('#ce').boundingBox();
+  await expect.poll(async () => {
+    await app.evaluate(({ webContents }, h) => {
+      globalThis.__suggerimentiNativi = null;
+      for (const wc of webContents.getAllWebContents()) {
+        let qui = false;
+        try { qui = new URL(wc.getURL()).host === h; } catch (_) {}
+        if (qui) wc.once('context-menu', (_e, p) => { globalThis.__suggerimentiNativi = { parola: p.misspelledWord, voci: p.dictionarySuggestions }; });
+      }
+    }, host);
+    await page.keyboard.press('Escape');
+    await page.mouse.click(box.x + 20, box.y + 16, { button: 'right' });
+    await page.waitForTimeout(300);
+    return app.evaluate(() => globalThis.__suggerimentiNativi);
+  }, { timeout: 15_000, intervals: [1000] }).toEqual({ parola: 'funzion', voci: expect.arrayContaining(['funzione']) });
+  await expect(page.locator('.sn-menu-correction:visible').first()).not.toBeEmpty({ timeout: 4000 });
 });

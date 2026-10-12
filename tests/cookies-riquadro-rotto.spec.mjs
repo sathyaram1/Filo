@@ -428,6 +428,11 @@ test('spento in Sicurezza: il riquadro sconosciuto non va al modello, il servizi
     await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
     await expect(sec.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
     await sec.screenshot({ path: 'tests/.shots/riquadri-modello-interruttore-scuro.png' });
+    // In Manuale Filo non rifiuta cookie: l'interruttore non conta e si spegne a vista.
+    await sec.locator('#cookie-mode-manual').check();
+    await expect(casella).toBeDisabled();
+    await sec.locator('#cookie-mode-default').check();
+    await expect(casella).toBeEnabled();
     await casella.click();
     await expect.poll(modello, { timeout: 5_000 }).toBe(false);
 
@@ -449,7 +454,7 @@ test('spento in Sicurezza: il riquadro sconosciuto non va al modello, il servizi
 
     // Riacceso dalla chat, il riquadro sconosciuto di un'altra pagina torna dal modello.
     const r = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('riquadri_rotti_modello', 'sì'));
-    await app.evaluate((partial) => globalThis.__filoHandlers.applySettingsUpdate(partial), r.partial);
+    await app.evaluate((_electron, partial) => globalThis.__filoHandlers.applySettingsUpdate(partial), r.partial);
     await expect.poll(modello, { timeout: 5_000 }).toBe(true);
     await expect(casella).toBeChecked({ timeout: 5_000 });
     await openTab(srv.artSu('f', 'd', 'vuoto'));
