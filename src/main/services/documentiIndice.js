@@ -491,14 +491,57 @@ async function cartelleMancanti(elenco) {
   return out;
 }
 
+function nomeOccasionale(c) {
+  const serie = Object.keys(DI_SERIE).find((k) => cartellaDiSerie(k) && path.resolve(cartellaDiSerie(k)) === path.resolve(c));
+  if (serie) return DI_SERIE[serie].nome;
+  if (deps.casa() && path.resolve(deps.casa()) === path.resolve(c)) return 'Cartella personale';
+  return path.basename(c) || c;
+}
+
+// Le cartelle cercate per l'occasione, con quanti documenti l'indice tiene solo per loro (quelli che «Dimentica» toglie).
+function elencoOccasionali(lista) {
+  const inLista = sottoUna(lista);
+  return Array.from(occasionali.keys()).sort((a, b) => occasionali.get(b) - occasionali.get(a)).map((c) => {
+    let documenti = 0;
+    for (const p of voci.keys()) if (dentro(p, c) && !inLista(p)) documenti += 1;
+    let esiste = false;
+    try { esiste = fs.statSync(c).isDirectory(); } catch (_) { esiste = false; }
+    return { percorso: c, nome: nomeOccasionale(c), documenti, esiste, quando: occasionali.get(c) || null };
+  });
+}
+
 async function stato() {
   await carica();
   const rs = await radici();
   return {
     ...riassuntoIndice(rs, daPercorrere(rs)),
+    occasionali: elencoOccasionali(daPercorrere(rs)),
     aggiornato: ultimoGiro || null,
     inCorso: corsa && corsa.stato && corsa.stato.fase === 'lettura' ? { fatti: corsa.stato.fatti, totali: corsa.stato.totali } : null,
   };
+}
+
+/** Toglie dall'indice una cartella cercata per l'occasione e i documenti che teneva solo per lei. → { tolta, documenti } */
+async function dimentica(cartella) {
+  await carica();
+  // Un giro in corso su quella cartella la rimetterebbe appena finito.
+  while (corsa) await corsa.promessa;
+  const c = String(cartella || '');
+  if (!c || !occasionali.has(c)) return { tolta: false, documenti: 0 };
+  occasionali.delete(c);
+  const resta = sottoUna(daPercorrere(await radici()).concat(Array.from(occasionali.keys())));
+  const righe = [rigaOccasionale(c, false)];
+  let documenti = 0;
+  for (const p of Array.from(voci.keys())) {
+    if (!dentro(p, c) || resta(p)) continue;
+    voci.delete(p);
+    righe.push(JSON.stringify({ p, via: true }));
+    documenti += 1;
+  }
+  accoda(righe);
+  if (!voci.size) await elimina();
+  else await compatta();
+  return { tolta: true, documenti };
 }
 
 // Su macOS leggere Documenti, Scrivania e Download fa comparire la richiesta di permesso del sistema: la prima lettura
