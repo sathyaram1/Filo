@@ -18,6 +18,7 @@ const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
+const MenuDiRiserva = require('./menuDiRiserva');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
