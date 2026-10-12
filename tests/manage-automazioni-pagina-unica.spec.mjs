@@ -26,7 +26,8 @@ const STORIA = Array.from({ length: 8 }, (_, i) => fusa(i));
 
 async function apri(app, openTab, { admin = true, recent = STORIA.slice(0, 6), preapproved = STORIA, size = [1536, 864] } = {}) {
   const page = await openTab(URL);
-  await app.evaluate(({ BrowserWindow }, s) => { BrowserWindow.getAllWindows()[0].setSize(s[0], s[1]); }, size);
+  // La finestra con le schede, non la prima: il menu a comparsa ha una finestra sua, pronta dall'avvio.
+  await app.evaluate(({ BrowserWindow }, s) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(s[0], s[1]); }, size);
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate((cfg) => {
