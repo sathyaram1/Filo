@@ -1,5 +1,5 @@
 // Riconosce fra i file del repo, che è pubblico, una copia di dati del server: documenti Firestore o feedback già in chiaro.
-// Non legge il server e non sposta niente: dice quali file sono copie e perché. Le copie di lavoro stanno in os.tmpdir().
+// Non legge il server e non sposta niente: dice quali file e commit sono copie e perché. Le copie di lavoro stanno in os.tmpdir().
 // Sentinella: tests/unit/copieDiDatiFuoriDalRepo.test.mjs.
 
 import { execFileSync } from 'node:child_process';
