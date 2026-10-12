@@ -217,7 +217,7 @@ const TETTO_SVUOTA_MS = 120;
 function statoDi(parent) {
   let s = stati.get(parent);
   if (!s) {
-    s = { parent, win: null, pronta: false, attesa: null, aperto: false, giro: 0, scelta: null, posa: null, mostratoAlle: 0, tetto: null, dopo: [] };
+    s = { parent, win: null, pronta: false, attesa: null, aperto: false, giro: 0, scelta: null, richiesta: null, posa: null, mostratoAlle: 0, tetto: null, dopo: [] };
     stati.set(parent, s);
   }
   return s;
