@@ -287,6 +287,12 @@ module.exports = function register(on, ctx) {
     const signedIn = auth.isSignedIn();
     const isAdmin = auth.isAdmin();
     if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
+    // `senzaRete`: chi apre un menu non aspetta il rinnovo del token che serve all'uid (#1123 giro 1).
+    if (msg && msg.senzaRete) {
+      let googleNelleSchede = false;
+      try { googleNelleSchede = await require('../accessoGoogle').collegatoNelleSchede(); } catch (_) {}
+      return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), remembered: auth.isRemembered(), googleNelleSchede };
+    }
     const uid = signedIn ? await auth.getUid() : null;
     // Se una scheda nuova su Google troverebbe un account: il menu dell'account ne fa le sue voci (#1123).
     let googleNelleSchede = false;
