@@ -226,11 +226,16 @@
         const date = immagini(m);
         const urls = (Array.isArray(date) ? date : []).filter((u) => typeof u === 'string' && u);
         if (!urls.length) continue;
-        const peso = urls.reduce((k, u) => k + u.length, 0);
-        if (quante + urls.length > MAX_IMMAGINI_RIMANDATE || caratteri + peso > MAX_CARATTERI_IMMAGINI) break;
-        quante += urls.length;
-        caratteri += peso;
-        fotoDi.set(i, urls);
+        // Un messaggio che non ci sta intero tiene le sue prime foto che ci stanno: le altre lasciano la nota.
+        const tenute = [];
+        for (const u of urls) {
+          if (quante + 1 > MAX_IMMAGINI_RIMANDATE || caratteri + u.length > MAX_CARATTERI_IMMAGINI) break;
+          quante += 1;
+          caratteri += u.length;
+          tenute.push(u);
+        }
+        if (tenute.length) fotoDi.set(i, tenute);
+        if (tenute.length < urls.length) break;
       }
     }
     const rendiIl = (i, prima) => rendi(lista[i], prima, { tetto: token, esito: esitoDi(i), osserva, foto: fotoDi.get(i) || null });
