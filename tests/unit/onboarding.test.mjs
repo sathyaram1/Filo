@@ -463,3 +463,22 @@ test('l’autonomia è una voce da scoprire, e la si spunta dopo la scelta (#118
   assert.match(voce.applica, /cambia solo lui/, 'e che il livello non lo cambia lui');
   assert.match(O.renderChecklistForPrompt(O.emptyState()), /\[ \] autonomia/);
 });
+
+test('con la scelta dell’autonomia a schermo l’intervista non si chiude da sola finché l’utente non scrive (#1188)', () => {
+  const quasi = O.tick(O.emptyState(), O.ITEM_IDS.filter((id) => id !== 'autonomia')).state;
+  const mostrata = O.mostraSceltaAutonomia(quasi);
+  assert.equal(O.autonomiaInSospeso(O.normalize(JSON.parse(JSON.stringify(mostrata)))), true, 'il segno sopravvive al salvataggio');
+  // Anche con l'elenco completo (la voce spuntata altrove), la scelta in sospeso tiene aperta l'intervista.
+  const completa = O.tick(mostrata, ['autonomia']).state;
+  assert.equal(O.shouldForceClose(completa), false);
+  // La risposta dell'utente scioglie il segno: da lì l'elenco finito chiude come sempre.
+  const risposto = O.appendTurn(completa, { role: 'user', text: 'Scelgo Conservativo.' });
+  assert.equal(O.autonomiaInSospeso(risposto), false);
+  assert.equal(O.shouldForceClose(risposto), true);
+  // Il turno di Filo non lo scioglie, e il tetto duro resta un tetto.
+  assert.equal(O.autonomiaInSospeso(O.appendTurn(mostrata, { role: 'filo', text: 'Scegli qui sotto.' })), true);
+  let lunga = O.mostraSceltaAutonomia(O.emptyState());
+  for (let i = 0; i < O.HARD_MAX_EXCHANGES; i++) lunga = O.mostraSceltaAutonomia(O.appendTurn(lunga, { role: 'user', text: `m${i}` }));
+  assert.equal(O.shouldForceClose(lunga), true);
+  assert.equal(O.autonomiaInSospeso(O.restart(mostrata)), false, 'rifarla riparte senza scelte in sospeso');
+});

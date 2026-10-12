@@ -431,3 +431,59 @@ test('nel benvenuto alzare l’autonomia vuole «conferma», e la scelta resta d
   await page.waitForTimeout(400);
   await page.screenshot({ path: 'tests/.shots/1188-scelta-autonomia-scuro.png' }).catch(() => {});
 });
+
+// #1188 — la scelta in sospeso tiene aperta l'intervista anche quando Filo, nella stessa risposta, spunta la voce
+// o chiude con un'azione separata: chiusa, la scelta sparirebbe con la chat prima del clic.
+test('nel benvenuto la scelta dell’autonomia resta a schermo finché l’utente non risponde, da qualunque azione arrivi la chiusura', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const page = await apriIntervista(app, shell);
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    const O = globalThis.SN_ONBOARDING;
+    await M.setOnboarding(O.tick(await M.getOnboarding(), O.ITEM_IDS.filter((id) => id !== 'autonomia')).state);
+  });
+  await queueChat(app, {
+    text: 'Ultima cosa: quanto vuoi che faccia da solo? Scegli qui sotto.',
+    actions: [{ type: 'ONBOARDING', autonomia: true }, { type: 'ONBOARDING', spunta: ['autonomia'] }, { type: 'ONBOARDING', fine: true }],
+  });
+  await page.locator('#input').fill('sono Anna');
+  await page.locator('#sendBtn').click();
+  const scelta = page.locator('.dash-bubble-filo .dash-autonomia-scelta');
+  await expect(scelta).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(3000);
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread');
+  await expect(scelta).toBeVisible();
+  expect((await onbState(app)).done).toBe(false);
+
+  // Il clic è la risposta: da lì Filo spunta e l'intervista lascia il posto alla home.
+  await queueChat(app, { text: 'Va bene così.', actions: [{ type: 'ONBOARDING', spunta: ['autonomia'] }] });
+  await scelta.locator('.dash-autonomia-livello', { hasText: 'Conservativo' }).click();
+  await expect.poll(() => livelloAutonomia(app), { timeout: 10_000 }).toBe('conservativo');
+  await expect(bolleUtente(page).last()).toHaveText('Scelgo Conservativo.');
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
+  expect((await onbState(app)).ticked).toContain('autonomia');
+});
+
+// #1188 — il blocco di attività dice «Non partita» solo di un'azione nominata e mai arrivata: la riga della scelta
+// (o dello stile) è partita, e il posto rimasto vuoto della nota diventata risposta non è un'azione.
+test('nel benvenuto il blocco di attività non dice «Non partita» sotto la scelta dell’autonomia né sotto lo stile', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const page = await apriIntervista(app, shell);
+  await queueChat(app, { text: 'Quanto vuoi che faccia da solo?', actions: [{ type: 'ONBOARDING', autonomia: true }] });
+  await page.locator('#input').fill('sono Anna');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo .dash-autonomia-scelta')).toBeVisible({ timeout: 30_000 });
+  const primo = page.locator('.dash-activity').last();
+  await expect(primo).toContainText('scelta dell’autonomia');
+  await page.waitForTimeout(2000);
+  expect(await primo.textContent()).not.toContain('Non partita');
+
+  await queueChat(app, rispostaStile);
+  await page.locator('#input').fill('scrivimi breve e dammi del tu');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-stile-accoglienza')).toBeVisible({ timeout: 30_000 });
+  const secondo = page.locator('.dash-activity').last();
+  await expect(secondo).toContainText('stile dell');
+  await page.waitForTimeout(2000);
+  expect(await secondo.textContent()).not.toContain('Non partita');
+});
