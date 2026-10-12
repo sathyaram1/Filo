@@ -23,6 +23,7 @@
       ],
       fixes: [
         'Mentre scorri o scrivi in una pagina, Filo non ridisegna più la barra delle schede e non risalva i suoi dati a ogni movimento. Menu e chat rispondono senza scatti e la batteria dura di più.',
+        'Preferenze, Modelli e le altre pagine di Filo si aprono un po\' più svelte dalla terza volta in poi. Filo tiene da parte il loro codice già preparato e non lo rifà a ogni apertura.',
         'La Cronologia AI tiene tutte le tue richieste: prima, oltre una certa dimensione, le più vecchie sparivano senza avviso. E Filo resta reattivo anche dopo settimane d\'uso, perché ogni modifica, anche solo di un\'impostazione, non riscrive più da capo tutta la cronologia. Anche con migliaia di voci la pagina della Cronologia AI si apre subito e la ricerca risponde a ogni lettera. E le richieste alla chat di Filo mostrano anche la tua domanda, che adesso puoi cercare.',
         'Nella ricerca della cronologia degli appunti Ctrl+Z annulla quello che hai scritto, invece di riportarti alla pagina di prima.',
         'La spiegazione che Filo prepara mentre selezioni e il correttore partono solo quando selezioni o scrivi tu. Un sito non li può più far partire da solo, e i tuoi crediti vanno solo a quello che usi.',
