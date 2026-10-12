@@ -218,7 +218,6 @@
       if (i >= 0) { shown = shown.filter((x) => x !== it); if (i < drawn) drawn--; }
       wrap.remove();
       if (!shown.length) showEmpty();
-      else drawMore();
     });
     right.appendChild(remove);
 
