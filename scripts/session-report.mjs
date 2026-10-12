@@ -101,8 +101,8 @@ export function scrittureCache(u) {
 /** Le versioni che il listino conosce per nome, con la tariffa che devono avere. */
 const VERSIONI = Object.freeze({
   opus: { '5-5': 'opus-5-5', 5: 'opus', '4-8': 'opus', '4-7': 'opus', '4-6': 'opus', '4-5': 'opus' },
-  sonnet: { 5: 'sonnet', '4-6': 'sonnet-4', '4-5': 'sonnet-4', 4: 'sonnet-4' },
-  haiku: { '4-5': 'haiku' },
+  sonnet: { '5-5': 'sonnet', 5: 'sonnet', '4-6': 'sonnet-4', '4-5': 'sonnet-4', 4: 'sonnet-4' },
+  haiku: { '5-5': 'haiku-5-5', '4-5': 'haiku' },
   fable: { '5-1': 'fable', 5: 'fable-5' },
   mythos: { '5-1': 'fable', 5: 'fable-5' },
 });
