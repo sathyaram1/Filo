@@ -153,11 +153,20 @@
 
   // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
   // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
-  function rendi(m, prima, { tetto, esito, osserva }) {
+  // `foto`: le immagini del messaggio che tornano davanti al modello in questo turno (la finestra decide quali).
+  function rendi(m, prima, { tetto, esito, osserva, foto = null }) {
     const cambia = !prima || prima.chat !== m.chat;
     const daFuori = daFuoriIl(m);
     const testo = daFuori ? '' : tienilo(m.text, tetto, m.chat);
-    if (m.role === 'user') return { role: 'user', content: `${intestazione(m.ts, m.chat)} ${testo}`.trim() };
+    if (m.role === 'user') {
+      const detto = `${intestazione(m.ts, m.chat)} ${testo}`.trim();
+      const quante = numeroImmagini(m);
+      if (!quante) return { role: 'user', content: detto };
+      if (Array.isArray(foto) && foto.length) {
+        return { role: 'user', content: [{ type: 'text', text: detto }, ...foto.map((url) => ({ type: 'image_url', image_url: { url } }))] };
+      }
+      return { role: 'user', content: `${detto}\n${notaImmagini(quante)}` };
+    }
     const parti = [];
     if (cambia) parti.push(intestazione(m.ts, m.chat));
     if (testo.trim()) parti.push(testo);
