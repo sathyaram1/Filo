@@ -384,6 +384,15 @@
     };
   }
 
+  // Il rifiuto di una richiesta per le immagini che porta: modello di solo testo, troppe immagini, richiesta troppo grossa.
+  function rifiutaImmagini(err) {
+    const st = Number(err && err.status);
+    if (st === 413) return true;
+    if (Number.isFinite(st) && st > 0 && ![400, 404, 415, 422].includes(st)) return false;
+    const s = String((err && (err.message || err.error)) || err || '');
+    return /imag|vision|multi-?modal|content must be a string|payload too large|entity too large/i.test(s);
+  }
+
   // Il tetto in token con cui riprovare dopo quel rifiuto. `caratteri`: tutta la richiesta; `caratteriTratto`: la
   // parte che si può stringere. Con le misure si va un po' sotto la finestra; senza, il tratto si dimezza.
   const MARGINE_FINESTRA = 0.85;
