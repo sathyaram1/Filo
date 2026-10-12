@@ -206,6 +206,7 @@ html[data-chrome-compact="1"] .addr {
   flex: none;
   width: max-content;
 }
+
 .tab.active.audible {
   animation: tab-glow-pulse 2.4s ease-in-out infinite;
 }
