@@ -131,6 +131,46 @@ export function copieDaSpedire(root, rif = 'HEAD') {
   return trovate;
 }
 
+/**
+ * Prima di spedire: se i commit da spedire portano copie, le toglie dalla loro storia rifacendoli in un commit solo
+ * (sono solo locali; il resto del lavoro resta e parte). { stato: 'pulito'|'riparato'|'fermo', avviso }: con 'fermo'
+ * (una fusione in mezzo, il primo commit del repo) non si spedisce, e l'avviso dice come toglierle a mano.
+ */
+export function spedibileSenzaCopie(root, { nome = 'claude-local', email = 'claude@local' } = {}) {
+  const copie = copieDaSpedire(root);
+  if (!copie.length) return { stato: 'pulito', avviso: '' };
+  const fermo = { stato: 'fermo', avviso: avvisoSpedizione(copie) };
+  const g = (args) => gitTesto(root, args).trim();
+  const primo = copie[0].commit;
+  let base;
+  try { base = g(['rev-parse', '--verify', '-q', `${primo}~1`]); } catch (_) { return fermo; }
+  if (g(['rev-list', '--merges', `${base}..HEAD`])) return fermo;
+  const soggetti = g(['log', '--reverse', '--format=%s', `${base}..HEAD`]).split('\n').filter(Boolean);
+  const file = [...new Set(copie.map((c) => c.file))];
+  const testa = g(['rev-parse', 'HEAD']);
+  try {
+    g(['reset', '-q', '--soft', base]);
+    // Solo i file che in cima sono ancora copie tornano come alla base: uno corretto dopo resta com'è adesso.
+    const restano = file.filter((f) => {
+      try { return motivoCopiaTesto(gitTesto(root, ['show', `${testa}:${f}`])); } catch (_) { return false; }
+    });
+    if (restano.length) g(['reset', '-q', base, '--', ...restano]);
+    try { escludiInLocale(root, restano); } catch (_) { /* il controllo sui file in scena li rivede */ }
+    g(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '--allow-empty', '-m',
+      `${soggetti.join(' + ').slice(0, 200)} (senza la copia dei dati: ${file.join(', ')})`]);
+  } catch (_) {
+    try { g(['reset', '-q', '--soft', testa]); } catch (__) { /* resta il messaggio */ }
+    return fermo;
+  }
+  if (copieDaSpedire(root).length) return fermo;
+  return {
+    stato: 'riparato',
+    avviso: `${file.join(', ')} ha la forma di una copia dei dati del server (${copie[0].motivo}) e il repo e' pubblico: `
+      + `l'ho tolto dai commit non ancora spediti, rifatti in uno solo (il lavoro resta), e il ramo parte senza. `
+      + `La copia resta nella cartella, invisibile a git: spostala nella cartella temporanea del sistema (os.tmpdir()).`,
+  };
+}
+
 const citaShell = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 
 /** Cosa dire a chi spedisce quando copieDaSpedire ha trovato qualcosa: il ramo non parte, e come toglierle dalla storia. */
