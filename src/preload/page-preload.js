@@ -16,6 +16,9 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// Prima di qualunque HTML scritto da Filo: la CSP della pagina non è la sua (#1122).
+try { require('./mondo-esente.js')(webFrame); } catch (e) { console.error('[Filo CS] mondo esente', e); }
+
 // Prima di ogni ascoltatore: una pagina che si riscrive non spegne Filo (#686.1).
 let riscrittura = null;
 try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
@@ -91,38 +94,66 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
 // ha bisogno di settings/spellcheck/Menu) si installa più tardi via
 // __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
 let contextMenuHandler = null;
+// Ogni tasto destro dell'utente apre un menu: quello di Filo o, se non parte (guasto, pagina ancora in caricamento,
+// Filo spento sul sito, Shift), quello di riserva del main, salvo che la pagina mostri il suo (#1122).
+// `clic` è l'ora del gesto: il main la usa per accoppiarlo al suo `context-menu`, non a quello di un clic prima.
+function menuDiRiserva(clic, motivo = '') {
+  try { ipcRenderer.send('filo:menu-di-riserva', { clic, motivo: String(motivo || '').slice(0, 2000) }); } catch (_) {}
+}
+function riservaSeLaPaginaTace(e, clic) {
+  setTimeout(() => { if (!e.defaultPrevented) menuDiRiserva(clic); }, 0);
+}
+function apriMenuDiFilo(e, clic = Date.now()) {
+  let esito;
+  try { esito = contextMenuHandler(e); } catch (err) { esito = Promise.reject(err); }
+  Promise.resolve(esito).catch((err) => {
+    console.error('[Filo CS] menu del tasto destro', err);
+    menuDiRiserva(clic, (err && err.stack) || err || 'errore');
+  });
+}
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
     // Solo il tasto destro dell'utente: uno fabbricato dallo script del sito aprirebbe il menu, e con lui
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
+    const clic = Date.now();
+    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser.
+    if (e.shiftKey) { riservaSeLaPaginaTace(e, clic); return; }
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
-      contextMenuHandler(e);
-      if (!e.shiftKey) { try { e.stopImmediatePropagation(); } catch (_) {} }
+      apriMenuDiFilo(e, clic);
+      try { e.stopImmediatePropagation(); } catch (_) {}
       return;
     }
+    if (!IS_SUBFRAME) { riservaSeLaPaginaTace(e, clic); return; }
     // #405 — primo tasto destro dentro un riquadro: i content script non sono
     // ancora montati (li montiamo solo all'uso). Montali ORA e rigioca questo
     // stesso clic appena l'handler è pronto, così il primo tentativo apre il
     // menu invece di andare perso — l'utente non deve cliccare due volte.
-    if (!IS_SUBFRAME) return;
-    // Shift resta la via di fuga anche qui: con Shift premuto non tocchiamo
-    // l'evento e lasciamo che il riquadro faccia quello che farebbe da solo.
-    if (e.shiftKey) return;
     try { e.stopImmediatePropagation(); } catch (_) {}
-    replayContextMenu(e);
+    replayContextMenu(e, clic);
     ensureContentScripts();
   }, { capture: true });
+} catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
+
+// Un tasto scritto in un riquadro chiuso di Filo lo prende Filo prima di ogni script del sito, anche in cattura (#1071):
+// per questo l'ascolto nasce qui, a document_start. Lo smista SN_FILO_UI.tastoNelRiquadro (src/shared/filoUi.js).
+try {
+  for (const tipo of ['keydown', 'keypress', 'keyup']) {
+    window.addEventListener(tipo, (e) => {
+      const UI = globalThis.SN_FILO_UI;
+      if (UI && typeof UI.tastoNelRiquadro === 'function') UI.tastoNelRiquadro(e);
+    }, { capture: true });
+  }
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
 // Copia inerte del clic destro da rigiocare quando l'handler vero è pronto.
 // Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
 // fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
 // i dati che l'handler legge, così il menu si apre sull'elemento giusto.
-function replayContextMenu(e) {
+function replayContextMenu(e, clic) {
   let node = null;
   try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
   catch (_) { node = e.target; }
@@ -140,8 +171,8 @@ function replayContextMenu(e) {
   };
   const deadline = Date.now() + 3000;
   const tick = () => {
-    if (typeof contextMenuHandler === 'function') { try { contextMenuHandler(copy); } catch (_) {} return; }
-    if (Date.now() > deadline) return;
+    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
+    if (globalThis.__snFiloSpento === true || Date.now() > deadline) { menuDiRiserva(clic); return; }
     setTimeout(tick, 16);
   };
   setTimeout(tick, 16);
@@ -155,6 +186,9 @@ if (!IS_SUBFRAME) {
 } else {
   try { require('./wheel-zoom.js').riquadro(webFrame, { ipcRenderer }); } catch (e) { console.error('[Filo CS] wheel-zoom riquadro', e); }
 }
+
+// In ogni frame, riquadri compresi: il tasto arriva solo al frame che ha il fuoco.
+try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] cmd-freccia', e); }
 
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
 //
@@ -173,7 +207,7 @@ if (!IS_SUBFRAME) try {
     const cfg = ipcRenderer.sendSync('filo:fp-config', loc) || { level: 0, seed: 0 };
     if (cfg && cfg.level > 0) {
       const { buildGuardSource } = require('./fingerprint-guard.js');
-      webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level), true).catch(() => {});
+      webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level), false).catch(() => {});
     }
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
@@ -471,6 +505,173 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
+// Il gesto che vale per finestre e schermo pieno lo dice solo questo ascolto, in ogni frame, prima della pagina: è
+// l'unico a sapere se l'input è caduto sull'interfaccia di Filo (#737.1 giri 6 e 7). Solo l'input vero: la pagina non
+// lo fabbrica. Il collegamento cliccato si apre anche se la pagina ha speso il gesto per sé. Regole: services/permessiPagine.js.
+try {
+  let ultimoGesto = 0;
+  let ultimoDiFilo = 0;
+  // Gli stessi tasti che nella pagina non sono un gesto (TASTI_SENZA_GESTO in services/permessiPagine.js).
+  const SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
+  const suUiDiFilo = (e) => {
+    const ui = globalThis.SN_FILO_UI;
+    if (!ui || typeof ui.aperti !== 'function') return false;
+    const radici = ui.aperti();
+    if (!radici.length) return false;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    return radici.some((r) => {
+      for (let n = r, k = 0; n && k < 32; k++) {
+        if (percorso.includes(n)) return true;
+        const radice = n.getRootNode && n.getRootNode();
+        n = radice && radice.host ? radice.host : null;
+      }
+      return false;
+    });
+  };
+  const gesto = (e) => {
+    if (!e.isTrusted || (e.type === 'keydown' && SENZA_GESTO.has(e.key))) return;
+    const ora = Date.now();
+    if (suUiDiFilo(e)) {
+      // pointerdown e mousedown dello stesso clic sono un gesto solo.
+      if (e.type === 'mousedown' && ora - ultimoDiFilo < 100) return;
+      if (e.type === 'pointerdown') ultimoDiFilo = ora;
+      try { ipcRenderer.sendSync('filo:gesto-di-filo'); } catch (_) {}
+      return;
+    }
+    if (e.type === 'pointerdown' && e.pointerType === 'touch') return;
+    if (e.type === 'mousedown' && ora - ultimoGesto < 100) return;
+    if (e.type === 'pointerdown') ultimoGesto = ora;
+    const tasto = e.type === 'keydown'
+      ? { key: e.key, code: e.code, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey } : null;
+    try { ipcRenderer.sendSync('filo:gesto-pagina', tasto); } catch (_) {}
+  };
+  const SCHEMI_APRIBILI = /^(https?|mailto|tel|sms):/i;
+  // Il pulsante d'invio cliccato porta dove lo manda il suo modulo: con GET i campi diventano la domanda dell'indirizzo.
+  const indirizzoDelModulo = (percorso) => {
+    try {
+      const b = percorso.find((n) => n && n.form && /^(submit|image)$/i.test(n.type || ''));
+      if (!b) return '';
+      const f = b.form;
+      const u = new URL(b.hasAttribute('formaction') ? b.formAction : f.action, (b.ownerDocument || document).baseURI);
+      if (String(b.formMethod || f.method || 'get').toLowerCase() === 'get') u.search = new URLSearchParams(new FormData(f, b)).toString();
+      return u.href;
+    } catch (_) { return ''; }
+  };
+  const scelto = (e) => {
+    if (!e.isTrusted || (e.type === 'auxclick' && e.button !== 1)) return;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href);
+    const url = a ? String(a.href) : indirizzoDelModulo(percorso);
+    if (!SCHEMI_APRIBILI.test(url)) return;
+    try { ipcRenderer.sendSync('filo:apertura-scelta', url); } catch (_) {}
+  };
+  const ascolta = (win) => {
+    // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
+    for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
+      win.addEventListener(ev, gesto, { capture: true, passive: true });
+    }
+    // Prima della pagina e dopo di lei: un sito che riscrive il collegamento al clic apre quello riscritto.
+    for (const ev of ['click', 'auxclick']) {
+      win.addEventListener(ev, scelto, { capture: true, passive: true });
+      win.addEventListener(ev, scelto, { passive: true });
+    }
+    win.addEventListener('pointerover', confine, { capture: true, passive: true });
+  };
+  // I documenti che la pagina si scrive da sé non hanno un preload loro (il riquadro vuoto riempito dallo script), o
+  // perdono gli ascolti (la riscrittura da capo): il gesto si ascolta anche lì (#737.1 giro 8). Regole nel pattern.
+  // Il segno lo mette solo il preload di un frame per sé; lo vedono i preload degli altri frame dello stesso sito.
+  const PRELOAD_PROPRIO = Symbol.for('filo:gesto-preload-proprio');
+  const seguiti = new WeakSet();
+  const inArrivo = (f) => (f.hasAttribute('src') && !/^(about:blank)?$/i.test(f.getAttribute('src').trim())) || f.hasAttribute('srcdoc');
+  const senzaPreload = (f, caricato) => {
+    if (!caricato && inArrivo(f)) return null;
+    try { const w = f.contentWindow; return w && w.document && !w[PRELOAD_PROPRIO] ? w : null; } catch (_) { return null; }
+  };
+  // Riquadri che aspettano il primo load: finché c'è, nessuna finestra si tocca alla cieca.
+  const inAttesa = new Set();
+  // Lo stesso riquadro cambia documento tenendo la finestra (il vuoto iniziale, la riscrittura): si riaggancia al load.
+  const riquadro = (f) => {
+    if (seguiti.has(f)) return;
+    seguiti.add(f);
+    f.addEventListener('load', () => { inAttesa.delete(f); const w = senzaPreload(f, true); if (w) segui(w); }, true);
+    if (inArrivo(f)) inAttesa.add(f);
+    const w = senzaPreload(f, false);
+    if (w) segui(w);
+  };
+  const segui = (win) => {
+    ascolta(win);
+    let doc = null;
+    try { doc = win.document; } catch (_) {}
+    if (!doc || seguiti.has(doc)) return;
+    seguiti.add(doc);
+    new MutationObserver(() => ascolta(win)).observe(doc, { childList: true });
+    const riquadri = doc.getElementsByTagName('iframe');
+    const nuovi = () => { for (const f of riquadri) riquadro(f); };
+    new MutationObserver(nuovi).observe(doc, { childList: true, subtree: true });
+    nuovi();
+  };
+  // Un riquadro dentro una radice ombra sfugge agli osservatori del documento e a window.frames (#737.1 giro 10): si
+  // cerca quando il puntatore passa, prima della pressione. Una radice chiusa mostra solo l'ospite: lì il riquadro lo
+  // trova l'albero dei frame, e si presenta lui nel mondo isolato del preload (lo stesso in tutti i frame).
+  const OSPITI_DI_FINESTRE = 'iframe,frame,object,embed';
+  const NASCOSTO = Symbol.for('filo:gesto-riquadro-nascosto');
+  const MONDO_DEL_PRELOAD = 999;
+  const PRESENTATI = `(()=>{try{const f=parent[Symbol.for('filo:gesto-riquadro-nascosto')];if(typeof f==='function'&&!window[Symbol.for('filo:gesto-preload-proprio')])f(window)}catch(_){}})()`;
+  let figliContati = 0;
+  const inOmbre = (doc) => {
+    let n = 0;
+    const visita = (radice) => {
+      const passi = doc.createTreeWalker(radice, NodeFilter.SHOW_ELEMENT);
+      for (let el = passi.nextNode(); el; el = passi.nextNode()) {
+        const r = el.shadowRoot;
+        if (!r) continue;
+        for (const f of r.querySelectorAll(OSPITI_DI_FINESTRE)) { n++; if (f.localName === 'iframe' || f.localName === 'frame') riquadro(f); }
+        visita(r);
+      }
+    };
+    visita(doc);
+    return n;
+  };
+  const confine = (e) => {
+    if (!e.isTrusted) return;
+    const n = typeof e.composedPath === 'function' ? e.composedPath()[0] : e.target;
+    if (n && (n.localName === 'iframe' || n.localName === 'frame')) { riquadro(n); return; }
+    if (e.currentTarget !== window) return;
+    const figli = [];
+    try { for (let c = webFrame.firstChild; c && figli.length < 256; c = c.nextSibling) figli.push(c); } catch (_) { return; }
+    if (!figli.length || figli.length === figliContati) return;
+    let visti = document.querySelectorAll(OSPITI_DI_FINESTRE).length;
+    if (figli.length > visti) visti += inOmbre(document);
+    if (figli.length > visti) {
+      for (const f of inAttesa) if (!f.isConnected) inAttesa.delete(f);
+      // Toccato prima del suo load un riquadro perde il preload: alla cieca solo quando nessuno è in arrivo.
+      if (inAttesa.size) return;
+      for (const c of figli) { try { c.executeJavaScriptInIsolatedWorld(MONDO_DEL_PRELOAD, [{ code: PRESENTATI }], false).catch(() => {}); } catch (_) {} }
+    }
+    figliContati = figli.length;
+  };
+  try {
+    Object.defineProperty(window, NASCOSTO, { value: (w) => { try { if (w && w.parent === window && !seguiti.has(w.document)) segui(w); } catch (_) {} } });
+  } catch (_) {}
+  try { Object.defineProperty(window, PRELOAD_PROPRIO, { value: true }); } catch (_) {}
+  segui(window);
+  // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
+  globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
+} catch (_) {}
+
+// Electron fa di window.close() la chiusura dell'intera finestra di Filo, da ogni pagina e riquadro: qui la pagina chiede
+// e il main chiude solo la sua scheda, quando un browser lo permetterebbe (#737.1 giro 11, ipc.js `filo:chiudi-pagina`).
+try {
+  const CHIUDI = 'filo:chiudi-pagina';
+  const chiudi = () => { try { ipcRenderer.send(CHIUDI); } catch (_) {} };
+  const ascolta = () => window.addEventListener(CHIUDI, chiudi, true);
+  ascolta();
+  // La riscrittura da capo (document.open, la ricevuta scritta dalla pagina che l'ha aperta) toglie gli ascolti.
+  new MutationObserver(ascolta).observe(document, { childList: true });
+  webFrame.executeJavaScript(`(()=>{const w=window,d=EventTarget.prototype.dispatchEvent,E=Event;
+    Object.defineProperty(w,'close',{value:function close(){d.call(w,new E(${JSON.stringify(CHIUDI)}))},writable:true,configurable:true,enumerable:true})})()`, false).catch(() => {});
+} catch (_) {}
+
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
@@ -552,6 +753,7 @@ function loadScripts() {
   // (traduzione, sentinella del testo nuovo) lo riconosce da quel marchio.
   try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
+  try { require(path.join(SHARED_DIR, 'clipboardHistory.js')); } catch (e) { console.error('[Filo CS] clipboardHistory', e); } // #256 — PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons

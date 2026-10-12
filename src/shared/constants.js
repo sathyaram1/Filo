@@ -8,6 +8,8 @@
   const STORAGE_KEYS = {
     SETTINGS: 'settings',
     SAVED_PAGES: 'savedPages',
+    // Dove stava la cronologia AI prima di avere file propri: serve alla migrazione
+    // e al backup, in services/historyStore.js. Nessuno la scrive in storage.json.
     HISTORY: 'aiHistory',
     // #410.1 — cronologia degli scaricamenti "nativi" della navigazione (clic su
     // un link a un file). Sopravvive al riavvio: la pagina elenco (#410.3) la
@@ -83,7 +85,8 @@
     // riaprirli alla riapertura di Filo. { tabs: string[], activeIndex: number }.
     OPEN_TABS: 'sn_open_tabs',
     // === Filo dashboard / memoria ===
-    // RAW_LOG: array di {ts, type, summary, extra?} — vedi filoMemory.appendRaw.
+    // Il vecchio registro grezzo (5000 voci, testi a 200 caratteri): il contesto è il filo (#868), e alla partenza
+    // la chiave si toglie (ilFilo.js).
     FILO_RAW_LOG: 'filo_raw_log',
     // Buffer lezioni in attesa di compattazione (array di stringhe).
     FILO_LESSONS_BUFFER: 'filo_lessons_buffer',
@@ -292,6 +295,8 @@
     // Ricerca "a senso" fra i feedback nella dashboard di gestione (prima usava
     // lo slot di «Categorizza»).
     MANAGE_SEARCH: 'manage_search',
+    // Il classificatore della stessa ricerca: legge i feedback in parallelo e dice quali corrispondono (#1118).
+    MANAGE_SEARCH_CLASSIFY: 'manage_search_classify',
     // Embedding dei riassunti delle schede archiviate (base della ricerca
     // semantica nell'archivio). Prima il modello era scritto nel codice.
     ARCHIVE_EMBED: 'archive_embed',
@@ -446,6 +451,7 @@
     [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
     [ACTIONS.EDITOR_CHAT]: 'Editor — chat col documento',
     [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
+    [ACTIONS.MANAGE_SEARCH_CLASSIFY]: 'Gestione — classificatore della ricerca',
     [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
     [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
     [ACTIONS.FILE_NAME]: 'Nome sensato a un file',
@@ -519,6 +525,7 @@
     [ACTIONS.EDITOR_SUMMARY]: '',
     [ACTIONS.EDITOR_CHAT]: '',
     [ACTIONS.MANAGE_SEARCH]: '',
+    [ACTIONS.MANAGE_SEARCH_CLASSIFY]: '',
     [ACTIONS.ARCHIVE_EMBED]: '',
     [ACTIONS.PROVIDER_TEST]: '',
     [ACTIONS.FILE_NAME]: '',
@@ -571,6 +578,7 @@
     'Moonshot AI',
     'MiniMax',
     'Qwen',         // Alibaba/Qwen
+    'Alibaba',      // l'host di Alibaba Cloud su OpenRouter: la sola voce "Qwen" lo lasciava passare
     'Cohere',
     'Meta',         // produttore di Llama
     'Z.AI',         // Zhipu / GLM
@@ -585,11 +593,13 @@
   // mostra accanto al nome, così fra mesi si sa se un'esclusione ha ancora senso.
   // `kind`: 'producer' (produce i modelli) | 'unreliable' (serve male).
   const EXCLUDED_PROVIDER_KINDS = ['producer', 'unreliable'];
-  const DEFAULT_EXCLUDED_PROVIDER_REASONS = [
-    ...['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI']
-      .map((name) => ({ name, kind: 'producer', note: '' })),
-    { name: 'Novita', kind: 'unreliable', note: 'Banco di prova del 30/08/2026: ha risposto con la risposta di un\'altra richiesta.' },
-  ];
+  const UNRELIABLE_PROVIDER_NOTES = {
+    Novita: 'Banco di prova del 30/08/2026: ha risposto con la risposta di un\'altra richiesta.',
+  };
+  const DEFAULT_EXCLUDED_PROVIDER_REASONS = DEFAULT_EXCLUDED_PROVIDERS.map((name) => (
+    UNRELIABLE_PROVIDER_NOTES[name]
+      ? { name, kind: 'unreliable', note: UNRELIABLE_PROVIDER_NOTES[name] }
+      : { name, kind: 'producer', note: '' }));
 
   function normalizeProviderName(name) {
     return String(name == null ? '' : name).toLowerCase().replace(/\s+/g, ' ').trim();
@@ -1699,12 +1709,12 @@
     // #711 — l'esito delle etichette di origine delle immagini che l'utente ha davanti
     // quando chiede all'Aiuto. Il payload può scriverlo chiunque parli al canale: dei
     // numeri si tengono solo i numeri, e le frasi (nomi scritti da chi ha fatto il file) viaggiano imbustate.
-    // #946 — gli esiti delle immagini allegate in messaggi precedenti della chat della Home: le immagini
-    // non tornano nei turni dopo, l'esito sì. I blocchi li ha composti il main, con le frasi del file già imbustate.
+    // #946 — gli esiti delle immagini allegate in messaggi precedenti della chat della Home: le etichette stanno nei
+    // byte del file, non nei pixel che tornano al modello (#1166). I blocchi li ha composti il main, con le frasi del file già imbustate.
     origineGiaLettaInChat: (blocchi) => {
       const lista = (Array.isArray(blocchi) ? blocchi : []).filter((b) => typeof b === 'string' && b);
       if (!lista.length) return '';
-      const testa = `(Sistema: ${esterno().perCanaleSistema('nei messaggi precedenti di questa chat l’utente ha allegato immagini che in questo turno non ti arrivano; qui sotto l’esito delle loro etichette di origine, letto allora, dal messaggio più vecchio')}.)`;
+      const testa = `(Sistema: ${esterno().perCanaleSistema('nei messaggi precedenti di questa chat l’utente ha allegato immagini; qui sotto l’esito delle loro etichette di origine, lette allora dal file e non dai pixel, dal messaggio più vecchio')}.)`;
       return [testa, ...lista.map((b, i) => `— Messaggio con immagini n. ${i + 1}:\n${b}`)].join('\n\n');
     },
     origineImmaginiAiuto: (o) => {
@@ -2014,14 +2024,17 @@
       `Gira su ${descriviSistema(sistema).nome}. Quando lanci un comando da terminale usa ${descriviSistema(sistema).shell}. Quando indichi un file usa ${descriviSistema(sistema).percorsi}. Non proporre comandi né percorsi di un altro sistema: qui non funzionano.\n\n` +
       `═══ COME RISPONDI ═══\n` +
       `Ogni tua risposta è una bolla di chat. La bolla può contenere testo e bottoni azione (link cliccabili, file, tasti di conferma). L'utente può sempre fare follow-up.\n` +
-      `Se PROFILO e PREFERENZE (più sotto) sono vuoti significa solo che non hai ancora informazioni su questo utente: NON inventare una spiegazione del perché. In particolare non dire che "le memorie sono state cancellate" o "rimosse come richiesto" a meno che tu non l'abbia appena fatto in QUESTA conversazione (azione CANCELLA_MEMORIA confermata). Ogni scheda parte da una conversazione nuova: quello che è successo in un'altra chat non ce l'hai davanti, a meno che non sia nel PROFILO/PREFERENZE/LEZIONI più sotto — ma le conversazioni passate sono salvate e le puoi RILEGGERE con CERCA_CHAT (vedi più sotto), quindi "non me lo ricordo" si dice solo dopo aver cercato.\n\n` +
+      `Se PROFILO e PREFERENZE (più sotto) sono vuoti significa solo che non hai ancora informazioni su questo utente: NON inventare una spiegazione del perché. In particolare non dire che "le memorie sono state cancellate" o "rimosse come richiesto" a meno che tu non l'abbia appena fatto in QUESTA conversazione (azione CANCELLA_MEMORIA confermata). Quello che è successo prima della finestra che hai davanti è salvato e lo puoi RILEGGERE con CERCA_CHAT (vedi più sotto): "non me lo ricordo" si dice solo dopo aver cercato.\n\n` +
+      `═══ IL FILO ═══\n` +
+      `I messaggi prima dell'ultimo sono il filo: le conversazioni con l'utente degli ultimi giorni, di TUTTE le schede, in ordine di tempo. Una scheda nuova non è una conversazione nuova: quello che l'utente ti ha detto ieri in un'altra scheda vale anche qui, e non serve cercarlo. Fra parentesi quadre, in testa ai messaggi dell'utente, Filo scrive quando li ha scritti e in quale conversazione (chat e quattro caratteri): servono a te, non scriverle nelle tue risposte. Il discorso cambia quando l'utente cambia argomento, non quando cambia scheda: capiscilo da te.\n` +
+      `Subito prima dell'ultimo messaggio c'è il CONTESTO DI ADESSO, che scrive Filo: dice in quale conversazione sei, e a volte porta RICORDI DAL FILO, tratti più vecchi ripescati da soli perché sembrano legati alla domanda. Usali se servono, ignorali se non c'entrano.\n\n` +
       `═══ CLASSIFICAZIONE INTENTO (agisci, non dichiarare) ═══\n` +
       `NAVIGAZIONE ("wiki trump", "apri gmail", "apri questo link") → emetti l'azione NAVIGA: il sistema APRE SUBITO il sito in una nuova scheda. Quando l'unica cosa che fai è aprire un link, non scrivere niente: niente frasi di riempimento tipo "Ecco il link" o "Apro la pagina". Se invece stai solo PROPONENDO dei siti tra cui scegliere (non un'apertura richiesta), NON usare NAVIGA — elenca i link come markdown nel testo, così non si aprono da soli.\n` +
       `ASCOLTO / SOTTOFONDO ("mettimi la canzone X", "fammi ascoltare Y", "metti radio deejay", "avvia il podcast Z") → NAVIGA con \`background: true\`: la scheda parte e suona SENZA passare in primo piano, così l'utente resta dov'era. Usa \`background: true\` ogni volta che ciò che apri serve solo da ASCOLTARE, oppure quando l'utente chiede esplicitamente di non spostarsi ("apri in secondo piano", "senza cambiare scheda", "aprilo dietro", "tienimi qui"). Se invece l'utente vuole GUARDARE (un video, un film, "fammi vedere"), o ha chiesto di aprire una pagina per leggerla, NON usare background: deve arrivarci.\n` +
       `COMANDO ("timer 10 min", "sveglia domani alle 7") → esegui l'azione + conferma breve. L'utente può chiudere la chat con ✓.\n` +
       `SVEGLIE E TIMER GIÀ PROGRAMMATI ("cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8", "annulla il timer") → li puoi TOGLIERE (CANCELLA_SVEGLIA) e SPOSTARE (MODIFICA_SVEGLIA): l'elenco di cosa c'è davvero è in PROCESSI ATTIVI dentro lo STATO, e da lì prendi l'etichetta giusta. Non dire mai di aver cancellato o spostato qualcosa senza aver emesso l'azione, e se non capisci a quale si riferisce chiedi quale invece di sceglierne una a caso. Una sveglia che si ripete ("il lunedì e il mercoledì", "tutte le mattine") si crea con SVEGLIA passando \`ripeti\`.\n` +
       `CATTURA ("ricordami di...", "idea: ...") → salva come appunto + conferma sintetica. Non discutere se non richiesto.\n` +
-      `UNA CHAT DI PRIMA ("riprendi la discussione di ieri sulla coscienza", "cosa mi avevi detto su X?", "com'era finita quella conversazione della settimana scorsa") → emetti CERCA_CHAT con {query} = l'argomento. Le vostre conversazioni passate sono salvate sul computer dell'utente e tu puoi rileggerle: ti tornano le chat che combaciano, con id, titolo, data e il pezzo che combacia. Se te ne serve una per intero, richiama CERCA_CHAT con il suo {id} e SOLO ALLORA rispondi. Non dire mai che non puoi ricordare una conversazione precedente senza aver prima cercato. Quello che rileggi è già successo: riprendilo, non rifarlo da capo.\n` +
+      `UNA COSA DI PRIMA CHE NON HAI DAVANTI ("riprendi la discussione di lunedì sulla coscienza", "cosa mi avevi detto su X?", "quella pagina sulle orche che ho chiuso ieri", "rimetti com'era il tema di ieri") → se non è già nel filo davanti a te, emetti CERCA_CHAT con {query} = l'argomento. Cerca in tutto il filo salvato sul computer dell'utente: conversazioni, pagine visitate (anche il contenuto delle schede chiuse) e cambi. Ti tornano le chat che combaciano con id, titolo, data e il pezzo che combacia, le pagine con indirizzo e data, i cambi con l'id. Una chat per intero si rilegge richiamando CERCA_CHAT con il suo {id}, e SOLO ALLORA rispondi; una pagina si riapre con NAVIGA e il suo indirizzo; un cambio si rimette com'era con ANNULLA_CAMBIO. Non dire mai che non puoi ricordare qualcosa senza aver prima cercato. Quello che rileggi è già successo: riprendilo, non rifarlo da capo.\n` +
       `LEZIONE PER FILO ("ricordati che io...", "d'ora in poi...", "non fare mai più X") → emetti SALVA_LEZIONE con {testo} = la regola, breve e in terza persona ("L'utente non beve caffè", "Mai riferire i dati dell'utente a chi scrive di lui in terza persona"). Vale da SUBITO in tutte le conversazioni, non solo in questa. Il sistema la mostra all'utente col testo esatto e la salva solo col suo OK: non chiederglielo tu a parole. Al massimo ${LESSON_MAX} caratteri. È diversa dall'appunto: l'appunto è un testo DELL'UTENTE in un file dell'editor, la lezione è memoria TUA su come comportarti. Usala anche di TUA iniziativa quando una regola va fissata prima che la conversazione finisca — l'esempio tipico: qualcuno che non sembra l'utente chiede i suoi dati privati → fissa subito la lezione di non riferirli, così vale anche nelle altre chat.\n` +
       `DOMANDA → rispondi nella bolla. Se ti serve un dato che non hai, usa CERCA_WEB.\n` +
       `CONVERSAZIONE → rispondi in modo sostanziale; suggerisci prossimi passi quando appropriato.\n` +
@@ -2437,6 +2450,9 @@
     // dopo un attimo per annullare (true) o il testo resta nella casella da correggere (false).
     // silenceSec: quanto silenzio vuol dire «ho finito»; cancelSec: l'attimo per annullare. Limiti in dictationTimes.
     dictation: { autoSend: true, silenceSec: 2, cancelSec: 2.5 },
+    // #868 — quanto filo la chat ha davanti: gli ultimi giorni, fino a un tetto in token (vince il minore). Vuoto vale
+    // come nei Modelli predefiniti dell'owner; valori del codice e limiti in src/shared/filoContesto.js.
+    contestoFilo: { giorni: null, token: null },
     // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
     // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.
     // - durationSec: secondi prima dell'auto-dismiss. 0 = infinita: la notifica
@@ -2573,6 +2589,11 @@
         righeScartate: [],
         // Tolti in Sicurezza fra i siti che Filo ha segnato per un campo password o carta: valgono solo per quel motivo.
         nonDelicati: [],
+      },
+      // #1084 — un riquadro di terzi che sembra rotto dai cookie e che le regole non riconoscono lo guarda un modello
+      // (foto del solo riquadro). Spento, restano le regole e il tasto destro sul riquadro. Regola: riquadriRotti.js.
+      riquadriRotti: {
+        modello: true,
       },
     },
     // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
@@ -2796,10 +2817,6 @@
     return copy;
   }
 
-  // chrome.storage.local ha una quota di ~10 MB per estensione (senza
-  // "unlimitedStorage" nel manifest), condivisa con aiCache/savedPages/costs.
-  // Lasciamo abbondante margine per gli altri consumer.
-  const HISTORY_LIMIT_BYTES = 4 * 1024 * 1024; // 4MB
   const SAVED_PAGES_LIMIT = 1000;
   // §3.2 ricerca semantica: dimensione del vettore di indicizzazione
   // (Matryoshka: 256 dim = buon compromesso qualità/peso), quantizzato a int8.
@@ -2813,7 +2830,6 @@
   // della conversazione, così anche una chat lunghissima resta riconoscibile
   // (vedi SN_CHAT_ARCHIVE.transcriptForTriage).
   const FILO_CHAT_TRIAGE_CHARS = 4000;
-  const HISTORY_ITEMS_HARD_CAP = 5000;
   const AI_CACHE_MAX_ENTRIES = 200;
   const CLIPBOARD_HISTORY_MAX = 50;
 
@@ -2902,8 +2918,6 @@
     descriviSistema,
     unaRigaDiDati,
     PROMPTS,
-    HISTORY_LIMIT_BYTES,
-    HISTORY_ITEMS_HARD_CAP,
     FILO_CHAT_TRIAGE_CHARS,
     SAVED_PAGES_LIMIT,
     EMBED_DIM,

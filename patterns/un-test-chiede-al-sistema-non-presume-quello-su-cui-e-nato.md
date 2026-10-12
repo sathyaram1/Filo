@@ -122,6 +122,29 @@ il rosso ferma le versioni per tutti:
 
 Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
 
+**Il codice che fa una cosa diversa per sistema** (#1135). Su Windows la versione
+nuova si installa all'apertura dopo, altrove alla chiusura (#1039): la prova scritta
+su Linux asseriva «alla chiusura», passava ovunque tranne al cancello, e otto rossi
+hanno fermato la pubblicazione. Quando l'esito dipende dalla piattaforma, la prova la
+sceglie lei e gira per ognuna (`perOgniSistema` in
+`tests/unit/aggiornamentiAutomatici.test.mjs`), così Linux corre anche il caso
+Windows: `conPiattaforma` cambia `process.platform` per la durata del caso e lo
+rimette com'era. Regge solo perché il codice la chiede al momento, da un punto solo
+(`dip.piattaforma()`), mai fissata in una costante al caricamento del modulo: lì la
+prova non arriverebbe più, e il caso Windows girerebbe da Linux. Uno spec in Electron
+fa lo stesso: la piattaforma la sceglie `perProva` nel main, e lo spec gira per ognuna
+(`tests/aggiornamenti-da-soli.spec.mjs`). Un `process.platform` letto dallo spec
+dà un ramo che la suite in GitHub non corre mai (#1171).
+
+**Il commit provato è vecchio** (#1185). Il cancello prova l'ultimo commit di main con
+la suite verde, che può stare giorni dietro la punta: gli stessi otto rossi, corretti
+su main da un giorno, hanno riaperto il loro feedback appena il primo si era chiuso.
+Prima di aprirlo il cancello rifà ogni file rosso sulla punta di main
+(`scripts/rossi-sulla-punta.mjs`): verdi tutti, nessun feedback e la corsa resta rossa;
+altrimenti il feedback dice il commit provato e quali file sono già verdi. Nel dubbio
+(main irraggiungibile, rosso senza file, controllo rotto) si apre come prima.
+Sentinella: `tests/unit/rossiSullaPunta.test.mjs`.
+
 ## Il collegamento simbolico (#742)
 
 Su Windows un collegamento simbolico lo crea solo l'amministratore o chi ha la
@@ -153,6 +176,42 @@ torna indietro, costa centinaia di unità.
 
 Un timer atteso (`await` di qualcosa che scade da sé) misura il timer e non il lavoro, e
 resta in millisecondi. Sentinella: `tests/unit/tempiSottoCarico.test.mjs`.
+
+### Nessun unit dipende dalla velocità della macchina (#1063)
+
+Dieci chiusure locali di fila rosse, ogni volta per un unit diverso, tutti verdi da soli.
+Le forme che cadevano, e cosa le ha sostituite:
+
+- **Un tempo atteso dal codice provato** (tempo limite, rate limit, attesa del menu, vita
+  massima di una finestra): orologio finto (`mock.timers` con `setTimeout` e `Date`), e il
+  tempo passa a tick con `scorri`/`finoA` (`tests/helpers/orologio.mjs`). Così la prova dice
+  anche il quando esatto: «non prima di 199 ms, sì a 200».
+- **Un processo o un file vero che deve arrivare** (un battito, la porta di un server finto,
+  un segno scritto da un figlio): si aspetta il fatto con `aspettaChe`
+  (`tests/helpers/attese.mjs`), mai «entro N secondi». Il tempo massimo di un processo vero
+  è una guardia contro l'appeso, `TETTO_ATTESA_MS`: un numero scritto a mano lo ferma una
+  sentinella, nelle opzioni di `spawnSync` ed esecuzioni simili, in un `setTimeout` da un
+  secondo in su, in un `timeoutMs`/`attesaMs` dato al codice provato. Il server finto di
+  `config/routines` si lancia da `tests/helpers/server-finto.mjs`, mai da una copia. Vale anche per il tempo
+  massimo che sta nel codice provato: la funzione che chiede qualcosa a un programma di
+  sistema prende l'attesa da chi la chiama, e la prova le passa `TETTO_ATTESA_MS` (il
+  controllo del comando che esiste: dieci secondi bastano all'uso, non a una macchina carica).
+- **«Non cresce con i dati»** (un messaggio con 50.000 eventi nel filo, una scheda chiusa con
+  6.000 in archivio): prima si contano le operazioni sul disco (nessuna rilettura, nessuna
+  riscrittura, una riga in coda; `tests/helpers/spiaDisco.mjs`), poi il lavoro in memoria si
+  misura a turno contro lo stesso lavoro su dati quasi vuoti, campione per campione, col
+  minimo di ciascuno (`rapportoFraCosti`). Una finestra di tempo fra due figli che devono
+  sovrapporsi si toglie facendoli girare in fila.
+- **La pulizia**: una cartella si toglie con `togliCartella`, che ritenta e non fa rosso il
+  test quando Windows la tiene ancora; `rmSync` ricorsivo nudo nei test lo ferma una
+  sentinella (`tests/unit/cartelleTemporanee.test.mjs`). Gli script che i test lanciano
+  ritentano anche loro (`maxRetries`).
+- **Il tetto del lanciatore** (20 minuti in cui niente va avanti, non la durata del file: un
+  file sano sotto carico è lento ma avanza): una prova sola che ci si avvicina si divide, e una
+  scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
+  (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
+  risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
+  lanciatore, e la riprova dei rossi pure (`--solo`).
 
 ## Il verso opposto (#937)
 

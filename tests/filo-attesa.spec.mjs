@@ -600,6 +600,12 @@ async function ricercaLenta(app, ms) {
   }, ms);
 }
 
+// «In volo» si aspetta, non si presume: il titolo «Cerco sul web» compare quando il modello chiama lo strumento, prima
+// che la sua risposta finisca; un fermo in quel momento ferma il modello e la ricerca non parte affatto.
+async function ricercaPartita(app) {
+  await expect.poll(() => app.evaluate(() => globalThis.__ricerche), { timeout: 5_000 }).toBe(1);
+}
+
 test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il seguito parte sapendo cosa è stato fatto', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -615,7 +621,7 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity');
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
-  await page.waitForTimeout(500);
+  await ricercaPartita(app);
   await page.locator('#stopBtn').click();
   await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
   // La chat è di nuovo dell'utente subito, non a ricerca finita.
@@ -653,6 +659,7 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await page.locator('#input').fill('orari treni');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
+  await ricercaPartita(app);
   await page.locator('#stopBtn').click();
   await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
   await page.locator('#sendBtn').click();

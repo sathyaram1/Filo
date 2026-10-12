@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -421,13 +422,13 @@ test('#914 dentro una routine owner-feedback rifiuta il segno locale e il sì de
   const { spawnSync } = await import('node:child_process');
   // #957: --approva-locale non c'è più per nessuno, routine compresa.
   const tolta = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'owner-feedback.mjs'), '123', '--approva-locale'], {
-    env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: 30000,
+    env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: TETTO_ATTESA_MS,
   });
   assert.equal(tolta.status, 1, tolta.stderr);
   assert.match(tolta.stderr, /--approva-locale non c'è più/);
   for (const opzione of ['--solo-locale']) {
     const r = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'owner-feedback.mjs'), '123', opzione], {
-      env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: 30000,
+      env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: TETTO_ATTESA_MS,
     });
     assert.equal(r.status, 3, `${opzione}: ${r.stderr}`);
     assert.match(r.stderr, /una routine non segna lavoro locale/);

@@ -64,6 +64,29 @@ test('su Mac sono Cmd+[ e Cmd+], e Alt+freccia resta al cursore', () => {
   assert.equal(T.comandoNavigazione({ ctrlKey: true, code: 'BracketLeft' }, 'win32'), null);
 });
 
+test('su Mac anche Cmd+freccia, ma con una regola a parte che chiede se si scrive', () => {
+  for (const forma of [dom, main]) {
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, code: 'ArrowLeft' }), 'darwin'), 'indietro');
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, code: 'ArrowRight' }), 'darwin'), 'avanti');
+    // Cmd+Shift+freccia seleziona fino a inizio o fine riga; Cmd+Opzione+freccia cambia scheda in Safari.
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, shiftKey: true, code: 'ArrowLeft' }), 'darwin'), null);
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, altKey: true, code: 'ArrowLeft' }), 'darwin'), null);
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, code: 'ArrowUp' }), 'darwin'), null);
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ code: 'ArrowLeft' }), 'darwin'), null);
+    // La regola che naviga SEMPRE non la conosce: preso lì, il cursore non arriverebbe più a inizio riga.
+    assert.equal(T.comandoNavigazione(forma({ metaKey: true, code: 'ArrowLeft' }), 'darwin'), null);
+    // Su Windows e Linux Ctrl+freccia salta di parola, e Cmd non c'è.
+    for (const sistema of ['win32', 'linux']) {
+      assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, code: 'ArrowLeft' }), sistema), null);
+      assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ ctrlKey: true, code: 'ArrowLeft' }), sistema), null);
+    }
+  }
+  assert.equal(T.comandoNavigazioneFuoriDalCampo(null, 'darwin'), null);
+  assert.equal(T.comandoNavigazioneFuoriDalCampo({ metaKey: true, key: 'ArrowRight' }, 'darwin'), 'avanti');
+  // Il nome resta Cmd+[: Cmd+freccia vale solo a metà, e un nome deve funzionare ovunque.
+  assert.equal(T.etichettaIndietro('darwin'), 'Cmd+[');
+});
+
 test('il tasto si legge dal codice fisico, ma gli eventi sintetici passano da key', () => {
   assert.equal(T.comandoNavigazione({ altKey: true, key: 'ArrowLeft' }, 'win32'), 'indietro');
   assert.equal(T.comandoNavigazione({ metaKey: true, key: ']' }, 'darwin'), 'avanti');
@@ -85,12 +108,14 @@ test('chi si assegna una scorciatoia sa che queste sono già prese', () => {
   for (const scritta of ['Alt+←', 'Alt+Left', 'Alt+ArrowLeft', 'Alt+→', 'Alt+Right']) {
     assert.equal(T.riservato(scritta, 'win32'), true, `${scritta} risulta libera su Windows`);
   }
-  for (const scritta of ['Cmd+[', 'Ctrl+[', 'Cmd+]']) {
+  for (const scritta of ['Cmd+[', 'Ctrl+[', 'Cmd+]', 'Cmd+←', 'Cmd+Left', 'Cmd+→']) {
     assert.equal(T.riservato(scritta, 'darwin'), true, `${scritta} risulta libera su Mac`);
   }
   // E all'incontrario: su Mac Alt+freccia arriva alla pagina, su Windows Ctrl+[.
   assert.equal(T.riservato('Alt+←', 'darwin'), false);
   assert.equal(T.riservato('Ctrl+[', 'win32'), false);
+  // Ctrl+freccia su Windows e Linux salta di parola, e resta della pagina.
+  assert.equal(T.riservato('Ctrl+←', 'win32'), false);
 });
 
 // ── Tutte le porte sono attaccate ──────────────────────────────────────────
@@ -109,6 +134,81 @@ test('i tasti arrivano sia dalla pagina sia dalla barra di Filo', () => {
   const usi = tabs.match(/comandoNavigazione\(/g) || [];
   assert.ok(usi.length >= 2, `la regola è ascoltata in ${usi.length} punto/i: manca il fuoco sulla barra o quello sulla pagina`);
   assert.match(tabs, /navigaCronologia\(verso/, 'tabs.js non manda il comando alla porta unica');
+  // Cmd+freccia su Mac: anche lei da tutte e due le porte, e sempre dopo aver chiesto se si scrive.
+  const fuori = tabs.match(/comandoNavigazioneFuoriDalCampo\(/g) || [];
+  assert.ok(fuori.length >= 2, `Cmd+freccia è ascoltata in ${fuori.length} punto/i su due`);
+  assert.match(tabs, /staScrivendo\(wc\)\) return false;\s*\} catch \(_\) \{ return false; \}\s*this\.navigaCronologia/);
+  // La barra laterale aperta da tastiera tiene il fuoco: Cmd+freccia passa anche da lì, con la stessa domanda.
+  const barra = sorgente('src', 'main', 'barraLaterale.js');
+  assert.match(barra, /comandoNavigazioneFuoriDalCampo\?\.\(input\)/, 'dalla barra laterale Cmd+freccia non arriva');
+  assert.match(barra, /_navigaSeNonScrive\(wc, verso, attiva\.id\)/, 'la barra laterale naviga senza chiedere se si scrive');
+});
+
+// #685.1 — sulla pagina Cmd+freccia è prima della pagina, come in Safari e Chrome:
+// il main la lascia passare, e naviga solo se il preload la rimanda perché nessuno l'ha usata.
+test('Cmd+freccia: la pagina la usa per prima, e solo un tasto vero torna al main', () => {
+  const tabs = sorgente('src', 'main', 'tabs.js');
+  assert.match(tabs, /if \(fuoriDalCampo\) wc\._filoCmdFreccia = \{ verso: fuoriDalCampo, t: Date\.now\(\) \}/,
+    'dalla pagina il main naviga da sé invece di lasciare il tasto alla pagina');
+  assert.match(tabs, /cmdFrecciaNonUsata\(wc, verso\) \{\s*const visto = wc && wc\._filoCmdFreccia;\s*if \(!visto \|\| visto\.verso !== verso/,
+    'il main accetta il rimando anche senza aver visto il tasto');
+  assert.match(sorgente('src', 'main', 'ipc.js'), /'filo:cmd-freccia'[\s\S]{0,400}cmdFrecciaNonUsata/);
+  const aiuto = sorgente('src', 'preload', 'cmd-freccia.js');
+  assert.match(aiuto, /!e\.isTrusted/, 'un tasto finto della pagina farebbe navigare');
+  assert.match(aiuto, /setTimeout\([\s\S]*e\.defaultPrevented[\s\S]*scriveQui\(win\.document\) !== false/);
+  for (const p of ['page-preload.js', 'internal-preload.js']) {
+    assert.match(sorgente('src', 'preload', p), /require\('\.\/cmd-freccia\.js'\)\(window, ipcRenderer\)/, `${p} non ascolta Cmd+freccia`);
+  }
+  assert.doesNotMatch(sorgente('src', 'preload', 'page-preload.js'), /if \(!IS_SUBFRAME\) \{[^}]*cmd-freccia/,
+    'nei riquadri non ascolta nessuno: un campo lì dentro non si vede');
+});
+
+test('si scrive anche in un campo "solo testo" e in un campo dentro un riquadro', () => {
+  require(join(ROOT, 'src', 'shared', 'campoTesto.js'));
+  const C = globalThis.SN_CAMPO_TESTO;
+  const editabile = { tagName: 'DIV', isContentEditable: true, matches: () => false };
+  const fermo = { tagName: 'DIV', isContentEditable: false, matches: () => false, closest: () => null };
+  assert.equal(C.campoDiTesto(editabile), true);
+  const riquadro = (dentro) => ({ tagName: 'IFRAME', matches: () => false, get contentDocument() { return dentro; } });
+  assert.equal(C.scriveQui({ activeElement: riquadro({ activeElement: editabile }) }), true);
+  assert.equal(C.scriveQui({ activeElement: riquadro({ activeElement: fermo }) }), false);
+  // D'altra origine il riquadro non si apre: «non so», e chi chiede lo interroga a parte.
+  assert.equal(C.scriveQui({ activeElement: riquadro(null) }), null);
+  assert.equal(C.scriveQui({ activeElement: fermo }), false);
+  // Componente a shadow DOM chiuso: decide il documento, che vede dove sta il cursore.
+  // Fuori dall'ombra la selezione punta all'ospite: (genitore, suo indice).
+  const chiuso = (scrivibile, cursoreQui = true, nome = 'x-campo') => {
+    const genitore = { childNodes: [] };
+    const el = { tagName: nome.toUpperCase(), localName: nome, shadowRoot: null, isContentEditable: false, parentNode: genitore,
+      matches: () => false, closest: () => null, contains: () => false,
+      ownerDocument: { queryCommandEnabled: (c) => c === 'insertText' && scrivibile,
+        getSelection: () => ({ anchorNode: genitore, anchorOffset: cursoreQui ? 1 : 0 }) } };
+    genitore.childNodes.push({}, el);
+    return el;
+  };
+  assert.equal(C.scriveQui({ activeElement: chiuso(true) }), true);
+  assert.equal(C.scriveQui({ activeElement: chiuso(false) }), false);
+  assert.equal(C.scriveQui({ activeElement: chiuso(true, false) }), false,
+    'il cursore scrivibile sta in un altro componente: qui non si scrive');
+  // L'ombra chiusa si appende anche a un div (la ricerca negli appunti di Filo): la forma non conta, decide il cursore.
+  const suDiv = (cursoreQui) => chiuso(true, cursoreQui, 'div');
+  assert.equal(C.scriveQui({ activeElement: suDiv(true) }), true, 'un campo in un\'ombra chiusa su un div non si vede');
+  assert.equal(C.scriveQui({ activeElement: suDiv(false) }), false);
+  // La pagina ha dato il fuoco a un contenitore del campo (#685.1 giro 7): la selezione scrivibile
+  // resta nel campo lasciato, dentro il contenitore o subito dopo di lui, non sull'ospite.
+  const contenitore = (anchor) => {
+    const genitore = { childNodes: [] };
+    const testo = { nodeType: 3 };
+    const el = { tagName: 'MAIN', shadowRoot: null, isContentEditable: false, parentNode: genitore,
+      matches: () => false, closest: () => null, contains: (n) => n === testo,
+      ownerDocument: { queryCommandEnabled: () => true,
+        getSelection: () => (anchor === 'dentro' ? { anchorNode: testo, anchorOffset: 2, focusNode: testo, focusOffset: 2 }
+          : { anchorNode: genitore, anchorOffset: 2, focusNode: genitore, focusOffset: 2 }) } };
+    genitore.childNodes.push({}, el, { tagName: 'INPUT' });
+    return el;
+  };
+  assert.equal(C.scriveQui({ activeElement: contenitore('dentro') }), false, 'il campo lasciato sta dentro il contenitore a fuoco');
+  assert.equal(C.scriveQui({ activeElement: contenitore('dopo') }), false, 'il campo lasciato sta subito dopo l\'elemento a fuoco');
 });
 
 test('i tasti laterali del mouse e lo scorrimento a due dita sono attaccati', () => {
@@ -138,7 +238,7 @@ test('il manifesto e l\'elenco delle scorciatoie dicono le stesse strade', () =>
   const voce = globalThis.SN_CAPABILITIES.get('navigate-back-forward');
   assert.ok(voce, 'la voce indietro/avanti è sparita dal manifesto');
   const testo = `${voce.invoke} ${voce.desc}`;
-  for (const pezzo of ['Alt+←', 'Alt+→', 'Cmd+[', 'Cmd+]', 'mouse']) {
+  for (const pezzo of ['Alt+←', 'Alt+→', 'Cmd+[', 'Cmd+]', 'Cmd+←', 'Cmd+→', 'mouse']) {
     assert.ok(testo.includes(pezzo), `il manifesto non cita ${pezzo}`);
   }
   // L'elenco delle scorciatoie deve chiedere il nome alla regola, non scriverlo.

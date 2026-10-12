@@ -5,6 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback #320: nella Cronologia AI non c'era modo di eliminare UNA sola voce —
 // l'unica opzione era "Cancella tutto". Se una voce conteneva qualcosa di privato
@@ -59,7 +60,7 @@ test('history page: rimuovi una singola voce e la rimozione persiste', async () 
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
     const page = await findTabPage(app, 'history');

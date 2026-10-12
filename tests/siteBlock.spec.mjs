@@ -150,6 +150,7 @@ async function newtabPage(app) {
 async function modelloFinto(app, giri) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -357,7 +358,8 @@ test('#590 link in una nuova scheda e redirect verso un sito della lista: blocca
     await page.waitForSelector('#redir', { timeout: 8000 });
     const prima = (await tabUrls(app)).length;
 
-    await page.evaluate(() => document.getElementById('blank').click());
+    // Il clic vero: col blocco dei popup una scheda nuova la apre solo l'utente (#737.1).
+    await page.click('#blank');
     await expect((await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
     await page.waitForTimeout(500);
     expect((await tabUrls(app)).length).toBe(prima);

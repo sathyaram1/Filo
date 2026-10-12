@@ -174,7 +174,7 @@
   // (`account`: { credits, usage } da `GET /api/v1/credits`), e senza nemmeno
   // quello resta la sola spesa.
   function ownKeyBalanceLine({ limit, usage, limit_remaining, account } = {}) {
-    const usd = (n) => `${new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+    const usd = (n) => `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
     const spesa = `Spesi ${usd(usage)}`;
     const conto = account && Number.isFinite(Number(account.credits))
       ? Math.max(0, Number(account.credits) - (Number(account.usage) || 0))
@@ -219,24 +219,14 @@
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
   }
 
-  // La frase del riscatto riuscito, coi numeri che il server manda: quanti
-  // crediti d'ingresso, quanti del vecchio conteggio locale sono passati e,
-  // se non tutti, perché. Chi aveva 12.000 crediti e ne ritrova 10.000 deve
-  // leggerlo qui, non scoprirlo dal saldo (primo giro di verifica del ramo -b).
   function fmtInt(n) {
     return String(Math.max(0, Math.floor(Number(n) || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
-  function redeemOkMessage({ entryCredits, migrated, localRequested, cutReason } = {}) {
+  // La frase del riscatto riuscito dice solo i crediti d'ingresso: il conteggio
+  // locale non passa (#1138), e «nessuno dei 1.000 che avevi» si leggeva come un furto.
+  function redeemOkMessage({ entryCredits } = {}) {
     const entry = Math.max(0, Math.floor(Number(entryCredits) || 0));
-    const got = Math.max(0, Math.floor(Number(migrated) || 0));
-    const asked = Math.max(0, Math.floor(Number(localRequested) || 0));
-    if (!entry || !asked) return REDEEM_MESSAGES.ok;
-    if (got >= asked) return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più i ${fmtInt(got)} che avevi già.`;
-    const why = cutReason === 'global_cap'
-      ? 'oltre non c’è posto in questo periodo'
-      : 'oltre non si portano';
-    const passati = got > 0 ? `${fmtInt(got)} dei ${fmtInt(asked)} che avevi già` : `nessuno dei ${fmtInt(asked)} che avevi già`;
-    return `Invito riscattato: ${fmtInt(entry)} crediti d’ingresso più ${passati} (${why}).`;
+    return entry ? `Invito riscattato: hai ${fmtInt(entry)} crediti d’ingresso.` : REDEEM_MESSAGES.ok;
   }
 
   // Il codice dentro quello che l'utente incolla. Il codice arriva per
@@ -495,7 +485,7 @@
   // italiana. La chat lo scrive uguale, così i due numeri non divergono.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
-    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);
   }
 
   // ── Il premio di una segnalazione chiusa, con un portafoglio (#816) ───────

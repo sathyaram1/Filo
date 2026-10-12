@@ -366,21 +366,8 @@ module.exports = function register(on, ctx) {
       // metà dei due testi (il report, cifrato, è `notes`). Va inoltrata, o la
       // dashboard resta l'unica strada da cui quella metà si perde.
       const { id, status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
-      // «Fondi senza chiedermelo» su questa pratica: la pagina manda solo
-      // sì/no, il CHI lo mette il main dalla sessione (l'email del token, la
-      // stessa che le regole vedono) — non è un dato che la pagina possa
-      // raccontare. `true` → { by, at }; `false` → il campo si toglie.
-      let mergePreapproved;
-      if (typeof msg.mergePreapproved === 'boolean') {
-        if (msg.mergePreapproved) {
-          let email = '';
-          try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
-          mergePreapproved = { by: email || 'owner', at: new Date().toISOString() };
-        } else {
-          mergePreapproved = null;
-        }
-      }
-      // «Solo in locale» (#908): stesso patto, il CHI lo mette il main.
+      // «Solo in locale» (#908): la pagina manda solo sì/no, il CHI lo mette il main dalla sessione (l'email del
+      // token, la stessa che le regole vedono). La fiducia non passa di qui: la scrive il server (FIDUCIA_SEGNA).
       let localOnly;
       if (typeof msg.localOnly === 'boolean') {
         let email = '';
@@ -395,11 +382,9 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
-      // «È mio» (#908): l'unico valore che l'owner può dare è la sua prova.
-      const senderProof = msg.senderProof === 'admin' ? 'admin' : undefined;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
@@ -416,11 +401,8 @@ module.exports = function register(on, ctx) {
       // dritti su quello, e l'età non conta più.
       await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
-      // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
-      // glielo dice il main, che è l'unico a saperlo. Anche il quando, che per
-      // la pagina è l'identità del segno (#701).
-      if (localOnly) return { ok: true, by: localOnly.by, at: localOnly.at };
-      return mergePreapproved ? { ok: true, by: mergePreapproved.by, at: mergePreapproved.at } : { ok: true };
+      // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
+      return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
       // Nel registro, non solo nella risposta: la pagina può aver cambiato
@@ -601,7 +583,11 @@ module.exports = function register(on, ctx) {
     try {
       await Defaults.refreshIfStale().catch(() => {});
       const d = Defaults.get();
-      return { ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {} };
+      const FC = globalThis.SN_FILO_CONTESTO;
+      return {
+        ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
+        contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
+      };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -1545,6 +1531,24 @@ module.exports = function register(on, ctx) {
       return { ok: true, domanda: r.domanda || null };
     }));
   }
+
+  // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
+  on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    const togli = msg?.fidato === false;
+    if (!feedbackId) return { ok: false, error: 'Manca il feedback da segnare fidato.' };
+    let r;
+    try {
+      r = await callSecurityFunction('ownerFiducia', { op: togli ? 'togli' : 'segna', feedbackId });
+    } catch (e) {
+      if (e?.httpStatus === 404) return { ok: false, error: 'La funzione «segna fidato» non è ancora pubblicata sul server.' };
+      if (String(e?.code || '').toUpperCase() === 'PERMISSION_DENIED') return { ok: false, error: 'Il server dice che questo account non può segnare fidato: serve quello del proprietario.' };
+      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
+    return { ok: true, fiducia: togli ? 'non_fidato' : 'fidato' };
+  }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });

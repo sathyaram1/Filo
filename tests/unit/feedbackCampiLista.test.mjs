@@ -68,7 +68,7 @@ test('i campi che una riga mostra, ordina o filtra ci sono', () => {
     'pipeline', 'status', 'statusPublic', 'statusReason', 'priority', 'starred',
     'name', 'text', 'seq', 'subSeq', 'createdAt', 'resolvedAt', 'resolvedInVersion',
     'clientId', 'userNote', 'votes', 'reopenRequests', 'blockReason',
-    'reviewDecision', 'mergePreapproved', 'stalls', 'workingResets', 'claimedBy', 'beatAt',
+    'reviewDecision', 'fiducia', 'stalls', 'workingResets', 'claimedBy', 'beatAt',
   ]) {
     assert.ok(FB.CAMPI_LISTA.includes(f), `${f} serve alle righe d'elenco`);
   }

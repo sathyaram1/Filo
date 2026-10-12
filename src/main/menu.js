@@ -79,20 +79,21 @@ function contenutoAFuoco() {
 
 // L'utente sta scrivendo in un campo di testo? La regola è una sola e sta in
 // src/shared/campoTesto.js: qui la mandiamo a valutare dentro la pagina.
-// #405: la domanda va fatta al RIQUADRO con cui l'utente ha interagito per
-// ultimo (un commento dentro un iframe è un campo di testo tanto quanto uno
-// nella pagina che lo ospita).
+// Si parte sempre dalla pagina principale, che segue il fuoco fin dentro i
+// riquadri della sua origine; un riquadro d'altra origine (null) si interroga a
+// parte (#405, #685.1): l'ultimo riquadro toccato non è dove sta il fuoco.
 async function staScrivendo(wc) {
   if (!wc) return false;
-  let dove = wc;
-  try {
-    const frame = wc._filoActiveFrame;
-    if (frame && !frame.detached) dove = frame;
-  } catch (_) { dove = wc; }
   const sorgente = globalThis.SN_CAMPO_TESTO && globalThis.SN_CAMPO_TESTO.sorgenteScriveQui();
   if (!sorgente) return true;
   try {
-    return !!(await dove.executeJavaScript(sorgente, false));
+    const qui = await wc.executeJavaScript(sorgente, false);
+    if (qui !== null) return !!qui;
+    const riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || [];
+    const risposte = await Promise.all(riquadri
+      .filter((f) => f !== wc.mainFrame && !f.detached)
+      .map((f) => f.executeJavaScript(sorgente, false).catch(() => true)));
+    return risposte.some((r) => r === true);
   } catch (_) {
     // Nel dubbio si annulla, non si naviga: annullare quando non c'è niente da
     // annullare non fa nulla, mentre andare indietro mentre si scrive porta via
@@ -305,40 +306,6 @@ function template(piattaforma) {
   return [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
 }
 
-// La barra esegue da sé i suoi tasti registrati quando nessuna pagina li ha usati:
-// chi inoltra tasti lo chiede qui per non far fare la stessa cosa due volte (#838).
-const formeDellaBarra = new Map();
-function formaTasto(mods, tasto) {
-  const NOMI = { plus: '+', left: 'arrowleft', right: 'arrowright' };
-  const k = String(tasto || '').toLowerCase();
-  return `${[...new Set(mods)].sort().join('+')}|${NOMI[k] || k}`;
-}
-function tastoDellaBarra(input, piattaforma = process.platform) {
-  if (!input) return false;
-  if (!formeDellaBarra.has(piattaforma)) {
-    const MAC = piattaforma === 'darwin';
-    const MOD = [
-      [/^(commandorcontrol|cmdorctrl)$/, MAC ? 'meta' : 'control'],
-      [/^(command|cmd|meta|super)$/, 'meta'], [/^(control|ctrl)$/, 'control'],
-      [/^(alt|option)$/, 'alt'], [/^shift$/, 'shift'],
-    ];
-    const forme = new Set();
-    const scendi = (voci) => {
-      for (const v of voci) {
-        if (v.submenu) scendi(v.submenu);
-        if (!v.accelerator || v.registerAccelerator === false) continue;
-        const parti = String(v.accelerator).split('+');
-        const mods = parti.slice(0, -1).map((p) => (MOD.find(([re]) => re.test(p.toLowerCase())) || [])[1]);
-        forme.add(formaTasto(mods, parti[parti.length - 1]));
-      }
-    };
-    scendi(template(piattaforma));
-    formeDellaBarra.set(piattaforma, forme);
-  }
-  const mods = ['meta', 'control', 'alt', 'shift'].filter((m) => input[m]);
-  return formeDellaBarra.get(piattaforma).has(formaTasto(mods, input.key));
-}
-
 // Da chiamare una volta sola, dopo `app.whenReady()`.
 function installaMenuApplicazione() {
   const { Menu, app } = require('electron');
@@ -352,4 +319,4 @@ function installaMenuApplicazione() {
   }
 }
 
-module.exports = { installaMenuApplicazione, template, tastoDellaBarra, annulla, ripeti, staScrivendo };
+module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo };

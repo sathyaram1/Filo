@@ -333,7 +333,7 @@ test('spostare un orario si fa subito; spostarne più d\'uno chiede conferma', (
 test('lo STATO che legge l\'agente dice la ricorrenza', () => {
   const text = globalThis.SN_FILO_STATE.renderForPrompt({
     time: { humanNow: 'x', timeSinceLastInteractionMin: null, session: null },
-    tabs: [], notifications: [], recentActions: [], dashboard: null, credits: null,
+    tabs: [], notifications: [], dashboard: null, credits: null,
     timers: [
       { id: 'a1', kind: 'alarm', label: 'lezione', repeat: ['lun', 'mer'], endsAt: new Date(2026, 8, 7, 7, 55).toISOString(), paused: false, remainingSec: 99 },
       { id: 'a2', kind: 'alarm', label: 'dentista', repeat: null, endsAt: new Date(2026, 8, 3, 9, 0).toISOString(), paused: false, remainingSec: 99 },

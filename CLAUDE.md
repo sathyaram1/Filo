@@ -237,7 +237,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~450 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
+npm test                   # SUITE COMPLETA (~475 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 ```
@@ -249,7 +249,7 @@ npm run test:shoot         # cattura visiva della finestra reale
   in `patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md`.
 - **I rossi d'ambiente noti** stanno in `tests/rossi-noti.json`: un rosso che
   non è lì dentro è una regressione.
-- **Nel contenitore delle routine** gli spec che aprono Electron vogliono davanti `ELECTRON_DISABLE_SANDBOX=1` e `xvfb-run -a` (`finish:check` li mette da sé, `scripts/lib/schermo-virtuale.mjs`); senza, il rosso non è del codice.
+- **Nel contenitore delle routine** gli spec che aprono Electron si lanciano con `node scripts/lancia-electron.mjs npx playwright test <percorso>`, che mette davanti `ELECTRON_DISABLE_SANDBOX=1 xvfb-run -a -n <base del worker>` come `finish:check` (`scripts/lib/schermo-virtuale.mjs`); senza, il rosso non è del codice.
 - Modelli per `test:explore`: open via OpenRouter, chiave in
   `tests/agent/.env`, MAI chiavi del produttore dei pesi (politica modelli).
 

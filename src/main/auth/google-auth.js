@@ -22,6 +22,7 @@ const http = require('node:http');
 const cfg = require('./config');
 const pkce = require('./pkce');
 const store = require('./token-store');
+const guasti = require('./guastiAccesso');
 
 let session = null; // { refreshToken, idToken, idTokenExp, email, name, picture }
 // Se la sessione sopravviverà alla chiusura: senza cifratura del sistema resta
@@ -50,6 +51,13 @@ function erroreAccesso(code, message) {
 const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
 let flussoInCorso = null;
 
+// A tempo costante: un tentativo sbagliato non chiude più l'ascolto, quindi i tentativi sono illimitati.
+function stessoState(ricevuto, atteso) {
+  const a = Buffer.from(String(ricevuto ?? ''));
+  const b = Buffer.from(String(atteso));
+  return a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+}
+
 // Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, abort }.
 function startLoopback(expectedState) {
   return new Promise((resolve, reject) => {
@@ -59,8 +67,13 @@ function startLoopback(expectedState) {
 
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, 'http://127.0.0.1');
+      // Lo state prima di tutto: una richiesta che non lo porta (un altro programma locale, il favicon) non chiude
+      // né fa fallire l'accesso, che resta in ascolto del ritorno vero.
+      if (!stessoState(url.searchParams.get('state'), expectedState)) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Richiesta non riconosciuta.');
+      }
       const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
       const error = url.searchParams.get('error');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">'
@@ -71,7 +84,6 @@ function startLoopback(expectedState) {
       server.close();
       if (error) return rejectCode(erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error));
       if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
-      if (state !== expectedState) return rejectCode(new Error('OAuth: state non corrispondente (possibile CSRF)'));
       resolveCode(code);
     });
 
@@ -115,10 +127,10 @@ async function exchangeCodeForGoogleToken(code, verifier, redirectUri) {
 async function signInWithFirebase(googleIdToken) {
   const anonToken = await installationToken();
   const attempt = async (linkTo) => {
+    // Niente returnIdpCredential: con quello un collegamento rifiutato torna 200, senza token.
     const body = {
       postBody: `id_token=${googleIdToken}&providerId=google.com`,
       requestUri: 'http://localhost',
-      returnIdpCredential: true,
       returnSecureToken: true,
     };
     if (linkTo) body.idToken = linkTo;
@@ -132,7 +144,11 @@ async function signInWithFirebase(googleIdToken) {
       err.status = res.status;
       throw err;
     }
-    return res.json(); // { idToken, refreshToken, email, emailVerified, displayName, photoUrl, expiresIn }
+    const fb = await res.json(); // { idToken, refreshToken, email, emailVerified, displayName, photoUrl, expiresIn }
+    if (!rispostaConSessione(fb)) {
+      throw new Error(`Firebase signInWithIdp senza sessione: ${String(fb?.errorMessage || (fb?.needConfirmation ? 'needConfirmation' : 'token assenti')).slice(0, 120)}`);
+    }
+    return fb;
   };
   if (anonToken) {
     try { return await attempt(anonToken); } catch (e) {
@@ -163,7 +179,15 @@ function persist() {
   });
 }
 
+// Una risposta 200 può non essere un accesso (FEDERATED_USER_ID_ALREADY_LINKED, needConfirmation): senza i due
+// token non c'è sessione, e salvarla farebbe credere a un accesso riuscito.
+function rispostaConSessione(fb) {
+  return Boolean(fb && !fb.errorMessage && fb.idToken && fb.refreshToken);
+}
+
 function setSession(fb) {
+  // Prima di toccare la sessione o il segno dell'owner caduto (#912): un accesso non avvenuto non li cambia.
+  if (!rispostaConSessione(fb)) throw new Error('accesso senza sessione: risposta di Firebase senza token');
   session = {
     refreshToken: fb.refreshToken,
     idToken: fb.idToken,
@@ -271,8 +295,8 @@ async function nuovoFlusso() {
     code_challenge: challenge,
     code_challenge_method: method,
     state,
-    access_type: 'offline',
-    prompt: 'consent',
+    // Di Google serve solo l'id_token: niente accesso offline, e il consenso si chiede una volta sola.
+    prompt: 'select_account',
   }).toString();
 
   const f = { url: authUrl.toString(), loop, aspettaBrowser: true };
@@ -330,7 +354,10 @@ async function refreshIfNeeded() {
     body,
   });
   if (!res.ok) {
-    // Refresh token revocato/scaduto → sessione non più valida.
+    // Si esce solo se il servizio dice che il refresh token non vale più: un 503 o un proxy
+    // che risponde 403 lasciano sessione e auth.bin come sono, e il prossimo tentativo riesce.
+    const testo = await res.text().catch(() => '');
+    if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
     const eraOwner = isAdmin();
     chiudiSessione();
     if (eraOwner) segnaOwnerCaduto(true);
@@ -408,5 +435,5 @@ module.exports = {
   isAdmin,
   accessoOwnerCaduto,
   // esportati per i test
-  _internals: { decodeJwtPayload, startLoopback },
+  _internals: { decodeJwtPayload, startLoopback, nuovoFlusso },
 };

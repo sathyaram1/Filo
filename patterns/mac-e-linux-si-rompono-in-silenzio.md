@@ -25,8 +25,8 @@ aggiunge lì.
   Alt+lettera apre menu e schede negli altri programmi (Alt+H è la Home di Word): le
   scorciatoie di Filo si ascoltano sui suoi webContents (`before-input-event`), così valgono
   solo con Filo davanti (#838, sentinella `tests/unit/scorciatoieSoloInFilo.test.mjs`).
-  Il visore dei PDF è un webContents a sé che non passa da quell'evento: i suoi tasti li
-  porta agli ascolti della scheda `inoltraTastiDegliOspiti` (`src/main/tabs.js`).
+  Il visore dei PDF, da Electron 41, è un riquadro della scheda: i suoi tasti passano dallo
+  stesso evento.
 - **Il nome di una scorciatoia non si scrive a mano: si chiede.** Le funzioni
   rispondevano già a Cmd: a mentire erano le SCRITTE, una alla volta.
   `src/shared/tasti.js` è la porta unica: `SN_TASTI.etichetta('Ctrl+B')` dà `Ctrl+B` su
@@ -92,6 +92,11 @@ aggiunge lì.
   guarda le tre manopole del kernel e aggiunge `--no-sandbox` SOLO dove dicono di no:
   Filo è un browser, e dove la gabbia regge deve restare. Il lanciatore usa `exec -a` per
   non cambiare il nome del processo, da cui viene l'aggancio dell'icona nella barra.
+- **In una sessione Wayland Filo parte su X.** Da Electron 38 Chromium lì parte come
+  programma Wayland, dove una finestra non sceglie dove aprirsi: i menu e le anteprime di
+  Filo sono finestre a sé messe accanto al puntatore. Lo stesso lanciatore aggiunge
+  `--ozone-platform=x11` quando c'è un X (anche XWayland) e l'utente non ha scelto da sé.
+  `app.commandLine.appendSwitch` non basta: la piattaforma si sceglie prima che parta il JS.
 - **La ricetta**: `build.linux` in `package.json`, `scripts/after-pack-linux.js` e il
   lavoro `release-linux`. Il nome del file è **fisso** perché il sito ha un collegamento
   solo; `artifactName`, `category` e `desktop` non sono decorazioni: senza il primo il

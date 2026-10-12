@@ -327,6 +327,34 @@ test('in chat, una cartella dove ogni file ha già un nome: niente da confermare
   }
 });
 
+// #1072 — prima dell'OK il main legge la cartella per preparare l'elenco: fuori perimetro, o su un altro
+// computer della rete, non la apre nemmeno, e dice perché.
+test('in chat, una cartella fuori dalla cartella personale o in rete: non si apre, e il perché arriva', async ({ app }) => {
+  test.setTimeout(90_000);
+  const fuori = cartellaTemporanea('filo-nomi-fuori-');
+  writeFileSync(join(fuori, 'scan_00999.pdf'), BOLLETTA);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: fuori }) }] },
+      { toolCalls: [{ id: 'r2', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: '\\\\host\\condivisa' }) }] },
+      { text: 'Non posso rinominarli da qui.' },
+    ]);
+    await modelloDeiNomi(app);
+    const page = await home(app);
+    await chiedi(page, 'rinomina i file di quelle cartelle');
+    await expect(page.locator('.dash-bubble', { hasText: 'Non posso rinominarli da qui.' })).toBeVisible({ timeout: 15000 });
+    expect(await confirmText(page)).toBe('');
+    const consegnato = (await app.evaluate(() => globalThis.__chatFinta_calls)).map((m) => JSON.stringify(m)).join('\n');
+    expect(consegnato).toContain('sta fuori dalla tua cartella personale');
+    expect(consegnato).toContain('sta su un altro computer della rete');
+    expect(consegnato, 'la cartella fuori perimetro non è stata letta').not.toContain('scan_00999');
+    expect(readdirSync(fuori)).toEqual(['scan_00999.pdf']);
+  } finally {
+    await ripristina(app);
+    rmSync(fuori, { recursive: true, force: true });
+  }
+});
+
 test('un file trascinato dove si scrive: entra col percorso, e dal tasto destro gli si dà un nome prima di mandarlo', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = cartellaTemporanea('filo-nomi-drop-');

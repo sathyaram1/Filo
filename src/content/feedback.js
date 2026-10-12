@@ -31,9 +31,8 @@
     return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
   }
 
-  // Chiave storage per la bozza di testo: sopravvive a chiusura/riapertura del
-  // box e al riavvio di Filo (chrome.storage.local → storage.json).
-  const DRAFT_KEY = 'sn_feedback_draft_text';
+  // La bozza sopravvive a chiusura/riapertura del box e al riavvio di Filo, ma resta al sito dove è nata (#1071).
+  const DRAFT_KEY = global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza('sn_feedback_draft_text') : null;
   // Colore/tratto del disegno di annotazione.
   const STROKE_COLOR = '#ff3b30';
   const STROKE_WIDTH = 3;
@@ -71,7 +70,8 @@
     if (!activeRoot) return;
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
-    activeRoot.remove();
+    if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
+    else activeRoot.remove();
     activeRoot = null;
     setShellDim(false);
   }
@@ -234,7 +234,7 @@
         <input type="file" class="sn-fb-file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,application/pdf,application/json,text/plain,text/markdown,text/csv,.png,.jpg,.jpeg,.gif,.webp,.bmp,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml" multiple hidden />
       </div>
     `;
-    document.documentElement.appendChild(root);
+    document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
     // Entra in modalità annotazione: oscura anche la barra in alto di Filo.
     setShellDim(true);
@@ -286,9 +286,11 @@
     // ---- bozza di testo persistente ----
     let saveTimer = null;
     function saveDraft() {
+      if (!DRAFT_KEY) return;
       try { chrome.storage.local.set({ [DRAFT_KEY]: textEl.value }); } catch (_) {}
     }
     function clearDraft() {
+      if (!DRAFT_KEY) return;
       try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
     }
     textEl.addEventListener('input', () => {
@@ -302,7 +304,7 @@
     const inFondo = () => { try { textEl.setSelectionRange(textEl.value.length, textEl.value.length); } catch (_) {} };
     if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
-      chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+      if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
         const saved = r?.[DRAFT_KEY];
         if (activeRoot !== root) return;
         if (saved && !textEl.value) textEl.value = saved;
@@ -647,8 +649,10 @@
       }
     }, true);
 
-    // Paste immagini nel modal
+    // Paste immagini nel modal. Allegare è dell'utente: un incolla fabbricato non porta niente (il trascinamento
+    // fabbricato lo ferma soloGestiVeri, sui siti).
     modal.addEventListener('paste', async (e) => {
+      if (!e.isTrusted) return;
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const it of items) {
@@ -661,6 +665,7 @@
 
     // Accetta immagini incollate via tasto destro (custom event da content.js)
     modal.addEventListener('filo:paste-image', async (e) => {
+      if (!global.SN_FILO_UI?.veroONostro?.(e)) return;
       if (e.detail?.blob) {
         e.preventDefault();
         await addImageFromBlob(e.detail.blob);
@@ -684,15 +689,16 @@
     // "Allega": apre il selettore file. Si possono allegare immagini E altri
     // file (pdf, txt, md, json…), oltre a incolla/trascina. Parità tra i
     // cammini equivalenti.
-    attachBtn.addEventListener('click', () => { try { fileInput.click(); } catch (_) {} });
+    attachBtn.addEventListener('click', (e) => { if (e.isTrusted) { try { fileInput.click(); } catch (_) {} } });
     fileInput.addEventListener('change', async () => {
       const picked = Array.from(fileInput.files || []);
       for (const f of picked) await addAttachment(f);
       fileInput.value = '';
     });
 
-    // Invio
-    sendBtn.addEventListener('click', async () => {
+    // Invio: solo dal clic dell'utente sul tasto (#1071).
+    sendBtn.addEventListener('click', async (e) => {
+      if (!e.isTrusted) return;
       const text = textEl.value.trim();
       // Allega lo screenshot quando c'è un disegno (annotato) OPPURE quando
       // l'utente ha premuto "Allega screenshot" (scatto della pagina senza disegno).

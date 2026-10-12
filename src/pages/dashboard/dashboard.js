@@ -344,8 +344,17 @@
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
-      if (text.trim()) {
+      // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
+      const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
+      if (text.trim() || fotoViste.length) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        fotoViste.forEach((src, i) => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.className = 'dash-bubble-img';
+          attachImageLightbox(img, src);
+          b.insertBefore(img, b.childNodes[i] || null);
+        });
         bubblesEl.appendChild(b);
         if (isUser) bollaUtente = b;
       }
@@ -357,13 +366,15 @@
       // capisce più di cosa si parlasse — un taglio silenzioso su quello che
       // aveva mandato lui.
       const quante = Number(m.images) || 0;
-      if (quante > 0) {
+      const perse = Math.max(0, quante - fotoViste.length);
+      if (perse > 0) {
         const nota = document.createElement('div');
         nota.className = 'dash-bubble-note';
         nota.dataset.replay = '1';
-        nota.textContent = quante === 1
-          ? '1 immagine, non conservata'
-          : `${quante} immagini, non conservate`;
+        const altre = fotoViste.length > 0;
+        nota.textContent = perse === 1
+          ? (altre ? 'un\'altra immagine, non conservata' : '1 immagine, non conservata')
+          : `${perse} ${altre ? 'altre ' : ''}immagini, non conservate`;
         bubblesEl.appendChild(nota);
       }
       if (!isUser && types.length) {
@@ -379,7 +390,7 @@
         ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
       };
       threadHistory.push(isUser
-        ? { role: 'user', text, ...(m.daModello ? { daModello: true } : {}) }
+        ? { role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}) }
         : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
     }
     Term.nuovaChat(chat.messages.some((m) => (
@@ -710,6 +721,21 @@
     // ragionamento si richiude da solo (resta apribile): i due non si accavallano.
     let streamBubble = null;
     let streamedText = '';
+    // La risposta scritta nei giri di soli bottoni (#1167) resta in testa alla bolla: i giri dopo scrivono sotto.
+    let rispostaPrima = '';
+    let giroIniziato = false;
+    const unisci = (...parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+    const testoDelGiro = () => (globalThis.SN_CALC
+      ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
+      : streamedText);
+    const bollaDellaRisposta = () => {
+      if (!streamBubble) {
+        streamBubble = document.createElement('div');
+        streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
+        bubblesEl.appendChild(streamBubble);
+      }
+      return streamBubble;
+    };
     const followBottomIfNear = () => {
       const nearBottom = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 48;
       if (nearBottom) bubblesEl.scrollTop = bubblesEl.scrollHeight;
@@ -719,24 +745,20 @@
       offAnswer = window.filo.onAnswer((data) => {
         if (!data || data.reqId !== reasoningReqId) return;
         if (data.reset) {
-          // Fallback provider a metà: butta ciò che era già a schermo, non accodare.
+          // Fallback provider a metà: butta ciò che il giro aveva già messo a schermo, non accodare.
           streamedText = '';
-          if (streamBubble) streamBubble.textContent = '';
+          if (streamBubble) streamBubble.textContent = rispostaPrima;
           return;
         }
         if (!data.delta || turno.fermato) return;
-        if (!streamBubble) {
+        if (!giroIniziato) {
+          giroIniziato = true;
           pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
-          streamBubble = document.createElement('div');
-          streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
-          bubblesEl.appendChild(streamBubble);
         }
         streamedText += data.delta;
         // Il marker del conto si vede già come numero mentre scorre: la
         // risposta finale lo avrà risolto nel main, e le due non devono differire.
-        streamBubble.textContent = globalThis.SN_CALC
-          ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
-          : streamedText;
+        bollaDellaRisposta().textContent = rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro();
         followBottomIfNear();
       });
     }
@@ -747,6 +769,19 @@
     // e la bolla riparte vuota per il giro dopo. Gli id delle chiamate già
     // raccontate qui non si ripetono a fine turno (renderActions).
     const shown = new Set();
+    // Il testo di un giro di soli bottoni resta nella bolla; quello degli altri giri va nel blocco.
+    const chiudiGiro = (data) => {
+      if (data.risposta) {
+        rispostaPrima = unisci(rispostaPrima, data.text || testoDelGiro());
+        bollaDellaRisposta().textContent = rispostaPrima;
+      } else if (streamBubble && rispostaPrima) {
+        pending.aggiungiNota(testoDelGiro());
+        streamBubble.textContent = rispostaPrima;
+      } else if (streamBubble) {
+        if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
+        streamBubble = null;
+      }
+    };
     let offAction = null;
     if (window.filo?.onAction) {
       offAction = window.filo.onAction((data) => {
@@ -765,11 +800,10 @@
             pending.azioneSenzaRiga(a, { scartata: true });
           }
         } else if (data.kind === 'round') {
-          if (streamBubble) {
-            if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
-            streamBubble = null;
-          }
+          // Dopo lo stop la bolla è di apriTurnoFermato: il testo a metà resta dov'è.
+          if (!turno.fermato) chiudiGiro(data);
           streamedText = '';
+          giroIniziato = false;
           pending.fineGiro();
         }
       });
@@ -811,7 +845,7 @@
     // suo esito arriva nel blocco, che si chiude allora (patterns/il-filo-dell-attesa.md).
     const r = await Promise.race([inviato, turno.fermata]);
     if (turno.fermato) {
-      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText });
+      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText: unisci(rispostaPrima, streamedText) });
       const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown }); });
       return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura };
     }
@@ -819,13 +853,21 @@
     if (!r?.ok) {
       // Il ragionamento già arrivato resta leggibile anche sotto un errore:
       // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
+      // La parte di risposta scritta coi bottoni era arrivata (#1167): resta nella bolla coi suoi bottoni, e l'errore
+      // dice sotto che il lavoro dopo non è riuscito. Il testo a metà del giro fallito invece se ne va.
+      if (rispostaPrima && streamBubble) {
+        streamBubble.classList.remove('dash-bubble-streaming');
+        setBubbleText(streamBubble, rispostaPrima, true);
+        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: goHome, activity: pending, shown });
+        streamBubble = null;
+      }
       pending.endTurn();
       if (ownsActivity) pending.finish();
       // Le azioni fatte PRIMA del guasto sono successe davvero: restano nello
       // storico, così un «Riprova» riparte sapendo che quel timer c'è già
       // invece di avviarne un secondo.
-      if (Array.isArray(r?.actions) && r.actions.length) {
-        threadHistory.push({ role: 'filo', text: '', actions: r.actions, interrotto: true });
+      if (rispostaPrima || (Array.isArray(r?.actions) && r.actions.length)) {
+        threadHistory.push({ role: 'filo', text: rispostaPrima, actions: Array.isArray(r?.actions) ? r.actions : [], interrotto: true });
       }
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
@@ -888,6 +930,8 @@
       // c'è testo ma ci sono azioni, la bolla in streaming non esiste (non è mai
       // arrivato un delta) e cadiamo nel ramo "solo azioni" come prima.
       let filoBubble;
+      // La nota che il main ha fatto diventare risposta esce dal blocco: la frase sta nella bolla e basta.
+      if (r.notaRisposta) pending.dropNote(r.notaRisposta);
       if (streamBubble) {
         streamBubble.classList.remove('dash-bubble-streaming');
         if (r.text) {
@@ -902,9 +946,8 @@
           bubblesEl.appendChild(filoBubble);
         }
       } else {
-        // Se il testo è la nota dell'ultimo giro con azioni (il giro finale era
-        // muto), la nota esce dal blocco: la frase sta nella bolla e basta.
-        if (r.text) pending.dropNote(r.text);
+        // Il testo uguale all'ultima nota (formato vecchio) non resta anche nel blocco.
+        if (r.text && !r.notaRisposta) pending.dropNote(r.text);
         filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true });
         bubblesEl.appendChild(filoBubble);
       }
@@ -981,8 +1024,13 @@
     // Prima query dalla home → entra in stato thread.
     if (body.dataset.state !== 'thread') goThread();
 
-    // Bolla utente
-    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}) });
+    // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
+    const domanda = text || 'Descrivi questa immagine.';
+    threadHistory.push({
+      role: 'user', text: domanda,
+      ...(imagesToSend.length ? { images: imagesToSend.length } : {}),
+      ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}),
+    });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     imagesToSend.forEach((src, i) => {
@@ -994,7 +1042,7 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello, daFuori });
+    await runTurnAndContinue({ userMessage: domanda, images: imagesToSend, daModello, daFuori });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra

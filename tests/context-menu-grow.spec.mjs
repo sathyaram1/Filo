@@ -335,7 +335,7 @@ test('#500 scorrendo un menu troppo alto il pannello segue la freccetta, e spari
 async function accorciaFinestra(app, page, quanto) {
   const vhPrima = await page.evaluate(() => window.innerHeight);
   const bounds = await app.evaluate(async ({ BrowserWindow }, d) => {
-    const w = BrowserWindow.getAllWindows()[0];
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const b = w.getBounds();
     w.setBounds({ ...b, height: Math.max(240, b.height - d) });
     return b;
@@ -345,7 +345,7 @@ async function accorciaFinestra(app, page, quanto) {
     .toBeLessThan(vhPrima);
   return async () => {
     await app.evaluate(async ({ BrowserWindow }, b) => {
-      BrowserWindow.getAllWindows()[0].setBounds(b);
+      BrowserWindow.getAllWindows().find((x) => x._filoTabs).setBounds(b);
     }, bounds);
   };
 }

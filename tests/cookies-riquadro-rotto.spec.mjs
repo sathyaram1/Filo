@@ -412,3 +412,55 @@ test('il riquadro sconosciuto rotto scorso via prima della foto riceve la propos
     await srv.chiudi();
   }
 });
+
+// #1084: la foto al modello parte da sola, quindi si spegne. Spento, nessuna foto; le regole e il tasto destro restano.
+test('spento in Sicurezza: il riquadro sconosciuto non va al modello, il servizio noto sì, e il tasto destro lo riattiva', async ({ app, openTab }) => {
+  const srv = await serve();
+  const modello = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.riquadriRotti?.modello);
+  try {
+    await prepara(app);
+    const sec = await openTab('filo://security/');
+    const casella = sec.locator('#sec-riquadri-modello');
+    await expect(casella).toBeChecked({ timeout: 8_000 });
+    await expect(sec.locator('#sec-riquadri-modello-row')).toContainText('Riconosci con un modello i contenuti incorporati rotti');
+    await sec.locator('#sec-riquadri-modello-row').scrollIntoViewIfNeeded();
+    await sec.screenshot({ path: 'tests/.shots/riquadri-modello-interruttore.png' });
+    await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
+    await expect(sec.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
+    await sec.screenshot({ path: 'tests/.shots/riquadri-modello-interruttore-scuro.png' });
+    // In Manuale Filo non rifiuta cookie: l'interruttore non conta e si spegne a vista.
+    await sec.locator('#cookie-mode-manual').check();
+    await expect(casella).toBeDisabled();
+    await sec.locator('#cookie-mode-default').check();
+    await expect(casella).toBeEnabled();
+    await casella.click();
+    await expect.poll(modello, { timeout: 5_000 }).toBe(false);
+
+    const page = await openTab(srv.art('cosmo', 'vuoto'));
+    await expect(page.frameLocator('#ri').locator('button')).toBeVisible();
+    await page.waitForTimeout(10_000);
+    expect(await chiamate(app)).toEqual([]);
+    expect(await proposte(app, 'a.localhost')).toEqual([]);
+    const ri = page.frameLocator('#ri');
+    await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
+    await ri.locator('.sn-menu').getByText('Attiva i cookie di cosmo.localhost qui', { exact: true }).click();
+    await expect(ri.locator('#ok')).toHaveText('La mappa del quartiere', { timeout: 10_000 });
+
+    const noto = await openTab(srv.artSu('e', 'b', 'post'));
+    const p = await aspettaProposta(app, 'e.localhost');
+    expect(p.testo).toBe('Attivo i cookie di Fotogrammi per questo contenuto?');
+    expect(await chiamate(app)).toEqual([]);
+    await noto.close();
+
+    // Riacceso dalla chat, il riquadro sconosciuto di un'altra pagina torna dal modello.
+    const r = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('riquadri_rotti_modello', 'sì'));
+    await app.evaluate((_electron, partial) => globalThis.__filoHandlers.applySettingsUpdate(partial), r.partial);
+    await expect.poll(modello, { timeout: 5_000 }).toBe(true);
+    await expect(casella).toBeChecked({ timeout: 5_000 });
+    await openTab(srv.artSu('f', 'd', 'vuoto'));
+    await aspettaProposta(app, 'f.localhost');
+    expect((await chiamate(app)).length).toBe(1);
+  } finally {
+    await srv.chiudi();
+  }
+});

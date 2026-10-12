@@ -1,14 +1,14 @@
 // Unit test di src/main/services/firmatariC2pa.js: l'elenco ufficiale dei firmatari
 // C2PA si scarica, resta su disco, e uno scaricato male non prende il posto di quello buono.
-// Il server è locale: la prova non tocca mai la rete vera.
+// Il fetch è finto e le attese a tempo pure: la prova non tocca la rete, e una macchina carica non decide chi arriva
+// prima fra l'elenco e il tempo limite (#1063).
 
-import { test, before, after } from 'node:test';
+import { test, beforeEach, afterEach, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { createServer } from 'node:http';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { pngFirmato, certificato, elencoPem, USO_MARCA } from '../helpers/immagineFirmata.mjs';
 
 process.env.NODE_ENV = 'test';
@@ -24,24 +24,26 @@ const RADICE = certificato({ organizzazione: 'Autorità di prova', nomeComune: '
 const ALTRA = certificato({ organizzazione: 'Altra autorità', nomeComune: 'Radice', ca: true });
 const IMMAGINE = pngFirmato({ cert: certificato({ organizzazione: 'OpenAI, Inc.', emittente: RADICE }) });
 
+// Il server finto: per indirizzo il corpo, e un `cancello` che tiene la risposta finché la prova non lo apre.
 const risposte = new Map();
-let server;
-let base;
-before(async () => {
-  server = createServer((req, res) => {
-    const r = risposte.get(req.url);
-    if (!r) { res.writeHead(404); res.end('non trovato'); return; }
-    setTimeout(() => {
-      res.writeHead(r.stato || 200, { 'Content-Type': 'text/plain' });
-      res.end(r.corpo);
-    }, r.ritardo || 0);
-  });
-  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
-  base = `http://127.0.0.1:${server.address().port}`;
-});
+const base = 'http://firmatari.prova';
+const fetchVero = globalThis.fetch;
+globalThis.fetch = async (url) => {
+  const { pathname } = new URL(String(url));
+  const r = risposte.get(pathname);
+  if (!r) return new Response('non trovato', { status: 404 });
+  if (r.cancello) await r.cancello;
+  return new Response(r.corpo, { status: r.stato || 200, headers: { 'Content-Type': 'text/plain', 'Content-Length': String(Buffer.byteLength(r.corpo)) } });
+};
+// I tempi limite del modulo (lo scaricamento, il thread di lettura, l'attesa della prima volta) non scadono da soli.
+// Il thread di lettura non tiene vivo il processo e i timer finti nemmeno: lo tiene vivo un intervallo vero.
+const vivo = setInterval(() => {}, 60_000);
+beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
+afterEach(() => mock.timers.reset());
 after(() => {
-  server.close();
-  rmSync(DATI, { recursive: true, force: true });
+  clearInterval(vivo);
+  globalThis.fetch = fetchVero;
+  togliCartella(DATI);
 });
 
 test('mai scaricato: la firma è valida ma il firmatario resta non verificato', async () => {
@@ -99,10 +101,16 @@ test('una pagina d’errore, un 404 o un elenco enorme non prendono il posto di 
   assert.equal((await F.analizzaImmagine(IMMAGINE)).firmatario, 'riconosciuto');
 });
 
-test('alla prima immagine firmata, un elenco in arrivo si aspetta invece di dire «non verificato»', async () => {
+test('alla prima immagine firmata, un elenco in arrivo si aspetta invece di dire «non verificato»', async (t) => {
   F._dimentica();
-  rmSync(join(DATI, 'firmatari-c2pa'), { recursive: true, force: true });
-  risposte.set('/lento.pem', { corpo: elencoPem(RADICE), ritardo: 400 });
+  assert.ok(togliCartella(join(DATI, 'firmatari-c2pa')));
+  let apri;
+  risposte.set('/lento.pem', { corpo: elencoPem(RADICE), cancello: new Promise((r) => { apri = r; }) });
+  // L'elenco arriva solo dopo che la prima lettura dell'immagine lo ha trovato ancora in viaggio.
+  const isolata = require('../../src/main/services/provenienzaIsolata.js');
+  const vera = isolata.analizza;
+  t.after(() => { isolata.analizza = vera; });
+  isolata.analizza = (...a) => vera(...a).then((r) => { setImmediate(apri); return r; });
   const giro = F.aggiorna({ forza: true, url: `${base}/lento.pem` });
   const r = await F.analizzaImmagine(IMMAGINE);
   assert.equal(r.firmatario, 'riconosciuto');

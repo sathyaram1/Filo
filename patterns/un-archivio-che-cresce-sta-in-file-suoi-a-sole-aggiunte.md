@@ -23,7 +23,9 @@ vettori appena tolti (#825).
   la voce e senza le sue righe di aggiornamento: il dato sparisce davvero dal
   disco. Se altre voci contengono un rimando a quella cancellata (per le schede
   sono gli indirizzi delle «aperte insieme»), il rimando si toglie nella stessa
-  riscrittura.
+  riscrittura. Lo stesso vale per una correzione che toglie un testo (la
+  Cronologia AI quando si cancella una chat, #866): si usa `riscrivi`, non una
+  riga di aggiornamento, che lascerebbe il testo vecchio nella riga di prima.
 - **Nessun tetto.** Se un limite serve davvero, deve essere alto e avvisare chi
   manda (CLAUDE.md § Limiti).
 - **Un dato derivato che costa** (riassunto, vettore) si salva con la voce e dura
@@ -39,7 +41,9 @@ vettori appena tolti (#825).
 - **L'incognito va rifatto a mano.** `storage.json` lo garantisce con
   l'allowlist fail-closed; un file proprio no. Ogni funzione pubblica chiede
   `inIncognito()` allo shim (`src/main/shim/storage.js`): se la chiamata arriva
-  dall'incognito, non legge e non scrive.
+  dall'incognito, non legge e non scrive su disco. Se l'incognito vedeva le sue
+  voci quando stavano nell'overlay di `storage.json` (la Cronologia AI), le tiene
+  in RAM e le butta con `resetIncognito`, insieme all'overlay.
 - **Migrazione dalla chiave vecchia.** Il deposito si apre solo fuori
   dall'incognito, perché lì la vista di `storage.json` è vuota. Le voci si
   scrivono nei file nuovi e solo dopo si toglie la chiave: se un arresto
@@ -50,6 +54,8 @@ vettori appena tolti (#825).
   l'archivio sotto la sua chiave di sempre, così i backup vecchi e nuovi si
   leggono uguali. `chrome.storage.local.clear()` (shim del main) svuota anche
   il deposito.
-- **Dove:** `src/main/services/archivedTabs.js`. Prove:
+- **Dove:** `src/main/services/archivedTabs.js`, `src/main/services/historyStore.js`
+  (Cronologia AI, #1065), `src/main/services/segnalazioniMie.js`. Prove:
   `tests/unit/depositoAggiunte.test.mjs`, `tests/unit/archivedTabsStore.test.mjs`,
-  `tests/archive-store-unlimited.spec.mjs`.
+  `tests/archive-store-unlimited.spec.mjs`, `tests/unit/historyStore.test.mjs`,
+  `tests/ai-history-store.spec.mjs`.

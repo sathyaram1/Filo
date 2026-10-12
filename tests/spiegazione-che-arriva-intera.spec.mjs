@@ -6,6 +6,12 @@
 // («OpenRouter 402: {…}»), e l'Aiuto nominava la pagina Crediti senza portarci.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi, clicca } from './helpers/riquadri.mjs';
+
+// Sui siti la spiegazione sta in uno shadow root chiuso (#1071): la bolla si legge dal mondo dei content script.
+const BOLLA = '.sn-popup .sn-msg-assistant .sn-msg-text';
+const testoBolla = async (app, page) => (await statoDi(app, page, BOLLA))?.testo || '';
+const rimedioVisibile = async (app, page) => !!(await statoDi(app, page, '.sn-popup .sn-msg-rimedio'))?.visibile;
 
 const PAGINA = '<!doctype html><meta charset="utf-8"><title>Pagina</title><p id="p">Una frase con dentro la parola sonda.</p>';
 
@@ -74,14 +80,12 @@ test('crediti finiti: il riquadro della spiegazione lo dice, non mostra la riga 
   const page = await testServer.openReady(openTab, PAGINA);
   await chiediSpiegazione(app, page);
 
-  const bolla = page.locator('.sn-popup .sn-msg-assistant .sn-msg-text').last();
-  await expect(bolla).toBeVisible({ timeout: 25_000 });
-  await expect(bolla).toContainText(/crediti/i, { timeout: 15_000 });
-  await expect(bolla).not.toContainText('402');
-  await expect(bolla).not.toContainText(/insufficient/i);
+  await expect.poll(() => testoBolla(app, page), { timeout: 40_000 }).toMatch(/crediti/i);
+  expect(await testoBolla(app, page)).not.toContain('402');
+  expect(await testoBolla(app, page)).not.toMatch(/insufficient/i);
   // La frase nomina la pagina Crediti: da un sito qualunque ci si deve poter
   // andare, come fa la chat della home.
-  await expect(page.locator('.sn-popup .sn-msg-rimedio')).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => rimedioVisibile(app, page), { timeout: 10_000 }).toBe(true);
 });
 
 test('nessuna chiave: il riquadro della spiegazione dice cosa manca e porta ai Crediti', async ({ app, openTab, testServer }) => {
@@ -90,14 +94,11 @@ test('nessuna chiave: il riquadro della spiegazione dice cosa manca e porta ai C
   const page = await testServer.openReady(openTab, PAGINA);
   await chiediSpiegazione(app, page);
 
-  const bolla = page.locator('.sn-popup .sn-msg-assistant .sn-msg-text').last();
-  await expect(bolla).toBeVisible({ timeout: 25_000 });
-  await expect(bolla).toContainText(/invito|crediti/i, { timeout: 15_000 });
+  await expect.poll(() => testoBolla(app, page), { timeout: 40_000 }).toMatch(/invito|crediti/i);
 
   // Il tasto non descrive il problema: lo toglie. Cliccarlo apre la pagina.
-  const via = page.locator('.sn-popup .sn-msg-rimedio');
-  await expect(via).toBeVisible({ timeout: 10_000 });
-  await via.click();
+  await expect.poll(() => rimedioVisibile(app, page), { timeout: 10_000 }).toBe(true);
+  await clicca(app, page, '.sn-popup .sn-msg-rimedio');
   await expect.poll(
     () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
       .flatMap((w) => (w._filoTabs ? w._filoTabs.tabs : []))

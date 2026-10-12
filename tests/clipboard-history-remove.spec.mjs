@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { CONFIRM_HOST } from './helpers/confirm.mjs';
 import { apriCronologia, statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback #256: nella cronologia degli appunti (freccia accanto a "Incolla")
 // l'utente poteva solo incollare le voci, non rimuoverne una singola né svuotare
@@ -66,7 +67,7 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const page = await findTabPage(app, host);
@@ -83,8 +84,11 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     expect(sensibile).toBeTruthy();
     await page.mouse.click(sensibile.rimuovi.x, sensibile.rimuovi.y);
 
-    // Sparisce subito dalla lista, le altre restano.
-    await expect.poll(() => testiCronologia(app, page)).toEqual(['secondo testo generico', 'terzo testo normale']);
+    // La riga resta al suo posto barrata (le righe sotto non devono salire di
+    // una posizione sotto la mano di chi clicca, #256 giro 4): le voci VIVE
+    // scendono a due.
+    await expect.poll(async () => (await statoCronologia(app, page)).voci.map((v) => [v.testo, v.tolta]))
+      .toEqual([[SENSITIVE, true], ['secondo testo generico', false], ['terzo testo normale', false]]);
 
     // (3) Persistenza: chiudi il menu e riaprilo — la cronologia riletta dallo
     // storage NON contiene più la voce sensibile (la rimozione è stata salvata).
@@ -133,7 +137,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
   const app = await launchWithHistory(userData);
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const page = await findTabPage(app, host);
@@ -151,7 +155,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     // Rimuovi la voce sensibile.
     const sensibile = (await statoCronologia(app, page)).voci.find((v) => v.testo === SENSITIVE);
     await page.mouse.click(sensibile.rimuovi.x, sensibile.rimuovi.y);
-    await expect.poll(() => testiCronologia(app, page)).toHaveLength(2);
+    await expect.poll(async () => (await statoCronologia(app, page)).voci.filter((v) => !v.tolta).length).toBe(2);
 
     // Porta il mouse lontano: il sotto-menu si richiude da solo, il menu del
     // tasto destro resta aperto (si chiude solo con un click o Esc).

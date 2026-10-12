@@ -12,9 +12,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
 
 const campo = (v) => (typeof v === 'string' ? { stringValue: v } : v);
+// Dal #1148 conta la fiducia, non la prova: le pratiche dell'owner e delle sessioni con la prova nascono (o la migrazione
+// le fa) fidate. Le prove la dicono come la scriverebbe il server, salvo dove la passano loro.
 function documento(id, f) {
   const fields = {};
-  for (const [k, v] of Object.entries(f)) if (v !== undefined) fields[k] = campo(v);
+  const proprie = /^(owner|local):/i.test(String(f.clientId || '')) && f.senderProof === 'admin';
+  for (const [k, v] of Object.entries(proprie && !('fiducia' in f) ? { ...f, fiducia: 'fidato' } : f)) if (v !== undefined) fields[k] = campo(v);
   return { name: `projects/p/databases/(default)/documents/feedback/${id}`, fields };
 }
 
@@ -227,7 +230,7 @@ test('negli stati del lavoro una sessione porta solo pratiche sue o dell’owner
     const r = await mod.scrivi('f3', 'done', 'fatto', { ...OPTS, attore: 'routine' });
     assert.deepEqual([r.ok, r.senzaProva, patch.length], [false, true, 0]);
     assert.doesNotMatch(mod.rifiutoPratica('f3', r), /--riconosci/, '#957: la prova a mano solo da Gestione');
-    assert.match(mod.rifiutoPratica('f3', r), /in Gestione, col tasto «🙋 È mio»/);
+    assert.match(mod.rifiutoPratica('f3', r), /in Gestione, col tasto «🤝 Segna fidato»/);
     assert.doesNotMatch(mod.rifiutoPratica('f3', r), /feedback:ripasso/, '#912: il ripasso non dà la prova al solo nome');
   });
   const segno = { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1790000000000' } } } };
@@ -355,7 +358,7 @@ test('le strade proposte dal rifiuto non rifiutano a loro volta: niente Ricevuti
       }
       if (nome === 'utente in coda') assert.match(testo, /--serve-locale/, nome);
       assert.doesNotMatch(testo, /--riconosci/, nome);
-      if (nome === 'sessione senza prova, pulita') assert.match(testo, /in Gestione, col tasto «🙋 È mio»/, nome);
+      if (nome === 'sessione senza prova, pulita') assert.match(testo, /in Gestione, col tasto «🤝 Segna fidato»/, nome);
       if (/Ricevuti/.test(nome) || /segnalata/.test(nome)) assert.match(testo, /owner/, `${nome}: dice chi decide`);
     });
     assert.deepEqual(vicoli, [], nome);
@@ -445,4 +448,22 @@ test('approvato come lavoro locale: i passaggi di npm run feedback e la presa in
     assert.equal(rifiuto.ok, false);
     assert.equal(rifiuto.utente, true);
   } finally { globalThis.fetch = vero; }
+});
+
+test('praticaInChiaro: fiducia assente resta assente (regola di prima fino alla migrazione), presente ma non testo è un no', async () => {
+  const doc = (extra) => ({
+    name: 'projects/p/databases/(default)/documents/feedback/x1',
+    fields: { clientId: { stringValue: 'local:claude' }, senderProof: { stringValue: 'admin' }, status: { stringValue: 'todo' }, ...extra },
+  });
+  const MR = globalThis.SN_MANAGE_REVIEW;
+  const assente = await mod.praticaInChiaro(doc());
+  assert.equal(assente.fiducia, undefined);
+  assert.equal(MR.localSenderCheck(assente).ok, true, 'la pratica locale prima della migrazione si lega');
+  const nulla = await mod.praticaInChiaro(doc({ fiducia: { nullValue: null } }));
+  assert.equal(nulla.fiducia, '');
+  assert.equal(MR.localSenderCheck(nulla).ok, false);
+  const nonFidata = await mod.praticaInChiaro(doc({ fiducia: { stringValue: 'non_fidato' } }));
+  assert.equal(MR.localSenderCheck(nonFidata).nonFidato, true);
+  const fidata = await mod.praticaInChiaro(doc({ fiducia: { stringValue: 'fidato' } }));
+  assert.equal(MR.localSenderCheck(fidata).ok, true);
 });

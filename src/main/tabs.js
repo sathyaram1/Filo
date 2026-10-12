@@ -3,7 +3,7 @@
 // La shell parla con il main via IPC (tabs:* canali); il main risponde con
 // broadcast tabs:updated alla shell perché ridisegni la barra.
 
-const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain } = require('electron');
+const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain, screen } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
@@ -18,6 +18,8 @@ const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
+const MenuDiRiserva = require('./menuDiRiserva');
+const IconaScheda = require('./services/iconaScheda');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -27,7 +29,7 @@ const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
-const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
+const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
@@ -98,6 +100,8 @@ function installaPermessi(ses) {
   Permessi.installa(ses, {
     prima: (wc, permission, callback) => {
       if (permission !== 'fullscreen') return false;
+      // A schermo intero la finestrella di accesso perderebbe la barra col sito (#1066).
+      if (wc && wc._filoFinestrella) { callback(false); return true; }
       const t = tabDiWebContents(wc);
       if (t && t._ultimoInputEsc) { callback(false); return true; }
       return false;
@@ -164,6 +168,8 @@ const SEGUI_APERTURA_MS = 60_000;
 // Il rinvio che la pagina dichiara di sé (meta refresh), in secondi, o -1.
 const RINVIO_DICHIARATO_JS = '(()=>{try{const m=document.querySelector(\'meta[http-equiv="refresh" i]\');const s=m?parseFloat(m.getAttribute("content")):NaN;return Number.isFinite(s)&&s>=0?s:-1;}catch(e){return -1;}})()';
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
+// La sessione scritta per ultima, in JSON: la chiave è una sola per tutte le finestre, quindi anche il ricordo.
+let sessioneScritta = null;
 
 // SICUREZZA — schemi consentiti per le navigazioni ORIGINATE da contenuto web
 // (click su link, window.location, window.open) e dall'agente. Tutto il resto è
@@ -199,6 +205,41 @@ function isOsDelegatedScheme(rawUrl) {
   let proto = '';
   try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
   return OS_DELEGATED_SCHEMES.has(proto);
+}
+
+const RIAPERTURA_ACCESSO_MS = 5000;
+const MONDO_RIAPERTURA = 1003;
+
+// Il dominio registrato, la parte che chi attacca non sceglie; una pagina scritta dal sito (about:blank, blob:) è sua.
+function titoloFinestrella(url, origine = '') {
+  const da = /^https?:/i.test(origine) ? origine : String(url || '');
+  if (!/^https?:/i.test(da)) return da.split(/[?#]/)[0] || 'about:blank';
+  return Permessi.nomeDaMostrare(da).dominio;
+}
+
+// La pagina sceglie misure e posizione, ma la finestrella sta tutta nello schermo, come in Chrome: fuori, con la barra
+// del titolo, uscirebbe l'unico posto dove si legge il sito (#1066 giro 1). Windows non la rimette dentro da solo.
+function dentroLoSchermo(b) {
+  const a = screen.getDisplayMatching(b).workArea;
+  const width = Math.min(b.width, a.width);
+  const height = Math.min(b.height, a.height);
+  return {
+    width, height,
+    x: Math.min(Math.max(b.x, a.x), a.x + a.width - width),
+    y: Math.min(Math.max(b.y, a.y), a.y + a.height - height),
+  };
+}
+
+// Electron passa alla finestra ogni chiave delle `features` di window.open (frame=no, fullscreen, titleBarStyle…):
+// alla pagina restano solo le misure, il resto torna com'è di suo, o il titolo col sito sparirebbe (#1066).
+const MISURE_FINESTRELLA = new Set(['width', 'height', 'left', 'top', 'x', 'y']);
+function senzaOpzioniDellaPagina(features) {
+  const via = {};
+  for (const coppia of String(features || '').split(',')) {
+    const chiave = coppia.split('=')[0].trim();
+    if (chiave && !MISURE_FINESTRELLA.has(chiave)) via[chiave] = undefined;
+  }
+  return via;
 }
 
 // Consegna all'OS un link mailto:/tel:/sms: (best-effort). Da chiamare SOLO dopo
@@ -571,7 +612,7 @@ class TabManager {
     if (!owner) return;
     try {
       owner.view.webContents
-        .executeJavaScript('try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} true', true)
+        .executeJavaScript('try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} true', false)
         .catch(() => {});
     } catch (_) {}
   }
@@ -782,6 +823,24 @@ class TabManager {
   }
 
   _makeView(url, partition, opts = {}) {
+    const webPreferences = this._preferenzeWeb(url, partition, opts);
+    // `opts.webContents`: la finestra che una pagina ha aperto col clic, tenuta da lei (setWindowOpenHandler).
+    // Con una finestra già nata le preferenze vanno ridate, o il preload non parte nei suoi documenti.
+    const view = new WebContentsView(opts.webContents ? { webContents: opts.webContents, webPreferences } : { webPreferences });
+    // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
+    // (privacy, proxy, incognito): una sessione non agganciata scarica col
+    // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
+    // L'incognito ha il suo ambito: le sue voci non vanno su disco.
+    try {
+      require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
+    } catch (_) {}
+    installaPermessi(view.webContents.session);
+    Permessi.seguiGesti(view.webContents);
+    require('./services/homeNetwork').attach(view.webContents.session);
+    return view;
+  }
+
+  _preferenzeWeb(url, partition, opts = {}) {
     const isInternal = url.startsWith('filo://');
     const webPreferences = {
       preload: isInternal ? INTERNAL_PRELOAD : PAGE_PRELOAD,
@@ -820,24 +879,14 @@ class TabManager {
         '--filo-suppress-autoplay',
       ];
     }
-    const view = new WebContentsView({ webPreferences });
-    // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
-    // (privacy, proxy, incognito): una sessione non agganciata scarica col
-    // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
-    // L'incognito ha il suo ambito: le sue voci non vanno su disco.
-    try {
-      require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
-    } catch (_) {}
-    installaPermessi(view.webContents.session);
-    Permessi.seguiGesti(view.webContents);
-    require('./services/homeNetwork').attach(view.webContents.session);
-    return view;
+    return webPreferences;
   }
 
   // `apriComunque`: la scheda non passa dalla lista dei siti bloccati per quel sito.
   // `permessoRichieste`: è un «Apri comunque» vero, e passa anche il blocco delle richieste.
   // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false } = {}) {
+  // `adotta`: { webContents, partition, sito } della finestra che una pagina ha aperto e tiene; si carica da sé.
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -890,15 +939,17 @@ class TabManager {
     }
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
-    const partition = this._partitionFor(url);
-    const view = this._makeView(url, partition, { suppressAutoplay });
+    const partition = adotta ? adotta.partition : this._partitionFor(url);
+    const view = this._makeView(url, partition, { suppressAutoplay, webContents: adotta && adotta.webContents });
 
     const tab = {
       id,
       view,
       title: 'Nuova scheda',
       url,
+      // `favicon` è il data: URL che vede la barra; `faviconUrl` l'indirizzo dichiarato dalla pagina, per archivio e salvati.
       favicon: '',
+      faviconUrl: '',
       loading: true,
       canBack: false,
       canFwd: false,
@@ -919,7 +970,7 @@ class TabManager {
       // (Electron zoom "level", 0 = 100%). Applicato una volta a fine caricamento.
       restoreZoomLevel: typeof restoreZoomLevel === 'number' ? restoreZoomLevel : null,
       partition,
-      partitionSite: isInternal ? null : Cookies.registrableOf(url),
+      partitionSite: isInternal ? null : (adotta && adotta.sito) || Cookies.registrableOf(url),
       // Proxy per-tab ("Apri da un altro paese"): { country, tier } finché la
       // tab è instradata da un altro paese, null altrimenti. Vedi setTabProxy.
       proxy: null,
@@ -970,7 +1021,12 @@ class TabManager {
     // Una scheda aperta da un clic vero eredita il gesto per la sua prima navigazione e i suoi rinvii (#664 giro 2).
     if (daGesto) view.webContents._filoGestoAlle = Date.now();
     if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
-    else view.webContents.loadURL(url);
+    else if (!adotta) view.webContents.loadURL(url);
+    // La pagina che l'ha aperta può chiuderla (window.close): la scheda se ne va con lei.
+    if (adotta) {
+      const wc = view.webContents;
+      wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id); }));
+    }
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
       for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
@@ -1142,7 +1198,7 @@ class TabManager {
         Archive.archive({
           url,
           title: tab.title || url,
-          favicon: tab.favicon || '',
+          favicon: tab.faviconUrl || '',
           identityColor: tab.identityColor || null,
           openedAt: tab.openedAt || null,
           closedAt: new Date().toISOString(),
@@ -1386,7 +1442,7 @@ class TabManager {
         try {
           contentExtract = await t.view.webContents.executeJavaScript(
             '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
-            true,
+            false,
           );
         } catch (_) {}
       }
@@ -1551,6 +1607,26 @@ class TabManager {
     this._broadcast();
   }
 
+  // L'icona la scarica il main con la sessione di questa scheda: la barra riceve solo byte già scaricati (#1083).
+  // Fino all'arrivo resta quella di prima: un'icona che cambia nella stessa pagina (un contatore) non lampeggia.
+  _aggiornaIcona(tab, wc, candidati) {
+    const lista = (Array.isArray(candidati) ? candidati : []).filter((u) => typeof u === 'string' && u);
+    tab.faviconUrl = lista[0] || '';
+    const giro = (tab._giroIcona || 0) + 1;
+    tab._giroIcona = giro;
+    const vivo = () => tab._giroIcona === giro && !!tab.view && tab.view.webContents === wc && !wc.isDestroyed();
+    let interna = false;
+    try { interna = /^filo:/i.test(wc.getURL() || ''); } catch (_) {}
+    IconaScheda.iconaPer(wc.session, lista, { interna, vivo }).then(({ url, dato }) => {
+      if (!vivo()) return;
+      if (url) tab.faviconUrl = url;
+      try { tab._origineIcona = origineDi(wc.getURL()); } catch (_) {}
+      if (tab.favicon === dato) return;
+      tab.favicon = dato;
+      this._broadcast();
+    }, () => {});
+  }
+
   // Colore IDENTITÀ del sito (§1.2): theme-color/manifest/favicon calcolato dal
   // content script. Lo cachiamo per dominio (calcolo una volta sola, come da
   // spec) e lo mettiamo sullo snapshot; la shell lo applica ATTENUATO alle tab
@@ -1585,7 +1661,7 @@ class TabManager {
     try {
       const exact = await tab.view.webContents.executeJavaScript(
         '(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;return max>0?Math.max(0,Math.min(100,(window.scrollY||d.scrollTop||0)/max*100)):0;}catch(e){return null;}})()',
-        true,
+        false,
       );
       if (typeof exact === 'number') scrollPct = exact;
     } catch (_) {}
@@ -1670,27 +1746,17 @@ class TabManager {
     try { dest.focus(); } catch (_) {}
   }
 
-  // §2.1 — segnali di attività riportati dal content script (input, scroll,
-  // form sporco). Merge parziale sullo snapshot. Best-effort: throttled lato
-  // pagina, qui non rimbalziamo se nulla cambia in modo significativo.
+  // §2.1 — segnali di attività del content script (input, scroll, form sporco), arrivano a ogni clic e
+  // scorrimento. Servono solo al main (triage, archivio): niente broadcast né salvataggio di sessione (#1089).
   setTabActivity(id, activity) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !activity || typeof activity !== 'object') return;
     // Qualsiasi attività in una tab conta come "Filo è in uso": resetta il
     // contatore di inattività dell'app (§2.1).
     this._lastAppInteractionAt = Date.now();
-    let changed = false;
-    if (typeof activity.lastInteractionAt === 'number') {
-      tab.lastInteractionAt = activity.lastInteractionAt; changed = true;
-    }
-    if (typeof activity.scrollPct === 'number') {
-      const v = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
-      if (v !== tab.scrollPct) { tab.scrollPct = v; changed = true; }
-    }
-    if (typeof activity.formDirty === 'boolean') {
-      if (activity.formDirty !== tab.formDirty) { tab.formDirty = activity.formDirty; changed = true; }
-    }
-    if (changed) this._broadcast();
+    if (typeof activity.lastInteractionAt === 'number') tab.lastInteractionAt = activity.lastInteractionAt;
+    if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
+    if (typeof activity.formDirty === 'boolean') tab.formDirty = activity.formDirty;
   }
 
   navigate(id, url) {
@@ -1835,6 +1901,27 @@ class TabManager {
     if (!target) return;
     if (verso === 'avanti') this.goForward(target);
     else this.goBack(target);
+  }
+
+  // Cmd+freccia su Mac dalle viste di Filo senza un preload che lo rimandi (la barra in alto, la
+  // barra laterale): diventa indietro/avanti solo se lì non si scrive. true = ha navigato.
+  async _navigaSeNonScrive(wc, verso, id) {
+    try {
+      if (await require('./menu').staScrivendo(wc)) return false;
+    } catch (_) { return false; }
+    this.navigaCronologia(verso, id);
+    return true;
+  }
+
+  // Cmd+freccia che la pagina non ha usato (src/preload/cmd-freccia.js). Vale solo
+  // per un tasto vero appena visto passare dal main su quella scheda: è lui che sa
+  // se siamo su Mac, e una pagina non deve poter navigare da sé con questo messaggio.
+  cmdFrecciaNonUsata(wc, verso) {
+    const visto = wc && wc._filoCmdFreccia;
+    if (!visto || visto.verso !== verso || Date.now() - visto.t > 3000) return;
+    wc._filoCmdFreccia = null;
+    const tab = this.tabs.find((t) => t.view && t.view.webContents === wc);
+    if (tab) this.navigaCronologia(verso, tab.id);
   }
 
   // I tasti del browser (#404, #685) da qualunque vista della finestra abbia il fuoco: la scheda, e la barra
@@ -2081,9 +2168,13 @@ class TabManager {
     shellWc.on('before-input-event', (event, input) => {
       if (input.type !== 'keyDown') return;
       const verso = comandoNavigazione(input);
-      if (!verso) return;
-      event.preventDefault();
-      this.navigaCronologia(verso);
+      if (verso) {
+        event.preventDefault();
+        this.navigaCronologia(verso);
+        return;
+      }
+      const fuoriDalCampo = comandoNavigazioneFuoriDalCampo(input);
+      if (fuoriDalCampo) this._navigaSeNonScrive(shellWc, fuoriDalCampo);
     });
   }
 
@@ -2229,7 +2320,12 @@ class TabManager {
           return;
         }
       }
-      if (this.tastoDelBrowser(input, tab)) event.preventDefault();
+      if (this.tastoDelBrowser(input, tab)) { event.preventDefault(); return; }
+      // Cmd+freccia resta alla pagina: se non la usa, la rimanda il suo preload (`cmdFrecciaNonUsata`).
+      if (input.type === 'keyDown') {
+        const fuoriDalCampo = comandoNavigazioneFuoriDalCampo(input);
+        if (fuoriDalCampo) wc._filoCmdFreccia = { verso: fuoriDalCampo, t: Date.now() };
+      }
     });
     // Navigazione main-frame iniziata dalla pagina (click su link,
     // window.location). Due casi richiedono di RICREARE la view invece di
@@ -2252,7 +2348,8 @@ class TabManager {
       // fallire li consegniamo al sistema (apre posta/telefono), come un browser.
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        fermaNavigazione(url, { win: this.win, wc });
+        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, undefined, { navigazione: true });
+        else fermaNavigazione(url, { win: this.win, wc });
         return;
       }
       // «Apri comunque» della pagina «Sito bloccato» che il main ha messo in questa scheda (#590).
@@ -2282,7 +2379,8 @@ class TabManager {
     wc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        fermaNavigazione(url, { win: this.win, wc });
+        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, undefined, { navigazione: true });
+        else fermaNavigazione(url, { win: this.win, wc });
         // Una scheda nata per un collegamento che rimbalza sull'invito o sulla posta resterebbe bianca (#664 giro 2).
         if (event.isMainFrame !== false && !tab._everNavigated && !tab.isInternal) setImmediate(() => this._dropTab(tab));
         return;
@@ -2309,9 +2407,9 @@ class TabManager {
     });
     // Debug helper: in dev relay i log della pagina al main.
     if (process.env.NODE_ENV !== 'production') {
-      wc.on('console-message', (_e, level, message, line, source) => {
-        const tag = ['log', 'warn', 'error'][level] || 'info';
-        const src = source ? ` (${source}:${line})` : '';
+      wc.on('console-message', ({ level, message, lineNumber, sourceId }) => {
+        const tag = { warning: 'warn', error: 'error', info: 'log' }[level] || level || 'log';
+        const src = sourceId ? ` (${sourceId}:${lineNumber})` : '';
         console.log(`[tab:${tab.id.slice(0, 6)}:${tag}] ${message}${src}`);
       });
     }
@@ -2401,7 +2499,7 @@ class TabManager {
         try {
           wc.executeJavaScript(
             'try{Object.defineProperty(navigator,"globalPrivacyControl",{get:function(){return true;},configurable:true});}catch(e){}',
-            true,
+            false,
           ).catch(() => {});
         } catch (_) {}
       }
@@ -2426,7 +2524,7 @@ class TabManager {
       const pct = Math.max(0, Math.min(100, tab.restoreScrollPct));
       tab.restoreScrollPct = null; // applica una volta sola
       const js = `(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;if(max>0)window.scrollTo(0,max*${pct}/100);}catch(e){}})()`;
-      const run = () => { try { wc.executeJavaScript(js, true).catch(() => {}); } catch (_) {} };
+      const run = () => { try { wc.executeJavaScript(js, false).catch(() => {}); } catch (_) {} };
       run();
       setTimeout(run, 500); // riprova dopo l'eventuale layout/lazy-load
     });
@@ -2464,7 +2562,7 @@ class TabManager {
           const letta = wc.getURL();
           wc.executeJavaScript(
             '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,2000);}catch(e){return "";}})()',
-            true,
+            false,
           ).then((txt) => {
             if (typeof txt === 'string' && txt && !wc.isDestroyed() && wc.getURL() === letta) tab.contentExtract = txt;
           }).catch(() => {});
@@ -2475,7 +2573,7 @@ class TabManager {
       update({ title: title || tab.title });
       this.visite.titolo(wc, title);
     });
-    wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
+    wc.on('page-favicon-updated', (_e, favicons) => this._aggiornaIcona(tab, wc, favicons));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
       // #412 — questa scheda ha committato una vera navigazione main-frame:
       // NON è più il "contenitore vuoto" di un download (una scheda aperta da un
@@ -2483,6 +2581,9 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // L'icona in volo era del documento di prima; quella mostrata vale ancora solo sullo stesso sito.
+      tab._giroIcona = (tab._giroIcona || 0) + 1;
+      if (origineDi(url) !== tab._origineIcona) tab.favicon = '';
       // Testo e titolo letti sono della pagina di prima: sotto l'indirizzo nuovo partirebbero col suo nome (#1004).
       // Una pagina senza titolo non lo cambia mai: vale quello del documento nuovo, cioè l'indirizzo, come negli altri browser.
       tab.contentExtract = '';
@@ -2648,6 +2749,7 @@ class TabManager {
       try { callback(false); } catch (_) {}
     });
 
+    MenuDiRiserva.segui(wc);
     // Spellcheck nativo: Electron è l'unico a conoscere i suggerimenti
     // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
     // content script perché li mostri nel menu di correzione custom.
@@ -2669,14 +2771,10 @@ class TabManager {
       }
     });
 
-    // Apertura nuove tab: tutto resta dentro Filo come nuovo tab — a meno che
-    // il popup blocker sia attivo e l'apertura sembri un popup pubblicitario
-    // (cioè non un click su <a target="_blank">). Heuristic: il disposition
-    // 'new-window' corrisponde a window.open() esplicito con features (size,
-    // toolbar, ecc.), che è la firma classica degli ad popup. Disposition
-    // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
+    // Apertura nuove tab: tutto resta dentro Filo come nuovo tab. Col blocco dei popup attivo passa solo ciò che segue
+    // un gesto vero dell'utente, uno per gesto e di chi l'ha ricevuto (#737.1), qualunque forma chieda la pagina.
     wc.setWindowOpenHandler((details) => {
-      const { url, disposition } = details;
+      const { url, disposition, referrer } = details;
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
@@ -2688,7 +2786,8 @@ class TabManager {
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
       if (isWebUnsafeNav(url)) {
-        fermaNavigazione(url, { win: this.win, wc });
+        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, referrer);
+        else fermaNavigazione(url, { win: this.win, wc });
         return { action: 'deny' };
       }
       // #209 — i popup di login ("Continua con Google" e simili) NON sono
@@ -2710,16 +2809,23 @@ class TabManager {
       // partizione per-sito; altrimenti null = sessione condivisa), per non
       // spezzare un eventuale login Google già presente in Filo.
       const accesso = tab.isInternal === false && isAuthPopup(url);
-      if (accesso) {
+      // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
+      const riaperta = accesso && this._riaperturaDiAccesso(tab, url);
+      // Una finestra senza barra dell'indirizzo la apre solo il clic, anche a blocco spento: da sola la pagina
+      // fingerebbe l'accesso di un altro sito (#1066), e la sua richiesta segue la strada delle altre.
+      const gesto = riaperta || (tab.isInternal === false && (this.security.blockPopups || accesso)
+        && Permessi.perUnaFinestra(wc, url, referrer));
+      if (tab.isInternal === false && this.security.blockPopups && !gesto) {
+        // «Apri» sull'avviso la fa ripartire dalla pagina, perché l'accesso possa tornarle l'esito.
+        if (accesso) tab._accessoBloccato = { url, nome: details.frameName || '', misure: details.features || '', pagina: wc.getURL() };
+        this._notifyPopupBlocked(tab.id, url, wc);
+        return { action: 'deny' };
+      }
+      if (accesso && gesto) {
         if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
         // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
         // finestrella diventa una scheda, dove l'avviso c'è.
-        if (!tab.sbAvviso) return this._allowAuthPopup(url);
-      }
-      const isAdLikePopup = disposition === 'new-window';
-      if (!accesso && tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
-        this._notifyPopupBlocked(tab.id, url);
-        return { action: 'deny' };
+        if (!tab.sbAvviso) return this._allowAuthPopup(url, details.features);
       }
       // #170.3 — la lista dei siti bloccati la applica openTab; un «Apri comunque»
       // dato qui vale anche per le schede che apre sullo stesso sito.
@@ -2729,16 +2835,35 @@ class TabManager {
       // ogni apertura veniva attivata, quindi l'utente veniva strappato dalla
       // pagina che stava leggendo — lo stesso attrito della musica che passava
       // davanti da sola.
-      const aperta = this.openTab(url, {
+      const opzioni = {
         activate: disposition !== 'background-tab',
         openedByLink: true,
         apriComunque: this._siteAllowedIn(tab, url),
         permessoRichieste: this._siteAllowedIn(tab, url) && !!tab._permessoRichieste,
         daGesto: Permessi.gestoRecente(wc),
-      });
+      };
       // Un blob: aperto dalla pagina si giudica come lei (src/main/tabs/tabSafebrowse.js).
-      const nuova = this.tabs.find((t) => t.id === aperta);
-      if (nuova) nuova._sbApertaDa = tab._urlNavigato;
+      const daLei = (aperta) => {
+        const nuova = this.tabs.find((t) => t.id === aperta);
+        if (nuova) nuova._sbApertaDa = tab._urlNavigato;
+      };
+      // La finestra resta in mano alla pagina che l'ha chiesta (la riempie, la porta altrove, la chiude), come in un
+      // browser; si può solo se la scheda nuova starebbe nella sua stessa partizione, altrove nasce staccata.
+      if (this._finestraDellaPagina(tab, url, opzioni.apriComunque)) {
+        const partition = tab.partition || null;
+        return {
+          action: 'allow',
+          outlivesOpener: true,
+          overrideBrowserWindowOptions: { webPreferences: this._preferenzeWeb('about:blank', partition) },
+          createWindow: (options) => {
+            // Un collegamento (Maiuscolo+clic, target=_blank) non dà una finestra da tenere: la scheda carica da sé.
+            if (!options.webContents) { daLei(this.openTab(url, opzioni)); return undefined; }
+            daLei(this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } }));
+            return options.webContents;
+          },
+        };
+      }
+      daLei(this.openTab(url, opzioni));
       return { action: 'deny' };
     });
 
@@ -2749,6 +2874,26 @@ class TabManager {
     wc.on('did-create-window', (child) => {
       this._hardenAuthPopup(child, tab);
     });
+  }
+
+  // Come in un browser una pagina chiude la sua scheda se l'ha aperta una pagina, o se è ancora alla prima pagina.
+  chiusaDallaPagina(wc) {
+    const tab = this.tabs.find((t) => t.view.webContents === wc);
+    if (!tab || tab.isInternal !== false) return;
+    let storia = 1;
+    try { storia = wc.navigationHistory.length(); } catch (_) {}
+    if (tab._openedByLink || storia <= 1) this.closeTab(tab.id);
+  }
+
+  // Una scheda proxata ha la partizione sua, e in privacy ogni sito la sua: lì la finestra non può restare alla pagina.
+  _finestraDellaPagina(tab, url, apriComunque) {
+    if (!tab || tab.isInternal !== false || tab.proxy) return false;
+    const u = String(url || '');
+    if (u && u !== 'about:blank') {
+      if (!/^https?:/i.test(u)) return false;
+      if ((this._partitionFor(u) || null) !== (tab.partition || null)) return false;
+    }
+    return Boolean(apriComunque || !this._decisioneBlocco(null, u || 'about:blank'));
   }
 
   // #209 — risposta 'allow' per un popup di login, con le webPreferences
@@ -2764,7 +2909,7 @@ class TabManager {
   // aperta su quella URL (Cookies.MODES.PRIVACY → partizione per-sito;
   // altrimenti null = sessione condivisa), per non spezzare un eventuale
   // login Google già presente in Filo.
-  _allowAuthPopup(url) {
+  _allowAuthPopup(url, features = '') {
     // #758 — l'accesso fatto nella finestrella conta come quello fatto in una scheda: i contenuti del provider
     // incorporati altrove devono tenere i cookie.
     try { require('./services/cookieIncorporati').paginaDiAccesso(url); } catch (_) {}
@@ -2774,6 +2919,10 @@ class TabManager {
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
+        ...senzaOpzioniDellaPagina(features),
+        title: titoloFinestrella(url),
+        frame: true,
+        titleBarStyle: 'default',
         webPreferences: {
           preload: PAGE_PRELOAD,
           contextIsolation: true,
@@ -2803,9 +2952,27 @@ class TabManager {
   _hardenAuthPopup(win, origine = null) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    // Senza barra dell'indirizzo il titolo è l'unico posto dove si legge il sito: lo scrive Filo, mai la pagina (#1066).
+    const mostraSito = () => {
+      if (win.isDestroyed() || pwc.isDestroyed()) return;
+      let o = '';
+      try { o = pwc.mainFrame.origin; } catch (_) {}
+      try { win.setTitle(titoloFinestrella(pwc.getURL(), o)); } catch (_) {}
+    };
+    win.on('page-title-updated', (e) => e.preventDefault());
+    pwc._filoFinestrella = true;
+    const rientra = (b) => {
+      if (!win.isDestroyed()) try { win.setBounds(dentroLoSchermo(b)); } catch (_) {}
+    };
+    rientra(win.getBounds());
+    // window.moveTo/resizeTo della pagina: lo spostamento dell'utente, col mouse, resta libero.
+    pwc.on('content-bounds-updated', (e, b) => { e.preventDefault(); rientra(b); });
+    pwc.on('did-navigate', mostraSito);
+    pwc.on('did-navigate-in-page', mostraSito);
     installZoom(pwc);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
+    MenuDiRiserva.segui(pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
@@ -2827,7 +2994,7 @@ class TabManager {
     pwc.on('will-navigate', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        fermaNavigazione(url, { win: this.win, wc: pwc });
+        this._esternoDallaPagina(pwc, origine ? origine.id : null, url, undefined, { navigazione: true });
         return;
       }
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
@@ -2838,20 +3005,26 @@ class TabManager {
     pwc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        fermaNavigazione(url, { win: this.win, wc: pwc });
+        this._esternoDallaPagina(pwc, origine ? origine.id : null, url, undefined, { navigazione: true });
         return;
       }
       if (event.isMainFrame === false) return;
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
-    pwc.setWindowOpenHandler(({ url }) => {
+    pwc.setWindowOpenHandler(({ url, referrer, features }) => {
       if (isWebUnsafeNav(url)) {
-        fermaNavigazione(url, { win: this.win, wc: pwc });
+        this._esternoDallaPagina(pwc, origine ? origine.id : null, url, referrer);
         return { action: 'deny' };
       }
-      if (isAuthPopup(url)) {
+      const accesso = isAuthPopup(url);
+      const gesto = (this.security.blockPopups || accesso) && Permessi.perUnaFinestra(pwc, url, referrer);
+      if (this.security.blockPopups && !gesto) {
+        this._notifyPopupBlocked(origine ? origine.id : null, url, pwc);
+        return { action: 'deny' };
+      }
+      if (accesso && gesto) {
         if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
-        return this._allowAuthPopup(url);
+        return this._allowAuthPopup(url, features);
       }
       this.openTab(url, {
         activate: true,
@@ -2866,11 +3039,40 @@ class TabManager {
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
   // mostra l'avviso "Bloccato popup da <host>" con «Apri» per aprirlo.
-  _notifyPopupBlocked(tabId, url) {
+  // `pagina`: l'avviso chiuso dall'utente tace finché la scheda resta su quella pagina.
+  _notifyPopupBlocked(tabId, url, wc = null) {
     try {
-      const host = globalThis.SN_NOMI_SITO.sitoDi(url) || url;
-      this.win.webContents.send('tabs:popup-blocked', { tabId, url, host });
+      let pagina = '';
+      try { pagina = wc ? String(wc.getURL() || '').split('#')[0] : ''; } catch (_) {}
+      // Posta, telefono e SMS non hanno un sito: l'avviso nomina la pagina che ci ha provato e l'app, non l'indirizzo.
+      const app = isOsDelegatedScheme(url) ? new URL(url).protocol.toLowerCase().slice(0, -1) : '';
+      const host = (app ? globalThis.SN_NOMI_SITO.sitoDi(pagina) : globalThis.SN_NOMI_SITO.sitoDi(url)) || (app ? '' : url);
+      this.win.webContents.send('tabs:popup-blocked', { tabId, url, host, pagina, app });
     } catch (_) {}
+  }
+
+  // Posta, telefono e SMS chiesti da una pagina: col blocco dei popup acceso partono solo da un gesto, come le finestre.
+  // `navigazione`: la navigazione è già partita, e il gesto che la porta Permessi l'ha messo da parte.
+  _esternoDallaPagina(wc, tabId, url, referrer, { navigazione = false } = {}) {
+    const invito = Boolean(globalThis.SN_WALLET?.isInviteDeepLink?.(url));
+    if (!invito && !isOsDelegatedScheme(url)) return;
+    // Per l'invito il clic che ha fatto partire la navigazione lo conta `invitoFermato`, che lo spegne all'arrivo (#664).
+    const gesto = Permessi.perUnaFinestra(wc, url, referrer) || (!invito && navigazione && Permessi.gestoPerLaNavigazione(wc));
+    // L'invito scelto dall'utente (anche dal menu di Filo, che alla pagina non dà il gesto) lo porta dentro Filo.
+    if (invito) { invitoFermato(url, { win: this.win, wc: gesto ? null : wc }); return; }
+    if (this.security.blockPopups && !gesto) {
+      this._notifyPopupBlocked(tabId, url, wc);
+      return;
+    }
+    openExternalScheme(url);
+  }
+
+  // Il lasciapassare che «Apri» dà alla finestra di accesso che la pagina richiede su suo ordine: una volta, subito.
+  _riaperturaDiAccesso(tab, url) {
+    const r = tab && tab._riaperturaAccesso;
+    if (!r || r.url !== url || Date.now() > r.fino) return false;
+    tab._riaperturaAccesso = null;
+    return true;
   }
 
   // Chiamato da IPC quando l'utente clicca "Apri" sull'avviso — il popup era
@@ -2880,12 +3082,29 @@ class TabManager {
   // `daScheda`: la scheda che aveva chiesto il popup, il cui «Apri comunque» vale anche per lui.
   openBlockedPopup(url, { apriComunque = false, daScheda = null } = {}) {
     const origine = daScheda ? this.tabs.find((t) => t.id === daScheda) : null;
+    if (openExternalScheme(url)) return;
+    if (this._riapriAccessoDallaPagina(origine, url)) return;
     const eredita = this._siteAllowedIn(origine, url);
     this.openTab(url, {
       activate: true,
       apriComunque: !!apriComunque || eredita,
       permessoRichieste: !!apriComunque || (eredita && !!origine._permessoRichieste),
     });
+  }
+
+  // Una finestra di accesso aperta da Filo sarebbe staccata dal sito e l'esito non gli tornerebbe: la riapre la pagina
+  // stessa, dal mondo isolato (che la pagina non può alterare), finché è ancora quella che l'aveva chiesta.
+  _riapriAccessoDallaPagina(tab, url) {
+    const a = tab && tab._accessoBloccato;
+    if (!a || a.url !== url || tab.isInternal !== false || !isAuthPopup(url)) return false;
+    let wc = null;
+    try { wc = tab.view.webContents; } catch (_) {}
+    if (!wc || wc.isDestroyed() || wc.getURL() !== a.pagina) return false;
+    tab._accessoBloccato = null;
+    tab._riaperturaAccesso = { url, fino: Date.now() + RIAPERTURA_ACCESSO_MS };
+    const codice = `void window.open(${JSON.stringify(url)}, ${JSON.stringify(a.nome)}, ${JSON.stringify(a.misure)})`;
+    try { wc.executeJavaScriptInIsolatedWorld(MONDO_RIAPERTURA, [{ code: codice }], false).catch(() => {}); } catch (_) { return false; }
+    return true;
   }
 
   // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova
@@ -3270,11 +3489,27 @@ class TabManager {
     this.anteprime.pota(new Set(this.tabs.map((t) => t.id)));
     // La shell è il primary webContents della BrowserWindow.
     try {
-      this.win.webContents.send('tabs:updated', this.snapshot());
+      this.win.webContents.send('tabs:updated', this._snapshotPerBarra());
     } catch (_) { /* shell non ancora caricata */ }
     this.barra.aggiornaNav();
     this._annunciaVista();
     this._persistSession();
+  }
+
+  // Alla barra un'icona viaggia solo quando cambia: rispedirle tutte a ogni aggiornamento la bloccava con icone pesanti (#1083).
+  // Chi la riceve riprende le altre dall'ultimo snapshot; quello chiesto con tabs:snapshot resta intero.
+  _snapshotPerBarra() {
+    const snap = this.snapshot();
+    const prima = this._iconeInviate || new Map();
+    this._iconeInviate = new Map();
+    for (const t of snap.tabs) {
+      this._iconeInviate.set(t.id, t.favicon);
+      if (t.favicon && prima.get(t.id) === t.favicon) {
+        delete t.favicon;
+        t.faviconUguale = true;
+      }
+    }
+    return snap;
   }
 
   // ─── persistenza sessione (riapri i tab alla riapertura di Filo) ──────────
@@ -3299,16 +3534,24 @@ class TabManager {
     return globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
   }
 
-  // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon),
-  // collassiamo le scritture ravvicinate.
+  // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon), e titolo, icona e
+  // caricamento non cambiano la sessione: se è uguale a quella scritta non si riscrive (#1089).
   _persistSession() {
     if (this.incognito) return; // incognito: nessuna sessione salvata su disco
     if (this._restoring) return; // non sovrascrivere mentre stiamo ripristinando
     clearTimeout(this._sessionTimer);
+    this._sessionTimer = null;
+    if (JSON.stringify(this.sessionState()) === sessioneScritta) return;
     this._sessionTimer = setTimeout(() => {
+      this._sessionTimer = null;
+      const stato = this.sessionState();
+      const testo = JSON.stringify(stato);
+      if (testo === sessioneScritta) return;
+      sessioneScritta = testo;
       try {
-        globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), this.sessionState());
-      } catch (_) {}
+        Promise.resolve(globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), stato))
+          .catch(() => { if (sessioneScritta === testo) sessioneScritta = null; });
+      } catch (_) { sessioneScritta = null; }
     }, 400);
   }
 
@@ -3387,6 +3630,10 @@ installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
 
+function origineDi(url) {
+  try { return new URL(url).origin; } catch (_) { return ''; }
+}
+
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.
 function hostOf(url) {
@@ -3442,24 +3689,4 @@ function mapCertError(error) {
 // logica serve anche al campo "nuova scheda" della dashboard, che prima aveva una
 // copia più povera. Sono importati in cima al file da globalThis.SN_URL_NAV.
 
-// Il visore dei PDF è un webContents a sé che prende la tastiera: i suoi tasti non
-// passano dal before-input-event della scheda e vanno portati agli stessi ascolti (#838).
-function inoltraTastiDegliOspiti(app) {
-  app.on('web-contents-created', (_e, wc) => {
-    if (wc.getType() !== 'remote') return;
-    wc.on('input-event', (_ev, input) => {
-      const tipo = input && { rawKeyDown: 'keyDown', keyDown: 'keyDown', keyUp: 'keyUp' }[input.type];
-      if (!tipo) return;
-      // Un tasto della barra dei menu (su Mac Cmd+W, Cmd+T…) lo esegue già lei.
-      if (tipo === 'keyDown' && require('./menu').tastoDellaBarra(input)) return;
-      // Chi ha la tastiera sta nella finestra davanti, nella scheda attiva.
-      const win = BrowserWindow.getFocusedWindow();
-      const tabs = win && win._filoTabs;
-      const tab = tabs && tabs.tabs.find((t) => t.id === tabs.activeId);
-      if (!tab || tab.view.webContents === wc || tab.view.webContents.isDestroyed()) return;
-      tab.view.webContents.emit('before-input-event', { preventDefault() {} }, { ...input, type: tipo });
-    });
-  });
-}
-
-module.exports = { TabManager, normalizeUrl, isWebUnsafeNav, inoltraTastiDegliOspiti };
+module.exports = { TabManager, normalizeUrl, isWebUnsafeNav };

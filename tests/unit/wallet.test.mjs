@@ -100,24 +100,26 @@ test('il codice si estrae da quello che si incolla: riga intera, spazi, minuscol
   assert.equal(W.extractCode(''), '');
 });
 
-test('la frase del riscatto riuscito dice quanti crediti locali sono passati e perché non tutti', () => {
-  // Nessun conteggio locale: la frase di sempre.
-  assert.equal(W.redeemOkMessage({ entryCredits: 5000, migrated: 0, localRequested: 0 }), W.REDEEM_MESSAGES.ok);
+// #1138: il conteggio locale non passa al portafoglio, e la frase non lo nomina
+// qualunque cosa il server rimandi (un server ancora col tetto vecchio compreso).
+test('la frase del riscatto riuscito dice solo i crediti d’ingresso, mai quelli di prima', () => {
+  const casi = [
+    { migrated: 0, localRequested: 0, cutReason: null },
+    { migrated: 0, localRequested: 1000, cutReason: 'migrate_cap' },
+    { migrated: 0, localRequested: 300, cutReason: 'global_cap' },
+    { migrated: 0, localRequested: 12000 },
+    { migrated: 1010, localRequested: 1010, cutReason: null },
+    { migrated: 952, localRequested: 1500, cutReason: 'global_cap' },
+  ];
+  for (const c of casi) {
+    const frase = W.redeemOkMessage({ entryCredits: 5000, ...c });
+    assert.equal(frase, 'Invito riscattato: hai 5.000 crediti d’ingresso.', JSON.stringify(c));
+    assert.doesNotMatch(frase, /avevi|nessuno|oltre|posto|1\.000|1\.010|12\.000|300|952/);
+  }
+  // Senza il numero d'ingresso: la frase di sempre, senza cifre.
+  assert.equal(W.redeemOkMessage({ entryCredits: 0, migrated: 0, localRequested: 1000 }), W.REDEEM_MESSAGES.ok);
   assert.equal(W.redeemOkMessage(), W.REDEEM_MESSAGES.ok);
-  // Tutti passati: i due numeri.
-  const tutti = W.redeemOkMessage({ entryCredits: 5000, migrated: 1234, localRequested: 1234, cutReason: null });
-  assert.match(tutti, /5\.000 crediti/);
-  assert.match(tutti, /i 1\.234 che avevi/);
-  // Tagliati dal tetto migrabile: passati, dichiarati, e il motivo.
-  const tetto = W.redeemOkMessage({ entryCredits: 5000, migrated: 10000, localRequested: 12000, cutReason: 'migrate_cap' });
-  assert.match(tetto, /10\.000 dei 12\.000/);
-  assert.match(tetto, /oltre non si portano/);
-  // Tagliati dal tetto globale: un motivo diverso.
-  const globale = W.redeemOkMessage({ entryCredits: 5000, migrated: 952, localRequested: 1500, cutReason: 'global_cap' });
-  assert.match(globale, /952 dei 1\.500/);
-  assert.match(globale, /posto/);
-  // Nessuno passato.
-  assert.match(W.redeemOkMessage({ entryCredits: 5000, migrated: 0, localRequested: 300, cutReason: 'global_cap' }), /nessuno dei 300/);
+  assert.match(W.redeemOkMessage({ entryCredits: 12345 }), /12\.345 crediti d’ingresso/);
 });
 
 // ── Link d'invito (#651) ────────────────────────────────────────────────────
@@ -388,7 +390,8 @@ test('le manopole dei crediti sono sette, hanno un nome e limiti sensati', () =>
 // ── #816: le cifre dette fuori dalla pagina Crediti ─────────────────────────
 
 test('formatCredits scrive il saldo come la pagina Crediti: un decimale al più, alla italiana', () => {
-  assert.equal(W.formatCredits(4321.5), new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(4321.5));
+  assert.equal(W.formatCredits(4321.5), new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(4321.5));
+  assert.equal(W.formatCredits(4321.5), '4.321,5');
   assert.equal(W.formatCredits(12345.44), '12.345,4');
   assert.equal(W.formatCredits(0.3), '0,3');
   assert.equal(W.formatCredits(null), '0');

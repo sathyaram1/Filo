@@ -21,10 +21,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { rmSync, mkdirSync, writeFileSync, cpSync } from 'node:fs';
+import { mkdirSync, writeFileSync, cpSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -133,7 +133,7 @@ async function giro(rispostaLavoro, consegne = []) {
     return { json: i >= 0 ? JSON.parse(out.so.slice(i, j + 1)) : null, stderr: out.se };
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 }
 

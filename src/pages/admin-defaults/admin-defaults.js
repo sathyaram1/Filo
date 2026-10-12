@@ -106,6 +106,10 @@
     $('saveBtn').textContent = I18n.t('admin_defaults_save');
     $('h-delicate').textContent = I18n.t('admin_defaults_delicate');
     $('delicate-desc').textContent = I18n.t('admin_defaults_delicate_desc');
+    $('h-contesto').textContent = I18n.t('admin_defaults_contesto');
+    $('contesto-desc').textContent = I18n.t('admin_defaults_contesto_desc');
+    $('l-contesto-giorni').textContent = I18n.t('admin_defaults_contesto_giorni');
+    $('l-contesto-token').textContent = I18n.t('admin_defaults_contesto_token');
   }
 
   function keyStateText(present) {
@@ -132,6 +136,10 @@
     }
     const s = String(v == null ? '' : v).toLowerCase().trim();
     return s && s !== 'auto' && REASONING_LEVELS.includes(s) ? s : null;
+  }
+
+  function ricontrollaAvvisi() {
+    if (modelChains) ModelChain.ricontrolla(modelChains);
   }
 
   function makeModelRow(nick, entry) {
@@ -200,7 +208,8 @@
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
     del.textContent = I18n.t('options_model_remove');
-    del.addEventListener('click', () => { row.remove(); });
+    del.addEventListener('click', () => { row.remove(); ricontrollaAvvisi(); });
+    for (const el of [nickIn, idIn]) el.addEventListener('change', ricontrollaAvvisi);
 
     const test = document.createElement('button');
     test.type = 'button';
@@ -514,6 +523,8 @@
   }
 
   function renderExcludedDrift() {
+    // Ogni cambio della lista passa di qui: l'avviso di voce e dettatura nella griglia la segue.
+    ricontrollaAvvisi();
     const box = $('excludedDrift');
     if (!box) return;
     const missing = excludedMissingFromBuild();
@@ -539,6 +550,8 @@
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: models || {},
       getRegistry: () => collectModelRegistry(),
+      // Qui si decidono anche i fornitori esclusi: l'avviso li legge dalla pagina, non da quelli in vigore.
+      avvisoDi: (action, ref) => ModelChain.avvisoHostAudio(action, ref, collectModelRegistry()[ref], collectExcluded()),
     });
     hiddenModels = Object.fromEntries(Object.entries(models || {})
       .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
@@ -586,6 +599,25 @@
     return out;
   }
 
+  // ── Quanto ricorda la chat (#868) ───────────────────────────────────────────
+  let contestoCaricato = {};
+  function renderContesto(salvato, diSerie) {
+    contestoCaricato = salvato || {};
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      $(id).value = contestoCaricato[k] != null ? String(contestoCaricato[k]) : '';
+      $(id).placeholder = diSerie && diSerie[k] != null ? String(diSerie[k]) : '';
+    }
+  }
+  // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
+  function collectContesto() {
+    const ora = {};
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      const v = $(id).value.trim();
+      if (v !== '' && Number.isFinite(Number(v))) ora[k] = Number(v);
+    }
+    return JSON.stringify(ora) === JSON.stringify(contestoCaricato) ? null : ora;
+  }
+
   // ── Load / Save ─────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
     const present = cfg.apiKeysPresent || {};
@@ -598,6 +630,7 @@
     // è quella che il salvataggio riscrive per intero.
     renderExcluded(cfg.excludedProviders || [], cfg.excludedProviderReasons || []);
     renderDelicate(cfg.sitiDelicati, cfg.sitiDelicatiDiSerie);
+    renderContesto(cfg.contestoFilo, cfg.contestoFiloDiSerie);
     ensureProviderCatalog();
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
@@ -662,6 +695,8 @@
     }
     const delicate = collectDelicate();
     if (delicate) config.sitiDelicati = delicate;
+    const contesto = collectContesto();
+    if (contesto) config.contestoFilo = contesto;
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();

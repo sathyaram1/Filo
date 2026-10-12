@@ -34,12 +34,14 @@ test('leggiArgomenti: ramo, pratica e prova a vuoto, anche quando npm si prende 
   assert.equal(leggiArgomenti(['claude/x']).pratica, null);
 });
 
-function doc(id, { clientId = 'local:claude', senderProof = 'admin', status = 'todo', locale = true, parti = null } = {}) {
+// Le pratiche di prova sono fidate (#1148), salvo dove la prova dice altro.
+function doc(id, { clientId = 'local:claude', senderProof = 'admin', status = 'todo', locale = true, parti = null, fiducia = 'fidato' } = {}) {
   const fields = {
     seq: { integerValue: '910' }, clientId: { stringValue: clientId }, status: { stringValue: status },
     statusPublic: { stringValue: 'open' }, notes: { stringValue: '' },
   };
   if (senderProof) fields.senderProof = { stringValue: senderProof };
+  if (fiducia) fields.fiducia = { stringValue: fiducia };
   if (locale) fields.localOnly = { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1' } } } };
   if (parti) {
     const valore = (v) => (typeof v === 'string' ? { stringValue: v } : { integerValue: String(v) });
@@ -88,7 +90,7 @@ test('senza pratica non parte niente, e si dice come aprirla', async () => {
 });
 
 test('la pratica di un utente, o senza segno locale, si rifiuta prima di toccare il server', async () => {
-  for (const d of [doc('p', { clientId: 'abc', senderProof: '' }), doc('p', { locale: false })]) {
+  for (const d of [doc('p', { clientId: 'abc', senderProof: '', fiducia: '' }), doc('p', { locale: false })]) {
     const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'] });
     assert.equal(r.k, 3, r.testo);
     assert.match(r.testo, /RIFIUTATO/);
@@ -99,6 +101,19 @@ test('la pratica di un utente, o senza segno locale, si rifiuta prima di toccare
   assert.equal(chiusa.k, 3, chiusa.testo);
   assert.match(chiusa.testo, /aprine una/);
   assert.deepEqual(chiusa.lanci, []);
+});
+
+// #1148, SPEC-DOMANDE.md §1.6: server:fondi spinge main senza L5 né server, quindi la fiducia la controlla qui.
+test('una pratica non fidata si rifiuta prima di toccare il server, anche approvata come lavoro locale', async () => {
+  const approvata = doc('p', { clientId: 'utente-7', senderProof: '', fiducia: 'non_fidato' });
+  approvata.fields.localApproval = { mapValue: { fields: { by: { stringValue: 'owner@esempio' }, at: { integerValue: '1' } } } };
+  for (const d of [doc('p', { fiducia: 'non_fidato' }), doc('p', { fiducia: '' }), approvata]) {
+    const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'] });
+    assert.equal(r.k, 3, r.testo);
+    assert.match(r.testo, /fidat/);
+    assert.deepEqual(r.lanci, [], 'il server non parte');
+    assert.deepEqual(r.scritture, [], 'sulla pratica non si scrive');
+  }
 });
 
 test('a vuoto: il server parte con la pratica e --dry-run, e sulla pratica non si scrive niente', async () => {

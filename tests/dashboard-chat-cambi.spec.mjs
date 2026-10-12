@@ -22,6 +22,7 @@ test('la chat converte le rupie col cambio del giorno e il conto lo fa Filo', as
 
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -33,7 +34,7 @@ test('la chat converte le rupie col cambio del giorno e il conto lo fa Filo', as
     globalThis.__prompts = [];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
       globalThis.__prompts.push(messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n---\n'));
-      const sys = String(messages[0].content || '');
+      const sys = messages.filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO')).map((m) => String(m.content || '')).join('\n');
       const conCambi = sys.includes('CAMBI:') && sys.includes('100.0 INR');
       const testo = conCambi
         ? '3000 rupie sono circa [[calc: 3000/100 | eur]] €, al cambio del 26 settembre.'

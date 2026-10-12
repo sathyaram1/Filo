@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -197,7 +197,7 @@ test('il biglietto scritto si rilegge', () => {
     assert.ok(existsSync(ticketFile(root)));
     clearTicket(root);
     assert.equal(readTicket(root), '');
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { togliCartella(root); }
 });
 
 test('un biglietto vecchio non viene riusato: il semaforo è certamente morto', () => {
@@ -220,7 +220,7 @@ test('un file illeggibile non fa saltare niente: si lavora senza biglietto', () 
   try {
     writeFileSync(ticketFile(root), '{ questo non è json', 'utf8');
     assert.equal(readTicket(root), '');
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { togliCartella(root); }
 });
 
 test('il marcatore del biglietto NON deve entrare nella storia: questo repo è pubblico', () => {
@@ -244,7 +244,7 @@ test('scrivere un biglietto vuoto non crea un marcatore fasullo', () => {
     assert.equal(writeTicket(root, ''), null);
     assert.equal(writeTicket(root, '   '), null);
     assert.equal(readTicket(root), '');
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { togliCartella(root); }
 });
 
 // ── La consegna dalla riga di comando ───────────────────────────────────────
@@ -256,7 +256,7 @@ test('scrivere un biglietto vuoto non crea un marcatore fasullo', () => {
 // Adesso un argomento non capito ferma la consegna invece di essere ignorato.
 
 import { spawnSync } from 'node:child_process';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const CANALE = resolve(fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url)));
 

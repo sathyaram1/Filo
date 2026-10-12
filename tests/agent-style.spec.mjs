@@ -107,6 +107,8 @@ async function newtabPage(app) {
 async function configureModel(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    // Col modello pronto la home aperta comincia l'intervista di benvenuto (#663): qui l'utente è già stato accolto.
+    await chrome.storage.local.set({ filo_onboarding: { done: true } });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },

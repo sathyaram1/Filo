@@ -33,6 +33,13 @@ tests/agent/reports/
 test-results/
 .DS_Store
 *.log
+# Copie di lavoro dei dati del server (feedback, collezioni Firestore): il repo è pubblico e il
+# salvataggio spedisce tutto. Vanno in os.tmpdir(). Questi nomi li ferma git; con un altro nome la copia
+# la riconosce dalla forma il salvataggio automatico (scripts/copie-in-scena.mjs), e la sentinella dopo.
+*dump*.json
+*dump*.jsonl
+filo-copie/
+filo-feedback/
 # Scarti dei comandi andati storti: nascono in radice, restano vuoti, e finiscono
 # committati per sbaglio insieme al resto (`nf2.err` ha viaggiato in ogni copia
 # del repo per due settimane).
@@ -69,10 +76,21 @@ test-results/
 # data: serve a non battere più di una volta ogni cinque minuti).
 .claude/routine-beat-hook.stamp
 
+# Dove è arrivata la lettura progressiva dei transcript per il consumo nel battito: numeri, mai testo.
+.claude/routine-consumo.json
+
+# Chi è il worker di questo clone (indice e quanti in parallelo, #1157): lo scrive
+# scripts/clone-worker.mjs, vale per questa cartella e basta.
+.claude/filo-worker.json
+
 # Stato locale del giro (ripiego: quello vero vive sul server). Effimero come
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.
 .claude/routine-state/
+
+# I biglietti delle sessioni locali (#1148, scripts/lib/biglietto-locale.mjs): SEGRETI come quello del giro.
+# Il salvataggio automatico committa tutto: senza questa riga un biglietto finirebbe sul repo pubblico.
+.claude/biglietti/
 
 # Diario locale delle interruzioni di sessione e dump di bash su Windows: macchina, non repo.
 .claude/cap-observations.jsonl

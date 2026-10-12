@@ -10,6 +10,7 @@
 //     (controllo che il test non sia un falso positivo dovuto ad altro)
 
 import { test, expect } from './fixtures/electron.mjs';
+import { menuAperto } from './helpers/barra.mjs';
 
 test('default settings: security.protectIpLeak e blockPopups sono ON', async ({ openTab }) => {
   const page = await openTab('filo://security/');
@@ -29,37 +30,21 @@ test('pagina Sicurezza dedicata: titolo + due toggle + box P2P', async ({ openTa
 });
 
 test('voce "Sicurezza" nel menu Impostazioni con icona lucchetto', async ({ shell, app }) => {
-  // Click sull'ingranaggio per aprire il dropdown. Il menu è una BrowserWindow
-  // separata (popup-menu.js) che si carica via `data:text/html` URL.
-  const before = new Set(app.windows().map((w) => w.url()));
   // L'ingranaggio è un trigger interno nascosto (la sua icona vive ora dentro la
-  // home): lo azioniamo con un click DOM diretto, come il bridge.
+  // home): lo azioniamo con un click DOM diretto, come il bridge. Il menu è la
+  // finestra riusata di popup-menu.js, piena di voci solo mentre è aperto.
   await shell.evaluate(() => document.getElementById('nav-settings').click());
-  // Aspetta che compaia una nuova window con URL data:text/html (popup-menu)
-  const deadline = Date.now() + 4_000;
-  let menuWin = null;
-  while (Date.now() < deadline) {
-    menuWin = app.windows().find((w) => w.url().startsWith('data:text/html') && !before.has(w.url()));
-    if (menuWin) break;
-    await new Promise((r) => setTimeout(r, 80));
-  }
+  const menuWin = await menuAperto(app, { tetto: 4_000 });
   expect(menuWin, 'il popup del menu Impostazioni deve aprirsi').toBeTruthy();
   // Verifica che la voce "Sicurezza" sia presente nel menu
   await expect(menuWin.locator('text=Sicurezza')).toBeVisible({ timeout: 3_000 });
 });
 
 test('voce "Modelli" nel menu Impostazioni ha icona dedicata, diversa dall\'ingranaggio', async ({ shell, app }) => {
-  const before = new Set(app.windows().map((w) => w.url()));
   // L'ingranaggio è un trigger interno nascosto (la sua icona vive ora dentro la
   // home): lo azioniamo con un click DOM diretto, come il bridge.
   await shell.evaluate(() => document.getElementById('nav-settings').click());
-  const deadline = Date.now() + 4_000;
-  let menuWin = null;
-  while (Date.now() < deadline) {
-    menuWin = app.windows().find((w) => w.url().startsWith('data:text/html') && !before.has(w.url()));
-    if (menuWin) break;
-    await new Promise((r) => setTimeout(r, 80));
-  }
+  const menuWin = await menuAperto(app, { tetto: 4_000 });
   expect(menuWin, 'il popup del menu Impostazioni deve aprirsi').toBeTruthy();
   // La voce "Modelli" deve esistere con icona dedicata (rete neurale a 3 nodi),
   // non più riusare l'ingranaggio "options" che si confonde con Impostazioni.
@@ -194,7 +179,9 @@ test('popup blocker: window.open() automatico viene bloccato', async ({ openTab,
   expect(popupTab, `il tab del popup non deve esistere — snap: ${JSON.stringify(snap.tabs.map((x) => ({ t: x.title, u: x.url })))}`).toBeFalsy();
 });
 
-test('popup blocker: i popup di login (OAuth) restano consentiti col blocco attivo (#209)', async ({ openTab, testServer, app, shell }) => {
+test('popup blocker: i popup di login (OAuth) chiesti col clic restano finestre vere col blocco attivo (#209)', async ({ openTab, testServer, app, shell }) => {
+  // Dal #737.1 anche la finestra di accesso la apre solo il clic dell'utente: qui la chiede il pulsante «Accedi».
+
   // Il blocco-popup è ON di default. Un popup verso un endpoint di
   // autenticazione (parametri OAuth client_id+redirect_uri) NON è pubblicità:
   // deve aprirsi come VERA finestra (così l'opener riceve l'esito del login),
@@ -203,13 +190,15 @@ test('popup blocker: i popup di login (OAuth) restano consentiti col blocco atti
     + '?client_id=abc&redirect_uri=https%3A%2F%2Fapp.example%2Fcb&response_type=code';
   const opener = testServer.html(`
     <title>OPENER_AUTH</title>
+    <button id="b" style="width:200px;height:60px">Accedi</button>
     <script>
-      setTimeout(() => { window.open(${JSON.stringify(authTarget)}, '_blank', 'popup,width=480,height=640'); }, 200);
+      document.getElementById('b').onclick = () => { window.open(${JSON.stringify(authTarget)}, '_blank', 'popup,width=480,height=640'); };
     </script>
     <p>opener</p>
   `);
 
-  await openTab(opener);
+  const pagina = await openTab(opener);
+  await pagina.click('#b');
 
   // Il popup OAuth si apre come BrowserWindow reale: compare tra le window.
   let popupWin = null;

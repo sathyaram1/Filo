@@ -16,6 +16,8 @@ import {
   IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { pidMorto } from '../helpers/processi.mjs';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..', '..');
 
@@ -580,7 +582,7 @@ test('trovaClaude: la variabile, poi il PATH, poi l’installazione dell’app d
 test('avvia --dry-run: il giro intero stampato, niente stato scritto, nessun processo vero', () => {
   const d = cartellaTemporanea('orch-vuoto-');
   const r = spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'avvia', '--dry-run', '4242'], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: TETTO_ATTESA_MS,
   });
   assert.equal(r.status, 0, r.stderr);
   for (const re of [/worktree add .*lavoro-4242"? -b claude\/lavoro-4242 origin\/main/, /claude -p \(lavoratore/, /verify-local\.mjs start/, /claude -p \(verificatore/, /finish-local\.mjs --feedback 4242/, /#4242 claude\/lavoro-4242: fuso/]) {
@@ -798,7 +800,7 @@ test('il lavoratore che riparte su un ramo con commit lo sa dal ramo, anche al p
 test('aggiungi: un ramo di un altro lavoro aperto si rifiuta se scelto con --slug, si evita da sé se è quello di default', () => {
   const d = cartellaTemporanea('orch-rami-');
   const agg = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'aggiungi', ...a], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: TETTO_ATTESA_MS,
   });
   assert.equal(agg('5', '--slug', 'doppio').status, 0);
   const r = agg('6', '--slug', 'doppio');
@@ -851,7 +853,7 @@ test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso
 test('lavoro rimasto a metà da un orchestratore chiuso: togli lo toglie, riprendi dice che riparte da sé; con uno vivo entrambi rifiutano', () => {
   const d = cartellaTemporanea('orch-a-meta-');
   const orch = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', ...a], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: TETTO_ATTESA_MS,
   });
   assert.equal(orch('aggiungi', '7', '--slug', 'a-meta-prova', '--richiesta', 'una prova').status, 0);
   const f = join(d, 'stato.json');
@@ -863,8 +865,7 @@ test('lavoro rimasto a metà da un orchestratore chiuso: togli lo toglie, ripren
   assert.match(orch('togli', '7').stderr, /orchestratore in corso/);
   assert.match(orch('riprendi', '7').stderr, /orchestratore in corso/);
 
-  const morto = spawnSync(process.execPath, ['-e', '']).pid;
-  writeFileSync(join(d, 'avvia.lock'), String(morto));
+  writeFileSync(join(d, 'avvia.lock'), String(pidMorto()));
   const r = orch('riprendi', '7');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /riparte da sola col prossimo «avvia»/);
@@ -942,7 +943,7 @@ test('argomenti: opzione storpiata o di un altro comando, senza valore, che si m
 test('aggiungi e avvia dalla riga di comando: col refuso o col valore mancante niente coda e niente giro; scritti bene la richiesta arriva intera', () => {
   const d = cartellaTemporanea('orch-argomenti-');
   const orch = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', ...a], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: TETTO_ATTESA_MS,
   });
   const stato = join(d, 'stato.json');
   for (const a of [['41', '--richeista', 'solo il bottone'], ['41', '--richiesta'], ['41', '--file'], ['41', '--richiesta', '   ']]) {
@@ -976,7 +977,7 @@ test('npm run orchestra senza «--»: le opzioni che npm si è tenuto (anche sto
 
   const d = cartellaTemporanea('orch-npm-');
   const r = spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'avvia'], {
-    cwd: ROOT, encoding: 'utf8', timeout: 60_000, env: { ...process.env, ...npm, npm_config_dry_run: 'true', FILO_ORCH_DIR: d },
+    cwd: ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: { ...process.env, ...npm, npm_config_dry_run: 'true', FILO_ORCH_DIR: d },
   });
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stderr, /npm si è tenuto --dry-run: .*npm run orchestra -- avvia.*Non ho fatto niente/);

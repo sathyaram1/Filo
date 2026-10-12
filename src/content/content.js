@@ -411,6 +411,8 @@
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
       if (isEditable(target) || isEditable(document.activeElement)) return;
+      // Il campo dentro un componente chiuso lo vede solo la regola intera (src/shared/campoTesto.js).
+      if (self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.scriveQui(document) === true) return;
       // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
       // modulo dell'Editor) se lo tiene: vince la scelta esplicita (#545).
       if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
@@ -612,7 +614,10 @@
   // all'host del componente, e closest()/tagName non vedono più il link,
   // l'immagine o il campo davvero cliccati. composedPath()[0] attraversa lo
   // shadow boundary e restituisce l'elemento reale.
+  // Dentro un riquadro chiuso di Filo (spiegazione, Modifica, feedback) il nodo vero lo sa solo SN_FILO_UI.
   function realTarget(e) {
+    const UI = self.SN_FILO_UI;
+    if (e && UI?.bersaglio) return UI.bersaglio(e);
     return (typeof e?.composedPath === 'function' && e.composedPath()[0]) || e?.target || null;
   }
 
@@ -654,7 +659,8 @@
       for (const el of hits) {
         if (!el || seen.has(el)) continue;
         seen.add(el);
-        if (el.shadowRoot) collect(el.shadowRoot);
+        const ombra = el.shadowRoot || self.SN_FILO_UI?.ombraDi?.(el);
+        if (ombra) collect(ombra);
         out.push(el);
       }
     };
@@ -1888,7 +1894,7 @@
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : window.open(linkEl.href, '_blank', 'noopener')),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(linkEl.href)),
       },
     );
     // "Salva file" — gemello di "Salva immagine come" per i link a un file

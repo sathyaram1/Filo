@@ -5,14 +5,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
+import { pidMorto } from '../helpers/processi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
-  provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
+  provaUnitSullaFusione, chiediConProva, provaDaRiusare, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 import { pathToFileURL } from 'node:url';
 
@@ -94,6 +96,31 @@ test('main mosso: si rifà la prova fino al tetto, poi ci si ferma senza fondere
   assert.equal(fermo.fermo, true);
 });
 
+test('la prova fatta per gli unit rossi del ramo vale al primo tentativo della richiesta, e solo lì (#1009)', async () => {
+  const P = '1'.repeat(40);
+  const verde = { esito: 'verde', mainSha: SHA };
+  assert.equal(provaDaRiusare({ fatta: { prova: verde, punta: P }, punta: P }), verde);
+  assert.equal(provaDaRiusare({ fatta: { prova: { esito: 'rosso_anche_su_main', mainSha: SHA }, punta: P }, punta: P }).esito, 'rosso_anche_su_main');
+  assert.equal(provaDaRiusare({ fatta: { prova: verde, punta: P }, punta: '2'.repeat(40) }), null, 'il ramo si è mosso: si riprova');
+  assert.equal(provaDaRiusare({ fatta: { prova: { ...verde, contenuto: true }, punta: P }, punta: P }), null, 'con main dentro la richiesta porta main_contenuto');
+  for (const p of [{ esito: 'rosso_sulla_fusione', mainSha: SHA }, { esito: 'conflitto', mainSha: SHA }, { errore: 'x' }, { saltata: true, motivo: 'm' }]) {
+    assert.equal(provaDaRiusare({ fatta: { prova: p, punta: P }, punta: P }), null);
+  }
+  assert.equal(provaDaRiusare({ fatta: null, punta: P }), null);
+
+  let prove = 0;
+  const chieste = [];
+  const r = await chiediConProva({
+    primaProva: verde, scrivi: () => {}, tentativi: 3,
+    prova: () => { prove++; return { esito: 'verde', mainSha: '3'.repeat(40) }; },
+    chiedi: async (campo) => { chieste.push(campo.mainSha); return { result: chieste.length < 2 ? 'main_moved' : 'merged' }; },
+    mainMosso: (x) => x.result === 'main_moved',
+  });
+  assert.equal(r.reply.result, 'merged');
+  assert.deepEqual(chieste, [SHA, '3'.repeat(40)], 'la prima richiesta porta la prova già fatta, la seconda una nuova');
+  assert.equal(prove, 1, 'una prova nuova solo dopo main mosso');
+});
+
 test('togliere il collegamento a node_modules non tocca la cartella a cui punta', () => {
   const casa = cartellaTemporanea('filo-929-collegamento-');
   try {
@@ -115,7 +142,7 @@ test('togliere il collegamento a node_modules non tocca la cartella a cui punta'
     assert.ok(existsSync(join(finto, 'dentro.txt')));
     assert.deepEqual(togliCollegamento(join(casa, 'non-c-e')), { ok: true });
   } finally {
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
@@ -128,7 +155,7 @@ function repoFinto() {
   execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', origin]);
   mkdirSync(join(lavoro, 'scripts', 'lib'), { recursive: true });
   mkdirSync(join(lavoro, 'tests', 'unit'), { recursive: true });
-  for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs']) {
+  for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs', 'scripts/lib/avanzamento-unit.mjs']) {
     copyFileSync(join(ROOT, f), join(lavoro, f));
   }
   writeFileSync(join(lavoro, '.gitignore'), 'node_modules\n', 'utf8');
@@ -186,7 +213,7 @@ test('prova vera: main dentro il ramo, verde, conflitto', () => {
     assert.deepEqual(p2.file, ['valore.txt']);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -216,7 +243,39 @@ test('prova vera: rosso solo sulla fusione ferma con l\'elenco, rosso anche su m
     assert.deepEqual(s.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
+  }
+});
+
+// Il finish giudica così un unit rosso sul ramo (#1009): con main già dentro, il risultato della fusione è il ramo.
+test('prova vera con ancheContenuto: il ramo che contiene main si prova lui, e un rosso si confronta con main da solo', () => {
+  const r = repoFinto();
+  try {
+    r.suMain(() => r.scrivi('tests/unit/valore.test.mjs', TEST_VALORE));
+    const verde = r.ramo('claude/verde', () => r.scrivi('innocuo.txt', 'x\n'));
+    const v = provaUnitSullaFusione({ root: r.lavoro, punta: verde, scrivi: () => {}, ancheContenuto: true });
+    assert.deepEqual([v.esito, v.contenuto], ['verde', true], JSON.stringify(v));
+    pulita(r);
+
+    const rompe = r.ramo('claude/rompe', () => r.scrivi('valore.txt', 'due\n'));
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta: rompe, scrivi: (s) => righe.push(s), ancheContenuto: true });
+    assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
+    assert.equal(p.contenuto, true);
+    assert.deepEqual(p.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
+    assert.ok(righe.some((s) => /sul ramo, che contiene già main/.test(s)), righe.join('\n'));
+    assert.match(testoProva(p), /^✗ Unit sul ramo, che contiene già main/);
+    pulita(r);
+    assert.equal(provaUnitSullaFusione({ root: r.lavoro, punta: rompe, scrivi: () => {} }).esito, 'main_contenuto', 'senza l\'opzione, come prima');
+
+    r.suMain(() => r.scrivi('tests/unit/rotto.test.mjs', TEST_ROTTO));
+    const innocuo = r.ramo('claude/innocuo', () => r.scrivi('altro.txt', 'y\n'));
+    const q = provaUnitSullaFusione({ root: r.lavoro, punta: innocuo, scrivi: () => {}, ancheContenuto: true });
+    assert.deepEqual([q.esito, q.contenuto], ['rosso_anche_su_main', true], JSON.stringify(q));
+    assert.doesNotMatch(testoProva(q), /si fonde/, 'qui non si sta fondendo niente');
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
   }
 });
 
@@ -229,7 +288,7 @@ test('senza origin la prova si salta e lo si dice; con origin irraggiungibile è
     g(['remote', 'add', 'origin', join(casa, 'non-esiste.git')]);
     assert.match(provaUnitSullaFusione({ root: casa, punta: SHA, scrivi: () => {} }).errore, /non riesco a scaricare main/);
   } finally {
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
@@ -244,7 +303,7 @@ test('una cartella di prova si toglie anche dopo un guasto, e il node_modules co
     assert.match(String(e.message), /lanciatore esploso/);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -258,7 +317,7 @@ test('chiudiAlbero toglie prima il collegamento: con un collegamento che non si 
     assert.equal(r.ok, false);
     assert.ok(existsSync(join(albero, 'node_modules', 'dentro.txt')));
   } finally {
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
@@ -330,22 +389,28 @@ test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione',
     assert.match(testoProva(p), /instabili/);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
 test('prova vera: due test verdi da soli che si rompono sempre insieme non sono instabili, e fermano la fusione', () => {
   const r = repoFinto();
   try {
-    // Il test di main lascia un segno legato alla corsa (il `node --test` padre), quello del ramo cade se lo trova:
-    // da solo passa sempre, nella stessa suite mai, in parallelo o in fila (main.test viene prima).
+    // Il test di main lascia un segno legato alla corsa (il `node --test` padre), quello del ramo cade se lo trova: da
+    // solo passa sempre, nella stessa suite mai. La suite del repo finto gira un file alla volta, in ordine (main.test
+    // prima di ramo.test): in parallelo il segno arrivava a tempo solo a macchina scarica (#1063).
     const diMain = "import { test } from 'node:test';\nimport { writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\n"
       + "test('main da solo', () => writeFileSync(join(process.cwd(), '..', `segno-${process.ppid}`), 'x'));\n";
     const delRamo = "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { existsSync } from 'node:fs';\n"
-      + "import { join } from 'node:path';\ntest('ramo da solo', async () => {\n"
-      + '  for (let i = 0; i < 40; i++) {\n'
-      + "    assert.ok(!existsSync(join(process.cwd(), '..', `segno-${process.ppid}`)), 'insieme a main no');\n"
-      + '    await new Promise((ok) => setTimeout(ok, 100));\n  }\n});\n';
+      + "import { join } from 'node:path';\n"
+      + "test('ramo da solo', () => assert.ok(!existsSync(join(process.cwd(), '..', `segno-${process.ppid}`)), 'insieme a main no'));\n";
+    const inFila = "import { fileURLToPath } from 'node:url';\n"
+      + "process.argv.splice(1, 1, fileURLToPath(new URL('./run-unit-tests-vero.mjs', import.meta.url)));\n"
+      + "process.argv.push('--test-concurrency=1');\nawait import('./run-unit-tests-vero.mjs');\n";
+    r.suMain(() => {
+      r.scrivi('scripts/run-unit-tests-vero.mjs', readFileSync(join(r.lavoro, 'scripts', 'run-unit-tests.mjs'), 'utf8'));
+      r.scrivi('scripts/run-unit-tests.mjs', inFila);
+    });
     const punta = r.ramo('claude/insieme', () => r.scrivi('tests/unit/ramo.test.mjs', delRamo));
     r.suMain(() => r.scrivi('tests/unit/main.test.mjs', diMain));
     r.ok(['checkout', '-q', 'claude/insieme']);
@@ -355,7 +420,7 @@ test('prova vera: due test verdi da soli che si rompono sempre insieme non sono 
     assert.ok(!p.instabili, 'niente instabili: si rompono a ogni suite intera');
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -389,18 +454,17 @@ test('durante la prova i worktree non contengono collegamenti: unlock e remove -
     assert.equal(rimosso, true, 'la pulizia che git suggerisce va fino in fondo');
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
 test('i resti di una prova interrotta si tolgono alla richiesta dopo anche se il ramo contiene già main', () => {
   const r = repoFinto();
-  // Nella temporanea vera, dove la prova la cerca e col nome che riconosce, col pid di un processo già finito.
+  // Nella temporanea vera, dove la prova la cerca e col nome che riconosce, col pid di un processo che non c'è più.
   const base = join(tmpdir(), `filo-fusione-t${Math.random().toString(36).slice(2).padEnd(5, '0').slice(0, 5)}`);
   mkdirSync(base);
   try {
-    const morto = spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim();
-    writeFileSync(join(base, 'pid'), morto);
+    writeFileSync(join(base, 'pid'), String(pidMorto()));
     collegaCartella(join(r.lavoro, 'node_modules'), join(base, 'node_modules'));
     r.ok(['worktree', 'add', '--detach', '--quiet', join(base, 'fusione'), 'HEAD']);
     const punta = r.ok(['rev-parse', 'HEAD']);
@@ -409,8 +473,8 @@ test('i resti di una prova interrotta si tolgono alla richiesta dopo anche se il
     pulita(r);
   } finally {
     togliCollegamento(join(base, 'node_modules'));
-    rmSync(base, { recursive: true, force: true });
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(base);
+    togliCartella(r.casa);
   }
 });
 
@@ -438,8 +502,8 @@ test('i resti di una prova interrotta li toglie la prova dopo, senza attraversar
     assert.deepEqual(pulisciResti({ git: r.g, tmp, vivo: () => false }), [viva]);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
-    rmSync(tmp, { recursive: true, force: true });
+    togliCartella(r.casa);
+    togliCartella(tmp);
   }
 });
 
@@ -467,7 +531,7 @@ test('clone poco profondo: la prova scarica la storia che manca e gira davvero s
     assert.equal(campo.storia.superficiale, true, 'la profondità del clone arriva al server');
     assert.equal(campo.storia.approfondito, p.storia.approfondito);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -483,7 +547,7 @@ test('clone poco profondo: un ramo che contiene già main si riconosce solo dopo
     const p = provaUnitSullaFusione({ root: clone, punta, scrivi: () => {}, lancia: () => assert.fail('main è già dentro: niente unit') });
     assert.equal(p.esito, 'main_contenuto', JSON.stringify(p));
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -561,7 +625,7 @@ test('clone del solo ramo: il primo download di main ha il tetto della storia, e
     assert.match(senzaRete.errore, /non riesco a scaricare main/);
     assert.equal(campoPerIlServer(senzaRete).storia.superficiale, true, 'il registro sa che il clone era poco profondo');
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -580,4 +644,42 @@ test('storia: un approfondimento arrivato alla radice si registra come storia in
   assert.deepEqual(s.storia, { superficiale: true, approfondito: 25, intera: true });
   assert.ok(!fatti.some((f) => f.includes('--unshallow')), 'la storia è già tutta: niente altri download');
   assert.match(testoStoria(s.storia), /storia intera/);
+});
+
+// Nessun tempo d'orologio sopra gli unit della prova (#1063): con la macchina carica la corsa intera dura più di
+// un'ora e la chiusura cadeva. Un file fermo lo chiude la guardia del lanciatore, anche nella riprova dei rossi.
+test('la riprova dei rossi sulla fusione passa dal lanciatore: un file fermo si chiude col suo nome e la prova finisce', () => {
+  const casa = cartellaTemporanea('filo-929-riprova-');
+  try {
+    const dir = join(casa, 'albero');
+    const base = join(casa, 'base');
+    mkdirSync(join(dir, 'scripts', 'lib'), { recursive: true });
+    mkdirSync(join(dir, 'tests', 'unit'), { recursive: true });
+    mkdirSync(base);
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs', 'scripts/lib/avanzamento-unit.mjs']) {
+      copyFileSync(join(ROOT, f), join(dir, f));
+    }
+    writeFileSync(join(dir, 'tests', 'unit', 'fermo.test.mjs'), "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
+    const modulo = pathToFileURL(join(ROOT, 'scripts', 'lib', 'unit-sulla-fusione.mjs')).href;
+    const codice = `import { lanciaUnit } from ${JSON.stringify(modulo)};\n`
+      + `console.log(JSON.stringify(lanciaUnit(${JSON.stringify(dir)}, ${JSON.stringify(base)}, 'riprova', { file: ['tests/unit/fermo.test.mjs'] })));\n`;
+    const env = { ...process.env, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', codice], { env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la riprova è rimasta appesa');
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const esito = JSON.parse(r.stdout.trim().split(/\r?\n/).pop());
+    assert.equal(esito.ok, false, JSON.stringify(esito));
+    assert.match(esito.coda, /fermo\.test\.mjs non è andato avanti/);
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('gli unit della prova non hanno un tempo d\'orologio sopra: li ferma solo la guardia del lanciatore', () => {
+  const testo = readFileSync(join(ROOT, 'scripts', 'lib', 'unit-sulla-fusione.mjs'), 'utf8');
+  const da = testo.indexOf('export function lanciaUnit(');
+  const corpo = testo.slice(da, testo.indexOf('\n}\n', da));
+  assert.ok(da >= 0 && corpo.includes('spawnSync('), 'la prova lancia ancora il lanciatore degli unit');
+  assert.doesNotMatch(corpo, /\btimeout\s*:/, 'con la macchina carica la corsa intera supera qualunque tempo fisso');
 });

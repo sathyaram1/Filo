@@ -53,6 +53,8 @@
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
+        contestoGiorni: 'contestoFilo.giorni',
+        contestoToken: 'contestoFilo.token',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle' },
       fuori: {},
@@ -62,6 +64,7 @@
         FILO_MEMORY_VIEW: 'DIMENTICA',
         FILO_MEMORY_FORGET: 'DIMENTICA',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
+        DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei due tetti della chat per mostrarli accanto ai campi: non salva niente',
         FILO_RESTART_ONBOARDING: 'pulsante che fa un’azione (rifà l’intervista di benvenuto): resta nella pagina',
         RESET_SETTINGS: 'pulsante che fa un’azione (ripristina tutte le impostazioni): resta nella pagina',
         TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
@@ -88,6 +91,7 @@
         'sec-delicate': 'security.pagineDelicate.enabled',
         'sec-delicate-sites': 'security.pagineDelicate.siti',
         'sec-auto-feedback': 'security.autoFeedback',
+        'sec-riquadri-modello': 'security.riquadriRotti.modello',
         'cookie-mode-manual': 'security.cookies.mode',
         'cookie-mode-default': 'security.cookies.mode',
         'cookie-mode-privacy': 'security.cookies.mode',
@@ -98,7 +102,9 @@
       },
       gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'sec-cookies-accessi': 'security.cookies.loggedSites', 'sec-cookies-riquadri': 'security.cookies.embedSites' },
       altrove: { 'sec-perm-list': 'permessiSiti' },
-      fuori: {},
+      fuori: {
+        'sec-clip-search': 'cerca fra le voci della cronologia appunti mostrate nella pagina: non è un valore da salvare',
+      },
       messaggi: {
         PERMESSI_SITI_GET: 'LEGGI_IMPOSTAZIONI',
         PERMESSI_SITI_TOGLI: 'TOGLI_PERMESSO_SITO',
@@ -110,6 +116,9 @@
         EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file): resta nella pagina',
         IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
+        GET_CLIPBOARD_HISTORY: 'la cronologia appunti è un dato dell’utente (anche password copiate), non un’impostazione: si legge nella pagina',
+        REMOVE_CLIPBOARD_ENTRY: 'pulsante che fa un’azione (toglie una voce della cronologia appunti): resta nella pagina',
+        CLEAR_CLIPBOARD_HISTORY: 'pulsante che fa un’azione (svuota la cronologia appunti): resta nella pagina',
       },
     },
     options: {
@@ -150,7 +159,7 @@
     permessiSiti: {
       nome: 'permessi dei siti (risposte ricordate)',
       come: 'TOGLI_PERMESSO_SITO per toglierne una',
-      parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti consentito negato',
+      parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti rete file cartelle consentito negato',
     },
   };
 

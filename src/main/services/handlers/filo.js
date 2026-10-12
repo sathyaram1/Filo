@@ -266,7 +266,9 @@ module.exports = function register(on, ctx) {
     const chat = await FiloChats.get(msg.id);
     // Riaperta (anche dopo un riavvio), la chat torna a dire cosa aveva letto da fuori prima di ogni clic (#810).
     try { ricordaLettoInChat([], (chat && chat.messages) || []); } catch (_) {}
-    return { ok: true, chat };
+    let conFoto = chat;
+    try { conFoto = global.SN_CONTESTO_FILO ? global.SN_CONTESTO_FILO.conFotoInMemoria(chat) : chat; } catch (_) {}
+    return { ok: true, chat: conFoto };
   });
 
   // Chiusura di una chat. La risposta NON aspetta il classificatore: chi ha
@@ -319,7 +321,7 @@ module.exports = function register(on, ctx) {
     const role = msg.role === 'user' ? 'user' : 'filo';
     // L'esito di un comando lanciato a mano l'ha scritto il comando: riaperta, la chat lo tratta da letto (#810).
     // Così il nome di un file scaricato, che sceglie il sito, quando una carta della home lo porta nel filo (#870).
-    const ESTERNI = { comando: "dall'output di un comando", download: 'dal nome di un file scaricato' };
+    const ESTERNI = { comando: globalThis.SN_FILO_CONTESTO.ESTERNO_COMANDO, download: 'dal nome di un file scaricato' };
     const esterno = role === 'filo' && Object.hasOwn(ESTERNI, msg.esterno) ? ESTERNI[msg.esterno] : '';
     // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
     const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');

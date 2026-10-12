@@ -311,7 +311,7 @@ test('foto della home a carte, chiara e scura, ferma, col menu e in conversazion
   await page.screenshot({ path: join(SHOTS, `home-carte-filo${scala}.png`) });
 
   // Finestra stretta: colonne da 200 punti, i titoli si accorciano e niente esce dalla carta.
-  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(900, 640); });
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(900, 640); });
   await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeLessThan(980);
   await page.waitForTimeout(400);
   const fuori = await page.locator('.dash-carta').evaluateAll((ns) => ns.filter((n) => n.scrollWidth > n.clientWidth + 1).length);
@@ -699,7 +699,7 @@ test('alla larghezza minima della finestra le carte restano ai lati e il campo d
   await app.evaluate(async () => { await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Pasta', seconds: 900 }); });
   await page.reload();
   await home(app);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(600, 760));
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(600, 760));
   await expect.poll(() => page.evaluate(() => innerWidth)).toBeLessThanOrEqual(720);
   await expect(page.locator('#accade .dash-carta[data-tipo="timer"]', { hasText: 'Pasta' })).toBeVisible();
   await expect(page.locator('#tieni .dash-carta[data-tipo="editor"]')).toBeVisible();

@@ -9,6 +9,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -400,7 +401,7 @@ test('chi supera il tetto di messaggi lo vede scritto', async ({ app, openTab })
   await expect(page.locator('.dk-chat-cap')).toHaveCount(0);
   await ask(page, 'una di troppo');
   await expect(page.locator('.dk-chat-cap')).toBeVisible();
-  const scritto = await page.evaluate((n) => n.toLocaleString('it-IT'), max);
+  const scritto = await page.evaluate((n) => n.toLocaleString('it-IT', { useGrouping: true }), max);
   await expect(page.locator('.dk-chat-cap')).toContainText(scritto);
 });
 
@@ -413,7 +414,7 @@ test('riavviato Filo, la chat del mazzo è ancora lì e il + funziona', async ()
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
   const openDecks = async (app, hash = '') => {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     const before = new Set(app.windows());
     await shell.evaluate((u) => window.filoShell.tabs.open(u), `filo://decks/decks.html${hash}`);

@@ -13,6 +13,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 test('#1 una pagina web non può aprire file:// (window.open) né navigarci (location)', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `
@@ -59,7 +60,11 @@ test('#1b i link mailto:/tel: vengono consegnati all\'OS, file:// no', async ({ 
   `);
   const startUrl = page.url();
 
+  // Posta e telefono partono da un gesto dell'utente (#737.1 giro 3): un clic vero prima di ognuno.
+  await page.mouse.click(5, 5);
   await page.evaluate(() => { try { window.location.href = 'mailto:mario@esempio.it?subject=ciao'; } catch (_) {} });
+  await page.waitForTimeout(150);
+  await page.mouse.click(5, 5);
   await page.evaluate(() => { try { window.open('tel:+39055123456'); } catch (_) {} });
   await page.evaluate(() => { try { window.open('file://attacker.example/share/x'); } catch (_) {} });
 
@@ -134,7 +139,7 @@ test('#2 i canali privilegiati non trapelano le chiavi API a un\'origine web', a
 });
 
 test('#3 le chiavi API sono cifrate nel storage.json (mai in chiaro su disco)', async ({ app, shell }) => {
-  // `shell` attende app.firstWindow() + load: senza, il primo app.evaluate
+  // `shell` attende primaFinestra(app) + load: senza, il primo app.evaluate
   // parte mentre l'app sta ancora navigando al boot e il contesto viene
   // distrutto ("Execution context was destroyed"). Gli altri test del file
   // passano proprio perché usano un fixture (shell/openTab) che aspetta il boot.

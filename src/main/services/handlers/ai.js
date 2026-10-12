@@ -126,6 +126,121 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
+  // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
+  // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
+  // pagina mostra i risultati mentre arrivano. Un giro per pagina: una ricerca nuova ferma quella di prima.
+  const { daFilo } = require('./origine');
+  const { settingsForOwnerAction } = require('../resolveSupportModel');
+  const giriRicerca = new Map(); // jobId → giro
+  let giriFatti = 0;
+  const GIRO_DIMENTICA_MS = 5 * 60 * 1000;
+  // Più dei feedback che la pagina carica, con margine: un elenco più lungo non viene da lei.
+  const RICERCA_MAX_CANDIDATI = 50000;
+
+  function fermaGiro(id) {
+    const g = giriRicerca.get(id);
+    if (!g) return;
+    giriRicerca.delete(id);
+    try { g.controller.abort(); } catch (_) {}
+  }
+
+  // Errori la cui frase è già per chi legge (dicono anche dove si imposta il modello).
+  const GIA_SCRITTI = ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'NO_API_KEY', 'NO_ALLOWED_HOST', 'LIMIT_REACHED', 'PROVIDER_METHOD_MISSING'];
+  function fraseErrore(e) {
+    const CE = globalThis.SN_CHAT_ERRORS;
+    if (e && GIA_SCRITTI.includes(e.code)) return String(e.message || e.code);
+    return CE && typeof CE.sentence === 'function' ? CE.sentence(e) : String((e && e.message) || e || 'errore');
+  }
+
+  function candidatiValidi(lista) {
+    const out = [];
+    const visti = new Set();
+    for (const c of Array.isArray(lista) ? lista : []) {
+      const id = c && c.id != null ? String(c.id) : '';
+      if (!id || visti.has(id)) continue;
+      visti.add(id);
+      out.push({ id, title: String((c && c.title) || '').slice(0, 500), text: String((c && c.text) || '') });
+    }
+    return out;
+  }
+
+  on(MSG.MANAGE_SEARCH_CLASSIFY, async (msg, sender, origin) => {
+    if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!isAdmin()) {
+      return { ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
+    }
+    const op = msg && msg.op;
+    const jobId = msg && typeof msg.jobId === 'string' ? msg.jobId : '';
+    if (op === 'stop') { fermaGiro(jobId); return { ok: true }; }
+    if (op === 'status') {
+      const g = giriRicerca.get(jobId);
+      if (!g) return { ok: false, code: 'NO_JOB', error: 'ricerca non trovata' };
+      if (g.finished) giriRicerca.delete(jobId);
+      const S = globalThis.SN_MANAGE_SEARCH;
+      return {
+        ok: true, done: g.done, total: g.total, hits: S.rankHits(g.hits), finished: g.finished,
+        skipped: g.skipped, error: g.error, code: g.code, model: g.model,
+      };
+    }
+    if (op !== 'start') return { ok: false, code: 'BAD_OP', error: 'operazione sconosciuta' };
+
+    const S = globalThis.SN_MANAGE_SEARCH;
+    const query = String((msg && msg.query) || '').trim();
+    if (!query) return { ok: false, code: 'EMPTY_QUERY', error: 'ricerca vuota' };
+    const lista = Array.isArray(msg && msg.candidates) ? msg.candidates : [];
+    if (lista.length > RICERCA_MAX_CANDIDATI) {
+      return { ok: false, code: 'TOO_MANY', error: `Troppi feedback per il classificatore: ${lista.length}, al massimo ${RICERCA_MAX_CANDIDATI}.` };
+    }
+    const candidati = candidatiValidi(lista);
+    const wcId = sender && sender.wc && typeof sender.wc.id === 'number' ? sender.wc.id : null;
+    for (const [id, g] of giriRicerca) if (g.wcId === wcId) fermaGiro(id);
+
+    const action = SN_CONST.ACTIONS.MANAGE_SEARCH_CLASSIFY;
+    let settings;
+    let attempts;
+    try {
+      settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
+      attempts = buildAttemptChain(settings, modelForAction(settings, action), action);
+    } catch (e) {
+      return { ok: false, code: (e && e.code) || 'NO_MODEL', error: fraseErrore(e) };
+    }
+    if (!attempts.some((a) => modelGate.supports(a.provider, 'decisions'))) {
+      return { ok: false, code: 'NO_DECISION_PROVIDER', error: 'Nessun fornitore del classificatore sa rispondere a domande chiuse.' };
+    }
+
+    const requests = S.buildDecisionRequests(query, candidati, S.CLASSIFIER.BATCH);
+    const id = `r${Date.now().toString(36)}${(++giriFatti).toString(36)}`;
+    const g = {
+      wcId, total: candidati.length, done: 0, hits: [], skipped: 0,
+      finished: false, error: null, code: null, model: attempts[0].model || '', controller: new AbortController(),
+    };
+    giriRicerca.set(id, g);
+    // La pagina chiusa a metà non paga il resto del giro.
+    try { if (sender && sender.wc && typeof sender.wc.once === 'function') sender.wc.once('destroyed', () => fermaGiro(id)); } catch (_) {}
+    const conta = (req, senza) => { g.done += req.ids.length; g.skipped += senza; };
+    modelGate.decideAll({
+      action, settings, attempts, requests, parallel: S.CLASSIFIER.PARALLEL, signal: g.controller.signal,
+      onAnswer: (i, answers) => {
+        const r = S.hitsFromAnswers(requests[i], answers, S.CLASSIFIER.THRESHOLD);
+        g.hits.push(...r.hits);
+        conta(requests[i], r.senza);
+      },
+    }).then((r) => {
+      for (const i of r.skipped || []) conta(requests[i], requests[i].ids.length);
+      if (r.model) g.model = r.model;
+      if (r.error) { g.error = fraseErrore(r.error); g.code = r.error.code || 'PARTIAL'; }
+    }).catch((e) => {
+      g.error = fraseErrore(e);
+      g.code = (e && e.code) || 'DECIDE_FAILED';
+      console.warn('[Filo ricerca] classificatore fermo:', (e && e.message) || e);
+    }).finally(() => {
+      g.finished = true;
+      const t = setTimeout(() => { if (giriRicerca.get(id) === g) giriRicerca.delete(id); }, GIRO_DIMENTICA_MS);
+      if (t && typeof t.unref === 'function') t.unref();
+    });
+    return { ok: true, jobId: id, total: g.total };
+  });
+
   // Dedup dell'avviso "lettura a modello non disponibile → voce del browser": un motivo si annuncia
   // una volta (firstFallback:true), un motivo DIVERSO sì (#713: altro modello escluso). Si riarma a ogni sintesi riuscita.
   let ttsFallbackAnnounced = '';
@@ -430,6 +545,40 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: provaFallita(e) };
     }
+  });
+
+  // Lo stesso verdetto di ensureAllowedHost (openrouter.js), chiesto mentre si sceglie il modello.
+  // Da un sito vale solo un nickname del registro: un id qualunque lo mandano solo le pagine di Filo.
+  on(MSG.AUDIO_HOST_CHECK, async (msg, sender, origin) => {
+    const A = SN_CONST.ACTIONS;
+    const fn = msg.action === A.TTS ? 'audio_host_fn_tts' : (msg.action === A.TRANSCRIBE_AUDIO ? 'audio_host_fn_stt' : '');
+    if (!fn) return { ok: true, verdict: 'na' };
+    const s = await getEffectiveSettings();
+    const interna = daFilo(origin, sender);
+    let routing = providerRouting(s);
+    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando.
+    if (interna && Array.isArray(msg.excluded)) {
+      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string') });
+    }
+    let entry = null;
+    if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {
+      entry = { provider: msg.provider, model: msg.model.trim() };
+    } else {
+      const raw = (s.modelRegistry || {})[String(msg.nickname || '').trim()];
+      if (raw) entry = registryEntryToSingle(raw);
+    }
+    if (!entry || !entry.model) return { ok: true, verdict: 'na' };
+    const v = await modelGate.hostVerdict({
+      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing,
+    });
+    if (v.ok) return { ok: true, verdict: 'ok' };
+    const many = v.excluded.length > 1 ? '_many' : '';
+    const key = v.reason === 'unknown' ? 'audio_host_warn_unknown' : `audio_host_warn_${v.reason}${many}`;
+    const I18n = globalThis.SN_I18N;
+    const label = String((typeof msg.label === 'string' && msg.label.trim()) || msg.nickname || entry.model).slice(0, 120);
+    const nomi = new Intl.ListFormat('it', { type: 'conjunction' }).format(v.excluded);
+    const warning = I18n ? I18n.t(key, label, I18n.t(fn), nomi) : key;
+    return { ok: true, verdict: v.reason, hosts: v.excluded, warning };
   });
 
   // Normalizza una entry del registry (nuovo schema { provider, model } o
