@@ -52,7 +52,7 @@ function ambiente(testoJob) {
 }
 
 function passi(testoJob) {
-  return testoJob.split(/\n(?= {6}- )/).filter((p) => /^ {6}- /.test(p));
+  return senzaCommenti(testoJob).split(/\n(?= {6}- )/).filter((p) => /^ {6}- /.test(p));
 }
 
 describe('i segreti si leggono solo dentro l\'ambiente rilascio', () => {
