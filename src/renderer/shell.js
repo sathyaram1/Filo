@@ -77,7 +77,7 @@
   // Fondo e inchiostri si calcolano sui colori veri del tema: al cambio di tema si ridipinge.
   try {
     window.matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', () => { try { render(); } catch (_) {} });
+      .addEventListener('change', () => { try { render({ forza: true }); } catch (_) {} });
   } catch (_) {}
   // Config notifiche (spec #170.1): durata, suono on/off, suono scelto. Letta
   // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
@@ -119,7 +119,7 @@
       applyTabPreview(r?.settings?.tabPreview);
       applyRingTone(r?.settings?.timerRingtone, r?.settings?.timerRingtoneVolume);
       refreshRinging();
-      try { render(); } catch (_) {}
+      try { render({ forza: true }); } catch (_) {}
       try { NOTIFS.rispecchia(); } catch (_) {}
     })
     .catch(() => {});
@@ -135,7 +135,7 @@
         // Il volume cambiato mentre suona deve sentirsi subito: senza questo si
         // sentirebbe solo alla scadenza dopo.
         refreshRinging();
-        try { render(); } catch (_) {}
+        try { render({ forza: true }); } catch (_) {}
         try { NOTIFS.rispecchia(); } catch (_) {}
       }
     });
@@ -503,8 +503,8 @@
   // al main di mostrare un mini-BrowserWindow stile Filo (vedi popup-tooltip.js),
   // invece del title nativo bianco squadrato. Serve una BrowserWindow secondaria
   // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
-  // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
-  // tab ricreati ad ogni render().
+  // sopra le WebContentsView delle tab. Delega globale così funziona anche per le
+  // schede nate dopo.
   // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
   const SUGGERIMENTO_RITARDO = 350;
   (() => {
