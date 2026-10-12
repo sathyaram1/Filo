@@ -221,10 +221,22 @@
       b.addEventListener('blur', () => mostraFrase(box));
       gruppo.appendChild(b);
     });
+    // Il posto della frase misura già la più lunga: se cambiasse altezza al passaggio del cursore, la chat in fondo
+    // salterebbe, il pulsante scivolerebbe via da sotto il cursore e il clic andrebbe a vuoto.
+    const posto = document.createElement('div');
+    posto.className = 'dash-autonomia-frase-posto';
+    for (const l of livelli) {
+      const misura = document.createElement('span');
+      misura.className = 'dash-autonomia-frase-misura';
+      misura.setAttribute('aria-hidden', 'true');
+      misura.textContent = A.infoLivello(l.id).frase;
+      posto.appendChild(misura);
+    }
     const frase = document.createElement('div');
     frase.className = 'dash-autonomia-frase';
     frase.setAttribute('aria-live', 'polite');
-    box.append(gruppo, frase);
+    posto.appendChild(frase);
+    box.append(gruppo, posto);
     segnaLivello(box, A.livelloAttivo(livello));
     // Quello dell'azione può essere di qualche istante fa: vale quello salvato.
     livelloSalvato().then((lv) => { if (lv) segnaLivello(box, A.livelloAttivo(lv)); });
