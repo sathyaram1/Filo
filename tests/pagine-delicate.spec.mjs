@@ -352,7 +352,7 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
     !!BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
   const IBAN = 'IT60X0542811101000000123456';
   const url = testServer.html(`<!doctype html><title>Bonifico</title><body><p id="p">Il mio IBAN è ${IBAN} per il bonifico.</p></body>`, { pubblico: true });
-  const seleziona = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito }) => {
+  const seleziona = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito, IBAN }) => {
     const win = BrowserWindow.getAllWindows().find((w) => !!w._filoIncognito === incognito && w._filoTabs);
     const tm = win._filoTabs;
     const id = tm.openTab(url);
