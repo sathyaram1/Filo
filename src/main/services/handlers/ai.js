@@ -155,7 +155,7 @@ module.exports = function register(on, ctx) {
   function candidatiValidi(lista) {
     const out = [];
     const visti = new Set();
-    for (const c of Array.isArray(lista) ? lista.slice(0, RICERCA_MAX_CANDIDATI) : []) {
+    for (const c of Array.isArray(lista) ? lista : []) {
       const id = c && c.id != null ? String(c.id) : '';
       if (!id || visti.has(id)) continue;
       visti.add(id);
@@ -187,7 +187,11 @@ module.exports = function register(on, ctx) {
     const S = globalThis.SN_MANAGE_SEARCH;
     const query = String((msg && msg.query) || '').trim();
     if (!query) return { ok: false, code: 'EMPTY_QUERY', error: 'ricerca vuota' };
-    const candidati = candidatiValidi(msg && msg.candidates);
+    const lista = Array.isArray(msg && msg.candidates) ? msg.candidates : [];
+    if (lista.length > RICERCA_MAX_CANDIDATI) {
+      return { ok: false, code: 'TOO_MANY', error: `Troppi feedback per il classificatore: ${lista.length}, al massimo ${RICERCA_MAX_CANDIDATI}.` };
+    }
+    const candidati = candidatiValidi(lista);
     const wcId = sender && sender.wc && typeof sender.wc.id === 'number' ? sender.wc.id : null;
     for (const [id, g] of giriRicerca) if (g.wcId === wcId) fermaGiro(id);
 

@@ -259,6 +259,7 @@
     /* Il motivo di un ripiego può essere lungo: va a capo e lascia metà riga al campo. */
     .mg-search-msg { font-size: 12px; color: var(--sn-muted); flex: 0 1 auto; min-width: 0; max-width: 50%; }
     .mg-search-msg.mg-err { color: #c0392b; }
+    .mg-search-msg.mg-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
     .mg-search-close {
       all: unset; cursor: pointer; flex: 0 0 auto;
       font-size: 18px; color: var(--sn-muted);
@@ -1721,7 +1722,7 @@
           </div>
 
           <!-- Funzioni che solo l'owner usa, nella sua app: fuori da Opzioni e Modelli predefiniti (#465). -->
-          <h3 class="mg-sm-slots-title mg-sm-slots-title--next">Modello per la gestione</h3>
+          <h3 class="mg-sm-slots-title mg-sm-slots-title--next">Modelli per la gestione</h3>
           <div class="mg-sm-slots" id="mgSmSlotsManage">
             <div class="mg-sm-slot" data-slot="manageSearch">
               <label>Ricerca fra i feedback</label>
@@ -1735,8 +1736,8 @@
               <label>Classificatore della ricerca</label>
               <div class="mg-sm-chain-host" id="mgSmChain-manageSearchClassifier"></div>
               <span class="mg-sm-slot-desc">
-                Legge i feedback in parallelo e dice quali corrispondono a quello che cerchi: un classificatore come Jev
-                (typesafe/jev-1.13), non un modello che scrive. Se manca o non risponde, li ordina il modello qui sopra.
+                Legge i feedback in parallelo e dice quali sono quelli che cerchi. Serve un classificatore, come Jev
+                (typesafe/jev-1.13). Se manca o non risponde, li ordina il modello qui sopra.
               </span>
             </div>
           </div>

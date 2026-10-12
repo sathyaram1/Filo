@@ -201,6 +201,9 @@
     err_unknown_model_for_action: '«%s» usa un modello che non esiste (%s): forse è stato rinominato o eliminato. %s',
     err_open_weights_only_no_model:
       '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Opzioni → Modelli per azione, oppure spegnere «Solo modelli a pesi aperti».',
+    // Le funzioni di chi gestisce Filo non stanno nelle Opzioni: il modello si cambia in Gestione (#1118).
+    err_open_weights_only_no_model_owner:
+      '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Gestione → Modelli di supporto, oppure spegnere «Solo modelli a pesi aperti».',
     err_open_weights_only_provider_blocked:
       'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_open_weights_only_model_blocked:

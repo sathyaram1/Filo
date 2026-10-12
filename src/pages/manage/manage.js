@@ -2725,6 +2725,7 @@
     if (!mgSearchMsg) return;
     mgSearchMsg.textContent = text || '';
     mgSearchMsg.classList.toggle('mg-err', kind === 'err');
+    mgSearchMsg.classList.toggle('mg-count', kind === 'count');
   }
 
   // Nasconde le barre specifiche della scheda (filtro archivio, ri-valuta,
@@ -2797,7 +2798,7 @@
     mgSearchProgress.setAttribute('aria-valuemax', String(total));
     mgSearchProgress.setAttribute('aria-valuenow', String(done));
     if (mgSearchProgressFill) mgSearchProgressFill.style.width = `${total ? (done / total) * 100 : 0}%`;
-    setSearchMsg(`Letti ${numIt(done)} di ${numIt(total)}`, null);
+    setSearchMsg(`Letti ${numIt(done)} di ${numIt(total)}`, 'count');
   }
 
   const pausa = (ms) => new Promise((ok) => setTimeout(ok, ms));

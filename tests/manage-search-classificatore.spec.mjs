@@ -21,8 +21,8 @@ function feedbacks() {
   return out;
 }
 
-async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWeightsOnly = false }) {
-  await app.evaluate(async (electron, { supportDoc, rispostaDecisioni, openWeightsOnly }) => {
+async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWeightsOnly = false, latenza = 300 }) {
+  await app.evaluate(async (electron, { supportDoc, rispostaDecisioni, openWeightsOnly, latenza }) => {
     const { createRequire } = process.getBuiltinModule('module');
     const path = process.getBuiltinModule('path');
     const req = createRequire(path.join(electron.app.getAppPath(), 'package.json'));
@@ -68,7 +68,7 @@ async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWei
         g.decisioni.push(body);
         g.inVolo++; g.picco = Math.max(g.picco, g.inVolo);
         try {
-          await pausa(40);
+          await pausa(latenza);
           if (rispostaDecisioni === 'rifiuta') return risposta(false, { error: { message: 'not a decisions model' } }, 400);
           const answers = {};
           for (const [nome, q] of Object.entries(body.questions || {})) {
@@ -81,7 +81,8 @@ async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWei
       }
       if (u.includes('openrouter.ai/api/v1/chat/completions')) {
         const body = JSON.parse(init.body || '{}');
-        g.chat.push(body.model);
+        // Solo le chiamate della ricerca: l'app ne fa altre per conto suo (la home, per esempio).
+        if (JSON.stringify(body.messages || []).includes('motore di ricerca semantica')) g.chat.push(body.model);
         const content = JSON.stringify([{ id: 'fb-23', reason: 'dal modello' }, { id: 'fb-7', reason: 'dal modello' }]);
         return risposta(true, { id: 'x', model: body.model, choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1 } });
       }
@@ -91,7 +92,7 @@ async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWei
     await globalThis.SN_HANDLE_MESSAGE({
       type: 'update_settings', settings: { apiKeys: { openrouter: 'sk-owner' }, openWeightsOnly },
     }, { url: 'filo://options/options.html' });
-  }, { supportDoc, rispostaDecisioni, openWeightsOnly });
+  }, { supportDoc, rispostaDecisioni, openWeightsOnly, latenza });
 }
 
 async function cerca(page, testo) {
@@ -175,27 +176,34 @@ test('con «solo modelli a pesi aperti» il classificatore resta spento e la ric
   expect(g.chat).toEqual(['deepseek/deepseek-v4-flash']);
 });
 
-test('una ricerca nuova ferma il giro di quella prima', async ({ app, openTab }) => {
+test('una ricerca nuova ferma il giro di quella prima, e chiudere la ricerca ferma il suo', async ({ app, openTab }) => {
   await preparaOwner(app, { supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13' } });
   const page = await openTab(URL);
   await page.waitForFunction(() => window.filo && window.__mgTest);
   const tanti = [];
   for (let i = 0; i < 400; i++) tanti.push({ _id: `fb-${i}`, name: `Altro ${i}`, text: `niente ${i}`, seq: i + 1, subSeq: 0, status: 'new', clientId: 't@example.com', createdAt: '2026-06-03T10:00:00Z', images: [] });
-  tanti[350] = { ...tanti[350], name: 'La X non chiude', text: 'Premo la crocetta e non succede niente.' };
   await page.evaluate((fbs) => window.__mgTest.setData(fbs), tanti);
+  const perRicerca = (q) => app.evaluate((_e, x) => globalThis.__g1118.decisioni.filter((b) => b.state && b.state.ricerca === x).length, q);
+
   await page.click('#mgSearchToggle');
   await page.fill('#mgSearchInput', 'prima ricerca');
   await page.press('#mgSearchInput', 'Enter');
   await expect(page.locator('#mgSearchProgress')).toBeVisible();
+  await page.fill('#mgSearchInput', 'seconda ricerca');
+  await page.press('#mgSearchInput', 'Enter');
+  await expect.poll(() => perRicerca('seconda ricerca')).toBeGreaterThan(0);
+  const prima = await perRicerca('prima ricerca');
+  expect(prima, 'la prima ricerca non arriva in fondo: 400 feedback sono 25 richieste').toBeLessThan(25);
+
   // Chiusa la ricerca a metà, il main smette di mandare richieste.
   await page.click('#mgSearchClose');
-  await page.waitForTimeout(400);
-  const dopoChiusura = await app.evaluate(() => globalThis.__g1118.decisioni.length);
-  await page.waitForTimeout(600);
-  const piuTardi = await app.evaluate(() => globalThis.__g1118.decisioni.length);
-  expect(dopoChiusura).toBeLessThan(25);
-  expect(piuTardi).toBe(dopoChiusura);
   await expect(page.locator('#mgSearchProgress')).toBeHidden();
+  await page.waitForTimeout(400);
+  const dopoChiusura = await perRicerca('seconda ricerca');
+  await page.waitForTimeout(800);
+  expect(await perRicerca('seconda ricerca')).toBe(dopoChiusura);
+  expect(dopoChiusura).toBeLessThan(25);
+  expect(await perRicerca('prima ricerca')).toBe(prima);
 });
 
 test('il classificatore si sceglie in Modelli di supporto e la scelta si salva', async ({ app, openTab }) => {

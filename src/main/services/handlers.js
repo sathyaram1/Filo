@@ -448,7 +448,7 @@ function openWeightsConfigError(settings, action, droppedRefs) {
   const label = actionLabelForSettings(action);
   const refs = droppedRefs || [];
   const e = new Error(I18n.t(
-    'err_open_weights_only_no_model',
+    ownerSlotFor(action) ? 'err_open_weights_only_no_model_owner' : 'err_open_weights_only_no_model',
     label,
     SN_CONST.formatModelRefsForMessage(refs),
   ));

@@ -5,7 +5,8 @@
 // (/audio/speech), dettatura (/audio/transcriptions) e indicizzazione
 // (/embeddings). Stessa chiave, stessa lista di esclusione dei fornitori, e —
 // dove il router non lo dice nella risposta — lo stesso riscontro su chi ha
-// davvero servito, chiesto a posteriori (lookupServedBy).
+// davvero servito, chiesto a posteriori (lookupServedBy). I classificatori
+// (decisioni a domande chiuse) hanno il loro endpoint: `decisions`.
 
 (function (global) {
   'use strict';
