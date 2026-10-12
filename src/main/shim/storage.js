@@ -397,12 +397,23 @@ async function set(obj) {
     if (!keys.length) return;
   }
   const changes = {};
+  let cambiate = 0;
   for (const k of keys) {
-    const oldValue = STATE.data[k];
     const newValue = obj[k];
+    // Uguale a quello già nel file: niente scrittura né evento. Si confronta il testo, non l'oggetto: chi
+    // ha cambiato dentro il valore letto e lo riscrive passa lo stesso riferimento.
+    if (!STATE.sporche.has(k) && STATE.testi.has(k)) {
+      let t = null;
+      try { t = JSON.stringify(newValue); } catch (_) {}
+      if (t !== null && t === STATE.testi.get(k)) continue;
+    }
+    const oldValue = STATE.data[k];
     STATE.data[k] = newValue;
+    STATE.sporche.add(k);
     changes[k] = { oldValue, newValue };
+    cambiate++;
   }
+  if (!cambiate) return;
   scheduleFlush();
   emitChange(changes);
 }
