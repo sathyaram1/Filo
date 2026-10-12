@@ -14,6 +14,9 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// Prima di qualsiasi sessione, che caricherebbe subito i dizionari del correttore scaricandoli da Google (#1084).
+try { require('./services/dizionari').prepara(app); } catch (_) {}
+
 // Su Windows serve un AppUserModelID esplicito perché la taskbar mostri
 // l'icona giusta (e non quella di Electron di default).
 if (process.platform === 'win32') {
