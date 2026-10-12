@@ -79,7 +79,8 @@ test('aprendo la pratica il pannello delle domande è già aperto, e sotto la co
   await expect(page.locator('#mgSideBody')).toContainText('Quale pulsante X intendi?');
   await expect(page.locator('#mgSideRispostaText')).toBeVisible();
   await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]')).toHaveClass(/mg-forma--scelta/);
-  await expect(page.locator('#mgDetail textarea:visible')).toHaveCount(0);
+  // Al centro resta solo il commento della revisione, che è un'altra cosa.
+  await expect(page.locator('#mgDetail textarea:visible:not(#mgAcceptComment)')).toHaveCount(0);
   await expect(page.locator('#mgDetail')).not.toContainText('Invia risposta');
   await page.screenshot({ path: 'tests/.shots/1061-domande-aperte.png' });
 
