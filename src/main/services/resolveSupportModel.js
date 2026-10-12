@@ -86,16 +86,24 @@ function ownerSlotFor(action) {
 }
 
 // Funzioni che usa solo l'owner (#465): catena dal loro slot, registro dei giudici sopra a quello
-// effettivo come sul server; slot null = mai impostato, resta la scelta di prima dello spostamento.
+// effettivo come sul server; slot null = mai impostato, resta la scelta di prima dello spostamento o, se non
+// c'è, la scelta iniziale dello slot.
+function initialChain(slot, settings, action) {
+  const prima = settings && settings.models ? settings.models[action] : null;
+  if (typeof prima === 'string' && prima.trim()) return null;
+  return OWNER_SLOT_DEFAULTS[slot] || null;
+}
+
 async function settingsForOwnerAction(settings, action, getConfig) {
   const slot = ownerSlotFor(action);
   if (!slot) return settings;
   const getter = typeof getConfig === 'function' ? getConfig : SupportModels.get;
   let config = null;
   try { config = await getter(); } catch (_) { config = null; }
-  const chain = config ? config[slot] : null;
+  let chain = config ? config[slot] : null;
+  if (typeof chain !== 'string') chain = initialChain(slot, settings, action);
   if (typeof chain !== 'string') return settings;
-  const judgeRegistry = (config.judgeRegistry && typeof config.judgeRegistry === 'object') ? config.judgeRegistry : {};
+  const judgeRegistry = (config && config.judgeRegistry && typeof config.judgeRegistry === 'object') ? config.judgeRegistry : {};
   return {
     ...settings,
     models: { ...(settings.models || {}), [action]: chain.trim() },
@@ -113,11 +121,11 @@ function fillMovedSlots(models, settings) {
   const unset = [];
   for (const { action, slot } of pairs) {
     if (models[slot] != null) continue;
-    models[slot] = typeof inUse[action] === 'string' ? inUse[action] : '';
+    models[slot] = initialChain(slot, settings, action) || (typeof inUse[action] === 'string' ? inUse[action] : '');
     unset.push(slot);
   }
   models.movedUnset = unset;
   return models;
 }
 
-module.exports = { resolveSupportModel, SLOT_DEFAULTS, ownerSlotFor, settingsForOwnerAction, fillMovedSlots };
+module.exports = { resolveSupportModel, SLOT_DEFAULTS, OWNER_SLOT_DEFAULTS, ownerSlotFor, settingsForOwnerAction, fillMovedSlots };
