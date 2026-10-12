@@ -149,6 +149,64 @@ test('una nota scritta prima della risposta col bottone resta nota anche se l\'u
   }
 });
 
+test('anche il bottone dell\'evento di calendario: la risposta scritta con lui resta nella bolla', async ({ app }) => {
+  test.setTimeout(60_000);
+  const VISITA = 'La visita è martedì 14 ottobre alle 10:30, dal dottor Rossi.';
+  try {
+    await modelloFinto(app, [
+      { text: VISITA, toolCalls: [{ id: 'e1', name: 'EVENTO_CALENDARIO', arguments: JSON.stringify({ data: '2026-10-14', ora: '10:30', titolo: 'Visita dottor Rossi' }) }] },
+      { text: 'Ti ho messo il bottone per aggiungerla al calendario.' },
+    ]);
+    const page = await home(app);
+    await chiedi(page, 'quando ho la visita?');
+    const bolla = page.locator('.dash-bubble-filo');
+    await expect(bolla).toContainText('Ti ho messo il bottone', { timeout: 15_000 });
+    await expect(bolla).toHaveCount(1);
+    const testo = await bolla.evaluate((el) => el.textContent);
+    expect(testo).toContain(VISITA);
+    expect(testo.indexOf(VISITA)).toBeLessThan(testo.indexOf('Ti ho messo il bottone'));
+    await expect(page.locator('.dash-activity-note')).toHaveCount(0);
+    const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 'e1');
+    expect(esito.content).toContain('non ripeterla');
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('il giro dopo il bottone fallisce: la risposta già scritta resta nella bolla col bottone, l\'errore sotto, e nella chat', async ({ app }) => {
+  test.setTimeout(60_000);
+  const { dir, file } = await bollettaTari(app);
+  try {
+    await modelloFinto(app, [{ text: RISPOSTA, toolCalls: [apriFile(file)] }]);
+    await app.evaluate(() => {
+      const primo = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+      globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (opts) => {
+        if (globalThis.__chatFinta_calls.length === 0) return primo(opts);
+        globalThis.__chatFinta_calls.push(JSON.parse(JSON.stringify(opts.messages)));
+        const e = new Error('Il fornitore non risponde.');
+        e.status = 503;
+        throw e;
+      };
+    });
+    const page = await home(app);
+    await chiedi(page, 'quanto ho pagato di tari?');
+    const risposta = page.locator('.dash-bubble-filo', { hasText: 'Hai pagato 305,40 €' });
+    await expect(risposta).toHaveCount(1, { timeout: 15_000 });
+    await expect(risposta.locator('.dash-file-btn')).toHaveCount(1);
+    await expect(page.locator('.dash-activity-note')).toHaveCount(0);
+    // L'errore resta detto, sotto la risposta, con il suo Riprova.
+    const errore = page.locator('.dash-bubble-filo', { hasText: 'Riprova' });
+    await expect(errore).toHaveCount(1);
+    const [yRisposta, yErrore] = await Promise.all([risposta.boundingBox(), errore.boundingBox()]).then((b) => b.map((x) => x.y));
+    expect(yRisposta).toBeLessThan(yErrore);
+    await expect.poll(async () => ((await ultimaChat(app)) || { messages: [] }).messages.length, { timeout: 5_000 }).toBe(2);
+    expect((await ultimaChat(app)).messages[1].text).toBe(RISPOSTA);
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('fermato mentre il modello scrive il giro dopo: la risposta col bottone resta, e resta anche nell\'archivio', async ({ app }) => {
   test.setTimeout(60_000);
   const { dir, file } = await bollettaTari(app);
