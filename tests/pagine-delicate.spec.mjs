@@ -390,7 +390,7 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
   await new Promise((r) => setTimeout(r, 1500));
   expect(await spiegazioni()).toEqual([]);
 
-  await seleziona(false);
+  expect(await seleziona(false)).toBe(IBAN);
   await expect.poll(async () => (await spiegazioni()).length, { timeout: 8_000 }).toBe(1);
 });
 
