@@ -1,10 +1,11 @@
 // scripts/domanda.mjs (#1149): JSON storto o fuori tetto rifiutato prima di chiamare, azioni di consenso e da fare
 // una per una mai applicate da una sessione, testi d'agente stampati coi caratteri di controllo visibili,
-// col biglietto delle routine `chiedi` passa dal canale. I/O finto: nessuna rete.
+// col biglietto delle routine `chiedi` passa dal canale, da una sessione porta il segreto del biglietto locale, e chi
+// stampa una domanda non fidata si sporca prima. I/O finto: nessuna rete.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { leggiArgomenti, leggiDomandaJson, soloDaFilo, messaggioErrore, formattaDomanda, formattaElenco, esegui } from '../../scripts/domanda.mjs';
+import { leggiArgomenti, leggiDomandaJson, soloDaFilo, messaggioErrore, formattaDomanda, formattaElenco, esegui, nonFidate, motivoNonFidate } from '../../scripts/domanda.mjs';
 
 const DOMANDA = {
   titolo: 'Archiviare il doppione?', priorita: 'importante', contesto: 'Due feedback uguali.',
@@ -21,6 +22,8 @@ function finto(risposte = {}) {
   const consegne = [];
   const out = [];
   const err = [];
+  const sporcate = [];
+  const ordine = [];
   const io = {
     chiama: async (data) => {
       chiamate.push(data);
@@ -30,12 +33,14 @@ function finto(risposte = {}) {
     },
     consegna: async (t, domanda) => { consegne.push({ t, domanda }); return risposte.consegna || { outcome: 'ok', id: 'D-7', num: 'D-7' }; },
     biglietto: async () => risposte.biglietto || '',
+    bigliettoLocale: async () => risposte.bigliettoLocale || '',
+    sporca: async (cosa, motivi) => { sporcate.push({ cosa, motivi }); ordine.push('sporca'); return 'Biglietto della sessione sporcato.'; },
     leggiFile: (p) => { if (!(p in (risposte.file || {}))) throw Object.assign(new Error('no'), { code: 'ENOENT' }); return risposte.file[p]; },
     stdin: async () => risposte.stdin || '',
-    scrivi: (s) => out.push(String(s)),
+    scrivi: (s) => { out.push(String(s)); ordine.push('scrivi'); },
     errore: (s) => err.push(String(s)),
   };
-  return { io, chiamate, consegne, out, err };
+  return { io, chiamate, consegne, out, err, sporcate, ordine };
 }
 
 test('argomenti: forme ammesse e rifiuti con l’uso', () => {
@@ -138,4 +143,60 @@ test('archivia e riapri passano al server; un elenco oltre il tetto lo dice', as
   assert.match(f.out.join('\n'), /D-4 è chiusa/);
   assert.equal(await esegui(['elenco'], f.io), 0);
   assert.match(f.out.join('\n'), /Ce ne sono altre oltre le prime 1/);
+});
+
+test('chiedi da una sessione porta il segreto del biglietto locale: la fiducia la decide il server da lì', async () => {
+  const conBiglietto = finto({ file: { 'd.json': JSON.stringify(DOMANDA) }, bigliettoLocale: 'segreto-della-sessione', chiedi: { ok: true, id: 'D-5', fiducia: 'fidato' } });
+  assert.equal(await esegui(['chiedi', 'd.json'], conBiglietto.io), 0);
+  assert.equal(conBiglietto.chiamate[0].biglietto, 'segreto-della-sessione');
+  assert.ok(!('fiducia' in conBiglietto.chiamate[0].domanda), 'la fiducia non si dichiara');
+  assert.match(conBiglietto.out.join('\n'), /D-5 aperta \(fidata\)/);
+
+  const senza = finto({ file: { 'd.json': JSON.stringify(DOMANDA) } });
+  assert.equal(await esegui(['chiedi', 'd.json'], senza.io), 0);
+  assert.ok(!('biglietto' in senza.chiamate[0]), 'senza biglietto locale il campo non parte');
+
+  const routine = finto({ file: { 'd.json': JSON.stringify(DOMANDA) }, biglietto: 'biglietto-routine', bigliettoLocale: 'segreto-della-sessione' });
+  assert.equal(await esegui(['chiedi', 'd.json'], routine.io), 0);
+  assert.equal(routine.chiamate.length, 0, 'col biglietto delle routine si passa dal canale, non da ownerDomande');
+});
+
+test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima; le fidate no', async () => {
+  const sporca = finto({ mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA, fiducia: 'non_fidato' } } });
+  assert.equal(await esegui(['mostra', 'D-3'], sporca.io), 0);
+  assert.equal(sporca.sporcate.length, 1);
+  assert.match(sporca.sporcate[0].cosa, /D-3/);
+  assert.deepEqual(sporca.ordine, ['sporca', 'scrivi'], 'si sporca prima di stampare');
+  assert.match(sporca.err.join('
+'), /sporcato/);
+
+  const senzaFiducia = finto({ mostra: { ok: true, domanda: { id: 'D-4', ...DOMANDA } } });
+  await esegui(['mostra', 'D-4'], senzaFiducia.io);
+  assert.equal(senzaFiducia.sporcate.length, 1, 'fiducia assente vale non fidata');
+
+  const pulita = finto({ mostra: { ok: true, domanda: { id: 'D-6', ...DOMANDA, fiducia: 'fidato' } } });
+  await esegui(['mostra', 'D-6'], pulita.io);
+  assert.equal(pulita.sporcate.length, 0);
+
+  const elenco = finto({ elenco: { ok: true, domande: [
+    { id: 'D-1', titolo: 'a', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' },
+    { id: 'D-2', titolo: 'b', priorita: 'importante', stato: 'aperta', fiducia: 'non_fidato' },
+    { id: 'D-7', titolo: 'c', priorita: 'importante', stato: 'aperta' },
+  ] } });
+  assert.equal(await esegui(['elenco'], elenco.io), 0);
+  assert.equal(elenco.sporcate.length, 1, 'una volta sola per tutto l’elenco');
+  assert.match(elenco.sporcate[0].motivi[0], /2 domande non fidate (D-2, D-7)/);
+  assert.deepEqual(elenco.ordine.slice(0, 2), ['sporca', 'scrivi']);
+
+  const tutteFidate = finto({ elenco: { ok: true, domande: [{ id: 'D-1', titolo: 'a', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' }] } });
+  await esegui(['elenco'], tutteFidate.io);
+  assert.equal(tutteFidate.sporcate.length, 0);
+});
+
+test('il motivo dello sporco: pochi id e mai oltre il tetto del server', () => {
+  assert.deepEqual(nonFidate([{ id: 'D-1', fiducia: 'fidato' }, { id: 'D-2', fiducia: 'boh' }, null]), ['D-2']);
+  const tanti = Array.from({ length: 400 }, (_, i) => `D-${i + 1}`);
+  const m = motivoNonFidate(tanti);
+  assert.match(m, /^testo di 400 domande non fidate (D-1, .*D-10, …)$/);
+  assert.ok(`elenco delle domande: ${m}`.length <= 300);
 });
