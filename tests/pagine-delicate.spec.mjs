@@ -374,7 +374,11 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
       tab.view.webContents.sendInputEvent({ type: 'mouseDown', x: p.x, y: p.y, button: 'left', clickCount });
       tab.view.webContents.sendInputEvent({ type: 'mouseUp', x: p.x, y: p.y, button: 'left', clickCount });
     }
-    const scelto = await tab.view.webContents.executeJavaScript('String(getSelection()).trim()');
+    let scelto = '';
+    for (const t1 = Date.now(); scelto !== IBAN && Date.now() - t1 < 5_000;) {
+      await new Promise((r) => setTimeout(r, 50));
+      scelto = await tab.view.webContents.executeJavaScript('String(getSelection()).trim()');
+    }
     if (scelto !== IBAN) throw new Error(`il doppio clic ha selezionato «${scelto}»`);
   }, { url, incognito, IBAN });
   const spiegazioni = async () => (await mandato(app)).filter((m) => m.testo.includes(IBAN));
