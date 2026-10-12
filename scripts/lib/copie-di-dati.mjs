@@ -72,9 +72,10 @@ export function copieNelRepo(root) {
   const trovate = [];
   for (const f of file) {
     if (f.startsWith(CARTELLA_FINTI)) continue;
-    let testo;
-    try { testo = readFileSync(join(root, f), 'utf8'); } catch (_) { continue; }
-    const motivo = motivoCopiaTesto(testo);
+    let byte;
+    try { byte = readFileSync(join(root, f)); } catch (_) { continue; }
+    if (!sembraJson(byte)) continue;
+    const motivo = motivoCopiaTesto(byte.toString('utf8'));
     if (motivo) trovate.push({ file: f, motivo });
   }
   return trovate;
