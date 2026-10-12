@@ -237,9 +237,10 @@ async function main() {
       ? `- Ultima versione: ${tag}, ${Number.isFinite(oreDallUltima) ? `${Math.round(oreDallUltima)} ore fa` : 'età sconosciuta'}; commit di codice dopo di lei: ${commitDopoTag}.`
       : '- Nessuna versione ancora pubblicata.',
   ];
+  if (scartata) riassunto.push(`- \`${scartata.head_sha}\` ha la suite Playwright verde ma non gli unit test su Windows: il cancello lo rifiuterebbe, non conta.`);
   if (erroreApi) riassunto.push(`- Le corse della suite non si sono lette: ${erroreApi}.`);
 
-  const oreDalVerde = verdeDopoTag ? oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato) : NaN;
+  const oreDalVerde = verdeDopoTag ? oreDalPrimoVerde(runs, primoGenitore, tagSha, eAntenato, Date.now(), valida) : NaN;
   const fermo = rilascioFermo({ oreDallUltima, commitDopoTag, verdeDopoTag, oreDalVerde });
   if (!fermo && tag && commitDopoTag > 0 && !verdeDopoTag && Number.isFinite(oreDallUltima)) {
     riassunto.push(`- Nessun commit verde dopo ${tag} da ${Math.round(oreDallUltima)} ore: sopra le ${SOGLIA_ORE} si apre un feedback.`);
