@@ -296,8 +296,17 @@ function segnalaPronto() {
 
 // Il cancello sta dove electron-updater legge la release e il suo provider: ogni strada (controllo, «Installa», da soli)
 // ci passa prima di decidere e scaricare. Un errore e non «aggiornato»: la release più recente non è nostra.
+// Un finto delle prove non passa dal motore di electron-updater e non scarica niente: il cancello serve solo al vero.
+// Se la libreria non esporta più la sua classe base, ogni aggiornatore conta come vero.
+function dalMotore(au) {
+  let AppUpdater;
+  try { ({ AppUpdater } = require('electron-updater')); } catch (_) { return false; }
+  return typeof AppUpdater !== 'function' || au instanceof AppUpdater;
+}
+
 function soloTagDiRilascio(au) {
   if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
+  if (!dalMotore(au)) return;
   // Un electron-updater che ha rinominato quel punto lascerebbe passare tutto: senza cancello niente aggiornamenti.
   if (typeof au.getUpdateInfoAndProvider !== 'function') {
     const fermo = async () => { throw new Error('aggiornamenti fermi: electron-updater non ha getUpdateInfoAndProvider'); };

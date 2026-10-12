@@ -47,8 +47,6 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lent
     chiudi() { for (const f of allaChiusura) f(0); },
     on(e, f) { (ascolta[e] ||= []).push(f); return u; },
     emit(e, ...a) { for (const f of ascolta[e] || []) f(...a); },
-    // Il punto a cui si aggancia il cancello dei tag (#1073): senza, il finto verrebbe fermato come un electron-updater rinominato.
-    async getUpdateInfoAndProvider() { return { info: null, provider: null }; },
     async checkForUpdates() {
       if (!versione) {
         u.emit('update-not-available', {});

@@ -21,7 +21,6 @@ async function aggiornatoreFinto(app) {
       autoDownload: true, autoInstallOnAppQuit: true, scaricamenti: 0,
       on(e, f) { (ascolta[e] ||= []).push(f); return u; },
       emit(e, ...a) { for (const f of ascolta[e] || []) f(...a); },
-      async getUpdateInfoAndProvider() { return { info: null, provider: null }; },
       async checkForUpdates() {
         u.emit('update-available', { version: '9.9.9' });
         return { downloadPromise: u.autoDownload ? u.downloadUpdate() : null };
