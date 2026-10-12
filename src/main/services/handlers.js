@@ -4707,11 +4707,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         const obs = observationsForPrompt(roundRendered);
         if (!obs || roundRendered.some((x) => x._confirm)) { exhausted = false; break; }
         threadMessages.push({ role: 'assistant', content: r.text });
-        threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}` });
+        threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}${fraLeNote ? `\n\n${RISPOSTA_FRA_LE_NOTE}` : ''}` });
         continue;
       }
       threadMessages.push(Tools.assistantMessage({ text, toolCalls, reasoningDetails: r.reasoningDetails }));
-      for (const x of results) threadMessages.push(Tools.toolMessage(x.action._callId, toolResultText(x, { risposta: diRisposta, testo: !!text.trim() })));
+      results.forEach((x, i) => {
+        const esito = toolResultText(x, { risposta: diRisposta });
+        threadMessages.push(Tools.toolMessage(x.action._callId, fraLeNote && i === results.length - 1 ? `${esito} ${RISPOSTA_FRA_LE_NOTE}` : esito));
+      });
     }
   } catch (e) {
     // Il turno è fallito (rete, provider, crediti): la prenotazione della
