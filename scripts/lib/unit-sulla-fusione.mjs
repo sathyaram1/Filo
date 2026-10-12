@@ -452,12 +452,13 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
 /**
  * Prova, chiede, e rifà la prova se il server risponde che main si è mosso, fino a `tentativi` volte.
  * `fermaSe(prova)` true = non si chiede niente (il finish locale si ferma da sé su un rosso o su una prova mancata).
+ * `primaProva`: una prova già fatta su questa punta vale per il primo tentativo; se main si è mosso lo dice il server.
  * @returns {Promise<{ prova, reply?, fermo?, tentativi, esaurito? }>}
  */
-export async function chiediConProva({ root, punta, chiedi, mainMosso, fermaSe = () => false, tentativi = TENTATIVI, prova = provaUnitSullaFusione, scrivi = (s) => console.log(s) } = {}) {
+export async function chiediConProva({ root, punta, chiedi, mainMosso, fermaSe = () => false, tentativi = TENTATIVI, prova = provaUnitSullaFusione, scrivi = (s) => console.log(s), primaProva = null } = {}) {
   let ultima = null;
   for (let i = 1; i <= tentativi; i++) {
-    ultima = prova({ root, punta, scrivi });
+    ultima = i === 1 && primaProva ? primaProva : prova({ root, punta, scrivi });
     scrivi(testoProva(ultima));
     if (fermaSe(ultima)) return { prova: ultima, fermo: true, tentativi: i };
     const reply = await chiedi(campoPerIlServer(ultima));
