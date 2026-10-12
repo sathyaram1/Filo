@@ -89,6 +89,7 @@ jobs:
     # codice e' quello di un tag, gia' provato.
     if: ${{ !inputs.ripubblica_mac && !inputs.ripubblica_linux }}
     runs-on: ubuntu-latest
+    environment: rilascio
     permissions:
       contents: read
       actions: read
