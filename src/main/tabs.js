@@ -2958,6 +2958,17 @@ class TabManager {
       try { win.setTitle(titoloFinestrella(pwc.getURL(), o)); } catch (_) {}
     };
     win.on('page-title-updated', (e) => e.preventDefault());
+    pwc._filoFinestrella = true;
+    const rientra = (b) => {
+      if (win.isDestroyed()) return;
+      try {
+        const d = dentroLoSchermo(b);
+        if (d.x !== b.x || d.y !== b.y || d.width !== b.width || d.height !== b.height || b !== win.getBounds()) win.setBounds(d);
+      } catch (_) {}
+    };
+    rientra(win.getBounds());
+    // window.moveTo/resizeTo della pagina: lo spostamento dell'utente, col mouse, resta libero.
+    pwc.on('content-bounds-updated', (e, b) => { e.preventDefault(); rientra(b); });
     pwc.on('did-navigate', mostraSito);
     pwc.on('did-navigate-in-page', mostraSito);
     installZoom(pwc);
