@@ -113,7 +113,7 @@ import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticke
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
-import { copieInScena, spedibileSenzaCopie, escludiInLocale } from './lib/copie-di-dati.mjs';
+import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -620,6 +620,7 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     copie = spedibileSenzaCopie(root, routine ? { nome: 'claude-routine', email: 'claude@routine' } : {});
   } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
   if (copie.stato === 'fermo') return { ok: false, skipped: false, branch: ramo, reason: copie.avviso };
+  try { installaControlloSpedizione(root); } catch (_) { /* il controllo qui sopra c'è già stato */ }
   const avviso = copie.avviso ? { avviso: copie.avviso } : {};
   const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
   if (push.ok) return { ok: true, skipped: false, branch: ramo, ...avviso };

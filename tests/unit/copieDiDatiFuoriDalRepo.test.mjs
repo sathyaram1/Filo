@@ -199,4 +199,48 @@ describe('copie di dati del server fuori dal repo', () => {
     assert.match(p.reason, /export\.txt[\s\S]*git reset --soft/);
     assert.ok(!spediti(s.origin).includes('export.txt'));
   });
+
+  test('una copia salvata a metà (le prime righe di una risposta lunga) è ancora una copia', () => {
+    const documenti = { documents: Array.from({ length: 30 }, (_, i) => ({ ...RISPOSTA_FIRESTORE.documents[0], name: `${DOC}${i}` })) };
+    const firestore = JSON.stringify(documenti, null, 2);
+    assert.notEqual(motivoCopiaTesto(firestore.split('\n').slice(0, 120).join('\n')), '', 'risposta di Firestore interrotta');
+    const chiaro = JSON.stringify(Array.from({ length: 30 }, () => FEEDBACK_IN_CHIARO[0]), null, 2);
+    assert.notEqual(motivoCopiaTesto(chiaro.slice(0, chiaro.length / 2)), '', 'elenco di feedback in chiaro interrotto');
+    assert.equal(motivoCopiaTesto('{"a": {"b": "}"}, "c": {"text": "x"'), '', 'graffe dentro le stringhe e oggetti innocui non bastano');
+  });
+
+  // Una regola sola per ogni strada che spedisce, anche quelle che nessuno ha pensato: il pre-push di git (#1108 giro 3).
+  test('col controllo di git installato una copia non parte nemmeno con un git push a mano; il codice sì', () => {
+    const s = ramoConStrumenti();
+    assert.equal(installaControlloSpedizione(s.work), 'installato');
+    assert.equal(installaControlloSpedizione(s.work), 'presente');
+    writeFileSync(join(s.work, 'scripts', 'feedback.json'), JSON.stringify(RISPOSTA_FIRESTORE, null, 2));
+    commitAMano(s.work, 'copia');
+    assert.throws(() => gitScena(s.work, ['push', '-q', 'origin', 'claude/prova']), /copia dei dati del server/);
+    assert.ok(!spediti(s.origin).includes('scripts/feedback.json'));
+    gitScena(s.work, ['reset', '-q', '--hard', 'HEAD~1']);
+    writeFileSync(join(s.work, 'note.txt'), 'lavoro\n');
+    commitAMano(s.work, 'lavoro');
+    gitScena(s.work, ['push', '-q', 'origin', 'claude/prova']);
+    assert.ok(spediti(s.origin).includes('note.txt'));
+  });
+
+  test('chi riparte su un ramo non spedisce la copia lasciata nei commit locali da una sessione morta', async () => {
+    const { prepareBranch } = await import('../../scripts/lib/branch-integrity.mjs');
+    const s = ramoConStrumenti();
+    gitScena(s.work, ['fetch', '-q', 'origin']);
+    writeFileSync(join(s.work, 'export.json'), JSON.stringify(FEEDBACK_IN_CHIARO));
+    commitAMano(s.work, 'copia, poi la sessione muore');
+    assert.ok(prepareBranch({ root: s.work, branch: 'claude/prova', checkpoint: null }).ok);
+    const ovunque = gitScena(s.origin, ['log', '--all', '--format=', '--name-only']);
+    assert.doesNotMatch(ovunque, /export\.json/, 'nemmeno nel ramo di scarto');
+  });
+
+  test('un pre-push che non è nostro non si tocca', () => {
+    const s = ramoConStrumenti();
+    const dove = join(s.work, '.git', 'hooks', 'pre-push');
+    writeFileSync(dove, '#!/bin/sh\nexit 0\n');
+    assert.equal(installaControlloSpedizione(s.work), 'altrui');
+    assert.equal(readFileSync(dove, 'utf8'), '#!/bin/sh\nexit 0\n');
+  });
 });

@@ -5,6 +5,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Dati finti per le prove: l'unico posto del repo dove una copia è ammessa.
 export const CARTELLA_FINTI = 'tests/fixtures/';
@@ -254,11 +255,14 @@ export function copieNelPush(root, righe) {
 
 // Il segno che riconosce il pre-push di Filo: uno con un altro contenuto è di qualcun altro e non si tocca.
 export const SEGNO_PRE_PUSH = 'filo-copie-di-dati';
+// Di riserva, se la cartella che spedisce non ha il controllo (un ramo vecchio): quello di chi ha installato.
+const RISERVA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'copie-in-scena.mjs').replace(/\\/g, '/');
 const PRE_PUSH = `#!/bin/sh
 # ${SEGNO_PRE_PUSH}: una copia dei dati del server non parte per nessuna strada, nemmeno un git push a mano (#1108).
 # Lo scrive scripts/lib/copie-di-dati.mjs; il controllo è quello della cartella che spedisce.
 radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 controllo="$radice/scripts/copie-in-scena.mjs"
+[ -f "$controllo" ] || controllo='${RISERVA.replace(/'/g, "'\\''")}'
 [ -f "$controllo" ] && command -v node >/dev/null 2>&1 || exit 0
 righe=$(cat)
 # node costa a ogni push: si chiama solo se i commit da spedire portano qualcosa che non e' codice o immagine.
