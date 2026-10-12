@@ -2584,6 +2584,8 @@
         // Tolti in Sicurezza fra i siti che Filo ha segnato per un campo password o carta: valgono solo per quel motivo.
         nonDelicati: [],
       },
+      // Segnalazione automatica e anonima dei problemi a chi sviluppa Filo (F4, src/shared/autoFeedback.js): attiva di serie.
+      autoFeedback: true,
     },
     // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
     // disco?», e nella home un `/comando` va alla shell. Accesa di serie (#892):
