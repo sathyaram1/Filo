@@ -167,6 +167,41 @@ test('accesso Google: un auth.bin che non si decifra si mette da parte, non si c
   assert.equal(messiDaParte('auth.bin', 'illeggibile-').length, 1);
 });
 
+test('accesso Google: tornato il portachiavi di sempre, la sessione messa da parte riparte da sola', () => {
+  accedi();
+  google.signOut();
+  writeFileSync(file('auth.bin'), electronFinto.safeStorage.encryptString(JSON.stringify({ refreshToken: 'rt-vecchio', email: 'chi@prova.test' })));
+  portachiavi.chiave = 'B';
+  google.restore();
+  assert.equal(google.isSignedIn(), false, 'col portachiavi sbagliato si è fuori');
+  portachiavi.chiave = 'A';
+  google.restore();
+  assert.equal(google.isSignedIn(), true);
+  assert.equal(store.load()?.refreshToken, 'rt-vecchio');
+  assert.equal(messiDaParte('auth.bin', 'illeggibile-').length, 0, 'il file è tornato al suo posto');
+});
+
+test('accesso Google: un portachiavi che va e viene, con un accesso rifatto in mezzo, non nasconde la sessione buona', () => {
+  writeFileSync(file('auth.bin'), electronFinto.safeStorage.encryptString(JSON.stringify({ refreshToken: 'rt-buono' })));
+  portachiavi.chiave = 'B';
+  assert.equal(store.load(), null);
+  store.save({ refreshToken: 'rt-col-portachiavi-sbagliato' });
+  portachiavi.chiave = 'A';
+  assert.equal(store.load()?.refreshToken, 'rt-buono', 'la copia più recente non si legge, quella prima sì');
+  assert.ok(existsSync(file('auth.bin')));
+});
+
+test('accesso Google: chi esce apposta non rientra quando torna il portachiavi', () => {
+  writeFileSync(file('auth.bin'), electronFinto.safeStorage.encryptString(JSON.stringify({ refreshToken: 'rt-vecchio' })));
+  portachiavi.chiave = 'B';
+  google.restore();
+  google.signOut();
+  portachiavi.chiave = 'A';
+  google.restore();
+  assert.equal(google.isSignedIn(), false);
+  assert.equal(messiDaParte('auth.bin', 'illeggibile-').length, 0);
+});
+
 // ─── Identità dell'installazione ──────────────────────────────────────────────
 
 function identitaSuDisco(refreshToken = 'rt-1') {
