@@ -229,6 +229,8 @@ test('popup di accesso: la domanda compare sopra la finestra del popup e la risp
   const sito = await testServer.openReady(openTab, '<h1>sito con «Accedi con…»</h1>');
   const segno = 'client_id=v5926';
   const login = `${testServer.html('<h1>accedi</h1>')}?${segno}&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
+  // Dal blocco dei popup di main (#737.1) la finestrella nasce solo da un clic vero.
+  await sito.mouse.click(5, 5);
   await sito.evaluate((u) => { window.open(u, '_blank', 'width=480,height=600'); }, login);
   await expect.poll(() => app.evaluate(async ({ BrowserWindow }, segno) => {
     const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes(segno));
