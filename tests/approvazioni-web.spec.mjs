@@ -300,7 +300,7 @@ test('su uno schermo da telefono si legge e si approva senza scorrere di lato', 
   const finto = serverFinto({ pending: [richiesta('r1', 'claude/un-ramo-dal-nome-molto-lungo-che-non-deve-allargare-la-pagina')] });
   const { app, page, chiudi } = await apri(`${sito.origin}/`, finto);
   try {
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setContentSize(390, 760));
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(390, 760));
     await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeLessThan(420);
     await page.locator('.ap-accedi').click();
     const card = page.locator('.sn-mac-card[data-request-id="r1"]');
