@@ -75,7 +75,15 @@
     for (const m of thread) {
       const role = m.role === 'filo' ? 'filo' : 'user';
       pushHistory({ role, text: m.text });
-      bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
+      const bolla = makeBubble({ role, text: m.text, markdown: role === 'filo' });
+      bubblesEl.appendChild(bolla);
+      const scelta = role === 'filo' && m.autonomia ? sceltaAutonomia() : null;
+      if (scelta) {
+        const wrap = document.createElement('div');
+        wrap.className = 'dash-bubble-actions';
+        wrap.appendChild(scelta);
+        bolla.appendChild(wrap);
+      }
     }
     const ultimo = thread[thread.length - 1];
     if (state.fermato && ultimo && ultimo.role !== 'filo' && segnaFermato) segnaFermato();
