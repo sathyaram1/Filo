@@ -941,7 +941,7 @@
         }
       } else {
         // Il testo uguale all'ultima nota (formato vecchio) non resta anche nel blocco.
-        if (r.text) pending.dropNote(r.text);
+        if (r.text && !r.notaRisposta) pending.dropNote(r.text);
         filoBubble = makeBubble({ role: 'filo', text: r.text || '', markdown: true });
         bubblesEl.appendChild(filoBubble);
       }
