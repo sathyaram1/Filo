@@ -1176,6 +1176,28 @@
   // ============================================================================
   // Applicazione correzioni
   // ============================================================================
+  // Come una battuta, dall'editing del browser: il correttore nativo sposta i segni delle altre parole invece di
+  // perderli (riscrivere il valore cancella tutto lo zigzag rosso del campo, #1111), e Ctrl+Z annulla la correzione.
+  // Falso se il campo è rimasto com'era: allora lo si riscrive.
+  function sostituisciComeBattuta(el, range, testo, cursorMode) {
+    const prima = el.value;
+    const caret = el.selectionEnd;
+    try {
+      const radice = el.getRootNode();
+      if (radice.activeElement !== el) el.focus({ preventScroll: true });
+      if (radice.activeElement !== el) return false;
+      el.setSelectionRange(range.start, range.end);
+      if (testo) document.execCommand('insertText', false, testo);
+      else document.execCommand('delete', false);
+    } catch (_) {}
+    if (el.value === prima) return false;
+    if (cursorMode === 'preserve' && typeof caret === 'number') {
+      const dove = caret >= range.end ? caret + testo.length - (range.end - range.start) : caret;
+      try { el.setSelectionRange(dove, dove); } catch (_) {}
+    }
+    return true;
+  }
+
   function applyFix(el, range, replacement, opts = {}) {
     const safeReplacement = String(replacement == null ? '' : replacement);
     // 'end' = caret a fine inserzione (popup correttore manuale).
