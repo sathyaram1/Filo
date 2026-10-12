@@ -711,7 +711,7 @@ export function mittenteConsegna(e) {
  * di un biglietto morto, già contato lì) fino a adesso, cioè fino al rilascio
  * del worker che sta lavorando. Un worker lanciato in sottofondo (il default di
  * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
- * col suo tool-use-id, non quel risultato. PURA.
+ * che lo nomina, o la sua consegna, non quel risultato. PURA.
  */
 export function finestraOrchestratore(linee) {
   const voci = [];
