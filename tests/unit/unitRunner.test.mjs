@@ -35,6 +35,7 @@ import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-loc
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { concorrenzaUnit } from '../../scripts/lib/dati-worker.mjs';
+import { slugProgetto } from '../../scripts/session-report.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
