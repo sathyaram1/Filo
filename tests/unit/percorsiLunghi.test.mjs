@@ -185,8 +185,9 @@ test('#1173 un campo che la pulizia accorcia molto tiene la coda: quale pulsante
   assert.equal(I.redactSelector(' '.repeat(3000) + 'button.Paga'), 'button.Paga');
   assert.equal(I.sanitizeIntent('"'.repeat(3000) + 'aprire le fatture'), 'aprire le fatture');
   assert.equal(I.sanitizeInitialUrl('​'.repeat(6000) + '/area/ordini', 'esempio.it'), '/area/ordini');
-  const c = costoInUnita(() => I.redactSelector(`[data-id="${'1'.repeat(600_000)}"] button.Paga`), { tetto: 30, giri: 3 });
-  assert.ok(c.entro, `un campo che si accorcia tutto costa quanto la sua lunghezza: ${c.come}`);
+  // Il pezzo cresce, ma non fino al mega: un documento ostile fatto di sole cifre costa come uno di lettere.
+  const c = costoInUnita(() => I.redactSelector(`[data-id="${'1'.repeat(600_000)}"] button.Paga`), { tetto: 3, giri: 3 });
+  assert.ok(c.entro, `un campo che si accorcia tutto: ${c.come}`);
 });
 
 test('#1173 quello che sta nel tetto resta quello di prima: il taglio anticipato non toglie niente', () => {
