@@ -974,9 +974,11 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   };
 
   // Selezionata col mouse, come fa l'utente: la spiegazione anticipata parte solo dietro un gesto vero (#1070), ed è
-  // lei la risposta pagata che nessuno legge. Il riquadro chiuso prima della sua risposta ferma la sua chiamata.
+  // lei la risposta pagata che nessuno legge; il riquadro chiuso prima della sua risposta ferma la sua chiamata.
   let prima = seen.completions.length;
   await selezionaColMouse(page, '#t');
+  await expect.poll(() => seen.completions.slice(prima).some((c) => c.lastText.includes('ha selezionato un testo')),
+    { timeout: 10_000 }).toBe(true);
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
