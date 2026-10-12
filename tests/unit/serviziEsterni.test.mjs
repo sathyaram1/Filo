@@ -244,13 +244,18 @@ function analizza(sorgenti) {
     const l = leggi(file, testo);
     testi.set(file, l);
     const righe = testo.split('\n');
-    for (const u of indirizziDi(l.frammenti, righe)) indirizzi.push({ file, ...u });
+    const visti = new Set();
+    const aggiungi = (u) => {
+      const chiave = `${u.riga} ${u.url}`;
+      if (!visti.has(chiave)) { visti.add(chiave); indirizzi.push({ file, ...u }); }
+    };
+    for (const u of indirizziDi(l.frammenti, righe)) aggiungi(u);
     if (CHIAMATA_RE.test(l.codice) || MODULO_RETE_RE.test(l.senzaCommenti)) {
       chiamate.add(file);
-      if (/\.[cm]?js$/.test(file)) for (const u of hostNelleOpzioni(file, testo, righe)) indirizzi.push({ file, ...u });
+      if (/\.[cm]?js$/.test(file) && !CHIAMATE_LOCALI[file]) for (const u of destinazioniNelCodice(file, testo, righe)) aggiungi(u);
     }
   }
-  return { indirizzi, chiamate, testi };
+  return { indirizzi, chiamate, testi, sorgenti };
 }
 
 const nonDiRete = (host) => NON_DI_RETE.some((r) => r.host.test(host.replace(/:\d*$/, '')));
