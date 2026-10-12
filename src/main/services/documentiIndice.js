@@ -412,7 +412,7 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     if (!esiste) cartellaMancante = String(cartella);
     else {
       sotto = [p];
-      if (!daPercorrere(rs).some((r) => dentro(p, r))) extra = [p];
+      if (daPercorrere(rs).every((r) => esclusa(p, r))) extra = [p];
     }
   }
   let fermata = false;
