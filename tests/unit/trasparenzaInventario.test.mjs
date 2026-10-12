@@ -1,14 +1,16 @@
-// L'inventario di dove vanno i dati: ogni file nella cartella dei dati e ogni collezione del database del server (anche
-// quelle in cui scrive solo il server) ha la sua frase nel documento sulla privacy (#951); gli indirizzi esterni li tiene
-// serviziEsterni.test.mjs. Una voce nuova fa rosso finché non entra qui CON la frase; «perche» solo per ciò che non porta dati tuoi.
+// L'inventario di dove vanno i dati: ogni file della cartella dei dati, ogni collezione del server e ogni voce dell'elenco
+// dei servizi esterni (che serviziEsterni.test.mjs confronta col codice) ha la sua frase nel documento sulla privacy (#951).
+// Una voce nuova fa rosso finché non entra qui CON la frase; «perche» solo per ciò che non porta dati tuoi.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join, relative } from 'node:path';
+import { createRequire } from 'node:module';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const require = createRequire(import.meta.url);
 const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
 const privacy = leggi('transparency', 'privacy.md').replace(/\s+/g, ' ');
 
@@ -139,4 +141,15 @@ test('ogni collezione del database del server è nel documento sulla privacy, co
   }
   confronta(collezioni, COLLEZIONI, 'collezione del server');
   confronta(campi, CAMPI_PUBBLICI_SCRITTI, 'campo pubblico scritto dall\'app');
+});
+
+// Gli host non hanno una tabella qui: l'elenco dei servizi esterni è l'unico, e ogni voce dice la sua frase.
+test('ogni servizio esterno con un indirizzo fisso ha la sua frase nel documento sulla privacy', () => {
+  require(join(ROOT, 'src', 'shared', 'serviziEsterni.js'));
+  const SE = globalThis.SN_SERVIZI_ESTERNI;
+  for (const v of [...SE.SERVIZI, ...SE.LINK_APERTI]) {
+    const frasi = [].concat(v.frase || []);
+    if (SE.SERVIZI.includes(v) && v.base.length) assert.ok(frasi.length, `${v.id}: manca «frase», il punto del documento sulla privacy che ne parla`);
+    for (const f of frasi) assert.ok(privacy.includes(f), `${v.id}: il documento sulla privacy non dice più «${f}»`);
+  }
 });

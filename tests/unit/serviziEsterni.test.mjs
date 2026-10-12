@@ -330,16 +330,6 @@ test('le voci sono complete e ben formate', () => {
   for (const v of VOCI.filter((x) => x.nellaLibreria)) assert.ok(proveDi(v).length, `${v.id}: un indirizzo scritto nella libreria vuole la «prova» del suo uso`);
 });
 
-// L'unico elenco degli host: il documento sulla privacy si confronta con queste voci, non con una tabella sua.
-test('ogni servizio con un indirizzo fisso ha la sua frase nel documento sulla privacy', () => {
-  const privacy = readFileSync(join(ROOT, 'transparency', 'privacy.md'), 'utf8').replace(/\s+/g, ' ');
-  for (const v of VOCI) {
-    const frasi = [].concat(v.frase || []);
-    if (SE.SERVIZI.includes(v) && v.base.length) assert.ok(frasi.length, `${v.id}: manca «frase», il punto del documento sulla privacy che ne parla`);
-    for (const f of frasi) assert.ok(privacy.includes(f), `${v.id}: il documento sulla privacy non dice più «${f}»`);
-  }
-});
-
 test('l’elenco nomina ogni servizio della richiesta #849', () => {
   const copre = (url) => SE.SERVIZI.some((v) => v.base.some((b) => SE.copre(b, url)));
   for (const url of [
