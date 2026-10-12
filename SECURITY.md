@@ -32,9 +32,18 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
   modelli. Non vengono mai mandate alle pagine web che visiti (§2, §3).
 - **Memorie, appunti e cronologia sono salvati solo sul tuo dispositivo**, e
   i server di Filo non li ricevono. Ai modelli invece arrivano: quando Filo
-  usa un modello gli manda quello che serve per rispondere, cioè le memorie,
-  gli appunti, il testo delle pagine. Quei messaggi vanno a OpenRouter e al
+  usa un modello gli manda quello che serve per rispondere, per esempio le
+  conversazioni, le memorie, gli appunti, il testo delle pagine e dei
+  documenti che legge, quello che stampa il terminale, lo screenshot della
+  pagina su cui ti guida l'Aiuto. Quei messaggi vanno a OpenRouter e al
   fornitore che serve il modello (§4).
+- **Alcuni servizi esterni ricevono pezzi della tua navigazione**: Google Safe
+  Browsing un frammento dell'impronta degli indirizzi che apri, non gli
+  indirizzi; il motore di ricerca dell'agente le ricerche che formula; i
+  registri dei domini il nome dei siti che sembrano sospetti; il servizio di
+  icone di Google il nome dei siti che la home ti suggerisce. L'elenco intero
+  sta nel documento sulla privacy (`transparency/privacy.md`, «Gli altri
+  servizi»).
 - **Il server di Filo riceve** i feedback che mandi, l'identità anonima
   dell'installazione, il portafoglio dei crediti con una riga per ogni
   chiamata ai modelli (funzione, modello, token e costo, senza il testo), i
