@@ -793,7 +793,7 @@ async function rapportoOrchestratore(principale) {
   const r = await analizzaRighe(righe, { role: 'orchestrator', continua });
   return {
     costUsd: r.costUsd, turns: r.turns, coldTurns: r.coldTurns, rewarmTurns: r.rewarmTurns, rewarmTokens: r.rewarmTokens,
-    maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, startedAt: r.startedAt, endedAt: r.endedAt,
+    maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, oltreSoglia: r.oltreSoglia, startedAt: r.startedAt, endedAt: r.endedAt,
   };
 }
 
