@@ -613,11 +613,16 @@ export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
   if (isProtectedBranch(ramo, principale)) return { ok: true, skipped: true, branch: ramo, reason: `'${ramo}' è un ramo protetto: non si spedisce da qui` };
   // La destinazione si dichiara sulla riga stessa (sorgente:destinazione),
   // come nell'hook: una sentinella negli unit test la cerca lì.
-  let copie = [];
-  try { copie = copieDaSpedire(root); } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
-  if (copie.length) return { ok: false, skipped: false, branch: ramo, reason: avvisoSpedizione(copie) };
+  // Come l'hook: una copia dei dati del server nei commit da spedire si toglie dalla loro storia, o il ramo non parte (#1108).
+  let copie = { stato: 'pulito', avviso: '' };
+  const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
+  try {
+    copie = spedibileSenzaCopie(root, routine ? { nome: 'claude-routine', email: 'claude@routine' } : {});
+  } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
+  if (copie.stato === 'fermo') return { ok: false, skipped: false, branch: ramo, reason: copie.avviso };
+  const avviso = copie.avviso ? { avviso: copie.avviso } : {};
   const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
-  if (push.ok) return { ok: true, skipped: false, branch: ramo };
+  if (push.ok) return { ok: true, skipped: false, branch: ramo, ...avviso };
   // «! [remote rejected]» è il SERVER che dice di no (un pre-receive, una
   // regola del repo, il push protection): non è storia divergente, un rebase
   // non lo cura e il lease non si tenta (verifica del giro 4, stessa regola
