@@ -600,6 +600,12 @@ async function ricercaLenta(app, ms) {
   }, ms);
 }
 
+// «In volo» si aspetta, non si presume: il titolo «Cerco sul web» compare quando il modello chiama lo strumento, prima
+// che la sua risposta finisca; un fermo in quel momento ferma il modello e la ricerca non parte affatto.
+async function ricercaPartita(app) {
+  await expect.poll(() => app.evaluate(() => globalThis.__ricerche), { timeout: 5_000 }).toBe(1);
+}
+
 test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il seguito parte sapendo cosa è stato fatto', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
