@@ -59,8 +59,13 @@ function startLoopback(expectedState) {
 
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, 'http://127.0.0.1');
+      // Lo state prima di tutto: una richiesta che non lo porta (un altro programma locale, il favicon) non chiude
+      // né fa fallire l'accesso, che resta in ascolto del ritorno vero.
+      if (!stessoState(url.searchParams.get('state'), expectedState)) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Richiesta non riconosciuta.');
+      }
       const code = url.searchParams.get('code');
-      const state = url.searchParams.get('state');
       const error = url.searchParams.get('error');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">'
