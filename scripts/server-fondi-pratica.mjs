@@ -39,7 +39,9 @@ export function leggiArgomenti(argv, env = {}) {
   if (sconosciute.length) return { errore: `argomenti non capiti (${sconosciute.join(' ')})` };
   if (altri.length > 1) return { errore: `un ramo solo, non ${altri.length} (${altri.join(' ')})` };
   const ramo = ramoCanonico(altri[0]);
-  if (ramo && (!RAMO_RE.test(ramo) || /\.\.|\.lock$|\.$|\/\./.test(ramo))) return { errore: `porto su main solo rami claude/<nome>: «${altri[0]}» no` };
+  if (ramo && (!(RAMO_RE.test(ramo) || RAMO_ROUTINE_RE.test(ramo)) || /\.\.|\.lock$|\.$|\/\./.test(ramo))) {
+    return { errore: `porto su main solo rami claude/<nome>, o worker/<nome> delle routine: «${altri[0]}» no` };
+  }
   return { ramo, pratica: f.valore, dryRun, soloServer, nota: daNpm.nota };
 }
 
