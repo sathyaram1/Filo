@@ -59,7 +59,62 @@ test('una release sotto un tag senza v non si annuncia né si scarica, quella gi
 test('collegato due volte, il cancello non si impila', async () => {
   const { au } = aggiornatore({ version: '0.2.234', tag: 'v0.2.234', files: [] });
   await U.avviaAggiornatore(au, { automatici: false });
-  const primo = au.isUpdateAvailable;
+  const primo = au.getUpdateInfoAndProvider;
   await U.avviaAggiornatore(au, { automatici: false });
-  assert.equal(au.isUpdateAvailable, primo);
+  assert.equal(au.getUpdateInfoAndProvider, primo);
+});
+
+// Il cammino vero col provider GitHub di electron-updater: feed, «/latest» e latest.yml finti, il resto suo.
+const { GitHubProvider } = require('electron-updater/out/providers/GitHubProvider');
+
+function conGitHub({ tagVero, yml }) {
+  const feed = `<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"><entry><id>1</id>` +
+    `<link rel="alternate" type="text/html" href="https://github.com/sathyaram1/Filo/releases/tag/${tagVero}"/>` +
+    `<title>${tagVero}</title><content>n</content><updated>2026-10-12T00:00:00Z</updated></entry></feed>`;
+  const { au, visti } = aggiornatore(null);
+  au.allowPrerelease = false;
+  const gh = new GitHubProvider({ provider: 'github', owner: 'sathyaram1', repo: 'Filo' }, au, {
+    isUseMultipleRangeRequest: true, platform: 'win32', executor: { request: async () => yml },
+  });
+  gh.httpRequest = async (url) => (String(url).endsWith('.atom') ? feed : JSON.stringify({ tag_name: tagVero }));
+  au.getUpdateInfoAndProvider = async () => ({ info: await gh.getLatestVersion(), provider: gh });
+  return { au, visti };
+}
+
+const yml = (righe, file) => `version: 99.0.0\n${righe}files:\n  - url: ${file}\n    sha512: AAAA\n    size: 1\npath: ${file}\nsha512: AAAA\n`;
+
+test('il tag e i percorsi scritti nel latest.yml di una release non nostra non la fanno passare', async () => {
+  const casi = [
+    ['x1', yml('tag: v99.0.0\n', '../x1/Filo-Setup.exe'), 'tag dichiarato nel file e file preso da x1'],
+    ['x1', yml('tag: ~\n', '../x1/Filo-Setup.exe'), 'tag tolto dal file'],
+    ['x1', yml('tag: v99.0.0\n', '../../../../altro/repo/releases/download/v99.0.0/Filo-Setup.exe'), 'file preso da un altro repo'],
+    ['x1', yml('tag: v99.0.0\n', '..%2Fx1%2FFilo-Setup.exe'), 'barre codificate'],
+    ['x1', yml('tag: v99.0.0\n', 'https://esempio.test/Filo-Setup.exe'), 'indirizzo intero'],
+  ];
+  for (const [tagVero, testo, cosa] of casi) {
+    const { au, visti } = conGitHub({ tagVero, yml: testo });
+    await U.avviaAggiornatore(au, { automatici: false });
+    await assert.rejects(au.doCheckForUpdates(), /rifiutata/, `passa: ${cosa}`);
+    assert.deepEqual(visti, [], `annunciata: ${cosa}`);
+  }
+
+  const { au, visti } = conGitHub({ tagVero: 'v99.0.0', yml: yml('', 'Filo Setup 99.0.0.exe') });
+  await U.avviaAggiornatore(au, { automatici: false });
+  const r = await au.doCheckForUpdates();
+  assert.equal(r.isUpdateAvailable, true, 'la release vera sotto v<versione> deve passare');
+  assert.deepEqual(visti, ['update-available']);
+});
+
+test('fileDiRilascio: solo https, il nostro repo, la cartella v<versione>, un nome semplice', () => {
+  const base = { versione: '1.2.3', owner: 'o', repo: 'r' };
+  const ok = (u) => R.fileDiRilascio({ ...base, urls: [u] });
+  assert.equal(ok('https://github.com/o/r/releases/download/v1.2.3/Filo-Setup.exe'), true);
+  assert.equal(ok('http://github.com/o/r/releases/download/v1.2.3/Filo-Setup.exe'), false);
+  assert.equal(ok('https://github.com/o/r/releases/download/v1.2.4/Filo-Setup.exe'), false);
+  assert.equal(ok('https://github.com/o/r/releases/download/x1/Filo-Setup.exe'), false);
+  assert.equal(ok('https://github.com/o/r/releases/download/v1.2.3/a%2Fb.exe'), false);
+  assert.equal(ok('https://github.com/o/r/releases/download/v1.2.3/'), false);
+  assert.equal(ok('https://evil.test/o/r/releases/download/v1.2.3/Filo-Setup.exe'), false);
+  assert.equal(R.fileDiRilascio({ ...base, urls: [] }), false);
+  assert.equal(R.fileDiRilascio({ ...base, owner: '', urls: ['https://github.com//r/releases/download/v1.2.3/a'] }), false);
 });
