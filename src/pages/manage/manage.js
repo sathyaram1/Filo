@@ -3448,13 +3448,17 @@
     // pratica) la forma che l'owner stava leggendo resta aperta e si riempie
     // di nuovo, come già fa quando cambia l'elenco delle fusioni; a chiuderlo
     // era ogni ridisegno, e con una segnalazione lunga si perdeva il punto.
-    // Cambiando pratica si chiude, come sempre.
+    // Cambiando pratica si chiude, come sempre. Su una pratica che aspetta la
+    // risposta dell'owner si apre invece il rombo verde: lì si risponde (#1061).
+    const domandeGiaDisegnate = ridisegno && attesaDisegnata === fb._id;
+    attesaDisegnata = rispostaOfferta(fb) ? fb._id : null;
     if (ridisegno && livelloAperto) {
       quandoPannelloLibero(() => {
         if (selectedId !== fb._id || !livelloAperto) return;
         riapriPannelloLivello(allFeedbacks.find((f) => f._id === fb._id) || fb);
       });
-    } else closeSidebar();
+    } else if (attesaDisegnata && !domandeGiaDisegnate) openSidebarLivello(fb, 'l3');
+    else closeSidebar();
   }
 
   // Riapre il pannello sulla forma già scelta, tenendo il punto di scorrimento.
