@@ -6,9 +6,9 @@ const { showPopupMenu } = require('./popup-menu');
 
 const ULTIMI = new WeakMap(); // webContents → { params, alle }
 const IN_ATTESA = new WeakMap(); // webContents → chi aspetta il prossimo `context-menu`
-// Il guasto arriva di solito dopo il `context-menu` (il menu fallisce dopo un'attesa), ma se fallisce subito può
-// precederlo: un `context-menu` più vecchio di così è di un clic precedente, e si aspetta quello nuovo.
-const FRESCO_MS = 1500;
+// La richiesta porta l'ora del gesto (stesso orologio del main): un `context-menu` arrivato prima di quell'ora è di un
+// clic precedente, e si aspetta quello nuovo, che può arrivare dopo la richiesta.
+const MARGINE_MS = 20;
 const ATTESA_MS = 1000;
 
 function segui(wc) {
