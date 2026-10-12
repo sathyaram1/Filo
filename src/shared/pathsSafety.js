@@ -294,8 +294,8 @@
     // sezione di partenza: quello che ha visto lì può ricopiarlo qui dentro.
     let s = neutralizzaMarcature(redigiDatiPersonali(text)).trim();
     if (!s) return '';
-    s = s.replace(/^["'`]+|["'`]+$/g, '').trim();
-    s = s.replace(/^[*_]+|[*_]+$/g, '').trim();
+    s = togliAiBordi(s, '"\'`').trim();
+    s = togliAiBordi(s, '*_').trim();
     if (s.length > MAX_INTENT_LEN) s = s.slice(0, MAX_INTENT_LEN);
     return s.trim();
   }
