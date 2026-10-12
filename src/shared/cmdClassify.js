@@ -1536,7 +1536,7 @@
         if (!noto && PERCORSO_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
         if (!FONTI_NOTE.has(progs[i]) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
         if (ELENCA_OGGETTI.has(progs[i]) || p.includes(SEGNAPOSTO)) elenco = true;
-        if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, cp));
+        if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, i < pipe.length - 1 ? { ...cp, stampaLibera: false } : cp));
       });
       return det;
     }
