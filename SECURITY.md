@@ -322,10 +322,13 @@ permesso**. La chiave è pubblica e per entrare basta un account Google
 qualunque, quindi una regola che chiede solo di essere autenticati lascia
 passare chiunque, anche chi Filo non l'ha mai installato. Le credenziali
 condivise, cioè le chiavi dei servizi AI che Filo usa per conto tuo, le legge
-**solo un amministratore**. Le chiavi che fanno funzionare Filo appena
-installato non le scarica il tuo computer. Arrivano già dentro l'applicazione,
-messe lì quando la versione viene costruita, e si rinnovano con l'aggiornamento
-automatico.
+**solo un amministratore**. Le chiavi di default, quelle che fanno funzionare
+Filo appena installato, il tuo computer non le scarica: arrivano già dentro
+l'applicazione, messe lì quando la versione viene costruita, e si rinnovano
+con l'aggiornamento automatico (`src/main/config/default-keys.js`). Chi
+riscatta un invito usa invece una chiave dei modelli personale: la crea il
+server, l'app la riceve e la conserva cifrata come le credenziali di accesso
+(`src/main/auth/wallet-store.js`, vedi §2).
 
 ### Le regole cambiano solo quando le pubblichi
 
