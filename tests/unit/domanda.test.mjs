@@ -167,8 +167,7 @@ test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima
   assert.equal(sporca.sporcate.length, 1);
   assert.match(sporca.sporcate[0].cosa, /D-3/);
   assert.deepEqual(sporca.ordine, ['sporca', 'scrivi'], 'si sporca prima di stampare');
-  assert.match(sporca.err.join('
-'), /sporcato/);
+  assert.match(sporca.err.join('\n'), /sporcato/);
 
   const senzaFiducia = finto({ mostra: { ok: true, domanda: { id: 'D-4', ...DOMANDA } } });
   await esegui(['mostra', 'D-4'], senzaFiducia.io);
