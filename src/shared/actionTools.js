@@ -540,7 +540,7 @@
         const O = modulo('SN_ONBOARDING', './onboarding.js');
         return {
           spunta: { type: 'array', items: { type: 'string', enum: O ? O.ITEM_IDS.slice() : [] }, description: 'Le voci fatte.' },
-          autonomia: B('true per mostrare sotto la tua risposta la scelta del livello di autonomia: la fa l\'utente, e la voce autonomia si spunta da sé.'),
+          autonomia: B('true per mostrare sotto la tua risposta la scelta del livello di autonomia: la fa l\'utente con un clic. La voce autonomia si spunta dopo, quando ha scelto.'),
           fine: B('true per chiudere l\'intervista (l\'utente lo chiede, o l\'elenco è finito).'),
         };
       },
