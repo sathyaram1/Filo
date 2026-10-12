@@ -109,7 +109,8 @@ function wireWindowCommon(win, tabs) {
   // Spiega, Traduci, Salva per dopo e Aiuto anche col fuoco sulla barra.
   collegaScorciatoie(win.webContents, win);
 
-  // Il menu a comparsa nasce con la barra, dopo il ripristino delle schede: il primo clic lo trova già caricato (#1090).
+  // Il menu a comparsa nasce quando la barra è pronta, così il primo clic lo trova già caricato (#1090); il giro
+  // di setTimeout lascia partire prima il ripristino delle schede.
   win.webContents.once('did-finish-load', () => {
     setTimeout(() => { try { require('./popup-menu').preparaMenu(win); } catch (_) {} }, 0);
   });
