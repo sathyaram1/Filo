@@ -172,7 +172,9 @@ sono i dati **più sensibili** che l'app tocca. La nostra posizione:
   quando ne usa uno gli manda quello che serve per rispondere: le memorie
   (`src/shared/filoMemory.js`, `renderMemoryForPrompt`), gli appunti e i
   titoli delle schede aperte nel messaggio della home
-  (`src/shared/constants.js`), il testo delle pagine su cui lavori, i
+  (`src/shared/constants.js`), il testo delle pagine su cui lavori
+  (l'elenco funzione per funzione sta in `transparency/privacy.md`, «I
+  modelli»), i
   candidati di una ricerca fra i tuoi documenti
   (`src/main/services/documentiIndice.js`), il testo delle schede che chiudi,
   per il riassunto con cui la cronologia le ritrova
