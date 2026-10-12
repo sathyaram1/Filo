@@ -588,16 +588,23 @@ test('K — fermato mentre Filo prepara ancora la richiesta: niente parte, e lo 
   await ripristina(app);
 });
 
-// Una ricerca sul web lenta (una rete che tarda): conta le chiamate.
-async function ricercaLenta(app, ms) {
+// Una ricerca sul web lenta (una rete che tarda): conta le chiamate partite e finite. Senza durata resta in volo finché
+// la prova non la lascia andare: un «ancora in volo» misurato a orologio diventa rosso su una macchina carica (#814.6).
+async function ricercaLenta(app, ms = null) {
   await app.evaluate((_, durata) => {
     globalThis.__ricerche = 0;
+    globalThis.__ricercheFinite = 0;
+    const trattenuta = durata == null ? new Promise((ok) => { globalThis.__lasciaRicerca = ok; }) : null;
     globalThis.SN_WEB_SEARCH = { search: async () => {
       globalThis.__ricerche += 1;
-      await new Promise((r) => setTimeout(r, durata));
+      await (trattenuta || new Promise((r) => setTimeout(r, durata)));
+      globalThis.__ricercheFinite += 1;
       return { results: [{ title: 'Orari', url: 'https://example.com/orari', content: 'treni' }], provider: 'finto' };
     } };
   }, ms);
+}
+async function lasciaLaRicerca(app) {
+  await app.evaluate(() => globalThis.__lasciaRicerca());
 }
 
 // «In volo» si aspetta, non si presume: il titolo «Cerco sul web» compare quando il modello chiama lo strumento, prima
