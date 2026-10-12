@@ -638,6 +638,8 @@
           if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
           if (mia !== lavoriServerScelte) return;
           mgLavoriServer.checked = r.lavoriServer === true;
+          // Le schede dei lavori server dicono chi li porta avanti: le routine o una sessione.
+          renderList();
         } catch (err) {
           console.error('[manage] salvataggio lavori server fallito:', err);
           if (mia !== lavoriServerScelte) return;
