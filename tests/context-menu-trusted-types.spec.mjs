@@ -71,6 +71,39 @@ test('Trusted Types: il tasto destro dentro un riquadro della pagina apre il men
   await menuCompleto(frame.locator('.sn-menu'));
 });
 
+test('Trusted Types: la spiegazione di una parola si apre e mostra la risposta formattata', async ({ app, openTab, testServer }) => {
+  const page = await apri(openTab, testServer, CSP['come accounts.google.com']);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const pezzi = ['Un **account** è ', 'il tuo profilo su un servizio.'];
+    globalThis.SN_PROVIDER_OPENROUTER = {
+      ...globalThis.SN_PROVIDER_OPENROUTER,
+      streamComplete: async ({ onDelta }) => {
+        for (const p of pezzi) { onDelta(p); await new Promise((r) => setTimeout(r, 40)); }
+        return { text: pezzi.join(''), usage: {} };
+      },
+    };
+  });
+  await page.evaluate(() => {
+    const p = document.getElementById('paragraph');
+    const r = document.createRange();
+    r.setStart(p.firstChild, 7); r.setEnd(p.firstChild, 21);
+    getSelection().removeAllRanges(); getSelection().addRange(r);
+  });
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__filoShortcuts.dispatch('explain-selection', BrowserWindow.getAllWindows().find((w) => w._filoTabs));
+  });
+  const riquadro = page.locator('.sn-popup');
+  await expect(riquadro).toContainText('il tuo profilo su un servizio', { timeout: 10_000 });
+  await expect(riquadro.locator('strong', { hasText: 'account' })).toBeVisible();
+});
+
 test('se il menu di Filo non si costruisce compare quello di riserva, e le sue voci funzionano', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
   await app.evaluate(({ webContents }, origine) => {
