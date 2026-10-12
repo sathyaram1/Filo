@@ -26,7 +26,6 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
-// Chi ha già un modello ha già fatto l'accoglienza: senza, il modello che arriva a home aperta la fa partire (#663).
 async function configureModel(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
