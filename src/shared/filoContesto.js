@@ -163,7 +163,15 @@
       const quante = numeroImmagini(m);
       if (!quante) return { role: 'user', content: detto };
       if (Array.isArray(foto) && foto.length) {
-        return { role: 'user', content: [{ type: 'text', text: detto }, ...foto.map((url) => ({ type: 'image_url', image_url: { url } }))] };
+        const mancano = quante - foto.length;
+        return {
+          role: 'user',
+          content: [
+            { type: 'text', text: detto },
+            ...foto.map((url) => ({ type: 'image_url', image_url: { url } })),
+            ...(mancano > 0 ? [{ type: 'text', text: notaImmagini(mancano, { altre: true }) }] : []),
+          ],
+        };
       }
       return { role: 'user', content: `${detto}\n${notaImmagini(quante)}` };
     }
