@@ -23,9 +23,52 @@ function ricordaEsiti(chat, ts, { azioni, reasoningDetails } = {}) {
   while (esiti.size > MAX_ESITI) esiti.delete(esiti.keys().next().value);
 }
 
+// Le immagini mandate in chat, come gli esiti: in memoria, mai su disco, finché possono ancora tornare al modello
+// (#1166). Il tetto in caratteri tiene il main lontano da un consumo esagerato; quelle tolte lasciano la nota.
+const MAX_CARATTERI_FOTO = 128 * 1024 * 1024;
+const foto = new Map();
+let caratteriFoto = 0;
+const pesoFoto = (urls) => urls.reduce((n, u) => n + u.length, 0);
+
+function togliFoto(k) {
+  const urls = foto.get(k);
+  if (!urls) return;
+  caratteriFoto -= pesoFoto(urls);
+  foto.delete(k);
+}
+
+function ricordaImmagini(chat, ts, immagini) {
+  if (!chat || !ts) return;
+  const urls = (Array.isArray(immagini) ? immagini : []).filter((u) => typeof u === 'string' && /^data:image\//i.test(u));
+  if (!urls.length) return;
+  const k = `${chat}|${ts}`;
+  togliFoto(k);
+  foto.set(k, urls);
+  caratteriFoto += pesoFoto(urls);
+  while (caratteriFoto > MAX_CARATTERI_FOTO && foto.size > 1) togliFoto(foto.keys().next().value);
+}
+
+// Un messaggio uscito dagli ultimi della sua chat non torna più fra quelli recenti: le sue immagini non servono più.
+function potaFoto(tutti) {
+  if (!foto.size) return;
+  const contati = new Map();
+  for (let i = tutti.length - 1; i >= 0; i--) {
+    const m = tutti[i];
+    const c = (contati.get(m.chat) || 0) + 1;
+    contati.set(m.chat, c);
+    if (c > FC().MESSAGGI_CON_ESITI) togliFoto(FC().chiave(m));
+  }
+}
+
 function dimentica(chat) {
-  if (!chat) { esiti.clear(); return; }
+  if (!chat) {
+    esiti.clear();
+    foto.clear();
+    caratteriFoto = 0;
+    return;
+  }
   for (const k of [...esiti.keys()]) if (k.startsWith(`${chat}|`)) esiti.delete(k);
+  for (const k of [...foto.keys()]) if (k.startsWith(`${chat}|`)) togliFoto(k);
 }
 
 // Tutto il filo in messaggi, in ordine di tempo. A parità d'ora decide la conversazione: lo stesso ordine a ogni turno.
