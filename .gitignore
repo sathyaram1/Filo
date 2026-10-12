@@ -35,10 +35,8 @@ test-results/
 *.log
 # Copie di lavoro dei dati del server (feedback, collezioni Firestore): il repo è pubblico e il
 # salvataggio spedisce tutto. Vanno in os.tmpdir(); con un altro nome le ferma tests/unit/copieDiDatiFuoriDalRepo.test.mjs.
-*_dump*.json
-*_dump*.jsonl
-*-dump*.json
-*-dump*.jsonl
+*dump*.json
+*dump*.jsonl
 filo-copie/
 filo-feedback/
 # Scarti dei comandi andati storti: nascono in radice, restano vuoti, e finiscono
