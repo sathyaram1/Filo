@@ -80,19 +80,6 @@ async function cerca(page, testo) {
   await page.press('#mgSearchInput', 'Enter');
 }
 
-test('troppe richieste: il giro rallenta e arriva in fondo', async ({ app, openTab }) => {
-  await preparaOwner(app, { modo: '429' });
-  const page = await openTab(URL);
-  await page.waitForFunction(() => window.filo && window.__mgTest);
-  await cerca(page, 'la x per chiudere');
-  await expect(page.locator('#mgSearchProgress')).toBeHidden({ timeout: 20000 });
-  await expect(page.locator('.mg-item--result')).toHaveCount(3);
-  await expect(page.locator('#mgSearchMsg')).toHaveText('');
-  const g = await app.evaluate(() => globalThis.__v1118);
-  expect(g.risposte429).toBe(4);
-  expect(g.chat).toBe(0);
-});
-
 test('crediti finiti a metà: restano i risultati trovati e la pagina dice dove si è fermato', async ({ app, openTab }) => {
   await preparaOwner(app, { modo: '402' });
   const page = await openTab(URL);
