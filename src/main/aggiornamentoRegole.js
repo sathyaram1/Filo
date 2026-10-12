@@ -128,8 +128,15 @@ function fraseScaricato({ versione, piattaforma, modo, pronto, appImageScrivibil
   return `Filo ${v} è pronto: si installa quando chiudi Filo.`;
 }
 
+// Solo i tag v* sono protetti su GitHub, e l'aggiornatore prende la release «più recente» qualunque tag abbia:
+// una release sotto un altro tag, creata da un ramo, non si installa (#1073). Senza tag (provider non GitHub) passa.
+function tagAccettato(info) {
+  if (!info || info.tag == null) return true;
+  return String(info.tag) === `v${info.version}`;
+}
+
 module.exports = {
   MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI,
   confrontaVersioni, modoScelto, piano, sceltaNonVale, haPulsante,
-  ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato,
+  ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato,
 };
