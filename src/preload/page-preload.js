@@ -16,6 +16,9 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// Prima di qualunque HTML scritto da Filo: la CSP della pagina non è la sua (#1122).
+try { require('./mondo-esente.js')(webFrame); } catch (e) { console.error('[Filo CS] mondo esente', e); }
+
 // Prima di ogni ascoltatore: una pagina che si riscrive non spegne Filo (#686.1).
 let riscrittura = null;
 try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
@@ -91,29 +94,46 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
 // ha bisogno di settings/spellcheck/Menu) si installa più tardi via
 // __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
 let contextMenuHandler = null;
+// Ogni tasto destro dell'utente apre un menu: quello di Filo o, se non parte (guasto, pagina ancora in caricamento,
+// Filo spento sul sito, Shift), quello di riserva del main, salvo che la pagina mostri il suo (#1122).
+// `clic` è l'ora del gesto: il main la usa per accoppiarlo al suo `context-menu`, non a quello di un clic prima.
+function menuDiRiserva(clic, motivo = '') {
+  try { ipcRenderer.send('filo:menu-di-riserva', { clic, motivo: String(motivo || '').slice(0, 2000) }); } catch (_) {}
+}
+function riservaSeLaPaginaTace(e, clic) {
+  setTimeout(() => { if (!e.defaultPrevented) menuDiRiserva(clic); }, 0);
+}
+function apriMenuDiFilo(e, clic = Date.now()) {
+  let esito;
+  try { esito = contextMenuHandler(e); } catch (err) { esito = Promise.reject(err); }
+  Promise.resolve(esito).catch((err) => {
+    console.error('[Filo CS] menu del tasto destro', err);
+    menuDiRiserva(clic, (err && err.stack) || err || 'errore');
+  });
+}
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
     // Solo il tasto destro dell'utente: uno fabbricato dallo script del sito aprirebbe il menu, e con lui
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
+    const clic = Date.now();
+    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser.
+    if (e.shiftKey) { riservaSeLaPaginaTace(e, clic); return; }
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
-      contextMenuHandler(e);
-      if (!e.shiftKey) { try { e.stopImmediatePropagation(); } catch (_) {} }
+      apriMenuDiFilo(e, clic);
+      try { e.stopImmediatePropagation(); } catch (_) {}
       return;
     }
+    if (!IS_SUBFRAME) { riservaSeLaPaginaTace(e, clic); return; }
     // #405 — primo tasto destro dentro un riquadro: i content script non sono
     // ancora montati (li montiamo solo all'uso). Montali ORA e rigioca questo
     // stesso clic appena l'handler è pronto, così il primo tentativo apre il
     // menu invece di andare perso — l'utente non deve cliccare due volte.
-    if (!IS_SUBFRAME) return;
-    // Shift resta la via di fuga anche qui: con Shift premuto non tocchiamo
-    // l'evento e lasciamo che il riquadro faccia quello che farebbe da solo.
-    if (e.shiftKey) return;
     try { e.stopImmediatePropagation(); } catch (_) {}
-    replayContextMenu(e);
+    replayContextMenu(e, clic);
     ensureContentScripts();
   }, { capture: true });
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
@@ -133,7 +153,7 @@ try {
 // Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
 // fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
 // i dati che l'handler legge, così il menu si apre sull'elemento giusto.
-function replayContextMenu(e) {
+function replayContextMenu(e, clic) {
   let node = null;
   try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
   catch (_) { node = e.target; }
@@ -151,8 +171,8 @@ function replayContextMenu(e) {
   };
   const deadline = Date.now() + 3000;
   const tick = () => {
-    if (typeof contextMenuHandler === 'function') { try { contextMenuHandler(copy); } catch (_) {} return; }
-    if (Date.now() > deadline) return;
+    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
+    if (globalThis.__snFiloSpento === true || Date.now() > deadline) { menuDiRiserva(clic); return; }
     setTimeout(tick, 16);
   };
   setTimeout(tick, 16);

@@ -202,17 +202,18 @@ export const test = base.extend({
         res.end(asset.body);
         return;
       }
-      const html = pages.get(id);
-      if (!html) { res.writeHead(404); res.end('not found'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      const page = pages.get(id);
+      if (!page) { res.writeHead(404); res.end('not found'); return; }
+      res.writeHead(200, { ...page.headers, 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(page.body);
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port;
     const api = {
-      html(body, { pubblico = false } = {}) {
+      // `headers`: intestazioni della risposta, per i siti che le usano per stringere la pagina (CSP).
+      html(body, { pubblico = false, headers = {} } = {}) {
         const id = String(++nextId);
-        pages.set(id, body);
+        pages.set(id, { body, headers });
         return `${pubblico ? this.originPubblico : this.origin}/${id}`;
       },
       /** Serve dei byte a un indirizzo di questo server e torna la URL. */

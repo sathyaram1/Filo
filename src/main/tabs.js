@@ -18,6 +18,7 @@ const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
+const MenuDiRiserva = require('./menuDiRiserva');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -2688,6 +2689,7 @@ class TabManager {
       try { callback(false); } catch (_) {}
     });
 
+    MenuDiRiserva.segui(wc);
     // Spellcheck nativo: Electron è l'unico a conoscere i suggerimenti
     // ortografici della parola sotto lo zigzag rosso. Li spingiamo al
     // content script perché li mostri nel menu di correzione custom.
@@ -2885,6 +2887,7 @@ class TabManager {
     installZoom(pwc);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
+    MenuDiRiserva.segui(pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
