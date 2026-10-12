@@ -3,7 +3,7 @@
 // Sentinella: tests/unit/unitConRiprova.test.mjs.
 
 import { spawn } from 'node:child_process';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chiaviDelRegistroUnit } from './build-alarm.mjs';
@@ -17,18 +17,22 @@ export function fileRossi(registro, radice) {
   return chiaviDelRegistroUnit(registro, radice).filter((k) => k.startsWith('unit:')).map((k) => k.slice(5));
 }
 
-/** Rossi della prima corsa che nella riprova sono passati. PURA. */
-export function ripassati(primaCorsa, riprova) {
-  const ancora = new Set(riprova);
-  return primaCorsa.filter((f) => !ancora.has(f));
+/**
+ * I rossi della prima corsa passati alla riprova. Una riprova rossa senza file riconoscibili (lancio fallito, tetto
+ * di tempo) non scagiona nessuno. PURA.
+ */
+export function ripassati(rossi, { codice, rossiRiprova }) {
+  if (codice !== 0 && !rossiRiprova.length) return [];
+  const ancora = new Set(rossiRiprova);
+  return rossi.filter((f) => !ancora.has(f));
 }
 
-/** Lancia il lanciatore degli unit, con l'uscita sia qui sia nel registro; torna codice e testo. */
-function corsa(argomenti, registro) {
+/** Il lanciatore degli unit, con l'uscita sia qui sia nel registro. */
+function corsa(argomenti, registro, lanciatore = LANCIATORE) {
   return new Promise((ok) => {
     const file = createWriteStream(registro);
     let testo = '';
-    const c = spawn(process.execPath, [LANCIATORE, ...argomenti], { cwd: RADICE, stdio: ['ignore', 'pipe', 'pipe'] });
+    const c = spawn(process.execPath, [lanciatore, ...argomenti], { cwd: RADICE, stdio: ['ignore', 'pipe', 'pipe'] });
     const passa = (verso) => (pezzo) => { verso.write(pezzo); file.write(pezzo); testo += pezzo; };
     c.stdout.on('data', passa(process.stdout));
     c.stderr.on('data', passa(process.stderr));
@@ -37,26 +41,28 @@ function corsa(argomenti, registro) {
   });
 }
 
+/** `FILO_UNIT_LANCIATORE` esiste solo per la sentinella: un lanciatore finto al posto della suite intera. */
+export async function unitConRiprova(registro, { lanciatore = process.env.FILO_UNIT_LANCIATORE || LANCIATORE } = {}) {
+  const prima = await corsa([], registro, lanciatore);
+  if (prima.codice === 0) return { codice: 0, rossi: [], flaky: [] };
+  const rossi = fileRossi(prima.testo, RADICE);
+  if (!rossi.length) return { codice: prima.codice, rossi: [], flaky: [] };
+  // La prima corsa resta accanto al registro; il registro, che l'allarme legge, tiene solo i rossi rimasti.
+  writeFileSync(registro.replace(/(\.\w+)?$/, '-prima$1'), prima.testo);
+  console.log(`\n[unit] riprova dei soli file rossi, una volta: ${rossi.join(', ')}`);
+  const riprova = await corsa([SOLO, ...rossi], registro, lanciatore);
+  const rossiRiprova = fileRossi(riprova.testo, RADICE);
+  return { codice: riprova.codice, rossi: riprova.codice === 0 ? [] : rossiRiprova, flaky: ripassati(rossi, { codice: riprova.codice, rossiRiprova }) };
+}
+
 async function main() {
   const i = process.argv.indexOf('--registro');
   const registro = resolve(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : 'unit.log');
-  const prima = await corsa([], registro.replace(/(\.\w+)?$/, '-prima$1'));
-  if (prima.codice === 0) {
-    await corsa([SOLO, '--list', ...[]], registro).catch(() => {});
-    return;
+  const esito = await unitConRiprova(registro);
+  if (esito.flaky.length) {
+    console.log(`::warning::unit test rossi alla prima corsa e verdi alla riprova (flaky su Windows): ${esito.flaky.join(', ')}`);
   }
-  const rossi = fileRossi(prima.testo, RADICE);
-  if (!rossi.length) {
-    // Rosso senza un file da rifare (un lancio fallito, un tetto di tempo): niente riprova, il registro è la corsa intera.
-    createWriteStream(registro).end(prima.testo);
-    process.exitCode = 1;
-    return;
-  }
-  console.log(`\n[unit] riprova dei soli file rossi, una volta: ${rossi.join(', ')}`);
-  const riprova = await corsa([SOLO, ...rossi], registro);
-  const flaky = ripassati(rossi, riprova.codice === 0 ? [] : fileRossi(riprova.testo, RADICE));
-  if (flaky.length) console.log(`::warning::unit test rossi alla prima corsa e verdi alla riprova (flaky su Windows): ${flaky.join(', ')}`);
-  process.exitCode = riprova.codice;
+  process.exitCode = esito.codice;
 }
 
 const eseguitoDirettamente = process.argv[1]
