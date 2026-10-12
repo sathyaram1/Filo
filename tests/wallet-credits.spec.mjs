@@ -15,6 +15,11 @@ const seen = { redeems: [], localCredits: [], reissues: 0, states: 0, signups: 0
 let redeemed = false;
 let serverDown = false;
 let identityDown = false;
+// #1138: lo stato del portafoglio appena riscattato (solo l'ingresso), senza
+// saldo, o che non si legge affatto.
+let soloIngresso = false;
+let saldoIgnoto = false;
+let statoGiu = false;
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
