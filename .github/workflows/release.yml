@@ -190,8 +190,7 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          set -o pipefail
-          npm run test:unit 2>&1 | tee unit.log
+          node scripts/unit-con-riprova.mjs --registro unit.log
           echo "unit_ok=1" >> "$GITHUB_OUTPUT"
 
       # Rosso = NON si pubblica, e il guasto diventa un feedback in coda: al

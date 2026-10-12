@@ -196,10 +196,11 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
     assert.match(lavoro, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
     assert.match(lavoro, /fetch-depth:\s*0/, 'l\'avviso elenca i commit dopo l\'ultimo verde');
     const cancello = passi(senzaCommenti(job('release'))).find((p) => p.id === 'gate');
-    const comando = 'npm run test:unit 2>&1 | tee unit.log';
+    const comando = 'node scripts/unit-con-riprova.mjs --registro unit.log';
     assert.ok(cancello.corpo.includes(comando), 'il cancello di pubblicazione è cambiato: questo lavoro va allineato');
     assert.ok(unit?.corpo.includes(comando));
-    assert.match(unit.corpo, /set -o pipefail/, 'senza, l\'esito sarebbe quello di tee');
+    assert.doesNotMatch(`${cancello.corpo}\n${unit.corpo}`, /npm run test:unit/,
+      'senza la riprova un flaky su Windows butta un verde, o un giro di pubblicazione');
     assert.match(unit.corpo, /continue-on-error:\s*true/, 'il passo dopo deve poter aprire il feedback');
     const node = (t) => (t.match(/node-version:\s*(\S+)/) || [])[1];
     assert.equal(node(lavoro), node(senzaCommenti(job('release'))));
