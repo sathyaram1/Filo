@@ -289,6 +289,8 @@ html[data-chrome-compact="1"] .addr {
 .tab .spinner {
   flex: 0 0 12px;
   width: 12px; height: 12px;
+  /* Lo stesso posto del favicon: la scheda che carica non cambia la larghezza chiesta da tutte (#429). */
+  margin: 0 2px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;

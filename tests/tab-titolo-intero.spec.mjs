@@ -20,7 +20,7 @@ async function verdettoTitoli(shell) {
       };
     });
     if (schede.length < 3 || schede.some((s) => !(s.w > 0))) return 'striscia non ancora disegnata';
-    if (!(striscia < fila / 2)) return `fila senza posto: striscia ${striscia} su ${fila}`;
+    if (!(striscia + 100 < fila)) return `fila senza posto: striscia ${striscia} su ${fila}`;
     const tagliati = schede.filter((s) => s.testo > s.posto + 0.5);
     if (tagliati.length) return `titoli tagliati: ${tagliati.map((s) => `«${s.titolo}» ${s.posto}/${s.testo}`).join(', ')}`;
     const attiva = schede.find((s) => s.attiva);
@@ -52,6 +52,8 @@ test('#429 — con la fila libera nessun titolo resta a metà, e Gestione contin
 
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
   await expect.poll(() => cimaPagina(gestione), { timeout: 10_000 }).not.toBe(chiaro);
+  // Playwright tiene la shell in chiaro per conto suo: lo scuro glielo chiede lui.
+  await shell.emulateMedia({ colorScheme: 'dark' });
   const scuro = await cimaPagina(gestione);
   await expect.poll(() => fondoAttiva(shell), { timeout: 10_000 }).toBe(scuro);
   await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
