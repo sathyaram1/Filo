@@ -141,7 +141,9 @@ test('una versione che il listino non conosce per nome lascia la nota, col costo
   const letture = { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 1000000, output_tokens: 0 };
   for (const [model, tariffa, costo] of [
     ['claude-opus-6', 'Opus 5', 0.5], ['claude-opus-5-6', 'Opus 5', 0.5], ['claude-opus-4-1', 'Opus 5', 0.5],
-    ['claude-sonnet-6', 'Sonnet 5', 0.2], ['claude-haiku-5', 'Haiku 4.5', 0.1], ['claude-fable-6', 'Fable 5.1', 0.25],
+    ['claude-sonnet-6', 'Sonnet 5', 0.2], ['claude-fable-6', 'Fable 5.1', 0.25],
+    // Una Haiku di quinta generazione o dopo: listino di 5.5, e il milione di token letti passa la soglia.
+    ['claude-haiku-5', 'Haiku 5.5', 0.05], ['claude-haiku-5-6', 'Haiku 5.5', 0.05], ['claude-haiku-6', 'Haiku 5.5', 0.05],
   ]) {
     const rep = await analizzaRighe([assistant('n', model, letture, [], T('00:00'))]);
     assert.equal(rep.costUsd, costo, model);
