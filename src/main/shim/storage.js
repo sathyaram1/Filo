@@ -32,17 +32,21 @@ function canEncrypt() {
   try { return safeStorage.isEncryptionAvailable(); } catch (_) { return false; }
 }
 
-// Copia DA SCRIVERE su disco: sostituisce settings.apiKeys (in chiaro, in
-// memoria) con settings.apiKeysEnc (base64 del blob cifrato). Non muta `data`.
-function serializeForDisk(data) {
+// L'ultima cifratura fatta: chiavi uguali non si ricifrano a ogni scrittura (#1089), e il file non cambia.
+let ultimaCifratura = { chiaro: null, blob: null };
+
+// Le impostazioni come vanno su disco: settings.apiKeys (in chiaro, in memoria) diventa
+// settings.apiKeysEnc (base64 del blob cifrato). Non muta `s`.
+function impostazioniPerDisco(s) {
   try {
-    const s = data && data.settings;
-    if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return data;
-    if (!canEncrypt()) return data; // niente keyring OS → resta com'era (no perdita dati)
-    const blob = safeStorage.encryptString(JSON.stringify(s.apiKeys)).toString('base64');
-    const ns = { ...s, apiKeys: undefined, apiKeysEnc: ENC_PREFIX + blob };
-    return { ...data, settings: ns };
-  } catch (_) { return data; }
+    if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return s;
+    if (!canEncrypt()) return s; // niente keyring OS → resta com'era (no perdita dati)
+    const chiaro = JSON.stringify(s.apiKeys);
+    if (chiaro !== ultimaCifratura.chiaro) {
+      ultimaCifratura = { chiaro, blob: safeStorage.encryptString(chiaro).toString('base64') };
+    }
+    return { ...s, apiKeys: undefined, apiKeysEnc: ENC_PREFIX + ultimaCifratura.blob };
+  } catch (_) { return s; }
 }
 
 // Inverso di serializeForDisk: al load ripristina settings.apiKeys in chiaro in

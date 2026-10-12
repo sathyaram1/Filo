@@ -38,7 +38,7 @@ function gestore() {
 }
 
 test('venti segnali di attività con scorrimenti diversi: nessun ridisegno della barra e nessuna scrittura', () => {
-  mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const tm = gestore();
     scritture.length = 0;
