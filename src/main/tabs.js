@@ -164,6 +164,8 @@ const SEGUI_APERTURA_MS = 60_000;
 // Il rinvio che la pagina dichiara di sé (meta refresh), in secondi, o -1.
 const RINVIO_DICHIARATO_JS = '(()=>{try{const m=document.querySelector(\'meta[http-equiv="refresh" i]\');const s=m?parseFloat(m.getAttribute("content")):NaN;return Number.isFinite(s)&&s>=0?s:-1;}catch(e){return -1;}})()';
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
+// La sessione scritta per ultima, in JSON: la chiave è una sola per tutte le finestre, quindi anche il ricordo.
+let sessioneScritta = null;
 
 // SICUREZZA — schemi consentiti per le navigazioni ORIGINATE da contenuto web
 // (click su link, window.location, window.open) e dall'agente. Tutto il resto è
