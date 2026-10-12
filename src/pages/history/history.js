@@ -119,9 +119,26 @@
     if (!fondo.hidden) { osservatore.unobserve(fondo); osservatore.observe(fondo); }
   }
 
-  const osservatore = typeof IntersectionObserver === 'function'
-    ? new IntersectionObserver((voci) => { if (voci.some((v) => v.isIntersecting) && drawn < shown.length) drawMore(); }, { rootMargin: '1200px 0px' })
-    : null;
+  const osservatore = new IntersectionObserver((voci) => {
+    if (voci.some((v) => v.isIntersecting) && drawn < shown.length) drawMore();
+  }, { rootMargin: '1200px 0px' });
+
+  // Il testo in cui cerca una voce si compone una volta sola, non a ogni lettera per ogni voce.
+  const haystacks = new WeakMap();
+  function haystackOf(it) {
+    let h = haystacks.get(it);
+    if (h === undefined) {
+      h = [
+        formatActionLabel(it.action),
+        formatInput(it.input),
+        it.output || '',
+        it.origin || '',
+        it.model || '',
+      ].join(' ').toLowerCase();
+      haystacks.set(it, h);
+    }
+    return h;
+  }
 
   function renderItem(it) {
     const wrap = document.createElement('div');
