@@ -64,7 +64,6 @@
     return global.SN_ESTERNO;
   }
 
-  const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
   const LONG_NUM_RE = /\b\d{6,}\b/g;
   // Un IBAN e un codice fiscale non sono fatti di sole cifre: due lettere e due
   // cifre davanti al primo, lettere e cifre alternate nel secondo. La regola
