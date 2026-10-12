@@ -20,6 +20,10 @@ test('r1 un percorso di rete calcolato e passato nel tubo a un comando che lo ap
     'Split-Path -NoQualifier C:\\\\evil\\x | cd',
     "Split-Path -NoQualifier 'C:\\\\evil\\x' | Test-Path",
     'Get-Date -Format "\'\'\\\\\\\\evil\\\\x" | Get-ChildItem',
+    // giro 6: le stesse porte in altre grafie
+    "Join-Path -Path '\\\\' -ChildPath evil -AdditionalChildPath x | cd",
+    'Split-Path -NoQualifier C:/\\evil/x | cd',
+    'Split-Path C:\\\\evil\\x -NoQualifier | Test-Path',
   ]) {
     expect(C.classifyDetail(cmd, CTX).level, cmd).toBeGreaterThanOrEqual(2);
   }
