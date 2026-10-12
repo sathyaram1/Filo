@@ -53,4 +53,4 @@ function cookieDiAccesso(c) {
   return !!c && NOMI_ACCESSO.has(String(c.name || '')) && diGoogle(c.domain);
 }
 
-module.exports = { SITO_GOOGLE, diGoogle, sitoDelContenitore, googleNellElenco, cookieDiAccesso, NOMI_ACCESSO };
+module.exports = { SITO_GOOGLE, diGoogle, sitoDelContenitore, googleNellElenco, ElencoConGoogle, cookieDiAccesso, NOMI_ACCESSO };
