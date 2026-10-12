@@ -64,6 +64,11 @@ diciannove manopole, l'ha ripetuta su tutte.
   peggiore: il volume della suoneria appena trascinato a zero teneva il fuoco,
   il volume rialzato a parole non compariva sulla manopola, e il primo altro
   tocco lo rimandava a zero. Timer di nuovo muto, cioè la segnalazione.
+- **Ridisegnare tutta la griglia dei modelli per azione.** Porta via quello che
+  la pagina sta dicendo in un'altra funzione, come il perché di un modello
+  appena respinto (#667.7); e confrontando l'oggetto intero la ridisegnava
+  anche al ritorno del proprio salvataggio. Si riscrive solo la catena che è
+  cambiata, e si salta solo quella in cui si sta scrivendo.
 
 ## Dove sta
 

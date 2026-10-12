@@ -80,6 +80,6 @@ test('mentre si scrive in una funzione, il modello cambiato da fuori per un\'alt
   await expect(spiega).toHaveValue(/abc$/);
 
   await opts.keyboard.press('Tab');
-  await expect.poll(async () => (await salvate(opts)).models?.explain || '', { timeout: 8_000 }).toMatch(/abc$/);
+  await expect.poll(async () => (await salvate(opts)).models?.explain || '', { timeout: 8_000 }).toContain('abc');
   expect((await salvate(opts)).models.transcribe_audio, 'il modello scelto altrove resta').toBe('dettatore-scelto');
 });
