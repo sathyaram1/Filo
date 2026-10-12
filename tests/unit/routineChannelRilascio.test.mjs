@@ -17,6 +17,7 @@ import { mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { ambientePerITest } from '../../scripts/run-unit-tests.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
