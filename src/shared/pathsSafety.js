@@ -334,12 +334,10 @@
     if (typeof text !== 'string') return '';
     // La frase la scrive un modello, ma leggendo gli elementi toccati e la
     // sezione di partenza: quello che ha visto lì può ricopiarlo qui dentro.
-    let s = neutralizzaMarcature(redigiDatiPersonali(tagliaPrimaDiPulire(text, MAX_INTENT_LEN))).trim();
-    if (!s) return '';
-    s = togliAiBordi(s, '"\'`').trim();
-    s = togliAiBordi(s, '*_').trim();
-    if (s.length > MAX_INTENT_LEN) s = s.slice(0, MAX_INTENT_LEN);
-    return s.trim();
+    return aTetto(text, MAX_INTENT_LEN, tagliaPrimaDiPulire, (pezzo) => {
+      const s = neutralizzaMarcature(redigiDatiPersonali(pezzo)).trim();
+      return togliAiBordi(togliAiBordi(s, '"\'`').trim(), '*_').trim();
+    }).trim();
   }
 
   function parseUrl(rawUrl) {
