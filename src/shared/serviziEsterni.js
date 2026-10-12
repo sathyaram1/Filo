@@ -329,7 +329,7 @@
       base: ['https://accounts.google.com/o/oauth2/v2/auth', 'https://accounts.google.com/ServiceLogin', 'https://www.youtube.com/'],
       occasione: 'quando fai il login, o colleghi YouTube, Gmail e Drive dal menu del profilo: in una scheda, o nel browser di sistema se Google rifiuta la scheda',
       riceve: 'quello che scrivi a Google per entrare',
-      frase: "Se Google rifiuta l'accesso dentro Filo, si apre nel browser",
+      frase: "L'accesso Google si apre in una scheda di Filo",
       dove: ['src/main/auth/config.js', 'src/main/auth/prodottiGoogle.js'],
     },
     {
