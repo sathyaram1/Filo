@@ -4465,6 +4465,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const rawActions = [];
   const renderedActions = [];
   const notes = [];
+  // I testi dei giri di soli bottoni, in ordine: aprono la risposta (#1167). Una nota scritta prima dell'ultimo di
+  // loro non diventa risposta a giro finale muto.
+  const risposta = [];
+  let noteAllaRisposta = 0;
   // Quante note erano già scritte all'ultimo «non disponibile»: quelle lo
   // davano per fatto, una nota successiva è scritta sapendolo (#771).
   let noteAlRifiuto = -1;
