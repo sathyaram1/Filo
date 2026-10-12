@@ -26,7 +26,7 @@
         : /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|socket hang up/i.test(String((err && err.message) || ''));
       return rete ? 'passeggero' : 'fatale';
     }
-    if (s === 400 && risposto) return 'scarta';
+    if (s === 400) return 'scarta';
     return 'fatale';
   }
 
