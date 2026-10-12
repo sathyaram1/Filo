@@ -2,8 +2,8 @@
 #
 # COSA FA
 #   Ogni sei ore (cron) il job `scegli` prende il commit PIU' NUOVO di `main`
-#   la cui suite Playwright completa e' verde (la suite gira a ogni fusione, in
-#   suite.yml). Se e' piu' nuovo dell'ultima release: CHIEDE AL SERVER il
+#   la cui suite e' verde (Playwright su Linux e unit su Windows, a ogni fusione,
+#   in suite.yml). Se e' piu' nuovo dell'ultima release: CHIEDE AL SERVER il
 #   numero della versione nuova, builda ESATTAMENTE quel commit (installer NSIS
 #   per Windows, poi Mac e Linux) e lo pubblica come nuova GitHub Release.
 #   L'auto-update dentro Filo (electron-updater) la vede e aggiorna i tester.
@@ -190,8 +190,7 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          set -o pipefail
-          npm run test:unit 2>&1 | tee unit.log
+          node scripts/unit-con-riprova.mjs --registro unit.log
           echo "unit_ok=1" >> "$GITHUB_OUTPUT"
 
       # Rosso = NON si pubblica, e il guasto diventa un feedback in coda: al
@@ -226,7 +225,7 @@ jobs:
             SULLA_PUNTA="
           Gia' verdi sulla punta di main, da non correggere: $(echo $GIA_VERDI)"
           fi
-          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti sul ramo principale: la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
+          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti su Windows sul commit ${PROVATO} (il piu nuovo di main con la suite verde, non la punta di main): la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. La suite di quel commit aveva gia passato gli stessi test su Windows: se ora sono rossi, di norma il test dipende dai tempi o dalla macchina. Capisci perche e sistemalo; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
           # I test rossi stanno all'INIZIO del log (una riga «not ok» per
           # ciascuno), la coda porta solo il riepilogo: prima si elencano
           # quelli, poi la coda. Un allarme con la sola coda non diceva quali
