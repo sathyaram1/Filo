@@ -369,9 +369,11 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
 .ed-chat-input .sn-voce-btn { margin-bottom: 2px; }
 /* Cresce col testo (anche col suggerimento, a capo per il microfono accanto) fino a due terzi della chat, poi
-   barra sottile: un tetto in pixel lo bucavano i caratteri più larghi di Mac e Linux (#256.4). */
+   barra sottile: un tetto in pixel lo bucavano i caratteri più larghi di Mac e Linux (#256.4). Il pavimento di
+   84px non supera mai la chat meno la riga dei tasti, se stanno sotto: in una chat bassa uscivano tagliati. */
 .ed-chat-input textarea {
-  flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px; max-height: max(84px, 66cqh);
+  flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px;
+  max-height: min(max(84px, 66cqh), calc(100cqh - 6px - var(--ed-chat-tasti, 0px)));
   overflow-y: auto; scrollbar-width: thin; padding: 7px 8px; line-height: 1.4;
   border: 1px solid var(--sn-border); border-radius: 8px;
   background: var(--sn-bg); color: var(--sn-fg); font-size: 12px;
