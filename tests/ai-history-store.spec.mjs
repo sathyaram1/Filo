@@ -47,6 +47,14 @@ const registra = (app, n, prefisso) => app.evaluate(async (_e, { n, prefisso, pa
   await globalThis.__filoStorage.whenSettled();
 }, { n, prefisso, pagina: PAGINA });
 
+// La pagina disegna le voci a lotti mentre si scorre: «le mostra tutte» vuol dire che scorrendo fino in fondo ci sono tutte.
+async function scorriFinoInFondo(page, n) {
+  await expect.poll(async () => {
+    await page.locator('.sn-history-item').last().scrollIntoViewIfNeeded();
+    return page.locator('.sn-history-item').count();
+  }, { timeout: 30_000 }).toBe(n);
+}
+
 test('dopo 300 richieste la pagina le mostra tutte, e storage.json non contiene la cronologia', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await registra(app, 300, 'domanda');
@@ -57,8 +65,8 @@ test('dopo 300 richieste la pagina le mostra tutte, e storage.json non contiene 
   expect(storage.length).toBeLessThan(200_000);
 
   const page = await openTab('filo://history/history.html');
-  await expect(page.locator('.sn-history-item')).toHaveCount(300, { timeout: 20_000 });
-  await expect(page.locator('.sn-history-item').first()).toContainText('domanda 299');
+  await expect(page.locator('.sn-history-item').first()).toContainText('domanda 299', { timeout: 20_000 });
+  await scorriFinoInFondo(page, 300);
   await expect(page.locator('.sn-history-item').last()).toContainText('domanda 0');
 
   // Tolta dalla pagina, la voce non resta in nessun file della cartella dati.
@@ -68,7 +76,8 @@ test('dopo 300 richieste la pagina le mostra tutte, e storage.json non contiene 
   await expect(page.locator('.sn-history-item')).toHaveCount(299);
   expect(fileCheContengono(dati, 'domanda 150"')).toEqual([]);
   await page.reload();
-  await expect(page.locator('.sn-history-item')).toHaveCount(299, { timeout: 20_000 });
+  await expect(page.locator('.sn-history-item').first()).toContainText('domanda 299', { timeout: 20_000 });
+  await scorriFinoInFondo(page, 299);
   await expect(page.locator('.sn-history-item', { hasText: 'domanda 150' })).toHaveCount(0);
 
   // «Cancella tutto» svuota anche i file.
@@ -132,6 +141,50 @@ test('con la cronologia che non si può scrivere la chat mostra comunque la risp
   }
 });
 
+test('con 3000 voci la pagina si apre e cerca senza bloccarsi, e scorrendo e cercando le voci ci sono tutte', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const N = 3000;
+  await app.evaluate(async (_e, { n }) => {
+    const risposta = 'Questa è la risposta del modello, lunga come quelle vere. '.repeat(25);
+    for (let i = 0; i < n; i++) {
+      await globalThis.SN_HISTORY.append({
+        action: i % 2 ? 'explain_selection' : 'filo_chat', provider: 'openrouter', model: 'deepseek/deepseek-v4-pro',
+        input: { selection: `domanda ${i}` }, output: `${risposta} ${i}`, origin: 'https://esempio.test/', costEur: 0.001,
+      });
+    }
+  }, { n: N });
+  const page = await openTab('filo://history/history.html');
+  await expect(page.locator('.sn-history-item').first()).toContainText(`domanda ${N - 1}`, { timeout: 60_000 });
+
+  // Dal tasto al primo disegno dopo: quello che l'utente sente come pagina bloccata (prima, con 3000 voci, 1,5 s).
+  const ms = await page.evaluate(async () => {
+    const s = document.getElementById('search');
+    s.focus();
+    const t = performance.now();
+    s.value = 'd';
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+    return performance.now() - t;
+  });
+  expect(ms, `un tasto nella ricerca ha bloccato la pagina per ${Math.round(ms)} ms`).toBeLessThan(500);
+
+  // La più vecchia si trova cercandola, e cancellando la ricerca si arriva in fondo scorrendo.
+  await page.locator('#search').fill('domanda 0');
+  await expect(page.locator('.sn-history-item')).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.locator('.sn-history-item')).toContainText('domanda 0');
+  await page.locator('#search').fill('');
+  await scorriFinoInFondo(page, N);
+  await expect(page.locator('.sn-history-item').last()).toContainText('domanda 0');
+
+  // Togliere una voce lontana dalla cima non riporta in cima la pagina.
+  const voce = page.locator('.sn-history-item', { hasText: /domanda 5(?!\d)/ }).first();
+  await voce.scrollIntoViewIfNeeded();
+  await voce.hover();
+  await voce.locator('.sn-history-remove').click();
+  await expect(page.locator('.sn-history-item')).toHaveCount(N - 1);
+  await expect(page.locator('.sn-history-item', { hasText: /domanda 4(?!\d)/ })).toBeInViewport();
+});
+
 testSenzaFixture('una cronologia oltre i 4 MB in storage.json si migra intera, e la pagina la mostra', async () => {
   testSenzaFixture.setTimeout(120_000);
   const userData = cartellaTemporanea('filo-migra-cronologia-');
@@ -165,7 +218,8 @@ testSenzaFixture('una cronologia oltre i 4 MB in storage.json si migra intera, e
     await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
     let page = null;
     await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith('filo://history')); return !!page; }).toBe(true);
-    await expect(page.locator('.sn-history-item')).toHaveCount(1200, { timeout: 30_000 });
+    await expect(page.locator('.sn-history-item').first()).toContainText('vecchia 1199', { timeout: 30_000 });
+    await scorriFinoInFondo(page, 1200);
     await expect(page.locator('.sn-history-item').last()).toContainText('vecchia 0');
   } finally {
     await chiudiApp(app);

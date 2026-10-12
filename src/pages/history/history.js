@@ -95,6 +95,7 @@
   function showEmpty() {
     const q = ($('search').value || '').trim();
     const empty = $('empty');
+    if (fondo) fondo.hidden = true;
     if (items.length && q) empty.textContent = I18n.t('history_no_results');
     else if (items.length && $('filter').value) empty.textContent = I18n.t('history_no_results_filter');
     else empty.textContent = I18n.t('history_empty');
@@ -278,6 +279,7 @@
     fondo = document.createElement('div');
     fondo.className = 'sn-history-fondo';
     fondo.hidden = true;
+    fondo.style.height = '1px';
     $('list').after(fondo);
     osservatore.observe(fondo);
     load();
