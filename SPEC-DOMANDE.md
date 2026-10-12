@@ -149,8 +149,8 @@ lo può scrivere anche un agente pulito.
 
 ### 1.7 Dati
 
-- `fiducia` su feedback, domande e biglietti. La scrive solo l'Admin SDK; le
-  regole la vietano ai client.
+- `fiducia` su feedback, domande, compiti e biglietti. La scrive solo l'Admin
+  SDK; le regole la vietano ai client.
 - `genitori: [id…]` sul feedback derivato.
 - `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
