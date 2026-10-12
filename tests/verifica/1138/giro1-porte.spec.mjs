@@ -82,7 +82,7 @@ test('chiave propria e conteggio locale a schermo: /invito in chat non dichiara 
   await crediti.reload();
   await expect(crediti.locator('#balance')).toHaveText('5.000', { timeout: 15000 });
   await expect(crediti.locator('#redeemForm')).toBeHidden();
-  await expect(crediti.locator('body')).not.toContainText('1.000', { useInnerText: true });
+  await expect(crediti.locator('body')).not.toContainText(locale, { useInnerText: true });
   await crediti.screenshot({ path: 'tests/.shots/1138-giro1-chiave-propria-dopo.png' });
 });
 
