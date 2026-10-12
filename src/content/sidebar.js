@@ -732,12 +732,17 @@
           .slice(0, 5)
           .map((c) => ({ label: c.label.trim(), prompt: c.prompt.trim() }));
       }
+      // Il documento da mostrare dopo una ricerca: il numero del candidato (o più d'uno, al massimo tre).
+      const file = (Array.isArray(obj.file) ? obj.file : [obj.file])
+        .map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
+        .filter((n, i, a) => a.indexOf(n) === i).slice(0, 3);
       return {
         display: typeof obj.text === 'string' ? obj.text : '',
         highlight,
         choices,
         status,
         collapse: collapseFlag,
+        file,
       };
     } catch (_) {
       return fallback;
