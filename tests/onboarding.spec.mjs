@@ -19,7 +19,7 @@
 // chiusura), (4) è rossa (il pulsante non c'è).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, clickConfirm, confirmState } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -315,4 +315,119 @@ test('nel benvenuto, se nel turno Filo ha letto testo di fuori lo stile torna a 
   await page.locator('#input').fill('come preferisco che mi scrivi? guarda tu');
   await page.locator('#sendBtn').click();
   await riquadroStile(page, app);
+});
+
+// #1188 — il livello di autonomia si sceglie nell'intervista: Filo lo chiede, sotto la domanda compaiono i livelli e
+// l'utente sceglie con un clic, che è anche la sua risposta. Alzarlo vuole «conferma», come in Preferenze.
+const DOMANDA_AUTONOMIA = {
+  text: 'Ultima cosa: quanto vuoi che faccia da solo? Scegli qui sotto.',
+  actions: [{ type: 'ONBOARDING', autonomia: true, spunta: ['autonomia'] }],
+};
+const livelloAutonomia = (app) => app.evaluate(() => globalThis.SN_STORAGE.getSettings().then((s) => (s.autonomia || {}).livello || ''));
+const bolleUtente = (page) => page.locator('.dash-bubble-user');
+
+async function chiediAutonomia(page, app) {
+  await queueChat(app, DOMANDA_AUTONOMIA);
+  await page.locator('#input').fill('sono Anna, insegnante');
+  await page.locator('#sendBtn').click();
+  const scelta = page.locator('.dash-bubble-filo .dash-autonomia-scelta');
+  await expect(scelta).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread');
+  return scelta;
+}
+
+test('nel benvenuto il livello di autonomia si sceglie con un clic, e il clic è la risposta', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const page = await apriIntervista(app, shell);
+  // Il resto è già fatto: l'autonomia è l'ultima voce, e mostrarne la scelta non chiude l'intervista.
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    const O = globalThis.SN_ONBOARDING;
+    await M.setOnboarding(O.tick(await M.getOnboarding(), O.ITEM_IDS.filter((id) => id !== 'autonomia')).state);
+  });
+  const scelta = await chiediAutonomia(page, app);
+  const livelli = scelta.locator('.dash-autonomia-livello');
+  await expect(livelli).toHaveText(['Conservativo', 'Normale', 'Automatico']);
+  await expect(scelta.locator('.dash-autonomia-livello.scelto')).toHaveText('Normale');
+  await expect(scelta.locator('.dash-autonomia-frase')).toHaveText(/ti chiede prima di ciò che non si disfa/);
+  expect((await onbState(app)).done).toBe(false);
+  expect((await onbState(app)).ticked).not.toContain('autonomia');
+
+  await livelli.filter({ hasText: 'Conservativo' }).hover();
+  await expect(scelta.locator('.dash-autonomia-frase')).toHaveText(/Senza chiederti fa solo quello che resta in chat/);
+  await page.screenshot({ path: 'tests/.shots/1188-scelta-autonomia-chiaro.png' }).catch(() => {});
+
+  // Abbassare non chiede niente: il livello si salva e la scelta parte come risposta.
+  await queueChat(app, { text: 'Va bene, ti chiedo prima di quasi tutto. Buon lavoro, Anna.', actions: [{ type: 'ONBOARDING', spunta: ['autonomia'] }] });
+  await livelli.filter({ hasText: 'Conservativo' }).click();
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  await expect.poll(() => livelloAutonomia(app), { timeout: 10_000 }).toBe('conservativo');
+  await expect(bolleUtente(page).last()).toHaveText('Scelgo Conservativo.');
+  // Filo spunta la voce: l'elenco è finito e l'intervista lascia il posto alla home.
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'home', { timeout: 40_000 });
+  const fine = await onbState(app);
+  expect(fine.done).toBe(true);
+  expect(fine.ticked).toContain('autonomia');
+});
+
+test('nel benvenuto alzare l’autonomia vuole «conferma», e la scelta resta dopo una ripresa', async ({ app, shell, openTab }) => {
+  test.setTimeout(150_000);
+  const page = await apriIntervista(app, shell);
+  const scelta = await chiediAutonomia(page, app);
+  const livello = (nome) => scelta.locator('.dash-autonomia-livello', { hasText: nome });
+  const utentiPrima = await bolleUtente(page).count();
+
+  // Annullare il riquadro lascia tutto com'era, e non parte nessuna risposta.
+  await livello('Automatico').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  expect((await confirmState(page)).hasInput, 'alzare il livello vuole la parola digitata').toBe(true);
+  expect((await confirmState(page)).text).toContain('Così Filo si fida di più.');
+  await clickConfirm(page, 'cancel');
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  expect(await livelloAutonomia(app)).toBe('default');
+  await expect(scelta.locator('.dash-autonomia-livello.scelto')).toHaveText('Normale');
+  await expect(bolleUtente(page)).toHaveCount(utentiPrima);
+
+  // Una bozza nella casella è dell'utente: il clic cambia il livello ma non la manda via.
+  await page.locator('#input').fill('aspetta, ci penso');
+  await livello('Conservativo').click();
+  await expect.poll(() => livelloAutonomia(app), { timeout: 10_000 }).toBe('conservativo');
+  await expect(page.locator('#input')).toHaveValue('aspetta, ci penso');
+  await expect(bolleUtente(page)).toHaveCount(utentiPrima);
+  await page.locator('#input').fill('');
+
+  // Con la parola il livello sale, e la scelta è la risposta.
+  await queueChat(app, { text: 'Fatto a modo tuo.', actions: [{ type: 'ONBOARDING', spunta: ['autonomia'] }] });
+  await livello('Automatico').click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
+  await expect.poll(() => livelloAutonomia(app), { timeout: 10_000 }).toBe('automatico');
+  await expect(bolleUtente(page).last()).toHaveText('Scelgo Automatico.');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto a modo tuo.' })).toBeVisible({ timeout: 30_000 });
+  await expect(scelta.locator('.dash-autonomia-livello.scelto')).toHaveText('Automatico');
+
+  // Cambiato in Preferenze, la scelta già a schermo lo segue.
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await prefs.locator('label:has(#autonomia-conservativo)').click();
+  await expect.poll(() => livelloAutonomia(app), { timeout: 10_000 }).toBe('conservativo');
+  await expect(scelta.locator('.dash-autonomia-livello.scelto')).toHaveText('Conservativo');
+
+  // Riaperta l'intervista, la scelta è ancora sotto la domanda; un clic adesso cambia il livello e basta.
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  const ripresa = page.locator('.dash-bubble-filo', { hasText: 'quanto vuoi che faccia da solo' }).locator('.dash-autonomia-scelta');
+  await expect(ripresa).toBeVisible({ timeout: 15_000 });
+  await expect(ripresa.locator('.dash-autonomia-livello.scelto')).toHaveText('Conservativo');
+  const utentiDopo = await bolleUtente(page).count();
+  await ripresa.locator('.dash-autonomia-livello', { hasText: 'Normale' }).click();
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await clickConfirm(page, 'cancel');
+  expect(await livelloAutonomia(app)).toBe('conservativo');
+  await expect(bolleUtente(page)).toHaveCount(utentiDopo);
+
+  await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }));
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'tests/.shots/1188-scelta-autonomia-scuro.png' }).catch(() => {});
 });
