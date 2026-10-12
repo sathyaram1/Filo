@@ -687,7 +687,7 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
   const elenco = `${restano.slice(0, 3).join(', ')}${restano.length > 3 ? ` (+${restano.length - 3} file)` : ''}`;
   const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: rilascio — ${elenco}`]);
   if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
-  return { ok: true, skipped: false, committed: fuori.length ? restano : st.lines, fuori, reason: '' };
+  return { ok: true, skipped: false, committed: restano, fuori, reason: '' };
 }
 
 /**
