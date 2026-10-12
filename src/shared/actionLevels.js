@@ -357,7 +357,7 @@
       costo: 1,
       campo: null,
       describe: (a) => {
-        if (a && (a.autonomia === true || a.autonomia === 'true')) return 'Mostrarti i livelli di autonomia, da scegliere tu';
+        if (a && /^(true|1|si|sì|yes)$/i.test(String(a.autonomia ?? ''))) return 'Mostrarti i livelli di autonomia, da scegliere tu';
         if (a && (a.fine ?? a.chiudi ?? a.done)) return 'Chiudere l’intervista di benvenuto';
         const ids = Array.isArray(a?.spunta) ? a.spunta : [];
         return `Segnare come fatto nell’intervista di benvenuto${ids.length ? `: ${ids.join(', ')}` : ''}`;
