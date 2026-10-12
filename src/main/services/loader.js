@@ -119,6 +119,7 @@ if (process.env.NODE_ENV === 'test') {
 }
 require(path.join(SHARED, 'patchNotes.js'));
 require(path.join(SHARED, 'capabilities.js'));
+require(path.join(SHARED, 'serviziEsterni.js'));  // #849 — i servizi esterni che Filo contatta, come dati
 // Documenti di trasparenza (generati da transparency/*.md): servono all'agente
 // per rispondere quando l'utente chiede conto di una scelta. Il gemello
 // transparencyUi.js NON si carica qui: è codice di pagina, tocca il DOM.
