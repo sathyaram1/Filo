@@ -190,12 +190,13 @@ async function getIdToken() {
   if (session?.idToken && Date.now() < session.idTokenExp) return session.idToken;
   if (lost) throw erroreIdentita('identity_lost');
   if (inflight) return inflight;
+  // Il portachiavi può sbloccarsi dopo l'avvio: prima di arrendersi si rilegge il disco. Fuori dalla
+  // corsa in volo: un errore sincrono lì dentro lascerebbe `inflight` fermo su un rifiuto per sempre.
+  if (!session?.refreshToken && walletStore.suDisco()) restore();
+  if (isUnreadable()) throw erroreIdentita('identity_unreadable');
   inflight = (async () => {
     try {
-      // Il portachiavi può sbloccarsi dopo l'avvio: prima di arrendersi si rilegge il disco.
-      if (!session?.refreshToken && walletStore.suDisco()) restore();
       if (session?.refreshToken) return await refresh();
-      if (isUnreadable()) throw erroreIdentita('identity_unreadable');
       await signUpAnonymous();
       return session.idToken;
     } finally { inflight = null; }
