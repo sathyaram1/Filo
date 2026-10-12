@@ -136,7 +136,9 @@ html[data-chrome-compact="1"] .addr {
   align-items: center;
   gap: 6px;
   height: 32px;
-  flex: 1 1 0;
+  /* Crescita = larghezza chiesta, messa da shell.js: la striscia dà a ognuna la sua e, se si stringe, toglie
+     di più alle più larghe (#429). */
+  flex: var(--tab-crescita, 1) 1 0;
   min-width: 40px;
   padding: 0 8px 0 10px;
   /* Sfondo effettivo della tab: di default il neutro della barra, ma le tab inattive lo sovrascrivono
@@ -195,9 +197,8 @@ html[data-chrome-compact="1"] .addr {
   color: var(--fg);
   margin-bottom: 0;
   z-index: 1;
-  /* La scheda selezionata è più larga e "stacca" leggermente, in stile Chrome (richiesta esplicita): quanto,
-     lo decide shell.js col contenuto (#429). Nessun tetto fisso: finché la fila ha posto il nome sta intero. */
-  flex-grow: var(--tab-crescita, 1.4);
+  /* La scheda selezionata è più larga e "stacca" leggermente, in stile Chrome (richiesta esplicita): di quanto
+     lo decide shell.js, che non le mette un tetto fisso (#429). */
   min-width: 110px;
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
 }

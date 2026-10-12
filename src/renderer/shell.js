@@ -773,7 +773,6 @@
   let giroSonda = 0;
   // Anche la parte di ogni scheda non cambia sotto il puntatore: un titolo che cambia mentre il puntatore sta
   // sulla fila (una scheda dietro che finisce di caricare) aspetta che la lasci, o la scheda gli scappa (#429).
-  let passoInVigore = 0;
   let passoTrattenuto = false;
   const fermo = () => Boolean(larghezzeFerme) || passoTrattenuto;
 
@@ -846,6 +845,12 @@
     sondaPuntatore();
   }, true);
   window.addEventListener('resize', sciogliLarghezze);
+  // Le larghezze dipendono dal posto della fila: si rifanno quando cambia la finestra o compare un indicatore.
+  window.addEventListener('resize', () => { if (!larghezzeFerme) misuraLarghezzeChieste(); });
+  try {
+    new MutationObserver(() => { if (!larghezzeFerme) misuraLarghezzeChieste(); })
+      .observe(tabRowEl, { attributes: true, attributeFilter: ['hidden'], subtree: true });
+  } catch (_) {}
 
   // ── Menu contestuale (tasto destro) su una tab ────────────────────────────
   // Riusa il popup-menu nativo della shell (sopra le WebContentsView). Le voci
@@ -1000,35 +1005,54 @@
   }
 
   // La scheda è un contenitore e non dà alla striscia la larghezza del contenuto: la si misura con tutto in
-  // vista. Regola unica (#429): finché la fila ha posto nessun nome è tagliato. Le schede dietro sono larghe
-  // quanto la più lunga di loro, l'attiva quanto il suo contenuto e almeno STACCO volte le altre; la striscia
-  // le divide in quella proporzione, e solo quando la fila è piena si stringono tutte insieme.
-  const STACCO = 1.4;
-  const STACCO_MAX = 1.8;
-  let crescitaInVigore = STACCO;
+  // vista. Regola unica (#429): finché la fila ha posto ogni scheda è larga quanto il suo contenuto e nessun
+  // nome è tagliato; quando manca, si accorciano prima i nomi più lunghi, tutti allo stesso tetto. L'attiva
+  // resta più larga di ogni altra di almeno STACCO.
+  const STACCO = 1.25;
+  const MIN_ATTIVA = 110;
+  const MIN_SCHEDA = 40;
+  let larghezzeInVigore = null; // { chiave, w: number[] }
+  function spazioDellaStriscia() {
+    const spazio = tabRowEl.querySelector('.tab-drag-spacer');
+    const sp = spazio ? spazio.getBoundingClientRect().width - (parseFloat(getComputedStyle(spazio).minWidth) || 0) : 0;
+    const cs = getComputedStyle(tabsEl);
+    return tabsEl.getBoundingClientRect().width + Math.max(0, sp) - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  }
+  function larghezzeDistribuite(naturali, ia, posto) {
+    const dietro = naturali.filter((_, i) => i !== ia);
+    const attivaCon = (tetto) => {
+      const piuLarga = Math.max(0, ...dietro.map((w) => Math.min(w, tetto)));
+      return Math.max(ia >= 0 ? naturali[ia] : 0, MIN_ATTIVA, Math.ceil(piuLarga * STACCO));
+    };
+    const totale = (tetto) => dietro.reduce((s, w) => s + Math.max(MIN_SCHEDA, Math.min(w, tetto)), 0) + (ia >= 0 ? attivaCon(tetto) : 0);
+    let tetto = Math.max(MIN_SCHEDA, ...naturali);
+    if (totale(tetto) > posto) {
+      let lo = MIN_SCHEDA, hi = tetto;
+      for (let k = 0; k < 24 && hi - lo > 0.5; k++) { const m = (lo + hi) / 2; if (totale(m) > posto) hi = m; else lo = m; }
+      tetto = lo;
+    }
+    return naturali.map((w, i) => (i === ia ? attivaCon(tetto) : Math.max(MIN_SCHEDA, Math.min(w, tetto))));
+  }
   function misuraLarghezzeChieste() {
     const schede = [...tabsEl.children];
     if (!schede.length) return;
+    const posto = spazioDellaStriscia();
     schede.forEach((el) => el.classList.add('misura'));
     const pad = getComputedStyle(schede[0]);
     const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
-    const larghe = schede.map((el) => el.getBoundingClientRect().width);
+    const naturali = schede.map((el) => Math.ceil(el.getBoundingClientRect().width));
     const ia = schede.findIndex((el) => el.classList.contains('active'));
-    const attiva = ia >= 0 ? larghe[ia] : 0;
-    const dietro = Math.max(0, ...larghe.filter((_, i) => i !== ia));
-    const misurato = Math.max(dietro, attiva / STACCO_MAX);
-    const crescitaMisurata = misurato > 0 ? Math.min(STACCO_MAX, Math.max(STACCO, attiva / misurato)) : STACCO;
-    const tieni = puntatoreSullaFila && passoInVigore > 0;
-    passoTrattenuto = tieni && (misurato !== passoInVigore || crescitaMisurata !== crescitaInVigore);
-    const passo = tieni ? passoInVigore : misurato;
-    const crescita = tieni ? crescitaInVigore : crescitaMisurata;
-    passoInVigore = passo;
-    crescitaInVigore = crescita;
-    // La striscia divide in proporzione solo lo spazio oltre il padding: la crescita si conta sul contenuto.
-    const contenuto = (w) => Math.max(1, Math.ceil(w - bordi));
+    const misurate = larghezzeDistribuite(naturali, ia, posto);
+    const chiave = schede.map((el) => el.dataset.id).join(',') + '|' + ia;
+    const tieni = puntatoreSullaFila && larghezzeInVigore && larghezzeInVigore.chiave === chiave;
+    passoTrattenuto = Boolean(tieni) && misurate.some((w, i) => w !== larghezzeInVigore.w[i]);
+    const w = tieni ? larghezzeInVigore.w : misurate;
+    larghezzeInVigore = { chiave, w };
+    // La striscia divide in proporzione solo lo spazio oltre il padding: crescita e misura si contano sul contenuto.
     schede.forEach((el, i) => {
-      el.style.setProperty('--tab-chiesta', `${contenuto(i === ia ? passo * crescita : passo)}px`);
-      if (i === ia) el.style.setProperty('--tab-crescita', String(contenuto(passo * crescita) / contenuto(passo)));
+      const contenuto = Math.max(1, Math.ceil(w[i] - bordi));
+      el.style.setProperty('--tab-chiesta', `${contenuto}px`);
+      el.style.setProperty('--tab-crescita', String(contenuto));
       el.classList.remove('misura');
     });
   }

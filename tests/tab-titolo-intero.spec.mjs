@@ -96,3 +96,50 @@ test('#429 — un titolo che cambia non sposta la scheda sotto il puntatore, poi
   await expect.poll(async () => (await rettangolo(shell, 'Corto')).w, { timeout: 5_000 }).toBeLessThan(prima.w);
   await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
 });
+
+// Le schede dietro non tengono il posto di una X che non mostrano: con la fila piena il nome tagliato arriva al
+// bordo, e la X che compare al passaggio non stringe il nome sotto il puntatore.
+test('#429 — con la fila piena il nome tagliato arriva al bordo, e il mouse non glielo stringe', async ({ app, shell, testServer }) => {
+  const url = testServer.html('<title>Cronologia delle ricerche</title><body>x</body>');
+  await shell.evaluate(async (u) => {
+    for (let i = 0; i < 13; i++) await window.filoShell.tabs.open(u);
+  }, url);
+  await expect(shell.locator('#tabs .tab')).toHaveCount(14, { timeout: 15_000 });
+  const dietro = () => shell.evaluate(() => [...document.querySelectorAll('#tabs .tab:not(.active)')].slice(1, 4).map((t) => {
+    const ti = t.querySelector('.title');
+    return { posto: ti.clientWidth, testo: ti.scrollWidth, vuoto: Math.round(t.getBoundingClientRect().right - ti.getBoundingClientRect().right) };
+  }));
+  await expect.poll(async () => (await dietro()).every((s) => s.posto > 0 && s.testo > s.posto && s.vuoto <= 10), { timeout: 10_000 }).toBe(true);
+  const prima = (await dietro())[1];
+  await shell.hover('#tabs .tab:nth-child(3) .favicon');
+  await expect(shell.locator('#tabs .tab:nth-child(3) .close')).toHaveCSS('opacity', '1');
+  expect((await dietro())[1].posto).toBe(prima.posto);
+  await captureCompositeElectron(app, 'tests/.shots/tab-titolo-intero-piena.png');
+
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs).setSize(720, 600));
+  await expect.poll(async () => (await dietro()).every((s) => s.posto > 0), { timeout: 10_000 }).toBe(true);
+});
+
+test('#429 — un titolo lungo si legge intero finché la fila ha posto, e l\'attiva resta più larga', async ({ shell, openTab, testServer }) => {
+  const lungo = 'Previsioni meteo per Milano e tutta la Lombardia aggiornate ogni ora';
+  await openTab(testServer.html(`<title>${lungo}</title><body>x</body>`));
+  await openTab('filo://manage/manage.html');
+  await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
+  await shell.locator('.tab', { hasText: 'Previsioni meteo' }).click();
+  await shell.mouse.move(600, 500);
+  await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
+  // L'ultima scheda attiva ha il piedino destro dentro la striscia: niente da scorrere.
+  expect(await shell.evaluate(() => { const s = document.getElementById('tabs'); return s.scrollWidth - s.clientWidth; })).toBe(0);
+});
+
+// La cima della pagina che cambia colore dopo il caricamento (il tema del sito, un'intestazione tardiva).
+test('#429 — la scheda attiva segue la cima della pagina anche quando cambia dopo il caricamento', async ({ shell, openTab, testServer }) => {
+  const p = await openTab(testServer.html('<title>Cambia</title><body style="margin:0;background:#fff"><header id=h style="height:80px"></header>x</body>'));
+  const fondo = () => shell.evaluate(() => getComputedStyle(document.querySelector('.tab.active')).backgroundColor);
+  await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(255, 255, 255)');
+  await p.waitForTimeout(1500);
+  await p.evaluate(() => { document.body.style.background = '#111111'; });
+  await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(17, 17, 17)');
+  await p.evaluate(() => { document.getElementById('h').style.background = '#1f7a3a'; });
+  await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(31, 122, 58)');
+});
