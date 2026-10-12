@@ -1461,6 +1461,7 @@
     getInputWordAt,
     requestWordSuggestion,
     applyFix,
+    riallineaIssues,
     addToDictionary,
     isInDictionary,
     setAutocorrect,
