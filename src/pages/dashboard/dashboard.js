@@ -784,7 +784,10 @@
             pending.azioneSenzaRiga(a, { scartata: true });
           }
         } else if (data.kind === 'round') {
-          if (data.risposta && !turno.fermato) {
+          // Dopo lo stop la bolla è di apriTurnoFermato: il testo a metà resta dov'è.
+          if (turno.fermato) {
+            // niente da spostare
+          } else if (data.risposta) {
             rispostaPrima = unisci(rispostaPrima, data.text || testoDelGiro());
             if (!streamBubble) {
               streamBubble = document.createElement('div');
