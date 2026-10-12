@@ -381,8 +381,8 @@ test('scrivere nel campo di ricerca della pagina non paga spiegazioni in anticip
   const prima = (await conti(app)).spiega;
   await page.keyboard.type('una ricerca qualunque scritta da una persona normale', { delay: 150 });
   await pausa(1500);
-  // Al più una: il clic nel campo è un gesto che seleziona, e lo prende la prima selezione della pagina.
-  expect((await conti(app)).spiega - prima).toBeLessThanOrEqual(1);
+  // Nessuna: né il clic nel campo né le lettere selezionano niente (#1070.1).
+  expect((await conti(app)).spiega - prima).toBe(0);
 });
 
 test('il controllo della parola lo paga il tasto che chiude una parola, non ogni lettera', async ({ app, openTab, testServer }) => {
@@ -446,6 +446,88 @@ test('un gesto paga solo la cosa che ha toccato: scrivere nella ricerca non paga
   const p = await puntoDellaParola(page, 'p2', 'Pitagora');
   await page.mouse.dblclick(p.x, p.y);
   await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(1);
+});
+
+// I tre casi di #1070.1: la pagina seleziona proprio sotto il clic, che però da solo non seleziona niente.
+const PAGINA_CLIC = `<!doctype html><meta charset="utf-8">
+<body style="font:20px sans-serif;padding:30px;margin:0">
+<p id="pp">Il ciclo dell'acqua porta il vapore <button id="bp" style="font:20px sans-serif">Evidenzia</button> in alto e lo restituisce come pioggia sulle montagne.</p>
+<p id="pl">La deriva dei continenti <a id="al" href="#fondo">sposta</a> le placche di pochi centimetri ogni anno.</p>
+<input id="ic" style="display:block;font:20px monospace;width:640px">
+<p id="pv">Le maree dipendono dalla Luna e dal Sole, che tirano gli oceani in direzioni diverse.</p>
+</body>`;
+
+test('la pagina che seleziona dove si clicca non paga spiegazioni: pulsante, collegamento, campo; trascinare, doppio clic e Maiusc+clic sì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await apri(app, openTab, testServer, PAGINA_CLIC);
+  // A ogni clic la pagina seleziona un testo sempre diverso: il resto del paragrafo del pulsante, la frase del
+  // collegamento, l'indirizzo che scrive nel campo (come i campi «copia il link»).
+  await page.evaluate(() => {
+    let n = 0;
+    const scegli = (da, a, dove, fino) => {
+      const r = document.createRange();
+      r.setStart(da, dove); r.setEnd(a, fino);
+      getSelection().removeAllRanges(); getSelection().addRange(r);
+    };
+    document.getElementById('bp').addEventListener('click', () => {
+      const t = document.getElementById('pp').lastChild;
+      n += 1;
+      scegli(t, t, n % 6, 25 + (n % 6));
+    });
+    document.getElementById('al').addEventListener('click', (e) => {
+      e.preventDefault();
+      const p = document.getElementById('pl');
+      n += 1;
+      scegli(p.firstChild, p.lastChild, n % 6, p.lastChild.textContent.length - (n % 3));
+    });
+    const ic = document.getElementById('ic');
+    ic.addEventListener('click', () => {
+      n += 1;
+      ic.value = `https://esempio.it/condividi/${n}/ricetta-della-nonna`;
+      ic.select();
+    });
+  });
+  const clicca = async (sel) => {
+    await page.locator(sel).click();
+    await pausa(700);
+    return page.evaluate(() => {
+      const a = document.activeElement;
+      return a && a.tagName === 'INPUT' ? a.value.slice(a.selectionStart, a.selectionEnd) : getSelection().toString();
+    });
+  };
+  const viste = new Set();
+  for (const sel of ['#bp', '#al', '#ic']) {
+    for (let i = 0; i < 5; i++) viste.add(await clicca(sel));
+  }
+  // La pagina ha davvero selezionato quindici testi diversi sotto i clic.
+  expect(viste.size).toBe(15);
+  await pausa(1000);
+  expect((await conti(app)).spiega).toBe(0);
+
+  // Le strade vere restano: trascinare sul testo, il doppio clic, Maiusc+clic che allarga la selezione.
+  // Punti interi: con coordinate frazionarie il trascinamento sintetico di Playwright qui non seleziona niente.
+  const parola = async (w) => {
+    const q = await puntoDellaParola(page, 'pv', w);
+    return { x: Math.round(q.x), y: Math.round(q.y) };
+  };
+  const a = await parola('maree');
+  const b = await parola('Luna');
+  await page.mouse.move(a.x - 20, a.y);
+  await page.mouse.down();
+  await page.mouse.move(b.x, b.y, { steps: 6 });
+  await page.mouse.up();
+  expect(await page.evaluate(() => getSelection().toString())).toContain('maree dipendono');
+  await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(1);
+  const c = await parola('oceani');
+  await page.mouse.dblclick(c.x, c.y);
+  await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(2);
+  await pausa(600);
+  const d = await parola('diverse');
+  await page.keyboard.down('Shift');
+  await page.mouse.click(d.x, d.y);
+  await page.keyboard.up('Shift');
+  expect(await page.evaluate(() => getSelection().toString())).toContain('oceani in direzioni');
+  await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(3);
 });
 
 test('chi esce dalla casella e ci rientra, anche col fuoco dato dalla pagina, ritrova il correttore sottolineato', async ({ app, openTab, testServer }) => {

@@ -110,13 +110,13 @@ test('gesto: una chiamata col tipo la paga solo il gesto che la chiede, non un t
     assert.equal(g.prendi('parola', G.CHIUDE), false);
     ev('keyup', k);
   }
-  // Maiusc+frecce, Ctrl/Cmd+A, il mouse e il dito selezionano; la freccia senza Maiusc no.
+  // Maiusc+frecce, Ctrl/Cmd+A e il doppio clic selezionano; la freccia senza Maiusc no. Il mouse e il dito: il test dopo.
   ev('keydown', 'ArrowRight');
   assert.equal(g.prendi('spiega', G.SELEZIONA), false);
   ev('keyup', 'ArrowRight');
   for (const [type, key, extra] of [['keydown', 'ArrowRight', { shiftKey: true }], ['keydown', 'End', { shiftKey: true }],
     ['keydown', 'a', { ctrlKey: true, code: 'KeyA' }], ['keydown', 'a', { metaKey: true, code: 'KeyA' }],
-    ['mouseup'], ['dblclick'], ['touchend']]) {
+    ['dblclick']]) {
     ev(type, key, extra);
     assert.equal(g.prendi('spiega', G.SELEZIONA), true, `${type} ${key || ''} seleziona`);
     if (key) ev('keyup', key, extra);
@@ -131,6 +131,68 @@ test('gesto: una chiamata col tipo la paga solo il gesto che la chiede, non un t
   ev('keyup', 'Control');
   c.avanti(G.FINESTRA_MS + 1);
   assert.equal(g.prendi('spiega', G.SELEZIONA), false, 'scaduto');
+});
+
+// Un clic semplice non può fare una selezione: se ne compare una dopo, l'ha fatta la pagina (#1070.1).
+test('gesto: un clic semplice non seleziona; trascinare, doppio e triplo clic, Maiusc+clic e la pressione lunga del dito sì', () => {
+  const c = orologio();
+  const nuovo = () => {
+    const g = G.crea(c.ora);
+    const ev = (type, x, y, extra = {}) => g.suEvento({ isTrusted: true, type, clientX: x, clientY: y, detail: 1, ...extra });
+    const dito = (type, x, y) => g.suEvento({ isTrusted: true, type, detail: 0, changedTouches: [{ clientX: x, clientY: y }] });
+    return { ev, dito, seleziona: () => g.prendi('spiega', G.SELEZIONA) };
+  };
+
+  let { ev, dito, seleziona } = nuovo();
+  ev('mouseup', 300, 300);
+  assert.equal(seleziona(), false, 'un rilascio senza pressione vista non è un trascinamento');
+  // Il clic semplice, anche col puntatore che trema di poco e con la coppia pointer*/mouse* che Chromium manda.
+  for (const d of [0, 1, G.SPOSTAMENTO_PX.puntatore]) {
+    ev('pointerdown', 100, 100, { pointerType: 'mouse', detail: 0 });
+    ev('mousedown', 100, 100);
+    assert.equal(seleziona(), false, 'la pressione da sola non seleziona');
+    c.avanti(120);
+    ev('pointerup', 100 + d, 100, { pointerType: 'mouse', detail: 0 });
+    ev('mouseup', 100 + d, 100);
+    assert.equal(seleziona(), false, `un clic che si sposta di ${d} px non seleziona`);
+    c.avanti(500);
+  }
+  // Il mouse tenuto fermo a lungo non seleziona: la pressione lunga seleziona solo col dito.
+  ev('mousedown', 100, 100); c.avanti(2000); ev('mouseup', 100, 100);
+  assert.equal(seleziona(), false);
+  // Trascinare, anche lentamente.
+  ev('mousedown', 100, 100); c.avanti(3000); ev('mouseup', 160, 104);
+  assert.equal(seleziona(), true, 'trascinare seleziona');
+  // Doppio e triplo clic: la pressione che conta due o tre seleziona già lei; poi il dblclick.
+  for (const detail of [2, 3]) {
+    ev('mousedown', 100, 100, { detail });
+    assert.equal(seleziona(), true, `pressione numero ${detail}`);
+    ev('mouseup', 100, 100, { detail });
+  }
+  ev('dblclick', 100, 100, { detail: 2 });
+  assert.equal(seleziona(), true);
+  // Maiusc+clic allarga la selezione.
+  ev('mousedown', 200, 100, { shiftKey: true });
+  assert.equal(seleziona(), true, 'Maiusc+clic seleziona');
+
+  ({ ev, dito, seleziona } = nuovo());
+  // Il tocco breve no, anche se il dito trema; nemmeno i mousedown/mouseup che Chromium aggiunge dopo un tocco.
+  dito('touchstart', 50, 50); c.avanti(150); dito('touchend', 58, 54);
+  ev('mousedown', 58, 54); ev('mouseup', 58, 54);
+  assert.equal(seleziona(), false, 'un tocco non seleziona');
+  // La pressione lunga del dito e il dito che trascina (le maniglie della selezione) sì, anche via pointer*.
+  dito('touchstart', 50, 50); c.avanti(G.PRESSIONE_LUNGA_MS); dito('touchend', 50, 50);
+  assert.equal(seleziona(), true, 'pressione lunga');
+  dito('touchstart', 50, 50); c.avanti(150); dito('touchend', 50, 50 + G.SPOSTAMENTO_PX.dito + 1);
+  assert.equal(seleziona(), true, 'il dito che trascina');
+  ev('pointerdown', 50, 50, { pointerType: 'touch', detail: 0 }); c.avanti(G.PRESSIONE_LUNGA_MS);
+  ev('pointerup', 50, 50, { pointerType: 'touch', detail: 0 });
+  assert.equal(seleziona(), true, 'pressione lunga vista dai pointer*');
+  // Il tocco di un dito non fa da pressione al mouse: un mouseup lontano da un tocco non è un trascinamento.
+  ({ ev, dito, seleziona } = nuovo());
+  dito('touchstart', 10, 10);
+  ev('mouseup', 300, 300);
+  assert.equal(seleziona(), false);
 });
 
 test('gesto: paga solo la cosa che ha toccato; il rilascio del mouse tocca anche dove è cominciata la pressione', () => {
