@@ -142,7 +142,6 @@ async function cerca(wc, { cosa, cartella = '', origine = '', avanzamento = null
     indice: indicePerLaPagina(r && r.indice),
     fermata: !!(r && r.fermata),
     cartellaMancante: (r && r.cartellaMancante) || '',
-    percorsi: risultati.map((x) => x.percorso),
   };
   return {
     ok: true,
