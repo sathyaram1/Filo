@@ -440,3 +440,26 @@ test('il testo di altri resta segnato nella conversazione, anche dopo una ripres
   assert.equal(ripetuto.thread.length, s.thread.length);
   assert.equal(O.haTestoDiAltri(ripetuto), true);
 });
+
+test('la scelta dell’autonomia resta legata al turno di Filo che la mostrava, anche dopo una ripresa (#1188)', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'user', text: 'sono Anna' });
+  s = O.appendTurn(s, { role: 'filo', text: 'Quanto vuoi che faccia da solo?', autonomia: true });
+  const ripreso = O.normalize(JSON.parse(JSON.stringify(s)));
+  assert.equal(ripreso.thread[1].autonomia, true, 'chi riapre l’intervista ritrova la scelta sotto la domanda');
+  // Il segno vale solo sotto una bolla di Filo: un messaggio dell'utente non porta una scelta.
+  const finto = O.normalize({ thread: [{ role: 'user', text: 'ciao', autonomia: true }] });
+  assert.equal(finto.thread[0].autonomia, undefined);
+  // Lo stesso turno ripartito non si duplica, ma il segno lo prende.
+  let r = O.appendTurn(O.emptyState(), { role: 'filo', text: 'Quanto vuoi che faccia da solo?' });
+  r = O.appendTurn(r, { role: 'filo', text: 'Quanto vuoi che faccia da solo?', autonomia: true });
+  assert.equal(r.thread.length, 1);
+  assert.equal(r.thread[0].autonomia, true);
+});
+
+test('l’autonomia è una voce da scoprire, e la si spunta dopo la scelta (#1188)', () => {
+  const voce = O.ITEMS.find((i) => i.id === 'autonomia');
+  assert.equal(voce.kind, 'scoprire');
+  assert.match(voce.applica, /"autonomia": true/, 'il modello deve sapere come mostrare la scelta');
+  assert.match(voce.applica, /cambia solo lui/, 'e che il livello non lo cambia lui');
+  assert.match(O.renderChecklistForPrompt(O.emptyState()), /\[ \] autonomia/);
+});
