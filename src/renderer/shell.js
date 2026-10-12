@@ -1083,6 +1083,24 @@
   // La barra si riconcilia per id (#1089): un aggiornamento tocca solo le schede cambiate e i nodi restano gli
   // stessi, così bagliore audio e suggerimenti non ripartono; misure e scorrimento si rifanno solo quando servono.
   const schedeVive = new Map(); // id → .tab
+
+  // Il main rispedisce un'icona solo quando cambia (`faviconUguale`): le altre si riprendono dall'ultimo snapshot.
+  // Solo byte già scaricati dal main con la sessione della scheda: un indirizzo qui girerebbe nella sessione della barra (#1083).
+  const iconeNote = new Map(); // id → { dato, giro }
+  function conIcone(snap) {
+    if (!snap || !Array.isArray(snap.tabs)) return snap;
+    const vive = new Map();
+    for (const t of snap.tabs) {
+      const id = String(t.id);
+      const prima = iconeNote.get(id);
+      if (t.faviconUguale) t.favicon = prima ? prima.dato : '';
+      const dato = /^data:image\//.test(t.favicon || '') ? t.favicon : '';
+      vive.set(id, prima && prima.dato === dato ? prima : { dato, giro: (prima ? prima.giro : 0) + 1 });
+    }
+    iconeNote.clear();
+    for (const [id, nota] of vive) iconeNote.set(id, nota);
+    return snap;
+  }
   const STILI_SCHEDA = ['--tab-active', '--tab-ink', '--tab-bg-eff', '--tab-bg-hover', '--tab-glow-color'];
   let firmaMisura = '';
   let attivaInVista = null;
@@ -1143,7 +1161,9 @@
       const glow = hasColorIdentity(t.color) ? t.color : coloreDelSito(t);
       if (glow) d.stili['--tab-glow-color'] = glow;
     }
-    d.icona = t.loading ? null : (t.favicon || '');
+    // Nella firma l'icona entra col suo numero di giro: un data: URL da centinaia di KB a ogni ridisegno bloccava la barra.
+    const nota = iconeNote.get(String(t.id));
+    d.icona = t.loading ? null : (nota && nota.dato ? nota.giro : '');
     d.paese = t.proxy && t.proxy.country ? String(t.proxy.country).toUpperCase() : '';
     d.titolo = tabLabel(t);
     d.audio = t.muted ? 'muta' : suona ? 'suona' : '';
@@ -1187,7 +1207,8 @@
 
     const p = el._parti;
     p.ico.className = d.icona === null ? 'spinner' : 'favicon';
-    p.ico.style.backgroundImage = d.icona ? `url("${d.icona}")` : '';
+    const nota = d.icona ? iconeNote.get(id) : null;
+    p.ico.style.backgroundImage = nota && nota.dato ? `url("${nota.dato}")` : '';
 
     // Indicatore "aperta da un altro paese": globo + codice paese accanto al
     // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
@@ -2231,10 +2252,10 @@
 
   api.tabs.onUpdate((snap) => {
     fermaLarghezzeSeChiusa(snap);
-    state = snap;
+    state = conIcone(snap);
     render();
   });
-  api.tabs.snapshot().then((snap) => { state = snap; render(); });
+  api.tabs.snapshot().then((snap) => { state = conIcone(snap); render(); });
 
   // ─── Velo d'ombra "modalità annotazione" feedback ──────────────────────────
   // Il box feedback vive in un content script sulla pagina e da lì oscura solo

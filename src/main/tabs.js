@@ -19,6 +19,7 @@ const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
 const MenuDiRiserva = require('./menuDiRiserva');
+const IconaScheda = require('./services/iconaScheda');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -912,7 +913,9 @@ class TabManager {
       view,
       title: 'Nuova scheda',
       url,
+      // `favicon` è il data: URL che vede la barra; `faviconUrl` l'indirizzo dichiarato dalla pagina, per archivio e salvati.
       favicon: '',
+      faviconUrl: '',
       loading: true,
       canBack: false,
       canFwd: false,
@@ -1161,7 +1164,7 @@ class TabManager {
         Archive.archive({
           url,
           title: tab.title || url,
-          favicon: tab.favicon || '',
+          favicon: tab.faviconUrl || '',
           identityColor: tab.identityColor || null,
           openedAt: tab.openedAt || null,
           closedAt: new Date().toISOString(),
@@ -1568,6 +1571,26 @@ class TabManager {
     if (tab.color === next) return;
     tab.color = next;
     this._broadcast();
+  }
+
+  // L'icona la scarica il main con la sessione di questa scheda: la barra riceve solo byte già scaricati (#1083).
+  // Fino all'arrivo resta quella di prima: un'icona che cambia nella stessa pagina (un contatore) non lampeggia.
+  _aggiornaIcona(tab, wc, candidati) {
+    const lista = (Array.isArray(candidati) ? candidati : []).filter((u) => typeof u === 'string' && u);
+    tab.faviconUrl = lista[0] || '';
+    const giro = (tab._giroIcona || 0) + 1;
+    tab._giroIcona = giro;
+    const vivo = () => tab._giroIcona === giro && !!tab.view && tab.view.webContents === wc && !wc.isDestroyed();
+    let interna = false;
+    try { interna = /^filo:/i.test(wc.getURL() || ''); } catch (_) {}
+    IconaScheda.iconaPer(wc.session, lista, { interna, vivo }).then(({ url, dato }) => {
+      if (!vivo()) return;
+      if (url) tab.faviconUrl = url;
+      try { tab._origineIcona = origineDi(wc.getURL()); } catch (_) {}
+      if (tab.favicon === dato) return;
+      tab.favicon = dato;
+      this._broadcast();
+    }, () => {});
   }
 
   // Colore IDENTITÀ del sito (§1.2): theme-color/manifest/favicon calcolato dal
@@ -2516,7 +2539,7 @@ class TabManager {
       update({ title: title || tab.title });
       this.visite.titolo(wc, title);
     });
-    wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
+    wc.on('page-favicon-updated', (_e, favicons) => this._aggiornaIcona(tab, wc, favicons));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
       // #412 — questa scheda ha committato una vera navigazione main-frame:
       // NON è più il "contenitore vuoto" di un download (una scheda aperta da un
@@ -2524,6 +2547,9 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // L'icona in volo era del documento di prima; quella mostrata vale ancora solo sullo stesso sito.
+      tab._giroIcona = (tab._giroIcona || 0) + 1;
+      if (origineDi(url) !== tab._origineIcona) tab.favicon = '';
       // Testo e titolo letti sono della pagina di prima: sotto l'indirizzo nuovo partirebbero col suo nome (#1004).
       // Una pagina senza titolo non lo cambia mai: vale quello del documento nuovo, cioè l'indirizzo, come negli altri browser.
       tab.contentExtract = '';
@@ -3402,11 +3428,27 @@ class TabManager {
     this.anteprime.pota(new Set(this.tabs.map((t) => t.id)));
     // La shell è il primary webContents della BrowserWindow.
     try {
-      this.win.webContents.send('tabs:updated', this.snapshot());
+      this.win.webContents.send('tabs:updated', this._snapshotPerBarra());
     } catch (_) { /* shell non ancora caricata */ }
     this.barra.aggiornaNav();
     this._annunciaVista();
     this._persistSession();
+  }
+
+  // Alla barra un'icona viaggia solo quando cambia: rispedirle tutte a ogni aggiornamento la bloccava con icone pesanti (#1083).
+  // Chi la riceve riprende le altre dall'ultimo snapshot; quello chiesto con tabs:snapshot resta intero.
+  _snapshotPerBarra() {
+    const snap = this.snapshot();
+    const prima = this._iconeInviate || new Map();
+    this._iconeInviate = new Map();
+    for (const t of snap.tabs) {
+      this._iconeInviate.set(t.id, t.favicon);
+      if (t.favicon && prima.get(t.id) === t.favicon) {
+        delete t.favicon;
+        t.faviconUguale = true;
+      }
+    }
+    return snap;
   }
 
   // ─── persistenza sessione (riapri i tab alla riapertura di Filo) ──────────
@@ -3526,6 +3568,10 @@ class TabManager {
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
+
+function origineDi(url) {
+  try { return new URL(url).origin; } catch (_) { return ''; }
+}
 
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.
