@@ -238,6 +238,15 @@
     return Array.isArray(thread) && thread.some((m) => m && m.role === 'user');
   }
 
+  // `daFuori`: nel turno è entrato testo di altri. `autonomia`: sotto quel turno di Filo c'era la scelta del
+  // livello, e chi riprende l'intervista la ritrova lì.
+  function segni(m) {
+    return {
+      ...(m && m.daFuori === true ? { daFuori: true } : {}),
+      ...(m && m.role === 'filo' && m.autonomia === true ? { autonomia: true } : {}),
+    };
+  }
+
   function normalizeThread(raw) {
     return Array.isArray(raw)
       ? raw
