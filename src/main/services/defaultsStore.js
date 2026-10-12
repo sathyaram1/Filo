@@ -900,6 +900,8 @@ module.exports = {
   setAutomationAutoApprove,
   getAutomationProberIdle,
   setAutomationProberIdle,
+  getLavoriServer,
+  setLavoriServer,
   getRoutinesEnabled,
   setRoutinesEnabled,
   getRoutineCaps,
