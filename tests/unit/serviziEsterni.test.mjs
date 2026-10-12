@@ -453,24 +453,59 @@ test('prova: un servizio che sparisce dal codice rende rossa la sua voce', () =>
 });
 
 // Rianalizza un file di src/ con un testo diverso, lasciando il resto com'è.
-function conFile(f, testo) {
+function conFile(f, testo, base = ANALISI) {
   const nuovo = analizza({ [f]: testo });
-  const chiamate = new Set([...ANALISI.chiamate].filter((x) => x !== f));
+  const chiamate = new Set([...base.chiamate].filter((x) => x !== f));
   if (nuovo.chiamate.has(f)) chiamate.add(f);
   return {
-    indirizzi: [...ANALISI.indirizzi.filter((u) => u.file !== f), ...nuovo.indirizzi],
+    indirizzi: [...base.indirizzi.filter((u) => u.file !== f), ...nuovo.indirizzi],
     chiamate,
-    testi: new Map([...ANALISI.testi, [f, nuovo.testi.get(f)]]),
+    testi: new Map([...base.testi, [f, nuovo.testi.get(f)]]),
   };
 }
 
+// Le prove guardano solo quello che il loro cambio aggiunge: un rosso vero altrove in src/ resta del suo test.
+const nuovi = (controllo, a, base = ANALISI) => {
+  const prima = new Set(controllo(base));
+  return controllo(a).filter((x) => !prima.has(x));
+};
+
 const WALLET = 'src/main/services/handlers/wallet.js';
+const FX = 'src/main/services/fxRates.js';
 
 test('prova: un host nuovo composto da una costante, in un file già nell’elenco, è rosso', () => {
   const a = conFile(WALLET, SORGENTI[WALLET] + "\nconst HOST_NUOVO = 'nuovo.example';\nfetch(`https://${HOST_NUOVO}/api`);\nfetch('https://' + HOST_NUOVO);\n");
-  const r = compostiScoperti(a);
+  const r = nuovi(compostiScoperti, a);
   assert.equal(r.length, 2, r.join('\n'));
   assert.ok(r.every((x) => x.startsWith(WALLET)));
+});
+
+test('prova: una richiesta con l’host in una costante, scritta con le opzioni, in un file già nell’elenco, è rossa', () => {
+  const a = conFile(FX, SORGENTI[FX] + "\nconst HOST_NUOVO = 'nuovo.example';\nrequire('node:https').request({ hostname: HOST_NUOVO, path: '/api' });\n");
+  assert.deepEqual(nuovi(indirizziScoperti, a).map((x) => x.replace(/:\d+ /, ' ')), [`${FX} https://nuovo.example`]);
+  const b = conFile(FX, SORGENTI[FX] + "\nconst host = 'nuovo.example';\nrequire('https').get({ host, path: '/' });\n");
+  assert.deepEqual(nuovi(indirizziScoperti, b).map((x) => x.replace(/:\d+ /, ' ')), [`${FX} https://nuovo.example`]);
+});
+
+test('prova: una richiesta con l’host calcolato nelle opzioni va dichiarata come indirizzo composto', () => {
+  const a = conFile(FX, SORGENTI[FX] + "\nrequire('node:tls').connect({ host: scegliHost(), port: 443 });\n");
+  const r = nuovi(compostiScoperti, a);
+  assert.equal(r.length, 1, r.join('\n'));
+  assert.ok(r[0].startsWith(FX) && r[0].includes('scegliHost()'));
+});
+
+test('prova: un indirizzo rimasto in una costante senza più chiamate rende rossa la sua voce', () => {
+  const testo = SORGENTI[FX].replace(/\bfetch\s*\(/g, 'nonChiama(');
+  assert.notEqual(testo, SORGENTI[FX], 'i cambi non chiamano più con fetch: aggiorna la prova');
+  const morte = vociMorte(conFile(FX, testo));
+  assert.ok(morte.some((m) => m.startsWith('cambi-valuta:')), morte.join('\n'));
+});
+
+test('prova: un indirizzo nuovo vero accende la sentinella, non le prove qui sopra', () => {
+  const base = conFile('src/main/services/zzNuovo.js', "module.exports = () => fetch('https://nuovo-servizio.example/api');\n");
+  assert.equal(indirizziScoperti(base).length, 1);
+  const a = conFile(WALLET, SORGENTI[WALLET] + "\nrequire('electron').net.request({ protocol: 'https:', hostname: 'altro.example', path: '/' });\n", base);
+  assert.deepEqual(nuovi(indirizziScoperti, a, base).map((x) => x.replace(/:\d+ /, ' ')), [`${WALLET} https://altro.example`]);
 });
 
 test('prova: un host intero seguito da un’espressione è un indirizzo fisso, e si confronta con l’elenco', () => {
