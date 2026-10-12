@@ -98,7 +98,11 @@
       });
     } catch (_) {}
     document.addEventListener('transitionend', dopoUnCambio, { capture: true, passive: true });
+    document.addEventListener('animationend', dopoUnCambio, { capture: true, passive: true });
     try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', dopoUnCambio); } catch (_) {}
+    // Lo stile può cambiare senza nessun evento (una regola aggiunta al foglio, un foglio sostituito): un campione
+    // al secondo a pagina visibile chiude tutte quelle porte insieme; senza cambio di colore non parte niente.
+    setInterval(() => { if (document.visibilityState === 'visible') schedule(); }, 1000);
     // Primo campione subito + ritardati per le pagine che colorano dopo il paint.
     schedule();
     setTimeout(schedule, 400);
