@@ -366,14 +366,20 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   const voci = (Array.isArray(entries) ? entries : []).filter((e) => e && typeof e === 'object');
   // Senza voci non c'è niente da mostrare: la pagina risponderebbe col vuoto e il menu resterebbe «aperto» senza comparire.
   if (!voci.length) return;
+  apri(parentWin, { voci, x: Number(x) || 0, y: Number(y) || 0, scelta: typeof onSelect === 'function' ? onSelect : null, ripresa: false });
+}
+
+function apri(parentWin, r) {
   if (inVista && inVista.parent !== parentWin) chiudi(inVista);
   const s = finestraDi(parentWin);
   if (!s) return;
   if (s.aperto) chiudi(s);
-  s.posa = posizione(parentWin, voci, Number(x) || 0, Number(y) || 0);
+  const { voci } = r;
+  s.richiesta = r;
+  s.posa = posizione(parentWin, voci, r.x, r.y);
   s.giro++;
   s.aperto = true;
-  s.scelta = typeof onSelect === 'function' ? onSelect : null;
+  s.scelta = r.scelta;
   s.mostratoAlle = Date.now();
   inVista = s;
   // La finestra compare quando la pagina conferma le voci nuove (popup-menu:pronto), mai con quelle di prima.
