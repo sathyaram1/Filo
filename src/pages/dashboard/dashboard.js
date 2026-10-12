@@ -215,6 +215,7 @@
     },
     setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
+    rispondi: (testo) => submitMessage(testo),
   });
   Carte.init({
     send,
