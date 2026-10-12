@@ -230,7 +230,7 @@ function creaDeposito({ cartella, meseDi }) {
   }
 
   return {
-    carica, tutti, prendi, aggiungi, aggiungiMolti, aggiorna, togli, svuota,
+    carica, tutti, prendi, aggiungi, aggiungiMolti, aggiorna, togli, riscrivi, svuota,
     numero: () => record.size,
     cartella: () => cartella,
   };
