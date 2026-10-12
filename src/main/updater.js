@@ -670,7 +670,7 @@ function controllaAdesso(tettoMs = 20000) {
     const ascolti = [
       ['update-available', (info) => fine(R.releaseCoerente(info) ? { esito: 'nuova', versione: info.version } : { esito: 'rifiutata' })],
       ['update-not-available', () => fine({ esito: 'nessuna' })],
-      ['error', (e) => fine({ esito: 'errore', messaggio: e?.message || String(e || '') })],
+      ['error', (e) => fine(e && e.rifiutata ? { esito: 'rifiutata' } : { esito: 'errore', messaggio: e?.message || String(e || '') })],
     ];
     for (const [ev, fn] of ascolti) updater.on(ev, fn);
     const timer = setTimeout(() => fine({ esito: 'tempo' }), tettoMs);
