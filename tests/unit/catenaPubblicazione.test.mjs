@@ -106,6 +106,7 @@ describe('il tag v* lo crea l\'app di pubblicazione, quando c\'è', () => {
   const iApp = ps.findIndex((p) => /uses:\s*actions\/create-github-app-token@/.test(p));
   const iPubblica = ps.findIndex((p) => /gh release edit[^\n]*--draft=false/.test(p));
   const iBuild = ps.findIndex((p) => /run:\s*npm run release\s*$/m.test(p));
+  const iNumero = ps.findIndex((p) => /scripts\/release-bump\.mjs/.test(p));
   const COL_FALLBACK = /GH_TOKEN:\s*\$\{\{\s*steps\.app\.outputs\.token\s*\|\|\s*secrets\.GITHUB_TOKEN\s*\}\}/;
 
   test('il token dell\'app si conia solo se la variabile c\'è, prima della bozza', () => {
