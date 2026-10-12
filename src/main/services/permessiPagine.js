@@ -451,8 +451,8 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
         callback(Boolean(typeof esterno === 'function' && esterno(url) && gestoRecente(wc)));
         return;
       }
-      const tipo = TIPI[permission];
-      if (!tipo) { callback(INNOCUI.has(permission)); return; }
+      const tipo = tipoDi(permission, details);
+      if (!tipo) { callback(senzaTipoPassa(permission)); return; }
       // Una richiesta di media senza microfono né fotocamera è la condivisione dello schermo, che Filo non sa dare.
       if (tipo === 'media' && !partiNote(details).length) { callback(false); return; }
       const parti = partiDi(tipo, details);
@@ -461,7 +461,7 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       if (decise.every((x) => x === true)) { callback(true); return; }
       if (decise.some((x) => x === false) || SOLO_CONTROLLO.has(permission)) { callback(false); return; }
       if (DOPO_UN_GESTO.has(permission) && !gestoRecente(wc)) { callback(false); return; }
-      chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi: schedaDi || (() => null) });
+      chiedi({ ses, wc, origine, tipo, parti, oggetto: oggettoDi(tipo, details), callback, schedaDi: schedaDi || (() => null) });
     });
   } catch (_) {}
   try {
