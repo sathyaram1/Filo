@@ -22,7 +22,7 @@
         'Quando un post o un video di un altro sito resta vuoto e Filo non lo conosce, la foto che manda a un modello per capire se sono i cookie la puoi spegnere: in Sicurezza, sotto i cookie, «Riconosci con un modello i contenuti incorporati rotti», o chiedendolo a Filo. Da spento quel riquadro lo riattivi col tasto destro.',
       ],
       fixes: [
-        'Nella chat dell\'Editor la casella cresce finché leggi tutta la tua domanda, fino a due terzi del riquadro. Prima dopo quattro righe cominciava a scorrere, e su Mac e Linux bastava una frase. Mentre scrivi, l\'ultima risposta di Filo resta in vista.',
+        'Nella chat dell\'Editor la casella cresce finché leggi tutta la tua domanda, fino a due terzi del riquadro. Prima dopo quattro righe cominciava a scorrere, e su Mac e Linux bastava una frase. Con la finestra piccola microfono e invio passano sotto e la casella prende tutta la riga. Mentre scrivi, l\'ultima risposta di Filo resta in vista.',
         'Filo vede ancora le foto che gli mandi in chat anche nei messaggi dopo, e puoi continuare a chiedergli di quello che c\'è dentro; riaprendo la chat le ritrovi anche tu. Prima dal secondo messaggio diceva di non vederle. Dopo una ventina di messaggi, o se riapri Filo, non le ha più davanti, ma sa che c\'erano e ti chiede di rimandarle se gli servono.',
         'Mentre scorri o scrivi in una pagina, Filo non ridisegna più la barra delle schede e non risalva i suoi dati a ogni movimento. Menu e chat rispondono senza scatti e la batteria dura di più.',
         'Preferenze, Modelli e le altre pagine di Filo si aprono un po\' più svelte dalla terza volta in poi. Filo tiene da parte il loro codice già preparato e non lo rifà a ogni apertura.',
