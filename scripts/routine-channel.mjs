@@ -1262,6 +1262,7 @@ if (isMain) {
         console.error('Non ho rilasciato niente: sistema il push e rilancia lo stesso comando (--senza-push solo se qui non c\'è un repo).');
         process.exit(1);
       }
+      if (p.avviso) console.error(p.avviso);
       console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
     }
     // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da
