@@ -196,6 +196,9 @@ export function readTicketReply(status, body) {
     // vecchio: chi guida ripiega sul worker generico.
     const out = { outcome: 'work', ticket: String(b.ticket) };
     if (typeof b.role === 'string' && b.role) out.role = b.role;
+    // Modello e sforzo decisi dal server per questo lavoro (#1189): assenti vale la definizione dell'agente. Il gancio
+    // dell'orchestratore li controlla e li mette (lib/orchestratore-cieco.mjs).
+    for (const k of ['model', 'effort']) if (typeof b[k] === 'string' && b[k].trim()) out[k] = b[k].trim();
     return out;
   }
   if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
