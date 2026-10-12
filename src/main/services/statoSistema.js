@@ -430,7 +430,7 @@ while ($true) {
       $rete.connessioni = $connessioni
     } catch {}
   }
-  if ($rete.profili -or $rete.connessioni) { $o.rete = $rete }
+  if (($null -ne $rete.profili) -or ($null -ne $rete.connessioni)) { $o.rete = $rete }
   if ($attendi) {
     $letto = $false
     try {
