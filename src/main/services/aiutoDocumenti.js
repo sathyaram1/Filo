@@ -27,7 +27,7 @@ const perScheda = new WeakMap();
 function statoDi(wc) {
   let s = perScheda.get(wc);
   if (s) return s;
-  s = { dati: null, chiavi: new Map(), ferma: null };
+  s = { dati: null, chiavi: new Map(), ferma: null, chiede: false };
   perScheda.set(wc, s);
   // Una pagina nuova è un'altra conversazione dell'Aiuto: le chiavi della vecchia non aprono più niente.
   try {
