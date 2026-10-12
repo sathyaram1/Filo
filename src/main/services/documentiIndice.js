@@ -376,8 +376,9 @@ function aspettaStop(segnale) {
 
 function riassuntoIndice(rs, sotto) {
   let documenti = 0; let conTesto = 0; let scansioni = 0; let senzaTesto = 0;
+  const qui = sottoUna(sotto);
   for (const [p, v] of voci || new Map()) {
-    if (!sotto.some((c) => dentro(p, c))) continue;
+    if (!qui(p)) continue;
     documenti += 1;
     if (v.t) conTesto += 1;
     else if (v.vuoto) scansioni += 1;
