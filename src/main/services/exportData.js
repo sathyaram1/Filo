@@ -512,16 +512,27 @@ function unisciPagine(local, imported, tetto) {
   return { lista, fuori, mieFuori };
 }
 
+// Dal backup esce solo ciò che è già scaduto, che suonerebbe appena importato: una sveglia singola di domani,
+// un timer in corso o in pausa restano contenuto; una ricorrente punta sulla prossima volta.
 function unisciSveglie(local, imported, prossima, adesso) {
   const out = Array.isArray(local) ? local.slice() : [];
   const ids = new Set(out.map((t) => t && t.id));
   for (const t of Array.isArray(imported) ? imported : []) {
-    if (!t || !t.id || ids.has(t.id) || t.kind !== 'alarm' || !Array.isArray(t.repeat) || !t.repeat.length) continue;
-    const at = typeof prossima === 'function' ? prossima(t, adesso) : null;
-    if (!Number.isFinite(at)) continue;
-    const s = { ...t, endsAt: new Date(at).toISOString(), paused: false };
-    delete s.ringing;
-    delete s.remainingMs;
+    if (!t || !t.id || ids.has(t.id)) continue;
+    let s = null;
+    if (t.kind === 'alarm' && Array.isArray(t.repeat) && t.repeat.length) {
+      const at = typeof prossima === 'function' ? prossima(t, adesso) : null;
+      if (!Number.isFinite(at)) continue;
+      s = { ...t, endsAt: new Date(at).toISOString(), paused: false };
+      delete s.ringing;
+      delete s.remainingMs;
+    } else if (t.ringing) {
+      continue;
+    } else if (t.paused && Number.isFinite(t.remainingMs) && t.remainingMs > 0) {
+      s = { ...t };
+    } else if (!t.paused && Date.parse(t.endsAt) > adesso) {
+      s = { ...t };
+    } else continue;
     out.push(s);
     ids.add(t.id);
   }
