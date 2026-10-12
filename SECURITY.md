@@ -56,16 +56,27 @@ password — la sicurezza è un requisito di design, non un'aggiunta successiva.
 
 ## 1. Identità e accesso (account)
 
-**Stato: 🔜 (in implementazione)**
+**Stato: ✅ (attivo)**
 
-L'accesso a Filo avviene tramite **"Accedi con Google"** (Google OAuth 2.0).
-Le ragioni:
+Per usare Filo non serve un account. Al primo bisogno Filo crea da sé
+un'**identità anonima per la tua installazione**: un account Firebase senza
+email né password, su cui poggiano crediti e portafoglio
+(`src/main/auth/anon-auth.js`).
+
+L'accesso con **"Accedi con Google"** (Google OAuth 2.0) è facoltativo. Se lo
+fai, Filo collega l'account Google all'identità della tua installazione, così
+crediti e portafoglio restano dove sono. Se quell'account è già collegato a
+un'altra installazione, per esempio su un secondo computer, l'accesso riesce
+lo stesso, ma le due installazioni restano due identità distinte
+(`src/main/auth/google-auth.js`).
+
+Perché l'accesso passa da Google:
 
 - Non gestiamo password: niente database di password da proteggere, niente
   reset, niente furti di credenziali lato nostro.
 - Google fornisce già autenticazione a due fattori e recupero account.
-- Un unico account funziona su tutti i dispositivi (oggi desktop; in futuro
-  telefono, TV…), che è il modello "una super-app per tutti i tuoi
+- Un unico account potrà valere su tutti i dispositivi (oggi desktop; in
+  futuro telefono, TV…), che è il modello "una super-app per tutti i tuoi
   dispositivi" verso cui Filo va.
 
 ### Come avviene il login (flusso tecnico)
