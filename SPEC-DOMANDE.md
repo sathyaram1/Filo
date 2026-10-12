@@ -336,22 +336,24 @@ porta alla domanda, e non in Ricevuti.
 
 ### 4.1 Compiti ricorrenti
 
-Un compito ricorrente è un **modello** scritto dall'owner (quindi fidato): un
-testo di istruzioni, una cadenza e un ambito. All'ora giusta il server ne crea
-un'istanza: un feedback fidato, priorità 3, tipo `compito`, con `nonPrimaDi`.
-L'orchestratore lo prende come ogni altro lavoro.
+Un compito ricorrente lo scrive l'owner (quindi è fidato): un testo di
+istruzioni, una cadenza, un ambito, un'urgenza, un modello e uno sforzo.
+All'ora giusta il server ne crea un'istanza: un compito fidato (§ 6) con
+`nonPrimaDi`. L'orchestratore lo prende come ogni altro lavoro. Un'istanza non
+ancora iniziata quando nasce la successiva si chiude come «superata»: le
+istanze non si accumulano.
 
-Un ruolo generico `compito` esegue il testo del modello. I permessi li dà
+Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
 l'ambito, non il ruolo.
 
-| Quando (ora italiana) | Compito | Ambito |
-|---|---|---|
-| ogni giorno | revisione delle domande (§ 3.6) | `domande` |
-| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` |
-| ogni giorno | monitoraggio (§ 4.3) | `monitor` |
-| lunedì | riordino della coda (§ 6) | `coda` |
-| lunedì | potatura dei rami fusi | `rami` |
-| domenica | audit di sicurezza | `lavoro` |
+| Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale |
+|---|---|---|---|---|
+| ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus |
+| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus |
+| ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus |
+| lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) |
+| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare |
+| domenica | audit di sicurezza | `lavoro` | 45 | Opus |
 
 Si vedono e si cambiano in Routine → Compiti ricorrenti.
 
