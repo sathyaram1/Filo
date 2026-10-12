@@ -1,0 +1,105 @@
+// Sentinella: nel repo, che è pubblico, non entra una copia di dati del server (#1108).
+// Il 02/07/2026 una copia di lavoro di 300 feedback (testi, user agent, identificativi) è stata committata e spedita
+// dal salvataggio automatico: tolta dall'albero, resta nella storia. La forma la riconosce scripts/lib/copie-di-dati.mjs.
+
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { copieNelRepo, motivoCopia, motivoCopiaTesto, CARTELLA_FINTI } from '../../scripts/lib/copie-di-dati.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+const DOC = 'projects/filo/databases/(default)/documents/feedback/abc123';
+const RISPOSTA_FIRESTORE = {
+  documents: [{
+    name: DOC,
+    fields: { text: { stringValue: 'il tasto non va' }, userAgent: { stringValue: 'Mozilla/5.0' }, clientId: { stringValue: 'c-1' } },
+    createTime: '2026-07-02T10:00:00Z',
+  }],
+};
+const FEEDBACK_IN_CHIARO = [
+  { id: 'abc123', text: 'il tasto non va', clientId: 'c-1', userAgent: 'Mozilla/5.0' },
+  { id: 'def456', text: 'grazie', clientId: 'c-2', userAgent: 'Mozilla/5.0' },
+];
+
+describe('copie di dati del server fuori dal repo', () => {
+  test('nessun file tracciato ha la forma di una copia di dati del server', () => {
+    const trovate = copieNelRepo(ROOT);
+    assert.deepEqual(trovate, [],
+      'questi file sono copie di dati del server, e il repo è pubblico: '
+      + trovate.map((c) => `${c.file} (${c.motivo})`).join('; ')
+      + '. Le copie di lavoro si scrivono in os.tmpdir(); i dati finti per le prove in tests/fixtures/. '
+      + 'Si tolgono con `git rm --cached <file>`, ma restano nella storia già spedita: va detto all\'owner nel report');
+  });
+
+  test('i nomi delle copie di lavoro non entrano in git', () => {
+    for (const nome of ['scripts/_fb_dump.json', 'feedback_dump.json', 'tmp/collezione-dump-2026.jsonl',
+      'filo-copie/abc.json', 'filo-feedback/1108-x/allegato.txt']) {
+      assert.doesNotThrow(
+        () => git(ROOT, '-c', 'core.excludesFile=/dev/null', 'check-ignore', '--no-index', '-q', nome),
+        `${nome} deve essere escluso da .gitignore: il salvataggio automatico committa e spedisce tutto il resto`);
+    }
+  });
+
+  test('un file finto con la forma di una copia: fuori da tests/fixtures la sentinella lo trova, dentro no', () => {
+    const repo = cartellaTemporanea('filo-copie-dati-');
+    git(repo, 'init', '-q');
+    mkdirSync(join(repo, 'scripts'));
+    mkdirSync(join(repo, CARTELLA_FINTI), { recursive: true });
+    writeFileSync(join(repo, 'scripts', 'lettura.json'), JSON.stringify(RISPOSTA_FIRESTORE, null, 2));
+    writeFileSync(join(repo, 'scripts', 'chiaro.json'), JSON.stringify(FEEDBACK_IN_CHIARO));
+    writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'x', scripts: { test: 'node --test' } }));
+    git(repo, 'add', '-A');
+
+    const fuori = copieNelRepo(repo);
+    assert.deepEqual(fuori.map((c) => c.file).sort(), ['scripts/chiaro.json', 'scripts/lettura.json'],
+      'una risposta di Firestore e una lista di feedback in chiaro committate nel repo vanno trovate, qualunque nome abbiano');
+
+    git(repo, 'rm', '-q', '--cached', 'scripts/lettura.json', 'scripts/chiaro.json');
+    renameSync(join(repo, 'scripts', 'lettura.json'), join(repo, CARTELLA_FINTI, 'lettura.json'));
+    renameSync(join(repo, 'scripts', 'chiaro.json'), join(repo, CARTELLA_FINTI, 'chiaro.json'));
+    git(repo, 'add', '-A');
+    assert.deepEqual(copieNelRepo(repo), [], 'in tests/fixtures/ stanno i dati finti delle prove: lì sono ammessi');
+  });
+
+  test('le forme di una copia: risposte di Firestore e feedback in chiaro, comunque impacchettati', () => {
+    const copie = {
+      'lista di documenti': RISPOSTA_FIRESTORE,
+      'lista con nomi corti': { documents: [{ name: 'abc', fields: {} }] },
+      'risposta di runQuery': [{ document: { name: DOC, fields: {} }, readTime: '2026-07-02T10:00:00Z' }],
+      'risposta di batchGet': [{ found: { name: DOC, fields: { seq: { integerValue: '3' } } } }],
+      'documento singolo': { name: DOC, fields: { seq: { integerValue: '3' } } },
+      'campi senza nome': [{ fields: { text: { stringValue: 'x' } } }],
+      'feedback in chiaro': FEEDBACK_IN_CHIARO,
+      'feedback per identificativo': { abc123: { text: 'ciao', userAgent: 'Mozilla/5.0' } },
+      'dentro un involucro': { esportati: 300, feedback: FEEDBACK_IN_CHIARO },
+      'identificativi senza testo': [{ clientIdHash: 'h', userAgent: 'Mozilla/5.0' }],
+    };
+    for (const [caso, valore] of Object.entries(copie)) {
+      assert.notEqual(motivoCopia(valore), '', `${caso}: è una copia di dati del server`);
+      assert.notEqual(motivoCopiaTesto(JSON.stringify(valore, null, 2)), '', `${caso}, come testo: è una copia`);
+    }
+    const righe = FEEDBACK_IN_CHIARO.map((f) => JSON.stringify(f)).join('\n');
+    assert.notEqual(motivoCopiaTesto(righe), '', 'una riga JSON per feedback è una copia anche lei');
+    assert.notEqual(motivoCopiaTesto(`﻿${JSON.stringify(RISPOSTA_FIRESTORE)}`), '', 'il BOM di un file salvato su Windows non la nasconde');
+  });
+
+  test('quello che copia non è resta fuori: configurazioni, schemi, indici, testi', () => {
+    const non = {
+      'package.json': { name: 'filo', scripts: { test: 'x' }, dependencies: { electron: '1' } },
+      'indici di Firestore': { indexes: [{ collectionGroup: 'feedback', fields: [{ fieldPath: 'seq', order: 'ASCENDING' }] }] },
+      'uno schema': { properties: { text: { type: 'string' }, clientId: { type: 'string' }, userAgent: { type: 'string' } } },
+      'soli testi': [{ text: 'a' }, { text: 'b' }],
+      'name e fields come elenco': { name: 'modulo', fields: ['a', 'b'] },
+    };
+    for (const [caso, valore] of Object.entries(non)) assert.equal(motivoCopia(valore), '', `${caso}: non è una copia`);
+    for (const testo of ['', '   ', 'testo normale', '// commento\nexport const a = 1;', '{ rotto', '[1, 2, 3]']) {
+      assert.equal(motivoCopiaTesto(testo), '', `${JSON.stringify(testo)} non è una copia`);
+    }
+  });
+});
