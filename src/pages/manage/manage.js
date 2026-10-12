@@ -1041,7 +1041,7 @@
 
   // ── Modello e sforzo per fase (config/routines.roleModels, #1193) ──────────
   // Ogni tendina salva la sua sola foglia appena cambia. Stesse regole delle sessioni qui sopra: mai un valore
-  // non letto sullo schermo, e una risposta partita prima non riscrive una scelta confermata dopo.
+  // non letto sullo schermo, e una risposta partita prima non riscrive una scelta confermata dopo (#675).
   const ROLE_GET = (window.SN_MSG?.MSG?.AUTOMATION_ROLE_MODELS_GET) || 'automation_role_models_get';
   const ROLE_SET = (window.SN_MSG?.MSG?.AUTOMATION_ROLE_MODELS_SET) || 'automation_role_models_set';
   const RM = window.SN_ROUTINE_MODELLI;

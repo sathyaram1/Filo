@@ -1257,11 +1257,12 @@
        «Definizione dell'agente» anche nella colonna di una finestra media. */
     .mg-role-models {
       display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 6px 10px; align-items: center; margin-top: 12px; max-width: 520px;
+      gap: 6px 8px; align-items: center; margin-top: 12px; max-width: 520px;
     }
     .mg-role-head { font-size: 12px; font-weight: 600; color: var(--sn-muted); }
     .mg-role-name { grid-column: 1 / -1; margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--sn-fg); }
-    .mg-role-models .sn-select-button { padding: 6px 10px; }
+    /* Un punto e due di margine in meno: a 1280px la colonna è la più stretta, e lì la scritta deve starci intera. */
+    .mg-role-models .sn-select-button { padding: 6px 8px; font-size: 12px; }
 
     /* Fusioni ferme senza una segnalazione alle spalle: l'aspetto sta tutto in mergeApprovals.css, qui solo la
        spaziatura. Niente tetto: stanno in Automazioni, che scorre da sé. */

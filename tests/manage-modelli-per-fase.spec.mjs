@@ -173,7 +173,7 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
 test('«Definizione dell\'agente» si legge intera, anche nella colonna stretta', async ({ app, openTab }) => {
   await preparaServer(app);
   const page = await apri(openTab);
-  for (const [w, h] of [[1536, 864], [1000, 800]]) {
+  for (const [w, h] of [[1536, 864], [1280, 800], [1000, 800]]) {
     await app.evaluate(({ BrowserWindow }, s) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(s[0], s[1]); }, [w, h]);
     await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeGreaterThan(w - 60);
     await expect(tendina(page, 'prober', 'effort').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
