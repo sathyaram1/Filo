@@ -2030,7 +2030,8 @@ export function emit(bucket, ctx) {
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
-  const instructions = serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base;
+  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
+  const instructions = server || serial ? [base.replace(/\s+$/, ''), server, serial].filter(Boolean).join('\n\n') : base;
   const stampaCon = (payload) => ({ role: bucket.role, payload, claim: bucket.id || null, instructions });
   let payload = pieno;
   try {
