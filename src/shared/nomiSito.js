@@ -17,7 +17,9 @@
   // chat (#225, #835): schema, percorso, porta, «www.», «*.» e virgolette via, un nome accentato nella forma «xn--»
   // con cui il sito si confronta. '' se non c'è un dominio valido.
   function dominio(raw) {
-    let s = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '').replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
+    // «*.sito.it» e «.sito.it» valgono «sito.it» come nella lista del main: si tolgono prima di leggere
+    // l'indirizzo, perché URL scrive la stella come «%2A».
+    let s =String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '').replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
     if (!s) return '';
     try { s = new URL(s.includes('://') ? s : `http://${s}`).hostname; } catch (_) { if (s.includes('://')) return ''; }
     s = s.split('/')[0].split('?')[0].split(':')[0].replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
