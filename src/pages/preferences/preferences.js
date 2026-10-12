@@ -1351,16 +1351,10 @@
     if (serve === 'no') { mostraAutonomia(livelloSalvato); return; }
     if (serve === 'conferma') {
       sceltaInCorso = true;
-      const info = Autonomia.infoLivello(nuovo);
       const Ui = window.SN_CONFIRM_UI;
       let ok = false;
       try {
-        ok = Ui ? await Ui.confirmTyped({
-          title: `Autonomia: ${info.nome}`,
-          text: `Filo farà da solo più cose di adesso.\n\n${info.frase}`,
-          avviso: 'Così Filo si fida di più.',
-          okLabel: 'Cambia',
-        }) : false;
+        ok = Ui ? await Ui.confirmTyped(Autonomia.confermaAlzata(nuovo)) : false;
       } finally { sceltaInCorso = false; }
       if (!ok) { mostraAutonomia(livelloSalvato); return; }
     }

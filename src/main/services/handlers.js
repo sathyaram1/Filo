@@ -2293,18 +2293,28 @@ async function eseguiAzioneFilo(action, {
         const state = await FiloMem.getOnboarding();
         if (state.done) return { executed: false, kept: false };
         const raw = action.spunta ?? action.spunte ?? action.fatto ?? action.done_items ?? action.ids;
-        const ids = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-        const { state: ticked } = Onboarding.tick(state, ids);
         const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+        // #1188 — la scelta dell'autonomia la fa l'utente sotto la risposta: qui si mostra e basta, il livello no.
+        // Finché è a schermo senza risposta la voce non si spunta e l'intervista non si chiude, anche da un'altra
+        // azione dello stesso turno: chiusa, la scelta sparirebbe con la chat. La regola sta nello stato dell'intervista.
+        const sceltaAutonomia = truthy(action.autonomia);
+        const inSospeso = sceltaAutonomia || Onboarding.autonomiaInSospeso(state);
+        const ids = (Array.isArray(raw) ? raw : (raw ? [raw] : []))
+          .filter((x) => !(inSospeso && String(x || '').trim().toLowerCase() === 'autonomia'));
+        const spuntato = Onboarding.tick(state, ids).state;
+        const ticked = sceltaAutonomia ? Onboarding.mostraSceltaAutonomia(spuntato) : spuntato;
         // L'intervista finisce quando lo dice Filo, quando l'elenco è finito, o
         // quando è andata troppo per le lunghe: chiudere è comunque lo stato in
         // cui l'utente vuole trovarsi, e da Preferenze la si rilancia.
-        const wantsEnd = truthy(action.fine ?? action.chiudi ?? action.done ?? action.finito);
+        const wantsEnd = !inSospeso && truthy(action.fine ?? action.chiudi ?? action.done ?? action.finito);
         const next = (wantsEnd || Onboarding.shouldForceClose(ticked))
           ? Onboarding.close(ticked)
           : ticked;
         await saveOnboarding(next);
-        return { executed: true, kept: false };
+        if (!sceltaAutonomia) return { executed: true, kept: false };
+        let livello = '';
+        try { livello = globalThis.SN_AUTONOMIA.livelloAttivo(((await Storage.getSettings()) || {}).autonomia?.livello); } catch (_) {}
+        return { executed: true, kept: true, output: { sceltaAutonomia: true, livello } };
       }
       case 'SALVA_LEZIONE': {
         // Qui ci si arriva solo dopo l'OK dell'utente sul testo esatto (livello
@@ -3953,6 +3963,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
+  if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
+    const A = globalThis.SN_AUTONOMIA;
+    const ora = A ? A.infoLivello(res.output.livello).nome : '';
+    return `Sotto la tua risposta l'utente vede i livelli di autonomia${ora ? ` (adesso è ${ora})` : ''} e sceglie lui con un clic: `
+      + `la scelta ti arriva come suo messaggio. Non dire di averlo cambiato tu.${doveStaIlTesto(giro)}`;
+  }
   if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
   if (soloBottone(type) && res.kept && !res.needsConfirm) {
     return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}.${doveStaIlTesto(giro)}`;
@@ -4846,7 +4862,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (onbActive) {
     let after = await FiloMem.getOnboarding();
     if (textReply && textReply !== '(vuoto)') {
-      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply, ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}) });
+      after = Onboarding.appendTurn(after, {
+        role: 'filo', text: textReply,
+        ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}),
+        ...(renderedActions.some((x) => x && x._output && x._output.sceltaAutonomia) ? { autonomia: true } : {}),
+      });
     }
     if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
     await saveOnboarding(after);

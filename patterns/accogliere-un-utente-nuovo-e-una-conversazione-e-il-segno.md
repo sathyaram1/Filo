@@ -21,6 +21,13 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
 - **Chi decide che è finita lo dice con un'azione** (`ONBOARDING` nel registro
   dei livelli), ma il codice ha comunque le sue due uscite: elenco finito, o
   troppi scambi. Un'accoglienza che non finisce mai è peggio di una incompleta.
+- **Una scelta che spetta solo all'utente si mostra, non si applica** (#1188):
+  il livello di autonomia il modello non lo può cambiare, quindi `ONBOARDING`
+  con `autonomia: true` mette i livelli sotto la sua domanda e l'utente sceglie
+  con le regole di Preferenze (alzare vuole «conferma»). Finché la domanda è in
+  sospeso il clic è anche la risposta. Mentre la scelta è a schermo la voce non
+  si spunta e l'intervista non si chiude, se no la scelta sparirebbe con la chat.
+  Il turno di Filo si salva col segno, e alla ripresa la scelta è ancora lì.
 - **L'ultimo atto è il RISULTATO, non un "fatto"**: alla chiusura le lezioni
   raccolte vengono compattate **subito** in memoria (compattazione forzata, non
   la soglia normale) e Filo genera la prima home personale. L'ordine conta:
