@@ -682,6 +682,30 @@ export function serialAwarenessNote(role, history, dropped = 0) {
   return '';
 }
 
+// ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ─────────────────────
+
+const LAVORO_SERVER_FILE = '_lavoro-server.md';
+
+/** Dove sta il clone di filo-security di un lavoro server: fuori dal checkout di Filo. PURA (legge l'ambiente). */
+export function cartellaCloneServer(env = process.env) {
+  return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
+}
+
+/** Il clone cade dentro il checkout di Filo? L'hook di salvataggio lo pubblicherebbe intero. PURA. */
+export function cloneDentroIlRepo(clone, root) {
+  const norm = (p) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p));
+  const r = relative(norm(root), norm(clone));
+  return r === '' || (!r.startsWith('..') && !isAbsolute(r));
+}
+
+/** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
+export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
+  const f = resolve(ROLES_DIR, LAVORO_SERVER_FILE);
+  if (!existsSync(f)) return '';
+  const avanti = (p) => String(p).split('\\').join('/');
+  return readFileSync(f, 'utf8').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
+}
+
 // L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
 export { verifierScope };
 export function perimetroNote(scope, perimetro) {
