@@ -458,6 +458,13 @@ test('editor: col microfono accanto, la casella della chat mostra tutto il sugge
   expect(piena.h).toBeGreaterThan(vuota.h);
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella.png` });
+  // Un testo che non ci sta scorre dentro la casella: il modulo non trabocca e la conversazione resta in vista.
+  await casella.fill('una domanda lunghissima sul documento '.repeat(30));
+  const lunga = await misura();
+  expect(lunga.sh).toBeGreaterThan(lunga.ch);
+  const [c, mod, reg] = await Promise.all([casella.boundingBox(), chat.boundingBox(), chat.locator('[data-chat="log"]').boundingBox()]);
+  expect(c.y + c.height).toBeLessThanOrEqual(mod.y + mod.height);
+  expect(reg.height).toBeGreaterThan(50);
 });
 
 // Un Esc o un Invio mentre l'ultima frase è ancora in trascrizione: quello che arriva resta nella casella.
