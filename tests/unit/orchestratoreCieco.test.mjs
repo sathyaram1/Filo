@@ -96,7 +96,7 @@ test('installa: unisce alle impostazioni utente senza toccare il resto, e una se
     assert.deepEqual(s.permissions, { allow: ['Bash(ls)'] });
     assert.deepEqual(s.env, { MIO: '1', ...AMBIENTE });
     assert.deepEqual(s.hooks.PreToolUse[0], altrui);
-    for (const [ev, matcher] of [['PreToolUse', 'Agent|Task'], ['PostToolUse', 'Agent|Task'], ['ConfigChange', 'user_settings']]) {
+    for (const [ev, matcher] of [['PreToolUse', 'Agent|Task'], ['PostToolUse', 'Agent|Task'], ['ConfigChange', undefined]]) {
       const nostri = s.hooks[ev].filter((g) => g.hooks.some((h) => h.command.includes(ETICHETTA)));
       assert.equal(nostri.length, 1, `${ev}: una voce sola anche dopo due installazioni`);
       assert.equal(nostri[0].matcher, matcher);
