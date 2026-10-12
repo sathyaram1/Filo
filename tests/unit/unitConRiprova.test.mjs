@@ -25,6 +25,22 @@ describe('quali file si rifanno', () => {
     assert.deepEqual(fileRossi('# fail 1\n', win), [], 'senza un file riconoscibile non si rifà niente: il rosso resta');
   });
 
+  // Le frasi le scrive il lanciatore: se cambiano lì, questa diventa rossa invece di far tornare il falso verde (#1184).
+  test('una prima corsa che non ha detto tutto non si riprova: le frasi sono quelle del lanciatore', () => {
+    const somma = (rossi) => ({ test: 2, pass: 1, fail: rossi.length, annullati: 0, saltati: 0, todo: 0, rossi });
+    const r1 = { gruppo: 1, nome: 'x', file: join(ROOT, A), riga: 3 };
+    const conRiepilogo = (t) => `${rosso(A)}# fail 1\n${t}\n`;
+    assert.equal(corsaIncompleta(`${rosso(A)}# fail 1\n`), '', 'un rosso normale, col suo riepilogo, si riprova');
+    assert.notEqual(corsaIncompleta(conRiepilogo(testoFermo([join(ROOT, B)], 4000))), '', 'un file appeso');
+    assert.notEqual(corsaIncompleta(conRiepilogo(testoFermo([], 4000))), '', 'niente avanzava');
+    assert.notEqual(corsaIncompleta(conRiepilogo(testoRiepilogo({ somma: somma([r1]), gruppi: 3, file: 3, esiti: [1, 1], interrotto: true }))), '', 'interrotta');
+    assert.notEqual(corsaIncompleta(conRiepilogo(testoRiepilogo({ somma: somma([r1]), gruppi: 2, file: 2, esiti: [1, 1] }))), '', 'gruppo rosso senza colpevole');
+    assert.notEqual(corsaIncompleta(rosso(A)), '', 'senza riepilogo node non è arrivato in fondo');
+    const gruppi = `[test:unit] gruppo 1 di 2 (1 file)\n${rosso(A)}# fail 1\n[test:unit] gruppo 2 di 2 (1 file)\nok 1 - y\n`;
+    assert.notEqual(corsaIncompleta(gruppi), '', 'un gruppo senza riepilogo');
+    assert.equal(corsaIncompleta(`${gruppi}# fail 0\n`), '', 'ogni gruppo col suo riepilogo');
+  });
+
   test('ripassato è chi era rosso e alla riprova non lo è più; una riprova rotta non scagiona nessuno', () => {
     assert.deepEqual(ripassati([A, B], { codice: 0, rossiRiprova: [] }), [A, B]);
     assert.deepEqual(ripassati([A, B], { codice: 1, rossiRiprova: [A] }), [B]);
