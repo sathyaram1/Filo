@@ -602,7 +602,8 @@ module.exports = function register(on, ctx) {
       const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
       const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
       const routinesEnabled = await Defaults.getRoutinesEnabled(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled };
+      const lavoriServer = await Defaults.getLavoriServer(idToken);
+      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
