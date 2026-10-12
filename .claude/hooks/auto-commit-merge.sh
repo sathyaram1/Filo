@@ -304,6 +304,7 @@ salva_cartella() {
     segnala_avviso "$wt" "le modifiche NON sono state committate (git add e' fallito): $(motivo_git "$ESITO_ADD"). Il salvataggio non e' avvenuto e le modifiche restano nella cartella: se e' un index.lock a terra e nessun git e' in corso, si toglie; al primo salvataggio dopo si riprova."
     return 0
   }
+  togli_copie_di_dati "$wt"
   if git diff --cached --quiet 2>/dev/null; then
     return 0
   fi
