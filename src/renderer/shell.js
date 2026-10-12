@@ -1024,10 +1024,11 @@
     const crescita = tieni ? crescitaInVigore : crescitaMisurata;
     passoInVigore = passo;
     crescitaInVigore = crescita;
+    // La striscia divide in proporzione solo lo spazio oltre il padding: la crescita si conta sul contenuto.
+    const contenuto = (w) => Math.max(1, Math.ceil(w - bordi));
     schede.forEach((el, i) => {
-      const chiesta = i === ia ? passo * crescita : passo;
-      el.style.setProperty('--tab-chiesta', `${Math.max(0, Math.ceil(chiesta - bordi))}px`);
-      if (i === ia) el.style.setProperty('--tab-crescita', String(crescita));
+      el.style.setProperty('--tab-chiesta', `${contenuto(i === ia ? passo * crescita : passo)}px`);
+      if (i === ia) el.style.setProperty('--tab-crescita', String(contenuto(passo * crescita) / contenuto(passo)));
       el.classList.remove('misura');
     });
   }
