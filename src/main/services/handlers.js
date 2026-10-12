@@ -1351,6 +1351,13 @@ function perimetroLettura(sender) {
   return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
 }
 
+// La shell delle Preferenze che eseguirà i comandi dell'assistente, già risolta per questo sistema.
+async function shellDeiComandi() {
+  let settings = {};
+  try { settings = await Storage.getSettings(); } catch (_) {}
+  return require('./terminal').resolveShell(settings.terminal && settings.terminal.shell);
+}
+
 async function segretiCustoditi() {
   let salvate = {};
   let effettive = {};
