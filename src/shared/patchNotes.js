@@ -45,6 +45,7 @@
         'I pulsanti che aprono una ricevuta, un report o un pagamento in una finestra nuova funzionano: la scheda mostra quello che il sito ci scrive, e il sito la può richiudere. Una pagina che chiede di chiudersi chiude solo la sua scheda, non più tutto Filo.',
         'Filo ti avvisa quando un sito si spaccia per un marchio famoso anche se sta su un servizio che ospita i siti di altri, come Weebly, Wix o Google Traduttore. Prima se ne accorgeva solo su pochi servizi, come GitHub Pages. Le immagini di Discord e le pagine dei marchi stessi su GitHub, come quelle di Google o Microsoft, non hanno più l\'avviso.',
         'Il controllo dei siti pericolosi non manda più a Google gli indirizzi che visiti.',
+        '«Accedi con Google» ti fa entrare anche su un secondo computer. Prima confermavi nel browser, ma Filo restava fuori e non te lo diceva; su Linux senza portachiavi succedeva a ogni riapertura. E il browser non ti chiede più il consenso a ogni accesso, solo quale account usare.',
         'Le schede in alto mostrano il titolo intero quando nella fila c\'è posto, e con tante schede aperte ne mostrano un pezzo più lungo. Prima una scheda si fermava alle prime lettere anche con mezza fila vuota.',
         'La scheda aperta prende il colore della pagina anche quando la pagina lo cambia dopo il caricamento, per esempio accendendo il suo tema scuro.',
         'La bozza di un feedback lasciata a metà resta sul sito dove l\'hai cominciata, e la ritrovi riaprendo il feedback lì. E sui siti la spiegazione, la Modifica e il feedback non prendono più lo stile della pagina: niente bottoni tutti maiuscoli o lettere spaziate.',
@@ -52,7 +53,6 @@
         'L\'Aiuto prende le istruzioni per assistenti solo dal sito su cui sei. Un sito non può più fargli leggere quello che c\'è sul tuo router o su altri dispositivi della rete di casa.',
         'Su Linux il correttore ortografico non scarica più i dizionari da Google, e su Windows nemmeno per le lingue che il sistema non corregge: quelli di italiano e inglese sono dentro Filo e funzionano anche senza rete.',
         'Quando riscatti un invito, la conferma dice quanti crediti d’ingresso ricevi. Prima nominava anche i crediti contati sul tuo computer, e sembrava che te li togliesse.',
-        '«Accedi con Google» ti fa entrare anche su un secondo computer. Prima confermavi nel browser, ma Filo restava fuori e non te lo diceva; su Linux senza portachiavi succedeva a ogni riapertura. E il browser non ti chiede più il consenso a ogni accesso, solo quale account usare.',
       ],
     },
     {
