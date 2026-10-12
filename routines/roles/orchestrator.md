@@ -41,6 +41,8 @@ feedback, non scegli ruoli, non lanci merge: sei cieco per design.
      rete, e per il caso in cui `main` si sia mosso nel frattempo.
 5. **Biglietto**: `node scripts/routine-channel.mjs ticket "<parola-d-ordine>" --json`
    → `{"ticket":"…","role":"…"}`: il ruolo ti serve per scegliere il worker.
+   Se il server ha deciso modello e sforzo ci sono anche `model` ed `effort`:
+   non ti servono, li registra il comando e li mette il gancio al lancio.
    La parola d'ordine arriva nel prompt della schedulazione e NON va mai
    esportata nell'ambiente. exit 2 → chiudi (niente da fare); exit 3 → chiudi
    (in dubbio ci si ferma: meglio un giro saltato che un giro senza controlli).
