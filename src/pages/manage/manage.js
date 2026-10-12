@@ -74,6 +74,10 @@
   const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
   const mgAccountsWarn    = document.getElementById('mgAccountsWarn');
   const mgPriorityWarn    = document.getElementById('mgPriorityWarn');
+  // Modello e sforzo per fase: le tendine le crea buildRoleModels, una per `${ruolo}.${campo}`.
+  const mgRoleModels      = document.getElementById('mgRoleModels');
+  const mgRoleModelsMsg   = document.getElementById('mgRoleModelsMsg');
+  const roleSelects       = new Map();
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
