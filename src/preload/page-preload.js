@@ -16,6 +16,9 @@
 const { ipcRenderer, webFrame } = require('electron');
 const path = require('node:path');
 
+// Prima di qualunque HTML scritto da Filo: la CSP della pagina non è la sua (#1122).
+try { require('./mondo-esente.js')(webFrame); } catch (e) { console.error('[Filo CS] mondo esente', e); }
+
 // Prima di ogni ascoltatore: una pagina che si riscrive non spegne Filo (#686.1).
 let riscrittura = null;
 try { riscrittura = require('./riscrittura.js')(); } catch (e) { console.error('[Filo CS] riscrittura', e); }
