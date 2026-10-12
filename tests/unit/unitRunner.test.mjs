@@ -652,3 +652,31 @@ test('i test non vedono chi è la sessione che li lancia: una routine e una sess
     togliCartella(casa);
   }
 });
+
+test('nemmeno dalla cartella di Claude: col biglietto in cartella un test non misura la sessione che lo lancia (#730.6)', () => {
+  const casa = cartellaTemporanea('filo-runner-claude-');
+  try {
+    // La sessione che lancia: il suo transcript sta dove il ripiego lo cerca, per la cartella da cui partono i test.
+    const claude = join(casa, 'claude-della-sessione');
+    const progetto = join(claude, 'projects', slugProgetto(ROOT));
+    mkdirSync(progetto, { recursive: true });
+    const turno = { type: 'assistant', message: { id: 'm1', model: 'claude-opus-5-5', usage: { input_tokens: 10, output_tokens: 5 } } };
+    writeFileSync(join(progetto, 'sessione-vera.jsonl'), `${JSON.stringify(turno)}\n`);
+    const lavoro = join(casa, 'lavoro');
+    mkdirSync(join(lavoro, '.claude'), { recursive: true });
+    writeFileSync(join(lavoro, '.claude', 'routine-ticket.json'), '{}');
+    const prove = join(casa, 'prove');
+    mkdirSync(prove);
+    writeFileSync(join(prove, 'crediti.test.mjs'), [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      `import { misureCrediti } from ${JSON.stringify(pathToFileURL(join(ROOT, 'scripts', 'routine-channel.mjs')).href)};`,
+      `test('crediti', () => { assert.deepEqual(misureCrediti({ root: ${JSON.stringify(lavoro)} }), {}); });`,
+    ].join('\n'));
+    const r = lanciaSu(prove, [], { CLAUDE_CONFIG_DIR: claude, FILO_ROUTINE: '1' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^ok 1 - crediti$/m);
+  } finally {
+    togliCartella(casa);
+  }
+});
