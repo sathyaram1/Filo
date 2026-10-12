@@ -270,7 +270,7 @@
     },
   ];
 
-  // Link che si aprono solo se l'utente li apre: il servizio lo contatta la scheda o il browser di sistema, non Filo da solo.
+  // Link che partono solo se l'utente li apre: li contatta la scheda o il browser di sistema, non Filo da solo.
   const LINK_APERTI = [
     {
       id: 'ricerca-google', nome: 'Google, come motore di ricerca',

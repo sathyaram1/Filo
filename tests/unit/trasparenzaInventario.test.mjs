@@ -158,6 +158,8 @@ const INDIRIZZI = {
   'www.google.com': { frase: 'Il servizio di icone di Google' },
   'lens.google.com': { frase: 'apre Google Lens' },
   'raw.githubusercontent.com': { frase: 'GitHub, EasyList e Fanboy' },
+  'github.com': { frase: 'All\'avvio GitHub riceve la richiesta della versione più recente' },
+  'redirector.gvt1.com': { frase: 'Google, per i dizionari del correttore.' },
   'easylist.to': { frase: 'GitHub, EasyList e Fanboy' },
   'secure.fanboy.co.nz': { frase: 'GitHub, EasyList e Fanboy' },
   'easylist-downloads.adblockplus.org': { frase: 'EasyList la pubblica su adblockplus.org' },
