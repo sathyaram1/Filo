@@ -122,4 +122,81 @@ describe('copie di dati del server fuori dal repo', () => {
       `una copia spedita resta nella storia pubblica anche se tolta subito: ${spediti}`);
     assert.match(r.stdout, /feedback\.json.*export\.txt|export\.txt.*feedback\.json/, 'la sessione sa cosa non è partito e perché');
   });
+
+  // Le altre strade che spediscono: il commit del rilascio, un commit a mano spedito dal salvataggio dopo (#1108 giro 2).
+  function ramoConStrumenti() {
+    const s = scene();
+    gitScena(s.work, ['checkout', '-q', '-b', 'claude/prova']);
+    mkdirSync(join(s.work, 'scripts', 'lib'), { recursive: true });
+    for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(s.work, f));
+    gitScena(s.work, ['add', '-A']);
+    gitScena(s.work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'strumenti']);
+    gitScena(s.work, ['push', '-q', 'origin', 'claude/prova']);
+    return s;
+  }
+  const spediti = (origin) => gitScena(origin, ['ls-tree', '-r', '--name-only', 'claude/prova']).split('\n');
+  const commitAMano = (work, msg) => {
+    gitScena(work, ['add', '-A']);
+    gitScena(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', msg]);
+  };
+
+  test('al rilascio una copia nata da shell resta fuori dal commit e dalla vista di git, il resto parte', async () => {
+    const { commitRestante, pushRamoCorrente } = await import('../../scripts/routine-channel.mjs');
+    const s = ramoConStrumenti();
+    writeFileSync(join(s.work, 'scripts', 'feedback.json'), JSON.stringify(RISPOSTA_FIRESTORE, null, 2));
+    writeFileSync(join(s.work, 'note.txt'), 'lavoro\n');
+    const c = commitRestante(s.work, { env: { FILO_ROUTINE: '1' } });
+    assert.ok(c.ok);
+    assert.deepEqual(c.fuori, ['scripts/feedback.json']);
+    assert.ok(pushRamoCorrente(s.work, { env: { FILO_ROUTINE: '1' } }).ok);
+    const su = spediti(s.origin);
+    assert.ok(su.includes('note.txt') && !su.includes('scripts/feedback.json'), `${su}`);
+    // Invisibile a git: un «git add -A» chiesto davanti a una cartella sporca non la rimette nel commit.
+    assert.equal(gitScena(s.work, ['status', '--porcelain']), '');
+  });
+
+  test('una copia entrata in un commit a mano esce dalla storia prima della spedizione, il lavoro parte', () => {
+    const s = ramoConStrumenti();
+    writeFileSync(join(s.work, 'scripts', 'feedback.json'), JSON.stringify(RISPOSTA_FIRESTORE, null, 2));
+    writeFileSync(join(s.work, 'a.txt'), 'uno\n');
+    commitAMano(s.work, 'verifica: prove');
+    writeFileSync(join(s.work, 'README.md'), 'lavoro\n');
+    const r = runHookRaw(s.work, stdinEdit(join(s.work, 'README.md')), { FILO_ROUTINE: '1' });
+    assert.equal(r.status, 0);
+    const su = spediti(s.origin);
+    assert.ok(su.includes('a.txt') && !su.includes('scripts/feedback.json'), `${su}`);
+    assert.equal(gitScena(s.origin, ['show', 'claude/prova:README.md']), 'lavoro');
+    const storia = gitScena(s.origin, ['log', '--format=', '--name-only', 'claude/prova']).split('\n');
+    assert.ok(!storia.includes('scripts/feedback.json'), 'nemmeno in un commit di mezzo');
+    assert.match(r.stdout, /feedback\.json/, 'la sessione sa cosa è stato tolto');
+  });
+
+  test('un file che era una copia ed è stato corretto dopo parte com\'è adesso, senza la copia nella storia', async () => {
+    const { pushRamoCorrente } = await import('../../scripts/routine-channel.mjs');
+    const s = ramoConStrumenti();
+    writeFileSync(join(s.work, 'dati.json'), JSON.stringify(FEEDBACK_IN_CHIARO));
+    commitAMano(s.work, 'copia');
+    writeFileSync(join(s.work, 'dati.json'), '{"soglia": 3}\n');
+    commitAMano(s.work, 'corretto');
+    assert.ok(pushRamoCorrente(s.work).ok);
+    assert.equal(gitScena(s.origin, ['show', 'claude/prova:dati.json']), '{"soglia": 3}');
+    const blob = gitScena(s.origin, ['log', '-p', '--format=', 'claude/prova', '--', 'dati.json']);
+    assert.doesNotMatch(blob, /clientId/);
+  });
+
+  test('con una fusione fra i commit da spedire il ramo non parte, e il motivo dice come toglierla a mano', async () => {
+    const { pushRamoCorrente } = await import('../../scripts/routine-channel.mjs');
+    const s = ramoConStrumenti();
+    writeFileSync(join(s.work, 'export.txt'), JSON.stringify(RISPOSTA_FIRESTORE));
+    commitAMano(s.work, 'copia');
+    gitScena(s.work, ['checkout', '-q', '-b', 'laterale', 'HEAD~1']);
+    writeFileSync(join(s.work, 'b.txt'), 'b\n');
+    commitAMano(s.work, 'laterale');
+    gitScena(s.work, ['checkout', '-q', 'claude/prova']);
+    gitScena(s.work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-edit', 'laterale']);
+    const p = pushRamoCorrente(s.work);
+    assert.equal(p.ok, false);
+    assert.match(p.reason, /export\.txt[\s\S]*git reset --soft/);
+    assert.ok(!spediti(s.origin).includes('export.txt'));
+  });
 });
