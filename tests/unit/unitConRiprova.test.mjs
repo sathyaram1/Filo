@@ -107,6 +107,15 @@ describe('la corsa vera, contro un lanciatore finto', () => {
     assert.doesNotMatch(r.stdout, /::warning::[^\n]*a\.test\.mjs/);
   });
 
+  test('un flaky e un file appeso: nessuna riprova, rosso, e il registro tiene la prima corsa intera', async () => {
+    const r = await lancia([{ codice: 1, testo: `${rosso(A)}${testoFermo([join(ROOT, B)], 4000)}\n` }, { codice: 0, testo: 'ok 1 - ripassato\n' }]);
+    assert.equal(r.codice, 1, 'i file dopo quello appeso non hanno detto niente: verde non si può dire');
+    assert.deepEqual(r.chiamate, [[]]);
+    assert.match(r.registro, /la corsa è stata chiusa/);
+    assert.match(r.stdout, /nessuna riprova/);
+    assert.doesNotMatch(r.stdout, /::warning::/);
+  });
+
   test('rosso senza un file da rifare (un lancio fallito): nessuna riprova, rosso', async () => {
     const r = await lancia([{ codice: 1, testo: '[test:unit] non sono riuscito a lanciare node\n' }]);
     assert.equal(r.codice, 1);
