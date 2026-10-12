@@ -190,6 +190,9 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     maxContextTokens: 0,
     tokens: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 },
     costUsd: 0,
+    // Richieste pagate al listino alto perché il prompt passava la soglia, per
+    // modello ({ 'claude-haiku-5-5': 3 }): un costo che si evita col contesto stretto.
+    oltreSoglia: {},
     // I turni dell'orchestratore fra il biglietto prima e questo (FUORI da
     // costUsd): senza, un terzo del consumo vero non stava in nessun rapporto.
     orchestrator: null,
