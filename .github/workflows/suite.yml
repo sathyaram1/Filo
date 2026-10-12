@@ -239,6 +239,7 @@ jobs:
 
 
           ${CODA}"
+          printf '%s\n' "${ROSSI:-(nessuna riga not ok)}"
           node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || echo "::warning::allarme non consegnato"
           exit 1
 
