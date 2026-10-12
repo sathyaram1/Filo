@@ -391,6 +391,11 @@
         if (!bubble || !bubble.isConnected) return;
         const text = (bubble.textContent || '').trim();
         bubble.remove();
+        this.aggiungiNota(text);
+      },
+      // Il testo di un giro venuto dopo una parte di risposta (#1167): la bolla resta, la nota entra qui.
+      aggiungiNota(testo) {
+        const text = String(testo || '').trim();
         if (!text) return;
         const note = document.createElement('div');
         note.className = 'dash-activity-note';
