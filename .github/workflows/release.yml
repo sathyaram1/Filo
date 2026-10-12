@@ -2,8 +2,8 @@
 #
 # COSA FA
 #   Ogni sei ore (cron) il job `scegli` prende il commit PIU' NUOVO di `main`
-#   la cui suite Playwright completa e' verde (la suite gira a ogni fusione, in
-#   suite.yml). Se e' piu' nuovo dell'ultima release: CHIEDE AL SERVER il
+#   la cui suite e' verde (Playwright su Linux e unit su Windows, a ogni fusione,
+#   in suite.yml). Se e' piu' nuovo dell'ultima release: CHIEDE AL SERVER il
 #   numero della versione nuova, builda ESATTAMENTE quel commit (installer NSIS
 #   per Windows, poi Mac e Linux) e lo pubblica come nuova GitHub Release.
 #   L'auto-update dentro Filo (electron-updater) la vede e aggiorna i tester.
