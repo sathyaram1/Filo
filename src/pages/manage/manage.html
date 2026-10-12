@@ -192,7 +192,7 @@
       border-bottom-color: var(--sn-accent);
     }
     .mg-tab[hidden] { display: none; }
-    /* Le schede che sezioni non sono (Statistiche, Modelli, Automazioni, Log) restano anche senza chiave:
+    /* Le schede che sezioni non sono (Statistiche, Red Team, Automazioni, Log) restano anche senza chiave:
        non dipendono dallo stato delle segnalazioni. */
     .mg-no-sections {
       margin: -6px 0 12px; font-size: 12px; color: var(--sn-muted);
@@ -286,8 +286,12 @@
     }
     .mg-coming-icon { font-size: 32px; opacity: 0.4; }
 
-    .mg-log { max-width: 720px; }
+    /* Worker e canale a sinistra, la traccia delle fusioni a destra: su uno schermo largo si leggono insieme. */
+    .mg-log { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px 40px; align-items: start; padding-bottom: 32px; }
+    @media (min-width: 1100px) { .mg-log { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .mg-log-col[hidden] { display: none; }
     .mg-log h2 { font-size: 18px; margin: 0 0 4px; }
+    .mg-log-col .mg-merge-approvals-recent { margin: 12px 0 24px; }
     .mg-log-intro { font-size: 13px; color: var(--sn-muted); margin: 0 0 16px; }
     .mg-log-loading, .mg-log-denied, .mg-log-empty {
       font-size: 13px; color: var(--sn-muted); padding: 24px 0;
@@ -1191,9 +1195,29 @@
       text-align: center; padding: 40px 0;
     }
 
-    .mg-automation { max-width: 640px; padding: 24px 0 32px; }
+    /* Automazioni e Modelli di supporto in una pagina sola, su tutta la larghezza (#1110). Colonne fisse e non a
+       scorrimento (`columns`): un esito che allunga un blocco non deve spostare gli altri sotto il cursore. */
+    .mg-automation {
+      padding: 24px 0 32px;
+      display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px 40px; align-items: start;
+    }
+    .mg-automation > .mg-merge-approvals { grid-column: 1 / -1; margin: 0; }
+    .mg-automation > .mg-merge-approvals[hidden] { display: none; }
+    .mg-auto-cols, .mg-sm-cols {
+      display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 20px; align-items: start;
+    }
+    @media (min-width: 900px) {
+      .mg-auto-cols, .mg-sm-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1280px) {
+      .mg-automation { grid-template-columns: minmax(0, 2fr) minmax(400px, 1fr); }
+      /* Nella terza colonna i modelli tornano uno sotto l'altro. */
+      .mg-sm-cols { grid-template-columns: minmax(0, 1fr); }
+    }
+    /* Il Red Team ha un riquadro solo: la griglia di Automazioni lo stirerebbe a due terzi della finestra. */
+    #mgRtRoot { display: block; max-width: 640px; }
     .mg-automation h2 {
-      font-size: 15px; font-weight: 700; margin: 0 0 4px; color: var(--sn-fg);
+      font-size: 15px; font-weight: 700; margin: 0 0 12px; color: var(--sn-fg);
     }
     .mg-auto-intro { font-size: 13px; color: var(--sn-muted); margin: 0 0 20px; }
     .mg-auto-block {
@@ -1204,13 +1228,14 @@
     .mg-auto-block-desc {
       font-size: 12px; color: var(--sn-muted); margin: 8px 0 0;
     }
-    .mg-auto-field-label {
-      display: block; font-size: 14px; font-weight: 600; color: var(--sn-fg);
+    /* `.sn-page` davanti: le regole generiche di pages.css su label e input vincerebbero per specificità. */
+    .sn-page .mg-auto-field-label {
+      display: block; margin: 0; font-size: 14px; font-weight: 600; color: var(--sn-fg);
     }
     .mg-auto-field-row {
       display: flex; align-items: center; gap: 10px; margin-top: 12px;
     }
-    .mg-auto-number {
+    .sn-page input.mg-auto-number {
       width: 72px; box-sizing: border-box;
       font: inherit; padding: 7px 10px; border-radius: 8px;
       border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
@@ -1233,17 +1258,9 @@
     .mg-merge-approvals { margin: 0 0 20px; }
     .mg-merge-approvals-recent { margin: 0 0 20px; }
 
-    .mg-support-models {
-      max-width: 760px;
-      padding: 24px 0 32px;
-    }
-    .mg-support-models h2 {
-      font-size: 15px; font-weight: 700; margin: 0 0 4px;
-      color: var(--sn-fg);
-    }
     .mg-support-models .mg-sm-intro {
       font-size: 13px; color: var(--sn-muted);
-      margin: 0 0 20px;
+      margin: 0 0 16px;
     }
     /* Riquadri leggeri attorno a "Chiave dei giudici" e "Modelli dei giudici", per separarli dai selettori per-giudice. */
     .mg-sm-block {
@@ -1266,7 +1283,7 @@
     }
     .mg-sm-key-state { font-weight: 400; color: var(--sn-muted); font-size: 12px; }
     /* Righe del registro giudici: la griglia base .sn-model-row ha cinque colonne, qui sono tre. */
-    .mg-sm-reg-row { grid-template-columns: 160px 1fr auto; }
+    .mg-sm-reg-row { grid-template-columns: 120px minmax(0, 1fr) auto; }
     .mg-sm-slots-title {
       margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--sn-fg);
     }
@@ -1276,8 +1293,8 @@
     }
     .mg-sm-slot {
       display: grid;
-      grid-template-columns: 200px 1fr;
-      align-items: start; gap: 8px 16px;
+      grid-template-columns: 130px minmax(0, 1fr);
+      align-items: start; gap: 8px 12px;
     }
     .mg-sm-slot label {
       font-size: 13px; font-weight: 600; color: var(--sn-fg);
@@ -1323,7 +1340,6 @@
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
       <button type="button" class="mg-tab" data-tab="stats" role="tab">Red Team</button>
-      <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab">Log</button>
       <!-- Lente di ricerca "a senso": cerca un feedback per SIGNIFICATO fra TUTTE le schede. -->
@@ -1614,424 +1630,420 @@
       </div>
     </section>
 
-    <!-- Un selettore a catena per ciascuno slot di supporto. La scelta va nel doc Firestore config/supportModels,
-       owner-gated, così la legge anche il backend filo-security. -->
-    <section class="mg-panel" id="panel-models" data-panel="models">
-      <div class="mg-support-models" id="mgSmSection">
-
-        <div class="mg-sm-loading" id="mgSmLoading">Caricamento…</div>
-        <div class="mg-sm-denied" id="mgSmDenied" hidden>
-          Questa sezione è riservata all'owner.
-        </div>
-
-        <div id="mgSmEditor" hidden>
-          <h2>Modelli di supporto</h2>
-          <p class="mg-sm-intro">
-            I giudici di sicurezza usano modelli e chiavi DEDICATI, separati dal
-            resto di Filo. Imposta qui la chiave, dai un nickname a ogni modello e
-            scegli quale modello usa ogni giudice e ogni strumento di questa
-            dashboard. Il tutto viene salvato nel cloud.
-          </p>
-
-          <!-- Chiave dei giudici: separata dal resto di Filo. -->
-          <section class="mg-sm-block" id="mgSmKeys">
-            <h3>Chiave dei giudici</h3>
-            <p class="mg-sm-block-desc">
-              I giudici usano una chiave OpenRouter dedicata, diversa da quelle
-              che usi nel resto di Filo. Lascia il campo vuoto per non cambiarla.
-            </p>
-            <label for="mgSmKeyOpenrouter">
-              OpenRouter API key
-              <span class="mg-sm-key-state" id="mgSmKeyOpenrouterState"></span>
-            </label>
-            <input type="password" id="mgSmKeyOpenrouter" placeholder="sk-or-v1-…" autocomplete="off" />
-          </section>
-
-          <section class="mg-sm-block" id="mgSmRegistry">
-            <h3>Modelli dei giudici</h3>
-            <p class="mg-sm-block-desc">
-              Dai un nome breve (nickname) a ogni modello OpenRouter che i giudici
-              possono usare. I selettori qui sotto propongono questi nickname.
-            </p>
-            <div id="mgSmRegistryList"></div>
-            <div class="sn-row" style="margin-top: 10px;">
-              <button class="sn-btn sn-btn-secondary" id="mgSmRegistryAdd" type="button">Aggiungi modello</button>
-            </div>
-          </section>
-
-          <!-- Datalist dei nickname per i dropdown del modelChainEditor, popolata da manage.js dal registro giudici. -->
-          <datalist id="nicknames-list"></datalist>
-
-          <h3 class="mg-sm-slots-title">Modello per ogni giudice</h3>
-          <div class="mg-sm-slots" id="mgSmSlots">
-            <div class="mg-sm-slot" data-slot="sanitizer">
-              <label>Sanitizer feedback</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-sanitizer"></div>
-              <span class="mg-sm-slot-desc">
-                Riscrive i feedback prima che appaiano nella board pubblica.
-              </span>
-            </div>
-
-            <div class="mg-sm-slot" data-slot="judge1">
-              <label>Giudice 1</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-judge1"></div>
-              <span class="mg-sm-slot-desc">
-                Primo giudice di sicurezza del panel (classifica i feedback in arrivo).
-              </span>
-            </div>
-
-            <div class="mg-sm-slot" data-slot="judge2">
-              <label>Giudice 2</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-judge2"></div>
-              <span class="mg-sm-slot-desc">
-                Secondo giudice di sicurezza del panel.
-              </span>
-            </div>
-
-            <div class="mg-sm-slot" data-slot="judge3">
-              <label>Giudice 3</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-judge3"></div>
-              <span class="mg-sm-slot-desc">
-                Terzo giudice di sicurezza del panel.
-              </span>
-            </div>
-
-            <div class="mg-sm-slot" data-slot="judgeDynamic">
-              <label>Giudice dinamico</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-judgeDynamic"></div>
-              <span class="mg-sm-slot-desc">
-                Quarto giudice del panel, con prompt mutevole.
-              </span>
-            </div>
-
-            <div class="mg-sm-slot" data-slot="judgeRedTeam">
-              <label>Giudice red-team</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-judgeRedTeam"></div>
-              <span class="mg-sm-slot-desc">
-                Valuta i tentativi nel canale red-team (F3).
-              </span>
-            </div>
-
-            <div class="mg-sm-slot" data-slot="judgePriority">
-              <label>Giudice priorità</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-judgePriority"></div>
-              <span class="mg-sm-slot-desc">
-                Assegna la priorità ai feedback (F5).
-              </span>
-            </div>
-          </div>
-
-          <!-- Funzioni che solo l'owner usa, nella sua app: fuori da Opzioni e Modelli predefiniti (#465). -->
-          <h3 class="mg-sm-slots-title mg-sm-slots-title--next">Modelli per la gestione</h3>
-          <div class="mg-sm-slots" id="mgSmSlotsManage">
-            <div class="mg-sm-slot" data-slot="manageSearch">
-              <label>Ricerca fra i feedback</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-manageSearch"></div>
-              <span class="mg-sm-slot-desc">
-                Ordina per pertinenza i feedback quando cerchi in questa pagina.
-                Gira sul tuo computer con la chiave del resto di Filo, non con quella dei giudici.
-              </span>
-            </div>
-            <div class="mg-sm-slot" data-slot="manageSearchClassifier">
-              <label>Classificatore della ricerca</label>
-              <div class="mg-sm-chain-host" id="mgSmChain-manageSearchClassifier"></div>
-              <span class="mg-sm-slot-desc">
-                Legge i feedback in parallelo e dice quali sono quelli che cerchi. Serve un classificatore, come Jev
-                (typesafe/jev-1.13). Se manca o non risponde, li ordina il modello qui sopra.
-              </span>
-            </div>
-          </div>
-
-          <div class="mg-sm-toolbar">
-            <button type="button" class="sn-btn" id="mgSmSaveBtn">Salva</button>
-            <span class="mg-sm-status" id="mgSmStatus" role="status"></span>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <!-- Operatività automatica di Filo: lo switch master e i parametri delle automazioni. -->
+    <!-- Automazioni e Modelli di supporto stanno in una pagina sola e su tutta la larghezza (#1110); la traccia
+       delle fusioni già decise sta nel Log, perché qui non si scorra per arrivare alle impostazioni. -->
     <section class="mg-panel" id="panel-automation" data-panel="automation">
       <div class="mg-automation">
-        <h2>Automazioni</h2>
-        <p class="mg-auto-intro">
-          Controlla l'operatività automatica di Filo: attivala o disattivala e
-          regola i parametri delle routine.
-        </p>
-
         <!-- Le fusioni ferme che NON nascono da una segnalazione (un ramo locale chiuso con `npm run finish`) non
            hanno una scheda dove vivere: senza questo elenco sparirebbero. -->
         <div class="mg-merge-approvals" id="mgMergeApprovalsOrphans" hidden></div>
 
-        <!-- La traccia delle fusioni già decise. -->
-        <div class="mg-merge-approvals-recent" id="mgMergeApprovalsRecent" hidden></div>
+        <div class="mg-auto-main">
+          <h2>Automazioni</h2>
+          <div class="mg-auto-cols">
+            <div class="mg-auto-col">
+              <!-- Interruttore master delle routine autonome. -->
+              <section class="mg-auto-block">
+                <label class="mg-switch" id="mgRoutinesSwitch" title="Ferma del tutto il lavoro autonomo delle routine">
+                  <span class="mg-switch-text">Routine autonome</span>
+                  <input type="checkbox" id="mgRoutinesToggle" checked />
+                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  <span class="mg-switch-state" id="mgRoutinesState">On</span>
+                </label>
+                <p class="mg-auto-block-desc">
+                  Spente, le sessioni automatiche partono ma non fanno niente: nessun
+                  lavoro sul codice, nessuna verifica, nessuna esplorazione. I feedback
+                  restano in coda e ti aspettano.
+                  <span class="mg-action-msg" id="mgRoutinesMsg" role="status"></span>
+                </p>
+              </section>
 
-        <!-- Fusioni avvenute SENZA chiedere, perché l'owner aveva messo il segno sulla pratica: è il controllo a
-           posteriori, con l'elenco intero. -->
-        <div class="mg-merge-approvals-recent" id="mgMergeApprovalsPreapproved" hidden></div>
+              <section class="mg-auto-block">
+                <label class="mg-switch" id="mgAutoSwitch" title="Attiva o disattiva la modalità automatica di Filo">
+                  <span class="mg-switch-text">Modalità automatica</span>
+                  <input type="checkbox" id="mgAutoToggle" />
+                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  <span class="mg-switch-state" id="mgAutoState">Off</span>
+                </label>
+                <p class="mg-auto-block-desc">
+                  Quando è attiva, i feedback giudicati sicuri entrano in coda da soli.
+                  Spenta, li approvi tu uno per uno.
+                  <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
+                </p>
 
-        <!-- Interruttore master delle routine autonome. -->
-        <section class="mg-auto-block">
-          <label class="mg-switch" id="mgRoutinesSwitch" title="Ferma del tutto il lavoro autonomo delle routine">
-            <span class="mg-switch-text">Routine autonome</span>
-            <input type="checkbox" id="mgRoutinesToggle" checked />
-            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            <span class="mg-switch-state" id="mgRoutinesState">On</span>
-          </label>
-          <p class="mg-auto-block-desc">
-            Spente, le sessioni automatiche partono ma non fanno niente: nessun
-            lavoro sul codice, nessuna verifica, nessuna esplorazione. I feedback
-            restano in coda e ti aspettano.
-            <span class="mg-action-msg" id="mgRoutinesMsg" role="status"></span>
-          </p>
-        </section>
+                <!-- Chi può entrare in coda da solo, per categoria di mittente: conta solo con l'automatica accesa. -->
+                <div class="mg-auto-sub" id="mgAutoApproveBlock">
+                  <p class="mg-auto-sub-title">Entrano in coda da soli</p>
+                  <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
+                    <span class="mg-switch-text">👑 I tuoi</span>
+                    <input type="checkbox" id="mgAutoApproveOwner" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="Feedback inviati dagli alpha tester">
+                    <span class="mg-switch-text">👤 Altri utenti</span>
+                    <input type="checkbox" id="mgAutoApproveUser" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di Claude mentre lavora con te sul tuo computer">
+                    <span class="mg-switch-text">💻 Claude (sessione locale)</span>
+                    <input type="checkbox" id="mgAutoApproveLocal" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti nati mentre un'automazione scriveva codice">
+                    <span class="mg-switch-text">🔧 Claude (sviluppo)</span>
+                    <input type="checkbox" id="mgAutoApproveWorker" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi verifica il lavoro di un'altra istanza">
+                    <span class="mg-switch-text">🧪 Claude (verifica)</span>
+                    <input type="checkbox" id="mgAutoApproveVerifier" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro">
+                    <span class="mg-switch-text">🧹 Claude (rilievi residui)</span>
+                    <input type="checkbox" id="mgAutoApproveResiduo" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi esplora l'app in cerca di problemi che nessuno ha segnalato">
+                    <span class="mg-switch-text">🔍 Claude (esplorazione)</span>
+                    <input type="checkbox" id="mgAutoApproveProber" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="Automazioni che non dichiarano il proprio ruolo (feedback storici)">
+                    <span class="mg-switch-text">🤖 Claude (ruolo non indicato)</span>
+                    <input type="checkbox" id="mgAutoApproveClaude" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="Segnalazioni che Filo scrive per conto di un utente">
+                    <span class="mg-switch-text">🧵 Filo (per conto di un utente)</span>
+                    <input type="checkbox" id="mgAutoApproveFilo" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                </div>
+              </section>
 
-        <section class="mg-auto-block">
-          <label class="mg-switch" id="mgAutoSwitch" title="Attiva o disattiva la modalità automatica di Filo">
-            <span class="mg-switch-text">Modalità automatica</span>
-            <input type="checkbox" id="mgAutoToggle" />
-            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            <span class="mg-switch-state" id="mgAutoState">Off</span>
-          </label>
-          <p class="mg-auto-block-desc">
-            Quando è attiva, i feedback giudicati sicuri entrano in coda da soli.
-            Spenta, li approvi tu uno per uno.
-            <span class="mg-action-msg" id="mgAutoMsg" role="status"></span>
-          </p>
+              <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
+              <section class="mg-auto-block" id="mgProberIdleBlock">
+                <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
+                  <span class="mg-switch-text">Esplora quando la coda è vuota</span>
+                  <input type="checkbox" id="mgProberIdle" checked />
+                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                </label>
+                <p class="mg-auto-block-desc">
+                  Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
+                  nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
+                  <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
+                </p>
+              </section>
 
-          <!-- Chi può entrare in coda da solo, per categoria di mittente: conta solo con l'automatica accesa. -->
-          <div class="mg-auto-sub" id="mgAutoApproveBlock">
-            <p class="mg-auto-sub-title">Entrano in coda da soli</p>
-            <label class="mg-switch mg-switch--sm" title="I feedback che scrivi tu">
-              <span class="mg-switch-text">👑 I tuoi</span>
-              <input type="checkbox" id="mgAutoApproveOwner" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="Feedback inviati dagli alpha tester">
-              <span class="mg-switch-text">👤 Altri utenti</span>
-              <input type="checkbox" id="mgAutoApproveUser" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="Ritrovamenti di Claude mentre lavora con te sul tuo computer">
-              <span class="mg-switch-text">💻 Claude (sessione locale)</span>
-              <input type="checkbox" id="mgAutoApproveLocal" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="Ritrovamenti nati mentre un'automazione scriveva codice">
-              <span class="mg-switch-text">🔧 Claude (sviluppo)</span>
-              <input type="checkbox" id="mgAutoApproveWorker" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi verifica il lavoro di un'altra istanza">
-              <span class="mg-switch-text">🧪 Claude (verifica)</span>
-              <input type="checkbox" id="mgAutoApproveVerifier" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="I rilievi rimasti fuori dal giro di correzione, raccolti dal server in un feedback figlio del lavoro">
-              <span class="mg-switch-text">🧹 Claude (rilievi residui)</span>
-              <input type="checkbox" id="mgAutoApproveResiduo" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="Ritrovamenti di chi esplora l'app in cerca di problemi che nessuno ha segnalato">
-              <span class="mg-switch-text">🔍 Claude (esplorazione)</span>
-              <input type="checkbox" id="mgAutoApproveProber" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="Automazioni che non dichiarano il proprio ruolo (feedback storici)">
-              <span class="mg-switch-text">🤖 Claude (ruolo non indicato)</span>
-              <input type="checkbox" id="mgAutoApproveClaude" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="Segnalazioni che Filo scrive per conto di un utente">
-              <span class="mg-switch-text">🧵 Filo (per conto di un utente)</span>
-              <input type="checkbox" id="mgAutoApproveFilo" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-          </div>
-        </section>
+              <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un
+                 account è una cosa che si decide PRIMA di riaccendere. -->
+              <section class="mg-auto-block" id="mgMaxSessionsBlock">
+                <label class="mg-auto-field-label" for="mgMaxSessions">Sessioni in parallelo</label>
+                <p class="mg-auto-block-desc">
+                  Quante sessioni possono lavorare insieme. Più sessioni svuotano la
+                  coda prima e consumano crediti più in fretta.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgMaxSessions" class="mg-auto-number"
+                    min="1" max="20" step="1" inputmode="numeric" />
+                  <button type="button" class="sn-btn" id="mgMaxSessionsSave">Salva</button>
+                  <span class="mg-action-msg" id="mgMaxSessionsMsg" role="status"></span>
+                </div>
+              </section>
 
-        <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
-        <section class="mg-auto-block" id="mgProberIdleBlock">
-          <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
-            <span class="mg-switch-text">Esplora quando la coda è vuota</span>
-            <input type="checkbox" id="mgProberIdle" checked />
-            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-          </label>
-          <p class="mg-auto-block-desc">
-            Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
-            nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
-            <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
-          </p>
-        </section>
+              <section class="mg-auto-block" id="mgPriorityAccountBlock">
+                <span class="mg-auto-field-label">Account prioritario</span>
+                <p class="mg-auto-block-desc">
+                  Si parte sempre da quello scelto finché non è esaurito o in pausa,
+                  poi tocca all'altro.
+                  <span class="mg-action-msg" id="mgPriorityAccountMsg" role="status"></span>
+                </p>
+                <div class="mg-auto-choice" id="mgPriorityAccountChoice" role="radiogroup" aria-label="Account prioritario">
+                  <label class="mg-auto-choice-item" title="Le sessioni si distribuiscono fra i due account">
+                    <input type="radio" name="mgPriorityAccount" value="" checked />
+                    <span class="mg-auto-choice-text">Si alternano</span>
+                  </label>
+                  <label class="mg-auto-choice-item" title="Si usa l'account A finché regge">
+                    <input type="radio" name="mgPriorityAccount" value="A" />
+                    <span class="mg-auto-choice-text">Prima A</span>
+                  </label>
+                  <label class="mg-auto-choice-item" title="Si usa l'account B finché regge">
+                    <input type="radio" name="mgPriorityAccount" value="B" />
+                    <span class="mg-auto-choice-text">Prima B</span>
+                  </label>
+                </div>
+                <!-- Il prioritario è stato escluso: la pillola accesa direbbe il contrario dell'interruttore spento. -->
+                <p class="mg-auto-warn" id="mgPriorityWarn" hidden></p>
+              </section>
 
-        <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un
-           account è una cosa che si decide PRIMA di riaccendere. -->
-        <section class="mg-auto-block" id="mgMaxSessionsBlock">
-          <label class="mg-auto-field-label" for="mgMaxSessions">Sessioni in parallelo</label>
-          <p class="mg-auto-block-desc">
-            Quante sessioni possono lavorare insieme. Più sessioni svuotano la
-            coda prima e consumano crediti più in fretta.
-          </p>
-          <div class="mg-auto-field-row">
-            <input type="number" id="mgMaxSessions" class="mg-auto-number"
-              min="1" max="20" step="1" inputmode="numeric" />
-            <button type="button" class="sn-btn" id="mgMaxSessionsSave">Salva</button>
-            <span class="mg-action-msg" id="mgMaxSessionsMsg" role="status"></span>
-          </div>
-        </section>
+              <section class="mg-auto-block" id="mgAccountsBlock">
+                <span class="mg-auto-field-label">Account in uso</span>
+                <p class="mg-auto-block-desc">
+                  Escluso un account, da lì non parte più nessuna sessione. Quelle già
+                  avviate finiscono il lavoro che hanno in mano.
+                  <span class="mg-action-msg" id="mgAccountsMsg" role="status"></span>
+                </p>
+                <div class="mg-auto-sub">
+                  <label class="mg-switch mg-switch--sm" title="Spento: dall'account A non parte nessuna sessione nuova">
+                    <span class="mg-switch-text">Account A</span>
+                    <input type="checkbox" id="mgAccountA" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                  <label class="mg-switch mg-switch--sm" title="Spento: dall'account B non parte nessuna sessione nuova">
+                    <span class="mg-switch-text">Account B</span>
+                    <input type="checkbox" id="mgAccountB" checked />
+                    <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                  </label>
+                </div>
+                <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
+              </section>
+            </div>
+            <div class="mg-auto-col">
+              <!-- Quanti giri di correzione si pagano per livello di rilievo. Valgono solo se le routine lavorano. -->
+              <section class="mg-auto-block" id="mgCap3Block">
+                <label class="mg-auto-field-label" for="mgCap3">Correzioni per i difetti gravi (livello 3)</label>
+                <p class="mg-auto-block-desc">
+                  Quante volte un difetto di sicurezza, di soldi o che rende Filo
+                  inutilizzabile può tornare indietro per essere corretto. Finito il
+                  bilancio, il lavoro si ferma e decidi tu.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgCap3" class="mg-auto-number"
+                    min="0" max="10" step="1" inputmode="numeric" />
+                  <button type="button" class="sn-btn" id="mgCap3Save">Salva</button>
+                  <span class="mg-action-msg" id="mgCap3Msg" role="status"></span>
+                </div>
+              </section>
 
-        <section class="mg-auto-block" id="mgPriorityAccountBlock">
-          <span class="mg-auto-field-label">Account prioritario</span>
-          <p class="mg-auto-block-desc">
-            Si parte sempre da quello scelto finché non è esaurito o in pausa,
-            poi tocca all'altro.
-            <span class="mg-action-msg" id="mgPriorityAccountMsg" role="status"></span>
-          </p>
-          <div class="mg-auto-choice" id="mgPriorityAccountChoice" role="radiogroup" aria-label="Account prioritario">
-            <label class="mg-auto-choice-item" title="Le sessioni si distribuiscono fra i due account">
-              <input type="radio" name="mgPriorityAccount" value="" checked />
-              <span class="mg-auto-choice-text">Si alternano</span>
-            </label>
-            <label class="mg-auto-choice-item" title="Si usa l'account A finché regge">
-              <input type="radio" name="mgPriorityAccount" value="A" />
-              <span class="mg-auto-choice-text">Prima A</span>
-            </label>
-            <label class="mg-auto-choice-item" title="Si usa l'account B finché regge">
-              <input type="radio" name="mgPriorityAccount" value="B" />
-              <span class="mg-auto-choice-text">Prima B</span>
-            </label>
-          </div>
-          <!-- Il prioritario è stato escluso: la pillola accesa direbbe il contrario dell'interruttore spento. -->
-          <p class="mg-auto-warn" id="mgPriorityWarn" hidden></p>
-        </section>
+              <section class="mg-auto-block" id="mgCap2Block">
+                <label class="mg-auto-field-label" for="mgCap2">Correzioni per le funzioni rotte (livello 2)</label>
+                <p class="mg-auto-block-desc">
+                  Quante volte un difetto che impedisce di ottenere la cosa chiesta
+                  nel caso normale può tornare indietro per essere corretto. Finito
+                  il bilancio, il lavoro passa e i difetti rimasti diventano feedback
+                  a parte, figli del lavoro, a priorità 2.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgCap2" class="mg-auto-number"
+                    min="0" max="10" step="1" inputmode="numeric" />
+                  <button type="button" class="sn-btn" id="mgCap2Save">Salva</button>
+                  <span class="mg-action-msg" id="mgCap2Msg" role="status"></span>
+                </div>
+              </section>
 
-        <section class="mg-auto-block" id="mgAccountsBlock">
-          <span class="mg-auto-field-label">Account in uso</span>
-          <p class="mg-auto-block-desc">
-            Escluso un account, da lì non parte più nessuna sessione. Quelle già
-            avviate finiscono il lavoro che hanno in mano.
-            <span class="mg-action-msg" id="mgAccountsMsg" role="status"></span>
-          </p>
-          <div class="mg-auto-sub">
-            <label class="mg-switch mg-switch--sm" title="Spento: dall'account A non parte nessuna sessione nuova">
-              <span class="mg-switch-text">Account A</span>
-              <input type="checkbox" id="mgAccountA" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-            <label class="mg-switch mg-switch--sm" title="Spento: dall'account B non parte nessuna sessione nuova">
-              <span class="mg-switch-text">Account B</span>
-              <input type="checkbox" id="mgAccountB" checked />
-              <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-            </label>
-          </div>
-          <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
-        </section>
+              <section class="mg-auto-block" id="mgCap1Block">
+                <label class="mg-auto-field-label" for="mgCap1">Correzioni per i rilievi minori (livello 1)</label>
+                <p class="mg-auto-block-desc">
+                  Quante volte cosmetica e attrito fuori dal cammino principale
+                  possono tornare indietro per essere corretti. Finito il bilancio, il
+                  lavoro passa e i rilievi rimasti diventano un feedback a parte,
+                  figlio del lavoro.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgCap1" class="mg-auto-number"
+                    min="0" max="10" step="1" inputmode="numeric" />
+                  <button type="button" class="sn-btn" id="mgCap1Save">Salva</button>
+                  <span class="mg-action-msg" id="mgCap1Msg" role="status"></span>
+                </div>
+              </section>
 
-        <!-- Quanti giri di correzione si pagano per livello di rilievo. Valgono solo se le routine lavorano. -->
-        <section class="mg-auto-block" id="mgCap3Block">
-          <label class="mg-auto-field-label" for="mgCap3">Correzioni per i difetti gravi (livello 3)</label>
-          <p class="mg-auto-block-desc">
-            Quante volte un difetto di sicurezza, di soldi o che rende Filo
-            inutilizzabile può tornare indietro per essere corretto. Finito il
-            bilancio, il lavoro si ferma e decidi tu.
-          </p>
-          <div class="mg-auto-field-row">
-            <input type="number" id="mgCap3" class="mg-auto-number"
-              min="0" max="10" step="1" inputmode="numeric" />
-            <button type="button" class="sn-btn" id="mgCap3Save">Salva</button>
-            <span class="mg-action-msg" id="mgCap3Msg" role="status"></span>
-          </div>
-        </section>
+              <section class="mg-auto-block" id="mgCap0Block">
+                <label class="mg-auto-field-label" for="mgCap0">Correzioni per i soli casi rari (livello 0)</label>
+                <p class="mg-auto-block-desc">
+                  A zero, i casi rari trovati da soli non si correggono mai: vanno nel
+                  feedback a parte. Si correggono comunque quando nello stesso giro
+                  c'è altro da correggere.
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgCap0" class="mg-auto-number"
+                    min="0" max="10" step="1" inputmode="numeric" />
+                  <button type="button" class="sn-btn" id="mgCap0Save">Salva</button>
+                  <span class="mg-action-msg" id="mgCap0Msg" role="status"></span>
+                </div>
+              </section>
 
-        <section class="mg-auto-block" id="mgCap2Block">
-          <label class="mg-auto-field-label" for="mgCap2">Correzioni per le funzioni rotte (livello 2)</label>
-          <p class="mg-auto-block-desc">
-            Quante volte un difetto che impedisce di ottenere la cosa chiesta
-            nel caso normale può tornare indietro per essere corretto. Finito
-            il bilancio, il lavoro passa e i difetti rimasti diventano feedback
-            a parte, figli del lavoro, a priorità 2.
-          </p>
-          <div class="mg-auto-field-row">
-            <input type="number" id="mgCap2" class="mg-auto-number"
-              min="0" max="10" step="1" inputmode="numeric" />
-            <button type="button" class="sn-btn" id="mgCap2Save">Salva</button>
-            <span class="mg-action-msg" id="mgCap2Msg" role="status"></span>
-          </div>
-        </section>
+              <section class="mg-auto-block" id="mgGiroStrettoBlock">
+                <label class="mg-switch" id="mgGiroStrettoSwitch" title="Acceso: dopo una correzione la verifica seguente controlla solo i rilievi corretti e il codice cambiato, invece di rifare tutta la ricerca. Costa meno giri; un difetto nato altrove può sfuggire.">
+                  <span class="mg-switch-text">Giro stretto dopo una correzione</span>
+                  <input type="checkbox" id="mgGiroStretto" />
+                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                </label>
+                <span class="mg-action-msg" id="mgGiroStrettoMsg" role="status"></span>
+              </section>
 
-        <section class="mg-auto-block" id="mgCap1Block">
-          <label class="mg-auto-field-label" for="mgCap1">Correzioni per i rilievi minori (livello 1)</label>
-          <p class="mg-auto-block-desc">
-            Quante volte cosmetica e attrito fuori dal cammino principale
-            possono tornare indietro per essere corretti. Finito il bilancio, il
-            lavoro passa e i rilievi rimasti diventano un feedback a parte,
-            figlio del lavoro.
-          </p>
-          <div class="mg-auto-field-row">
-            <input type="number" id="mgCap1" class="mg-auto-number"
-              min="0" max="10" step="1" inputmode="numeric" />
-            <button type="button" class="sn-btn" id="mgCap1Save">Salva</button>
-            <span class="mg-action-msg" id="mgCap1Msg" role="status"></span>
-          </div>
-        </section>
+              <section class="mg-auto-block" id="mgFixInstructionsBlock">
+                <label class="mg-auto-field-label" for="mgFixInstructions">Istruzioni per chi corregge</label>
+                <p class="mg-auto-block-desc">
+                  Il testo che il server aggiunge in coda alla risposta, quando c'è
+                  da correggere. Vuoto: vale il testo del server.
+                </p>
+                <div class="mg-auto-field-row mg-auto-field-row--stack">
+                  <textarea id="mgFixInstructions" class="mg-auto-textarea" rows="6" spellcheck="false"
+                    placeholder="Vuoto: vale il testo del server."></textarea>
+                  <div class="mg-auto-field-row">
+                    <button type="button" class="sn-btn" id="mgFixInstructionsSave">Salva</button>
+                    <span class="mg-action-msg" id="mgFixInstructionsMsg" role="status"></span>
+                  </div>
+                </div>
+              </section>
 
-        <section class="mg-auto-block" id="mgCap0Block">
-          <label class="mg-auto-field-label" for="mgCap0">Correzioni per i soli casi rari (livello 0)</label>
-          <p class="mg-auto-block-desc">
-            A zero, i casi rari trovati da soli non si correggono mai: vanno nel
-            feedback a parte. Si correggono comunque quando nello stesso giro
-            c'è altro da correggere.
-          </p>
-          <div class="mg-auto-field-row">
-            <input type="number" id="mgCap0" class="mg-auto-number"
-              min="0" max="10" step="1" inputmode="numeric" />
-            <button type="button" class="sn-btn" id="mgCap0Save">Salva</button>
-            <span class="mg-action-msg" id="mgCap0Msg" role="status"></span>
-          </div>
-        </section>
-
-        <section class="mg-auto-block" id="mgGiroStrettoBlock">
-          <label class="mg-switch" id="mgGiroStrettoSwitch" title="Acceso: dopo una correzione la verifica seguente controlla solo i rilievi corretti e il codice cambiato, invece di rifare tutta la ricerca. Costa meno giri; un difetto nato altrove può sfuggire.">
-            <span class="mg-switch-text">Giro stretto dopo una correzione</span>
-            <input type="checkbox" id="mgGiroStretto" />
-            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-          </label>
-          <span class="mg-action-msg" id="mgGiroStrettoMsg" role="status"></span>
-        </section>
-
-        <section class="mg-auto-block" id="mgFixInstructionsBlock">
-          <label class="mg-auto-field-label" for="mgFixInstructions">Istruzioni per chi corregge</label>
-          <p class="mg-auto-block-desc">
-            Il testo che il server aggiunge in coda alla risposta, quando c'è
-            da correggere. Vuoto: vale il testo del server.
-          </p>
-          <div class="mg-auto-field-row mg-auto-field-row--stack">
-            <textarea id="mgFixInstructions" class="mg-auto-textarea" rows="6" spellcheck="false"
-              placeholder="Vuoto: vale il testo del server."></textarea>
-            <div class="mg-auto-field-row">
-              <button type="button" class="sn-btn" id="mgFixInstructionsSave">Salva</button>
-              <span class="mg-action-msg" id="mgFixInstructionsMsg" role="status"></span>
+              <!-- Timeout di ogni giudice di sicurezza (secondi). -->
+              <section class="mg-auto-block">
+                <label class="mg-auto-field-label" for="mgJudgeTimeout">Timeout dei giudici (secondi)</label>
+                <p class="mg-auto-block-desc">
+                  Quanto Filo aspetta la risposta di ogni giudice prima di considerarlo
+                  "non pervenuto". Con modelli che ragionano a lungo, alza il valore: se
+                  è troppo basso il giudice non fa in tempo a rispondere e il feedback
+                  resta "non filtrato".
+                </p>
+                <div class="mg-auto-field-row">
+                  <input type="number" id="mgJudgeTimeout" class="mg-auto-number"
+                    min="10" max="300" step="1" inputmode="numeric" />
+                  <button type="button" class="sn-btn" id="mgJudgeTimeoutSave">Salva</button>
+                  <span class="mg-action-msg" id="mgJudgeTimeoutMsg" role="status"></span>
+                </div>
+              </section>
             </div>
           </div>
-        </section>
+        </div>
 
-        <!-- Timeout di ogni giudice di sicurezza (secondi). -->
-        <section class="mg-auto-block">
-          <label class="mg-auto-field-label" for="mgJudgeTimeout">Timeout dei giudici (secondi)</label>
-          <p class="mg-auto-block-desc">
-            Quanto Filo aspetta la risposta di ogni giudice prima di considerarlo
-            "non pervenuto". Con modelli che ragionano a lungo, alza il valore: se
-            è troppo basso il giudice non fa in tempo a rispondere e il feedback
-            resta "non filtrato".
-          </p>
-          <div class="mg-auto-field-row">
-            <input type="number" id="mgJudgeTimeout" class="mg-auto-number"
-              min="10" max="300" step="1" inputmode="numeric" />
-            <button type="button" class="sn-btn" id="mgJudgeTimeoutSave">Salva</button>
-            <span class="mg-action-msg" id="mgJudgeTimeoutMsg" role="status"></span>
+        <!-- Un selettore a catena per ciascuno slot di supporto. La scelta va nel doc Firestore config/supportModels,
+           owner-gated, così la legge anche il backend filo-security. -->
+        <div class="mg-support-models" id="mgSmSection">
+          <h2>Modelli di supporto</h2>
+          <div class="mg-sm-loading" id="mgSmLoading">Caricamento…</div>
+          <div class="mg-sm-denied" id="mgSmDenied" hidden>
+            Questa sezione è riservata all'owner.
           </div>
-        </section>
+
+          <div id="mgSmEditor" hidden>
+            <p class="mg-sm-intro">
+              I giudici di sicurezza usano modelli e chiavi DEDICATI, separati dal
+              resto di Filo. Imposta qui la chiave, dai un nickname a ogni modello e
+              scegli quale modello usa ogni giudice e ogni strumento di questa
+              dashboard. Il tutto viene salvato nel cloud.
+            </p>
+            <div class="mg-sm-cols">
+              <div class="mg-sm-col">
+                <!-- Chiave dei giudici: separata dal resto di Filo. -->
+                <section class="mg-sm-block" id="mgSmKeys">
+                  <h3>Chiave dei giudici</h3>
+                  <p class="mg-sm-block-desc">
+                    I giudici usano una chiave OpenRouter dedicata, diversa da quelle
+                    che usi nel resto di Filo. Lascia il campo vuoto per non cambiarla.
+                  </p>
+                  <label for="mgSmKeyOpenrouter">
+                    OpenRouter API key
+                    <span class="mg-sm-key-state" id="mgSmKeyOpenrouterState"></span>
+                  </label>
+                  <input type="password" id="mgSmKeyOpenrouter" placeholder="sk-or-v1-…" autocomplete="off" />
+                </section>
+
+                <section class="mg-sm-block" id="mgSmRegistry">
+                  <h3>Modelli dei giudici</h3>
+                  <p class="mg-sm-block-desc">
+                    Dai un nome breve (nickname) a ogni modello OpenRouter che i giudici
+                    possono usare. I selettori qui sotto propongono questi nickname.
+                  </p>
+                  <div id="mgSmRegistryList"></div>
+                  <div class="sn-row" style="margin-top: 10px;">
+                    <button class="sn-btn sn-btn-secondary" id="mgSmRegistryAdd" type="button">Aggiungi modello</button>
+                  </div>
+                </section>
+
+                <!-- Datalist dei nickname per i dropdown del modelChainEditor, popolata da manage.js dal registro giudici. -->
+                <datalist id="nicknames-list"></datalist>
+              </div>
+              <div class="mg-sm-col">
+                <h3 class="mg-sm-slots-title">Modello per ogni giudice</h3>
+                <div class="mg-sm-slots" id="mgSmSlots">
+                  <div class="mg-sm-slot" data-slot="sanitizer">
+                    <label>Sanitizer feedback</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-sanitizer"></div>
+                    <span class="mg-sm-slot-desc">
+                      Riscrive i feedback prima che appaiano nella board pubblica.
+                    </span>
+                  </div>
+
+                  <div class="mg-sm-slot" data-slot="judge1">
+                    <label>Giudice 1</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-judge1"></div>
+                    <span class="mg-sm-slot-desc">
+                      Primo giudice di sicurezza del panel (classifica i feedback in arrivo).
+                    </span>
+                  </div>
+
+                  <div class="mg-sm-slot" data-slot="judge2">
+                    <label>Giudice 2</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-judge2"></div>
+                    <span class="mg-sm-slot-desc">
+                      Secondo giudice di sicurezza del panel.
+                    </span>
+                  </div>
+
+                  <div class="mg-sm-slot" data-slot="judge3">
+                    <label>Giudice 3</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-judge3"></div>
+                    <span class="mg-sm-slot-desc">
+                      Terzo giudice di sicurezza del panel.
+                    </span>
+                  </div>
+
+                  <div class="mg-sm-slot" data-slot="judgeDynamic">
+                    <label>Giudice dinamico</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-judgeDynamic"></div>
+                    <span class="mg-sm-slot-desc">
+                      Quarto giudice del panel, con prompt mutevole.
+                    </span>
+                  </div>
+
+                  <div class="mg-sm-slot" data-slot="judgeRedTeam">
+                    <label>Giudice red-team</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-judgeRedTeam"></div>
+                    <span class="mg-sm-slot-desc">
+                      Valuta i tentativi nel canale red-team (F3).
+                    </span>
+                  </div>
+
+                  <div class="mg-sm-slot" data-slot="judgePriority">
+                    <label>Giudice priorità</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-judgePriority"></div>
+                    <span class="mg-sm-slot-desc">
+                      Assegna la priorità ai feedback (F5).
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Funzioni che solo l'owner usa, nella sua app: fuori da Opzioni e Modelli predefiniti (#465). -->
+                <h3 class="mg-sm-slots-title mg-sm-slots-title--next">Modelli per la gestione</h3>
+                <div class="mg-sm-slots" id="mgSmSlotsManage">
+                  <div class="mg-sm-slot" data-slot="manageSearch">
+                    <label>Ricerca fra i feedback</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-manageSearch"></div>
+                    <span class="mg-sm-slot-desc">
+                      Ordina per pertinenza i feedback quando cerchi in questa pagina.
+                      Gira sul tuo computer con la chiave del resto di Filo, non con quella dei giudici.
+                    </span>
+                  </div>
+                  <div class="mg-sm-slot" data-slot="manageSearchClassifier">
+                    <label>Classificatore della ricerca</label>
+                    <div class="mg-sm-chain-host" id="mgSmChain-manageSearchClassifier"></div>
+                    <span class="mg-sm-slot-desc">
+                      Legge i feedback in parallelo e dice quali sono quelli che cerchi. Serve un classificatore, come Jev
+                      (typesafe/jev-1.13). Se manca o non risponde, li ordina il modello qui sopra.
+                    </span>
+                  </div>
+                </div>
+
+                <div class="mg-sm-toolbar">
+                  <button type="button" class="sn-btn" id="mgSmSaveBtn">Salva</button>
+                  <span class="mg-sm-status" id="mgSmStatus" role="status"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -2039,33 +2051,48 @@
        workerLog), che scrive scripts/dispatch.mjs a ogni spawn. -->
     <section class="mg-panel" id="panel-log" data-panel="log">
       <div class="mg-log">
-        <h2>Log dei worker</h2>
-        <p class="mg-log-intro">
-          Ogni worker avviato dalle routine automatiche, dal più recente. Per
-          ciascuno vedi il ruolo che ha assunto e quando è partito.
-        </p>
-        <div class="mg-log-loading" id="mgLogLoading">Caricamento…</div>
-        <div class="mg-log-denied" id="mgLogDenied" hidden>
-          Questa sezione è riservata all'owner.
-        </div>
-        <div class="mg-log-empty" id="mgLogEmpty" hidden>
-          Nessun worker registrato finora.
-        </div>
-        <ul class="mg-log-list" id="mgLogList" hidden></ul>
-
-        <!-- Due registri: i RIFIUTI, cioè le richieste fuori dal perimetro del biglietto, segnale che qualcuno ha
-           manipolato un lavoratore; e i CONFRONTI fra la scelta del server e quella delle routine. -->
-        <div class="mg-log-section" id="mgChannelSection" hidden>
-          <h3>Canale delle routine</h3>
+        <div class="mg-log-col">
+          <h2>Log dei worker</h2>
           <p class="mg-log-intro">
-            Le richieste respinte dal server, le fusioni chieste senza gli unit
-            sul risultato e, finché il canale nuovo affianca quello vecchio,
-            quanto le due strade scelgono lo stesso lavoro.
+            Ogni worker avviato dalle routine automatiche, dal più recente. Per
+            ciascuno vedi il ruolo che ha assunto e quando è partito.
           </p>
-          <div class="mg-log-empty" id="mgChannelEmpty" hidden>
-            Nessun rifiuto e nessun confronto finora.
+          <div class="mg-log-loading" id="mgLogLoading">Caricamento…</div>
+          <div class="mg-log-denied" id="mgLogDenied" hidden>
+            Questa sezione è riservata all'owner.
           </div>
-          <ul class="mg-log-list" id="mgChannelList" hidden></ul>
+          <div class="mg-log-empty" id="mgLogEmpty" hidden>
+            Nessun worker registrato finora.
+          </div>
+          <ul class="mg-log-list" id="mgLogList" hidden></ul>
+
+          <!-- Due registri: i RIFIUTI, cioè le richieste fuori dal perimetro del biglietto, segnale che qualcuno ha
+             manipolato un lavoratore; e i CONFRONTI fra la scelta del server e quella delle routine. -->
+          <div class="mg-log-section" id="mgChannelSection" hidden>
+            <h3>Canale delle routine</h3>
+            <p class="mg-log-intro">
+              Le richieste respinte dal server, le fusioni chieste senza gli unit
+              sul risultato e, finché il canale nuovo affianca quello vecchio,
+              quanto le due strade scelgono lo stesso lavoro.
+            </p>
+            <div class="mg-log-empty" id="mgChannelEmpty" hidden>
+              Nessun rifiuto e nessun confronto finora.
+            </div>
+            <ul class="mg-log-list" id="mgChannelList" hidden></ul>
+          </div>
+        </div>
+
+        <!-- La traccia delle fusioni già decise: un'eccezione ai controlli di sicurezza deve lasciare un segno che si
+           può rileggere. Nascosta finché l'elenco non è stato letto: un «nessuna» non letto sarebbe falso. -->
+        <div class="mg-log-col" id="mgFusioniSection" hidden>
+          <h2>Fusioni</h2>
+          <div class="mg-log-empty" id="mgFusioniEmpty" hidden>
+            Nessuna fusione decisa finora.
+          </div>
+          <div class="mg-merge-approvals-recent" id="mgMergeApprovalsRecent" hidden></div>
+          <!-- Fusioni avvenute SENZA chiedere, perché l'owner aveva messo il segno sulla pratica: è il controllo a
+             posteriori, con l'elenco intero. -->
+          <div class="mg-merge-approvals-recent" id="mgMergeApprovalsPreapproved" hidden></div>
         </div>
       </div>
     </section>

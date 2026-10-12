@@ -61,7 +61,7 @@
 //
 //   `--preapprova`: «fondi senza chiedermelo» su QUESTA pratica. Se i controlli
 //   del server fermano il lavoro di una routine, il server fonde lo stesso e
-//   registra cosa era stato fermato (Gestione → Automazioni, «Fuse senza
+//   registra cosa era stato fermato (Gestione → Log, «Fuse senza
 //   chiedere»). `--chiedi-prima` toglie il segno. Vale finché la pratica è
 //   aperta; il lavoro locale (npm run finish) non lo guarda. Salta il sì alla fusione come il lavoro locale: da qui
 //   solo sulle pratiche dell'owner o di una sessione (#957); sulle altre lo mette l'owner, in Gestione.

@@ -1,9 +1,9 @@
 // Spec Playwright per la pagina di gestione (filo://manage/).
 //
 // Assert di COMPORTAMENTO:
-//   - dashboard unificata (DB1): 9 tab, "Ricevuti" attiva di default; le tab
+//   - dashboard unificata (DB1): "Ricevuti" attiva di default; le tab
 //     lista (Ricevuti/In coda/Risolti/Archiviati) condividono panel-list;
-//     stats/models sono segnaposto; "Automazioni" raccoglie le impostazioni;
+//     "Automazioni" raccoglie le impostazioni, Modelli di supporto compresi (#1110);
 //   - lo switch "Modalità automatica" vive nella tab "Automazioni",
 //     si attiva/disattiva e lo stato sopravvive al ricaricamento;
 //   - il numero di tentativi del loop di correzione è editabile e persiste;
@@ -39,12 +39,12 @@ const FAKE_FB = {
   },
 };
 
-test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1)', async ({ openTab }) => {
+test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 10 tab della dashboard unificata (la nona: «Statistiche feedback», #496; la decima: «Lavori locali», #908).
-  await expect(page.locator('.mg-tab')).toHaveCount(10);
+  // 9 tab: «Statistiche feedback» (#496) e «Lavori locali» (#908) in più, «Modelli di supporto» dentro Automazioni (#1110).
+  await expect(page.locator('.mg-tab')).toHaveCount(9);
   // Con i feedback caricati (qui: nessuno) le cinque schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
@@ -57,7 +57,8 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
   await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Red Team');
-  await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
+  // I Modelli di supporto stanno dentro Automazioni (#1110).
+  await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveCount(0);
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
   await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveText('Log');
 
@@ -70,7 +71,7 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (0)');
 });
 
-test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arrivo" (DB1)', async ({ openTab }) => {
+test('le tab-lista condividono panel-list; le altre hanno il loro pannello (DB1)', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
@@ -92,9 +93,10 @@ test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arri
   await expect(page.locator('#panel-stats #mgRtOpenSwitch')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 
-  // Modelli di supporto → pannello dedicato (DD1: non più un segnaposto).
-  await page.locator('.mg-tab[data-tab="models"]').click();
-  await expect(page.locator('#panel-models')).toHaveClass(/mg-panel--active/);
+  // Modelli di supporto → dentro Automazioni (#1110).
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await expect(page.locator('#panel-automation')).toHaveClass(/mg-panel--active/);
+  await expect(page.locator('#panel-automation #mgSmSection')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 });
 
@@ -2327,7 +2329,7 @@ async function stubSupportModels(page, initialModels, isAdmin = true) {
   }, { models: initialModels, admin: isAdmin });
 }
 
-test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEditor', async ({ openTab }) => {
+test('DD1: i Modelli di supporto (in Automazioni) renderizzano tutti gli slot col modelChainEditor', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
@@ -2335,7 +2337,7 @@ test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEd
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
 
   // Clicca la tab: innesca il caricamento lazy.
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await page.locator('.mg-tab[data-tab="automation"]').click();
 
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
@@ -2376,7 +2378,7 @@ test('DD1: i valori caricati popolano i campi (slot con catena ha più segmenti)
   await page.waitForFunction(() => window.__mgTest && window.filo);
 
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await page.locator('.mg-tab[data-tab="automation"]').click();
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
   // Lo slot "sanitizer" ha valore "flash" → un solo input con "flash".
@@ -2402,7 +2404,7 @@ test('DD1: il bottone Salva invia support_models_update con i valori corretti', 
   await page.waitForFunction(() => window.__mgTest && window.filo);
 
   await stubSupportModels(page, FAKE_SUPPORT_MODELS);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await page.locator('.mg-tab[data-tab="automation"]').click();
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
   // Salva senza modifiche.
@@ -2442,7 +2444,7 @@ test('DD1: per i non-admin la sezione mostra il messaggio di accesso negato', as
 
   // Stub con admin=false.
   await stubSupportModels(page, {}, false);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await page.locator('.mg-tab[data-tab="automation"]').click();
 
   // Aspetta che il caricamento finisca (il denied appare subito dopo la risposta).
   await expect(page.locator('#mgSmDenied')).toBeVisible({ timeout: 5000 });
