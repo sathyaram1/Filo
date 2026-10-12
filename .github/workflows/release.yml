@@ -120,6 +120,7 @@ jobs:
     # `success()` per esteso: con `scegli` rosso qui non si parte.
     if: ${{ success() && needs.scegli.outputs.sha != '' }}
     runs-on: windows-latest
+    environment: rilascio
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.bump.outputs.version }}
