@@ -77,9 +77,48 @@ function conGitHub({ tagVero, yml }) {
     isUseMultipleRangeRequest: true, platform: 'win32', executor: { request: async () => yml },
   });
   gh.httpRequest = async (url) => (String(url).endsWith('.atom') ? feed : JSON.stringify({ tag_name: tagVero }));
-  au.getUpdateInfoAndProvider = async () => ({ info: await gh.getLatestVersion(), provider: gh });
+  // Il getUpdateInfoAndProvider vero del prototipo, non uno finto: il cancello deve agganciarsi a quello che gira.
+  delete au.getUpdateInfoAndProvider;
+  Object.assign(au, {
+    app: { whenReady: async () => {} },
+    clientPromise: Promise.resolve(gh),
+    stagingUserIdPromise: { value: Promise.resolve(null) },
+    requestHeaders: null,
+  });
   return { au, visti };
 }
+
+test('il punto a cui si aggancia il cancello è quello che electron-updater chiama davvero', () => {
+  assert.equal(typeof AppUpdater.prototype.getUpdateInfoAndProvider, 'function',
+    'electron-updater non ha più getUpdateInfoAndProvider: il cancello dei tag ferma tutti gli aggiornamenti');
+  assert.match(AppUpdater.prototype.doCheckForUpdates.toString(), /this\.getUpdateInfoAndProvider\(\)/,
+    'doCheckForUpdates non passa più da getUpdateInfoAndProvider: il cancello dei tag non lo vede');
+});
+
+test('senza quel punto gli aggiornamenti si fermano, non partono senza cancello', async () => {
+  const au = Object.create(AppUpdater.prototype);
+  au.getUpdateInfoAndProvider = undefined;
+  au.leggi = async () => ({ info: { version: '99.0.0', tag: 'x1', files: [] }, provider: {} });
+  Object.assign(au, {
+    currentVersion: semver.parse('0.2.233'), allowDowngrade: false, autoDownload: false,
+    _logger: { info() {}, warn() {}, error() {} },
+    isUpdateSupported: () => true, isUserWithinRollout: () => true,
+  });
+  // Il corpo di doCheckForUpdates con la chiamata rinominata, come dopo un aggiornamento della dipendenza.
+  au.doCheckForUpdates = async function () {
+    const r = await this.leggi();
+    if (await this.isUpdateAvailable(r.info)) this.emit('update-available', r.info);
+    return r;
+  };
+  au.checkForUpdates = function () { return this.doCheckForUpdates(); };
+  const visti = [];
+  au.on('update-available', () => visti.push('update-available'));
+  await U.avviaAggiornatore(au, { automatici: false });
+  await assert.rejects(au.doCheckForUpdates(), /aggiornamenti fermi/);
+  await assert.rejects(au.checkForUpdates(), /aggiornamenti fermi/);
+  await assert.rejects(au.downloadUpdate(), /aggiornamenti fermi/);
+  assert.deepEqual(visti, []);
+});
 
 const yml = (righe, file) => `version: 99.0.0\n${righe}files:\n  - url: ${file}\n    sha512: AAAA\n    size: 1\npath: ${file}\nsha512: AAAA\n`;
 
