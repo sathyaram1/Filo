@@ -1053,6 +1053,7 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return false;
     tab._sorvegliante = typeof fn === 'function' ? fn : null;
+    this._persistSession();
     return true;
   }
 
