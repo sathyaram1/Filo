@@ -37,6 +37,7 @@
   let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
   let loadDashboard = null;
+  let rispondi = null;
 
   // Lo stato lo tiene il main (una chiave sola): all'apertura chiediamo se
   // l'intervista è aperta e, se sì, ricomponiamo la conversazione com'era.
