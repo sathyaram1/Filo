@@ -747,6 +747,12 @@ async function main() {
       console.error(`\n✗ '${branch}' è il ramo principale: da qui non si spedisce.`);
       process.exit(1);
     }
+    let copie = [];
+    try { copie = copieDaSpedire(ROOT); } catch (_) { /* senza elenco si spedisce: la sentinella resta la seconda rete */ }
+    if (copie.length) {
+      console.error(`\n✗ ${avvisoSpedizione(copie)}`);
+      process.exit(1);
+    }
     // La DESTINAZIONE è dichiarata dentro pushArgs: non la sceglie la
     // configurazione locale di git (vedi il commento lì sopra).
     const pushed = git(pushArgs(branch));
