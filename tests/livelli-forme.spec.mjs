@@ -296,7 +296,7 @@ test('domande nelle sole note: rombo verde, e dentro ci sono le domande', async 
   await apri(page, [fb]);
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
 
-  await expect(page.locator('#mgClarify')).toBeVisible();
+  await expect(page.locator('#mgSideRispostaText')).toBeVisible();
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
   await expect(rombo).toHaveClass(/mg-forma--design/);
   await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
@@ -370,7 +370,7 @@ test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di ris
   expect(await card.getAttribute('title')).toMatch(/aspetta una tua scelta/);
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
 
-  await expect(page.locator('#mgClarify')).toBeVisible();
+  await expect(page.locator('#mgSideRispostaText')).toBeVisible();
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
   await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
   expect(await rombo.getAttribute('title')).toBe('Domande e segnalazione di Claude');
