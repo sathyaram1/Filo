@@ -54,22 +54,24 @@ function hostDi(origine) {
   try { return new URL(String(origine || '')).hostname; } catch (_) { return ''; }
 }
 
-// Perché la cartella esce dal perimetro di lettura ('' se ci sta): la stessa regola di CERCA_DOCUMENTI in chat.
+// Perché la cartella esce dal perimetro di lettura ('' se ci sta): il costo di CERCA_DOCUMENTI in chat, e il suo motivo.
 function fuoriPerimetro(cartella) {
   if (!cartella) return '';
   const L = globalThis.SN_ACTION_LEVELS;
-  if (!L || typeof L.describe !== 'function') return 'non si sa dove legge';
+  const C = globalThis.SN_CMD_CLASSIFY;
+  if (!L || !C) return 'non si sa dove legge';
   const win = process.platform === 'win32';
-  const azione = { type: 'CERCA_DOCUMENTI', cosa: '', cartella, _perimetro: { home: os.homedir(), win, maiuscole: win || process.platform === 'darwin' } };
-  return L.costoFor(azione) > 0 ? (String(L.describe(azione)).split('Perché te lo chiedo: ')[1] || 'legge fuori dalla tua cartella personale') : '';
+  const perimetro = { home: os.homedir(), win, maiuscole: win || process.platform === 'darwin' };
+  if (!(L.costoFor({ type: 'CERCA_DOCUMENTI', cartella, _perimetro: perimetro }) > 0)) return '';
+  return C.fuoriPerimetro(cartella, perimetro) || 'non si sa dove legge';
 }
 
 function domanda({ cosa, cartella, host, perche }) {
   const dove = cartella ? ` nella cartella ${unaRiga(cartella, 200)}` : '';
   const chi = host ? `L'Aiuto di ${host}` : 'L\'Aiuto';
-  const righe = [`${chi} vuole cercare fra i tuoi documenti: «${unaRiga(cosa, COSA_NEL_POPUP).replace(/[«»]/g, '"')}»${dove}.`];
-  if (host) righe.push(`Il sito potrà leggere quello che l'Aiuto ti risponde, con i nomi dei documenti trovati. Il documento lo carichi tu, se lo trascini nella pagina.`);
-  if (perche) righe.push(`Te lo chiedo anche perché ${perche}.`);
+  const righe = [`${chi} vuole cercare fra i tuoi documenti «${unaRiga(cosa, COSA_NEL_POPUP).replace(/[«»]/g, '"')}»${dove}.`];
+  if (host) righe.push('Il sito potrà leggere la risposta dell\'Aiuto, con i nomi dei documenti trovati. Il documento arriva al sito solo se lo trascini tu nella pagina.');
+  if (perche) righe.push(`Perché te lo chiedo: ${perche}.`);
   return { tipo: 'confirm', title: 'Cerco fra i tuoi documenti?', text: righe.join('\n\n'), okLabel: 'Cerca', cancelLabel: 'Annulla' };
 }
 
