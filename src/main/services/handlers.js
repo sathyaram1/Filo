@@ -3960,6 +3960,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
   }
+  if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
+    const A = globalThis.SN_AUTONOMIA;
+    const ora = A ? A.infoLivello(res.output.livello).nome : '';
+    return `Sotto la tua risposta l'utente vede i livelli di autonomia${ora ? ` (adesso è ${ora})` : ''} e sceglie lui con un clic: `
+      + `la scelta ti arriva come suo messaggio. Non dire di averlo cambiato tu.${doveStaIlTesto(giro)}`;
+  }
   if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
   if (soloBottone(type) && res.kept && !res.needsConfirm) {
     return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}.${doveStaIlTesto(giro)}`;
