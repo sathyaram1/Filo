@@ -237,7 +237,76 @@
       return { ...r, servedBy, violation, costEur };
     }
 
-    return { complete, stream, text, call, ensureUnderLimit, supports, hasProvider, keyInfo };
+    // Crediti finiti: lo stesso avviso delle chat, una volta, e nessun altro tentativo con la stessa chiave.
+    function fineCrediti(err) {
+      const W = global.SN_WALLET;
+      if (!W || typeof W.isOutOfCredits !== 'function' || !W.isOutOfCredits(err)) return false;
+      try { global.SN_WALLET_MAIN?.outOfCreditsNotice(err); } catch (_) {}
+      return true;
+    }
+
+    // Un classificatore su tante richieste in parallelo (#1118): limite di spesa e segreti come ogni chiamata, ma UN
+    // conto per giro invece di uno per richiesta. Il tentativo dopo nella catena parte solo se quello prima non ha
+    // mai risposto. `onAnswer(indice, answers)` arriva appena una richiesta ha risposto.
+    async function decideAll({ action, settings, attempts, requests, parallel, onAnswer, signal } = {}) {
+      const { s, chain } = await chainFor({ action, settings, attempts });
+      const usable = chain.filter((a) => supports(a.provider, 'decide') && a.model);
+      if (!usable.length) throw codeError('Nessun fornitore della catena sa classificare', 'PROVIDER_METHOD_MISSING');
+      const Coda = global.SN_CODA_ADATTIVA;
+      if (!Coda) throw codeError('Coda dei lavori non caricata', 'GATE_METHOD');
+      let lista = [];
+      try { lista = await segreti(); } catch (_) { lista = []; }
+      const G = global.SN_GUARDIANO_STATICO;
+      const oscura = (v) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, lista) : v);
+      const richieste = (Array.isArray(requests) ? requests : []).map((r) => ({
+        state: oscura(r && r.state), questions: oscura(r && r.questions),
+      }));
+      let ultimo = null;
+      for (const a of usable) {
+        const P = providerOf(a.provider);
+        const somma = { promptTokens: 0, completionTokens: 0, costUsd: 0, keySource: '' };
+        let risposte = 0;
+        let servedBy = null;
+        const fai = async (req) => {
+          const r = (await P.decide({
+            apiKey: a.apiKey, model: a.model, state: req.state, questions: req.questions,
+            providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s), signal,
+          })) || {};
+          risposte++;
+          const u = r.usage || {};
+          somma.promptTokens += Number(u.promptTokens) || 0;
+          somma.completionTokens += Number(u.completionTokens) || 0;
+          somma.costUsd += Number(u.costUsd) || 0;
+          if (!somma.keySource && u.keySource) somma.keySource = u.keySource;
+          if (!servedBy && r.servedBy) servedBy = r.servedBy;
+          return r;
+        };
+        const esito = await Coda.esegui(richieste, fai, {
+          parallelo: parallel, signal,
+          classifica: (err) => esitoDecisione(err, risposte > 0),
+          suEsito: (r, _req, i) => { if (onAnswer) onAnswer(i, (r && r.answers) || {}); },
+        });
+        let seen = { servedBy: null, violation: false };
+        let costEur = 0;
+        if (risposte) {
+          seen = noteServed(s, action, { servedBy, model: a.model });
+          costEur = await recordCost(s, action, a.provider, a.model, somma);
+        }
+        if (esito.fermo && fineCrediti(esito.fermo) && !risposte) throw esito.fermo;
+        if (esito.fermo && !risposte && !esito.interrotto) {
+          ultimo = esito.fermo;
+          continue;
+        }
+        return {
+          provider: a.provider, model: a.model, servedBy: seen.servedBy, violation: seen.violation, costEur,
+          answered: esito.fatti, skipped: esito.scartati.map((x) => x.indice),
+          error: esito.fermo || null, aborted: esito.interrotto,
+        };
+      }
+      throw ultimo || codeError('Il classificatore non ha risposto', 'DECIDE_FAILED');
+    }
+
+    return { complete, stream, text, call, decideAll, ensureUnderLimit, supports, hasProvider, keyInfo };
   }
 
   global.SN_MODEL_GATE = { create, hasProvider, supports, keyInfo, limitError, PAID };
