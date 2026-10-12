@@ -243,6 +243,63 @@ async function whenSettled() {
   }
 }
 
+function serializzaChiave(k) {
+  const v = STATE.data[k];
+  let t;
+  try {
+    t = JSON.stringify(v);
+  } catch (err) {
+    // Un valore che non si serializza tiene nel file la sua ultima forma buona e non ferma le altre chiavi.
+    console.error('[Filo storage] chiave non serializzabile:', k, err.message);
+    STATE.sporche.delete(k);
+    return;
+  }
+  STATE.testi.set(k, t);
+  const disco = k === 'settings' ? impostazioniPerDisco(v) : v;
+  STATE.suDisco.set(k, disco === v ? t : JSON.stringify(disco));
+  STATE.sporche.delete(k);
+}
+
+// Lo stesso testo di JSON.stringify(STATE.data) con le chiavi API cifrate: stesso ordine, stesso formato.
+function testoDelFile({ tutte = false } = {}) {
+  const parti = [];
+  for (const k of Object.keys(STATE.data)) {
+    if (tutte || STATE.sporche.has(k) || !STATE.suDisco.has(k)) serializzaChiave(k);
+    const t = STATE.suDisco.get(k);
+    if (t !== undefined) parti.push(JSON.stringify(k) + ':' + t);
+  }
+  STATE.sporche.clear();
+  return '{' + parti.join(',') + '}';
+}
+
+// Rete per chi cambia un valore letto senza riscriverlo con set: prima ci pensava il flush intero
+// successivo, ora lo trova questo giro (raro, e solo sulle chiavi non già in coda).
+function verificaMutazioni() {
+  if (!STATE.loaded) return [];
+  const cambiate = [];
+  for (const k of Object.keys(STATE.data)) {
+    if (STATE.sporche.has(k) || !STATE.testi.has(k)) continue;
+    let t;
+    try { t = JSON.stringify(STATE.data[k]); } catch (_) { continue; }
+    if (t === STATE.testi.get(k)) continue;
+    cambiate.push(k);
+    STATE.sporche.add(k);
+    if (!STATE.avvisate.has(k)) {
+      STATE.avvisate.add(k);
+      console.warn('[Filo storage] valore cambiato senza set, salvato dal controllo periodico:', k);
+    }
+  }
+  if (cambiate.length) scheduleFlush();
+  return cambiate;
+}
+const VERIFICA_OGNI_MS = 60_000;
+let giroVerifica = null;
+function avviaVerifica() {
+  if (giroVerifica) return;
+  giroVerifica = setInterval(verificaMutazioni, VERIFICA_OGNI_MS);
+  if (giroVerifica.unref) giroVerifica.unref();
+}
+
 async function doFlush() {
   const target = filePath();
   const tmp = target + '.tmp';
