@@ -110,7 +110,9 @@ sito web. Seguiamo lo standard **RFC 8252 ("OAuth 2.0 for Native Apps")**:
 - **Redirect su loopback locale** (`http://127.0.0.1:<porta>`): Filo apre un
   micro-server temporaneo solo su `127.0.0.1` per ricevere il codice di
   autorizzazione, poi lo chiude. Niente di questo è esposto in rete
-  (`src/main/auth/google-auth.js`).
+  (`src/main/auth/google-auth.js`). Il micro-server ascolta solo la risposta
+  che porta il codice casuale (`state`) creato per quell'accesso. Un altro
+  programma del computer che gli scrive riceve un rifiuto, e l'accesso continua.
 
 ---
 
