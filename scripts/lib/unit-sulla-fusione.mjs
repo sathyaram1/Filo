@@ -291,11 +291,13 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
 }
 
 /**
- * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda? } | { saltata, motivo } | { errore, mainSha? }.
- * `lancia` è iniettabile solo per i test.
+ * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda?, contenuto? } | { saltata, motivo } | { errore, mainSha? }.
+ * `ancheContenuto`: con main già dentro il ramo si prova il ramo stesso invece di rispondere `main_contenuto`
+ * (serve a giudicare un unit rosso sul ramo, #1009). `lancia` è iniettabile solo per i test.
  */
 export function provaUnitSullaFusione({
   root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s),
+  ancheContenuto = false,
 } = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
