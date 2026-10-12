@@ -115,6 +115,7 @@ import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
+import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
