@@ -2423,6 +2423,13 @@
       if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
       if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
       if (d.tipo === 'rete') return { testo: 'vuole collegarsi agli apparecchi della tua rete', icone: ['wifi'] };
+      if (d.tipo === 'file') {
+        const o = d.oggetto || {};
+        const nome = String(o.nome || '');
+        if (!nome) return { testo: 'vuole modificare i tuoi file', icone: ['pencil'] };
+        if (o.cartella) return { testo: 'vuole creare, modificare e cancellare file in', nome, percorso: o.percorso, icone: ['folder'] };
+        return { testo: 'vuole modificare', nome, percorso: o.percorso, icone: ['pencil'] };
+      }
       const parti = Array.isArray(d.parti) ? d.parti : [];
       const mic = parti.includes('audio');
       const cam = parti.includes('video');
