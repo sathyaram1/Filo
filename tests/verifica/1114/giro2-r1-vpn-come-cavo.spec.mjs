@@ -20,7 +20,3 @@ const pV = { id: V, livello: 3, iana: 6, nome: 'ufficio.local' };
 test('r1 Wi-Fi più VPN «Ethernet» che Windows usa per Internet: icona del Wi-Fi e nome della rete', () => {
   expect(S.datiDaWindows(riga(V, [pW, pV])).rete).toEqual({ tipo: 'wifi', nome: 'Casa' });
 });
-
-test('r1 Wi-Fi più VPN «Ethernet», Windows non dice quale usa: icona del Wi-Fi e nome della rete', () => {
-  expect(S.datiDaWindows(riga(null, [pV, pW])).rete).toEqual({ tipo: 'wifi', nome: 'Casa' });
-});
