@@ -818,7 +818,7 @@ async function rapportoOrchestratore(principale) {
  * rilascio lo porta, viaggia con la risposta alla domanda di fine sessione. Non lancia mai.
  */
 export async function rapportoChiusura({ transcript = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
-  const base = { v: 3, role: 'orchestrator', closing: true, notes: [] };
+  const base = { v: rapportoVuoto().v, role: 'orchestrator', closing: true, notes: [] };
   const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
   if (!trovato.file) return { ...base, notes: [trovato.note || 'transcript non trovato'] };
   const principale = eSottoAgente(trovato.file) ? `${dirname(dirname(trovato.file))}.jsonl` : trovato.file;
