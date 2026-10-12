@@ -10,7 +10,8 @@
   const n = (k) => (k < NUMERI.length ? NUMERI[k] : String(k));
   const TITOLI = {
     CERCA_WEB: ['Cercato sul web', (k) => `Fatte ${n(k)} ricerche sul web`, 'ricerca'],
-    CERCA_CHAT: ['Cercato fra le chat di prima', (k) => `Fatte ${n(k)} ricerche fra le chat`, 'chat di prima'],
+    CERCA_CHAT: ['Cercato nel filo', (k) => `Fatte ${n(k)} ricerche nel filo`, 'filo'],
+    RICORDO_FILO: ['Ricordato dal filo', (k) => `Ricordati ${n(k)} pezzi del filo`, 'ricordo'],
     LEGGI_FILE: ['Letto un file', (k) => `Letti ${n(k)} file`, 'file'],
     LEGGI_DOCUMENTO: ['Letto un documento', (k) => `Letti ${n(k)} documenti`, 'documento'],
     CERCA_DOCUMENTI: ['Cercato fra i documenti', (k) => `Fatte ${n(k)} ricerche fra i documenti`, 'documenti'],

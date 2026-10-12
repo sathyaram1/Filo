@@ -561,8 +561,31 @@ test('in chat Filo sa a che livello di autonomia sta: il contesto di ogni turno 
   try {
     await chiedi(page, 'a che livello di autonomia sei adesso?');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15000 }).toBeGreaterThan(0);
-    const sistema = String((await chiamateAlModello(app))[0][0].content || '');
-    expect(sistema).toMatch(/AUTONOMIA DI FILO\nLivello scelto dall'utente: Conservativo\./);
+    // Lo stato cambia a ogni turno: sta nel contesto di adesso, in coda, non nel prefisso in cache (#868).
+    const contesto = (await chiamateAlModello(app))[0]
+      .map((m) => String(m.content || '')).find((t) => t.startsWith('═══ CONTESTO DI ADESSO')) || '';
+    expect(contesto).toMatch(/AUTONOMIA DI FILO\nLivello scelto dall'utente: Conservativo\./);
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('le coordinate bancarie scritte dall\'utente un messaggio prima, nella stessa scheda, valgono come chieste', async ({ app }) => {
+  const IBAN = 'IT60X0542811101000000123456';
+  const page = await home(app);
+  await modelloFinto(app, [
+    { text: 'Segnato il tuo IBAN.' },
+    { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://bonifici.example/nuovo?iban=${IBAN}` }) }] },
+    { text: 'Fatto.' },
+  ]);
+  try {
+    await chiedi(page, `il mio IBAN è ${IBAN}`);
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato il tuo IBAN.' })).toBeVisible({ timeout: 15000 });
+    await chiedi(page, 'aprimi la pagina del bonifico con quell\'iban già compilato');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15000 }).toBeGreaterThanOrEqual(3);
+    const esito = (await chiamateAlModello(app))[2].filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
+    expect(esito).toContain('Eseguita');
+    expect(esito).not.toMatch(/coordinate bancarie/i);
   } finally {
     await ripristina(app);
   }

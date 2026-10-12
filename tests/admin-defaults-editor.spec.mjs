@@ -18,7 +18,7 @@ const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
 
 async function openStubbedEditor(openTab, overrides = {}) {
   const page = await openTab(ADMIN_URL);
-  await page.addInitScript(({ codiceSenza, ...over }) => {
+  await page.addInitScript((over) => {
     const fakeConfig = {
       apiKeysPresent: { openrouter: true, tavily: false },
       safeBrowsingKeyPresent: false,
@@ -29,12 +29,13 @@ async function openStubbedEditor(openTab, overrides = {}) {
       excludedProviders: null,
       ...over,
     };
-    // `codiceSenza`: la lista del codice meno quelle voci, letta dal codice: scritta qui a mano invecchiava a ogni
-    // fornitore escluso in più, e l'avviso restava acceso per quello.
+    // `__defaultsMinus`: la lista del codice tranne quelle voci, letta dal codice e
+    // non ricopiata, così una voce di serie nuova non sposta l'avviso del test.
     if (fakeConfig.excludedProviders == null) {
+      const minus = new Set(fakeConfig.__defaultsMinus || []);
       Object.defineProperty(fakeConfig, 'excludedProviders', {
         get: () => ((window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [])
-          .filter((n) => !(codiceSenza || []).includes(n)),
+          .filter((n) => !minus.has(n)),
       });
     }
     window.__sent = [];
@@ -316,7 +317,7 @@ test('ogni fornitore escluso dice perché, e il perché si salva', async ({ open
 // #541 giro 1: il nome che il menu scrive per Novita è quello del catalogo; la
 // pagina deve riconoscerlo come la voce del codice, e dargli il suo motivo.
 test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e il motivo segue', async ({ openTab }) => {
-  const page = await openStubbedEditor(openTab, { codiceSenza: ['Novita'] });
+  const page = await openStubbedEditor(openTab, { __defaultsMinus: ['Novita'] });
   await expect(page.locator('#excludedDriftText')).toContainText('Novita');
   await page.click('#addExcludedRow');
   const row = page.locator('#excludedList .sn-excluded-row').last();
