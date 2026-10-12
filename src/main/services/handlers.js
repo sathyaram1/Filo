@@ -2818,9 +2818,7 @@ async function eseguiAzioneFilo(action, {
         // che il gate ha valutato e ciò che lanciamo (stessa stringa `comando`).
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim();
         if (!cmd) return { executed: false, kept: true, output: { command: '', blocked: 'empty' } };
-        let settings = {};
-        try { settings = await Storage.getSettings(); } catch (_) {}
-        const shell = settings.terminal && settings.terminal.shell;
+        const shell = (action._perimetro && action._perimetro.shell) || await shellDeiComandi();
         const { runCommand } = require('./terminal');
         // cwd PERSISTENTE: partiamo dalla cartella corrente dell'assistente e
         // catturiamo quella risultante, così un `cd` resta valido per il comando
