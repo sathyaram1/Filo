@@ -297,7 +297,13 @@ function segnalaPronto() {
 // Il cancello sta dove electron-updater legge la release e il suo provider: ogni strada (controllo, «Installa», da soli)
 // ci passa prima di decidere e scaricare. Un errore e non «aggiornato»: la release più recente non è nostra.
 function soloTagDiRilascio(au) {
-  if (typeof au.getUpdateInfoAndProvider !== 'function' || au.getUpdateInfoAndProvider.filoTag) return;
+  if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
+  // Un electron-updater che ha rinominato quel punto lascerebbe passare tutto: senza cancello niente aggiornamenti.
+  if (typeof au.getUpdateInfoAndProvider !== 'function') {
+    const fermo = async () => { throw new Error('aggiornamenti fermi: electron-updater non ha getUpdateInfoAndProvider'); };
+    for (const m of ['checkForUpdates', 'checkForUpdatesAndNotify', 'doCheckForUpdates', 'downloadUpdate']) au[m] = fermo;
+    return;
+  }
   const originale = au.getUpdateInfoAndProvider;
   const cancello = async function (...args) {
     const r = await originale.apply(this, args);
