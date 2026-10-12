@@ -193,3 +193,28 @@ test.skip(` + '`saltata ${1}`' + String.raw`, async ({ app, page }) => { await c
   assert.deepEqual(proveScoperte(file, 'x.spec.mjs'), ['scoperta', 'nel commento non vale', 'saltata ${1}']);
   assert.deepEqual(proveScoperte(file, 'onboarding-x.spec.mjs'), []);
 });
+
+test('con la fixture così com\'è la prova è già accolta; chi apre Filo da sé o chiede il profilo nuovo dichiara', () => {
+  const testa = String.raw`import { test, expect } from './fixtures/electron.mjs';
+async function configura(app) {
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k' } }); });
+}
+const scrivi = (page) => page.locator('#input').fill('ciao');
+const lancia = () => electron.launch({ args: ['.'] });
+`;
+  const prove = String.raw`
+test('con la fixture', async ({ app, page }) => { await configura(app); await scrivi(page); });
+test('aperta da sé', async ({ page }) => { const app = await lancia(); await configura(app); await scrivi(page); });
+test.describe(() => {
+  test.use({ accoglienzaFatta: false });
+  test('nel gruppo del profilo nuovo', async ({ app, page }) => { await configura(app); await scrivi(page); });
+});
+`;
+  assert.deepEqual(proveScoperte(testa + prove, 'x.spec.mjs'), ['aperta da sé', 'nel gruppo del profilo nuovo']);
+  assert.deepEqual(proveScoperte(`${testa}test.use({ accoglienzaFatta: false });\n${prove}`, 'x.spec.mjs'),
+    ['con la fixture', 'aperta da sé', 'nel gruppo del profilo nuovo']);
+  assert.deepEqual(proveScoperte(`// test.use({ accoglienzaFatta: false });\n${testa}${prove}`, 'x.spec.mjs'),
+    ['aperta da sé', 'nel gruppo del profilo nuovo']);
+  assert.deepEqual(proveScoperte(testa.replace('./fixtures/electron.mjs', '@playwright/test') + prove, 'x.spec.mjs'),
+    ['con la fixture', 'aperta da sé', 'nel gruppo del profilo nuovo']);
+});
