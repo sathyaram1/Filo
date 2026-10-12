@@ -1304,6 +1304,9 @@
     const state = monitored.get(el);
     if (state) {
       seguiIlTesto(state);
+      if (getEditableText(el) === currentText) {
+        state.issues = state.issues.filter((i) => !(i.start === range.start && i.end === range.end));
+      }
       state.lastScannedText = '';
       renderOverlayContent(state);
       scheduleScan(state);
