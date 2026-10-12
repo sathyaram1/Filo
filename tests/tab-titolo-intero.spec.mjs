@@ -184,4 +184,5 @@ test('#429 — la scheda attiva non tiene un vuoto che serve a un nome tagliato'
   await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab .title')]
     .filter((t) => t.scrollWidth > t.clientWidth + 0.5).map((t) => `${t.textContent} ${t.clientWidth}/${t.scrollWidth}`)), { timeout: 10_000 })
     .toEqual([]);
+  await captureCompositeElectron(app, 'tests/.shots/tab-titolo-intero-attiva-senza-vuoto.png');
 });
