@@ -137,6 +137,32 @@ test('nessun modello della catena risponde: l\'errore risale', async () => {
   assert.equal(registrazioni.length, 0);
 });
 
+test('un classificatore che non ha mai risposto non si ritenta: il ripiego parte subito; dopo una risposta sì', async () => {
+  for (const errore of [
+    Object.assign(new Error('OpenRouter 503: upstream'), { status: 503 }),
+    Object.assign(new Error('OpenRouter 429: piano'), { status: 429, retryAfterMs: 5000 }),
+    new TypeError('fetch failed'),
+  ]) {
+    viste = [];
+    rispondi = () => { throw errore; };
+    const t0 = Date.now();
+    await assert.rejects(cancello(UNO).decideAll({ action: AZIONE, requests: richieste(10), parallel: 2 }));
+    assert.ok(Date.now() - t0 < 300, `${errore.message}: ${Date.now() - t0} ms`);
+    assert.ok(viste.length <= 2, `${errore.message}: ${viste.length} chiamate`);
+  }
+
+  viste = [];
+  let n = 0;
+  rispondi = () => {
+    n++;
+    if (n === 2) throw Object.assign(new Error('OpenRouter 503: upstream'), { status: 503 });
+    return { answers: { f1: { noul: 0.1 } }, usage: { costUsd: 0.001 } };
+  };
+  const r = await cancello(UNO).decideAll({ action: AZIONE, requests: richieste(4), parallel: 1 });
+  assert.equal(r.answered, 4, 'dopo la prima risposta un guasto passeggero si ritenta');
+  assert.equal(r.error, null);
+});
+
 test('la chiamata al classificatore è fra quelle che il cancello conosce', () => {
   assert.ok(GATE.PAID.has('decisions'));
 });
