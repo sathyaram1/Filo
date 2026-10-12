@@ -264,7 +264,7 @@
   // Di un campo si pulisce un pezzo poco più lungo di quello che può restarne, non
   // tutto: elementi da centinaia di migliaia di caratteri fermavano l'Aiuto (#1173).
   // Se la pulizia lo accorcia sotto il tetto il pezzo cresce: la coda (quale
-  // pulsante, dove si va) arriva come prima, fino a trentadue volte il tetto: oltre,
+  // pulsante, dove si va) arriva come prima, fino a otto volte il tetto: oltre,
   // un campo che è quasi tutto dati da cancellare non vale il costo di cinquanta
   // documenti ostili. Il taglio non lascia in fondo mezza forma (email, codice,
   // numero). Prove: tests/unit/percorsiLunghi.test.mjs.
