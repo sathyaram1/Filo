@@ -438,6 +438,7 @@ async function remove(keys) {
     if (k in STATE.data) {
       changes[k] = { oldValue: STATE.data[k], newValue: undefined };
       delete STATE.data[k];
+      dimenticaTesto(k);
     }
   }
   if (Object.keys(changes).length) {
