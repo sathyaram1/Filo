@@ -126,10 +126,10 @@ async function exchangeCodeForGoogleToken(code, verifier, redirectUri) {
 async function signInWithFirebase(googleIdToken) {
   const anonToken = await installationToken();
   const attempt = async (linkTo) => {
+    // Niente returnIdpCredential: con quello un collegamento rifiutato torna 200, senza token.
     const body = {
       postBody: `id_token=${googleIdToken}&providerId=google.com`,
       requestUri: 'http://localhost',
-      returnIdpCredential: true,
       returnSecureToken: true,
     };
     if (linkTo) body.idToken = linkTo;
@@ -143,7 +143,11 @@ async function signInWithFirebase(googleIdToken) {
       err.status = res.status;
       throw err;
     }
-    return res.json(); // { idToken, refreshToken, email, emailVerified, displayName, photoUrl, expiresIn }
+    const fb = await res.json(); // { idToken, refreshToken, email, emailVerified, displayName, photoUrl, expiresIn }
+    if (!rispostaConSessione(fb)) {
+      throw new Error(`Firebase signInWithIdp senza sessione: ${String(fb?.errorMessage || (fb?.needConfirmation ? 'needConfirmation' : 'token assenti')).slice(0, 120)}`);
+    }
+    return fb;
   };
   if (anonToken) {
     try { return await attempt(anonToken); } catch (e) {
