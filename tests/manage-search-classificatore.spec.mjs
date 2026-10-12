@@ -174,6 +174,24 @@ test('classificatore che non risponde: li ordina il modello della ricerca, e la 
   expect(chat).toEqual(['vendor/testo']);
 });
 
+for (const guasto of ['guasto', 'rete']) {
+  test(`classificatore giù (${guasto}): i risultati del modello arrivano subito, senza aspettare i tentativi`, async ({ app, openTab }) => {
+    await preparaOwner(app, {
+      supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13', manageSearch: 'vendor/testo' },
+      rispostaDecisioni: guasto,
+    });
+    const page = await openTab(URL);
+    await page.waitForFunction(() => window.filo && window.__mgTest);
+    const t0 = Date.now();
+    await cerca(page, 'il tasto chiudi');
+    await expect(page.locator('.mg-item--result')).toHaveCount(2, { timeout: 10000 });
+    const secondi = (Date.now() - t0) / 1000;
+    expect(secondi, `risultati dopo ${secondi.toFixed(1)} s`).toBeLessThan(4);
+    await expect(page.locator('#mgSearchMsg')).toContainText('Classificatore:');
+    await expect(page.locator('#mgSearchMsg')).toContainText('Li ha ordinati il modello della ricerca.');
+  });
+}
+
 test('con «solo modelli a pesi aperti» il classificatore resta spento e la ricerca funziona lo stesso', async ({ app, openTab }) => {
   await preparaOwner(app, {
     supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13', manageSearch: 'deepseek/deepseek-v4-flash' },
