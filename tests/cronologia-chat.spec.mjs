@@ -375,15 +375,19 @@ test('Filo ritrova una conversazione di prima e la rilegge', async ({ app }) => 
   expect(vuota.output.found).toBe(false);
 });
 
-test('la chat in corso non torna fra i risultati: non è un ricordo, è adesso', async ({ app }) => {
+test('la chat in corso non torna fra i risultati: non è un ricordo, è adesso; quella aperta in un\'altra scheda sì (#868)', async ({ app }) => {
   await configura(app);
   await stubProvider(app, {});
   await turno(app, 'c-aperta', 'Parliamo di vulcani');
 
   const r = await app.evaluate(
-    () => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'vulcani' }, { confirmed: false }),
+    () => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'vulcani' }, { confirmed: false, chatId: 'c-aperta' }),
   );
   expect(r.output.results.length).toBe(0);
+  const daAltrove = await app.evaluate(
+    () => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CERCA_CHAT', query: 'vulcani' }, { confirmed: false, chatId: 'c-altra' }),
+  );
+  expect(daAltrove.output.results.map((x) => x.id)).toEqual(['c-aperta']);
 });
 
 test('una chat vuota non lascia un guscio senza titolo in Cronologia', async ({ app, openTab }) => {

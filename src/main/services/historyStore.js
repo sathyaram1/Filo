@@ -28,6 +28,11 @@
     if (!input || typeof input !== 'object') return input || {};
     const out = { ...input };
     delete out.screenshot;
+    // Il tratto del filo davanti alla chat (#868) è fino a 100.000 token, ed è già nel filo: qui ne resta la misura.
+    if (Array.isArray(out.filoTratto)) {
+      const caratteri = out.filoTratto.reduce((n, m) => n + String((m && m.content) || '').length, 0);
+      out.filoTratto = { messaggi: out.filoTratto.length, caratteri };
+    }
     return out;
   }
 

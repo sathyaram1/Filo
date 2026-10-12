@@ -106,6 +106,10 @@
     $('saveBtn').textContent = I18n.t('admin_defaults_save');
     $('h-delicate').textContent = I18n.t('admin_defaults_delicate');
     $('delicate-desc').textContent = I18n.t('admin_defaults_delicate_desc');
+    $('h-contesto').textContent = I18n.t('admin_defaults_contesto');
+    $('contesto-desc').textContent = I18n.t('admin_defaults_contesto_desc');
+    $('l-contesto-giorni').textContent = I18n.t('admin_defaults_contesto_giorni');
+    $('l-contesto-token').textContent = I18n.t('admin_defaults_contesto_token');
   }
 
   function keyStateText(present) {
@@ -586,6 +590,25 @@
     return out;
   }
 
+  // ── Quanto ricorda la chat (#868) ───────────────────────────────────────────
+  let contestoCaricato = {};
+  function renderContesto(salvato, diSerie) {
+    contestoCaricato = salvato || {};
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      $(id).value = contestoCaricato[k] != null ? String(contestoCaricato[k]) : '';
+      $(id).placeholder = diSerie && diSerie[k] != null ? String(diSerie[k]) : '';
+    }
+  }
+  // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
+  function collectContesto() {
+    const ora = {};
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      const v = $(id).value.trim();
+      if (v !== '' && Number.isFinite(Number(v))) ora[k] = Number(v);
+    }
+    return JSON.stringify(ora) === JSON.stringify(contestoCaricato) ? null : ora;
+  }
+
   // ── Load / Save ─────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
     const present = cfg.apiKeysPresent || {};
@@ -598,6 +621,7 @@
     // è quella che il salvataggio riscrive per intero.
     renderExcluded(cfg.excludedProviders || [], cfg.excludedProviderReasons || []);
     renderDelicate(cfg.sitiDelicati, cfg.sitiDelicatiDiSerie);
+    renderContesto(cfg.contestoFilo, cfg.contestoFiloDiSerie);
     ensureProviderCatalog();
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
@@ -662,6 +686,8 @@
     }
     const delicate = collectDelicate();
     if (delicate) config.sitiDelicati = delicate;
+    const contesto = collectContesto();
+    if (contesto) config.contestoFilo = contesto;
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();
