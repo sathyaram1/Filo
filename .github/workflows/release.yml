@@ -374,7 +374,7 @@ jobs:
       - name: I file per Windows sono davvero nella bozza?
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -eo pipefail
