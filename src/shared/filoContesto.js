@@ -185,7 +185,8 @@
 
   // Il tratto del filo che il modello ha davanti. `messaggi` è tutto il filo in ordine di tempo, senza la domanda di
   // adesso; `ancora` è l'inizio scelto al turno prima, che si tiene finché i tetti lo permettono.
-  function finestra(messaggi, { ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null } = {}) {
+  // `immagini(m)`: i data URL ancora in memoria del messaggio, o null.
+  function finestra(messaggi, { ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null } = {}) {
     const lista = Array.isArray(messaggi) ? messaggi : [];
     const n = lista.length;
     const t0 = taglio(ora, giorni);
