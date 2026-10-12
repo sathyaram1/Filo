@@ -62,7 +62,34 @@ export function motivoCopiaTesto(testo) {
       if (m) return m;
     } catch (_) { /* riga non JSON: non dice niente */ }
   }
+  for (const o of oggettiChiusi(t)) {
+    const m = motivoCopia(o);
+    if (m) return m;
+  }
   return '';
+}
+
+// Gli oggetti chiusi dentro un JSON interrotto: una copia salvata a metà («le prime 300 righe») resta riconoscibile
+// dai documenti interi che contiene. Solo le graffe fuori dalle stringhe contano.
+function* oggettiChiusi(t) {
+  const aperti = [];
+  let inStringa = false;
+  let escape = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inStringa) {
+      if (escape) escape = false;
+      else if (c === '\\') escape = true;
+      else if (c === '"') inStringa = false;
+    } else if (c === '"') inStringa = true;
+    else if (c === '{') aperti.push(i);
+    else if (c === '}' && aperti.length) {
+      const da = aperti.pop();
+      let o;
+      try { o = JSON.parse(t.slice(da, i + 1)); } catch (_) { continue; }
+      yield o;
+    }
+  }
 }
 
 // Il primo carattere visibile, letto sui byte: immagini e caratteri non si decodificano per niente.
