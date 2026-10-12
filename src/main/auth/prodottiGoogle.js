@@ -55,12 +55,15 @@ function collega({ daUrl = '', finestra = null } = {}) {
     hostAccesso: host,
     // Uscita dalle pagine d'accesso: l'utente è dentro, il resto della scheda è suo.
     fino: (u) => !!hostDi(u) && hostDi(u) !== host,
-    suRifiuto: () => {
-      googleRifiutaLeSchede();
-      try { require('../services/avvisoFinestra').avvisoNellaFinestra(RIFIUTO, { chiave: 'prodotti-google-rifiutati' }); } catch (_) {}
+    suRifiuto: (motivo) => {
+      // Una pagina che non si carica non è un no di Google: l'invito resta.
+      if (motivo !== 'rete') googleRifiutaLeSchede();
+      const testo = motivo === 'rete' ? NON_CARICATA : RIFIUTO;
+      try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'prodotti-google-rifiutati' }); } catch (_) {}
     },
   });
   if (!scheda) return { ok: false, error: 'Apri una finestra normale di Filo e riprova.' };
+  schedaAperta = scheda;
   return { ok: true };
 }
 
