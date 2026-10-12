@@ -97,7 +97,7 @@ test('popup di accesso con Trusted Types: il tasto destro apre il menu', async (
   await vediMenu(pop);
 });
 
-test('tasto destro mentre la pagina carica ancora: qualcosa compare', async ({ app, openTab }) => {
+test('tasto destro mentre la pagina carica ancora: qualcosa compare', async ({ app, shell }) => {
   let rilascia;
   const lento = new Promise((r) => { rilascia = r; });
   const srv = http.createServer(async (req, res) => {
