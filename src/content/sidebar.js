@@ -651,6 +651,21 @@
       if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
         return { kind: 'web_search', query: obj.query.trim().slice(0, 300) };
       }
+      // Output speciale: un documento dell'utente (#947.3). Anche detto come l'azione della chat della home, che
+      // il modello conosce: da qui la cerca il main, col sì dato fuori dalla pagina.
+      const cercaDoc = obj.action === 'documenti' ? obj
+        : (obj.action === 'filo' && obj.filo && String(obj.filo.type || '').toUpperCase() === 'CERCA_DOCUMENTI' ? obj.filo : null);
+      if (cercaDoc) {
+        const cosa = cercaDoc.cosa ?? cercaDoc.query ?? cercaDoc.testo;
+        if (typeof cosa === 'string' && cosa.trim()) {
+          return {
+            kind: 'documenti',
+            cosa: cosa.trim().slice(0, 500),
+            cartella: typeof cercaDoc.cartella === 'string' ? cercaDoc.cartella.trim().slice(0, 2000) : '',
+            display: typeof obj.text === 'string' ? obj.text : '',
+          };
+        }
+      }
       // Output speciale: comando della shell di Filo (icone della barra in alto).
       // Eseguito in autonomia, senza coinvolgere l'utente. "close" è escluso.
       if (obj.action === 'shell' && typeof obj.command === 'string') {
