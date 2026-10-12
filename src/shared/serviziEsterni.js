@@ -101,8 +101,8 @@
       base: ['https://oauth2.googleapis.com/token', 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp', RINNOVO_ACCESSO],
       quando: 'funzione',
       occasione: 'quando fai il login con Google, e a ogni rinnovo dell’accesso',
-      riceve: 'il codice d’accesso che Google ha dato a Filo nel browser di sistema',
-      frase: "L'accesso Google si apre nel browser",
+      riceve: 'il codice d’accesso che Google ha dato a Filo nella scheda d’accesso, o nel browser di sistema',
+      frase: "L'accesso Google si apre in una scheda di Filo",
       dove: ['src/main/auth/google-auth.js', 'src/main/auth/config.js'],
     },
     {
