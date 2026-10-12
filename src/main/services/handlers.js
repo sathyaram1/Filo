@@ -4497,12 +4497,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const FC = globalThis.SN_FILO_CONTESTO;
     const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 ? FC.troppoLungo(e) : null;
     if (!rifiuto) return false;
-    const caratteriDi = (msgs) => (Array.isArray(msgs) ? msgs : [])
-      .reduce((n, m) => n + String(typeof (m && m.content) === 'string' ? m.content : JSON.stringify((m && m.content) || '')).length, 0);
     let inviati = [];
     try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
-    const caratteri = caratteriDi(inviati);
-    const caratteriTratto = caratteriDi(payloadBase.filoTratto);
+    const caratteri = FC.caratteriDi(inviati);
+    const caratteriTratto = FC.caratteriDi(payloadBase.filoTratto);
     const token = FC.tettoDopoRifiuto({ ...rifiuto, caratteri, caratteriTratto });
     if (token == null || token >= tettiChat.token) return false;
     strette++;
