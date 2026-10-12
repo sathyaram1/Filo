@@ -358,15 +358,8 @@
   function suInput(state) {
     // 1) autocorrect istantaneo
     tryAutocorrect(state);
-    // 2) gli issue blu hanno offset relativi al testo precedente: digitare anche
-    // un solo carattere prima della fine può sfasare l'intero set. Cancellali
-    // subito; verranno ricostruiti dal prossimo scan (debounce 1.5s). Senza
-    // questo, "Risolvi" può applicare il fix sul range sbagliato e "mangiare"
-    // la frase.
-    if (state.issues.length) {
-      state.issues = [];
-      renderOverlayContent(state);
-    }
+    // 2) gli issue blu seguono il testo fino al prossimo scan
+    seguiIlTesto(state);
     // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello. Lo scan già chiesto
     // da un gesto (un tasto tenuto premuto) si sposta soltanto: resta una chiamata, sul testo finale.
     if (!prendeGesto(state)) {
