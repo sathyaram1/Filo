@@ -5,7 +5,8 @@
 // (/audio/speech), dettatura (/audio/transcriptions) e indicizzazione
 // (/embeddings). Stessa chiave, stessa lista di esclusione dei fornitori, e —
 // dove il router non lo dice nella risposta — lo stesso riscontro su chi ha
-// davvero servito, chiesto a posteriori (lookupServedBy).
+// davvero servito, chiesto a posteriori (lookupServedBy). I classificatori
+// (decisioni a domande chiuse) hanno il loro endpoint: `decisions`.
 
 (function (global) {
   'use strict';
@@ -15,6 +16,8 @@
   const SPEECH_ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
   const TRANSCRIPTIONS_ENDPOINT = 'https://openrouter.ai/api/v1/audio/transcriptions';
   const EMBEDDINGS_ENDPOINT = 'https://openrouter.ai/api/v1/embeddings';
+  // I classificatori (Jev) non passano dalla chat: hanno un endpoint loro, ancora in alfa sul router.
+  const DECISIONS_ENDPOINT = 'https://openrouter.ai/api/alpha/decisions';
   const GENERATION_ENDPOINT = 'https://openrouter.ai/api/v1/generation';
   const AUTH_KEY_ENDPOINT = 'https://openrouter.ai/api/v1/auth/key';
   const CREDITS_ENDPOINT = 'https://openrouter.ai/api/v1/credits';
@@ -683,6 +686,43 @@
     };
   }
 
+  // ─── Decisioni (classificatori) ───────────────────────────────────────────
+  // Un classificatore non scrive: a ogni domanda chiusa di `questions` (per nome) risponde con una probabilità,
+  // dopo aver letto `state`. Le risposte tornano per nome in `answers`, tali e quali; il costo lo dice il router.
+  // `retryAfterMs` sull'errore è l'attesa chiesta da un 429, per chi rimette la richiesta in coda.
+  async function decisions({ apiKey, model, state, questions, providerRouting, signal }) {
+    await ensureAllowedHost({ apiKey, model, providerRouting });
+    const body = { model, state, questions };
+    const pb = providerBlock(providerRouting, model);
+    if (pb) body.provider = pb;
+    const payload = JSON.stringify(body);
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(DECISIONS_ENDPOINT, apiKey, (key) => ({
+      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    }));
+    if (!res.ok) {
+      const err = await httpError(res);
+      const attesa = Number(res.headers && typeof res.headers.get === 'function' ? res.headers.get('retry-after') : NaN);
+      if (Number.isFinite(attesa) && attesa >= 0) err.retryAfterMs = attesa * 1000;
+      throw err;
+    }
+    const data = (await res.json()) || {};
+    const usage = data.usage || {};
+    const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+    return {
+      answers: data.answers && typeof data.answers === 'object' ? data.answers : {},
+      model: typeof data.model === 'string' && data.model ? data.model : model,
+      servedBy: extractServedBy(data),
+      keyUsed, keyFallback,
+      usage: {
+        promptTokens: num(usage.input_tokens != null ? usage.input_tokens : usage.prompt_tokens),
+        completionTokens: num(usage.output_tokens != null ? usage.output_tokens : usage.completion_tokens),
+        cachedPromptTokens: 0,
+        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        keySource, keyFallback,
+      },
+    };
+  }
+
   // ─── Chi ha servito, a posteriori ─────────────────────────────────────────
   // Per voce e dettatura il router non mette il fornitore nella risposta: lo
   // si chiede con l'id della generazione, che diventa consultabile qualche
@@ -744,9 +784,10 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
+    cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
     modelHosts, forgetModelHosts, forgetReasoningRefusals,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
-    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
+    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
+    GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

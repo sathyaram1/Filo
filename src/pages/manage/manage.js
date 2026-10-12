@@ -2725,6 +2725,7 @@
     if (!mgSearchMsg) return;
     mgSearchMsg.textContent = text || '';
     mgSearchMsg.classList.toggle('mg-err', kind === 'err');
+    mgSearchMsg.classList.toggle('mg-count', kind === 'count');
   }
 
   // Nasconde le barre specifiche della scheda (filtro archivio, ri-valuta,
@@ -2757,69 +2758,171 @@
   function closeSearch(opts) {
     const keepList = !!(opts && opts.keepList);
     searchSeq++;               // invalida ricerche eventualmente in volo
+    stopClassify();
     searchMode = false;
     if (mgSearchBar) mgSearchBar.hidden = true;
     if (mgSearchInput) mgSearchInput.value = '';
     toggleSearchIcon(false);
     setSearchMsg('', null);
+    showClassifyProgress(null);
     if (!keepList) renderList();
   }
 
-  // Disegna i risultati (ordinati per pertinenza) al posto della lista. `reason`
-  // (il perché è pertinente) vive nel tooltip, non nel colore del bordo.
-  function renderSearchResults(results, opts) {
-    const fallback = !!(opts && opts.fallback);
-    hideTabBars();
-    mgListLoading.hidden = true;
-    mgList.innerHTML = '';
-    // Il motivo del main dice anche dove si imposta il modello: senza, l'owner lo cercava dove non c'è più (#465).
-    const motivo = fallback && opts && opts.motivo ? String(opts.motivo).trim() : '';
-    setSearchMsg(fallback
-      ? (motivo ? `${motivo} Intanto mostro i risultati per testo.` : 'Modello non disponibile: mostro i risultati per testo.')
-      : '', null);
+  // ── Il classificatore della ricerca (#1118) ──────────────────────────────
+  // Se in Modelli di supporto c'è un classificatore, legge TUTTI i feedback in parallelo e dice quali sono quelli
+  // cercati, con una probabilità; il giro gira nel main e la pagina chiede a che punto è, mostrando i risultati
+  // mentre arrivano. Se manca o non risponde, la ricerca resta quella di prima: li ordina il modello, poi le parole.
+  const CLASSIFY_MSG = (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.MANAGE_SEARCH_CLASSIFY) || 'manage_search_classify';
+  const CLASSIFY_POLL_MS = 200;
+  const mgSearchProgress = document.getElementById('mgSearchProgress');
+  const mgSearchProgressFill = document.getElementById('mgSearchProgressFill');
+  let classifyJob = null;
+  const CLASSIFY_ASSENTE = ['NO_MODEL_FOR_ACTION', 'not_admin', 'forbidden'];
 
-    // "Nessun risultato" al tetto del caricamento significa "nessuno fra quelli
-    // caricati": la ricerca legge solo i feedback che stanno in pagina.
-    const nessuno = () => {
-      mgList.hidden = true;
-      mgListEmpty.hidden = false;
-      mgListEmpty.textContent = 'Nessun feedback pertinente.'
-        + (loadHitCap() ? ` ${FB.COUNT_INCOMPLETE_HINT}` : '');
-    };
+  function stopClassify() {
+    if (!classifyJob) return;
+    const jobId = classifyJob;
+    classifyJob = null;
+    Promise.resolve().then(() => sendToMain({ type: CLASSIFY_MSG, op: 'stop', jobId })).catch(() => {});
+  }
 
-    if (!results.length) {
-      // Quanti ne ha trovati è esattamente la domanda della ricerca: zero è una
-      // risposta, e si scrive come le altre (#495).
-      setListHead('Ricerca', 0);
-      nessuno();
-      return;
+  const numIt = (n) => Number(n || 0).toLocaleString('it-IT');
+
+  // null nasconde la barra; altrimenti quanti feedback ha già letto il classificatore, su quanti.
+  function showClassifyProgress(state) {
+    if (!mgSearchProgress) return;
+    if (!state) { mgSearchProgress.hidden = true; return; }
+    const total = Math.max(0, Number(state.total) || 0);
+    const done = Math.min(total, Math.max(0, Number(state.done) || 0));
+    mgSearchProgress.hidden = false;
+    mgSearchProgress.setAttribute('aria-valuemax', String(total));
+    mgSearchProgress.setAttribute('aria-valuenow', String(done));
+    if (mgSearchProgressFill) mgSearchProgressFill.style.width = `${total ? (done / total) * 100 : 0}%`;
+    setSearchMsg(`Letti ${numIt(done)} di ${numIt(total)}`, 'count');
+  }
+
+  const pausa = (ms) => new Promise((ok) => setTimeout(ok, ms));
+
+  // Torna null se la ricerca è stata superata o il classificatore non è impostato; { used:false, motivo } se c'è ma
+  // non ha risposto; { used:true, hits, nota } se ha letto i feedback (anche solo una parte: la nota dice quale).
+  async function classifySearch(query, my) {
+    if (!SRCH || typeof SRCH.classifierOrder !== 'function') return null;
+    const max = SRCH.CLASSIFIER && SRCH.CLASSIFIER.MAX_TEXT;
+    const candidates = SRCH.classifierOrder(SRCH.buildCandidates(allFeedbacks, max), query);
+    let r = null;
+    try { r = await sendToMain({ type: CLASSIFY_MSG, op: 'start', query, candidates }); } catch (_) { r = null; }
+    const superata = () => my !== searchSeq || !searchMode;
+    if (superata()) {
+      if (r && r.ok && r.jobId) sendToMain({ type: CLASSIFY_MSG, op: 'stop', jobId: r.jobId }).catch(() => {});
+      return null;
     }
-    mgListEmpty.hidden = true;
-    mgList.hidden = false;
-    let shown = 0;
-    for (const res of results) {
-      const fb = allFeedbacks.find((f) => f._id === res.id);
-      if (!fb) continue;
-      shown++;
+    if (!r) return null;
+    // Nessun classificatore impostato, o chi guarda non gestisce Filo: la ricerca di sempre, senza note.
+    if (!r.ok) return CLASSIFY_ASSENTE.includes(r.code) ? null : { used: false, motivo: String(r.error || '').trim() };
+    classifyJob = r.jobId;
+    showClassifyProgress({ done: 0, total: r.total });
+    for (;;) {
+      await pausa(CLASSIFY_POLL_MS);
+      if (superata() || classifyJob !== r.jobId) return null;
+      let st = null;
+      try { st = await sendToMain({ type: CLASSIFY_MSG, op: 'status', jobId: r.jobId }); } catch (_) { st = null; }
+      if (superata() || classifyJob !== r.jobId) return null;
+      if (!st || !st.ok) {
+        classifyJob = null;
+        showClassifyProgress(null);
+        return { used: false, motivo: 'Il classificatore si è interrotto.' };
+      }
+      const hits = Array.isArray(st.hits) ? st.hits : [];
+      showClassifyProgress(st);
+      if (hits.length) renderSearchResults(hits, { running: true });
+      if (!st.finished) continue;
+      classifyJob = null;
+      showClassifyProgress(null);
+      const skipped = Math.max(0, Number(st.skipped) || 0);
+      const letti = Math.max(0, (Number(st.done) || 0) - skipped);
+      const errore = String(st.error || '').trim();
+      if (!letti) return { used: false, motivo: errore };
+      let nota = '';
+      if (errore) nota = `Il classificatore si è fermato dopo ${numIt(letti)} feedback su ${numIt(st.total)}: ${errore}`;
+      else if (skipped) nota = `${numIt(skipped)} feedback non letti dal classificatore.`;
+      return { used: true, hits, nota };
+    }
+  }
+
+  // Le card dei risultati restano le stesse finché la ricerca è la stessa: i risultati del classificatore arrivano
+  // mentre la lista è già lì, e una card rifatta a ogni giro perderebbe il clic che ci stava cadendo sopra.
+  let resultCards = new Map();
+
+  function resultCard(fb, res) {
+    let item = resultCards.get(fb._id);
+    if (!item) {
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
-      const item = document.createElement('div');
-      item.className = 'mg-item mg-item--result' + (fb._id === selectedId ? ' mg-item--selected' : '');
+      item = document.createElement('div');
+      item.className = 'mg-item mg-item--result';
       item.dataset.id = fb._id;
-      const reason = String(res.reason || '').trim();
-      item.title = (num ? `#${num} · ` : '') + title + (reason ? ` — ${reason}` : '');
       item.innerHTML = `
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
       `;
       item.addEventListener('click', () => openDetail(fb._id));
-      mgList.appendChild(item);
+      resultCards.set(fb._id, item);
     }
-    // Il numero è quello delle card DAVVERO disegnate: un risultato il cui
-    // feedback non è più fra i caricati non viene mostrato, e non va contato.
-    setListHead('Ricerca', shown);
-    if (!shown) nessuno();
+    const num = FB.formatNum(fb.seq, fb.subSeq);
+    const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
+    const p = Number(res.p);
+    const reason = String(res.reason || '').trim()
+      || (Number.isFinite(p) ? `pertinenza ${Math.round(p * 100)}%` : '');
+    item.title = (num ? `#${num} · ` : '') + title + (reason ? ` — ${reason}` : '');
+    item.classList.toggle('mg-item--selected', fb._id === selectedId);
+    return item;
+  }
+
+  // Disegna i risultati (ordinati per pertinenza) al posto della lista. `reason`
+  // (il perché è pertinente) vive nel tooltip, non nel colore del bordo.
+  // `running`: il classificatore sta ancora leggendo, e i risultati sono quelli trovati finora.
+  function renderSearchResults(results, opts) {
+    const fallback = !!(opts && opts.fallback);
+    const running = !!(opts && opts.running);
+    hideTabBars();
+    mgListLoading.hidden = true;
+    // Il motivo del main dice anche dove si imposta il modello: senza, l'owner lo cercava dove non c'è più (#465).
+    const motivo = opts && opts.motivo ? String(opts.motivo).trim() : '';
+    if (!running) {
+      setSearchMsg(fallback
+        ? (motivo ? `${motivo} Intanto mostro i risultati per testo.` : 'Modello non disponibile: mostro i risultati per testo.')
+        : motivo, null);
+    }
+
+    // "Nessun risultato" al tetto del caricamento significa "nessuno fra quelli
+    // caricati": la ricerca legge solo i feedback che stanno in pagina.
+    const nessuno = () => {
+      mgList.hidden = true;
+      mgListEmpty.hidden = false;
+      mgListEmpty.textContent = running ? 'Cerco…' : 'Nessun feedback pertinente.'
+        + (loadHitCap() ? ` ${FB.COUNT_INCOMPLETE_HINT}` : '');
+    };
+
+    const cards = [];
+    for (const res of results || []) {
+      const fb = allFeedbacks.find((f) => f._id === res.id);
+      if (fb) cards.push(resultCard(fb, res));
+    }
+    const keep = new Set(cards);
+    for (const child of Array.from(mgList.children)) if (!keep.has(child)) child.remove();
+    for (const [id, el] of resultCards) if (!keep.has(el)) resultCards.delete(id);
+    // Si sposta solo la card fuori posto: quella già al suo posto non esce dal documento.
+    cards.forEach((el, i) => { if (mgList.children[i] !== el) mgList.insertBefore(el, mgList.children[i] || null); });
+
+    // Quanti ne ha trovati è esattamente la domanda della ricerca: zero è una
+    // risposta, e si scrive come le altre (#495). Il numero è quello delle card
+    // DAVVERO disegnate: un risultato il cui feedback non è più fra i caricati
+    // non viene mostrato, e non va contato.
+    setListHead('Ricerca', running && !cards.length ? null : cards.length);
+    if (!cards.length) { nessuno(); return; }
+    mgListEmpty.hidden = true;
+    mgList.hidden = false;
   }
 
   async function runSearch(rawQuery) {
@@ -2827,13 +2930,19 @@
     const query = String(rawQuery || '').trim();
     if (!query) {
       // Campo svuotato: torna all'invito — e il numero se ne va con i risultati.
+      searchSeq++;
+      stopClassify();
+      showClassifyProgress(null);
       setListHead('Ricerca', null);
       mgList.hidden = true; mgList.innerHTML = '';
+      resultCards = new Map();
       mgListEmpty.hidden = false; mgListEmpty.textContent = 'Scrivi cosa cerchi e premi Invio.';
       setSearchMsg('', null);
       return;
     }
     const my = ++searchSeq;
+    stopClassify();
+    showClassifyProgress(null);
     const candidates = SRCH.buildCandidates(allFeedbacks);
     if (!candidates.length) {
       renderSearchResults([], { fallback: false });
@@ -2847,8 +2956,22 @@
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.hidden = true; mgList.innerHTML = '';
+    resultCards = new Map();
     mgListEmpty.hidden = false; mgListEmpty.textContent = 'Cerco…';
     setSearchMsg('', null);
+
+    const cls = await classifySearch(query, my);
+    if (my !== searchSeq || !searchMode) return;
+    if (cls && cls.used) {
+      renderSearchResults(cls.hits, { motivo: cls.nota });
+      return;
+    }
+    // Il classificatore c'è ma non ha risposto: lo si dice accanto ai risultati del modello.
+    const motivoCls = cls ? String(cls.motivo || '').replace(/[.\s]+$/, '') : '';
+    const notaClassificatore = cls
+      ? `Classificatore: ${motivoCls ? motivoCls.replace(/^([A-Z])(?=[a-zà-ù])/, (m) => m.toLowerCase()) : 'nessuna risposta'}. `
+      : '';
+    if (cls) setSearchMsg('', null);
 
     const validIds = new Set(candidates.map((c) => c.id));
     let ranked = null;
@@ -2876,10 +2999,15 @@
     if (my !== searchSeq || !searchMode) return;
 
     if (ranked) {
-      renderSearchResults(ranked, { fallback: false });
+      renderSearchResults(ranked, {
+        fallback: false,
+        motivo: notaClassificatore ? `${notaClassificatore}Li ha ordinati il modello della ricerca.` : '',
+      });
     } else {
       // Ripiego per parole: la ricerca trova comunque qualcosa.
-      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), { fallback: true, motivo });
+      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), {
+        fallback: true, motivo: `${notaClassificatore}${motivo}`.trim(),
+      });
     }
   }
 
@@ -5431,7 +5559,7 @@
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
   // Slot → editor a segmenti (buildChain del modelChainEditor).
   // Caricato pigro: viene inizializzato la prima volta che l'utente clicca la tab.
-  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch'];
+  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch', 'manageSearchClassifier'];
   // Etichette amichevoli per slot (i giudici del panel L2 sono "Giudice 1/2/3"
   // + "Giudice dinamico"; l'id grezzo non va mai mostrato all'utente). L'HTML
   // ha già le <label> statiche; questa mappa è la sorgente di verità se in
@@ -5445,6 +5573,7 @@
     judgeRedTeam:  'Giudice red-team',
     judgePriority: 'Giudice priorità',
     manageSearch:  'Ricerca fra i feedback',
+    manageSearchClassifier: 'Classificatore della ricerca',
   };
   let smChains = {};        // slot → { getValue }
   // Nickname del registro condiviso (Modelli predefiniti): il server dei giudici

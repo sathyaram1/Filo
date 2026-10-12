@@ -580,6 +580,11 @@
     // Tutto letto anche dal backend filo-security (DD3).
     SUPPORT_MODELS_GET: 'support_models_get',      // → { ok, models } | { ok:false, error }
     SUPPORT_MODELS_UPDATE: 'support_models_update',// { models, judgeRegistry?, openrouterKey? } → { ok, models } | { ok:false, error }
+    // Il classificatore della ricerca fra i feedback (#1118), riservato a chi li gestisce. Il giro gira nel main:
+    // { op:'start', query, candidates:[{id,title,text}] } → { ok, jobId, total } | { ok:false, code, error };
+    // { op:'status', jobId } → { ok, done, total, hits:[{id,p}], finished, skipped, error, code };
+    // { op:'stop', jobId } → { ok }.
+    MANAGE_SEARCH_CLASSIFY: 'manage_search_classify',
     // Ri-valutazione owner dei feedback "non filtrati" (panel parziale): la
     // dashboard passa gli id dei feedback bianchi; il backend ri-esegue SOLO i
     // giudici mancanti e riscrive il pipeline. Owner-only.

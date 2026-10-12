@@ -121,6 +121,9 @@
     user('feedback-title', 'Titolo automatico di un feedback', 'Feedback', A.FEEDBACK_TITLE),
     owner('manage-search', 'Ricerca fra i feedback', 'Feedback', 'manageSearch',
       'Gira sul computer di chi gestisce Filo, con la chiave che usa nel resto di Filo.', A.MANAGE_SEARCH),
+    owner('manage-search-classify', 'Classificatore della ricerca fra i feedback', 'Feedback', 'manageSearchClassifier',
+      'Legge i feedback in parallelo e dice quali corrispondono alla ricerca; se manca o non risponde, li ordina il modello della ricerca.',
+      A.MANAGE_SEARCH_CLASSIFY),
 
     // Diagnostica
     user('provider-test', 'Prova di un fornitore («Prova» accanto alla chiave)', 'Diagnostica', A.PROVIDER_TEST),

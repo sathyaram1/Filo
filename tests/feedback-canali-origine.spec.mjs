@@ -137,6 +137,9 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       fusioniElenco: { type: MSG.MERGE_APPROVALS_GET },
       fusioniApprova: { type: MSG.MERGE_APPROVAL_APPROVE, id: 'ab12cd34ef56ab12cd34ef56' },
       fusioniScarta: { type: MSG.MERGE_APPROVAL_DISCARD, id: 'ab12cd34ef56ab12cd34ef56' },
+      // Il classificatore della ricerca spende la chiave dell'owner leggendo tutti i feedback (#1118).
+      ricercaClassificatore: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'start', query: 'x', candidates: [{ id: 'a', title: 't', text: 'x' }] },
+      ricercaClassificatoreStato: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'status', jobId: 'r1' },
     });
     const esegui = async (mittente) => {
       const res = {};

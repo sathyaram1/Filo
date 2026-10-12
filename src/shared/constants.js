@@ -295,6 +295,8 @@
     // Ricerca "a senso" fra i feedback nella dashboard di gestione (prima usava
     // lo slot di «Categorizza»).
     MANAGE_SEARCH: 'manage_search',
+    // Il classificatore della stessa ricerca: legge i feedback in parallelo e dice quali corrispondono (#1118).
+    MANAGE_SEARCH_CLASSIFY: 'manage_search_classify',
     // Embedding dei riassunti delle schede archiviate (base della ricerca
     // semantica nell'archivio). Prima il modello era scritto nel codice.
     ARCHIVE_EMBED: 'archive_embed',
@@ -449,6 +451,7 @@
     [ACTIONS.EDITOR_SUMMARY]: 'Editor — riassunto del documento',
     [ACTIONS.EDITOR_CHAT]: 'Editor — chat col documento',
     [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
+    [ACTIONS.MANAGE_SEARCH_CLASSIFY]: 'Gestione — classificatore della ricerca',
     [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
     [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
     [ACTIONS.FILE_NAME]: 'Nome sensato a un file',
@@ -522,6 +525,7 @@
     [ACTIONS.EDITOR_SUMMARY]: '',
     [ACTIONS.EDITOR_CHAT]: '',
     [ACTIONS.MANAGE_SEARCH]: '',
+    [ACTIONS.MANAGE_SEARCH_CLASSIFY]: '',
     [ACTIONS.ARCHIVE_EMBED]: '',
     [ACTIONS.PROVIDER_TEST]: '',
     [ACTIONS.FILE_NAME]: '',
