@@ -175,7 +175,23 @@ async function main() {
   } catch (e) {
     erroreApi = String(e.stderr || e.message || e).trim().split('\n')[0];
   }
-  const verde = scegliUltimoVerde(runs, primoGenitore);
+  const passate = new Map();
+  let erroreLavori = '';
+  const valida = (r) => {
+    if (!passate.has(r?.id)) {
+      let ok = false;
+      try {
+        ok = r?.id != null && passaIlCancello(ghApi(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`)?.jobs);
+      } catch (e) {
+        erroreLavori ||= `lavori della corsa ${r?.id}: ${String(e.stderr || e.message || e).trim().split('\n')[0]}`;
+      }
+      passate.set(r?.id, ok);
+    }
+    return passate.get(r?.id);
+  };
+  const verde = scegliUltimoVerde(runs, primoGenitore, valida);
+  // Un verde trovato basta; senza, un errore nel leggere i lavori può essere il motivo, e si dice.
+  if (!verde && erroreLavori && !erroreApi) erroreApi = erroreLavori;
 
   // Il suite.yml di un avviso vuole solo lo sha: da lì conta i commit entrati dopo.
   if (process.argv.includes('--stampa')) {
