@@ -109,7 +109,7 @@ describe('il tag v* lo crea l\'app di pubblicazione, quando c\'è', () => {
   const iNumero = ps.findIndex((p) => /scripts\/release-bump\.mjs/.test(p));
   const COL_FALLBACK = /GH_TOKEN:\s*\$\{\{\s*steps\.app\.outputs\.token\s*\|\|\s*secrets\.GITHUB_TOKEN\s*\}\}/;
 
-  test('il token dell\'app si conia solo se la variabile c\'è, prima della bozza', () => {
+  test('il token dell\'app si conia solo se la variabile c\'è, prima del numero di versione', () => {
     assert.ok(iApp >= 0, 'manca il passo che conia il token dell\'app: con la regola sui tag accesa la versione non uscirebbe');
     assert.match(ps[iApp], /^\s*id:\s*app\s*$/m);
     assert.match(ps[iApp], /if:[^\n]*vars\.FILO_RILASCIO_APP_ID != ''/,
