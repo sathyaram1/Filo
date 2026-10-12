@@ -460,6 +460,35 @@ test('editor: col microfono accanto, la casella della chat mostra tutto il sugge
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella.png` });
 });
 
+// Con la finestra piccola la chat è stretta: la casella non resta larga due parole accanto ai tasti (#256.4).
+test('editor: con la finestra piccola la casella della chat prende tutta la riga e mostra la richiesta intera', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(1024, 640); });
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const ed = await openTab('filo://editor/editor.html');
+  await ed.waitForSelector('.ed-module[data-type="switch"]');
+  await ed.locator('.ed-switch-icon').nth(1).click();
+  const chat = ed.locator('.ed-module[data-type="chat"]');
+  const mic = chat.locator('.sn-voce-btn');
+  await expect(mic).toBeVisible();
+  const casella = chat.locator('[data-chat="input"]');
+  const misura = () => casella.evaluate((i) => ({ sh: i.scrollHeight, ch: i.clientHeight }));
+  const vuota = await misura();
+  expect(vuota.sh).toBeLessThanOrEqual(vuota.ch);
+  await casella.fill('riassumi il secondo paragrafo e dimmi se il tono è adatto a una lettera');
+  const piena = await misura();
+  expect(piena.sh).toBeLessThanOrEqual(piena.ch);
+  const pos = await ed.evaluate(() => {
+    const mod = document.querySelector('.ed-module[data-type="chat"]');
+    const r = (s) => mod.querySelector(s).getBoundingClientRect();
+    const t = r('[data-chat="input"]'), m = r('.sn-voce-btn'), s = r('[data-chat="send"]');
+    return { micSotto: m.top >= t.bottom, invioSotto: s.top >= t.bottom, invioDentro: s.right <= mod.getBoundingClientRect().right && s.bottom <= mod.getBoundingClientRect().bottom };
+  });
+  expect(pos).toEqual({ micSotto: true, invioSotto: true, invioDentro: true });
+  mkdirSync(SHOTS, { recursive: true });
+  await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-stretta.png` });
+});
+
 // Il tetto della casella segue il modulo, non i caratteri del sistema (#256.4): oltre scorre, ma resta dentro la chat,
 // il registro non sparisce e l'ultima risposta non scivola fuori vista mentre si scrive.
 test('editor: una richiesta lunghissima ferma la casella entro la chat, e l\'ultima risposta resta in vista', async ({ app, shell, openTab }) => {
