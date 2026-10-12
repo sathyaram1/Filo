@@ -170,9 +170,23 @@ test('#1173 un indirizzo si taglia fra un pezzo e l’altro: un’email cifrata 
       assert.ok(fuori.length <= MAX_URL_LEN);
       assert.ok(fuori.includes('[NUMERO]'), 'la prova deve arrivare al taglio');
       assert.doesNotMatch(fuori, /mario|rossi|%40|@/, `tagliato dopo ${dentro}: ${fuori.slice(-60)}`);
-      assert.match(fuori, /\/\[ID\]$/, 'al posto di quello che non si guarda resta il segnaposto');
+      assert.match(fuori, /\/\[EMAIL\]\/fine$/, 'la pulizia accorcia, e quello che segue arriva lo stesso');
     }
   }
+});
+
+test('#1173 un campo che la pulizia accorcia molto tiene la coda: quale pulsante, dove si va', () => {
+  assert.equal(I.redactSelector(`[data-id="${'1'.repeat(1400)}"] button.Paga`), '[data-id="[NUMERO]"] button.Paga');
+  assert.match(I.redactSelector(`[aria-label="${'mario.rossi.lunghissimo@example-company.com, '.repeat(40)}"] .invia`), /\.invia$/);
+  assert.equal(I.sanitizeIntent(`Pagare la pratica ${'1'.repeat(800)} dal menu Fatture`), 'Pagare la pratica [NUMERO] dal menu Fatture');
+  assert.equal(I.sanitizeInitialUrl(`https://esempio.it/area/${'1'.repeat(4500)}/ordini`), '/area/[NUMERO]/ordini');
+  assert.equal(I.sanitizeInitialUrl(`/area/${'1'.repeat(4500)}/ordini`, 'esempio.it'), '/area/[NUMERO]/ordini');
+  // In testa quello che la pulizia toglie del tutto: spazi, virgolette, segni invisibili.
+  assert.equal(I.redactSelector(' '.repeat(3000) + 'button.Paga'), 'button.Paga');
+  assert.equal(I.sanitizeIntent('"'.repeat(3000) + 'aprire le fatture'), 'aprire le fatture');
+  assert.equal(I.sanitizeInitialUrl('​'.repeat(6000) + '/area/ordini', 'esempio.it'), '/area/ordini');
+  const c = costoInUnita(() => I.redactSelector(`[data-id="${'1'.repeat(600_000)}"] button.Paga`), { tetto: 30, giri: 3 });
+  assert.ok(c.entro, `un campo che si accorcia tutto costa quanto la sua lunghezza: ${c.come}`);
 });
 
 test('#1173 quello che sta nel tetto resta quello di prima: il taglio anticipato non toglie niente', () => {
