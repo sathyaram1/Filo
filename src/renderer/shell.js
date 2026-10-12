@@ -1000,29 +1000,34 @@
   }
 
   // La scheda è un contenitore e non dà alla striscia la larghezza del contenuto: la si misura con tutto in
-  // vista. Le schede si dividono la striscia a parti uguali, quindi ognuna chiede la sua parte di una striscia
-  // dove sta il titolo più lungo: la somma delle proprie tagliava i titoli a fila mezza vuota (#429).
+  // vista. Regola unica (#429): finché la fila ha posto nessun nome è tagliato. Le schede dietro sono larghe
+  // quanto la più lunga di loro, l'attiva quanto il suo contenuto e almeno STACCO volte le altre; la striscia
+  // le divide in quella proporzione, e solo quando la fila è piena si stringono tutte insieme.
+  const STACCO = 1.4;
+  const STACCO_MAX = 1.8;
+  let crescitaInVigore = STACCO;
   function misuraLarghezzeChieste() {
     const schede = [...tabsEl.children];
     if (!schede.length) return;
-    const px = (v, ripiego) => { const n = parseFloat(v); return Number.isFinite(n) ? n : ripiego; };
-    const regole = schede.map((el) => {
-      const cs = getComputedStyle(el);
-      return { peso: px(cs.flexGrow, 1) || 1, min: px(cs.minWidth, 0), max: px(cs.maxWidth, Infinity) };
-    });
     schede.forEach((el) => el.classList.add('misura'));
     const pad = getComputedStyle(schede[0]);
     const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
     const larghe = schede.map((el) => el.getBoundingClientRect().width);
-    const misurato = Math.max(...larghe.map((w, i) => Math.min(w, regole[i].max)));
+    const ia = schede.findIndex((el) => el.classList.contains('active'));
+    const attiva = ia >= 0 ? larghe[ia] : 0;
+    const dietro = Math.max(0, ...larghe.filter((_, i) => i !== ia));
+    const misurato = Math.max(dietro, attiva / STACCO_MAX);
+    const crescitaMisurata = misurato > 0 ? Math.min(STACCO_MAX, Math.max(STACCO, attiva / misurato)) : STACCO;
     const tieni = puntatoreSullaFila && passoInVigore > 0;
-    passoTrattenuto = tieni && misurato !== passoInVigore;
+    passoTrattenuto = tieni && (misurato !== passoInVigore || crescitaMisurata !== crescitaInVigore);
     const passo = tieni ? passoInVigore : misurato;
+    const crescita = tieni ? crescitaInVigore : crescitaMisurata;
     passoInVigore = passo;
+    crescitaInVigore = crescita;
     schede.forEach((el, i) => {
-      const { peso, min, max } = regole[i];
-      const chiesta = Math.min(max, Math.max(min, passo * peso));
+      const chiesta = i === ia ? passo * crescita : passo;
       el.style.setProperty('--tab-chiesta', `${Math.max(0, Math.ceil(chiesta - bordi))}px`);
+      if (i === ia) el.style.setProperty('--tab-crescita', String(crescita));
       el.classList.remove('misura');
     });
   }
