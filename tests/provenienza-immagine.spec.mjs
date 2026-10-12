@@ -438,7 +438,7 @@ test('credenziali valide nel formato del 2023: il menu non dice che la firma non
   expect((await riga.isVisible()) ? await riga.getAttribute('aria-label') : '').not.toMatch(/non è valida/);
 });
 
-// Le immagini non tornano nei turni dopo: la domanda fatta al messaggio seguente deve trovare l'esito (#946).
+// La domanda fatta al messaggio seguente trova l'esito (#946), insieme all'immagine che torna col suo messaggio (#1166).
 test('nella chat della Home, «è fatta con l’AI?» al messaggio dopo l’immagine trova lo stesso esito', async ({ app, openTab }) => {
   await modelloFinto(app);
   const home = await openTab('filo://newtab/');
