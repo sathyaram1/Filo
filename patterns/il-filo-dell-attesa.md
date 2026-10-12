@@ -55,7 +55,10 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   stessa animazione al contrario. Il riassunto si sposta quanto serve a
   lasciare a un gomitolo grosso l'aria di uno piccolo (prova J dello spec).
   Se dopo il testo arriva un'azione, quel
-  testo era una nota: il gomitolo si srotola e il lavoro continua.
+  testo era una nota: il gomitolo si srotola e il lavoro continua. Non se il
+  giro ha solo azioni che mettono un bottone e basta (APRI_FILE): il loro esito
+  si sa già, quindi quel testo è la risposta e resta nella bolla, e quello dei
+  giri dopo continua sotto (#1167).
 - **Fermare.** Mentre Filo lavora il posto dell'invio lo prende un quadrato
   (`#stopBtn`, stesso posto, colore d'accento) e Invio fa la stessa cosa:
   fermare è urgente, e sul telefono il passaggio del mouse non esiste. Il filo
