@@ -75,14 +75,7 @@
         // punteggiatura JSON, facendo "trovare" parole che l'utente non vede
         // da nessuna parte. Qui usiamo l'input formattato come in lista,
         // l'etichetta dell'azione, il modello, l'output e l'origine.
-        const haystack = [
-          formatActionLabel(it.action),
-          formatInput(it.input),
-          it.output || '',
-          it.origin || '',
-          it.model || '',
-        ].join(' ').toLowerCase();
-        return haystack.includes(q);
+        return haystackOf(it).includes(q);
       });
     }
 
