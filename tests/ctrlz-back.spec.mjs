@@ -187,6 +187,8 @@ for (const [nome, tasto, mod, mac] of [['Cmd+freccia sinistra su Mac', 'Left', [
       if (mac) await app.evaluate(() => { Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true }); });
       const stato = await apriCronologia(app, page, '#ta');
       expect(stato.voci.length).toBe(2);
+      // Il campo prende il fuoco un giro dopo essere montato: digitare prima perde le prime lettere.
+      await expect.poll(async () => (await statoCronologia(app, page))?.cerca?.fuoco, { timeout: 3000 }).toBe(true);
       await page.keyboard.type('secondo');
       await expect.poll(async () => (await statoCronologia(app, page))?.cerca?.valore, { timeout: 3000 }).toBe('secondo');
       await page.waitForTimeout(400);
