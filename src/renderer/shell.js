@@ -1007,7 +1007,7 @@
   // La scheda è un contenitore e non dà alla striscia la larghezza del contenuto: la si misura con tutto in
   // vista. Regola unica (#429): finché la fila ha posto ogni scheda è larga quanto il suo contenuto e nessun
   // nome è tagliato; quando manca, si accorciano prima i nomi più lunghi, tutti allo stesso tetto. L'attiva
-  // stacca di STACCO dalla scheda tipica dietro (la più corta delle due metà), senza superare STACCO_MAX tetti.
+  // stacca di STACCO dalla scheda tipica dietro solo con lo spazio che avanza: un vuoto suo non taglia un nome altrui.
   const STACCO = 1.25;
   const STACCO_MAX = 1.8;
   const MIN_ATTIVA = 110;
