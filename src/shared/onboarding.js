@@ -415,11 +415,13 @@
     if (!text) return normalize(state);
     const cur = togliFermato(state);
     const last = cur.thread[cur.thread.length - 1];
+    const nuovi = segni({ ...turn, role });
     if (last && last.role === role && last.text.trim() === text.trim()) {
-      const segnato = turn.daFuori === true && !last.daFuori ? { thread: [...cur.thread.slice(0, -1), { ...last, daFuori: true }] } : {};
+      const mancanti = Object.keys(nuovi).some((k) => !last[k]);
+      const segnato = mancanti ? { thread: [...cur.thread.slice(0, -1), { ...last, ...nuovi }] } : {};
       return { ...cur, ...segnato, startedAt: cur.startedAt || new Date().toISOString() };
     }
-    const thread = [...cur.thread, { role, text, ...(turn.daFuori === true ? { daFuori: true } : {}) }].slice(-THREAD_CAP);
+    const thread = [...cur.thread, { role, text, ...nuovi }].slice(-THREAD_CAP);
     return { ...cur, thread, startedAt: cur.startedAt || new Date().toISOString() };
   }
 
