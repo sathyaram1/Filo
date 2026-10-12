@@ -6,6 +6,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { confermaSopraPagina } from '../../helpers/confirm.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
+import { primaFinestra } from '../../helpers/primaFinestra.mjs';
 import { apriCronologia, statoCronologia } from '../../helpers/cronologiaAppunti.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -21,8 +22,7 @@ test('tasto destro → Svuota cronologia: Annulla lascia tutto, OK svuota davver
   const host = new URL(url).hostname;
   const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' } });
   try {
-    const shell = await app.firstWindow();
-    await shell.waitForLoadState('domcontentloaded');
+    const shell = await primaFinestra(app);
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     let page = null;
     for (let i = 0; i < 100 && !page; i++) {
