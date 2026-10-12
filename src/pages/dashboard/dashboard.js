@@ -721,6 +721,13 @@
     // ragionamento si richiude da solo (resta apribile): i due non si accavallano.
     let streamBubble = null;
     let streamedText = '';
+    // La risposta scritta nei giri di soli bottoni (#1167) resta in testa alla bolla: i giri dopo scrivono sotto.
+    let rispostaPrima = '';
+    let giroIniziato = false;
+    const unisci = (...parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+    const testoDelGiro = () => (globalThis.SN_CALC
+      ? globalThis.SN_CALC.resolveCalcMarkers(streamedText, { streaming: true })
+      : streamedText);
     const followBottomIfNear = () => {
       const nearBottom = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 48;
       if (nearBottom) bubblesEl.scrollTop = bubblesEl.scrollHeight;
