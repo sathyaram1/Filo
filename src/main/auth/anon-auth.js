@@ -104,11 +104,8 @@ function load() {
     return null;
   }
   if (!walletStore.suDisco()) return null;
-  const vecchio = guasti.ultimoDaParte(file, 'illeggibile-');
-  const dati = vecchio && decifra(vecchio);
-  if (!dati) return null;
-  try { fs.renameSync(vecchio, file); } catch (_) {}
-  console.info('[identity] identità messa da parte di nuovo leggibile: ripresa');
+  const dati = guasti.riprendiDaParte(file, 'illeggibile-', decifra);
+  if (dati) console.info('[identity] identità messa da parte di nuovo leggibile: ripresa');
   return dati;
 }
 
