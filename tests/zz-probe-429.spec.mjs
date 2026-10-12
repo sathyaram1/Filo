@@ -29,6 +29,12 @@ test('probe', async ({ app, shell, openTab, testServer }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     return w._filoTabs.tabs.map((t) => ({ url: t.url, color: t.color }));
   });
+  const dbg = await shell.evaluate(() => {
+    const el = [...document.querySelectorAll('.tab')][1];
+    const kids = (m) => { if (m) el.classList.add('misura'); const r = { w: el.getBoundingClientRect().width, kids: [...el.children].map((k) => [k.className, k.getBoundingClientRect().width, getComputedStyle(k).display]) , gap: getComputedStyle(el).gap, range: (() => { const r = document.createRange(); r.selectNodeContents(el.querySelector('.title')); return r.getBoundingClientRect().width; })(), sw: el.querySelector('.title').scrollWidth, font: getComputedStyle(el.querySelector('.title')).font, title: el.querySelector('.title').textContent}; el.classList.remove('misura'); return r; };
+    return { misura: kids(true), normale: kids(false) };
+  });
+  console.log(JSON.stringify(dbg));
   console.log(JSON.stringify({ info, top, state }, null, 1));
   await captureCompositeElectron(app, 'tests/.shots/probe-429.png');
 });
