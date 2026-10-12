@@ -524,3 +524,76 @@ test('un sito usa-e-getta della Privacy buttato all\'uscita dimentica le rispost
   Permessi.dimenticaSessione(disco);
   assert.equal(Permessi.scelteRicordate().length, prima);
 });
+
+// #1069 — la cartella scelta per farla leggere non diventa scrivibile senza un sì. Electron manda `fileSystem` per la
+// lettura di una cartella scelta, per requestPermission e per la scrittura su un file aperto; il salvataggio no.
+const cartella = (accesso, filePath = '/home/anna/foto da caricare', isDirectory = true) => ({ fileAccessType: accesso, filePath, isDirectory });
+
+test('leggere la cartella o il file scelti nel selettore passa senza domanda: la scelta è il consenso', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://carica-foto.example/');
+  assert.equal(Permessi.INNOCUI.has('fileSystem'), false);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('readable')), [true]);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('readable', '/home/anna/nota.txt', false)), [true]);
+  assert.equal(ses.avvisi.length, 0);
+  assert.equal(ses.controllo(wc, 'fileSystem', 'https://carica-foto.example', {}), true, 'il controllo non chiude la lettura');
+});
+
+test('scrivere nella cartella data da leggere si chiede col nome della cartella; il no resta per il sito, la lettura no', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://carica-foto.example/album');
+  wc.session = ses;
+  const esiti = chiedi(ses, wc, 'fileSystem', cartella('writable'));
+  assert.deepEqual(esiti, [], 'nessuna scrittura prima della risposta');
+  const domanda = ses.avvisi.find((a) => a.evento === 'chiedi').dati;
+  assert.equal(domanda.tipo, 'file');
+  assert.deepEqual(domanda.parti, ['file']);
+  assert.equal(domanda.host, 'carica-foto.example');
+  assert.deepEqual(domanda.oggetto, { nome: 'foto da caricare', percorso: '/home/anna/foto da caricare', cartella: true });
+  Permessi.rispondi(domanda.id, false);
+  assert.deepEqual(esiti, [false]);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/Documenti')), [false], 'il no vale per il sito');
+  assert.equal(ses.avvisi.filter((a) => a.evento === 'chiedi').length, 1);
+  assert.equal(ses.controllo(wc, 'fileSystem', 'https://carica-foto.example', { fileAccessType: 'writable' }), false);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('readable')), [true], 'leggere resta concesso');
+  assert.deepEqual(Permessi.scelteDi(wc).scelte, [{ parte: 'file', si: false }]);
+  assert.deepEqual(Permessi.dimentica(wc), { tolte: 1, ricarica: false });
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('writable')), [], 'azzerato: si richiede');
+});
+
+test('il sì alla scrittura vale per il sito; due richieste insieme fanno una domanda sola; un altro sito chiede di nuovo', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://editor.example/');
+  const a = chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/progetto'));
+  const b = chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/progetto/nuovo.txt', false));
+  assert.equal(ses.avvisi.filter((x) => x.evento === 'chiedi').length, 1);
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, true);
+  assert.deepEqual([a, b], [[true], [true]]);
+  assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/altro')), [true]);
+  assert.equal(ses.controllo(wc, 'fileSystem', 'https://editor.example', { fileAccessType: 'writable' }), true);
+  assert.deepEqual(chiedi(ses, wcFinto('https://altro.example/'), 'fileSystem', cartella('writable')), []);
+});
+
+test('la scrittura su un file aperto per leggerlo si chiede col nome del file; senza dettagli si chiede lo stesso', () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://appunti.example/');
+  chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/nota.txt', false));
+  assert.deepEqual(ses.avvisi.at(-1).dati.oggetto, { nome: 'nota.txt', percorso: '/home/anna/nota.txt', cartella: false });
+  const wc2 = wcFinto('https://vago.example/');
+  assert.deepEqual(chiedi(ses, wc2, 'fileSystem', {}), [], 'un accesso che non dice cos\'è non passa da lettura');
+  assert.deepEqual(ses.avvisi.at(-1).dati.oggetto, { nome: '', percorso: '', cartella: false });
+  assert.deepEqual(chiedi(ses, wcFinto('filo://editor/'), 'fileSystem', cartella('writable')), [true], 'Filo stesso non si chiede');
+});
+
+test('dalla chat la risposta sulla modifica dei file si toglie come le altre', async () => {
+  Permessi._usaDisco({ get: async () => ({}), set: async () => {} });
+  const disco = sessioneFinta();
+  disco.isPersistent = () => true;
+  const wc = wcFinto('https://www.carica-foto.example/');
+  chiedi(disco, wc, 'fileSystem', cartella('writable'));
+  Permessi.rispondi(disco.avvisi.at(-1).dati.id, false);
+  assert.ok(Permessi.righeRicordate().some((r) => /carica-foto\.example · modifica dei file: negato|carica-foto\.example · file: negato/.test(r)));
+  const r = Permessi.togliPerChat('carica-foto.example', 'cartelle');
+  assert.equal(r.tolte.length, 1);
+  assert.deepEqual(chiedi(disco, wc, 'fileSystem', cartella('writable')), [], 'tolta: si richiede');
+});

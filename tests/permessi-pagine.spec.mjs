@@ -114,6 +114,35 @@ PAGINE['/schermi'] = dopoUnClic("window.getScreenDetails().then(() => m('schermi
 PAGINE['/presenza'] = dopoUnClic("IdleDetector.requestPermission().then((x) => m('presenza:' + x), (e) => m('presenza:' + e.name));");
 PAGINE['/font'] = dopoUnClic("window.queryLocalFonts().then((f) => m('font:' + (f.length ? 'letti' : 'vuoti')), (e) => m('font:' + e.name));");
 PAGINE['/spazio'] = dopoUnClic("navigator.storage.persist().then((x) => m('spazio:' + x), (e) => m('spazio:' + e.name));");
+// Un sito che carica foto (#1069): l'utente gli dà la cartella da leggere, e al clic su «Carica» il sito prova a scriverci.
+PAGINE['/cartella'] = `<!doctype html><meta charset="utf-8"><title>Carica foto</title>
+<style>body{margin:0}#zona{position:fixed;inset:0}#carica{position:fixed;top:200px;left:200px;z-index:1}</style>
+<div id="zona">trascina qui la cartella</div><button id="carica">Carica</button>
+<script>
+  const m = (x) => fetch('/esito?m=' + encodeURIComponent(x));
+  let cartella = null;
+  const zona = document.getElementById('zona');
+  zona.addEventListener('dragover', (e) => e.preventDefault());
+  zona.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    try {
+      cartella = await e.dataTransfer.items[0].getAsFileSystemHandle();
+      m('cartella:' + cartella.kind + ':' + (await cartella.queryPermission({ mode: 'read' })) + '/' + (await cartella.queryPermission({ mode: 'readwrite' })));
+    } catch (err) { m('cartella:' + err.name); }
+  });
+  document.getElementById('carica').addEventListener('click', async () => {
+    const x = await cartella.requestPermission({ mode: 'readwrite' }).catch((err) => err.name);
+    m('scrittura:' + x);
+    if (x !== 'granted') return;
+    try {
+      const f = await cartella.getFileHandle('lasciato.txt', { create: true });
+      const w = await f.createWritable();
+      await w.write('cifrato');
+      await w.close();
+      m('scritto');
+    } catch (err) { m('scritto:' + err.name); }
+  });
+</script>`;
 
 let server;
 let origine;
