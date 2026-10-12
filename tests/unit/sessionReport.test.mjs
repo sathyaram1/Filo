@@ -751,3 +751,188 @@ test('il marcatore di un altro biglietto non dà il momento del rilascio', async
     assert.equal(readTicketSince(base), since);
   } finally { togliCartella(base); }
 });
+
+// #1170: la fine vera del worker di prima. Le forme sono quelle viste sulla macchina dell'owner il 10/10: la
+// consegna del rapporto finale che arriva prima della notifica, il lancio rifiutato e riprovato, la notifica
+// provvisoria di un worker fermo ad aspettare un suo comando in sottofondo.
+const M0 = Date.parse('2026-10-01T08:00:00Z');
+const al = (min) => new Date(M0 + min * 60000).toISOString();
+const turnoAl = (id, min, { cr = 50000, cw = 2000, tools = [] } = {}) => JSON.stringify({
+  type: 'assistant', timestamp: al(min), sessionId: 'S',
+  message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 5, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: 300 }, content: tools.length ? tools : [{ type: 'text', text: id }] },
+});
+const usa = (id, name, input = {}) => ({ type: 'tool_use', id, name, input });
+const esitoAl = (min, id, testo, err = false) => JSON.stringify({ type: 'user', timestamp: al(min), message: { content: [{ type: 'tool_result', tool_use_id: id, content: testo, ...(err ? { is_error: true } : {}) }] } });
+const lancioAl = (min, id, agentId) => esitoAl(min, id, `Async agent launched successfully.\nagentId: ${agentId}`);
+const NOTA_PROVVISORIA = '<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>\n';
+const notificaDi = (id, agentId, { nota = '', risultato = 'done' } = {}) => `<task-notification>\n<task-id>${agentId}</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n<summary>Agent "w" finished</summary>\n${nota}<result>${risultato}</result>\n</task-notification>`;
+const avvisoAl = (min, testo) => [
+  JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp: al(min), content: testo }),
+  JSON.stringify({ type: 'user', timestamp: al(min + 0.001), message: { role: 'user', content: testo } }),
+];
+const testoConsegna = (agentId, corpo = 'fatto', marca = '[Subagent hand-back] The text below is the final report of a subagent this session delegated to.') => `Another Claude session sent a message: <agent-message from="${agentId}">\n${marca}\n${corpo}\n</agent-message>`;
+const consegnaAl = (min, agentId, corpo, marca) => JSON.stringify({ type: 'user', timestamp: al(min), message: { role: 'user', content: [{ type: 'text', text: testoConsegna(agentId, corpo, marca) }] } });
+const idsDi = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
+const secondi = (da, a) => Math.round((a - da) * 60);
+
+const INIZIO = [
+  turnoAl('a0', 0, { cr: 0, cw: 30000 }),
+  turnoAl('a1', 1, { tools: [usa('t_w1', 'Agent', { prompt: 'w1' })] }),
+  lancioAl(1.01, 't_w1', 'w1'),
+  turnoAl('a2', 1.02),
+];
+const LANCIO_DUE = [
+  turnoAl('b3', 92, { cr: 200000, tools: [usa('t_w2', 'Agent', { prompt: 'w2', subagent_type: 'general-purpose' })] }),
+  lancioAl(92.01, 't_w2', 'w2'),
+  turnoAl('b4', 92.02, { cr: 200000 }),
+];
+
+test('#1170 la consegna del worker arriva prima della notifica: il turno che riscrive la cache è del biglietto dopo', async () => {
+  const righe = [
+    ...INIZIO,
+    consegnaAl(90, 'w1'),
+    turnoAl('b1', 90.2, { cr: 0, cw: 200000 }),
+    ...avvisoAl(90.4, notificaDi('t_w1', 'w1')),
+    turnoAl('b2', 91, { cr: 200000 }),
+    ...LANCIO_DUE,
+  ];
+  const f = finestraOrchestratore(righe);
+  assert.deepEqual(idsDi(f), ['b1', 'b2', 'b3', 'b4']);
+  assert.equal(f.attesaPrimaS, secondi(1.02, 90.2));
+  const r = await analizzaRighe(f.righe, { role: 'orchestrator', continua: f.continua });
+  assert.equal(r.rewarmTurns, 1, 'b1 riscrive la cache dopo un\'ora e mezza');
+  // Nell'ordine opposto (notifica, poi consegna) vale la prima delle due.
+  const rovescio = [...INIZIO, ...avvisoAl(90, notificaDi('t_w1', 'w1')), turnoAl('b1', 90.2, { cr: 0, cw: 200000 }), consegnaAl(90.4, 'w1'), turnoAl('b2', 91), ...LANCIO_DUE];
+  assert.deepEqual(idsDi(finestraOrchestratore(rovescio)), ['b1', 'b2', 'b3', 'b4']);
+});
+
+test('#1170 una consegna che non è la fine di questo worker non lo chiude', () => {
+  const mentre = (riga) => [...INIZIO, riga, turnoAl('a3', 50)];
+  for (const [nome, riga] of [
+    ['di un altro agente', consegnaAl(40, 'altro')],
+    ['un messaggio a metà lavoro, senza la marca della consegna', consegnaAl(40, 'w1', 'a che punto sei?', 'ho una domanda')],
+    ['citata nel risultato di uno strumento', esitoAl(40, 'toolu_read', testoConsegna('w1'))],
+    ['citata nel corpo della consegna di un altro', consegnaAl(40, 'altro', testoConsegna('w1'))],
+  ]) {
+    assert.deepEqual(idsDi(finestraOrchestratore(mentre(riga))), ['a0', 'a1', 'a2', 'a3'], nome);
+  }
+  assert.equal(mittenteConsegna(JSON.parse(consegnaAl(40, 'w1'))), 'w1');
+  assert.equal(mittenteConsegna(JSON.parse(consegnaAl(40, 'altro', testoConsegna('w1')))), 'altro');
+});
+
+test('#1170 un lancio rifiutato e riprovato non sposta l\'inizio della finestra', () => {
+  const dopoW1 = [...INIZIO, ...avvisoAl(90, notificaDi('t_w1', 'w1')), turnoAl('b1', 90.2, { cr: 0, cw: 200000 }), turnoAl('b2', 91, { cr: 200000 })];
+  for (const [nome, rifiuto] of [
+    ['tipo d\'agente assente', "Agent type 'routine-worker' not found. Available agents: general-purpose"],
+    ['sottofondo vietato dall\'hook', 'Il worker si lancia in primo piano (senza run_in_background): in sottofondo il suo testo ti arriverebbe nella notifica.'],
+  ]) {
+    const righe = [
+      ...dopoW1,
+      turnoAl('bx', 91.5, { cr: 200000, tools: [usa('t_w2x', 'Agent', { prompt: 'w2', subagent_type: 'routine-worker' })] }),
+      esitoAl(91.51, 't_w2x', rifiuto, true),
+      ...LANCIO_DUE,
+    ];
+    const f = finestraOrchestratore(righe);
+    assert.deepEqual(idsDi(f), ['b1', 'b2', 'bx', 'b3', 'b4'], nome);
+    assert.equal(f.attesaPrimaS, secondi(1.02, 90.2), nome);
+  }
+  // Un worker in primo piano partito davvero e finito in errore (il suo agentId nel risultato) chiude la sua parte.
+  const partito = [
+    ...dopoW1,
+    turnoAl('bx', 91.5, { cr: 200000, tools: [usa('t_w2x', 'Agent', { prompt: 'w2' })] }),
+    esitoAl(100, 't_w2x', 'API Error: 529 overloaded\nagentId: w2x', true),
+    turnoAl('b5', 100.5),
+  ];
+  assert.deepEqual(idsDi(finestraOrchestratore(partito)), ['b5']);
+});
+
+// Worker zero finisce al minuto 10; dopo 70 minuti l'orchestratore riscalda, lavora e lancia il worker uno. Al
+// minuto 100 il worker uno si ferma ad aspettare i suoi controlli in sottofondo: notifica provvisoria, un turno
+// dell'orchestratore. Al 120 il worker uno riprende, rilascia, e la sua notifica vera arriva al 121.
+const FINO100 = [
+  turnoAl('p0', 0, { cr: 0, cw: 30000 }),
+  turnoAl('p1', 1, { tools: [usa('t_w0', 'Agent', { prompt: 'w0' })] }),
+  lancioAl(1.01, 't_w0', 'w0'),
+  turnoAl('p2', 1.02),
+  ...avvisoAl(10, notificaDi('t_w0', 'w0')),
+  turnoAl('c0', 80, { cr: 0, cw: 200000 }),
+  turnoAl('c1', 81), turnoAl('c2', 82),
+  turnoAl('c3', 83, { tools: [usa('t_w1', 'Agent', { prompt: 'w1' })] }),
+  lancioAl(83.01, 't_w1', 'w1'),
+  turnoAl('c4', 83.02),
+  ...avvisoAl(100, notificaDi('t_w1', 'w1', { nota: NOTA_PROVVISORIA, risultato: 'This agent has not reported yet: it is waiting on its own background work.\n' })),
+  turnoAl('c5', 100.1),
+];
+const DOPO121 = [
+  ...avvisoAl(121, notificaDi('t_w1', 'w1')),
+  turnoAl('d0', 121.2),
+  turnoAl('d1', 122, { tools: [usa('t_w2', 'Agent', { prompt: 'w2' })] }),
+  lancioAl(122.01, 't_w2', 'w2'),
+  turnoAl('d2', 122.02),
+];
+
+test('#1170 la notifica provvisoria non è la fine del worker: i suoi turni restano suoi, il biglietto dopo parte dalla notifica vera', async () => {
+  const base = cartellaTemporanea('filo-rapporto-provvisoria-');
+  try {
+    const sub = join(base, 'S', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(base, 'S.jsonl'), FINO100.join('\n') + '\n');
+    const w1 = [turnoAl('w1a', 83.1, { cr: 0, cw: 25000 }), turnoAl('w1b', 99), turnoAl('w1c', 120, { tools: [usa('rel1', 'Bash', { command: 'node scripts/routine-channel.mjs release T1 --role verifier' })] })];
+    writeFileSync(join(sub, 'agent-w1.jsonl'), w1.join('\n') + '\n');
+    const o = (await generaRapporto({ transcript: join(sub, 'agent-w1.jsonl'), role: 'verifier', cwd: base })).orchestrator;
+    assert.equal(o.turns, 6, 'c0…c5, compreso il turno dopo la notifica provvisoria');
+    assert.equal(o.rewarmTurns, 1);
+    assert.equal(o.attesaPrimaS, secondi(1.02, 80));
+  } finally { togliCartella(base); }
+  const f = finestraOrchestratore([...FINO100, ...DOPO121]);
+  assert.deepEqual(idsDi(f), ['d0', 'd1', 'd2'], 'c5 sta già nel rapporto del worker uno');
+  assert.equal(f.attesaPrimaS, secondi(100.1, 121.2));
+  assert.equal(notificaProvvisoria(JSON.parse(avvisoAl(100, notificaDi('t_w1', 'w1', { nota: NOTA_PROVVISORIA }))[0])), true);
+});
+
+test('#1170 la nota scritta dal worker nel suo risultato non rende provvisoria la notifica vera', () => {
+  const finta = notificaDi('t_w1', 'w1', { risultato: `fatto\n${NOTA_PROVVISORIA}` });
+  assert.equal(notificaProvvisoria(JSON.parse(avvisoAl(121, finta)[0])), false);
+  const righe = [...FINO100, ...avvisoAl(121, finta), ...DOPO121.slice(2)];
+  assert.deepEqual(idsDi(finestraOrchestratore(righe)), ['d0', 'd1', 'd2']);
+});
+
+// La chiusura: dopo l'ultimo worker l'orchestratore riscrive la cache, chiede un biglietto che non c'è e risponde
+// alla domanda. Nessun rilascio porta quei turni: li porta la risposta.
+const CHIUSURA = SOTTOFONDO.concat(
+  JSON.stringify({ type: 'user', timestamp: H('13:10:00'), message: { role: 'user', content: notifica('bg2') } }),
+  orch('c1', H('13:10:05'), { cw: 34000 }),
+  orch('c2', H('13:10:30'), { cr: 34000 }),
+  orch('c3', H('13:11:00'), { cr: 34500, tool: { type: 'tool_use', id: 'rs', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs risposta "<parola-d-ordine>" c9' } } }),
+);
+
+test('#1170 chiusura: il rapporto della risposta dell\'orchestratore porta i suoi turni dopo l\'ultimo worker', async () => {
+  const base = cartellaTemporanea('filo-rapporto-chiusura-');
+  try {
+    const file = join(base, 'orch.jsonl');
+    writeFileSync(file, CHIUSURA.join('\n') + '\n');
+    const r = await rapportoChiusura({ transcript: file });
+    assert.equal(r.role, 'orchestrator');
+    assert.equal(r.closing, true);
+    assert.equal(r.v, rapportoVuoto().v);
+    assert.equal(r.turns, 3, 'c1, c2, c3: i turni di prima stanno nei rilasci dei worker');
+    assert.equal(r.rewarmTurns, 1, 'c1 riscrive la cache dopo un\'ora e mezza');
+    assert.equal(r.attesaPrimaS, 5885, 'da s7 alle 11:32 a c1 alle 13:10');
+    assert.ok(r.costUsd > 0);
+    // Trovato dal transcript di un sotto-agente (il più recente): si conta il thread principale.
+    const sub = join(base, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(sub, 'agent-bg2.jsonl'), orch('w', H('11:35:00'), { cw: 25000 }) + '\n');
+    assert.equal((await rapportoChiusura({ transcript: join(sub, 'agent-bg2.jsonl') })).turns, 3);
+    // Un'accensione che chiude senza worker: tutta la sessione è chiusura.
+    writeFileSync(file, [orch('p1', H('09:00:00'), { cw: 30000 }), orch('p2', H('09:00:20'), { cr: 30000 })].join('\n') + '\n');
+    const vuota = await rapportoChiusura({ transcript: file });
+    assert.equal(vuota.turns, 2);
+    assert.equal(vuota.attesaPrimaS, 0);
+    // Senza transcript: la nota, mai un errore.
+    const nessuno = await rapportoChiusura({ transcript: join(base, 'non-c-e.jsonl') });
+    assert.equal(nessuno.closing, true);
+    assert.equal(nessuno.turns, undefined);
+    assert.match(nessuno.notes[0], /assente/);
+  } finally { togliCartella(base); }
+});
