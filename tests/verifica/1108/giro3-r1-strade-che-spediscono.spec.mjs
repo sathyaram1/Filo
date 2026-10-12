@@ -6,6 +6,7 @@ import { writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
+import { prepareBranch } from '../../../scripts/lib/branch-integrity.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const RAMO = 'worker/prova-1108';
@@ -35,6 +36,19 @@ function scena() {
   git(wt, 'fetch', '-q', 'origin');
   return { dir, origin, wt };
 }
+
+const suOrigin = (origin) => git(origin, 'log', '--all', '--format=', '--name-only');
+
+test('r1 un commit locale con la copia, lasciato da una sessione morta, non arriva su origin quando il lavoro riparte sul ramo', () => {
+  const { dir, origin, wt } = scena();
+  try {
+    writeFileSync(join(wt, 'feedback.json'), COPIA);
+    git(wt, 'add', '-A'); git(wt, 'commit', '-qm', 'copia a mano');
+    const esito = prepareBranch({ root: wt, branch: RAMO, checkpoint: null });
+    expect(esito.ok).toBe(true);
+    expect(suOrigin(origin)).not.toContain('feedback.json');
+  } finally { togliCartella(dir); }
+});
 
 test('r1 quando il salvataggio non spedisce per una copia, non suggerisce di spedire il ramo a mano', () => {
   const { dir, wt } = scena();
