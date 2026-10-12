@@ -1268,12 +1268,13 @@
     }
 
     const flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
-    if (tabsEl.style.flex !== flex) tabsEl.style.flex = flex;
     const firma = JSON.stringify([perMisura, flex]);
     if (firma !== firmaMisura) {
       firmaMisura = firma;
       misuraLarghezzeChieste();
+      cambiata = true;
     }
+    if (tabsEl.style.flex !== flex) tabsEl.style.flex = flex;
     if (cambiata) { try { ANTEPRIMA.ridisegnata(); } catch (_) {} }
 
     // §6 — con la striscia scrollabile la scheda attiva resta in vista: si porta lì quando cambia, non a ogni
