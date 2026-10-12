@@ -138,6 +138,10 @@
     return s && s !== 'auto' && REASONING_LEVELS.includes(s) ? s : null;
   }
 
+  function ricontrollaAvvisi() {
+    if (modelChains) ModelChain.ricontrolla(modelChains);
+  }
+
   function makeModelRow(nick, entry) {
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-model-row-reason';
@@ -204,7 +208,8 @@
     del.type = 'button';
     del.className = 'sn-btn sn-btn-secondary';
     del.textContent = I18n.t('options_model_remove');
-    del.addEventListener('click', () => { row.remove(); });
+    del.addEventListener('click', () => { row.remove(); ricontrollaAvvisi(); });
+    for (const el of [nickIn, idIn]) el.addEventListener('change', ricontrollaAvvisi);
 
     const test = document.createElement('button');
     test.type = 'button';
@@ -518,6 +523,8 @@
   }
 
   function renderExcludedDrift() {
+    // Ogni cambio della lista passa di qui: l'avviso di voce e dettatura nella griglia la segue.
+    ricontrollaAvvisi();
     const box = $('excludedDrift');
     if (!box) return;
     const missing = excludedMissingFromBuild();
@@ -543,6 +550,8 @@
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: models || {},
       getRegistry: () => collectModelRegistry(),
+      // Qui si decidono anche i fornitori esclusi: l'avviso li legge dalla pagina, non da quelli in vigore.
+      avvisoDi: (action, ref) => ModelChain.avvisoHostAudio(action, ref, collectModelRegistry()[ref], collectExcluded()),
     });
     hiddenModels = Object.fromEntries(Object.entries(models || {})
       .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));

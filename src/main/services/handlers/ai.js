@@ -95,6 +95,7 @@ module.exports = function register(on, ctx) {
   }
 
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
+  const { daFilo } = require('./origine');
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
   // Il tetto avvisa una volta per pausa, nella scheda che l'ha toccato: chi legge sa perché qualcosa si è fermato.
   function fermataDalTetto(msg, sender) {
@@ -545,6 +546,40 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: provaFallita(e) };
     }
+  });
+
+  // Lo stesso verdetto di ensureAllowedHost (openrouter.js), chiesto mentre si sceglie il modello.
+  // Da un sito vale solo un nickname del registro: un id qualunque lo mandano solo le pagine di Filo.
+  on(MSG.AUDIO_HOST_CHECK, async (msg, sender, origin) => {
+    const A = SN_CONST.ACTIONS;
+    const fn = msg.action === A.TTS ? 'audio_host_fn_tts' : (msg.action === A.TRANSCRIBE_AUDIO ? 'audio_host_fn_stt' : '');
+    if (!fn) return { ok: true, verdict: 'na' };
+    const s = await getEffectiveSettings();
+    const interna = daFilo(origin, sender);
+    let routing = providerRouting(s);
+    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando.
+    if (interna && Array.isArray(msg.excluded)) {
+      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string') });
+    }
+    let entry = null;
+    if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {
+      entry = { provider: msg.provider, model: msg.model.trim() };
+    } else {
+      const raw = (s.modelRegistry || {})[String(msg.nickname || '').trim()];
+      if (raw) entry = registryEntryToSingle(raw);
+    }
+    const OR = globalThis.SN_PROVIDER_OPENROUTER;
+    if (!OR || !entry || entry.provider !== 'openrouter' || !entry.model) return { ok: true, verdict: 'na' };
+    const v = await OR.hostVerdict({
+      apiKey: (s.apiKeys && s.apiKeys.openrouter) || '', model: entry.model, providerRouting: routing,
+    });
+    if (v.ok) return { ok: true, verdict: 'ok' };
+    const many = v.excluded.length > 1 ? '_many' : '';
+    const key = v.reason === 'unknown' ? 'audio_host_warn_unknown' : `audio_host_warn_${v.reason}${many}`;
+    const I18n = globalThis.SN_I18N;
+    const label = String((typeof msg.label === 'string' && msg.label.trim()) || msg.nickname || entry.model).slice(0, 120);
+    const warning = I18n ? I18n.t(key, label, I18n.t(fn), OR.joinNames(v.excluded)) : key;
+    return { ok: true, verdict: v.reason, hosts: v.excluded, warning };
   });
 
   // Normalizza una entry del registry (nuovo schema { provider, model } o

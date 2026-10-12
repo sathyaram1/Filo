@@ -396,6 +396,7 @@
       // Registry LIVE (dalle righe correnti, anche non salvate) così la
       // validazione modello↔funzione riflette subito le modifiche.
       getRegistry: () => collectModelRegistry().registry,
+      avvisoDi: avvisoModello,
     });
 
     // Costi
@@ -594,6 +595,10 @@
   // o duplicato di una riga precedente) così save() può segnalarle sul posto
   // invece di ignorarle in silenzio dietro un "Salvato" che non le riguarda
   // (#216: l'utente perdeva la riga senza nessun avviso).
+  function avvisoModello(action, ref) {
+    return ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref]);
+  }
+
   function collectModelRegistry() {
     const host = $('modelRegistryList');
     const out = {};
@@ -928,7 +933,11 @@
           models: s.models,
           onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
           getRegistry: () => collectModelRegistry().registry,
+          avvisoDi: avvisoModello,
         });
+      } else if (modelChains) {
+        // Il modello di una riga del registro può cambiare sotto lo stesso nome: l'avviso si rifà.
+        ModelChain.ricontrolla(modelChains);
       }
     });
   }

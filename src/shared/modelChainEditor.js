@@ -200,14 +200,38 @@
   }
 
   // Costruisce l'editor a segmenti per UNA azione.
-  // Ritorna { el, getValue, conferma } dove getValue() torna la stringa "a, b, c".
+  // Ritorna { el, avviso, getValue, conferma, ricontrolla } dove getValue() torna la stringa "a, b, c".
   function buildChain(value, onChange, ctx) {
     const validate = ctx && ctx.validate;
     const isKnown = (ctx && ctx.isKnown) || (() => true);
+    const avvisoDi = ctx && typeof ctx.avvisoDi === 'function' ? ctx.avvisoDi : null;
     const el = document.createElement('div');
     el.className = 'sn-chain';
     let refs = splitRefs(value);
     if (!refs.length) refs = [''];
+
+    // Avviso che non blocca (#1141): il modello resta scelto, ma con lui la funzione non partirebbe. Sta sotto la
+    // pillola, non nel segmento, così non sposta «×» e «+»; vince solo la risposta all'ultima domanda.
+    const avviso = document.createElement('div');
+    avviso.className = 'sn-chain-warn';
+    avviso.setAttribute('role', 'status');
+    avviso.hidden = true;
+    let giroAvviso = 0;
+    function ricontrolla() {
+      if (!avvisoDi) return;
+      const mio = ++giroAvviso;
+      const scelti = [...new Set(confermati.map((r) => String(r || '').trim()).filter(Boolean))];
+      Promise.all(scelti.map((r) => Promise.resolve().then(() => avvisoDi(r)).catch(() => ''))).then((testi) => {
+        if (mio !== giroAvviso) return;
+        const righe = [...new Set(testi.filter((x) => typeof x === 'string' && x))];
+        avviso.replaceChildren(...righe.map((x) => {
+          const p = document.createElement('p');
+          p.textContent = x;
+          return p;
+        }));
+        avviso.hidden = !righe.length;
+      });
+    }
 
     // Ultimo valore accettato per segmento: chi salva prima della conferma (pausa, cambio scheda, Ctrl+W) legge il
     // segmento a metà passato dallo stesso controllo del clic, così le due uscite salvano la stessa cosa (#590.5).
@@ -267,7 +291,9 @@
           if (bad) inp.title = t('options_chain_unknown_title');
           else inp.removeAttribute('title');
         };
-        const accept = (val) => { clearSegMsg(seg); confermati[i] = val; refs[i] = val; emit(); markUnknown(val); };
+        const accept = (val) => {
+          clearSegMsg(seg); confermati[i] = val; refs[i] = val; emit(); markUnknown(val); ricontrolla();
+        };
         const reject = (reason) => {
           showSegMsg(seg, reason);
           inp.value = confermati[i]; fit(inp);
@@ -300,6 +326,7 @@
             if (!refs.length) refs = [''];
             render(Math.max(0, i - 1));
             emit();
+            ricontrolla();
           });
           seg.appendChild(rm);
         }
@@ -327,7 +354,8 @@
     }
 
     render();
-    return { el, getValue, conferma };
+    ricontrolla();
+    return { el, avviso, getValue, conferma, ricontrolla };
   }
 
   // Popola un host (.sn-grid-2) con una cella per azione: etichetta + editor a
@@ -345,9 +373,11 @@
       const chain = buildChain(models[action] || '', o.onChange, {
         validate: makeValidator(action, getRegistry),
         isKnown: makeKnownCheck(getRegistry),
+        avvisoDi: typeof o.avvisoDi === 'function' ? (ref) => o.avvisoDi(action, ref) : null,
       });
       cell.appendChild(label);
       cell.appendChild(chain.el);
+      cell.appendChild(chain.avviso);
       host.appendChild(cell);
       chains[action] = chain;
     }
@@ -364,5 +394,27 @@
     for (const action of Object.keys(chains || {})) chains[action].conferma();
   }
 
-  global.SN_MODEL_CHAIN = { buildChain, renderGrid, collect, conferma, actionLabels, makeValidator, makeKnownCheck };
+  function ricontrolla(chains) {
+    for (const action of Object.keys(chains || {})) chains[action].ricontrolla();
+  }
+
+  // Avviso della griglia per voce e dettatura: lo stesso verdetto sui fornitori che le ferma a runtime (#1141).
+  // `entry` è la riga del registro com'è sulla pagina, anche non salvata; `excluded`, se c'è, la lista che la
+  // pagina sta modificando al posto di quella in vigore.
+  function avvisoHostAudio(action, ref, entry, excluded) {
+    const C = global.SN_CONST;
+    const A = C && C.ACTIONS;
+    if (!A || (action !== A.TTS && action !== A.TRANSCRIBE_AUDIO)) return Promise.resolve('');
+    if (!entry || !entry.model || typeof chrome === 'undefined' || !chrome.runtime) return Promise.resolve('');
+    const msg = {
+      type: global.SN_MSG.MSG.AUDIO_HOST_CHECK, action, nickname: ref,
+      provider: entry.provider || 'openrouter', model: entry.model, label: entry.label || ref,
+    };
+    if (Array.isArray(excluded)) msg.excluded = excluded;
+    return Promise.resolve(chrome.runtime.sendMessage(msg)).then((r) => (r && r.warning) || '', () => '');
+  }
+
+  global.SN_MODEL_CHAIN = {
+    buildChain, renderGrid, collect, conferma, ricontrolla, actionLabels, makeValidator, makeKnownCheck, avvisoHostAudio,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
