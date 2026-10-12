@@ -1,13 +1,15 @@
-// Popup menu custom: BrowserWindow frameless + trasparente che mostra un menu
-// stilizzato come il menu tasto destro. Risolve il problema per cui i dropdown
-// HTML nella shell non possono apparire sopra una WebContentsView nativa.
+// Il menu a comparsa di Filo (tasto destro su una scheda, Impostazioni/App/Profilo, avvisi, barra laterale): una
+// finestra figlia per finestra madre, perché l'HTML della shell non sta sopra le schede. Non decide le voci.
+// Regole: patterns/una-finestra-a-comparsa-nasce-una-volta-e-si-riusa.md
 
 const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
 const { hideForTests } = require('./test-window-mode');
 const { collegaScorciatoie } = require('./shortcuts');
 
-let activePopup = null;
+const stati = new WeakMap();
+// Un menu solo in tutta l'app: aprirne uno in un'altra finestra chiude questo.
+let inVista = null;
 
 // ── SVG icon paths (viewBox 0 0 24 24, stroke-based) ──────────────────────
 const ICON_PATHS = {
