@@ -598,8 +598,12 @@ test('Non consentire: il sito non scrive nella cartella data da leggere, e per q
   await expect(barra()).toBeVisible({ timeout: 10_000 });
   await barra().getByRole('button', { name: 'Non consentire', exact: true }).click();
   await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['scrittura:denied']);
-  await pagina.locator('#carica').click();
-  await expect.poll(() => esiti.slice(1), { timeout: 10_000 }).toEqual(['scrittura:denied', 'scrittura:denied']);
-  await expect(barra()).toBeHidden();
   expect(existsSync(lasciato)).toBe(false);
+  // Un'altra cartella dello stesso sito: il no ricordato vale anche lì, senza domanda.
+  const altro = await trascina(pagina, 'documenti');
+  await pagina.locator('#carica').click();
+  await expect.poll(() => esiti.slice(1), { timeout: 10_000 })
+    .toEqual(['scrittura:denied', 'cartella:directory:granted/prompt', 'scrittura:denied']);
+  await expect(barra()).toBeHidden();
+  expect(existsSync(altro)).toBe(false);
 });
