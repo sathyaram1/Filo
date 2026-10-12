@@ -149,6 +149,48 @@ test('bottone del file e un\'altra azione nello stesso giro: il modello sa che i
   }
 });
 
+test('risposta scritta insieme al solo promemoria: il modello sa che è fra le note e la riscrive, e arriva nella bolla', async ({ app }) => {
+  test.setTimeout(60_000);
+  try {
+    await modelloFinto(app, [
+      { text: RISPOSTA, toolCalls: [{ id: 't1', name: 'TIMER', arguments: '{"secondi":300,"etichetta":"TARI"}' }] },
+      { text: `${RISPOSTA} Il promemoria suona tra 5 minuti.` },
+    ]);
+    const page = await home(app);
+    await chiedi(page, 'quanto ho pagato di tari? e ricordamelo tra 5 minuti');
+    const bolla = page.locator('.dash-bubble-filo');
+    await expect(bolla).toContainText('Il promemoria suona', { timeout: 15_000 });
+    const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 't1');
+    expect(esito.content).toContain('riscrivila per intero');
+    await expect(bolla).toHaveCount(1);
+    expect((await bolla.evaluate((el) => el.textContent)).split('305,40').length - 1).toBe(1);
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('una nota di lavoro senza risposta dentro: il modello lo sa una volta sola per giro, e la risposta del giro dopo è la bolla', async ({ app }) => {
+  test.setTimeout(60_000);
+  try {
+    await modelloFinto(app, [
+      { text: 'Controllo cosa so fare.', toolCalls: [
+        { id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' },
+        { id: 'c2', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["timer"]}' },
+      ] },
+      { text: 'Sì, posso salvare le pagine per dopo.' },
+    ]);
+    const page = await home(app);
+    await chiedi(page, 'puoi salvare le pagine per dopo?');
+    const bolla = page.locator('.dash-bubble-filo');
+    await expect(bolla).toContainText('posso salvare', { timeout: 15_000 });
+    const esiti = (await chiamateAlModello(app))[1].filter((m) => m.role === 'tool');
+    expect(esiti.map((m) => m.content.includes('riscrivila per intero'))).toEqual([false, true]);
+    expect(await bolla.evaluate((el) => el.textContent)).not.toContain('Controllo cosa so fare');
+  } finally {
+    await ripristina(app);
+  }
+});
+
 test('una nota scritta prima della risposta col bottone resta nota anche se l\'ultimo giro è muto', async ({ app }) => {
   test.setTimeout(60_000);
   const { dir, file } = await bollettaTari(app);
