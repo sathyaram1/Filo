@@ -402,8 +402,8 @@ function depAVuoto(P, stato, log) {
       const r = finto(cmd, args, cwd);
       return { ...r, stdout: r.out };
     },
-    claude: async ({ ruolo, cwd, nome }) => {
-      log(`[a vuoto] claude -p (${ruolo}, ${JSON.stringify(modelloDelRuolo(ruolo))}) «${nome}» in ${cwd}`);
+    claude: async ({ ruolo, cwd, nome, dalServer }) => {
+      log(`[a vuoto] claude -p (${ruolo}, ${JSON.stringify(modelloDelRuolo(ruolo, ROOT, dalServer))}) «${nome}» in ${cwd}`);
       if (ruolo === 'verificatore') giri.set(cwd, 'superata');
       return { ok: true, testo: 'fatto', costo: 0 };
     },
