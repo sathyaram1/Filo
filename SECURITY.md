@@ -105,16 +105,29 @@ sito web. Seguiamo lo standard **RFC 8252 ("OAuth 2.0 for Native Apps")**:
 
 ## 2. Dove vengono salvati i token di accesso
 
-**Stato: 🔜 (in implementazione)**
+**Stato: ✅ (attivo)**
 
 Dopo il login, Filo conserva i token che dimostrano la tua identità. **Non**
 li mettiamo in un file di testo o in `localStorage` (sarebbero leggibili da
 qualsiasi programma sul computer). Usiamo invece **`safeStorage` di Electron**,
-che cifra i dati con le API del sistema operativo:
+che cifra i dati con le API del sistema operativo
+(`src/main/auth/token-store.js`). Allo stesso modo, ognuna nel suo file,
+stanno cifrate l'identità anonima dell'installazione
+(`src/main/auth/anon-auth.js`) e la chiave personale dei modelli che ricevi
+quando riscatti un invito (`src/main/auth/wallet-store.js`).
 
 - **Windows:** DPAPI (legata al tuo account utente Windows)
 - **macOS:** Keychain
-- **Linux:** il keyring di sistema (libsecret), quando disponibile
+- **Linux:** KWallet su KDE; sugli altri desktop, sway, i3 e Hyprland
+  compresi, il portachiavi del sistema attraverso libsecret
+  (`src/main/portachiavi.js`, scelta in `src/main/main.js`)
+
+Senza un portachiavi Filo non scrive niente di tutto questo su disco: l'accesso
+resta solo in memoria e vale fino alla chiusura di Filo
+(`src/main/auth/token-store.js`). Filo te lo dice appena accedi, e dove può
+spiega cosa installare; nel menu dell'account compare «Accesso valido fino
+alla chiusura di Filo» (`src/main/services/handlers/auth.js`,
+`src/renderer/shell.js`).
 
 Non implementiamo crittografia "fatta in casa": ci appoggiamo ai meccanismi
 del sistema operativo, che sono quelli che proteggono già le altre credenziali
