@@ -105,12 +105,17 @@ async function sulServer(app) {
   return daFs({ mapValue: doc });
 }
 
-async function apri(openTab) {
-  const page = await openTab(URL);
+async function pronta(page) {
   await page.waitForFunction(() => window.__mgTest && window.filo && window.SN_ROUTINE_MODELLI);
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.locator('.mg-tab[data-tab="automation"]').click();
   return page;
+}
+const apri = async (openTab) => pronta(await openTab(URL));
+// Riaprire la pagina: niente resta in memoria, quello che si vede viene dal server.
+async function riapri(page) {
+  await page.reload();
+  return pronta(page);
 }
 
 const tendina = (page, ruolo, campo) => page.locator('.sn-select-wrap', { has: page.locator(`select[data-ruolo="${ruolo}"][data-campo="${campo}"]`) });
@@ -143,8 +148,7 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   expect((await sulServer(app)).roleModels['new-work']).toEqual({ effort: 'max' });
   expect(await app.evaluate(() => globalThis.__g1193.maschere)).toEqual([['roleModels.verifier.model'], ['roleModels.`new-work`.effort']]);
 
-  await page.reload();
-  page = await apri(openTab);
+  page = await riapri(page);
   await expect(page.locator('select[data-ruolo="verifier"][data-campo="model"]')).toHaveValue('sonnet');
   await expect(tendina(page, 'verifier', 'model').locator('.sn-select-value')).toHaveText('Sonnet');
   await expect(page.locator('select[data-ruolo="new-work"][data-campo="effort"]')).toHaveValue('max');
@@ -155,8 +159,7 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Verifica: salvato.');
   expect((await sulServer(app)).roleModels.verifier).toEqual({});
 
-  await page.reload();
-  page = await apri(openTab);
+  page = await riapri(page);
   await expect(page.locator('select[data-ruolo="verifier"][data-campo="model"]')).toHaveValue('');
   await expect(tendina(page, 'verifier', 'model').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
   await expect(page.locator('select[data-ruolo="new-work"][data-campo="effort"]')).toHaveValue('max');
