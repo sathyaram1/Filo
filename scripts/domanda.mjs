@@ -198,6 +198,29 @@ async function consegnaDomanda(biglietto, domanda) {
   return deliver(biglietto, 'domanda', { domanda });
 }
 
+/** Il segreto del biglietto della sessione (il più sporco se più d'uno), '' senza: il server allora la fa non fidata. */
+async function segretoLocale() {
+  const { trovaBiglietto } = await import('./lib/biglietto-locale.mjs');
+  const b = await trovaBiglietto().catch(() => null);
+  return b && typeof b.ticket === 'string' ? b.ticket : '';
+}
+
+async function sporcaSessione(cosa, motivi) {
+  const { rigaSporco } = await import('./lib/biglietto-locale.mjs');
+  return rigaSporco(cosa, motivi);
+}
+
+/** Gli id delle domande il cui testo non è fidato (fiducia assente compresa). PURA. */
+export function nonFidate(domande) {
+  return (Array.isArray(domande) ? domande : []).filter((d) => d && d.fiducia !== 'fidato').map((d) => String(d.id || '?'));
+}
+
+/** Il motivo per cui chi stampa queste domande si sporca, entro i 300 caratteri del server. PURA. */
+export function motivoNonFidate(ids) {
+  const primi = ids.slice(0, 10).map((x) => visibile(x).slice(0, 20));
+  return `${ids.length === 1 ? 'testo di una domanda non fidata' : `testo di ${ids.length} domande non fidate`} (${primi.join(', ')}${ids.length > primi.length ? ', …' : ''})`;
+}
+
 async function leggiStdin() {
   if (process.stdin.isTTY) return '';
   const pezzi = [];
