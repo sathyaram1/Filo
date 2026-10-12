@@ -653,6 +653,7 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await page.locator('#input').fill('orari treni');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
+  await ricercaPartita(app);
   await page.locator('#stopBtn').click();
   await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
   await page.locator('#sendBtn').click();
