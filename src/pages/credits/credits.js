@@ -506,8 +506,8 @@
     if (r && r.ok) {
       msg.textContent = r.message || 'Fatto.';
       msg.classList.add('is-ok');
-      // Il modulo dell'invito sparisce col portafoglio: la frase (con quanti
-      // crediti sono passati) resta nella nota, fuori dal modulo.
+      // Il modulo dell'invito sparisce col portafoglio: la frase (coi crediti
+      // d'ingresso) resta nella nota, fuori dal modulo.
       showConfirmation(r.message || 'Fatto.');
       // Il saldo grande e i codici arrivano dallo stato nuovo. La vista owner
       // sta in un'altra pagina e si rilegge da sé all'avviso di saldo cambiato.
