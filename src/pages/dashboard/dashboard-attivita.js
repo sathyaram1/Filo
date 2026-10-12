@@ -8,7 +8,7 @@
 //
 // `create` appende il blocco al container che gli si dà e ritorna l'oggetto
 // `activity` che il turno di Filo si passa di mano in mano (pushReasoning,
-// working, addRow, addCommand, azioneSenzaRiga, absorbBubble, dropNote,
+// working, addRow, addCommand, azioneSenzaRiga, absorbBubble, aggiungiNota, dropNote,
 // fineGiro, fineDiretta, endTurn, taglia, finish, remove). Il filo che lo
 // disegna sta in filo-attesa.js. Il container è esplicito apposta: chi disegna un blocco decide
 // dove, invece di scoprire a posteriori che finisce sempre nelle bolle.
