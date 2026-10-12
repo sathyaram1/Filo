@@ -14,8 +14,8 @@ function fb(over = {}) {
 
 const FUSA_FIDATA = {
   id: 'm-1', num: '1601', feedbackId: 'u-1', branch: 'worker/u-1', sha: 'a'.repeat(40), mergeSha: 'b'.repeat(40),
-  skippedL5: true, motivo: 'fiducia', decidedAtMs: Date.now() - 3600e3,
-  blocks: [{ gate: 'sensitive', files: ['src/main/services/terminal.js'] }],
+  origin: 'routine', skippedL5: true, motivo: 'fiducia', decidedAtMs: Date.now() - 3600e3,
+  blocks: [{ gate: 'sensitive', items: ['src/main/services/terminal.js'] }],
 };
 
 async function apri(page, lista, { errore = '', tab = 'inbox' } = {}) {
@@ -105,6 +105,7 @@ test('nel Log il lavoro fidato fuso senza chiedere si legge per intero, e porta 
   const host = page.locator('#mgMergeApprovalsPreapproved');
   await expect(host).toBeVisible();
   await expect(host).toContainText('Fuse senza chiedere');
+  await expect(host).toContainText('automazione · feedback #1601');
   await expect(host).toContainText('lavoro fidato: controllo registrato');
   await expect(host).toContainText('src/main/services/terminal.js');
   await host.locator('.sn-mac-origin-link').first().click();
