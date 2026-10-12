@@ -72,6 +72,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
     globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
     globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
+    globalThis.__filoDizionari = require('./services/dizionari');
     globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
