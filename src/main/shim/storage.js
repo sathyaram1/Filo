@@ -312,12 +312,14 @@ async function doFlush() {
   STATE.flushInFlight = (STATE.flushInFlight || 0) + 1;
   if (STATE.flushInFlight > (STATE.flushMaxInFlight || 0)) STATE.flushMaxInFlight = STATE.flushInFlight;
   try {
-    const txt = JSON.stringify(serializeForDisk(STATE.data));
+    const txt = testoDelFile();
     await fsp.mkdir(path.dirname(target), { recursive: true });
     await fsp.writeFile(tmp, txt, 'utf8');
     await fsp.rename(tmp, target);
   } catch (err) {
     console.error('[Filo storage] flush failed:', err);
+    // Il file non ha l'ultima versione: la prossima set non va scartata come «già scritta».
+    STATE.testi.clear();
   } finally {
     STATE.flushInFlight -= 1;
   }
