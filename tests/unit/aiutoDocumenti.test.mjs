@@ -120,3 +120,21 @@ test('la busta per l\'Aiuto: candidati numerati, cartella coi nomi di Filo, si m
   const turno = PROMPTS.turnoAutomaticoAiuto({ nota: 'ho cercato', dati: { documenti: Aiuto.perIlModello(wc) } });
   assert.match(turno, /DOCUMENTI_TROVATI/);
 });
+
+test('una domanda alla volta per scheda: chi chiede ancora mentre il popup aspetta non ne accoda un altro', async () => {
+  let rispondi;
+  const domande = [];
+  finto();
+  Aiuto.configura({ chiediSi: (_wc, r) => { domande.push(r); return new Promise((ok) => { rispondi = ok; }); } });
+  const wc = scheda();
+  const prima = Aiuto.cerca(wc, { cosa: 'bolletta', origine: 'https://x.example/' });
+  const seconda = await Aiuto.cerca(wc, { cosa: 'iban', origine: 'https://x.example/' });
+  assert.deepEqual(seconda, { ok: false, errore: 'in attesa' });
+  assert.equal(domande.length, 1);
+  rispondi(true);
+  assert.equal((await prima).ok, true);
+  const dopo = Aiuto.cerca(wc, { cosa: 'gas', origine: 'https://x.example/' });
+  assert.equal(domande.length, 2, 'risposta la prima, se ne può fare un\'altra');
+  rispondi(false);
+  assert.deepEqual(await dopo, { ok: false, annullata: true });
+});

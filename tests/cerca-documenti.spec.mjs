@@ -234,7 +234,7 @@ test('una cartella cercata per l\'occasione si vede in Preferenze, coi documenti
     const r = await app.evaluate((_e, c) => globalThis.SN_DOCUMENTI_INDICE.cerca('contratto affitto', { cartella: c }), archivio);
     expect(r.risultati[0].nome).toBe('affitto.txt');
     const pref = await openTab('filo://preferences/preferences.html');
-    const riga = pref.locator(`#documentiCartelle .doc-occasionale[data-occasionale="${archivio.replace(/\\/g, '\\\\')}"]`);
+    const riga = pref.locator(`#documentiCercate .doc-occasionale[data-occasionale="${archivio.replace(/\\/g, '\\\\')}"]`);
     await expect(riga).toBeVisible({ timeout: 10_000 });
     await expect(riga.locator('.doc-dove')).toContainText('ci hai cercato tu · 2 documenti già letti');
     await pref.locator('#sec-documenti').screenshot({ path: 'tests/.shots/cerca-documenti-occasionale.png' });
@@ -284,7 +284,7 @@ test('le porte nuove sono chiuse ai siti, e da Filo si apre un documento ma non 
     const da = (url) => (msg) => app.evaluate((_e, [m, u]) => globalThis.SN_HANDLE_MESSAGE(m, { tab: { id: 9, url: u }, url: u }), [msg, url]);
     const sito = da('http://sito-ostile.example/');
     const filo = da('filo://newtab/');
-    for (const type of ['file_apri', 'file_mostra_cartella', 'documenti_stato', 'documenti_scegli_cartella']) {
+    for (const type of ['file_apri', 'file_mostra_cartella', 'documenti_stato', 'documenti_scegli_cartella', 'documenti_dimentica']) {
       const r = await sito({ type, percorso: join(dir, 'fattura.pdf') });
       expect(r.error, `${type} accessibile da una pagina web`).toBe('forbidden');
     }

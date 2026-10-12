@@ -21,7 +21,7 @@ const deps = {
 };
 function configura(d) { Object.assign(deps, d || {}); }
 
-// wc → { dati: l'ultima ricerca com'è per il modello, chiavi: chiave → percorso, ferma: AbortController | null }
+// wc → { dati: l'ultima ricerca com'è per il modello, chiavi: chiave → percorso, ferma: AbortController | null, chiede }
 const perScheda = new WeakMap();
 
 function statoDi(wc) {
