@@ -31,7 +31,6 @@
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
   const dashDir = $('dashDir');
-  const autonomiaEl = $('dashAutonomia');
 
   // ===== Stato locale =====
   let suggestions = [];
