@@ -24,10 +24,13 @@ const TIPI = {
   'local-network': 'rete',
   'loopback-network': 'rete',
 };
+// File e cartelle (#1069): leggere quello che l'utente ha scelto nel selettore passa, la scelta è il consenso; scriverci
+// si chiede. Il salvataggio (showSaveFilePicker) qui non arriva: Electron gli dà la scrittura da sé, come Chrome.
+const SECONDO_L_ACCESSO = { fileSystem: (d) => (d && d.fileAccessType === 'readable' ? null : 'file') };
 // Ciò che Chrome concede di fabbrica passa senza domanda.
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
-  'speaker-selection', 'storage-access', 'top-level-storage-access', 'fileSystem', 'midi',
+  'speaker-selection', 'storage-access', 'top-level-storage-access', 'midi',
   'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage',
 ]);
 // Ciò che Filo non sa dare è no, senza domanda: condividere lo schermo e i dispositivi collegati vogliono una scelta
