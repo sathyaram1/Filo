@@ -37,7 +37,12 @@ function destinazione(daUrl) {
   return /^https:/i.test(String(daUrl || '')) && G.diGoogle(daUrl) ? String(daUrl) : DOPO;
 }
 
+// Una pagina d'accesso alla volta, come per l'accesso a Filo: chi lo richiede la ritrova davanti.
+let schedaAperta = null;
+
 function collega({ daUrl = '', finestra = null } = {}) {
+  if (schedaAperta && schedaAperta.riporta()) return { ok: true };
+  schedaAperta = null;
   const auth = require('./google-auth');
   const profilo = auth.getProfile();
   const url = new URL(cfg.webLoginEndpoint);
