@@ -783,9 +783,10 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
+    cachedPromptTokens, synthesizeSpeech, transcribe, embed, decide, lookupServedBy, keyInfo, fetchWithKey,
     modelHosts, forgetModelHosts, forgetReasoningRefusals,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
-    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
+    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
+    GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
