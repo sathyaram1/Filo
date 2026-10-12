@@ -294,19 +294,30 @@ function segnalaPronto() {
   avvisaPronto(testo, versione);
 }
 
-// Il cancello sta dove electron-updater decide se c'è una versione nuova: ogni strada (controllo, «Installa», da soli)
-// ci passa prima di scaricare. Un errore e non «aggiornato»: la release più recente non è nostra.
+// Il cancello sta dove electron-updater legge la release e il suo provider: ogni strada (controllo, «Installa», da soli)
+// ci passa prima di decidere e scaricare. Un errore e non «aggiornato»: la release più recente non è nostra.
 function soloTagDiRilascio(au) {
-  if (typeof au.isUpdateAvailable !== 'function' || au.isUpdateAvailable.filoTag) return;
-  const originale = au.isUpdateAvailable;
-  const cancello = async function (info) {
+  if (typeof au.getUpdateInfoAndProvider !== 'function' || au.getUpdateInfoAndProvider.filoTag) return;
+  const originale = au.getUpdateInfoAndProvider;
+  const cancello = async function (...args) {
+    const r = await originale.apply(this, args);
+    const info = r && r.info;
     if (!R.tagAccettato(info)) {
       throw new Error(`release ${info.tag} rifiutata: il tag non è v${info.version}`);
     }
-    return originale.call(this, info);
+    const opz = r.provider && r.provider.options;
+    if (opz && opz.provider === 'github') {
+      const urls = r.provider.resolveFiles(info)
+        .flatMap((f) => [f.url && f.url.href, f.packageInfo && f.packageInfo.path])
+        .filter(Boolean);
+      if (!R.fileDiRilascio({ versione: info.version, urls, owner: opz.owner, repo: opz.repo, host: opz.host || 'github.com' })) {
+        throw new Error(`release ${info.tag} rifiutata: i suoi file non stanno sotto v${info.version}`);
+      }
+    }
+    return r;
   };
   cancello.filoTag = true;
-  au.isUpdateAvailable = cancello;
+  au.getUpdateInfoAndProvider = cancello;
 }
 
 function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = () => {}, modo = R.MODO_PREDEFINITO } = {}) {
