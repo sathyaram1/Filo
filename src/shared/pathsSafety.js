@@ -693,10 +693,8 @@
   function normalizedPath(rawUrl) {
     const u = parseUrl(rawUrl);
     if (!u) return '';
-    const pezzo = tagliaPercorsoPrimaDiPulire(u.pathname || '/', MAX_URL_LEN);
-    let path = redigiPercorso(pezzo, u.hostname) || '/';
-    if (path.length > MAX_URL_LEN) path = path.slice(0, MAX_URL_LEN);
-    return path;
+    return aTetto(u.pathname || '/', MAX_URL_LEN, tagliaPercorsoPrimaDiPulire,
+      (pezzo) => redigiPercorso(pezzo, u.hostname)) || '/';
   }
 
   function sanitizeDomain(raw) {
