@@ -83,11 +83,8 @@ function registraUsciteApp(app) {
   ].join('\n');
 }
 
-// Chi apre Filo in una prova è già stato accolto: senza, appena Filo sa rispondere la home aperta
-// comincia l'intervista di benvenuto e la prova della chat ci scrive dentro (#663.6).
-// Una prova dell'accoglienza parte dal profilo nuovo con `test.use({ accoglienzaFatta: false })`.
-const PROFILO_ACCOLTO = { filo_onboarding: { done: true } };
-
+// Chi apre Filo in una prova è già stato accolto (tests/helpers/profiloAccolto.mjs). Una prova dell'accoglienza
+// parte dal profilo nuovo con `test.use({ accoglienzaFatta: false })`.
 export const test = base.extend({
   accoglienzaFatta: [true, { option: true }],
 
