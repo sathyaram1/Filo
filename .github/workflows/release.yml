@@ -239,6 +239,8 @@ jobs:
           TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
           TESTO="${PREMESSA}
 
+          Commit provato: ${PROVATO}, l'ultimo di main con la suite verde.${SULLA_PUNTA}
+
           Test rossi:
           ${ROSSI:-(nessuna riga not ok: guarda la coda)}
 
