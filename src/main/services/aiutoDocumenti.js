@@ -1,6 +1,6 @@
 // La ricerca fra i documenti chiesta dall'Aiuto di una scheda (#947.3). Su un sito parte solo col sì dato nella vista
 // di Filo sopra la scheda; alla pagina tornano nomi e chiavi a caso, mai percorsi, e i testi restano qui per il modello.
-// Regole: patterns/l-aiuto-di-un-sito-cerca-i-documenti-col-si-fuori-dal-sito.md
+// Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
 
 'use strict';
 
@@ -196,18 +196,38 @@ function mostra(wc, chiave) {
   return nonCe;
 }
 
-// L'icona sotto il puntatore: quella che il sistema dà a quel tipo di file; se non ne dà, un quadratino (su Mac un
-// trascinamento senza icona non parte).
+// L'icona sotto il puntatore: quella che il sistema dà a quel tipo di file, se arriva subito (il trascinamento parte
+// mentre il tasto è giù; su Linux senza tema di icone la richiesta non torna); se no un foglio disegnato qui. Su Mac
+// un trascinamento senza icona non parte.
+const ICONA_MS = 150;
+const icone = new Map();
+function foglio() {
+  const { nativeImage } = require('electron');
+  const L = 24; const A = 30;
+  const bgra = Buffer.alloc(L * A * 4);
+  for (let y = 0; y < A; y++) {
+    for (let x = 0; x < L; x++) {
+      const i = (y * L + x) * 4;
+      const bordo = x === 0 || y === 0 || x === L - 1 || y === A - 1;
+      const riga = x > 4 && x < L - 5 && y > 6 && y < A - 5 && y % 4 === 0;
+      const v = bordo ? 0x8a : (riga ? 0xb8 : 0xfa);
+      bgra[i] = v; bgra[i + 1] = v; bgra[i + 2] = v; bgra[i + 3] = 0xff;
+    }
+  }
+  return nativeImage.createFromBitmap(bgra, { width: L, height: A });
+}
 async function iconaDi(p) {
-  const { app, nativeImage } = require('electron');
+  const ext = path.extname(p).toLowerCase();
+  if (icone.has(ext)) return icone.get(ext);
+  let img = null;
   try {
-    const img = await app.getFileIcon(p, { size: 'normal' });
-    if (img && !img.isEmpty()) return img;
-  } catch (_) {}
-  const lato = 32;
-  const bgra = Buffer.alloc(lato * lato * 4);
-  for (let i = 0; i < bgra.length; i += 4) { bgra[i] = 0x6b; bgra[i + 1] = 0x8f; bgra[i + 2] = 0xc8; bgra[i + 3] = 0xff; }
-  return nativeImage.createFromBitmap(bgra, { width: lato, height: lato });
+    img = await Promise.race([
+      require('electron').app.getFileIcon(p, { size: 'normal' }),
+      new Promise((ok) => setTimeout(() => ok(null), ICONA_MS)),
+    ]);
+  } catch (_) { img = null; }
+  if (img && !img.isEmpty()) { icone.set(ext, img); return img; }
+  return foglio();
 }
 
 async function trascina(wc, chiave) {

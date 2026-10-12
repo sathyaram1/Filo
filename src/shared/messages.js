@@ -351,7 +351,7 @@
     // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto vive nella pagina: su un sito
     // la ricerca parte solo dopo il sì nella vista di Filo sopra la scheda (confermeSopraPagina), e alla pagina tornano
     // nomi, cartelle dette coi nomi di Filo e chiavi a caso, mai percorsi. Le chiavi valgono solo per la scheda che ha
-    // cercato. Regole: patterns/l-aiuto-di-un-sito-cerca-i-documenti-col-si-fuori-dal-sito.md
+    // cercato. Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
     // { cosa, cartella? } → { ok, cercato, candidati: [{ n, nome, dove, tipo, data, chiave }], indice, fermata } | { ok:false, annullata }
     AIUTO_CERCA_DOCUMENTI: 'aiuto_cerca_documenti',
     // {} → { ok }: ferma la lettura dei documenti nuovi; la ricerca risponde con quelli già letti.
