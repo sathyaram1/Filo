@@ -852,6 +852,7 @@
       domainOf, normalizedPath, sanitizeDomain, sanitizeInitialUrl, clusterKey,
       redigiPercorso, redigiSegmento, INVISIBILI_RE, SUFFISSI_PRIVATI, normalizzaHost,
       sembraNomeDiPersona, redigiNellaZona, parolaDiSezione, PAROLE_DI_SEZIONE,
+      redigiEmail, togliAiBordi, tagliaPrimaDiPulire, tagliaPercorsoPrimaDiPulire, FORMA_MAX,
     },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
