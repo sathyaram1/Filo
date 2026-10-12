@@ -668,6 +668,13 @@ export function eRilascio(comando) {
  * rapporto di un worker riportato dentro può citare altri id. '' se la riga non è una notifica. PURA.
  */
 export function testaNotifica(e) {
+  const s = testoDiServizio(e);
+  if (!s.startsWith('<task-notification>')) return '';
+  return s.split(/<summary>|<result>/)[0];
+}
+
+/** Il testo che Claude Code mette nel thread (coda, allegato, messaggio di testo), mai un tool_result. PURA. */
+function testoDiServizio(e) {
   if (!e || typeof e !== 'object') return '';
   const msg = e.message && typeof e.message === 'object' ? e.message : null;
   let s = '';
@@ -677,9 +684,25 @@ export function testaNotifica(e) {
     s = typeof msg.content === 'string' ? msg.content
       : Array.isArray(msg.content) ? msg.content.filter((b) => b && b.type === 'text').map((b) => String(b.text || '')).join('\n') : '';
   }
-  s = s.trimStart();
-  if (!s.startsWith('<task-notification>')) return '';
-  return s.split(/<summary>|<result>/)[0];
+  return s.trimStart();
+}
+
+/**
+ * La notifica di un worker fermo ad aspettare un suo comando in sottofondo: riprenderà, e la sua fine sarà la
+ * notifica dopo. La nota la scrive Claude Code prima del risultato; il risultato lo scrive il worker. PURA.
+ */
+export function notificaProvvisoria(e) {
+  const s = testoDiServizio(e);
+  return s.startsWith('<task-notification>') && /<note>[^<]*\binterim\b[^<]*<\/note>/i.test(s.split('<result>')[0]);
+}
+
+/**
+ * L'agentId di chi ha consegnato il suo rapporto finale (SubagentHandback), o ''. La consegna può arrivare
+ * prima della notifica, e l'orchestratore ci lavora già sopra. Un messaggio a metà lavoro non è una consegna. PURA.
+ */
+export function mittenteConsegna(e) {
+  const m = testoDiServizio(e).match(/^[^<]{0,200}<agent-message from="([^"]+)">\s*\[Subagent hand-back\]/);
+  return m ? m[1].trim() : '';
 }
 
 /**
