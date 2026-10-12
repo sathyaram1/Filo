@@ -4709,9 +4709,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // Nell'archivio della chat restano le azioni che sono successe davvero: riaperta, la chat racconta cosa era stato
     // fatto prima che l'utente fermasse.
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
-    if (chatId && successe.length) {
+    // La parte di risposta già scritta coi bottoni resta con loro, come nella bolla.
+    const giaScritta = unisciTesti(risposta);
+    if (chatId && (successe.length || giaScritta)) {
       const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
-      const dopo = await appendToChatArchive(chatId, { role: 'filo', text: '', actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+      const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
       const fermo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
       if (fermo && fermo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, fermo.ts, { azioni: successe });
     }
