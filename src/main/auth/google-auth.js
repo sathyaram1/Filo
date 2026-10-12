@@ -76,7 +76,6 @@ function startLoopback(expectedState) {
       server.close();
       if (error) return rejectCode(erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error));
       if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
-      if (state !== expectedState) return rejectCode(new Error('OAuth: state non corrispondente (possibile CSRF)'));
       resolveCode(code);
     });
 
