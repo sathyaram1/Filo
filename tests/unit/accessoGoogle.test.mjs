@@ -64,6 +64,7 @@ function conIdentitaInstallazione() {
 
 async function accedi() {
   const f = await _internals.nuovoFlusso();
+  f.esito.catch(() => {}); // come signIn, che lo aggancia subito: l'esito può arrivare prima di chi lo aspetta
   const state = new URL(f.url).searchParams.get('state');
   const ritorno = await chiama(`${f.loop.redirectUri}/?code=codice-google&state=${encodeURIComponent(state)}`);
   assert.equal(ritorno.status, 200);
@@ -74,7 +75,7 @@ test('il ritorno senza lo state giusto non chiude né fa fallire l\'accesso', as
   const loop = await _internals.startLoopback('stato-vero');
   let esito = 'in attesa';
   loop.waitForCode().then((c) => { esito = c; }, (e) => { esito = e; });
-  for (const q of ['?error=access_denied', '?error=access_denied&state=altro', '?code=intruso&state=stato-falso', '', '/favicon.ico']) {
+  for (const q of ['?error=access_denied', '?error=access_denied&state=altro', '?code=intruso&state=stato-falso', '', 'favicon.ico']) {
     const r = await chiama(`${loop.redirectUri}/${q}`);
     assert.equal(r.status, 400, q);
     assert.equal(esito, 'in attesa', `«${q}» non deve chiudere l'accesso`);
