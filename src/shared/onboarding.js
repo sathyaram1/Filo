@@ -242,7 +242,7 @@
     return Array.isArray(raw)
       ? raw
         .filter((m) => m && typeof m === 'object')
-        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || ''), ...(m.daFuori === true ? { daFuori: true } : {}) }))
+        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || ''), ...segni(m) }))
         .filter((m) => m.text)
         .slice(-THREAD_CAP)
       : [];
