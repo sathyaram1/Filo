@@ -227,7 +227,9 @@ test('il classificatore si sceglie in Modelli di supporto e la scelta si salva',
   const slot = page.locator('.mg-sm-slot[data-slot="manageSearchClassifier"]');
   await expect(slot.locator('label')).toHaveText('Classificatore della ricerca');
   const campo = slot.locator('.sn-chain-input').first();
-  await campo.fill('typesafe/jev-1.13');
+  // Mai scelto: mostra quello che la ricerca usa già.
+  await expect(campo).toHaveValue('typesafe/jev-1.13');
+  await campo.fill('typesafe/jev-1.13-20260917');
   await campo.press('Tab');
   await page.click('#mgSmSaveBtn');
   await expect(page.locator('#mgSmStatus')).toHaveText('Salvato.', { timeout: 5000 });
@@ -235,5 +237,5 @@ test('il classificatore si sceglie in Modelli di supporto e la scelta si salva',
     const f = globalThis.__g1118.docs['config/supportModels'].fields.manageSearchClassifier;
     return f && f.stringValue;
   });
-  expect(salvato).toBe('typesafe/jev-1.13');
+  expect(salvato).toBe('typesafe/jev-1.13-20260917');
 });
