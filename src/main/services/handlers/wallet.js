@@ -411,20 +411,9 @@ module.exports = function register(on, ctx) {
     if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
-    // I crediti del vecchio conteggio locale si portano sul server: chi li
-    // aveva guadagnati non deve perderli passando al portafoglio (entro un
-    // tetto che sta in configurazione lato server).
-    // Si dichiarano una volta sola: quanto è già stato dichiarato a un riscatto
-    // precedente (identità annullata e nuovo invito) non si ripresenta, il
-    // conteggio locale resta com'è e paga solo la parte guadagnata dopo.
-    let localCredits = 0;
-    let balanceNow = 0;
-    try {
-      const pub = await globalThis.SN_CREDITS?.getPublic?.();
-      balanceNow = Number(pub && (pub.balanceExact != null ? pub.balanceExact : pub.balance)) || 0;
-      const declared = Number(await globalThis.SN_STORAGE.getRaw(DECLARED_KEY, 0)) || 0;
-      localCredits = Math.max(0, Math.floor(balanceNow - declared));
-    } catch (_) { localCredits = 0; }
+    // Il conteggio locale non passa al portafoglio (#1138): il server non si fida
+    // dei crediti che il PC dichiara, e 0 non lascia niente da tagliare.
+    const localCredits = 0;
     // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
     // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
     // risposta è del codice giusto (pieno, tuo, già dentro) e ferma la fila.
