@@ -3,6 +3,7 @@
 
 import { rmSync } from 'node:fs';
 import { test, expect, lista, schede, finestre, apri, idAttiva, contaAvvisi, schedaSu, avviaFilo, chiudiApp, cartellaTemporanea } from './helpers/reteFinta.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const aperteSu = async (app, host) => (await schede(app)).filter((u) => u.includes(host));
 const PAGINA_BLOCCATA = /^filo:\/\/error\/error\.html\?.*code=blocked/;
@@ -58,16 +59,16 @@ test('dai risultati di una ricerca il sito della lista si ferma, cliccato o aper
   const avvisi = await contaAvvisi(app);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO CERCATO</h1>');
   const r = rete.rimbalzo('accorcia.test', '/r', bersaglio);
-  const risultati = rete.pagina('www.bing.com', '/search', `<a id="diretto" href="${bersaglio}">risultato</a> <a id="nuova" target="_blank" href="${r}">risultato</a>`);
+  const risultati = rete.pagina('www.ecosia.org', '/search', `<a id="diretto" href="${bersaglio}">risultato</a> <a id="nuova" target="_blank" href="${r}">risultato</a>`);
   await apri(app, shell, risultati);
-  const tab = app.windows().find((w) => w.url().includes('www.bing.com'));
+  const tab = app.windows().find((w) => w.url().includes('www.ecosia.org'));
   // Il clic vero: col blocco dei popup una scheda nuova la apre solo l'utente (#737.1).
   await tab.click('#nuova');
   await shell.waitForTimeout(1500);
   await tab.evaluate(() => document.getElementById('diretto').click());
   await shell.waitForTimeout(1500);
   expect(await aperteSu(app, 'blocked.test')).toEqual([]);
-  expect(tab.url()).toContain('www.bing.com/search');
+  expect(tab.url()).toContain('www.ecosia.org/search');
   expect((await avvisi()).length).toBeGreaterThan(0);
 });
 
@@ -259,7 +260,7 @@ test('alla riapertura di Filo una scheda su un sito della lista torna sulla pagi
   const userData = cartellaTemporanea('filo-test-');
   const avvia = async () => {
     const app = await avviaFilo(rete, userData);
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     return { app, shell };
   };

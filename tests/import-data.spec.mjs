@@ -19,6 +19,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -75,7 +76,7 @@ test('pagina Sicurezza: "Importa dati" ripristina davvero i dati di un backup', 
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
     }, zipPath);
 
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://security/'));
 
@@ -165,7 +166,7 @@ test('"trasferire i dati su un altro computer": esporto da un profilo, importo i
     await appA.evaluate(({ dialog }, p) => {
       dialog.showSaveDialog = async () => ({ canceled: false, filePath: p });
     }, trasferimento);
-    const shellA = await appA.firstWindow();
+    const shellA = await primaFinestra(appA);
     await shellA.waitForLoadState('domcontentloaded');
     await shellA.evaluate(() => window.filoShell.tabs.open('filo://security/'));
     const pageA = await findInternalPage(appA, 'security');
@@ -183,7 +184,7 @@ test('"trasferire i dati su un altro computer": esporto da un profilo, importo i
     await appB.evaluate(({ dialog }, p) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
     }, trasferimento);
-    const shellB = await appB.firstWindow();
+    const shellB = await primaFinestra(appB);
     await shellB.waitForLoadState('domcontentloaded');
     await shellB.evaluate(() => window.filoShell.tabs.open('filo://security/'));
     const pageB = await findInternalPage(appB, 'security');

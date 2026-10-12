@@ -77,8 +77,8 @@ npm start                       # avvia Filo (apre la finestra)
 npm run test:smoke              # smoke headless (verifica che la newtab carichi)
 ```
 
-Il primo `npm install` scarica Electron (~150MB). Se non lo fa in automatico
-(succede su alcune configurazioni di npm), esegui manualmente:
+Il binario di Electron (~150MB) non lo scarica `npm install`: lo scarica il primo
+`npm start`, o il primo lancio dei test. Per scaricarlo subito:
 
 ```bash
 node node_modules/electron/install.js

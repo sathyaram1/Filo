@@ -34,7 +34,8 @@
 //   un lanciatore che guarda se il sistema concede quel permesso e, se non lo
 //   concede, avvia Filo con `--no-sandbox`. AppRun trova il nome che si
 //   aspetta, e da lì in poi tutte le strade (doppio clic, file lanciato a mano,
-//   cartella estratta, voce di menu) partono nello stesso modo.
+//   cartella estratta, voce di menu) partono nello stesso modo. Per la stessa
+//   via sceglie X invece di Wayland (il perché sta nel lanciatore).
 //
 // LA GABBIA SI TIENE DOVE IL SISTEMA LA LASCIA
 //   Filo è un browser: apre siti qualunque, e la gabbia di Chromium è la
@@ -81,7 +82,14 @@ if [ "$(manopola /proc/sys/kernel/apparmor_restrict_unprivileged_userns)" = "1" 
   SENZA_GABBIA=(--no-sandbox)
 fi
 
-exec -a "$QUI/${nome}" "$QUI/${nome}${SUFFISSO}" "\${SENZA_GABBIA[@]}" "\${ARGOMENTI[@]}"
+# Da Electron 38, in una sessione Wayland, Chromium parte come programma Wayland: lì una finestra non sceglie dove
+# aprirsi, e i menu e le anteprime di Filo, finestre a sé messe accanto al puntatore, le piazzerebbe il sistema.
+# Dove c'è un X (anche XWayland) Filo resta su X, come fino a Electron 33; chi vuole Wayland passa --ozone-platform=wayland.
+PIATTAFORMA=()
+[ -n "$DISPLAY" ] && PIATTAFORMA=(--ozone-platform=x11)
+for a in "\${ARGOMENTI[@]}"; do case "$a" in --ozone-platform|--ozone-platform=*) PIATTAFORMA=() ;; esac; done
+
+exec -a "$QUI/${nome}" "$QUI/${nome}${SUFFISSO}" "\${SENZA_GABBIA[@]}" "\${PIATTAFORMA[@]}" "\${ARGOMENTI[@]}"
 `;
 
 exports.default = async function afterPackLinux(context) {
@@ -109,7 +117,7 @@ exports.default = async function afterPackLinux(context) {
   // il pacchetto uscirebbe rotto e ce ne accorgeremmo dal tester. Si controlla
   // qui, dove il rosso costa poco.
   const scritto = fs.readFileSync(programma, 'utf8');
-  if (!scritto.includes('--no-sandbox') || !scritto.includes(nome + SUFFISSO)) {
+  if (!scritto.includes('--no-sandbox') || !scritto.includes('--ozone-platform=x11') || !scritto.includes(nome + SUFFISSO)) {
     throw new Error('[after-pack-linux] il lanciatore scritto non avvia il programma vero');
   }
   fs.accessSync(programma, fs.constants.X_OK);

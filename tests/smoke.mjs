@@ -11,6 +11,7 @@ import { readFileSync, existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { createRequire } from 'node:module';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -22,9 +23,9 @@ try { (await import('node:fs')).rmSync(outDir, { recursive: true, force: true })
 const sentinel = path.join(outDir, 'sentinel.json');
 
 // Usa il binario nativo (no .cmd shim) per evitare problemi di quoting su
-// percorsi con spazi su Windows.
-const electronModule = path.join(ROOT, 'node_modules', 'electron');
-const electronExe = path.join(electronModule, 'dist', process.platform === 'win32' ? 'electron.exe' : 'electron');
+// percorsi con spazi su Windows. Lo chiede al pacchetto: da Electron 42 il
+// binario arriva al primo `require('electron')`, non con `npm install`.
+const electronExe = createRequire(path.join(ROOT, 'package.json'))('electron');
 
 // Chromium si rifiuta di partire come root senza --no-sandbox (crbug.com/638180),
 // cosa che rompe questo smoke in ogni container/routine cloud che gira come root.

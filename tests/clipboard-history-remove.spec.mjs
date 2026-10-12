@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { CONFIRM_HOST } from './helpers/confirm.mjs';
 import { apriCronologia, statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback #256: nella cronologia degli appunti (freccia accanto a "Incolla")
 // l'utente poteva solo incollare le voci, non rimuoverne una singola né svuotare
@@ -66,7 +67,7 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const page = await findTabPage(app, host);
@@ -133,7 +134,7 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
   const app = await launchWithHistory(userData);
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     const page = await findTabPage(app, host);

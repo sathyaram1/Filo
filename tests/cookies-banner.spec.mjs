@@ -8,6 +8,7 @@ import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -331,7 +332,7 @@ test('dopo aver riaperto Filo il menu della scheda offre ancora «Mostra il bann
       cwd: APP_ROOT,
       env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
     });
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     const open = async (url) => {
       await shell.evaluate((u) => window.filoShell.tabs.open(u), url);

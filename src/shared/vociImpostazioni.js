@@ -154,7 +154,7 @@
     permessiSiti: {
       nome: 'permessi dei siti (risposte ricordate)',
       come: 'TOGLI_PERMESSO_SITO per toglierne una',
-      parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti consentito negato',
+      parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti rete consentito negato',
     },
   };
 

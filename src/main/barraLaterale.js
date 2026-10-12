@@ -7,6 +7,7 @@ const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
 const RedteamGate = require('./services/redteamGate');
+const { tastoPremuto } = require('./tastoDelMouse');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -290,7 +291,7 @@ class BarraLaterale {
       this.puntoFermo = this._punto();
       this._guarda();
     } else if (t === 'mouseMove') {
-      this.tasti[chi] = (input.modifiers || []).some((m) => /buttondown$/i.test(String(m)));
+      this.tasti[chi] = Boolean(tastoPremuto(input));
     }
   }
 
@@ -681,7 +682,9 @@ class BarraLaterale {
       { label: 'Copia data e ora', action: 'barra:copia-ora' },
     ];
     const scegli = (a) => {
-      if (a === 'barra:copia-ora') { try { require('electron').clipboard.writeText(`${data} ${orario}`); } catch (_) {} }
+      if (a === 'barra:copia-ora') {
+        try { Promise.resolve(require('electron').clipboard.writeText(`${data} ${orario}`)).catch(() => {}); } catch (_) {}
+      }
     };
     return { voci, scegli };
   }

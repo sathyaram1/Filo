@@ -6170,13 +6170,13 @@
   // I numeri si scrivono all'italiana, come ovunque in Filo: il punto separa
   // le migliaia e la virgola i decimali (Intl.NumberFormat('it-IT')).
   const FS_FMT = (() => {
-    try { return new Intl.NumberFormat('it-IT'); } catch (_) { return null; }
+    try { return new Intl.NumberFormat('it-IT', { useGrouping: true }); } catch (_) { return null; }
   })();
   function fsCifra(v, decimali) {
     if (typeof v !== 'number' || !Number.isFinite(v)) return String(v);
     try {
       return decimali
-        ? v.toLocaleString('it-IT', { minimumFractionDigits: decimali, maximumFractionDigits: decimali })
+        ? v.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: decimali, maximumFractionDigits: decimali })
         : (FS_FMT ? FS_FMT.format(v) : String(v));
     } catch (_) { return decimali ? v.toFixed(decimali) : String(v); }
   }

@@ -24,6 +24,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -241,7 +242,7 @@ test('la regola persistente sopravvive al RIAVVIO: riaprendo il dominio la sched
   //    (stesso routing dell'agente), poi forza il flush su disco e chiudi. ──
   let app1 = await electron.launch(launchOpts);
   try {
-    await app1.firstWindow();
+    await primaFinestra(app1);
     await app1.evaluate(async (_e, cfg) => {
       await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: cfg.endpoint, bypass: '<-loopback>' } });
     }, { endpoint: `socks5://127.0.0.1:${socks.port}` });
@@ -259,7 +260,7 @@ test('la regola persistente sopravvive al RIAVVIO: riaprendo il dominio la sched
   //    riapertura del dominio nasce proxata (born proxied dopo riavvio). ──
   let app2 = await electron.launch(launchOpts);
   try {
-    const shell2 = await app2.firstWindow();
+    const shell2 = await primaFinestra(app2);
     await shell2.waitForLoadState('domcontentloaded');
     // Sopravvissuta al riavvio.
     const rules = await proxyRules(app2);

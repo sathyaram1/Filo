@@ -46,6 +46,8 @@ try {
   });
   if (scelto) app.commandLine.appendSwitch('password-store', scelto);
 } catch (_) {}
+require('./test-window-mode').disegnaAncheFuoriSchermo(app);
+require('./test-window-mode').webglAncheSenzaScheda(app);
 
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
@@ -200,7 +202,6 @@ app.whenReady().then(async () => {
   // è in cima allo schermo e vince sui tasti che le pagine ascoltano, quindi va
   // messa PRIMA che si apra qualsiasi finestra (vedi src/main/menu.js).
   installaMenuApplicazione();
-  require('./tabs').inoltraTastiDegliOspiti(app);
 
   const Storage = globalThis.SN_STORAGE;
   try {

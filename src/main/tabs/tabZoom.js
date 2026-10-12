@@ -25,9 +25,8 @@ function installZoom(wc) {
     if (!perCampo) return;
     event.preventDefault();
     if (perCampo === 'incolla') {
-      let testo = '';
-      try { testo = String(clipboard.readText() || ''); } catch (_) {}
-      try { wc.send('filo:zoom-campo-tasto', { incolla: testo }); } catch (_) {}
+      Promise.resolve().then(() => clipboard.readText()).then((t) => String(t || ''), () => '')
+        .then((testo) => { try { wc.send('filo:zoom-campo-tasto', { incolla: testo }); } catch (_) {} });
       return;
     }
     const key = String(input.key || '');

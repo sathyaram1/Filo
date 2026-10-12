@@ -6,6 +6,7 @@
 
 const { randomUUID } = require('node:crypto');
 const Psl = require('./safebrowse/psl');
+const { tastoPremuto } = require('../tastoDelMouse');
 
 // Ciò che Chrome chiede all'utente: si chiede anche qui. Ogni nome che Electron può mandare sta in uno dei gruppi sotto,
 // e la sentinella in tests/unit/permessiPagine.test.mjs lo confronta con quelli che Electron dichiara.
@@ -14,10 +15,14 @@ const TIPI = {
   'clipboard-read': 'appunti',
   'deprecated-sync-clipboard-read': 'appunti',
   geolocation: 'posizione',
+  'geolocation-approximate': 'posizione',
   notifications: 'notifiche',
   'window-management': 'schermi',
   'idle-detection': 'presenza',
   midiSysex: 'strumenti',
+  'local-network-access': 'rete',
+  'local-network': 'rete',
+  'loopback-network': 'rete',
 };
 // Ciò che Chrome concede di fabbrica passa senza domanda.
 const INNOCUI = new Set([
@@ -26,8 +31,13 @@ const INNOCUI = new Set([
   'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage',
 ]);
 // Ciò che Filo non sa dare è no, senza domanda: condividere lo schermo e i dispositivi collegati vogliono una scelta
-// (quale finestra, quale dispositivo) che Filo non ha.
-const NON_DISPONIBILI = new Set(['display-capture', 'unknown', 'hid', 'serial', 'usb']);
+// (quale finestra, quale dispositivo) che Filo non ha; realtà virtuale, NFC, stampa diretta e app web installate Filo non
+// le ha; e quello che Chrome lascia solo alle app installate (schermo intero senza gesto, sincronia periodica) qui non c'è.
+const NON_DISPONIBILI = new Set([
+  'display-capture', 'captured-surface-control', 'unknown', 'hid', 'serial', 'usb', 'smart-card', 'nfc', 'ar', 'vr',
+  'hand-tracking', 'web-printing', 'web-app-installation', 'automatic-fullscreen', 'periodic-background-sync',
+  'system-wake-lock',
+]);
 // Il controllo dice sì solo dopo un sì vero: la lettura sincrona degli appunti non sa chiedere, le notifiche Electron le
 // mostra a chi il controllo dà per concesse, e chi sa che sei al computer lo saprebbe senza domanda.
 const CONTROLLO_SOLO_COL_SI = new Set(['deprecated-sync-clipboard-read', 'notifications', 'idle-detection']);
@@ -142,8 +152,7 @@ function lasciapassare(wc, tipo) {
 
 function tastoDelMenu(input) {
   const type = input.type;
-  // Electron non dà il pulsante: il tasto destro premuto sta fra i modificatori.
-  if (type === 'mouseDown') return Array.isArray(input.modifiers) && input.modifiers.includes('rightbuttondown');
+  if (type === 'mouseDown') return tastoPremuto(input) === 'right';
   return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
 }
 
@@ -519,6 +528,7 @@ const PAROLE_PARTE = {
   camera: 'video', video: 'video', appunti: 'appunti', posizione: 'posizione', geolocalizzazione: 'posizione',
   localizzazione: 'posizione', notifiche: 'notifiche', notifica: 'notifiche', schermi: 'schermi', schermo: 'schermi',
   presenza: 'presenza', 'presenza al computer': 'presenza', strumenti: 'strumenti', 'strumenti musicali': 'strumenti', midi: 'strumenti',
+  rete: 'rete', 'rete locale': 'rete', 'rete di casa': 'rete', lan: 'rete',
 };
 function nomeParte(parte) {
   const S = (globalThis.SN_I18N && globalThis.SN_I18N.STRINGS) || {};
@@ -546,7 +556,7 @@ function togliPerChat(sito, permesso) {
   const p = String(permesso || '').trim().toLowerCase();
   const tutti = !p || /^(tutt[oiea]|ogni|qualsiasi|all)$/.test(p);
   const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
-  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti)` };
+  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete)` };
   const delSito = scelteRicordate().filter((s) => {
     let h = '';
     try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }

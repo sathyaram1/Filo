@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -39,7 +40,7 @@ test.beforeAll(async () => {
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  shell = await app.firstWindow();
+  shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
 
   // Mini server HTTP locale condiviso (replica del fixture testServer).
