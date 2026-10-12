@@ -15,6 +15,13 @@
 
 const storage = require('./storage');
 
+// La finestra con le schede, non la prima della lista: menu, suggerimento e carta d'anteprima sono finestre figlie
+// senza schede e possono stare in testa (con loro chrome.tabs rispondeva «nessuna scheda»).
+function finestraConSchede() {
+  const wins = require('electron').BrowserWindow.getAllWindows();
+  return wins.find((w) => w._filoTabs && !w.isDestroyed()) || null;
+}
+
 // `globalThis.chrome` ci dà un namespace simile a quello di MV3.
 const chromeShim = {
   // ─── storage ─────────────────────────────────────────────────────────────
@@ -72,7 +79,7 @@ const chromeShim = {
   // sottile pensata per i moduli background portati.
   tabs: {
     async create({ url } = {}) {
-      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const win = finestraConSchede();
       if (win && win._filoTabs) {
         const id = win._filoTabs.openTab(url || 'filo://newtab/');
         return { id };
@@ -94,7 +101,7 @@ const chromeShim = {
         try { return Math.round(t.view.webContents.getZoomFactor() * 100); }
         catch (_) { return null; }
       };
-      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const win = finestraConSchede();
       const tm = win && win._filoTabs;
       if (!tm || !Array.isArray(tm.tabs)) return [];
       return tm.tabs.map((t) => ({
@@ -111,24 +118,24 @@ const chromeShim = {
       }));
     },
     async remove(id) {
-      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const win = finestraConSchede();
       if (win && win._filoTabs) win._filoTabs.closeTab(id);
     },
     async sendMessage() { /* ai content script: gestito da ipc */ },
     async goBack(id) {
-      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const win = finestraConSchede();
       if (win && win._filoTabs) win._filoTabs.goBack(id);
     },
     async goForward(id) {
-      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const win = finestraConSchede();
       if (win && win._filoTabs) win._filoTabs.goForward(id);
     },
     async reload(id) {
-      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const win = finestraConSchede();
       if (win && win._filoTabs) win._filoTabs.reload(id);
     },
     async captureVisibleTab(_winId, _options) {
-      const win = require('electron').BrowserWindow.getAllWindows()[0];
+      const win = finestraConSchede();
       if (!win || !win._filoTabs) return '';
       const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
       if (!tab) return '';

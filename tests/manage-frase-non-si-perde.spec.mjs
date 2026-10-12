@@ -231,7 +231,7 @@ const LARGHEZZA_FISSA = 1600;
 
 async function finestraLarga(app, px) {
   const dato = await app.evaluate(({ BrowserWindow }, l) => {
-    const w = BrowserWindow.getAllWindows()[0];
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (!w) return 0;
     if (w.isMaximized()) w.unmaximize();
     const [, h] = w.getContentSize();

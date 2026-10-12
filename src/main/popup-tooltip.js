@@ -89,6 +89,12 @@ function ensureWin(parentWin) {
       doShow(parentWin, text, x, y);
     }
   });
+  // Col processo morto il fumetto non comparirebbe più: si butta, e il prossimo ne fa uno nuovo.
+  const questa = tipWin;
+  questa.webContents.on('render-process-gone', () => {
+    if (tipWin === questa) { tipWin = null; tipReady = false; }
+    if (!questa.isDestroyed()) questa.destroy();
+  });
   tipWin.webContents.on('ipc-message', (_e, channel, payload) => {
     if (channel === 'size' && tipWin && !tipWin.isDestroyed()) {
       const w = Math.max(20, payload.w + 4);

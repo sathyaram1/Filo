@@ -224,7 +224,7 @@ test('con lo zoom alzato o la finestra bassa le aree restano dentro la finestra'
   await expect(page.locator('#mgSearchBar')).toBeVisible();
   for (const [w, h] of [[1366, 768], [1100, 700], [1000, 620]]) {
     await app.evaluate(async ({ BrowserWindow }, [w, h]) => {
-      const win = BrowserWindow.getAllWindows()[0];
+      const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
       if (win) win.setContentSize(w, h);
     }, [w, h]);
     await page.waitForTimeout(400);
@@ -246,7 +246,7 @@ test('le schede senza aree scorrono ancora fino in fondo', async ({ app, openTab
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows()[0];
+    const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (win) win.setContentSize(1200, 700);
   });
   await page.waitForTimeout(300);

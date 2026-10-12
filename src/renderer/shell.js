@@ -902,9 +902,20 @@
   // Stato proxy per il menu (lazy, richiesto a ogni apertura: la config può
   // cambiare dalle impostazioni mentre l'app è aperta).
   let ctxProxyStatus = null;
+  let ctxGiro = 0;
+  const senzaErrore = (fn) => { try { return Promise.resolve(fn()).catch(() => null); } catch (_) { return Promise.resolve(null); } };
   async function openTabContextMenu(t, x, y) {
+    const mio = ++ctxGiro;
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
+    // Le due domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
+    const [proxy, permessi] = await Promise.all([
+      senzaErrore(() => api.tabs.proxyStatus()),
+      senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
+    ]);
+    // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
+    if (mio !== ctxGiro) return;
+    ctxProxyStatus = proxy;
     const entries = [
       { label: 'Duplica', icon: 'duplicate', action: 'tab-duplicate' },
       t.muted
@@ -916,7 +927,6 @@
     // configurato — una voce che non può funzionare non deve comparire.
     // Il click diretto usa il default (ultima location usata, altrimenti USA);
     // la freccia apre la lista paesi. Su tab già proxata: "Torna in Italia".
-    try { ctxProxyStatus = await api.tabs.proxyStatus(); } catch (_) { ctxProxyStatus = null; }
     if (ctxProxyStatus && ctxProxyStatus.configured) {
       if (t.proxy) {
         // Tab già instradata: si può cambiare paese (apre la lista) o tornare
@@ -944,8 +954,6 @@
       }
     }
     // Un sì o un no dato nella domanda dei permessi si toglie da qui, per il sito della scheda.
-    let permessi = null;
-    try { permessi = api.tabs.permessi ? await api.tabs.permessi(t.id) : null; } catch (_) { permessi = null; }
     if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
       entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
     }

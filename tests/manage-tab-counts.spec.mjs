@@ -156,7 +156,7 @@ test('#495 — negli Archiviati il numero segue il filtro ⭐ (dice quello che s
 test('#495 — a finestra stretta il nome e il suo numero restano sulla stessa riga', async ({ app, openTab }) => {
   // Larghezza minima consentita alla finestra (src/main/window.js: minWidth 720).
   await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows()[0];
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (w) w.setContentSize(720, 800);
   });
 
