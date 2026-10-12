@@ -152,7 +152,7 @@ function replayContextMenu(e) {
   };
   const deadline = Date.now() + 3000;
   const tick = () => {
-    if (typeof contextMenuHandler === 'function') { try { contextMenuHandler(copy); } catch (_) {} return; }
+    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy); return; }
     if (Date.now() > deadline) return;
     setTimeout(tick, 16);
   };
