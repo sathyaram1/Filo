@@ -1491,7 +1491,7 @@
 
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
-    const c = contesto(ctx);
+    const c = { ...contesto(ctx), stampaLibera: true };
     return classifica(comeLaShell(cmd, c), c, 0);
   }
 
