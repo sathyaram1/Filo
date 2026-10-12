@@ -211,6 +211,15 @@
       dove: ['src/content/pageColor.js'],
     },
     {
+      id: 'icona-della-scheda', nome: 'Il sito che stai visitando, per l’icona della scheda',
+      base: [], indirizzo: 'il sito della pagina, o quello che ospita l’icona che la pagina dichiara',
+      quando: 'pagina',
+      occasione: 'a ogni pagina che apri in una scheda, per l’icona da mostrare nella barra',
+      riceve: 'la richiesta dell’icona, con i cookie e la sessione di quella scheda, come la farebbe la pagina',
+      frase: 'gli chiede anche l\'icona da mostrare sulla scheda',
+      dove: ['src/main/services/iconaScheda.js'],
+    },
+    {
       id: 'icone-google', nome: 'Il servizio di icone di Google',
       base: ['https://www.google.com/s2/favicons'],
       quando: 'funzione',
