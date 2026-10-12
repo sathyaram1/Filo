@@ -344,3 +344,61 @@ test('l\'accesso chiesto dalla finestra incognito porta davanti la finestra con 
   await shell.evaluate((id) => window.filoShell.tabs.close(id), scheda.id);
   expect((await inc.evaluate(() => window.__esito)).code).toBe('annullato');
 });
+
+// Riaperta dopo un riavvio o dall'archivio, la pagina d'accesso porterebbe a un ritorno che non ascolta più.
+test('la pagina d\'accesso in attesa non si riapre al prossimo avvio, e chiusa non finisce nell\'archivio', async ({ app, shell, testServer }) => {
+  const pagina = await googleFinto(app, testServer);
+  const altra = testServer.html('<title>Mia</title><p>mia</p>', { pubblico: true });
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), altra);
+  await avviaAccesso(shell);
+  expect(await indirizzoDellAccesso(app, pagina)).toBeTruthy();
+  const salvate = () => app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getRaw('sn_open_tabs', null);
+    return (s && s.tabs) || [];
+  });
+  await expect.poll(salvate, { message: 'la scheda dell\'utente si salva' }).toContain(altra);
+  await new Promise((r) => setTimeout(r, 1000));
+  expect((await salvate()).filter((u) => u.startsWith(pagina + '?'))).toEqual([]);
+
+  const [scheda] = await schedeSu(app, pagina);
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), scheda.id);
+  expect((await esito(shell)).code).toBe('annullato');
+  await new Promise((r) => setTimeout(r, 1000));
+  const archivio = await app.evaluate(async () => {
+    const l = await globalThis.SN_ARCHIVED_TABS.list();
+    return (Array.isArray(l) ? l : (l && l.items) || []).map((x) => x.url);
+  });
+  expect(archivio.filter((u) => String(u).startsWith(pagina + '?'))).toEqual([]);
+});
+
+test('«Collega anche i prodotti Google» chiesto di nuovo riporta davanti la stessa pagina d\'accesso', async ({ app, shell, testServer }) => {
+  const pagina = await googleFinto(app, testServer);
+  await shell.evaluate(() => window.filoShell.message({ type: 'auth_collega_google' }));
+  expect(await indirizzoDellAccesso(app, pagina)).toBeTruthy();
+  const [scheda] = await schedeSu(app, pagina);
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
+  await expect.poll(() => schedeSu(app, pagina).then((s) => s[0] && s[0].attiva)).toBe(false);
+  await shell.evaluate(() => window.filoShell.message({ type: 'auth_collega_google' }));
+  await expect.poll(() => schedeSu(app, pagina).then((s) => s.map((x) => `${x.id}:${x.attiva}`).join())).toBe(`${scheda.id}:true`);
+});
+
+test('una pagina d\'accesso che non si carica: si continua nel browser con il motivo vero, e l\'invito a collegare resta', async ({ app, shell, testServer, avvisi }) => {
+  await googleFinto(app, testServer);
+  // Una porta dove nessuno risponde: la pagina d'accesso non si carica.
+  await app.evaluate(() => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]config\.js$/.test(x));
+    M._cache[k].exports.authEndpoint = 'http://sito-pubblico.test:9/o/oauth2/v2/auth';
+  });
+  await avviaAccesso(shell);
+  await expect.poll(() => app.evaluate(() => globalThis.__aperture.length), { timeout: 15_000 }).toBe(1);
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'non si è caricata' })).toBeVisible({ timeout: 8_000 });
+  expect((await vista.locator('.shell-notif-msg').allInnerTexts()).join(' | ')).not.toContain('Google non accetta');
+  const invitoSegnato = await app.evaluate(({ app: a }) => {
+    const fs = process.getBuiltinModule('fs');
+    const path = process.getBuiltinModule('path');
+    return fs.existsSync(path.join(a.getPath('userData'), 'invito-prodotti-google'));
+  });
+  expect(invitoSegnato, 'l\'invito a collegare i prodotti Google non deve sparire per una pagina non caricata').toBe(false);
+});
