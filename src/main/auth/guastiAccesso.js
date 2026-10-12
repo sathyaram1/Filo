@@ -48,14 +48,32 @@ function metteDaParte(file, etichetta) {
   }
 }
 
-// Il più recente fra i file messi da parte con quell'etichetta (il timbro ISO si ordina come testo).
-function ultimoDaParte(file, etichetta) {
+// I file messi da parte con quell'etichetta, dal più recente (il timbro ISO si ordina come testo).
+function daParte(file, etichetta) {
   const dir = path.dirname(file);
   const prefisso = `${path.basename(file)}.${etichetta}`;
   let nomi = [];
-  try { nomi = fs.readdirSync(dir).filter((n) => n.startsWith(prefisso)); } catch (_) { return null; }
-  nomi.sort();
-  return nomi.length ? path.join(dir, nomi[nomi.length - 1]) : null;
+  try { nomi = fs.readdirSync(dir).filter((n) => n.startsWith(prefisso)); } catch (_) { return []; }
+  return nomi.sort().reverse().map((n) => path.join(dir, n));
 }
 
-module.exports = { rinnovoRifiutato, codiceRifiuto, nonRaggiungibile, timbro, metteDaParte, ultimoDaParte };
+// Tornata la chiave del sistema, la copia messa da parte che adesso si decifra torna al suo posto. Si
+// provano tutte, dalla più recente: dopo un portachiavi che va e viene la più recente può essere quella
+// scritta con la chiave sbagliata. `decifra(file)` → dati o null.
+function riprendiDaParte(file, etichetta, decifra) {
+  if (fs.existsSync(file)) return null;
+  for (const vecchio of daParte(file, etichetta)) {
+    const dati = decifra(vecchio);
+    if (!dati) continue;
+    try { fs.renameSync(vecchio, file); } catch (_) {}
+    return dati;
+  }
+  return null;
+}
+
+// Un'uscita voluta non deve resuscitare con la chiave che torna: le copie messe da parte se ne vanno con lei.
+function togliDaParte(file, etichetta) {
+  for (const f of daParte(file, etichetta)) { try { fs.rmSync(f, { force: true }); } catch (_) {} }
+}
+
+module.exports = { rinnovoRifiutato, codiceRifiuto, nonRaggiungibile, timbro, metteDaParte, riprendiDaParte, togliDaParte };
