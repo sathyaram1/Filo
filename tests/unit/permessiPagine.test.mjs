@@ -244,8 +244,8 @@ test('ogni permesso che Electron dichiara è chiesto, concesso o negato per una 
     for (const m of union.matchAll(/'([^']+)'/g)) nomi.add(m[1]);
   }
   assert.ok(nomi.size > 15);
-  const regole = new Set([...Object.keys(Permessi.TIPI), ...Permessi.INNOCUI, ...Permessi.NON_DISPONIBILI,
-    ...Permessi.COL_GESTO_SENZA_DOMANDA, 'openExternal']);
+  const regole = new Set([...Object.keys(Permessi.TIPI), ...Object.keys(Permessi.SECONDO_L_ACCESSO), ...Permessi.INNOCUI,
+    ...Permessi.NON_DISPONIBILI, ...Permessi.COL_GESTO_SENZA_DOMANDA, 'openExternal']);
   assert.deepEqual([...nomi].filter((n) => !regole.has(n)), []);
 });
 
