@@ -89,7 +89,7 @@ test('una richiesta legittima a un asset esistente passa', async () => {
   assert.equal(res.status, 200);
 });
 
-// Electron tiene la cache del codice V8 solo per http(s): uno schema proprio la ottiene con codeCache, che vale solo se è anche standard (#1091).
+// Per Electron codeCache vale solo su uno schema standard (#1091): il perché del privilegio sta accanto alla sua dichiarazione.
 test('lo schema filo chiede la cache del codice V8, insieme a standard', () => {
   schemiRegistrati.length = 0;
   registerProtocolSchemes();
