@@ -1799,6 +1799,16 @@
                 </div>
                 <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
               </section>
+
+              <!-- Le righe le scrive manage.js da SN_ROUTINE_MODELLI: fasi e scelte vivono in un posto solo. -->
+              <section class="mg-auto-block" id="mgRoleModelsBlock">
+                <span class="mg-auto-field-label" id="mgRoleModelsLabel">Modello e sforzo per fase</span>
+                <p class="mg-auto-block-desc">
+                  Con cosa lavora ogni fase di un cambio di codice, dal prossimo biglietto.
+                  <span class="mg-action-msg" id="mgRoleModelsMsg" role="status"></span>
+                </p>
+                <div class="mg-role-models" id="mgRoleModels" role="group" aria-labelledby="mgRoleModelsLabel"></div>
+              </section>
             </div>
             <div class="mg-auto-col">
               <!-- Quanti giri di correzione si pagano per livello di rilievo. Valgono solo se le routine lavorano. -->
