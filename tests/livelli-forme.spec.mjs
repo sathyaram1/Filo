@@ -563,8 +563,9 @@ async function stringiPannello(page) {
 }
 
 // Con un font più largo di Segoe UI «Approva e fondi» non stava accanto a Scarta e andava a capo: armato,
-// «Confermi?» ci stava in una riga e il tasto si abbassava di una riga (#256.3).
-test('fusione: se i tasti non stanno affiancati va a capo la fila, non la scritta di Approva', async ({ openTab }) => {
+// «Confermi?» ci stava in una riga e il tasto si abbassava di una riga (#256.3); coi caratteri di Linux succedeva
+// alla larghezza normale del pannello (#933.1).
+test('fusione: se i tasti non stanno affiancati va a capo la fila, non la scritta di Approva, e il secondo clic approva', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
   await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
