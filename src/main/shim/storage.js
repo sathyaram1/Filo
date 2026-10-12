@@ -56,8 +56,10 @@ function deserializeFromDisk(data) {
     const s = data && data.settings;
     if (!s || typeof s !== 'object' || typeof s.apiKeysEnc !== 'string') return data;
     if (!s.apiKeysEnc.startsWith(ENC_PREFIX) || !canEncrypt()) return data;
-    const buf = Buffer.from(s.apiKeysEnc.slice(ENC_PREFIX.length), 'base64');
-    const apiKeys = JSON.parse(safeStorage.decryptString(buf));
+    const blob = s.apiKeysEnc.slice(ENC_PREFIX.length);
+    const chiaro = safeStorage.decryptString(Buffer.from(blob, 'base64'));
+    const apiKeys = JSON.parse(chiaro);
+    ultimaCifratura = { chiaro: JSON.stringify(apiKeys), blob };
     const ns = { ...s, apiKeys };
     delete ns.apiKeysEnc;
     return { ...data, settings: ns };
