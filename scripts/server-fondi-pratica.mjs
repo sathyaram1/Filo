@@ -16,6 +16,8 @@ export { cartellaDelServer };
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Lo legge server:fondi di filo-security: senza, si rifiuta e rimanda qui.
 export const PRATICA_ENV = 'FILO_SERVER_PRATICA';
+// I lavori server delle routine hanno su filo-security il nome del ramo dell'app, `worker/<id>-<ora>` (#1159).
+export const RAMO_ROUTINE_RE = /^worker\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 const USO = 'Uso, dal repo Filo: npm run server:fondi -- claude/<ramo> --feedback <N> [--solo-server] [--dry-run]';
 
 export const SENZA_PRATICA = [
