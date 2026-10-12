@@ -80,14 +80,24 @@ function chiusa(codice, i, apre, chiude) {
 export function proveScoperte(testo, nomeFile = '') {
   if (SULL_ACCOGLIENZA.test(nomeFile)) return [];
   const { codice, senzaCommenti } = maschere(testo);
-  // Il corpo che comincia dopo la lista dei parametri aperta in `par`.
-  const corpoDopo = (par) => {
-    const graffa = codice.indexOf('{', chiusa(codice, par, '(', ')'));
+  // Il corpo che comincia dopo la lista dei parametri aperta in `par`; una freccia senza graffa arriva a fine riga.
+  const corpoDopo = (par, freccia) => {
+    let k = chiusa(codice, par, '(', ')') + 1;
+    if (freccia) {
+      const f = /^\s*=>\s*/.exec(codice.slice(k));
+      if (!f) return '';
+      k += f[0].length;
+      if (codice[k] !== '{') {
+        const fine = codice.slice(k).search(/[;\n]/);
+        return senzaCommenti.slice(k, fine < 0 ? codice.length : k + fine);
+      }
+    }
+    const graffa = codice.indexOf('{', k);
     return graffa < 0 ? '' : senzaCommenti.slice(graffa, chiusa(codice, graffa, '{', '}') + 1);
   };
   const funzioni = new Map();
   for (const m of codice.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(|\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g)) {
-    funzioni.set(m[1] || m[2], corpoDopo(m.index + m[0].length - 1));
+    funzioni.set(m[1] || m[2], corpoDopo(m.index + m[0].length - 1, !m[1]));
   }
   // Il corpo della prova più quello delle funzioni del file che chiama, a ogni profondità.
   const raggiunto = (corpo) => {
