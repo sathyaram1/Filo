@@ -217,7 +217,7 @@
       occasione: 'quando la home mostra i siti che Filo ti suggerisce',
       riceve: 'il nome di quei siti',
       frase: 'Il servizio di icone di Google',
-      dove: ['src/pages/dashboard/dashboard.js'],
+      dove: ['src/pages/dashboard/dashboard.js'], prova: 'faviconUrl: (url) => faviconUrl(url)',
     },
     {
       id: 'aggiornamenti', nome: 'GitHub, per gli aggiornamenti',
