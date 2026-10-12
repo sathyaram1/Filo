@@ -96,6 +96,31 @@ test('main mosso: si rifà la prova fino al tetto, poi ci si ferma senza fondere
   assert.equal(fermo.fermo, true);
 });
 
+test('la prova fatta per gli unit rossi del ramo vale al primo tentativo della richiesta, e solo lì (#1009)', async () => {
+  const P = '1'.repeat(40);
+  const verde = { esito: 'verde', mainSha: SHA };
+  assert.equal(provaDaRiusare({ fatta: { prova: verde, punta: P }, punta: P }), verde);
+  assert.equal(provaDaRiusare({ fatta: { prova: { esito: 'rosso_anche_su_main', mainSha: SHA }, punta: P }, punta: P }).esito, 'rosso_anche_su_main');
+  assert.equal(provaDaRiusare({ fatta: { prova: verde, punta: P }, punta: '2'.repeat(40) }), null, 'il ramo si è mosso: si riprova');
+  assert.equal(provaDaRiusare({ fatta: { prova: { ...verde, contenuto: true }, punta: P }, punta: P }), null, 'con main dentro la richiesta porta main_contenuto');
+  for (const p of [{ esito: 'rosso_sulla_fusione', mainSha: SHA }, { esito: 'conflitto', mainSha: SHA }, { errore: 'x' }, { saltata: true, motivo: 'm' }]) {
+    assert.equal(provaDaRiusare({ fatta: { prova: p, punta: P }, punta: P }), null);
+  }
+  assert.equal(provaDaRiusare({ fatta: null, punta: P }), null);
+
+  let prove = 0;
+  const chieste = [];
+  const r = await chiediConProva({
+    primaProva: verde, scrivi: () => {}, tentativi: 3,
+    prova: () => { prove++; return { esito: 'verde', mainSha: '3'.repeat(40) }; },
+    chiedi: async (campo) => { chieste.push(campo.mainSha); return { result: chieste.length < 2 ? 'main_moved' : 'merged' }; },
+    mainMosso: (x) => x.result === 'main_moved',
+  });
+  assert.equal(r.reply.result, 'merged');
+  assert.deepEqual(chieste, [SHA, '3'.repeat(40)], 'la prima richiesta porta la prova già fatta, la seconda una nuova');
+  assert.equal(prove, 1, 'una prova nuova solo dopo main mosso');
+});
+
 test('togliere il collegamento a node_modules non tocca la cartella a cui punta', () => {
   const casa = cartellaTemporanea('filo-929-collegamento-');
   try {
