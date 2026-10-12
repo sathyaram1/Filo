@@ -87,12 +87,12 @@
   // una versione rilasciata), 'archived' Archiviati.
   const TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox: 'Nessun feedback in attesa di una tua decisione.',
     queue: 'Nessun feedback in lavorazione.',
-    local: 'Nessun lavoro locale.',
+    local: 'Nessun lavoro server.',
     resolved: 'Nessun fix uscito in una versione rilasciata.',
     archived: 'Nessun feedback archiviato.',
   };
@@ -796,7 +796,7 @@
       if (payload.localApproval === true && item.fiducia !== 'fidato') {
         const f = await sendToMain({ type: (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna', feedbackId: id }).catch((err) => ({ ok: false, error: err?.message }));
         if (f && f.ok) item.fiducia = 'fidato';
-        else alert(`Nei Lavori locali, ma non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}. Alla fusione ti chiederà il via libera.`);
+        else alert(`Nei Lavori server, ma non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}. Alla fusione ti chiederà il via libera.`);
       }
       return true;
     } catch (e) {
@@ -816,7 +816,7 @@
   // dashboard di gestione legge la stessa tabella, quindi sulla stessa
   // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
   // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server: lo lavorano le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione. La fusione non aspetta il tuo sì.';
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';

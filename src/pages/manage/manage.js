@@ -205,12 +205,12 @@
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori server', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox:    'Nessun feedback ricevuto.',
     queue:    'Nessun feedback in coda.',
-    local:    'Nessun lavoro locale.',
+    local:    'Nessun lavoro server.',
     resolved: 'Nessun feedback risolto.',
     archived: 'Nessun feedback archiviato.',
   };
@@ -1966,20 +1966,20 @@
     if (isAdmin && MR.isLocalOnly(fb)) {
       const chiusa = MR.praticaChiusa(fb, { releasedVersion, fusioni });
       voci.push({
-        testo: chiusa ? '💻 Non era un lavoro locale' : '💻 Rimetti anche alle routine',
+        testo: chiusa ? '💻 Non era un lavoro server' : '💻 Non è un lavoro server',
         titolo: chiusa ? `${localSignText(fb)} ${titoloTogliChiusa(fb)}` : localSignText(fb),
         azione: () => segnoDalMenu(fb, false),
       });
     } else if (segnabile.ok) {
       voci.push({
-        testo: segnabile.chiusa ? '💻 Era un lavoro locale' : '💻 Solo lavoro locale',
-        titolo: segnabile.chiusa ? titoloLocaleChiusa(fb) : 'Nessuna routine la prende. La lavora una sessione locale, e passa nei Lavori locali.',
+        testo: segnabile.chiusa ? '💻 Era un lavoro server' : '💻 Lavoro server',
+        titolo: segnabile.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server: lo lavorano le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione locale.',
         azione: () => segnoDalMenu(fb, true),
       });
     }
     const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
     if (lavoroLocale) {
-      voci.push({ testo: '💻 Approva come lavoro locale', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
+      voci.push({ testo: '💻 Approva come lavoro server', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
     }
     if (isAdmin && MR.fiduciaCheck(fb).ok) {
       voci.push({ testo: '🤝 Segna fidato', titolo: titoloFiducia(fb), azione: () => { if (selectedId !== fb._id) openDetail(fb._id); impostaFiducia(fb._id, true); } });
@@ -2374,17 +2374,17 @@
   // l'owner nei Ricevuti, una chiusa) la scheda lo porta, o sembrerebbe una delle routine.
   function localBadgeHtml(fb) {
     if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
-    return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">locale</span>`;
+    return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
   function localSignText(fb) {
     const m = fb && fb.localOnly;
     if (!m) return '';
     const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
-    const cosa = !MR.praticaChiusa(fb, { releasedVersion, fusioni }) ? 'Solo lavoro locale: nessuna routine la prende.'
-      : MR.isPrivateLocalWork(fb) ? 'Era un lavoro locale: per questo non sta nella bacheca pubblica.'
-        : 'Era un lavoro locale: la sua scheda resta nella bacheca pubblica, per chi l’ha mandato.';
+    const cosa = !MR.praticaChiusa(fb, { releasedVersion, fusioni }) ? 'Lavoro server: lo prendono le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione locale.'
+      : MR.isPrivateLocalWork(fb) ? 'Era un lavoro server: per questo non sta nella bacheca pubblica.'
+        : 'Era un lavoro server: la sua scheda resta nella bacheca pubblica, per chi l’ha mandato.';
     const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
-    const si = a ? ` Approvato come lavoro locale da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}. Se togli il segno l'approvazione resta, e il segno si rimette con un clic.` : '';
+    const si = a ? ` Approvato come lavoro server da ${chiHaMessoIlSegno(a.by)}${Number(a.at) > 0 ? ` il ${formatDateTime(new Date(Number(a.at)).toISOString())}` : ''}. Se togli il segno l'approvazione resta, e il segno si rimette con un clic.` : '';
     return `${cosa} Segno messo da ${chiHaMessoIlSegno(m.by)}${quando}.${si}`;
   }
   // Una sessione firma il segno col suo mittente (`local:claude`), l'owner con l'email: il mittente si legge come in testata.
@@ -2485,7 +2485,7 @@
     if (!show || !mgAlignedBtn) return;
     // Quelli col segno locale approvati vanno nei Lavori locali (#908): la freccia dice dove.
     const locali = blues.filter((f) => MR.isLocalOnly(f)).length;
-    const dove = !locali ? 'In coda' : (locali === blues.length ? 'Lavori locali' : 'In coda e Lavori locali');
+    const dove = !locali ? 'In coda' : (locali === blues.length ? 'Lavori server' : 'In coda e Lavori server');
     mgAlignedBtn.textContent = `Approva tutti gli allineati (${blues.length}) → ${dove}`;
   }
   async function approveAllAligned() {
@@ -3199,18 +3199,18 @@
     return MR.isLocalOnly(fb) || MR.isFidato(fb) || MR.isLocalApproved(fb);
   }
   // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server: lo lavorano le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione. La fusione non aspetta il tuo sì.';
   // Stesso avviso di «Segna fidato»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
   function titoloLavoroLocale(fb) {
     const c = MR.localApprovalCheck(fb, { releasedVersion, fusioni });
     return c.segnalato ? `${TITOLO_LAVORO_LOCALE} Attenzione: ${c.segnalato}, guardalo prima.` : TITOLO_LAVORO_LOCALE;
   }
-  const TITOLO_LOCALE_CHIUSA = 'Era un lavoro locale: la segna così, e la sua scheda esce dalla bacheca pubblica.';
+  const TITOLO_LOCALE_CHIUSA = 'Era un lavoro server: la segna così, e la sua scheda esce dalla bacheca pubblica.';
   // Una pratica chiusa le routine non la prendono più: togliere il segno la rimette solo nella bacheca.
   const TITOLO_TOGLI_CHIUSA = 'Un clic toglie il segno, e la sua scheda torna nella bacheca pubblica.';
   // Il feedback di un utente approvato la scheda la tiene (#913): è da lì che chi l'ha mandato vede la risoluzione.
   function titoloLocaleChiusa(fb) {
-    return MR.isLocalApproved(fb) ? 'Era un lavoro locale: la segna così, e la sua scheda resta nella bacheca pubblica.' : TITOLO_LOCALE_CHIUSA;
+    return MR.isLocalApproved(fb) ? 'Era un lavoro server: la segna così, e la sua scheda resta nella bacheca pubblica.' : TITOLO_LOCALE_CHIUSA;
   }
   function titoloTogliChiusa(fb) {
     return MR.isPrivateLocalWork(fb) ? TITOLO_TOGLI_CHIUSA : 'Un clic toglie il segno.';
@@ -3221,13 +3221,13 @@
     mgLocalBtn.hidden = !isAdmin || !localToggleOffered(fb);
     mgLocalBtn.disabled = false;
     mgLocalBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    mgLocalBtn.textContent = on ? '💻 Solo locale' : '💻 Locale';
+    mgLocalBtn.textContent = on ? '💻 Lavoro server' : '💻 Server';
     const perche = on ? null : MR.localSignCheck(fb, true);
     const chiusa = on && MR.praticaChiusa(fb, { releasedVersion, fusioni });
     mgLocalBtn.title = on
-      ? `${localSignText(fb)} ${chiusa ? titoloTogliChiusa(fb) : 'Un clic la rimette anche alle routine.'}`
+      ? `${localSignText(fb)} ${chiusa ? titoloTogliChiusa(fb) : 'Un clic la toglie dai lavori server.'}`
       : (perche.ok
-        ? (perche.chiusa ? titoloLocaleChiusa(fb) : 'La lavora solo una sessione locale. Nessuna routine la prende, e passa nei Lavori locali.')
+        ? (perche.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server: lo lavorano le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione locale.')
         : `Adesso non si può: ${perche.motivo}.`);
   }
 
@@ -3291,7 +3291,7 @@
     const chi = num ? ` (#${num})` : '';
     if (!check.ok) { setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${check.motivo}.`, 'err'); return; }
     if (selectedId === id && mgLocalBtn) mgLocalBtn.disabled = true;
-    setManageMsg(valore ? 'Segno la pratica come lavoro locale…' : (check.chiusa ? 'Tolgo il segno…' : 'La rimetto anche alle routine…'), '');
+    setManageMsg(valore ? 'Segno la pratica come lavoro server…' : (check.chiusa ? 'Tolgo il segno…' : 'La tolgo dai lavori server…'), '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, localOnly: valore });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
@@ -3300,9 +3300,9 @@
       renderList();
       const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
       const fatto = !valore
-        ? (check.chiusa ? `Da ora${chi} non è più un lavoro locale${MR.isLocalApproved(fb) ? '' : ': la sua scheda torna nella bacheca pubblica'}.` : `Da ora${chi} la possono prendere anche le routine.`)
-        : check.chiusa ? `Segnata${chi} come lavoro locale${MR.isLocalApproved(fb) ? '' : ': fuori dalla bacheca pubblica'}.`
-          : `Da ora${chi} la lavora solo una sessione locale${dove === 'local' ? ': la trovi nei Lavori locali' : ''}.`;
+        ? (check.chiusa ? `Da ora${chi} non è più un lavoro server${MR.isLocalApproved(fb) ? '' : ': la sua scheda torna nella bacheca pubblica'}.` : `Da ora${chi} è un lavoro come gli altri.`)
+        : check.chiusa ? `Segnata${chi} come lavoro server${MR.isLocalApproved(fb) ? '' : ': fuori dalla bacheca pubblica'}.`
+          : `Da ora${chi} è un lavoro server${dove === 'local' ? ': la trovi nei Lavori server' : ''}.`;
       setManageMsg(fatto, 'ok');
     } catch (e) {
       setManageMsg(`Segno non ${valore ? 'messo' : 'tolto'}${chi}: ${e.message || 'Errore'}`, 'err');
@@ -3361,7 +3361,7 @@
   };
   const ACTION_PROGRESS = {
     accept: 'Metto in coda…',
-    accept_local: 'Lo passo nei Lavori locali…',
+    accept_local: 'Lo passo nei Lavori server…',
     confirm_attack: 'Conferma in corso…',
     confirm_spam: 'Conferma in corso…',
     archive: 'Archivio…',
@@ -3495,7 +3495,7 @@
           const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err.message }));
           if (f && f.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; } else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
         }
-        toast(`${num ? `#${num}` : 'Il feedback'} è nei Lavori locali. Nessuna routine lo prende.${fiducia}`, fiducia ? 'err' : 'ok');
+        toast(`${num ? `#${num}` : 'Il feedback'} è nei Lavori server.${fiducia}`, fiducia ? 'err' : 'ok');
       }
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
