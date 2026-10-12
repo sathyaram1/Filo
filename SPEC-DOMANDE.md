@@ -281,8 +281,8 @@ Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
 
 ### 3.5 Il compito «Gestisci la risposta»
 
-- Un feedback a priorità 3, tipo `risposta`. L'orchestratore lo prende appena
-  può.
+- Un compito senza feedback (§ 6), urgenza 47: passa davanti a tutto tranne i
+  feedback a priorità 3.
 - Lo lavora **Opus col repo**: una decisione capita male costa più di qualunque
   risparmio sul modello.
 - Il biglietto nasce con la fiducia della domanda (§ 1.2).
