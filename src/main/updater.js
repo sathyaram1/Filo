@@ -512,6 +512,7 @@ async function trova() {
   if (stato.versioneTrovata || stato.pronta) return true;
   try { await updater.checkForUpdates(); } catch (e) {
     console.error('[updater] controllo update fallito:', e?.message || e);
+    if (e && e.rifiutata) return false;
     stato.errore = 'Adesso non riesco a controllare se c\'è una versione nuova. Riprova fra poco.';
     stato.annuncia();
     return false;
