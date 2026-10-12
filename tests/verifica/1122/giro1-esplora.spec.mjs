@@ -108,8 +108,9 @@ test('tasto destro mentre la pagina carica ancora: qualcosa compare', async ({ a
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   try {
     const url = `http://127.0.0.1:${srv.address().port}/`;
-    const page = await openTab(url, { waitForLoad: false }).catch(async () => null)
-      || app.windows().find((w) => w.url().startsWith(url));
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith(url)); return !!page; }, { timeout: 10000 }).toBe(true);
     await page.locator('#p').waitFor();
     const quanti = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed() && x.isVisible() && x.webContents.getURL().startsWith('data:text/html')).length);
     await page.locator('#p').click({ button: 'right' });
