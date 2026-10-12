@@ -1430,6 +1430,11 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
     const t = risultati.filter(Boolean).map((r) => `${r.title || ''}\n${r.url || ''}\n${r.snippet || ''}`).join('\n');
     fonti.push({ testo: t, fonte: 'dai risultati di una ricerca' });
   }
+  const documenti = payload && payload.esterno && payload.esterno.documenti && payload.esterno.documenti.risultati;
+  if (Array.isArray(documenti)) {
+    const t = documenti.filter(Boolean).map((r) => `${r.nome || ''}\n${r.inizio || ''}\n${r.squarcio || ''}`).join('\n');
+    fonti.push({ testo: t, fonte: 'dai documenti trovati sul disco' });
+  }
   let reg = LETTI_DALL_AIUTO.get(wc);
   if (!reg) {
     reg = SegretiLetti.registro(MAX_LETTI_AIUTO);
