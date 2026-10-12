@@ -7,7 +7,9 @@ const require = createRequire(import.meta.url);
 require('../../../src/shared/cmdClassify.js');
 const C = globalThis.SN_CMD_CLASSIFY;
 const BASE = { win: true, maiuscole: true, home: 'C:\\Users\\a' };
-const NOMI = ['Get-Command .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto', 'git rev-parse segreto', 'git show segreto'];
+// Giro 6: anche git log/diff/blame cercano il nome fra i file della cartella.
+const NOMI = ['Get-Command .\\segreto', 'Get-Command -Name .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto',
+  'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto'];
 
 test('r2 nella cartella di rete un nome cercato chiede un OK come ls', () => {
   for (const ctx of [{ ...BASE, cwd: '\\\\evil\\x' }, { ...BASE, cwd: 'Z:\\', reti: ['z'] }]) {
