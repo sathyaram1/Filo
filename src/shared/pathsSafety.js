@@ -261,11 +261,32 @@
       .replace(SOPRANNOME_RE, (_m, prima) => `${prima}[ID]`);
   }
 
+  // Di un campo si pulisce il doppio di quello che può restarne, più una forma
+  // intera: un documento della raccolta può portare elementi da centinaia di
+  // migliaia di caratteri, e pulirli interi per tenerne cinquecento fermava
+  // l'Aiuto (#1173). Il taglio torna indietro fino all'inizio della forma che
+  // spezzerebbe (email, codice, pezzo d'indirizzo), che spezzata la pulizia
+  // non riconoscerebbe più; la prova sui bordi sta in tests/unit/percorsiLunghi.test.mjs.
+  const FORMA_MAX = 320;
+  function nellaForma(c) { return carattereLocale(c) || c === 64; }
+  function nelPezzoDiIndirizzo(c) { return c !== 47; }
+
+  function tagliaPrimaDiPulire(testo, max, formaContinua = nellaForma) {
+    const tetto = max * 2 + FORMA_MAX;
+    if (testo.length <= tetto) return testo;
+    let fine = tetto;
+    while (fine > tetto - FORMA_MAX && formaContinua(testo.charCodeAt(fine - 1))) fine--;
+    // Mai mezzo carattere: la metà alta di una coppia non è un testo.
+    const c = testo.charCodeAt(fine - 1);
+    if (c >= 0xD800 && c <= 0xDBFF) fine--;
+    return testo.slice(0, fine);
+  }
+
   // Un elemento toccato, pronto per la raccolta: senza dati personali, senza
   // niente che imiti la struttura del prompt, e dentro al tetto.
   function redactSelector(selector) {
     if (typeof selector !== 'string' || !selector) return '';
-    let s = redigiDatiPersonali(selector);
+    let s = redigiDatiPersonali(tagliaPrimaDiPulire(selector, MAX_SELECTOR_LEN));
     s = neutralizzaMarcature(s).trim();
     if (s.length > MAX_SELECTOR_LEN) s = s.slice(0, MAX_SELECTOR_LEN);
     return s;
