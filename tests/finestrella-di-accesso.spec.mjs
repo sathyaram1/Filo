@@ -129,3 +129,43 @@ test('dalla finestrella, col blocco spento, una seconda finestra di accesso chie
   await expect.poll(async () => (await schede(app)).filter((u) => u === FINTA).length, { timeout: 8000 }).toBe(1);
   expect((await finestrelle(app)).map((f) => f.url)).toEqual([GOOGLE]);
 });
+
+const dentroLoSchermo = (app) => app.evaluate(({ BrowserWindow, screen }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && !x.isDestroyed() && x.webContents.getURL().includes('sito-finto'));
+  if (!w) return null;
+  const b = w.getBounds();
+  const a = screen.getDisplayMatching(b).workArea;
+  return { dentro: b.x >= a.x && b.y >= a.y && b.x + b.width <= a.x + a.width && b.y + b.height <= a.y + a.height, schermoIntero: w.isFullScreen() };
+});
+
+for (const [dove, misure] of [
+  ['sopra il bordo alto', 'width=420,height=520,left=100,top=-400'],
+  ['in alto a sinistra fuori dallo schermo', 'width=420,height=520,left=-2000,top=-2000'],
+  ['più grande dello schermo', 'width=9000,height=9000,left=0,top=-60'],
+]) {
+  test(`la finestrella che la pagina chiede ${dove} nasce dentro lo schermo, con la barra del titolo in vista`, async ({ app, openTab, testServer }) => {
+    await servi(app, { 'login.sito-finto.it/login': FINTA_HTML });
+    const page = await testServer.openReady(openTab, `<button id="b" style="width:220px;height:60px"
+      onclick="window.open('${FINTA}','login','${misure}')">Accedi</button>`);
+    await page.click('#b');
+    await expect.poll(() => dentroLoSchermo(app), { timeout: 8000 }).toEqual({ dentro: true, schermoIntero: false });
+  });
+}
+
+test('la pagina dentro la finestrella non la sposta fuori dallo schermo né la mette a schermo intero', async ({ app, openTab, testServer }) => {
+  await servi(app, { 'login.sito-finto.it/login': `${FINTA_HTML}<button id="avanti" style="position:fixed;left:0;top:0;width:200px;height:80px"
+    onclick="document.documentElement.requestFullscreen().catch(function(){})">Avanti</button>
+    <script>setTimeout(function(){window.moveTo(-2000,-2000);window.resizeTo(9000,9000)},600)</script>` });
+  const page = await testServer.openReady(openTab, bottone(FINTA));
+  await page.click('#b');
+  await expect.poll(() => dentroLoSchermo(app), { timeout: 8000 }).not.toBeNull();
+  await page.waitForTimeout(1500);
+  expect(await dentroLoSchermo(app)).toEqual({ dentro: true, schermoIntero: false });
+  await app.evaluate(({ BrowserWindow }) => {
+    const wc = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && x.webContents.getURL().includes('sito-finto')).webContents;
+    wc.sendInputEvent({ type: 'mouseDown', x: 40, y: 30, button: 'left', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: 40, y: 30, button: 'left', clickCount: 1 });
+  });
+  await page.waitForTimeout(1500);
+  expect(await dentroLoSchermo(app)).toEqual({ dentro: true, schermoIntero: false });
+});

@@ -215,6 +215,19 @@ function titoloFinestrella(url, origine = '') {
   return Permessi.nomeDaMostrare(da).dominio;
 }
 
+// La pagina sceglie misure e posizione, ma la finestrella sta tutta nello schermo, come in Chrome: fuori, con la barra
+// del titolo, uscirebbe l'unico posto dove si legge il sito (#1066 giro 1). Windows non la rimette dentro da solo.
+function dentroLoSchermo(b) {
+  const a = screen.getDisplayMatching(b).workArea;
+  const width = Math.min(b.width, a.width);
+  const height = Math.min(b.height, a.height);
+  return {
+    width, height,
+    x: Math.min(Math.max(b.x, a.x), a.x + a.width - width),
+    y: Math.min(Math.max(b.y, a.y), a.y + a.height - height),
+  };
+}
+
 // Electron passa alla finestra ogni chiave delle `features` di window.open (frame=no, fullscreen, titleBarStyle…):
 // alla pagina restano solo le misure, il resto torna com'è di suo, o il titolo col sito sparirebbe (#1066).
 const MISURE_FINESTRELLA = new Set(['width', 'height', 'left', 'top', 'x', 'y']);
