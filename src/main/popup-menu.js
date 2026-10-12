@@ -273,6 +273,19 @@ function finestraDi(parent) {
     if (d) invia(s, d);
   });
   wc.on('ipc-message', (_e, canale, a, b) => { if (s.win === win) dalMenu(s, canale, a, b); });
+  // Un processo morto non risponde più: tenuta, la finestra lascerebbe la finestra madre senza menu fino al riavvio.
+  // Si butta; il prossimo clic ne fa una nuova, e il menu che stava per comparire si riapre una volta sola.
+  wc.on('render-process-gone', () => {
+    if (s.win !== win) return;
+    const r = s.aperto && !win.isVisible() && s.richiesta && !s.richiesta.ripresa ? s.richiesta : null;
+    clearTimeout(s.tetto);
+    s.win = null;
+    s.pronta = false;
+    s.attesa = null;
+    chiudi(s);
+    if (!win.isDestroyed()) win.destroy();
+    if (r && !parent.isDestroyed()) apri(parent, { ...r, ripresa: true });
+  });
   win.on('blur', () => sfocato(s, win));
   win.on('closed', () => {
     if (s.win !== win) return;
