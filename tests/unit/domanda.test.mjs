@@ -184,7 +184,7 @@ test('mostra ed elenco: stampare una domanda non fidata sporca la sessione prima
   ] } });
   assert.equal(await esegui(['elenco'], elenco.io), 0);
   assert.equal(elenco.sporcate.length, 1, 'una volta sola per tutto l’elenco');
-  assert.match(elenco.sporcate[0].motivi[0], /2 domande non fidate (D-2, D-7)/);
+  assert.match(elenco.sporcate[0].motivi[0], /2 domande non fidate \(D-2, D-7\)/);
   assert.deepEqual(elenco.ordine.slice(0, 2), ['sporca', 'scrivi']);
 
   const tutteFidate = finto({ elenco: { ok: true, domande: [{ id: 'D-1', titolo: 'a', priorita: 'bloccante', stato: 'aperta', fiducia: 'fidato' }] } });
