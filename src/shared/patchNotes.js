@@ -24,6 +24,7 @@
         'Nella stessa pagina c\'è un campo per cercare fra le voci copiate: con la cronologia piena trovi subito quella da togliere, senza scorrerle tutte.',
         'Cliccando una voce della cronologia la rimetti negli appunti, pronta da incollare dove vuoi.',
         'Nella cronologia del menu "Incolla" le immagini copiate si vedono in miniatura: due schermate copiate una dietro l\'altra non si leggono più tutte e due "Immagine".',
+        'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
       ],
       fixes: [
         'Filo vede ancora le foto che gli mandi in chat anche nei messaggi dopo, e puoi continuare a chiedergli di quello che c\'è dentro; riaprendo la chat le ritrovi anche tu. Prima dal secondo messaggio diceva di non vederle. Dopo una ventina di messaggi, o se riapri Filo, non le ha più davanti, ma sa che c\'erano e ti chiede di rimandarle se gli servono.',
