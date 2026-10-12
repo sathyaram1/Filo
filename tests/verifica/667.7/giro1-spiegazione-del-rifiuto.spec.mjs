@@ -53,10 +53,11 @@ test('con Invio al posto di Tab, uguale', async ({ openTab }) => {
 test('nel segmento di riserva aggiunto col +', async ({ openTab }) => {
   const page = await apri(openTab);
   const c = cella(page, 'Spiega (inline)');
+  const quanti = await c.locator('.sn-chain-seg').count();
   await c.locator('.sn-chain-add').click();
-  await expect(c.locator('.sn-chain-seg')).toHaveCount(2);
+  await expect(c.locator('.sn-chain-seg')).toHaveCount(quanti + 1);
   await page.waitForTimeout(800);
-  const seg = c.locator('.sn-chain-seg').nth(1);
+  const seg = c.locator('.sn-chain-seg').nth(quanti);
   await respingi(page, seg, 'kokoro');
   await expect(seg.locator('.sn-chain-msg')).toHaveText(/Modello non adatto: \S/);
 });
