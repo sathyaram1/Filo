@@ -9,7 +9,8 @@
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron, test as testSenzaFixture } from '@playwright/test';
-import { readFileSync, readdirSync, statSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
+import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
