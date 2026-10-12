@@ -348,10 +348,22 @@ jobs:
             fi
           fi
 
+      # Coniato qui e non prima: vale un'ora, e deve coprire build, controllo e
+      # pubblicazione. I file per Mac e Linux si allegano a una release che c'e'
+      # gia', senza creare tag: a loro basta il GITHUB_TOKEN.
+      - name: Token dell'app di pubblicazione (se configurata)
+        id: app
+        if: steps.check.outputs.should_release == 'true' && vars.FILO_RILASCIO_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.FILO_RILASCIO_APP_ID }}
+          private-key: ${{ secrets.FILO_RILASCIO_APP_KEY }}
+          permission-contents: write
+
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
         run: npm run release
 
