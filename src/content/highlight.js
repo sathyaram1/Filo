@@ -16,6 +16,7 @@
   let scrollListener = null;
   let clickListener = null;
   let onTargetClick = null;
+  const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
   function clear() {
     if (activeOverlay) {
@@ -240,7 +241,8 @@
         acceptBtn.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          if (!activeTarget) return;
+          // Il sì al passo lo dà l'utente: il bottone sta nel documento del sito, che lo preme da codice (#592.6).
+          if (!activeTarget || !gestoVero(e)) return;
           fillElement(activeTarget, fillValue);
           const cb = onAction;
           // Disattiva subito per evitare doppi trigger su doppio click.
@@ -289,7 +291,7 @@
     // Solo per action="click": il clic sul target stesso conferma il passo.
     if (action === 'click' && onTargetClick) {
       clickListener = (e) => {
-        if (!activeTarget) return;
+        if (!activeTarget || !gestoVero(e)) return;
         const path = e.composedPath ? e.composedPath() : null;
         const hit = path
           ? path.includes(activeTarget)
