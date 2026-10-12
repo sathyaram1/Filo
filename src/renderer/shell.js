@@ -796,6 +796,7 @@
       el.style.flex = '';
       el.style.minWidth = '';
       el.style.maxWidth = '';
+      el._firma = ''; // la larghezza ferma non c'è più: la prossima volta la scheda si ridisegna da capo
     }
     // Da ferme le schede hanno misurato la larghezza fermata: senza rimisurarle restano strette fino al prossimo ridisegno.
     misuraLarghezzeChieste();
