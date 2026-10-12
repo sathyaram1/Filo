@@ -37,7 +37,7 @@ test('controllo: la copia senza modifiche è verde', () => {
 for (const [cosa, file, testo] of [
   ['una chiave di impostazione col punto', 'src/main/services/adblock.js', "\nfunction accesoDaPreferenze(p) { return p['adblock.enabled'] !== false; }\n"],
   ['il nome di un file .jsonl', 'src/main/services/fxRates.js', "\nconst STORICO = 'cambi.jsonl';\n"],
-  ['il nome di un eseguibile', 'src/main/services/handlers/misc.js', "\nconst INSTALLER = 'Filo-Setup.exe'.toLowerCase();\n"],
+  ['il nome di un eseguibile', 'src/main/services/handlers/misc.js', "\nconst INSTALLER = 'filo-setup.exe';\n"],
   ['un pezzo di codice per la pagina', 'src/main/services/adblock.js', "\nfunction titolo(wc) { return wc.executeJavaScript('document.title'); }\n"],
 ]) {
   test(`r1 ${cosa} in un file che fa rete non è un servizio nuovo`, () => {
