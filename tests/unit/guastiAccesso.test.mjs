@@ -280,6 +280,21 @@ test('identità: tornata la chiave del sistema, all\'avvio dopo l\'identità mes
   assert.equal(chiamate.signUp, 0);
 });
 
+test('identità: una copia più recente scritta con la chiave sbagliata non nasconde quella buona messa da parte prima', () => {
+  identitaSuDisco('rt-buono');
+  portafoglioSuDisco();
+  const buona = file('identity.bin.illeggibile-2026-01-01T00-00-00-000Z');
+  writeFileSync(buona, readFileSync(file('identity.bin')));
+  portachiavi.chiave = 'B';
+  writeFileSync(file('identity.bin.illeggibile-2026-02-01T00-00-00-000Z'), electronFinto.safeStorage.encryptString(JSON.stringify({ refreshToken: 'rt-sbagliato' })));
+  rmSync(file('identity.bin'));
+  portachiavi.chiave = 'A';
+  assert.equal(anon.restore(), true);
+  assert.deepEqual(anon.segreti(), ['rt-buono']);
+  assert.equal(existsSync(buona), false, 'tornata al suo posto');
+  assert.ok(existsSync(file('identity.bin')));
+});
+
 test('identità: senza cifratura del sistema e con un portafoglio su disco non ne nasce una nuova', async () => {
   identitaSuDisco();
   portafoglioSuDisco();
