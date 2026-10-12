@@ -26,6 +26,9 @@ test('il rapporto di ripiego, quando generarlo fallisce, porta la stessa version
   const m = src.match(/rapporto = \{ v: (\d+), role: ruolo/);
   assert.ok(m, 'il rapporto di ripiego c\'è ancora');
   assert.equal(Number(m[1]), rapportoVuoto().v);
+  const chiusura = src.match(/rapporto = \{ v: (\d+), role: 'orchestrator', closing: true/);
+  assert.ok(chiusura, 'il ripiego del rapporto di chiusura c\'è ancora');
+  assert.equal(Number(chiusura[1]), rapportoVuoto().v);
 });
 const {
   heartbeat, release, releaseConRapporto, pushRamoCorrente, statoContenitore,
