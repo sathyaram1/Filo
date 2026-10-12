@@ -1,6 +1,6 @@
-// #1033: si risponde alle domande di Claude anche dal pannello del rombo verde.
-// La casella del pannello e quella sotto la conversazione sono la stessa
-// risposta (una bozza, un invio): la risposta entra in chat e la pratica torna in coda.
+// #1033, #1061: alle domande di Claude si risponde dal pannello del rombo verde,
+// che si apre da sé sulla pratica che aspetta la risposta; sotto la
+// conversazione non c'è più una seconda casella. La risposta entra in chat e la pratica torna in coda.
 
 import { test, expect } from './fixtures/electron.mjs';
 
