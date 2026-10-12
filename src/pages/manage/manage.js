@@ -7759,7 +7759,8 @@
     startLive();
   }
 
-  const bootDone = init().catch((e) => { console.error('[manage] init:', e); });
+  // Un avvio rotto prima della lettura non deve lasciare le automazioni senza valori per sempre.
+  const bootDone = init().catch((e) => { console.error('[manage] init:', e); }).finally(fineLetturaAutomazioni);
   // Gli spec devono poter aspettare la FINE del caricamento vero (Firestore)
   // prima di iniettare dati finti: se il caricamento atterra a metà test, li
   // sovrascrive e il test diventa rumore.
