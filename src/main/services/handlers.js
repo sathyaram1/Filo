@@ -4280,8 +4280,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let filo = null;
   let tettiChat = null;
   let modelloChat = '';
+  let fotoNelTratto = true;
   const componiFilo = (tetti) => ContestoFilo.componi({
     chatId, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
+    immagini: fotoNelTratto && !modelliSenzaFoto.has(modelloChat),
   });
   try {
     const settingsChat = await getEffectiveSettings();
