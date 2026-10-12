@@ -6,8 +6,9 @@ Menu, fumetto e carta d'anteprima stanno sopra le schede, quindi sono finestre
 figlie (la shell non disegna sopra una WebContentsView). Una `BrowserWindow`
 nuova è un processo renderer nuovo: sul PC lento il menu compariva verso il
 secondo, e il secondo clic non era più veloce del primo (#1090). Quindi una
-finestra a comparsa nasce una volta per finestra madre e poi si riusa:
-all'apertura cambiano contenuto, posizione e visibilità, mai il documento.
+finestra a comparsa nasce una volta (menu e carta: una per finestra madre) e poi
+si riusa: all'apertura cambiano contenuto, posizione e visibilità, mai il
+documento.
 
 - **Nasce prima del clic.** Il menu nasce nascosto quando la barra della
   finestra ha finito di caricarsi (`preparaMenu` in `src/main/window.js`), col
