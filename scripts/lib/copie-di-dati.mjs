@@ -72,18 +72,32 @@ function sembraJson(byte) {
   return byte[i] === 0x7B || byte[i] === 0x5B;
 }
 
-/** I file tracciati da git in `root` che sono copie di dati del server, fuori dalla cartella dei dati finti. */
-export function copieNelRepo(root) {
-  const file = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-    .split('\0').filter(Boolean);
+// Il motivo per cui il file `f` di `root` è una copia, o '': fuori dai dati finti, solo se comincia come un JSON.
+function motivoFile(root, f) {
+  if (f.startsWith(CARTELLA_FINTI)) return '';
+  let byte;
+  try { byte = readFileSync(join(root, f)); } catch (_) { return ''; }
+  return sembraJson(byte) ? motivoCopiaTesto(byte.toString('utf8')) : '';
+}
+
+function copieFra(root, file) {
   const trovate = [];
   for (const f of file) {
-    if (f.startsWith(CARTELLA_FINTI)) continue;
-    let byte;
-    try { byte = readFileSync(join(root, f)); } catch (_) { continue; }
-    if (!sembraJson(byte)) continue;
-    const motivo = motivoCopiaTesto(byte.toString('utf8'));
+    const motivo = motivoFile(root, f);
     if (motivo) trovate.push({ file: f, motivo });
   }
   return trovate;
+}
+
+const elencoGit = (root, args) => execFileSync('git', [...args, '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  .split('\0').filter(Boolean);
+
+/** I file tracciati da git in `root` che sono copie di dati del server, fuori dalla cartella dei dati finti. */
+export function copieNelRepo(root) {
+  return copieFra(root, elencoGit(root, ['ls-files']));
+}
+
+/** Come copieNelRepo, sui soli file messi in scena (aggiunti o cambiati): il salvataggio li toglie prima del commit. */
+export function copieInScena(root) {
+  return copieFra(root, elencoGit(root, ['diff', '--cached', '--name-only', '--diff-filter=ACMR']));
 }
