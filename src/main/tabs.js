@@ -2885,6 +2885,7 @@ class TabManager {
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
+        title: titoloFinestrella(url),
         webPreferences: {
           preload: PAGE_PRELOAD,
           contextIsolation: true,
