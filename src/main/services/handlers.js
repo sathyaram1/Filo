@@ -4855,6 +4855,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // giro: la scheda li tiene con la conversazione, e il ragionamento torna
     // al modello al turno dopo.
     notes, reasoningDetails,
+    ...(notaRisposta ? { notaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(keyFallback ? { keyFallback } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di
