@@ -373,7 +373,6 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
   updater = au;
   soloTagDiRilascio(au);
   Object.assign(stato, nuovoStato(), { attivo: true, automatici, chiesta, annuncia, modo });
-  etichettaDaGitHub(au);
   regola();
   au.on('checking-for-update', () => { if (stato.fase !== 'pronto') stato.fase = 'controllo'; });
   au.on('update-available', (info) => {
