@@ -73,7 +73,7 @@ function leggiJs(testo) {
   const letterali = [];
   const riga = contaRighe(testo);
   const pila = [];
-  let prima = null, primaTesto = '';
+  let prima = null, primaTesto = '', primaPrimaTesto = '', ultimo = null;
   for (;;) {
     let k = sc.scan();
     if (k === K.EndOfFileToken) break;
