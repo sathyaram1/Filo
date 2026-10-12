@@ -67,7 +67,7 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   Restano invece le cose che stanno in chiaro e con lo stato non c'entrano —
   ⭐ preferito, la frase per chi ha segnalato, le fusioni ferme.
 - **Sezione non è sinonimo di scheda.** La barra della dashboard di gestione
-  porta anche Statistiche Red Team, Modelli di supporto, Automazioni e Log:
+  porta anche Statistiche, Red Team, Automazioni (coi Modelli di supporto) e Log:
   non elencano segnalazioni e non dipendono dal loro stato, quindi restano
   raggiungibili. Spariscono le quattro sezioni, non la barra come oggetto.
 - **Ogni lista, nessuna esclusa.** Se una superficie prende i numeri, li prende

@@ -9,7 +9,7 @@
 //        riga in lista porta un segno piccolo;
 //     2. lo stesso tasto lo toglie (se si può mettere si può togliere);
 //     3. su una pratica chiusa il tasto non c'è: il segno lì non conta;
-//     4. Gestione → Automazioni elenca le fusioni avvenute senza chiedere, con
+//     4. Gestione → Log elenca le fusioni avvenute senza chiedere, con
 //        ramo, commit, chi aveva messo il segno e TUTTO ciò che era stato
 //        segnalato — nessuna voce tagliata.
 //
@@ -126,7 +126,7 @@ test('su una pratica chiusa il tasto non c’è, e un segno rimasto non si mostr
   await expect(page.locator('.mg-item .mg-preapproved')).toHaveCount(0);
 });
 
-test('Automazioni elenca le fuse senza chiedere, con tutto quello che era stato segnalato', async ({ openTab }) => {
+test('il Log elenca le fuse senza chiedere, con tutto quello che era stato segnalato', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const file = Array.from({ length: 30 }, (_, i) => `scripts/lib/guardia-${i}.mjs`);
   const fusa = {
@@ -149,7 +149,7 @@ test('Automazioni elenca le fuse senza chiedere, con tutto quello che era stato 
   };
   await apri(page, [pratica()], { preapproved: [fusa] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.locator('.mg-tab[data-tab="log"]').click();
 
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
@@ -174,7 +174,7 @@ test('Automazioni elenca le fuse senza chiedere, con tutto quello che era stato 
 // Il controllo a posteriori si legge a distanza di giorni, e può essere lungo:
 // la riga dice la DATA della fusione (non solo «N giorni fa»), e se il server
 // ha lasciato fuori le più vecchie lo dice, invece di tacere.
-test('Automazioni: la data della fusione per esteso, e quante ne restano fuori', async ({ openTab }) => {
+test('Log: la data della fusione per esteso, e quante ne restano fuori', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fusaAt = Date.now() - 9 * 24 * 60 * 60 * 1000;
   const d = new Date(fusaAt);
@@ -199,7 +199,7 @@ test('Automazioni: la data della fusione per esteso, e quante ne restano fuori',
     };
   });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.locator('.mg-tab[data-tab="log"]').click();
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible();
   await expect(box.locator('.sn-mac-preapproved-row')).toHaveCount(8);
@@ -211,12 +211,12 @@ test('senza fusioni pre-approvate l’elenco non compare', async ({ openTab }) =
   const page = await openTab(MANAGE);
   await apri(page, [pratica()], { preapproved: [] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.locator('.mg-tab[data-tab="log"]').click();
   await expect(page.locator('#mgMergeApprovalsPreapproved')).toBeHidden();
 });
 
 // #743: la fusione nata dal segno di un sì non si presenta come «fondi senza chiedermelo».
-test('Automazioni: una fusa col segno di un sì non dice «fondi senza chiedermelo»', async ({ openTab }) => {
+test('Log: una fusa col segno di un sì non dice «fondi senza chiedermelo»', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const AT = '2026-09-26T10:26:00.000Z';
   const riga = (i, over) => Object.assign({
@@ -229,7 +229,7 @@ test('Automazioni: una fusa col segno di un sì non dice «fondi senza chiederme
   const daSi = riga(1, { preapprovedBy: 'owner@esempio · approvazione ab12cd34ef56ab12cd34ef56' });
   await apri(page, [pratica()], { preapproved: [daSi] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.locator('.mg-tab[data-tab="log"]').click();
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
   const intro = box.locator('.sn-mac-preapproved-intro');

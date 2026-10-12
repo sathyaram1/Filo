@@ -375,7 +375,7 @@ Da oggi la fusione è una consegna del canale come le altre:
   **l'elenco intero** di ciò che L5 aveva segnalato (gate, file, righe: senza
   tetto). Il blocco resta comunque nel registro dei rifiuti. Il lavoratore
   riceve `merged` e chiude la pratica come dopo ogni fusione. L'owner rilegge
-  a posteriori in Gestione → Automazioni, «Fuse senza chiedere»
+  a posteriori in Gestione → Log, «Fuse senza chiedere»
   (`ownerMergeApprovals {op:'list'}` → `preapproved`, stessa finestra di
   `recent`). Vale **solo** per il lavoro delle routine: `npm run finish`
   locale non guarda il segno e apre la richiesta come sempre. Non esiste una

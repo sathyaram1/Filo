@@ -188,7 +188,7 @@ test('nei Ricevuti col segno: resta lì, la scheda lo dice, l’approvazione dic
   await expect(page.locator('#mgAcceptBtn')).toHaveText('→ Lavori locali');
 });
 
-test('Automazioni: la fusione locale che ha saltato L5 dice perché non ha chiesto', async ({ openTab }) => {
+test('Log: la fusione locale che ha saltato L5 dice perché non ha chiesto', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fusa = {
     id: 'cd34ef56ab12cd34ef56ab12', branch: 'claude/lavori-locali', sha: 'a1b2c3d4'.repeat(5),
@@ -199,7 +199,7 @@ test('Automazioni: la fusione locale che ha saltato L5 dice perché non ha chies
   };
   await apri(page, [fb({ localOnly: SEGNO })], { preapproved: [fusa] });
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
-  await tabBtn(page, 'automation').click();
+  await tabBtn(page, 'log').click();
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
   await expect(box).toContainText('lavoro locale · feedback #908');
