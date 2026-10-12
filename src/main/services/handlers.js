@@ -3834,7 +3834,7 @@ const LEGACY_CONTINUE_NUDGE =
 // conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
 // esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
 // e un modello che la ritenta lo farebbe comparire due volte.
-function toolResultText({ action, res, rendered }) {
+function toolResultText({ action, res, rendered }, giro = null) {
   const type = String(action.type || '').toUpperCase();
   const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
   // `rejected` è il solo «non è un'azione» (fuori registro, argomenti rotti,
