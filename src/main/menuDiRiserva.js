@@ -50,16 +50,13 @@ function esegui(azione, params, wc, schede, tab) {
   if (wc.isDestroyed()) return;
   if (['cut', 'copy', 'paste', 'selectAll'].includes(azione)) { wc[azione](); return; }
   if (azione === 'link-copia') { clipboard.writeText(params.linkURL); return; }
-  if (azione === 'link-apri') {
-    if (schede) schede.apriDaCollegamento(params.linkURL);
-    else wc.loadURL(params.linkURL);
-    return;
-  }
-  const nav = { indietro: ['goBack', 'goBack'], avanti: ['goForward', 'goForward'], ricarica: ['reload', 'reload'] }[azione];
-  if (!nav) return;
-  if (schede && tab) schede[nav[0]](tab.id);
-  else if (azione === 'ricarica') wc.reload();
-  else wc.navigationHistory[nav[1]]();
+  if (azione === 'link-apri') { if (schede) schede.apriDaCollegamento(params.linkURL); return; }
+  const metodo = { indietro: 'goBack', avanti: 'goForward', ricarica: 'reload' }[azione];
+  if (!metodo) return;
+  // Le schede passano dalle loro porte (pagina d'errore, siti bloccati); una finestra d'accesso no.
+  if (schede && tab) schede[metodo](tab.id);
+  else if (metodo === 'reload') wc.reload();
+  else wc.navigationHistory[metodo]();
 }
 
 function mostra(wc, params) {
