@@ -231,11 +231,19 @@
   }
 
   // null = la scheda resta sul neutro della barra (nessuna identità o colore spento).
+  // Un acromatico non si stacca dalla barra più di una tinta: dal lato opposto alla barra si ferma a
+  // luminosita_tab, sennò il marchio bianco al buio (o nero in chiaro) fa la scheda più accesa di tutte (#429).
   function inactiveTabBackground(identity, bar, params) {
-    const adapted = adaptIdentity(identity, params);
+    let adapted = adaptIdentity(identity, params);
     const b = toRgb(bar);
     if (!adapted || !b) return null;
-    return blendRgb(adapted, b, clampParams(params).opacita_tab);
+    const p = clampParams(params);
+    if (Math.max(...adapted) - Math.min(...adapted) < IDENTITY_CHROMA_MIN) {
+      const tetto = 255 * p.luminosita_tab;
+      const barraScura = (b[0] + b[1] + b[2]) / 3 < 128;
+      adapted = adapted.map((v) => Math.round(barraScura ? Math.min(v, tetto) : Math.max(v, tetto)));
+    }
+    return blendRgb(adapted, b, p.opacita_tab);
   }
 
   function relativeLuminance(color) {

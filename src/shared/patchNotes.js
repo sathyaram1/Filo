@@ -37,6 +37,8 @@
         'I pulsanti che aprono una ricevuta, un report o un pagamento in una finestra nuova funzionano: la scheda mostra quello che il sito ci scrive, e il sito la può richiudere. Una pagina che chiede di chiudersi chiude solo la sua scheda, non più tutto Filo.',
         'Filo ti avvisa quando un sito si spaccia per un marchio famoso anche se sta su un servizio che ospita i siti di altri, come Weebly, Wix o Google Traduttore. Prima se ne accorgeva solo su pochi servizi, come GitHub Pages. Le immagini di Discord e le pagine dei marchi stessi su GitHub, come quelle di Google o Microsoft, non hanno più l\'avviso.',
         'Il controllo dei siti pericolosi non manda più a Google gli indirizzi che visiti.',
+        'Le schede in alto mostrano il titolo intero quando nella fila c\'è posto, e con tante schede aperte ne mostrano un pezzo più lungo. Prima una scheda si fermava alle prime lettere anche con mezza fila vuota.',
+        'La scheda aperta prende il colore della pagina anche quando la pagina lo cambia dopo il caricamento, per esempio accendendo il suo tema scuro.',
         'La bozza di un feedback lasciata a metà resta sul sito dove l\'hai cominciata, e la ritrovi riaprendo il feedback lì. E sui siti la spiegazione, la Modifica e il feedback non prendono più lo stile della pagina: niente bottoni tutti maiuscoli o lettere spaziate.',
         'In Opzioni, se scegli per una funzione un modello che non la sa fare, come una voce per le spiegazioni, sotto il campo resta scritto perché. Prima il campo tornava com\'era senza dire niente.',
       ],

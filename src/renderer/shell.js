@@ -771,6 +771,10 @@
   let puntatoreSullaFila = false;
   let sondaFila = null;
   let giroSonda = 0;
+  // Anche la parte di ogni scheda non cambia sotto il puntatore: un titolo che cambia mentre il puntatore sta
+  // sulla fila (una scheda dietro che finisce di caricare) aspetta che la lasci, o la scheda gli scappa (#429).
+  let passoTrattenuto = false;
+  const fermo = () => Boolean(larghezzeFerme) || passoTrattenuto;
 
   function sullaFila(x, y) {
     const r = tabRowEl.getBoundingClientRect();
@@ -784,7 +788,7 @@
 
   function sciogliLarghezze() {
     fermaSonda();
-    if (!larghezzeFerme) return;
+    if (!larghezzeFerme) { if (passoTrattenuto) misuraLarghezzeChieste(); return; }
     larghezzeFerme = null;
     strisciaFerma = 0;
     tabsEl.style.flex = '';
@@ -794,17 +798,17 @@
       el.style.maxWidth = '';
     }
     // Da ferme le schede hanno misurato la larghezza fermata: senza rimisurarle restano strette fino al prossimo ridisegno.
-    misuraLarghezzeNaturali();
+    misuraLarghezzeChieste();
   }
 
   // Sulla pagina, e su Windows sulle zone di trascinamento della finestra, la
   // barra non riceve eventi del mouse: chiede al main dove sta il puntatore.
   function sondaPuntatore() {
     fermaSonda();
-    if (!larghezzeFerme) return;
+    if (!fermo()) return;
     const giro = giroSonda;
     Promise.resolve(typeof api.puntatore === 'function' ? api.puntatore() : null).then((p) => {
-      if (giro !== giroSonda || !larghezzeFerme || puntatoreSullaFila) return;
+      if (giro !== giroSonda || !fermo() || puntatoreSullaFila) return;
       if (p && sullaFila(p.x, p.y)) sondaFila = setTimeout(sondaPuntatore, 150);
       else sciogliLarghezze();
     }, () => { if (giro === giroSonda) sciogliLarghezze(); });
@@ -824,6 +828,14 @@
       if (w > 0) m.set(el.dataset.id, w);
     }
     if (!m.size) return;
+    // Con le schede larghe quanto il nome, la X della scheda che scivola al posto della chiusa cade sotto il
+    // puntatore solo se le si dà la larghezza della chiusa: così si chiudono più schede di fila (#428, #429).
+    const chiuse = primaIds.filter((id) => !dopo.has(id));
+    if (chiuse.length === 1) {
+      const i = primaIds.indexOf(chiuse[0]);
+      const subentra = primaIds.slice(i + 1).find((id) => dopo.has(id));
+      if (subentra && m.has(chiuse[0]) && m.has(subentra)) m.set(subentra, m.get(chiuse[0]));
+    }
     larghezzeFerme = m;
     // Se se ne va l'ultima, il + scivolerebbe sotto il puntatore e il clic
     // dopo aprirebbe una scheda: la striscia tiene la sua larghezza.
@@ -841,6 +853,12 @@
     sondaPuntatore();
   }, true);
   window.addEventListener('resize', sciogliLarghezze);
+  // Le larghezze dipendono dal posto della fila: si rifanno quando cambia la finestra o compare un indicatore.
+  window.addEventListener('resize', () => { if (!larghezzeFerme) misuraLarghezzeChieste(); });
+  try {
+    new MutationObserver(() => { if (!larghezzeFerme) misuraLarghezzeChieste(); })
+      .observe(tabRowEl, { attributes: true, attributeFilter: ['hidden'], subtree: true });
+  } catch (_) {}
 
   // ── Menu contestuale (tasto destro) su una tab ────────────────────────────
   // Riusa il popup-menu nativo della shell (sopra le WebContentsView). Le voci
@@ -994,17 +1012,61 @@
     });
   }
 
-  // La scheda è un contenitore (le icone cedono il posto per priorità, shell.css) e così non darebbe
-  // più alla striscia la larghezza del suo contenuto: la si misura con tutto in vista e la si restituisce.
-  function misuraLarghezzeNaturali() {
+  // La scheda è un contenitore e non dà alla striscia la larghezza del contenuto: la si misura con tutto in
+  // vista. Regola unica (#429): finché la fila ha posto ogni scheda è larga quanto il suo contenuto e nessun
+  // nome è tagliato; quando manca, si accorciano prima i nomi più lunghi, tutti allo stesso tetto. L'attiva
+  // stacca di STACCO dalla scheda tipica dietro solo con lo spazio che avanza: un vuoto suo non taglia un nome altrui.
+  const STACCO = 1.25;
+  const STACCO_MAX = 1.8;
+  const MIN_ATTIVA = 110;
+  const MIN_SCHEDA = 40;
+  let larghezzeInVigore = null; // { chiave, w: number[] }
+  function spazioDellaStriscia() {
+    const spazio = tabRowEl.querySelector('.tab-drag-spacer');
+    const sp = spazio ? spazio.getBoundingClientRect().width - (parseFloat(getComputedStyle(spazio).minWidth) || 0) : 0;
+    const cs = getComputedStyle(tabsEl);
+    return tabsEl.getBoundingClientRect().width + Math.max(0, sp) - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  }
+  function larghezzeDistribuite(naturali, ia, posto) {
+    const dietro = naturali.filter((_, i) => i !== ia);
+    const ordinate = [...dietro].sort((a, b) => a - b);
+    const tipica = ordinate.length ? ordinate[Math.floor((ordinate.length - 1) / 2)] : 0;
+    const attivaCon = (tetto) => Math.max(MIN_ATTIVA, Math.min(ia >= 0 ? naturali[ia] : 0, Math.ceil(tetto * STACCO_MAX)));
+    const totale = (tetto) => dietro.reduce((s, w) => s + Math.max(MIN_SCHEDA, Math.min(w, tetto)), 0) + (ia >= 0 ? attivaCon(tetto) : 0);
+    let tetto = Math.max(MIN_SCHEDA, ...naturali);
+    if (totale(tetto) > posto) {
+      let lo = MIN_SCHEDA, hi = tetto;
+      for (let k = 0; k < 24 && hi - lo > 0.5; k++) { const m = (lo + hi) / 2; if (totale(m) > posto) hi = m; else lo = m; }
+      // Intero: le larghezze chieste vanno in px interi, e un tetto con la virgola le arrotonderebbe oltre il posto
+      // della fila, che le stringerebbe tutte in proporzione tagliando di un pixel anche il nome che ci stava (#429).
+      tetto = Math.max(MIN_SCHEDA, Math.floor(lo));
+    }
+    const attiva = attivaCon(tetto);
+    const stacco = Math.ceil(Math.min(tetto, tipica) * STACCO) - attiva;
+    const avanzo = Math.floor(posto - totale(tetto));
+    const conStacco = attiva + Math.max(0, Math.min(stacco, avanzo));
+    return naturali.map((w, i) => (i === ia ? conStacco : Math.max(MIN_SCHEDA, Math.min(w, tetto))));
+  }
+  function misuraLarghezzeChieste() {
     const schede = [...tabsEl.children];
     if (!schede.length) return;
+    const posto = spazioDellaStriscia();
     schede.forEach((el) => el.classList.add('misura'));
     const pad = getComputedStyle(schede[0]);
     const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
-    const larghe = schede.map((el) => el.getBoundingClientRect().width);
+    const naturali = schede.map((el) => Math.ceil(el.getBoundingClientRect().width));
+    const ia = schede.findIndex((el) => el.classList.contains('active'));
+    const misurate = larghezzeDistribuite(naturali, ia, posto);
+    const chiave = schede.map((el) => el.dataset.id).join(',') + '|' + ia;
+    const tieni = puntatoreSullaFila && larghezzeInVigore && larghezzeInVigore.chiave === chiave;
+    passoTrattenuto = Boolean(tieni) && misurate.some((w, i) => w !== larghezzeInVigore.w[i]);
+    const w = tieni ? larghezzeInVigore.w : misurate;
+    larghezzeInVigore = { chiave, w };
+    // La striscia divide in proporzione solo lo spazio oltre il padding: crescita e misura si contano sul contenuto.
     schede.forEach((el, i) => {
-      el.style.setProperty('--tab-naturale', `${Math.max(0, Math.ceil(larghe[i] - bordi))}px`);
+      const contenuto = Math.max(1, Math.ceil(w[i] - bordi));
+      el.style.setProperty('--tab-chiesta', `${contenuto}px`);
+      el.style.setProperty('--tab-crescita', String(contenuto));
       el.classList.remove('misura');
     });
   }
@@ -1175,7 +1237,7 @@
       });
       tabsEl.appendChild(el);
     }
-    misuraLarghezzeNaturali();
+    misuraLarghezzeChieste();
 
     tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
     try { ANTEPRIMA.ridisegnata(); } catch (_) {}
