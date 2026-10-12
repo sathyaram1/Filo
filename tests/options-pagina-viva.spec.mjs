@@ -37,7 +37,7 @@ test('il modello scelto altrove resta scelto dopo un campo toccato in Opzioni', 
   expect(dopo.models.transcribe_audio, 'il modello scelto altrove resta').toBe('dettatore-scelto');
 });
 
-// Per l'etichetta della cella: la tendina aperta di un'altra funzione elenca modelli con le stesse parole.
+// Si cerca l'etichetta della cella, non il testo: la tendina aperta di un'altra funzione elenca modelli con le stesse parole.
 const cella = (page, etichetta) => page.locator('#modelsGrid > div')
   .filter({ has: page.locator(':scope > label', { hasText: etichetta }) });
 
