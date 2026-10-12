@@ -167,7 +167,7 @@ test('Validazione: kokoro scritto a tastiera in Spiega e uscita col clic, la spi
   await input.click();
   await input.press('ControlOrMeta+a');
   await input.pressSequentially('kokoro', { delay: 20 });
-  await page.locator('#modelsGrid').locator('xpath=preceding::h2[1]').click();
+  await page.click('#h-models');
 
   await expect(seg.locator('.sn-chain-msg')).toHaveText(/Modello non adatto: \S/, { timeout: 4_000 });
   await expect.poll(() => page.evaluate(() => window.__echi), { timeout: 8_000 }).toBeGreaterThan(echiPrima);
