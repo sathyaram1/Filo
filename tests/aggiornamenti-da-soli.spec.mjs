@@ -90,14 +90,15 @@ for (const s of SISTEMI) test(`spenta: la versione nuova non parte da sola; «In
   await expect(menu.locator('.dash-menu-voce', { hasText: 'Installa' })).toHaveCount(1);
   await expect(menu.locator('.dash-menu-voce', { hasText: 'Preferenze sugli aggiornamenti' })).toHaveCount(1);
   mkdirSync(SHOTS, { recursive: true });
-  await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-menu.png` });
+  const foto = (nome) => `${SHOTS}/aggiornamenti-carta-${nome}-${s.piattaforma}.png`;
+  await home.screenshot({ path: foto('menu') });
   await home.keyboard.press('Escape');
 
   for (const t of ['light', 'dark']) {
     await tema(home, t);
     await home.mouse.move(640, 300);
     await home.waitForTimeout(250);
-    await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-${t}.png` });
+    await home.screenshot({ path: foto(t) });
   }
   await tema(home, 'light');
 
@@ -105,12 +106,12 @@ for (const s of SISTEMI) test(`spenta: la versione nuova non parte da sola; «In
   await expect(carta.locator('.dash-carta-stato')).toHaveText('Scarico la versione 9.9.9: 37%', { timeout: 5_000 });
   await expect(carta.locator('.dash-carta-avanza')).toBeVisible();
   await expect(carta.locator('.dash-carta-az.principale')).toHaveCount(0);
-  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: ALLA_CHIUSURA });
-  await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-scarica.png` });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: s.allaChiusura });
+  await home.screenshot({ path: foto('scarica') });
 
   await app.evaluate(() => globalThis.__aggFinto.finisci());
-  await expect(carta.locator('.dash-carta-stato')).toHaveText(`La versione 9.9.9 è pronta. Si installa ${ALLA_CHIUSURA ? 'quando chiudi Filo' : 'la prossima volta che apri Filo'}.`, { timeout: 5_000 });
-  await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-pronta.png` });
+  await expect(carta.locator('.dash-carta-stato')).toHaveText(`La versione 9.9.9 è pronta. Si installa ${quando}.`, { timeout: 5_000 });
+  await home.screenshot({ path: foto('pronta') });
   // Chiusa, la carta di questa versione non torna a un nuovo controllo.
   await carta.hover();
   await carta.locator('.dash-carta-togli').click();
