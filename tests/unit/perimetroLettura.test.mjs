@@ -360,7 +360,7 @@ const WIN_CMD = { ...WIN, shell: 'cmd' };
 
 test('#1072.1 — con cmd il `^` non nasconde un percorso di rete', () => {
   for (const cmd of ['dir ^\\^\\host\\x', 'dir ^\\\\host\\x', 'type ^\\^\\host\\x\\a.txt', 'cd ^\\^\\host\\x', 'pushd ^\\^\\host\\x',
-    'dir ^/^/host/x', 'type ^"\\\\host\\x\\a.txt^"', 'Get-ChildItem ^\\^\\host\\x']) {
+    'dir ^/^/host/x', 'type ^"\\\\host\\x\\a.txt^"', 'tree ^\\^\\host\\x']) {
     const d = C.classifyDetail(cmd, WIN_CMD);
     assert.equal(d.level, 2, `"${cmd}" con cmd contatta un altro computer: chiede un OK`);
     assert.match(d.motivo, /altro computer della rete/, cmd);
@@ -404,6 +404,15 @@ test('#1072.1 — con cmd le letture di tutti i giorni restano libere; con Power
   }
   // Le virgolette tipografiche le converte PowerShell, non cmd: per cmd sono testo e `^` dopo resta un escape.
   assert.match(C.classifyDetail('type C:\\Users\\Mario\\“x” ^.ssh\\id_rsa', WIN_CMD).motivo, /nascosto/);
+});
+
+test('#1072.1 — un download scritto con `^` o con le virgolette resta testo del web, non l\'uscita di un comando', () => {
+  const fonte = (comando, stdout = '<html>') => AL.fonteDi({ type: 'ESEGUI_COMANDO', comando, _output: { stdout } });
+  for (const comando of ['c^url h^ttps://x.it', 'w^get x.it/a', 'c"u"rl x.it', 'Invoke-We^bRequest x.it', 'curl ht""tps://x.it']) {
+    assert.equal(fonte(comando).classe, 5, comando);
+    assert.equal(fonte(comando).chiave, 'web:comando', comando);
+  }
+  assert.equal(fonte('type nota.txt', 'ciao').chiave, 'terminale:uscita');
 });
 
 // Su Linux cmd non c'è (la shell si risolve in sh): resta la regola del main, scritta.
