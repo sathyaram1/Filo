@@ -660,6 +660,7 @@ export function sommaSottoAgente(rep, sub) {
   rep.tools.errors += Number(st.errors) || 0;
   for (const [nome, n] of Object.entries(st.byName || {})) rep.tools.byName[nome] = (rep.tools.byName[nome] || 0) + (Number(n) || 0);
   for (const [sforzo, n] of Object.entries(sub.effort || {})) rep.effort[sforzo] = (rep.effort[sforzo] || 0) + (Number(n) || 0);
+  for (const [modello, n] of Object.entries(sub.oltreSoglia || {})) rep.oltreSoglia[modello] = (rep.oltreSoglia[modello] || 0) + (Number(n) || 0);
   rep.subagents += Number(sub.subagents) || 0;
   rep.longestToolS = Math.max(rep.longestToolS, Number(sub.longestToolS) || 0);
   for (const m of Array.isArray(sub.models) ? sub.models : []) if (!rep.models.includes(m)) rep.models.push(m);
