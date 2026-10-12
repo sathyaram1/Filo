@@ -37,6 +37,10 @@ test('una domanda alla chat resta in Cronologia AI dopo il riavvio; una voce tol
     await chiedi(page, 'Domanda-due sul treno?');
     await expect(page.getByText('Risposta due sul treno.')).toBeVisible({ timeout: 20_000 });
     await ripristina(app);
+    console.log('VOCE', JSON.stringify(await app.evaluate(async () => {
+      const l = await globalThis.SN_HISTORY.list();
+      return l.map((it) => ({ action: it.action, chiavi: Object.keys(it.input || {}), um: it.input && it.input.userMessage, vista: globalThis.SN_HISTORY.vistaPagina(it).input }));
+    })));
 
     const h = await apriCronologia(app);
     await expect(h.locator('.sn-history-item', { hasText: 'Risposta due sul treno.' })).toHaveCount(1, { timeout: 20_000 });
