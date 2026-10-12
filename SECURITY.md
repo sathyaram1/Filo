@@ -299,9 +299,8 @@ Le regole (Firebase Security Rules) dicono:
   risolto, il suo numero, le date, lo stato, la versione in cui è uscito, la
   frase scritta per chi l'aveva segnalato, il premio, i voti e le richieste di
   riapertura. Non il testo, non l'indirizzo della pagina, non gli screenshot,
-  non le note di lavorazione. Quei campi vivono in una raccolta separata — una
-  vetrina — riempita da chi gestisce i feedback: la raccolta vera resta
-  chiusa.
+  non le note di lavorazione. Quei campi vivono in una raccolta separata, una
+  vetrina che riempie chi gestisce i feedback. La raccolta vera resta chiusa.
 - **Gli amministratori** (un elenco ristretto di email autorizzate) possono
   **gestire** i feedback: cambiarne lo stato, la priorità, le note, o
   cancellarli. Gli agenti autorizzati possono solo farli avanzare di stato e
@@ -378,7 +377,7 @@ rompa niente di visibile: il caso peggiore, perché nessuno se ne accorge.
 
 **L'ordine conta**, e sbagliarlo costa il lavoro due volte. Prima si pubblicano
 le regole, poi si ruotano le chiavi dai pannelli dei servizi. Al contrario, le
-chiavi nuove finiscono in un documento che chiunque legge ancora, e la
+chiavi nuove finiscono in un documento che chiunque può ancora leggere, e la
 rotazione è da rifare da capo.
 
 **Poi vanno ruotati i codici di scarico degli allegati vecchi.** Le regole nuove
