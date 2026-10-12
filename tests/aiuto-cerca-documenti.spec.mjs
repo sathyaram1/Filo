@@ -1,0 +1,248 @@
+// #947.3 — L'Aiuto di una scheda trova i documenti dell'utente: sul sito del fornitore, dove si carica la bolletta,
+// «mi serve la bolletta della luce di marzo» dà il file da aprire o da trascinare nella pagina. La ricerca parte solo
+// col sì nel popup di Filo sopra la scheda, e al documento del sito non arriva nessun percorso.
+// Senza il lavoro di #947.3 l'Aiuto non conosceva la ricerca e nessuna prova qui arriva al bottone.
+
+import { test, expect } from './fixtures/electron.mjs';
+import { join } from 'node:path';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { cartellaDellaProva, BOLLETTA_MARZO } from './helpers/documentiFinti.mjs';
+import { confermaSopraPagina, confirmState, clickConfirm } from './helpers/confirm.mjs';
+
+const RICHIESTA = 'mi serve la bolletta della luce di marzo';
+const PAGINA = `<!doctype html><html><head><title>Fornitore Energia</title></head>
+<body style="padding:40px;font:16px sans-serif"><h1>Carica la tua bolletta</h1>
+<form><label>Bolletta <input type="file" id="bolletta"></label><button>Invia</button></form></body></html>`;
+
+async function preparaModelli(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+}
+
+// L'Aiuto riceve la risposta della prima coppia [parola, risposta] la cui parola sta nell'ultimo messaggio dell'utente;
+// tutti i messaggi arrivati al modello restano in __visti.
+async function aiutoFinto(app, risposte) {
+  await app.evaluate((_e, risposte) => {
+    const P = globalThis.SN_PROVIDERS;
+    globalThis.__visti = [];
+    const risposta = ({ attempts, messages }) => {
+      globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
+      const ultimo = JSON.stringify([...messages].reverse().find((m) => m.role === 'user') || '');
+      const testo = JSON.stringify(messages);
+      if (testo.includes('preparare la dashboard')) return { text: '{"message":"Ciao.","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      const scelta = risposte.find(([parola]) => ultimo.includes(parola)) || risposte[risposte.length - 1];
+      return { text: scelta[1], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+    P.completeWithFallback = async (o) => risposta(o);
+    P.streamCompleteWithFallback = async (o) => risposta(o);
+  }, risposte);
+}
+
+async function shellCheRegistra(app) {
+  await app.evaluate(({ shell }) => {
+    globalThis.__aperti = [];
+    globalThis.__cartelle = [];
+    shell.openPath = async (p) => { globalThis.__aperti.push(p); return ''; };
+    shell.showItemInFolder = (p) => { globalThis.__cartelle.push(p); };
+  });
+}
+
+async function apriAiuto(shell, page) {
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+}
+
+async function chiediAllAiuto(page, testo) {
+  await page.fill('.sn-sidebar-input textarea', testo);
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+}
+
+const testoDi = (messaggi) => (messaggi || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+
+const RISPOSTE = [
+  ['DOCUMENTI_TROVATI', JSON.stringify({ text: 'È la bolletta dell\'energia elettrica di marzo: trascinala nel campo «Bolletta».', file: 1, status: 'done' })],
+  ['', JSON.stringify({ action: 'documenti', cosa: 'bolletta luce energia elettrica marzo', text: 'La cerco fra i tuoi documenti.' })],
+];
+
+test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bolletta, dopo il sì nel popup di Filo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Scansioni');
+  cartellaDellaProva(dir);
+  const bolletta = join(dir, BOLLETTA_MARZO);
+  try {
+    const page = await testServer.openReady(openTab, PAGINA);
+    await preparaModelli(app);
+    await aiutoFinto(app, RISPOSTE);
+    await shellCheRegistra(app);
+    await apriAiuto(shell, page);
+    await chiediAllAiuto(page, RICHIESTA);
+
+    // Il sì lo chiede Filo fuori dal documento del sito, e dice cosa vedrà il sito.
+    const sopra = await confermaSopraPagina(app, { timeout: 20_000 });
+    const domanda = await confirmState(sopra);
+    expect(domanda.title).toBe('Cerco fra i tuoi documenti?');
+    expect(domanda.text).toContain('127.0.0.1');
+    expect(domanda.text).toContain('«bolletta luce energia elettrica marzo»');
+    await clickConfirm(sopra, 'ok');
+
+    const file = page.locator('.sn-sidebar .sn-sidebar-file');
+    await expect(file).toHaveCount(1, { timeout: 20_000 });
+    await expect(file.locator('.sn-sidebar-file-nome')).toHaveText(BOLLETTA_MARZO);
+    await expect(file.locator('.sn-sidebar-file-dove')).toHaveText('Download › Scansioni');
+    await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('bolletta dell\'energia elettrica di marzo');
+    await expect(page.locator('.sn-sidebar-log', { hasText: 'cercato fra i tuoi documenti' })).toBeVisible();
+
+    // Il modello ha avuto la bolletta come primo candidato, con la cartella detta coi nomi di Filo e senza percorsi.
+    const visti = await app.evaluate(() => globalThis.__visti);
+    const conCandidati = testoDi(visti.find((m) => testoDi(m).includes('DOCUMENTI_TROVATI')));
+    expect(conCandidati).toMatch(new RegExp(`1\\. ${BOLLETTA_MARZO.replace('.', '\\.')}`));
+    expect(conCandidati).toContain('cartella: Download › Scansioni');
+    expect(conCandidati).toMatch(/01\/03\/2026/);
+    expect(conCandidati).not.toContain(dir);
+    expect(conCandidati, 'il testo di un documento che non è fra i candidati non esce').not.toContain('Programma cotone 40 gradi');
+
+    // Nel documento del sito non c'è nessun percorso del computer.
+    const html = await page.evaluate(() => document.documentElement.outerHTML);
+    expect(html).not.toContain(dir);
+
+    // Un clic lo apre col programma del sistema; dal tasto destro si apre la sua cartella.
+    await file.click();
+    await expect.poll(() => app.evaluate(() => globalThis.__aperti)).toEqual([bolletta]);
+    await file.click({ button: 'right' });
+    await page.locator('.sn-sidebar-file-menu .sn-sidebar-choice', { hasText: 'Mostra nella cartella' }).click();
+    await expect.poll(() => app.evaluate(() => globalThis.__cartelle)).toEqual([bolletta]);
+
+    // Trascinato, parte il trascinamento del sistema col file vero: quello che la pagina riceve al rilascio.
+    await app.evaluate(({ BrowserWindow }) => {
+      globalThis.__trascinati = [];
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of w._filoTabs?.tabs || []) {
+          const wc = t.view && t.view.webContents;
+          if (wc && /^http:\/\/127\.0\.0\.1/.test(wc.getURL())) wc.startDrag = (item) => { globalThis.__trascinati.push(item.file); };
+        }
+      }
+    });
+    const box = await file.boundingBox();
+    await page.mouse.move(box.x + 20, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 60, box.y + box.height / 2 + 30, { steps: 6 });
+    await page.mouse.move(box.x - 200, box.y - 200, { steps: 6 });
+    await page.mouse.up();
+    await expect.poll(() => app.evaluate(() => globalThis.__trascinati)).toEqual([bolletta]);
+
+    await page.screenshot({ path: 'tests/.shots/aiuto-cerca-documenti.png' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('con Annulla nel popup non si cerca niente e l’Aiuto non riceve documenti', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Annulla');
+  cartellaDellaProva(dir);
+  try {
+    const page = await testServer.openReady(openTab, PAGINA);
+    await preparaModelli(app);
+    await aiutoFinto(app, RISPOSTE);
+    await apriAiuto(shell, page);
+    await chiediAllAiuto(page, RICHIESTA);
+    const sopra = await confermaSopraPagina(app, { timeout: 20_000 });
+    await clickConfirm(sopra, 'cancel');
+    await expect(page.locator('.sn-sidebar-log', { hasText: 'ricerca fra i documenti: annullata' })).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    await expect(page.locator('.sn-sidebar-file')).toHaveCount(0);
+    const visti = await app.evaluate(() => globalThis.__visti);
+    expect(visti.length, 'nessun giro in più verso il modello').toBe(1);
+    expect(testoDi(visti.flat())).not.toContain(BOLLETTA_MARZO);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('le porte dell’Aiuto: chiavi a caso valide solo nella loro scheda, mai un percorso, niente da un riquadro', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Porte');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'fattura-luce.txt'), 'Fattura energia elettrica marzo');
+  try {
+    await shellCheRegistra(app);
+    const a = await testServer.openReady(openTab, PAGINA);
+    const b = await testServer.openReady(openTab, PAGINA.replace('Fornitore Energia', 'Altro sito'));
+    // Il messaggio arriva come da ciascuna scheda, col suo webContents vero; il sì al popup lo dà la prova.
+    const daScheda = (titolo, msg, { riquadro = false } = {}) => app.evaluate(async ({ BrowserWindow }, [titolo, msg, riquadro]) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of w._filoTabs?.tabs || []) {
+          const wc = t.view && t.view.webContents;
+          if (!wc || wc.getTitle() !== titolo) continue;
+          const url = wc.getURL();
+          const frame = riquadro ? { parent: wc.mainFrame } : wc.mainFrame;
+          return globalThis.SN_HANDLE_MESSAGE(msg, { tab: { id: t.id, url }, url, wc, frame });
+        }
+      }
+      return null;
+    }, [titolo, msg, riquadro]);
+    const cerca = daScheda('Fornitore Energia', { type: 'aiuto_cerca_documenti', cosa: 'fattura luce' });
+    await clickConfirm(await confermaSopraPagina(app, { timeout: 15_000 }), 'ok');
+    const r = await cerca;
+    expect(r.ok).toBe(true);
+    expect(JSON.stringify(r)).not.toContain(dir);
+    const chiave = r.candidati.find((c) => c.nome === 'fattura-luce.txt').chiave;
+    expect((await daScheda('Altro sito', { type: 'aiuto_apri_file', chiave })).ok, 'un\'altra scheda non apre con quella chiave').not.toBe(true);
+    expect((await daScheda('Fornitore Energia', { type: 'aiuto_apri_file', chiave: 'inventata', percorso: join(dir, 'fattura-luce.txt') })).ok).not.toBe(true);
+    expect((await daScheda('Fornitore Energia', { type: 'aiuto_apri_file', chiave }, { riquadro: true })).error, 'un riquadro è un altro sito').toBe('forbidden');
+    expect(await app.evaluate(() => globalThis.__aperti)).toEqual([]);
+    expect((await daScheda('Fornitore Energia', { type: 'aiuto_apri_file', chiave })).ok).toBe(true);
+    expect(await app.evaluate(() => globalThis.__aperti)).toEqual([join(dir, 'fattura-luce.txt')]);
+    // Senza webContents (una chiamata che non viene da una scheda) la porta non risponde.
+    const senza = await app.evaluate((_e, m) => globalThis.SN_HANDLE_MESSAGE(m, { tab: { id: 9, url: 'http://sito-ostile.example/' }, url: 'http://sito-ostile.example/' }), { type: 'aiuto_cerca_documenti', cosa: 'fattura' });
+    expect(senza.error).toBe('forbidden');
+    void a; void b;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mentre l’indice legge i documenti nuovi la riga dice quanti ne mancano, e «Ferma» risponde con quelli già letti', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const dir = join(await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR), 'Tanti');
+  mkdirSync(dir, { recursive: true });
+  for (let i = 0; i < 60; i++) writeFileSync(join(dir, `doc_${String(i).padStart(3, '0')}.txt`), `documento numero ${i}`);
+  try {
+    await app.evaluate(() => {
+      globalThis.SN_DOCUMENTI_INDICE.configura({
+        estrai: async (p) => { await new Promise((ok) => setTimeout(ok, 150)); return { testo: `contenuto di ${p}`, pagine: 0, vuoto: false, errore: '' }; },
+      });
+    });
+    const page = await testServer.openReady(openTab, PAGINA);
+    await preparaModelli(app);
+    await aiutoFinto(app, [
+      ['DOCUMENTI_TROVATI', JSON.stringify({ text: 'Ho guardato solo quelli già letti.', status: 'done' })],
+      ['', JSON.stringify({ action: 'documenti', cosa: 'documento numero 42' })],
+    ]);
+    await apriAiuto(shell, page);
+    await chiediAllAiuto(page, 'trovami il documento numero 42');
+    await clickConfirm(await confermaSopraPagina(app, { timeout: 20_000 }), 'ok');
+    const riga = page.locator('.sn-sidebar-log', { hasText: 'leggo i documenti nuovi' });
+    await expect(riga).toHaveText(/leggo i documenti nuovi: \d+ di 60/, { timeout: 10_000 });
+    await expect(riga).not.toContainText('doc_', { message: 'la pagina non vede i nomi dei file che l\'indice legge' });
+    await page.screenshot({ path: 'tests/.shots/aiuto-cerca-documenti-attesa.png' });
+    await riga.locator('.sn-sidebar-log-ferma').click();
+    await expect(page.locator('.sn-sidebar-log', { hasText: '(fermata da te)' })).toBeVisible({ timeout: 5_000 });
+    await expect(riga).toHaveCount(0);
+    await expect(page.locator('.sn-sidebar-msg-assistant').last()).toHaveText('Ho guardato solo quelli già letti.', { timeout: 10_000 });
+    const visti = await app.evaluate(() => globalThis.__visti);
+    expect(testoDi(visti[visti.length - 1])).toContain('FERMATO');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

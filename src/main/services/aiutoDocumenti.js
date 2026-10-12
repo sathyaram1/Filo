@@ -44,7 +44,7 @@ function statoDi(wc) {
 const daFilo = (origine) => String(origine || '').startsWith('filo://');
 
 function unaRiga(v, max) {
-  const t = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f​-‏ -‮⁠-⁯﻿]+/g, ' ')
+  const t = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]+/g, ' ')
     .replace(/\s+/g, ' ').trim();
   const segni = Array.from(t);
   return segni.length > max ? `${segni.slice(0, max - 1).join('').trimEnd()}…` : t;
