@@ -73,8 +73,9 @@ diciannove manopole, l'ha ripetuta su tutte.
 ## Dove sta
 
 `src/shared/pageBootstrap.js` (`staUsandoAdesso`, la regola condivisa), il
-`salta` di `riallineaPagina` in `src/pages/options/options.js` (che ridisegna
-anche la griglia dei modelli per azione) e, per il box in chat,
+`salta` di `riallineaPagina` in `src/pages/options/options.js` (che riscrive
+anche le catene dei modelli per azione cambiate, con `imposta` di
+`src/shared/modelChainEditor.js`) e, per il box in chat,
 `src/shared/aestheticRefiner.js` con `src/pages/dashboard/dashboard-attivita.js`.
 Sentinella: `tests/unit/paginaImpostazioniViva.test.mjs`. Le prove dal punto
 di vista dell'utente sono `tests/preferences-pagina-viva.spec.mjs`,
