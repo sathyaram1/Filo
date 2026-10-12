@@ -514,6 +514,7 @@ test('la pagina che seleziona dove si clicca non paga spiegazioni: pulsante, col
   await page.mouse.down();
   await page.mouse.move(b.x, b.y, { steps: 6 });
   await page.mouse.up();
+  expect(await page.evaluate(() => getSelection().toString())).toContain('maree dipendono');
   await expect.poll(async () => (await conti(app)).spiega, { timeout: 5000 }).toBe(1);
   const c = await parola('oceani');
   await page.mouse.dblclick(c.x, c.y);
