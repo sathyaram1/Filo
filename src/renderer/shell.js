@@ -383,9 +383,9 @@
     }
   }
 
-  async function refreshAuth() {
+  async function refreshAuth(opzioni) {
     try {
-      const r = await api.auth.status();
+      const r = await api.auth.status(opzioni);
       authProfile = (r && r.ok && r.signedIn) ? r.profile : null;
       isAdmin = !!(r && r.ok && r.signedIn && r.isAdmin);
       authRemembered = !(r && r.remembered === false);
