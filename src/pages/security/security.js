@@ -743,28 +743,6 @@
     }
   }
 
-  // Normalizza e valida ogni riga della blacklist come il campo "siti fidati":
-  // scarta schema/path/www, minuscolo, e tiene solo domini con estensione
-  // (niente IP o nomi a etichetta singola come "facebook"). Ritorna i domini
-  // validi (deduplicati) e le righe scartate così com'erano, per l'avviso; `scartate` le tiene
-  // col posto (quanti domini validi le precedevano), per ridarle dove l'utente le aveva scritte.
-  function parseBlacklist(raw) {
-    const valid = [];
-    const seen = new Set();
-    const invalid = [];
-    const scartate = [];
-    for (const line of String(raw || '').split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const domain = cleanDomain(trimmed);
-      if (!domain) { invalid.push(trimmed); scartate.push({ riga: trimmed, dopo: valid.length }); continue; }
-      if (seen.has(domain)) continue;
-      seen.add(domain);
-      valid.push(domain);
-    }
-    return { valid, invalid, scartate };
-  }
-
   function righe(validi, scartate) {
     const v = (Array.isArray(validi) ? validi : []).filter((r) => typeof r === 'string' && r.trim());
     const s = (Array.isArray(scartate) ? scartate : [])
