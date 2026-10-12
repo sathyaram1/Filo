@@ -360,7 +360,7 @@ describe('ogni allarme dice al server cosa è rotto', () => {
         assert.match(p.corpo, /--chiav/, `${nome}: il passo «${p.nome}» apre un allarme senza chiavi`);
       }
     }
-    assert.equal(chiamate, 2, 'le chiamate dirette sono due: il cancello unit e la suite rossa');
+    assert.equal(chiamate, 3, 'le chiamate dirette sono tre: il cancello unit, la suite rossa e gli unit rossi su Windows');
     assert.match(senzaCommenti(job('release')), /build-alarm\.mjs [^\n]*--chiavi-unit unit\.log/, 'il cancello unit dà una chiave per file di test');
   });
 

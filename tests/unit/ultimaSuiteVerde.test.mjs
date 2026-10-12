@@ -240,8 +240,8 @@ const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
 if (p.includes('/actions/workflows/suite.yml/runs')) {
   const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
   process.stdout.write(JSON.stringify({ workflow_runs: runs }));
-} else if (/\/actions\/runs\/[^/]+\/jobs/.test(p)) {
-  const id = p.match(/\/actions\/runs\/([^/]+)\/jobs/)[1];
+} else if (/actions[/]runs[/][^/]+[/]jobs/.test(p)) {
+  const id = p.match(/actions[/]runs[/]([^/]+)[/]jobs/)[1];
   const windows = (s.senzaWindows || []).map(String).includes(id) ? [] : [{ name: 'unit-windows', conclusion: 'success' }];
   process.stdout.write(JSON.stringify({ jobs: [{ name: 'suite', conclusion: 'success' }, ...windows] }));
 } else if (p.includes('/releases/tags/')) process.stdout.write(JSON.stringify({ published_at: s.pubblicata }));
@@ -348,7 +348,7 @@ const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
 if (p.includes('/actions/workflows/suite.yml/runs')) {
   const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
   process.stdout.write(JSON.stringify({ workflow_runs: runs }));
-} else if (/\/actions\/runs\/[^/]+\/jobs/.test(p)) {
+} else if (/actions[/]runs[/][^/]+[/]jobs/.test(p)) {
   process.stdout.write(JSON.stringify({ jobs: [{ name: 'suite', conclusion: 'success' }, { name: 'unit-windows', conclusion: 'success' }] }));
 } else if (p.includes('/releases/tags/')) process.stdout.write(JSON.stringify({ published_at: s.pubblicata }));
 else process.stdout.write(JSON.stringify({ workflow_runs: [] }));
