@@ -157,9 +157,6 @@
     },
   };
 
-  // Quando la chiave manca: il valore che la pagina mostra e che il main applica. Il resto viene dai default.
-  const ASSENTE = { 'security.autoFeedback': true };
-
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   function dentro(o, percorso) {
     return String(percorso).split('.').reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
