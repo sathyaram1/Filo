@@ -559,6 +559,14 @@ test('il motore passa all’istanza la decisione del server della pratica, o nie
   b.dep.claude = (a) => { visti.push(a.dalServer); return vera(a); };
   await b.motore.avvia();
   assert.ok(visti.length > 0 && visti.every((d) => d === null), 'senza biglietto del server vale il frontmatter');
+  const decisa = { ...nuovaPratica({ num: 7, slug: 'sette', richiesta: 'fai X' }), decisioneServer: { model: 'sonnet', effort: 'high' } };
+  const c = banco({ pratiche: [decisa], verdetti: ['pass'] });
+  const conServer = [];
+  const veraC = c.dep.claude;
+  c.dep.claude = (a) => { conServer.push(a.dalServer); return veraC(a); };
+  await c.motore.avvia();
+  assert.ok(conServer.length > 0);
+  for (const d of conServer) assert.deepEqual(d, { model: 'sonnet', effort: 'high' });
 });
 
 test('uscita di claude -p: esito, costo, errore', () => {
