@@ -128,8 +128,10 @@ su Linux asseriva «alla chiusura», passava ovunque tranne al cancello, e otto 
 hanno fermato la pubblicazione. Quando l'esito dipende dalla piattaforma, la prova la
 sceglie lei e gira per ognuna (`perOgniSistema` in
 `tests/unit/aggiornamentiAutomatici.test.mjs`), così Linux corre anche il caso
-Windows. Il codice la legge da un punto che la prova può sostituire
-(`dip.piattaforma()`), mai `process.platform` sparso nelle funzioni.
+Windows: `conPiattaforma` cambia `process.platform` per la durata del caso e lo
+rimette com'era. Regge solo perché il codice la chiede al momento, da un punto solo
+(`dip.piattaforma()`), mai fissata in una costante al caricamento del modulo: lì la
+prova non arriverebbe più, e il caso Windows girerebbe da Linux.
 
 ## Il collegamento simbolico (#742)
 
