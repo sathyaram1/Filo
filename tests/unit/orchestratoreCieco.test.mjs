@@ -38,12 +38,22 @@ test('fuori dal giro è inerte: altra sessione o installazione scaduta; senza se
   assert.equal(decidi(dopo({ session_id: 's2' }), { sessione: '', creato: Date.now() }).hookSpecificOutput.updatedToolOutput, AL_POSTO_DEL_TESTO);
 });
 
-// Il worker può riscrivere le impostazioni utente da shell: nella sessione del giro la modifica non si applica.
-test('nella sessione del giro le impostazioni utente non cambiano; le altre e le altre sessioni sì', () => {
-  assert.equal(decidi(cambio(), OPZ).decision, 'block');
-  assert.equal(decidi(cambio({ source: 'local_settings' }), OPZ), null);
-  assert.equal(decidi(cambio({ session_id: 's2' }), OPZ), null);
-  assert.equal(decidi(cambio(), { sessione: '', creato: Date.now() }), null, 'senza sessione nota non si blocca nessuno');
+// Il worker scrive da shell nelle impostazioni utente e nella cartella del progetto, che vince sull'utente: un
+// disableAllHooks o un gancio suo lì spegnerebbero la cecità (#1182). Nella sessione del giro nessuna modifica si applica.
+test('nella sessione del giro impostazioni e skill restano quelle di partenza, da qualunque file arrivi la modifica', () => {
+  const progetto = '/home/user/Filo/.claude';
+  for (const c of [
+    {},
+    { source: 'project_settings', file_path: `${progetto}/settings.json` },
+    { source: 'local_settings', file_path: `${progetto}/settings.local.json` },
+    { source: 'skills', file_path: `${progetto}/skills/nuova/SKILL.md` },
+    { source: undefined },
+    { source: 'fonte_di_domani' },
+  ]) assert.equal(decidi(cambio(c), OPZ)?.decision, 'block', JSON.stringify(c));
+  assert.equal(decidi(cambio({ source: 'policy_settings' }), OPZ), null, 'le impostazioni gestite Claude Code le applica comunque');
+  assert.equal(decidi(cambio({ source: 'local_settings', session_id: 's2' }), OPZ), null);
+  assert.equal(decidi(cambio({ source: 'project_settings' }), { sessione: '', creato: Date.now() }), null, 'senza sessione nota non si blocca nessuno');
+  assert.equal(decidi(cambio({ source: 'local_settings' }), { sessione: 's1', creato: Date.now() - VALIDITA_MS - 1 }), null, 'scaduta, inerte');
 });
 
 // Il caso dei giri passati: a worker finito la cartella è sul ramo del worker, senza gancio né impostazioni del giro.
