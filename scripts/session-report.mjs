@@ -814,6 +814,23 @@ async function rapportoOrchestratore(principale) {
 }
 
 /**
+ * Il costo dell'orchestratore dopo l'ultimo biglietto (la chiusura, o un'accensione senza worker): nessun
+ * rilascio lo porta, viaggia con la risposta alla domanda di fine sessione. Non lancia mai.
+ */
+export async function rapportoChiusura({ transcript = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
+  const base = { v: 3, role: 'orchestrator', closing: true, notes: [] };
+  const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
+  if (!trovato.file) return { ...base, notes: [trovato.note || 'transcript non trovato'] };
+  const principale = eSottoAgente(trovato.file) ? `${dirname(dirname(trovato.file))}.jsonl` : trovato.file;
+  try {
+    const r = await rapportoOrchestratore(principale);
+    return r ? { ...base, ...r } : { ...base, notes: [`thread principale assente: ${principale}`] };
+  } catch (e) {
+    return { ...base, notes: [`thread principale illeggibile: ${String((e && e.message) || e)}`] };
+  }
+}
+
+/**
  * Quando è nato `ticket` nel thread principale: la prima risposta di uno strumento che lo contiene (la stampa di
  * `ticket … --json`). ISO, o '' se non c'è. Il marcatore del biglietto lo scrive il worker: se muore prima, è di un altro.
  */
