@@ -675,11 +675,12 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
   let fuori = [];
   try { fuori = copieInScena(root).map((c) => c.file); } catch (_) { /* la spedizione ricontrolla i commit */ }
   for (const f of fuori) if (!run(['reset', '-q', '--', f]).ok) run(['rm', '-q', '--cached', '--', f]);
+  let restano = st.lines;
   if (fuori.length) {
     try { escludiInLocale(root, fuori); } catch (_) { /* l'avviso parte lo stesso */ }
-    if (run(['diff', '--cached', '--quiet']).ok) return { ok: true, skipped: false, committed: [], fuori, reason: '' };
+    restano = run(['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
+    if (!restano.length) return { ok: true, skipped: false, committed: [], fuori, reason: '' };
   }
-  const restano = run(['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
   const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
   const nome = routine ? 'claude-routine' : 'claude-local';
   const email = routine ? 'claude@routine' : 'claude@local';
