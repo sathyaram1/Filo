@@ -20,6 +20,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { seminaProfiloAccolto } from '../helpers/profiloAccolto.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
 
