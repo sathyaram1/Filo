@@ -193,6 +193,7 @@ async function leggiFile() {
     STATE.data = {};
   }
   STATE.loaded = true;
+  avviaVerifica();
 }
 
 function scheduleFlush() {
