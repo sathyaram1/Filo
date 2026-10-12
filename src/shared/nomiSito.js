@@ -114,7 +114,7 @@
     } catch (_) { return ''; }
   }
 
-  const api = { valido, leggibile, sitoDi };
+  const api = { valido, dominio, righeSiti, leggibile, sitoDi };
   global.SN_NOMI_SITO = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
