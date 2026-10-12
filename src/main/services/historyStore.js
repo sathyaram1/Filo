@@ -40,7 +40,7 @@
     return out;
   }
 
-  // Le voci che arrivano da un'altra strada (storage.json di prima, un backup) passano dalla stessa pulizia dell'append.
+  // Le voci che entrano da un'altra strada (storage.json di prima, un backup) passano dalla stessa pulizia dell'append.
   const ripulita = (it) => (it.input && typeof it.input === 'object' ? { ...it, input: sanitizeInput(it.input) } : it);
   const isVoce = (it) => it && typeof it === 'object' && !Array.isArray(it);
 
