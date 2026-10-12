@@ -74,6 +74,16 @@ test('col login Google l\'app scrive email, nome e consumi sul server, e il docu
   legame(consumi, privacy, 'escono i totali per funzione', 'consumi per funzione sul server');
 });
 
+test('l\'accesso Google si apre in una scheda di Filo, col browser come ripiego, e il documento sulla privacy lo dice', () => {
+  const auth = leggi('src', 'main', 'auth', 'google-auth.js');
+  const inScheda = /require\('\.\/accessoInScheda'\)\.apri\(/.test(auth);
+  const fidato = /trustedSites:\s*\[\.\.\.prima, G\.SITO_GOOGLE\]/.test(leggi('src', 'main', 'services', 'accessoGoogle.js'));
+  legame(inScheda, privacy, 'L\'accesso Google si apre in una scheda di Filo', 'accesso in una scheda');
+  legame(!inScheda, privacy, 'L\'accesso Google si apre nel browser;', 'accesso nel browser');
+  legame(inScheda, privacy, 'Se Google rifiuta l\'accesso dentro Filo, si apre nel browser', 'ripiego nel browser');
+  legame(fidato, privacy, 'Filo mette Google fra i siti fidati', 'Google fidato dopo un accesso in Privacy massima');
+});
+
 test('le ricerche su Google dal tasto destro sono fra gli altri servizi', () => {
   const azioni = leggi('src', 'content', 'actions.js');
   legame(/lens\.google\.com/.test(azioni), privacy, 'apre Google Lens', 'ricerca per immagine con Google Lens');

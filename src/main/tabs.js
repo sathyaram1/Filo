@@ -1047,10 +1047,48 @@ class TabManager {
     return id;
   }
 
+  // Chi ha aperto una scheda per seguirne il percorso (l'accesso a Google, #1123) riceve i suoi indirizzi e la sua
+  // chiusura, anche attraverso le viste ricreate. `fn(evento, dati)`; null smette.
+  sorveglia(id, fn) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return false;
+    tab._sorvegliante = typeof fn === 'function' ? fn : null;
+    this._persistSession();
+    return true;
+  }
+
+  _avvisaSorvegliante(tab, evento, dati = {}) {
+    const fn = tab && tab._sorvegliante;
+    if (!fn) return;
+    // Chiusa mentre Filo la seguiva: è un passaggio, e l'archivio non la deve riaprire.
+    if (evento === 'chiusa') { tab._sorvegliante = null; tab._passaggio = true; }
+    try { fn(evento, dati); } catch (_) {}
+  }
+
+  _seguiPercorso(tab, wc) {
+    const avvisa = (url, principale) => { if (principale && url) this._avvisaSorvegliante(tab, 'naviga', { url }); };
+    try {
+      wc.on('did-start-navigation', (_e, url, _inPagina, principale) => avvisa(url, principale));
+      wc.on('did-redirect-navigation', (_e, url, _inPagina, principale) => avvisa(url, principale));
+      wc.on('did-fail-load', (_e, code, _desc, url, principale) => {
+        if (principale && code !== -3) this._avvisaSorvegliante(tab, 'fallita', { url, code });
+      });
+    } catch (_) {}
+  }
+
+  // Una scheda aperta da Filo per un passaggio (la pagina d'accesso) se ne va senza finire nell'archivio.
+  chiudiDiServizio(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return false;
+    tab._sorvegliante = null;
+    return this._dropTab(tab);
+  }
+
   closeTab(id) {
     const idx = this.tabs.findIndex((t) => t.id === id);
     if (idx < 0) return;
     const tab = this.tabs[idx];
+    this._avvisaSorvegliante(tab, 'chiusa');
     // Se la scheda che se ne va è quella che aveva chiesto il fullscreen al
     // sito (Ctrl+W funziona anche a tutto schermo), lo schermo intero resterebbe
     // acceso con la deroga dell'Esc appesa a una pagina che non esiste più:
@@ -1176,6 +1214,7 @@ class TabManager {
   // si chiude l'ultima scheda: la finestra resta, con una scheda vuota).
   closeAllTabs() {
     for (const tab of this.tabs) {
+      this._avvisaSorvegliante(tab, 'chiusa');
       this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
@@ -1192,7 +1231,7 @@ class TabManager {
   // newtab (non sono "siti" da ritrovare). Senza store caricato, è un no-op.
   _archiveClosedTab(tab, reason = 'manual') {
     try {
-      if (!tab || this.incognito) return;
+      if (!tab || this.incognito || tab._passaggio) return;
       const Archive = globalThis.SN_ARCHIVED_TABS;
       if (!Archive) return;
       const url = tab.url || '';
@@ -1540,6 +1579,7 @@ class TabManager {
     });
 
     for (const { tab, reason } of toArchive) {
+      this._avvisaSorvegliante(tab, 'chiusa');
       this._archiveClosedTab(tab, reason);
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
@@ -2254,6 +2294,7 @@ class TabManager {
     installZoom(wc);
     this._registraPermessoRichieste(tab);
     try { wc.once('destroyed', () => this.visite.chiusa(wc)); } catch (_) {}
+    this._seguiPercorso(tab, wc);
     const update = (patch) => {
       Object.assign(tab, patch);
       this._broadcast();
@@ -3163,6 +3204,7 @@ class TabManager {
   _dropTab(tab) {
     const idx = this.tabs.findIndex((t) => t.id === tab.id);
     if (idx < 0) return false;
+    this._avvisaSorvegliante(tab, 'chiusa');
     this._esitoApertura(tab, null);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
@@ -3532,11 +3574,13 @@ class TabManager {
   // content script ricalcolino il colore di ogni sito. Campo aggiuntivo: un
   // ripristino vecchio senza `colors` continua a funzionare (viene ignorato).
   sessionState() {
+    // Una scheda seguita da Filo (l'accesso a Google, #1123) è un passaggio: riaperta dopo un riavvio porterebbe a un
+    // ritorno che non ascolta più. Quando Filo smette di seguirla diventa dell'utente e si salva.
     const kept = this.tabs
-      .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank');
+      .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank' && !t._sorvegliante);
     const tabs = kept.map((t) => t.url);
     const colors = kept.map((t) => t.identityColor || null);
-    let activeIndex = this.tabs.findIndex((t) => t.id === this.activeId);
+    let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
     return { tabs, colors, activeIndex };
   }

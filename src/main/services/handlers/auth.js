@@ -3,6 +3,7 @@
 
 const path = require('node:path');
 const auth = require('../../auth/google-auth');
+const ProdottiGoogle = require('../../auth/prodottiGoogle');
 const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
@@ -286,9 +287,28 @@ module.exports = function register(on, ctx) {
     const signedIn = auth.isSignedIn();
     const isAdmin = auth.isAdmin();
     if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
-    const uid = signedIn ? await auth.getUid() : null;
-    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
+    // `senzaRete`: chi apre un menu non aspetta il rinnovo del token che serve all'uid.
+    const conUid = !(msg && msg.senzaRete);
+    const uid = signedIn && conUid ? await auth.getUid() : null;
+    // Se una scheda nuova su Google troverebbe un account: il menu dell'account ne fa le sue voci (#1123).
+    let googleNelleSchede = false;
+    try { googleNelleSchede = await require('../accessoGoogle').collegatoNelleSchede(); } catch (_) {}
+    const out = { ok: true, signedIn, isAdmin, profile: auth.getProfile(), remembered: auth.isRemembered(), googleNelleSchede };
+    return conUid ? { ...out, uid } : out;
   });
+
+  // YouTube, Gmail e Drive nelle schede per chi è dentro Filo (#1123). Solo da Filo: un sito non apre pagine d'accesso.
+  on(MSG.AUTH_COLLEGA_GOOGLE, soloFilo(async (msg, sender) => {
+    const win = sender && sender.win;
+    let daUrl = '';
+    try {
+      const tabs = win && win._filoTabs;
+      const attiva = tabs && tabs.tabs.find((t) => t.id === tabs.activeId);
+      daUrl = (attiva && attiva.url) || '';
+    } catch (_) {}
+    try { return ProdottiGoogle.collega({ daUrl, finestra: win }); }
+    catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  }));
 
   // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
   // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.

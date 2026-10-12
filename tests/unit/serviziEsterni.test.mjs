@@ -37,6 +37,7 @@ const ESEMPI = [
   { file: 'src/shared/actionTools.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
   { file: 'src/main/services/providers/openrouter.js', url: 'https://filo.local', perche: 'intestazione HTTP-Referer' },
   { file: 'src/main/services/scryfall.js', url: 'https://singolarita.com', perche: 'recapito nello User-Agent' },
+  { file: 'src/main/services/accessoGoogle.js', url: 'https://accounts.google.com/', perche: 'sceglie la sessione delle schede in cui vivono i cookie di Google' },
 ];
 
 // Indirizzi con l'host composto da un'espressione: quale servizio contattano, o perché non contattano niente.
