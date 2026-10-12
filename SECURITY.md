@@ -231,8 +231,8 @@ disponibile, il feedback non parte (`src/shared/feedback.js`, `submit`).
 Accanto viaggiano l'impronta dell'identificativo (`clientIdHash`), che serve a
 riconoscere i tuoi feedback senza decifrarli, e, se questa copia di Filo ha un
 portafoglio, il suo pseudonimo, che serve a darti il premio per la
-segnalazione. Restano in chiaro anche il titolo breve, il titolo della pagina
-e lo user agent. "In chiaro" vuol dire non cifrato, non pubblico: chi può
+segnalazione. Restano in chiaro anche il titolo breve, il titolo della
+pagina, lo user agent e i nomi dei file allegati. "In chiaro" vuol dire non cifrato, non pubblico: chi può
 leggere il documento lo dicono le regole del §7.
 
 Questi dati vengono salvati su Google Firebase (Firestore + Storage) e ci
@@ -243,8 +243,8 @@ attacco (`FEEDBACK-STATES.md`, `filo-model-policy.md`), e gli **agenti** che
 lavorano la segnalazione. **Non includere in un feedback dati che non vuoi
 condividere.**
 
-Filo stesso, quando si accorge di non saper fare una cosa che gli chiedi, può
-mandare da solo una segnalazione generica: senza le tue parole e senza
+Filo stesso, quando si accorge di non saper fare una cosa che gli chiedi o
+che qualcosa non ha funzionato, può mandare da solo una segnalazione generica: senza le tue parole e senza
 l'indirizzo della pagina, con un avviso che ti lascia annullarla. Si spegne
 in Sicurezza, «Segnalazione automatica dei problemi»
 (`src/shared/autoFeedback.js`).
@@ -253,15 +253,19 @@ in Sicurezza, «Segnalazione automatica dei problemi»
 
 ## 7. Permessi: chi può fare cosa sui feedback
 
-**Stato: 🔜 (regole pronte, attivazione subordinata ai prerequisiti sotto)**
+**Stato: ✅ per le regole di Firestore (`firestore.rules`), pubblicate e
+confrontate col progetto il 22/09/2026. Per gli allegati le regole sono nel
+repo (`storage.rules`) e valgono da quando si pubblicano col comando qui sotto.**
 
-I server applicano regole precise (Firebase Security Rules):
+Le regole (Firebase Security Rules) dicono:
 
 - **Chiunque** può **inviare** un nuovo feedback (in forma anonima). Non serve
   loggarsi: vogliamo abbassare al massimo l'attrito per ricevere segnalazioni.
 - **Nessuno può LEGGERE i feedback**, a parte chi li gestisce: gli
-  amministratori e il server che li lavora. Quello che invii non è consultabile
-  da un altro utente, e nemmeno da chi conoscesse l'indirizzo del documento.
+  amministratori, il server che li lavora e gli agenti autorizzati che
+  risolvono le segnalazioni (un elenco a parte, sul server). Quello che invii
+  non è consultabile da un altro utente, e nemmeno da chi conoscesse
+  l'indirizzo del documento.
 - Lo stesso vale per gli **screenshot e i file** che alleghi: non si possono
   elencare e non si aprono conoscendone l'indirizzo. L'unica chiave è il codice
   di scarico che sta nel link, e quel link non esce dalle mani di chi gestisce i
