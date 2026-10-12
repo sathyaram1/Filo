@@ -21,7 +21,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
   + '                          avvia [--paralleli N] [--tetto N] [--derivati non-locale|locale|nessuno] [--tieni-worktree] [--budget-istanza <$>]\n'
   + '                                [--ore-istanza <ore>] [--cpu-max <%>] [--cpu-chiusura <%>] [--dry-run [<N>…]]\n'
-  + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N>';
+  + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N> | fusioni-server [--dry-run]';
 
 // Un lettore solo per ogni comando (#1027): un argomento che non torna ferma tutto prima di qualsiasi lavoro, mai preso per buono o saltato.
 const TESTO = { atteso: 'un testo', leggi: (v) => v.trim() || undefined };
