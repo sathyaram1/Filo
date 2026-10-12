@@ -56,8 +56,8 @@ test('i modelli si salvano dalla pagina unica', async ({ app, openTab }) => {
   const page = await apri(app, openTab);
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
   await page.locator('#mgSmKeyOpenrouter').fill('sk-or-v1-prova');
-  await page.locator('#mgSmSave').scrollIntoViewIfNeeded();
-  await page.locator('#mgSmSave').click();
+  await page.locator('#mgSmSaveBtn').scrollIntoViewIfNeeded();
+  await page.locator('#mgSmSaveBtn').click();
   await expect.poll(() => page.evaluate(() => window.__inviati.length)).toBe(1);
   const m = await page.evaluate(() => window.__inviati[0]);
   expect(m.openrouterKey).toBe('sk-or-v1-prova');
