@@ -540,6 +540,27 @@ test('modello e sforzo dei ruoli vengono dagli agenti delle routine', () => {
   assert.equal(args[args.indexOf('--effort') + 1], v.effort);
 });
 
+// #1189: col biglietto del server valgono modello e sforzo che ha deciso lui, campo per campo; un valore ignoto ferma.
+test('modello e sforzo decisi dal server battono il frontmatter; senza vale il frontmatter', () => {
+  const fm = modelloDelRuolo('lavoratore', ROOT);
+  assert.deepEqual(modelloDelRuolo('lavoratore', ROOT, null), fm);
+  assert.deepEqual(modelloDelRuolo('lavoratore', ROOT, {}), fm);
+  assert.deepEqual(modelloDelRuolo('lavoratore', ROOT, { model: 'haiku', effort: 'low' }), { model: 'haiku', effort: 'low' });
+  assert.deepEqual(modelloDelRuolo('verificatore', ROOT, { model: 'fable' }), { model: 'fable', effort: modelloDelRuolo('verificatore', ROOT).effort });
+  assert.deepEqual(modelloDelRuolo('verificatore', ROOT, { effort: 'max' }), { model: modelloDelRuolo('verificatore', ROOT).model, effort: 'max' });
+  assert.throws(() => modelloDelRuolo('lavoratore', ROOT, { model: 'gpt' }), /modello deciso dal server sconosciuto/);
+  assert.throws(() => modelloDelRuolo('lavoratore', ROOT, { effort: 'altissimo' }), /sforzo deciso dal server sconosciuto/);
+});
+
+test('il motore passa all’istanza la decisione del server della pratica, o niente', async () => {
+  const b = banco({ verdetti: ['pass'] });
+  const visti = [];
+  const vera = b.dep.claude;
+  b.dep.claude = (a) => { visti.push(a.dalServer); return vera(a); };
+  await b.motore.avvia();
+  assert.ok(visti.length > 0 && visti.every((d) => d === null), 'senza biglietto del server vale il frontmatter');
+});
+
 test('uscita di claude -p: esito, costo, errore', () => {
   assert.deepEqual(leggiUscitaClaude(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'ok sha', total_cost_usd: 1.2 })), { ok: true, testo: 'ok sha', costo: 1.2, errore: '' });
   const e = leggiUscitaClaude(JSON.stringify({ subtype: 'error_max_turns', is_error: true, result: '' }), '', 1);
