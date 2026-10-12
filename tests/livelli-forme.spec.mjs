@@ -693,6 +693,7 @@ for (const larghezza of [768, 700, 560]) {
     const scheda = corpo.locator('.sn-mac-card').first();
     const go = corpo.locator('.sn-mac-btn-go');
     await expect(go).toBeVisible();
+    await go.scrollIntoViewIfNeeded();
     const dentro = async () => {
       const [s, g, c] = await Promise.all([scheda.boundingBox(), go.boundingBox(), corpo.boundingBox()]);
       expect(g.x, 'il tasto esce a sinistra della scheda').toBeGreaterThanOrEqual(s.x - 0.5);
