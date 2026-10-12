@@ -102,6 +102,8 @@ test('Google rifiuta la scheda: l\'accesso passa da solo al browser di sistema, 
   const r = await esito(shell);
   expect(r.ok, r.error).toBe(true);
   expect(r.profile.email).toBe(EMAIL);
+  // Dentro Filo, «continua nel browser» non ha più niente da dire.
+  await expect(shell.locator('.shell-notif-msg', { hasText: 'continua nel browser' })).toHaveCount(0, { timeout: 8_000 });
 });
 
 test('chiudere la scheda dell\'accesso lo annulla subito, e lo dice', async ({ app, shell, testServer }) => {
