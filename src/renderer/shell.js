@@ -1029,7 +1029,9 @@
     if (totale(tetto) > posto) {
       let lo = MIN_SCHEDA, hi = tetto;
       for (let k = 0; k < 24 && hi - lo > 0.5; k++) { const m = (lo + hi) / 2; if (totale(m) > posto) hi = m; else lo = m; }
-      tetto = lo;
+      // Intero: le larghezze chieste vanno in px interi, e un tetto con la virgola le arrotonderebbe oltre il posto
+      // della fila, che le stringerebbe tutte in proporzione tagliando di un pixel anche il nome che ci stava (#429).
+      tetto = Math.max(MIN_SCHEDA, Math.floor(lo));
     }
     const attiva = attivaCon(tetto);
     const stacco = Math.ceil(Math.min(tetto, tipica) * STACCO) - attiva;
