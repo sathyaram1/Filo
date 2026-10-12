@@ -981,8 +981,13 @@
     // Prima query dalla home → entra in stato thread.
     if (body.dataset.state !== 'thread') goThread();
 
-    // Bolla utente
-    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}) });
+    // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
+    const domanda = text || 'Descrivi questa immagine.';
+    threadHistory.push({
+      role: 'user', text: domanda,
+      ...(imagesToSend.length ? { images: imagesToSend.length } : {}),
+      ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}),
+    });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     imagesToSend.forEach((src, i) => {
