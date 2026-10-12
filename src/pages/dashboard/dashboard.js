@@ -747,15 +747,10 @@
           giroIniziato = true;
           pending.answerStarted(); // il ragionamento si richiude, la risposta comincia
         }
-        if (!streamBubble) {
-          streamBubble = document.createElement('div');
-          streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
-          bubblesEl.appendChild(streamBubble);
-        }
         streamedText += data.delta;
         // Il marker del conto si vede già come numero mentre scorre: la
         // risposta finale lo avrà risolto nel main, e le due non devono differire.
-        streamBubble.textContent = rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro();
+        bollaDellaRisposta().textContent = rispostaPrima ? `${rispostaPrima}\n\n${testoDelGiro()}` : testoDelGiro();
         followBottomIfNear();
       });
     }
