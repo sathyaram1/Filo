@@ -128,8 +128,7 @@ module.exports = function register(on, ctx) {
     });
     if (r.ok) {
       // Quello che il modello vede dei documenti sporca il compito come un documento letto in chat (#530).
-      const dati = AiutoDoc.perIlModello(wc);
-      const scaricato = (dati && dati.risultati || []).some((_, i) => ctx.fileScaricato(AiutoDoc._percorsoDi(wc, r.candidati[i] && r.candidati[i].chiave)));
+      const scaricato = r.candidati.some((c) => ctx.fileScaricato(AiutoDoc.percorsoDi(wc, c.chiave)));
       try { ctx.segnaLetturaAiuto(sender, { type: 'CERCA_DOCUMENTI', cosa: r.cercato, _output: { cercato: r.cercato, risultati: r.candidati, scaricato } }); } catch (_) {}
     }
     return r;
