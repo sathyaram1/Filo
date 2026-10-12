@@ -2914,6 +2914,16 @@ class TabManager {
   _hardenAuthPopup(win, origine = null) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    // Senza barra dell'indirizzo il titolo è l'unico posto dove si legge il sito: lo scrive Filo, mai la pagina (#1066).
+    const mostraSito = () => {
+      if (win.isDestroyed() || pwc.isDestroyed()) return;
+      let o = '';
+      try { o = pwc.mainFrame.origin; } catch (_) {}
+      try { win.setTitle(titoloFinestrella(pwc.getURL(), o)); } catch (_) {}
+    };
+    win.on('page-title-updated', (e) => e.preventDefault());
+    pwc.on('did-navigate', mostraSito);
+    pwc.on('did-navigate-in-page', mostraSito);
     installZoom(pwc);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
