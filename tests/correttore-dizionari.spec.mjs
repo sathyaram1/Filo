@@ -27,7 +27,7 @@ test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli a
   expect(stato.chiesti.filter((l) => prima.lingue.includes(l))).toEqual([]);
 
   // Il successo per chi scrive: senza chiave per i modelli, la correzione in cima al menu può venire solo dal dizionario.
-  // Quale suggerimento sta in cima dipende dalla lingua del sistema (#169); fra quelli del dizionario c'è l'italiano.
+  // Quale suggerimento sta in cima dipende dalla lingua del sistema (#169): l'italiano si cerca fra tutti.
   const host = new URL(url).host;
   await page.locator('#ce').click();
   await page.keyboard.type('funzion ciao ');
