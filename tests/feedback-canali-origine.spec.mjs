@@ -143,6 +143,8 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       domandeConsiglio: { type: MSG.DOMANDE_CONSIGLIO, ids: ['D-1', 'D-2'] },
       domandaArchivia: { type: MSG.DOMANDA_ARCHIVIA, id: 'D-1' },
       domandaRiapri: { type: MSG.DOMANDA_RIAPRI, id: 'D-1' },
+      segnaFidato: { type: MSG.FIDUCIA_SEGNA, feedbackId: 'f1' },
+      togliFiducia: { type: MSG.FIDUCIA_SEGNA, feedbackId: 'f1', fidato: false },
       // Il classificatore della ricerca spende la chiave dell'owner leggendo tutti i feedback (#1118).
       ricercaClassificatore: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'start', query: 'x', candidates: [{ id: 'a', title: 't', text: 'x' }] },
       ricercaClassificatoreStato: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'status', jobId: 'r1' },
