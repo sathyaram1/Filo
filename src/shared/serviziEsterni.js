@@ -25,7 +25,7 @@
   const SERVIZI = [
     {
       id: 'modelli-openrouter', nome: 'OpenRouter, per i modelli',
-      base: ['https://openrouter.ai/api/v1/', 'https://openrouter.ai/api/alpha/decisions'],
+      base: ['https://openrouter.ai/api/v1/', 'https://openrouter.ai/api/alpha/'],
       quando: 'funzione',
       occasione: 'a ogni funzione che usa un modello (chat, spiegazioni, traduzione, correttore, voce, immagini), e quando scegli un modello o guardi il saldo della chiave',
       riceve: 'quello che serve alla funzione per rispondere: testo, immagini o audio, con la chiave dei crediti di Filo o la tua',
