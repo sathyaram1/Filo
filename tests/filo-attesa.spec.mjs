@@ -615,7 +615,7 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity');
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
-  await page.waitForTimeout(500);
+  await ricercaPartita(app);
   await page.locator('#stopBtn').click();
   await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
   // La chat è di nuovo dell'utente subito, non a ricerca finita.
