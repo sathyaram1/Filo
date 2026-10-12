@@ -2383,10 +2383,6 @@
   }
   // Passato dalla verifica, aspetta il PC per la fusione e il deploy del server (#1159): lo prende `npm run orchestra -- fusioni-server`.
   const TITOLO_ATTESA_SERVER = 'La verifica è passata, aspetta il tuo PC. Lo porta su main di filo-security e lo pubblica npm run orchestra -- fusioni-server, che parte anche con avvia.';
-  function attesaServerBadgeHtml(fb) {
-    if (!MR.inAttesaFusioneServer(fb)) return '';
-    return `<span class="mg-local-badge mg-attesa-badge" title="${esc(TITOLO_ATTESA_SERVER)}">aspetta il PC</span>`;
-  }
   function localSignText(fb) {
     const m = fb && fb.localOnly;
     if (!m) return '';
