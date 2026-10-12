@@ -228,4 +228,4 @@ async function trascina(wc, chiave) {
   }
 }
 
-module.exports = { configura, cerca, ferma, perIlModello, testoLetto, apri, mostra, trascina, _percorsoDi: percorsoDi, _domanda: domanda };
+module.exports = { configura, cerca, ferma, perIlModello, testoLetto, percorsoDi, apri, mostra, trascina, _domanda: domanda };
