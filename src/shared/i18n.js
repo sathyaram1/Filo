@@ -700,16 +700,30 @@
     security_visite_nessuna: 'Nessuna pagina da cancellare',
     security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto,
+    // %6 = security_import_nulla_perso o security_import_escono_mie
     security_import_confirm_text:
       'Da "%1"%2: %3 e %4%5.\n\n' +
-      'Nulla di ciò che hai ora viene cancellato: le liste (chat, pagine visitate, pagine salvate, ' +
+      '%6le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
-      'quello del backup. Le impostazioni del backup diventano attive subito.',
+      'quello del backup. Le impostazioni del backup diventano attive subito. ' +
+      'Della spesa resta, mese per mese, la più alta fra adesso e il backup. ' +
+      'I crediti e le schede aperte restano quelli di adesso.',
+    // Righe in fondo alla conferma, solo quando servono. %1 = numero
+    security_import_images_lost: 'Immagini che non si leggono: %1. Al loro posto non ci sarà niente.',
+    security_import_filo_lost: 'Le chat e le pagine visitate del backup non si leggono.',
+    // %1 = quante restano fuori, %2 = il tetto
+    security_import_pages_out: 'Pagine salvate che non entrano: %1. L’elenco ne tiene %2, le più recenti.',
+    security_import_pages_out_mine: 'Fra queste, pagine che hai salvato adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_nulla_perso: 'Nulla di ciò che hai ora viene cancellato: ',
+    security_import_escono_mie: 'Di ciò che hai ora escono solo le pagine salvate più vecchie, contate qui sotto: ',
     security_import_confirm_ok: 'Importa',
     security_import_done: 'Dati importati',
     security_import_invalid: 'Non è un archivio esportato da Filo',
+    security_import_damaged: 'L’archivio è rovinato e Filo non ne legge i dati',
+    security_import_compressed: 'L’archivio è compresso in un formato che Filo non legge (bzip2 o LZMA): ricomprimilo come zip normale e riprova',
+    security_import_encrypted: 'L’archivio è protetto da una password: scompattalo, ricomprimilo senza password e riprova',
     security_import_fail: 'Importazione non riuscita',
 
     // Home

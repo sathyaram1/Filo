@@ -85,7 +85,16 @@ const STATE = {
   suDisco: new Map(),
   sporche: new Set(),
   avvisate: new Set(),
+  osservate: new Set(),
 };
+
+// Una chiave che qualcuno osserva in scrittura non si presta mai viva, né in lettura né in scrittura: chi muta
+// la lista letta prima di set() toglierebbe all'osservatore il valore di prima (#1088).
+function staccata(k, v) {
+  if (!STATE.osservate.has(k) || !v || typeof v !== 'object') return v;
+  // Una funzione dentro il valore non arriverebbe comunque sul disco: la copia la lascia cadere come il JSON.
+  try { return structuredClone(v); } catch (_) { return JSON.parse(JSON.stringify(v)); }
+}
 
 // === Modalità incognito ===========================================
 // Le finestre incognito non devono lasciare tracce su disco: né dati di
@@ -341,17 +350,21 @@ async function get(keysOrNull) {
   await loadIfNeeded();
   const incog = inIncognito();
   if (keysOrNull == null) {
-    if (!incog) return { ...STATE.data };
-    // Vista incognito di "tutto": solo le chiavi config dal disco (meno quelle
-    // tombstoned) + ciò che l'incognito ha scritto nell'overlay.
     const out = {};
-    for (const k of Object.keys(STATE.data)) {
-      if ((INCOGNITO_READABLE.has(k) && !INCOGNITO.tombstones.has(k)) || INCOGNITO_SHARED.has(k)) out[k] = STATE.data[k];
+    if (!incog) {
+      Object.assign(out, STATE.data);
+    } else {
+      // Vista incognito di "tutto": solo le chiavi config dal disco (meno quelle
+      // tombstoned) + ciò che l'incognito ha scritto nell'overlay.
+      for (const k of Object.keys(STATE.data)) {
+        if ((INCOGNITO_READABLE.has(k) && !INCOGNITO.tombstones.has(k)) || INCOGNITO_SHARED.has(k)) out[k] = STATE.data[k];
+      }
+      for (const k of Object.keys(INCOGNITO.data)) out[k] = INCOGNITO.data[k];
     }
-    for (const k of Object.keys(INCOGNITO.data)) out[k] = INCOGNITO.data[k];
+    for (const k of STATE.osservate) if (k in out) out[k] = staccata(k, out[k]);
     return out;
   }
-  const pick = (k) => (incog ? incognitoReadKey(k) : STATE.data[k]);
+  const pick = (k) => staccata(k, incog ? incognitoReadKey(k) : STATE.data[k]);
   if (typeof keysOrNull === 'string') {
     return { [keysOrNull]: pick(keysOrNull) };
   }
@@ -390,7 +403,7 @@ async function set(obj) {
     // emitChange (così non contamina i listener delle finestre normali).
     for (const k of keys) {
       if (INCOGNITO_SHARED.has(k)) continue;
-      INCOGNITO.data[k] = obj[k];
+      INCOGNITO.data[k] = staccata(k, obj[k]);
       INCOGNITO.tombstones.delete(k);
     }
     keys = keys.filter((k) => INCOGNITO_SHARED.has(k));
@@ -406,10 +419,10 @@ async function set(obj) {
     if (!STATE.sporche.has(k) && STATE.testi.has(k)) {
       let t = null;
       try { t = JSON.stringify(newValue); } catch (_) {}
-      if (t !== null && t === STATE.testi.get(k)) { STATE.data[k] = newValue; continue; }
+      if (t !== null && t === STATE.testi.get(k)) { STATE.data[k] = staccata(k, newValue); continue; }
     }
     const oldValue = STATE.data[k];
-    STATE.data[k] = newValue;
+    STATE.data[k] = staccata(k, newValue);
     STATE.sporche.add(k);
     changes[k] = { oldValue, newValue };
     cambiate++;
@@ -477,7 +490,9 @@ function onChanged(fn) {
 }
 
 // Come onChanged, ma chiamato PRIMA della scrittura e anche in incognito, con { incognito }.
-function onScrittura(fn) {
+// `chiavi`: quelle che l'osservatore confronta prima/dopo; da qui in poi non si prestano vive.
+function onScrittura(fn, chiavi = []) {
+  for (const k of chiavi) STATE.osservate.add(k);
   STATE.scritture.add(fn);
   return () => STATE.scritture.delete(fn);
 }
@@ -497,7 +512,7 @@ function flushSync() {
 function setSync(obj) {
   try {
     if (!STATE.loaded) return;
-    for (const k of Object.keys(obj)) STATE.data[k] = obj[k];
+    for (const k of Object.keys(obj)) STATE.data[k] = staccata(k, obj[k]);
     flushSync();
   } catch (e) { /* ignore */ }
 }
