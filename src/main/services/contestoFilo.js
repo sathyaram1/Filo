@@ -69,6 +69,16 @@ function potaFoto(tutti) {
   }
 }
 
+// La chat riaperta mostra le foto che il modello ha ancora davanti: quello che vede lui, l'utente lo deve vedere.
+function conFotoInMemoria(chat) {
+  if (!chat || !Array.isArray(chat.messages) || !foto.size) return chat;
+  const messages = chat.messages.map((m) => {
+    const urls = m && m.role === 'user' && Number(m.images) > 0 ? foto.get(`${chat.id}|${m.ts}`) : null;
+    return urls ? { ...m, fotoInMemoria: urls.slice() } : m;
+  });
+  return { ...chat, messages };
+}
+
 function dimentica(chat) {
   if (!chat) {
     esiti.clear();
