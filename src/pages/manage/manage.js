@@ -4301,9 +4301,8 @@
     if (!selectedId) return;
     const id = selectedId;
     if (rispostaInVolo.has(id)) return;
-    const casella = (origine && origine.tagName === 'TEXTAREA') ? origine : mgClarifyText;
     const reply = (bozzeRisposta.get(id) || '').trim();
-    if (!reply) { casella.focus(); return; }
+    if (!reply) { if (origine && origine.isConnected) origine.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
