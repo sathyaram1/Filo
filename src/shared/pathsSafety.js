@@ -323,7 +323,7 @@
     if (typeof text !== 'string') return '';
     // La frase la scrive un modello, ma leggendo gli elementi toccati e la
     // sezione di partenza: quello che ha visto lì può ricopiarlo qui dentro.
-    let s = neutralizzaMarcature(redigiDatiPersonali(text)).trim();
+    let s = neutralizzaMarcature(redigiDatiPersonali(tagliaPrimaDiPulire(text, MAX_INTENT_LEN))).trim();
     if (!s) return '';
     s = togliAiBordi(s, '"\'`').trim();
     s = togliAiBordi(s, '*_').trim();
