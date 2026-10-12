@@ -184,10 +184,11 @@ async function main() {
         ok = r?.id != null && passaIlCancello(ghApi(`repos/${repo}/actions/runs/${r.id}/jobs?per_page=100`)?.jobs);
       } catch (e) {
         erroreLavori ||= `lavori della corsa ${r?.id}: ${String(e.stderr || e.message || e).trim().split('\n')[0]}`;
+        ok = null;
       }
       passate.set(r?.id, ok);
     }
-    return passate.get(r?.id);
+    return passate.get(r?.id) === true;
   };
   const verde = scegliUltimoVerde(runs, primoGenitore, valida);
   // Un verde trovato basta; senza, un errore nel leggere i lavori può essere il motivo, e si dice.
@@ -214,8 +215,10 @@ async function main() {
   const sha = verdeDopoTag ? verde : '';
   const corsaVerde = verde ? corseVerdi(runs).get(verde) : null;
   const soloPlaywright = scegliUltimoVerde(runs, primoGenitore);
-  const scartata = soloPlaywright && soloPlaywright !== verde && verdePiuNuovoDelTag(soloPlaywright, tagSha, eAntenato)
-    ? corseVerdi(runs).get(soloPlaywright) : null;
+  const corsaSoloPlaywright = soloPlaywright ? corseVerdi(runs).get(soloPlaywright) : null;
+  // Scartata davvero, non solo illeggibile: di una corsa i cui lavori non si sono letti non si dice che non ha passato.
+  const scartata = soloPlaywright !== verde && verdePiuNuovoDelTag(soloPlaywright, tagSha, eAntenato)
+    && passate.get(corsaSoloPlaywright?.id) === false ? corsaSoloPlaywright : null;
   const esecuzione = process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL || 'https://github.com'}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
     : '';
