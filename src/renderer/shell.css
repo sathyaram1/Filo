@@ -262,7 +262,9 @@ html[data-chrome-compact="1"] .addr {
   white-space: nowrap;
 }
 .tab .close {
+  /* La larghezza oltre alla base: la scheda misurata col contenuto conta la larghezza, non la base (#429). */
   flex: 0 0 18px;
+  width: 18px;
   height: 18px;
   border-radius: 50%;
   display: inline-flex;
@@ -297,6 +299,7 @@ html[data-chrome-compact="1"] .addr {
 /* Avviso audio (suona o mutata) dopo il titolo, come in Chrome, col colore delle scritte della scheda (#431). */
 .tab .tab-alert {
   flex: 0 0 16px;
+  width: 16px;
   height: 16px;
   display: inline-flex;
   align-items: center;
