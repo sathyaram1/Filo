@@ -1523,7 +1523,11 @@ html, body {
 .dash-autonomia-livello.scelto { border-color: var(--dash-ink); background: var(--dash-ink); color: var(--dash-paper); }
 .dash-autonomia-livello.scelto:hover, .dash-autonomia-livello.scelto:focus-visible { opacity: 0.88; }
 .dash-autonomia-livello.scelto .dash-autonomia-tacca:not(.piena) { background: var(--dash-paper); opacity: 0.35; }
-.dash-autonomia-frase { font-size: 12.5px; line-height: 1.45; color: var(--dash-ink-soft); min-height: 1.45em; }
+/* Frase e misure nella stessa cella: l'altezza è quella della frase più lunga, e il cursore non sposta niente. */
+.dash-autonomia-frase-posto { display: grid; font-size: 12.5px; line-height: 1.45; color: var(--dash-ink-soft); }
+.dash-autonomia-frase-posto > * { grid-area: 1 / 1; }
+.dash-autonomia-frase-misura { visibility: hidden; pointer-events: none; }
+.dash-autonomia-frase { min-height: 1.45em; }
 .dash-autonomia-tacche { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
 .dash-autonomia-tacca { width: 3px; border-radius: 1px; background: var(--dash-line-strong); }
 .dash-autonomia-tacca:nth-child(1) { height: 5px; }
