@@ -503,7 +503,11 @@ test('la pagina che seleziona dove si clicca non paga spiegazioni: pulsante, col
   expect((await conti(app)).spiega).toBe(0);
 
   // Le strade vere restano: trascinare sul testo, il doppio clic, Maiusc+clic che allarga la selezione.
-  const parola = (w) => puntoDellaParola(page, 'pv', w);
+  // Punti interi: con coordinate frazionarie il trascinamento sintetico di Playwright qui non seleziona niente.
+  const parola = async (w) => {
+    const q = await puntoDellaParola(page, 'pv', w);
+    return { x: Math.round(q.x), y: Math.round(q.y) };
+  };
   const a = await parola('maree');
   const b = await parola('Luna');
   await page.mouse.move(a.x - 20, a.y);
