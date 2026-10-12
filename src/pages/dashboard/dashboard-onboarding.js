@@ -465,5 +465,7 @@
     refreshOnboardingNotice,
     hideOnboardingNotice,
     makeSkipOnboardingBtn,
+    sceltaAutonomia,
+    aggiornaSceltaAutonomia,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
