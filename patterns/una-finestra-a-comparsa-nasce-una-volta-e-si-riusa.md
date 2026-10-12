@@ -14,7 +14,7 @@ documento.
   finestra ha finito di caricarsi (`preparaMenu` in `src/main/window.js`), col
   documento e il preload già caricati. Chi lo distrugge (uno spec, la chiusura
   della madre) non rompe niente: la prossima apertura lo ricrea.
-- **Una cosa sola si collega alla nascita.** Scorciatoie, invisibilità nei test
+- **Quello che resta si collega alla nascita.** Scorciatoie, invisibilità nei test
   e l'ascoltatore dei messaggi della pagina si attaccano una volta. Il gestore
   dei messaggi è unico e risolve la scelta del menu aperto adesso.
 - **Ogni apertura ha un numero (`giro`).** Le voci arrivano col numero, la scelta
