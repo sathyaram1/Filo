@@ -1,8 +1,9 @@
 // #1122 — Su una pagina che impone Trusted Types (accounts.google.com, Gmail, YouTube…) il tasto destro apre il menu di
-// Filo con le sue voci, anche se la pagina limita i nomi delle policy o tocca un riquadro prima che carichi; e se il menu
-// non si costruisce comunque, compare quello di riserva invece di niente.
+// Filo con le sue voci e i riquadri di Filo si aprono, anche se la pagina limita i nomi delle policy o tocca un riquadro
+// prima che carichi; e se il menu non si costruisce comunque, compare quello di riserva invece di niente.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { statoDi } from './helpers/riquadri.mjs';
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Accedi</h1>
@@ -38,13 +39,13 @@ async function menuCompleto(menu) {
 }
 
 for (const [caso, csp] of Object.entries(CSP)) {
-  test(`Trusted Types (${caso}): il tasto destro apre il menu di Filo, e la sua voce apre il riquadro`, async ({ openTab, testServer }) => {
+  test(`Trusted Types (${caso}): il tasto destro apre il menu di Filo, e la sua voce apre il riquadro`, async ({ app, openTab, testServer }) => {
     const page = await apri(openTab, testServer, csp);
     await page.locator('#paragraph').click({ button: 'right' });
     const menu = page.locator('.sn-menu');
     await menuCompleto(menu);
     await menu.getByText('Invia feedback', { exact: true }).click();
-    await expect(page.locator('.sn-fb-overlay .sn-fb-text')).toBeVisible();
+    await expect.poll(async () => (await statoDi(app, page, '.sn-fb-text'))?.visibile ?? false).toBe(true);
   });
 
   // Electron rifà il mondo isolato a ogni documento nuovo del processo, e per un riquadro toccato prima del suo
@@ -99,9 +100,9 @@ test('Trusted Types: la spiegazione di una parola si apre e mostra la risposta f
   await app.evaluate(({ BrowserWindow }) => {
     globalThis.__filoShortcuts.dispatch('explain-selection', BrowserWindow.getAllWindows().find((w) => w._filoTabs));
   });
-  const riquadro = page.locator('.sn-popup');
-  await expect(riquadro).toContainText('il tuo profilo su un servizio', { timeout: 10_000 });
-  await expect(riquadro.locator('strong', { hasText: 'account' })).toBeVisible();
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup'))?.testo ?? '', { timeout: 10_000 }).toContain('il tuo profilo su un servizio');
+  const grassetto = await statoDi(app, page, '.sn-popup strong');
+  expect(grassetto && grassetto.visibile && grassetto.testo).toBe('account');
 });
 
 // Il menu di riserva è una finestra a sé, fuori dalla pagina: le sue voci si leggono e si scelgono da lì.
