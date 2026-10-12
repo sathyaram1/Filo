@@ -828,6 +828,14 @@
       if (w > 0) m.set(el.dataset.id, w);
     }
     if (!m.size) return;
+    // Con le schede larghe quanto il nome, la X della scheda che scivola al posto della chiusa cade sotto il
+    // puntatore solo se le si dà la larghezza della chiusa: così si chiudono più schede di fila (#428, #429).
+    const chiuse = primaIds.filter((id) => !dopo.has(id));
+    if (chiuse.length === 1) {
+      const i = primaIds.indexOf(chiuse[0]);
+      const subentra = primaIds.slice(i + 1).find((id) => dopo.has(id));
+      if (subentra && m.has(chiuse[0]) && m.has(subentra)) m.set(subentra, m.get(chiuse[0]));
+    }
     larghezzeFerme = m;
     // Se se ne va l'ultima, il + scivolerebbe sotto il puntatore e il clic
     // dopo aprirebbe una scheda: la striscia tiene la sua larghezza.
