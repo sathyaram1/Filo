@@ -117,11 +117,10 @@ test('una pratica passata che aspetta il PC lo dice sulla scheda; rimessa in cod
   const rimessa = fb({ _id: 'srv-2', seq: 1201, status: 'todo', attesa: 'fusione_server' });
   await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [pronta, rimessa]);
   await page.evaluate(() => window.__mgTest.setTab('local'));
-  const segno = page.locator('.mg-item[data-id="srv-1"] .mg-attesa-badge');
-  await expect(segno).toHaveText('aspetta il PC');
-  await expect(segno).toHaveAttribute('title', /aspetta il tuo PC.*fusioni-server/);
-  await expect(page.locator('.mg-item[data-id="srv-1"]')).toContainText('Pronto: aspetta il PC');
+  const riga = page.locator('.mg-item[data-id="srv-1"] .mg-attesa-server');
+  await expect(riga).toHaveText('Pronto: aspetta il PC');
+  await expect(riga).toHaveAttribute('title', /aspetta il tuo PC.*fusioni-server/);
   await expect(page.locator('.mg-item[data-id="srv-1"]')).not.toContainText('sessione locale');
   await expect(page.locator('.mg-item[data-id="srv-2"]')).toBeVisible();
-  await expect(page.locator('.mg-item[data-id="srv-2"] .mg-attesa-badge')).toHaveCount(0);
+  await expect(page.locator('.mg-item[data-id="srv-2"] .mg-attesa-server')).toHaveCount(0);
 });
