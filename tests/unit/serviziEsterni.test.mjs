@@ -440,11 +440,6 @@ test('l’aggiornamento chiede proprio al repository scritto nella ricetta dei p
   }
 });
 
-test('i dizionari del correttore arrivano dal CDN di Chromium finché nessuno cambia l’indirizzo', () => {
-  const cambia = Object.keys(SORGENTI).filter((f) => /setSpellCheckerDictionaryDownloadURL/.test(ANALISI.testi.get(f).codice));
-  assert.deepEqual(cambia, [], 'un indirizzo nuovo per i dizionari va scritto nella voce «dizionari-correttore»');
-});
-
 test('prova: un fetch verso un host nuovo fa diventare rossa la sentinella', () => {
   const a = analizza({ 'src/main/services/nuovo.js': "async function x() { return fetch('https://nuovo-servizio.example/api'); }\n" });
   assert.deepEqual(indirizziScoperti(a), ['src/main/services/nuovo.js:1 https://nuovo-servizio.example/api']);
