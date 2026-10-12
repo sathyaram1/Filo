@@ -94,11 +94,15 @@ test('solo i quattro rifiuti di securetoken sono definitivi, anche col «: spieg
   ]) assert.equal(guasti.rinnovoRifiutato(t), false, t);
 });
 
-test('l\'errore del servizio non raggiungibile non porta lo stato fra parentesi (chi lo legge lo scambierebbe per il suo)', () => {
-  const e = guasti.nonRaggiungibile(403);
-  assert.equal(e.code, 'servizio_non_raggiungibile');
-  assert.equal(e.httpStatus, 403);
-  assert.equal(/\((\d{3})\)/.test(e.message), false);
+test('l\'errore del servizio non raggiungibile non porta lo stato nel testo: un 403 del proxy non diventa «non sei amministratore» in Gestione', () => {
+  const { permissionDeniedHelp } = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'feedbackError.js'));
+  for (const status of [400, 403, 407, 429, 500, 503]) {
+    const e = guasti.nonRaggiungibile(status);
+    assert.equal(e.code, 'servizio_non_raggiungibile');
+    assert.equal(e.httpStatus, status);
+    assert.equal(/\d{3}/.test(e.message), false, `HTTP ${status}`);
+    assert.equal(permissionDeniedHelp(e.message, { email: 'owner@prova.test' }, { serverAdmin: null }), e.message, `HTTP ${status}`);
+  }
 });
 
 test('mettere da parte non sovrascrive mai un file già messo da parte', () => {
