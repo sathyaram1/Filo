@@ -784,11 +784,23 @@
             pending.azioneSenzaRiga(a, { scartata: true });
           }
         } else if (data.kind === 'round') {
-          if (streamBubble) {
+          if (data.risposta && !turno.fermato) {
+            rispostaPrima = unisci(rispostaPrima, data.text || testoDelGiro());
+            if (!streamBubble) {
+              streamBubble = document.createElement('div');
+              streamBubble.className = 'dash-bubble dash-bubble-filo dash-bubble-streaming';
+              bubblesEl.appendChild(streamBubble);
+            }
+            streamBubble.textContent = rispostaPrima;
+          } else if (streamBubble && rispostaPrima) {
+            pending.aggiungiNota(testoDelGiro());
+            streamBubble.textContent = rispostaPrima;
+          } else if (streamBubble) {
             if (!streamBubble.querySelector('.dash-bubble-actions')) pending.absorbBubble(streamBubble);
             streamBubble = null;
           }
           streamedText = '';
+          giroIniziato = false;
           pending.fineGiro();
         }
       });
