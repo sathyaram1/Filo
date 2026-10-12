@@ -994,11 +994,9 @@
     });
   }
 
-  // La scheda è un contenitore (le icone cedono il posto per priorità, shell.css) e non dà più alla
-  // striscia la larghezza del suo contenuto: la si misura con tutto in vista. Le schede si dividono la
-  // striscia in parti uguali (l'attiva di più), quindi ognuna chiede la sua parte di una striscia dove ci
-  // sta il titolo più lungo, non la propria larghezza: la somma delle proprie lasciava a metà i titoli
-  // lunghi con la finestra mezza vuota (#429). Il passo non dipende da quale è attiva.
+  // La scheda è un contenitore e non dà alla striscia la larghezza del contenuto: la si misura con tutto in
+  // vista. Le schede si dividono la striscia a parti uguali, quindi ognuna chiede la sua parte di una striscia
+  // dove sta il titolo più lungo: la somma delle proprie tagliava i titoli a fila mezza vuota (#429).
   function misuraLarghezzeChieste() {
     const schede = [...tabsEl.children];
     if (!schede.length) return;
