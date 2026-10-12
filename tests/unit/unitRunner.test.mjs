@@ -633,3 +633,22 @@ test('--solo fa girare solo i file dati, con la guardia della corsa intera: un f
     togliCartella(dir);
   }
 });
+
+test('i test non vedono chi è la sessione che li lancia: una routine e una sessione locale corrono gli stessi test (#949.1)', () => {
+  const casa = cartellaTemporanea('filo-runner-identita-');
+  try {
+    writeFileSync(join(casa, 'identita.test.mjs'), [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      `const chiavi = ${JSON.stringify(IDENTITA_SESSIONE)};`,
+      "test('identita', () => { assert.deepEqual(chiavi.filter((k) => k in process.env), []); assert.equal(process.env.FILO_ALTRO, 'resta'); });",
+    ].join('\n'));
+    const sessione = Object.fromEntries(IDENTITA_SESSIONE.map((k) => [k, k === 'FILO_ROUTINE' ? '1' : `valore-${k}`]));
+    const r = lanciaSu(casa, [], { ...sessione, FILO_ALTRO: 'resta' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^ok 1 - identita$/m);
+    assert.ok(['FILO_ROUTINE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID'].every((k) => IDENTITA_SESSIONE.includes(k)), 'un elenco svuotato farebbe passare la prova senza togliere niente');
+  } finally {
+    togliCartella(casa);
+  }
+});
