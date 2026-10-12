@@ -174,7 +174,7 @@ test('#429 — con la cima in due colori la scheda attiva prende quello che prev
 });
 
 // L'attiva si stacca dalle altre solo con lo spazio che avanza: un vuoto suo non taglia il nome della vicina.
-test('#429 — la scheda attiva non tiene un vuoto che serve a un nome tagliato', async ({ shell, openTab, testServer }) => {
+test('#429 — la scheda attiva non tiene un vuoto che serve a un nome tagliato', async ({ app, shell, openTab, testServer }) => {
   await openTab(testServer.html('<title>Meteo Italia previsioni del tempo</title><body>x</body>'));
   await openTab(testServer.html('<title>Previsioni meteo per Milano e tutta la Lombardia aggiornate ogni ora con radar</title><body>x</body>'));
   await openTab('filo://manage/manage.html');
