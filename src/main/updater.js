@@ -328,6 +328,11 @@ function dalMotore(au) {
   return typeof AppUpdater !== 'function' || au instanceof AppUpdater;
 }
 
+// Una release rifiutata non è un guasto di rete: per chi usa Filo la versione non c'è, e «Installa» e la chat lo dicono (#1119).
+function rifiutoDelCancello(messaggio, info) {
+  return Object.assign(new Error(messaggio), { rifiutata: String((info && info.version) || '?') });
+}
+
 function soloTagDiRilascio(au) {
   if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
   if (!dalMotore(au)) return;
@@ -342,7 +347,7 @@ function soloTagDiRilascio(au) {
     const r = await originale.apply(this, args);
     const info = r && r.info;
     if (!R.tagAccettato(info)) {
-      throw new Error(`release ${info.tag} rifiutata: il tag non è v${info.version}`);
+      throw rifiutoDelCancello(`release ${info.tag} rifiutata: il tag non è v${info.version}`, info);
     }
     const opz = r.provider && r.provider.options;
     if (opz && opz.provider === 'github') {
@@ -354,13 +359,13 @@ function soloTagDiRilascio(au) {
       const { CancellationToken } = require('electron-updater');
       const vero = await r.provider.getLatestTagName(new CancellationToken());
       if (!R.tagDiGitHubAccettato(vero, info.version)) {
-        throw new Error(`release ${vero} rifiutata: il tag non è v${info.version}`);
+        throw rifiutoDelCancello(`release ${vero} rifiutata: il tag non è v${info.version}`, info);
       }
       const urls = r.provider.resolveFiles(info)
         .flatMap((f) => [f.url && f.url.href, f.packageInfo && f.packageInfo.path])
         .filter(Boolean);
       if (!R.fileDiRilascio({ versione: info.version, urls, owner: opz.owner, repo: opz.repo, host: opz.host || 'github.com' })) {
-        throw new Error(`release ${info.tag} rifiutata: i suoi file non stanno sotto v${info.version}`);
+        throw rifiutoDelCancello(`release ${info.tag} rifiutata: i suoi file non stanno sotto v${info.version}`, info);
       }
     }
     return r;
@@ -424,6 +429,11 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
   // Un errore PRIMA di aver trovato un aggiornamento (rete assente) non riguarda l'utente: lo filtra l'avviso.
   au.on('error', (err) => {
     console.error('[updater] errore', err ? (err.stack || err).toString() : 'sconosciuto');
+    if (err && err.rifiutata) {
+      stato.rifiutata = err.rifiutata;
+      if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
+      return;
+    }
     if (stato.fase !== 'pronto') stato.fase = 'errore';
     // Dove l'installazione si ferma da sé l'avviso di Mac e Linux, che dice cosa fare, prende il posto della carta.
     if (AGGIORNAMENTO_BLOCCATO[dip.piattaforma()] && stato.versioneTrovata) {
