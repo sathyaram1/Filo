@@ -79,6 +79,12 @@ const STATE = {
   flushTimer: null,
   listeners: new Set(),
   scritture: new Set(),
+  // Il file si compone chiave per chiave (#1089): `testi` è il JSON di ogni valore come è stato scritto,
+  // `suDisco` la sua forma nel file (chiavi API cifrate), `sporche` le chiavi da riserializzare.
+  testi: new Map(),
+  suDisco: new Map(),
+  sporche: new Set(),
+  avvisate: new Set(),
 };
 
 // === Modalità incognito ===========================================
