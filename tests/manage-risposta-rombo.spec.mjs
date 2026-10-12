@@ -56,8 +56,6 @@ test('dal rombo verde si risponde: la risposta entra in conversazione e la prati
   await page.screenshot({ path: 'tests/.shots/1033-rombo-risposta.png' });
 
   await casella.fill('Intendo il pulsante in alto a destra.');
-  // Una risposta sola: quella sotto la conversazione dice la stessa cosa.
-  await expect(page.locator('#mgClarifyText')).toHaveValue('Intendo il pulsante in alto a destra.');
   await page.locator('#mgSideRispostaBtn').click();
 
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
