@@ -4727,23 +4727,29 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // placeholder confuso ("hai scritto tu vuoto o è stato prodotto da filo?").
   // Il fallback "(vuoto)" resta SOLO per la risposta davvero vuota (niente
   // testo E niente azioni), che sarebbe altrimenti una bolla muta.
+  // La nota che diventa risposta: la scheda la toglie dal blocco, dove l'aveva già messa.
+  let notaRisposta = '';
   if (exhausted) {
     const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
-    const last = String(textReply || '').trim();
+    const last = unisciTesti([...risposta, textReply]);
     textReply = last ? `${last}\n\n${stop}` : stop;
   } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
     // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
     // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
-    const prima = notes.pop();
-    textReply = prima
+    const prima = notes.length > noteAllaRisposta ? notes.pop() : '';
+    if (prima) notaRisposta = prima;
+    textReply = unisciTesti([...risposta, prima
       ? `${RISPOSTA_PROXY_NON_DISPONIBILE}\n\nPrima di saperlo avevo scritto: «${prima}»`
-      : RISPOSTA_PROXY_NON_DISPONIBILE;
-  } else if (!String(textReply || '').trim() && notes.length) {
+      : RISPOSTA_PROXY_NON_DISPONIBILE]);
+  } else if (!String(textReply || '').trim() && notes.length > noteAllaRisposta) {
     // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
     // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non
     // una nota di lavoro. Lasciarla nel blocco chiuso voleva dire un turno
     // senza nessuna bolla. Torna alla scheda come testo, e non più come nota.
-    textReply = notes.pop();
+    notaRisposta = notes.pop();
+    textReply = unisciTesti([...risposta, notaRisposta]);
+  } else {
+    textReply = unisciTesti([...risposta, textReply]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
