@@ -153,8 +153,35 @@ export function proveScoperte(testo, nomeFile = '') {
 test('la fixture apre Filo su un profilo già accolto, se la prova non chiede quello nuovo', () => {
   const f = readFileSync(FIXTURE, 'utf8');
   assert.match(f, /\baccoglienzaFatta:\s*\[\s*true\s*,\s*\{\s*option:\s*true\s*\}\s*\]/);
-  assert.match(f, /if \(accoglienzaFatta\) writeFileSync\(join\(userData, 'storage\.json'\), JSON\.stringify\(PROFILO_ACCOLTO\)\)/);
-  assert.match(f, /PROFILO_ACCOLTO = \{ filo_onboarding: \{ done: true \} \}/);
+  assert.match(f, /if \(accoglienzaFatta\) seminaProfiloAccolto\(userData\)/);
+  assert.match(readFileSync(join(TESTS, 'helpers', 'profiloAccolto.mjs'), 'utf8'),
+    /PROFILO_ACCOLTO = \{ filo_onboarding: \{ done: true \} \}/);
+});
+
+// Gli aiuti che aprono Filo per le prove (rete finta, banchi dei giri sui crediti) partono accolti come la fixture:
+// le prove che li usano mettono modello e chat negli aiuti, dove la ricerca per prova non arriva (#663.6).
+// Fuori: gli spec, che la prova sopra legge uno per uno, e gli strumenti in cui la finestra è il risultato.
+function aiutiCheApronoFilo(dir = TESTS, rel = '') {
+  const trovati = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const r = rel ? `${rel}/${e.name}` : e.name;
+    if (e.isDirectory()) {
+      if (!['unit', 'agent', 'node_modules', '.shots', '.smoke', '.out'].includes(e.name)) trovati.push(...aiutiCheApronoFilo(join(dir, e.name), r));
+    } else if (e.name.endsWith('.mjs') && !e.name.endsWith('.spec.mjs') && r !== 'smoke.mjs') {
+      const { senzaCommenti } = maschere(readFileSync(join(dir, e.name), 'utf8'));
+      if (APRE_DA_SE.test(senzaCommenti)) trovati.push({ r, senzaCommenti });
+    }
+  }
+  return trovati;
+}
+
+test('ogni aiuto che apre Filo per le prove lo apre già accolto, se la prova non chiede il profilo nuovo', () => {
+  const aiuti = aiutiCheApronoFilo();
+  assert.ok(aiuti.some((a) => a.r === 'helpers/reteFinta.mjs'), 'la ricerca degli aiuti non trova più la rete finta');
+  const scoperti = aiuti.filter((a) => !/\bseminaProfiloAccolto\s*\(/.test(a.senzaCommenti)).map((a) => a.r);
+  assert.deepEqual(scoperti, [],
+    'Questo aiuto apre Filo su una cartella sua: prima del lancio chiami seminaProfiloAccolto(userData) '
+    + '(tests/helpers/profiloAccolto.mjs), con un modo per chiedere il profilo nuovo a chi prova l\'accoglienza.');
 });
 
 test('ogni prova che mette un modello e scrive nella chat della home parte già accolta', () => {

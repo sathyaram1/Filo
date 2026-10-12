@@ -18,6 +18,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../../../helpers/percorsi.mjs';
+import { seminaProfiloAccolto } from '../../../helpers/profiloAccolto.mjs';
 import { argomentiScala } from '../../../helpers/scala.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -267,7 +268,8 @@ export const ENV_OFFLINE = {
   FILO_ADMIN_EMAILS: OWNER_EMAIL,
 };
 
-export async function avviaFilo({ userData = cartellaTemporanea('filo-598-'), env = {} } = {}) {
+export async function avviaFilo({ userData = cartellaTemporanea('filo-598-'), env = {}, accolto = true } = {}) {
+  if (accolto) seminaProfiloAccolto(userData);
   const app = await electron.launch({
     args: [...argomentiScala, '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9', '.'],
     cwd: APP_ROOT,

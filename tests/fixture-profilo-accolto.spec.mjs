@@ -3,6 +3,7 @@
 // nuovo con `test.use({ accoglienzaFatta: false })`. Senza la fixture che semina il profilo, la prima è rossa.
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
+import { test as testRete } from './helpers/reteFinta.mjs';
 
 const RISPOSTA = 'Domani a Bologna piove dalle dieci.';
 const statoAccoglienza = (app) => app.evaluate(() => globalThis.SN_FILO_MEMORY.getOnboarding());
