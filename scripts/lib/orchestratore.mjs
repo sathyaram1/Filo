@@ -435,7 +435,8 @@ export function creaMotore(dep, opzioni = {}) {
     let atteso = 0;
     const prima = (((dep.verifica(P.wt(p.slug)) || {}).entry) || {}).verdict || '';
     for (let t = 0; ; t += 1) {
-      const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [cartella, P.serverRadice].filter(Boolean), nome });
+      // decisioneServer: { model, effort } del biglietto del server, se la pratica ne ha uno; senza vale il frontmatter.
+      const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [cartella, P.serverRadice].filter(Boolean), nome, dalServer: p.decisioneServer || null });
       const costo = Number(r.costo) || 0;
       p.costo += costo;
       p.istanze.push({ ruolo, giro: p.giriTotali, at: dep.ora(), ok: !!r.ok, costo, riga: primaRiga(r.testo || r.errore).slice(0, 300) });
