@@ -2444,6 +2444,13 @@
       if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
       if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
       if (d.tipo === 'rete') return { testo: 'vuole collegarsi agli apparecchi della tua rete', icone: ['wifi'] };
+      if (d.tipo === 'file') {
+        const o = d.oggetto || {};
+        const nome = String(o.nome || '');
+        if (!nome) return { testo: 'vuole modificare i tuoi file', icone: ['pencil'] };
+        if (o.cartella) return { testo: 'vuole creare, modificare e cancellare file in', nome, percorso: o.percorso, icone: ['folder'] };
+        return { testo: 'vuole modificare', nome, percorso: o.percorso, icone: ['pencil'] };
+      }
       const parti = Array.isArray(d.parti) ? d.parti : [];
       const mic = parti.includes('audio');
       const cam = parti.includes('video');
@@ -2511,6 +2518,15 @@
       testo.className = 'permesso-cosa';
       testo.textContent = cosa.testo;
       msg.append(chi, ' ', testo);
+      if (cosa.nome) {
+        // Un nome lunghissimo non spinge giù la pagina di righe: si accorcia in mezzo, l'estensione resta, intero al passaggio.
+        const n = document.createElement('strong');
+        n.className = 'permesso-oggetto';
+        const c = Array.from(cosa.nome);
+        n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
+        n.title = String(cosa.percorso || cosa.nome);
+        msg.append(' ', n);
+      }
       const si = document.createElement('button');
       si.type = 'button';
       si.className = 'permesso-btn permesso-si';

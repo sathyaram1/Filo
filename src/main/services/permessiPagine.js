@@ -5,6 +5,7 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const path = require('node:path');
 const Psl = require('./safebrowse/psl');
 const { tastoPremuto } = require('../tastoDelMouse');
 
@@ -24,10 +25,13 @@ const TIPI = {
   'local-network': 'rete',
   'loopback-network': 'rete',
 };
+// File e cartelle (#1069): leggere quello che l'utente ha scelto nel selettore passa, la scelta è il consenso; scriverci
+// si chiede. Il salvataggio (showSaveFilePicker) qui non arriva: Electron gli dà la scrittura da sé, come Chrome.
+const SECONDO_L_ACCESSO = { fileSystem: (d) => (d && d.fileAccessType === 'readable' ? null : 'file') };
 // Ciò che Chrome concede di fabbrica passa senza domanda.
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
-  'speaker-selection', 'storage-access', 'top-level-storage-access', 'fileSystem', 'midi',
+  'speaker-selection', 'storage-access', 'top-level-storage-access', 'midi',
   'screen-wake-lock', 'background-sync', 'background-fetch', 'sensors', 'payment-handler', 'persistent-storage',
 ]);
 // Ciò che Filo non sa dare è no, senza domanda: condividere lo schermo e i dispositivi collegati vogliono una scelta
@@ -97,6 +101,22 @@ function origineDi(wc, altro) {
   if (!c.filo || !cima) return c;
   const r = classifica(altro);
   return r.origine ? r : c;
+}
+
+function tipoDi(permission, details) {
+  if (Object.hasOwn(SECONDO_L_ACCESSO, permission)) return SECONDO_L_ACCESSO[permission](details);
+  return Object.hasOwn(TIPI, permission) ? TIPI[permission] : null;
+}
+
+function senzaTipoPassa(permission) {
+  return INNOCUI.has(permission) || Object.hasOwn(SECONDO_L_ACCESSO, permission);
+}
+
+// Il nome della cartella o del file nella domanda: chi l'ha scelto per farlo leggere riconosce cosa sta per cambiare.
+function oggettoDi(tipo, details) {
+  if (tipo !== 'file') return undefined;
+  const percorso = String((details && details.filePath) || '');
+  return { nome: path.basename(percorso) || percorso, percorso, cartella: Boolean(details && details.isDirectory) };
 }
 
 function partiNote(details) {
@@ -399,7 +419,7 @@ function seguiPagina(wc) {
 }
 
 // La domanda resta finché l'utente risponde o la pagina se ne va: una scadenza toglieva il sì a chi rispondeva con calma.
-function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
+function chiedi({ ses, wc, origine, tipo, parti, oggetto, callback, schedaDi }) {
   const dove = schedaDi(wc);
   if (!dove || typeof dove.avvisa !== 'function') { callback(false); return; }
   for (const p of inAttesa.values()) {
@@ -411,7 +431,7 @@ function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
   const { sotto, dominio } = nomeDaMostrare(origine);
   let host = origine;
   try { host = new URL(origine).host; } catch (_) {}
-  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti });
+  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti, ...(oggetto ? { oggetto } : {}) });
 }
 
 // `schedaDi(wc)` → { tabId, avvisa(evento, dati) } della finestra che mostra la pagina, o null.
@@ -431,8 +451,8 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
         callback(Boolean(typeof esterno === 'function' && esterno(url) && gestoRecente(wc)));
         return;
       }
-      const tipo = TIPI[permission];
-      if (!tipo) { callback(INNOCUI.has(permission)); return; }
+      const tipo = tipoDi(permission, details);
+      if (!tipo) { callback(senzaTipoPassa(permission)); return; }
       // Una richiesta di media senza microfono né fotocamera è la condivisione dello schermo, che Filo non sa dare.
       if (tipo === 'media' && !partiNote(details).length) { callback(false); return; }
       const parti = partiDi(tipo, details);
@@ -441,7 +461,7 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       if (decise.every((x) => x === true)) { callback(true); return; }
       if (decise.some((x) => x === false) || SOLO_CONTROLLO.has(permission)) { callback(false); return; }
       if (DOPO_UN_GESTO.has(permission) && !gestoRecente(wc)) { callback(false); return; }
-      chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi: schedaDi || (() => null) });
+      chiedi({ ses, wc, origine, tipo, parti, oggetto: oggettoDi(tipo, details), callback, schedaDi: schedaDi || (() => null) });
     });
   } catch (_) {}
   try {
@@ -452,8 +472,8 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       const origine = chi.origine;
       if (!origine) return false;
       if (COL_GESTO_SENZA_DOMANDA.has(permission)) return gestoRecente(wc);
-      const tipo = TIPI[permission];
-      if (!tipo) return INNOCUI.has(permission);
+      const tipo = tipoDi(permission, details);
+      if (!tipo) return senzaTipoPassa(permission);
       const parti = partiDi(tipo, details);
       if (lasciapassareValido(wc, tipo, parti)) return true;
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
@@ -529,6 +549,7 @@ const PAROLE_PARTE = {
   localizzazione: 'posizione', notifiche: 'notifiche', notifica: 'notifiche', schermi: 'schermi', schermo: 'schermi',
   presenza: 'presenza', 'presenza al computer': 'presenza', strumenti: 'strumenti', 'strumenti musicali': 'strumenti', midi: 'strumenti',
   rete: 'rete', 'rete locale': 'rete', 'rete di casa': 'rete', lan: 'rete',
+  file: 'file', cartella: 'file', cartelle: 'file', 'modifica dei file': 'file', 'modificare i file': 'file', scrittura: 'file',
 };
 function nomeParte(parte) {
   const S = (globalThis.SN_I18N && globalThis.SN_I18N.STRINGS) || {};
@@ -556,7 +577,7 @@ function togliPerChat(sito, permesso) {
   const p = String(permesso || '').trim().toLowerCase();
   const tutti = !p || /^(tutt[oiea]|ogni|qualsiasi|all)$/.test(p);
   const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
-  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete)` };
+  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete, file)` };
   const delSito = scelteRicordate().filter((s) => {
     let h = '';
     try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }
@@ -579,6 +600,6 @@ module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, aperturaScelta, perUnaFinestra,
-  TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
+  TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };
