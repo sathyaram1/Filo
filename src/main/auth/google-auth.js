@@ -294,8 +294,8 @@ async function nuovoFlusso() {
     code_challenge: challenge,
     code_challenge_method: method,
     state,
-    access_type: 'offline',
-    prompt: 'consent',
+    // Di Google serve solo l'id_token: niente accesso offline, e il consenso si chiede una volta sola.
+    prompt: 'select_account',
   }).toString();
 
   const f = { url: authUrl.toString(), loop, aspettaBrowser: true };
