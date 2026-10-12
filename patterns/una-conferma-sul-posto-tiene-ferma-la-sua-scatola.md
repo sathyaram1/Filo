@@ -34,5 +34,6 @@ conferma: una fusione voluta è finita scartata (#550).
 - Vicino: [Un clic, una scheda: nessuna azione ricompone la lista sotto il cursore](un-clic-una-scheda-nessuna-azione-ricompone-la-lista.md),
   la stessa trappola quando a muoversi è la lista intera.
 - **Dove:** `buildCard` in `src/shared/mergeApprovals.js` (copiato nella pagina
-  delle approvazioni da browser). Prove: `tests/livelli-forme.spec.mjs`,
+  delle approvazioni da browser) e «Salta il controllo» del pentagono in
+  `src/pages/manage/manage.js`. Prove: `tests/livelli-forme.spec.mjs`,
   `tests/merge-approvals.spec.mjs`.
