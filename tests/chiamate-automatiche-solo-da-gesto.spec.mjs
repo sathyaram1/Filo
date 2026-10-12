@@ -379,8 +379,8 @@ test('scrivere nel campo di ricerca della pagina non paga spiegazioni in anticip
   const prima = (await conti(app)).spiega;
   await page.keyboard.type('una ricerca qualunque scritta da una persona normale', { delay: 150 });
   await pausa(1500);
-  // Al più una: il clic nel campo è un gesto che seleziona, e lo prende la prima selezione della pagina.
-  expect((await conti(app)).spiega - prima).toBeLessThanOrEqual(1);
+  // Nessuna: né il clic nel campo né le lettere selezionano niente (#1070.1).
+  expect((await conti(app)).spiega - prima).toBe(0);
 });
 
 test('il controllo della parola lo paga il tasto che chiude una parola, non ogni lettera', async ({ app, openTab, testServer }) => {
