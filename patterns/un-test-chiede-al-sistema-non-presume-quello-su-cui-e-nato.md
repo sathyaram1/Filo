@@ -122,6 +122,17 @@ il rosso ferma le versioni per tutti:
 
 Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
 
+**Il codice che fa una cosa diversa per sistema** (#1135). Su Windows la versione
+nuova si installa all'apertura dopo, altrove alla chiusura (#1039): la prova scritta
+su Linux asseriva «alla chiusura», passava ovunque tranne al cancello, e otto rossi
+hanno fermato la pubblicazione. Quando l'esito dipende dalla piattaforma, la prova la
+sceglie lei e gira per ognuna (`perOgniSistema` in
+`tests/unit/aggiornamentiAutomatici.test.mjs`), così Linux corre anche il caso
+Windows: `conPiattaforma` cambia `process.platform` per la durata del caso e lo
+rimette com'era. Regge solo perché il codice la chiede al momento, da un punto solo
+(`dip.piattaforma()`), mai fissata in una costante al caricamento del modulo: lì la
+prova non arriverebbe più, e il caso Windows girerebbe da Linux.
+
 ## Il collegamento simbolico (#742)
 
 Su Windows un collegamento simbolico lo crea solo l'amministratore o chi ha la
