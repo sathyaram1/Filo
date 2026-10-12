@@ -448,6 +448,7 @@ jobs:
     # verrebbe saltato con lui.
     if: ${{ !cancelled() && (inputs.ripubblica_mac || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: macos-latest
+    environment: rilascio
     continue-on-error: true
     outputs:
       allarme: ${{ steps.allarme.outputs.esito }}
