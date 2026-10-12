@@ -2335,6 +2335,7 @@
         ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
         ${localBadgeHtml(fb)}
+        ${attesaServerBadgeHtml(fb)}
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
