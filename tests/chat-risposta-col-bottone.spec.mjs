@@ -48,8 +48,7 @@ test('la segnalazione: la risposta scritta col bottone del file resta nella boll
     expect(testo).toContain(DOPO);
     expect(testo.indexOf(RISPOSTA)).toBeLessThan(testo.indexOf(DOPO));
     await expect(bolla.locator('.dash-file-btn-nome')).toHaveText('tari-2026.pdf');
-    await page.locator('.dash-activity-head').click();
-    await expect(page.locator('.dash-activity-body')).toBeVisible();
+    // Nessuna nota: il blocco, senza altro da raccontare, si è tolto da solo.
     await expect(page.locator('.dash-activity-note')).toHaveCount(0);
     await page.screenshot({ path: 'tests/.shots/chat-risposta-col-bottone.png' });
 
