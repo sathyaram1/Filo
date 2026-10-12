@@ -1,0 +1,63 @@
+// Lavori server dalla cloud (#1159), lato app: il clone di filo-security non entra mai nel repo pubblico, e la busta
+// `lavoroServer` porta al worker le istruzioni del clone coi percorsi veri.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// Come in dispatch.test.mjs: stato e marcatori in una cartella usa-e-getta, letti all'import.
+const TMP = cartellaTemporanea('filo-lavori-server-');
+process.env.FILO_DISPATCH_STATE_DIR = TMP;
+process.env.FILO_REPO_ROOT = TMP;
+process.env.FILO_TOOLS_ROOT = REPO;
+process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
+
+const { cartellaCloneServer, cloneDentroIlRepo, testoLavoroServer, serverCtx } = await import('../../scripts/dispatch.mjs');
+
+test('il clone del server non si committa: .gitignore lo esclude ovunque stia', () => {
+  const righe = readFileSync(join(REPO, '.gitignore'), 'utf8').split(/\r?\n/).map((l) => l.trim());
+  assert.ok(righe.includes('filo-security/'), '.gitignore deve escludere filo-security/');
+  for (const p of ['filo-security/functions/index.js', 'tests/filo-security/x.js']) {
+    const out = execFileSync('git', ['check-ignore', '-v', p], { cwd: REPO, encoding: 'utf8' });
+    assert.match(out, /filo-security\//, p);
+  }
+});
+
+test('dispatch rifiuta un clone dentro il checkout di Filo', () => {
+  const root = resolve('/progetti/Filo');
+  assert.equal(cloneDentroIlRepo(join(root, 'filo-security'), root), true);
+  assert.equal(cloneDentroIlRepo(root, root), true);
+  assert.equal(cloneDentroIlRepo(join(root, 'a', 'b'), root), true);
+  assert.equal(cloneDentroIlRepo(resolve('/progetti/filo-security'), root), false);
+  assert.equal(cloneDentroIlRepo(resolve('/progetti/Filo-copia'), root), false);
+  if (process.platform === 'win32') assert.equal(cloneDentroIlRepo('C:\\PROGETTI\\filo\\filo-security', 'c:\\progetti\\Filo'), true);
+  assert.equal(cartellaCloneServer({}), resolve(join(homedir(), 'filo-security')));
+  assert.equal(cartellaCloneServer({ FILO_SERVER_CLONE: '/altrove/fs' }), resolve('/altrove/fs'));
+});
+
+test('le istruzioni del lavoro server: percorsi veri, aiutante nel clone, registro dopo il push', () => {
+  const t = testoLavoroServer({ clone: '/home/user/filo-security', canale: 'C:\\x\\scripts\\routine-channel.mjs' });
+  assert.ok(t.length > 400);
+  assert.ok(!t.includes('<CLONE>') && !t.includes('<CANALE>'), 'segnaposti sostituiti');
+  assert.ok(!/<!--\s*includi:/.test(t));
+  assert.match(t, /git-credenziali/);
+  assert.match(t, /credential\.useHttpPath/);
+  assert.match(t, /config --local credential\.helper ""/, 'l’elenco si azzera nel clone, mai globale');
+  assert.match(t, /node "C:\/x\/scripts\/routine-channel\.mjs" ramo-server/, 'barre in avanti, percorso assoluto');
+  assert.match(t, /"\/home\/user\/filo-security"/);
+  assert.ok(!/--global/.test(t), 'niente configurazione globale');
+});
+
+test('la busta del server passa il segno `lavoroServer` ai ruoli che lavorano, mai al controllo di sicurezza', () => {
+  const busta = { payload: { feedback: { text: 'x' }, lavoroServer: { repo: 'sathyaram1/filo-security' } } };
+  for (const role of ['new-work', 'fixer', 'verifier']) {
+    assert.deepEqual(serverCtx({ role }, busta).lavoroServer, { repo: 'sathyaram1/filo-security' }, role);
+  }
+  assert.equal(serverCtx({ role: 'verifier' }, { payload: { feedback: { text: 'x' } } }).lavoroServer, undefined);
+  assert.equal(serverCtx({ role: 'secaudit' }, busta).lavoroServer, undefined);
+});
