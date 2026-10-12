@@ -297,11 +297,14 @@ async function mostraAccesso(f) {
 function passaAlBrowser(f, motivo) {
   f.scheda = null;
   f.nelBrowser = true;
-  console.warn('[auth] Google non accetta la scheda (' + motivo + '): accesso nel browser di sistema');
-  try { require('./prodottiGoogle').googleRifiutaLeSchede(); } catch (_) {}
+  console.warn('[auth] scheda d\'accesso abbandonata (' + motivo + '): accesso nel browser di sistema');
+  // Una pagina che non si carica non è un no di Google: la riga dice il motivo vero, e l'invito a collegare resta.
+  const nonCaricata = motivo === 'rete';
+  if (!nonCaricata) { try { require('./prodottiGoogle').googleRifiutaLeSchede(); } catch (_) {} }
   // La riga «continua nel browser» solo se il browser si è aperto: altrimenti parla l'errore dell'accesso.
   apriBrowser(f.url).then(() => {
-    try { require('../services/avvisoFinestra').avvisoNellaFinestra(AVVISO_NEL_BROWSER, { chiave: 'accesso-nel-browser' }); } catch (_) {}
+    const testo = nonCaricata ? AVVISO_NON_CARICATA : AVVISO_NEL_BROWSER;
+    try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'accesso-nel-browser' }); } catch (_) {}
   }, (e) => f.loop.abort(e));
 }
 
