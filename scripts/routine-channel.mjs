@@ -1129,7 +1129,20 @@ if (isMain) {
       console.error(`  … risposta ${a.cred.ticket ? '--biglietto <biglietto>' : '"<parola-d-ordine>" <id>'} <<'FINE'\n  niente\n  FINE`);
       process.exit(1);
     }
-    const r = await rispostaChiusura(a.cred, testo);
+    // Il costo dell'orchestratore dopo l'ultimo biglietto viaggia con la sua risposta: nessun rilascio lo porta.
+    let rapporto = null;
+    if (a.cred.passphrase) {
+      try {
+        const { rapportoChiusura } = await import('./session-report.mjs');
+        rapporto = await rapportoChiusura({ cwd: ROOT });
+        if (rapporto.turns !== undefined) console.error(`chiusura dell'orchestratore: $${Number(rapporto.costUsd || 0).toFixed(4)} (${rapporto.turns} turni, contesto ${rapporto.maxContextTokens}, ${rapporto.rewarmTurns} da riscaldare, fermo ${rapporto.attesaPrimaS}s)`);
+        else console.error(`chiusura dell'orchestratore senza conti: ${rapporto.notes.join(' | ')}`);
+      } catch (e) {
+        rapporto = { v: 3, role: 'orchestrator', closing: true, notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
+      }
+    }
+    const r = await rispostaChiusura(a.cred, testo, undefined, rapporto);
+    if (r.avviso) console.error(r.avviso);
     if (r.esito === 'ok') { console.log('OK: risposta registrata.'); process.exit(0); }
     if (r.esito === 'assente') { console.error(`risposta non arrivata (${r.reason}): chiudi comunque, senza insistere.`); process.exit(EXIT_CHIUSURA.assente); }
     console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato);
