@@ -8,7 +8,7 @@ const PAGINE = ['filo://manage/manage.html', 'filo://options/options.html', 'fil
 
 async function apri(shell, quante) {
   for (const u of PAGINE.slice(0, quante)) await shell.evaluate((u) => window.filoShell.tabs.open(u), u);
-  await expect.poll(() => shell.locator('#tabs .tab').count(), { timeout: 10_000 }).toBe(quante + 1);
+  await expect.poll(() => shell.locator('#tabs .tab').count(), { timeout: 10_000 }).toBeGreaterThanOrEqual(quante + 1);
   await shell.waitForTimeout(1500);
 }
 
@@ -18,7 +18,9 @@ const schede = (shell) => shell.evaluate(() => [...document.querySelectorAll('#t
   return { nome: ti.textContent, posto: ti.clientWidth, testo: ti.scrollWidth, vuoto: Math.round(r.right - q.right) };
 }));
 
-test('r1 con sette schede su 1280 px il nome tagliato arriva fino al bordo della scheda', async ({ shell }) => {
+// Con le larghezze a misura del nome sette pagine di Filo ci stanno intere: per avere nomi tagliati ne servono di più.
+test('r1 con tredici schede su 1280 px il nome tagliato arriva fino al bordo della scheda', async ({ shell }) => {
+  await shell.evaluate(async () => { for (let i = 0; i < 6; i++) await window.filoShell.tabs.open('filo://newtab/'); });
   await apri(shell, 7);
   const tagliate = (await schede(shell)).filter((s) => s.testo > s.posto + 0.5);
   expect(tagliate.length, 'con sette schede qualche nome è tagliato').toBeGreaterThan(0);
