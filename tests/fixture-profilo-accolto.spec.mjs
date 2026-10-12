@@ -39,15 +39,18 @@ test('un modello messo a home aperta e una domanda subito: risponde la chat, l�
 test.describe(() => {
   test.use({ accoglienzaFatta: false });
 
-  test('chi prova l’accoglienza parte dal profilo nuovo: col modello, la home aperta si presenta', async ({ app }) => {
+  test('chi prova l’accoglienza parte dal profilo nuovo: col modello, la home che si apre si presenta', async ({ app, shell }) => {
     test.setTimeout(60_000);
     expect((await statoAccoglienza(app)).done, 'il profilo è nuovo').toBe(false);
     const page = await home(app);
     const benvenuto = await inizioBenvenuto(app);
     try {
       await modelloFinto(app, [{ text: RISPOSTA }]);
-      await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
-      await expect(page.locator('.dash-bubble-filo').first()).toContainText(benvenuto);
+      await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+      await expect.poll(() => app.windows().filter((w) => w.url().startsWith('filo://newtab')).length, { timeout: 10_000 }).toBe(2);
+      const nuova = app.windows().find((w) => w.url().startsWith('filo://newtab') && w !== page);
+      await expect(nuova.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+      await expect(nuova.locator('.dash-bubble-filo').first()).toContainText(benvenuto);
     } finally {
       await ripristina(app);
     }
