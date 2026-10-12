@@ -77,14 +77,17 @@
     window.addEventListener('resize', schedule, { passive: true });
     // La cima cambia colore anche senza scorrere: il tema del sito acceso dal suo interruttore, un'intestazione
     // che arriva tardi, il tema di sistema. Senza, la scheda restava del colore vecchio fino alla rotella (#429).
+    // Una pagina che muta di continuo non deve costare più di quattro campioni al secondo.
+    let quieto = null;
+    const dopoUnCambio = () => { if (!quieto) quieto = setTimeout(() => { quieto = null; schedule(); }, 250); };
     try {
-      new MutationObserver(schedule).observe(document.documentElement, {
+      new MutationObserver(dopoUnCambio).observe(document.documentElement, {
         attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-color-scheme', 'theme', 'dark'],
         childList: true, subtree: true,
       });
     } catch (_) {}
-    document.addEventListener('transitionend', schedule, { capture: true, passive: true });
-    try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', schedule); } catch (_) {}
+    document.addEventListener('transitionend', dopoUnCambio, { capture: true, passive: true });
+    try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', dopoUnCambio); } catch (_) {}
     // Primo campione subito + ritardati per le pagine che colorano dopo il paint.
     schedule();
     setTimeout(schedule, 400);
