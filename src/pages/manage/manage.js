@@ -375,7 +375,16 @@
   // Vero da quando l'avvio ha chiesto le impostazioni: un accesso arrivato dopo le richiede di nuovo.
   let impostazioniAvviate = false;
   function caricaImpostazioni() {
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()]);
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
+      .finally(fineLetturaAutomazioni);
+  }
+
+  // Finché la prima lettura non risponde i controlli non mostrano un valore (regola nel CSS di manage.html).
+  function fineLetturaAutomazioni() {
+    const pan = document.getElementById('panel-automation');
+    if (!pan) return;
+    pan.classList.remove('mg-in-lettura');
+    pan.removeAttribute('aria-busy');
   }
 
   async function refreshAuth() {
