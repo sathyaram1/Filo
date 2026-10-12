@@ -12,8 +12,9 @@
 
   // Cosa fare di un errore di un classificatore che gira su tanti lavori insieme (decideAll). `risposto`: il modello
   // ha già risposto almeno una volta, quindi un 400 è colpa di quella richiesta e non del modello. Prima della prima
-  // risposta, con nessun'altra richiesta in volo, un intoppo passeggero ha UN nuovo tentativo ad attesa corta: un
-  // servizio giù ripiega in un attimo, un intoppo alla prima ondata no (#1118). Prove: tests/unit/cancelloDecisioni.test.mjs.
+  // risposta, con nessun'altra richiesta in volo, un guasto passeggero (server, rete) ha UN nuovo tentativo ad attesa
+  // corta: un servizio giù ripiega in un attimo. Un 429 invece è un servizio che risponde: aspetta quanto chiede e si
+  // riprova come sempre (#1118). Prove: tests/unit/cancelloDecisioni.test.mjs.
   const TENTATIVI_PRIMA_RISPOSTA = 1;
   const ATTESA_PRIMA_RISPOSTA_MS = 1500;
   function esitoDecisione(err, risposto, tentativo = 0, altriInVolo = false) {
