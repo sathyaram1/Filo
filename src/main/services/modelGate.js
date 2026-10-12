@@ -31,7 +31,7 @@
         : /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|socket hang up/i.test(String((err && err.message) || ''));
       if (rete) tipo = 'passeggero';
     }
-    if (tipo !== 'fatale' && !risposto && !altriInVolo && tentativo >= TENTATIVI_PRIMA_RISPOSTA) return 'fatale';
+    if (tipo === 'passeggero' && !risposto && !altriInVolo && tentativo >= TENTATIVI_PRIMA_RISPOSTA) return 'fatale';
     return tipo;
   }
 
