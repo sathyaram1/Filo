@@ -14,7 +14,7 @@ import { pidMorto } from '../helpers/processi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
-  provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
+  provaUnitSullaFusione, chiediConProva, provaDaRiusare, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 import { pathToFileURL } from 'node:url';
 

@@ -614,7 +614,7 @@ describe('unit rossi sul ramo da solo: decide la prova come arriverebbero su mai
     const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
     const esito = codice.indexOf('esitoUnitDelRamo({ checkOnly, prova })', unit);
     assert.ok(unit > 0 && esito > unit);
-    assert.match(codice.slice(unit, esito), /provaUnitSullaFusione\(\{ root: ROOT, punta: git\(\['rev-parse', 'HEAD'\]\)\.out, ancheContenuto: true \}\)/);
+    assert.match(codice.slice(unit, esito), /const puntaProvata = git\(\['rev-parse', 'HEAD'\]\)\.out;\s*const prova = provaUnitSullaFusione\(\{ root: ROOT, punta: puntaProvata, ancheContenuto: true \}\);/);
     assert.match(codice.slice(esito, codice.indexOf('runSpecsALotti(blocking', esito)), /unitRossi = esito\.rosso;/);
   });
 });
