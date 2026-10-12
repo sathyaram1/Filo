@@ -43,8 +43,8 @@ async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWei
     auth.isAdmin = () => true;
     auth.isSignedIn = () => true;
     auth.getProfile = () => ({ email: 'owner@example.com', name: 'Owner' });
-    const risposta = (ok, corpo, status) => ({
-      ok, status: status || (ok ? 200 : 404), headers: new Map(),
+    const risposta = (ok, corpo, status, headers) => ({
+      ok, status: status || (ok ? 200 : 404), headers: new Map(Object.entries(headers || {})),
       clone() { return this; }, async json() { return corpo; }, async text() { return JSON.stringify(corpo); },
     });
     const pausa = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -68,7 +68,10 @@ async function preparaOwner(app, { supportDoc, rispostaDecisioni = 'ok', openWei
         g.decisioni.push(body);
         g.inVolo++; g.picco = Math.max(g.picco, g.inVolo);
         try {
+          const n = g.decisioni.length;
+          if (rispostaDecisioni === 'uno-giu' && n === 1) return risposta(false, { error: { message: 'upstream' } }, 502);
           await pausa(latenza);
+          if (rispostaDecisioni === 'piano' && n <= 4) return risposta(false, { error: { message: 'rate limited' } }, 429, { 'retry-after': '0.3' });
           if (rispostaDecisioni === 'rifiuta') return risposta(false, { error: { message: 'not a decisions model' } }, 400);
           if (rispostaDecisioni === 'guasto') return risposta(false, { error: { message: 'upstream error' } }, 503);
           if (rispostaDecisioni === 'rete') throw new TypeError('fetch failed');
@@ -189,6 +192,20 @@ for (const guasto of ['guasto', 'rete']) {
     expect(secondi, `risultati dopo ${secondi.toFixed(1)} s`).toBeLessThan(4);
     await expect(page.locator('#mgSearchMsg')).toContainText('Classificatore:');
     await expect(page.locator('#mgSearchMsg')).toContainText('Li ha ordinati il modello della ricerca.');
+  });
+}
+
+for (const [intoppo, rispostaDecisioni] of [['troppe richieste alla prima ondata', 'piano'], ['una sola richiesta in errore prima delle altre', 'uno-giu']]) {
+  test(`${intoppo}: si riprova, e i risultati li dà il classificatore`, async ({ app, openTab }) => {
+    await preparaOwner(app, { supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13', manageSearch: 'vendor/testo' }, rispostaDecisioni });
+    const page = await openTab(URL);
+    await page.waitForFunction(() => window.filo && window.__mgTest);
+    await cerca(page, 'la x per chiudere');
+    await expect(page.locator('#mgSearchProgress')).toBeHidden({ timeout: 20000 });
+    const ordine = await page.locator('.mg-item--result').evaluateAll((els) => els.map((e) => e.dataset.id));
+    expect(ordine).toEqual(['fb-7', 'fb-23', 'fb-31']);
+    await expect(page.locator('#mgSearchMsg')).toHaveText('');
+    expect(await app.evaluate(() => globalThis.__g1118.chat)).toEqual([]);
   });
 }
 

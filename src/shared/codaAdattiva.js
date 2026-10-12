@@ -28,7 +28,7 @@
     });
   }
 
-  // `fai(lavoro, indice)` fa il lavoro; `classifica(err)` dice cosa fare di un errore:
+  // `fai(lavoro, indice)` fa il lavoro; `classifica(err, tentativiFatti)` dice cosa fare di un errore:
   //   'lento'      troppe richieste: meno parallelismo, e il lavoro si riprova;
   //   'passeggero' rete o server giù un attimo: si riprova;
   //   'scarta'     il guasto è di questo lavoro: si salta, gli altri continuano;
@@ -72,7 +72,7 @@
             r = await fai(job.lavoro, job.indice);
           } catch (err) {
             if (interrotto()) return;
-            const tipo = classifica(err);
+            const tipo = classifica(err, job.tentativo);
             if ((tipo === 'lento' || tipo === 'passeggero') && job.tentativo < tentativi) {
               job.tentativo++;
               if (tipo === 'lento') rallenta();

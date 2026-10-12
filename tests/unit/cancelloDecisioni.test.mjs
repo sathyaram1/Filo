@@ -137,7 +137,7 @@ test('nessun modello della catena risponde: l\'errore risale', async () => {
   assert.equal(registrazioni.length, 0);
 });
 
-test('un classificatore che non ha mai risposto non si ritenta: il ripiego parte subito; dopo una risposta sì', async () => {
+test('prima della prima risposta un intoppo passeggero ha un solo tentativo in più, ad attesa corta: un servizio giù ripiega presto', async () => {
   for (const errore of [
     Object.assign(new Error('OpenRouter 503: upstream'), { status: 503 }),
     Object.assign(new Error('OpenRouter 429: piano'), { status: 429, retryAfterMs: 5000 }),
@@ -147,10 +147,42 @@ test('un classificatore che non ha mai risposto non si ritenta: il ripiego parte
     rispondi = () => { throw errore; };
     const t0 = Date.now();
     await assert.rejects(cancello(UNO).decideAll({ action: AZIONE, requests: richieste(10), parallel: 2 }));
-    assert.ok(Date.now() - t0 < 300, `${errore.message}: ${Date.now() - t0} ms`);
-    assert.ok(viste.length <= 2, `${errore.message}: ${viste.length} chiamate`);
+    assert.ok(Date.now() - t0 < 4000, `${errore.message}: ${Date.now() - t0} ms`);
+    assert.ok(viste.length <= 4, `${errore.message}: ${viste.length} chiamate`);
   }
+});
 
+test('troppe richieste alla prima ondata: si aspetta e si riprova, e risponde il classificatore', async () => {
+  viste = [];
+  let n = 0;
+  rispondi = () => {
+    n++;
+    if (n <= 2) throw Object.assign(new Error('OpenRouter 429: piano'), { status: 429, retryAfterMs: 50 });
+    return { answers: { f1: { noul: 0.1 } }, usage: { costUsd: 0.001 } };
+  };
+  const r = await cancello(UNO).decideAll({ action: AZIONE, requests: richieste(6), parallel: 2 });
+  assert.equal(r.answered, 6);
+  assert.equal(r.error, null);
+});
+
+test('una richiesta che cade due volte mentre le altre sono ancora in volo non ferma il giro', async () => {
+  viste = [];
+  let n = 0;
+  let sblocca;
+  const secondaCaduta = new Promise((ok) => { sblocca = ok; });
+  rispondi = async () => {
+    n++;
+    if (n === 1) throw Object.assign(new Error('OpenRouter 502: upstream'), { status: 502 });
+    if (n === 4) { sblocca(); throw Object.assign(new Error('OpenRouter 502: upstream'), { status: 502 }); }
+    await secondaCaduta;
+    return { answers: { f1: { noul: 0.1 } }, usage: { costUsd: 0.001 } };
+  };
+  const r = await cancello(UNO).decideAll({ action: AZIONE, requests: richieste(6), parallel: 3 });
+  assert.equal(r.answered, 6);
+  assert.equal(r.error, null);
+});
+
+test('dopo la prima risposta un guasto passeggero si ritenta', async () => {
   viste = [];
   let n = 0;
   rispondi = () => {
@@ -159,7 +191,7 @@ test('un classificatore che non ha mai risposto non si ritenta: il ripiego parte
     return { answers: { f1: { noul: 0.1 } }, usage: { costUsd: 0.001 } };
   };
   const r = await cancello(UNO).decideAll({ action: AZIONE, requests: richieste(4), parallel: 1 });
-  assert.equal(r.answered, 4, 'dopo la prima risposta un guasto passeggero si ritenta');
+  assert.equal(r.answered, 4);
   assert.equal(r.error, null);
 });
 

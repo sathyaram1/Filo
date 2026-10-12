@@ -12,22 +12,26 @@
 
   // Cosa fare di un errore di un classificatore che gira su tanti lavori insieme (decideAll). `risposto`: il modello
   // ha già risposto almeno una volta, quindi un 400 è colpa di quella richiesta e non del modello. Prima della prima
-  // risposta non si ritenta niente: chi cerca aspetta, e il ripiego risponde subito (#1118, otto secondi di attesa).
-  function esitoDecisione(err, risposto) {
+  // risposta, con nessun'altra richiesta in volo, un intoppo passeggero ha UN nuovo tentativo ad attesa corta: un
+  // servizio giù ripiega in un attimo, un intoppo alla prima ondata no (#1118). Prove: tests/unit/cancelloDecisioni.test.mjs.
+  const TENTATIVI_PRIMA_RISPOSTA = 1;
+  const ATTESA_PRIMA_RISPOSTA_MS = 1500;
+  function esitoDecisione(err, risposto, tentativo = 0, altriInVolo = false) {
     const s = Number(err && err.status);
     if (err && (err.name === 'AbortError' || err.code === 'ABORT_ERR')) return 'fatale';
-    if (!risposto) return 'fatale';
-    if (s === 429) return 'lento';
-    if (s >= 500 || s === 408) return 'passeggero';
-    if (!s) {
-      const CE = global.SN_CHAT_ERRORS;
-      const rete = CE && typeof CE.isTransientNetwork === 'function'
-        ? CE.isTransientNetwork(err)
+    if (s === 400) return risposto ? 'scarta' : 'fatale';
+    let tipo = 'fatale';
+    if (s === 429) tipo = 'lento';
+    else if (s >= 500 || s === 408) tipo = 'passeggero';
+    else if (!s) {
+      const W = global.SN_WALLET;
+      const rete = W && typeof W.isNetworkError === 'function'
+        ? W.isNetworkError(err)
         : /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|socket hang up/i.test(String((err && err.message) || ''));
-      return rete ? 'passeggero' : 'fatale';
+      if (rete) tipo = 'passeggero';
     }
-    if (s === 400) return 'scarta';
-    return 'fatale';
+    if (tipo !== 'fatale' && !risposto && !altriInVolo && tentativo >= TENTATIVI_PRIMA_RISPOSTA) return 'fatale';
+    return tipo;
   }
 
   // Il router rende leggibile una generazione qualche secondo dopo: tre tentativi, poi si lascia perdere.
@@ -268,12 +272,17 @@
         const P = providerOf(a.provider);
         const somma = { promptTokens: 0, completionTokens: 0, costUsd: 0, keySource: '' };
         let risposte = 0;
+        let inVolo = 0;
         let servedBy = null;
         const fai = async (req) => {
-          const r = (await P.decisions({
-            apiKey: a.apiKey, model: a.model, state: req.state, questions: req.questions,
-            providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s), signal,
-          })) || {};
+          inVolo++;
+          let r;
+          try {
+            r = (await P.decisions({
+              apiKey: a.apiKey, model: a.model, state: req.state, questions: req.questions,
+              providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s), signal,
+            })) || {};
+          } finally { inVolo--; }
           risposte++;
           const u = r.usage || {};
           somma.promptTokens += Number(u.promptTokens) || 0;
@@ -285,7 +294,11 @@
         };
         const esito = await Coda.esegui(richieste, fai, {
           parallelo: parallel, signal,
-          classifica: (err) => esitoDecisione(err, risposte > 0),
+          classifica: (err, tentativo) => esitoDecisione(err, risposte > 0, tentativo, inVolo > 0),
+          attesa: (tentativo, err) => {
+            const ms = Coda.attesaPredefinita(tentativo, err);
+            return risposte > 0 ? ms : Math.min(ms, ATTESA_PRIMA_RISPOSTA_MS);
+          },
           suEsito: (r, _req, i) => { if (onAnswer) onAnswer(i, (r && r.answers) || {}); },
         });
         let seen = { servedBy: null, violation: false };
