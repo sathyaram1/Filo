@@ -599,8 +599,10 @@ test('un’immagine incollata: la chat riaperta a Filo ancora aperto la rimostra
   await chiudi(app, 'c-img');
 
   const dash = await openTab('filo://dashboard/dashboard.html?chat=c-img');
-  await expect(dash.locator('.dash-bubble').first()).toContainText('Cosa vedi in questo grafico?');
-  await expect(dash.locator('.dash-thread')).toContainText('1 immagine');
+  const bolla = dash.locator('.dash-bubble').first();
+  await expect(bolla).toContainText('Cosa vedi in questo grafico?');
+  await expect(bolla.locator('img.dash-bubble-img')).toHaveAttribute('src', png);
+  await expect(dash.locator('.dash-thread')).not.toContainText('non conservata');
 });
 
 test('la Cronologia aperta si accorge di una chat finita in un’altra scheda', async ({ app, openTab }) => {
