@@ -420,7 +420,94 @@ test('nessuna strada verso fuori vuol dire offline anche se Chromium dice online
     { online: true, tipo: 'cavo', nome: null });
   // Le connessioni senza Internet e senza gateway (gli adattatori virtuali lato computer) non si scelgono.
   assert.match(L.SCRIPT_WINDOWS, /GatewayAddresses/);
-  assert.match(L.SCRIPT_WINDOWS, /IsConnectedToInternet\) -and \(-not \$uscite/);
+  const vEthernet = { id: VETH, tipo: 'Ethernet', gateway: false };
+  assert.deepEqual(L.reteDaWindows({ schede: [vEthernet], profili: [{ id: VETH, livello: 1, iana: 6 }], connessioni: [] }), { uscita: false });
+  assert.deepEqual(L.reteDaWindows({ schede: [vEthernet], profili: null, connessioni: [{ id: VETH, internet: false, nome: 'Rete non identificata' }] }), { uscita: false });
+});
+
+// ── Windows: quale connessione e come esce (#1114) ──
+// Una riga come la scrive il PowerShell: gli adattatori accesi, i profili di Windows, quello che usa per Internet
+// e le connessioni del gestore delle reti (coi nomi).
+
+const WIFI = '0f8a6b4f-1c2d-4e5f-8a9b-0c1d2e3f4a5b';
+const VETH = 'a1b2c3d4-0000-4000-8000-00000000abcd';
+const CAVO = '5e6f7a8b-1111-4222-8333-444455556666';
+const VPN = '99999999-aaaa-4bbb-8ccc-dddddddddddd';
+const schedaWifi = { id: WIFI, tipo: 'Wireless80211', gateway: true };
+const schedaVeth = { id: VETH, tipo: 'Ethernet', gateway: false };
+const rigaWindows = (rete) => JSON.stringify({ batteria: { livello: 43, inCarica: false, collegata: false }, rete, bluetooth: { acceso: true, dispositivi: [] }, volume: { livello: 62, muto: false }, wifi: { acceso: true } });
+
+test('#1114 Windows: col Guid del gestore delle reti illeggibile la home dice il Wi-Fi col suo nome, non il globo', () => {
+  // Il caso della segnalazione: portatile sul Wi-Fi più l'adattatore virtuale di Hyper-V, e il gestore delle reti
+  // che attraverso PowerShell non dice l'adattatore delle sue connessioni.
+  const riga = rigaWindows({
+    schede: [schedaWifi, schedaVeth],
+    profili: [{ id: WIFI, livello: 3, iana: 71 }, { id: VETH, livello: 1, iana: 6 }],
+    principale: WIFI,
+    connessioni: [{ id: null, internet: true, nome: 'Caffè' }, { id: null, internet: false, nome: 'Rete non identificata' }],
+  });
+  const stato = globalThis.SN_SISTEMA.normalizza(L.componi(L.datiDaWindows(riga), true));
+  assert.deepEqual(stato.rete, { online: true, tipo: 'wifi', nome: 'Caffè' });
+  const voce = globalThis.SN_SISTEMA.descrivi(stato).rete;
+  assert.equal(voce.icona, 'wifi');
+  assert.equal(voce.testo, 'Caffè');
+  assert.equal(voce.hover, 'Wi-Fi');
+  // Staccato il Wi-Fi resta solo l'adattatore virtuale: offline, anche se Chromium dice online.
+  const staccato = rigaWindows({ schede: [schedaVeth], profili: [{ id: VETH, livello: 1, iana: 6 }], principale: null, connessioni: [{ id: null, internet: false, nome: 'Rete non identificata' }] });
+  assert.deepEqual(L.componi(L.datiDaWindows(staccato), true).rete, { online: false });
+});
+
+test('Windows: senza i profili di Windows decide il gestore delle reti, legato all\'adattatore dal suo Guid', () => {
+  const conGuid = { schede: [schedaWifi, schedaVeth], profili: null, connessioni: [
+    { id: `{${VETH.toUpperCase()}}`, internet: false, nome: 'Rete non identificata' },
+    { id: `{${WIFI.toUpperCase()}}`, internet: true, nome: 'Casa' },
+  ] };
+  assert.deepEqual(L.reteDaWindows(conGuid), { tipo: 'wifi', nome: 'Casa' });
+  // Senza né profili né Guid si sa che si esce, non come: il globo, senza un nome preso a caso.
+  const senza = { ...conGuid, connessioni: conGuid.connessioni.map((c) => ({ ...c, id: 'System.__ComObject' })) };
+  assert.deepEqual(L.reteDaWindows(senza), { tipo: null, nome: null });
+  // Nessuna delle due letture riuscita: la piattaforma non sa niente, decide Chromium.
+  assert.equal(L.reteDaWindows({ schede: [schedaWifi], profili: null, connessioni: null }), null);
+  assert.deepEqual(L.datiDaWindows(rigaWindows(null)).rete, null);
+});
+
+test('Windows: fra due uscite vince chi ha Internet, poi chi sa come esce, poi quella che Windows usa', () => {
+  const schedaCavo = { id: CAVO, tipo: 'Ethernet', gateway: true };
+  const schedaVpn = { id: VPN, tipo: 'Ppp', gateway: true };
+  const entrambe = { schede: [schedaWifi, schedaCavo], profili: [{ id: WIFI, livello: 3, iana: 71 }, { id: CAVO, livello: 3, iana: 6 }], connessioni: [] };
+  assert.equal(L.reteDaWindows({ ...entrambe, principale: CAVO }).tipo, 'cavo');
+  assert.equal(L.reteDaWindows({ ...entrambe, principale: WIFI }).tipo, 'wifi');
+  // Una VPN che Windows usa per Internet non nasconde il Wi-Fi sotto; il nome, con due reti su Internet, si dice
+  // solo se il gestore lega la connessione all'adattatore.
+  const vpn = { schede: [schedaWifi, schedaVpn], profili: [{ id: VPN, livello: 3, iana: 23 }, { id: WIFI, livello: 3, iana: 71 }], principale: VPN };
+  const nomi = [{ id: null, internet: true, nome: 'Ufficio VPN' }, { id: null, internet: true, nome: 'Casa' }];
+  assert.deepEqual(L.reteDaWindows({ ...vpn, connessioni: nomi }), { tipo: 'wifi', nome: null });
+  assert.deepEqual(L.reteDaWindows({ ...vpn, connessioni: [{ ...nomi[0], id: VPN }, { ...nomi[1], id: WIFI }] }), { tipo: 'wifi', nome: 'Casa' });
+  // Un portale da accettare (Internet limitata) è comunque una strada fuori: Wi-Fi, non offline.
+  assert.equal(L.reteDaWindows({ schede: [schedaWifi], profili: [{ id: WIFI, livello: 2, iana: 71 }], connessioni: [] }).tipo, 'wifi');
+  // Un adattatore Wi-Fi che si presenta senza il numero IANA lo dice il suo tipo.
+  assert.equal(L.reteDaWindows({ schede: [schedaWifi], profili: [{ id: WIFI, livello: 3, iana: 0 }], connessioni: [] }).tipo, 'wifi');
+});
+
+test('Windows: profili vuoti e gestore che vede Internet, elenchi alla PowerShell 5.1 e Guid storti', () => {
+  // Se i profili non dicono niente ma il gestore vede una connessione con Internet, non si dice offline.
+  assert.deepEqual(L.reteDaWindows({ schede: [schedaWifi], profili: [], connessioni: [{ id: WIFI, internet: true, nome: 'Casa' }] }), { tipo: 'wifi', nome: 'Casa' });
+  const r = L.reteDaWindows({
+    schede: { value: [schedaWifi], Count: 1 },
+    profili: { value: [{ id: `{${WIFI}}`, livello: 3, iana: 71 }, { id: 'eth0', livello: 3, iana: 6 }, null, 'x'], Count: 4 },
+    connessioni: { value: [{ id: null, internet: true, nome: '  ' }], Count: 1 },
+  });
+  assert.deepEqual(r, { tipo: 'wifi', nome: null }, 'un nome vuoto non si inventa');
+});
+
+test('Windows: lo script raccoglie i fatti della rete, e un dato che non arriva non si porta via gli altri', () => {
+  const s = L.SCRIPT_WINDOWS;
+  for (const pezzo of ['GetConnectionProfiles', 'GetInternetConnectionProfile', 'NetworkAdapterId', 'IanaInterfaceType', 'GetNetworkConnectivityLevel', 'GetNetworkConnections', 'GetAdapterId']) {
+    assert.ok(s.includes(pezzo), pezzo);
+  }
+  assert.match(s, /try \{ \$a = \(\[string\]\$c\.GetAdapterId\(\)\)[^\n]*\} catch \{\}/, 'il Guid illeggibile di una connessione non cancella la lettura');
+  assert.match(s, /try \{ \$nome = \[string\]\$c\.GetNetwork\(\)\.GetName\(\) \} catch \{\}/);
+  assert.match(s, /\(\$null -ne \$rete\.profili\) -or \(\$null -ne \$rete\.connessioni\)/, 'un elenco vuoto è una lettura (offline), non un dato mancante');
 });
 
 test('online lo decide Chromium: offline toglie tipo e nome, online tiene quello che la piattaforma sa', () => {

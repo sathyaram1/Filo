@@ -964,5 +964,6 @@ module.exports = {
   SCRIPT_WINDOWS,
   scriptWindows,
   datiDaWindows,
+  reteDaWindows,
   lettoreWindows,
 };
