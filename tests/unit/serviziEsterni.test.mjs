@@ -92,12 +92,21 @@ function leggiJs(testo) {
       if (pila.at(-1) === '{') pila.pop();
       else if (pila.at(-1) === 'tpl') { k = sc.reScanTemplateToken(false); if (k === K.TemplateTail) pila.pop(); }
     }
+    if (k === K.PlusToken && ultimo && ultimo.dopo === da) ultimo.concat = true;
+    ultimo = null;
     if (LETTERALI.has(k)) {
-      frammenti.push({ valore: sc.getTokenValue(), riga: riga(da), segue: k === K.TemplateHead || k === K.TemplateMiddle });
+      const valore = sc.getTokenValue();
+      // `{ hostname: 'x.it' }` di net.request o https.request: l'host senza schema è un indirizzo come gli altri.
+      const host = (k === K.StringLiteral || k === K.NoSubstitutionTemplateLiteral) && prima === K.ColonToken
+        && CHIAVI_HOST.has(primaPrimaTesto.replace(/^['"]|['"]$/g, '')) && /^[a-z0-9.-]+$/i.test(valore);
+      ultimo = { valore: host ? `https://${valore}` : valore, riga: riga(da), segue: k === K.TemplateHead || k === K.TemplateMiddle };
+      frammenti.push(ultimo);
       letterali.push([da + 1, sc.getTextPos() - 1]);
+      ultimo.dopo = sc.getTextPos();
     } else if (k === K.RegularExpressionLiteral) {
       letterali.push([da + 1, sc.getTextPos() - 1]);
     }
+    primaPrimaTesto = primaTesto;
     prima = k;
     primaTesto = sc.getTokenText();
   }
