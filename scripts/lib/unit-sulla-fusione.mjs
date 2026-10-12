@@ -450,6 +450,17 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
 }
 
 /**
+ * La prova fatta per giudicare gli unit rossi del ramo da solo, se vale anche per la richiesta di fusione: stessa
+ * punta, ramo senza main dentro (lì la richiesta porta `main_contenuto`, che non costa una corsa), esito che fa
+ * proseguire. Rifarla sullo stesso main era una corsa intera degli unit pagata due volte (#1009). PURA.
+ */
+export function provaDaRiusare({ fatta, punta } = {}) {
+  const p = fatta && fatta.prova;
+  if (!p || !punta || fatta.punta !== punta || p.contenuto || p.errore || p.saltata) return null;
+  return p.esito === 'verde' || p.esito === 'rosso_anche_su_main' ? p : null;
+}
+
+/**
  * Prova, chiede, e rifà la prova se il server risponde che main si è mosso, fino a `tentativi` volte.
  * `fermaSe(prova)` true = non si chiede niente (il finish locale si ferma da sé su un rosso o su una prova mancata).
  * `primaProva`: una prova già fatta su questa punta vale per il primo tentativo; se main si è mosso lo dice il server.
