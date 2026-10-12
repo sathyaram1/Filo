@@ -60,8 +60,12 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   `tests/onboarding-ripresa.spec.mjs` (la riga sulla home dopo una chiusura a
   metà), `tests/verifica/524/verify-524-g2.spec.mjs` (rifiutare una proposta, rilanci a
   vuoto, testo ostile, tre schede).
-- **Nelle prove della chat l'accoglienza si dichiara**: una home aperta in un
-  profilo nuovo comincia l'intervista appena Filo ha un modello, anche a metà
-  prova, e il messaggio scritto subito dopo finisce lì dentro, o no, secondo i
-  tempi. Chi mette un modello e poi scrive in chat segna prima l'utente come già
-  accolto. Sentinella: `tests/unit/proveChatAccoglienza.test.mjs`.
+- **Le prove partono da un utente già accolto**: una home aperta in un profilo
+  nuovo comincia l'intervista appena Filo ha un modello, anche a metà prova, e
+  il messaggio scritto subito dopo finisce lì dentro, o no, secondo i tempi. La
+  fixture apre quindi Filo già accolto; una prova dell'accoglienza chiede il
+  profilo nuovo con `test.use({ accoglienzaFatta: false })`, e chi apre Filo da
+  sé lo segna prima di mettere il modello. Con l'accoglienza fatta la home
+  aperta prepara il suo saluto col modello: una spia che conta le chiamate
+  salta quella della home (il prompt dice «preparare la dashboard»). Sentinella:
+  `tests/unit/proveChatAccoglienza.test.mjs`; prova: `tests/fixture-profilo-accolto.spec.mjs`.
