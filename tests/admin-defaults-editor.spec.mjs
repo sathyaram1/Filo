@@ -66,6 +66,11 @@ async function openStubbedEditor(openTab, overrides = {}) {
               { name: 'Together', slug: 'together' },
             ],
           };
+        case 'audio_host_check': {
+          // Come il main: il verdetto dipende dalla lista di esclusione che la pagina manda (#1141).
+          const misto = msg.model === 'acme/misto' && Array.isArray(msg.excluded) && msg.excluded.includes('OpenAI');
+          return misto ? { ok: true, verdict: 'mixed', warning: `Con «${msg.label}» la lettura non parte.` } : { ok: true, verdict: 'ok' };
+        }
         case 'test_default_model':
           // Il main risponderebbe ok solo se riceve la stringa modello.
           if (!msg.model) return { ok: false, error: `Modello "${msg.nickname}" non trovato` };
@@ -207,6 +212,25 @@ test('la lista dei fornitori esclusi si modifica e si salva nella config condivi
   expect(upd?.config?.excludedProviders).toEqual(['Google', 'Novita']);
 
   await page.screenshot({ path: 'tests/.shots/admin-defaults-excluded.png', fullPage: true }).catch(() => {});
+});
+
+test('voce e dettatura: l\'avviso del modello segue la lista dei fornitori esclusi che si sta modificando (#1141)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    excludedProviders: ['Google', 'OpenAI'],
+    modelRegistry: { 'voce-mista': { provider: 'openrouter', model: 'acme/misto', label: 'Voce mista', inputs: ['text'], outputs: ['audio'] } },
+    models: { tts: 'voce-mista' },
+  });
+  const idx = await page.evaluate(() => window.SN_MODEL_CHAIN.actionLabels().findIndex(([a]) => a === 'tts'));
+  const avviso = page.locator('#modelsGrid > div').nth(idx).locator('.sn-chain-warn');
+  await expect(avviso).toHaveText('Con «Voce mista» la lettura non parte.');
+  const chiesto = await page.evaluate(() => window.__sent.filter((m) => m.type === 'audio_host_check').pop());
+  expect(chiesto).toMatchObject({ action: 'tts', provider: 'openrouter', model: 'acme/misto', excluded: ['Google', 'OpenAI'] });
+
+  // Tolto OpenAI dalla lista (non ancora salvata), l'avviso se ne va.
+  await page.locator('#excludedList .sn-excluded-row').nth(1).getByRole('button', { name: 'Rimuovi' }).click();
+  await expect(avviso).toBeHidden();
+  const dopo = await page.evaluate(() => window.__sent.filter((m) => m.type === 'audio_host_check').pop());
+  expect(dopo.excluded).toEqual(['Google']);
 });
 
 test('esclusioni del codice che la lista condivisa non copre: la pagina le nomina e le rimette', async ({ openTab }) => {

@@ -27,6 +27,7 @@
       ],
       fixes: [
         'Filo vede ancora le foto che gli mandi in chat anche nei messaggi dopo, e puoi continuare a chiedergli di quello che c\'è dentro; riaprendo la chat le ritrovi anche tu. Prima dal secondo messaggio diceva di non vederle. Dopo una ventina di messaggi, o se riapri Filo, non le ha più davanti, ma sa che c\'erano e ti chiede di rimandarle se gli servono.',
+        'Lettura ad alta voce e dettatura partono solo se Filo ammette tutti i fornitori che servono il modello. Prima ne bastava uno, e la tua voce poteva finire a quello escluso. Con un modello così Filo ti dice perché non parte, e lo vedi già quando lo scegli, nelle Opzioni o da «Detta» col tasto destro.',
         'Mentre scorri o scrivi in una pagina, Filo non ridisegna più la barra delle schede e non risalva i suoi dati a ogni movimento. Menu e chat rispondono senza scatti e la batteria dura di più.',
         'Preferenze, Modelli e le altre pagine di Filo si aprono un po\' più svelte dalla terza volta in poi. Filo tiene da parte il loro codice già preparato e non lo rifà a ogni apertura.',
         'Il tasto destro su una scheda o su un avviso e i menu Impostazioni, App e Profilo si aprono appena fai clic, anche sui computer lenti. Prima ogni apertura ricostruiva il menu da capo e poteva farti aspettare quasi un secondo.',
