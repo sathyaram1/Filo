@@ -1139,8 +1139,13 @@ const soloBottone = (type) => AZIONI_SOLO_BOTTONE.has(String(type || '').toUpper
 const giroDiSoliBottoni = (results) => results.length > 0 && results.every(({ action, res }) => !!res
   && !res.rejected && res.kept && !res.needsConfirm && !(res.output && res.output.blocked)
   && soloBottone(action && action.type));
-const NON_RIPETERE_LA_RISPOSTA = 'Se insieme a questa chiamata hai già scritto la risposta, l\'utente la sta leggendo: non ripeterla e non '
+// Cosa dire al modello del testo scritto col bottone dipende da dove l'ha messo la chat: «l'utente la sta leggendo»
+// detto di un testo finito fra le note lo seppelliva lì (giro con un'altra azione insieme al bottone, #1167).
+const NON_RIPETERE_LA_RISPOSTA = 'Il testo che hai scritto insieme a questa chiamata l\'utente lo sta leggendo come risposta: non ripeterlo e non '
   + 'annunciare il bottone. Se non hai altro da fare, chiudi senza scrivere altro.';
+const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate l\'utente lo vede fra le note di lavoro, non come risposta: '
+  + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
+const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : giro && giro.testo ? ` ${RISPOSTA_FRA_LE_NOTE}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
 
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
