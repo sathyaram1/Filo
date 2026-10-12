@@ -97,9 +97,10 @@ lettura della rete. Adesso:
   che Windows usa per Internet, e le connessioni del gestore delle reti coi nomi;
 - `reteDaWindows` sceglie: vince chi ha Internet, poi chi sa come esce, poi
   quella che Windows usa. Una VPN davanti non nasconde il Wi-Fi sotto;
-- il nome viene dal gestore delle reti, per adattatore; se il Guid manca, solo
-  quando una connessione sola esce su Internet. Altrimenti niente nome: un nome
-  preso a caso è peggio di nessuno.
+- il nome viene dal gestore delle reti, per adattatore; se il Guid manca, dal
+  nome del profilo di Windows legato all'adattatore (una VPN accesa fa uscire su
+  Internet in due); senza nemmeno quello, solo quando una connessione sola esce
+  su Internet. Altrimenti niente nome: un nome preso a caso è peggio di nessuno.
 
 La scelta così si prova in `tests/unit/statoSistema.test.mjs` su ogni macchina.
 Lo script con oggetti finti al posto di Windows si può far girare con
