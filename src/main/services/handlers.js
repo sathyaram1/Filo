@@ -1909,6 +1909,9 @@ async function eseguiAzioneFilo(action, {
       if (built && built.elenco) {
         const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
         if (r.invariato) action._invariato = r.invariato;
+        // #947.3 — «togli» una cartella dove l'utente ha cercato una volta: non è nell'elenco, ma c'è da dimenticare.
+        if (r.invariato && built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli'
+          && (await require('./documentiIndice').occasionaliFra(built.elenco.voci)).length) delete action._invariato;
         // #947 — una cartella dei documenti che non c'è non entra nell'elenco: si dice subito, senza chiedere un OK a vuoto.
         if (!r.invariato && built.elenco.percorso === 'documenti.cartelle' && built.elenco.op !== 'togli') {
           const mancanti = await require('./documentiIndice').cartelleMancanti(built.elenco.voci);
@@ -2397,8 +2400,14 @@ async function eseguiAzioneFilo(action, {
         if (action._invariato) return { executed: false, kept: false, output: { error: action._invariato, invariato: true } };
         // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
         let partial = built.partial;
+        let dimenticate = 0;
         if (built.elenco) {
           const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          if (built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli') {
+            const Indice = require('./documentiIndice');
+            for (const c of await Indice.occasionaliFra(built.elenco.voci)) dimenticate += (await Indice.dimentica(c)).tolta ? 1 : 0;
+          }
+          if (r.invariato && dimenticate) return { executed: true, kept: true, output: { etichetta: `${built.label} (Filo ne dimentica i documenti già letti)` } };
           if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
           partial = r.partial;
         }
@@ -2488,7 +2497,12 @@ async function eseguiAzioneFilo(action, {
         const settings = await Storage.getSettings();
         let permessiSiti = null;
         try { permessiSiti = require('./permessiPagine').righeRicordate(); } catch (_) {}
-        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti } });
+        let cartelleCercate = null;
+        try {
+          cartelleCercate = (await require('./documentiIndice').stato()).occasionali
+            .map((o) => `${o.nome} (${o.percorso}, ${o.documenti} documenti già letti${o.esiste ? '' : ', ora non c\'è'})`);
+        } catch (_) {}
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti, cartelleCercate } });
         return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
       }
       case 'TOGLI_PERMESSO_SITO': {

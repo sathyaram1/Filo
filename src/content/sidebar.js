@@ -1011,6 +1011,14 @@
     return false;
   }
 
+  // Il tasto destro sul bottone apre il menu di Filo con queste voci (content.js, fileSotto).
+  const azioniDelFile = new WeakMap();
+  function fileSotto(el) {
+    if (!root || !el || !root.contains(el)) return null;
+    const btn = el.closest ? el.closest('.sn-sidebar-file') : null;
+    return (btn && azioniDelFile.get(btn)) || null;
+  }
+
   // Un clic lo apre col programma del sistema; trascinato, è il file vero (la pagina lo riceve come da una cartella,
   // per esempio nel campo per caricarlo); col tasto destro, anche «Mostra nella cartella».
   function bottoneFile(c) {
@@ -1044,36 +1052,10 @@
       if (!gestoVero(e)) return;
       azioneFile(btn, MSG.AIUTO_TRASCINA_FILE, c, 'Non sono riuscito a prendere il file');
     });
-    let menu = null;
-    const apriMenu = (e) => {
-      e.preventDefault();
-      if (!gestoVero(e)) return;
-      if (menu) { menu.remove(); menu = null; return; }
-      menu = document.createElement('div');
-      menu.className = 'sn-sidebar-choices sn-sidebar-file-menu';
-      for (const [label, type, fallita] of [
-        ['Apri', MSG.AIUTO_APRI_FILE, 'Il file non si è aperto'],
-        ['Mostra nella cartella', MSG.AIUTO_MOSTRA_FILE, 'La cartella non si è aperta'],
-      ]) {
-        const voce = document.createElement('button');
-        voce.type = 'button';
-        voce.className = 'sn-sidebar-choice';
-        voce.textContent = label;
-        voce.addEventListener('click', (ev) => {
-          if (!gestoVero(ev)) return;
-          if (menu) { menu.remove(); menu = null; }
-          azioneFile(btn, type, c, fallita);
-        });
-        menu.appendChild(voce);
-      }
-      btn.insertAdjacentElement('afterend', menu);
-      const primo = menu.querySelector('button');
-      if (primo) try { primo.focus({ preventScroll: true }); } catch (_) {}
-    };
-    btn.addEventListener('contextmenu', apriMenu);
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) apriMenu(e);
-    });
+    azioniDelFile.set(btn, [
+      { label: 'Apri', fn: () => azioneFile(btn, MSG.AIUTO_APRI_FILE, c, 'Il file non si è aperto') },
+      { label: 'Mostra nella cartella', fn: () => azioneFile(btn, MSG.AIUTO_MOSTRA_FILE, c, 'La cartella non si è aperta') },
+    ]);
     return btn;
   }
 
@@ -1841,7 +1823,7 @@
     });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata };
+  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
   global.__filoSidebarTest = {

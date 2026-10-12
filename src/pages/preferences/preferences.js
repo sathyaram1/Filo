@@ -1261,8 +1261,13 @@
     for (const v of Object.keys(CARTELLE_DI_SERIE)) {
       if (!cartelleSalvate.includes(v)) box.appendChild(rigaCartella(v, { tolta: true }));
     }
-    const occasionali = statoDocumenti && Array.isArray(statoDocumenti.occasionali) ? statoDocumenti.occasionali : [];
-    for (const o of occasionali) box.appendChild(rigaOccasionale(o));
+    const cercate = $('documentiCercate');
+    if (cercate) {
+      const occasionali = statoDocumenti && Array.isArray(statoDocumenti.occasionali) ? statoDocumenti.occasionali : [];
+      cercate.textContent = '';
+      for (const o of occasionali) cercate.appendChild(rigaOccasionale(o));
+      cercate.hidden = !occasionali.length;
+    }
   }
 
   // #947.3 — una cartella fuori elenco in cui l'utente ha chiesto di cercare: Filo tiene quello che ne ha già letto,

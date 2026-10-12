@@ -267,7 +267,8 @@
       scrive: [percorso],
       aiuto: '"aggiungi <cartella>" | "togli <cartella>" | "solo <cartella>" | "svuota" (le cartelle in cui Filo cerca i '
         + 'documenti per contenuto; di serie Documenti, Download e Scrivania; le altre col percorso intero o con ~, più '
-        + 'cartelle separate da punto e virgola; svuotato, Filo non legge più nessun documento)',
+        + 'cartelle separate da punto e virgola; svuotato, Filo non legge più nessun documento; «togli» fa dimenticare anche '
+        + 'una cartella dove l\'utente ha cercato una volta, coi documenti che Filo ne ha già letto)',
       costo: 2,
       // Una cartella in più è un posto in più dove Filo legge: abbassa una difesa come aggiungere un sito fidato.
       allenta: (r) => !!r.elenco && r.elenco.op !== 'togli' && r.elenco.voci.length > 0,

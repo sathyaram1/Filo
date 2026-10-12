@@ -28,16 +28,16 @@ async function preparaModelli(app) {
 }
 
 // L'Aiuto riceve la risposta della prima coppia [parola, risposta] la cui parola sta nell'ultimo messaggio dell'utente;
-// tutti i messaggi arrivati al modello restano in __visti.
+// i messaggi delle sue chiamate restano in __visti. Le chiamate di sottofondo (la home) hanno una risposta vuota.
 async function aiutoFinto(app, risposte) {
   await app.evaluate((_e, risposte) => {
     const P = globalThis.SN_PROVIDERS;
     globalThis.__visti = [];
     const risposta = ({ attempts, messages }) => {
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      if (!sistema.includes('# Protocollo di risposta')) return { text: '{"message":"Ciao.","suggestions":[],"issues":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
       const ultimo = JSON.stringify([...messages].reverse().find((m) => m.role === 'user') || '');
-      const testo = JSON.stringify(messages);
-      if (testo.includes('preparare la dashboard')) return { text: '{"message":"Ciao.","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       const scelta = risposte.find(([parola]) => ultimo.includes(parola)) || risposte[risposte.length - 1];
       return { text: scelta[1], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
@@ -118,8 +118,11 @@ test('la prova della segnalazione: sul sito del fornitore l’Aiuto trova la bol
     // Un clic lo apre col programma del sistema; dal tasto destro si apre la sua cartella.
     await file.click();
     await expect.poll(() => app.evaluate(() => globalThis.__aperti)).toEqual([bolletta]);
+    // Il tasto destro apre il menu di Filo con le azioni del file, non quello della pagina.
     await file.click({ button: 'right' });
-    await page.locator('.sn-sidebar-file-menu .sn-sidebar-choice', { hasText: 'Mostra nella cartella' }).click();
+    const voci = page.locator('.sn-menu .sn-menu-item');
+    await expect(voci).toHaveText(['Apri', 'Mostra nella cartella']);
+    await voci.filter({ hasText: 'Mostra nella cartella' }).click();
     await expect.poll(() => app.evaluate(() => globalThis.__cartelle)).toEqual([bolletta]);
 
     // Trascinato, parte il trascinamento del sistema col file vero: quello che la pagina riceve al rilascio.
@@ -180,34 +183,32 @@ test('le porte dell’Aiuto: chiavi a caso valide solo nella loro scheda, mai un
     const b = await testServer.openReady(openTab, PAGINA.replace('Fornitore Energia', 'Altro sito'));
     const a = await testServer.openReady(openTab, PAGINA);
     // Il messaggio arriva come da ciascuna scheda, col suo webContents vero; il sì al popup lo dà la prova.
-    const daScheda = (titolo, msg, { riquadro = false } = {}) => app.evaluate(async ({ BrowserWindow }, [titolo, msg, riquadro]) => {
+    const daScheda = (pagina, msg, { riquadro = false } = {}) => app.evaluate(async ({ BrowserWindow }, [url, msg, riquadro]) => {
       for (const w of BrowserWindow.getAllWindows()) {
         for (const t of w._filoTabs?.tabs || []) {
           const wc = t.view && t.view.webContents;
-          if (!wc || wc.getTitle() !== titolo) continue;
-          const url = wc.getURL();
+          if (!wc || wc.getURL() !== url) continue;
           const frame = riquadro ? { parent: wc.mainFrame } : wc.mainFrame;
           return globalThis.SN_HANDLE_MESSAGE(msg, { tab: { id: t.id, url }, url, wc, frame });
         }
       }
-      return null;
-    }, [titolo, msg, riquadro]);
-    const cerca = daScheda('Fornitore Energia', { type: 'aiuto_cerca_documenti', cosa: 'fattura luce' });
+      return { trovata: false };
+    }, [pagina.url(), msg, riquadro]);
+    const cerca = daScheda(a, { type: 'aiuto_cerca_documenti', cosa: 'fattura luce' });
     await clickConfirm(await confermaSopraPagina(app, { timeout: 15_000 }), 'ok');
     const r = await cerca;
     expect(r.ok).toBe(true);
     expect(JSON.stringify(r)).not.toContain(dir);
     const chiave = r.candidati.find((c) => c.nome === 'fattura-luce.txt').chiave;
-    expect((await daScheda('Altro sito', { type: 'aiuto_apri_file', chiave })).ok, 'un\'altra scheda non apre con quella chiave').not.toBe(true);
-    expect((await daScheda('Fornitore Energia', { type: 'aiuto_apri_file', chiave: 'inventata', percorso: join(dir, 'fattura-luce.txt') })).ok).not.toBe(true);
-    expect((await daScheda('Fornitore Energia', { type: 'aiuto_apri_file', chiave }, { riquadro: true })).error, 'un riquadro è un altro sito').toBe('forbidden');
+    expect((await daScheda(b, { type: 'aiuto_apri_file', chiave })).ok, 'un\'altra scheda non apre con quella chiave').not.toBe(true);
+    expect((await daScheda(a, { type: 'aiuto_apri_file', chiave: 'inventata', percorso: join(dir, 'fattura-luce.txt') })).ok).not.toBe(true);
+    expect((await daScheda(a, { type: 'aiuto_apri_file', chiave }, { riquadro: true })).error, 'un riquadro è un altro sito').toBe('forbidden');
     expect(await app.evaluate(() => globalThis.__aperti)).toEqual([]);
-    expect((await daScheda('Fornitore Energia', { type: 'aiuto_apri_file', chiave })).ok).toBe(true);
+    expect((await daScheda(a, { type: 'aiuto_apri_file', chiave })).ok).toBe(true);
     expect(await app.evaluate(() => globalThis.__aperti)).toEqual([join(dir, 'fattura-luce.txt')]);
     // Senza webContents (una chiamata che non viene da una scheda) la porta non risponde.
     const senza = await app.evaluate((_e, m) => globalThis.SN_HANDLE_MESSAGE(m, { tab: { id: 9, url: 'http://sito-ostile.example/' }, url: 'http://sito-ostile.example/' }), { type: 'aiuto_cerca_documenti', cosa: 'fattura' });
     expect(senza.error).toBe('forbidden');
-    void a; void b;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

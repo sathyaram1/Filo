@@ -195,7 +195,6 @@
 .sn-sidebar-file-icona { display: inline-flex; flex-shrink: 0; color: var(--sn-accent); }
 .sn-sidebar-file-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sn-sidebar-file-dove { color: var(--sn-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sn-sidebar-file-menu { margin-top: 0; }
 .sn-sidebar-log-ferma {
   all: unset;
   cursor: pointer;

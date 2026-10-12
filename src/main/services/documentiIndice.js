@@ -510,6 +510,18 @@ function elencoOccasionali(lista) {
   });
 }
 
+/** Le cartelle cercate per l'occasione che le voci indicano (come le scrive l'elenco: «Download», «~/Archivio»). */
+async function occasionaliFra(elenco) {
+  await carica();
+  const out = [];
+  for (const v of Array.isArray(elenco) ? elenco : []) {
+    const voce = voceCartella(v);
+    const p = voce && DI_SERIE[voce] ? cartellaDiSerie(voce) : voce;
+    if (p && occasionali.has(p) && !out.includes(p)) out.push(p);
+  }
+  return out;
+}
+
 async function stato() {
   await carica();
   const rs = await radici();
@@ -578,7 +590,7 @@ function avviaInSottofondo() {
 
 module.exports = {
   configura, radici, aggiorna, cerca, stato, avviaInSottofondo, ascoltaGiro, voceCartella, nomeDellaVoce, cartelleMancanti,
-  cartellaDiSerie, elimina, dimentica, comeDarePermesso, doveSta, DI_SERIE,
+  cartellaDiSerie, elimina, dimentica, occasionaliFra, comeDarePermesso, doveSta, DI_SERIE,
   // per gli unit test
   _giroInSottofondo: giroInSottofondo,
   _azzera: () => { voci = null; occasionali = new Map(); caricamento = null; ultimoGiro = 0; corsa = null; daRifare = false; troppi = false; righeSuDisco = 0; negate = new Set(); },
