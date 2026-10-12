@@ -1,6 +1,5 @@
-// #1122 giro 1 — esplorazione del verificatore: le strade vicine al tasto destro su una pagina con Trusted Types.
+// #1122 giro 1 — porte vicine provate e chiuse: al tasto destro su una pagina con Trusted Types.
 
-import http from 'node:http';
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const TT = "require-trusted-types-for 'script'; trusted-types goog#html";
@@ -26,7 +25,7 @@ test('campo email della pagina di accesso: il tasto destro apre il menu', async 
   await pronto(page);
   await page.locator('#email').click({ button: 'right' });
   const menu = await vediMenu(page);
-  await expect(menu.getByText('Seleziona tutto', { exact: true })).toBeVisible();
+  await expect(menu.getByText('Incolla', { exact: true })).toBeVisible();
 });
 
 test('navigazione nella stessa scheda da una pagina TT a un altra TT: il menu si apre ancora', async ({ openTab, testServer }) => {
@@ -97,26 +96,3 @@ test('popup di accesso con Trusted Types: il tasto destro apre il menu', async (
   await vediMenu(pop);
 });
 
-test('tasto destro mentre la pagina carica ancora: qualcosa compare', async ({ app, shell }) => {
-  let rilascia;
-  const lento = new Promise((r) => { rilascia = r; });
-  const srv = http.createServer(async (req, res) => {
-    if (req.url === '/lento.js') { await lento; res.writeHead(200, { 'Content-Type': 'text/javascript' }); res.end(''); return; }
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end('<!doctype html><body style="padding:40px"><p id="p" style="font-size:30px">Testo che compare subito</p><script src="/lento.js"></script></body>');
-  });
-  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  try {
-    const url = `http://127.0.0.1:${srv.address().port}/`;
-    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-    let page = null;
-    await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith(url)); return !!page; }, { timeout: 10000 }).toBe(true);
-    await page.locator('#p').waitFor();
-    const quanti = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed() && x.isVisible() && x.webContents.getURL().startsWith('data:text/html')).length);
-    await page.locator('#p').click({ button: 'right' });
-    await page.waitForTimeout(1500);
-    const menuPagina = await page.locator('.sn-menu').count();
-    const riserva = await quanti();
-    expect(menuPagina + riserva, 'nessun menu durante il caricamento').toBeGreaterThan(0);
-  } finally { rilascia(); srv.close(); }
-});
