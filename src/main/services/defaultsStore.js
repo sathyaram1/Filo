@@ -653,6 +653,18 @@ async function setAutomationProberIdle(on, idToken) {
   return Boolean(on);
 }
 
+// I lavori server alle routine (#1159): solo un `true` scritto apposta li accende, come legge il server.
+async function getLavoriServer(idToken) {
+  const doc = await fetchDoc(ROUTINES_DOC, idToken);
+  return !!doc && doc.lavoriServer === true;
+}
+
+async function setLavoriServer(on, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare i lavori server.');
+  await patchDoc(ROUTINES_DOC, { lavoriServer: toFsValue(Boolean(on)) }, ['lavoriServer'], idToken);
+  return Boolean(on);
+}
+
 // I bilanci dei giri di correzione, uno per livello (config/routines, campi in
 // VERIFIER_CAP_KEYS — feedback #561) e il testo della fase 2 (`fixInstructions`).
 // Li applica il SERVER quando registra la critica; qui la dashboard li legge e
