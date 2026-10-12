@@ -32,6 +32,7 @@ require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il si
 const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
+const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
 const { AnteprimeSchede } = require('./tabs/anteprime');
 const { VisiteSchede } = require('./tabs/visite');
@@ -382,6 +383,12 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    const schedaDavanti = () => this.tabs.find((x) => x.id === this.activeId) || null;
+    this.conferme = new ConfermeSopraPagina(window, {
+      sotto: () => { const t = schedaDavanti(); return (t && t.view && t.view.webContents) || null; },
+      area: () => { const t = schedaDavanti(); return t && t.view ? t.view.getBounds() : null; },
+      dopoInCima: () => { if (this.barra) this.barra._inCima(); },
+    });
     this.visite = new VisiteSchede({ incognito: this.incognito });
     this.anteprime = new AnteprimeSchede(this, {
       suNuova: (id, dato) => CartaAnteprima.precarica(window, id, dato),
@@ -389,6 +396,7 @@ class TabManager {
     });
     if (window && typeof window.once === 'function') window.once('closed', () => this.anteprime.chiudi());
     this.avvisi = new AvvisiSopraPagina(window, {
+      dopoInCima: () => this.conferme.inCima(),
       alto: () => this._altezzaCornice(),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       schedaAttiva: () => {
@@ -1732,8 +1740,9 @@ class TabManager {
   vistaSottoIlVuoto() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab) return null;
+    const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
     const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
-    return avviso || tab.view || null;
+    return domanda || avviso || tab.view || null;
   }
 
   _tastieraAllaSchedaAttiva() {
@@ -2144,6 +2153,7 @@ class TabManager {
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
     this.avvisi.posa();
+    this.conferme.posa();
     this.barra.posa();
   }
 
@@ -2970,6 +2980,7 @@ class TabManager {
     pwc.on('did-navigate', mostraSito);
     pwc.on('did-navigate-in-page', mostraSito);
     installZoom(pwc);
+    registraFinestraDelSito(win, this.win);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
     MenuDiRiserva.segui(pwc);

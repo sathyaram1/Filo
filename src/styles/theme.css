@@ -108,6 +108,10 @@
 .sn-select-button:focus-visible {
   border-color: var(--sn-accent);
 }
+.sn-select-wrap > select:disabled + .sn-select-button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .sn-select-value {
   overflow: hidden;
   text-overflow: ellipsis;

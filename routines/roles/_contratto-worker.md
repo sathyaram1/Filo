@@ -58,6 +58,12 @@ giro aprisse il ramo su cui stai lavorando. Dentro il progetto ci sono gli
 strumenti di QUEL ramo, che possono essere vecchi di giorni e non fare cose che
 credi facciano — senza dirtelo. Se scrivi `scripts/…` a mano, stai tornando lì.
 
+## Sotto-agenti
+
+Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
+Agent (senza, vale il default); la catena arriva a tre livelli sotto
+l'orchestratore, tu compreso.
+
 ## Il battito non è affar tuo
 
 Il semaforo che tiene il tuo lavoro cade dopo un'ora di silenzio, e un controllo

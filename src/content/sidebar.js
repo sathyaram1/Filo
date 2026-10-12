@@ -25,6 +25,7 @@
   // da fuori (risultati di ricerca, etichette della pagina) entra in
   // cronologia gia imbustato.
   const Esterno = global.SN_ESTERNO;
+  const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
   let root = null;
   let stackEntry = null;
@@ -152,17 +153,22 @@
     makeDraggable(root.querySelector('.sn-sidebar-header'));
     const form = root.querySelector('.sn-sidebar-input');
     const ta = form.querySelector('textarea');
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
+    // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
+    const invia = () => {
       const text = ta.value.trim();
       if (!text) return;
       ta.value = '';
       submit({ userMessage: text });
+    };
+    form.addEventListener('submit', (e) => e.preventDefault());
+    form.querySelector('button[type="submit"]').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (gestoVero(e)) invia();
     });
     ta.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        form.requestSubmit();
+        if (gestoVero(e)) invia();
       }
     });
     // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere).
@@ -330,8 +336,8 @@
       btn.type = 'button';
       btn.className = 'sn-sidebar-choice';
       btn.textContent = c.label;
-      btn.addEventListener('click', () => {
-        if (wrap.classList.contains('sn-sidebar-choices-used')) return;
+      btn.addEventListener('click', (e) => {
+        if (!gestoVero(e) || wrap.classList.contains('sn-sidebar-choices-used')) return;
         wrap.classList.add('sn-sidebar-choices-used');
         // disabilita visivamente tutti i bottoni
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
@@ -455,10 +461,17 @@
     // modello guarda il resto e blocca tutto il percorso se ci riconosce una
     // persona. Prometteva «senza il tuo nome» quando quel modello, di fatto,
     // non vedeva niente di quello che stava per uscire (#584, terzo giro).
-    nota.textContent = 'Rispondendo condividi i passi di questo percorso in una raccolta che chiunque può leggere. Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
+    const tutela = 'Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
+    nota.textContent = `Rispondendo condividi i passi di questo percorso in una raccolta che chiunque può leggere. ${tutela}`;
     wrap.appendChild(nota);
+    // Il riquadro sta nel documento del sito: i bottoni in uno Shadow DOM chiuso, che la pagina non trova né preme,
+    // e il sì alla condivisione nel popup di Filo, che su un sito sta fuori dalla sua portata (#592.6).
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
+    const bottoni = row.attachShadow({ mode: 'closed' });
+    const stile = document.createElement('style');
+    stile.textContent = CSS_RISPOSTA;
+    bottoni.appendChild(stile);
 
     const up = document.createElement('button');
     up.type = 'button';
@@ -484,28 +497,84 @@
       wrap.appendChild(t);
     }
 
-    up.addEventListener('click', () => {
+    // Un no nel popup chiude la domanda: niente parte, e non si ripropone.
+    async function rispondi(riuscito) {
       disableAll();
-      saveCurrentPath(true).catch(() => {});
+      let ok = false;
+      try {
+        const Ui = global.SN_CONFIRM_UI;
+        ok = !!Ui && await Ui.confirm({
+          title: 'Condividi questo percorso?',
+          text: `Filo condivide i passi di questo percorso con chi lo userà su questo sito. ${tutela}`,
+          okLabel: 'Condividi',
+          cancelLabel: 'Non condividere',
+        });
+      } catch (_) { ok = false; }
+      if (!ok) { wrap.classList.add('sn-sidebar-feedback-dismissed'); return; }
+      saveCurrentPath(riuscito).catch(() => {});
       thanks();
-    });
-    down.addEventListener('click', () => {
-      disableAll();
-      saveCurrentPath(false).catch(() => {});
-      thanks();
-    });
-    skip.addEventListener('click', () => {
+    }
+    up.addEventListener('click', (e) => { if (gestoVero(e)) rispondi(true); });
+    down.addEventListener('click', (e) => { if (gestoVero(e)) rispondi(false); });
+    skip.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
       // Niente save, solo dismiss visivo.
       disableAll();
       wrap.classList.add('sn-sidebar-feedback-dismissed');
     });
 
-    row.appendChild(up);
-    row.appendChild(down);
-    row.appendChild(skip);
+    bottoni.appendChild(up);
+    bottoni.appendChild(down);
+    bottoni.appendChild(skip);
     wrap.appendChild(row);
     conv.appendChild(wrap);
     conv.scrollTop = conv.scrollHeight;
+    rispostaAperta = { up, down, skip };
+  }
+
+  let rispostaAperta = null;
+  const CSS_RISPOSTA = `
+.sn-sidebar-feedback-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 12px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  font-size: 12px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.sn-sidebar-feedback-btn:hover {
+  background: var(--sn-accent);
+  color: #fff;
+  border-color: var(--sn-accent);
+}
+.sn-sidebar-feedback-btn:disabled { cursor: default; opacity: 0.5; }
+.sn-sidebar-feedback-btn:disabled:hover {
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border-color: var(--sn-border);
+}
+.sn-sidebar-feedback-skip {
+  all: unset;
+  cursor: pointer;
+  margin-left: auto;
+  padding: 0 6px;
+  color: var(--sn-muted);
+  font-size: 14px;
+  line-height: 1;
+}
+.sn-sidebar-feedback-skip:hover { color: var(--sn-fg); }
+.sn-sidebar-feedback-skip:disabled { opacity: 0.5; cursor: default; }
+`;
+
+  // Per gli spec: i bottoni stanno in un root chiuso, i locator non ci arrivano. Centro per un clic vero del mouse.
+  function puntoRisposta(quale) {
+    const b = rispostaAperta && rispostaAperta[quale];
+    if (!b || !b.isConnected) return null;
+    const r = b.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2, disabled: b.disabled, label: b.textContent };
   }
 
   // Da questa pagina un percorso condiviso partirebbe? Lo sa solo il processo
@@ -1548,6 +1617,6 @@
     // che legge chiunque, quindi quello che c'è scritto è una promessa (#584).
     // `renderFeedbackPrompt` lo disegna e basta; chi decide se chiedere è
     // `percorsoRaccoglibile`, ed è quella la porta che vale.
-    renderFeedbackPrompt, percorsoRaccoglibile,
+    renderFeedbackPrompt, percorsoRaccoglibile, puntoRisposta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -36,6 +36,7 @@
   <script src="filo://shared/boardArchive.js"></script>
   <script src="filo://shared/mergeApprovals.js"></script>
   <script src="filo://shared/routineSessioni.js"></script>
+  <script src="filo://shared/routineModelli.js"></script>
   <style>
     /* Le misure verticali della testata stanno qui, una volta sola, perché più
        di un pezzo le usa e una copia rimasta indietro si vede (#498). */
@@ -149,6 +150,14 @@
       outline: 2px solid var(--sn-accent); outline-offset: 2px;
     }
     .mg-auto-choice-item input:disabled + .mg-auto-choice-text { opacity: 0.5; }
+    /* Prima della prima lettura nessun controllo delle automazioni dice un valore: quello scritto qui non viene
+       dal server (#1193). Levette senza pallina, pillole tutte spente, numeri e tendine senza testo. */
+    #panel-automation.mg-in-lettura .mg-auto-cols .mg-switch input + .mg-switch-track { background: var(--sn-border); }
+    #panel-automation.mg-in-lettura .mg-auto-cols :is(.mg-switch-thumb, .mg-switch-state, .sn-select-value) { visibility: hidden; }
+    #panel-automation.mg-in-lettura .mg-auto-cols .mg-auto-choice-item input + .mg-auto-choice-text {
+      border-color: var(--sn-border); color: var(--sn-muted); background: var(--sn-bg, transparent);
+    }
+    #panel-automation.mg-in-lettura .mg-auto-cols input.mg-auto-number { color: transparent; }
     /* L'owner ha escluso tutti e due gli account: permesso, ma non deve passare inosservato. */
     .mg-auto-warn {
       margin: 12px 0 0; font-size: 12px; font-weight: 600; color: #c0392b;
@@ -1237,6 +1246,16 @@
       background: var(--sn-bg-input, var(--sn-bg, #fff)); color: inherit;
     }
     .mg-auto-textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* Modello e sforzo per fase: il nome della fase sopra le sue due tendine, che restano larghe abbastanza per
+       «Definizione dell'agente» anche nella colonna di una finestra media. */
+    .mg-role-models {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 8px; align-items: center; margin-top: 12px; max-width: 520px;
+    }
+    .mg-role-head { font-size: 12px; font-weight: 600; color: var(--sn-muted); }
+    .mg-role-name { grid-column: 1 / -1; margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--sn-fg); }
+    /* Un punto e due di margine in meno: a 1280px la colonna è la più stretta, e lì la scritta deve starci intera. */
+    .mg-role-models .sn-select-button { padding: 6px 8px; font-size: 12px; }
 
     /* Fusioni ferme senza una segnalazione alle spalle: l'aspetto sta tutto in mergeApprovals.css, qui solo la
        spaziatura. Niente tetto: stanno in Automazioni, che scorre da sé. */
@@ -1609,7 +1628,7 @@
 
     <!-- Automazioni e Modelli di supporto stanno in una pagina sola e su tutta la larghezza (#1110); la traccia
        delle fusioni già decise sta nel Log, perché qui non si scorra per arrivare alle impostazioni. -->
-    <section class="mg-panel" id="panel-automation" data-panel="automation">
+    <section class="mg-panel mg-in-lettura" id="panel-automation" data-panel="automation" aria-busy="true">
       <div class="mg-automation">
         <!-- Le fusioni ferme che NON nascono da una segnalazione (un ramo locale chiuso con `npm run finish`) non
            hanno una scheda dove vivere: senza questo elenco sparirebbero. -->
@@ -1774,6 +1793,16 @@
                   </label>
                 </div>
                 <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
+              </section>
+
+              <!-- Le righe le scrive manage.js da SN_ROUTINE_MODELLI: fasi e scelte vivono in un posto solo. -->
+              <section class="mg-auto-block" id="mgRoleModelsBlock">
+                <span class="mg-auto-field-label" id="mgRoleModelsLabel">Modello e sforzo per fase</span>
+                <p class="mg-auto-block-desc">
+                  Con cosa lavora ogni fase di un cambio di codice, dal prossimo biglietto.
+                  <span class="mg-action-msg" id="mgRoleModelsMsg" role="status"></span>
+                </p>
+                <div class="mg-role-models" id="mgRoleModels" role="group" aria-labelledby="mgRoleModelsLabel"></div>
               </section>
             </div>
             <div class="mg-auto-col">

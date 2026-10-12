@@ -74,6 +74,10 @@
   const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
   const mgAccountsWarn    = document.getElementById('mgAccountsWarn');
   const mgPriorityWarn    = document.getElementById('mgPriorityWarn');
+  // Modello e sforzo per fase: le tendine le crea buildRoleModels, una per `${ruolo}.${campo}`.
+  const mgRoleModels      = document.getElementById('mgRoleModels');
+  const mgRoleModelsMsg   = document.getElementById('mgRoleModelsMsg');
+  const roleSelects       = new Map();
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
@@ -368,7 +372,16 @@
   // Vero da quando l'avvio ha chiesto le impostazioni: un accesso arrivato dopo le richiede di nuovo.
   let impostazioniAvviate = false;
   function caricaImpostazioni() {
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadJudgeTimeout(), loadMergeApprovals()]);
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
+      .finally(fineLetturaAutomazioni);
+  }
+
+  // Finché la prima lettura non risponde i controlli non mostrano un valore (regola nel CSS di manage.html).
+  function fineLetturaAutomazioni() {
+    const pan = document.getElementById('panel-automation');
+    if (!pan) return;
+    pan.classList.remove('mg-in-lettura');
+    pan.removeAttribute('aria-busy');
   }
 
   async function refreshAuth() {
@@ -629,7 +642,7 @@
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
-      mgAccountA, mgAccountB, ...mgPriorityRadios, mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
+      mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
       if (el) el.disabled = !isAdmin;
     }
   }
@@ -1031,6 +1044,163 @@
       saveSessions({ [campo]: !el.checked }, mgAccountsMsg);
     });
   }
+
+  // ── Modello e sforzo per fase (config/routines.roleModels, #1193) ──────────
+  // Ogni tendina salva la sua sola foglia appena cambia. Stesse regole delle sessioni qui sopra: mai un valore
+  // non letto sullo schermo, e una risposta partita prima non riscrive una scelta confermata dopo (#675).
+  const ROLE_GET = (window.SN_MSG?.MSG?.AUTOMATION_ROLE_MODELS_GET) || 'automation_role_models_get';
+  const ROLE_SET = (window.SN_MSG?.MSG?.AUTOMATION_ROLE_MODELS_SET) || 'automation_role_models_set';
+  const RM = window.SN_ROUTINE_MODELLI;
+  const roleState = {};
+  const roleNoti = new Set();
+  const roleFermo = {};
+  const roleInAttesa = [];
+  let roleTick = 0;
+  let roleAccolto = 0;
+  // Prima della prima risposta la pagina non sa ancora niente, e non è il caso di dire «non letto».
+  let roleTentato = false;
+  let roleEsito = { testo: '', kind: null };
+
+  function buildRoleModels() {
+    if (!mgRoleModels || !RM) return;
+    const cella = (cls, testo) => {
+      const s = document.createElement('span');
+      s.className = cls;
+      s.textContent = testo;
+      return s;
+    };
+    mgRoleModels.append(...RM.CAMPI.map((c) => cella('mg-role-head', RM.NOME_CAMPO[c])));
+    for (const r of RM.RUOLI) {
+      mgRoleModels.append(cella('mg-role-name', r.nome));
+      for (const campo of RM.CAMPI) {
+        const sel = document.createElement('select');
+        sel.dataset.ruolo = r.id;
+        sel.dataset.campo = campo;
+        sel.setAttribute('aria-label', `${RM.NOME_CAMPO[campo]}: ${r.nome}`);
+        sel.append(new Option(RM.VUOTO, ''));
+        for (const s of RM.SCELTE[campo]) sel.append(new Option(s.nome, s.id));
+        sel.disabled = !isAdmin;
+        sel.addEventListener('change', () => saveRoleModel(r.id, campo, sel.value));
+        mgRoleModels.append(sel);
+        // Non letto finché il server non risponde: la prima voce sarebbe già una risposta.
+        sel.selectedIndex = -1;
+        roleSelects.set(`${r.id}.${campo}`, sel);
+      }
+    }
+  }
+
+  const roleScelta = (chiave) => {
+    for (let i = roleInAttesa.length - 1; i >= 0; i--) if (roleInAttesa[i].chiave === chiave) return roleInAttesa[i].valore;
+    return roleNoti.has(chiave) ? roleState[chiave] : null;
+  };
+
+  function mostraRoleMsg() {
+    if (!mgRoleModelsMsg) return;
+    const ignoti = roleTentato && [...roleSelects.keys()].some((k) => roleScelta(k) === null);
+    const avvisa = ignoti && (!roleEsito.testo || roleEsito.kind === 'err');
+    mgRoleModelsMsg.textContent = avvisa ? [roleEsito.testo, SESSIONS_NON_LETTO].filter(Boolean).join(' ') : roleEsito.testo;
+    mgRoleModelsMsg.classList.toggle('mg-ok', !avvisa && roleEsito.kind === 'ok');
+    mgRoleModelsMsg.classList.toggle('mg-err', avvisa || roleEsito.kind === 'err');
+  }
+
+  function setRoleMsg(testo, kind) {
+    roleEsito = { testo: testo || '', kind: kind || null };
+    mostraRoleMsg();
+  }
+
+  function reflectRoleModels() {
+    for (const [chiave, sel] of roleSelects) {
+      const v = roleScelta(chiave);
+      for (const o of [...sel.options]) if (o.dataset.fuori && o.value !== v) o.remove();
+      // Non letto: nessuna voce scelta, nemmeno «definizione dell'agente», che sarebbe già una risposta.
+      if (v === null) { sel.selectedIndex = -1; continue; }
+      if (![...sel.options].some((o) => o.value === v)) {
+        // Scritto a mano nel documento: si mostra com'è, e non si può riscegliere.
+        const o = new Option(`${v} (fuori elenco)`, v);
+        o.dataset.fuori = '1';
+        o.disabled = true;
+        sel.append(o);
+      }
+      sel.value = v;
+    }
+    mostraRoleMsg();
+  }
+
+  /** Una tabella intera dal server: vale se nessuna lettura partita dopo è già sullo schermo. */
+  function accogliRuoli(tabella, nato) {
+    if (nato < roleAccolto) return;
+    roleAccolto = nato;
+    const doc = RM.leggiDoc({ [RM.CAMPO]: tabella });
+    for (const r of RM.RUOLI) {
+      for (const campo of RM.CAMPI) {
+        const k = `${r.id}.${campo}`;
+        // Confermato da una scrittura arrivata dopo la partenza di questa lettura, che può averlo letto prima.
+        if ((roleFermo[k] || 0) > nato) continue;
+        roleState[k] = doc[r.id][campo];
+        roleNoti.add(k);
+      }
+    }
+  }
+
+  function loadRoleModels() {
+    if (!RM) return Promise.resolve();
+    const nato = ++roleTick;
+    return (async () => {
+      let r = null;
+      try { r = await sendToMain({ type: ROLE_GET }); } catch (_) { /* come una lettura fallita */ }
+      if (nato < roleAccolto) return;
+      roleTentato = true;
+      if (r && r.ok) {
+        accogliRuoli(r.roleModels, nato);
+      } else {
+        // Restano note solo le foglie confermate da una scrittura arrivata dopo la partenza di questa lettura.
+        for (const k of [...roleNoti]) if ((roleFermo[k] || 0) <= nato) roleNoti.delete(k);
+        if (roleEsito.kind === 'ok') roleEsito = { testo: '', kind: null };
+      }
+      reflectRoleModels();
+    })();
+  }
+
+  function saveRoleModel(ruolo, campo, valore) {
+    const esito = RM.valida({ ruolo, campo, valore });
+    if (!esito.ok) {
+      reflectRoleModels();
+      setRoleMsg(esito.testo, 'err');
+      return Promise.resolve(false);
+    }
+    const chiave = `${ruolo}.${campo}`;
+    const scelta = { chiave, valore };
+    roleInAttesa.push(scelta);
+    setRoleMsg('Salvo…', null);
+    const nome = RM.nomeRuolo(ruolo);
+    // Una fila sola per tutte le tendine: le risposte arrivano nell'ordine delle scelte.
+    return inFila('roleModels', async () => {
+      const nato = ++roleTick;
+      let r = null;
+      let errore = null;
+      try { r = await sendToMain({ type: ROLE_SET, ruolo, campo, valore }); } catch (err) { errore = err; }
+      roleInAttesa.splice(roleInAttesa.indexOf(scelta), 1);
+      if (!r || !r.ok) {
+        reflectRoleModels();
+        setRoleMsg(`${nome}: salvataggio fallito, la scelta NON è cambiata.`, 'err');
+        const motivo = errore || r?.error;
+        if (motivo) console.error('[manage] salvataggio modello per fase:', motivo);
+        return false;
+      }
+      roleState[chiave] = valore;
+      roleNoti.add(chiave);
+      roleFermo[chiave] = ++roleTick;
+      if (r.letto && r.roleModels) accogliRuoli(r.roleModels, nato);
+      reflectRoleModels();
+      // «Salvato» parla di quello che si vede: non mentre un'altra scelta è ancora per strada.
+      if (!roleInAttesa.length) {
+        setRoleMsg(r.letto ? `${nome}: salvato.` : `${nome}: salvato. Il resto non l'ho potuto rileggere dal server.`, 'ok');
+      }
+      return true;
+    });
+  }
+
+  buildRoleModels();
 
 
   // ── Timeout dei giudici ────────────────────────────────────────────────────
@@ -2680,7 +2850,7 @@
     Promise.resolve().then(() => sendToMain({ type: CLASSIFY_MSG, op: 'stop', jobId })).catch(() => {});
   }
 
-  const numIt = (n) => Number(n || 0).toLocaleString('it-IT');
+  const numIt = (n) => Number(n || 0).toLocaleString('it-IT', { useGrouping: true });
 
   // null nasconde la barra; altrimenti quanti feedback ha già letto il classificatore, su quanti.
   function showClassifyProgress(state) {
@@ -5351,6 +5521,8 @@
     loadCaps,
     // Ri-legge le scelte sulle sessioni delle routine (IPC) — per i test.
     loadSessions,
+    // Ri-legge modello e sforzo per fase (IPC) — per i test.
+    loadRoleModels,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
@@ -7372,7 +7544,8 @@
     startLive();
   }
 
-  const bootDone = init().catch((e) => { console.error('[manage] init:', e); });
+  // Un avvio rotto prima della lettura non deve lasciare le automazioni senza valori per sempre.
+  const bootDone = init().catch((e) => { console.error('[manage] init:', e); }).finally(fineLetturaAutomazioni);
   // Gli spec devono poter aspettare la FINE del caricamento vero (Firestore)
   // prima di iniettare dati finti: se il caricamento atterra a metà test, li
   // sovrascrive e il test diventa rumore.

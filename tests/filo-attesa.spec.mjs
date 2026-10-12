@@ -588,16 +588,23 @@ test('K — fermato mentre Filo prepara ancora la richiesta: niente parte, e lo 
   await ripristina(app);
 });
 
-// Una ricerca sul web lenta (una rete che tarda): conta le chiamate.
-async function ricercaLenta(app, ms) {
+// Una ricerca sul web lenta (una rete che tarda): conta le chiamate partite e finite. Senza durata resta in volo finché
+// la prova non la lascia andare: un «ancora in volo» misurato a orologio diventa rosso su una macchina carica (#814.6).
+async function ricercaLenta(app, ms = null) {
   await app.evaluate((_, durata) => {
     globalThis.__ricerche = 0;
+    globalThis.__ricercheFinite = 0;
+    const trattenuta = durata == null ? new Promise((ok) => { globalThis.__lasciaRicerca = ok; }) : null;
     globalThis.SN_WEB_SEARCH = { search: async () => {
       globalThis.__ricerche += 1;
-      await new Promise((r) => setTimeout(r, durata));
+      await (trattenuta || new Promise((r) => setTimeout(r, durata)));
+      globalThis.__ricercheFinite += 1;
       return { results: [{ title: 'Orari', url: 'https://example.com/orari', content: 'treni' }], provider: 'finto' };
     } };
   }, ms);
+}
+async function lasciaLaRicerca(app) {
+  await app.evaluate(() => globalThis.__lasciaRicerca());
 }
 
 // «In volo» si aspetta, non si presume: il titolo «Cerco sul web» compare quando il modello chiama lo strumento, prima
@@ -612,7 +619,7 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   const page = await newtabPage(app);
   await configureModel(app);
   await senzaAccoglienza(app, page);
-  await ricercaLenta(app, 5_000);
+  await ricercaLenta(app);
   await copione(app, [
     { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'l1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['Il tempo: rispondo. '], ogni: 100, testo: 'Oggi sole.' },
@@ -624,15 +631,18 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   await ricercaPartita(app);
   await page.locator('#stopBtn').click();
   await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
-  // La chat è di nuovo dell'utente subito, non a ricerca finita.
+  // La chat è di nuovo dell'utente con la ricerca ancora in volo, non a ricerca finita.
   await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 1_000 });
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#input').fill('lascia stare, che tempo fa?');
   await page.locator('#input').press('Enter');
   await expect(page.locator('.dash-bubble-user')).toHaveCount(2, { timeout: 1_000 });
-  // Il seguito sta sotto la riga del fermo, e la risposta arriva dopo che la ricerca in volo è finita e raccontata.
+  // Il seguito sta sotto la riga del fermo, e il modello parte solo dopo che la ricerca in volo è finita e raccontata.
   const ordine = await page.evaluate(() => [...document.querySelectorAll('.dash-bubble-fermato, .dash-bubble-user')].map((e) => (e.classList.contains('dash-bubble-user') ? 'utente' : 'fermo')));
   expect(ordine).toEqual(['utente', 'fermo', 'utente']);
+  await page.waitForTimeout(500);
+  expect(await app.evaluate(() => [globalThis.__ricercheFinite, globalThis.__messaggi.length])).toEqual([0, 1]);
+  await lasciaLaRicerca(app);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Oggi sole.' })).toBeVisible({ timeout: 10_000 });
   await expect(blocco.first().locator('.dash-activity-seg-head').first()).toHaveText(/Cercato sul web/);
   await expect(blocco.first().locator('.dash-activity-label')).toHaveText(/^Fermato · /);
@@ -651,7 +661,7 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   const page = await newtabPage(app);
   await configureModel(app);
   await senzaAccoglienza(app, page);
-  await ricercaLenta(app, 4_000);
+  await ricercaLenta(app);
   await copione(app, [
     { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'm1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['La ricerca c\'è già. '], ogni: 100, testo: 'Ecco gli orari.' },
@@ -661,14 +671,54 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await expect(page.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
   await ricercaPartita(app);
   await page.locator('#stopBtn').click();
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#sendBtn').click();
+  // Premuto con la ricerca ancora in volo: la ripresa la aspetta invece di rifarla o di partire senza saperne l'esito.
+  await expect(page.locator('#sendBtn')).toBeHidden();
+  await page.waitForTimeout(500);
+  expect(await app.evaluate(() => [globalThis.__ricercheFinite, globalThis.__messaggi.length])).toEqual([0, 1]);
+  await lasciaLaRicerca(app);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco gli orari.' })).toBeVisible({ timeout: 10_000 });
   expect(await app.evaluate(() => globalThis.__ricerche)).toBe(1);
   expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(2);
   const ultimi = await app.evaluate(() => globalThis.__messaggi[1]);
   const testo = ultimi.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
   expect(testo).toContain('ERANO GIÀ STATE FATTE');
+  await ripristina(app);
+});
+
+// L'altro lato di L2 (#814.2): il titolo c'è ma il modello sta ancora scrivendo la chiamata. Il fermo la annulla, e
+// «riprendi» lascia il modello libero di cercare: la ricerca si fa una volta, dopo, e non risulta fatta prima.
+test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «riprendi» la fa, una volta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await senzaAccoglienza(app, page);
+  await ricercaLenta(app, 300);
+  await copione(app, [
+    { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 3_000, strumenti: [{ id: 'n1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
+    { pensa: ['Riprendo: cerco. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'n2', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
+    { pensa: ['Ho gli orari. '], ogni: 100, testo: 'Ecco gli orari.' },
+  ]);
+  await page.locator('#input').fill('orari treni');
+  await page.locator('#sendBtn').click();
+  const blocco = page.locator('.dash-activity').first();
+  await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
+  await page.locator('#stopBtn').click();
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+  // Lo schermo non dice più che sta cercando, e la ricerca non parte nemmeno in ritardo.
+  await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText('Fermato qui');
+  await page.waitForTimeout(500);
+  expect(await app.evaluate(() => globalThis.__ricerche)).toBe(0);
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco gli orari.' })).toBeVisible({ timeout: 10_000 });
+  expect(await app.evaluate(() => globalThis.__ricerche)).toBe(1);
+  await expect(page.locator('.dash-activity-seg-head', { hasText: 'Cercato sul web' })).toHaveCount(1);
+  const ripresa = await app.evaluate(() => globalThis.__messaggi[1]);
+  const testo = ripresa.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+  expect(testo).toContain('riprendere il lavoro da dove ti eri fermato');
+  expect(testo).not.toContain('ERANO GIÀ STATE FATTE');
   await ripristina(app);
 });
 

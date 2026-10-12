@@ -711,6 +711,29 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Modello e sforzo del worker per fase (config/routines.roleModels). Owner-only. Le legge il server
+  // quando consegna un biglietto: cambiarle qui vale dal prossimo.
+  on(MSG.AUTOMATION_ROLE_MODELS_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return { ok: true, roleModels: await Defaults.getRoutineRoleModels(idToken) };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  on(MSG.AUTOMATION_ROLE_MODELS_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const r = await Defaults.setRoutineRoleModel({ ruolo: msg.ruolo, campo: msg.campo, valore: msg.valore }, idToken);
+      return Object.assign({ ok: true }, r);
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
   // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
   // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab

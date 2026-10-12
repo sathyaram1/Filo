@@ -458,6 +458,10 @@ test('editor: col microfono accanto, la casella della chat mostra tutto il sugge
   expect(piena.h).toBeGreaterThan(vuota.h);
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella.png` });
+  // Cinque righe a capo vero, non del font: un tetto fisso (ne teneva quattro) torna rosso su qualunque macchina (#667.6).
+  await casella.fill(Array.from({ length: 5 }, (_, i) => `riga ${i + 1}`).join('\n'));
+  const cinque = await misura();
+  expect(cinque.sh).toBeLessThanOrEqual(cinque.ch);
   // Un testo che non ci sta scorre dentro la casella: il modulo non trabocca e la conversazione resta in vista.
   await casella.fill('una domanda lunghissima sul documento '.repeat(30));
   const lunga = await misura();

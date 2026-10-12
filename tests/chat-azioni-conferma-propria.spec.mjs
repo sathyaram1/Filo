@@ -20,6 +20,8 @@ async function newtabPage(app) {
 async function configure(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    // Col modello pronto la home aperta comincia l'intervista di benvenuto (#663): qui l'utente è già stato accolto.
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test', tavily: '' },
@@ -337,7 +339,6 @@ test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
-  await app.evaluate(() => globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] }));
   await configure(app);
   await seedArchive(app, [{ title: 'Gatti persiani', gatto: true }, { title: 'Torta', gatto: false }]);
   await fakeChat(app, [

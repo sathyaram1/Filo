@@ -918,26 +918,16 @@
       });
       if (toccati.includes('useDefaultModels')) applyDefaultModelsVisibility();
       if (toccati.length) renderOpenWeightsImpact();
-      // Il modello di un'azione si sceglie anche dal tasto destro di una pagina (la dettatura): senza ridisegnare
-      // la griglia il salvataggio dopo lo rimanderebbe indietro. Non mentre qualcuno ci sta scrivendo dentro.
+      // Il modello di un'azione si sceglie anche dal tasto destro di una pagina (la dettatura): senza riallineare
+      // la griglia il salvataggio dopo lo rimanderebbe indietro. Si riscrive solo la catena cambiata, e non quella
+      // in cui si sta scrivendo: ridisegnare tutto portava via la spiegazione del modello appena respinto (#667.7).
       const s = msg.settings;
-      const griglia = $('modelsGrid');
       const inUso = staUsandoAdesso(document.activeElement) ? document.activeElement : null;
-      // Si confrontano solo le azioni che la griglia mostra: le impostazioni ne hanno altre, e col confronto
-      // dell'oggetto intero ogni salvataggio ridisegnava, portando via l'avviso del modello appena respinto.
       const catena = (v) => String(v == null ? '' : v).split(',').map((x) => x.trim()).filter(Boolean).join(', ');
-      const diversa = Boolean(s.models)
-        && Object.keys(modelChains || {}).some((a) => catena(modelChains[a].getValue()) !== catena(s.models[a]));
-      if (s.models && griglia && !(inUso && griglia.contains(inUso)) && diversa) {
-        modelChains = ModelChain.renderGrid(griglia, {
-          models: s.models,
-          onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
-          getRegistry: () => collectModelRegistry().registry,
-          avvisoDi: avvisoModello,
-        });
-      } else if (modelChains) {
-        // Il modello di una riga del registro può cambiare sotto lo stesso nome: l'avviso si rifà.
-        ModelChain.ricontrolla(modelChains);
+      for (const [azione, ch] of Object.entries(modelChains || {})) {
+        const daFuori = s.models && !(inUso && ch.el.contains(inUso)) && catena(ch.getValue()) !== catena(s.models[azione]);
+        // Il modello di una riga del registro può cambiare sotto lo stesso nome: l'avviso si rifà anche così.
+        if (daFuori) ch.imposta(s.models[azione]); else ch.ricontrolla();
       }
     });
   }
