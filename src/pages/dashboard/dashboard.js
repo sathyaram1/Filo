@@ -853,6 +853,8 @@
     if (!r?.ok) {
       // Il ragionamento già arrivato resta leggibile anche sotto un errore:
       // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
+      // La parte di risposta scritta coi bottoni ci resta come nota, come il resto del tentativo.
+      if (rispostaPrima) pending.aggiungiNota(rispostaPrima);
       pending.endTurn();
       if (ownsActivity) pending.finish();
       // Le azioni fatte PRIMA del guasto sono successe davvero: restano nello
