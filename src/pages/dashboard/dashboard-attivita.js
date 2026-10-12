@@ -176,6 +176,13 @@
       seg.esito = seg.voci.every((x) => x.voce.esito === 'fallita') ? 'cede' : 'tiene';
       if (seg.esito === 'cede') seg.nodo.cede(); else seg.nodo.tiene();
     }
+    function togliSeg(seg) {
+      const i = segs.indexOf(seg);
+      if (i >= 0) segs.splice(i, 1);
+      if (viva === seg) viva = null;
+      if (aperta === seg) aperta = null;
+      seg.el.remove();
+    }
     function chiudiSeg(seg) {
       if (!seg) return;
       if (seg.stato === 'agisce') chiudiNodo(seg);
