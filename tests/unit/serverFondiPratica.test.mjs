@@ -66,17 +66,22 @@ const ORE = 3600 * 1000;
 
 const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${sha.slice(0, 12)}`, togli: () => ({ ok: true }) });
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta }) {
+// Il registro dei rami (#1159): per difetto il ramo non ne ha uno, come i lavori locali di prima.
+const SENZA_REGISTRO = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: 'il ramo non ha un registro' });
+
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40) }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
+    const chiesti = [];
     const k = await esegui(argv, {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
       lancia: (cartella, args, env) => { lanci.push({ cartella, args, pratica: env[PRATICA_ENV] }); return codiceServer; },
       punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => verdetto, fissa,
+      lavoroDelRamo: async (x) => { chiesti.push(x); return lavoroDelRamo(x); }, puntaRamo,
     });
-    return { k, lanci, scritture, testo: righe.join('\n') };
+    return { k, lanci, scritture, chiesti, testo: righe.join('\n') };
   });
 }
 
