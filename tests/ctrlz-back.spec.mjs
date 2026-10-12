@@ -174,8 +174,7 @@ for (const [nome, tasto, mod, mac] of [['Cmd+freccia sinistra su Mac', 'Left', [
     const b = testServer.html('<!doctype html><body style="padding:40px"><textarea id="ta" rows="5" cols="60"></textarea></body>');
     const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' } });
     try {
-      const shell = await app.firstWindow();
-      await shell.waitForLoadState('domcontentloaded');
+      const shell = await primaFinestra(app);
       await shell.evaluate((u) => window.filoShell.tabs.open(u), a);
       await expect.poll(() => urlAttiva(app), { timeout: 10_000 }).toBe(a);
       await app.evaluate(({ BrowserWindow }, u) => {
