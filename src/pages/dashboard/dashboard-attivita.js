@@ -8,7 +8,7 @@
 //
 // `create` appende il blocco al container che gli si dà e ritorna l'oggetto
 // `activity` che il turno di Filo si passa di mano in mano (pushReasoning,
-// working, addRow, addCommand, azioneSenzaRiga, absorbBubble, dropNote,
+// working, addRow, addCommand, azioneSenzaRiga, absorbBubble, aggiungiNota, dropNote,
 // fineGiro, fineDiretta, endTurn, taglia, finish, remove). Il filo che lo
 // disegna sta in filo-attesa.js. Il container è esplicito apposta: chi disegna un blocco decide
 // dove, invece di scoprire a posteriori che finisce sempre nelle bolle.
@@ -391,6 +391,11 @@
         if (!bubble || !bubble.isConnected) return;
         const text = (bubble.textContent || '').trim();
         bubble.remove();
+        this.aggiungiNota(text);
+      },
+      // Il testo di un giro venuto dopo una parte di risposta (#1167): la bolla resta, la nota entra qui.
+      aggiungiNota(testo) {
+        const text = String(testo || '').trim();
         if (!text) return;
         const note = document.createElement('div');
         note.className = 'dash-activity-note';

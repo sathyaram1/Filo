@@ -74,7 +74,8 @@ const filoApi = {
   // modello ha appena nominato un'azione: { type }), 'done' (eseguita, con
   // l'azione completa di esito: { action }) e 'round' (un giro con azioni si è
   // chiuso: il testo scritto in quel giro è una nota di lavoro, non la
-  // risposta: { text }). Il chiamante filtra per reqId. Ritorna un unsubscribe.
+  // risposta: { text }; con `risposta: true` è un giro di soli bottoni e il
+  // testo apre la risposta). Il chiamante filtra per reqId. Ritorna un unsubscribe.
   onAction: (fn) => {
     const wrapped = (_event, data) => { try { fn(data); } catch (_) {} };
     ipcRenderer.on('filo:action', wrapped);
