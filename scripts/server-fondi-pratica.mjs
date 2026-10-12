@@ -282,7 +282,7 @@ export async function esegui(argv, deps = {}) {
     // La prova guarda lo stesso sha che fonderebbe la fusione vera, non la punta del ramo.
     const fissate = { lancia, fissa: deps.fissa || ramoFisso, log, err };
     if (a.dryRun) {
-      const k = lanciaFissato(cartella, a.ramo, verdetto, figlio, { ...fissate, prova: true });
+      const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, { ...fissate, prova: true });
       log(tardiva
         ? `PROVA: la pratica ${chi} non si riapre e, a fusione riuscita, ${dopo}.`
         : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
@@ -295,7 +295,7 @@ export async function esegui(argv, deps = {}) {
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
     }
-    const k = lanciaFissato(cartella, a.ramo, verdetto, figlio, fissate);
+    const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
     if (k !== 0) {
       if (tardiva) { err(`main del server non si è mosso, e la pratica ${chi} resta chiusa com'era: sistema e rilancia lo stesso comando.`); return k; }
       await of.annotaPratica(r.id, `server:fondi si è fermato (uscita ${k}) su ${a.ramo}: main del server non si è mosso.`, { bearer }).catch(() => null);
@@ -303,7 +303,7 @@ export async function esegui(argv, deps = {}) {
       return k;
     }
     const sha = (deps.punta || puntaDelServer)(cartella);
-    const verificato = verdetto && verdetto.server ? verdetto.server.sha : '';
+    const verificato = daFondere && daFondere.server ? daFondere.server.sha : '';
     if (verificato && sha && sha !== verificato) {
       err(`Attenzione: main del server è su ${sha.slice(0, 9)}, non sullo sha verificato ${verificato.slice(0, 9)}: il ramo si è mosso fra il controllo e la fusione.`);
     }
