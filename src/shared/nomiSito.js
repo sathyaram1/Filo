@@ -13,6 +13,33 @@
     return VALIDO.test(String(host || ''));
   }
 
+  // Il sito che l'utente intende con quello che ha scritto o incollato, in un elenco della pagina Sicurezza o in
+  // chat (#225, #835): schema, percorso, porta, «www.», «*.» e virgolette via, un nome accentato nella forma «xn--»
+  // con cui il sito si confronta. '' se non c'è un dominio valido.
+  function dominio(raw) {
+    let s = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '').replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
+    if (!s) return '';
+    try { s = new URL(s.includes('://') ? s : `http://${s}`).hostname; } catch (_) { if (s.includes('://')) return ''; }
+    s = s.split('/')[0].split('?')[0].split(':')[0].replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
+    return valido(s) ? s : '';
+  }
+
+  // Una casella di siti, un sito per riga: i domini validi senza doppioni e le righe scartate com'erano; `scartate`
+  // le tiene col posto (quanti domini validi le precedevano), per ridarle dove l'utente le aveva scritte.
+  function righeSiti(raw) {
+    const valid = [];
+    const invalid = [];
+    const scartate = [];
+    for (const line of String(raw || '').split('\n')) {
+      const riga = line.trim();
+      if (!riga) continue;
+      const d = dominio(riga);
+      if (!d) { invalid.push(riga); scartate.push({ riga, dopo: valid.length }); continue; }
+      if (!valid.includes(d)) valid.push(d);
+    }
+    return { valid, invalid, scartate };
+  }
+
   // Decodifica punycode di una sola etichetta (RFC 3492), senza il prefisso «xn--».
   const BASE = 36, TMIN = 1, TMAX = 26, SKEW = 38, DAMP = 700, MAXINT = 2147483647;
 
