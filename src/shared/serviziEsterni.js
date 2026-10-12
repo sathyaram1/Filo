@@ -56,7 +56,7 @@
       id: 'invito-in-attesa', nome: 'Il server di Filo, per l’invito in attesa',
       base: [FUNZIONI],
       quando: 'avvio',
-      occasione: 'all’avvio, nei primi giorni e finché non hai i crediti: chiede se un invito aperto dal sito aspetta questa installazione',
+      occasione: 'all’avvio, nel primo giorno e finché non hai i crediti: chiede se un invito aperto dal sito aspetta questa installazione',
       riceve: 'l’identità anonima dell’installazione; il server confronta l’impronta del tuo indirizzo IP con quella lasciata dal link d’invito',
       dove: ['src/main/services/handlers/wallet.js'],
     },
