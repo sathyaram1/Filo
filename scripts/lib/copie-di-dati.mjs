@@ -3,7 +3,7 @@
 // Sentinella: tests/unit/copieDiDatiFuoriDalRepo.test.mjs.
 
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 // Dati finti per le prove: l'unico posto del repo dove una copia è ammessa.
