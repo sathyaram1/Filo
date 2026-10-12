@@ -50,13 +50,14 @@ export async function risposteFinte(app, email) {
 export async function schedeSu(app, prefisso) {
   return app.evaluate(({ BrowserWindow }, p) => {
     const out = [];
+    const su = (u) => String(u || '') === p || String(u || '').startsWith(p + '?');
     for (const w of BrowserWindow.getAllWindows()) {
       const t = w._filoTabs;
       if (!t) continue;
       for (const s of t.tabs) {
         let url = '';
         try { url = s.view.webContents.getURL() || s.url || ''; } catch (_) { url = s.url || ''; }
-        if (url.startsWith(p) || String(s.url || '').startsWith(p)) out.push({ id: s.id, url: url.startsWith(p) ? url : s.url, attiva: t.activeId === s.id });
+        if (su(url) || su(s.url)) out.push({ id: s.id, url: su(url) ? url : s.url, attiva: t.activeId === s.id });
       }
     }
     return out;
