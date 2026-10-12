@@ -339,3 +339,53 @@ test('la prova a vuoto con un verdetto guarda lo sha verificato, come la fusione
   assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`, '--dry-run']]);
   assert.deepEqual(r.scritture, []);
 });
+
+// #1159, mappa §1.6: il ramo del server dev'essere un lavoro fidato anche per il registro dei rami, non solo la pratica.
+test('un ramo del server con registro non fidato si rifiuta prima di toccare il server, col motivo', async () => {
+  const sporco = async () => ({ ok: true, registro: true, lavoroFidato: false, attesa: 'fusione_server', motivo: 'sul ramo ha scritto un biglietto sporco' });
+  const r = await giro({ docs: { p: doc('p') }, argv: ['worker/f1-20261012T090000Z', '--feedback', 'p', '--solo-server'], lavoroDelRamo: sporco });
+  assert.equal(r.k, 3, r.testo);
+  assert.match(r.testo, /non è un lavoro fidato: sul ramo ha scritto un biglietto sporco/);
+  assert.deepEqual(r.lanci, []);
+  assert.deepEqual(r.scritture, []);
+  assert.deepEqual(r.chiesti, [{ repo: 'server', ramo: 'worker/f1-20261012T090000Z', sha: 'c'.repeat(40), feedbackId: 'p' }]);
+});
+
+test('un lavoro delle routine in attesa del PC senza registro del ramo si rifiuta', async () => {
+  const senza = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: 'fusione_server', motivo: 'il ramo non ha un registro' });
+  const r = await giro({ docs: { p: doc('p') }, argv: ['worker/f1-20261012T090000Z', '--feedback', 'p', '--solo-server'], lavoroDelRamo: senza });
+  assert.equal(r.k, 3, r.testo);
+  assert.match(r.testo, /lavoro delle routine ma non ha registro/);
+  assert.deepEqual(r.lanci, []);
+});
+
+test('un ramo del server fidato per il registro si fonde fermo sullo sha controllato, anche senza verifica locale', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: 'fusione_server', motivo: '' });
+  const r = await giro({ docs: { p: doc('p') }, argv: ['worker/f1-20261012T090000Z', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.lanci.map((l) => l.args), [[`worker/f1-20261012T090000Z-verificato-${'c'.repeat(12)}`]]);
+  assert.match(r.testo, /Pratica #910 chiusa/);
+});
+
+test('senza registro e senza attesa (lavoro locale di prima) vale la fiducia della pratica, e lo si dice', async () => {
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'] });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.lanci.map((l) => l.args), [['claude/x']]);
+  assert.match(r.testo, /non ha un registro: lavoro locale di prima/);
+});
+
+test('registro irraggiungibile o ramo assente su origin: non si tocca niente', async () => {
+  const giu = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: async () => { throw new Error('la funzione localTicket non è ancora pubblicata sul server'); } });
+  assert.equal(giu.k, 4, giu.testo);
+  assert.match(giu.testo, /registro dei rami non risponde/);
+  assert.deepEqual(giu.lanci, []);
+  const assente = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], puntaRamo: () => '' });
+  assert.equal(assente.k, 1, assente.testo);
+  assert.match(assente.testo, /non trovo claude\/x su origin del server/);
+  assert.deepEqual(assente.lanci, []);
+});
+
+test('leggiArgomenti: i rami delle routine (worker/…) valgono come i claude/…', () => {
+  assert.equal(leggiArgomenti(['worker/f1-20261012T090000Z', '--feedback', '9']).ramo, 'worker/f1-20261012T090000Z');
+  for (const no of ['worker/', 'worker/../main', 'lavoro/x']) assert.match(leggiArgomenti([no]).errore, /solo rami claude/, no);
+});
