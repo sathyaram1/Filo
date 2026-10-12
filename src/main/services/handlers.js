@@ -4422,6 +4422,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive }) : null;
   const cambi = await cambiP;
   const payloadBase = {
+    // Non entra nel prompt (la domanda sta in threadMessages): è la domanda come l'ha scritta l'utente, per la Cronologia AI.
+    userMessage: String(userMessage || ''),
     profilo, preferenze, espansioni, lezioni, stato: stateText, capacita, cambi,
     files: fileSummaries,
     onboarding: onboardingText,
