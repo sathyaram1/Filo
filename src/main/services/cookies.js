@@ -170,8 +170,7 @@ function partitionForUrl(url, trusted) {
   // Google e YouTube stanno in un jar solo: l'accesso fatto su uno vale sull'altro (#1123).
   const sito = Google.sitoDelContenitore(reg);
   const base = baseDelSito(sito);
-  if (Sito.voceSalvata(url, trusted instanceof Set ? trusted : null)
-    || (sito === Google.SITO_GOOGLE && Google.googleNellElenco(trusted))) return 'persist:' + base;
+  if (fidatoIn(url, trusted instanceof Set ? trusted : null)) return 'persist:' + base;
   sitoDelJar.set(base, sito);
   const g = jarGen.get(base);
   return g && g.n ? `${base}~${g.n}` : base;
