@@ -406,8 +406,8 @@
 
   // Interruttori dell'automazione: una lettura vale per un interruttore solo se
   // nessun suo salvataggio era per strada né è partito o arrivato nel frattempo.
-  const mosseAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0 };
-  const inVoloAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0 };
+  const mosseAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0, lavoriServer: 0 };
+  const inVoloAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0, lavoriServer: 0 };
   function salvaAuto(chiave, fn) {
     mosseAuto[chiave] += 1;
     inVoloAuto[chiave] += 1;
