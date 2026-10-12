@@ -264,15 +264,18 @@
   // Di un campo si pulisce un pezzo poco più lungo di quello che può restarne, non
   // tutto: elementi da centinaia di migliaia di caratteri fermavano l'Aiuto (#1173).
   // Se la pulizia lo accorcia sotto il tetto il pezzo cresce: la coda (quale
-  // pulsante, dove si va) arriva come prima. Il taglio non lascia in fondo mezza
-  // forma (email, codice, numero). Prove: tests/unit/percorsiLunghi.test.mjs.
+  // pulsante, dove si va) arriva come prima, fino a trentadue volte il tetto: oltre,
+  // un campo che è quasi tutto dati da cancellare non vale il costo di cinquanta
+  // documenti ostili. Il taglio non lascia in fondo mezza forma (email, codice,
+  // numero). Prove: tests/unit/percorsiLunghi.test.mjs.
   const FORMA_MAX = 320; // un indirizzo email non supera i 254 caratteri
+  const CRESCITA_MAX = 32;
 
   function aTetto(testo, max, taglia, pulisci) {
     for (let tetto = max * 2 + FORMA_MAX; ; tetto *= 4) {
       const pezzo = taglia(testo, tetto);
       const out = pulisci(pezzo);
-      if (pezzo === testo || out.length >= max + FORMA_MAX) return out.slice(0, max);
+      if (pezzo === testo || out.length >= max + FORMA_MAX || tetto >= max * CRESCITA_MAX) return out.slice(0, max);
     }
   }
 
