@@ -450,6 +450,7 @@
     soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
+    rispondi = deps.rispondi || null;
   }
 
   global.SN_DASH_ONBOARDING = {
