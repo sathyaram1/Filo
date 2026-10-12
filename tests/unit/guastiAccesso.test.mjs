@@ -253,6 +253,12 @@ test('identità: senza cifratura del sistema e con un portafoglio su disco non n
   await assert.rejects(anon.getIdToken(), (e) => e.code === 'identity_unreadable');
   assert.equal(chiamate.signUp, 0);
   assert.ok(existsSync(file('identity.bin')), 'il file non si tocca: non si sa nemmeno se è leggibile');
+
+  // Il portachiavi si sblocca dopo l'avvio: la richiesta dopo ritrova l'identità di prima.
+  portachiavi.disponibile = true;
+  risposte = [RINNOVATO];
+  assert.equal(await anon.getIdToken(), 'id-nuovo');
+  assert.equal(chiamate.signUp, 0);
 });
 
 test('identità: un file rovinato senza portafoglio si mette da parte e ne nasce una nuova', async () => {
