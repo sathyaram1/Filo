@@ -88,6 +88,7 @@ async function messaggiDelFilo(opts) {
         ...(Array.isArray(m.letti) ? { letti: m.letti } : {}),
         ...(typeof m.esterno === 'string' ? { esterno: m.esterno } : {}),
         ...(m.daModello ? { daModello: true } : {}),
+        ...(Number(m.images) > 0 ? { images: Number(m.images) } : {}),
         _i: i,
       });
     });
