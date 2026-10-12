@@ -16,6 +16,12 @@
 # stderr e prosegue.
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+# Gli script accanto a questo hook, letti prima del cd (un percorso relativo vale dalla cartella di partenza).
+case "${BASH_SOURCE[0]}" in
+  /*|?:*) HOOK_SCRIPTS="${BASH_SOURCE[0]%/*}/../../scripts" ;;
+  */*) HOOK_SCRIPTS="$PWD/${BASH_SOURCE[0]%/*}/../../scripts" ;;
+  *) HOOK_SCRIPTS="$PWD/../../scripts" ;;
+esac
 cd "$PROJECT_DIR" || exit 0
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
