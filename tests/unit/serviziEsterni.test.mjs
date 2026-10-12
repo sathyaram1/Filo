@@ -64,9 +64,20 @@ const CHIAMATE_LOCALI = {
   'src/main/test-servizi-chiusi.js': 'la fetch finta delle prove',
 };
 
+// In un file che fa rete ogni testo con la forma di un nome di dominio è una destinazione, per qualunque strada arrivi
+// alla chiamata (opzioni, join, concat…). Fanno eccezione le costanti qui sotto, nomi che il file confronta e non contatta.
+const NOMI_NON_CONTATTATI = [
+  { file: 'src/main/services/adblock.js', costante: 'BASE_WHITELIST', perche: 'i siti che il blocco della pubblicità non blocca mai' },
+  { file: 'src/shared/feedback.js', costante: 'BUCKET', perche: 'il nome del deposito degli allegati, che sta nel percorso dell’indirizzo' },
+  { file: 'src/shared/feedback.js', costante: 'PREFISSI_ALLEGATO', perche: 'riconosce un allegato di Filo anche nella forma storage.googleapis.com; Filo li scrive tutti sotto firebasestorage' },
+];
+// Un nome di file ha la stessa forma di un dominio: queste estensioni non sono domini di primo livello.
+const ESTENSIONI_DI_FILE = new Set(['json', 'html', 'htm', 'js', 'mjs', 'cjs', 'css', 'bin', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'txt', 'log', 'wasm', 'pdf', 'map']);
+
 const CHIAVI_HOST = new Set(['host', 'hostname']);
 // Un host già intero seguito da un'espressione (`https://api.x.it${percorso}`) è un indirizzo fisso, non dinamico.
 const HOST_INTERO_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(:\d+)?$/;
+const eDominio = (s) => HOST_INTERO_RE.test(s) && !ESTENSIONI_DI_FILE.has(s.replace(/:\d+$/, '').split('.').pop());
 
 const ESTENSIONI = ['.js', '.mjs', '.cjs', '.html', '.css', '.json'];
 const URL_RE = /\b(?:https?|wss?):\/\/[^\s'"`<>()\\]*/gi;
