@@ -460,6 +460,51 @@ test('editor: col microfono accanto, la casella della chat mostra tutto il sugge
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella.png` });
 });
 
+// Il tetto della casella segue il modulo, non i caratteri del sistema (#256.4): oltre scorre, ma resta dentro la chat,
+// il registro non sparisce e l'ultima risposta non scivola fuori vista mentre si scrive.
+test('editor: una richiesta lunghissima ferma la casella entro la chat, e l\'ultima risposta resta in vista', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await prepara(app);
+  await rispostaFinta(app, 'Ultima risposta del documento.');
+  const ed = await openTab('filo://editor/editor.html');
+  await ed.waitForSelector('.ed-module[data-type="switch"]');
+  await ed.locator('.ed-switch-icon').nth(1).click();
+  const chat = ed.locator('.ed-module[data-type="chat"]');
+  const casella = chat.locator('[data-chat="input"]');
+  const log = chat.locator('[data-chat="log"]');
+  for (let i = 1; i <= 3; i++) {
+    await casella.fill(`domanda ${i}`);
+    await casella.press('Enter');
+    await expect(chat.locator('.ed-chat-msg.assistant')).toHaveCount(i, { timeout: 8_000 });
+  }
+  await expect(chat.locator('.ed-chat-msg.assistant').last()).toHaveText('Ultima risposta del documento.');
+  const vuota = await casella.evaluate((i) => i.offsetHeight);
+  await casella.fill(Array.from({ length: 40 }, (_, i) => `frase numero ${i + 1} della richiesta lunga`).join(', '));
+  const m = await ed.evaluate(() => {
+    const mod = document.querySelector('.ed-module[data-type="chat"]');
+    const t = mod.querySelector('[data-chat="input"]');
+    const l = mod.querySelector('[data-chat="log"]');
+    const r = (el) => el.getBoundingClientRect();
+    const ultima = [...l.querySelectorAll('.ed-chat-msg.assistant')].pop();
+    return {
+      sh: t.scrollHeight, ch: t.clientHeight, h: t.offsetHeight, chat: mod.querySelector('.ed-chat').clientHeight,
+      fondoCasella: r(t).bottom, fondoModulo: r(mod).bottom, log: l.clientHeight,
+      ultimaInVista: r(ultima).bottom <= r(l).bottom + 1 && r(ultima).top >= r(l).top - 1,
+    };
+  });
+  expect(m.sh).toBeGreaterThan(m.ch);
+  expect(m.h).toBeGreaterThan(vuota);
+  expect(m.h).toBeGreaterThan(m.chat * 0.5);
+  expect(m.fondoCasella).toBeLessThanOrEqual(m.fondoModulo);
+  expect(m.log).toBeGreaterThan(20);
+  expect(m.ultimaInVista).toBe(true);
+  mkdirSync(SHOTS, { recursive: true });
+  await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella-tetto.png` });
+  await casella.fill('');
+  await expect.poll(() => casella.evaluate((i) => i.offsetHeight)).toBe(vuota);
+});
+
 // Un Esc o un Invio mentre l'ultima frase è ancora in trascrizione: quello che arriva resta nella casella.
 async function trascrizioneLenta(app, dallaPrima = false) {
   await app.evaluate((_e, primaLenta) => {
