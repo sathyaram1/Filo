@@ -684,6 +684,51 @@ test('il rapporto del worker porta a parte i turni dell\'orchestratore, e la cac
     assert.equal(o.maxContextTokens, 35000);
     assert.equal(rep.costUsd, 0.4096, 'costUsd resta quello del worker, senza l’orchestratore');
     assert.match(riassunto(rep)[3], /orchestratore \$/);
+    assert.doesNotMatch(riassunto(rep)[3], /oltre/, 'tutto Opus 5.5: nessuna soglia');
+  } finally { togliCartella(base); }
+});
+
+test('orchestratore su Haiku 5.5: prezzato col suo listino, e le sue richieste oltre soglia a parte da quelle del worker', async () => {
+  const base = cartellaTemporanea('filo-rapporto-orch-haiku-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    const riga = (id, model, ts, { cw = 0, cr = 0, out = 10, tool = null } = {}) => JSON.stringify({
+      type: 'assistant', timestamp: ts, sessionId: id.startsWith('h') ? 'orch' : 'w4',
+      message: { id, model, usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: out }, content: tool ? [tool] : [{ type: 'text', text: id }] },
+    });
+    const H55 = 'claude-haiku-5-5';
+    writeFileSync(join(dir, 'orch.jsonl'), [
+      riga('h1', H55, H('09:00:00'), { cw: 30000 }),
+      riga('h2', H55, H('09:01:00'), { cr: 30000, tool: { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} } }),
+      fine('ag1', H('09:30:00')),
+      riga('h3', H55, H('09:30:10'), { cr: 120000, cw: 2000 }),
+      riga('h4', H55, H('09:31:00'), { cr: 40000, tool: { type: 'tool_use', id: 'ag2', name: 'Agent', input: {} } }),
+    ].join('\n') + '\n');
+    writeFileSync(join(sub, 'agent-w4.jsonl'), [
+      riga('w1', H55, H('09:32:00'), { cw: 110000 }),
+      riga('w2', 'claude-sonnet-5-5', H('09:33:00'), { cr: 150000 }),
+    ].join('\n') + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 60, t - 60);
+    const rep = await generaRapporto({ role: 'resolver', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w4');
+    const o = rep.orchestrator;
+    assert.equal(o.turns, 2, 'h3 e h4: la finestra dalla fine del worker di prima');
+    // h3 passa la soglia (122.000): 120.000·0,05 + 2000·0,625 + 10·2,50 = 7275; h4 no: 40.000·0,01 + 10·0,50 = 405.
+    // A tariffa Haiku 4.5 sarebbe uscito 0,0186.
+    assert.equal(o.costUsd, 0.0077);
+    assert.deepEqual(o.oltreSoglia, { 'claude-haiku-5-5': 1 });
+    // w1: 110.000·0,625 + 10·2,50 = 68.775; w2 (Sonnet 5.5, lineare): 150.000·0,2 + 10·10 = 30.100.
+    assert.equal(rep.costUsd, Math.round(((68775 + 30100) / 1e6) * 10000) / 10000);
+    assert.deepEqual(rep.oltreSoglia, { 'claude-haiku-5-5': 1 });
+    assert.ok(!rep.notes.some((n) => /sconosciuto/.test(n)), JSON.stringify(rep.notes));
+    assert.match(riassunto(rep)[3], /orchestratore \$0\.0077 \([^)]*oltre soglia: claude-haiku-5-5 1\)/);
+    assert.match(riassunto(rep)[3], /richieste oltre la soglia del prompt: claude-haiku-5-5 1$/);
   } finally { togliCartella(base); }
 });
 
