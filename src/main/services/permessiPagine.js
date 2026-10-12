@@ -102,6 +102,22 @@ function origineDi(wc, altro) {
   return r.origine ? r : c;
 }
 
+function tipoDi(permission, details) {
+  if (Object.hasOwn(SECONDO_L_ACCESSO, permission)) return SECONDO_L_ACCESSO[permission](details);
+  return Object.hasOwn(TIPI, permission) ? TIPI[permission] : null;
+}
+
+function senzaTipoPassa(permission) {
+  return INNOCUI.has(permission) || Object.hasOwn(SECONDO_L_ACCESSO, permission);
+}
+
+// Il nome della cartella o del file nella domanda: chi l'ha scelto per farlo leggere riconosce cosa sta per cambiare.
+function oggettoDi(tipo, details) {
+  if (tipo !== 'file') return undefined;
+  const percorso = String((details && details.filePath) || '');
+  return { nome: path.basename(percorso) || percorso, percorso, cartella: Boolean(details && details.isDirectory) };
+}
+
 function partiNote(details) {
   const d = details || {};
   const tipi = Array.isArray(d.mediaTypes) ? d.mediaTypes : (d.mediaType ? [d.mediaType] : []);
