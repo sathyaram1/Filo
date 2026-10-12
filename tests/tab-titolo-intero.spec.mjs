@@ -59,3 +59,27 @@ test('#429 — con la fila libera nessun titolo resta a metà, e Gestione contin
   await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
   await captureCompositeElectron(app, 'tests/.shots/tab-titolo-intero-scuro.png');
 });
+
+const rettangolo = (shell, testo) => shell.locator('.tab', { hasText: testo })
+  .evaluate((el) => { const r = el.getBoundingClientRect(); return { x: Math.round(r.left), w: Math.round(r.width) }; });
+
+// Le schede si dividono la fila a parti uguali: il titolo più lungo che si accorcia le stringerebbe tutte, e quella
+// sotto il puntatore gli scapperebbe da sotto. Si adattano quando il puntatore lascia la fila.
+test('#429 — un titolo che cambia non sposta la scheda sotto il puntatore, poi la fila si adatta', async ({ app, shell, openTab, testServer }) => {
+  await openTab(testServer.html('<title>Gestione</title><body>uno</body>'));
+  const lunga = await openTab(testServer.html('<title>Una pagina col titolo più lungo di tutti</title><body>due</body>'));
+  await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
+
+  await shell.locator('.tab', { hasText: 'Gestione' }).click();
+  await expect(shell.locator('.tab.active .title')).toHaveText('Gestione');
+  const prima = await rettangolo(shell, 'titolo più lungo');
+  await shell.mouse.move(prima.x + 12, 24);
+
+  await lunga.evaluate(() => { document.title = 'Corto'; });
+  await expect(shell.locator('.tab .title', { hasText: 'Corto' })).toBeVisible();
+  expect(await rettangolo(shell, 'Corto')).toEqual(prima);
+
+  await shell.mouse.move(600, 500);
+  await expect.poll(async () => (await rettangolo(shell, 'Corto')).w, { timeout: 5_000 }).toBeLessThan(prima.w);
+  await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
+});

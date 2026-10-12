@@ -771,6 +771,11 @@
   let puntatoreSullaFila = false;
   let sondaFila = null;
   let giroSonda = 0;
+  // Anche la parte di ogni scheda non cambia sotto il puntatore: un titolo che cambia mentre il puntatore sta
+  // sulla fila (una scheda dietro che finisce di caricare) aspetta che la lasci, o la scheda gli scappa (#429).
+  let passoInVigore = 0;
+  let passoTrattenuto = false;
+  const fermo = () => Boolean(larghezzeFerme) || passoTrattenuto;
 
   function sullaFila(x, y) {
     const r = tabRowEl.getBoundingClientRect();
@@ -784,7 +789,7 @@
 
   function sciogliLarghezze() {
     fermaSonda();
-    if (!larghezzeFerme) return;
+    if (!larghezzeFerme) { if (passoTrattenuto) misuraLarghezzeChieste(); return; }
     larghezzeFerme = null;
     strisciaFerma = 0;
     tabsEl.style.flex = '';
@@ -801,10 +806,10 @@
   // barra non riceve eventi del mouse: chiede al main dove sta il puntatore.
   function sondaPuntatore() {
     fermaSonda();
-    if (!larghezzeFerme) return;
+    if (!fermo()) return;
     const giro = giroSonda;
     Promise.resolve(typeof api.puntatore === 'function' ? api.puntatore() : null).then((p) => {
-      if (giro !== giroSonda || !larghezzeFerme || puntatoreSullaFila) return;
+      if (giro !== giroSonda || !fermo() || puntatoreSullaFila) return;
       if (p && sullaFila(p.x, p.y)) sondaFila = setTimeout(sondaPuntatore, 150);
       else sciogliLarghezze();
     }, () => { if (giro === giroSonda) sciogliLarghezze(); });
@@ -1009,7 +1014,11 @@
     const pad = getComputedStyle(schede[0]);
     const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
     const larghe = schede.map((el) => el.getBoundingClientRect().width);
-    const passo = Math.max(...larghe.map((w, i) => Math.min(w, regole[i].max)));
+    const misurato = Math.max(...larghe.map((w, i) => Math.min(w, regole[i].max)));
+    const tieni = puntatoreSullaFila && passoInVigore > 0;
+    passoTrattenuto = tieni && misurato !== passoInVigore;
+    const passo = tieni ? passoInVigore : misurato;
+    passoInVigore = passo;
     schede.forEach((el, i) => {
       const { peso, min, max } = regole[i];
       const chiesta = Math.min(max, Math.max(min, passo * peso));
