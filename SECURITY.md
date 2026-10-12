@@ -137,20 +137,24 @@ della tua macchina.
 
 ## 3. Isolamento: i token non toccano mai le pagine web
 
-**Stato: ✅ (principio già in vigore nell'architettura)**
+**Stato: ✅ per i token; 🔜 per il resto del canale fra le pagine e Filo, che
+stiamo restringendo**
 
 Filo è un browser, quindi carica siti web di terze parti. Una pagina web
 **non deve mai poter leggere** i tuoi token o i tuoi dati di Filo. Per questo:
 
 - L'autenticazione e i token vivono **solo nel processo principale** (il
-  "cervello" dell'app, in Node.js), mai nel contesto delle pagine web.
+  "cervello" dell'app, in Node.js), mai nel contesto delle pagine web
+  (`src/main/auth/`).
 - Le pagine web esterne girano con `contextIsolation` attivo e senza accesso a
-  Node, e comunicano con Filo solo attraverso un canale ristretto e
-  controllato (preload). Quel canale non espone né i token né le funzioni di
-  amministrazione.
+  Node (`src/main/tabs.js`), e comunicano con Filo attraverso il preload
+  (`src/preload/page-preload.js`). Quel canale non consegna i token, e le
+  funzioni di amministrazione rispondono solo alle pagine di Filo
+  (`src/main/services/handlers/origine.js`).
 
-In pratica: anche un sito malevolo che gira in una scheda non può chiedere a
-Filo "dammi il token dell'utente" né eseguire azioni privilegiate.
+Cosa un sito possa chiedere a Filo attraverso quel canale, oltre a questo, lo
+stiamo ancora restringendo: finché il lavoro è aperto, questa sezione promette
+solo quello che c'è scritto qui sopra.
 
 ---
 
