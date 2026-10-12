@@ -54,6 +54,8 @@ function esegui(azione, params, wc, schede, tab) {
   if (wc.isDestroyed()) return;
   if (['cut', 'copy', 'paste', 'selectAll'].includes(azione)) { wc[azione](); return; }
   if (azione === 'link-copia') { clipboard.writeText(params.linkURL); return; }
+  if (azione === 'immagine-copia') { wc.copyImageAt(params.x, params.y); return; }
+  if (azione === 'immagine-url') { clipboard.writeText(params.srcURL); return; }
   if (azione === 'link-apri') { if (schede) schede.apriDaCollegamento(params.linkURL); return; }
   const metodo = { indietro: 'goBack', avanti: 'goForward', ricarica: 'reload' }[azione];
   if (!metodo) return;
