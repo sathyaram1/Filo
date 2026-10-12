@@ -551,10 +551,11 @@ trigger ricalcola l'urgenza del suo compito aperto.
 - Ogni agente può lanciare sotto-agenti, fino a tre livelli sotto la sessione
   principale, e sceglierne il modello.
 
-Transizione: dal 12/10 il server legge già `model` ed `effort` dal feedback,
-per primo lavoro e correzione (#1192), e #1190 li rende scrivibili in Gestione.
-Con i compiti la lettura dal feedback si toglie, e #1190 tiene solo la scelta
-per fase in Automazioni.
+Transizione: dal 12/10 il server manda modello e sforzo col biglietto (#1192)
+e li legge da `config/routines.roleModels` (la scelta per fase, scrivibile in
+Automazioni con #1193). Il gancio che li impone è #1189. Il server legge anche
+`model` ed `effort` sul feedback, per primo lavoro e correzione, ma nessuno li
+scrive: con i compiti quella lettura si toglie.
 
 ### 6.5 Numerazione e dove si vedono
 
