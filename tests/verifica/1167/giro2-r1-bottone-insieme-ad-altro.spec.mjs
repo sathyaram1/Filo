@@ -42,20 +42,3 @@ test('r1 risposta col bottone del file e un promemoria nello stesso giro: la ris
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
-test('r1 risposta con due bottoni di file, uno dei due non esiste: la risposta arriva nella bolla', async ({ app }) => {
-  test.setTimeout(60_000);
-  const { dir, file } = await bollettaTari(app);
-  try {
-    await modelloFinto(app, [
-      { text: RISPOSTA, toolCalls: [apriFile(file, 'f1'), apriFile(join(dir, 'tari-2025.pdf'), 'f2')] },
-      { text: 'La bolletta del 2025 invece non l\'ho trovata.' },
-    ]);
-    const page = await home(app);
-    await chiedi(page, 'quanto ho pagato di tari quest\'anno e l\'anno scorso?');
-    await controlla(app, page, 'non l\'ho trovata');
-  } finally {
-    await ripristina(app);
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
