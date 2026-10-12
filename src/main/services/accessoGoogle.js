@@ -79,7 +79,8 @@ function osserva(ses, partition = '') {
     ses.cookies.on('changed', (_e, c, causa, tolto) => {
       if (!c) return;
       if (!tolto && G.cookieDiAccesso(c)) accessoOsservato(effimera ? ses : null).catch(() => {});
-      if (effimera && causa !== 'overwrite') rispecchia(ses, c, tolto);
+      // Una sovrascrittura arriva come un'uscita seguita dall'arrivo del nuovo: basta il secondo.
+      if (effimera && !(tolto && causa === 'overwrite')) rispecchia(ses, c, tolto);
     });
   } catch (_) {}
 }
