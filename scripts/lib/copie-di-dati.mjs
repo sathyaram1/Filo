@@ -28,7 +28,7 @@ function motivoDiUnNodo(o, chiave) {
   }
   const presenti = IDENTITA.filter((k) => typeof o[k] === 'string');
   if (presenti.length && presenti.length + (typeof o.text === 'string' ? 1 : 0) >= 2) {
-    return `feedback in chiaro (${[...(typeof o.text === 'string' ? ['text'] : []), ...presenti].join(', ')})`;
+    return `campi di un feedback in chiaro (${[...(typeof o.text === 'string' ? ['text'] : []), ...presenti].join(', ')})`;
   }
   return '';
 }
