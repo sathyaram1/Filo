@@ -1906,6 +1906,7 @@
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
     if (deps.apriProposta) apriProposta = deps.apriProposta;
     if (deps.archiviaAzione) archiviaAzione = deps.archiviaAzione;
+    if (deps.sceltaAutonomia) sceltaAutonomiaEl = deps.sceltaAutonomia;
   }
 
   global.SN_DASH_ATTIVITA = {
