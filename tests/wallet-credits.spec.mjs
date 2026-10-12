@@ -225,32 +225,65 @@ test('senza portafoglio la pagina chiede l\'invito; col codice giusto mostra il 
   identityDown = false;
 });
 
-test('il riscatto dice quanti crediti locali sono passati; si dichiarano una volta sola; la nuova chiave conferma', async ({ app, openTab }) => {
+// #1138 — un'installazione nuova ha 1.000 crediti nel conteggio locale: al
+// riscatto non li dichiara, e né la frase né la pagina li nominano. Il server
+// finto risponde come quello vero col tetto a 0 («nessuno dei 1.000»).
+test('il riscatto non dichiara il conteggio locale: frase e pagina dicono solo i crediti d’ingresso; la nuova chiave conferma', async ({ app, openTab }) => {
   redeemed = false;
   seen.redeems.length = 0; seen.localCredits.length = 0; seen.reissues = 0;
+  expect(await app.evaluate(async () => (await globalThis.SN_CREDITS.getPublic()).balance)).toBe(1000);
   const page = await openTab('filo://credits/credits.html');
   await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+
+  // Senza chiave e col server muto la nota non rimanda a un saldo che qui non c'è.
+  serverDown = true;
+  await page.reload();
+  await expect(page.locator('#walletNote')).toHaveText('Il server dei crediti non risponde adesso: riprova fra poco.', { timeout: 15000 });
+  await expect(page.locator('#hero')).toBeHidden();
+  serverDown = false;
+  await page.reload();
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+
+  // Riscatto riuscito ma stato del portafoglio illeggibile subito dopo: con la
+  // chiave personale il saldo è del server, e al suo posto non compare il
+  // conteggio locale.
+  soloIngresso = true;
+  statoGiu = true;
   await page.fill('#inviteCode', 'ABCD-EFGH');
   await page.click('#redeemBtn');
-  // La frase porta i numeri del server: ingresso e locali passati.
-  await expect(page.locator('#redeemMsg')).toContainText('5.000 crediti', { timeout: 10000 });
-  await expect(page.locator('#redeemMsg')).toContainText('1.010 che avevi già');
-  // Il modulo dell'invito sparisce: la frase resta nella nota, visibile, anche
-  // dopo il ridisegno che segue l'avviso di saldo cambiato.
+  const frase = 'Invito riscattato: hai 5.000 crediti d’ingresso.';
+  await expect(page.locator('#redeemMsg')).toHaveText(frase, { timeout: 10000 });
+  expect(seen.localCredits).toEqual([0]);
   await page.waitForTimeout(1200);
-  await expect(page.locator('#walletNote')).toBeVisible();
-  await expect(page.locator('#walletNote')).toContainText('1.010 che avevi già');
-  // L'app ha dichiarato il conteggio locale (intero, positivo).
-  expect(seen.localCredits).toHaveLength(1);
-  expect(seen.localCredits[0]).toBeGreaterThan(0);
-  expect(Number.isInteger(seen.localCredits[0])).toBe(true);
+  await expect(page.locator('#walletNote')).toHaveText(frase);
+  await expect(page.locator('#hero')).toBeHidden();
+  await expect(page.locator('body')).not.toContainText('1.000');
+  statoGiu = false;
+
+  // Stato letto: saldo e movimenti sono i soli crediti d'ingresso.
+  await page.reload();
+  await expect(page.locator('#hero')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('#balance')).toHaveText('5.000', { timeout: 15000 });
+  await expect(page.locator('#moves li')).toHaveCount(1);
+  await expect(page.locator('#moves li .sn-credits-move-gain')).toHaveText('+5.000');
+  await expect(page.locator('#redeemForm')).toBeHidden();
+  await expect(page.locator('body')).not.toContainText('1.000');
+  await page.screenshot({ path: 'tests/.shots/1138-crediti-dopo-il-riscatto.png' });
+
+  // Il server risponde senza saldo: un trattino, non il conteggio locale.
+  saldoIgnoto = true;
+  await page.reload();
+  await expect(page.locator('#invites li')).toHaveCount(3, { timeout: 15000 });
+  await expect(page.locator('#balance')).toHaveText('—');
+  saldoIgnoto = false;
+  soloIngresso = false;
 
   // Un secondo riscatto dalla stessa installazione (identità nuova dopo un
-  // annullamento) non ripresenta quello che è già passato.
+  // annullamento) non dichiara niente nemmeno lui.
   const again = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'wallet_redeem', code: 'ABCD-EFGH' }, { tab: { id: 9, url: 'filo://credits/credits.html' }, url: 'filo://credits/credits.html' }));
   expect(again.ok).toBe(true);
-  expect(seen.localCredits).toHaveLength(2);
-  expect(seen.localCredits[1]).toBe(0);
+  expect(again.message).toBe(frase);
+  expect(seen.localCredits).toEqual([0, 0]);
 
   // La chiave personale sparisce da questo computer (deposito perso): la
   // pagina offre «Richiedi una nuova chiave» e, premuto, CONFERMA. Nel ramo
