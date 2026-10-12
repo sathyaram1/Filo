@@ -62,7 +62,7 @@ const COMPOSTI = [
 const CHIAMATE_LOCALI = {
   'src/main/protocol.js': 'net.fetch sui file delle pagine filo://',
   'src/main/test-servizi-chiusi.js': 'la fetch finta delle prove',
-  'src/pages/security/security.js': 'fetch su un data: URL, per farne un file da copiare',
+  'src/pages/security/security.js': 'fetch su un data: URL, per rimettere un’immagine negli appunti',
 };
 
 // In un file che fa rete ogni testo con la forma di un nome di dominio è una destinazione, per qualunque strada arrivi
