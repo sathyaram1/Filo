@@ -173,6 +173,22 @@ test('#429 — con la cima in due colori la scheda attiva prende quello che prev
   await expect.poll(fondo, { timeout: 5_000 }).toBe('rgb(255, 255, 255)');
 });
 
+// Le larghezze chieste sommano al più il posto della fila: arrotondate oltre, la striscia le stringerebbe tutte
+// e l'attiva, che ha esattamente la sua, perderebbe un pixel e mezzo nome.
+test('#429 — con la fila piena la scheda attiva non taglia il suo nome per un pixel', async ({ app, shell }) => {
+  for (const u of ['filo://manage/manage.html', 'filo://options/options.html', 'filo://history/history.html',
+    'filo://feedback/feedback.html', 'filo://downloads/downloads.html']) await shell.evaluate((x) => window.filoShell.tabs.open(x), u);
+  await expect(shell.locator('#tabs .tab')).toHaveCount(6, { timeout: 15_000 });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w.getBounds().width > 600)?.setSize(760, 600));
+  await expect(shell.locator('.tab.active .title')).toHaveText('Download');
+  await expect.poll(() => shell.evaluate(() => {
+    const ti = document.querySelector('#tabs .tab.active .title');
+    const tagliate = [...document.querySelectorAll('#tabs .tab:not(.active) .title')].filter((t) => t.scrollWidth > t.clientWidth + 0.5);
+    if (!tagliate.length) return 'fila non ancora piena';
+    return ti.scrollWidth > ti.clientWidth + 0.5 ? `«Download» ${ti.clientWidth}/${ti.scrollWidth}` : 'intero';
+  }), { timeout: 10_000 }).toBe('intero');
+});
+
 // L'attiva si stacca dalle altre solo con lo spazio che avanza: un vuoto suo non taglia il nome della vicina.
 test('#429 — la scheda attiva non tiene un vuoto che serve a un nome tagliato', async ({ app, shell, openTab, testServer }) => {
   await openTab(testServer.html('<title>Meteo Italia previsioni del tempo</title><body>x</body>'));
