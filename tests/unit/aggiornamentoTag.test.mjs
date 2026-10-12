@@ -13,7 +13,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const R = require(join(ROOT, 'src', 'main', 'aggiornamentoRegole.js'));
 const U = require(join(ROOT, 'src', 'main', 'updater.js'));
 const { AppUpdater } = require('electron-updater/out/AppUpdater');
-const semver = require('semver');
+// Il semver di electron-updater: una SemVer di un'altra copia non la riconosce.
+const semver = createRequire(require.resolve('electron-updater'))('semver');
 
 function aggiornatore(info) {
   const au = Object.create(AppUpdater.prototype);
@@ -43,13 +44,13 @@ test('la regola: tag uguale a v più la versione dichiarata, e niente tag solo f
 test('una release sotto un tag senza v non si annuncia né si scarica, quella giusta sì', async () => {
   for (const tag of ['99.0.0', 'x1']) {
     const { au, visti } = aggiornatore({ version: '99.0.0', tag, files: [] });
-    await U.avviaAggiornatore(au, { automatici: true });
+    await U.avviaAggiornatore(au, { automatici: false });
     await assert.rejects(au.doCheckForUpdates(), /rifiutata/, `la release sotto il tag ${tag} passa il controllo`);
     assert.deepEqual(visti, [], `la release sotto il tag ${tag} è stata annunciata`);
   }
 
   const { au, visti } = aggiornatore({ version: '0.2.234', tag: 'v0.2.234', files: [] });
-  await U.avviaAggiornatore(au, { automatici: true });
+  await U.avviaAggiornatore(au, { automatici: false });
   const r = await au.doCheckForUpdates();
   assert.equal(r.isUpdateAvailable, true);
   assert.deepEqual(visti, ['update-available']);
@@ -57,8 +58,8 @@ test('una release sotto un tag senza v non si annuncia né si scarica, quella gi
 
 test('collegato due volte, il cancello non si impila', async () => {
   const { au } = aggiornatore({ version: '0.2.234', tag: 'v0.2.234', files: [] });
-  await U.avviaAggiornatore(au, { automatici: true });
+  await U.avviaAggiornatore(au, { automatici: false });
   const primo = au.isUpdateAvailable;
-  await U.avviaAggiornatore(au, { automatici: true });
+  await U.avviaAggiornatore(au, { automatici: false });
   assert.equal(au.isUpdateAvailable, primo);
 });
