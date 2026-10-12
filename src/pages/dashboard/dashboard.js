@@ -853,15 +853,21 @@
     if (!r?.ok) {
       // Il ragionamento già arrivato resta leggibile anche sotto un errore:
       // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
-      // La parte di risposta scritta coi bottoni ci resta come nota, come il resto del tentativo.
-      if (rispostaPrima) pending.aggiungiNota(rispostaPrima);
+      // La parte di risposta scritta coi bottoni era arrivata (#1167): resta nella bolla coi suoi bottoni, e l'errore
+      // dice sotto che il lavoro dopo non è riuscito. Il testo a metà del giro fallito invece se ne va.
+      if (rispostaPrima && streamBubble) {
+        streamBubble.classList.remove('dash-bubble-streaming');
+        setBubbleText(streamBubble, rispostaPrima, true);
+        Att.renderActions(streamBubble, Array.isArray(r?.actions) ? r.actions : [], { onAck: goHome, activity: pending, shown });
+        streamBubble = null;
+      }
       pending.endTurn();
       if (ownsActivity) pending.finish();
       // Le azioni fatte PRIMA del guasto sono successe davvero: restano nello
       // storico, così un «Riprova» riparte sapendo che quel timer c'è già
       // invece di avviarne un secondo.
-      if (Array.isArray(r?.actions) && r.actions.length) {
-        threadHistory.push({ role: 'filo', text: '', actions: r.actions, interrotto: true });
+      if (rispostaPrima || (Array.isArray(r?.actions) && r.actions.length)) {
+        threadHistory.push({ role: 'filo', text: rispostaPrima, actions: Array.isArray(r?.actions) ? r.actions : [], interrotto: true });
       }
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
