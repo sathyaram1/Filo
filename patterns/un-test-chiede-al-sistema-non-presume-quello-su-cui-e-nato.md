@@ -136,6 +136,15 @@ fa lo stesso: la piattaforma la sceglie `perProva` nel main, e lo spec gira per 
 (`tests/aggiornamenti-da-soli.spec.mjs`). Un `process.platform` letto dallo spec
 dà un ramo che la suite in GitHub non corre mai (#1171).
 
+**Il commit provato è vecchio** (#1185). Il cancello prova l'ultimo commit di main con
+la suite verde, che può stare giorni dietro la punta: gli stessi otto rossi, corretti
+su main da un giorno, hanno riaperto il loro feedback appena il primo si era chiuso.
+Prima di aprirlo il cancello rifà ogni file rosso sulla punta di main
+(`scripts/rossi-sulla-punta.mjs`): verdi tutti, nessun feedback e la corsa resta rossa;
+altrimenti il feedback dice il commit provato e quali file sono già verdi. Nel dubbio
+(main irraggiungibile, rosso senza file, controllo rotto) si apre come prima.
+Sentinella: `tests/unit/rossiSullaPunta.test.mjs`.
+
 ## Il collegamento simbolico (#742)
 
 Su Windows un collegamento simbolico lo crea solo l'amministratore o chi ha la
