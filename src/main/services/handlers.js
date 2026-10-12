@@ -5298,6 +5298,7 @@ const handlerCtx = {
   ricordaLettoInChat,
   decisioneAzionePagina,
   segnaLetturaAiuto,
+  fileScaricato,
   nuovaConversazioneAiuto,
   maybeRunCompactor,
   // Archivio delle chat (#525)
