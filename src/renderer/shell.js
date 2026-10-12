@@ -434,7 +434,7 @@
     accountBtn.addEventListener('click', async () => {
       if (authBusy) return;
       // Google nelle schede cambia senza avvisi (un accesso o un'uscita fatti in una scheda): si chiede adesso.
-      if (authProfile) await refreshAuth();
+      if (authProfile) await refreshAuth({ senzaRete: true });
       if (authProfile) {
         const label = shortName(authProfile);
         showNativeMenu(accountBtn, [
