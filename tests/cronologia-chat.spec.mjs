@@ -587,7 +587,8 @@ test('un’accoglienza aperta e mai risposta non lascia una chat con dentro la s
   await expect(page.locator('#chatsSection')).toBeHidden();
 });
 
-test('un’immagine incollata: la chat riaperta dice quante ce n’erano', async ({ app, openTab }) => {
+// A Filo ancora aperto l'immagine è in memoria (#1166) e torna nella bolla; il conto «non conservata» vale dopo un riavvio.
+test('un’immagine incollata: la chat riaperta a Filo ancora aperto la rimostra', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await configura(app);
   await stubProvider(app, { grafico: { tipo: 'conversazione', titolo: 'Il grafico' } });
