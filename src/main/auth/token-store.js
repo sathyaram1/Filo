@@ -53,27 +53,29 @@ function save(session) {
   }
 }
 
+function decifra(file) {
+  try {
+    const { safeStorage } = require('electron');
+    const j = JSON.parse(safeStorage.decryptString(fs.readFileSync(file)));
+    return j && j.refreshToken ? j : null;
+  } catch (_) { return null; }
+}
+
 // Carica la sessione cifrata, o null se assente/illeggibile.
 function load() {
   if (!canEncrypt()) return inMemoria;
-  let raw;
-  try {
-    raw = fs.readFileSync(filePath());
-  } catch (_) {
-    return inMemoria; // file assente: non loggato, o salvato solo per questo avvio
-  }
-  try {
-    const { safeStorage } = require('electron');
-    const json = safeStorage.decryptString(raw);
-    return JSON.parse(json);
-  } catch (e) {
-    // Blob corrotto o cifrato con un'altra chiave OS (portachiavi diverso, profilo ricreato): si è
-    // fuori, ma il file resta da parte, perché quella chiave può tornare (#1085).
-    console.warn('[auth] sessione illeggibile, la metto da parte:', e?.message || e);
+  const file = filePath();
+  if (fs.existsSync(file)) {
+    const dati = decifra(file);
+    if (dati) return dati;
+    // Blob corrotto o cifrato con un'altra chiave OS (portachiavi diverso, profilo ricreato): il file
+    // resta da parte, perché quella chiave può tornare (#1085).
+    console.warn('[auth] sessione illeggibile, la metto da parte');
     inMemoria = null;
-    guasti.metteDaParte(filePath(), 'illeggibile-' + guasti.timbro());
-    return null;
+    guasti.metteDaParte(file, 'illeggibile-' + guasti.timbro());
   }
+  // Salvata solo per questo avvio, o una copia messa da parte che con la chiave di adesso si legge.
+  return inMemoria || guasti.riprendiDaParte(file, 'illeggibile-', decifra);
 }
 
 function clear() {
@@ -81,6 +83,7 @@ function clear() {
   try {
     fs.rmSync(filePath(), { force: true });
   } catch (_) {}
+  guasti.togliDaParte(filePath(), 'illeggibile-');
 }
 
 module.exports = { save, load, clear, canEncrypt };
