@@ -142,6 +142,18 @@ test('il classificatore legge tutti i feedback in parallelo e mostra quelli gius
   await expect(page.locator('#mgThread')).toContainText('Il tasto per chiudere non risponde.');
 });
 
+test('con il classificatore mai scelto la ricerca parte già con Jev', async ({ app, openTab }) => {
+  await preparaOwner(app, { supportDoc: { manageSearch: 'vendor/testo' } });
+  const page = await openTab(URL);
+  await page.waitForFunction(() => window.filo && window.__mgTest);
+  await cerca(page, 'quella volta che la x per chiudere non andava');
+  await expect(page.locator('.mg-item--result')).toHaveCount(3, { timeout: 10000 });
+  const g = await app.evaluate(() => ({ decisioni: globalThis.__g1118.decisioni, chat: globalThis.__g1118.chat }));
+  expect(g.decisioni.length).toBeGreaterThan(0);
+  expect(g.decisioni[0].model).toBe('typesafe/jev-1.13');
+  expect(g.chat).toEqual([]);
+});
+
 test('classificatore che non risponde: li ordina il modello della ricerca, e la pagina lo dice', async ({ app, openTab }) => {
   await preparaOwner(app, {
     supportDoc: { manageSearchClassifier: 'vendor/non-classifica', manageSearch: 'vendor/testo' },
