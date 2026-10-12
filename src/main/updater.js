@@ -294,8 +294,60 @@ function segnalaPronto() {
   avvisaPronto(testo, versione);
 }
 
+// Il cancello sta dove electron-updater legge la release e il suo provider: ogni strada (controllo, «Installa», da soli)
+// ci passa prima di decidere e scaricare. Un errore e non «aggiornato»: la release più recente non è nostra.
+// Un finto delle prove non passa dal motore di electron-updater e non scarica niente: il cancello serve solo al vero.
+// Se la libreria non esporta più la sua classe base, ogni aggiornatore conta come vero.
+function dalMotore(au) {
+  let AppUpdater;
+  try { ({ AppUpdater } = require('electron-updater')); } catch (_) { return false; }
+  return typeof AppUpdater !== 'function' || au instanceof AppUpdater;
+}
+
+function soloTagDiRilascio(au) {
+  if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
+  if (!dalMotore(au)) return;
+  // Un electron-updater che ha rinominato quel punto lascerebbe passare tutto: senza cancello niente aggiornamenti.
+  if (typeof au.getUpdateInfoAndProvider !== 'function') {
+    const fermo = async () => { throw new Error('aggiornamenti fermi: electron-updater non ha getUpdateInfoAndProvider'); };
+    for (const m of ['checkForUpdates', 'checkForUpdatesAndNotify', 'doCheckForUpdates', 'downloadUpdate']) au[m] = fermo;
+    return;
+  }
+  const originale = au.getUpdateInfoAndProvider;
+  const cancello = async function (...args) {
+    const r = await originale.apply(this, args);
+    const info = r && r.info;
+    if (!R.tagAccettato(info)) {
+      throw new Error(`release ${info.tag} rifiutata: il tag non è v${info.version}`);
+    }
+    const opz = r.provider && r.provider.options;
+    if (opz && opz.provider === 'github') {
+      // electron-updater lascia che il «tag:» di latest.yml copra quello vero: si richiede a GitHub, come fa lui.
+      // Una release di prova, che Filo non pubblica, non è sotto /latest e viene rifiutata.
+      if (typeof r.provider.getLatestTagName !== 'function') {
+        throw new Error('aggiornamenti fermi: il provider GitHub di electron-updater non ha getLatestTagName');
+      }
+      const { CancellationToken } = require('electron-updater');
+      const vero = await r.provider.getLatestTagName(new CancellationToken());
+      if (!R.tagDiGitHubAccettato(vero, info.version)) {
+        throw new Error(`release ${vero} rifiutata: il tag non è v${info.version}`);
+      }
+      const urls = r.provider.resolveFiles(info)
+        .flatMap((f) => [f.url && f.url.href, f.packageInfo && f.packageInfo.path])
+        .filter(Boolean);
+      if (!R.fileDiRilascio({ versione: info.version, urls, owner: opz.owner, repo: opz.repo, host: opz.host || 'github.com' })) {
+        throw new Error(`release ${info.tag} rifiutata: i suoi file non stanno sotto v${info.version}`);
+      }
+    }
+    return r;
+  };
+  cancello.filoTag = true;
+  au.getUpdateInfoAndProvider = cancello;
+}
+
 function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = () => {}, modo = R.MODO_PREDEFINITO } = {}) {
   updater = au;
+  soloTagDiRilascio(au);
   Object.assign(stato, nuovoStato(), { attivo: true, automatici, chiesta, annuncia, modo });
   regola();
   au.on('checking-for-update', () => { if (stato.fase !== 'pronto') stato.fase = 'controllo'; });

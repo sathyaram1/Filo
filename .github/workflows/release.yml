@@ -23,9 +23,17 @@
 #   server, non qui.
 #
 # AUTENTICAZIONE
-#   · GITHUB_TOKEN effimero di Actions: crea e pubblica la Release. Le
-#     "Workflow permissions" del repo devono essere su "Read and write"
-#     (Settings -> Actions -> General).
+#   · I segreti stanno nell'ambiente `rilascio`, aperto al solo `main`: ogni
+#     job che ne legge uno lo dichiara, cosi' un workflow spinto su un ramo
+#     non li vede (#1073, tests/unit/catenaPubblicazione.test.mjs).
+#   · GITHUB_TOKEN effimero di Actions: crea la bozza e allega i file. I
+#     permessi li dichiara questo file: le impostazioni del repo possono
+#     restare su sola lettura.
+#   · L'app di pubblicazione, se `vars.FILO_RILASCIO_APP_ID` c'e': rende
+#     pubblica la bozza, il passo che crea il tag v*, e la regola su TUTTI i
+#     tag lascia passare solo lei: il download del sito prende la release piu'
+#     recente qualunque tag abbia (l'app rifiuta un tag che non sia
+#     v<versione>, il sito no). Senza variabile resta il GITHUB_TOKEN.
 #   · FILO_BUILD_PASSPHRASE: la parola d'ordine di scopo `build`, la stessa che
 #     apre le chiavi di default e l'allarme. Apre SOLO quelle tre cose, e
 #     l'aumento di versione non accetta da qui nessun numero e nessun
@@ -83,6 +91,7 @@ jobs:
     # codice e' quello di un tag, gia' provato.
     if: ${{ !inputs.ripubblica_mac && !inputs.ripubblica_linux }}
     runs-on: ubuntu-latest
+    environment: rilascio
     permissions:
       contents: read
       actions: read
@@ -113,6 +122,7 @@ jobs:
     # `success()` per esteso: con `scegli` rosso qui non si parte.
     if: ${{ success() && needs.scegli.outputs.sha != '' }}
     runs-on: windows-latest
+    environment: rilascio
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.bump.outputs.version }}
@@ -282,6 +292,19 @@ jobs:
           FILO_DEFAULT_SAFEBROWSING_KEY: ${{ secrets.FILO_DEFAULT_SAFEBROWSING_KEY }}
         run: node scripts/bake-default-config.mjs
 
+      # Prima del numero, come i cancelli: un'app configurata male ferma il giro
+      # senza consumare una versione. Il token vale un'ora, e la build parte
+      # subito dopo. Mac e Linux allegano a una release che c'e' gia', senza
+      # creare tag: a loro basta il GITHUB_TOKEN.
+      - name: Token dell'app di pubblicazione (se configurata)
+        id: app
+        if: steps.check.outputs.should_release == 'true' && vars.FILO_RILASCIO_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.FILO_RILASCIO_APP_ID }}
+          private-key: ${{ secrets.FILO_RILASCIO_APP_KEY }}
+          permission-contents: write
+
       # ─── IL NUMERO DI VERSIONE LO SCRIVE IL SERVER ───────────────────────
       # Prima qui si faceva `npm version patch` + `git push origin HEAD:main`.
       # Su `main` adesso scrive solo l'identità del server (ruleset), e questo
@@ -343,7 +366,7 @@ jobs:
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
         run: npm run release
 
@@ -354,7 +377,7 @@ jobs:
       - name: I file per Windows sono davvero nella bozza?
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -eo pipefail
@@ -383,7 +406,7 @@ jobs:
         # l'URL .../releases/latest/download/Filo-Setup.exe punti a questa.
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         shell: bash
         # --target: il tag nasce sul commit costruito, non sulla punta di main
         # al momento della pubblicazione (il confronto "c'e' qualcosa di nuovo"
@@ -428,6 +451,7 @@ jobs:
     # verrebbe saltato con lui.
     if: ${{ !cancelled() && (inputs.ripubblica_mac || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: macos-latest
+    environment: rilascio
     continue-on-error: true
     outputs:
       allarme: ${{ steps.allarme.outputs.esito }}
@@ -665,6 +689,7 @@ jobs:
     # verrebbe saltato con lui.
     if: ${{ !cancelled() && (inputs.ripubblica_linux || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: ubuntu-latest
+    environment: rilascio
     continue-on-error: true
     outputs:
       allarme: ${{ steps.allarme.outputs.esito }}
