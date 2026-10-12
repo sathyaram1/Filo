@@ -38,7 +38,7 @@ after(async () => { await new Promise((r) => server.close(r)); });
 
 function lancia(args) {
   return new Promise((resolve) => {
-    execFile(process.execPath, [CANALE, ...args], { env: { ...process.env, FILO_ROUTINE_API: base, FILO_ROUTINE_TICKET: '' }, encoding: 'utf8', timeout: 60000 },
+    execFile(process.execPath, [CANALE, ...args], { env: { ...process.env, FILO_ROUTINE_API: base, FILO_ROUTINE_TICKET: '' }, encoding: 'utf8', timeout: TETTO_ATTESA_MS },
       (err, stdout, stderr) => resolve({ code: err ? err.code : 0, stdout, stderr }));
   });
 }
