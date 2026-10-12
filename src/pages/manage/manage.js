@@ -3408,10 +3408,7 @@
     // pratica che potrebbe essere già chiusa è peggio che non offrire niente.
     renderActions(fb);
     disegnaSegnoTestata(fb);
-    mgClarify.hidden = !rispostaOfferta(fb);
-    mgClarifyText.value = bozzeRisposta.get(fb._id) || '';
     if (!ridisegno) setClarifyMsg('', '');
-    mgClarifyBtn.disabled = rispostaInVolo.has(fb._id);
 
     // Gestione (⭐ + archivia/ripristina): visibile per l'owner su QUALUNQUE
     // feedback selezionato, accanto alle azioni contestuali.
