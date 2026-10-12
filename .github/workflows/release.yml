@@ -195,6 +195,27 @@ jobs:
         shell: bash
         run: |
           echo "::error::Controlli automatici rossi: pubblicazione annullata."
+          # Il commit provato e' l'ultimo di main con la suite verde, a volte giorni indietro: se ogni rosso e' gia' verde
+          # sulla punta, il feedback chiederebbe un lavoro fatto e si riaprirebbe a ogni chiusura (#1185). Nel dubbio si apre.
+          PROVATO=$(git rev-parse --short HEAD)
+          GIA_VERDI=""
+          # La copia della punta sta dentro il repo: i suoi test trovano node_modules risalendo.
+          if git fetch --quiet origin main && [ "$(git rev-parse FETCH_HEAD)" != "$(git rev-parse HEAD)" ] \
+            && git worktree add --quiet --detach .punta-main FETCH_HEAD; then
+            PUNTA=$(git rev-parse --short FETCH_HEAD)
+            if GIA_VERDI=$(node .punta-main/scripts/rossi-sulla-punta.mjs unit.log); then
+              git worktree remove --force .punta-main || true
+              echo "::warning::I rossi del commit provato ${PROVATO} sono gia' verdi sulla punta di main (${PUNTA}): nessun feedback. La versione esce col primo commit di main con la suite verde."
+              { echo "## Rossi gia' corretti su main"; echo; echo "Rossi su ${PROVATO}, verdi sulla punta ${PUNTA}:"; printf -- '- %s\n' $GIA_VERDI; } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            git worktree remove --force .punta-main || true
+          fi
+          SULLA_PUNTA=""
+          if [ -n "$GIA_VERDI" ]; then
+            SULLA_PUNTA="
+          Gia' verdi sulla punta di main, da non correggere: $(echo $GIA_VERDI)"
+          fi
           PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti sul ramo principale: la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
           # I test rossi stanno all'INIZIO del log (una riga «not ok» per
           # ciascuno), la coda porta solo il riepilogo: prima si elencano
