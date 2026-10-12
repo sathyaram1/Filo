@@ -1,4 +1,5 @@
-// Esplorazione del verificatore per #1166: Riprova dopo un guasto, chat riaperta, foto in un'altra chat.
+// Verifica #1166, giro 1: le foto che il modello ha ancora davanti si vedono anche dall'utente; molte foto pesanti
+// mandate insieme non spariscono tutte al turno dopo.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -64,24 +65,8 @@ async function scrivi(home, testo) {
 const chiamate = (app) => app.evaluate(() => globalThis.__chiamate);
 const fotoTot = (msgs) => msgs.reduce((n, m) => n + (Array.isArray(m.content) ? m.content.filter((p) => p.type === 'image_url').length : 0), 0);
 
-test('riprova dopo un guasto: le foto arrivano una volta sola, e al turno dopo ci sono ancora', async ({ app, openTab }) => {
-  test.setTimeout(90_000);
-  await preparaModello(app, [{ text: 'Vedo ceci e farina.' }, { text: 'Hummus coi ceci.' }], { guastiPrima: 1 });
-  const home = await apriHome(openTab);
-  await incollaFoto(home, ['#c0392b', '#2e86c1']);
-  await scrivi(home, 'cosa c’è nella dispensa?');
-  const riprova = home.locator('button', { hasText: 'Riprova' });
-  await expect(riprova).toBeVisible({ timeout: 15_000 });
-  await riprova.click();
-  await expect(home.locator('.dash-bubble-filo', { hasText: 'Vedo ceci' })).toBeVisible({ timeout: 15_000 });
-  await scrivi(home, 'e coi ceci?');
-  await expect(home.locator('.dash-bubble-filo', { hasText: 'Hummus' })).toBeVisible({ timeout: 15_000 });
-  const [primo, secondo] = await chiamate(app);
-  expect(fotoTot(primo)).toBe(2);
-  expect(fotoTot(secondo)).toBe(2);
-});
 
-test('chat riaperta nella stessa sessione: il modello vede le foto, e l\'utente?', async ({ app, openTab }) => {
+test('r1 chat riaperta nella stessa sessione: la foto che il modello vede ancora la vede anche l\'utente', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await preparaModello(app, [{ text: 'Vedo ceci.' }, { text: 'Ancora ceci.' }]);
   const home = await apriHome(openTab);
@@ -93,13 +78,32 @@ test('chat riaperta nella stessa sessione: il modello vede le foto, e l\'utente?
     const arr = Array.isArray(l) ? l : (l && l.chats) || [];
     return arr.map((c) => c.id).find(Boolean);
   });
-  const riaperta = await apriHome(openTab, `filo://newtab/?chat=${encodeURIComponent(id)}`);
-  await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'Vedo ceci' })).toBeVisible({ timeout: 15_000 });
-  const nota = await riaperta.locator('.dash-bubble-note').allTextContents();
-  const imgs = await riaperta.locator('.dash-bubble-user img').count();
-  console.log('NOTE RIAPERTA', JSON.stringify(nota), 'IMG', imgs);
-  await scrivi(riaperta, 'e adesso?');
-  await expect(riaperta.locator('.dash-bubble-filo', { hasText: 'Ancora' })).toBeVisible({ timeout: 15_000 });
+  // La stessa chat riaperta (dalla Cronologia, o la home ricaricata), Filo sempre acceso.
+  await home.goto(`filo://newtab/?chat=${encodeURIComponent(id)}`);
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Vedo ceci' })).toBeVisible({ timeout: 15_000 });
+  await scrivi(home, 'e adesso?');
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Ancora' })).toBeVisible({ timeout: 15_000 });
   const [, secondo] = await chiamate(app);
-  console.log('FOTO AL MODELLO DOPO RIAPERTURA', fotoTot(secondo));
+  // Il modello ha ancora la foto davanti: l'utente deve poterla vedere, e la chat non deve dirla «non conservata».
+  expect(fotoTot(secondo)).toBe(1);
+  await expect(home.locator('.dash-bubble-user img')).toHaveCount(1);
+  await expect(home.locator('.dash-bubble-note', { hasText: 'non conservat' })).toHaveCount(0);
+});
+
+test('r2 cinque foto da telefono mandate insieme: al messaggio dopo il modello ne ha ancora davanti almeno una parte', async ({ app }) => {
+  test.setTimeout(90_000);
+  await preparaModello(app, [{ text: 'Cinque scaffali.' }, { text: 'Sul terzo ci sono i ceci.' }]);
+  await app.evaluate(async () => {
+    // Una foto da telefono pesa sui 4 MB: in data URL sono più di 5 milioni di caratteri.
+    const foto = (k) => `data:image/jpeg;base64,/9j/${String.fromCharCode(65 + k).repeat(5_400_000)}`;
+    const images = [0, 1, 2, 3, 4].map(foto);
+    await globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'ecco la dispensa', threadHistory: [], chatId: 'c-dispensa', images });
+    await globalThis.SN_HANDLE_FILO_CHAT({
+      userMessage: 'cosa c’è sul terzo scaffale?', chatId: 'c-dispensa',
+      threadHistory: [{ role: 'user', text: 'ecco la dispensa', images: 5 }, { role: 'filo', text: 'Cinque scaffali.' }],
+    });
+  });
+  const [primo, secondo] = await chiamate(app);
+  expect(fotoTot(primo)).toBe(5);
+  expect(fotoTot(secondo)).toBeGreaterThan(0);
 });
