@@ -236,7 +236,8 @@ function regola() {
 function scaricaVerificata(u) {
   const interna = u && u.updateInfoAndProvider;
   const info = interna && interna.info ? interna.info : stato.info;
-  if (!R.releaseCoerente(info)) {
+  // Rifiutata dal cancello, la release non diventa «l'ultima trovata»: si ferma qui una trovata prima (#1119).
+  if (!R.releaseCoerente(info) || stato.rifiutata) {
     rifiuta(info);
     return Promise.reject(new Error('versione rifiutata: il numero non è quello della sua etichetta'));
   }
