@@ -223,7 +223,8 @@
       for (let i = n - 1; i >= 0; i--) {
         const m = lista[i];
         if (!recente[i] || m.role !== 'user' || !numeroImmagini(m)) continue;
-        const urls = (Array.isArray(immagini(m)) ? immagini(m) : []).filter((u) => typeof u === 'string' && u);
+        const date = immagini(m);
+        const urls = (Array.isArray(date) ? date : []).filter((u) => typeof u === 'string' && u);
         if (!urls.length) continue;
         const peso = urls.reduce((k, u) => k + u.length, 0);
         if (quante + urls.length > MAX_IMMAGINI_RIMANDATE || caratteri + peso > MAX_CARATTERI_IMMAGINI) break;
