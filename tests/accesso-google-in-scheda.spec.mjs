@@ -294,3 +294,53 @@ test('Privacy: un account Google visto nelle schede rende persistente il jar di 
   const stato = await shell.evaluate(() => window.filoShell.auth.status());
   expect(stato.googleNelleSchede).toBe(true);
 });
+
+test('il menu dell\'account si apre subito anche quando il token di Filo va rinnovato', async ({ app, shell, testServer }) => {
+  const pagina = await googleFinto(app, testServer);
+  // Firebase dà un token che scade subito, e il suo rinnovo impiega quattro secondi.
+  await app.evaluate((_e, email) => {
+    const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const jwt = `${b64({ alg: 'none' })}.${b64({ user_id: 'uid-prova', sub: 'uid-prova', email })}.x`;
+    const vero = globalThis.fetch;
+    const risposta = (o) => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    globalThis.fetch = async (input, init) => {
+      const u = String(input && input.url ? input.url : input);
+      if (u.startsWith('https://oauth2.googleapis.com/token')) return risposta({ id_token: jwt });
+      if (u.includes('accounts:signInWithIdp')) return risposta({ idToken: jwt, refreshToken: 'rt', email, displayName: 'X', expiresIn: '60' });
+      if (u.includes('securetoken')) { await new Promise((r) => setTimeout(r, 4000)); return risposta({ id_token: jwt, expires_in: '3600' }); }
+      return vero(input, init);
+    };
+  }, EMAIL);
+  await avviaAccesso(shell);
+  await (await paginaDi(app, pagina)).locator('#continua').click();
+  expect((await esito(shell)).ok).toBe(true);
+  const t0 = Date.now();
+  const { voci } = await vociMenuAccount(app, shell);
+  expect(voci).toContain('Esci da Filo');
+  expect(Date.now() - t0, 'il menu aspetta il rinnovo del token').toBeLessThan(2000);
+});
+
+test('l\'accesso chiesto dalla finestra incognito porta davanti la finestra con la scheda di Google', async ({ app, shell, testServer }) => {
+  const pagina = await googleFinto(app, testServer);
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  let inc = null;
+  const scade = Date.now() + 15_000;
+  while (!inc && Date.now() < scade) {
+    inc = app.windows().find((w) => { try { return /shell\.html\?incognito=1/.test(w.url()); } catch (_) { return false; } });
+    if (!inc) await new Promise((r) => setTimeout(r, 100));
+  }
+  await inc.waitForFunction(() => !!(window.filoShell && window.filoShell.auth));
+  // Senza un gestore di finestre il fuoco non si legge: si conta la richiesta di venire davanti.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    globalThis.__davanti = 0;
+    const focus = w.focus.bind(w);
+    w.focus = (...a) => { globalThis.__davanti++; return focus(...a); };
+  });
+  await inc.evaluate(() => { window.__esito = window.filoShell.auth.signIn(); });
+  expect(await indirizzoDellAccesso(app, pagina)).toBeTruthy();
+  expect(await app.evaluate(() => globalThis.__davanti), 'la finestra normale resta dietro quella incognito').toBeGreaterThan(0);
+  const [scheda] = await schedeSu(app, pagina);
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), scheda.id);
+  expect((await inc.evaluate(() => window.__esito)).code).toBe('annullato');
+});
