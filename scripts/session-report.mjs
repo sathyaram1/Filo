@@ -59,6 +59,8 @@ import { fileURLToPath } from 'node:url';
 // risultavano care più del doppio, perché la lettura della cache è quasi tutto.
 // Un modello che il listino non conosce per nome paga la tariffa della sua
 // famiglia (opus se non ne ha una), con una nota nel rapporto.
+// Haiku 5.5 (tabella del 2026-10-06) ha due listini: una richiesta col prompt
+// (input + cache letta e scritta) oltre `soglia` paga tutta la tariffa `oltre`.
 //
 // Le due durate si distinguono nel transcript (`usage.cache_creation.
 // ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`; la somma è
