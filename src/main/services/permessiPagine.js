@@ -419,7 +419,7 @@ function seguiPagina(wc) {
 }
 
 // La domanda resta finché l'utente risponde o la pagina se ne va: una scadenza toglieva il sì a chi rispondeva con calma.
-function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
+function chiedi({ ses, wc, origine, tipo, parti, oggetto, callback, schedaDi }) {
   const dove = schedaDi(wc);
   if (!dove || typeof dove.avvisa !== 'function') { callback(false); return; }
   for (const p of inAttesa.values()) {
@@ -431,7 +431,7 @@ function chiedi({ ses, wc, origine, tipo, parti, callback, schedaDi }) {
   const { sotto, dominio } = nomeDaMostrare(origine);
   let host = origine;
   try { host = new URL(origine).host; } catch (_) {}
-  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti });
+  dove.avvisa('chiedi', { id, tabId: dove.tabId, host, sotto, dominio, tipo, parti, ...(oggetto ? { oggetto } : {}) });
 }
 
 // `schedaDi(wc)` → { tabId, avvisa(evento, dati) } della finestra che mostra la pagina, o null.
