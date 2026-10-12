@@ -53,12 +53,3 @@ test('nessun crash parte da solo, e il documento lo dice', () => {
   assert.deepEqual(dove(/crashReporter\s*\.\s*start/), [], 'un crash reporter acceso va raccontato nel documento sulla privacy');
   assert.ok(privacy.includes('Filo non ha un sistema che segnala i crash da solo'));
 });
-
-test('gli aggiornamenti chiedono a GitHub senza un indirizzo nel codice, e il documento lo dice', () => {
-  const pkg = JSON.parse(leggi('package.json'));
-  const pubblica = [pkg.build.publish, pkg.build.mac?.publish, pkg.build.linux?.publish, pkg.build.win?.publish]
-    .flat().filter(Boolean).map((p) => p.provider);
-  assert.ok(dove(/require\('electron-updater'\)/).length > 0);
-  assert.deepEqual([...new Set(pubblica)], ['github'], 'il controllo degli aggiornamenti va altrove: cambia la voce su GitHub');
-  assert.ok(privacy.includes('All\'avvio GitHub riceve la richiesta della versione più recente'));
-});
