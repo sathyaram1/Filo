@@ -25,7 +25,6 @@ const homeDi = (app) => trovaPagina(app, (u) => u.startsWith('filo://newtab') &&
 async function configura(app, extra = {}) {
   await app.evaluate(async (_e, ex) => {
     const C = globalThis.SN_CONST;
-    // L'intervista di benvenuto ha una chat sua: qui serve la chat di tutti i giorni.
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
