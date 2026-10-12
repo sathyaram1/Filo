@@ -549,9 +549,10 @@ Filo si aggiorna da solo: a ogni avvio controlla se c'è una versione più
 recente e la scarica (`src/main/updater.js`). Su Windows la installa la volta
 dopo che apri Filo, con la barra di avanzamento, oppure in silenzio quando lo
 chiudi, se lo scegli in Preferenze → Impostazioni avanzate → «Quando
-installarla» (`src/main/aggiornamentoRegole.js`). Su Mac e su Linux
-l'installazione può fermarsi: in quel caso Filo te lo dice con una notifica,
-che spiega come installare la versione nuova a mano. Gli aggiornamenti vengono
+installarla» (`src/main/aggiornamentoRegole.js`). Su Mac e su Linux prova a
+installarla quando chiudi Filo, ma lì l'installazione può fermarsi: in quel
+caso Filo te lo dice con una notifica, che spiega come installare la versione
+nuova a mano. Gli aggiornamenti vengono
 pubblicati come release ufficiali del progetto. Puoi disattivare gli
 aggiornamenti automatici dalle impostazioni (Preferenze → Impostazioni
 avanzate → «Installa gli aggiornamenti da solo»), o chiedendolo a Filo, se
