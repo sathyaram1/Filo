@@ -450,9 +450,12 @@
       finish({ failed = false } = {}) {
         closeTurnReasoning();
         inDiretta = false;
-        for (const s of segs) {
+        for (const s of [...segs]) {
           if (s.stato !== 'agisce') continue;
           if (s.voci.length) { chiudiNodo(s); continue; }
+          // #1188 — senza un'azione nominata non c'è niente che non sia partito: era il posto di una nota, poi
+          // diventata la risposta. Vuota se ne va, con una nota resta com'è.
+          if (!s.attese.size) { if (!s.testo && !s.corpo.querySelector('.dash-activity-note') && !s.esiti.childElementCount) togliSeg(s); continue; }
           // Nominata ma mai partita (fermata prima, o persa per strada): il nodo non tiene e la riga lo dice.
           scrivi(s, fermato ? 'Fermato qui' : 'Non partita');
           if (s.nodo && !s.esito) { s.esito = 'cede'; s.nodo.cede(); }
