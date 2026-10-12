@@ -148,13 +148,13 @@ for (const s of SISTEMI) test(`Preferenze, Impostazioni avanzate: l'opzione è a
   mkdirSync(SHOTS, { recursive: true });
   for (const t of ['light', 'dark']) {
     await tema(pref, t);
-    await pref.locator('#sec-aggiornamenti').screenshot({ path: `${SHOTS}/aggiornamenti-preferenze-${t}.png` });
+    await pref.locator('#sec-aggiornamenti').screenshot({ path: `${SHOTS}/aggiornamenti-preferenze-${t}-${s.piattaforma}.png` });
   }
   await tema(pref, 'light');
 
   await casella.check();
   await expect.poll(async () => (await impostazioni(app)).aggiornamenti?.automatici).toBe(true);
-  expect((await finto(app)).autoInstallOnAppQuit).toBe(ALLA_CHIUSURA);
+  expect((await finto(app)).autoInstallOnAppQuit).toBe(s.allaChiusura);
 });
 
 test('la voce del tasto destro della carta porta alla preferenza, anche in fondo alla pagina', async ({ app, shell }) => {
