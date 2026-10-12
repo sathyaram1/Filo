@@ -142,16 +142,15 @@
   const mgReopenConfirm = document.getElementById('mgReopenConfirmBtn');
   const mgSegnoConferma = document.getElementById('mgSegnoConferma');
 
-  // Risposta ai chiarimenti (owner-only)
-  const mgClarify     = document.getElementById('mgClarify');
-  const mgClarifyText = document.getElementById('mgClarifyText');
-  const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
-  const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
-  // La casella sotto la conversazione e quella nel pannello del rombo verde
-  // (#1033) sono la stessa risposta: una bozza per pratica, fuori dai nodi che
-  // i ridisegni ricostruiscono, e un solo invio per volta.
+  // Risposta alle domande di Claude (owner-only), nel pannello del rombo verde:
+  // bozza ed esito stanno fuori dai nodi che i ridisegni ricostruiscono, un
+  // solo invio per volta per pratica.
   const bozzeRisposta = new Map();
   const rispostaInVolo = new Set();
+  let esitoRisposta = { text: '', kind: '' };
+  // La pratica che aveva già le domande al disegno prima: il pannello si apre
+  // da sé quando arrivano, non a ogni ridisegno dopo che l'owner l'ha chiuso.
+  let attesaDisegnata = null;
   // Frase per chi ha segnalato: il modulo (`mgUserNote`) sta chiuso finché non
   // lo si apre col tasto della barra (`mgUserNoteToggle`).
   const mgUserNote       = document.getElementById('mgUserNote');
