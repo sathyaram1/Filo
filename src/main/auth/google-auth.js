@@ -273,6 +273,7 @@ async function signIn() {
 }
 
 const AVVISO_NEL_BROWSER = 'Google non accetta l\'accesso dentro Filo, quindi continua nel browser. Filo si collega lo stesso, ma YouTube, Gmail e Drive nelle schede restano scollegati.';
+const AVVISO_NON_CARICATA = 'La pagina d\'accesso di Google non si è caricata in Filo, quindi continua nel browser.';
 
 // Prima in una scheda della finestra normale: lì l'accesso a Google vale anche per YouTube, Gmail e Drive (#1123).
 // Il browser di sistema resta il ripiego, quando Google rifiuta la scheda o una finestra normale non c'è.
