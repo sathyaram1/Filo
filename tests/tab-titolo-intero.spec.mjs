@@ -60,14 +60,27 @@ test('#429 — con la fila libera nessun titolo resta a metà, e Gestione contin
   await captureCompositeElectron(app, 'tests/.shots/tab-titolo-intero-scuro.png');
 });
 
-const rettangolo = (shell, testo) => shell.locator('.tab', { hasText: testo })
-  .evaluate((el) => { const r = el.getBoundingClientRect(); return { x: Math.round(r.left), w: Math.round(r.width) }; });
+// Il nodo letto può essere quello che un ridisegno ha appena tolto (misura zero): si rilegge finché è a schermo.
+async function rettangolo(shell, testo) {
+  let r = null;
+  await expect.poll(async () => {
+    r = await shell.locator('.tab', { hasText: testo })
+      .evaluate((el) => { const b = el.getBoundingClientRect(); return { x: Math.round(b.left), w: Math.round(b.width) }; });
+    return r.w;
+  }, { timeout: 5_000 }).toBeGreaterThan(0);
+  return r;
+}
 
 // Le schede si dividono la fila a parti uguali: il titolo più lungo che si accorcia le stringerebbe tutte, e quella
 // sotto il puntatore gli scapperebbe da sotto. Si adattano quando il puntatore lascia la fila.
 test('#429 — un titolo che cambia non sposta la scheda sotto il puntatore, poi la fila si adatta', async ({ app, shell, openTab, testServer }) => {
   await openTab(testServer.html('<title>Gestione</title><body>uno</body>'));
-  const lunga = await openTab(testServer.html('<title>Una pagina col titolo più lungo di tutti</title><body>due</body>'));
+  const url = testServer.html('<title>Una pagina col titolo più lungo di tutti</title><body>due</body>');
+  await openTab(url);
+  // openTab cerca la vista per nome di host, e le due pagine stanno sullo stesso.
+  let lunga = null;
+  await expect.poll(() => { lunga = app.windows().find((w) => w.url().startsWith(url)); return Boolean(lunga); }).toBe(true);
+  await expect(shell.locator('.tab .title', { hasText: 'titolo più lungo' })).toBeVisible();
   await expect.poll(() => verdettoTitoli(shell), { timeout: 10_000 }).toBe('titoli interi');
 
   await shell.locator('.tab', { hasText: 'Gestione' }).click();
