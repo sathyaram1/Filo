@@ -48,6 +48,10 @@ Windows con un disco normale non si vedono:
   cartella è privata, e non ci entra a meno che la cartella chiesta non sia già
   lì dentro. La stessa regola filtra i candidati di una ricerca: quello letto
   nella Libreria, chiesta per nome, non torna con la cartella personale.
+  Dentro la Libreria però il Mac tiene iCloud Drive (`Mobile Documents`) e le
+  cartelle di Dropbox, OneDrive e Google Drive (`CloudStorage`): per la regola
+  sono documenti, e il giro scende dalla Libreria solo lì
+  (`SN_CMD_CLASSIFY.aperteDentro`), senza elencarne il resto.
 - **Le cartelle chieste per l'occasione.** Una cartella fuori elenco
   («cerca nell'Archivio») usciva dall'indice al primo giro sulle cartelle di
   sempre, e la richiesta dopo rileggeva tutto: con migliaia di PDF, minuti. Ora

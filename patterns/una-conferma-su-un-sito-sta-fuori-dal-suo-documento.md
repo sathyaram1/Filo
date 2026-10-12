@@ -92,8 +92,8 @@ La strada che regge:
 - **Alla pagina niente percorsi.** Il content script riceve nome, cartella detta
   coi nomi di Filo («Download › Bollette») e una chiave a caso per ogni
   candidato. Le chiavi vivono nel mondo isolato e valgono solo per la scheda che
-  ha cercato, dal suo documento principale, fino alla prossima ricerca o
-  navigazione. Aprire, mostrare nella cartella e trascinare passano dalla
+  ha cercato, dal suo documento principale, fino alla navigazione: i bottoni
+  delle ricerche di prima restano in chat e devono aprire ancora il loro file. Aprire, mostrare nella cartella e trascinare passano dalla
   chiave.
 - **Il modello non vede percorsi.** I candidati per il modello li mette il main
   nel messaggio (`payload.esterno.documenti` viene sempre riscritto, la pagina
