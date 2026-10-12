@@ -202,3 +202,152 @@ test('#587 giro 11 — scritture equivalenti del percorso non aggirano il perime
   assert.equal(lvl('Get-ChildItem Documenti,env:', WIN), 2);
   assert.equal(lvl('Get-Content rel,finale.txt', WIN), 1);
 });
+
+// #1072 — un percorso di rete (UNC, `\\?\UNC\`, `//server`) fa aprire a Windows una connessione verso
+// quel computer: anche una sola lettura di nomi chiede un OK, e il popup dice perché. Gemello: #810.13.
+test('#1072 — le letture su un percorso di rete chiedono un OK col motivo «rete»', () => {
+  const rete = /altro computer della rete/;
+  for (const cmd of [
+    'cd \\\\host\\x', 'chdir \\\\host\\x', 'pushd \\\\host\\x', 'Set-Location \\\\host\\x', 'sl -Path \\\\host\\x',
+    'Set-Location -LiteralPath:"\\\\host\\x"', 'Test-Path \\\\host\\x', 'Get-ChildItem \\\\host', 'gci -Path \\\\host\\x',
+    'dir \\\\host\\x', 'ls //host/x', 'Get-FileHash \\\\host\\x', 'Get-Item \\\\host\\x', 'Resolve-Path \\\\host\\x',
+    'tree \\\\host\\x', 'Get-ChildItem \\\\?\\UNC\\host\\x', 'ls Documents,\\\\host\\x', 'cd "\\\\host\\x"',
+    'gc \\\\host\\x', 'type \\\\host\\x', 'Select-String a -Path \\\\host\\x', 'grep --file=\\\\host\\x a.txt',
+    'echo \\\\host\\x | Test-Path', 'Test-Path (Join-Path "\\\\host" "x")', 'cd \\\\host\\x; ls',
+  ]) {
+    for (const ctx of [WIN, undefined]) {
+      const d = C.classifyDetail(cmd, ctx);
+      assert.equal(d.level, 2, `"${cmd}" non deve contattare un altro computer senza chiedere`);
+      assert.match(d.motivo, rete, `"${cmd}": il popup dice che si va in rete`);
+    }
+  }
+  // Il disco locale resta libero, anche scritto con il prefisso dei percorsi lunghi.
+  for (const cmd of ['cd C:\\Windows', 'ls C:\\Windows', 'Get-ChildItem C:\\Windows', 'dir \\\\?\\C:\\Windows',
+    'Test-Path Documents', 'cd ..', 'echo ciao', 'echo https://example.com/a']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+  // Su macOS `/net/<host>` monta le cartelle condivise di quel computer.
+  assert.equal(lvl('ls /net/host/x', MAC), 2);
+  assert.equal(lvl('ls /net', MAC), 1);
+});
+
+test('#1072 — con la cartella di lavoro in rete ogni percorso relativo va in rete', () => {
+  const inRete = { ...WIN, cwd: '\\\\host\\x' };
+  for (const cmd of ['ls', 'dir', 'Get-ChildItem', 'ls foo', 'cd foo', 'cd ..', 'Test-Path foo', 'cat a.txt', 'gc \\a.txt']) {
+    const d = C.classifyDetail(cmd, inRete);
+    assert.equal(d.level, 2, cmd);
+    assert.match(d.motivo, /rete/, cmd);
+  }
+  assert.equal(lvl('ls C:\\Users\\Mario\\Documents', inRete), 1, 'un percorso locale intero resta libero');
+  assert.equal(lvl('echo ciao', inRete), 1);
+});
+
+test('#1072 — un percorso preso dal contenuto di un file chiede un OK; i valori scritti nel comando no', () => {
+  for (const cmd of ['gc elenco.txt | Test-Path', 'Get-Content elenco.txt | Get-ChildItem', 'gc elenco.txt | cd',
+    'Test-Path (gc elenco.txt)', 'cd (Get-Content elenco.txt)', 'Get-FileHash (gc elenco.txt)']) {
+    assert.equal(lvl(cmd, WIN), 2, cmd);
+  }
+  for (const cmd of ['Test-Path (Join-Path $env:USERPROFILE "Downloads")', 'gci | Get-FileHash',
+    'Get-ChildItem Downloads | Select-Object -First 3 | Get-FileHash', 'Get-Content log.txt | Select-String errore',
+    'cat a.txt | wc -l']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
+test('#1072 — LEGGI_DOCUMENTO e il popup del terminale dicono che si va in rete', () => {
+  const doc = { type: 'LEGGI_DOCUMENTO', percorso: '\\\\host\\x\\a.pdf', _perimetro: WIN };
+  assert.equal(AL.costoFor(doc), 2);
+  assert.match(AL.describe(doc), /Perché te lo chiedo: si collega a un altro computer della rete/);
+  assert.equal(AL.costoFor({ ...doc, percorso: 'a.pdf', _perimetro: { ...WIN, cwd: '\\\\host\\x' } }), 2);
+  const cmd = { type: 'ESEGUI_COMANDO', comando: 'Test-Path \\\\host\\x', _perimetro: WIN };
+  assert.equal(AL.costoFor(cmd), 2);
+  assert.match(AL.describe(cmd), /Perché te lo chiedo: si collega a un altro computer della rete/);
+});
+
+test('#1072 — due barre senza il nome di un computer non sono un percorso di rete', () => {
+  for (const cmd of ['grep -n "// TODO" app.js', 'grep "//" app.js', 'Select-String -Pattern "// TODO" -Path app.js',
+    'findstr "//" app.js', 'Get-Content app.js | Select-String "//"']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN), { level: 1, motivo: '' }, cmd);
+  }
+  for (const cmd of ['cd \\\\evil\\x', 'Test-Path //evil/x', 'grep a //evil/x', 'echo \\\\evil\\x | ls', 'ls \\\\\\evil\\x']) {
+    assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+});
+
+test('#1072 — una lettera d\'unità che punta a un altro computer è rete, come cartella di lavoro e come percorso', () => {
+  const PUSHD = { ...WIN, cwd: 'Z:\\', reti: ['Z:'] };
+  for (const cmd of ['dir', 'ls', 'dir segreto', 'type nota.txt', 'dir \\segreto', 'dir Z:\\segreto', 'cd ..; ls']) {
+    const d = C.classifyDetail(cmd, PUSHD);
+    assert.equal(d.level, 2, cmd);
+    assert.match(d.motivo, /rete/, cmd);
+  }
+  assert.equal(lvl('dir Z:\\segreto', { ...WIN, reti: ['z:'] }), 2);
+  for (const cmd of ['dir C:\\Windows', 'cd C:\\Users\\Mario', 'ls C:\\Users\\Mario']) assert.equal(lvl(cmd, PUSHD), 1, cmd);
+  assert.equal(lvl('dir Z:\\segreto', WIN), 1, 'senza unità di rete note, Z: è un disco come un altro');
+});
+
+test('#1072 — le unità di rete si riconoscono da dove Windows le risolve', () => {
+  const { unitaDiRete } = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'shell.js'));
+  const risolte = { 'y:\\': '\\\\nas\\condivisa\\', 'x:\\': 'X:\\', 'w:\\': '\\\\?\\UNC\\nas\\altra\\' };
+  const realpath = (p) => { if (!(p in risolte)) throw new Error('ENOENT'); return risolte[p]; };
+  assert.deepEqual(unitaDiRete('Y:\\lavoro', { win: true, realpath }), ['y:']);
+  assert.deepEqual(unitaDiRete('X:\\dati', { win: true, realpath }), ['y:']);
+  assert.deepEqual(unitaDiRete('W:\\', { win: true, realpath }).sort(), ['w:', 'y:']);
+  assert.deepEqual(unitaDiRete('V:\\', { win: true, realpath }).sort(), ['w:', 'y:'], 'un\'unità che non risponde non diventa locale per sempre');
+  risolte['v:\\'] = '\\\\nas\\v\\';
+  assert.deepEqual(unitaDiRete('V:\\', { win: true, realpath }).sort(), ['v:', 'w:', 'y:']);
+  assert.deepEqual(unitaDiRete('/home/mario', { win: false, realpath }), []);
+});
+
+test('#1072 — `FileSystem::` davanti a un percorso non cambia dove porta: in rete chiede, sul disco no', () => {
+  for (const cmd of ['cd FileSystem::\\\\evil\\x', 'chdir filesystem::\\\\evil\\x', 'cd Microsoft.PowerShell.Core\\FileSystem::\\\\evil\\x',
+    'ls FileSystem::\\\\evil\\x', 'type FileSystem::\\\\evil\\x']) {
+    const d = C.classifyDetail(cmd, WIN);
+    assert.equal(d.level, 2, cmd);
+    assert.match(d.motivo, /rete/, cmd);
+  }
+  assert.equal(lvl('cd FileSystem::C:\\Windows', WIN), 1);
+  assert.match(C.classifyDetail('type FileSystem::C:\\Users\\Mario\\.ssh\\id_rsa', WIN).motivo, /nascosto/);
+  assert.equal(lvl('ls', { ...WIN, cwd: 'Microsoft.PowerShell.Core\\FileSystem::C:\\Users\\Mario' }), 1);
+});
+
+test('#1072 — il testo cercato non si apre: due barre nel modello non sono rete, nel file sì', () => {
+  for (const cmd of ['grep -n "//TODO" app.js', 'findstr "//TODO" app.js', 'Select-String -Pattern "//TODO" -Path app.js',
+    'Select-String "//eslint-disable" app.js', 'git log -S "//TODO"', 'git log --grep=//fix']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN), { level: 1, motivo: '' }, cmd);
+  }
+  // La ricerca in una cartella intera chiedeva già prima, per i file nascosti: il motivo resta quello.
+  for (const cmd of ['grep -rn "//eslint-disable" src', 'git grep "//TODO"']) {
+    assert.doesNotMatch(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+  for (const cmd of ['grep TODO //evil/x/app.js', 'grep -f //evil/x/p a.txt', 'grep "//TODO" //evil/x/a.js', 'findstr /d:\\\\evil\\x a *.txt',
+    'Select-String "//x" \\\\evil\\a', 'git grep x //evil/x', 'git --git-dir=\\\\evil\\x\\.git log', 'echo \\\\evil\\x | ls']) {
+    assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+});
+
+test('#1072 — stampare un testo con due barre non apre niente; usato da un altro comando (tubo, gruppo) sì', () => {
+  for (const cmd of ['echo "//commento"', 'echo //evil', 'Write-Output "\\\\server\\cartella"', 'Write-Host "//commento"',
+    "Out-String -InputObject '\\\\evil\\x'", 'echo //x; ls']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN), { level: 1, motivo: '' }, cmd);
+  }
+  assert.equal(lvl('echo //evil/x', LINUX), 1);
+  for (const cmd of ['echo \\\\evil\\x | cd', 'Write-Output \\\\evil\\x | Get-ChildItem', 'echo \\\\evil\\x | Test-Path',
+    'cd (echo \\\\evil\\x)', 'cd $(echo \\\\evil\\x)', "Test-Path (Write-Output '\\\\evil\\x')", "Out-String -InputObject '\\\\evil\\x' | cd"]) {
+    assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+});
+
+test('#1072 — su Windows si legge il comando come lo spezza PowerShell: virgolette tipografiche, trattini lunghi, `\\` in coda', () => {
+  for (const cmd of ['cd “\\\\evil\\x”', 'cd ‘\\\\evil\\x’', 'Test-Path „\\\\evil\\x”', 'Get-ChildItem ‛\\\\evil\\x‛', 'cd -Path:“\\\\evil\\x”',
+    'Set-Location —Path:\\\\evil\\x', 'Get-ChildItem –LiteralPath:\\\\evil\\x', 'findstr a src\\ \\\\evil\\x\\a', 'dir C:\\ \\\\evil\\x',
+    'type src\\ \\\\evil\\x\\a']) {
+    assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
+  }
+  for (const cmd of ['Get-Content “..\\..\\b\\secret.txt”', 'Get-Content —LiteralPath:..\\..\\b\\secret.txt', 'findstr a src\\ ..\\..\\b\\secret.txt']) {
+    assert.equal(lvl(cmd, WIN), 2, cmd);
+  }
+  assert.equal(lvl('Get-Content “notes.txt”', WIN), 1);
+  // In bash `\ ` protegge lo spazio: è un nome solo, nella cartella di lavoro.
+  assert.equal(lvl('cat my\\ file.txt', { win: false, maiuscole: false, home: '/home/a', cwd: '/home/a/p' }), 1);
+});
