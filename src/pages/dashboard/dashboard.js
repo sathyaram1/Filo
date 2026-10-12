@@ -216,7 +216,12 @@
     },
     setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
-    rispondi: (testo) => submitMessage(testo),
+    // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
+    rispondi: (testo) => {
+      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length) return false;
+      submitMessage(testo);
+      return true;
+    },
   });
   Carte.init({
     send,
