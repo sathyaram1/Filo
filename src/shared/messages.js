@@ -200,10 +200,11 @@
     //   è su questo computer: il server ne emette un'altra (la vecchia si
     //   spegne, il saldo resta). { } → { ok, status, message, state? }
     WALLET_REISSUE: 'wallet_reissue',
-    // WALLET_RESET_IDENTITY: l'identità dell'installazione è stata annullata
-    //   sul server (il portafoglio legato a essa non si raggiunge più):
-    //   l'utente sceglie di ricominciare con un'identità nuova e un nuovo
-    //   invito. { } → { ok, state }
+    // WALLET_RESET_IDENTITY: l'identità dell'installazione è annullata sul
+    //   server o illeggibile qui (il portafoglio legato a essa non si
+    //   raggiunge): l'utente sceglie di ricominciare con un'identità nuova e
+    //   un nuovo invito. I file di prima restano accanto.
+    //   { confermato: true } → { ok, state } | { ok:false, status:'needs_confirm'|'identity_ok' }
     WALLET_RESET_IDENTITY: 'wallet_reset_identity',
     // WALLET_OWN_KEY_INFO (#629): spesa e residuo che OpenRouter dichiara per
     //   la chiave OpenRouter scritta dall'utente (la pagina Crediti li mostra;

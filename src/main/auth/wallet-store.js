@@ -15,6 +15,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const guasti = require('./guastiAccesso');
 
 let cache = undefined; // undefined = non ancora letto; null = assente
 
@@ -74,10 +75,18 @@ function save(wallet) {
   }
 }
 
-function clear() {
+// Ricominciare con un'identità nuova (scelta confermata dall'utente) toglie il portafoglio da questa
+// copia di Filo, ma il file resta accanto: chiave e crediti di prima non si buttano mai (#1085).
+function metteDaParte() {
   cache = null;
-  try { fs.rmSync(filePath(), { force: true }); } catch (_) {}
+  guasti.metteDaParte(filePath(), 'prev');
   avvisaProntezza();
+}
+
+// C'è un portafoglio su disco, anche se adesso non si decifra: allora l'identità che lo regge non si
+// sostituisce in silenzio.
+function suDisco() {
+  try { return fs.existsSync(filePath()); } catch (_) { return false; }
 }
 
 // La sola chiave, o '' se non c'è. È quello che withDefaults chiede.
@@ -102,4 +111,4 @@ function lastServer() {
   return w && w.lastServer ? w.lastServer : null;
 }
 
-module.exports = { load, save, clear, personalKey, pseudonym, saveLastServer, lastServer };
+module.exports = { load, save, metteDaParte, suDisco, personalKey, pseudonym, saveLastServer, lastServer };
