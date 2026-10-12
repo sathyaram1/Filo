@@ -322,6 +322,17 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
     assert.equal(r.ricevute.length, 0);
     assert.equal(r.output.trim(), `sha=${r.verde}`);
   });
+
+  test('#1184: un verde della sola suite Playwright non si sceglie, e il fermo dice che è senza verde e perché', async () => {
+    const r = await scegli({ oreVersione: 112, oreVerde: 108, senzaWindows: true });
+    assert.equal(r.output.trim(), 'sha=', 'il cancello su Windows lo rifiuterebbe a ogni giro: non si prova nemmeno');
+    assert.equal(r.ricevute.length, 1);
+    assert.deepEqual(r.ricevute[0].keys, [chiaveDelFermo(CHIAVE_FERMO, 'v0.2.228')], 'è un fermo senza verde, non dopo il verde');
+    assert.ok(r.ricevute[0].text.includes(r.verde), 'il feedback nomina il verde scartato');
+    assert.match(r.ricevute[0].text, /unit test su Windows/);
+    assert.ok(r.riassunto.includes(r.verde), 'anche il riassunto della corsa dice perché quel verde non conta');
+    assert.equal(r.codice, 1);
+  });
 });
 
 // Il caso di #569: il feedback di un fermo resta aperto (parcheggiato) anche dopo che una versione è uscita. Il server
