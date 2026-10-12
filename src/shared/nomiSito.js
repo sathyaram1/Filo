@@ -28,6 +28,7 @@
   // le tiene col posto (quanti domini validi le precedevano), per ridarle dove l'utente le aveva scritte.
   function righeSiti(raw) {
     const valid = [];
+    const visti = new Set();
     const invalid = [];
     const scartate = [];
     for (const line of String(raw || '').split('\n')) {
@@ -35,7 +36,7 @@
       if (!riga) continue;
       const d = dominio(riga);
       if (!d) { invalid.push(riga); scartate.push({ riga, dopo: valid.length }); continue; }
-      if (!valid.includes(d)) valid.push(d);
+      if (!visti.has(d)) { visti.add(d); valid.push(d); }
     }
     return { valid, invalid, scartate };
   }
