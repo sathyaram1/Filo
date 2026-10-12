@@ -80,7 +80,8 @@ function chiusa(codice, i, apre, chiude) {
 export function proveScoperte(testo, nomeFile = '') {
   if (SULL_ACCOGLIENZA.test(nomeFile)) return [];
   const { codice, senzaCommenti } = maschere(testo);
-  // Il corpo che comincia dopo la lista dei parametri aperta in `par`; una freccia senza graffa arriva a fine riga.
+  // Il corpo che comincia dopo la lista dei parametri aperta in `par`; una freccia senza graffa finisce col suo
+  // enunciato.
   const corpoDopo = (par, freccia) => {
     let k = chiusa(codice, par, '(', ')') + 1;
     if (freccia) {
@@ -88,8 +89,15 @@ export function proveScoperte(testo, nomeFile = '') {
       if (!f) return '';
       k += f[0].length;
       if (codice[k] !== '{') {
-        const fine = codice.slice(k).search(/[;\n]/);
-        return senzaCommenti.slice(k, fine < 0 ? codice.length : k + fine);
+        let d = 0;
+        let j = k;
+        for (; j < codice.length; j++) {
+          const c = codice[j];
+          if ('([{'.includes(c)) d++;
+          else if (')]}'.includes(c) && --d < 0) break;
+          else if (d === 0 && (c === ';' || c === '\n')) break;
+        }
+        return senzaCommenti.slice(k, j);
       }
     }
     const graffa = codice.indexOf('{', k);
