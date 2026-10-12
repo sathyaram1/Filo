@@ -71,6 +71,7 @@
         'Una voce tolta dalla cronologia appunti resta tolta: se la stessa cosa è ancora negli appunti e la incolli con "Incolla", Filo non la rimette in cronologia.',
         'Togliendo le voci della cronologia appunti con la tastiera il fuoco resta sulla lista, pronto per la voce dopo, anche se il mouse è fermo sopra le righe. Prima in quel caso tornava all\'inizio della pagina e per ogni voce bisognava riattraversare tutte le impostazioni col tabulatore.',
         'Le finestrelle di accesso, come quella di «Accedi con Google», hanno nel titolo il sito vero, e la pagina non può cambiarlo. Un sito non le apre più da solo. Senza un tuo clic la pagina chiesta si apre in una scheda, con l\'indirizzo in vista, oppure resta ferma se hai il blocco dei popup acceso.',
+        'Nella chat dell\'editor la casella dove scrivi si allunga finché la domanda si legge tutta, anche con i caratteri più larghi di Linux. Prima si fermava a quattro righe e il testo scorreva dentro, con mezza chat vuota sopra.',
       ],
     },
     {
