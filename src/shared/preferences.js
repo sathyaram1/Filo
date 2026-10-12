@@ -1171,8 +1171,9 @@
       percorso: 'security.safeBrowse.llmJudge',
       nome: 'Giudizio AI sui siti sospetti',
       aiuto: 'true | false (un modello valuta gli indizi di identità di un sito rimasto dubbio)',
-      risk: 'Controlla il giudizio di un modello AI sui siti che restano dubbi. Spegnerlo toglie un controllo: '
-        + 'un sito sospetto può aprirsi senza avviso.',
+      risk: 'Quando un sito resta dubbio, Filo ne manda il nome e gli indizi (età, certificato, da dove arriva il link, '
+        + 'se chiede password o pagamento) al modello AI scelto per il giudizio dei siti, mai il testo della pagina. '
+        + 'Spento, niente esce dal computer, ma un sito sospetto può aprirsi senza avviso.',
     }),
     interruttore({
       keys: ['link_sospetti_isolati', 'finestra isolata', 'link sospetti', 'apri i link sospetti in una finestra isolata'],
