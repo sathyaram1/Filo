@@ -53,12 +53,17 @@ Un worker alla volta, scelto dal ruolo che il biglietto porta (`role` nel
 JSON di `ticket … --json`; vuoto = server vecchio, usa il worker generico):
 `subagent_type: routine-nuovo-lavoro` se il ruolo è `new-work`,
 `subagent_type: routine-secaudit` se è `secaudit`, altrimenti
-`subagent_type: routine-worker` (definiti in `.claude/agents/`: il primo
-lavoro Opus a sforzo `xhigh`, gli altri due Opus a sforzo `high` — decisione
-owner 2026-10-02). Mai
-Fable, consuma crediti a parte; mai degradare: se lo spawn fallisce, chiudi.
+`subagent_type: routine-worker` (definiti in `.claude/agents/`: di default il
+primo lavoro Opus a sforzo `xhigh`, gli altri due Opus a sforzo `high` —
+decisione owner 2026-10-02). Modello e sforzo del worker non li scegli tu: il
+gancio che il preflight ha installato li mette al lancio come li ha decisi il
+server per quel biglietto, e toglie quelli che avessi scritto se il server non
+ne ha detti (vale la definizione dell'agente). Un lancio senza `--ticket
+<biglietto>` nel prompt, o con un biglietto che il comando `ticket` non ha
+registrato, il gancio lo rifiuta col motivo: è uno spawn fallito. Mai
+degradare: se lo spawn fallisce, chiudi.
 Se quei tipi di agente non risultano disponibili (cartella caricata solo al
-riavvio della sessione), ripiega su `general-purpose` con `model: "opus"`.
+riavvio della sessione), ripiega su `general-purpose`.
 MAI worker in parallelo: due worker nella stessa cartella si pestano sui lock
 (il clone per worker c'e', `scripts/clone-worker.mjs`; l'accensione e' del #1158).
 
