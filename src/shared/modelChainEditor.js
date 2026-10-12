@@ -200,7 +200,7 @@
   }
 
   // Costruisce l'editor a segmenti per UNA azione.
-  // Ritorna { el, avviso, getValue, conferma, ricontrolla } dove getValue() torna la stringa "a, b, c".
+  // Ritorna { el, avviso, getValue, conferma, ricontrolla, imposta } dove getValue() torna la stringa "a, b, c".
   function buildChain(value, onChange, ctx) {
     const validate = ctx && ctx.validate;
     const isKnown = (ctx && ctx.isKnown) || (() => true);
