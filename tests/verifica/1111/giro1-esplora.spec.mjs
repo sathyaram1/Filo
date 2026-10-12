@@ -25,8 +25,7 @@ async function fornitoreFinto(app) {
       if (t.includes('Analizza il testo qui sotto')) {
         globalThis.__scan += 1;
         await new Promise((r) => setTimeout(r, globalThis.__ritardo || 0));
-        const testo = (t.match(/<<<([\s\S]*?)>>>/) || [])[1] || t;
-        const parole = [...new Set(testo.match(/xq[a-z]+\d+/g) || [])];
+        const parole = [...new Set(t.match(/xq[a-z]+\d+/g) || [])];
         return { text: JSON.stringify({ annotated: parole.map((w) => `**${w}**`).join(' '), issues: parole.map((w) => ({ type: 'grammar', explanation: 'x', correction: w.slice(2, -1) })) }), model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
       }
       return { text: '{"misspelled":false,"correction":""}', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
