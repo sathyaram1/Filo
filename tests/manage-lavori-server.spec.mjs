@@ -4,7 +4,7 @@
 //   1. La sezione dei lavori col segno `localOnly` si chiama «Lavori server», qui e nella pagina gemella dei feedback.
 //   2. Automazioni: l'interruttore «Lavori server alle routine» nasce spento (campo assente), si accende e si spegne,
 //      e ogni gesto arriva al main come `lavoriServer` vero/falso; un salvataggio fallito torna indietro e lo dice.
-//   3. Una pratica passata in cloud che aspetta il PC porta il segno «aspetta il PC»; rimessa in coda no.
+//   3. Una pratica passata in cloud che aspetta il PC lo dice sulla scheda («Pronto: aspetta il PC»); rimessa in coda no.
 
 import { test, expect } from './fixtures/electron.mjs';
 
