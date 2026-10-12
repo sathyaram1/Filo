@@ -736,7 +736,8 @@ migrazione le mappa. Il codice che decide in base al prefisso
 ### 12.2 Domani
 
 - **Un orchestratore Haiku.** Non legge feedback e non sceglie niente: lancia,
-  aspetta e rilascia. I worker restano Opus, dalle definizioni degli agenti.
+  aspetta e rilascia. Modello e sforzo di ogni worker vengono dal compito, col
+  biglietto (§ 6.4).
 - **Lavori in parallelo dentro la stessa sessione.** Chiede un biglietto, lancia
   il worker in sottofondo, e ripete finché il server dice di sì.
 - **I posti li conta solo il server.** Un biglietto nuovo esce solo se i lavori
@@ -766,10 +767,11 @@ Da sistemare prima dei worker in parallelo:
   salvataggio automatico passa da tutte le cartelle. Quindi ogni worker ha il
   suo **clone**, con la cache dei pacchetti condivisa, e il salvataggio salva
   solo la cartella di chi ha modificato.
-- **Sotto-lavori.** Un worker è già un sotto-agente dell'orchestratore, e un
-  sotto-agente non può lanciarne altri. Quando un lavoro va diviso (una
-  revisione grande, per esempio), il worker chiede al server dei biglietti
-  figli, col ruolo e i numeri, mai testo libero, come per l'unione (§ 1.3).
+- **Sotto-lavori.** Un worker può lanciare sotto-agenti suoi (fino a tre
+  livelli sotto la sessione principale) per il lavoro interno: esplorazioni,
+  raccolte, prove. Quando invece un lavoro va diviso in pezzi che contano nei
+  posti e hanno un biglietto loro (una revisione grande, per esempio), il worker
+  chiede al server dei biglietti figli, col ruolo e i numeri, mai testo libero, come per l'unione (§ 1.3).
   L'orchestratore li lancia come gli altri, dentro N e K. I figli ereditano la
   fiducia del padre in quel momento. Il padre aspetta i loro esiti dal server.
   Le chiusure a metà e i crash li segue il monitoraggio.
@@ -788,20 +790,24 @@ lavorano in locale.
 2. *server*: collezione `domande`, regole, operazioni, azioni strutturate.
 3. App: barra delle sezioni, sezione Domande, Ricevuti coi filtri L1–L5.
 4. Le attese di oggi diventano domande (§ 3.8); `domanda.mjs` per tutti.
-5. Compito «Gestisci la risposta», chiarimenti, «discutiamone», note per gli
+5. *server*: compiti (§ 6): collezione, funzione delle fasi col trigger e il
+   controllo nel pacemaker, urgenza al posto dell'ordine di oggi, biglietto
+   legato al compito, modello e sforzo dal compito; app: scheda Routine →
+   Compiti. Serve ai punti 6 e 8.
+6. Compito «Gestisci la risposta», chiarimenti, «discutiamone», note per gli
    agenti.
-6. Registro, revisione quotidiana, risposte automatiche.
-7. Compiti ricorrenti, ruolo `compito`, ambiti `coda`/`unisci`/`domande`/
+7. Registro, revisione quotidiana, risposte automatiche.
+8. Compiti ricorrenti, ruolo `compito`, ambiti `coda`/`unisci`/`domande`/
    `monitor`/`rami`, segnalazioni, domanda di fine turno per tutti i ruoli.
-8. Monitoraggio: taccuino, sveglie, esperimenti.
-9. Crediti (§ 8), dopo la conferma dei numeri.
-10. Lavori server dalla cloud (§ 7).
-11. Istruzioni dei ruoli sul server (§ 9).
-12. Canale stabile (§ 4.2).
-13. Posta (`posta`, `invio`), quando l'owner ha creato l'ambiente.
-14. Mittenti normalizzati (§ 10).
-15. Cartella padre per le sessioni cloud (§ 11).
-16. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
+9. Monitoraggio: taccuino, sveglie, esperimenti.
+10. Crediti (§ 8), dopo la conferma dei numeri.
+11. Lavori server dalla cloud (§ 7).
+12. Istruzioni dei ruoli sul server (§ 9).
+13. Canale stabile (§ 4.2).
+14. Posta (`posta`, `invio`), quando l'owner ha creato l'ambiente.
+15. Mittenti normalizzati (§ 10).
+16. Cartella padre per le sessioni cloud (§ 11).
+17. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
     il salvataggio per cartella.
 
 I punti 1–4 danno già il risultato principale: un posto solo, con le domande
