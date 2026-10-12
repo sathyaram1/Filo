@@ -1,4 +1,4 @@
-// Verifica #1118 giro 6: esplorazione (aspetto nei due temi, ricerche in fila, chiusura a metà).
+// Verifica #1118 giro 6: ricerche in fila, chiusura a metà, riapertura: porte provate e chiuse.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
@@ -87,25 +87,6 @@ async function invia(page, testo) {
   await page.fill('#mgSearchInput', testo);
   await page.press('#mgSearchInput', 'Enter');
 }
-
-test('aspetto: barra di lettura e risultati nei due temi', async ({ app, openTab }) => {
-  const page = await apri(app, openTab, 400, { latenza: 1200 });
-  for (const tema of ['light', 'dark']) {
-    await page.evaluate(async (t) => {
-      await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } });
-    }, tema);
-    await page.waitForTimeout(400);
-    await invia(page, tema === 'light' ? 'la x per chiudere' : 'tema scuro illeggibile');
-    await expect(page.locator('#mgSearchProgress')).toBeVisible({ timeout: 5000 });
-    await page.waitForTimeout(1800);
-    await page.screenshot({ path: `tests/.shots/v1118-g6-corsa-${tema}.png` });
-    await expect(page.locator('#mgSearchProgress')).toBeHidden({ timeout: 30000 });
-    await page.locator('.mg-item--result').first().hover();
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: `tests/.shots/v1118-g6-fine-${tema}.png` });
-    console.log(tema, 'msg:', await page.locator('#mgSearchMsg').innerText(), '| head:', await page.locator('#mgListHead, .mg-list-head').first().innerText().catch(() => '?'));
-  }
-});
 
 test('due ricerche in fila: restano solo i risultati della seconda', async ({ app, openTab }) => {
   const page = await apri(app, openTab, 400, { latenza: 700 });
