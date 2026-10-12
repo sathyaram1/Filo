@@ -92,7 +92,7 @@ function leggiJs(testo) {
       if (pila.at(-1) === '{') pila.pop();
       else if (pila.at(-1) === 'tpl') { k = sc.reScanTemplateToken(false); if (k === K.TemplateTail) pila.pop(); }
     }
-    if (k === K.PlusToken && ultimo && ultimo.dopo === da) ultimo.concat = true;
+    if (k === K.PlusToken && ultimo) ultimo.concat = true;
     ultimo = null;
     if (LETTERALI.has(k)) {
       const valore = sc.getTokenValue();
@@ -102,7 +102,6 @@ function leggiJs(testo) {
       ultimo = { valore: host ? `https://${valore}` : valore, riga: riga(da), segue: k === K.TemplateHead || k === K.TemplateMiddle };
       frammenti.push(ultimo);
       letterali.push([da + 1, sc.getTextPos() - 1]);
-      ultimo.dopo = sc.getTextPos();
     } else if (k === K.RegularExpressionLiteral) {
       letterali.push([da + 1, sc.getTextPos() - 1]);
     }
@@ -140,7 +139,8 @@ function leggi(file, testo) {
 }
 
 // Un indirizzo è dinamico quando il suo host lo completa un'espressione: `https://${dominio}/x`, 'https://' + host.
-function indirizziDi(frammenti) {
+// È «composto» quando l'espressione lo costruisce davvero; un 'https://' da solo, in un startsWith, non compone niente.
+function indirizziDi(frammenti, righe) {
   const out = [];
   for (const fr of frammenti) {
     for (const m of fr.valore.matchAll(URL_RE)) {
@@ -149,7 +149,8 @@ function indirizziDi(frammenti) {
       const host = resto.split(/[/?#]/)[0].toLowerCase();
       const finoAllaFine = m.index + url.length === fr.valore.length;
       const dinamico = !host || (fr.segue && finoAllaFine && !/[/?#]/.test(resto));
-      out.push({ url, host, riga: fr.riga, dinamico });
+      const composto = dinamico && finoAllaFine && !!(fr.segue || fr.concat);
+      out.push({ url, host, riga: fr.riga, dinamico, composto, testoRiga: righe[fr.riga - 1] || '' });
     }
   }
   return out;
@@ -162,7 +163,8 @@ function analizza(sorgenti) {
   for (const [file, testo] of Object.entries(sorgenti)) {
     const l = leggi(file, testo);
     testi.set(file, l);
-    for (const u of indirizziDi(l.frammenti)) indirizzi.push({ file, ...u });
+    const righe = testo.split('\n');
+    for (const u of indirizziDi(l.frammenti, righe)) indirizzi.push({ file, ...u });
     if (CHIAMATA_RE.test(l.codice) || MODULO_RETE_RE.test(l.senzaCommenti)) chiamate.add(file);
   }
   return { indirizzi, chiamate, testi };
