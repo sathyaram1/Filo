@@ -444,10 +444,129 @@ vale per tutti i compiti di quel tipo.
   biglietto, la priorità la decide la revisione. Una richiesta di permessi la
   revisione la trasforma in una proposta d'ambito (§ 5.3).
 
-## 6. Feedback: una cosa da fare
+## 6. Feedback e compiti
 
-- Un feedback è una cosa da fare. Unire vuol dire creare un feedback nuovo con
-  `genitori`, per delega (§ 1.3).
+Due oggetti, decisi dall'owner il 12/10:
+
+- **Feedback**: una cosa da fare, segnalata da un utente, da un agente o
+  dall'owner. Ha una **priorità** da 0 a 3 e, se è un cambio di codice, il suo
+  ciclo: ramo, verifica, controllo cieco, fusione. Non porta un modello.
+- **Compito**: una chiamata di un agente. Ha **urgenza**, **modello**,
+  **sforzo**, **ambito**, fiducia e, se c'è, il feedback a cui è legato con la
+  sua **fase**. Il biglietto è un tentativo di eseguire un compito: un compito
+  ne può avere più di uno, per esempio dopo un arenamento.
+
+### 6.1 Da dove nascono i compiti
+
+**Dalle fasi di un feedback.** Quale compito serve a un feedback lo dice una
+funzione sola e pura, dallo stato del feedback: è la scelta del ruolo che il
+server fa già oggi. Le fasi sono primo lavoro, verifica, correzione come ripresa
+e controllo cieco. La funzione gira in due momenti:
+
+- a ogni modifica del feedback, con un trigger: copre anche le modifiche che
+  l'owner fa da Gestione senza passare dal server;
+- ogni 10 minuti nel pacemaker, come rete. Un feedback che ha bisogno di un
+  compito e non ce l'ha lo riceve. Un compito aperto il cui feedback è andato
+  avanti si chiude come «superato».
+
+Lo stato vero resta sul feedback: il compito lo registra, non decide niente.
+Invariante, con sentinella: al massimo un compito aperto per feedback.
+
+**Senza feedback:** le istanze dei ricorrenti (§ 4.1), «Gestisci la risposta»
+(§ 3.5), l'invio di una mail approvata, l'unione (§ 1.3), l'esplorazione a coda
+vuota, e i compiti creati a mano dall'owner o da una sessione locale.
+
+**Non sono compiti**, perché non chiamano un agente: la fusione (la fa il
+server), il blocco di sicurezza (diventa una domanda), la segnalazione (diventa
+un feedback, § 5.4).
+
+### 6.2 Le fasi di un cambio di codice
+
+- **Primo lavoro.**
+- **Verifica:** un compito solo, compresa la correzione dei rilievi trovati nel
+  giro.
+- **Correzione**, solo come ripresa: dopo una risposta dell'owner, o dopo un
+  conflitto con main (riallineamento). Da valutare: riprendere da qui anche
+  quando l'agente della verifica muore a metà correzione, invece di rifare la
+  verifica.
+- **Controllo cieco.**
+
+### 6.3 Urgenza
+
+Il server dà il biglietto al compito pronto con l'urgenza più alta; a pari
+urgenza, al più vecchio.
+
+**Compiti di un feedback.** Ogni casella va dalla priorità del feedback e dalla
+fase:
+
+| Fase | p0 | p1 | p2 | p3 |
+|---|---|---|---|---|
+| Primo lavoro | 0–3 | 5–8 | 20–23 | 50–53 |
+| Verifica | 10–13 | 25–28 | 35–38 | 55–58 |
+| Correzione (ripresa) | 10–13 | 25–28 | 35–38 | 55–58 |
+| Controllo cieco | 15–18 | 30–33 | 40–43 | 60–63 |
+
+Dentro la casella il gradino lo dà la provenienza, al posto degli spareggi di
+oggi: +3 fidato, +2 fidato e figlio di un altro feedback, +1 non fidato, +0 non
+fidato e figlio. I nipoti contano come figli.
+
+**Compiti senza feedback:**
+
+| Compito | Urgenza |
+|---|---|
+| Gestisci la risposta | 47 |
+| Invio di una mail approvata | 46 |
+| Monitoraggio, audit di sicurezza, riordino della coda | 45 |
+| Revisione delle domande, posta | 30 |
+| Unione di feedback | 20 |
+| Potatura dei rami | 5 |
+| Esplorazione | sotto tutto, solo a coda vuota |
+
+Cosa garantisce la scala:
+
+- **La priorità 3 passa sopra tutto**, in qualunque fase, compresi i cicli già
+  avviati degli altri feedback e i ricorrenti. Un agente già partito finisce il
+  suo compito: il 3 prende il primo posto libero. Per ora il 3 vale anche per
+  il lavoro sul processo (routine, gestione dei feedback, strumenti): finché non
+  ci sono utenti conta più della sicurezza.
+- **Sotto il 3, un feedback iniziato** passa davanti a uno nuovo con un gradino
+  di priorità in più, non con due.
+- **Fiducia e figli** non scavalcano mai una casella: fra una casella e l'altra
+  c'è sempre almeno un numero libero.
+
+La tabella delle fasi vive sul server come dati e si regola lì; l'urgenza dei
+ricorrenti si cambia su ciascuno. Quando cambia la priorità di un feedback, il
+trigger ricalcola l'urgenza del suo compito aperto.
+
+### 6.4 Modello e sforzo
+
+- Il compito porta modello (gli alias `opus`, `sonnet`, `haiku`, `fable`, che
+  seguono da soli l'ultima versione) e sforzo. Il server li manda col biglietto,
+  e il gancio dell'orchestratore li impone al lancio, qualunque cosa abbia
+  scritto l'orchestratore.
+- **Fasi di un feedback:** modello e sforzo per fase, scelti dall'owner in
+  Routine → Automazioni. Oggi: primo lavoro Opus `xhigh`, le altre Opus `high`.
+- **Compiti senza feedback:** dal ricorrente o da chi crea il compito. «Gestisci
+  la risposta» resta Opus (§ 3.5).
+- Ogni agente può lanciare sotto-agenti, fino a tre livelli sotto la sessione
+  principale, e sceglierne il modello.
+
+Transizione: dal 12/10 il server legge già `model` ed `effort` dal feedback,
+per primo lavoro e correzione (#1192), e #1190 li rende scrivibili in Gestione.
+Con i compiti la lettura dal feedback si toglie, e #1190 tiene solo la scelta
+per fase in Automazioni.
+
+### 6.5 Numerazione e dove si vedono
+
+- I feedback tengono la loro numerazione (#N, #N.k). I compiti ne hanno una
+  loro; quelli di un feedback si mostrano come «#N · fase».
+- I feedback restano in Gestione → Feedback. I compiti hanno una scheda loro,
+  Routine → Compiti: aperti, in corso e storico, con modello, costo ed esito di
+  ogni chiamata. L'owner la guarda di rado.
+
+### 6.6 La coda dei feedback
+
+- Unire vuol dire creare un feedback nuovo con `genitori`, per delega (§ 1.3).
 - Il riordino del lunedì lavora tutta la coda insieme:
   - unisce i doppioni;
   - archivia gli stantii e i già fatti;
