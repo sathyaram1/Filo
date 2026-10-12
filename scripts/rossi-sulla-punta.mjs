@@ -35,10 +35,14 @@ export function tuttiGiaVerdi({ file, nonRifacibili, verdi }) {
 
 /** Lancia un file col lanciatore della punta; la sua uscita va su stderr, così stdout resta l'elenco dei verdi. */
 function lanciaSullaPunta(file) {
+  // Ereditata da un `node --test`, farebbe saltare i file al lanciatore: uscita 0 senza aver provato niente.
+  const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
   const r = spawnSync(process.execPath, [join(PUNTA, 'scripts', 'run-unit-tests.mjs'), '--solo', file], {
     cwd: PUNTA,
+    env,
     stdio: ['ignore', 2, 2],
     timeout: TETTO_FILE_MS,
+    windowsHide: true,
   });
   return r.error ? 1 : r.status;
 }
