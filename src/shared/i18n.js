@@ -653,6 +653,7 @@
     options_site_perms_part_presenza: 'Presenza al computer',
     options_site_perms_part_strumenti: 'Strumenti musicali',
     options_site_perms_part_rete: 'Rete locale',
+    options_site_perms_part_file: 'Modifica dei file',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:
