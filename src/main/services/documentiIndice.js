@@ -425,8 +425,9 @@ async function cerca(richiesta, { limite = 8, cartella = '', avanzamento = null,
     smetti();
   }
   const candidati = [];
+  const qui = sottoUna(sotto);
   for (const [p, v] of voci) {
-    if (!sotto.some((c) => dentro(p, c))) continue;
+    if (!qui(p)) continue;
     if (v.tp == null) v.tp = Ricerca.piano(v.t);
     if (v.np == null) v.np = Ricerca.piano(v.n.replace(/\.[^.]+$/, ''));
     if (v.pp == null) v.pp = Ricerca.periodi(v.t);
