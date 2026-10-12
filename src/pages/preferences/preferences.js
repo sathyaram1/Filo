@@ -1261,6 +1261,45 @@
     for (const v of Object.keys(CARTELLE_DI_SERIE)) {
       if (!cartelleSalvate.includes(v)) box.appendChild(rigaCartella(v, { tolta: true }));
     }
+    const occasionali = statoDocumenti && Array.isArray(statoDocumenti.occasionali) ? statoDocumenti.occasionali : [];
+    for (const o of occasionali) box.appendChild(rigaOccasionale(o));
+  }
+
+  // #947.3 — una cartella fuori elenco in cui l'utente ha chiesto di cercare: Filo tiene quello che ne ha già letto,
+  // e qui lo si vede e lo si dimentica.
+  function rigaOccasionale(o) {
+    const row = document.createElement('div');
+    row.className = 'mem-riga doc-occasionale';
+    row.dataset.occasionale = o.percorso;
+    const t = document.createElement('span');
+    t.className = 'mem-testo';
+    t.textContent = o.nome || o.percorso;
+    const dove = document.createElement('span');
+    dove.className = 'doc-dove';
+    const n = Number(o.documenti) || 0;
+    const quanti = n === 1 ? 'un documento già letto' : `${n.toLocaleString('it-IT', { useGrouping: true })} documenti già letti`;
+    dove.textContent = `${o.percorso} · ci hai cercato tu, Filo ne tiene ${quanti}${o.esiste ? '' : ' · ora non è collegata'}`;
+    t.appendChild(dove);
+    row.appendChild(t);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mem-via';
+    b.textContent = '×';
+    b.title = 'Dimentica';
+    b.setAttribute('aria-label', `Dimentica i documenti letti in ${o.nome || o.percorso}`);
+    b.addEventListener('click', () => dimenticaCartella(b, o.percorso));
+    row.appendChild(b);
+    return row;
+  }
+
+  async function dimenticaCartella(b, percorso) {
+    b.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_DIMENTICA, percorso }); } catch (_) { r = null; }
+    const hint = $('documentiHint');
+    if (hint) hint.textContent = r && r.ok && r.tolta ? 'Dimenticata' : 'Non c\'era più: ecco com\'è adesso';
+    flashSaved('documentiHint');
+    await caricaStatoDocumenti();
   }
 
   function scriviStatoDocumenti() {
