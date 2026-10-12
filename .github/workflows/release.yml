@@ -226,7 +226,7 @@ jobs:
             SULLA_PUNTA="
           Gia' verdi sulla punta di main, da non correggere: $(echo $GIA_VERDI)"
           fi
-          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti sul ramo principale: la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
+          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti su Windows sul commit ${PROVATO} (il piu nuovo di main con la suite verde, non la punta di main): la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. La suite di quel commit aveva gia passato gli stessi test su Windows: se ora sono rossi, di norma il test dipende dai tempi o dalla macchina. Capisci perche e sistemalo; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
           # I test rossi stanno all'INIZIO del log (una riga «not ok» per
           # ciascuno), la coda porta solo il riepilogo: prima si elencano
           # quelli, poi la coda. Un allarme con la sola coda non diceva quali
