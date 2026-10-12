@@ -13,6 +13,7 @@ import { readFileSync, readdirSync, statSync, writeFileSync, existsSync, rmSync 
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const cartellaDati = (app) => app.evaluate(() => process.env.FILO_USER_DATA);
@@ -22,12 +23,16 @@ function fileSotto(dir) {
   const out = [];
   for (const nome of readdirSync(dir)) {
     const p = join(dir, nome);
-    if (statSync(p).isDirectory()) out.push(...fileSotto(p));
+    let st;
+    try { st = statSync(p); } catch (_) { continue; }
+    if (st.isDirectory()) out.push(...fileSotto(p));
     else out.push(p);
   }
   return out;
 }
-const fileCheContengono = (dir, ago) => fileSotto(dir).filter((f) => readFileSync(f, 'latin1').includes(ago));
+const fileCheContengono = (dir, ago) => fileSotto(dir).filter((f) => {
+  try { return readFileSync(f, 'latin1').includes(ago); } catch (_) { return false; }
+});
 
 // Quello che scrive il main a ogni richiesta: il payload intero, qualche KB.
 const registra = (app, n, prefisso) => app.evaluate(async (_e, { n, prefisso, pagina }) => {
@@ -67,7 +72,7 @@ test('dopo 300 richieste la pagina le mostra tutte, e storage.json non contiene 
 
   // «Cancella tutto» svuota anche i file.
   await page.locator('#clear').click();
-  await page.locator('.sn-confirm-ok, [data-confirm-ok]').first().click();
+  await clickConfirm(page, 'ok');
   await expect(page.locator('.sn-history-item')).toHaveCount(0);
   await expect(page.locator('#empty')).toBeVisible();
   expect(fileCheContengono(dati, 'domanda 1"')).toEqual([]);
