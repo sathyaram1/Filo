@@ -65,6 +65,13 @@ export function motivoCopiaTesto(testo) {
   return '';
 }
 
+// Il primo carattere visibile, letto sui byte: immagini e caratteri non si decodificano per niente.
+function sembraJson(byte) {
+  let i = byte[0] === 0xEF && byte[1] === 0xBB && byte[2] === 0xBF ? 3 : 0;
+  while (i < byte.length && (byte[i] === 0x20 || byte[i] === 0x09 || byte[i] === 0x0A || byte[i] === 0x0D)) i++;
+  return byte[i] === 0x7B || byte[i] === 0x5B;
+}
+
 /** I file tracciati da git in `root` che sono copie di dati del server, fuori dalla cartella dei dati finti. */
 export function copieNelRepo(root) {
   const file = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
