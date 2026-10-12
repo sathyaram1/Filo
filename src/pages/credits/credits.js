@@ -279,7 +279,9 @@
         : `Non riesco a preparare l\'identità di questa installazione: ${w.identity.error || 'errore sconosciuto'}.`;
       note.hidden = false;
     } else if (w.error === 'not_reachable') {
-      note.textContent = 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
+      note.textContent = noKey
+        ? 'Il server dei crediti non risponde adesso: riprova fra poco.'
+        : 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
       note.hidden = false;
     } else if (server && server.invitesOpen === false) {
       note.textContent = 'Per ora i posti sono finiti: il tuo codice resta valido, riprova fra qualche giorno.';
