@@ -506,7 +506,8 @@ module.exports = {
   navigazione,
   paginaDiAccesso,
   credenziali,
-  accessoOsservato: segnaAccesso,
+  // Torna la scrittura in corso: chi scrive altre impostazioni dopo la aspetta, o una delle due si perde.
+  accessoOsservato: (sito) => { segnaAccesso(sito); return scrittura; },
   giroDiPulizia,
   allUscita,
   margineTest,

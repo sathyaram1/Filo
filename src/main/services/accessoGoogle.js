@@ -45,7 +45,7 @@ function rendiPersistente() {
 }
 
 async function accessoOsservato(ses) {
-  try { require('./cookieIncorporati').accessoOsservato(G.SITO_GOOGLE); } catch (_) {}
+  try { await require('./cookieIncorporati').accessoOsservato(G.SITO_GOOGLE); } catch (_) {}
   if (!inPrivacy()) return;
   await rendiPersistente();
   if (ses) await travasa(ses);

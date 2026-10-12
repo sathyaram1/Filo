@@ -3,6 +3,7 @@
 
 const path = require('node:path');
 const auth = require('../../auth/google-auth');
+const ProdottiGoogle = require('../../auth/prodottiGoogle');
 const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
@@ -302,7 +303,7 @@ module.exports = function register(on, ctx) {
       const attiva = tabs && tabs.tabs.find((t) => t.id === tabs.activeId);
       daUrl = (attiva && attiva.url) || '';
     } catch (_) {}
-    try { return require('../../auth/prodottiGoogle').collega({ daUrl, finestra: win }); }
+    try { return ProdottiGoogle.collega({ daUrl, finestra: win }); }
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 
