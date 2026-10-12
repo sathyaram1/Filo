@@ -41,6 +41,9 @@
   const mgRoutinesMsg    = document.getElementById('mgRoutinesMsg');
   const mgProberIdle      = document.getElementById('mgProberIdle');
   const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
+  const mgLavoriServer       = document.getElementById('mgLavoriServer');
+  const mgLavoriServerSwitch = document.getElementById('mgLavoriServerSwitch');
+  const mgLavoriServerMsg    = document.getElementById('mgLavoriServerMsg');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
   // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
   // per i soli 0; più il testo in coda alla risposta (fixInstructions).
