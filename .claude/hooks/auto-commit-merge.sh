@@ -297,6 +297,7 @@ copie_da_spedire() {
 salva_cartella() {
   local wt="$1"
   cd "$wt" || return 0
+  metti_controllo_spedizione "$wt"
 
   BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
