@@ -16,6 +16,8 @@ test('r2 cercando in tutta la cartella personale si trovano i documenti di iClou
   for (const d of [icloud, dropbox, posta]) mkdirSync(d, { recursive: true });
   writeFileSync(join(icloud, 'luce-marzo.txt'), 'Bolletta energia elettrica, periodo marzo 2026, totale 61 euro');
   writeFileSync(join(dropbox, 'affitto.txt'), 'Contratto di locazione ad uso abitativo, canone mensile 650 euro');
+  mkdirSync(join(casa, 'Lavori'), { recursive: true });
+  writeFileSync(join(casa, 'Lavori', 'luce-aprile.txt'), 'Bolletta energia elettrica, periodo aprile 2026');
   writeFileSync(join(posta, 'allegato.txt'), 'Bolletta energia elettrica allegata a una mail');
   try {
     const nomi = await app.evaluate(async (_e, casa) => {
@@ -25,6 +27,7 @@ test('r2 cercando in tutta la cartella personale si trovano i documenti di iClou
       const affitto = await I.cerca('contratto affitto', { cartella: casa });
       return { luce: luce.risultati.map((x) => x.nome), affitto: affitto.risultati.map((x) => x.nome) };
     }, casa);
+    expect(nomi.luce, 'la ricerca nella cartella personale funziona').toContain('luce-aprile.txt');
     expect(nomi.luce, 'la bolletta in iCloud Drive').toContain('luce-marzo.txt');
     expect(nomi.affitto, 'il contratto in Dropbox').toContain('affitto.txt');
     expect(nomi.luce, 'la posta resta fuori').not.toContain('allegato.txt');
