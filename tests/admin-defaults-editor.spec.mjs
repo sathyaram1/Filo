@@ -18,7 +18,7 @@ const ADMIN_URL = 'filo://admin-defaults/admin-defaults.html';
 
 async function openStubbedEditor(openTab, overrides = {}) {
   const page = await openTab(ADMIN_URL);
-  await page.addInitScript((over) => {
+  await page.addInitScript(({ codiceSenza, ...over }) => {
     const fakeConfig = {
       apiKeysPresent: { openrouter: true, tavily: false },
       safeBrowsingKeyPresent: false,
@@ -29,9 +29,12 @@ async function openStubbedEditor(openTab, overrides = {}) {
       excludedProviders: null,
       ...over,
     };
+    // `codiceSenza`: la lista del codice meno quelle voci, letta dal codice: scritta qui a mano invecchiava a ogni
+    // fornitore escluso in più, e l'avviso restava acceso per quello.
     if (fakeConfig.excludedProviders == null) {
       Object.defineProperty(fakeConfig, 'excludedProviders', {
-        get: () => (window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [],
+        get: () => ((window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [])
+          .filter((n) => !(codiceSenza || []).includes(n)),
       });
     }
     window.__sent = [];
