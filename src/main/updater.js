@@ -243,28 +243,6 @@ function scaricaVerificata(u) {
   return u.downloadUpdate();
 }
 
-// GitHubProvider mette l'etichetta della release «latest» e poi ci copia sopra latest.yml, che può portarne una sua: si
-// richiede a GitHub, così il confronto e gli indirizzi dei file partono dall'etichetta vera (#1119).
-const ETICHETTA_RICHIESTA = Symbol('etichettaRichiesta');
-function etichettaDaGitHub(au) {
-  const orig = au && au.getUpdateInfoAndProvider;
-  if (typeof orig !== 'function' || orig[ETICHETTA_RICHIESTA]) return;
-  const avvolta = async function (...a) {
-    const r = await orig.apply(this, a);
-    const p = r && r.provider;
-    const tag = p && typeof p.getLatestTagName === 'function' ? await p.getLatestTagName(new (gettoneAnnullo())()) : null;
-    return { ...r, info: { ...(r && r.info), tag: typeof tag === 'string' ? tag : null } };
-  };
-  avvolta[ETICHETTA_RICHIESTA] = true;
-  au.getUpdateInfoAndProvider = avvolta;
-}
-
-// La copia di builder-util-runtime che usa electron-updater, annidata o in cima che sia.
-function gettoneAnnullo() {
-  const base = path.dirname(require.resolve('electron-updater'));
-  return require(require.resolve('builder-util-runtime', { paths: [base] })).CancellationToken;
-}
-
 // Nessun canale verso il server porta un allarme dall'app: resta la riga di log.
 function rifiuta(info) {
   const dato = (v) => String(JSON.stringify(v === undefined ? null : v)).slice(0, 120);
