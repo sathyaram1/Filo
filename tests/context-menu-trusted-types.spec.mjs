@@ -104,26 +104,47 @@ test('Trusted Types: la spiegazione di una parola si apre e mostra la risposta f
   await expect(riquadro.locator('strong', { hasText: 'account' })).toBeVisible();
 });
 
+// Il menu di riserva è una finestra a sé, fuori dalla pagina: le sue voci si leggono e si scelgono da lì.
+const vociDiRiserva = (app) => app.evaluate(({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x.webContents.getURL().startsWith('data:text/html'));
+  return w ? w.webContents.executeJavaScript("[...document.querySelectorAll('.item .lbl')].map((n) => n.textContent)") : [];
+});
+const scegliDiRiserva = (app, voce) => app.evaluate(({ BrowserWindow }, v) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x.webContents.getURL().startsWith('data:text/html'));
+  return w.webContents.executeJavaScript(`[...document.querySelectorAll('button.item')].find((b) => b.textContent.trim() === ${JSON.stringify(v)}).click()`);
+}, voce);
+const rompiIlMenu = (app, origine) => app.evaluate(({ webContents }, o) => {
+  const wc = webContents.getAllWebContents().filter((w) => String(w.getURL()).startsWith(o)).pop();
+  return wc.executeJavaScriptInIsolatedWorld(999, [{ code: "SN_MENU.open = () => { throw new Error('prova #1122'); }; true" }]);
+}, origine);
+
 test('se il menu di Filo non si costruisce compare quello di riserva, e le sue voci funzionano', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, HTML);
-  await app.evaluate(({ webContents }, origine) => {
-    const wc = webContents.getAllWebContents().filter((w) => String(w.getURL()).startsWith(origine)).pop();
-    return wc.executeJavaScriptInIsolatedWorld(999, [{ code: "SN_MENU.open = () => { throw new Error('prova #1122'); }; true" }]);
-  }, testServer.origin);
+  await rompiIlMenu(app, testServer.origin);
 
   await page.locator('#email').click({ button: 'right' });
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x.webContents.getURL().startsWith('data:text/html'));
-    return w ? w.webContents.executeJavaScript("[...document.querySelectorAll('.item .lbl')].map((n) => n.textContent)") : [];
-  }), { timeout: 5000 }).toEqual(expect.arrayContaining(['Seleziona tutto', 'Ricarica']));
+  await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toEqual(expect.arrayContaining(['Seleziona tutto', 'Ricarica']));
   await expect(page.locator('.sn-menu')).toHaveCount(0);
 
-  await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x.webContents.getURL().startsWith('data:text/html'));
-    return w.webContents.executeJavaScript("[...document.querySelectorAll('button.item')].find((b) => b.textContent.trim() === 'Seleziona tutto').click()");
-  });
+  await scegliDiRiserva(app, 'Seleziona tutto');
   await expect.poll(() => page.evaluate(() => {
     const el = document.getElementById('email');
     return document.activeElement === el && el.selectionStart === 0 && el.selectionEnd === el.value.length;
   })).toBe(true);
+});
+
+test('il menu di riserva su un collegamento lo apre e lo copia', async ({ app, openTab, testServer }) => {
+  const meta = testServer.html('<p>destinazione</p>');
+  const page = await testServer.openReady(openTab, HTML.replace('</body>', `<a id="link" href="${meta}">vai avanti</a></body>`));
+  await rompiIlMenu(app, testServer.origin);
+
+  await page.locator('#link').click({ button: 'right' });
+  await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toEqual(expect.arrayContaining(['Apri in nuova tab', 'Copia URL', 'Ricarica']));
+  await scegliDiRiserva(app, 'Copia URL');
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe(meta);
+
+  await page.locator('#link').click({ button: 'right' });
+  await expect.poll(() => vociDiRiserva(app), { timeout: 5000 }).toContain('Apri in nuova tab');
+  await scegliDiRiserva(app, 'Apri in nuova tab');
+  await expect.poll(() => app.evaluate(({ webContents }, u) => webContents.getAllWebContents().some((w) => w.getURL() === u), meta)).toBe(true);
 });
