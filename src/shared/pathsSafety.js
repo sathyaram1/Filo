@@ -299,10 +299,8 @@
   // niente che imiti la struttura del prompt, e dentro al tetto.
   function redactSelector(selector) {
     if (typeof selector !== 'string' || !selector) return '';
-    let s = redigiDatiPersonali(tagliaPrimaDiPulire(selector, MAX_SELECTOR_LEN));
-    s = neutralizzaMarcature(s).trim();
-    if (s.length > MAX_SELECTOR_LEN) s = s.slice(0, MAX_SELECTOR_LEN);
-    return s;
+    return aTetto(selector, MAX_SELECTOR_LEN, tagliaPrimaDiPulire,
+      (pezzo) => neutralizzaMarcature(redigiDatiPersonali(pezzo)).trim());
   }
 
   function sanitizeSteps(rawSteps) {
