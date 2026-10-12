@@ -583,6 +583,7 @@
       approveBtn.textContent = 'Approva e fondi';
       approveBtn.classList.remove('is-armed');
       approveBtn.style.minWidth = '';
+      approveBtn.style.minHeight = '';
       if (armTimer) { clearTimeout(armTimer); armTimer = null; }
       liberata(card);
     }
