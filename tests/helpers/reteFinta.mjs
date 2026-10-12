@@ -9,7 +9,6 @@ import { _electron as electron } from '@playwright/test';
 import { test as filoTest, expect, chiudiApp } from '../fixtures/electron.mjs';
 import { cartellaTemporanea, togliCartella } from './percorsi.mjs';
 import { argomentiScala } from './scala.mjs';
-import { seminaProfiloAccolto } from './profiloAccolto.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
@@ -59,12 +58,11 @@ export const test = filoTest.extend({
 // Filo sulla rete finta con una cartella dati scelta da chi chiama: due avvii sulla stessa
 // cartella sono una riapertura di Filo. Come nella fixture, parte già accolto se non chiede il profilo nuovo.
 export function avviaFilo(rete, userData, { accolto = true } = {}) {
-  if (accolto) seminaProfiloAccolto(userData);
   const rules = HOSTS.map((h) => `MAP ${h} 127.0.0.1:${rete.port}`).join(', ');
   return electron.launch({
     args: [...argomentiScala, `--host-resolver-rules=${rules}`, '.'],
     cwd: APP_ROOT,
-    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test', FILO_TEST_ACCOLTO: accolto ? '1' : '0' },
   });
 }
 

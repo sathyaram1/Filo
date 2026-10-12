@@ -1,6 +1,6 @@
 // La fixture apre Filo su un profilo già accolto (#663.6): una prova della chat che dà a Filo un modello a home
 // aperta trova la chat di tutti i giorni, non l'intervista di benvenuto. Chi prova l'accoglienza parte dal profilo
-// nuovo con `test.use({ accoglienzaFatta: false })`. Senza la fixture che semina il profilo, la prima è rossa.
+// nuovo con `test.use({ accoglienzaFatta: false })`. Senza il profilo accolto delle prove, la prima è rossa.
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
 import { test as testRete } from './helpers/reteFinta.mjs';

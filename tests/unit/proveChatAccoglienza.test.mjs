@@ -150,38 +150,17 @@ export function proveScoperte(testo, nomeFile = '') {
   return scoperte;
 }
 
-test('la fixture apre Filo su un profilo già accolto, se la prova non chiede quello nuovo', () => {
+// Il profilo accolto non lo semina un aiuto per volta: ogni Filo aperto da una prova eredita FILO_TEST_ACCOLTO dalla
+// configurazione, e lo spec che apre Filo con un suo lancio (rete finta, banchi dei giri) parte accolto come la fixture.
+test('ogni Filo aperto da una prova parte già accolto, se la prova non chiede il profilo nuovo', () => {
+  const ROOT = join(TESTS, '..');
+  assert.match(readFileSync(join(ROOT, 'playwright.config.js'), 'utf8'), /^process\.env\.FILO_TEST_ACCOLTO = '1';$/m);
+  assert.match(readFileSync(join(ROOT, 'src', 'main', 'shim', 'storage.js'), 'utf8'),
+    /if \(err\.code === 'ENOENT' && process\.env\.FILO_TEST_ACCOLTO === '1'\) STATE\.data = \{ filo_onboarding: \{ done: true \} \};/);
   const f = readFileSync(FIXTURE, 'utf8');
   assert.match(f, /\baccoglienzaFatta:\s*\[\s*true\s*,\s*\{\s*option:\s*true\s*\}\s*\]/);
-  assert.match(f, /if \(accoglienzaFatta\) seminaProfiloAccolto\(userData\)/);
-  assert.match(readFileSync(join(TESTS, 'helpers', 'profiloAccolto.mjs'), 'utf8'),
-    /PROFILO_ACCOLTO = \{ filo_onboarding: \{ done: true \} \}/);
-});
-
-// Gli aiuti che aprono Filo per le prove (rete finta, banchi dei giri sui crediti) partono accolti come la fixture:
-// le prove che li usano mettono modello e chat negli aiuti, dove la ricerca per prova non arriva (#663.6).
-// Fuori: gli spec, che la prova sopra legge uno per uno, e gli strumenti in cui la finestra è il risultato.
-function aiutiCheApronoFilo(dir = TESTS, rel = '') {
-  const trovati = [];
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const r = rel ? `${rel}/${e.name}` : e.name;
-    if (e.isDirectory()) {
-      if (!['unit', 'agent', 'node_modules', '.shots', '.smoke', '.out'].includes(e.name)) trovati.push(...aiutiCheApronoFilo(join(dir, e.name), r));
-    } else if (e.name.endsWith('.mjs') && !e.name.endsWith('.spec.mjs') && r !== 'smoke.mjs') {
-      const { senzaCommenti } = maschere(readFileSync(join(dir, e.name), 'utf8'));
-      if (APRE_DA_SE.test(senzaCommenti)) trovati.push({ r, senzaCommenti });
-    }
-  }
-  return trovati;
-}
-
-test('ogni aiuto che apre Filo per le prove lo apre già accolto, se la prova non chiede il profilo nuovo', () => {
-  const aiuti = aiutiCheApronoFilo();
-  assert.ok(aiuti.some((a) => a.r === 'helpers/reteFinta.mjs'), 'la ricerca degli aiuti non trova più la rete finta');
-  const scoperti = aiuti.filter((a) => !/\bseminaProfiloAccolto\s*\(/.test(a.senzaCommenti)).map((a) => a.r);
-  assert.deepEqual(scoperti, [],
-    'Questo aiuto apre Filo su una cartella sua: prima del lancio chiami seminaProfiloAccolto(userData) '
-    + '(tests/helpers/profiloAccolto.mjs), con un modo per chiedere il profilo nuovo a chi prova l\'accoglienza.');
+  assert.match(f, /FILO_TEST_ACCOLTO: accoglienzaFatta \? '1' : '0'/);
+  assert.match(readFileSync(join(TESTS, 'helpers', 'reteFinta.mjs'), 'utf8'), /FILO_TEST_ACCOLTO: accolto \? '1' : '0'/);
 });
 
 test('ogni prova che mette un modello e scrive nella chat della home parte già accolta', () => {
