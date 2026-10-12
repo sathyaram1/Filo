@@ -135,8 +135,8 @@ const gitTesto = (root, args) => execFileSync('git', args, { cwd: root, encoding
  * Le copie nei commit che spedire `rif` porterebbe su origin (quelli che nessun ramo di origin conosce),
  * dal commit più vecchio: [{ commit, file, motivo }]. Ogni strada che spedisce lo chiede prima del push.
  */
-export function copieDaSpedire(root, rif = 'HEAD') {
-  const commit = gitTesto(root, ['rev-list', '--reverse', rif, '--not', '--remotes=origin']).split('\n').filter(Boolean);
+export function copieDaSpedire(root, rif = 'HEAD', { giaLa = ['--remotes=origin'] } = {}) {
+  const commit = gitTesto(root, ['rev-list', '--reverse', rif, '--not', ...giaLa]).split('\n').filter(Boolean);
   const trovate = [];
   const lette = new Map();
   for (const c of commit) {
