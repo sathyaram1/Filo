@@ -65,7 +65,7 @@ test('la richiesta di git: solo https, github.com e il percorso di filo-security
     { protocol: 'https', host: 'github.com' }, // senza useHttpPath git non dice il repo: a nessuno
     {},
   ]) assert.equal(richiestaPerServer(altro), false, JSON.stringify(altro));
-  assert.equal(rigaCredenziali('t', Date.parse('2026-10-12T11:00:00Z')), 'username=x-access-token\npassword=t\npassword_expiry_utc=1792234800\n');
+  assert.equal(rigaCredenziali('t', Date.parse('2026-10-12T11:00:00Z')), 'username=x-access-token\npassword=t\npassword_expiry_utc=1791802800\n');
   assert.equal(rigaCredenziali('t', 0), 'username=x-access-token\npassword=t\n');
 });
 

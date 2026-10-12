@@ -1,0 +1,55 @@
+## Lavoro server: anche filo-security
+
+Questo lavoro tocca il server, il repo privato `sathyaram1/filo-security`. Il tuo biglietto porta l'ambito
+`server`: finché resta pulito, il server ti dà un token da un'ora, solo per quel repo, e git lo chiede da solo
+all'aiutante di credenziali. Qui il codice del server lo tocchi: il resto di «Se il lavoro si fa solo in locale»
+(deploy, segreti, credenziali dell'owner) vale ancora.
+
+Il clone sta **fuori** dal checkout di Filo, in `<CLONE>`. L'hook di salvataggio pubblica tutto quello che sta
+dentro Filo: un file del server copiato lì finisce sul repo pubblico. Non copiare mai niente del server dentro Filo.
+
+### Il clone, una volta sola
+
+La configurazione dell'aiutante va nel clone, mai globale: la configurazione globale è quella del proxy.
+
+```bash
+git -c credential.helper= -c 'credential.helper=!node "<CANALE>" git-credenziali' -c credential.useHttpPath=true \
+  clone https://github.com/sathyaram1/filo-security.git "<CLONE>"
+git -C "<CLONE>" config --local credential.helper ""
+git -C "<CLONE>" config --local --add credential.helper '!node "<CANALE>" git-credenziali'
+git -C "<CLONE>" config --local credential.useHttpPath true
+git -C "<CLONE>" ls-remote origin HEAD
+```
+
+Se `ls-remote` non si autentica, ripeti il comando con le tre `-c` davanti: se continua, il token non esce (biglietto
+sporco, feedback non fidato) e il lavoro non si fa da qui. Non aggirarlo: niente token scritti nell'URL, niente
+altre credenziali. Rimandalo in locale come dice «Se il lavoro si fa solo in locale».
+
+### Il ramo
+
+Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --abbrev-ref HEAD` nel checkout di Filo).
+
+- Lavoro nuovo: `git -C "<CLONE>" checkout -b <ramo> origin/main`.
+- Verifica o correzione: `git -C "<CLONE>" fetch origin <ramo>` e `git -C "<CLONE>" checkout -B <ramo> origin/<ramo>`.
+  Se sul server il ramo non c'è, il lavoro sta tutto nell'app.
+
+### Prove, spinta, registro
+
+- Le prove del server: `npm ci` la prima volta, poi `npm test` in `<CLONE>/functions`, con `FILO_PUBLIC_REPO` uguale
+  al checkout di Filo. Se il lavoro tocca anche l'app, le prove dell'app come sempre.
+- Le prove del giro che riguardano il server vanno in `functions/test/` del clone, sul ramo.
+- Spingi solo il tuo ramo: `git -C "<CLONE>" push origin <ramo>`. Subito dopo, a ogni spinta e prima di consegnare:
+
+```bash
+node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
+```
+
+  Il server legge la punta e la scrive nel registro dei rami. Senza questa riga il ramo del server non risulta fidato
+  e il lavoro non arriva su main.
+- Mai: `main` di filo-security (né push né merge), `server:fondi`, deploy (`firebase`, `server:pubblica`),
+  `.github/workflows` (GitHub rifiuta le spinte che li toccano: quel lavoro si fa in locale).
+
+### Dopo la verifica
+
+Un lavoro server passato non lo fonde il cancello: aspetta il PC dell'owner, che porta il ramo su main di
+filo-security e lo pubblica. Non chiedere la fusione del server da qui.
