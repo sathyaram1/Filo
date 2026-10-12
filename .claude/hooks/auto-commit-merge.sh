@@ -293,6 +293,17 @@ copie_da_spedire() {
   git log --format= --name-only -z --diff-filter=ACMR "refs/heads/$ramo" --not --remotes=origin 2>/dev/null | forse_dati || return 0
   node "$controllo" --spedizione "$wt" "$COMMIT_AS_NAME" "$COMMIT_AS_EMAIL" 2>/dev/null
 }
+# Questo hook gira in ogni sessione: mette il pre-push che ferma la copia su ogni altra strada (push a mano, nota
+# diagnostica). Un pre-push che c'e' gia', nostro o altrui, o una cartella di hook condivisa: node non si paga.
+metti_controllo_spedizione() {
+  local dove controllo
+  [ -n "$(git config --get core.hooksPath 2>/dev/null)" ] && return 0
+  dove=$(git rev-parse --git-path hooks/pre-push 2>/dev/null) || return 0
+  [ -e "$dove" ] && return 0
+  controllo=$(controllo_copie "$1") || return 0
+  node "$controllo" --installa "$1" >/dev/null 2>&1
+  return 0
+}
 
 salva_cartella() {
   local wt="$1"
