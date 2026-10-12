@@ -135,8 +135,28 @@ function tagAccettato(info) {
   return String(info.tag) === `v${info.version}`;
 }
 
+function segmento(s) {
+  try { return decodeURIComponent(s); } catch { return null; }
+}
+
+// Il tag e i percorsi dentro latest.yml li scrive chi ha creato la release: «tag: v99.0.0» e «../x1/…» portano
+// altrove. Conta dove stanno davvero i file da scaricare: solo sotto il tag protetto v<versione> del nostro repo (#1073).
+function fileDiRilascio({ versione, urls, owner, repo, host = 'github.com' } = {}) {
+  if (!parti(versione) || !owner || !repo || !Array.isArray(urls) || !urls.length) return false;
+  const attesi = [String(owner), String(repo), 'releases', 'download', `v${versione}`];
+  return urls.every((u) => {
+    let x;
+    try { x = new URL(String(u)); } catch { return false; }
+    if (x.protocol !== 'https:' || x.hostname !== host || x.username || x.password) return false;
+    const seg = x.pathname.split('/').slice(1).map(segmento);
+    const nome = seg[5];
+    return seg.length === 6 && attesi.every((a, i) => seg[i] === a)
+      && typeof nome === 'string' && nome !== '' && nome !== '.' && nome !== '..' && !/[/\\]/.test(nome);
+  });
+}
+
 module.exports = {
   MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI,
   confrontaVersioni, modoScelto, piano, sceltaNonVale, haPulsante,
-  ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato,
+  ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato, fileDiRilascio,
 };
