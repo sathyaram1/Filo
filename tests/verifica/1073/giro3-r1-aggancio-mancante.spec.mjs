@@ -20,10 +20,18 @@ test('r1 con il metodo interno rinominato, una release sotto il tag x1 non viene
   Rinominato.prototype.leggiReleaseENuovoProvider = async () => ({
     info: { version: '99.0.0', tag: 'x1', files: [] }, provider: {},
   });
+  // Il corpo di doCheckForUpdates di electron-updater, con la sola chiamata rinominata.
   Rinominato.prototype.doCheckForUpdates = async function () {
-    const salva = this.getUpdateInfoAndProvider;
-    this.getUpdateInfoAndProvider = this.leggiReleaseENuovoProvider;
-    try { return await AppUpdater.prototype.doCheckForUpdates.call(this); } finally { this.getUpdateInfoAndProvider = salva; }
+    this.emit('checking-for-update');
+    const result = await this.leggiReleaseENuovoProvider();
+    const updateInfo = result.info;
+    if (!(await this.isUpdateAvailable(updateInfo))) {
+      this.emit('update-not-available', updateInfo);
+      return { isUpdateAvailable: false, versionInfo: updateInfo, updateInfo };
+    }
+    this.updateInfoAndProvider = result;
+    this.onUpdateAvailable(updateInfo);
+    return { isUpdateAvailable: true, versionInfo: updateInfo, updateInfo, downloadPromise: null };
   };
 
   const au = Object.create(Rinominato.prototype);
