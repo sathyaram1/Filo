@@ -131,9 +131,10 @@ test('un modello di solo testo non blocca la conversazione dopo una foto: le fot
 
   await scrivi(home, 'va bene, dimmi una ricetta coi ceci');
   await expect(home.locator('.dash-bubble-filo', { hasText: 'hummus' })).toBeVisible({ timeout: 15_000 });
-  const [secondo] = await chiamate(app);
-  expect(JSON.stringify(secondo)).not.toContain('image_url');
-  const conNota = secondo.find((m) => m.role === 'user' && testo(m).includes('cosa c’è qui?'));
+  // Le chiamate rifiutate non si contano: questa è la prima riuscita.
+  const [riuscita] = await chiamate(app);
+  expect(JSON.stringify(riuscita)).not.toContain('image_url');
+  const conNota = riuscita.find((m) => m.role === 'user' && testo(m).includes('cosa c’è qui?'));
   expect(testo(conNota)).toContain('un\'immagine che non hai più davanti');
 
   // Il rifiuto si ricorda: il messaggio dopo parte già senza foto, senza un tentativo a vuoto.
