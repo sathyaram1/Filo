@@ -170,6 +170,26 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   await page.locator('#mgRoleModelsBlock').screenshot({ path: 'tests/.shots/1193-modelli-per-fase-scuro.png' });
 });
 
+test('«Definizione dell\'agente» si legge intera, anche nella colonna stretta', async ({ app, openTab }) => {
+  await preparaServer(app);
+  const page = await apri(openTab);
+  for (const [w, h] of [[1536, 864], [1000, 800]]) {
+    await app.evaluate(({ BrowserWindow }, s) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(s[0], s[1]); }, [w, h]);
+    await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeGreaterThan(w - 60);
+    await expect(tendina(page, 'prober', 'effort').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
+    const tagliate = await page.evaluate(() => Array.from(document.querySelectorAll('#mgRoleModels .sn-select-value'))
+      .filter((v) => v.scrollWidth > v.clientWidth + 1).length);
+    expect(tagliate, `${w}px`).toBe(0);
+  }
+  // L'ultima tendina aperta scende sotto il riquadro senza essere tagliata.
+  await tendina(page, 'prober', 'model').locator('.sn-select-button').click();
+  const pop = tendina(page, 'prober', 'model').locator('.sn-select-pop');
+  await expect(pop).toBeVisible();
+  await pop.scrollIntoViewIfNeeded();
+  await expect(pop.locator('.sn-select-option')).toHaveCount(5);
+  await page.screenshot({ path: 'tests/.shots/1193-tendina-aperta.png' });
+});
+
 test('due scelte di fila sulla stessa tendina: vince l\'ultima, sullo schermo e sul server', async ({ app, openTab }) => {
   await preparaServer(app);
   const page = await apri(openTab);
