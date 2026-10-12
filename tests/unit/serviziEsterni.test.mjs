@@ -244,15 +244,15 @@ function analizza(sorgenti) {
     const l = leggi(file, testo);
     testi.set(file, l);
     const righe = testo.split('\n');
-    const visti = new Set();
-    const aggiungi = (u) => {
-      const chiave = `${u.riga} ${u.url}`;
-      if (!visti.has(chiave)) { visti.add(chiave); indirizzi.push({ file, ...u }); }
-    };
-    for (const u of indirizziDi(l.frammenti, righe)) aggiungi(u);
+    const letti = indirizziDi(l.frammenti, righe);
+    for (const u of letti) indirizzi.push({ file, ...u });
     if (CHIAMATA_RE.test(l.codice) || MODULO_RETE_RE.test(l.senzaCommenti)) {
       chiamate.add(file);
-      if (/\.[cm]?js$/.test(file) && !CHIAMATE_LOCALI[file]) for (const u of destinazioniNelCodice(file, testo, righe)) aggiungi(u);
+      if (!/\.[cm]?js$/.test(file) || CHIAMATE_LOCALI[file]) continue;
+      // `{ hostname: 'x.it' }` lo legge già il lexer: lo stesso host sulla stessa riga non si conta due volte.
+      for (const u of destinazioniNelCodice(file, testo, righe)) {
+        if (!letti.some((x) => x.riga === u.riga && x.url === u.url)) indirizzi.push({ file, ...u });
+      }
     }
   }
   return { indirizzi, chiamate, testi, sorgenti };
