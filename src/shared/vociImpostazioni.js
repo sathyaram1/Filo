@@ -186,7 +186,6 @@
   function leggi(settings, percorso) {
     const v = dentro(settings, percorso);
     if (v !== undefined && v !== null) return v;
-    if (has(ASSENTE, percorso)) return ASSENTE[percorso];
     const C = global.SN_CONST;
     const d = C && C.DEFAULT_SETTINGS ? dentro(C.DEFAULT_SETTINGS, percorso) : undefined;
     return d === undefined ? v : d;
