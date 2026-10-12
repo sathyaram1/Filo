@@ -120,6 +120,9 @@ function daPercorrere(rs) {
 // ── L'indice in memoria e su disco ──────────────────────────────────────────
 
 let voci = null;          // percorso → { n, m, s, k, t, pg, vuoto, e, tp?, np?, pp? }
+// Le cartelle fuori elenco in cui l'utente ha chiesto di cercare: quello che se ne è letto resta finché il file non
+// cambia, così la richiesta dopo lì rilegge solo il nuovo. Si vedono e si dimenticano da Preferenze.
+let occasionali = new Map(); // percorso → quando ci si è cercato l'ultima volta
 let caricamento = null;
 let ultimoGiro = 0;
 let troppi = false;
