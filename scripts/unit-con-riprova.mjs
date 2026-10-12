@@ -18,6 +18,22 @@ export function fileRossi(registro, radice) {
 }
 
 /**
+ * Perché la prima corsa non ha detto tutto ('' se l'ha detto): un file appeso, un gruppo interrotto o rosso senza
+ * colpevole, node non partito, un riepilogo mancante. Lì i rossi con un file non sono tutti i rossi, e rifare solo
+ * quelli scagionerebbe test mai riportati (#1184). Le frasi sono quelle del lanciatore: la sentinella le prende da lui. PURA.
+ */
+export function corsaIncompleta(registro) {
+  const testo = String(registro || '');
+  if (/la corsa è stata chiusa/.test(testo)) return 'un file non è andato avanti e la corsa è stata chiusa';
+  if (/interrotto al gruppo/.test(testo)) return 'la corsa è stata interrotta a metà';
+  if (/ross[oi] senza un test rosso registrato/.test(testo)) return 'un gruppo è uscito rosso senza un test rosso registrato';
+  if (/non sono riuscito a lanciare node/.test(testo)) return 'node non è partito';
+  const gruppi = testo.match(/^\[test:unit\] gruppo \d+ di \d+/gm)?.length || 1;
+  const riepiloghi = testo.match(/^# fail \d+/gm)?.length || 0;
+  return riepiloghi < gruppi ? 'manca il riepilogo di node: la corsa non è arrivata in fondo' : '';
+}
+
+/**
  * I rossi della prima corsa passati alla riprova. Una riprova rossa senza file riconoscibili (lancio fallito, tetto
  * di tempo) non scagiona nessuno. PURA.
  */
