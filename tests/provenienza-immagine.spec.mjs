@@ -462,7 +462,7 @@ test('nella chat della Home, «è fatta con l’AI?» al messaggio dopo l’imma
   await home.locator('#sendBtn').click();
   await expect.poll(() => app.evaluate(turno, 'ed è fatta con'), { timeout: 20000 }).not.toBe('');
   const secondo = await app.evaluate(turno, 'ed è fatta con');
-  expect(secondo).not.toContain('data:image');
+  expect(secondo).toContain('data:image');
   expect(secondo).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
   expect(secondo).toContain('messaggi precedenti di questa chat');
 });
