@@ -192,8 +192,8 @@ function registerIpcHandlers() {
   });
 
   // Il menu di Filo nella pagina non si è costruito (page-preload.js): si apre quello di riserva (#1122).
-  ipcMain.on('filo:menu-di-riserva', (event, motivo) => {
-    try { MenuDiRiserva.chiesto(event, motivo); } catch (_) {}
+  ipcMain.on('filo:menu-di-riserva', (event, richiesta) => {
+    try { MenuDiRiserva.chiesto(event, richiesta); } catch (_) {}
   });
 
   // window.close() di una pagina web (page-preload.js): chiude la sua scheda, mai la finestra di Filo; una finestrella
