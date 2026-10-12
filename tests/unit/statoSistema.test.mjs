@@ -18,6 +18,8 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
 const SORGENTE = readFileSync(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'), 'utf8');
+require(join(ROOT, 'src', 'shared', 'sistema.js'));
+const SIS = globalThis.SN_SISTEMA;
 
 function albero(file, sistema) {
   const radice = cartellaTemporanea('filo-sysfs-');
@@ -420,9 +422,10 @@ test('nessuna strada verso fuori vuol dire offline anche se Chromium dice online
     { online: true, tipo: 'cavo', nome: null });
   // Le connessioni senza Internet e senza gateway (gli adattatori virtuali lato computer) non si scelgono.
   assert.match(L.SCRIPT_WINDOWS, /GatewayAddresses/);
-  const vEthernet = { id: VETH, tipo: 'Ethernet', gateway: false };
-  assert.deepEqual(L.reteDaWindows({ schede: [vEthernet], profili: [{ id: VETH, livello: 1, iana: 6 }], connessioni: [] }), { uscita: false });
-  assert.deepEqual(L.reteDaWindows({ schede: [vEthernet], profili: null, connessioni: [{ id: VETH, internet: false, nome: 'Rete non identificata' }] }), { uscita: false });
+  const veth = 'a1b2c3d4-0000-4000-8000-00000000abcd';
+  const vEthernet = { id: veth, tipo: 'Ethernet', gateway: false };
+  assert.deepEqual(L.reteDaWindows({ schede: [vEthernet], profili: [{ id: veth, livello: 1, iana: 6 }], connessioni: [] }), { uscita: false });
+  assert.deepEqual(L.reteDaWindows({ schede: [vEthernet], profili: null, connessioni: [{ id: veth, internet: false, nome: 'Rete non identificata' }] }), { uscita: false });
 });
 
 // ── Windows: quale connessione e come esce (#1114) ──
@@ -446,9 +449,9 @@ test('#1114 Windows: col Guid del gestore delle reti illeggibile la home dice il
     principale: WIFI,
     connessioni: [{ id: null, internet: true, nome: 'Caffè' }, { id: null, internet: false, nome: 'Rete non identificata' }],
   });
-  const stato = globalThis.SN_SISTEMA.normalizza(L.componi(L.datiDaWindows(riga), true));
+  const stato = SIS.normalizza(L.componi(L.datiDaWindows(riga), true));
   assert.deepEqual(stato.rete, { online: true, tipo: 'wifi', nome: 'Caffè' });
-  const voce = globalThis.SN_SISTEMA.descrivi(stato).rete;
+  const voce = SIS.descrivi(stato).rete;
   assert.equal(voce.icona, 'wifi');
   assert.equal(voce.testo, 'Caffè');
   assert.equal(voce.hover, 'Wi-Fi');
