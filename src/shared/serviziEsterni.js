@@ -282,15 +282,6 @@
       dove: ['src/main/services/scryfall.js'],
     },
     {
-      id: 'dizionari-correttore', nome: 'Google, per i dizionari del correttore ortografico',
-      base: ['https://redirector.gvt1.com/edgedl/chrome/dict/'],
-      quando: 'avvio',
-      occasione: 'la prima volta per ogni lingua del correttore, su Windows e Linux: su Mac il correttore è quello del sistema',
-      riceve: 'la lingua del dizionario che manca',
-      frase: 'Google, per i dizionari del correttore.',
-      dove: ['src/main/main.js'], prova: 'setSpellCheckerLanguages(', nellaLibreria: true,
-    },
-    {
       id: 'proxy-altro-paese', nome: 'Il proxy che imposti tu',
       base: [], indirizzo: 'il fornitore di proxy scritto nelle impostazioni',
       quando: 'funzione',
