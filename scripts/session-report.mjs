@@ -741,16 +741,27 @@ export function finestraOrchestratore(linee) {
         if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
         const testo = testoDi(b.content);
         const c = chiamate.get(b.tool_use_id);
-        if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || ''; continue; }
+        c.agentId = c.agentId || (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || '';
+        if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; continue; }
+        // Un lancio rifiutato (tipo d'agente assente, sottofondo vietato dall'hook, input non valido) torna in
+        // errore senza che sia partito nessuno: non chiude niente, e il lancio riprovato non sposta la finestra.
+        if (b.is_error === true && !c.agentId) { chiamate.delete(b.tool_use_id); continue; }
         c.fine = ms;
       }
     }
   }
-  // Un worker in sottofondo finisce solo con la prima notifica dopo il lancio che lo NOMINA (tool-use-id della
-  // chiamata o task-id = agentId del lancio): un Monitor, un comando, un artefatto o un testo che ne parla non lo chiudono.
+  // Un worker in sottofondo finisce con la prima notifica dopo il lancio che lo NOMINA (tool-use-id della chiamata
+  // o task-id = agentId del lancio), o con la sua consegna se arriva prima: un Monitor, un comando, un artefatto,
+  // un testo che ne parla o la notifica provvisoria di un worker che aspetta un suo comando non lo chiudono.
   const aperta = (c, ms) => c.inizio <= ms && !(c.fine <= ms);
   for (const { e, ms } of voci) {
-    const testa = Number.isFinite(ms) ? testaNotifica(e) : '';
+    if (!Number.isFinite(ms)) continue;
+    const da = mittenteConsegna(e);
+    if (da) {
+      for (const c of chiamate.values()) if (c.agentId === da && aperta(c, ms)) c.fine = ms;
+      continue;
+    }
+    const testa = notificaProvvisoria(e) ? '' : testaNotifica(e);
     if (!testa) continue;
     const ids = [...testa.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)].map((m) => m[1].trim());
     const task = [...testa.matchAll(/<task-id>([^<]+)<\/task-id>/g)].map((m) => m[1].trim());
