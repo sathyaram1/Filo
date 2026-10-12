@@ -413,8 +413,8 @@ export function ambientePerITest(base, temp = '') {
   // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
   const { FILO_UNIT_DIR: _d, FILO_UNIT_TETTO_RIGA: _t, FILO_UNIT_TETTO_FERMO_MS: _f, ...env } = base || {};
   for (const k of IDENTITA_SESSIONE) delete env[k];
-  // Anche senza variabili la sessione si trovava: col biglietto in cartella vale il transcript più recente della
-  // cartella di Claude (#730.6). Quella dei test è loro, vuota, e se ne va con la corsa.
+  // Senza variabili la sessione si trova lo stesso: col biglietto in cartella vale il transcript più recente nella
+  // cartella di Claude (#730.6). I test ne hanno una loro, vuota, che se ne va con la corsa.
   if (temp) Object.assign(env, { TMPDIR: temp, TEMP: temp, TMP: temp, CLAUDE_CONFIG_DIR: join(temp, 'claude-dei-test') });
   return env;
 }
