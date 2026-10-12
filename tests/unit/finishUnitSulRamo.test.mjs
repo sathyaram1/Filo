@@ -85,6 +85,7 @@ test('finish: un unit rosso già corretto su main arriva a chiedere la fusione s
     assert.match(v.out, /Controlli di logica rossi sul ramo da solo, ma sul risultato della fusione con main [0-9a-f]{8}, che è ciò che arriva su main, sono verdi: non sono del ramo, proseguo\./, v.out);
     assert.doesNotMatch(v.out, /non pubblico/, v.out);
     assert.match(v.out, /Chiedo al server di fondere/, 'arriva alla richiesta di fusione');
+    assert.equal(v.out.match(/▸ Unit sul risultato della fusione con main/g).length, 1, 'la prova sulla fusione gira una volta sola, non di nuovo prima della richiesta');
     assert.equal(r.git('rev-parse', 'HEAD'), vecchio, 'il ramo non si è mosso: il verdetto resta legato al suo sha');
     assert.equal(r.git('rev-list', '--count', 'HEAD..origin/main'), '1', 'main non è stato fuso nel ramo');
 

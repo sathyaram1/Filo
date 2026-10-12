@@ -71,7 +71,7 @@ import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
-import { chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, testoProva } from './lib/unit-sulla-fusione.mjs';
+import { chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
@@ -664,6 +664,7 @@ async function main() {
   const v = verdictForCurrentBranch(ROOT);
   const spec = specDaRilanciare({ checkOnly, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
   let unitRossi = false;
+  let provaDelRamo = null;
 
   {
     // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
@@ -686,7 +687,9 @@ async function main() {
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
       console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
-      const prova = provaUnitSullaFusione({ root: ROOT, punta: git(['rev-parse', 'HEAD']).out, ancheContenuto: true });
+      const puntaProvata = git(['rev-parse', 'HEAD']).out;
+      const prova = provaUnitSullaFusione({ root: ROOT, punta: puntaProvata, ancheContenuto: true });
+      provaDelRamo = { prova, punta: puntaProvata };
       const esito = esitoUnitDelRamo({ checkOnly, prova });
       (esito.rosso ? console.error : console.log)(`\n${esito.messaggio}`);
       if (esito.ferma) process.exit(1);
@@ -810,8 +813,10 @@ async function main() {
   //    lega al main su cui sono girati.
   // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
   const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
+  const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
+  if (primaProva) console.log('\n▸ Unit sulla fusione: vale la prova fatta qui sopra sullo stesso ramo. Se main si è mosso, il server lo dice e la rifaccio.');
   const giro = await chiediConProva({
-    root: ROOT, punta: cur,
+    root: ROOT, punta: cur, primaProva,
     fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
     chiedi: (provaUnit) => {
       process.stdout.write('\n▸ Chiedo al server di fondere\n');
