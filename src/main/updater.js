@@ -677,7 +677,7 @@ function controllaAdesso(tettoMs = 20000) {
     // null: l'updater non gira (un AppImage estratto, uno snap) e nessun evento arriverà.
     Promise.resolve().then(() => updater.checkForUpdates())
       .then((r) => { if (r == null) fine({ esito: 'inattivo' }); })
-      .catch((e) => fine({ esito: 'errore', messaggio: e?.message || String(e || '') }));
+      .catch((e) => fine(e && e.rifiutata ? { esito: 'rifiutata' } : { esito: 'errore', messaggio: e?.message || String(e || '') }));
   });
 }
 
