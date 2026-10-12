@@ -222,6 +222,38 @@ test('prova vera: rosso solo sulla fusione ferma con l\'elenco, rosso anche su m
   }
 });
 
+// Il finish giudica così un unit rosso sul ramo (#1009): con main già dentro, il risultato della fusione è il ramo.
+test('prova vera con ancheContenuto: il ramo che contiene main si prova lui, e un rosso si confronta con main da solo', () => {
+  const r = repoFinto();
+  try {
+    r.suMain(() => r.scrivi('tests/unit/valore.test.mjs', TEST_VALORE));
+    const verde = r.ramo('claude/verde', () => r.scrivi('innocuo.txt', 'x\n'));
+    const v = provaUnitSullaFusione({ root: r.lavoro, punta: verde, scrivi: () => {}, ancheContenuto: true });
+    assert.deepEqual([v.esito, v.contenuto], ['verde', true], JSON.stringify(v));
+    pulita(r);
+
+    const rompe = r.ramo('claude/rompe', () => r.scrivi('valore.txt', 'due\n'));
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta: rompe, scrivi: (s) => righe.push(s), ancheContenuto: true });
+    assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
+    assert.equal(p.contenuto, true);
+    assert.deepEqual(p.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
+    assert.ok(righe.some((s) => /sul ramo, che contiene già main/.test(s)), righe.join('\n'));
+    assert.match(testoProva(p), /^✗ Unit sul ramo, che contiene già main/);
+    pulita(r);
+    assert.equal(provaUnitSullaFusione({ root: r.lavoro, punta: rompe, scrivi: () => {} }).esito, 'main_contenuto', 'senza l\'opzione, come prima');
+
+    r.suMain(() => r.scrivi('tests/unit/rotto.test.mjs', TEST_ROTTO));
+    const innocuo = r.ramo('claude/innocuo', () => r.scrivi('altro.txt', 'y\n'));
+    const q = provaUnitSullaFusione({ root: r.lavoro, punta: innocuo, scrivi: () => {}, ancheContenuto: true });
+    assert.deepEqual([q.esito, q.contenuto], ['rosso_anche_su_main', true], JSON.stringify(q));
+    assert.doesNotMatch(testoProva(q), /si fonde/, 'qui non si sta fondendo niente');
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
 test('senza origin la prova si salta e lo si dice; con origin irraggiungibile è un errore', () => {
   const casa = cartellaTemporanea('filo-929-senza-');
   try {

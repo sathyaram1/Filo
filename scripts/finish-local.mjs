@@ -71,7 +71,7 @@ import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
-import { chiediConProva, pulisciResti, gitIn } from './lib/unit-sulla-fusione.mjs';
+import { chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, testoProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
@@ -418,12 +418,31 @@ export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
 }
 
 /**
- * Unit rossi: con `--check` gli spec delle aree girano lo stesso e l'esito resta rosso alla fine. PURA.
- * Fermarsi lì lasciava chi verifica senza gli spec, anche per un rosso che c'è uguale su main (#874.1).
+ * Unit rossi sul ramo da solo: li giudica la prova sulla fusione con main, perché su main arriva la fusione (#1009).
+ * Già corretti su main, o rossi uguali su main da solo: non sono del ramo e non fermano. Con `--check` un rosso del
+ * ramo non salta gli spec delle aree e l'esito finale resta rosso (#874.1). PURA.
  */
-export function esitoUnitPerCheck({ checkOnly }) {
-  if (!checkOnly) return { ferma: true, messaggio: 'Controlli di logica rossi: non pubblico. Sistema e rilancia.' };
-  return { ferma: false, messaggio: 'Controlli di logica rossi: corro lo stesso gli spec delle aree toccate, l\'esito finale resta rosso.' };
+export function esitoUnitDelRamo({ checkOnly, prova }) {
+  const p = prova || {};
+  const m = String(p.mainSha || '').slice(0, 8);
+  const ins = Array.isArray(p.instabili) && p.instabili.length;
+  if (!p.errore && !p.saltata && (p.esito === 'verde' || p.esito === 'rosso_anche_su_main')) {
+    let perche;
+    if (p.esito === 'rosso_anche_su_main') perche = 'sono rossi uguali anche su main da solo, senza test rotti in più';
+    else if (p.contenuto) perche = `rifatti sul ramo (che contiene già main ${m}) in una cartella pulita sono verdi`;
+    else perche = `sul risultato della fusione con main ${m}, che è ciò che arriva su main, sono verdi`;
+    const righe = [...(ins ? [testoProva(p)] : []), `▸ Controlli di logica rossi sul ramo da solo, ma ${perche}: non sono del ramo, proseguo.`];
+    return { ferma: false, rosso: false, messaggio: righe.join('\n') };
+  }
+  let motivo;
+  if (p.errore) motivo = `non ho potuto provarli sulla fusione con main (${p.errore})`;
+  else if (p.saltata) motivo = `non ho potuto provarli sulla fusione con main (${p.motivo})`;
+  else if (p.esito === 'conflitto') motivo = 'non ho potuto provarli sulla fusione con main, che va in conflitto';
+  else if (p.esito === 'rosso_sulla_fusione') motivo = p.contenuto ? 'rossi sul ramo, che contiene già main, e su main da solo passano' : 'rossi anche sulla fusione con main, e su main da solo passano';
+  else motivo = p.esito ? `la prova sulla fusione con main ha risposto «${p.esito}»` : 'la prova sulla fusione con main non ha dato un esito';
+  const dettaglio = p.esito === 'rosso_sulla_fusione' ? [testoProva(p)] : [];
+  const coda = checkOnly ? 'corro lo stesso gli spec delle aree toccate, l\'esito finale resta rosso.' : 'non pubblico. Sistema e rilancia.';
+  return { ferma: !checkOnly, rosso: true, messaggio: [...dettaglio, `✗ Controlli di logica rossi: ${motivo}; ${coda}`].join('\n') };
 }
 
 /**
@@ -619,7 +638,7 @@ async function main() {
     console.error('Ci sono modifiche non salvate: falle salvare (un Edit qualsiasi) prima di chiudere.');
     process.exit(1);
   }
-  // Anche con --check, che la prova sulla fusione non la fa: i resti di una prova interrotta non aspettano la prossima.
+  // Anche con --check, che la prova sulla fusione la fa solo per giudicare unit rossi: i resti di una prova interrotta non aspettano la prossima.
   pulisciResti({ git: gitIn(ROOT) });
 
   // La linea principale VERA è su origin: il ref locale può essere indietro di
@@ -666,10 +685,12 @@ async function main() {
     }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
-      const esito = esitoUnitPerCheck({ checkOnly });
-      console.error(`\n✗ ${esito.messaggio}`);
+      console.log('\n▸ Controlli di logica rossi sul ramo da solo: prima di giudicarli li provo come arriverebbero su main');
+      const prova = provaUnitSullaFusione({ root: ROOT, punta: git(['rev-parse', 'HEAD']).out, ancheContenuto: true });
+      const esito = esitoUnitDelRamo({ checkOnly, prova });
+      (esito.rosso ? console.error : console.log)(`\n${esito.messaggio}`);
       if (esito.ferma) process.exit(1);
-      unitRossi = true;
+      unitRossi = esito.rosso;
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
