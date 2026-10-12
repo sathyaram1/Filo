@@ -18,8 +18,8 @@
   const RINNOVO_ACCESSO = 'https://securetoken.googleapis.com/v1/token';
 
   // `base` vuoto vuol dire che l'indirizzo lo decide la pagina o l'utente, e allora `indirizzo` dice quale.
-  // `prova`: pezzi di codice che mostrano l'uso, uno basta. Serve quando in src/ non c'è né l'indirizzo né una fetch
-  // riconoscibile, e in un file che serve più servizi, dove chiamate e indirizzo condiviso non dicono quale.
+  // `prova`: pezzi di codice che mostrano l'uso, uno basta. Serve quando nei file della voce non c'è una chiamata di rete
+  // riconoscibile (un'immagine, una finestra), e in un file che serve più servizi, dove chiamate e indirizzo non dicono quale.
   // `nellaLibreria`: l'indirizzo lo scrive la libreria (o Electron), non src/.
   // `frase`: dove ne parla il documento sulla privacy (transparency/privacy.md), parola per parola; obbligatoria con `base`.
   const SERVIZI = [
