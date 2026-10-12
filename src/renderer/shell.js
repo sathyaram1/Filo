@@ -1007,8 +1007,9 @@
   // La scheda è un contenitore e non dà alla striscia la larghezza del contenuto: la si misura con tutto in
   // vista. Regola unica (#429): finché la fila ha posto ogni scheda è larga quanto il suo contenuto e nessun
   // nome è tagliato; quando manca, si accorciano prima i nomi più lunghi, tutti allo stesso tetto. L'attiva
-  // resta più larga di ogni altra di almeno STACCO.
+  // stacca di STACCO dalla scheda tipica dietro (la più corta delle due metà), senza superare STACCO_MAX tetti.
   const STACCO = 1.25;
+  const STACCO_MAX = 1.8;
   const MIN_ATTIVA = 110;
   const MIN_SCHEDA = 40;
   let larghezzeInVigore = null; // { chiave, w: number[] }
@@ -1020,9 +1021,11 @@
   }
   function larghezzeDistribuite(naturali, ia, posto) {
     const dietro = naturali.filter((_, i) => i !== ia);
+    const ordinate = [...dietro].sort((a, b) => a - b);
+    const tipica = ordinate.length ? ordinate[Math.floor((ordinate.length - 1) / 2)] : 0;
     const attivaCon = (tetto) => {
-      const piuLarga = Math.max(0, ...dietro.map((w) => Math.min(w, tetto)));
-      return Math.max(ia >= 0 ? naturali[ia] : 0, MIN_ATTIVA, Math.ceil(piuLarga * STACCO));
+      const minima = Math.max(MIN_ATTIVA, Math.ceil(Math.min(tetto, tipica) * STACCO));
+      return Math.max(minima, Math.min(ia >= 0 ? naturali[ia] : 0, Math.ceil(tetto * STACCO_MAX)));
     };
     const totale = (tetto) => dietro.reduce((s, w) => s + Math.max(MIN_SCHEDA, Math.min(w, tetto)), 0) + (ia >= 0 ? attivaCon(tetto) : 0);
     let tetto = Math.max(MIN_SCHEDA, ...naturali);

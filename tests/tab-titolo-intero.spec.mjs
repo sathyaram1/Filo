@@ -23,8 +23,9 @@ async function verdettoTitoli(shell) {
     if (!(striscia + 100 < fila)) return `fila senza posto: striscia ${striscia} su ${fila}`;
     const tagliati = schede.filter((s) => s.testo > s.posto + 0.5);
     if (tagliati.length) return `titoli tagliati: ${tagliati.map((s) => `«${s.titolo}» ${s.posto}/${s.testo}`).join(', ')}`;
+    // Un nome lungo dietro può fare la sua scheda più larga dell'attiva: l'attiva stacca dalla scheda tipica.
     const attiva = schede.find((s) => s.attiva);
-    if (schede.some((s) => !s.attiva && s.w >= attiva.w)) return `attiva non più larga: ${schede.map((s) => s.w).join(' ')}`;
+    if (!schede.some((s) => !s.attiva && s.w < attiva.w)) return `attiva non più larga: ${schede.map((s) => s.w).join(' ')}`;
     return 'titoli interi';
   });
 }
@@ -110,14 +111,21 @@ test('#429 — con la fila piena il nome tagliato arriva al bordo, e il mouse no
     return { posto: ti.clientWidth, testo: ti.scrollWidth, vuoto: Math.round(t.getBoundingClientRect().right - ti.getBoundingClientRect().right) };
   }));
   await expect.poll(async () => (await dietro()).every((s) => s.posto > 0 && s.testo > s.posto && s.vuoto <= 10), { timeout: 10_000 }).toBe(true);
+  await shell.waitForTimeout(1000);
   const prima = (await dietro())[1];
   await shell.hover('#tabs .tab:nth-child(3) .favicon');
   await expect(shell.locator('#tabs .tab:nth-child(3) .close')).toHaveCSS('opacity', '1');
   expect((await dietro())[1].posto).toBe(prima.posto);
   await captureCompositeElectron(app, 'tests/.shots/tab-titolo-intero-piena.png');
 
+  // Nella finestra più stretta, con otto schede, ognuna mostra ancora l'inizio del nome.
+  await shell.mouse.move(600, 500);
+  await shell.evaluate(async () => {
+    for (const el of [...document.querySelectorAll('#tabs .tab')].slice(1, 7)) await window.filoShell.tabs.close(el.dataset.id);
+  });
+  await expect(shell.locator('#tabs .tab')).toHaveCount(8, { timeout: 10_000 });
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs).setSize(720, 600));
-  await expect.poll(async () => (await dietro()).every((s) => s.posto > 0), { timeout: 10_000 }).toBe(true);
+  await expect.poll(async () => (await dietro()).every((s) => s.posto > 8), { timeout: 10_000 }).toBe(true);
 });
 
 test('#429 — un titolo lungo si legge intero finché la fila ha posto, e l\'attiva resta più larga', async ({ shell, openTab, testServer }) => {
