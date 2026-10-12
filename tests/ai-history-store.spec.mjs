@@ -112,6 +112,25 @@ test('esporta e reimporta: la cronologia torna uguale, e reimportare due volte n
   expect(JSON.parse(readFileSync(join(dati, 'storage.json'), 'utf8')).aiHistory).toBeUndefined();
 });
 
+test('con la cronologia che non si può scrivere la chat mostra comunque la risposta del modello', async ({ app }) => {
+  test.setTimeout(60_000);
+  const RISPOSTA = 'Il museo apre alle nove e chiude alle diciotto.';
+  const dati = await cartellaDati(app);
+  await app.evaluate(() => globalThis.SN_HISTORY.prepara());
+  // Il file del mese non si apre in scrittura (disco pieno, file bloccato da un antivirus): qui è una cartella.
+  const file = join(dati, 'cronologia-ai', new Date().toISOString().slice(0, 7) + '.jsonl');
+  rmSync(file, { force: true, recursive: true });
+  mkdirSync(file, { recursive: true });
+  try {
+    await modelloFinto(app, [{ text: RISPOSTA }]);
+    const page = await home(app);
+    await chiedi(page, 'A che ora apre il museo?');
+    await expect(page.getByText(RISPOSTA)).toBeVisible({ timeout: 20_000 });
+  } finally {
+    await ripristina(app);
+  }
+});
+
 testSenzaFixture('una cronologia oltre i 4 MB in storage.json si migra intera, e la pagina la mostra', async () => {
   testSenzaFixture.setTimeout(120_000);
   const userData = cartellaTemporanea('filo-migra-cronologia-');
