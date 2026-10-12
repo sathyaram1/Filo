@@ -156,6 +156,19 @@ test('la fusione dedup anche le voci senza id, per contenuto', () => {
   assert.equal(merged.clipboardHistory.length, 2);
 });
 
+test('cronologia appunti: la stessa cosa copiata in due momenti torna una voce sola', () => {
+  const current = { clipboardHistory: [{ type: 'text', text: 'password-segreta', ts: 200 }] };
+  const imported = {
+    clipboardHistory: [
+      { type: 'text', text: 'password-segreta ', ts: 100 },
+      { type: 'text', text: 'nota', ts: 90 },
+    ],
+  };
+  const { merged } = mergeImportedData(current, imported);
+  assert.deepEqual(merged.clipboardHistory.map((x) => x.text), ['password-segreta', 'nota']);
+  assert.equal(merged.clipboardHistory[0].ts, 200, 'resta la voce locale');
+});
+
 test('sui valori in conflitto vince il backup, ma le chiavi solo-locali restano', () => {
   const current = { settings: { theme: 'light', textScale: 1.4, soloLocale: true } };
   const imported = { settings: { theme: 'dark', apiKeys: { openrouter: 'sk-1' } } };
