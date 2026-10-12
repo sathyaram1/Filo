@@ -595,7 +595,7 @@ export function comandoRisposta(io, cred, id) {
  * git rifiuta, ed è giusto così. Un fallimento torna con la causa: chi chiama
  * NON rilascia.
  */
-export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
+export function pushRamoCorrente(root, { exec = execFileSync, env = process.env } = {}) {
   const run = (args) => {
     try {
       return { ok: true, out: String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }) || '').trim() };
