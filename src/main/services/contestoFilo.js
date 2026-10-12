@@ -37,10 +37,18 @@ function togliFoto(k) {
   foto.delete(k);
 }
 
+// Le chat dell'incognito: alla chiusura della sua ultima finestra le loro copie in memoria se ne vanno con lui.
+const chatIncognito = new Set();
+function dimenticaIncognito() {
+  for (const c of chatIncognito) dimentica(c);
+  chatIncognito.clear();
+}
+
 function ricordaImmagini(chat, ts, immagini) {
   if (!chat || !ts) return;
   const urls = (Array.isArray(immagini) ? immagini : []).filter((u) => typeof u === 'string' && /^data:image\//i.test(u));
   if (!urls.length) return;
+  if (require('../shim/storage').inIncognito()) chatIncognito.add(chat);
   const k = `${chat}|${ts}`;
   togliFoto(k);
   foto.set(k, urls);
