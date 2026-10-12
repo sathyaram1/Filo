@@ -472,8 +472,8 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       const origine = chi.origine;
       if (!origine) return false;
       if (COL_GESTO_SENZA_DOMANDA.has(permission)) return gestoRecente(wc);
-      const tipo = TIPI[permission];
-      if (!tipo) return INNOCUI.has(permission);
+      const tipo = tipoDi(permission, details);
+      if (!tipo) return senzaTipoPassa(permission);
       const parti = partiDi(tipo, details);
       if (lasciapassareValido(wc, tipo, parti)) return true;
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
