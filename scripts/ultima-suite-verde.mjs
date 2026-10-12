@@ -272,7 +272,7 @@ async function main() {
   if (fermo === 'senza-verde') {
     let corse = [];
     try { corse = repo ? leggiCorse(repo, 'per_page=8') : []; } catch { /* il testo lo dice: nessuna letta */ }
-    const { titolo, testo } = testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, corse, esecuzione, erroreApi });
+    const { titolo, testo } = testoRilascioFermo({ tag, oreDallUltima, commitDopoTag, verde, corsaVerde, scartata, corse, esecuzione, erroreApi });
     console.log(`::error::${titolo}`);
     await inviaAllarme(titolo, testo, [chiaveDelFermo(CHIAVE_FERMO, tag)]);
     process.exit(1);
