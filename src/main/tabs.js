@@ -164,6 +164,8 @@ const SEGUI_APERTURA_MS = 60_000;
 // Il rinvio che la pagina dichiara di sé (meta refresh), in secondi, o -1.
 const RINVIO_DICHIARATO_JS = '(()=>{try{const m=document.querySelector(\'meta[http-equiv="refresh" i]\');const s=m?parseFloat(m.getAttribute("content")):NaN;return Number.isFinite(s)&&s>=0?s:-1;}catch(e){return -1;}})()';
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
+// La sessione scritta per ultima, in JSON: la chiave è una sola per tutte le finestre, quindi anche il ricordo.
+let sessioneScritta = null;
 
 // SICUREZZA — schemi consentiti per le navigazioni ORIGINATE da contenuto web
 // (click su link, window.location, window.open) e dall'agente. Tutto il resto è
@@ -1686,27 +1688,17 @@ class TabManager {
     try { dest.focus(); } catch (_) {}
   }
 
-  // §2.1 — segnali di attività riportati dal content script (input, scroll,
-  // form sporco). Merge parziale sullo snapshot. Best-effort: throttled lato
-  // pagina, qui non rimbalziamo se nulla cambia in modo significativo.
+  // §2.1 — segnali di attività del content script (input, scroll, form sporco), arrivano a ogni clic e
+  // scorrimento. Servono solo al main (triage, archivio): niente broadcast né salvataggio di sessione (#1089).
   setTabActivity(id, activity) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !activity || typeof activity !== 'object') return;
     // Qualsiasi attività in una tab conta come "Filo è in uso": resetta il
     // contatore di inattività dell'app (§2.1).
     this._lastAppInteractionAt = Date.now();
-    let changed = false;
-    if (typeof activity.lastInteractionAt === 'number') {
-      tab.lastInteractionAt = activity.lastInteractionAt; changed = true;
-    }
-    if (typeof activity.scrollPct === 'number') {
-      const v = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
-      if (v !== tab.scrollPct) { tab.scrollPct = v; changed = true; }
-    }
-    if (typeof activity.formDirty === 'boolean') {
-      if (activity.formDirty !== tab.formDirty) { tab.formDirty = activity.formDirty; changed = true; }
-    }
-    if (changed) this._broadcast();
+    if (typeof activity.lastInteractionAt === 'number') tab.lastInteractionAt = activity.lastInteractionAt;
+    if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
+    if (typeof activity.formDirty === 'boolean') tab.formDirty = activity.formDirty;
   }
 
   navigate(id, url) {
@@ -3436,16 +3428,24 @@ class TabManager {
     return globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
   }
 
-  // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon),
-  // collassiamo le scritture ravvicinate.
+  // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon), e titolo, icona e
+  // caricamento non cambiano la sessione: se è uguale a quella scritta non si riscrive (#1089).
   _persistSession() {
     if (this.incognito) return; // incognito: nessuna sessione salvata su disco
     if (this._restoring) return; // non sovrascrivere mentre stiamo ripristinando
     clearTimeout(this._sessionTimer);
+    this._sessionTimer = null;
+    if (JSON.stringify(this.sessionState()) === sessioneScritta) return;
     this._sessionTimer = setTimeout(() => {
+      this._sessionTimer = null;
+      const stato = this.sessionState();
+      const testo = JSON.stringify(stato);
+      if (testo === sessioneScritta) return;
+      sessioneScritta = testo;
       try {
-        globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), this.sessionState());
-      } catch (_) {}
+        Promise.resolve(globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), stato))
+          .catch(() => { if (sessioneScritta === testo) sessioneScritta = null; });
+      } catch (_) { sessioneScritta = null; }
     }, 400);
   }
 

@@ -77,7 +77,7 @@
   // Fondo e inchiostri si calcolano sui colori veri del tema: al cambio di tema si ridipinge.
   try {
     window.matchMedia('(prefers-color-scheme: dark)')
-      .addEventListener('change', () => { try { render(); } catch (_) {} });
+      .addEventListener('change', () => { try { render({ forza: true }); } catch (_) {} });
   } catch (_) {}
   // Config notifiche (spec #170.1): durata, suono on/off, suono scelto. Letta
   // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
@@ -119,7 +119,7 @@
       applyTabPreview(r?.settings?.tabPreview);
       applyRingTone(r?.settings?.timerRingtone, r?.settings?.timerRingtoneVolume);
       refreshRinging();
-      try { render(); } catch (_) {}
+      try { render({ forza: true }); } catch (_) {}
       try { NOTIFS.rispecchia(); } catch (_) {}
     })
     .catch(() => {});
@@ -135,7 +135,7 @@
         // Il volume cambiato mentre suona deve sentirsi subito: senza questo si
         // sentirebbe solo alla scadenza dopo.
         refreshRinging();
-        try { render(); } catch (_) {}
+        try { render({ forza: true }); } catch (_) {}
         try { NOTIFS.rispecchia(); } catch (_) {}
       }
     });
@@ -503,8 +503,8 @@
   // al main di mostrare un mini-BrowserWindow stile Filo (vedi popup-tooltip.js),
   // invece del title nativo bianco squadrato. Serve una BrowserWindow secondaria
   // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
-  // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
-  // tab ricreati ad ogni render().
+  // sopra le WebContentsView delle tab. Delega globale così funziona anche per le
+  // schede nate dopo.
   // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
   const SUGGERIMENTO_RITARDO = 350;
   (() => {
@@ -796,6 +796,7 @@
       el.style.flex = '';
       el.style.minWidth = '';
       el.style.maxWidth = '';
+      el._firma = ''; // la larghezza ferma non c'è più: la prossima volta la scheda si ridisegna da capo
     }
     // Da ferme le schede hanno misurato la larghezza fermata: senza rimisurarle restano strette fino al prossimo ridisegno.
     misuraLarghezzeChieste();
@@ -1071,181 +1072,217 @@
     });
   }
 
-  function render() {
-    // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
-    // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
-    // viene confermato dal broadcast successivo al rilascio (api.tabs.move).
-    // NB: si sospende NON appena il drag è armato (mousedown), non solo dopo aver
-    // superato la soglia di 4px. Nella finestra tra mousedown e soglia `drag`
-    // esiste ma `moved` è ancora false: un broadcast `tabs:updated` che arriva lì
-    // (cambio titolo/favicon/loading/audio: frequentissimo) ricreerebbe tutti i
-    // nodi .tab, ORFANIZZANDO `drag.el`. Quando poi si supera la soglia, l'orfano
-    // verrebbe reinserito accanto al nodo rigenerato con lo stesso id → due schede
-    // fantasma affiancate e indice di rilascio sbagliato. Sospendere già da armato
-    // costa solo un frame di lag visivo mentre il tasto è premuto (ridisegnato al
-    // rilascio dal broadcast successivo).
+  // La barra si riconcilia per id (#1089): un aggiornamento tocca solo le schede cambiate e i nodi restano gli
+  // stessi, così bagliore audio e suggerimenti non ripartono; misure e scorrimento si rifanno solo quando servono.
+  const schedeVive = new Map(); // id → .tab
+  const STILI_SCHEDA = ['--tab-active', '--tab-ink', '--tab-bg-eff', '--tab-bg-hover', '--tab-glow-color'];
+  let firmaMisura = '';
+  let attivaInVista = null;
+  // Colori veri del tema: leggerli forza un ricalcolo degli stili, quindi si rileggono solo al cambio di tema.
+  let coloriTema;
+  function coloriDelTema() {
+    if (coloriTema === undefined) {
+      const bar = TabColor.resolveCssColor(document, 'var(--tab-bg)');
+      const page = TabColor.resolveCssColor(document, 'var(--bg)');
+      const fg = TabColor.resolveCssColor(document, 'var(--fg)');
+      coloriTema = bar && page && fg ? { bar, page, fg } : null;
+    }
+    return coloriTema;
+  }
+  // Il colore salvato del sito ha la tinta piena: saturazione e luminosità dell'utente si applicano qui.
+  function coloreDelSito(t) {
+    const c = TabColor && t.identityColor ? TabColor.adaptIdentity(t.identityColor, tabColorParams) : null;
+    return c ? TabColor.rgbCss(c) : null;
+  }
+
+  // Tutto ciò che si vede di una scheda: due descrizioni uguali disegnano la stessa scheda.
+  function descriviScheda(t, tinte) {
+    const attiva = t.id === state.activeId;
+    const d = { attiva, classi: [], stili: {} };
+    // Con l'anteprima accesa la carta dice già il titolo: il suggerimento di testo sarebbe un doppione.
+    if (anteprimaSchede.enabled) d.anteprima = true;
+    else d.tip = t.title || t.url || '';
+    const ferma = larghezzeFerme && larghezzeFerme.get(String(t.id));
+    if (ferma) d.ferma = ferma;
+    // Tab attiva: sempre il colore della cima della pagina, anche bianca, mai il
+    // marchio del sito (decisione D63). Inchiostro con la regola delle inattive.
+    if (attiva && t.color) {
+      d.stili['--tab-active'] = t.color;
+      const c = TabColor ? coloriDelTema() : null;
+      const ink = c && TabColor.readableInk([t.color], [c.fg, c.page]);
+      if (ink) {
+        d.classi.push('inked');
+        d.stili['--tab-ink'] = TabColor.rgbCss(ink);
+      }
+    }
+    // Tab INATTIVE: la tinta del sito mescolata col neutro della barra quanto
+    // dice opacita_tab (tabColor.js). Passa da --tab-bg-eff, non da
+    // `background`, perché l'hover del CSS si calcola sulla stessa variabile.
+    if (!attiva && t.identityColor && tinte) {
+      const bg = TabColor.inactiveTabBackground(t.identityColor, tinte.bar, tabColorParams);
+      if (bg) {
+        const { ink, hover } = TabColor.inkAndHover(bg, tinte.fg, tinte.page);
+        d.classi.push('tinted', 'inked');
+        d.stili['--tab-bg-eff'] = TabColor.rgbCss(bg);
+        d.stili['--tab-bg-hover'] = TabColor.rgbCss(hover);
+        d.stili['--tab-ink'] = TabColor.rgbCss(ink);
+      }
+    }
+    // Audio in riproduzione: bagliore col colore identità della scheda, o l'accento Filo se non ce l'ha.
+    const suona = t.audible && !t.muted;
+    if (suona) {
+      d.classi.push('audible');
+      const glow = hasColorIdentity(t.color) ? t.color : coloreDelSito(t);
+      if (glow) d.stili['--tab-glow-color'] = glow;
+    }
+    d.icona = t.loading ? null : (t.favicon || '');
+    d.paese = t.proxy && t.proxy.country ? String(t.proxy.country).toUpperCase() : '';
+    d.titolo = tabLabel(t);
+    d.audio = t.muted ? 'muta' : suona ? 'suona' : '';
+    return d;
+  }
+
+  function creaScheda(id) {
+    const el = document.createElement('div');
+    el.dataset.id = id;
+    const ico = document.createElement('div');
+    const title = document.createElement('span');
+    title.className = 'title';
+    const close = document.createElement('span');
+    close.className = 'close';
+    if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
+    else close.textContent = '×';
+    el.append(ico, title, close);
+    el._parti = { ico, title, close, paese: null, audio: null };
+    return el;
+  }
+
+  function applicaScheda(el, d) {
+    const id = el.dataset.id;
+    const classi = ['tab', ...(d.attiva ? ['active'] : []), ...d.classi].join(' ');
+    if (el.className !== classi) el.className = classi;
+    if (d.anteprima) {
+      el.dataset.anteprima = id;
+      delete el.dataset.tip;
+    } else {
+      delete el.dataset.anteprima;
+      el.dataset.tip = d.tip;
+    }
+    for (const p of STILI_SCHEDA) {
+      if (d.stili[p]) el.style.setProperty(p, d.stili[p]);
+      else el.style.removeProperty(p);
+    }
+    const ferma = d.ferma ? `${d.ferma}px` : '';
+    el.style.flex = ferma ? `0 0 ${ferma}` : '';
+    el.style.minWidth = ferma;
+    el.style.maxWidth = ferma;
+
+    const p = el._parti;
+    p.ico.className = d.icona === null ? 'spinner' : 'favicon';
+    p.ico.style.backgroundImage = d.icona ? `url("${d.icona}")` : '';
+
+    // Indicatore "aperta da un altro paese": globo + codice paese accanto al
+    // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
+    if (d.paese && !p.paese) {
+      p.paese = document.createElement('span');
+      p.paese.className = 'proxy-ind';
+      p.paese.setAttribute('aria-label', 'Aperta da un altro paese');
+      p.paese.dataset.tip = 'Aperta da un altro paese';
+      p.paese.innerHTML = PROXY_IND_SVG + '<span class="cc"></span>';
+      el.insertBefore(p.paese, p.title);
+    } else if (!d.paese && p.paese) {
+      p.paese.remove();
+      p.paese = null;
+    }
+    if (p.paese) p.paese.querySelector('.cc').textContent = d.paese;
+
+    if (p.title.textContent !== d.titolo) p.title.textContent = d.titolo;
+
+    // Avviso audio dopo il titolo, come in Chrome (#431): suona o mutata stanno
+    // nello stesso posto, così il clic che muta lascia lì il tasto per riattivare.
+    if (d.audio && !p.audio) {
+      p.audio = document.createElement('span');
+      p.audio.setAttribute('role', 'button');
+      el.insertBefore(p.audio, p.close);
+    } else if (!d.audio && p.audio) {
+      p.audio.remove();
+      p.audio = null;
+    }
+    if (p.audio && p.audio.dataset.stato !== d.audio) {
+      const muta = d.audio === 'muta';
+      p.audio.dataset.stato = d.audio;
+      p.audio.className = 'tab-alert ' + (muta ? 'mute-ind' : 'audio-ind');
+      // Ogni controllo dentro la scheda porta il suo data-tip (mai `title`): senza, il suggerimento
+      // di Filo risale a quello della scheda e dice il titolo della pagina (#431).
+      p.audio.dataset.tip = muta ? 'Riattiva audio' : 'Silenzia';
+      p.audio.setAttribute('aria-label', muta
+        ? 'Audio mutato — clicca per riattivare'
+        : 'Audio in riproduzione — clicca per silenziare');
+      p.audio.innerHTML = muta ? MUTE_IND_SVG : AUDIO_IND_SVG;
+    }
+
+    // La scorciatoia chiude la scheda attiva: sulle altre la croce non la promette.
+    p.close.dataset.tip = d.attiva ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
+  }
+
+  // Prima si tolgono i nodi che non restano, poi si mettono in ordine: un nodo che resta non si stacca mai.
+  function allineaSchede(nodi) {
+    const tieni = new Set(nodi);
+    for (const f of [...tabsEl.children]) if (!tieni.has(f)) f.remove();
+    nodi.forEach((n, i) => { if (tabsEl.children[i] !== n) tabsEl.insertBefore(n, tabsEl.children[i] || null); });
+  }
+
+  // `forza`: tema, font o impostazioni cambiati, quindi colori e larghezze si rileggono anche a schede uguali.
+  function render({ forza = false } = {}) {
+    if (forza) { coloriTema = undefined; firmaMisura = ''; }
+    // Durante una trascinata (già da armata, al mousedown) e col tasto giù sulla striscia non si ridisegna:
+    // riordinare i nodi riporterebbe indietro la scheda trascinata. Il broadcast dopo il rilascio ridisegna.
     if (drag || premutoSullaStriscia) { ridisegnoRimandato = true; return; }
     ridisegnoRimandato = false;
-    // tabs
-    tabsEl.innerHTML = '';
-    // Colori veri del tema, letti una volta per render e solo se servono.
-    let theme;
-    const themeColors = () => {
-      if (theme === undefined) {
-        const bar = TabColor.resolveCssColor(document, 'var(--tab-bg)');
-        const page = TabColor.resolveCssColor(document, 'var(--bg)');
-        const fg = TabColor.resolveCssColor(document, 'var(--fg)');
-        theme = bar && page && fg ? { bar, page, fg } : null;
-      }
-      return theme;
-    };
-    // Il colore salvato del sito ha la tinta piena: saturazione e luminosità dell'utente si applicano qui.
-    const siteColor = (t) => {
-      const c = TabColor && t.identityColor ? TabColor.adaptIdentity(t.identityColor, tabColorParams) : null;
-      return c ? TabColor.rgbCss(c) : null;
-    };
     // opacita_tab 0 = nessun colore: la scheda resta identica a una senza favicon.
-    let tabPaint = null;
-    if (TabColor && tabColorParams && tabColorParams.opacita_tab > 0
-      && state.tabs.some((t) => t.id !== state.activeId && t.identityColor)) {
-      tabPaint = themeColors();
-    }
+    const tinte = TabColor && tabColorParams && tabColorParams.opacita_tab > 0
+      && state.tabs.some((t) => t.id !== state.activeId && t.identityColor) ? coloriDelTema() : null;
+
+    let cambiata = false;
+    const nodi = [];
+    const visti = new Set();
+    const perMisura = [];
     for (const t of state.tabs) {
-      const el = document.createElement('div');
-      el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
-      el.dataset.id = t.id;
-      // Con l'anteprima accesa la carta dice già il titolo: il suggerimento di testo sarebbe un doppione.
-      if (anteprimaSchede.enabled) el.dataset.anteprima = t.id;
-      else el.dataset.tip = t.title || t.url;
-      const ferma = larghezzeFerme && larghezzeFerme.get(String(t.id));
-      if (ferma) {
-        el.style.flex = `0 0 ${ferma}px`;
-        el.style.minWidth = `${ferma}px`;
-        el.style.maxWidth = `${ferma}px`;
+      const id = String(t.id);
+      visti.add(id);
+      let el = schedeVive.get(id);
+      if (!el) { el = creaScheda(id); schedeVive.set(id, el); }
+      const d = descriviScheda(t, tinte);
+      const firma = JSON.stringify(d);
+      if (el._firma !== firma) {
+        applicaScheda(el, d);
+        el._firma = firma;
+        cambiata = true;
       }
-
-      // Tab attiva: sempre il colore della cima della pagina, anche bianca, mai il
-      // marchio del sito (decisione D63). Inchiostro con la regola delle inattive.
-      if (t.id === state.activeId) {
-        const activeColor = t.color;
-        if (activeColor) {
-          el.style.setProperty('--tab-active', activeColor);
-          const c = TabColor ? themeColors() : null;
-          const ink = c && TabColor.readableInk([activeColor], [c.fg, c.page]);
-          if (ink) {
-            el.classList.add('inked');
-            el.style.setProperty('--tab-ink', TabColor.rgbCss(ink));
-          }
-        }
-      }
-
-      // Tab INATTIVE: la tinta del sito mescolata col neutro della barra quanto
-      // dice opacita_tab (tabColor.js). Passa da --tab-bg-eff, non da
-      // `background`, perché l'hover del CSS si calcola sulla stessa variabile.
-      if (t.id !== state.activeId && t.identityColor && tabPaint) {
-        const bg = TabColor.inactiveTabBackground(t.identityColor, tabPaint.bar, tabColorParams);
-        if (bg) {
-          const { ink, hover } = TabColor.inkAndHover(bg, tabPaint.fg, tabPaint.page);
-          el.classList.add('tinted', 'inked');
-          el.style.setProperty('--tab-bg-eff', TabColor.rgbCss(bg));
-          el.style.setProperty('--tab-bg-hover', TabColor.rgbCss(hover));
-          el.style.setProperty('--tab-ink', TabColor.rgbCss(ink));
-        }
-      }
-
-      // Audio in riproduzione: aggiunge classe per il bagliore animato.
-      // Il colore del bagliore viene calcolato dal colore identità della tab
-      // e impostato come variabile CSS inline.
-      const isAudible = t.audible && !t.muted;
-      if (isAudible) {
-        el.classList.add('audible');
-        // Calcola il colore del bagliore: usa il colore identità se disponibile,
-        // altrimenti l'accento Filo come fallback. Desaturiamo già via CSS.
-        const glowBase = hasColorIdentity(t.color) ? t.color : siteColor(t);
-        if (glowBase) {
-          el.style.setProperty('--tab-glow-color', glowBase);
-        }
-      }
-
-      const ico = document.createElement('div');
-      if (t.loading) {
-        ico.className = 'spinner';
-      } else {
-        ico.className = 'favicon';
-        if (t.favicon) ico.style.backgroundImage = `url("${t.favicon}")`;
-      }
-      el.appendChild(ico);
-
-      // Indicatore "aperta da un altro paese": globo + codice paese accanto al
-      // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
-      if (t.proxy && t.proxy.country) {
-        const p = document.createElement('span');
-        p.className = 'proxy-ind';
-        p.setAttribute('aria-label', 'Aperta da un altro paese');
-        p.dataset.tip = 'Aperta da un altro paese';
-        p.innerHTML = PROXY_IND_SVG + '<span class="cc">' + t.proxy.country.toUpperCase() + '</span>';
-        el.appendChild(p);
-      }
-
-      const title = document.createElement('span');
-      title.className = 'title';
-      title.textContent = tabLabel(t);
-      el.appendChild(title);
-
-      // Avviso audio dopo il titolo, come in Chrome (#431): suona o mutata stanno
-      // nello stesso posto, così il clic che muta lascia lì il tasto per riattivare.
-      if (t.muted || isAudible) {
-        const a = document.createElement('span');
-        a.className = 'tab-alert ' + (t.muted ? 'mute-ind' : 'audio-ind');
-        a.setAttribute('role', 'button');
-        // Ogni controllo dentro la scheda porta il suo data-tip (mai `title`): senza, il suggerimento
-        // di Filo risale a quello della scheda e dice il titolo della pagina (#431).
-        a.dataset.tip = t.muted ? 'Riattiva audio' : 'Silenzia';
-        a.setAttribute('aria-label', t.muted
-          ? 'Audio mutato — clicca per riattivare'
-          : 'Audio in riproduzione — clicca per silenziare');
-        a.innerHTML = t.muted ? MUTE_IND_SVG : AUDIO_IND_SVG;
-        a.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
-        el.appendChild(a);
-      }
-
-      // Tasto destro su una tab → menu contestuale (Duplica / Muta / Chiudi).
-      el.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        openTabContextMenu(t, e.clientX, e.clientY);
-      });
-
-      const close = document.createElement('span');
-      close.className = 'close';
-      // La scorciatoia chiude la scheda attiva: sulle altre la croce non la promette.
-      close.dataset.tip = t.id === state.activeId ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
-      if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
-      else close.textContent = '×';
-      close.addEventListener('click', (e) => {
-        e.stopPropagation();
-        api.tabs.close(t.id);
-      });
-      el.appendChild(close);
-
-      el.addEventListener('mousedown', (e) => startTabDrag(e, t, el));
-      el.addEventListener('click', () => {
-        if (suppressClickId === t.id) { suppressClickId = null; return; }
-        api.tabs.activate(t.id);
-      });
-      el.addEventListener('auxclick', (e) => {
-        if (e.button === 1) api.tabs.close(t.id);
-      });
-      tabsEl.appendChild(el);
+      perMisura.push([id, d.attiva, d.titolo, d.paese, d.audio, d.ferma || 0]);
+      nodi.push(el);
     }
-    misuraLarghezzeChieste();
+    for (const id of [...schedeVive.keys()]) if (!visti.has(id)) schedeVive.delete(id);
+    if (nodi.length !== tabsEl.children.length || nodi.some((n, i) => tabsEl.children[i] !== n)) {
+      allineaSchede(nodi);
+      cambiata = true;
+    }
 
-    tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
-    try { ANTEPRIMA.ridisegnata(); } catch (_) {}
+    const flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
+    const firma = JSON.stringify([perMisura, flex]);
+    if (firma !== firmaMisura) {
+      firmaMisura = firma;
+      misuraLarghezzeChieste();
+      cambiata = true;
+    }
+    if (tabsEl.style.flex !== flex) tabsEl.style.flex = flex;
+    if (cambiata) { try { ANTEPRIMA.ridisegnata(); } catch (_) {} }
 
-    // §6 — con la striscia scrollabile, assicuriamoci che la scheda attiva sia
-    // sempre visibile (può finire fuori vista dopo che ne apri molte).
-    const activeEl = tabsEl.querySelector('.tab.active');
-    if (activeEl) {
+    // §6 — con la striscia scrollabile la scheda attiva resta in vista: si porta lì quando cambia, non a ogni
+    // aggiornamento, o la rotellina che scorre la striscia verrebbe riportata indietro dal titolo di un'altra.
+    const activeEl = state.activeId != null ? schedeVive.get(String(state.activeId)) : null;
+    if (activeEl && attivaInVista !== activeEl) {
+      attivaInVista = activeEl;
       try { activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (_) {}
     }
 
@@ -1260,6 +1297,40 @@
     // di Filo. Sui siti resta solo la fila di tab + i controlli finestra.
     applyChrome(isHomeUrl(a ? a.url : null));
   }
+
+  // Gli eventi delle schede stanno sulla striscia: valgono per ogni nodo, anche nato dopo, e leggono la
+  // scheda di adesso, non quella del momento in cui il nodo è nato.
+  function schedaDellEvento(e) {
+    const el = e.target && e.target.closest ? e.target.closest('.tab') : null;
+    if (!el || el.parentElement !== tabsEl) return null;
+    const t = state.tabs.find((x) => String(x.id) === el.dataset.id);
+    return t ? { el, t } : null;
+  }
+  tabsEl.addEventListener('contextmenu', (e) => {
+    const s = schedaDellEvento(e);
+    if (!s) return;
+    e.preventDefault();
+    openTabContextMenu(s.t, e.clientX, e.clientY);
+  });
+  tabsEl.addEventListener('mousedown', (e) => {
+    const s = schedaDellEvento(e);
+    if (s) startTabDrag(e, s.t, s.el);
+  });
+  tabsEl.addEventListener('click', (e) => {
+    const s = schedaDellEvento(e);
+    if (!s) return;
+    if (e.target.closest('.close')) { api.tabs.close(s.t.id); return; }
+    if (e.target.closest('.tab-alert')) { api.tabs.setMuted(s.t.id); return; }
+    if (suppressClickId === s.t.id) { suppressClickId = null; return; }
+    api.tabs.activate(s.t.id);
+  });
+  tabsEl.addEventListener('auxclick', (e) => {
+    if (e.button !== 1) return;
+    const s = schedaDellEvento(e);
+    if (s) api.tabs.close(s.t.id);
+  });
+  // Un font che finisce di caricare cambia la larghezza dei nomi.
+  try { document.fonts.addEventListener('loadingdone', () => { if (!larghezzeFerme) misuraLarghezzeChieste(); }); } catch (_) {}
 
   function displayUrl(url) {
     if (!url) return '';

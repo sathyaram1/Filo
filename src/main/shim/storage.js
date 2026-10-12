@@ -32,28 +32,34 @@ function canEncrypt() {
   try { return safeStorage.isEncryptionAvailable(); } catch (_) { return false; }
 }
 
-// Copia DA SCRIVERE su disco: sostituisce settings.apiKeys (in chiaro, in
-// memoria) con settings.apiKeysEnc (base64 del blob cifrato). Non muta `data`.
-function serializeForDisk(data) {
+// L'ultima cifratura fatta: chiavi uguali non si ricifrano a ogni scrittura (#1089), e il file non cambia.
+let ultimaCifratura = { chiaro: null, blob: null };
+
+// Le impostazioni come vanno su disco: settings.apiKeys (in chiaro, in memoria) diventa
+// settings.apiKeysEnc (base64 del blob cifrato). Non muta `s`.
+function impostazioniPerDisco(s) {
   try {
-    const s = data && data.settings;
-    if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return data;
-    if (!canEncrypt()) return data; // niente keyring OS → resta com'era (no perdita dati)
-    const blob = safeStorage.encryptString(JSON.stringify(s.apiKeys)).toString('base64');
-    const ns = { ...s, apiKeys: undefined, apiKeysEnc: ENC_PREFIX + blob };
-    return { ...data, settings: ns };
-  } catch (_) { return data; }
+    if (!s || typeof s !== 'object' || !s.apiKeys || typeof s.apiKeys !== 'object') return s;
+    if (!canEncrypt()) return s; // niente keyring OS → resta com'era (no perdita dati)
+    const chiaro = JSON.stringify(s.apiKeys);
+    if (chiaro !== ultimaCifratura.chiaro) {
+      ultimaCifratura = { chiaro, blob: safeStorage.encryptString(chiaro).toString('base64') };
+    }
+    return { ...s, apiKeys: undefined, apiKeysEnc: ENC_PREFIX + ultimaCifratura.blob };
+  } catch (_) { return s; }
 }
 
-// Inverso di serializeForDisk: al load ripristina settings.apiKeys in chiaro in
+// Inverso di impostazioniPerDisco: al load ripristina settings.apiKeys in chiaro in
 // memoria a partire dal blob cifrato, e rimuove il campo apiKeysEnc.
 function deserializeFromDisk(data) {
   try {
     const s = data && data.settings;
     if (!s || typeof s !== 'object' || typeof s.apiKeysEnc !== 'string') return data;
     if (!s.apiKeysEnc.startsWith(ENC_PREFIX) || !canEncrypt()) return data;
-    const buf = Buffer.from(s.apiKeysEnc.slice(ENC_PREFIX.length), 'base64');
-    const apiKeys = JSON.parse(safeStorage.decryptString(buf));
+    const blob = s.apiKeysEnc.slice(ENC_PREFIX.length);
+    const chiaro = safeStorage.decryptString(Buffer.from(blob, 'base64'));
+    const apiKeys = JSON.parse(chiaro);
+    ultimaCifratura = { chiaro: JSON.stringify(apiKeys), blob };
     const ns = { ...s, apiKeys };
     delete ns.apiKeysEnc;
     return { ...data, settings: ns };
@@ -73,6 +79,12 @@ const STATE = {
   flushTimer: null,
   listeners: new Set(),
   scritture: new Set(),
+  // Il file si compone chiave per chiave (#1089): `testi` è il JSON di ogni valore come è stato scritto,
+  // `suDisco` la sua forma nel file (chiavi API cifrate), `sporche` le chiavi da riserializzare.
+  testi: new Map(),
+  suDisco: new Map(),
+  sporche: new Set(),
+  avvisate: new Set(),
 };
 
 // === Modalità incognito ===========================================
@@ -181,6 +193,7 @@ async function leggiFile() {
     STATE.data = {};
   }
   STATE.loaded = true;
+  avviaVerifica();
 }
 
 function scheduleFlush() {
@@ -231,6 +244,63 @@ async function whenSettled() {
   }
 }
 
+function serializzaChiave(k) {
+  const v = STATE.data[k];
+  let t;
+  try {
+    t = JSON.stringify(v);
+  } catch (err) {
+    // Un valore che non si serializza tiene nel file la sua ultima forma buona e non ferma le altre chiavi.
+    console.error('[Filo storage] chiave non serializzabile:', k, err.message);
+    STATE.sporche.delete(k);
+    return;
+  }
+  STATE.testi.set(k, t);
+  const disco = k === 'settings' ? impostazioniPerDisco(v) : v;
+  STATE.suDisco.set(k, disco === v ? t : JSON.stringify(disco));
+  STATE.sporche.delete(k);
+}
+
+// Lo stesso testo di JSON.stringify(STATE.data) con le chiavi API cifrate: stesso ordine, stesso formato.
+function testoDelFile({ tutte = false } = {}) {
+  const parti = [];
+  for (const k of Object.keys(STATE.data)) {
+    if (tutte || STATE.sporche.has(k) || !STATE.suDisco.has(k)) serializzaChiave(k);
+    const t = STATE.suDisco.get(k);
+    if (t !== undefined) parti.push(JSON.stringify(k) + ':' + t);
+  }
+  STATE.sporche.clear();
+  return '{' + parti.join(',') + '}';
+}
+
+// Rete per chi cambia un valore letto senza riscriverlo con set: prima ci pensava il flush intero
+// successivo, ora lo trova questo giro (raro, e solo sulle chiavi non già in coda).
+function verificaMutazioni() {
+  if (!STATE.loaded) return [];
+  const cambiate = [];
+  for (const k of Object.keys(STATE.data)) {
+    if (STATE.sporche.has(k) || !STATE.testi.has(k)) continue;
+    let t;
+    try { t = JSON.stringify(STATE.data[k]); } catch (_) { continue; }
+    if (t === STATE.testi.get(k)) continue;
+    cambiate.push(k);
+    STATE.sporche.add(k);
+    if (!STATE.avvisate.has(k)) {
+      STATE.avvisate.add(k);
+      console.warn('[Filo storage] valore cambiato senza set, salvato dal controllo periodico:', k);
+    }
+  }
+  if (cambiate.length) scheduleFlush();
+  return cambiate;
+}
+const VERIFICA_OGNI_MS = 60_000;
+let giroVerifica = null;
+function avviaVerifica() {
+  if (giroVerifica) return;
+  giroVerifica = setInterval(verificaMutazioni, VERIFICA_OGNI_MS);
+  if (giroVerifica.unref) giroVerifica.unref();
+}
+
 async function doFlush() {
   const target = filePath();
   const tmp = target + '.tmp';
@@ -243,12 +313,14 @@ async function doFlush() {
   STATE.flushInFlight = (STATE.flushInFlight || 0) + 1;
   if (STATE.flushInFlight > (STATE.flushMaxInFlight || 0)) STATE.flushMaxInFlight = STATE.flushInFlight;
   try {
-    const txt = JSON.stringify(serializeForDisk(STATE.data));
+    const txt = testoDelFile();
     await fsp.mkdir(path.dirname(target), { recursive: true });
     await fsp.writeFile(tmp, txt, 'utf8');
     await fsp.rename(tmp, target);
   } catch (err) {
     console.error('[Filo storage] flush failed:', err);
+    // Il file non ha l'ultima versione: la prossima set non va scartata come «già scritta».
+    STATE.testi.clear();
   } finally {
     STATE.flushInFlight -= 1;
   }
@@ -325,12 +397,24 @@ async function set(obj) {
     if (!keys.length) return;
   }
   const changes = {};
+  let cambiate = 0;
   for (const k of keys) {
-    const oldValue = STATE.data[k];
     const newValue = obj[k];
+    // Uguale a quello già nel file: niente scrittura né evento. Si confronta il testo, non l'oggetto: chi
+    // ha cambiato dentro il valore letto e lo riscrive passa lo stesso riferimento. Il riferimento nuovo
+    // si tiene comunque, così chi lo cambia ancora dopo lo ritrova in memoria.
+    if (!STATE.sporche.has(k) && STATE.testi.has(k)) {
+      let t = null;
+      try { t = JSON.stringify(newValue); } catch (_) {}
+      if (t !== null && t === STATE.testi.get(k)) { STATE.data[k] = newValue; continue; }
+    }
+    const oldValue = STATE.data[k];
     STATE.data[k] = newValue;
+    STATE.sporche.add(k);
     changes[k] = { oldValue, newValue };
+    cambiate++;
   }
+  if (!cambiate) return;
   scheduleFlush();
   emitChange(changes);
 }
@@ -354,6 +438,7 @@ async function remove(keys) {
     if (k in STATE.data) {
       changes[k] = { oldValue: STATE.data[k], newValue: undefined };
       delete STATE.data[k];
+      dimenticaTesto(k);
     }
   }
   if (Object.keys(changes).length) {
@@ -375,8 +460,15 @@ async function clear() {
     changes[k] = { oldValue: STATE.data[k], newValue: undefined };
   }
   STATE.data = {};
+  for (const k of Object.keys(changes)) dimenticaTesto(k);
   scheduleFlush();
   emitChange(changes);
+}
+
+function dimenticaTesto(k) {
+  STATE.testi.delete(k);
+  STATE.suDisco.delete(k);
+  STATE.sporche.delete(k);
 }
 
 function onChanged(fn) {
@@ -390,11 +482,11 @@ function onScrittura(fn) {
   return () => STATE.scritture.delete(fn);
 }
 
-// Flush sincrono best-effort prima della chiusura.
+// Flush sincrono best-effort prima della chiusura: riserializza tutto, così niente cambiato senza set resta fuori.
 function flushSync() {
   try {
     if (!STATE.loaded) return;
-    fs.writeFileSync(filePath(), JSON.stringify(serializeForDisk(STATE.data)), 'utf8');
+    fs.writeFileSync(filePath(), testoDelFile({ tutte: true }), 'utf8');
   } catch (e) { /* ignore */ }
 }
 
@@ -421,6 +513,7 @@ module.exports = {
   whenSettled,
   flushNow,
   maxFlushOverlap,
+  verificaMutazioni,
   setSync,
   runIncognito,
   runNormale,
