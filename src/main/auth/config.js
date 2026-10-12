@@ -29,6 +29,8 @@ module.exports = {
   authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
   scopes: ['openid', 'email', 'profile'],
+  // L'accesso web a Google, per collegare YouTube, Gmail e Drive nelle schede a chi è già dentro Filo (#1123).
+  webLoginEndpoint: 'https://accounts.google.com/ServiceLogin',
 
   // Firebase Auth (Identity Toolkit) — scambia il token Google con un Firebase
   // ID token, l'unico che popola request.auth nelle regole Firestore.
