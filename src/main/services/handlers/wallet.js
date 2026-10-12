@@ -389,7 +389,7 @@ module.exports = function register(on, ctx) {
     let motivo = '';
     try { await identity.getIdToken(); } catch (e) { motivo = (e && e.code) || ''; }
     if (motivo !== 'identity_lost' && motivo !== 'identity_unreadable') {
-      return { ok: false, status: 'identity_ok', state: await readState() };
+      return { ok: false, status: motivo ? 'not_reachable' : 'identity_ok', state: await readState() };
     }
     if (!msg || msg.confermato !== true) return { ok: false, status: 'needs_confirm' };
     identity.resetIdentity();
