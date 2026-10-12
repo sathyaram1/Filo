@@ -670,13 +670,22 @@ export function commitRestante(root, { exec = execFileSync, env = process.env } 
   if (!st.lines.length) return { ok: true, skipped: false, committed: [], reason: '' };
   const add = run(['add', '-A']);
   if (!add.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(add.out) };
+  // Un file nato da shell è il modo più comune di scaricare una copia dei dati del server: come l'hook, resta fuori (#1108).
+  let fuori = [];
+  try { fuori = copieInScena(root).map((c) => c.file); } catch (_) { /* la spedizione ricontrolla i commit */ }
+  for (const f of fuori) if (!run(['reset', '-q', '--', f]).ok) run(['rm', '-q', '--cached', '--', f]);
+  if (fuori.length) {
+    try { escludiInLocale(root, fuori); } catch (_) { /* l'avviso parte lo stesso */ }
+    if (run(['diff', '--cached', '--quiet']).ok) return { ok: true, skipped: false, committed: [], fuori, reason: '' };
+  }
+  const restano = run(['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
   const routine = Boolean(env.FILO_ROUTINE) && env.FILO_ROUTINE !== '0';
   const nome = routine ? 'claude-routine' : 'claude-local';
   const email = routine ? 'claude@routine' : 'claude@local';
-  const elenco = `${st.lines.slice(0, 3).join(', ')}${st.lines.length > 3 ? ` (+${st.lines.length - 3} file)` : ''}`;
+  const elenco = `${restano.slice(0, 3).join(', ')}${restano.length > 3 ? ` (+${restano.length - 3} file)` : ''}`;
   const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: rilascio — ${elenco}`]);
   if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
-  return { ok: true, skipped: false, committed: st.lines, reason: '' };
+  return { ok: true, skipped: false, committed: fuori.length ? restano : st.lines, fuori, reason: '' };
 }
 
 /**
