@@ -30,6 +30,13 @@ test("l'«In breve» dice cosa esce, verso chi, e chi legge i feedback", () => {
   assert.doesNotMatch(breve, /esattamente/);
 });
 
+// Non tutte le porte del proprietario passano dal controllo di provenienza (#784.2): finché è così il §3 promette solo quelle dei feedback.
+test('il §3 non promette che ogni funzione di amministrazione risponda solo a Filo', () => {
+  const isolamento = sec.slice(sec.indexOf('## 3.'), sec.indexOf('## 4.'));
+  assert.doesNotMatch(isolamento, /funzioni di amministrazione\s+rispondono solo/);
+  assert.match(isolamento, /funzioni che leggono e gestiscono i feedback\s+rispondono solo alle pagine di\s+Filo/);
+});
+
 test("l'«In breve» non fa passare per completo un elenco più corto di quello che esce", () => {
   const voceModelli = breve.slice(breve.indexOf('Memorie, appunti e cronologia'), breve.indexOf('Il server di Filo riceve'));
   assert.match(voceModelli, /per esempio/);
