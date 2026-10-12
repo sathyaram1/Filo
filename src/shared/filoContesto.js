@@ -273,7 +273,7 @@
     for (const i of indici) {
       const m = lista[i];
       const e = esitoDi(i);
-      out.push(rendi(m, prima, { tetto: token, esito: e, osserva }));
+      out.push(rendiIl(i, prima));
       if (e && Array.isArray(e.azioni)) azioni.push(...e.azioni);
       visti.push(m);
       prima = m;
