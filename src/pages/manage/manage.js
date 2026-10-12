@@ -2410,8 +2410,12 @@
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
   // un'istanza ci sta lavorando in questo momento.
   function workStateHtml(progress, fb) {
+    // Un lavoro server passato aspetta il PC (#1159); coi lavori server alle routine, un fidato segue il loro iter.
+    if (fb && MR.inAttesaFusioneServer(fb)) {
+      return `<div class="mg-item-state"><span class="mg-work-idle">Pronto: aspetta il PC</span></div>`;
+    }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
-    if (fb && MR.isLocalOnly(fb)) {
+    if (fb && MR.isLocalOnly(fb) && !(mgLavoriServer && mgLavoriServer.checked && MR.isFidato(fb))) {
       const dove = progress.status === 'working' ? 'In lavorazione' : 'In verifica';
       return `<div class="mg-item-state"><span class="mg-work-idle">${dove} in una sessione locale</span></div>`;
     }
