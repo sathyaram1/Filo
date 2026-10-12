@@ -45,6 +45,8 @@ const CHIAMATE_LOCALI = {
   'src/main/test-servizi-chiusi.js': 'la fetch finta delle prove',
 };
 
+const CHIAVI_HOST = new Set(['host', 'hostname']);
+
 const ESTENSIONI = ['.js', '.mjs', '.cjs', '.html', '.css', '.json'];
 const URL_RE = /\b(?:https?|wss?):\/\/[^\s'"`<>()\\]*/gi;
 // safeFetch e fetchList sono gli involucri del progetto che fanno rete per conto di un altro file.
