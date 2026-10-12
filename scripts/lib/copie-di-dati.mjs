@@ -67,6 +67,17 @@ export function motivoCopiaTesto(testo) {
     const m = motivoCopia(o);
     if (m) return m;
   }
+  return motivoInterrotto(t);
+}
+
+// Un pezzo più corto del primo documento non chiude nessun oggetto, ma porta già una persona: lo dicono le chiavi scritte.
+const PERCORSO_INTERROTTO = /"name"\s*:\s*"[^"]*\/databases\/[^"/]+\/documents\//;
+const IDENTITA_FIRESTORE = new RegExp(`"(?:${IDENTITA.join('|')})"\\s*:\\s*\\{\\s*"stringValue"`);
+function motivoInterrotto(t) {
+  if (PERCORSO_INTERROTTO.test(t)) return 'documento Firestore (name + fields), interrotto';
+  if (IDENTITA_FIRESTORE.test(t)) return 'campi nel formato di Firestore (stringValue, integerValue…), interrotto';
+  const presenti = [...IDENTITA, 'text'].filter((k) => new RegExp(`"${k}"\\s*:\\s*"`).test(t));
+  if (presenti.length >= 2 && presenti.some((k) => k !== 'text')) return `campi di un feedback in chiaro (${presenti.join(', ')}), interrotto`;
   return '';
 }
 
