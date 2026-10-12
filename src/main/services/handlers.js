@@ -112,7 +112,8 @@ async function noteProvenienzaImmagini(dataUrls) {
   return blocchi.join('\n\n');
 }
 
-// Le immagini non tornano nei turni dopo: senza, «ed è fatta con l'AI?» al messaggio seguente non aveva più l'esito (#946).
+// Le etichette di origine stanno nel file, non nei pixel che tornano al modello: senza, «ed è fatta con l'AI?» al
+// messaggio seguente non aveva più l'esito (#946).
 const MAX_CHAT_CON_ORIGINE = 200;
 const MAX_ESITI_PER_CHAT = 20;
 const origineDelleChat = new Map();
