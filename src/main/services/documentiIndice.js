@@ -231,9 +231,9 @@ async function elenca(cartelle) {
   const negate = [];
   let contati = 0;
   let pieno = false;
-  let radice = '';
+  let radicePrivata = false;
   async function giro(dir, prof) {
-    if (pieno || prof > PROFONDITA_MAX || (prof > 0 && esclusa(dir, radice))) return;
+    if (pieno || prof > PROFONDITA_MAX || (prof > 0 && !radicePrivata && privata(dir))) return;
     let elenco;
     try { elenco = await fsp.readdir(dir, { withFileTypes: true }); } catch (e) {
       if (prof === 0 && e && NEGATO.has(e.code)) negate.push(dir);
