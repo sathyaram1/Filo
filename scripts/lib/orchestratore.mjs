@@ -366,7 +366,7 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
  * Il motore. dep = {
  *   store: { leggi() → { coda, pratiche }, salvaPratica(p) },
  *   esegui(cmd, args, { cwd, input, timeoutMs }) → { code, stdout, out },   // out = stdout + stderr
- *   claude({ ruolo, prompt, cwd, addDirs, nome }) → { ok, testo, costo, errore },
+ *   claude({ ruolo, prompt, cwd, addDirs, nome, dalServer }) → { ok, testo, costo, errore },
  *   verifica(wtApp) → { ok, entry, dirty }, pubblica() → { code, out },
  *   carico() → { cpu, liberaGB }, dormi(ms), log(riga), ora() → ISO,
  *   percorsi: { radice, wt(slug), serverRadice ('' se manca), wtServer(slug), note, regole },
@@ -435,7 +435,8 @@ export function creaMotore(dep, opzioni = {}) {
     let atteso = 0;
     const prima = (((dep.verifica(P.wt(p.slug)) || {}).entry) || {}).verdict || '';
     for (let t = 0; ; t += 1) {
-      const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [cartella, P.serverRadice].filter(Boolean), nome });
+      // decisioneServer: { model, effort } del biglietto del server, se la pratica ne ha uno; senza vale il frontmatter.
+      const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [cartella, P.serverRadice].filter(Boolean), nome, dalServer: p.decisioneServer || null });
       const costo = Number(r.costo) || 0;
       p.costo += costo;
       p.istanze.push({ ruolo, giro: p.giriTotali, at: dep.ora(), ok: !!r.ok, costo, riga: primaRiga(r.testo || r.errore).slice(0, 300) });

@@ -38,8 +38,9 @@
 //
 //   node scripts/routine-channel.mjs ticket <parola-d-ordine> [--json]
 //       → stampa il biglietto su stdout (una riga), oppure "niente da fare".
-//         Con `--json` stampa biglietto E ruolo insieme: serve a chi guida per
-//         scegliere il tipo di worker PRIMA di lanciarlo.
+//         Con `--json` stampa biglietto E ruolo insieme (più `model` ed `effort` se il server li ha decisi):
+//         il ruolo serve a chi guida per scegliere il tipo di worker PRIMA di lanciarlo. In tutte e due le forme
+//         registra la decisione per il gancio dell'orchestratore cieco, che mette modello e sforzo al lancio.
 //         Exit 0 = biglietto, 2 = niente da fare, 3 = guasto (il giro si ferma).
 //
 //   node scripts/routine-channel.mjs work <biglietto>
@@ -114,6 +115,7 @@ import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
+import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -196,6 +198,9 @@ export function readTicketReply(status, body) {
     // vecchio: chi guida ripiega sul worker generico.
     const out = { outcome: 'work', ticket: String(b.ticket) };
     if (typeof b.role === 'string' && b.role) out.role = b.role;
+    // Modello e sforzo decisi dal server per questo lavoro (#1189): assenti vale la definizione dell'agente. Il gancio
+    // dell'orchestratore li controlla e li mette (lib/orchestratore-cieco.mjs).
+    for (const k of ['model', 'effort']) if (typeof b[k] === 'string' && b[k].trim()) out[k] = b[k].trim();
     return out;
   }
   if (status === 200 && b.ok && b.work === false) return { outcome: 'nothing', reason: String(b.reason || '') };
@@ -1145,9 +1150,20 @@ if (isMain) {
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'ticket') {
     const r = await ticket(args[0]);
-    // `--json`: biglietto E ruolo, per chi deve scegliere il worker prima di
-    // lanciarlo. Senza flag resta la sola stringa, come sempre.
-    if (r.outcome === 'work') { console.log(data.json === true ? JSON.stringify({ ticket: r.ticket, role: r.role || '' }) : r.ticket); process.exit(0); }
+    if (r.outcome === 'work') {
+      // Senza la decisione registrata il gancio rifiuta il lancio: meglio fermarsi qui che con un worker rifiutato.
+      const reg = registraDecisione(r);
+      if (!reg.ok) {
+        const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
+        console.error(`guasto: decisione del server non registrata per il gancio in ${reg.file} (${reg.why}), il lancio del worker verrebbe rifiutato. Rilascia il biglietto: node "${io}" release ${r.ticket} --role orchestrator`);
+        process.exit(3);
+      }
+      // `--json`: biglietto E ruolo, per chi deve scegliere il worker prima di
+      // lanciarlo. Senza flag resta la sola stringa, come sempre.
+      const decisi = { ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}) };
+      console.log(data.json === true ? JSON.stringify({ ticket: r.ticket, role: r.role || '', ...decisi }) : r.ticket);
+      process.exit(0);
+    }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'work') {
