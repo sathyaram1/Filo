@@ -209,8 +209,7 @@
   // nessuno.
   function redigiDatiPersonali(testo) {
     if (typeof testo !== 'string' || !testo) return '';
-    return testo
-      .replace(EMAIL_RE, '[EMAIL]')
+    return redigiEmail(testo)
       .replace(IBAN_RE, '[IBAN]')
       .replace(CF_RE, '[CODICE]')
       .replace(LONG_NUM_RE, '[NUMERO]')
