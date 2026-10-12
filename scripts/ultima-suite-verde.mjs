@@ -213,6 +213,9 @@ async function main() {
   const verdeDopoTag = verdePiuNuovoDelTag(verde, tagSha, eAntenato);
   const sha = verdeDopoTag ? verde : '';
   const corsaVerde = verde ? corseVerdi(runs).get(verde) : null;
+  const soloPlaywright = scegliUltimoVerde(runs, primoGenitore);
+  const scartata = soloPlaywright && soloPlaywright !== verde && verdePiuNuovoDelTag(soloPlaywright, tagSha, eAntenato)
+    ? corseVerdi(runs).get(soloPlaywright) : null;
   const esecuzione = process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL || 'https://github.com'}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
     : '';
