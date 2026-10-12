@@ -197,5 +197,5 @@ function azzeraAncore() {
   ancore.incognito = null;
 }
 
-module.exports = { ricordaEsiti, dimentica, messaggiDelFilo, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
+module.exports = { ricordaEsiti, ricordaImmagini, dimentica, messaggiDelFilo, componi, senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore };
 globalThis.SN_CONTESTO_FILO = module.exports;
