@@ -41,6 +41,8 @@ async function aggiornatoreFinto(app, { automatici, versione = '9.9.9' }) {
       scaricamenti: 0,
       on(e, f) { (ascolta[e] ||= []).push(f); return u; },
       emit(e, ...a) { for (const f of ascolta[e] || []) f(...a); },
+      // Il punto a cui si aggancia il cancello dei tag (#1073): senza, il finto verrebbe fermato come un electron-updater rinominato.
+      async getUpdateInfoAndProvider() { return { info: null, provider: null }; },
       async checkForUpdates() {
         u.emit('update-available', { version: v });
         return { downloadPromise: u.autoDownload ? u.downloadUpdate() : null };
