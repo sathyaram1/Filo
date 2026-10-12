@@ -326,11 +326,11 @@
     },
     {
       id: 'pagina-accesso-google', nome: 'La pagina di accesso di Google',
-      base: ['https://accounts.google.com/o/oauth2/v2/auth'],
-      occasione: 'quando fai il login, nel browser di sistema',
+      base: ['https://accounts.google.com/o/oauth2/v2/auth', 'https://accounts.google.com/ServiceLogin', 'https://www.youtube.com/'],
+      occasione: 'quando fai il login, o colleghi YouTube, Gmail e Drive dal menu del profilo: in una scheda, o nel browser di sistema se Google rifiuta la scheda',
       riceve: 'quello che scrivi a Google per entrare',
       frase: "L'accesso Google si apre nel browser",
-      dove: ['src/main/auth/config.js'],
+      dove: ['src/main/auth/config.js', 'src/main/auth/prodottiGoogle.js'],
     },
     {
       id: 'scryfall-sito', nome: 'Il sito di Scryfall',
