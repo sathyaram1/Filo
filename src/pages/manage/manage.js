@@ -4389,9 +4389,7 @@
     const msg = document.createElement('span');
     msg.id = 'mgSideRispostaMsg';
     msg.setAttribute('role', 'status');
-    // Un esito solo per le due caselle: il pannello lo riprende da quella sotto la conversazione.
-    msg.className = mgClarifyMsg.className;
-    msg.textContent = mgClarifyMsg.textContent;
+    riflettiEsitoRisposta(msg);
     riga.appendChild(btn); riga.appendChild(msg);
     box.appendChild(t); box.appendChild(riga);
     return box;
