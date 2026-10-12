@@ -160,8 +160,8 @@ Filo è un browser, quindi carica siti web di terze parti. Una pagina web
 - Le pagine web esterne girano con `contextIsolation` attivo e senza accesso a
   Node (`src/main/tabs.js`), e comunicano con Filo attraverso il preload
   (`src/preload/page-preload.js`). Quel canale non consegna i token, e le
-  funzioni di amministrazione rispondono solo alle pagine di Filo
-  (`src/main/services/handlers/origine.js`).
+  funzioni che leggono e gestiscono i feedback rispondono solo alle pagine di
+  Filo (`src/main/services/handlers/origine.js`).
 
 Cosa un sito possa chiedere a Filo attraverso quel canale, oltre a questo, lo
 stiamo ancora restringendo: finché il lavoro è aperto, questa sezione promette
