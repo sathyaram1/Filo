@@ -99,7 +99,7 @@ test('dal dettaglio: il tasto «Locale» mette il segno, la pratica passa nei La
   const btn = page.locator('#mgLocalBtn');
   await expect(btn).toBeVisible();
   await expect(btn).toHaveAttribute('aria-pressed', 'false');
-  await expect(btn).toHaveAttribute('title', /Passa nei Lavori server: lo lavorano le routine se i lavori server sono accesi/);
+  await expect(btn).toHaveAttribute('title', /Passa nei Lavori server\. Lo lavorano le routine se in Automazioni i lavori server sono accesi/);
   await btn.click();
   await expect(btn).toHaveAttribute('aria-pressed', 'true');
   await expect(btn).toHaveText('💻 Lavoro server');
@@ -185,7 +185,7 @@ test('nei Ricevuti col segno: resta lì, la scheda lo dice, l’approvazione dic
   await expect(page.locator('#mgAlignedBtn')).toHaveText('Approva tutti gli allineati (1) → Lavori server');
   const badge = page.locator('.mg-item .mg-local-badge');
   await expect(badge).toHaveText('server');
-  await expect(badge).toHaveAttribute('title', /Lavoro server: lo prendono le routine.*owner@esempio/);
+  await expect(badge).toHaveAttribute('title', /Lavoro server\. Lo prendono le routine.*owner@esempio/);
   await page.locator('.mg-item').click();
   await expect(page.locator('#mgAcceptBtn')).toHaveText('→ Lavori server');
 });

@@ -1978,7 +1978,7 @@
     } else if (segnabile.ok) {
       voci.push({
         testo: segnabile.chiusa ? '💻 Era un lavoro server' : '💻 Lavoro server',
-        titolo: segnabile.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server: lo lavorano le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione locale.',
+        titolo: segnabile.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.',
         azione: () => segnoDalMenu(fb, true),
       });
     }
@@ -2383,7 +2383,7 @@
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
   // Passato dalla verifica, aspetta il PC per la fusione e il deploy del server (#1159): lo prende `npm run orchestra -- fusioni-server`.
-  const TITOLO_ATTESA_SERVER = 'Pronto: la verifica è passata, aspetta il tuo PC. Con Filo acceso, npm run orchestra -- fusioni-server lo porta su main di filo-security e lo pubblica.';
+  const TITOLO_ATTESA_SERVER = 'La verifica è passata, aspetta il tuo PC. Lo porta su main di filo-security e lo pubblica npm run orchestra -- fusioni-server, che parte anche con avvia.';
   function attesaServerBadgeHtml(fb) {
     if (!MR.inAttesaFusioneServer(fb)) return '';
     return `<span class="mg-local-badge mg-attesa-badge" title="${esc(TITOLO_ATTESA_SERVER)}">aspetta il PC</span>`;
@@ -2392,7 +2392,7 @@
     const m = fb && fb.localOnly;
     if (!m) return '';
     const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
-    const cosa = !MR.praticaChiusa(fb, { releasedVersion, fusioni }) ? 'Lavoro server: lo prendono le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione locale.'
+    const cosa = !MR.praticaChiusa(fb, { releasedVersion, fusioni }) ? 'Lavoro server. Lo prendono le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.'
       : MR.isPrivateLocalWork(fb) ? 'Era un lavoro server: per questo non sta nella bacheca pubblica.'
         : 'Era un lavoro server: la sua scheda resta nella bacheca pubblica, per chi l’ha mandato.';
     const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
@@ -3215,7 +3215,7 @@
     return MR.isLocalOnly(fb) || MR.isFidato(fb) || MR.isLocalApproved(fb);
   }
   // #913: il feedback di un utente o di una routine diventa lavoro locale col sì dell'owner, che ne ha letto il testo.
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server: lo lavorano le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione. La fusione non aspetta il tuo sì.';
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
   // Stesso avviso di «Segna fidato»: il sì vale anche alla fusione, quindi un segnalato si guarda prima.
   function titoloLavoroLocale(fb) {
     const c = MR.localApprovalCheck(fb, { releasedVersion, fusioni });
@@ -3243,7 +3243,7 @@
     mgLocalBtn.title = on
       ? `${localSignText(fb)} ${chiusa ? titoloTogliChiusa(fb) : 'Un clic la toglie dai lavori server.'}`
       : (perche.ok
-        ? (perche.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server: lo lavorano le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione locale.')
+        ? (perche.chiusa ? titoloLocaleChiusa(fb) : 'Passa nei Lavori server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.')
         : `Adesso non si può: ${perche.motivo}.`);
   }
 

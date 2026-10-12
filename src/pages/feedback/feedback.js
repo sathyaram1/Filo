@@ -816,7 +816,7 @@
   // dashboard di gestione legge la stessa tabella, quindi sulla stessa
   // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
   // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
-  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server: lo lavorano le routine se i lavori server sono accesi in Automazioni, altrimenti una sessione. La fusione non aspetta il tuo sì.';
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro server. Lo lavorano le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione. La fusione non aspetta il tuo sì.';
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
