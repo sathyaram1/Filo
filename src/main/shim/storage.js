@@ -49,7 +49,7 @@ function impostazioniPerDisco(s) {
   } catch (_) { return s; }
 }
 
-// Inverso di serializeForDisk: al load ripristina settings.apiKeys in chiaro in
+// Inverso di impostazioniPerDisco: al load ripristina settings.apiKeys in chiaro in
 // memoria a partire dal blob cifrato, e rimuove il campo apiKeysEnc.
 function deserializeFromDisk(data) {
   try {
