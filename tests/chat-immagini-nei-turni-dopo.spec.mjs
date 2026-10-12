@@ -104,7 +104,11 @@ test('le foto mandate in chat il modello le ha ancora davanti al messaggio dopo,
   expect(testo(conFoto[0])).toContain('cosa c’è nella mia dispensa?');
   expect(fotoDi(conFoto[0])).toEqual(mandate);
   expect(secondo.indexOf(conFoto[0])).toBeLessThan(posContesto(secondo));
-  expect(testo(secondo[secondo.length - 1])).toBe('e con i ceci cosa ci faccio?');
+  const domanda = testo(secondo[secondo.length - 1]);
+  expect(domanda).toMatch(/^e con i ceci cosa ci faccio\?/);
+  // L'esito delle etichette d'origine viaggia ancora, e non dice più che le immagini non arrivano.
+  expect(domanda).toContain('etichette di origine');
+  expect(domanda).not.toContain('non ti arrivano');
   expect(JSON.stringify(secondo)).not.toContain('non hai più davanti');
 
   // Al terzo ci sono ancora, e quello che il secondo turno aveva davanti è rimasto identico: la cache lo riusa.
