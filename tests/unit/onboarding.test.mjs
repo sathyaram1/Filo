@@ -43,10 +43,10 @@ test('si registra su globalThis con la sua API', () => {
 
 test("l'elenco copre le cose da scoprire E quelle da dire", () => {
   const ids = O.ITEMS.map((i) => i.id);
-  for (const id of ['profilo', 'stile', 'estetica', 'privacy', 'modelli', 'crediti']) {
+  for (const id of ['profilo', 'stile', 'autonomia', 'estetica', 'privacy', 'modelli', 'crediti']) {
     assert.ok(ids.includes(id), `manca la voce "${id}"`);
   }
-  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile']);
+  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia']);
   assert.equal(new Set(ids).size, ids.length, 'id duplicati');
   for (const i of O.ITEMS) {
     assert.ok(i.label && i.detail, `voce ${i.id} senza etichetta o dettaglio`);
