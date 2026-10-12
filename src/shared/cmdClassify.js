@@ -820,6 +820,8 @@
   // Le righe di comando degli altri programmi portano token e password (`ps e` anche l'ambiente).
   const PROCESSI = new Set(['ps', 'get-process', 'gps', 'w']);
   const SPOSTAMENTI = new Set(['cd', 'chdir', 'set-location', 'sl', 'pushd', 'popd']);
+  // Stampano i loro argomenti e basta: il testo conta solo se qualcuno lo usa (tubo, gruppo).
+  const STAMPANO = new Set(['echo', 'write-output', 'write-host', 'out-string', 'out-host']);
   // Usano gli operandi come percorsi (i lettori hanno il loro controllo, `fuoriDa`).
   const PRENDONO_PERCORSI = new Set([...ELENCHI, ...SPOSTAMENTI, 'split-path', 'join-path']);
   // I cmdlet che legano al percorso ciò che arriva dal tubo (`cat`/`ls`/`cd` sono loro alias in PowerShell).
