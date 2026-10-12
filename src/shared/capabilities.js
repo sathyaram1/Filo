@@ -561,6 +561,12 @@
       invoke: 'Pagina filo://security/security.html, oppure chiedendolo a Filo in chat: prima di cambiare una voce della sicurezza chiede un OK, tranne per «Salta le pubblicità dei video».',
     },
     {
+      id: 'google-account', title: 'Accesso con Google, con YouTube, Gmail e Drive già collegati', category: 'settings',
+      desc: 'L\'accesso a Filo con Google si fa in una scheda di Filo: scegli l\'account, la scheda si chiude da sola e torni dov\'eri. Da lì YouTube, Gmail, Drive e gli altri servizi Google nelle schede sono collegati allo stesso account. Se Google non accetta l\'accesso dentro Filo, Filo lo apre da solo nel browser del computer e te lo dice: Filo si collega lo stesso, i servizi Google nelle schede no. Chi era entrato in Filo prima trova una volta l\'invito a collegarli, e nel menu dell\'account la voce «Collega anche i prodotti Google», che apre l\'accesso a Google con l\'email già scritta. In Privacy massima Google e YouTube tengono i cookie nello stesso spazio, e dopo un accesso Google entra fra i siti fidati.',
+      invoke: 'Menu dell\'account (icona del profilo): «Accedi con Google»; da dentro, finché i servizi Google nelle schede non sono collegati, «Collega anche i prodotti Google».',
+      doesNot: 'Uscire da Filo non ti fa uscire da Google nelle schede, e uscire da Google in una scheda non ti fa uscire da Filo: sono due accessi diversi. Non aggira i controlli di Google: se rifiuta l\'accesso dentro Filo, i servizi Google nelle schede restano da collegare a mano. L\'accesso a Google non va nelle finestre incognito.',
+    },
+    {
       id: 'dangerous-sites', title: 'Avviso dei siti pericolosi', category: 'settings',
       desc: 'Un sito pericoloso (in lista per phishing o malware, o che imita un marchio e chiede la password) o sospetto viene coperto da un avviso appena si apre, prima che finisca di caricarsi. L\'avviso sta fuori dalla pagina: il sito non lo copre, non lo toglie e non sente quello che ci scrivi. Su un sito pericoloso si prosegue scrivendo «confermo», su uno sospetto con «Continua»; la scelta vale per quel sito in quella scheda finché resta aperta.',
       invoke: 'Compare da solo. Tasto destro sull\'avviso: «Chiedi a Filo di questo sito» (apre una chat nuova con la domanda), «Segnala un falso allarme» (apre «Invia feedback» già scritto), «Copia l\'indirizzo», «Torna indietro». Impostazioni → Sicurezza → «Avvisa sui siti pericolosi».',

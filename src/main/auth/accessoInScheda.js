@@ -5,6 +5,7 @@
 'use strict';
 
 const { rifiutoDiGoogle } = require('./rifiutoGoogle');
+const { diGoogle } = require('../services/dominiGoogle');
 
 function hostDi(url) {
   try { return new URL(String(url)).hostname.toLowerCase(); } catch (_) { return ''; }
@@ -54,11 +55,22 @@ function apri(url, { hostAccesso = hostDi(url), suChiusa, suRifiuto, fino, fines
     try { tabs.chiudiDiServizio(id); } catch (_) {}
     if (suRifiuto) suRifiuto(motivo);
   });
+  // La scheda è ancora dell'accesso finché sta su Google o sul ritorno a Filo: se l'utente ci ha aperto altro, è sua.
+  const ancoraNostra = () => {
+    const t = tabs.tabs.find((x) => x.id === id);
+    if (!t) return false;
+    let u = '';
+    try { u = t.view.webContents.getURL() || t.url || ''; } catch (_) { u = t.url || ''; }
+    if (!/^https?:/i.test(u)) return true;
+    const h = hostDi(u);
+    return h === hostAccesso || diGoogle(u) || h === '127.0.0.1' || h === 'localhost' || h === '[::1]';
+  };
   return {
     id,
-    // Riporta davanti la scheda ancora aperta; false se non c'è più da seguire.
+    // Riporta davanti la scheda ancora aperta; false se non c'è più, o se ormai mostra altro.
     riporta() {
-      if (finita || win.isDestroyed() || !tabs.tabs.some((t) => t.id === id)) return false;
+      if (finita || win.isDestroyed()) return false;
+      if (!ancoraNostra()) { smetti(); return false; }
       try { if (win.isMinimized()) win.restore(); win.focus(); } catch (_) {}
       tabs.activate(id);
       return true;
@@ -66,7 +78,7 @@ function apri(url, { hostAccesso = hostDi(url), suChiusa, suRifiuto, fino, fines
     chiudi() {
       const aperta = !finita;
       smetti();
-      if (aperta && !win.isDestroyed()) { try { tabs.chiudiDiServizio(id); } catch (_) {} }
+      if (aperta && !win.isDestroyed() && ancoraNostra()) { try { tabs.chiudiDiServizio(id); } catch (_) {} }
     },
   };
 }

@@ -415,9 +415,9 @@
   async function collegaGoogle() {
     try {
       const r = await api.message({ type: 'auth_collega_google' });
-      if (r && r.ok === false) showToast(r.error || 'Non sono riuscito ad aprire l\'accesso a Google: riprova.');
+      if (r && r.ok === false) showToast(r.error || 'Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
     } catch (_) {
-      showToast('Non sono riuscito ad aprire l\'accesso a Google: riprova.');
+      showToast('Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
     }
   }
 

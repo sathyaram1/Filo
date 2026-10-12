@@ -9,7 +9,7 @@ const G = require('../services/dominiGoogle');
 
 const DOPO = 'https://www.youtube.com/';
 const INVITO = 'YouTube, Gmail e Drive nelle schede non sono ancora collegati al tuo account Google.';
-const RIFIUTO = 'Google non accetta l\'accesso dentro Filo: YouTube, Gmail e Drive nelle schede restano da collegare.';
+const RIFIUTO = 'Google non accetta l\'accesso dentro Filo, quindi YouTube, Gmail e Drive nelle schede restano scollegati.';
 
 function hostDi(url) {
   try { return new URL(String(url)).hostname.toLowerCase(); } catch (_) { return ''; }

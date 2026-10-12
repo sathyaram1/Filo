@@ -272,7 +272,7 @@ async function signIn() {
   return f.esito;
 }
 
-const AVVISO_NEL_BROWSER = 'Google non accetta l\'accesso dentro Filo: continua nel browser. Filo si collega, i prodotti Google nelle schede no.';
+const AVVISO_NEL_BROWSER = 'Google non accetta l\'accesso dentro Filo, quindi continua nel browser. Filo si collega lo stesso, ma YouTube, Gmail e Drive nelle schede restano scollegati.';
 
 // Prima in una scheda della finestra normale: lì l'accesso a Google vale anche per YouTube, Gmail e Drive (#1123).
 // Il browser di sistema resta il ripiego, quando Google rifiuta la scheda o una finestra normale non c'è.
@@ -299,8 +299,10 @@ function passaAlBrowser(f, motivo) {
   f.nelBrowser = true;
   console.warn('[auth] Google non accetta la scheda (' + motivo + '): accesso nel browser di sistema');
   try { require('./prodottiGoogle').googleRifiutaLeSchede(); } catch (_) {}
-  try { require('../services/avvisoFinestra').avvisoNellaFinestra(AVVISO_NEL_BROWSER, { chiave: 'accesso-nel-browser' }); } catch (_) {}
-  apriBrowser(f.url).catch((e) => f.loop.abort(e));
+  // La riga «continua nel browser» solo se il browser si è aperto: altrimenti parla l'errore dell'accesso.
+  apriBrowser(f.url).then(() => {
+    try { require('../services/avvisoFinestra').avvisoNellaFinestra(AVVISO_NEL_BROWSER, { chiave: 'accesso-nel-browser' }); } catch (_) {}
+  }, (e) => f.loop.abort(e));
 }
 
 function hostDi(url) {

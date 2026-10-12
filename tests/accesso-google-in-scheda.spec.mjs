@@ -1,7 +1,8 @@
 // #1123 — l'accesso a Filo con Google si apre in una scheda di Filo, così Google mette i suoi cookie dove li trovano
 // YouTube, Gmail e Drive. La scheda si chiude quando il codice arriva; se Google la rifiuta l'accesso passa da solo al
 // browser di sistema, con una riga che lo dice. Chi era entrato prima collega i prodotti Google dal menu dell'account.
-// L'accesso vero a Google non si prova qui: le sue pagine sono finte (tests/helpers/googleFinto.mjs).
+// L'accesso vero a Google non si prova qui: le sue pagine sono finte (tests/helpers/googleFinto.mjs), e se Google
+// risponda davvero disallowed_useragent a una scheda di Filo lo dice solo una prova dal vivo.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
@@ -142,6 +143,26 @@ test('chiedere di nuovo l\'accesso mentre la scheda aspetta la riporta davanti, 
   expect(a.ok && b.ok, 'tutti e due i gesti hanno lo stesso esito').toBe(true);
 });
 
+test('una scheda d\'accesso dove l\'utente ha aperto altro resta sua: non torna davanti e non si chiude', async ({ app, shell, testServer }) => {
+  const pagina = await googleFinto(app, testServer);
+  await risposteFinte(app, EMAIL);
+  await avviaAccesso(shell);
+  await indirizzoDellAccesso(app, pagina);
+  const [scheda] = await schedeSu(app, pagina);
+  const altro = testServer.html('<p>un altro sito</p>').replace('127.0.0.1', 'blocked.test');
+  await shell.evaluate(([id, u]) => window.filoShell.tabs.navigate(id, u), [scheda.id, altro]);
+  await expect.poll(() => schedeSu(app, altro).then((s) => s.length)).toBe(1);
+
+  await shell.evaluate(() => { window.__secondo = window.filoShell.auth.signIn(); });
+  await expect.poll(() => schedeSu(app, pagina).then((s) => s.length), { message: 'serve una pagina d\'accesso nuova' }).toBe(1);
+  const [nuova] = await schedeSu(app, pagina);
+  expect(nuova.id).not.toBe(scheda.id);
+  await (await paginaDi(app, pagina)).locator('#continua').click();
+  expect((await shell.evaluate(() => window.__secondo)).ok).toBe(true);
+  await expect.poll(() => schedeSu(app, pagina).then((s) => s.length)).toBe(0);
+  expect((await schedeSu(app, altro)).map((s) => s.id), 'la scheda dell\'utente è rimasta').toEqual([scheda.id]);
+});
+
 test('chi è dentro Filo senza Google nelle schede: invito una volta, voce nel menu, accesso web con l\'email già scritta', async ({ app, shell, testServer, avvisi }) => {
   const pagina = await googleFinto(app, testServer);
   await risposteFinte(app, EMAIL);
@@ -189,7 +210,8 @@ test('chi è dentro Filo senza Google nelle schede: invito una volta, voce nel m
 
   // La voce del menu fa la stessa cosa dell'invito.
   const { popup } = await vociMenuAccount(app, shell);
-  await popup.locator('.item', { hasText: 'Collega anche i prodotti Google' }).click();
+  // Il menu si chiude al clic: la chiusura può arrivare prima che Playwright chiuda il suo giro.
+  await popup.locator('.item', { hasText: 'Collega anche i prodotti Google' }).click({ noWaitAfter: true }).catch(() => {});
   await expect.poll(() => schedeSu(app, pagina).then((s) => s.length)).toBe(1);
 
   // Google entra nelle schede: la voce sparisce, l'uscita dice che Google resta, e i suoi domini diventano protetti.
@@ -218,7 +240,7 @@ test('collegare i prodotti Google quando Google rifiuta la scheda: la scheda si 
   const r = await shell.evaluate(() => window.filoShell.message({ type: 'auth_collega_google' }));
   expect(r.ok).toBe(true);
   const vista = await avvisi();
-  await expect(vista.locator('.shell-notif-msg', { hasText: 'YouTube, Gmail e Drive nelle schede restano da collegare' })).toBeVisible({ timeout: 8_000 });
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'Google non accetta l\'accesso dentro Filo, quindi YouTube, Gmail e Drive nelle schede restano scollegati' })).toBeVisible({ timeout: 8_000 });
   await expect.poll(() => schedeSu(app, pagina).then((s) => s.length)).toBe(0);
   expect(await app.evaluate(() => globalThis.__aperture.length), 'il browser di sistema non collega le schede: non si apre').toBe(0);
 });
