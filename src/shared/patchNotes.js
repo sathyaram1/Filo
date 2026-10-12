@@ -69,7 +69,7 @@
         'Una voce copiata fatta di soli spazi non è più una riga vuota senza spiegazione: adesso dice che sono spazi e quanti.',
         'Una voce tolta dalla cronologia appunti resta tolta: se la stessa cosa è ancora negli appunti e la incolli con "Incolla", Filo non la rimette in cronologia.',
         'Togliendo le voci della cronologia appunti con la tastiera il fuoco resta sulla lista, pronto per la voce dopo, anche se il mouse è fermo sopra le righe. Prima in quel caso tornava all\'inizio della pagina e per ogni voce bisognava riattraversare tutte le impostazioni col tabulatore.',
-        'Le finestrelle di accesso, come quella di «Accedi con Google», hanno nel titolo il sito vero, e la pagina non può cambiarlo. E un sito non le apre più da solo: senza un tuo clic la pagina si apre in una scheda con l\'indirizzo in vista, o resta ferma se hai il blocco dei popup acceso.',
+        'Le finestrelle di accesso, come quella di «Accedi con Google», hanno nel titolo il sito vero, e la pagina non può cambiarlo. Un sito non le apre più da solo. Senza un tuo clic la pagina chiesta si apre in una scheda, con l\'indirizzo in vista, oppure resta ferma se hai il blocco dei popup acceso.',
       ],
     },
     {
