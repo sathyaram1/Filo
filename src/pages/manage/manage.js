@@ -4271,33 +4271,27 @@
 
   mgStarBtn.addEventListener('click', toggleStarred);
 
-  // Le due caselle e il rombo verde della fila nascono dalla stessa domanda.
+  // La casella della risposta e il rombo verde della fila nascono dalla stessa domanda.
   function rispostaOfferta(fb) {
     return !!(isAdmin && fb && statoLeggibile(fb) && MR.aspettaRisposta(fb));
   }
-  function caselleRisposta() {
-    return [mgClarifyText, document.getElementById('mgSideRispostaText')].filter(Boolean);
-  }
-  function scriviBozzaRisposta(origine) {
+  function scriviBozzaRisposta(casella) {
     if (!selectedId) return;
-    const v = origine.value || '';
+    const v = casella.value || '';
     if (v) bozzeRisposta.set(selectedId, v); else bozzeRisposta.delete(selectedId);
-    for (const c of caselleRisposta()) if (c !== origine) c.value = v;
-  }
-  function bottoniRisposta(disabled) {
-    for (const b of [mgClarifyBtn, document.getElementById('mgSideRispostaBtn')]) if (b) b.disabled = disabled;
   }
   function tastiRisposta(e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendClarifyReply(e.currentTarget); }
   }
 
+  function riflettiEsitoRisposta(el) {
+    el.textContent = esitoRisposta.text;
+    el.className = 'mg-action-msg' + (esitoRisposta.kind ? ` mg-${esitoRisposta.kind}` : '');
+  }
   function setClarifyMsg(text, kind) {
-    const side = document.getElementById('mgSideRispostaMsg');
-    for (const el of [mgClarifyMsg, side]) {
-      if (!el) continue;
-      el.textContent = text || '';
-      el.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
-    }
+    esitoRisposta = { text: text || '', kind: kind || '' };
+    const el = document.getElementById('mgSideRispostaMsg');
+    if (el) riflettiEsitoRisposta(el);
   }
 
   // Risposta dell'owner a un feedback in `clarify`: la risposta si appende alle
