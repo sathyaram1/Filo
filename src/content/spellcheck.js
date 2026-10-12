@@ -572,6 +572,7 @@
     // Reset se il testo è troppo corto o invariato
     if (!text || text.length < MIN_TEXT_LENGTH) {
       state.issues = [];
+      state.testoIssues = text;
       state.lastScannedText = text;
       renderOverlayContent(state);
       return;
