@@ -35,6 +35,8 @@ require('../../shared/feedbackThread.js');
 // Registra SN_ROUTINE_SESSIONI: le regole su quante sessioni e da quale
 // account, le stesse che applica la pagina di gestione.
 require('../../shared/routineSessioni.js');
+// Registra SN_ROUTINE_MODELLI: modello e sforzo per fase, stesse regole della pagina.
+require('../../shared/routineModelli.js');
 
 const PROJECT_ID = 'filo-8b9cb';
 const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per design
