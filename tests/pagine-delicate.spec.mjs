@@ -59,7 +59,8 @@ test('chiusa una pagina con un campo password, al modello del riassunto e all\'i
 
   const partito = await mandato(app);
   expect(partito.filter((m) => m.tipo === 'riassunto')).toEqual([]);
-  expect(partito.some((m) => m.testo.includes('Saldo') || m.testo.includes('Il mio conto'))).toBe(false);
+  // «Saldo» da solo c'è anche nei crediti che il saluto della home manda al modello: si cerca il testo della pagina.
+  expect(partito.some((m) => m.testo.includes('Saldo disponibile') || m.testo.includes('Il mio conto'))).toBe(false);
 });
 
 test('con l\'interruttore delle pagine delicate spento, il testo della stessa pagina arriva al riassunto', async ({ app, shell, openTab, testServer }) => {
