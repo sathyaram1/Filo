@@ -1686,27 +1686,17 @@ class TabManager {
     try { dest.focus(); } catch (_) {}
   }
 
-  // §2.1 — segnali di attività riportati dal content script (input, scroll,
-  // form sporco). Merge parziale sullo snapshot. Best-effort: throttled lato
-  // pagina, qui non rimbalziamo se nulla cambia in modo significativo.
+  // §2.1 — segnali di attività del content script (input, scroll, form sporco), arrivano a ogni clic e
+  // scorrimento. Servono solo al main (triage, archivio): niente broadcast né salvataggio di sessione (#1089).
   setTabActivity(id, activity) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab || !activity || typeof activity !== 'object') return;
     // Qualsiasi attività in una tab conta come "Filo è in uso": resetta il
     // contatore di inattività dell'app (§2.1).
     this._lastAppInteractionAt = Date.now();
-    let changed = false;
-    if (typeof activity.lastInteractionAt === 'number') {
-      tab.lastInteractionAt = activity.lastInteractionAt; changed = true;
-    }
-    if (typeof activity.scrollPct === 'number') {
-      const v = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
-      if (v !== tab.scrollPct) { tab.scrollPct = v; changed = true; }
-    }
-    if (typeof activity.formDirty === 'boolean') {
-      if (activity.formDirty !== tab.formDirty) { tab.formDirty = activity.formDirty; changed = true; }
-    }
-    if (changed) this._broadcast();
+    if (typeof activity.lastInteractionAt === 'number') tab.lastInteractionAt = activity.lastInteractionAt;
+    if (typeof activity.scrollPct === 'number') tab.scrollPct = Math.max(0, Math.min(100, Math.round(activity.scrollPct)));
+    if (typeof activity.formDirty === 'boolean') tab.formDirty = activity.formDirty;
   }
 
   navigate(id, url) {
