@@ -384,6 +384,8 @@
         el,
         overlay: null,
         issues: [],
+        // Il testo a cui si riferiscono gli offset di `issues`.
+        testoIssues: '',
         lastScannedText: '',
         timer: null,
         ro: null,
