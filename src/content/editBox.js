@@ -159,14 +159,17 @@
       if (savedCtx.kind === 'input') {
         const el = savedCtx.el;
         const start = savedCtx.start, end = savedCtx.end;
+        const caret = start + currentResult.length;
         // Come una battuta: il rosso del correttore sulle altre parole resta (#1111).
-        if (!global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, currentResult)) {
+        if (global.SN_SPELLCHECK?.sostituisciComeBattuta?.(el, { start, end }, currentResult)) {
+          el.setSelectionRange(start, caret);
+        } else {
           el.value = el.value.slice(0, start) + currentResult + el.value.slice(end);
+          el.setSelectionRange(start, caret);
           // Il campo può stare in un riquadro di Filo, chiuso ai gesti finti: la sostituzione è nostra e deve sentirla.
           const ev = new Event('input', { bubbles: true });
           el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
         }
-        el.setSelectionRange(start, start + currentResult.length);
       } else if (savedCtx.kind === 'ce') {
         try { document.execCommand('insertText', false, currentResult); } catch (_) {}
       }
