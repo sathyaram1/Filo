@@ -612,6 +612,9 @@ export function pushRamoCorrente(root, { exec = execFileSync } = {}) {
   if (isProtectedBranch(ramo, principale)) return { ok: true, skipped: true, branch: ramo, reason: `'${ramo}' è un ramo protetto: non si spedisce da qui` };
   // La destinazione si dichiara sulla riga stessa (sorgente:destinazione),
   // come nell'hook: una sentinella negli unit test la cerca lì.
+  let copie = [];
+  try { copie = copieDaSpedire(root); } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
+  if (copie.length) return { ok: false, skipped: false, branch: ramo, reason: avvisoSpedizione(copie) };
   const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
   if (push.ok) return { ok: true, skipped: false, branch: ramo };
   // «! [remote rejected]» è il SERVER che dice di no (un pre-receive, una
