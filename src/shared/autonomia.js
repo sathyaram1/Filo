@@ -320,7 +320,7 @@
     ELENCO_FISSO, CAMPI, MANOPOLE, RISPOSTE, SEGRETI,
     livelloValido, livelloDa, livelloAttivo, selezionabile, infoLivello, livelliSelezionabili, unisciPiuStretta,
     costoValido, campoValido, classeValida, costoEffettivo, classeFonte, stato,
-    decide, decideDettaglio, richiestaCambioLivello, richiestaSpostamentoFonte,
+    decide, decideDettaglio, richiestaCambioLivello, confermaAlzata, richiestaSpostamentoFonte,
     segreto, frasePerche, fraseNo,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : self);
