@@ -134,8 +134,9 @@ test('gli aggiornatori veri di ogni sistema passano dal cancello, un finto delle
   let controlli = 0;
   ascolta.checkForUpdates = async () => { controlli++; return null; };
   await U.avviaAggiornatore(ascolta, { automatici: false });
+  const prima = controlli;
   await ascolta.checkForUpdates();
-  assert.equal(controlli, 1, 'un aggiornatore finto, fuori da electron-updater, viene fermato come una libreria rinominata');
+  assert.equal(controlli, prima + 1, 'un aggiornatore finto, fuori da electron-updater, viene fermato come una libreria rinominata');
 });
 
 const yml = (righe, file) => `version: 99.0.0\n${righe}files:\n  - url: ${file}\n    sha512: AAAA\n    size: 1\npath: ${file}\nsha512: AAAA\n`;
