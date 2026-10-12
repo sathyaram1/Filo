@@ -4552,6 +4552,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     nascostiDellaChat = nascostiDi(filo);
     return true;
   };
+  // Turno finito prima del suo ultimo giro (fermato, o un guasto): nell'archivio restano le azioni successe davvero e la
+  // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
+  const archiviaGiaFatto = async () => {
+    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
+    const giaScritta = unisciTesti(risposta);
+    if (!chatId || (!successe.length && !giaScritta)) return;
+    const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
+    if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
+  };
   let fermato = false;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
