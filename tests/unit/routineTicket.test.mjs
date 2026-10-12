@@ -301,9 +301,11 @@ test('#565 ticket --json stampa biglietto E ruolo (e il biglietto non si spreca)
   });
   await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
   const porta = srv.address().port;
+  // Il comando registra la decisione nelle impostazioni utente: qui una cartella usa-e-getta.
+  const utente = cartellaTemporanea('filo-ticket-utente-');
   const esegui = (argomenti) => new Promise((ok) => {
     const p = spawn(process.execPath, [CANALE, ...argomenti], {
-      env: { ...process.env, FILO_ROUTINE_TICKET: '', FILO_ROUTINE_API: `http://127.0.0.1:${porta}` },
+      env: { ...process.env, FILO_ROUTINE_TICKET: '', FILO_ROUTINE_API: `http://127.0.0.1:${porta}`, CLAUDE_CONFIG_DIR: utente },
     });
     let so = ''; let se = '';
     p.stdout.on('data', (c) => { so += c; });
