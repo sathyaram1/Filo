@@ -99,11 +99,8 @@ test('crediti finiti a metà: restano i risultati trovati e la pagina dice dove 
   await page.waitForFunction(() => window.filo && window.__mgTest);
   await cerca(page, 'la x per chiudere');
   await expect(page.locator('#mgSearchProgress')).toBeHidden({ timeout: 20000 });
-  const msg = await page.locator('#mgSearchMsg').textContent();
-  const n = await page.locator('.mg-item--result').count();
-  console.log('402 →', n, 'risultati, messaggio:', msg);
-  expect(msg).toMatch(/si è fermato dopo 16 feedback su 40/);
-  expect(n).toBeGreaterThan(0);
+  await expect(page.locator('#mgSearchMsg')).toContainText(/si è fermato dopo 16 feedback su 40/);
+  await expect(page.locator('.mg-item--result')).toHaveCount(3);
 });
 
 test('titolo con markup ed emoji: si legge come testo, e il clic durante la lettura resta', async ({ app, openTab }) => {
@@ -127,4 +124,22 @@ test('titolo con markup ed emoji: si legge come testo, e il clic durante la lett
   await expect(page.locator('#mgSearchProgress')).toBeVisible();
   await page.waitForTimeout(1200);
   await page.screenshot({ path: 'tests/.shots/v1118-in-lettura-scuro.png' });
+});
+
+test('la barra di avanzamento nei due temi', async ({ app, openTab }) => {
+  await preparaOwner(app, { latenza: 1500 });
+  const page = await openTab(URL);
+  await page.waitForFunction(() => window.filo && window.__mgTest);
+  const tanti = feedbacks();
+  for (let i = 40; i < 400; i++) tanti.push({ _id: `fb-${i}`, name: `Altro ${i}`, text: `niente ${i}`, seq: i + 600, subSeq: 0, status: 'new', clientId: 't@example.com', createdAt: '2026-06-03T10:00:00Z', images: [] });
+  await page.evaluate((fbs) => window.__mgTest.setData(fbs), tanti);
+  await page.click('#mgSearchToggle');
+  await page.fill('#mgSearchInput', 'la x per chiudere');
+  await page.press('#mgSearchInput', 'Enter');
+  await expect(page.locator('.mg-item--result').first()).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'tests/.shots/v1118-barra-chiaro.png' });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'tests/.shots/v1118-barra-scuro.png' });
 });
