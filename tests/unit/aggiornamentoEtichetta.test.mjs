@@ -214,7 +214,8 @@ perOgniSistema('trovata una versione vera e poi spostata la «latest» su una ma
   const { u, feed } = await avvia({ ...s, ...VERA, automatici: false });
   assert.ok(cartaDi('0.2.240'));
   Object.assign(feed, MANOMESSA);
-  await u.checkForUpdates();
+  // Il cancello dei tag (#1073) rifiuta il controllo stesso.
+  await assert.rejects(u.checkForUpdates(), /rifiutata/);
   await U.installaAggiornamento();
   await calma();
   assert.equal(u.scaricamenti, 0, 'electron-updater scarica l\'ultima che ha trovato: la manomessa');
