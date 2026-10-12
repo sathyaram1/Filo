@@ -200,7 +200,7 @@
   }
 
   // Costruisce l'editor a segmenti per UNA azione.
-  // Ritorna { el, avviso, getValue, conferma, ricontrolla } dove getValue() torna la stringa "a, b, c".
+  // Ritorna { el, avviso, getValue, conferma, ricontrolla, imposta } dove getValue() torna la stringa "a, b, c".
   function buildChain(value, onChange, ctx) {
     const validate = ctx && ctx.validate;
     const isKnown = (ctx && ctx.isKnown) || (() => true);
@@ -353,9 +353,17 @@
       }
     }
 
+    // Un valore arrivato da fuori riscrive solo questa catena: le altre tengono il messaggio di un rifiuto e il fuoco.
+    function imposta(value) {
+      refs = splitRefs(value);
+      if (!refs.length) refs = [''];
+      render();
+      ricontrolla();
+    }
+
     render();
     ricontrolla();
-    return { el, avviso, getValue, conferma, ricontrolla };
+    return { el, avviso, getValue, conferma, ricontrolla, imposta };
   }
 
   // Popola un host (.sn-grid-2) con una cella per azione: etichetta + editor a
