@@ -1060,7 +1060,8 @@ class TabManager {
   _avvisaSorvegliante(tab, evento, dati = {}) {
     const fn = tab && tab._sorvegliante;
     if (!fn) return;
-    if (evento === 'chiusa') tab._sorvegliante = null;
+    // Chiusa mentre Filo la seguiva: è un passaggio, e l'archivio non la deve riaprire.
+    if (evento === 'chiusa') { tab._sorvegliante = null; tab._passaggio = true; }
     try { fn(evento, dati); } catch (_) {}
   }
 
