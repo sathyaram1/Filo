@@ -25,6 +25,17 @@ export function chiaveDelFermo(tipo, tag) {
 const EVENTI = new Set(['push', 'workflow_dispatch']);
 const PROFONDITA = 3000;
 
+/** Il lavoro di suite.yml che rifà il cancello di pubblicazione: gli unit test su Windows. */
+export const LAVORO_UNIT_WINDOWS = 'unit-windows';
+
+/**
+ * Una corsa verde si pubblica solo se ha passato anche gli unit su Windows: senza (una corsa di prima del lavoro, o col
+ * lavoro saltato) il cancello di release.yml può rifiutare quel commit a ogni giro, e nessuno lo sistema più (#1184). PURA.
+ */
+export function passaIlCancello(lavori) {
+  return (Array.isArray(lavori) ? lavori : []).some((j) => j?.name === LAVORO_UNIT_WINDOWS && j.conclusion === 'success');
+}
+
 /** Le corse riuscite di suite.yml su main, per commit (la più nuova per prima). PURA. */
 export function corseVerdi(runs) {
   const perSha = new Map();
