@@ -366,7 +366,7 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
  * Il motore. dep = {
  *   store: { leggi() → { coda, pratiche }, salvaPratica(p) },
  *   esegui(cmd, args, { cwd, input, timeoutMs }) → { code, stdout, out },   // out = stdout + stderr
- *   claude({ ruolo, prompt, cwd, addDirs, nome }) → { ok, testo, costo, errore },
+ *   claude({ ruolo, prompt, cwd, addDirs, nome, dalServer }) → { ok, testo, costo, errore },
  *   verifica(wtApp) → { ok, entry, dirty }, pubblica() → { code, out },
  *   carico() → { cpu, liberaGB }, dormi(ms), log(riga), ora() → ISO,
  *   percorsi: { radice, wt(slug), serverRadice ('' se manca), wtServer(slug), note, regole },
