@@ -169,5 +169,8 @@
 
   const gesto = crea();
   if (typeof window !== 'undefined') gesto.ascolta(window);
-  global.SN_GESTO = { FINESTRA_MS, EVENTI, SELEZIONA, CHIUDE, tipiDelTasto, luogoDi, dentro, sullaSelezione, crea, ...gesto };
+  global.SN_GESTO = {
+    FINESTRA_MS, EVENTI, SELEZIONA, CHIUDE, SPOSTAMENTO_PX, PRESSIONE_LUNGA_MS,
+    tipiDelTasto, luogoDi, dentro, sullaSelezione, crea, ...gesto,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
