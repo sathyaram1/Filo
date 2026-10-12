@@ -68,7 +68,7 @@
     },
     'contestoFilo.token': {
       nome: 'tetto in token di quello che la chat ricorda',
-      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT')} token`),
+      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
       livello: 2,
     },
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
