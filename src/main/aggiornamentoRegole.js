@@ -163,5 +163,5 @@ function fileDiRilascio({ versione, urls, owner, repo, host = 'github.com' } = {
 module.exports = {
   MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI,
   confrontaVersioni, modoScelto, piano, sceltaNonVale, haPulsante,
-  ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato, fileDiRilascio,
+  ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato, tagDiGitHubAccettato, fileDiRilascio,
 };
