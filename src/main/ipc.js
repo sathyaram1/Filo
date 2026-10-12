@@ -22,6 +22,7 @@ const SegretiLetti = require('./services/segretiLetti');
 const MAX_STAMPATO = 8000000;
 const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
+const { chiediConferma, ritiraConferma } = require('./confermeSopraPagina');
 
 const inFlightStreams = new Map(); // requestId → AbortController
 // Una shell PERSISTENTE per scheda, chiavata sull'id del WebContents che la
@@ -602,6 +603,10 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win && win._filoTabs.avvisi) win._filoTabs.avvisi.aggiorna(stato);
   });
+
+  // ─── conferme di Filo chieste da un sito (sopra la sua scheda, #592.6) ───────
+  ipcMain.handle('filo:conferma', (event, richiesta) => chiediConferma(event, richiesta));
+  ipcMain.on('filo:conferma-ritira', (event, d) => ritiraConferma(event, d));
 
   // ─── barra laterale (#871) ────────────────────────────────────────────────
   // Solo la shell della propria finestra: tema e profilo che mostra, e la maniglia.

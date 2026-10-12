@@ -257,6 +257,26 @@ let streamCounter = 0;
 
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
+// Le conferme di Filo su un sito le disegna il main sopra la scheda, fuori dal documento
+// che il sito può ridisegnare (#592.6): SN_CONFIRM_UI manda qui la domanda. Ai tasti che
+// l'utente batte sul popup mentre scriveva risponde il suo campo, in questo frame.
+const tastiConferme = new Map();
+let seqConferme = 0;
+ipcRenderer.on('filo:conferma-tasto', (_event, d) => {
+  const suTasto = d && tastiConferme.get(d.id);
+  if (suTasto) suTasto(d.tasto);
+});
+globalThis.SN_CONFERMA_FUORI = (richiesta, suTasto, segnale) => {
+  const id = ++seqConferme;
+  tastiConferme.set(id, suTasto);
+  const ritira = () => ipcRenderer.send('filo:conferma-ritira', { id });
+  const ascolta = segnale && typeof segnale.addEventListener === 'function';
+  if (ascolta) segnale.addEventListener('abort', ritira, { once: true });
+  return ipcRenderer.invoke('filo:conferma', { ...richiesta, id }).finally(() => {
+    tastiConferme.delete(id);
+    if (ascolta) segnale.removeEventListener('abort', ritira);
+  });
+};
 // ─── #664 — il collegamento d'invito cliccato dentro Filo ──────────────────
 // `filo://invito/<codice>` non è una pagina: da fuori lo consegna il sistema e
 // Filo riscatta. Dentro Filo lo stesso clic deve fare lo stesso, ma solo un
