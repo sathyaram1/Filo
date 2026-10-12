@@ -1494,7 +1494,8 @@
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
-    return classifica(comeLaShell(cmd, c), c, 0);
+    const letto = comeLaShell(cmd, c);
+    return letto == null ? TRE : classifica(letto, c, 0);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
