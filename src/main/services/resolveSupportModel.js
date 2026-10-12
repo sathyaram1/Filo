@@ -41,6 +41,12 @@ const SLOT_DEFAULTS = {
   judgePriority: 'flash',
 };
 
+// La scelta iniziale delle funzioni dell'owner nate dopo lo spostamento (#465): non hanno una scelta di prima da
+// ereditare, e senza questa partirebbero spente finché l'owner non le imposta (#1118). Una stringa vuota le spegne.
+const OWNER_SLOT_DEFAULTS = Object.freeze({
+  manageSearchClassifier: 'typesafe/jev-1.13',
+});
+
 /**
  * Risolve il modello per uno slot di supporto.
  *
