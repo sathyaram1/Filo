@@ -23,9 +23,15 @@
 #   server, non qui.
 #
 # AUTENTICAZIONE
-#   · GITHUB_TOKEN effimero di Actions: crea e pubblica la Release. Le
-#     "Workflow permissions" del repo devono essere su "Read and write"
-#     (Settings -> Actions -> General).
+#   · I segreti stanno nell'ambiente `rilascio`, aperto al solo `main`: ogni
+#     job che ne legge uno lo dichiara, cosi' un workflow spinto su un ramo
+#     non li vede (#1073, tests/unit/catenaPubblicazione.test.mjs).
+#   · GITHUB_TOKEN effimero di Actions: crea la bozza e allega i file. I
+#     permessi li dichiara questo file: le impostazioni del repo possono
+#     restare su sola lettura.
+#   · L'app di pubblicazione, se `vars.FILO_RILASCIO_APP_ID` c'e': rende
+#     pubblica la bozza, il passo che crea il tag v*, e la regola sui tag
+#     lascia passare solo lei. Senza variabile resta il GITHUB_TOKEN.
 #   · FILO_BUILD_PASSPHRASE: la parola d'ordine di scopo `build`, la stessa che
 #     apre le chiavi di default e l'allarme. Apre SOLO quelle tre cose, e
 #     l'aumento di versione non accetta da qui nessun numero e nessun
