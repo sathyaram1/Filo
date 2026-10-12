@@ -195,6 +195,7 @@ test.skip(` + '`saltata ${1}`' + String.raw`, async ({ app, page }) => { await c
 });
 
 test('con la fixture così com\'è la prova è già accolta; chi apre Filo da sé o chiede il profilo nuovo dichiara', () => {
+  // Il lancio è spezzato: scritto per intero, le sentinelle dei lanci leggerebbero questo file come uno che apre Filo.
   const testa = String.raw`import { test, expect } from './fixtures/electron.mjs';
 async function configura(app) {
   await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'k' } }); });
