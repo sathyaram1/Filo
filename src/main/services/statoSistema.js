@@ -475,12 +475,84 @@ function scriptWindows(pid) {
   return SCRIPT_WINDOWS.replace('__GENITORE__', String(Math.trunc(Number(pid)) || 0)).replace('__VOLUME__', () => volume);
 }
 
+// Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}.
+function elencoWindows(v) {
+  if (Array.isArray(v)) return v.filter((x) => x && typeof x === 'object');
+  if (v && typeof v === 'object' && Array.isArray(v.value)) return elencoWindows(v.value);
+  return null;
+}
+const RE_GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const guidWindows = (v) => {
+  const s = typeof v === 'string' ? v.trim().replace(/^\{|\}$/g, '').toLowerCase() : '';
+  return RE_GUID.test(s) ? s : null;
+};
+// IANA 71 è 802.11, 6 è Ethernet: lo stesso numero che .NET chiama Wireless80211 ed Ethernet.
+const TIPO_IANA = { 71: 'wifi', 6: 'cavo' };
+function tipoSchedaWindows(t) {
+  const s = String(t || '');
+  if (s === 'Wireless80211') return 'wifi';
+  return /ethernet/i.test(s) ? 'cavo' : null;
+}
+
+// Le connessioni vive con Internet o un gateway; vince chi ha Internet, poi chi sa come esce, poi quella che Windows usa.
+// I profili di Windows legano la connessione al suo adattatore con un Guid vero; il gestore delle reti è la riserva, e
+// dà i nomi. #1114: il suo Guid attraverso PowerShell può mancare, e la rete restava «collegata» senza dire il Wi-Fi.
+function reteDaWindows(r) {
+  const schede = new Map();
+  for (const s of elencoWindows(r.schede) || []) {
+    const id = guidWindows(s.id);
+    if (id) schede.set(id, s);
+  }
+  const profili = elencoWindows(r.profili);
+  const connessioni = elencoWindows(r.connessioni);
+  if (!profili && !connessioni) return null;
+  const esce = (id) => !!(id && schede.get(id) && schede.get(id).gateway === true);
+  const tipoDi = (id) => tipoSchedaWindows(id && schede.get(id) && schede.get(id).tipo);
+  const daiProfili = [];
+  for (const p of profili || []) {
+    const id = guidWindows(p.id);
+    const livello = Number(p.livello);
+    // 1 solo la rete locale, 2 Internet limitata (un portale da accettare), 3 Internet.
+    if (!id || !(livello >= 1)) continue;
+    if (livello < 2 && !esce(id)) continue;
+    daiProfili.push({ id, internet: livello === 3, tipo: TIPO_IANA[Number(p.iana)] || tipoDi(id) });
+  }
+  const daiCollegamenti = [];
+  for (const c of connessioni || []) {
+    const id = guidWindows(c.id);
+    const internet = c.internet === true;
+    if (!internet && !esce(id)) continue;
+    daiCollegamenti.push({ id, internet, tipo: tipoDi(id) });
+  }
+  const candidati = daiProfili.length ? daiProfili : daiCollegamenti;
+  if (!candidati.length) return { uscita: false };
+  const principale = guidWindows(r.principale);
+  const peso = (c) => (c.internet ? 4 : 0) + (c.tipo ? 2 : 0) + (c.id && c.id === principale ? 1 : 0);
+  let scelta = candidati[0];
+  for (const c of candidati) if (peso(c) > peso(scelta)) scelta = c;
+  return { tipo: scelta.tipo, nome: scelta.tipo === 'wifi' ? nomeDaWindows(scelta, candidati, connessioni || []) : null };
+}
+
+// Il nome della rete lo dà il gestore delle reti, per adattatore. Se non dice quale, il nome è certo solo quando
+// una connessione sola esce su Internet, da tutte e due le parti.
+function nomeDaWindows(scelta, candidati, connessioni) {
+  const nome = (c) => (c && typeof c.nome === 'string' && c.nome.trim() ? c.nome : null);
+  const stessa = scelta.id && connessioni.find((c) => guidWindows(c.id) === scelta.id);
+  if (stessa) return nome(stessa);
+  if (connessioni.some((c) => guidWindows(c.id))) return null;
+  const conInternet = connessioni.filter((c) => c.internet === true);
+  if (!scelta.internet || conInternet.length !== 1 || candidati.filter((c) => c.internet).length !== 1) return null;
+  return nome(conInternet[0]);
+}
+
 function datiDaWindows(riga) {
   let j;
   try { j = JSON.parse(String(riga || '').trim()); } catch (_) { return null; }
   if (!j || typeof j !== 'object' || Array.isArray(j)) return null;
-  let rete = j.rete && typeof j.rete === 'object' ? { tipo: j.rete.tipo || null, nome: j.rete.nome || null } : null;
-  if (rete && j.rete.uscita === false) rete = { uscita: false };
+  const r = j.rete && typeof j.rete === 'object' && !Array.isArray(j.rete) ? j.rete : null;
+  let rete = null;
+  if (r && ('profili' in r || 'connessioni' in r)) rete = reteDaWindows(r);
+  else if (r) rete = r.uscita === false ? { uscita: false } : { tipo: r.tipo || null, nome: r.nome || null };
   let bluetooth = j.bluetooth && typeof j.bluetooth === 'object' ? { ...j.bluetooth } : null;
   // Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}: si riprende l'elenco.
   const d = bluetooth && bluetooth.dispositivi;
