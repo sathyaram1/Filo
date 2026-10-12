@@ -14,7 +14,7 @@ const YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'release.yml'), '
 const SUITE_YML = readFileSync(resolve(ROOT, '.github', 'workflows', 'suite.yml'), 'utf8');
 const SCEGLI_JS = readFileSync(resolve(ROOT, 'scripts', 'ultima-suite-verde.mjs'), 'utf8');
 const { PASSI, casella } = await import('../../scripts/release-platform-alarm.mjs');
-const { CHIAVE_FERMO, SOGLIA_ORE } = await import('../../scripts/ultima-suite-verde.mjs');
+const { CHIAVE_FERMO, SOGLIA_ORE, LAVORO_UNIT_WINDOWS } = await import('../../scripts/ultima-suite-verde.mjs');
 
 // I commenti raccontano: si guardano solo le righe di comando/configurazione.
 const senzaCommenti = (s) => s.split(/\r?\n/).filter((r) => !/^\s*#/.test(r)).join('\n');
