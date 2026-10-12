@@ -84,7 +84,9 @@ const ESTENSIONI = ['.js', '.mjs', '.cjs', '.html', '.css', '.json'];
 const URL_RE = /\b(?:https?|wss?):\/\/[^\s'"`<>()\\]*/gi;
 // safeFetch e fetchList sono gli involucri del progetto che fanno rete per conto di un altro file.
 const CHIAMATA_RE = /\bfetch\s*\(|\bnet\s*\.\s*(?:request|fetch|connect|createConnection)\b|\bglobalThis\s*\.\s*fetch\b|\bnew\s+(?:WebSocket|EventSource|XMLHttpRequest)\b|\bsendBeacon\s*\(|\b(?:safeFetch|fetchList)\s*\(/;
-const MODULO_RETE_RE = /\brequire\(\s*['"](?:node:)?(?:https?|http2|tls|dgram)['"]\s*\)|\bfrom\s+['"](?:node:)?(?:https?|http2|tls|dgram)['"]/;
+// Un file che prende un modulo di rete fa rete, comunque poi chiami le sue funzioni (per nome, destrutturate, al volo).
+// Uno che lo prende solo per un aiuto (net.isIP) si dichiara fra le chiamate locali.
+const MODULO_RETE_RE = /\brequire\(\s*['"](?:node:)?(?:https?|http2|tls|net|dgram)['"]\s*\)|\bfrom\s+['"](?:node:)?(?:https?|http2|tls|net|dgram)['"]|\brequire\(\s*['"]electron['"]\s*\)\s*\.\s*net\b|\{[^}]*\bnet\b[^}]*\}\s*=\s*require\(\s*['"]electron['"]\s*\)|\bimport\s*\{[^}]*\bnet\b[^}]*\}\s*from\s+['"]electron['"]/;
 
 const K = ts.SyntaxKind;
 const PAROLE_PRIMA_DI_REGEX = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'instanceof', 'new', 'delete', 'void', 'throw', 'yield', 'await']);
