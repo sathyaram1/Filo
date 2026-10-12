@@ -1181,8 +1181,9 @@
     if (prog === 'grep') cerca = operandiGrep(testi);
     else if (prog === 'findstr') cerca = operandiFindstr(testi);
     else if (prog === 'select-string' || prog === 'sls') cerca = operandiSls(testi);
-    // Il testo cercato non si apre mai: `grep "//TODO" a.js` non contatta nessuno.
-    if (scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
+    // Il testo cercato non si apre mai: `grep "//TODO" a.js` non contatta nessuno, `echo //nota` che nessuno usa neanche.
+    const stampaSoltanto = c.stampaLibera && STAMPANO.has(prog);
+    if (!stampaSoltanto && scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
     if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
     if (PROCESSI.has(prog)) return due(MOTIVI.processi);
     if (prog === 'git') return gitPerimetro(dequote(raw), c);
