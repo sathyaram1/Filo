@@ -103,6 +103,22 @@ test('esplora: Filo mostra la scelta due volte; clic su quella vecchia e su quel
   await page.waitForTimeout(2000);
   const dopoVecchia = { livello: await livello(app), utente: await page.locator('.dash-bubble-user').allTextContents(),
     scelti: await page.locator('.dash-autonomia-livello.scelto').allTextContents() };
+  const btn = page.locator('.dash-autonomia-scelta').last().locator('.dash-autonomia-livello', { hasText: 'Conservativo' });
+  const campiona = async () => {
+    const out = [];
+    for (let i = 0; i < 8; i++) {
+      const b = await btn.boundingBox();
+      const frasi = await page.locator('.dash-autonomia-frase').allTextContents();
+      const sc = await page.evaluate(() => { const e = document.getElementById('bubbles') || document.querySelector('.dash-bubbles'); return e ? [e.scrollTop, e.scrollHeight] : null; });
+      out.push([b && Math.round(b.y), frasi.map((f) => f.slice(0, 20)), sc]);
+      await page.waitForTimeout(150);
+    }
+    return out;
+  };
+  console.log('CAMPIONI-MOUSE-SOPRA', JSON.stringify(await campiona()));
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(500);
+  console.log('CAMPIONI-MOUSE-VIA', JSON.stringify(await campiona()));
   await queueChat(app, { text: 'Fatto.', actions: [{ type: 'ONBOARDING', spunta: ['autonomia'] }] });
   await page.locator('.dash-autonomia-scelta').last().locator('.dash-autonomia-livello', { hasText: 'Conservativo' }).click();
   await page.waitForTimeout(6000);
