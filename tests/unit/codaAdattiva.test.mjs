@@ -30,23 +30,39 @@ test('fa tutti i lavori, mai più del tetto insieme, e dice ognuno appena è fat
   assert.ok(visti.every(([ris, lavoro, i]) => ris === lavoro * 2 && lavoro === i));
 });
 
-test('un 429 dimezza il tetto e il lavoro si rifà dopo l\'attesa', async () => {
+test('un 429 dimezza il tetto, il lavoro si rifà dopo l\'attesa, e passata la raffica il tetto torna su', async () => {
   let attivi = 0;
-  const picchiDopo = [];
+  const picchi = [];
   let colpito = false;
-  const r = await esegui(Array.from({ length: 24 }, (_, i) => i), async (x) => {
+  let dopo = false;
+  const partenze = [];
+  const r = await esegui(Array.from({ length: 60 }, (_, i) => i), async (x) => {
     attivi++;
+    if (colpito) partenze.push(attivi);
     try {
       await ritardo(4);
       if (x === 0 && !colpito) { colpito = true; throw errore(429, { retryAfterMs: 1 }); }
-      if (colpito) picchiDopo.push(attivi);
+      if (colpito) { dopo = true; picchi.push(attivi); }
       return x;
     } finally { attivi--; }
   }, { parallelo: 8, classifica, attesa: () => 1 });
-  assert.equal(r.fatti, 24, 'il lavoro rallentato si rifà, non si perde');
+  assert.equal(r.fatti, 60, 'il lavoro rallentato si rifà, non si perde');
   assert.deepEqual(r.scartati, []);
-  // Dopo il rallentamento i lavori nuovi partono con un tetto di 4: in coda alla corsa il picco non torna a 8.
-  assert.ok(Math.max(...picchiDopo.slice(-6)) <= 4, `picco finale ${Math.max(...picchiDopo.slice(-6))}`);
+  assert.ok(dopo);
+  assert.ok(Math.min(...partenze) <= 4, 'subito dopo il 429 i lavori nuovi partono con un tetto più basso');
+  assert.equal(Math.max(...picchi.slice(-12)), 8, 'in coda alla corsa si torna al tetto pieno');
+});
+
+test('troppe richieste di continuo: finiti i tentativi di un lavoro si ferma tutto, senza rifare la scala per ogni lavoro', async () => {
+  const partiti = new Set();
+  const r = await esegui(Array.from({ length: 40 }, (_, i) => i), async (x) => {
+    partiti.add(x);
+    await ritardo(2);
+    throw errore(429);
+  }, { parallelo: 4, classifica, tentativi: 3, attesa: () => 1 });
+  assert.equal(r.fermo.status, 429);
+  assert.equal(r.fatti, 0);
+  assert.ok(partiti.size <= 4, `partiti ${partiti.size} lavori: oltre la prima ondata non ne parte nessuno`);
 });
 
 test('un guasto passeggero si riprova; finiti i tentativi il lavoro si salta e gli altri continuano', async () => {
