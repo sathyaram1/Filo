@@ -222,7 +222,7 @@ function senzaOpzioniDellaPagina(features) {
   const via = {};
   for (const coppia of String(features || '').split(',')) {
     const chiave = coppia.split('=')[0].trim();
-    if (chiave && chiave !== 'webPreferences' && !MISURE_FINESTRELLA.has(chiave)) via[chiave] = undefined;
+    if (chiave && !MISURE_FINESTRELLA.has(chiave)) via[chiave] = undefined;
   }
   return via;
 }
