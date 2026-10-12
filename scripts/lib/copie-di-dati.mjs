@@ -260,7 +260,14 @@ const PRE_PUSH = `#!/bin/sh
 radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 controllo="$radice/scripts/copie-in-scena.mjs"
 [ -f "$controllo" ] && command -v node >/dev/null 2>&1 || exit 0
-exec node "$controllo" --pre-push "$radice"
+righe=$(cat)
+# node costa a ogni push: si chiama solo se i commit da spedire portano qualcosa che non e' codice o immagine.
+dati=$(printf '%s\\n' "$righe" | while read -r _ locale _ _; do
+  case "$locale" in *[!0]*) ;; *) continue ;; esac
+  git log --format= --name-only --diff-filter=ACMR "$locale" --not --remotes 2>/dev/null
+done | grep -vE '\\.(js|mjs|cjs|ts|css|html|md|sh|ps1|png|jpe?g|gif|webp|svg|ico)$' | grep -m1 .)
+[ -n "$dati" ] || exit 0
+printf '%s\\n' "$righe" | node "$controllo" --pre-push "$radice"
 `;
 
 /**
