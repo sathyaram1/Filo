@@ -55,7 +55,10 @@ test('Opzioni: cambiato il modello della riga del registro, l\'avviso di voce lo
   await p.evaluate(() => { delete document.documentElement.dataset.snTheme; });
 
   // La riga «voce-mista» del registro passa a un modello servito solo da ammessi.
-  const riga = p.locator('.sn-model-row').filter({ has: p.locator('input[value="voce-mista"]') }).first();
+  const righe = p.locator('.sn-model-row');
+  const n = await righe.evaluateAll((rs) => rs.findIndex((r) => [...r.querySelectorAll('input')].some((i) => i.value === 'voce-mista')));
+  expect(n).toBeGreaterThanOrEqual(0);
+  const riga = righe.nth(n);
   const id = riga.locator('input.sn-model-id');
   await id.fill('acme/voce-buona');
   await id.dispatchEvent('input');
