@@ -19,6 +19,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const PAGE_A = '<!doctype html><title>A</title><h1 id="mark-a">pagina A</h1>';
 const PAGE_B = '<!doctype html><title>B</title><h1 id="mark-b">pagina B</h1>'
