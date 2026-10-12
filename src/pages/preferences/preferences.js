@@ -1330,6 +1330,8 @@
     const elenco = Array.from(new Set(nuovo));
     disegnaCartelle(elenco);
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { documenti: { cartelle: elenco } } });
+    const hint = $('documentiHint');
+    if (hint) hint.textContent = 'Salvato';
     flashSaved('documentiHint');
     setTimeout(caricaStatoDocumenti, 400);
   }
