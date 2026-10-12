@@ -596,7 +596,8 @@ test('fusione col pannello stretto al minimo: armato, Approva non si muove e il 
   const go = corpo.locator('.sn-mac-btn-go');
   await go.scrollIntoViewIfNeeded();
   const prima = await go.boundingBox();
-  const punto = { x: prima.x + 3, y: prima.y + prima.height - 4 };
+  // In basso, dove il tasto finiva se si abbassava; al centro, perché gli angoli tondi il clic li rispetta.
+  const punto = { x: prima.x + prima.width / 2, y: prima.y + prima.height - 6 };
 
   await page.mouse.click(punto.x, punto.y);
   await expect(go).toHaveText('Confermi?');
