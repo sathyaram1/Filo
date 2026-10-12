@@ -538,6 +538,22 @@ async function main(argv) {
     return 0;
   }
 
+  // I lavori server passati in cloud aspettano il PC (#1159): fusione, deploy, e la parte dell'app torna alle routine.
+  const depFusioni = (log) => ({
+    attese: () => attesePc(), fineAttesa: (id) => fineAttesa(id), esegui, pubblica: () => pubblicaDavvero(P), log, radice: P.radice,
+  });
+  const righeFerme = (esito) => esito.ferme.map((f) => `#${f.num} fermo: ${f.motivo}`);
+
+  if (cmd === 'fusioni-server') {
+    const { opz, posizionali } = leggiArgomenti('fusioni-server', rest);
+    if (posizionali.length) throw erroreDiUso(`fusioni-server: argomento non capito «${posizionali[0]}»`);
+    const pid = inCorso();
+    if (pid) throw new Error(`un orchestratore è in corso (pid ${pid}): le fusioni del server le fa lui all’avvio, o rilancia quando ha finito`);
+    const esito = await fusioniServer(depFusioni((r) => console.log(r)), { prova: opz.dryRun === true });
+    for (const r of righeFerme(esito)) console.error(r);
+    return esito.ferme.length ? 2 : 0;
+  }
+
   if (cmd === 'avvia') {
     const opz = opzioniDa(rest);
     const log = (riga) => {
