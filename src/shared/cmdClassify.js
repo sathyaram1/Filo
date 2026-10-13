@@ -840,6 +840,8 @@
     'convert-path', 'get-location', 'gl', 'pwd', 'test-path', 'get-date', 'where-object', 'where', '?',
     'sort-object', 'select-object', 'select', 'measure-object', 'measure',
   ]);
+  // Compongono un percorso: sul valore del tubo il risultato non si legge nel comando (#1072.4).
+  const CALCOLANO = new Set(['join-path', 'split-path']);
   // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
   const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
   // Dentro la Libreria del Mac stanno anche i documenti nel cloud dell'utente (iCloud Drive; Dropbox, OneDrive e
