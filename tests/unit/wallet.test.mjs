@@ -366,15 +366,14 @@ test('un movimento del portafoglio si legge in italiano, anche con l’id attacc
   assert.equal(W.grantLabel(null), 'Crediti ricevuti');
 });
 
-// #652 — le sette manopole della pagina dell'owner. La tabella sta qui perché
+// #652 — le manopole della pagina dell'owner. La tabella sta qui perché
 // la usano sia la pagina (per disegnare i campi) sia il main (per rifiutare un
 // numero storto prima di scriverlo): se divergessero, il main accetterebbe
-// quello che la pagina rifiuta.
-test('le manopole dei crediti sono sette, hanno un nome e limiti sensati', () => {
-  assert.equal(W.OWNER_KNOBS.length, 7);
+// quello che la pagina rifiuta. Le chiavi sono quelle che legge il server.
+test('le manopole dei crediti hanno un nome e limiti sensati', () => {
   assert.deepEqual(W.OWNER_KNOB_KEYS, [
     'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses',
-    'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackClosed',
+    'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackSentPerDay', 'rewardFeedbackClosed',
   ]);
   for (const k of W.OWNER_KNOBS) {
     assert.ok(k.etichetta && k.etichetta.length > 2, `${k.chiave}: serve un nome leggibile`);
