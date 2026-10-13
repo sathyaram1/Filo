@@ -194,6 +194,7 @@
         if (ev.titleByUser) c.titleByUser = true;
         if (ev.kindByUser) c.kindByUser = true;
         if (Number.isFinite(ev.triagedCount)) c.triagedCount = ev.triagedCount;
+        if (typeof ev.soggetto === 'string') c.soggetto = ev.soggetto;
         break;
       case TIPI.CHAT_FONTI: {
         if (!c) break;
