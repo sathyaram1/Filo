@@ -337,7 +337,7 @@ macchina a stati non cambia. Per l'owner, però, un `design` con una domanda
 aperta si vede nella scheda **In coda**, col segno «aspetta una domanda» che
 porta alla domanda, e non in Ricevuti.
 
-## 4. Compiti ricorrenti, pubblicazione, monitoraggio
+## 4. Compiti ricorrenti, pubblicazione, gestione del lavoro
 
 ### 4.1 Compiti ricorrenti
 
