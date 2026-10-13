@@ -27,9 +27,8 @@ test('r2 il feedback ripreso da una domanda non fidata non è mai in coda senza 
       istanti.push(nascitaDelProssimo(S, 'fbA').fiducia);
     }
   };
-  const base = S.fsMod.db;
-  S.fsMod.db = () => {
-    const api = base();
+  S.usaDb(() => {
+    const api = S.mem();
     const conGuardia = (ref) => (ref.path === 'feedback/fbA'
       ? Object.assign({}, ref, {
         set: async (...a) => { await ref.set(...a); await guarda(); },
@@ -41,12 +40,12 @@ test('r2 il feedback ripreso da una domanda non fidata non è mai in coda senza 
       collection: (c) => Object.assign({}, api.collection(c), { doc: (id) => conGuardia(api.collection(c).doc(id)) }),
       runTransaction: async (fn) => { const out = await api.runTransaction(fn); await guarda(); return out; },
     });
-  };
+  });
   try {
     const risposta = await S.domande.perOwner({ op: 'rispondi', id: 'D-1', scelta: 0 }, { who: 'owner@example.com' });
     expect(risposta.ok).toBe(true);
   } finally {
-    S.fsMod.db = base;
+    S.usaDb();
   }
   expect(istanti.length, 'il feedback non è mai tornato in coda col testo della domanda').toBeGreaterThan(0);
   expect(istanti, 'c\'è un istante in cui #813 è in coda col testo di uno sporco e un biglietto nascerebbe pulito').not.toContain('fidato');

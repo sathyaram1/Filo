@@ -51,9 +51,13 @@ export async function server(seed = {}) {
   const { memFirestore } = req('test/fixtures/firestore-mem');
   const mem = memFirestore(seed);
   const fsMod = req('src/data/firestore');
-  fsMod.db = () => mem();
+  // Canale, consegne e coda tengono la funzione db che trovano al primo caricamento: la si fa passare da qui.
+  if (!fsMod.__perVerifica) { fsMod.db = () => globalThis.__dbVerificaDomande(); fsMod.__perVerifica = true; }
+  globalThis.__dbVerificaDomande = () => mem();
   const S = {
-    mem, fsMod,
+    mem,
+    /** Sostituisce il Firestore che vede il server (per osservarne le scritture); senza argomento torna a mem. */
+    usaDb: (fabbrica) => { globalThis.__dbVerificaDomande = fabbrica || (() => mem()); },
     domande: req('src/domande'),
     archivio: req('src/domande/archivio'),
     deliver: req('src/routine/deliver'),
