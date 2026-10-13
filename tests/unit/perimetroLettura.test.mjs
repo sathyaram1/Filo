@@ -365,6 +365,41 @@ test('#1072.4 — un percorso di rete calcolato da un comando innocuo chiede un 
   }
 });
 
+// #1072.4 giro 1 — il calcolo sfugge se i pezzi arrivano dal tubo, il parametro è abbreviato o la qualifica non è
+// una lettera d'unità (`Env:`, `HKCU:`, `Provider::`): ognuna di queste forme compone `\\evil\x` e chiede un OK.
+test('#1072.4 — un percorso di rete composto dal tubo, con parametri abbreviati o altre qualifiche chiede un OK', () => {
+  for (const cmd of [
+    "Write-Output '\\\\' | Join-Path -ChildPath evil\\x | cd", "Get-Date -Format '\\\\\\\\' | Join-Path -ChildPath evil\\x | cd",
+    "Split-Path -NoQualifier 'C:\\\\' | Join-Path -ChildPath evil\\x | cd", "Write-Output '\\\\' | Join-Path -ChildPath evil\\x -Resolve",
+    "Write-Output 'C:\\\\evil\\x' | Split-Path -NoQualifier | cd", 'echo C:\\\\evil\\x | Split-Path -NoQualifier | Test-Path',
+    'Split-Path -N C:\\\\evil\\x | cd', 'Split-Path -No C:\\\\evil\\x | cd', "Join-Path '\\\\' 'evil\\x' -Resolve:$true",
+    'Split-Path -NoQualifier Env:\\\\evil\\x | cd', 'Split-Path -NoQualifier HKCU:\\\\evil\\x | cd',
+    "Split-Path -NoQualifier 'Foo::\\\\evil\\x' | cd", "Test-Path (Write-Output '\\\\' | Join-Path -ChildPath evil\\x)",
+  ]) {
+    assert.ok(lvl(cmd, WIN) >= 2, `"${cmd}" compone un percorso di rete: chiede un OK`);
+  }
+  for (const cmd of ["Write-Output 'C:\\x' | Join-Path -ChildPath docs | Sort-Object", 'Get-ChildItem | Split-Path -Leaf | Sort-Object',
+    'Split-Path -NoQualifier HKCU:\\Software | Sort-Object', 'Split-Path -N C:\\Users\\Mario\\x | cd']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
+// #1072.4 giro 1 — in una cwd di rete il nome arriva al remoto anche come riferimento git (`.git/refs/<nome>`,
+// per ogni sotto-comando) e come valore passato col tubo o da un gruppo a chi lo cerca nella cartella.
+test('#1072.4 — in una cwd di rete un nome dato a git, dal tubo o da un gruppo chiede un OK', () => {
+  const NOMI = ['git cat-file -t segreto', 'git reflog segreto', 'git reflog show segreto', 'git name-rev segreto',
+    'git ls-tree segreto', 'git symbolic-ref segreto', 'git describe segreto', 'Write-Output segreto | Test-Path',
+    'Write-Output segreto | Get-Item', 'Write-Output segreto | Resolve-Path', 'Write-Output segreto | Get-Content',
+    'Write-Output segreto | Get-FileHash', 'echo segreto | cat', 'Write-Output .\\segreto | Get-Command',
+    'Test-Path (Write-Output segreto)', 'Get-Content (Write-Output segreto)'];
+  for (const ctx of [{ ...WIN, cwd: '\\\\host\\x' }, { ...WIN, cwd: 'Z:\\', reti: ['Z:'] }]) {
+    for (const cmd of NOMI) assert.ok(lvl(cmd, ctx) >= 2, `"${cmd}" in ${ctx.cwd} manda il nome al remoto: chiede un OK`);
+  }
+  for (const cmd of ['git cat-file -t HEAD', 'git reflog', 'Write-Output a.txt | Test-Path', 'Test-Path (Write-Output a.txt)']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
 // #1072.4 — con la cartella di lavoro su un altro computer anche i comandi "liberi"
 // che risolvono un NOME contro la cartella (Get-Command/Get-Help, where di cmd,
 // git log/show/diff/rev-parse/blame) lo mandano al remoto: l'OK che vale per `ls`.
