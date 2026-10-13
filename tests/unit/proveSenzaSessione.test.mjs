@@ -25,9 +25,11 @@ test('chi prova i moduli che misurano la sessione importa senzaSessione', () => 
   assert.deepEqual(toccano.filter((f) => !IMPORTA.test(testo(f))), []);
 });
 
-function nodeTest(args, env) {
+function nodeTest(args, sessione) {
+  // Con NODE_TEST_CONTEXT il figlio si crede una sotto-prova e non lancia i file.
+  const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
   return new Promise((ok) => {
-    const p = spawn(process.execPath, ['--test', '--test-reporter=tap', ...args], { cwd: ROOT, env });
+    const p = spawn(process.execPath, ['--test', '--test-reporter=tap', ...args], { cwd: ROOT, env: { ...env, ...sessione } });
     let out = '';
     p.stdout.on('data', (c) => { out += c; });
     p.stderr.on('data', (c) => { out += c; });
