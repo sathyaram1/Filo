@@ -2,7 +2,7 @@
 // callable `localTicket`. Il file è un SEGRETO (.gitignore e SESSION_MARKERS): l'hook di salvataggio fa `git add -A`.
 // Le regole della fiducia le tiene il server; qui niente decide, e un guasto vale «nessun biglietto» (non fidato).
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 
