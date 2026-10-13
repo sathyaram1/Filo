@@ -7,10 +7,11 @@ const MAX_PERCORSO = 56;
 const MAX_SCHEMA = 24;
 
 function accorciato(s, max = MAX_PERCORSO) {
-  const t = String(s || '').replace(/\s+/g, ' ').trim();
-  if (t.length <= max) return t;
+  // Per caratteri interi, non per unità UTF-16: un taglio in mezzo a un'emoji lascerebbe un «�».
+  const t = Array.from(String(s || '').replace(/\s+/g, ' ').trim());
+  if (t.length <= max) return t.join('');
   const testa = Math.ceil((max - 1) / 3);
-  return `${t.slice(0, testa)}…${t.slice(t.length - (max - 1 - testa))}`;
+  return `${t.slice(0, testa).join('')}…${t.slice(t.length - (max - 1 - testa)).join('')}`;
 }
 
 function decodificato(s) {

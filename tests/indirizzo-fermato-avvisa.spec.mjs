@@ -128,3 +128,13 @@ test('su una pagina web il clic su un collegamento a una cartella di rete lo dic
   expect(await nelModello(shell, 'bilancio.xlsx'), 'cliccato di nuovo, l\'avviso resta uno').toBe(1);
   expect(page.url()).toContain('127.0.0.1');
 });
+
+test('«Apri in nuova tab» del menu di Filo su un collegamento a un file di una pagina web lo dice', async ({ openTab, testServer, avvisi }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+    <a id="f" href="file:///C:/Condivisa/listino.pdf" style="display:block;width:300px;padding:20px">listino</a></body></html>`);
+  await page.locator('#f').click({ button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible();
+  await menu.getByText('Apri in nuova tab', { exact: false }).click();
+  await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: C:/Condivisa/listino.pdf')).toBeVisible({ timeout: 8000 });
+});
