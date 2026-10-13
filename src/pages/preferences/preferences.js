@@ -1102,7 +1102,7 @@
       if (vuole('tts.pitch')) {
         const pitch = Number(tts.pitch) || 1;
         $('ttsPitch').value = String(pitch);
-        $('ttsPitchVal').textContent = pitch.toFixed(1);
+        $('ttsPitchVal').textContent = unDecimale(pitch);
       }
       if (vuole('tts.voice')) populateVoices(tts.voice || '');
     }
