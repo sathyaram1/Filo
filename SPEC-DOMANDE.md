@@ -79,9 +79,14 @@ lo vede:
 
 - **in cloud:** gli ambienti dei lavori fidati hanno la rete limitata al
   repo e ai pacchetti;
-- **in locale:** la sessione dichiara da sé di essersi sporcata (`biglietto.mjs
-  sporca "motivo"`), e gli strumenti che stampano testo esterno lo fanno da
-  soli. È un limite accettato: in locale c'è l'owner.
+- **in locale:** un gancio sporca il biglietto dopo ogni strumento che porta
+  dentro testo esterno (pagine web e ricerche, strumenti MCP, file letti fuori
+  dal repo), senza contare sulla sessione, che un testo malevolo può ingannare;
+  col server giù lo sporco resta annotato accanto al biglietto, che intanto
+  vale sporco, e parte alla prossima occasione. Il resto (un comando di shell
+  che scarica qualcosa) lo dichiara la sessione (`biglietto.mjs sporca
+  "motivo"`), e gli strumenti che stampano testo esterno lo fanno da soli. È un
+  limite accettato: in locale c'è l'owner.
 
 Le sessioni locali prendono il biglietto all'avvio (hook), come le routine.
 
