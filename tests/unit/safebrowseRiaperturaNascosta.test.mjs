@@ -124,5 +124,22 @@ test('ogni verifica di una pagina passa dalla porta che conosce l\'incognito', (
   assert.equal(porta.length, 1, `una sola chiamata, in _sbAnalizza: ${porta.join(', ')}`);
   assert.deepEqual(chiamate.filter((c) => !porta.includes(c)), [],
     'una verifica nuova passa da _sbAnalizza, o l\'incognito non la ferma');
-  assert.deepEqual(daAprire, [], 'chi prova un link prima che si apra aggiorna transparency/privacy.md («Gli altri servizi» e punti deboli), poi questa lista');
+  assert.deepEqual(daAprire, [], 'chi prova un link prima che si apra aggiorna transparency/privacy.md («Gli altri servizi» e punti deboli), rimette in vista l\'interruttore della finestra isolata (prova sotto), poi questa lista');
+});
+
+// Finché nessuna funzione prova un link prima che si apra, l'interruttore non comanda niente: non si mostra in
+// Sicurezza e, chiesto a Filo, non promette una protezione che non c'è.
+test('l\'interruttore della finestra isolata non promette di seguire prima i link sospetti', () => {
+  const html = readFileSync(join(ROOT, 'src/pages/security/security.html'), 'utf8');
+  const riga = html.match(/<div[^>]*id="sec-safebrowse-sandbox-row"[^>]*>/);
+  assert.ok(riga && /\shidden[\s>]/.test(riga[0]), 'la riga dell\'interruttore resta nascosta');
+  const css = readFileSync(join(ROOT, 'src/styles/pages.css'), 'utf8');
+  assert.match(css, /\.sn-page \.sn-toggle-row\[hidden\]\s*\{\s*display:\s*none/, 'hidden vince sul display della riga');
+  const PROMESSA = /(li apre prima|segue prima|segue dove portano|fa aprire quei link direttamente)/i;
+  const P = require('../../src/shared/preferences.js');
+  const voce = JSON.stringify(P.buildPreferencePartial('link_sospetti_isolati', 'off', {}) || null);
+  const src = readFileSync(join(ROOT, 'src/shared/preferences.js'), 'utf8');
+  const i = src.indexOf("percorso: 'security.safeBrowse.sandbox'");
+  assert.ok(i > 0 && voce !== 'null');
+  assert.doesNotMatch(src.slice(i, src.indexOf('}),', i)), PROMESSA);
 });
