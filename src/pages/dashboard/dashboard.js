@@ -30,6 +30,9 @@
   const GLIFO_RIPRENDI = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
+  // Dopo un turno finito senza risposta (#557) i passi fatti bastano spesso già: rifarli rimetterebbe Filo nello stesso giro.
+  const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
+    + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
   const dashDir = $('dashDir');
 
   // ===== Stato locale =====
@@ -43,9 +46,18 @@
   let chatId = null;
   let sending = false;
   // Il turno che sta lavorando adesso (#578): il quadrato lo ferma. `ripresa`: l'ultimo turno è stato fermato e il
-  // tasto d'invio offre di riprenderlo finché l'utente non scrive altro.
+  // tasto d'invio offre di riprenderlo finché l'utente non scrive altro. `tasto`: il «Continua» nella bolla di un
+  // turno finito senza risposta (#557), che se ne va quando l'offerta finisce.
   let turnoVivo = null;
   let ripresa = null;
+  const chiudiRipresa = () => {
+    if (ripresa && ripresa.tasto) {
+      const riga = ripresa.tasto.parentElement;
+      ripresa.tasto.remove();
+      if (riga && !riga.childElementCount) riga.remove();
+    }
+    ripresa = null;
+  };
   // Un turno fermato la cui azione in volo non è ancora tornata dal main: finché c'è, il turno dopo aspetta lei.
   let chiusuraInCorso = null;
   // Chi ferma lo fa di fretta e insiste (doppio clic, Invio ripetuto): per un attimo il secondo colpo trova ancora il
@@ -177,7 +189,7 @@
     goThread: () => goThread(),
     resetHistory: (onbState) => {
       threadHistory = [];
-      ripresa = null;
+      chiudiRipresa();
       aggiornaTasto();
       // #525 — l'intervista è UNA conversazione: la sua targa la dà lo stato
       // dell'intervista, non il sorteggio di questo caricamento di pagina.
@@ -308,7 +320,7 @@
     threadHistory = [];
     bubblesEl.innerHTML = '';
     inputEl.value = '';
-    ripresa = null;
+    chiudiRipresa();
     aggiornaTasto();
     autoGrowInput();
     inputEl.focus();
@@ -341,7 +353,7 @@
     if (chiudiPrima && chatId && chatId !== chat.id) { closeCurrentChat(); Term.nuovaChat(false); }
     chatId = chat.id;
     threadHistory = [];
-    ripresa = null;
+    chiudiRipresa();
     aggiornaTasto();
     bubblesEl.innerHTML = '';
     goThread();
@@ -1035,7 +1047,7 @@
     if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
     sending = true;
     // Chi scrive altro dopo aver fermato non vuole più riprendere: l'offerta finisce qui.
-    ripresa = null;
+    chiudiRipresa();
     aggiornaTasto();
     const imagesToSend = pendingImages.slice();
     const daFuori = testoDaFuori || imagesToSend.length > 0 || pendingFiles.length > 0;
@@ -1092,6 +1104,7 @@
     sending = false;
     // Riprendere ha senso solo nella conversazione che è ancora a schermo.
     if (r?.ok && r.stopped && activity.el.isConnected) ripresa = { nota: r._notaFermato || null, blocco: activity.el };
+    else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) offriContinua(r._bubble, activity.el);
     aggiornaTasto();
     inputEl.focus();
 
@@ -1111,7 +1124,7 @@
   async function retryTurn(errBubble, args) {
     if (sending) return;
     sending = true;
-    ripresa = null;
+    chiudiRipresa();
     aggiornaTasto();
     try { errBubble.remove(); } catch (_) {}
     await runTurnAndContinue(args);
@@ -1172,12 +1185,31 @@
   async function riprendi() {
     if (sending || !ripresa) return;
     const { nota } = ripresa;
-    ripresa = null;
+    const testo = ripresa.messaggio || RIPRENDI;
+    chiudiRipresa();
     sending = true;
     aggiornaTasto();
     if (nota && nota.isConnected) nota.remove();
-    threadHistory.push({ role: 'user', text: RIPRENDI, interno: true });
-    await runTurnAndContinue({ userMessage: RIPRENDI, internal: true });
+    threadHistory.push({ role: 'user', text: testo, interno: true });
+    await runTurnAndContinue({ userMessage: testo, internal: true });
+  }
+  // Un turno finito senza risposta (#557): la frase la scrive il main, qui il «Continua» sotto e lo stesso «riprendi»
+  // di un turno fermato sul tasto d'invio e nel tasto destro del blocco.
+  function offriContinua(bolla, blocco) {
+    let riga = bolla.querySelector('.dash-bubble-actions');
+    if (!riga) {
+      riga = document.createElement('div');
+      riga.className = 'dash-bubble-actions';
+      bolla.appendChild(riga);
+    }
+    const tasto = document.createElement('button');
+    tasto.type = 'button';
+    tasto.className = 'dash-action-btn dash-action-btn-primary dash-continua';
+    tasto.textContent = 'Continua';
+    tasto.title = 'Riprendi da dove si era fermato';
+    tasto.addEventListener('click', () => { riprendi(); inputEl.focus(); });
+    riga.appendChild(tasto);
+    ripresa = { nota: null, blocco, tasto, messaggio: CONTINUA };
   }
   // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
   // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
