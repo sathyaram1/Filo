@@ -65,6 +65,8 @@ test('dieci schede che aprono popup tutte insieme in una finestra bassa: pochi a
     await expect(x).toBeInViewport();
     await x.click();
     await expect(shell.locator('.shell-notif:not([data-closing="1"])')).toHaveCount(resto - 1, { timeout: 4000 });
+    // La chiusura torna alla pila disegnata con un viaggio in più: senza aspettarla si riclicca la carta che sparisce.
+    await expect(vista.locator('.shell-notif.show')).toHaveCount(resto - 1, { timeout: 4000 });
   }
   await expect(shell.locator('.shell-notif')).toHaveCount(0, { timeout: 4000 });
 });
