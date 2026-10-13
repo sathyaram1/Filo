@@ -173,9 +173,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.MANAGE_SEARCH_CLASSIFY, async (msg, sender, origin) => {
     if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    if (!isAdmin()) {
-      return { ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-    }
+    if (!isAdmin()) return NON_ADMIN();
     const op = msg && msg.op;
     const jobId = msg && typeof msg.jobId === 'string' ? msg.jobId : '';
     if (op === 'stop') { fermaGiro(jobId); return { ok: true }; }
