@@ -57,6 +57,18 @@ test('classificatore: Read sporca solo fuori dal repo, dal checkout del server a
   assert.equal(leggi('/casa/Filo/link/x.txt', { ...ctxPosix, canonico }), 'Read fuori dal repo (x.txt)');
 });
 
+test('classificatore: le uscite in sottofondo e gli appunti nella cartella temporanea di Claude del progetto non sporcano (#1211 giro 1)', () => {
+  const tmp = L.cartelleTemporaneeDiClaude(['/casa/Filo', ''], { env: { CLAUDE_CODE_TMPDIR: '/scelta' }, tmp: ['/tmp'], uid: 0 });
+  assert.deepEqual(tmp, ['/scelta/claude-0/-casa-Filo', '/scelta/claude/-casa-Filo', '/tmp/claude-0/-casa-Filo', '/tmp/claude/-casa-Filo']);
+  const ctx = { ...ctxPosix, cartelle: [...ctxPosix.cartelle, ...tmp] };
+  assert.equal(leggi('/tmp/claude-0/-casa-Filo/tasks/b1x2.output', ctx), '');
+  assert.equal(leggi('/tmp/claude-0/-casa-Filo/8460d4c2/scratchpad/note.txt', ctx), '');
+  assert.equal(leggi('/tmp/claude-0/-casa-Altro/tasks/b1.output', ctx), 'Read fuori dal repo (b1.output)', 'un altro progetto no');
+  assert.equal(leggi('/tmp/scaricato.html', ctx), 'Read fuori dal repo (scaricato.html)');
+  const win = L.cartelleTemporaneeDiClaude(['C:\\Users\\agenti AI\\Desktop\\Filo\\Filo'], { tmp: ['C:\\Users\\agenti AI\\AppData\\Local\\Temp'], win: true });
+  assert.deepEqual(win, ['C:\\Users\\agenti AI\\AppData\\Local\\Temp\\claude\\C--Users-agenti-AI-Desktop-Filo-Filo']);
+});
+
 test('classificatore: su Windows maiuscole e barre non contano', () => {
   const ctx = { cwd: 'C:\\Users\\agenti AI\\Desktop\\Filo\\Filo', win: true, cartelle: ['c:\\users\\agenti ai\\desktop\\filo\\filo', 'C:\\Users\\agenti AI\\.claude'], file: ['C:\\Users\\agenti AI\\Desktop\\Filo\\LOCAL.md'] };
   assert.equal(leggi('C:\\Users\\Agenti AI\\Desktop\\Filo\\Filo\\src\\x.js', ctx), '');
