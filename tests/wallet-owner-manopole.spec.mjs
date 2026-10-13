@@ -313,6 +313,14 @@ test('le manopole si salvano davvero, un numero storto non arriva al server e «
   await page.click('#knob-invitesMaxUses-salva');
   await expect(msgUsi).toHaveText('Persone per invito: almeno 1.');
   expect(patch.length).toBe(2);
+
+  // #1077: il tetto ai premi d'invio arriva al server con la chiave che il server legge.
+  await page.fill('#knob-rewardFeedbackSentPerDay', '3');
+  await page.click('#knob-rewardFeedbackSentPerDay-salva');
+  await expect(page.locator('#knob-rewardFeedbackSentPerDay-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(patch.length).toBe(3);
+  expect(patch[2].mask).toEqual(['rewardFeedbackSentPerDay']);
+  expect(configDoc.rewardFeedbackSentPerDay).toBe(3);
 });
 
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {
