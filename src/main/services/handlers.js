@@ -4867,6 +4867,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   } else {
     textReply = unisciTesti([...risposta, textReply]);
   }
+  if (!String(textReply || '').trim() && rawActions.length && soloLetture(renderedActions)) {
+    senzaRisposta = { passi };
+    textReply = fraseSenzaRisposta(passi);
+  }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
