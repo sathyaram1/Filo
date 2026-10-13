@@ -178,14 +178,12 @@ module.exports = function register(on, ctx) {
   });
 
   // L'interruttore di Gestione: lettura fresca e scrittura, solo all'owner e solo da Filo.
-  on(MSG.REDTEAM_OPEN_GET, soloFilo(async () => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+  on(MSG.REDTEAM_OPEN_GET, soloOwner(async () => {
     const s = await Gate.rileggiOra();
     return { ok: true, openToAll: s.openToAll, letto: s.letto };
   }));
 
-  on(MSG.REDTEAM_OPEN_SET, soloFilo(async (msg) => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+  on(MSG.REDTEAM_OPEN_SET, soloOwner(async (msg) => {
     if (typeof msg?.openToAll !== 'boolean') return { ok: false, error: 'openToAll deve essere vero o falso.' };
     try {
       const s = await Gate.impostaApertoATutti(msg.openToAll);
