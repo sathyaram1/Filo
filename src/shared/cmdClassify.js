@@ -848,6 +848,9 @@
   const JOLLY = /[*?[\]{}\uFFFD]/;
   // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
   const SEGNAPOSTO = '$_\uE000';
+  // `'` e `\"` dove sono un carattere qualunque (vedi `comeLaShell`): nessun controllo li prende per virgolette.
+  const APICE_TESTO = '\u02BC';
+  const VIRGOLETTE_TESTO = '\u02BA';
   // Senza contesto: cartella di lavoro e home coincidono, un relativo si dà per interno.
   const SENZA_CONTESTO = { cwd: '/~', home: '/~', win: false, maiuscole: false };
 
@@ -1616,19 +1619,27 @@
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
   // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
   // devono vedere il comando che la shell esegue, non la sua grafia (#1072). Per cmd quei segni sono testo.
+  // Per cmd `'` è testo (`' \\host\x '` sono tre argomenti), per i programmi C anche `\"` (findstr); i programmi
+  // MSYS (cat, ls di Git) leggono `'` come virgolette. Vale la lettura peggiore, a pari livello la prima (#1072.5).
   function comeLaShell(cmd, c) {
-    if (!c.win) return cmd;
-    if (c.shell === 'cmd') return comeCmd(cmd);
-    return cmd.replace(/[\u201C-\u201F]/g, '"')
+    if (!c.win) return [cmd];
+    if (c.shell === 'cmd') {
+      const l = comeCmd(cmd);
+      if (l == null) return null;
+      const interni = l.replace(/'/g, APICE_TESTO);
+      const programmiC = interni.replace(/(\\+)"/g, (m, b) => (b.length % 2 ? '\\'.repeat(b.length >> 1) + VIRGOLETTE_TESTO : m));
+      return [...new Set([programmiC, interni, l])];
+    }
+    return [cmd.replace(/[\u201C-\u201F]/g, '"')
       .replace(/[\u2018-\u201B]/g, "'")
-      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-');
+      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-')];
   }
 
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
-    const letto = comeLaShell(cmd, c);
-    return letto == null ? TRE : classifica(letto, c, 0);
+    const letture = comeLaShell(cmd, c);
+    return letture == null ? TRE : letture.map((l) => classifica(l, c, 0)).reduce(peggiore);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
