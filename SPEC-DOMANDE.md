@@ -563,8 +563,9 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | `domande` | leggere le domande e il registro, raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
 | `posta` | leggere la casella di Filo, aprire domande con bozze | mandare mail |
 | `invio` | mandare una bozza approvata dall'owner | scrivere testi |
-| `monitor` | leggere registri e domande passate, il suo taccuino, cambiare la domanda di fine turno, spegnere, chiedere una sveglia, aprire domande e feedback | accendere, cambiare feedback |
-| `rami` | cancellare rami fusi che nessun feedback aperto nomina | tutto il resto |
+| `monitor` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lui; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; riaccendere quello che ha spento l'owner |
+| `rami` | leggere rami, storia di git e feedback; aprire feedback e domande; scrivere nel taccuino del monitoraggio | cancellare rami: lo fa la regola del server (§ 4.7) |
+| `esperimento` | lavorare dal commit indicato, spingere su `esperimento/*`, consegnare l'esito | fondere, aprire feedback o domande, spingere altrove, leggere il `main` di oggi |
 | `server` | come `lavoro`, più spingere un ramo su filo-security (§ 7) | — solo per biglietti puliti |
 
 ### 5.3 Ambiti nuovi
