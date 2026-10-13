@@ -1547,7 +1547,7 @@
     }
     $('ttsVoice').addEventListener('change', persist);
     $('ttsRate').addEventListener('input', (e) => {
-      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toFixed(1) + '×';
+      $('ttsRateVal').textContent = unDecimale(parseFloat($('ttsRate').value) || 1) + '×';
       caselle.cambiato('pref', e);
     });
     $('ttsPitch').addEventListener('input', (e) => {
