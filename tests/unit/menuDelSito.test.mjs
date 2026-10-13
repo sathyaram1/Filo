@@ -14,8 +14,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'shared', 'nomiSito.js'));
-const P = require(join(ROOT, 'src', 'shared', 'preferences.js'));
-const K = require(join(ROOT, 'src', 'shared', 'cambi.js'));
+require(join(ROOT, 'src', 'shared', 'preferences.js'));
+const P = globalThis.SN_PREF;
+require(join(ROOT, 'src', 'shared', 'cambi.js'));
+const K = globalThis.SN_CAMBI;
 const W = require(join(ROOT, 'src', 'main', 'services', 'impostazioniPerOrigine.js'));
 const M = require(join(ROOT, 'src', 'main', 'services', 'menuDelSito.js'));
 const { sorgenteSonda } = require(join(ROOT, 'src', 'preload', 'menu-del-sito.js'));

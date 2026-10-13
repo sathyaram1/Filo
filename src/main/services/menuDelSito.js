@@ -10,7 +10,8 @@ const NOME = /^[a-z0-9-]+(\.[a-z0-9-]+)*$/;
 const IPV6 = /^\[[0-9a-f:.]+\]$/;
 
 function normalizza(host) {
-  const h = String(host == null ? '' : host).trim().toLowerCase().replace(/\.+$/, '').replace(/^www\./, '');
+  if (typeof host !== 'string') return '';
+  const h = host.trim().toLowerCase().replace(/\.+$/, '').replace(/^www\./, '');
   if (!h || h.length > 253) return '';
   return NOME.test(h) || IPV6.test(h) ? h : '';
 }
