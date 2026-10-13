@@ -2173,5 +2173,6 @@
     applyCommandCwd: Term.applyCommandCwd,
     getCwd: Term.getCwd,
     refreshAccountControl,
+    ricompenseAvvio: () => ricompenseAvvio,
   };
 })();
