@@ -1628,7 +1628,7 @@
       if (l == null) return null;
       const interni = l.replace(/'/g, APICE_TESTO);
       const programmiC = interni.replace(/(\\+)"/g, (m, b) => (b.length % 2 ? '\\'.repeat(b.length >> 1) + VIRGOLETTE_TESTO : m));
-      return [...new Set([interni, programmiC, l])];
+      return [...new Set([programmiC, interni, l])];
     }
     return [cmd.replace(/[\u201C-\u201F]/g, '"')
       .replace(/[\u2018-\u201B]/g, "'")
