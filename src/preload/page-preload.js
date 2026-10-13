@@ -94,6 +94,18 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
 // ha bisogno di settings/spellcheck/Menu) si installa più tardi via
 // __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
 let contextMenuHandler = null;
+// I siti col menu proprio (#975): la sonda va nel mondo della pagina prima dei suoi script. content.js dice, coi siti
+// scelti nelle impostazioni, se qui il tasto destro va prima alla pagina; Shift allora porta al menu di Filo.
+let MenuDelSito = null;
+try { MenuDelSito = require('./menu-del-sito.js').crea({ webFrame, riserva: (clic) => menuDiRiserva(clic) }); } catch (e) { console.error('[Filo CS] menu del sito', e); }
+let menuDelSitoPrima = () => false;
+try {
+  globalThis.__snMenuDelSito = MenuDelSito;
+  globalThis.__snSetMenuDelSitoPrima = (fn) => { if (typeof fn === 'function') menuDelSitoPrima = fn; };
+} catch (_) {}
+function sitoPrima() {
+  try { return !!MenuDelSito && menuDelSitoPrima() === true; } catch (_) { return false; }
+}
 // Ogni tasto destro dell'utente apre un menu: quello di Filo o, se non parte (guasto, pagina ancora in caricamento,
 // Filo spento sul sito, Shift), quello di riserva del main, salvo che la pagina mostri il suo (#1122).
 // `clic` è l'ora del gesto: il main la usa per accoppiarlo al suo `context-menu`, non a quello di un clic prima.
