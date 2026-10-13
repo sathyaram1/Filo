@@ -377,6 +377,7 @@ async function whenSettled() {
   await scrittureFerme();
   if (STATE.copiaTimer) await aggiornaCopia();
   else await STATE.copia;
+  await STATE.pulizia;
 }
 
 async function scrittureFerme() {
