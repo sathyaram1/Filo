@@ -318,10 +318,11 @@ export async function attesePc(deps = {}) {
 
 /**
  * La parte del server è su main e pubblicata, o (`soloApp`) sul server il ramo non c'è: la pratica torna alle routine per
- * la parte dell'app. Lancia.
+ * la parte dell'app. `riallinea`: il ramo del server va in conflitto con main, e torna alle routine per riallinearlo. Lancia.
  */
-export async function fineAttesa(feedbackId, { soloApp = false, ...deps } = {}) {
-  return chiama('fineAttesa', soloApp === true ? { feedbackId, soloApp: true } : { feedbackId }, deps);
+export async function fineAttesa(feedbackId, { soloApp = false, riallinea = false, ...deps } = {}) {
+  const data = riallinea === true ? { feedbackId, riallinea: true } : soloApp === true ? { feedbackId, soloApp: true } : { feedbackId };
+  return chiama('fineAttesa', data, deps);
 }
 
 /** Chiude i biglietti di questa sessione e ne toglie i file. */
