@@ -1628,20 +1628,21 @@
         }
       }
 
+      // Il riquadro scelto diventa una chiamata al modello, un file e gli appunti: lo disegna solo il mouse dell'utente.
       overlay.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || !gestoVero(e)) return;
         dragging = true;
         startX = curX = e.clientX;
         startY = curY = e.clientY;
         updateMask(startX, startY, startX, startY);
       });
       overlay.addEventListener('mousemove', (e) => {
-        if (!dragging) return;
+        if (!dragging || !gestoVero(e)) return;
         curX = e.clientX; curY = e.clientY;
         updateMask(startX, startY, curX, curY);
       });
       overlay.addEventListener('mouseup', (e) => {
-        if (!dragging) return;
+        if (!dragging || !gestoVero(e)) return;
         dragging = false;
         curX = e.clientX; curY = e.clientY;
         finish();
