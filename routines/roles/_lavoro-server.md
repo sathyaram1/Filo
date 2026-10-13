@@ -21,9 +21,15 @@ git -C "<CLONE>" config --local credential.useHttpPath true
 git -C "<CLONE>" ls-remote origin HEAD
 ```
 
-Se `ls-remote` non si autentica, ripeti il comando con le tre `-c` davanti: se continua, il token non esce (biglietto
-sporco, feedback non fidato) e il lavoro non si fa da qui. Non aggirarlo: niente token scritti nell'URL, niente
-altre credenziali. Rimandalo in locale come dice «Se il lavoro si fa solo in locale».
+Se `ls-remote` non si autentica, ripeti il comando con le tre `-c` davanti. Se continua, il token non esce: il motivo
+l'ha stampato l'aiutante (biglietto sporco, feedback non fidato, ramo del server scritto fuori registro, GitHub che non
+risponde). Non aggirarlo: niente token scritti nell'URL, niente altre credenziali. La parte del server da qui non si fa:
+
+- se fai il primo lavoro o correggi, rimanda la pratica in locale con la consegna che trovi più su, nella sezione «Se
+  il lavoro si fa solo in locale», e scrivi nelle note il motivo;
+- se verifichi, non passare il lavoro guardando solo l'app. Registra la critica con un rilievo `[2i?]` che dice che la
+  parte del server non si è potuta verificare, col motivo, e allega con `--segnala` un file per l'owner con le due
+  strade: lavorarlo in locale, o ridarlo alle routine quando il motivo è sparito. Il lavoro si ferma finché non risponde.
 
 ### Il ramo
 
