@@ -22,7 +22,6 @@ import { senzaSessione } from '../helpers/sessione.mjs';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
 const { rapportoVuoto } = await import('../../scripts/session-report.mjs');
-const { ambientePerITest } = await import('../../scripts/run-unit-tests.mjs');
 
 test('il rapporto di ripiego, quando generarlo fallisce, porta la stessa versione di quello vero', () => {
   const src = readFileSync(resolve(REPO, 'scripts', 'routine-channel.mjs'), 'utf8');
@@ -329,11 +328,11 @@ function fintoServer(rispondi) {
   });
   return new Promise((ok) => srv.listen(0, '127.0.0.1', () => ok({ srv, port: srv.address().port, ricevute })));
 }
-// Il figlio non vede la sessione che lancia i test, come sotto `npm run test:unit`: col file lanciato a mano in una
-// routine misurava il consumo vero, che finiva nel rilascio e nel deposito di prova (#1123.2).
+// Dentro una routine il figlio misurava la sessione vera: il consumo nel corpo e nel deposito di prova (#1123.2),
+// `.claude/` nella cartella di prova (#849.2).
 function cli(args, env) {
   return new Promise((done) => {
-    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...ambientePerITest(process.env), ...env } },
+    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { cwd: env.FILO_REPO_ROOT, env: senzaSessione(env) },
       (err, so, se) => done({ code: err ? (err.code ?? 1) : 0, so: String(so || ''), se: String(se || '') }));
   });
 }
