@@ -1486,6 +1486,7 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
     pagina: daPagina ? await testoDellaPagina(sender) : null,
     letti: (daPagina ? lettiDallAiuto(sender) : []).concat(SegretiLetti.tutti()),
     parole: typeof parole === 'string' ? parole : '',
+    domanda: typeof domanda === 'string' ? domanda : '',
     memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
     daPagina,
   });
