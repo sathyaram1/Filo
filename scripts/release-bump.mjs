@@ -31,6 +31,7 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parolaDellaCostruzione } from './build-alarm.mjs';
 
 // Dove vive il server. `FILO_ROUTINE_API` esiste per i test e per un eventuale
 // ambiente di prova: NON è un segreto, è solo un indirizzo.
@@ -141,7 +142,7 @@ export async function askServerBump({ passphrase, fetchImpl = fetch, url = RELEA
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const reply = await askServerBump({ passphrase: process.env.FILO_BUILD_PASSPHRASE || '' });
+  const reply = await askServerBump({ passphrase: parolaDellaCostruzione() });
   const code = exitCodeForBump(reply);
   console.error(messageForBump(reply));
   // Su stdout SOLO il numero, e solo se c'è: è quello che il lavoro di
