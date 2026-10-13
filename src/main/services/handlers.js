@@ -4587,6 +4587,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // rispondere: allora l'utente deve saperlo, non ricevere l'ultima nota di
   // lavoro spacciata per risposta.
   let exhausted = true;
+  // I giri con azioni: i «passi» della frase che dice che Filo si è fermato senza risposta.
+  let passi = 0;
   // Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
   // finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
   const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false };
