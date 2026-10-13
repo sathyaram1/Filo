@@ -29,6 +29,8 @@ test('la parola d’ordine nuova sta da sola sulla sua riga, senza spazi intorno
       assert.equal(r.code, 0, r.err);
       const riga = r.out.split('\n').find((l) => l.includes('parola-finta-123'));
       assert.equal(riga, 'parola-finta-123', `potere ${potere}: la riga da copiare è la parola d'ordine e basta`);
+      // L'ambiente fa ombra al segreto omonimo del repo: messa lì, la parola nuova non la leggerebbe nessuno.
+      if (potere === 'build') assert.match(r.out, /ambiente «rilascio»/, 'la parola della costruzione va nell\'ambiente «rilascio»');
     }
   } finally { togliCartella(dir); }
 });
