@@ -38,6 +38,7 @@ function scritturaInterrotta(dest, dati) {
   throw errore('ENOSPC');
 }
 
+let aperto = null;
 // Ogni prova ha la sua cartella dei dati e un modulo appena caricato: è un avvio di Filo.
 function avvio(file = {}) {
   const dir = cartellaTemporanea('filo-storage-durevole-');
@@ -45,7 +46,8 @@ function avvio(file = {}) {
   for (const [nome, testo] of Object.entries(file)) fs.writeFileSync(join(dir, nome), testo);
   process.env.FILO_USER_DATA = dir;
   delete require.cache[require.resolve(PERCORSO)];
-  return { dir, Storage: require(PERCORSO), file: (n = 'storage.json') => join(dir, n) };
+  aperto = require(PERCORSO);
+  return { dir, Storage: aperto, file: (n = 'storage.json') => join(dir, n) };
 }
 
 const tace = () => {
