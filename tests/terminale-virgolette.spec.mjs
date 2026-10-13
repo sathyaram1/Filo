@@ -169,6 +169,13 @@ test('#968: un comando fallito per le virgolette mancanti propone la versione gi
   await expect(page.locator('#dashDir')).toHaveText(cartella, { timeout: 12_000 });
   await expect(page.locator('.dash-term-cmd').last()).toContainText('cd "Nome Cognome"');
   await expect(proposta.locator('.dash-term-proposta-esegui')).toBeDisabled();
+  // Il comando partito si legge: la sua bolla ha un fondo, non è testo chiaro su chiaro.
+  const colori = await page.locator('.dash-term-cmd').last().evaluate((el) => ({
+    fondo: getComputedStyle(el).backgroundColor,
+    testo: getComputedStyle(el).color,
+  }));
+  expect(colori.fondo).not.toBe('rgba(0, 0, 0, 0)');
+  expect(colori.fondo).not.toBe(colori.testo);
 
   await app.evaluate(async () => globalThis.__filoHandlers.handleMessage(
     { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
