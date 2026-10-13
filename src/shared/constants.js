@@ -2441,6 +2441,8 @@
     // Tasso di conversione USD->EUR usato per la stima costi (i prezzi provider sono in USD)
     usdToEur: 0.92,
     blocklist: [],
+    // Siti dove il tasto destro apre il menu del sito e quello di Filo sta a Shift (#975).
+    menuDelSito: { siti: [] },
     // Feature flags
     // - help, categorize: Fase 2, default off
     // - spellcheck: correttore AI (zigzag blu sopra il rosso nativo del browser), default on
