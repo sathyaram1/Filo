@@ -730,7 +730,9 @@ class BarraLaterale {
 
   _mostraSuggerimento(dati) {
     const t = testo(dati && dati.testo).slice(0, 300);
-    if (!t || !this.vista || !this.win || this.win.isDestroyed()) { this._nascondiSuggerimento(); return; }
+    // L'etichetta è della barra aperta: chiusa, la vista si stringe sotto il puntatore senza dirgli che è uscito,
+    // e un'etichetta arrivata in ritardo resterebbe sopra la pagina (#1201).
+    if (!t || !this.aperta || !this.vista || !this.win || this.win.isDestroyed()) { this._nascondiSuggerimento(); return; }
     const b = this.vista.getBounds();
     this.suggerimento = true;
     try { require('./popup-tooltip').showTooltip(this.win, t, b.x + numero(dati.x, 0, 10000), b.y + numero(dati.y, 0, 10000)); } catch (_) {}
