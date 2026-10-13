@@ -125,7 +125,10 @@ test('richiede lavoro locale: rombo azzurro in lista e nel dettaglio, che aperto
   await expect(page.locator('#mgSideTitle')).toHaveText('Richiede lavoro locale');
   const corpo = page.locator('#mgSideBody');
   await expect(corpo).toContainText('lancia lo script sulla tua macchina');
-  await expect(corpo).toContainText('Lavoro locale');
+  // Il pannello nomina il pulsante che sta davvero sulla scheda (#1159 l'ha chiamato «Lavoro server»).
+  await expect(page.locator('#mgAcceptLocalBtn')).toBeVisible();
+  await expect(page.locator('#mgAcceptLocalBtn')).toHaveText('💻 Lavoro server');
+  await expect(corpo).toContainText('💻 Lavoro server');
   await expect(corpo).not.toContainText('Nessuna segnalazione');
 
   for (const tema of ['dark', 'light']) {
