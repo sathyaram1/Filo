@@ -99,7 +99,7 @@ export function messageForBump(reply) {
         + '  È voluto: un aumento a raffica brucia numeri di versione. Riprova al prossimo giro.';
     case 'denied':
       return '[release-bump] RIFIUTATO: il server non riconosce la parola d’ordine della costruzione.\n'
-        + '  Va rigenerata e rimessa nel segreto FILO_BUILD_PASSPHRASE del repo.';
+        + `  Va rigenerata e rimessa come FILO_BUILD_PASSPHRASE ${DOVE_VA_LA_PAROLA}.`;
     case 'rejected':
       return `[release-bump] RIFIUTATO: ${r.reason}.\n`
         + '  Il manifesto su main non è come il server se lo aspetta: niente è cambiato.';
