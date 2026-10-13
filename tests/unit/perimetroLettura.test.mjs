@@ -518,7 +518,7 @@ test('#1072.5 — con cmd un percorso fra apici singoli non sfugge ai controlli 
     assert.equal(lvl('dir \' \\\\host\\x \'', ctx), 1);
   }
   for (const cmd of ['echo l\'errore', 'findstr "l\'errore" log.txt', 'findstr \'errore\' log.txt', 'dir \'Documenti personali\'',
-    'git log --oneline -- \'src/a b.js\'']) {
+    'git log --oneline -- \'src/a b.js\'', 'findstr /c:"a \\"b\\"" log.txt']) {
     assert.deepEqual(C.classifyDetail(cmd, WIN_CMD), { level: 1, motivo: '' }, cmd);
   }
   // `'dir'` per cmd è un programma che si chiama così, non `dir`.
