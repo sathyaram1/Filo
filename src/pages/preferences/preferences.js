@@ -15,9 +15,8 @@
   const CUSTOM_KEY = '__custom__';
 
   function $(id) { return document.getElementById(id); }
-  // Ogni numero che la pagina scrive passa da qui: 1.234 e 1,5 (regola in tests/unit/numeriItaliani.test.mjs).
+  // I numeri che la pagina scrive: 1.234 e 1,5 (regola in tests/unit/numeriItaliani.test.mjs).
   const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
-  const unDecimale = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   // Nessuna casella della pagina ha un «Salva», e chiudere o cambiare scheda non avvisa la pagina (#590.5): ognuna
   // parte da qui, dopo una pausa o al primo segno di uscita. Uscendo, i numeri fuori scala tornano al valore in uso.
@@ -1097,12 +1096,12 @@
       if (vuole('tts.rate')) {
         const rate = Number(tts.rate) || 1;
         $('ttsRate').value = String(rate);
-        $('ttsRateVal').textContent = unDecimale(rate) + '×';
+        $('ttsRateVal').textContent = rate.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
       }
       if (vuole('tts.pitch')) {
         const pitch = Number(tts.pitch) || 1;
         $('ttsPitch').value = String(pitch);
-        $('ttsPitchVal').textContent = unDecimale(pitch);
+        $('ttsPitchVal').textContent = pitch.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
       }
       if (vuole('tts.voice')) populateVoices(tts.voice || '');
     }
@@ -1314,6 +1313,7 @@
     const el = $('documentiStato');
     if (!el || !statoDocumenti) return;
     const s = statoDocumenti;
+    const cifre = (x) => Number(x).toLocaleString('it-IT', { useGrouping: true });
     const n = Number(s.documenti) || 0;
     let t = n === 1 ? 'Un documento' : `${cifre(n)} documenti`;
     if (s.scansioni) t += `, di cui ${cifre(s.scansioni)} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
@@ -1547,11 +1547,11 @@
     }
     $('ttsVoice').addEventListener('change', persist);
     $('ttsRate').addEventListener('input', (e) => {
-      $('ttsRateVal').textContent = unDecimale(parseFloat($('ttsRate').value) || 1) + '×';
+      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
       caselle.cambiato('pref', e);
     });
     $('ttsPitch').addEventListener('input', (e) => {
-      $('ttsPitchVal').textContent = unDecimale(parseFloat($('ttsPitch').value) || 1);
+      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
       caselle.cambiato('pref', e);
     });
     $('ttsPreview').addEventListener('click', previewTts);
