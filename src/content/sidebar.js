@@ -319,7 +319,8 @@
     btn.type = 'button';
     btn.className = 'sn-sidebar-choice';
     btn.textContent = pagina.label;
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
     });
     wrap.appendChild(btn);
