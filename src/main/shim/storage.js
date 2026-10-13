@@ -365,8 +365,9 @@ function flushNow() {
 }
 
 // Attende che non resti NIENTE in sospeso: né un flush in attesa del debounce,
-// né uno in volo, né la copia di riserva in attesa del suo minuto. Quello che è
-// in attesa lo fa scattare subito, così non c'è nessuna attesa a tempo.
+// né uno in volo, né la copia di riserva in attesa del suo minuto, né la pulizia
+// dei temporanei dell'avvio. Quello che è in attesa lo fa scattare subito, così
+// non c'è nessuna attesa a tempo.
 //
 // Serve ai test: aspettare "abbastanza secondi" che una scrittura grande
 // arrivi su disco è affidabile a macchina scarica e diventa un falso allarme
