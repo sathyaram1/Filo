@@ -247,7 +247,6 @@ test('anti doppio-premio: alla riapertura non ricompare né ri-accredita', async
   // Riapertura: il feedback è già stato premiato → niente popup, saldo invariato.
   await page.reload();
   await risposta(page);
-  await page.waitForTimeout(400);
   await expect(page.locator('#thanksOverlay')).toHaveCount(0);
   expect(await balanceOf(app)).toBe(1050);
 });
