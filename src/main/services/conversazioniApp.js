@@ -120,5 +120,5 @@ async function dimentica({ app: nome, rif, prefisso } = {}) {
   return tolte;
 }
 
-globalThis.SN_CONVERSAZIONI_APP = { annota, righe, dimentica, collega, ESTERNO };
+globalThis.SN_CONVERSAZIONI_APP = { annota, rinomina, righe, dimentica, collega, ESTERNO };
 module.exports = globalThis.SN_CONVERSAZIONI_APP;
