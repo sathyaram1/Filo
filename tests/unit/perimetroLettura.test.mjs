@@ -487,6 +487,41 @@ test('#1072.1 — con cmd le letture di tutti i giorni restano libere; con Power
   assert.match(C.classifyDetail('type C:\\Users\\Mario\\“x” ^.ssh\\id_rsa', WIN_CMD).motivo, /nascosto/);
 });
 
+// #1072.5 — per cmd l'apice singolo è un carattere: `' \\host\x '` sono tre argomenti, e il percorso in mezzo arriva
+// al programma da solo. I programmi MSYS (cat, ls di Git) invece lo leggono come virgolette: valgono le due letture.
+test('#1072.5 — con cmd un percorso fra apici singoli non sfugge ai controlli su rete e file nascosti', () => {
+  for (const [cmd, motivo] of [
+    ['findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \'', /nascosto/],
+    ['type \' C:\\Users\\Mario\\.ssh\\id_rsa \'', /nascosto/],
+    ['findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \' | more', /nascosto/],
+    ['dir \' \\\\host\\x \'', /altro computer della rete/],
+    ['findstr a \' \\\\host\\x\\a.txt \'', /altro computer della rete/],
+    ['dir \' \\\\host\\x \' && dir', /altro computer della rete/],
+    ['dir ^\' \\\\host\\x ^\'', /altro computer della rete/],
+    // Letti come virgolette, come fa un programma MSYS.
+    ['type \'C:\\Users\\Mario\\.ssh\\id_rsa\'', /nascosto/],
+    ['dir \'\\\\host\\x\'', /altro computer della rete/],
+  ]) {
+    const d = C.classifyDetail(cmd, WIN_CMD);
+    assert.equal(d.level, 2, `"${cmd}" con cmd chiede un OK`);
+    assert.match(d.motivo, motivo, cmd);
+  }
+  const a = { type: 'ESEGUI_COMANDO', comando: 'findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \'', _perimetro: WIN_CMD };
+  assert.equal(AL.costoFor(a), 2);
+  assert.match(AL.describe(a), /Perché te lo chiedo: legge un file nascosto/);
+  // Per PowerShell gli apici fanno una stringa sola: lì le stesse righe sono innocue.
+  for (const ctx of [WIN, { ...WIN, shell: 'powershell' }]) {
+    assert.equal(lvl('findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \'', ctx), 1);
+    assert.equal(lvl('dir \' \\\\host\\x \'', ctx), 1);
+  }
+  for (const cmd of ['echo l\'errore', 'findstr "l\'errore" log.txt', 'findstr \'errore\' log.txt', 'dir \'Documenti personali\'',
+    'git log --oneline -- \'src/a b.js\'']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN_CMD), { level: 1, motivo: '' }, cmd);
+  }
+  // `'dir'` per cmd è un programma che si chiama così, non `dir`.
+  assert.equal(lvl('\'dir\'', WIN_CMD), 3);
+});
+
 test('#1072.1 — un download scritto con `^` o con le virgolette resta testo del web, non l\'uscita di un comando', () => {
   const fonte = (comando, stdout = '<html>') => AL.fonteDi({ type: 'ESEGUI_COMANDO', comando, _output: { stdout } });
   for (const comando of ['c^url h^ttps://x.it', 'w^get x.it/a', 'c"u"rl x.it', 'Invoke-We^bRequest x.it', 'curl ht""tps://x.it']) {
