@@ -450,7 +450,7 @@
       help.hidden = false;
       help.style.color = 'var(--sn-muted, #888)';
       help.style.gridColumn = '2 / -1';
-      help.textContent = `intervallo ${m.min}–${m.max} · ${m.comment}`;
+      help.textContent = `intervallo ${cifre(m.min)}–${cifre(m.max)} · ${m.comment}`;
       row.appendChild(help);
 
       box.appendChild(row);
