@@ -668,7 +668,7 @@
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
         n = Math.max(0, Math.min(2, n));
-        return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${n.toFixed(1)}` };
+        return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${decimali(n)}` };
       },
     },
     {
