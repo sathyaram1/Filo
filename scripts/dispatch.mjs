@@ -677,6 +677,7 @@ export function serialAwarenessNote(role, history, dropped = 0) {
       '',
       ...tolte,
       'Le critiche dei giri passati sono in `payload.history` (dalla più vecchia).',
+      ...(riallineamenti ? [`${riallineamenti === 1 ? 'Quella' : `Le ${riallineamenti}`} con \`caso: riallineamento\` le ha scritte il server dopo una fusione fallita: non parlano di un difetto, e qui non contano come giri.`] : []),
       'Se raccontano lo stesso danno da porte diverse, non limitarti a cercare la',
       'porta successiva: elenca nella STESSA critica tutte quelle che trovi, così',
       'la prossima correzione le chiude insieme invece che una per giro.',
