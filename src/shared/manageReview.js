@@ -1804,10 +1804,15 @@
     return { sezione: v.sezione, schede };
   }
 
-  // Domande: quale scheda le mostra. Fino alla sezione Domande vera (#1150 fase 2) è la regola minima.
-  const SCHEDA_DOMANDA = { aperta: 'domande', in_lavorazione: 'domande-lavoro', chiusa: 'domande-archivio', superata: 'domande-archivio' };
+  // La regola stato → scheda è SN_DOMANDE.schedaDi (src/shared/domande.js); qui solo il nome della scheda di Gestione.
+  // Le risposte automatiche stanno in Archivio finché la loro scheda non ha una fonte (#1154): mai fuori da ogni scheda.
+  const SCHEDA_DOMANDA = Object.freeze({
+    da_rispondere: 'domande', in_lavorazione: 'domande-lavoro', risposte_automatiche: 'domande-archivio', archivio: 'domande-archivio',
+  });
   function schedaDomanda(d) {
-    return (d && SCHEDA_DOMANDA[d.stato]) || null;
+    const D = global.SN_DOMANDE;
+    if (!d || typeof d !== 'object' || !D || typeof D.schedaDi !== 'function') return null;
+    return SCHEDA_DOMANDA[D.schedaDi(d)] || null;
   }
   function contaDomande(domande) {
     const n = { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 };
