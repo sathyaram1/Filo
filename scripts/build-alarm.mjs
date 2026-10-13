@@ -179,7 +179,7 @@ export function parolaDellaCostruzione(env = process.env) {
   if (parola && parola !== grezza && !bordiDetti) {
     bordiDetti = true;
     // Su stderr: lo stdout di release-bump è il numero di versione, e lo cattura il lavoro di pubblicazione.
-    console.warn('::warning::FILO_BUILD_PASSPHRASE ha spazi o a capo ai bordi: tolti prima di spedirla. Il segreto va ricopiato senza, ${DOVE_VA_LA_PAROLA}.`);
+    console.warn(`::warning::FILO_BUILD_PASSPHRASE ha spazi o a capo ai bordi: tolti prima di spedirla. Il segreto va ricopiato senza, ${DOVE_VA_LA_PAROLA}.`);
   }
   return parola;
 }
