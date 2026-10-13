@@ -172,26 +172,9 @@ try {
   }
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
-// Copia inerte del clic destro da rigiocare quando l'handler vero è pronto.
-// Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
-// fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
-// i dati che l'handler legge, così il menu si apre sull'elemento giusto.
+// Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
 function replayContextMenu(e, clic) {
-  let node = null;
-  try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
-  catch (_) { node = e.target; }
-  const copy = {
-    target: node,
-    currentTarget: node,
-    clientX: e.clientX, clientY: e.clientY,
-    pageX: e.pageX, pageY: e.pageY,
-    screenX: e.screenX, screenY: e.screenY,
-    button: e.button,
-    shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
-    defaultPrevented: false,
-    composedPath: () => (node ? [node] : []),
-    preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {},
-  };
+  const copy = require('./menu-del-sito.js').copiaDelClic(e);
   const deadline = Date.now() + 3000;
   const tick = () => {
     if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
