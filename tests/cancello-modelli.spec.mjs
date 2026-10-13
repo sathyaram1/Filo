@@ -6,6 +6,8 @@ import { test, expect } from './fixtures/electron.mjs';
 
 // Configurazione di prova, fornitore finto che conta le chiamate, spesa del mese spinta oltre il limite.
 async function prepara(app) {
+  // Il giudice si aggancia all'avvio, dopo che l'app è già raggiungibile: senza aspettarlo «non chiama» per finta.
+  await expect.poll(() => app.evaluate(() => globalThis.SN_SAFEBROWSE.activeProviders().llm), { timeout: 15_000 }).toBe(true);
   await app.evaluate(async () => {
     const T = globalThis.SN_TEST_MODELS;
     await globalThis.SN_STORAGE.updateSettings({
