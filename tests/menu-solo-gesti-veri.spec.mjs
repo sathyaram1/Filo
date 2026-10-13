@@ -208,15 +208,17 @@ const PAGINA_DA_SOLA = `<!doctype html><html><body style="padding:40px">
     if (b) b.click();
     return !!b;
   };
-  const t0 = Date.now();
+  // Insiste dall'apertura fino a tre secondi dopo che Filo è pronto nella pagina.
+  let pronto = 0;
   const giro = setInterval(async () => {
+    if (!pronto && document.documentElement.dataset.filoContentReady === '1') pronto = Date.now();
     window.tasto();
     await new Promise((ok) => setTimeout(ok, 150));
     if (document.querySelector('.sn-menu')) window.__menuMai = true;
     window.freccia();
     window.incolla();
     for (const v of ['Detta', 'Invia feedback', 'Aiuto']) window.premi(v);
-    if (Date.now() - t0 > 5000) { clearInterval(giro); window.__fatto = true; }
+    if (pronto && Date.now() - pronto > 3000) { clearInterval(giro); window.__fatto = true; }
   }, 300);</script>
 </body></html>`;
 
