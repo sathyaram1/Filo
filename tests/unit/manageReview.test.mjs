@@ -1348,6 +1348,20 @@ test('stateBadge: etichetta, colore e motivo dal vocabolario unico', () => {
   assert.equal(motivoGrezzo.showReason, false);
 });
 
+test('stateBadge e righeStato: il riallineamento si chiama così, e dice che non è una bocciatura (#532)', () => {
+  const fb = { status: 'revision_capability', statusReason: 'riallineamento' };
+  const b = MR.stateBadge(fb);
+  assert.equal(b.label, 'Riallineamento');
+  assert.equal(b.showReason, true);
+  assert.match(b.reasonText, /si rifà su main/);
+  assert.match(b.hint, /^Stato: Riallineamento/);
+  assert.equal(MR.stateBadge({ status: 'revision_capability' }).label, 'Verifica fix');
+  const righe = MR.righeStato(fb);
+  assert.equal(righe[0].valore.startsWith('Riallineamento — '), true);
+  assert.match(righe.find((r) => r.etichetta === 'In breve').valore, /Non è una bocciatura/);
+  assert.equal(MR.righeStato({ status: 'revision_capability' }).some((r) => r.etichetta === 'In breve'), false);
+});
+
 test('stateBadge: stato cifrato → solo aperta/chiusa, o niente', () => {
   assert.equal(MR.stateBadge({ status: CIFRATO, statusPublic: 'closed' }).label, 'Chiusa');
   assert.equal(MR.stateBadge({ status: CIFRATO, statusPublic: 'closed' }).encrypted, true);
