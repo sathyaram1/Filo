@@ -27,6 +27,7 @@
         'Cliccando una voce della cronologia la rimetti negli appunti, pronta da incollare dove vuoi.',
         'Nella cronologia del menu "Incolla" le immagini copiate si vedono in miniatura: due schermate copiate una dietro l\'altra non si leggono più tutte e due "Immagine".',
         'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
+        'Col tasto destro su un\'immagine Filo riconosce anche quelle fatte con Stable Diffusion o FLUX che hanno perso le etichette: legge il marchio invisibile che questi programmi scrivono nei pixel, e lo dice in cima alla descrizione. Te lo dice anche in chat, se gli chiedi se l\'immagine è fatta con l\'AI. Un ritaglio o un ridimensionamento cancellano il marchio, quindi se non compare niente non vuol dire che la foto sia vera.',
       ],
       fixes: [
         'Un sito non può più premere da sé i pezzi di Filo che compaiono nella sua pagina: la conferma di «Salva per dopo», la parte di schermo da catturare o trascrivere, i bottoni del QR e quelli sotto le risposte dell\'Aiuto. Vanno avanti solo col tuo clic o col tuo tasto.',

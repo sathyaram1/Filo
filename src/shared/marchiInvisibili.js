@@ -87,7 +87,6 @@
       const filtro = d[r];
       const s = r + 1;
       const fine = r + passoRiga;
-      const su = s - passoRiga;
       if (filtro === 0) continue;
       if (filtro === 1) {
         for (let i = s + bpp; i < fine; i++) d[i] = (d[i] + d[i - bpp]) & 255;
@@ -109,7 +108,6 @@
           d[i] = (d[i] + (pa <= pb && pa <= pc ? a : pb <= pc ? c : ac)) & 255;
         }
       } else return false;
-      void su;
     }
     return true;
   }
@@ -146,11 +144,17 @@
 
   // ────────────────────────────── la lettura ──────────────────────────────
 
-  // La U di BGR2YUV di OpenCV sugli 8 bit (interi a 14 bit), come la calcola il decodificatore di riferimento.
+  // La U di BGR2YUV di OpenCV come la vede il codificatore. Sugli 8 bit (interi a 14 bit, centro 128) per chi marca
+  // un'immagine già salvata (Stable Diffusion 1); in virgola mobile (centro 0,5) per chi marca l'uscita del modello
+  // prima di salvarla (diffusers, Stability, FLUX). Il blocco si legge sui valori grezzi, centro compreso: letto
+  // nell'altro modo, un marchio di SDXL sembra rumore.
   function canaleU(b, g, r) {
     const y = (r * 4899 + g * 9617 + b * 1868 + 8192) >> 14;
     const v = ((b - y) * 8061 + 2105344) >> 14;
     return v < 0 ? 0 : v > 255 ? 255 : v;
+  }
+  function canaleUVirgola(b, g, r) {
+    return (b - (0.299 * r + 0.587 * g + 0.114 * b)) * 0.492 + 0.5;
   }
 
   // Il filtro di haar di pywt, nello stesso ordine di operazioni: prima le colonne, poi le righe. Così un
@@ -171,30 +175,32 @@
     return (massimo % SCALA) > SCALA / 2 ? 1 : 0;
   }
 
-  // Un bit letto per ogni blocco di 8×8 pixel, nell'ordine in cui il codificatore li scrive, nei due ordini dei
-  // canali: i generatori passano BGR al codificatore, le prime versioni di diffusers gli passavano RGB.
+  // Un bit letto per ogni blocco di 8×8 pixel, nell'ordine in cui il codificatore li scrive. Quattro letture: i due
+  // modi di calcolare U, e i due ordini dei canali (i generatori passano BGR, le prime versioni di diffusers RGB).
   function punteggi(px) {
     const { dati, w, h, passoRiga, inizio, passoPixel, passoCanale } = px;
     const bx = (((w >> 2) << 2) >> 1) >> 2;
     const by = (((h >> 2) << 2) >> 1) >> 2;
-    const diretti = new Uint8Array(bx * by);
-    const scambiati = new Uint8Array(bx * by);
-    const ua = new Float64Array(64), ub = new Float64Array(64), ll = new Float64Array(16);
+    const letture = [0, 1, 2, 3].map(() => new Uint8Array(bx * by));
+    const uu = [0, 1, 2, 3].map(() => new Float64Array(64));
+    const ll = new Float64Array(16);
     for (let i = 0; i < by; i++) {
       for (let j = 0; j < bx; j++) {
         for (let r = 0; r < 8; r++) {
           let p = (8 * i + r) * passoRiga + inizio + 8 * j * passoPixel;
           for (let c = 0; c < 8; c++, p += passoPixel) {
             const R = dati[p], G = dati[p + passoCanale], B = dati[p + 2 * passoCanale];
-            ua[8 * r + c] = canaleU(B, G, R);
-            ub[8 * r + c] = canaleU(R, G, B);
+            const q = 8 * r + c;
+            uu[0][q] = canaleU(B, G, R);
+            uu[1][q] = canaleU(R, G, B);
+            uu[2][q] = canaleUVirgola(B, G, R);
+            uu[3][q] = canaleUVirgola(R, G, B);
           }
         }
-        diretti[i * bx + j] = punteggio(ua, ll);
-        scambiati[i * bx + j] = punteggio(ub, ll);
+        for (let l = 0; l < 4; l++) letture[l][i * bx + j] = punteggio(uu[l], ll);
       }
     }
-    return { diretti, scambiati };
+    return letture;
   }
 
   // P(U ≥ u) senza marchio per ogni u: i coefficienti del binomiale gaussiano [n1+n0, n1]_q, contati esatti.
@@ -238,26 +244,27 @@
     return coda(n1, L - n1)[U];
   }
 
+  // { marchio, chi, p } se c'è; { marchio: null } se i pixel si leggono e non lo portano; null se non si leggono.
   // `opzioni.jpeg`: il decodificatore JPEG; senza, i JPEG non si leggono.
   function cerca(byte, opzioni) {
     const b = u8(byte);
     const px = pixelPng(b, nodeMod('node:zlib')) || pixelJpeg(b, opzioni && opzioni.jpeg);
     if (!px) return null;
-    const { diretti, scambiati } = punteggi(px);
+    const letture = punteggi(px);
     let migliore = null;
     for (const m of MARCHI) {
-      if (diretti.length < m.bit.length) continue;
-      for (const punti of [diretti, scambiati]) {
+      if (letture[0].length < m.bit.length) continue;
+      for (const punti of letture) {
         const p = probabilita(punti, m.bit);
         if (p <= ALFA && (!migliore || p < migliore.p)) migliore = { marchio: m.id, chi: m.chi, p };
       }
     }
-    return migliore;
+    return migliore || { marchio: null };
   }
 
   global.SN_MARCHI_INVISIBILI = {
     cerca,
     MARCHI: MARCHI.map(({ id, chi }) => ({ id, chi })),
-    _interni: { pixelPng, pixelJpeg, punteggi, probabilita, coda, canaleU, ALFA, MIN_PIXEL, MAX_PIXEL },
+    _interni: { pixelPng, pixelJpeg, punteggi, probabilita, coda, canaleU, canaleUVirgola, ALFA, MIN_PIXEL, MAX_PIXEL },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

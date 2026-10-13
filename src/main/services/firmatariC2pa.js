@@ -165,10 +165,42 @@ function elenco() {
   return { versione: versioneElenco, pem: ancore ? salvato.pem : '', pemTsa: ancore && ancoreTsa ? salvato.pemTsa : '' };
 }
 
+// Un marchio nei pixel si cerca solo se il file non dichiara niente: le sue etichette parlano per prime (#889).
+// La lettura si ricorda per i byte, così menu, Aiuto e chat sulla stessa immagine non la decodificano tre volte.
+const MAX_MARCHI = 300;
+const marchi = new Map();
+let ritardoMarchi = 0;
+
+async function marchioNeiPixel(byte) {
+  const k = Buffer.from(await globalThis.crypto.subtle.digest('SHA-256', byte)).toString('hex');
+  let lettura = marchi.get(k);
+  if (lettura) {
+    marchi.delete(k);
+  } else {
+    lettura = (async () => {
+      if (ritardoMarchi) await attesa(ritardoMarchi);
+      return require('./provenienzaIsolata').cercaMarchi(byte);
+    })();
+    // Una lettura interrotta (un altro file ha fatto cadere il thread) non diventa un «niente marchio» per sempre.
+    lettura.catch(() => { if (marchi.get(k) === lettura) marchi.delete(k); });
+  }
+  marchi.set(k, lettura);
+  while (marchi.size > MAX_MARCHI) marchi.delete(marchi.keys().next().value);
+  try { return await lettura; } catch (e) {
+    console.warn('[marchi] lettura dei pixel interrotta:', e && e.message);
+    return null;
+  }
+}
+
 async function analizzaImmagine(byte) {
   const isolata = require('./provenienzaIsolata');
   let res = await isolata.analizza(byte, elenco());
-  if (!res.trovato || res.firmatario !== 'non_verificato') return res;
+  if (!res.trovato) {
+    const P = provenienza();
+    const m = await marchioNeiPixel(byte);
+    return (m && P && P.esitoDaMarchio(m)) || { ...res, marchiCercati: !!m };
+  }
+  if (res.firmatario !== 'non_verificato') return res;
   const giro = inCorso || (automatico() && serveAggiornare() ? aggiorna() : null);
   if (!giro) return res;
   await Promise.race([giro, attesa(ATTESA_PRIMA_VOLTA_MS)]);
@@ -248,6 +280,9 @@ function stato() {
   };
 }
 
+// Solo per i test: la lettura dei pixel che arriva dopo il menu, per vedere che il menu non la aspetta.
+function _rallentaMarchi(ms) { ritardoMarchi = Math.max(0, Number(ms) || 0); }
+
 // Solo per i test: si riparte come al primo avvio, senza elenco in memoria.
 function _dimentica() {
   salvato = { pem: '', scaricatoIl: 0, fonte: '', pemTsa: '' };
@@ -257,6 +292,7 @@ function _dimentica() {
   ultimoTentativo = 0;
   ultimoErrore = '';
   copie.clear();
+  marchi.clear();
 }
 
-module.exports = { FONTE, FONTE_TSA, init, aggiorna, analizzaImmagine, ricordaCopia, origineDellaCopia, stato, carica, _dimentica };
+module.exports = { FONTE, FONTE_TSA, init, aggiorna, analizzaImmagine, ricordaCopia, origineDellaCopia, stato, carica, _dimentica, _rallentaMarchi };

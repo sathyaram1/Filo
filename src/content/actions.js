@@ -793,7 +793,8 @@
           leggiOrigine(dataUrl).then((p) => {
             if (cancelled || !p || !p.ok || !p.frase) return;
             testoChiuso(origine, p.frase);
-            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified' : 'menu_origin_hint');
+            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified'
+              : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
             origine.classList.toggle('sn-menu-origine-debole', !p.forte);
             origine.hidden = false;
           }).catch(() => {});

@@ -101,6 +101,7 @@ require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei ma
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
 require(path.join(SHARED, 'provenienzaImmagine.js'));
+require(path.join(SHARED, 'marchiInvisibili.js'));  // #889 — i marchi aperti nei pixel: li legge il thread di provenienzaIsolata
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 // #530 — la regola «Filo può fare X?» come dati: prima del registro, che le passa gli ingressi.
 require(path.join(SHARED, 'autonomia.js'));
