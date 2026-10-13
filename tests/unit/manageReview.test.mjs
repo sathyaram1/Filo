@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackStatus.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'domande.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'manageReview.js'));
 
 const MR = globalThis.SN_MANAGE_REVIEW;
@@ -1770,14 +1771,24 @@ test('apertura: bloccante aperta > Ricevuti non vuoto > ultima sezione > Feedbac
   ]) assert.equal(ap({ domande: [d], ricevuti: 0, ultima: null }), 'feedback/inbox/predefinita', JSON.stringify(d));
 });
 
-test('domande: la scheda di ogni stato e i conteggi delle tre schede', () => {
+test('domande: la scheda di ogni stato viene da SN_DOMANDE.schedaDi, e ogni sua scheda ha un posto in Gestione', () => {
   assert.equal(MR.schedaDomanda({ stato: 'aperta' }), 'domande');
   assert.equal(MR.schedaDomanda({ stato: 'in_lavorazione' }), 'domande-lavoro');
   assert.equal(MR.schedaDomanda({ stato: 'chiusa' }), 'domande-archivio');
   assert.equal(MR.schedaDomanda({ stato: 'superata' }), 'domande-archivio');
-  assert.equal(MR.schedaDomanda({ stato: 'boh' }), null);
+  // Uno stato ignoto resta davanti all'owner, come dice il modulo delle domande.
+  assert.equal(MR.schedaDomanda({ stato: 'boh' }), 'domande');
+  assert.equal(MR.schedaDomanda({ stato: 'chiusa', esito: { automatica: true } }), 'domande-archivio');
+  assert.equal(MR.schedaDomanda(null), null);
+  const schedeDomande = MR.SEZIONI.find((s) => s.id === 'domande').schede;
+  for (const s of globalThis.SN_DOMANDE.SCHEDE) {
+    const d = { da_rispondere: { stato: 'aperta' }, in_lavorazione: { stato: 'in_lavorazione' },
+      risposte_automatiche: { stato: 'chiusa', esito: { automatica: true } }, archivio: { stato: 'superata' } }[s];
+    assert.ok(d, `la prova non conosce la scheda «${s}» di SN_DOMANDE`);
+    assert.ok(schedeDomande.includes(MR.schedaDomanda(d)), `«${s}» non ha una scheda in Gestione`);
+  }
   assert.deepEqual(MR.contaDomande([
     { stato: 'aperta' }, { stato: 'aperta' }, { stato: 'in_lavorazione' }, { stato: 'superata' }, { stato: 'boh' },
-  ]), { domande: 2, 'domande-lavoro': 1, 'domande-archivio': 1 });
+  ]), { domande: 3, 'domande-lavoro': 1, 'domande-archivio': 1 });
   assert.deepEqual(MR.contaDomande(null), { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 });
 });
