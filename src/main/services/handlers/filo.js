@@ -77,7 +77,7 @@ module.exports = function register(on, ctx) {
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg) });
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg) });
     if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
