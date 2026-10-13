@@ -50,17 +50,20 @@ const SITO_CON_SCHEDA = { tab: { id: 1, url: 'https://evil.example/pagina' }, ur
 const PAGINA_DI_FILO = { url: 'filo://manage/manage.html' };
 
 // I codici d'invito del red team e le prove coi modelli predefiniti (#784.2): spendono le chiavi di Filo
-// o aprono il red team a chi vuole il sito. Passate come funzione: `app.evaluate` vuole dati serializzabili.
-const PORTE_784 = String((MSG) => ({
-  redteamGeneraCodici: { type: MSG.REDTEAM_GEN_CODES, count: 5 },
-  redteamElencoCodici: { type: MSG.REDTEAM_LIST_CODES },
-  redteamRevocaCodice: { type: MSG.REDTEAM_REVOKE_CODE, code: 'ABCD-EFGH' },
-  redteamApertoLettura: { type: MSG.REDTEAM_OPEN_GET },
-  redteamApertoScrittura: { type: MSG.REDTEAM_OPEN_SET, openToAll: true },
-  provaModelloScelto: { type: MSG.TEST_DEFAULT_MODEL, provider: 'openrouter', model: 'qualsiasi/modello' },
-  provaModelloPredefinito: { type: MSG.TEST_DEFAULT_MODEL, nickname: 'qualsiasi' },
-  catalogoModelli: { type: MSG.DEFAULT_MODELS_LIST, provider: 'openrouter' },
-  elencoFornitori: { type: MSG.DEFAULT_PROVIDERS_LIST },
+// o aprono il red team a chi vuole il sito. Nome della costante e resto del messaggio: `app.evaluate` vuole dati.
+const PORTE_784 = {
+  redteamGeneraCodici: ['REDTEAM_GEN_CODES', { count: 5 }],
+  redteamElencoCodici: ['REDTEAM_LIST_CODES', {}],
+  redteamRevocaCodice: ['REDTEAM_REVOKE_CODE', { code: 'ABCD-EFGH' }],
+  redteamApertoLettura: ['REDTEAM_OPEN_GET', {}],
+  redteamApertoScrittura: ['REDTEAM_OPEN_SET', { openToAll: true }],
+  provaModelloScelto: ['TEST_DEFAULT_MODEL', { provider: 'openrouter', model: 'qualsiasi/modello' }],
+  catalogoModelli: ['DEFAULT_MODELS_LIST', { provider: 'openrouter' }],
+  elencoFornitori: ['DEFAULT_PROVIDERS_LIST', {}],
+};
+const messaggiDa = (MSG, porte) => Object.fromEntries(Object.entries(porte).map(([nome, [k, resto]]) => {
+  if (!MSG[k]) throw new Error(`messaggio sconosciuto: ${k}`);
+  return [nome, { type: MSG[k], ...resto }];
 }));
 
 test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', async ({ app, shell }) => {
