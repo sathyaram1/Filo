@@ -26,7 +26,7 @@ for (const [file, prove] of [
   test(`${file} lanciato da solo dentro una routine: le prove della riga di comando non vedono la sessione`, () => {
     const casa = cartellaTemporanea('filo-prove-in-sessione-');
     try {
-      const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-name-pattern=${prove}`, join('tests', 'unit', file)],
+      const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', `--test-name-pattern=${prove}`, `tests/unit/${file}`],
         { cwd: REPO, env: sessioneDiRoutine(casa), encoding: 'utf8', timeout: 120_000 });
       assert.equal(r.status, 0, `${r.stdout.slice(-4000)}\n${r.stderr.slice(-2000)}`);
       assert.match(r.stdout, /^# pass [1-9]/m, 'le prove sono partite davvero');
