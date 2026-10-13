@@ -53,6 +53,20 @@ test('le istruzioni del lavoro server: percorsi veri, aiutante nel clone, regist
   assert.ok(!/--global/.test(t), 'niente configurazione globale');
 });
 
+test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {
+  const server = testoLavoroServer({ clone: '/home/user/filo-security' });
+  // Chi verifica non può consegnare uno stato: la sua strada è la critica con la segnalazione all'owner.
+  const verifica = `${readRoleInstructions('verifier', { scope: 'pieno' })}\n\n${server}`;
+  assert.ok(!/deliver status/.test(verifica), 'al verificatore non si indica una consegna che il server gli rifiuta');
+  assert.match(server, /se verifichi, non passare il lavoro[^]*--segnala/);
+  const sezioni = [...server.matchAll(/sezione «([^»]+)»/g)].map((m) => m[1]);
+  assert.ok(sezioni.length > 0);
+  for (const role of ['new-work', 'fixer']) {
+    const t = `${readRoleInstructions(role)}\n\n${server}`;
+    for (const titolo of sezioni) assert.ok(t.includes(`## ${titolo}`), `${role} riceve la sezione «${titolo}»`);
+  }
+});
+
 test('la busta del server passa il segno `lavoroServer` ai ruoli che lavorano, mai al controllo di sicurezza', () => {
   const busta = { payload: { feedback: { text: 'x' }, lavoroServer: { repo: 'sathyaram1/filo-security' } } };
   for (const role of ['new-work', 'fixer', 'verifier']) {
