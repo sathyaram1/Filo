@@ -9,8 +9,9 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const SB = require('../../src/main/services/safebrowse/index.js');
 
-const LOGIN = { linkOrigin: 'email', hasPassword: true };
-const ACCESSO = { hasPassword: true };
+// I conti valgono anche per la finestra nascosta, che prova solo un link non ancora aperto (#1081).
+const LOGIN = { linkOrigin: 'email', hasPassword: true, daAprire: true };
+const ACCESSO = { hasPassword: true, daAprire: true };
 // Piattaforme che l'elenco interno non separa: il dominio è di migliaia di proprietari.
 const PIATTAFORME = ['weebly.com', '000webhostapp.com', 'r2.dev', 'webflow.io', 'trycloudflare.com', 'wixsite.com', 'square.site', 'godaddysites.com'];
 

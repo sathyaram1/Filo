@@ -119,9 +119,10 @@ test('giudizio AI e finestra isolata: una sola chiamata in volo per pagina, anch
     sandbox: async (u) => { conta.sandbox.push(u); await attesa; return { verdict: 'clean', finalUrl: u, redirects: [] }; },
   });
   const url = 'http://accesso-esempio.com/login';
-  SB.analyze(url, {}, () => {});
-  SB.analyze(url, { hasPassword: true }, () => {});
-  SB.analyze(url, { hasPassword: true, linkOrigin: 'email' }, () => {});
+  const link = { daAprire: true };
+  SB.analyze(url, link, () => {});
+  SB.analyze(url, { ...link, hasPassword: true }, () => {});
+  SB.analyze(url, { ...link, hasPassword: true, linkOrigin: 'email' }, () => {});
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(conta.llm.length, 1);
   assert.equal(conta.sandbox.length, 1);
@@ -193,7 +194,7 @@ test('un sito in whitelist col certificato rotto ha l\'avviso, ma niente giudizi
     sandbox: async (u) => { conta.sandbox.push(u); return { verdict: 'clean', finalUrl: u, redirects: [] }; },
   });
   SB.recordCert('www.google.com', 'mismatch');
-  const v = SB.analyze('https://www.google.com/', {}, () => {});
+  const v = SB.analyze('https://www.google.com/', { daAprire: true }, () => {});
   await new Promise((ok) => setTimeout(ok, 20));
   assert.equal(v.level, 'sospetto');
   assert.deepEqual([conta.llm.length, conta.sandbox.length, conta.rdap.length], [0, 0, 0]);
