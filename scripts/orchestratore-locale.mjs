@@ -553,7 +553,7 @@ async function main(argv) {
 
   // I lavori server passati in cloud aspettano il PC (#1159): fusione, deploy, e la parte dell'app torna alle routine.
   const depFusioni = (log) => ({
-    attese: () => attesePc(), fineAttesa: (id) => fineAttesa(id), esegui, pubblica: () => pubblicaDavvero(P), log, radice: P.radice,
+    attese: () => attesePc(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P), log, radice: P.radice,
   });
   const righeFerme = (esito) => esito.ferme.map((f) => `#${f.num} fermo: ${f.motivo}`);
 
