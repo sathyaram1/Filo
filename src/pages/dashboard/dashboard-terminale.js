@@ -169,8 +169,12 @@
       r = await window.filo?.shellVirgoletteIncolla?.({ riga, inizio, fine, shell: terminalShell, cwd: currentCwd });
     } catch (_) { r = null; }
     const s = r && r.sostituzione;
-    // Se nel frattempo la riga è cambiata (o è già partita) non si tocca: si cambia solo quello che l'utente vede.
-    if (!s || typeof s.testo !== 'string' || inputEl.value !== riga) return;
+    if (!s || typeof s.testo !== 'string' || !Number.isInteger(s.inizio) || !Number.isInteger(s.fine)) return;
+    // Nel frattempo si può aver scritto o incollato altro DOPO: va bene. Se è cambiato il percorso o quello che
+    // lo precede, o se il comando è già partito, non si tocca niente.
+    const ora = inputEl.value;
+    const seguito = ora.slice(s.fine);
+    if (ora.slice(0, s.fine) !== riga.slice(0, s.fine) || (seguito && !/^[\s;&|]/.test(seguito))) return;
     const cursore = inputEl.selectionEnd;
     const delta = s.testo.length - (s.fine - s.inizio);
     let fatto = false;
