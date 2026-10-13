@@ -264,7 +264,7 @@ test('a menu aperto dall\'utente il sito non preme Invia feedback né Aiuto; l\'
       await expect(page.locator('.sn-sidebar'), `il sito non apre l'Aiuto premendo «${testo}»`).toHaveCount(0);
       expect(await conta(app, page, '.sn-fb-modal'), `il sito non apre il feedback premendo «${testo}»`).toBe(0);
       await page.keyboard.press('Escape');
-      await page.evaluate(() => { for (const b of document.body.querySelectorAll(':scope > button')) b.remove(); });
+      await page.evaluate(() => { for (const b of document.body.querySelectorAll(':scope > button[class^="sn-"]')) b.remove(); });
     }
   }
 
