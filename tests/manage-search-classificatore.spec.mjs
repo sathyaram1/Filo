@@ -253,6 +253,17 @@ test('troppe richieste di continuo su 800 feedback: si ripiega sul modello in po
   expect(g.chat).toEqual(['vendor/testo']);
 });
 
+// #814.7: dalle quattro cifre il conto della lettura prende il punto delle migliaia, come ogni numero di Filo.
+test('con migliaia di feedback il conto della lettura scrive i numeri col punto delle migliaia', async ({ app, openTab }) => {
+  await preparaOwner(app, { supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13' } });
+  const page = await openTab(URL);
+  await page.waitForFunction(() => window.filo && window.__mgTest);
+  await cerca(page, 'la x per chiudere', 1200);
+  await expect(page.locator('#mgSearchMsg')).toHaveText(/^Letti (\d{1,3}|1\.\d{3}) di 1\.200$/);
+  await expect(page.locator('.mg-item--result')).toHaveCount(3, { timeout: 20000 });
+  await expect(page.locator('#mgSearchProgress')).toBeHidden();
+});
+
 test('con «solo modelli a pesi aperti» il classificatore resta spento e la ricerca funziona lo stesso', async ({ app, openTab }) => {
   await preparaOwner(app, {
     supportDoc: { manageSearchClassifier: 'typesafe/jev-1.13', manageSearch: 'deepseek/deepseek-v4-flash' },
