@@ -299,7 +299,7 @@ export async function esegui(argv, io = {}) {
           return 1;
         }
       }
-      const data = { op: 'rispondi', id: a.id };
+      const data = Object.assign({ op: 'rispondi', id: a.id }, await daSessione());
       if (a.scelta !== undefined) data.scelta = a.scelta;
       if (typeof a.testo === 'string' && a.testo.trim()) data.testo = a.testo;
       const r = await chiama(data);
