@@ -25,7 +25,8 @@ async function prepara(app) {
     };
     const finto = async ({ attempts, messages }) => {
       const testo = JSON.stringify(messages || []);
-      globalThis.__cancello.chiamate.push(testo.includes('METADATI') ? 'giudice' : 'testo');
+      // La home si prepara da sola appena c'è un modello: non è uno dei chiamanti di servizio contati qui.
+      if (!testo.includes('preparare la dashboard')) globalThis.__cancello.chiamate.push(testo.includes('METADATI') ? 'giudice' : 'testo');
       const text = testo.includes('METADATI') ? '{"suspicious":false,"reason":null,"confidence":"low"}' : 'geo_block';
       return { text, provider: attempts[0].provider, model: attempts[0].model, servedBy: 'DeepInfra', usage: { promptTokens: 200, completionTokens: 5, costUsd: 0.0005 } };
     };
