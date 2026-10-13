@@ -140,6 +140,7 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       // Il classificatore della ricerca spende la chiave dell'owner leggendo tutti i feedback (#1118).
       ricercaClassificatore: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'start', query: 'x', candidates: [{ id: 'a', title: 't', text: 'x' }] },
       ricercaClassificatoreStato: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'status', jobId: 'r1' },
+      ...PORTE_784(MSG),
     });
     const esegui = async (mittente) => {
       const res = {};
