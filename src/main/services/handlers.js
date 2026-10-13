@@ -1570,7 +1570,8 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
     const chiesti = daSito && wc ? (OK_CHIESTI_AI_SITI.get(wc) || new Set()) : null;
     const ok = confermato && (!chiesti || chiesti.delete(k));
     if (!ok) {
-      if (chiesti) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
+      // Un OK arrivato senza la domanda non ne apre una: altrimenti due OK forgiati di fila aprirebbero.
+      if (chiesti && !confermato) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
       const Levels = globalThis.SN_ACTION_LEVELS;
       const azione = { type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: motivo || u.reason || '' };
       return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo };
