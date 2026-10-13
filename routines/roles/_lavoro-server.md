@@ -38,6 +38,8 @@ Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --ab
 - Lavoro nuovo: `git -C "<CLONE>" checkout -b <ramo> origin/main`.
 - Verifica o correzione: `git -C "<CLONE>" fetch origin <ramo>` e `git -C "<CLONE>" checkout -B <ramo> origin/<ramo>`.
   Se sul server il ramo non c'è, il lavoro sta tutto nell'app.
+- Riallineamento del server (lo dice la critica): `git -C "<CLONE>" merge origin/main`, conflitti risolti tenendo main
+  per ciò che altri ci hanno già portato, poi prove e spinta come sotto.
 
 ### Prove, spinta, registro
 
