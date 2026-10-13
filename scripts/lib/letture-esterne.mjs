@@ -138,7 +138,12 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
     if (!input || typeof input !== 'object' || !puoLeggereFuori(input.tool_name)) return { esito: 'nessuna lettura esterna' };
     const cwd = String(input.cwd || env.CLAUDE_PROJECT_DIR || process.cwd());
     const sessione = String(input.session_id || '').trim();
-    const biglietti = B.trovaBiglietti({ env: sessione ? { ...env, [B.ENV_SESSIONE]: sessione } : env, cwd });
+    const envSessione = sessione ? { ...env, [B.ENV_SESSIONE]: sessione } : env;
+    // La cartella corrente può stare fuori dal progetto (un'altra cartella di lavoro): il biglietto resta nel progetto
+    // da cui la sessione è partita.
+    let biglietti = B.trovaBiglietti({ env: envSessione, cwd });
+    const progetto = String(env.CLAUDE_PROJECT_DIR || '').trim();
+    if (!biglietti.length && progetto && progetto !== cwd) biglietti = B.trovaBiglietti({ env: envSessione, cwd: progetto });
     if (!biglietti.length) return { esito: 'senza biglietto' };
     // Le cartelle fidate (altre chiamate a git) servono solo a Read.
     const motivo = motivoLettura(input, input.tool_name === 'Read' ? contesto({ cwd, env }) : {});
