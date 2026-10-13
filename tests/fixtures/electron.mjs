@@ -156,15 +156,7 @@ export const test = base.extend({
   // La vista che disegna sopra la pagina gli avvisi della barra (#588.5); nasce al primo avviso.
   // La pila nella shell è solo il modello, nascosto: quello che l'utente vede e clicca sta qui.
   avvisi: async ({ app }, use) => {
-    await use(async () => {
-      const scadenza = Date.now() + 10_000;
-      while (Date.now() < scadenza) {
-        const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avvisi.html'); } catch (_) { return false; } });
-        if (p) return p;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      throw new Error('avvisi: la vista degli avvisi non è nata');
-    });
+    await use(() => aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'avvisi: la vista degli avvisi non è nata'));
   },
 
   // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
@@ -175,17 +167,7 @@ export const test = base.extend({
     const fn = async (url) => {
       const target = new URL(url).hostname;
       await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-      const deadline = Date.now() + 10_000;
-      let page = null;
-      while (Date.now() < deadline) {
-        page = app.windows().find((w) => {
-          try { return new URL(w.url()).hostname === target; }
-          catch (_) { return false; }
-        });
-        if (page) break;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      if (!page) throw new Error(`openTab: nessuna window per ${url}`);
+      const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === target, `openTab: nessuna window per ${url}`);
       await page.waitForLoadState('domcontentloaded').catch(() => {});
       return page;
     };
