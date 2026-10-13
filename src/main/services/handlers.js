@@ -4662,7 +4662,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto: azioniViste, parole: paroleUtente, domanda, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
