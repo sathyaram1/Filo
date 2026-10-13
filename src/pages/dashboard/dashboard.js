@@ -72,6 +72,8 @@
   let pendingFiles = [];
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
+  // Il testo del Ctrl+V nativo: l'evento `input` che segue non lo porta con sé (#968).
+  let testoIncollato = null;
   const percorsiImmagini = new Map();
 
   // ===== Le parti della home =====
@@ -1384,6 +1386,7 @@
     else if (percorso) addPendingFile(percorso);
   }
   inputForm.addEventListener('paste', (e) => {
+    testoIncollato = e.target === inputEl ? (e.clipboardData?.getData('text/plain') ?? null) : null;
     const items = e.clipboardData?.items;
     if (!items) return;
     // Incolla TUTTE le immagini presenti negli appunti (non solo la prima).
@@ -1424,11 +1427,13 @@
     testoDaFuori = true;
     const prima = inputEl.value.slice(0, inputEl.selectionStart);
     const dopo = inputEl.value.slice(inputEl.selectionEnd);
-    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${dopo && !/^\s/.test(dopo) ? ' ' : ''}`;
+    const spazioDopo = dopo && !/^\s/.test(dopo) ? ' ' : '';
+    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${spazioDopo}`;
     inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
     inputEl.focus();
     autoGrowInput();
     Comandi.updateInputClass();
+    Term.virgoletteSuInserito(testo, inputEl.selectionEnd - spazioDopo.length);
   });
 
   // ===== Lightbox: click su un'immagine per ingrandirla =====
@@ -1516,6 +1521,12 @@
     if (!inputEl.value) testoDaFuori = false;
     else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
     Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto();
+    // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
+    if (e.inputType === 'insertFromPaste') {
+      const incollato = typeof e.data === 'string' ? e.data : testoIncollato;
+      testoIncollato = null;
+      Term.virgoletteSuInserito(incollato, inputEl.selectionEnd);
+    }
   });
 
   // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
