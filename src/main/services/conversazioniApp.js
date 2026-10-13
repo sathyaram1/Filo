@@ -76,6 +76,29 @@ function annota({ app: nome, rif, soggetto, dove, messaggi } = {}, opts) {
   });
 }
 
+// Il documento o il mazzo ha cambiato nome: le sue righe lo seguono subito, anche per la ricerca, senza aspettare il
+// prossimo messaggio. Un nome dato dall'utente in Cronologia resta suo. `prefisso`: tutte quelle di un documento.
+function rinomina({ app: nome, rif, prefisso, soggetto } = {}, opts) {
+  const R = A();
+  if (!R.eApp(nome)) return Promise.resolve(0);
+  const r = rif == null ? '' : String(rif).slice(0, 400);
+  const p = prefisso == null ? '' : String(prefisso);
+  const sogg = R.soggetto(soggetto);
+  if ((!r && !p) || !sogg) return Promise.resolve(0);
+  return F().transazione(async (t) => {
+    const eventi = t.tutte()
+      .filter((c) => c.app === nome && (r ? c.rif === r : String(c.rif || '').startsWith(p)) && (c.soggetto || '') !== sogg)
+      .map((c) => t.evento(T().CHAT_TITOLO, {
+        chat: c.id, ...(c.titleByUser ? {} : { title: R.titolo(nome, sogg) }), soggetto: sogg,
+      }, { autore: 'filo' }));
+    if (eventi.length) await t.scrivi(eventi);
+    return eventi.length;
+  }, opts).then((n) => {
+    if (n) { try { app.annuncia(); } catch (_) {} }
+    return n;
+  });
+}
+
 async function righe({ chat = null } = {}, opts) {
   const tutte = await F().chats(opts);
   let giorni = 3;
