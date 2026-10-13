@@ -25,7 +25,6 @@
 //   node scripts/routine-keys.mjs account <nome> <A|B>
 
 import { findAdminRefreshToken, mintIdToken } from './lib/firestore-auth.mjs';
-import { DOVE_VA_LA_PAROLA } from './build-alarm.mjs';
 
 const REGIONE = 'europe-west1';
 const PROGETTO = 'filo-8b9cb';
@@ -104,7 +103,7 @@ async function main() {
     console.log(`${r.passphrase}\n`);
     console.log('Copiala ADESSO dove serve: non si potrà più rileggere.');
     console.log(potere === 'build'
-      ? `Va come FILO_BUILD_PASSPHRASE ${DOVE_VA_LA_PAROLA}.`
+      ? "Va nell'ambiente «rilascio» del repo (Settings → Environments → rilascio), come FILO_BUILD_PASSPHRASE: fra i segreti del repo non la legge nessuno."
       // Una parola d'ordine di routine NON va nell'ambiente: l'ambiente lo
       // eredita ogni lavoratore che parte da lì. Sta solo nel prompt della
       // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.
