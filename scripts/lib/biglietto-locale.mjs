@@ -29,7 +29,8 @@ export function radiceRepo(cwd = process.cwd()) {
 
 /**
  * La radice del checkout principale del repo di `cwd`, uguale da ogni suo worktree: lì vivono i biglietti, così chi
- * lavora in un worktree trova quello della sessione anche senza la variabile. '' fuori da un repo.
+ * lavora in un worktree trova quello della sessione anche senza la variabile, che PowerShell non riceve mai (è un
+ * percorso). '' fuori da un repo.
  */
 export function radiceCondivisa(cwd = process.cwd()) {
   const radice = radiceRepo(cwd);
