@@ -18,6 +18,7 @@
 //   e si guarda quale dei due viene eseguito. Senza la copia fissata esce il
 //   vecchio, ed è rosso.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

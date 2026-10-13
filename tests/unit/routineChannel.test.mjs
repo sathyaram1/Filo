@@ -8,6 +8,7 @@
 //     bug, non un dettaglio di stile.
 //   - call: ritenta i guasti che possono passare da soli, NON i rifiuti.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
