@@ -1199,6 +1199,7 @@
     }
     writeCollection();
     renderDocSwitcher();
+    rinominaNelFilo(id, f && f.meta && f.meta.title);
     return true;
   }
 
