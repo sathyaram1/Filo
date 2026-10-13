@@ -95,12 +95,17 @@
   menuDi(striscia, { striscia: true });
 
   // ── suggerimenti ─────────────────────────────────────────────────────────
+  // L'etichetta vive quanto il puntatore sull'icona, a barra aperta e con l'icona ferma (#1201):
+  // patterns/un-riquadro-che-si-riempie-dopo-va-rimisurato-dopo-la-posa.md.
   let suggTimer = null;
+  let suggDi = null;
   function programmaSuggerimento(el) {
     nascondiSuggerimento();
+    suggDi = el;
     suggTimer = setTimeout(() => {
       suggTimer = null;
-      if (!el.isConnected || trascina) return;
+      // Chiusa nel frattempo, o la vista stretta sotto il puntatore: nessun pointerleave lo direbbe.
+      if (!el.isConnected || trascina || !stato.aperta || !el.matches(':hover')) { suggDi = null; return; }
       const r = el.getBoundingClientRect();
       const p = pannello.getBoundingClientRect();
       api.suggerimento({ testo: el.dataset.sugg || el.getAttribute('aria-label') || '', x: Math.round(p.right + 8), y: Math.round(r.top + r.height / 2 - 11) });
@@ -108,6 +113,7 @@
   }
   function nascondiSuggerimento() {
     if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; }
+    suggDi = null;
     api.suggerimento({ testo: '' });
   }
 
@@ -117,7 +123,8 @@
     b.type = 'button';
     b.className = classe;
     b.addEventListener('pointerenter', (e) => { if (e.isTrusted) programmaSuggerimento(b); });
-    b.addEventListener('pointerleave', () => { if (suggTimer) { clearTimeout(suggTimer); suggTimer = null; } });
+    b.addEventListener('pointerleave', () => { if (suggDi === b) nascondiSuggerimento(); });
+    b.addEventListener('pointerdown', () => { if (suggDi === b) nascondiSuggerimento(); });
     return b;
   }
 
