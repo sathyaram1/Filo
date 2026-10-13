@@ -24,7 +24,7 @@
 //   volte un verificatore è stato lanciato sullo stesso numero: il primo giro
 //   è la verifica, ogni giro in più è una critica che ha rimandato indietro il
 //   lavoro. Quindi «critiche prima del via libera» = lanci del verificatore
-//   meno uno. Non c'è un contatore sul documento: il conto dei giri vive sul
+//   meno uno, senza i controlli dopo un riallineamento (`caso`, #532). Non c'è un contatore sul documento: il conto dei giri vive sul
 //   server, e questa è l'unica traccia che arriva al client.
 //
 // IL REGISTRO È UNA FINESTRA, E LO DICE
