@@ -114,7 +114,6 @@ test('la scheda Log chiama per nome riallineamento, ripresa e il loro controllo'
   await expect(page.locator('#mgLogList .mg-log-role')).toHaveText([
     'Riallineamento', 'Verifica del riallineamento', 'Ripresa', 'Riallineamento o ripresa', 'Verifica', 'Riallineamento o ripresa',
   ]);
-  await expect(page.locator('#mgLogList .mg-log-role')).not.toContainText(['Correzione']);
   await page.locator('#panel-log').screenshot({ path: 'tests/.shots/532-log.png' });
 });
 
