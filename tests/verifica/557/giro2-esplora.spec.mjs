@@ -71,6 +71,8 @@ test('tetto dei passi con frasi di lavoro, tema scuro: una bolla che dice che si
   await expect(page.locator('.dash-continua')).toHaveCount(1);
   console.log('BOLLE:', await page.locator('.dash-bubble-filo').allInnerTexts());
   console.log('TESTA:', await page.locator('.dash-activity-head').allInnerTexts());
+  await app.evaluate((_e) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
+  await page.waitForTimeout(800);
   await page.screenshot({ path: 'tests/.shots/v557g2-tetto-scuro.png' });
   await ripristina(app);
 });
