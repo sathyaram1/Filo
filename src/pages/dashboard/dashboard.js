@@ -1386,6 +1386,7 @@
     else if (percorso) addPendingFile(percorso);
   }
   inputForm.addEventListener('paste', (e) => {
+    testoIncollato = e.target === inputEl ? (e.clipboardData?.getData('text/plain') ?? null) : null;
     const items = e.clipboardData?.items;
     if (!items) return;
     // Incolla TUTTE le immagini presenti negli appunti (non solo la prima).
