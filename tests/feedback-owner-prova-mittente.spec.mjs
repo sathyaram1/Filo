@@ -102,7 +102,8 @@ test('l’owner senza accesso aspetta invece di partire da utente, e parte con l
   expect(r.ok, JSON.stringify(r)).toBe(true);
   await expect.poll(async () => (await banco$(app)).tokenChiesti, { timeout: 20_000 }).toBeGreaterThanOrEqual(1);
   const vista = await avvisi();
-  await expect(vista.locator('.shell-notif-msg', { hasText: 'aspetta il tuo accesso' }).first()).toBeVisible({ timeout: 15_000 });
+  // La vista degli avvisi nasce, carica e disegna quando la macchina glielo lascia fare: la ferma il tetto del test.
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'aspetta il tuo accesso' }).first()).toBeVisible({ timeout: 0 });
   expect((await banco$(app)).inviati).toEqual([]);
 
   const rientro = await app.evaluate(async (_e, t) => {
