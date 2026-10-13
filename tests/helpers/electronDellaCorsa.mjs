@@ -55,9 +55,9 @@ export function confrontaElectron({ dichiarata, inUso, altrove = '' }) {
   return { avviso: `Electron ${inUso} al posto del ${dichiarata} del lockfile: la corsa parte, ma ${rimedio}.` };
 }
 
-export function controllaElectronDellaCorsa(radice, env = process.env) {
+export function controllaElectronDellaCorsa(radice, env = process.env, { leggiVersione = versioneDelBinario } = {}) {
   const dichiarata = electronDichiarato(radice);
   const file = dichiarata && binarioElectron(radice, env);
   if (!file) return {};
-  return confrontaElectron({ dichiarata, inUso: versioneDelBinario(file), altrove: env.ELECTRON_OVERRIDE_DIST_PATH || '' });
+  return confrontaElectron({ dichiarata, inUso: leggiVersione(file), altrove: env.ELECTRON_OVERRIDE_DIST_PATH || '' });
 }
