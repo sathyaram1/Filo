@@ -7,6 +7,8 @@
 //                                  di rete (GSB/RDAP/CT/sandbox/LLM); quando un
 //                                  dato arriva e cambia il verdetto, richiama
 //                                  onUpdate(verdict). Le chiamate NON bloccano.
+//                                  ctx.daAprire: un link non ancora aperto (solo
+//                                  lì la sandbox); ctx.incognito: niente LLM né sandbox.
 //   recordCert(host, st)           registra l'esito del certificato visto da
 //                                  Electron (certificate-error / did-navigate).
 //   setProviders(fns)              inietta i fetcher di rete (Task 4/5).
