@@ -520,8 +520,9 @@ dicono gli esperimenti (§ 4.6).
 
 ### 4.8 Budget e rapporto settimanale
 
-- **Budget:** 200 € a settimana per tutta la gestione del lavoro: sessioni del
-  monitoraggio, indagini, esperimenti, istanze di riordino e potatura. È circa
+- **Budget:** 200 € a settimana per tutta la manutenzione del processo:
+  sessioni del monitoraggio, indagini, esperimenti, e le pulizie della coda e
+  dei rami (riordino e potatura, anche quelle del lunedì). È circa
   il 10% della settimana di un account (§ 8.1). Il monitoraggio lo divide come
   crede; sforare di poco va bene. Si conta come nei rapporti delle routine.
 - **Oltre il budget** chiede con una domanda, azione `esperimento`.
