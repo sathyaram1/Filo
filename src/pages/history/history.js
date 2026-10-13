@@ -63,7 +63,7 @@
     list.innerHTML = '';
 
     let filtered = items;
-    if (filter) filtered = filtered.filter((it) => it.action === filter);
+    if (filter) filtered = filtered.filter((it) => it && it.action && formatActionLabel(it.action) === filter);
     if (q) {
       filtered = filtered.filter((it) => {
         // Cerca SOLO sui testi che la voce mostra davvero — non su
