@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -113,6 +113,16 @@ test('la parola d’ordine della costruzione perde spazi e a capo ai bordi, e se
   assert.equal(parolaDellaCostruzione({ FILO_BUILD_PASSPHRASE: '   ' }), '');
   assert.equal(parolaDellaCostruzione({}), '');
   assert.equal(parolaDellaCostruzione(undefined), '');
+});
+
+test('ogni strumento legge FILO_BUILD_PASSPHRASE da parolaDellaCostruzione, non dall’ambiente nudo', () => {
+  const cartella = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts');
+  const nudi = [];
+  for (const f of [...readdirSync(cartella), ...readdirSync(join(cartella, 'lib')).map((x) => `lib/${x}`)]) {
+    if (!f.endsWith('.mjs') || f === 'build-alarm.mjs') continue;
+    if (/env(\?\.|\[['"])FILO_BUILD_PASSPHRASE/.test(readFileSync(join(cartella, f), 'utf8'))) nudi.push(f);
+  }
+  assert.deepEqual(nudi, [], 'con gli spazi ai bordi il server la rifiuta: si passa dal pulitore');
 });
 
 describe('le chiavi arrivano al server', () => {

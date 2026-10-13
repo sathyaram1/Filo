@@ -175,7 +175,7 @@ export function parolaDellaCostruzione(env = process.env) {
   const parola = grezza.trim();
   if (parola && parola !== grezza && !bordiDetti) {
     bordiDetti = true;
-    // stderr: lo stdout di release-bump porta solo il numero di versione.
+    // Su stderr: lo stdout di release-bump è il numero di versione, e lo cattura il lavoro di pubblicazione.
     console.warn('::warning::FILO_BUILD_PASSPHRASE ha spazi o a capo ai bordi: tolti prima di spedirla. Il segreto va ricopiato senza, nell\'ambiente «rilascio» del repo.');
   }
   return parola;
@@ -221,7 +221,7 @@ export async function spedisciAllarme(name, text, chiavi = []) {
     const body = await res.json().catch(() => ({}));
     if (!res.ok || !body.ok) {
       console.error(`[allarme] non consegnato (${res.status}${body.reason ? ' ' + body.reason : ''}).`);
-      // In evidenza nella corsa: in coda al registro è rimasto cinque giorni senza che nessuno lo leggesse (#1210).
+      // In evidenza nella corsa: in coda al registro nessuno lo legge, e la pubblicazione si ferma in silenzio (#1210).
       if (res.status === 401 || body.reason === 'bad_passphrase') {
         console.error('::error::Allarme non consegnato: il server non riconosce FILO_BUILD_PASSPHRASE di questo lavoro. Va ricopiata, quella in uso, nell\'ambiente «rilascio» del repo: senza, nessun guasto della costruzione diventa un feedback e la pubblicazione non parte.');
       }
