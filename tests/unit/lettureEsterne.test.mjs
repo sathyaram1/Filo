@@ -98,6 +98,18 @@ test('contesto: il repo anche da una worktree, il checkout del server accanto, l
       assert.equal(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: dove } }, ctx), '', dove);
     }
     assert.match(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: join(sopra, 'altro.md') } }, ctx), /fuori dal repo/);
+    // Dalla worktree col progetto dichiarato: il repo resta di casa.
+    const daWt = L.contestoLettura({ cwd: wt, env: { CLAUDE_PROJECT_DIR: repo } });
+    assert.equal(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: join(wt, 'src', 'a.js') } }, daWt), '');
+    // Spostata in un repo clonato da fuori, la sessione che ne legge un file si sporca (#1211 giro 2).
+    const altrui = join(sopra, 'clonato');
+    mkdirSync(altrui);
+    execFileSync('git', ['init', '-q'], { cwd: altrui, stdio: 'ignore' });
+    const fuori = L.contestoLettura({ cwd: altrui, env: { CLAUDE_PROJECT_DIR: repo } });
+    assert.match(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: join(altrui, 'README.md') } }, fuori), /fuori dal repo/);
+    assert.match(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: 'README.md' } }, fuori), /fuori dal repo/, 'anche relativo');
+    assert.equal(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: join(repo, 'x.txt') } }, fuori), '', 'il progetto resta di casa');
+    assert.equal(L.motivoLettura({ tool_name: 'Read', tool_input: { file_path: join(sopra, 'filo-security', 'functions', 'index.js') } }, fuori), '');
   } finally { togliCartella(sopra); }
 });
 
