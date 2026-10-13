@@ -26,6 +26,7 @@ const DIFFERENZE = {
     'src/content/cookieBanners.js': 'banner dei cookie da nascondere: le pagine interne non ne hanno',
     'src/content/adSkip.js': 'pubblicità dei video da saltare: le pagine interne non ne hanno',
     'src/content/riquadroRotto.js': 'riquadri di altri siti rotti dai cookie: le pagine interne non ne hanno',
+    'src/content/menuDelSito.js': 'il menu che un sito ha per il tasto destro: le pagine interne hanno i loro, già davanti a Filo',
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
