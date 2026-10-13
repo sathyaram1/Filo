@@ -838,6 +838,8 @@
   ]);
   // Compongono un percorso: sul valore del tubo il risultato non si legge nel comando (#1072.4).
   const CALCOLANO = new Set(['join-path', 'split-path']);
+  // Cercano il comando o lo script indicato anche nella cartella di lavoro (`.\x`).
+  const CERCANO_NOME = new Set(['get-command', 'get-help']);
   // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
   const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
   // Dentro la Libreria del Mac stanno anche i documenti nel cloud dell'utente (iCloud Drive; Dropbox, OneDrive e
