@@ -1627,14 +1627,14 @@
     }
     return [cmd.replace(/[\u201C-\u201F]/g, '"')
       .replace(/[\u2018-\u201B]/g, "'")
-      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-');
+      .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-')];
   }
 
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
-    const letto = comeLaShell(cmd, c);
-    return letto == null ? TRE : classifica(letto, c, 0);
+    const letture = comeLaShell(cmd, c);
+    return letture == null ? TRE : letture.map((l) => classifica(l, c, 0)).reduce(peggiore);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
