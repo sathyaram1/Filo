@@ -11,6 +11,8 @@ const IMPORTA = /^import '\.\.\/helpers\/senzaSessione\.mjs';$/m;
 
 test('r1 chi prova i moduli che misurano la sessione passa dall\'unico isolamento di main', () => {
   const testo = (f) => readFileSync(join(UNIT, f), 'utf8');
-  const toccano = readdirSync(UNIT).filter((f) => f.endsWith('.test.mjs') && MISURANO.test(testo(f)));
+  // Solo le prove di questo ramo: le altre le ha già sistemate main, e arrivano col riallineamento.
+  const delRamo = (f) => f === 'sessioneIsolata.test.mjs' || /helpers\/sessioneIsolata\.mjs/.test(testo(f));
+  const toccano = readdirSync(UNIT).filter((f) => f.endsWith('.test.mjs') && delRamo(f) && MISURANO.test(testo(f)));
   expect(toccano.filter((f) => !IMPORTA.test(testo(f)))).toEqual([]);
 });
