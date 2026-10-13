@@ -109,7 +109,7 @@ module.exports = function register(on, ctx) {
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg) });
+    const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg), domanda: domandaDa(msg) });
     if (r && r.output) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     return { ok: true, ...r };
   });
