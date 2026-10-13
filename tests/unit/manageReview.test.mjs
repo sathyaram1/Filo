@@ -1360,6 +1360,14 @@ test('stateBadge e righeStato: il riallineamento si chiama così, e dice che non
   assert.equal(righe[0].valore.startsWith('Riallineamento — '), true);
   assert.match(righe.find((r) => r.etichetta === 'In breve').valore, /Non è una bocciatura/);
   assert.equal(MR.righeStato({ status: 'revision_capability' }).some((r) => r.etichetta === 'In breve'), false);
+  // Rimasto sul documento dopo l'uscita dallo stato, il motivo non si scrive: il lavoro non si rifà più.
+  for (const status of ['revision_security', 'done']) {
+    const resto = MR.stateBadge({ status, statusReason: 'riallineamento' });
+    assert.equal(resto.showReason, false, status);
+    assert.doesNotMatch(resto.hint, /rifà su main/, status);
+    assert.equal(MR.motivoDiStato({ status, statusReason: 'riallineamento' }), null, status);
+  }
+  assert.equal(MR.motivoDiStato({ status: 'design', statusReason: 'clarify' }), 'clarify');
 });
 
 test('stateBadge: stato cifrato → solo aperta/chiusa, o niente', () => {
