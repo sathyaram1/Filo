@@ -681,7 +681,9 @@ module.exports = function register(on, ctx) {
     return (eff.apiKeys || {})[provider] || '';
   }
 
-  on(MSG.TEST_DEFAULT_MODEL, async (msg) => {
+  // Le prove spendono le chiavi predefinite: le chiedono solo le Opzioni e l'editor dei predefiniti,
+  // mai un sito visitato (#784.2).
+  on(MSG.TEST_DEFAULT_MODEL, soloFilo(async (msg) => {
     try {
       const nickname = (msg.nickname || '').trim();
       const explicitModel = (msg.model || '').trim();
@@ -692,9 +694,7 @@ module.exports = function register(on, ctx) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
         // riservato agli amministratori.
-        if (!isAdmin()) {
-          return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-        }
+        if (!isAdmin()) return NON_ADMIN();
         provider = 'openrouter';
         modelId = explicitModel;
       } else {
