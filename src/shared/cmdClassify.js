@@ -848,8 +848,9 @@
   const JOLLY = /[*?[\]{}\uFFFD]/;
   // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
   const SEGNAPOSTO = '$_\uE000';
-  // L'apice di cmd, letto come una lettera qualunque: nessun controllo lo prende per virgolette.
+  // `'` e `\"` dove sono un carattere qualunque (vedi `comeLaShell`): nessun controllo li prende per virgolette.
   const APICE_TESTO = '\u02BC';
+  const VIRGOLETTE_TESTO = '\u02BA';
   // Senza contesto: cartella di lavoro e home coincidono, un relativo si dà per interno.
   const SENZA_CONTESTO = { cwd: '/~', home: '/~', win: false, maiuscole: false };
 
