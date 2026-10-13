@@ -1331,7 +1331,7 @@
     const list = Array.isArray(entries) ? entries : [];
     if (!list.length) { setLogView('empty'); mgLogList.innerHTML = ''; return; }
     mgLogList.innerHTML = list.map((e) => {
-      const role = roleLabel(e && e.role);
+      const role = roleLabel(e && e.role, e && e.caso);
       const num  = e && e.num ? ` · #${esc(String(e.num))}` : '';
       const rel  = timeAgo(e && e.startedAt);
       const abs  = formatDateTime(e && e.startedAt);
