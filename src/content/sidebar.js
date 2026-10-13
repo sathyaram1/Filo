@@ -787,8 +787,8 @@
     return riga;
   }
 
-  // La notifica se ne va in pochi secondi, il bottone resta. Sta nel DOM della pagina, che ne guida clic
-  // e tasti: non apre niente, riporta la notifica «Sito bloccato» (che la pagina ottiene anche da sé).
+  // La notifica se ne va in pochi secondi, il bottone resta. Sta nel DOM della pagina, e un sito uscito nel
+  // frattempo dalla lista si apre subito: va avanti solo per il clic dell'utente (#592.16).
   function bottoneApriComunque(dopo, { host, url } = {}) {
     if (!dopo || !/^https?:\/\//i.test(String(url || ''))) return;
     const wrap = document.createElement('div');
