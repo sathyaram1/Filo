@@ -389,10 +389,10 @@
     else if (e && e.ok === false && e.errore === 'in_corso') testo = 'Risposta in corso sul server…';
     else if (e && e.ok === false) { testo = 'L’ultima risposta non è stata applicata: il motivo è nella conversazione.'; tipo = 'err'; }
     else if (d.stato === 'in_lavorazione') testo = e && e.compito && e.compito.da ? `Affidata a un agente il ${quando(e.compito.da, true)}.` : 'Affidata a un agente.';
-    else if (e && e.ok) testo = `Fatto${e.applicataIl ? ` il ${quando(e.applicataIl, true)}` : ''}.`;
+    // Una domanda riaperta da un chiarimento può portarsi dietro l'esito di prima: «fatto» solo se è chiusa.
+    else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` il ${quando(e.applicataIl, true)}` : ''}.`;
     if (!testo) return null;
-    const p = el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
-    return p;
+    return el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
   }
 
   function autoreDi(a) {
