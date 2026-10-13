@@ -173,3 +173,20 @@ chiavi, le ore dell'archivio automatico tornavano com'erano (#590.5).
 - **Dove:** `caselle` in `src/pages/options/altro.js`,
   `src/pages/options/options.js`, `src/pages/preferences/preferences.js`. Test:
   `tests/impostazioni-caselle-non-si-perdono.spec.mjs`.
+
+## Le manopole con «Salva» passano dallo stesso punto
+
+Nella pagina «Inviti e utenti» le manopole dei crediti hanno il loro «Salva» e
+partivano anche lasciando il campo, ma ricaricare la pagina o chiudere la
+scheda col cursore dentro buttava via il numero (#666).
+
+- **Un campo col suo «Salva» si iscrive lo stesso.** Il «Salva» resta la strada
+  esplicita; pausa lunga, Ctrl da solo, ricarica e scheda chiusa li porta
+  `SN_CASELLE`. Un numero storto non parte e lo dice all'uscita vera, non
+  mentre si scrive.
+- **La risposta di un salvataggio non cancella quello scritto dopo.** Se nel
+  campo è cambiato qualcosa mentre il server rispondeva, il campo resta com'è
+  (e resta da spedire); un salvataggio chiesto in quel mentre parte appena
+  torna la risposta.
+- **Dove:** `collega` in `src/shared/campoNumero.js`, `costruisciManopole` in
+  `src/pages/credits/owner.js`. Test: `tests/wallet-owner-manopole.spec.mjs`.
