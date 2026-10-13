@@ -290,6 +290,9 @@
   // ── "Allineato" LEGACY: panel completo con tutti i giudici d'accordo ──────
   // Usata SOLO da normalizeStatus per lo storico. Colore BLU (--mg-dot--aligned).
   const ALIGNED = { color: '#5b6ee0', label: 'Allineato' };
+  // Rimandato all'owner perché si finisce solo sulla sua macchina (#1060): l'azzurro dello schermo di 💻, l'icona
+  // che nella pagina vuol già dire «sessione locale». Le regole CSS lo ripetono: tests/unit/segnoFermata.test.mjs.
+  const LOCALE = { color: '#26c9fc', label: 'Lavoro locale' };
   function isAlignedLegacy(fb) {
     if (!fb) return false;
     if (classifyLegacyBlock(fb)) return false; // blocco/non-filtrato/loop → non allineato
