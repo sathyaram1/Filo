@@ -32,7 +32,7 @@
 //     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
 //   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
-//   accessoCambiato()                                       — l'owner è rientrato: riprova le voci col token rifiutato
+//   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
 
 (function (global) {
