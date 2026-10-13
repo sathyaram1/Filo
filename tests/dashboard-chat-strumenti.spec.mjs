@@ -357,6 +357,48 @@ test('F — nove ricerche e poi niente: la chat dice che si è fermato con «Con
   await app.evaluate(() => { try { globalThis.__restoreProvider6?.(); } catch (_) {} });
 });
 
+test('G — ricerche annunciate e poi silenzio: la frase di lavoro non passa per risposta, la bolla dice che si è fermato e offre «Continua»', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configureModel(app);
+
+  await app.evaluate(async () => {
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    const origWS = globalThis.SN_WEB_SEARCH;
+    globalThis.__restoreProvider7 = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; globalThis.SN_WEB_SEARCH = origWS; };
+    globalThis.SN_WEB_SEARCH = { search: async ({ query }) => ({ provider: 'finto', results: [{ title: `Risultato ${query}`, url: 'https://example.com/', snippet: 'testo' }] }) };
+    let n = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      n += 1;
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
+      if (n <= 3) {
+        const text = `Cerco ancora gli orari, giro ${n}…`;
+        try { onDelta && onDelta(text); } catch (_) {}
+        return { ...base, text, finishReason: 'tool_calls', toolCalls: [{ id: `g${n}`, name: 'CERCA_WEB', arguments: JSON.stringify({ query: `orari treni ${n}` }) }] };
+      }
+      if (n === 4) return { ...base, text: '', toolCalls: [], finishReason: 'stop' };
+      try { onDelta && onDelta('Parte alle 8:15.'); } catch (_) {}
+      return { ...base, text: 'Parte alle 8:15.', toolCalls: [], finishReason: 'stop' };
+    };
+  });
+
+  await page.locator('#input').fill('a che ora parte il treno?');
+  await page.locator('#sendBtn').click();
+  const fermo = page.locator('.dash-bubble-filo', { hasText: 'Mi sono fermato' });
+  await expect(fermo).toContainText('Mi sono fermato dopo 3 passi senza arrivare a una risposta.', { timeout: 30_000 });
+  await expect(fermo).toContainText('Cerco ancora gli orari, giro 3…');
+  await expect(fermo.locator('.dash-continua')).toBeVisible();
+  await expect(page.locator('#sendBtn')).toHaveAttribute('data-modo', 'riprendi');
+
+  await fermo.locator('.dash-continua').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Parte alle 8:15.' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.dash-continua')).toHaveCount(0);
+
+  await app.evaluate(() => { try { globalThis.__restoreProvider7?.(); } catch (_) {} });
+});
+
 test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima degli argomenti', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });

@@ -4848,6 +4848,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let notaRisposta = '';
   // La scheda mette «Continua» sotto la frase: si riprende da qui, senza riscrivere la domanda.
   let senzaRisposta = null;
+  // Muto dopo sole letture: una frase di lavoro che diventa la bolla («cerco ancora…») non è una risposta (#557).
+  const mutoDopoLetture = !exhausted && !String(textReply || '').trim() && rawActions.length > 0 && soloLetture(renderedActions);
   if (exhausted) {
     senzaRisposta = { passi };
     textReply = unisciTesti([...risposta, textReply, fraseSenzaRisposta(passi)]);
@@ -4869,9 +4871,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   } else {
     textReply = unisciTesti([...risposta, textReply]);
   }
-  if (!String(textReply || '').trim() && rawActions.length && soloLetture(renderedActions)) {
+  if (mutoDopoLetture) {
     senzaRisposta = { passi };
-    textReply = fraseSenzaRisposta(passi);
+    textReply = unisciTesti([textReply, fraseSenzaRisposta(passi)]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
