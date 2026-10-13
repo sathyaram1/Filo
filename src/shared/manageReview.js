@@ -974,6 +974,15 @@
     { key: 'verify',   label: 'Controllo funzionalità' },
     { key: 'security', label: 'Controllo sicurezza' },
   ];
+  // Il rientro dopo una fusione fallita (conflitto, o unit rossi sul risultato) non è una bocciatura: il codice
+  // aveva passato le verifiche e il ramo si rifà su main. Lo segna il server in `statusReason` (#532).
+  const RIALLINEAMENTO = 'riallineamento';
+  const STEP_RIALLINEAMENTO = { key: 'realign', label: 'Riallineamento', hint: 'il codice aveva passato le verifiche: il ramo si rifà su main' };
+  function inRiallineamento(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    const { status, statusReason } = normalizeStatus(fb);
+    return status === 'revision_capability' && statusReason === RIALLINEAMENTO;
+  }
 
   /**
    * Stato di avanzamento di un feedback nell'iter di lavorazione, o null se
