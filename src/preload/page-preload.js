@@ -115,9 +115,9 @@ function menuDiRiserva(clic, motivo = '') {
 function riservaSeLaPaginaTace(e, clic) {
   setTimeout(() => { if (!e.defaultPrevented) menuDiRiserva(clic); }, 0);
 }
-function apriMenuDiFilo(e, clic = Date.now()) {
+function apriMenuDiFilo(e, clic = Date.now(), opzioni = undefined) {
   let esito;
-  try { esito = contextMenuHandler(e); } catch (err) { esito = Promise.reject(err); }
+  try { esito = contextMenuHandler(e, opzioni); } catch (err) { esito = Promise.reject(err); }
   Promise.resolve(esito).catch((err) => {
     console.error('[Filo CS] menu del tasto destro', err);
     menuDiRiserva(clic, (err && err.stack) || err || 'errore');
