@@ -182,9 +182,10 @@
     }
 
     async function scrivi(valore, { comeRipristino = false } = {}) {
-      if (inCorso) return;
+      if (inCorso) { ancora = true; return; }
       inCorso = true;
       const prima = attuale;
+      const scritto = String(input.value);
       if (o.salvaBtn) o.salvaBtn.disabled = true;
       if (rimetti) rimetti.disabled = true;
       dillo('Salvo…', null);
