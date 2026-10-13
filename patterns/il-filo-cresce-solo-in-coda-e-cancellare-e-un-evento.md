@@ -73,6 +73,11 @@ CERCA_CHAT e l'id. Una chat nuova lo eredita con una voce in `APP` di `src/share
   lo mostrano. Errori e risposte a metà non entrano.
 - **Una riga per conversazione.** Lo stesso `rif` continua la stessa riga finché non passa un'ora di silenzio;
   l'Aiuto ne apre una a ogni apertura del pannello.
+- **Il nome segue la cosa, subito.** Documento o mazzo rinominato (a mano, dal titolo automatico, dal commander):
+  `rinomina` riscrive il soggetto di tutte le sue righe, senza aspettare il messaggio dopo, così la ricerca trova
+  il nome nuovo. Per i Mazzi lo fa il salvataggio del mazzo, per l'Editor le due strade che cambiano il titolo.
+- **Lo scambio aperto si legge come nell'app**: le risposte di Filo con la formattazione leggera della home
+  (HTML escapato, link filtrati), le domande dell'utente letterali.
 - **Dove sta la riga nella home** (`perLaHome`): dentro la conversazione della home in cui è nata, o in testa a
   quella che segue; a home vuota sotto il messaggio, quelle nate dopo l'ultima conversazione lì. Mai più vecchie
   dei giorni che la chat ha davanti.

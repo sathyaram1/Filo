@@ -285,3 +285,67 @@ test('con una conversazione della home aperta, la riga di un’app nata adesso a
   expect(ordine.indexOf('dash-bubble')).toBeLessThan(ordine.indexOf('dash-riga-app'));
   await expect(casa.locator('#righeApp')).toBeHidden();
 });
+
+test('rinominato dopo la chat, il documento o il mazzo: la riga e la ricerca dicono il nome nuovo', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  const casa = await home(app);
+  const editor = await chatDellEditor(openTab, 'bozza', 'Cosa ne pensi del capitolo sui licheni?');
+  await editor.click('#docSwitch');
+  await editor.locator('.ed-doc-item').first().locator('.ed-doc-rename').click();
+  await editor.locator('.ed-doc-item-input').fill('tesi definitiva');
+  await editor.locator('.ed-doc-item-input').press('Enter');
+  await editor.keyboard.press('Escape');
+  await attiva(shell, 'filo://newtab');
+  await expect(casa.locator('#righeApp .dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi definitiva", { timeout: 10_000 });
+  const [conv] = await righeFilo(app);
+  expect(conv.title).toBe('Editor · tesi definitiva');
+
+  // Il mazzo rinominato, da qualunque strada passi il salvataggio, porta con sé la sua riga.
+  const mazzo = await app.evaluate(async () => {
+    const deck = await globalThis.SN_DECK_STORE.create({ nome: 'Prova' });
+    await globalThis.SN_DECK_CHATS_SVC.edit(deck.id, { op: 'append', messages: [{ who: 'user', text: 'serve più rampa?' }] });
+    await globalThis.SN_DECK_STORE.put(globalThis.SN_DECKS.renameDeck(deck, 'Draghi rossi'));
+    return (await globalThis.SN_IL_FILO.chats()).find((c) => c.app === 'mazzi');
+  });
+  expect(mazzo.soggetto).toBe('Draghi rossi');
+  expect(mazzo.title).toBe('Mazzi · Draghi rossi');
+});
+
+test('le risposte di Filo nello scambio aperto restano formattate, e il loro link apre una scheda', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  await app.evaluate(() => {
+    const P = globalThis.SN_PROVIDERS;
+    const prima = P.completeWithFallback;
+    P.completeWithFallback = async (o) => {
+      const sistema = String((o.messages.find((m) => m.role === 'system') || {}).content || '');
+      if (!sistema.includes('# Protocollo di risposta')) return prima(o);
+      const text = '**Iscriviti** è in alto a destra: vedi [la guida](https://example.com/guida). <b>niente markup</b>';
+      return { text: JSON.stringify({ text, status: 'done' }), model: o.attempts[0].model, provider: o.attempts[0].provider, usage: {} };
+    };
+  });
+  const casa = await home(app);
+  const sito = await testServer.openReady(openTab, '<!doctype html><title>Iscrizioni</title><h1>Iscriviti</h1><button>Iscriviti</button>');
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  await sito.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await sito.fill('.sn-sidebar-input textarea', 'dove mi iscrivo?');
+  await sito.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(sito.locator('.sn-sidebar-msg-assistant strong').last()).toHaveText('Iscriviti', { timeout: 10_000 });
+
+  await attiva(shell, 'filo://newtab');
+  const riga = casa.locator('#righeApp .dash-riga-app');
+  await riga.locator('.dash-riga-app-testa').click();
+  const msg = riga.locator('.dash-riga-app-msg-filo');
+  await expect(msg.locator('strong')).toHaveText('Iscriviti');
+  await expect(msg).not.toContainText('**');
+  await expect(msg).toContainText('<b>niente markup</b>');
+  await expect(msg.locator('b')).toHaveCount(0);
+  await expect(riga.locator('.dash-riga-app-msg-user')).toHaveText('dove mi iscrivo?');
+  mkdirSync(SHOTS, { recursive: true });
+  await casa.screenshot({ path: `${SHOTS}/974-home-riga-formattata.png` });
+  await msg.locator('a.filo-md-link').click();
+  await expect.poll(async () => (await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.url)))
+    .some((u) => u.startsWith('https://example.com/guida'))).toBe(true);
+});
