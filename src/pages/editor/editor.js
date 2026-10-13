@@ -3895,6 +3895,11 @@
     if (!conv || !String(text || '').trim()) return;
     sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP, app: 'editor', ...conv, messaggi: [{ role, text }] });
   }
+  // Il documento rinominato (a mano o dal titolo automatico): le righe delle sue chat dicono il nome nuovo.
+  function rinominaNelFilo(id, title) {
+    if (!id) return;
+    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP_RINOMINA, app: 'editor', prefisso: `${id}:`, soggetto: title || STORE.DEFAULT_TITLE });
+  }
   // Una chat che l'Editor butta via davvero se ne va anche dal filo.
   function dimenticaNelFilo(campi) {
     sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP_DIMENTICA, app: 'editor', ...campi });
