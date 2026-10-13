@@ -889,6 +889,7 @@ migrazione le mappa. Il codice che decide in base al prefisso
   vivi, di tutti gli orchestratori insieme, sono meno di N. L'orchestratore non
   fa conti: chiede, e il server risponde sì o no. Così più orchestratori
   possono convivere e i lavori non superano mai N.
+- **N lo decide la curva del monitoraggio** (§ 4.5), applicata dal server.
 - **Abbassare N** non chiude niente: il server smette di dare biglietti, e i
   lavori in corso finiscono.
 - **Vita di 4 ore.** Dopo 4 ore, o col contesto oltre il 70%, l'orchestratore
