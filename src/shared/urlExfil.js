@@ -694,10 +694,10 @@
   }
 
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
-  function valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente) {
+  function valutaAvvisi(tipo, action, { memoria, azioni, daPagina, parole = '', domanda = '' }, niente) {
     if (tipo === 'NAVIGA') {
       const url = String(action.url ?? action.href ?? action.link ?? '').trim();
-      const v = url ? valutaNaviga(url, { memoria, azioni, daPagina }) : null;
+      const v = url ? valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda }) : null;
       if (v && v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
     if (tipo === 'CERCA_WEB') {
