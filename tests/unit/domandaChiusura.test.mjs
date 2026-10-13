@@ -21,11 +21,12 @@ const owner = await import('../../scripts/routine-domanda.mjs');
 const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
 const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
 
+const { senzaSessione } = await import('../helpers/sessione.mjs');
+
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 // Il biglietto nella cartella di una routine fa misurare la sessione vera anche senza il suo ambiente (#949.1):
-// misure finte qui, e per il figlio un transcript che non c'è.
+// misure finte qui, e per il figlio senzaSessione().
 const piano = { sleep: async () => {}, misureCrediti: () => ({}) };
-const NESSUN_TRANSCRIPT = resolve(QUI, 'transcript-che-non-esiste.jsonl');
 
 // ─── corpi delle richieste ──────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ function fintoServer(status, risposta) {
 
 // spawn ASINCRONO: il server finto vive in questo processo.
 function cli(port, args, stdin = '') {
-  const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_TRANSCRIPT: NESSUN_TRANSCRIPT };
+  const env = { ...senzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
   return new Promise((risolvi) => {
     const p = spawn(process.execPath, [CANALE, ...args], { env });
     let stdout = ''; let stderr = '';

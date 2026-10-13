@@ -60,6 +60,9 @@
     const n = parseFloat(s);
     return Number.isFinite(n) ? n : NaN;
   }
+  // Il verso opposto, per i numeri interi che l'utente legge: 1.500 ms, 1.200 caratteri.
+  const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
+  const decimali = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 2 });
 
   // I toni della suoneria e degli avvisi: gli id sono quelli di SN_SOUNDS (sounds.js).
   const TONI = {
@@ -358,8 +361,8 @@
     if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 10)) n *= 1000;
     n = Math.round(n);
     const [min, max] = global.SN_CONST.BARRA_LATERALE_LIMITI[campo];
-    if (n < min || n > max) return { rifiuto: `${n} ms è fuori dai limiti: da ${min} a ${max} ms` };
-    return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(n) };
+    if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+    return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(cifre(n)) };
   }
 
   // Quanto stringe un modo: scendere di rigore abbassa una difesa. Il valore attuale ignoto vale il più stretto.
@@ -461,7 +464,7 @@
         const C = global.SN_CONST;
         const n = C.agentStyleLength(s);
         if (n > C.AGENT_STYLE_MAX) {
-          return { rifiuto: `lo stile è lungo ${n} caratteri e il massimo è ${C.AGENT_STYLE_MAX}` };
+          return { rifiuto: `lo stile è lungo ${cifre(n)} caratteri e il massimo è ${cifre(C.AGENT_STYLE_MAX)}` };
         }
         return { partial: { agentStyle: s }, label: "Stile dell'agente", testo: s };
       },
@@ -653,7 +656,7 @@
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
         n = Math.max(0.5, Math.min(2, n));
-        return { partial: { tts: { rate: n } }, label: `Velocità lettura → ${n.toFixed(1)}×` };
+        return { partial: { tts: { rate: n } }, label: `Velocità lettura → ${decimali(n)}×` };
       },
     },
     {
@@ -665,7 +668,7 @@
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
         n = Math.max(0, Math.min(2, n));
-        return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${n.toFixed(1)}` };
+        return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${decimali(n)}` };
       },
     },
     {
@@ -710,7 +713,7 @@
         // Come «Altra voce: scrivi il nome…» della pagina: un nome fuori catalogo si salva com'è scritto.
         const nome = testoVisibile(s);
         if (!nome) return null;
-        if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${nome.length} caratteri e il massimo è ${VOCE_MAX}` };
+        if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${cifre(nome.length)} caratteri e il massimo è ${VOCE_MAX}` };
         return { partial: { tts: { modelVoice: nome } }, label: `Voce naturale → "${nome}" (nome scritto a mano)` };
       },
     },
@@ -1558,7 +1561,7 @@
     if (!testo) return { testo: '' };
     const C = global.SN_CONST;
     const n = C.agentStyleLength(testo);
-    if (n > C.LESSON_MAX) return { testo, rifiuto: `la lezione è lunga ${n} caratteri e il massimo è ${C.LESSON_MAX}` };
+    if (n > C.LESSON_MAX) return { testo, rifiuto: `la lezione è lunga ${cifre(n)} caratteri e il massimo è ${cifre(C.LESSON_MAX)}` };
     return { testo };
   }
 
