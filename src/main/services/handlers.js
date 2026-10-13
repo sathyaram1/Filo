@@ -5484,6 +5484,7 @@ require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);
 require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei video da saltare
+require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
