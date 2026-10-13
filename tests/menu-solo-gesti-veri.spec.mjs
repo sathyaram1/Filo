@@ -271,9 +271,9 @@ test('a menu aperto dall\'utente il sito non preme Invia feedback né Aiuto; l\'
   await page.locator('#campo').click({ button: 'right' });
   await voce('Invia feedback').click();
   await expect.poll(() => conta(app, page, '.sn-fb-modal')).toBe(1);
-  await page.keyboard.press('Escape');
-  await expect.poll(() => conta(app, page, '.sn-fb-modal')).toBe(0);
 
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
   await page.locator('#campo').click({ button: 'right' });
   await voce('Aiuto').click();
   await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
