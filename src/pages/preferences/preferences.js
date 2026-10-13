@@ -1285,7 +1285,7 @@
     const dove = document.createElement('span');
     dove.className = 'doc-dove';
     const n = Number(o.documenti) || 0;
-    const quanti = n === 1 ? 'un documento già letto' : `${n.toLocaleString('it-IT', { useGrouping: true })} documenti già letti`;
+    const quanti = n === 1 ? 'un documento già letto' : `${cifre(n)} documenti già letti`;
     dove.textContent = `${o.percorso} · ci hai cercato tu · ${quanti}${o.esiste ? '' : ' · ora non c\'è'}`;
     t.appendChild(dove);
     row.appendChild(t);
