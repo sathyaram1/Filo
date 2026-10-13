@@ -8,6 +8,8 @@ import { basename, dirname, join, resolve } from 'node:path';
 
 export const CARTELLA = join('.claude', 'biglietti');
 export const ENV_FILE = 'FILO_BIGLIETTO_FILE';
+// Claude Code lo passa a ogni shell, PowerShell compresa, e ai sotto-agenti; è il nome del file del biglietto.
+export const ENV_SESSIONE = 'CLAUDE_CODE_SESSION_ID';
 const BASE = process.env.FILO_FUNCTIONS_BASE || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 export const LOCAL_TICKET_URL = `${BASE}/localTicket`;
 // Un hook di avvio non deve tenere ferma la sessione: oltre, si va avanti senza biglietto.
