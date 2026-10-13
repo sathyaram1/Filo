@@ -428,6 +428,7 @@
         for (const r of Array.isArray(out.results) ? out.results : []) {
           if (r) letti.push(`${testo(r.title)}\n${testo(r.snippet)}`);
         }
+        conversazioni.push(...letti);
         // I cambi del filo sono dati del computer; le pagine visitate si riaprono tali e quali, come i link di
         // una ricerca, e quello che ci hanno scritto i siti conta come testo di fuori (#868).
         for (const c of Array.isArray(out.cambi) ? out.cambi : []) if (c) letti.push(testo(c.frase));
