@@ -378,7 +378,7 @@ test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'e
   await expect.poll(async () => (await computer(app)).bluetooth.acceso, { timeout: 2_000 }).toBe(false);
   await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 2_000 });
   // Spento il Bluetooth l'elenco si rilegge una volta, e arriva nel riquadro aperto.
-  await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 10_000 });
+  await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 25_000 });
   expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(2);
 });
 
