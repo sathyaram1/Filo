@@ -46,9 +46,18 @@
   let chatId = null;
   let sending = false;
   // Il turno che sta lavorando adesso (#578): il quadrato lo ferma. `ripresa`: l'ultimo turno è stato fermato e il
-  // tasto d'invio offre di riprenderlo finché l'utente non scrive altro.
+  // tasto d'invio offre di riprenderlo finché l'utente non scrive altro. `tasto`: il «Continua» nella bolla di un
+  // turno finito senza risposta (#557), che se ne va quando l'offerta finisce.
   let turnoVivo = null;
   let ripresa = null;
+  const chiudiRipresa = () => {
+    if (ripresa && ripresa.tasto) {
+      const riga = ripresa.tasto.parentElement;
+      ripresa.tasto.remove();
+      if (riga && !riga.childElementCount) riga.remove();
+    }
+    ripresa = null;
+  };
   // Un turno fermato la cui azione in volo non è ancora tornata dal main: finché c'è, il turno dopo aspetta lei.
   let chiusuraInCorso = null;
   // Chi ferma lo fa di fretta e insiste (doppio clic, Invio ripetuto): per un attimo il secondo colpo trova ancora il
