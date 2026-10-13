@@ -10,7 +10,8 @@
   const RUOLI = Object.freeze([
     Object.freeze({ id: 'new-work', nome: 'Primo lavoro' }),
     Object.freeze({ id: 'verifier', nome: 'Verifica' }),
-    Object.freeze({ id: 'fixer', nome: 'Correzione' }),
+    // I rilievi li corregge chi verifica (#561): questa fase riallinea il ramo o riprende dopo una risposta (#532).
+    Object.freeze({ id: 'fixer', nome: 'Riallineamento e ripresa' }),
     Object.freeze({ id: 'secaudit', nome: 'Controllo cieco' }),
     Object.freeze({ id: 'prober', nome: 'Esplorazione' }),
   ]);
