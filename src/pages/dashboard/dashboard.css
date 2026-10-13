@@ -1611,6 +1611,22 @@ html, body {
   color: var(--dash-ink-mute);
   font-style: italic;
 }
+/* #968 — sotto un comando fallito, la sua versione con le virgolette: il tratto riscritto in sabbia. */
+.dash-term-proposta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.dash-term-proposta-cmd {
+  min-width: 0;
+  font-family: 'Cascadia Code', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--dash-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.dash-term-proposta-cmd mark {
+  background: color-mix(in srgb, var(--dash-accent-2) 30%, transparent);
+  color: inherit;
+  border-radius: 3px;
+}
+.dash-action-btn.dash-term-proposta-esegui { padding: 3px 12px; font-size: 12.5px; }
 
 .dash-skeleton {
   display: inline-block;
