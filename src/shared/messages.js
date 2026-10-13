@@ -876,6 +876,8 @@
     FILO_CONVERSAZIONE_APP: 'filo_conversazione_app',
     // L'app ha cancellato la sua conversazione: via anche dal filo. { app, rif } o { app, prefisso }. Solo filo://.
     FILO_CONVERSAZIONE_APP_DIMENTICA: 'filo_conversazione_app_dimentica',
+    // Il documento dell'app ha cambiato nome: le sue righe lo seguono. { app, rif | prefisso, soggetto }. Solo filo://.
+    FILO_CONVERSAZIONE_APP_RINOMINA: 'filo_conversazione_app_rinomina',
     // Le righe che la home mostra: { chat? } → { ok, righe }. Solo filo://.
     FILO_RIGHE_APP: 'filo_righe_app',
     // ANNUNCIO (main → pagine di Filo, senza dati): le righe sono cambiate, chi le mostra le richiede.
