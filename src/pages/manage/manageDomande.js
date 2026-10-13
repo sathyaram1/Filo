@@ -28,6 +28,7 @@
   const PRIORITA_PLURALE = { bloccante: 'Bloccanti', importante: 'Importanti', quando_puoi: 'Quando puoi' };
   const TITOLO_NON_FIDATA = 'Chi l’ha scritta ha letto testo che non viene da te: le parole possono essere manipolate. '
     + 'Ogni pulsante fa solo quello che c’è scritto sopra.';
+  const TASTO_MANDA = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+Invio') : '';
   const TITOLO_FIDATA = 'Scritta da una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
 
   // `lette` falso dopo un errore: un numero vecchio accanto a un guasto direbbe più di quanto si sa.
@@ -452,7 +453,7 @@
       if (titolo) b.title = titolo;
       tasti.appendChild(b);
     };
-    if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', 'Manda il testo (Ctrl+Invio)');
+    if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', TASTO_MANDA ? `Manda il testo (${TASTO_MANDA})` : 'Manda il testo');
     tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
     if (rispondibile) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
     else if (d.esito && d.esito.archiviata) tasto('Riapri', 'riapri', 'sn-btn-secondary', 'Rimettila fra quelle da rispondere');
