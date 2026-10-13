@@ -223,7 +223,8 @@
     }
     const labels = (u.hostname || '').split('.');
     const sub = labels.slice(0, Math.max(0, labels.length - 2)).join('.');
-    return `${sub} ${u.pathname || ''} ${u.search || ''} ${u.hash || ''}`;
+    // Nome e password prima della chiocciola arrivano al sito come il resto (#868.6).
+    return `${u.username || ''} ${u.password || ''} ${sub} ${u.pathname || ''} ${u.search || ''} ${u.hash || ''}`;
   }
 
   function carrierAlnum(url) {
