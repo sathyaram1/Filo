@@ -798,7 +798,8 @@
     btn.className = 'sn-sidebar-choice';
     btn.textContent = `Apri comunque ${host || url}`;
     btn.title = 'Filo ti chiede conferma nella notifica «Sito bloccato»';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
       Promise.resolve().then(() => chrome.runtime.sendMessage({ type: MSG.APRI_COMUNQUE, url })).catch(() => {});
     });
     wrap.appendChild(btn);
