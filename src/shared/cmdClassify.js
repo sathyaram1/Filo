@@ -1261,7 +1261,7 @@
   // Get-Command/Get-Help cercano il file/comando indicato; where.exe (shell cmd)
   // guarda prima nella cartella corrente. git lo fa in gitPerimetro.
   function cercaNomeInRete(prog, testi, c) {
-    if (prog === 'get-command' || prog === 'get-help') {
+    if (CERCANO_NOME.has(prog)) {
       return testi.some((t) => {
         const v = valoreDuePunti(t);
         const nome = v != null ? v : (t.startsWith('-') ? null : t);
