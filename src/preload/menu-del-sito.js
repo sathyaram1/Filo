@@ -1,6 +1,6 @@
 // Il menu che un sito si disegna da sé (#975): una sonda nel mondo della pagina sa chi ascolta il tasto destro, senza
 // che la pagina riceva l'evento; da qui si chiede, si rigioca il clic alla pagina e si guarda se un menu compare.
-// Non decide niente da sola: chi la chiama è il ponte del tasto destro (page-preload.js) e content.js. Prove: tests/menu-del-sito.spec.mjs.
+// La chiamano il ponte del tasto destro (page-preload.js) e content.js. Regole: patterns/sapere-chi-ascolta-un-evento-senza-darlo-alla-pagina.md.
 'use strict';
 
 // Un menu nasce dove si è cliccato (spigolo sul cursore, o rovesciato contro il bordo): dentro questa distanza è suo.
