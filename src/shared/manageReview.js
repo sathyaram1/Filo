@@ -943,18 +943,19 @@
     if (inAttesaOrigine(fb)) {
       return { label: 'In attesa', color: null, hint: `Stato: In attesa (${reasonText(statusReason)})`, reason: statusReason, reasonText: reasonText(statusReason), showReason: true, encrypted: false };
     }
-    const txt = statusReason ? reasonText(statusReason) : '';
+    const motivo = motivoDiStato(fb);
+    const txt = motivo ? reasonText(motivo) : '';
     // Una bocciatura e un riallineamento stanno nello stesso stato: l'etichetta li separa a colpo d'occhio.
     if (inRiallineamento(fb)) {
-      return { label: 'Riallineamento', color: info.color || null, hint: `Stato: Riallineamento (${txt})`, reason: statusReason, reasonText: txt, showReason: true, encrypted: false };
+      return { label: 'Riallineamento', color: info.color || null, hint: `Stato: Riallineamento (${txt})`, reason: motivo, reasonText: txt, showReason: true, encrypted: false };
     }
     return {
       label: info.label,
       color: info.color || null,
-      hint: `Stato: ${info.label}${statusReason ? ` (${txt})` : ''}`,
-      reason: statusReason || null,
+      hint: `Stato: ${info.label}${motivo ? ` (${txt})` : ''}`,
+      reason: motivo || null,
       reasonText: txt,
-      showReason: !!txt && txt !== String(statusReason),
+      showReason: !!txt && txt !== String(motivo),
       encrypted: false,
     };
   }
