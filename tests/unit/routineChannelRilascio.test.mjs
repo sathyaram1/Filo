@@ -328,10 +328,10 @@ function fintoServer(rispondi) {
   return new Promise((ok) => srv.listen(0, '127.0.0.1', () => ok({ srv, port: srv.address().port, ricevute })));
 }
 // Il figlio non vede la sessione che lancia i test, come sotto `npm run test:unit`: col file lanciato a mano in una
-// routine misurava il consumo vero, che finiva nel rilascio e nel deposito di prova (#1123.2).
-function cli(args, env) {
+// routine misurava il consumo vero, che finiva nel rilascio e nel deposito di prova (#1123.2, #1084.2).
+function cli(args, env, chiLancia = process.env) {
   return new Promise((done) => {
-    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...ambientePerITest(process.env), ...env } },
+    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...ambientePerITest(chiLancia), ...env } },
       (err, so, se) => done({ code: err ? (err.code ?? 1) : 0, so: String(so || ''), se: String(se || '') }));
   });
 }
@@ -387,6 +387,25 @@ describe('release da riga di comando', () => {
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
       assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' });
+    } finally { srv.close(); }
+  });
+
+  test('la sessione viva di chi lancia i test non entra nel rilascio; quella data al figlio sì', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { base, work } = scena();
+    const transcript = resolve(base, 'sessione-viva.jsonl');
+    const turno = { type: 'assistant', message: { id: 'm1', model: 'claude-opus-4-8', usage: { input_tokens: 10, output_tokens: 5 } } };
+    writeFileSync(transcript, `${JSON.stringify(turno)}\n`, 'utf8');
+    const nudo = ['release', 'tkt-cli', '--senza-push', '--senza-rapporto', '--guasto', 'motivo'];
+    const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1' };
+    const rilasci = () => ricevute.filter((x) => x.url.includes('routineRelease'));
+    try {
+      const r = await cli(nudo, env, { ...process.env, FILO_ROUTINE: '1', FILO_TRANSCRIPT: transcript });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo' });
+      const d = await cli(nudo, { ...env, FILO_TRANSCRIPT: transcript });
+      assert.equal(d.code, 0, `stderr: ${d.se}`);
+      assert.equal(rilasci()[1].body.consumo.sessionId, 'sessione-viva', 'il transcript finto si misura: la prova sopra distingue');
     } finally { srv.close(); }
   });
 
