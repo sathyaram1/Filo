@@ -159,7 +159,8 @@ test('#592: uno stile oltre il tetto è rifiutato col perché, non tagliato', ()
   const r = build('stile_agente', lungo);
   assert.ok(r && r.rifiuto, 'oltre il tetto torna un rifiuto, non null e non un partial');
   assert.equal(r.partial, undefined, 'niente da scrivere: né intero né accorciato');
-  assert.ok(r.rifiuto.includes(String(C.agentStyleLength(lungo))), `il rifiuto dice quanto è lungo: ${r.rifiuto}`);
+  assert.equal(C.agentStyleLength(lungo), 1199);
+  assert.ok(r.rifiuto.includes('1.199'), `il rifiuto dice quanto è lungo, col punto delle migliaia: ${r.rifiuto}`);
   assert.ok(r.rifiuto.includes(String(C.AGENT_STYLE_MAX)), `il rifiuto dice il tetto: ${r.rifiuto}`);
   // Nessun popup per un rifiuto: il dispatch lo respinge spiegando perché.
   assert.equal(Levels.costoFor(stileDalModello(lungo)), 1);

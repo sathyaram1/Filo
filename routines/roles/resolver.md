@@ -8,6 +8,7 @@ rifiutata. Non fondere su `main`: lo fa il cancello a valle.
 allegati già aperti come testo: una spec allegata sta lì).
 <!-- includi: _decisioni-owner.md -->
 Non richiedere quello che ha già deciso.
+<!-- includi: _note-per-agenti.md -->
 
 <!-- includi: _immagini.md -->
 

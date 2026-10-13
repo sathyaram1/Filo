@@ -24,7 +24,11 @@ documento.
   dei messaggi è unico e risolve la scelta del menu aperto adesso.
 - **Ogni apertura ha un numero (`giro`).** Le voci arrivano col numero, la scelta
   e la chiusura tornano col numero, e il main scarta ciò che arriva da un menu
-  già passato: un clic sul menu di prima non sceglie per quello nuovo.
+  già passato: un clic sul menu di prima non sceglie per quello nuovo. Vale
+  anche per il fumetto: la misura del testo torna col numero, e se nel frattempo
+  qualcuno l'ha nascosto non lo rimostra. Altrimenti resta appeso sopra la
+  pagina, perché chi l'ha chiesto crede di averlo già tolto (#1201, prova:
+  `tests/barra-laterale-suggerimento.spec.mjs`).
 - **Compare quando la pagina conferma le voci nuove** (`popup-menu:pronto`), e
   sparisce solo dopo aver disegnato il vuoto (`popup-menu:vuoto`, con un tetto
   se la pagina non risponde). Nascosta col menu dentro, alla comparsa dopo lo

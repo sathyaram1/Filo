@@ -15,6 +15,8 @@
   const CUSTOM_KEY = '__custom__';
 
   function $(id) { return document.getElementById(id); }
+  // I numeri che la pagina scrive: 1.234 e 1,5 (regola in tests/unit/numeriItaliani.test.mjs).
+  const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
 
   // Nessuna casella della pagina ha un «Salva», e chiudere o cambiare scheda non avvisa la pagina (#590.5): ognuna
   // parte da qui, dopo una pausa o al primo segno di uscita. Uscendo, i numeri fuori scala tornano al valore in uso.
@@ -353,7 +355,7 @@
       const scambi = conv.thread.filter((m) => m.role === 'user').length;
       meta.textContent = conv.current && !state.done
         ? 'in corso'
-        : `${scambi} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
+        : `${cifre(scambi)} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
       sum.appendChild(when);
       sum.appendChild(meta);
       det.appendChild(sum);
@@ -424,7 +426,7 @@
       input.step = String(m.step);
       input.spellcheck = false;
       input.autocomplete = 'off';
-      input.setAttribute('aria-label', `${m.label} (${m.min}–${m.max})`);
+      input.setAttribute('aria-label', `${m.label} (${cifre(m.min)}–${cifre(m.max)})`);
       input.addEventListener('input', (e) => onTabColorInput(m.key, e));
       input.addEventListener('blur', () => {
         if (!tabColDaSalvare.has(m.key)) tabColInCorso.delete(m.key);
@@ -436,7 +438,7 @@
       reset.type = 'button';
       reset.className = 'sn-token-reset';
       reset.textContent = '↺';
-      reset.title = `Ripristina il predefinito (${m.def})`;
+      reset.title = `Ripristina il predefinito (${cifre(m.def)})`;
       reset.setAttribute('aria-label', `Ripristina ${m.key}`);
       reset.addEventListener('click', () => resetTabColorParam(m.key));
       row.appendChild(reset);
@@ -447,7 +449,7 @@
       help.hidden = false;
       help.style.color = 'var(--sn-muted, #888)';
       help.style.gridColumn = '2 / -1';
-      help.textContent = `intervallo ${m.min}–${m.max} · ${m.comment}`;
+      help.textContent = `intervallo ${cifre(m.min)}–${cifre(m.max)} · ${m.comment}`;
       row.appendChild(help);
 
       box.appendChild(row);
@@ -558,8 +560,8 @@
     note.classList.toggle('agent-style-over', over);
     $('agentStyleText').classList.toggle('agent-style-over', over);
     note.textContent = over
-      ? `Troppo lungo: ${n} caratteri, il massimo è ${AGENT_STYLE_MAX}. Non lo salvo finché non lo accorci.`
-      : `${n} / ${AGENT_STYLE_MAX}`;
+      ? `Troppo lungo: ${cifre(n)} caratteri, il massimo è ${cifre(AGENT_STYLE_MAX)}. Non lo salvo finché non lo accorci.`
+      : `${cifre(n)} / ${cifre(AGENT_STYLE_MAX)}`;
     mostraTuttoLoStile();
     return !over;
   }
@@ -1094,12 +1096,12 @@
       if (vuole('tts.rate')) {
         const rate = Number(tts.rate) || 1;
         $('ttsRate').value = String(rate);
-        $('ttsRateVal').textContent = rate.toFixed(1) + '×';
+        $('ttsRateVal').textContent = rate.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
       }
       if (vuole('tts.pitch')) {
         const pitch = Number(tts.pitch) || 1;
         $('ttsPitch').value = String(pitch);
-        $('ttsPitchVal').textContent = pitch.toFixed(1);
+        $('ttsPitchVal').textContent = pitch.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
       }
       if (vuole('tts.voice')) populateVoices(tts.voice || '');
     }
@@ -1282,7 +1284,7 @@
     const dove = document.createElement('span');
     dove.className = 'doc-dove';
     const n = Number(o.documenti) || 0;
-    const quanti = n === 1 ? 'un documento già letto' : `${n.toLocaleString('it-IT', { useGrouping: true })} documenti già letti`;
+    const quanti = n === 1 ? 'un documento già letto' : `${cifre(n)} documenti già letti`;
     dove.textContent = `${o.percorso} · ci hai cercato tu · ${quanti}${o.esiste ? '' : ' · ora non c\'è'}`;
     t.appendChild(dove);
     row.appendChild(t);
@@ -1311,10 +1313,11 @@
     const el = $('documentiStato');
     if (!el || !statoDocumenti) return;
     const s = statoDocumenti;
+    const cifre = (x) => Number(x).toLocaleString('it-IT', { useGrouping: true });
     const n = Number(s.documenti) || 0;
-    let t = n === 1 ? 'Un documento' : `${n.toLocaleString('it-IT', { useGrouping: true })} documenti`;
-    if (s.scansioni) t += `, di cui ${s.scansioni} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
-    if (s.inCorso && s.inCorso.totali) t += ` · ne sto leggendo ${Math.min(s.inCorso.fatti + 1, s.inCorso.totali)} di ${s.inCorso.totali}`;
+    let t = n === 1 ? 'Un documento' : `${cifre(n)} documenti`;
+    if (s.scansioni) t += `, di cui ${cifre(s.scansioni)} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
+    if (s.inCorso && s.inCorso.totali) t += ` · ne sto leggendo ${cifre(Math.min(s.inCorso.fatti + 1, s.inCorso.totali))} di ${cifre(s.inCorso.totali)}`;
     el.textContent = cartelleSalvate && cartelleSalvate.length ? t : '';
   }
 
@@ -1544,11 +1547,11 @@
     }
     $('ttsVoice').addEventListener('change', persist);
     $('ttsRate').addEventListener('input', (e) => {
-      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toFixed(1) + '×';
+      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
       caselle.cambiato('pref', e);
     });
     $('ttsPitch').addEventListener('input', (e) => {
-      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toFixed(1);
+      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
       caselle.cambiato('pref', e);
     });
     $('ttsPreview').addEventListener('click', previewTts);

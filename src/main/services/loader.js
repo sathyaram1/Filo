@@ -76,6 +76,7 @@ require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedb
 require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione per l'aggiornamento continuo della dashboard
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
+require(path.join(SHARED, 'domande.js')); // #1149 — azioni delle domande all'owner come dati (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
 require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'manageSearch.js')); // #1118 — la ricerca fra i feedback: il classificatore gira nel main
