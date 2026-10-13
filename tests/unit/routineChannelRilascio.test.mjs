@@ -325,9 +325,11 @@ function fintoServer(rispondi) {
   });
   return new Promise((ok) => srv.listen(0, '127.0.0.1', () => ok({ srv, port: srv.address().port, ricevute })));
 }
+// Il figlio non vede la sessione che lancia i test, come sotto `npm run test:unit`: col file lanciato a mano in una
+// routine misurava il consumo vero, che finiva nel rilascio e nel deposito di prova (#1123.2).
 function cli(args, env) {
   return new Promise((done) => {
-    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...process.env, ...env } },
+    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...ambientePerITest(process.env), ...env } },
       (err, so, se) => done({ code: err ? (err.code ?? 1) : 0, so: String(so || ''), se: String(se || '') }));
   });
 }
