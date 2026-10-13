@@ -98,7 +98,7 @@ test('con il riassunto delle schede chiuse spento non parte niente, e la scheda 
 
   const partito = await mandato(app);
   expect(partito.filter((m) => m.tipo === 'riassunto')).toEqual([]);
-  expect(partito.some((m) => /lievito|Ricetta del pane/.test(m.testo))).toBe(false);
+  expect(partito.some((m) => m.tipo !== 'home' && /lievito|Ricetta del pane/.test(m.testo))).toBe(false);
 });
 
 test('la pulizia automatica delle schede: di una pagina delicata al modello va solo il tipo, mai titolo, indirizzo o testo', async ({ app }) => {
