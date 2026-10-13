@@ -572,8 +572,7 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | `coda` | leggere i feedback **in coda** (non quelli in Ricevuti né quelli fermi per attacco), cambiare priorità, chiedere un biglietto di unione (§ 1.3), archiviare | scrivere testi di feedback, cancellare, toccare Ricevuti |
 | `unisci` | leggere i genitori indicati, scrivere il figlio, chiudere i genitori col rimando | leggere altro |
 | `domande` | leggere le domande e il registro, raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
-| `posta` | leggere la casella di Filo, aprire domande con bozze | mandare mail |
-| `invio` | mandare una bozza approvata dall'owner | scrivere testi |
+| `posta` | ricevere dal server i messaggi della casella di Filo, cercare sul web, tenere il suo taccuino, aprire domande con bozze di mail, aprire feedback dalle mail degli utenti | mandare mail, vedere le credenziali della casella |
 | `monitor` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lui; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; riaccendere quello che ha spento l'owner |
 | `rami` | leggere rami, storia di git e feedback; aprire feedback e domande; scrivere nel taccuino del monitoraggio | cancellare rami: lo fa la regola del server (§ 4.7) |
 | `audit` | leggere il codice di Filo e del server, i metadati dei feedback aperti e i testi che servono; provare il codice nel contenitore; aprire feedback e domande | spingere rami, chiedere fusioni, cambiare feedback |
