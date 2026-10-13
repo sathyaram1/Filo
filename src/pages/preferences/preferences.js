@@ -557,9 +557,10 @@
     note.hidden = !over && n < AGENT_STYLE_MAX * 0.8;
     note.classList.toggle('agent-style-over', over);
     $('agentStyleText').classList.toggle('agent-style-over', over);
+    const cifre = (x) => x.toLocaleString('it-IT', { useGrouping: true });
     note.textContent = over
-      ? `Troppo lungo: ${n} caratteri, il massimo è ${AGENT_STYLE_MAX}. Non lo salvo finché non lo accorci.`
-      : `${n} / ${AGENT_STYLE_MAX}`;
+      ? `Troppo lungo: ${cifre(n)} caratteri, il massimo è ${cifre(AGENT_STYLE_MAX)}. Non lo salvo finché non lo accorci.`
+      : `${cifre(n)} / ${cifre(AGENT_STYLE_MAX)}`;
     mostraTuttoLoStile();
     return !over;
   }
