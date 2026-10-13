@@ -66,12 +66,13 @@ try {
   process.exit(0);
 }
 
-// Un pacchetto rimasto indietro rispetto al lock non si ripara col binario: «già pronto» qui sarebbe falso.
-let testoLock = null;
-try { testoLock = readFileSync(join(ROOT, 'package-lock.json'), 'utf8'); } catch { /* senza lock niente da confrontare */ }
-const delLock = verdettoMotore({ atteso: electronDelLock(testoLock), pacchetto: version });
-if (!delLock.ok) {
-  log(delLock.motivo);
+// Un pacchetto rimasto indietro rispetto al lock non si ripara col binario: «già pronto» qui sarebbe falso. La guardia
+// di chi lancia le prove (tests/helpers/motoreDelleProve.mjs) sta fuori dalla copia degli strumenti: qui non si importa.
+let delLock = null;
+try { delLock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8'))?.packages?.['node_modules/electron']?.version || null; } catch { /* senza lock niente da confrontare */ }
+if (delLock && delLock !== version) {
+  log(`node_modules ha Electron ${version} e package-lock.json chiede la ${delLock}: il binario non lo ripara.`
+    + ' Reinstalla i pacchetti (`npm ci`) e rilancia questo script.');
   process.exit(1);
 }
 
