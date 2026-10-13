@@ -339,7 +339,7 @@ function cli(args, env) {
 describe('release da riga di comando', () => {
   test('spinge il ramo, poi rilascia col rapporto allegato (rapporto minimo: qui non c\'è un transcript)', async () => {
     const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
-    const { base, origin, work } = scena();
+    const { origin, work } = scena();
     try {
       g(work, ['checkout', '-q', '-b', 'worker/10']);
       commitFile(work, 'lavoro.js');
