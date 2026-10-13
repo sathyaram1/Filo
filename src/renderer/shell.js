@@ -1709,6 +1709,16 @@
           }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
           if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
+          // #975 — «Sì» alla proposta: su quel sito il tasto destro apre il menu del sito.
+          if (a && typeof a.menuDelSito === 'string' && !a.onClick) {
+            const sito = a.menuDelSito;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'menu_del_sito_accetta', sito }).then((r) => {
+                if (r && r.ok && r.frase) NOTIFS.show(r.frase);
+              }).catch(() => {}),
+            };
+          }
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
           if (a && a.aggiornaFilo && !a.onClick) {
             return {

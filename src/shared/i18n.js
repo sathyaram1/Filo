@@ -50,6 +50,9 @@
     menu_del_sito_togli: 'Rimetti il menu di Filo al tasto destro',
     menu_del_sito_fatto: 'Su questo sito il tasto destro apre il menu di %s',
     menu_del_sito_tolto: 'Il tasto destro apre di nuovo il menu di Filo',
+    menu_del_sito_proposta: 'Su %s vuoi il menu del sito direttamente col tasto destro? Quello di Filo resta su Maiusc + tasto destro.',
+    menu_del_sito_si: 'Sì',
+    menu_del_sito_accettato: 'Su %s il tasto destro apre il menu del sito',
 
     // Menu — link / immagine
     menu_open_in_new_tab: 'Apri in nuova tab',

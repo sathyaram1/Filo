@@ -5485,6 +5485,7 @@ require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei vi
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
+require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito ha per il tasto destro
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
