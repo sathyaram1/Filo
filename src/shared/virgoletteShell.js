@@ -230,7 +230,7 @@
     const t = String(testo || '').trim();
     if (!t || /[\r\n\0]/.test(t)) return false;
     if (/^(["'\u2018\u2019\u201c\u201d]).*\1$/.test(t) && t.length > 1) return false;
-    return /[\s'"`$&;|<>(){},^=\u2018\u2019\u201a\u201b\u201c\u201d\u201e\\]/.test(t);
+    return /[\s'"`$&;|<>(){},^=\u2018\u2019\u201a\u201b\u201c\u201d\u201e]/.test(t);
   }
 
   global.SN_VIRGOLETTE = {
