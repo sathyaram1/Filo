@@ -263,8 +263,17 @@ function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
   try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {}
   return true;
 }
+// Un indirizzo fermato non resta muto (#482): il silenzio sembra un'app rotta. Solo testo, niente «Apri comunque».
+function avvisaIndirizzoFermato(rawUrl, win) {
+  const a = avvisoIndirizzoFermato(rawUrl);
+  if (!a || !win || win.isDestroyed?.()) return;
+  try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave } }); } catch (_) {}
+}
+// Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
-  if (!invitoFermato(rawUrl, ctx)) openExternalScheme(rawUrl);
+  if (invitoFermato(rawUrl, ctx) || openExternalScheme(rawUrl)) return true;
+  avvisaIndirizzoFermato(rawUrl, ctx && ctx.win);
+  return false;
 }
 // La pagina intera passa da will-navigate; qui solo i riquadri, e solo l'invito.
 function fermaInvitoNelRiquadro(event, ctx) {
