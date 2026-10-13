@@ -498,6 +498,9 @@ test('#1072.5 — con cmd un percorso fra apici singoli non sfugge ai controlli 
     ['findstr a \' \\\\host\\x\\a.txt \'', /altro computer della rete/],
     ['dir \' \\\\host\\x \' && dir', /altro computer della rete/],
     ['dir ^\' \\\\host\\x ^\'', /altro computer della rete/],
+    // Per findstr e gli altri programmi C `\"` è una `"` dentro l'argomento, non l'inizio di un gruppo.
+    ['findstr /v \\" x C:\\Users\\Mario\\.ssh\\id_rsa \\"', /nascosto/],
+    ['findstr a \\" \\\\host\\x\\a.txt \\"', /altro computer della rete/],
     // Letti come virgolette, come fa un programma MSYS.
     ['type \'C:\\Users\\Mario\\.ssh\\id_rsa\'', /nascosto/],
     ['dir \'\\\\host\\x\'', /altro computer della rete/],
