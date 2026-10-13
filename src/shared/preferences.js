@@ -463,7 +463,7 @@
         const C = global.SN_CONST;
         const n = C.agentStyleLength(s);
         if (n > C.AGENT_STYLE_MAX) {
-          return { rifiuto: `lo stile è lungo ${n} caratteri e il massimo è ${C.AGENT_STYLE_MAX}` };
+          return { rifiuto: `lo stile è lungo ${cifre(n)} caratteri e il massimo è ${cifre(C.AGENT_STYLE_MAX)}` };
         }
         return { partial: { agentStyle: s }, label: "Stile dell'agente", testo: s };
       },
