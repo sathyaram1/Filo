@@ -563,6 +563,9 @@
       }
       return { text: 'Tutti d’accordo: aspetta la tua approvazione.', color: S.aligned.color };
     }
+    if (inRiallineamento(fb)) {
+      return { text: 'Il codice aveva passato verifica e sicurezza; main è andato avanti e il ramo si rifà sopra. Non è una bocciatura: il conto delle critiche non cambia.', color: null };
+    }
     if (status === 'attack') return { text: 'Segnalato come attacco.', color: S.attack.color };
     if (status === 'spam') return { text: 'Segnalato come spam.', color: S.spam.color };
     if (status === 'unlabeled') {
