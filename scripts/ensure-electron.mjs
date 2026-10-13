@@ -67,8 +67,10 @@ try {
 }
 
 // Un pacchetto rimasto indietro rispetto al lock non si ripara col binario: «già pronto» qui sarebbe falso.
-const delLock = electronDelLock(ROOT);
-if (!delLock.ok && delLock.pacchetto !== delLock.lock) {
+let testoLock = null;
+try { testoLock = readFileSync(join(ROOT, 'package-lock.json'), 'utf8'); } catch { /* senza lock niente da confrontare */ }
+const delLock = verdettoMotore({ atteso: electronDelLock(testoLock), pacchetto: version });
+if (!delLock.ok) {
   log(delLock.motivo);
   process.exit(1);
 }

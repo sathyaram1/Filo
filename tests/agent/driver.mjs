@@ -26,7 +26,6 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
-import { richiediElectronDelLock } from '../../scripts/lib/electron-del-lock.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
@@ -46,7 +45,6 @@ export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {}
   // GUARDA una modifica visiva girava sempre al 100% anche con la manopola
   // accesa, e non lo diceva: chi la usava per rivedere un rosso da 125% vedeva
   // un'immagine che non c'entrava niente.
-  richiediElectronDelLock(APP_ROOT, { env });
   const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env });
   const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');

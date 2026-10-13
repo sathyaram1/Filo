@@ -13,7 +13,6 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { assicuraMotore } from './helpers/motoreDelleProve.mjs';
 import { createRequire } from 'node:module';
-import { richiediElectronDelLock } from '../scripts/lib/electron-del-lock.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
