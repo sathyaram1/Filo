@@ -17,6 +17,7 @@ const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
 const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
+const ConversazioniApp = require('./conversazioniApp');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -6315,6 +6316,17 @@ Registro.collega({
   annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
 });
 Registro.avvia();
+
+// Le righe delle conversazioni delle app (#974): la home le richiede, la Cronologia rilegge l'elenco; una tolta perché
+// l'app l'ha cancellata la dice come le chat cancellate. Quanti giorni mostrarne: quelli che la chat ha davanti.
+ConversazioniApp.collega({
+  annuncia: (tolte) => {
+    broadcastToFiloPages({ type: MSG.FILO_RIGHE_APP_CAMBIATE });
+    if (Array.isArray(tolte) && tolte.length) for (const id of tolte) broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, cancellata: id });
+    else broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED });
+  },
+  tetti: async () => globalThis.SN_FILO_CONTESTO.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo),
+});
 
 function broadcastToTabs(message) {
   try {

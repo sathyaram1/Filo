@@ -158,6 +158,8 @@
       closedAt: chat.closedAt || null,
       messageCount: messages.length,
       excerpt: excerptOf(messages, chat.title || fallbackTitle(messages)),
+      // Una conversazione di un'altra app (#974): si riapre nel filo o nella sua app, non si continua dalla home.
+      ...(chat.app ? { app: chat.app, dove: typeof chat.dove === 'string' ? chat.dove : '' } : {}),
     };
   }
 
