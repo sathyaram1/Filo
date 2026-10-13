@@ -28,6 +28,21 @@ export function radiceRepo(cwd = process.cwd()) {
   }
 }
 
+/**
+ * La radice del checkout principale del repo di `cwd`, uguale da ogni suo worktree: lì vivono i biglietti, così chi
+ * lavora in un worktree trova quello della sessione anche senza la variabile. '' fuori da un repo.
+ */
+export function radiceCondivisa(cwd = process.cwd()) {
+  const radice = radiceRepo(cwd);
+  if (!radice) return '';
+  try {
+    const comune = resolve(radice, execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd: radice, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim());
+    return basename(comune) === '.git' ? dirname(comune) : radice;
+  } catch (_) {
+    return radice;
+  }
+}
+
 export function cartellaBiglietti(radice) {
   return resolve(radice, CARTELLA);
 }
