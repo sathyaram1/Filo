@@ -58,7 +58,9 @@ function annota({ app: nome, rif, soggetto, dove, messaggi } = {}, opts) {
     const soggettoOra = sogg || (c && c.soggetto) || '';
     if (!c || soggettoOra !== (c.soggetto || '')) {
       eventi.push(t.evento(T().CHAT_TITOLO, {
-        chat: id, title: R.titolo(nome, soggettoOra), kind: globalThis.SN_CHAT_ARCHIVE.KIND_TALK, soggetto: soggettoOra,
+        // Un nome dato dall'utente in Cronologia resta suo anche quando il documento cambia nome.
+        chat: id, title: c && c.titleByUser ? c.title : R.titolo(nome, soggettoOra), kind: globalThis.SN_CHAT_ARCHIVE.KIND_TALK,
+        soggetto: soggettoOra,
       }, { autore: 'filo' }));
     }
     for (const m of senzaRiprova(c ? c.messages : [], nuovi)) {

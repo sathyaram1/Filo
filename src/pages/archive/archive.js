@@ -262,8 +262,12 @@
     // niente titolo generato, niente tipo, e al posto della data «In corso».
     // Senza questa riga si leggeva come una chat finita, e cliccarla apriva
     // una seconda copia della stessa conversazione.
-    const inCorso = !c.closedAt;
+    // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) non è «in corso» in una scheda della home:
+    // continua nella sua app, e da qui si guarda nel filo.
+    const app = appDi(c);
+    const inCorso = !c.closedAt && !app;
     if (inCorso) row.dataset.incorso = '1';
+    if (app) row.dataset.app = c.app;
 
     const date = document.createElement('div');
     date.className = 'arc-chat-date';
@@ -273,8 +277,8 @@
     row.title = [
       c.title || '',
       `${c.messageCount || 0} messaggi`,
-      inCorso ? 'Conversazione ancora aperta' : (c.kind === 'comando' ? 'Comando' : 'Conversazione'),
-      inCorso ? 'Clic per tornare dov’è aperta' : 'Clic per riaprirla e continuare a scrivere',
+      app ? `Conversazione ${app.nel}` : (inCorso ? 'Conversazione ancora aperta' : (c.kind === 'comando' ? 'Comando' : 'Conversazione')),
+      app ? 'Clic per guardarla nel filo' : (inCorso ? 'Clic per tornare dov’è aperta' : 'Clic per riaprirla e continuare a scrivere'),
     ].filter(Boolean).join('\n');
 
     row.addEventListener('click', (e) => {
@@ -309,7 +313,7 @@
   // fra loro — scrivi in una e l'altra resta indietro — e nell'archivio i due
   // fili finiscono mescolati.
   async function reopenChat(c) {
-    if (!c.closedAt) {
+    if (!c.closedAt && !appDi(c)) {
       try {
         const r = await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_FOCUS, id: c.id });
         if (r && r.portato) return;
@@ -317,6 +321,17 @@
     }
     try { chrome.tabs.create({ url: `filo://dashboard/dashboard.html?chat=${encodeURIComponent(c.id)}` }); }
     catch (_) {}
+  }
+
+  function appDi(c) {
+    const A = window.SN_FILO_APP;
+    return c && c.app && A && A.APP[c.app] ? A.APP[c.app] : null;
+  }
+
+  // L'app dove la conversazione è nata, al documento, al mazzo o alla pagina di allora.
+  function apriApp(c) {
+    if (!c.dove) return;
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: c.dove })).catch(() => {}); } catch (_) {}
   }
 
   // Cancellazione manuale, con la conferma prevista per le azioni
@@ -561,6 +576,17 @@
   // menu del tasto destro.
   function openChatCtxMenu(x, y, c, row) {
     const versoComando = c.kind !== 'comando';
+    const app = appDi(c);
+    if (app) {
+      const VAI = { editor: 'Apri nell’Editor', mazzi: 'Apri nei Mazzi', aiuto: 'Apri la pagina' };
+      openMenuAt(x, y, [
+        { label: 'Apri nel filo', run: () => reopenChat(c) },
+        ...(c.dove && VAI[c.app] ? [{ label: VAI[c.app], run: () => apriApp(c) }] : []),
+        { label: 'Rinomina', run: () => rinominaChat(c, row) },
+        { label: 'Elimina la chat', run: () => removeChat(c) },
+      ]);
+      return;
+    }
     openMenuAt(x, y, [
       { label: 'Riapri la chat', run: () => reopenChat(c) },
       { label: 'Rinomina', run: () => rinominaChat(c, row) },
