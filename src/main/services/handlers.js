@@ -1151,7 +1151,9 @@ const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(B
 const AZIONI_DI_LETTURA = new Set([
   'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
 ]);
-const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || AZIONI_DI_LETTURA.has(String(a.type || '').toUpperCase()));
+// Una lettura che aspetta l'OK, o fermata per un segreto, ha già la sua parola sotto la risposta.
+const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (AZIONI_DI_LETTURA.has(String(a.type || '').toUpperCase())
+  && !a._confirm && !a._domanda && !(a._output && a._output.blocked)));
 const fraseSenzaRisposta = (passi) => `Mi sono fermato dopo ${passi === 1 ? 'un passo' : `${passi} passi`} senza arrivare a una risposta.`;
 
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
