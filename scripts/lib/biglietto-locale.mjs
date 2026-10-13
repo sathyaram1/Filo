@@ -73,8 +73,8 @@ export function scriviFile(path, { ticket, fp, natoIl }) {
 
 /**
  * Il biglietto di questa sessione, in una lista di al più uno: quello di FILO_BIGLIETTO_FILE se vale, altrimenti quello
- * col nome della sessione nella cartella del checkout principale. Mai quelli delle altre sessioni (giro 9 di #1148: da
- * PowerShell una dichiarazione sporcava tutte le sessioni aperte); chi non trova il suo non ne ha, e vale non fidato.
+ * col nome della sessione nella cartella del checkout principale. Mai quelli delle altre sessioni: una dichiarazione
+ * sporcherebbe anche loro, e la fiducia prenderebbe lo sporco di sessioni finite. Chi non trova il suo vale non fidato.
  */
 export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) {
   const daEnv = String(env[ENV_FILE] || '').trim();
