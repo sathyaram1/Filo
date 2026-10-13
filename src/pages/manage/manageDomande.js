@@ -31,7 +31,7 @@
   const TITOLO_FIDATA = 'Scritta da una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
 
   // `lette` falso dopo un errore: un numero vecchio accanto a un guasto direbbe più di quanto si sa.
-  const stato = { lette: false, fallita: false, nonDisponibile: false, errore: '', domande: [], riferimenti: {}, adesso: 0, altre: false };
+  const stato = { lette: false, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', domande: [], riferimenti: {}, adesso: 0, altre: false };
   let finte = false;
   let inVolo = null;
   let scheda = 'domande';
@@ -100,7 +100,7 @@
         let domande = delta ? fondi(stato.domande, r.domande) : r.domande.slice();
         if (aperte) domande = fondi(domande, aperte.domande);
         Object.assign(stato, {
-          lette: true, fallita: false, nonDisponibile: false, errore: '',
+          lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '',
           domande,
           riferimenti: Object.assign({}, delta ? stato.riferimenti : {}, aperte ? aperte.riferimenti : {}, r.riferimenti || {}),
           adesso: Number(r.adesso) || stato.adesso,
@@ -108,7 +108,10 @@
         });
       } else {
         const errore = String(guasto.error || 'nessuna risposta');
-        Object.assign(stato, { lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), errore, domande: [], riferimenti: {}, adesso: 0, altre: false });
+        Object.assign(stato, {
+          lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), soloOwner: guasto.code === 'not_admin',
+          errore, domande: [], riferimenti: {}, adesso: 0, altre: false,
+        });
       }
       cambia();
       return stato;
@@ -712,6 +715,7 @@
       firmaLista = '';
       if (!D) el0.textContent = 'Le domande non si possono mostrare: manca il modulo delle domande.';
       else if (stato.nonDisponibile) el0.textContent = 'Le domande non sono ancora disponibili: il server non le pubblica ancora.';
+      else if (stato.soloOwner) el0.textContent = 'Le domande le vede solo l’owner: accedi col suo account.';
       else if (stato.fallita) {
         el0.textContent = `Non riesco a leggere le domande: ${stato.errore}`;
         if (riprova) riprova.hidden = false;
@@ -884,9 +888,9 @@
       finte = true;
       const errore = opts && opts.errore ? String(opts.errore) : '';
       Object.assign(stato, errore
-        ? { lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), errore, domande: [], riferimenti: {}, altre: false }
+        ? { lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), soloOwner: !!(opts && opts.soloOwner), errore, domande: [], riferimenti: {}, altre: false }
         : {
-          lette: true, fallita: false, nonDisponibile: false, errore: '',
+          lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '',
           domande: Array.isArray(lista) ? lista : [], riferimenti: (opts && opts.riferimenti) || {}, altre: !!(opts && opts.altre),
         });
       cambia();

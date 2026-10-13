@@ -16,13 +16,17 @@ async function apri(page) {
   await page.evaluate(() => window.__mgTest.whenReady());
 }
 
-test('senza domande pubblicate il pannello lo dice e la sezione non ha numero', async ({ openTab }) => {
+test('da non owner, o col server senza domande, il pannello lo dice: niente numero, niente Riprova', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page);
   await page.locator('.mg-sezione[data-sezione="domande"]').click();
   await expect(page.locator('#panel-domande')).toHaveClass(/mg-panel--active/);
-  await expect(page.locator('#mgDomandeStato')).toContainText('non sono ancora disponibili');
+  // Le prove non hanno l'account dell'owner: il main rifiuta, e non è un guasto da riprovare.
+  await expect(page.locator('#mgDomandeStato')).toHaveText('Le domande le vede solo l’owner: accedi col suo account.');
   await expect(page.locator('.mg-sezione[data-sezione="domande"] .mg-sezione-count')).toHaveText('');
+  await expect(page.locator('#mgDomandeRiprova')).toBeHidden();
+  await page.evaluate(() => window.__mgTest.setDomande(null, { errore: 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.' }));
+  await expect(page.locator('#mgDomandeStato')).toContainText('non sono ancora disponibili');
   await expect(page.locator('#mgDomandeRiprova')).toBeHidden();
 });
 
