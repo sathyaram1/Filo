@@ -178,9 +178,13 @@
 
   // #912: col token rifiutato ogni giro consumava un numero del contatore comune e ricaricava gli allegati, ogni
   // mezzo minuto e per sempre. Si riprova solo quando l'owner rientra o al riavvio (il segno non si salva).
+  // Chi rientra non aspetta il giro del backoff già fissato, che può cadere mezzo minuto dopo (#1212).
   function accessoCambiato() {
     for (const it of queue) it.tokenRifiutato = false;
-    if (queue.length) scheduleFlush(0);
+    if (!queue.length) return;
+    if (timer) { clearTimeout(timer); timer = null; }
+    backoff = backoffMin;
+    scheduleFlush(0);
   }
 
   // Tenta di inviare TUTTA la coda una volta. Ritorna true se la coda è vuota
