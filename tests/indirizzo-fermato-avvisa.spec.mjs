@@ -12,6 +12,9 @@ const intercettaEsterni = (app) => app.evaluate(({ shell }) => {
   globalThis.__esterni = [];
   shell.openExternal = async (u) => { globalThis.__esterni.push(String(u)); };
 });
+// La pila della shell è il modello e non si disegna: per contare anche ciò che non è (ancora) a schermo si legge lì.
+const nelModello = (shell, testo) => shell.evaluate((t) => [...document.querySelectorAll('#shell-notifs > .shell-notif')]
+  .filter((c) => c.dataset.closing !== '1' && c.textContent.includes(t)).length, testo);
 const carta = async (avvisi, testo) => (await avvisi()).locator('.shell-notif.show', { hasText: testo });
 
 test('aperto da Filo in una scheda nuova, un file del computer viene fermato e lo dice, senza «Apri comunque»', async ({ app, shell, avvisi }) => {
@@ -65,7 +68,7 @@ test('la posta va al programma di posta sia aprendo una scheda nuova sia rinavig
   await expect.poll(() => esterni(app), { timeout: 6000 }).toEqual(['mailto:a@b.it', 'mailto:c@d.it?subject=Ciao']);
   await shell.waitForTimeout(500);
   expect((await schede(app)).some((u) => /google\.[a-z]+\/search/.test(u)), 'la posta non diventa una ricerca').toBe(false);
-  await expect(shell.locator('.shell-notif', { hasText: 'bloccat' })).toHaveCount(0);
+  expect(await nelModello(shell, 'bloccat')).toBe(0);
 });
 
 test('un collegamento di Filo (risposta in chat, «Apri in nuova scheda») verso un file lo dice', async ({ app, shell, avvisi }) => {
@@ -82,56 +85,23 @@ test('provato più volte, l\'avviso resta uno', async ({ app, shell, avvisi }) =
   await expect(vista.locator('.shell-notif', { hasText: '/tmp/ripetuto.txt' })).toHaveCount(1);
 });
 
-// ESPLORAZIONE: quali porte delle pagine arrivano davvero al cancello.
-test('esplora: pagina interna e pagina web', async ({ app, shell, avvisi, testServer, openTab }) => {
-  await app.evaluate(({ BrowserWindow }) => {
-    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    globalThis.__visti = [];
-    const orig = tm._esternoDallaPagina.bind(tm);
-    tm._esternoDallaPagina = (...a) => { globalThis.__visti.push(['esterno', a[2]]); return orig(...a); };
-  });
-  const page = await openTab(testServer.html(`<title>Web</title>
-    <a id="f" href="file:///tmp/dal-sito.pdf" style="position:fixed;left:0;top:0;width:300px;height:40px">file</a>
-    <a id="z" href="zoommtg://zoom.us/join?confno=1" style="position:fixed;left:0;top:50px;width:300px;height:40px">zoom</a>
-    <a id="d" href="data:text/html,ciao" style="position:fixed;left:0;top:100px;width:300px;height:40px">data</a>
-    <a id="fb" href="file:///tmp/dal-sito-blank.pdf" target="_blank" style="position:fixed;left:0;top:150px;width:300px;height:40px">file blank</a>`));
-  for (const y of [20, 70, 120, 170]) {
-    await page.mouse.click(30, y);
-    await page.waitForTimeout(900);
-    console.log('DOPO', y, JSON.stringify(await app.evaluate(() => globalThis.__visti)));
-  }
-  await page.evaluate(() => { setTimeout(() => { location.href = 'file:///tmp/senza-gesto.pdf'; }, 1500); });
-  await page.waitForTimeout(2500);
-  console.log('VISTI', JSON.stringify(await app.evaluate(() => globalThis.__visti)));
-  const testi = await (await avvisi().catch(() => null))?.locator('.shell-notif').allInnerTexts().catch(() => []);
-  console.log('AVVISI', JSON.stringify(testi));
+test('un percorso di Windows scritto così com\'è viene fermato e lo dice come file, non come uno schema', async ({ shell, avvisi }) => {
+  await shell.evaluate(() => window.filoShell.tabs.open('C:\\Users\\agenti AI\\Desktop\\nota.txt'));
+  await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: C:\\Users\\agenti AI\\Desktop\\nota.txt')).toBeVisible({ timeout: 8000 });
 });
 
-test('esplora: pagina interna', async ({ app, shell, avvisi }) => {
-  await shell.waitForFunction(() => !!window.filoShell);
-  await app.evaluate(({ BrowserWindow }) => {
-    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    globalThis.__visti = [];
-    const orig = tm.apriDaCollegamento.bind(tm);
-    tm.apriDaCollegamento = (...a) => { globalThis.__visti.push(['collegamento', a[0]]); return orig(...a); };
-  });
-  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
-  await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://newtab')), { timeout: 10000 }).toBe(true);
-  const interna = app.windows().find((w) => w.url().startsWith('filo://newtab'));
-  await interna.waitForLoadState('domcontentloaded');
-  console.log('INTERNA', interna && interna.url());
-  await interna.evaluate(() => { window.open('file:///tmp/interna-open.pdf'); });
-  await interna.waitForTimeout(1200);
-  await interna.evaluate(() => {
-    const a = document.createElement('a'); a.href = 'file:///tmp/interna-link.pdf'; a.id = 'xx'; a.textContent = 'LINK';
-    a.style.cssText = 'position:fixed;left:0;top:0;width:300px;height:60px;z-index:99999;background:red;display:block';
-    document.body.appendChild(a);
-  });
-  await interna.mouse.click(30, 30);
-  await interna.waitForTimeout(1200);
-  await interna.evaluate(() => { location.href = 'file:///tmp/interna-location.pdf'; });
-  await interna.waitForTimeout(1200);
-  console.log('VISTI-INT', JSON.stringify(await app.evaluate(() => globalThis.__visti)));
-  const testi = await shell.locator('.shell-notif').allInnerTexts().catch(() => []);
-  console.log('AVVISI-INT', JSON.stringify(testi));
+// Da una pagina web file: e data: li ferma Chromium prima di Filo; le app (zoommtg:, ms-teams:…) le ferma Filo.
+test('su una pagina web il clic su un collegamento a un\'app fermato lo dice; il tentativo della pagina da sola no', async ({ shell, openTab, testServer, avvisi }) => {
+  const page = await openTab(testServer.html(`<title>Riunione</title>
+    <a id="z" href="zoommtg://zoom.us/join?confno=1" style="position:fixed;left:0;top:0;width:300px;height:60px;display:block">entra</a>
+    <script>setTimeout(function(){location.href='ms-teams://da-sola'},400)</script>`));
+  await page.waitForTimeout(1500);
+  expect(await nelModello(shell, 'ms-teams'), 'la pagina da sola non fa nascere avvisi').toBe(0);
+  await page.mouse.click(40, 30);
+  const c = await carta(avvisi, 'Indirizzo «zoommtg:» bloccato per sicurezza');
+  await expect(c).toBeVisible({ timeout: 8000 });
+  await expect(c.locator('.shell-notif-action')).toHaveCount(0);
+  expect(await nelModello(shell, 'zoommtg')).toBe(1);
+  expect(await nelModello(shell, 'ms-teams')).toBe(0);
+  expect(page.url()).toContain('127.0.0.1');
 });

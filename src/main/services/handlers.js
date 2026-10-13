@@ -3962,7 +3962,8 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return `Pagina NON aperta: ${sito} ${chi}. Diglielo in una riga: se vuole aprirla lo stesso, sotto la tua risposta c'è «Apri comunque». Non riprovare e non cercare un altro indirizzo per arrivarci.`;
   }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
-    return 'Pagina NON aperta: l\'indirizzo non è una pagina web (ammessi solo http e https). Non riprovare con lo stesso indirizzo.';
+    // #482 — un indirizzo fermato non resta muto: è il modello a dirlo, col perché.
+    return 'Pagina NON aperta: per sicurezza Filo non apre in una scheda i file del computer, le cartelle di rete e gli indirizzi che non sono pagine web (solo http e https). Diglielo in una riga. Non riprovare con lo stesso indirizzo.';
   }
   if (type === 'PULISCI_TAB' && res.executed && res.output) {
     const n = Number(res.output.archived) || 0;
