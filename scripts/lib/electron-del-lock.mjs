@@ -34,14 +34,13 @@ export function electronDelLock(root, { env = process.env } = {}) {
     };
   }
   if (binario && binario !== lock) {
-    const dove = env.ELECTRON_OVERRIDE_DIST_PATH ? `ELECTRON_OVERRIDE_DIST_PATH (${dist})` : 'node_modules/electron/dist';
-    return {
-      ...esito,
-      ok: false,
-      motivo: `il binario in ${dove} è Electron ${binario} e package-lock.json chiede la ${lock}. Rimetti il binario`
-        + ' giusto (nel contenitore delle routine `node scripts/ensure-electron.mjs`; altrove cancella'
-        + ` node_modules/electron/dist e lo riscarica il primo avvio) e rilancia: ${conseguenza}`,
-    };
+    const rimedio = env.ELECTRON_OVERRIDE_DIST_PATH
+      ? `il binario in ELECTRON_OVERRIDE_DIST_PATH (${dist}) è Electron ${binario} e package-lock.json chiede la ${lock}.`
+        + ' Togli la variabile, o falla puntare a un Electron della versione giusta,'
+      : `il binario in node_modules/electron/dist è Electron ${binario} e package-lock.json chiede la ${lock}. Rimetti`
+        + ' il binario giusto (nel contenitore delle routine `node scripts/ensure-electron.mjs`; altrove cancella'
+        + ' node_modules/electron/dist e lo riscarica il primo avvio)';
+    return { ...esito, ok: false, motivo: `${rimedio} e rilancia: ${conseguenza}` };
   }
   return esito;
 }
