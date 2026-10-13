@@ -4169,6 +4169,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
 
     if (!result || !result.id) return;
     const feedbackId = result.id;
+    autoFeedbackAnnullabili.add(String(feedbackId));
 
     // Toast non bloccante con undo: l'utente può annullare entro la durata del toast.
     const win = winOf(sender);
