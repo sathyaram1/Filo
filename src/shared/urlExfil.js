@@ -216,14 +216,18 @@
 
   // Solo la parte che può portare dati: sottodomini, percorso, query, frammento.
   // Il dominio no, se no ogni sito citato in un file diventerebbe sospetto.
-  function carrierAlnum(url) {
+  function carrierTesto(url) {
     let u;
     try { u = new URL(url); } catch (_) {
-      try { u = new URL(`https://${url}`); } catch (_) { return exposedAlnum(url); }
+      try { u = new URL(`https://${url}`); } catch (_) { return String(url || ''); }
     }
     const labels = (u.hostname || '').split('.');
     const sub = labels.slice(0, Math.max(0, labels.length - 2)).join('.');
-    return exposedAlnum(`${sub} ${u.pathname || ''} ${u.search || ''} ${u.hash || ''}`);
+    return `${sub} ${u.pathname || ''} ${u.search || ''} ${u.hash || ''}`;
+  }
+
+  function carrierAlnum(url) {
+    return exposedAlnum(carrierTesto(url));
   }
 
   // `esposto` = testo già ridotto a minuscolo alfanumerico (di un URL o di una
