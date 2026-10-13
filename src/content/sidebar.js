@@ -31,6 +31,8 @@
   let stackEntry = null;
   // history per l'AI: { role, content, kind } — kind ∈ 'real'|'action'|null
   let history = [];
+  // L'identità di questa conversazione nel filo (#974): nasce a ogni apertura, muore con la chiusura.
+  let convFilo = '';
   let collapsed = false;
   // Se true, click fuori dal pannello NON lo collassa (es. AI ha richiesto chat aperta)
   let aiPrefersOpen = false;
@@ -80,6 +82,7 @@
     stackEntry = null;
     root.remove();
     root = null;
+    convFilo = '';
     history = [];
     documenti = null;
     collapsed = false;
@@ -97,6 +100,9 @@
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
+    // Ogni apertura è una conversazione sua anche nel filo.
+    convFilo = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
     // Ciò che ha letto la conversazione di prima non vale per questa (#530).
     try { chrome.runtime.sendMessage({ type: MSG.FILO_AIUTO_NUOVO }).catch(() => {}); } catch (_) {}
     // L'URL "iniziale" è quello al momento dell'apertura della sidebar — anche
@@ -288,7 +294,20 @@
 
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
 
-  function appendChatMessage(role, text) {
+  // Ogni messaggio mostrato entra nel filo come parte della riga ripiegata di questa conversazione (#974): una
+  // strada nuova che risponde ci passa da sé. Errori e note dell'interfaccia no (`nelFilo: false`).
+  function nelFiloAiuto(role, text) {
+    if (!convFilo || !String(text || '').trim()) return;
+    try {
+      chrome.runtime.sendMessage({
+        type: MSG.FILO_CONVERSAZIONE_APP, app: 'aiuto', rif: convFilo, soggetto: document.title,
+        messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text) }],
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
+  function appendChatMessage(role, text, { nelFilo = true } = {}) {
+    if (nelFilo) nelFiloAiuto(role, text);
     const conv = convEl();
     if (!conv) return null;
     const msg = document.createElement('div');
@@ -1642,7 +1661,7 @@
       // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
       const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
       const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
-      assistantEl = appendChatMessage('assistant', displayText);
+      assistantEl = appendChatMessage('assistant', displayText, { nelFilo: !!parsed.display });
 
       // Aggiorna la storia AI
       if (userAction && !userMessage) {
@@ -1781,7 +1800,7 @@
       const errText = /context invalidated/i.test(raw)
         ? 'L\'estensione è stata ricaricata. Aggiorna la pagina (F5) per ricollegare la sidebar.'
         : (CE ? CE.sentence(err) : raw);
-      assistantEl = appendChatMessage('assistant', errText);
+      assistantEl = appendChatMessage('assistant', errText, { nelFilo: false });
       assistantEl.classList.add('sn-sidebar-msg-error');
       // La frase nomina la pagina dove si rimedia; da un sito qualunque
       // l'utente non sa come arrivarci, quindi la strada sta qui sotto (#663).

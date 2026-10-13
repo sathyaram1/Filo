@@ -135,6 +135,8 @@
       righe: presi.map((m) => {
         const t = String(m.text).replace(/\s+/g, ' ').trim();
         const testo = t.length > CARATTERI_CONVERSAZIONE ? `${t.slice(0, CARATTERI_CONVERSAZIONE)}…` : t;
+        // La riga di una conversazione di un'altra app (#974) non l'ha detta nessuno dei due: è un fatto.
+        if (m.riga) return `- [${formatRelativeTime(m.ts)}] ${testo}`;
         return `- [${formatRelativeTime(m.ts)}] ${m.role === 'user' ? 'utente' : 'Filo'}: ${testo}`;
       }),
       tolti: recenti.length - presi.length,

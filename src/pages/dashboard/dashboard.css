@@ -1897,3 +1897,96 @@ html, body {
   color: var(--dash-ink-mute);
   padding: 0 12px;
 }
+
+/* Le conversazioni delle altre app (#974): un nodo nel filo, al centro perché non le ha dette né l'utente né la
+   chat di qui. Ripiegate sono una riga sola; aperte, lo scambio in piccolo sotto. */
+.dash-righe-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+.dash-riga-app {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(86%, 560px);
+  max-width: 100%;
+}
+.dash-riga-app-testa {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 12px;
+  border: 1px dashed var(--dash-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dash-ink-mute);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+.dash-riga-app-testa:hover,
+.dash-riga-app-testa:focus-visible { color: var(--dash-ink-soft); background: var(--dash-card); border-color: var(--dash-line-strong); }
+.dash-riga-app-aperta .dash-riga-app-testa { color: var(--dash-ink); border-style: solid; background: var(--dash-card); }
+.dash-riga-app-icona { display: inline-flex; flex: none; color: var(--dash-accent); }
+.dash-riga-app-icona svg { width: 14px; height: 14px; }
+.dash-riga-app-testo { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-riga-app-ora { flex: none; font-size: 12px; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.dash-riga-app-corpo {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--dash-line);
+  border-radius: 14px;
+  background: var(--dash-card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.dash-riga-app-msg {
+  max-width: 92%;
+  font-size: 13.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.dash-riga-app-msg-user {
+  align-self: flex-end;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border-bottom-right-radius: 4px;
+  background: var(--dash-ink);
+  color: var(--dash-paper);
+}
+.dash-riga-app-msg-filo { align-self: flex-start; color: var(--dash-ink); }
+.dash-riga-app-msg.dash-bubble-md { white-space: normal; }
+.dash-riga-app-vuoto { font-size: 13px; font-style: italic; color: var(--dash-ink-mute); }
+.dash-riga-app-vai {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dash-ink-soft);
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.dash-riga-app-vai:hover,
+.dash-riga-app-vai:focus-visible { background: var(--dash-ink); color: var(--dash-paper); text-decoration: none; }

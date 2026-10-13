@@ -378,6 +378,44 @@ module.exports = function register(on, ctx) {
     return { ok: true, chats, termini, allargata };
   });
 
+  // #974 — le conversazioni delle altre app nel filo, come righe ripiegate. Da un sito parla solo l'Aiuto, e il sito
+  // (soggetto, indirizzo da riaprire, recinto del riferimento) lo dice l'indirizzo di chi manda, mai il messaggio.
+  on(MSG.FILO_CONVERSAZIONE_APP, async (msg, sender, origin) => {
+    const app = String((msg && msg.app) || '');
+    if (!globalThis.SN_FILO_APP.eApp(app)) return { ok: false, error: 'app sconosciuta' };
+    let soggetto = msg.soggetto;
+    let dove = '';
+    let recinto = 'filo';
+    if (isFilo(origin) || sender?.isShell) {
+      const d = String(msg.dove || '');
+      if (/^(?:filo|https?):\/\//i.test(d)) dove = d;
+    } else {
+      if (app !== 'aiuto') return { ok: false, code: 'forbidden', error: 'forbidden' };
+      let u = null;
+      try { u = new URL(String(origin)); } catch (_) {}
+      if (!u || !/^https?:$/.test(u.protocol) || !u.hostname) return { ok: false, code: 'forbidden', error: 'forbidden' };
+      soggetto = u.hostname.replace(/^www\./, '');
+      dove = u.href;
+      recinto = u.hostname;
+    }
+    const rif = app === 'aiuto' ? `${recinto}|${String(msg.rif == null ? '' : msg.rif)}` : msg.rif;
+    const chat = await globalThis.SN_CONVERSAZIONI_APP.annota({ app, rif, soggetto, dove, messaggi: msg.messaggi });
+    return chat ? { ok: true, id: chat.id } : { ok: false, error: 'niente da scrivere' };
+  });
+
+  on(MSG.FILO_CONVERSAZIONE_APP_DIMENTICA, soloFilo(async (msg) => {
+    const tolte = await globalThis.SN_CONVERSAZIONI_APP.dimentica({ app: msg.app, rif: msg.rif, prefisso: msg.prefisso });
+    return { ok: true, tolte: tolte.length };
+  }));
+
+  on(MSG.FILO_CONVERSAZIONE_APP_RINOMINA, soloFilo(async (msg) => ({
+    ok: true,
+    rinominate: await globalThis.SN_CONVERSAZIONI_APP.rinomina({ app: msg.app, rif: msg.rif, prefisso: msg.prefisso, soggetto: msg.soggetto }),
+  })));
+
+  on(MSG.FILO_RIGHE_APP, soloFilo(async (msg) => (
+    { ok: true, righe: await globalThis.SN_CONVERSAZIONI_APP.righe({ chat: msg.chat || null }) })));
+
   // #866 — le pagine visitate del filo: quante sono in un periodo, e cancellarle (pagina Sicurezza).
   const periodoDa = (msg) => globalThis.SN_FILO_EVENTI.periodo(msg && msg.periodo);
   on(MSG.FILO_PAGINE_CONTA, soloFilo(async (msg) => {

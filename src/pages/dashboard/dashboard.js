@@ -119,6 +119,11 @@
   // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
   const Cambi = self.SN_DASH_CAMBI;
   Cambi.init({ send });
+  // Le conversazioni delle altre app, righe ripiegate del filo a schermo (#974).
+  const Righe = self.SN_DASH_RIGHE;
+  Righe.init({
+    send, bubblesEl, homeEl: $('righeApp'), inThread: () => body.dataset.state === 'thread', chatId: () => chatId,
+  });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -326,12 +331,15 @@
     aggiornaTasto();
     autoGrowInput();
     inputEl.focus();
+    Righe.aggiorna().catch(() => {});
   }
 
   function goThread() {
+    const entra = body.dataset.state !== 'thread';
     body.dataset.state = 'thread';
     homeView.hidden = true;
     threadView.hidden = false;
+    if (entra) Righe.aggiorna().catch(() => {});
   }
 
   // #525 — riapertura di una chat archiviata (filo://archive → clic su una
@@ -353,6 +361,20 @@
     if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
     // Da una carta della home (#870): la conversazione a schermo si chiude come col ritorno alla home.
     if (chiudiPrima && chatId && chatId !== chat.id) { closeCurrentChat(); Term.nuovaChat(false); }
+    // Una conversazione dell'Editor, dei Mazzi o dell'Aiuto (#974) si guarda aperta nel filo, non si continua da qui:
+    // quello che si scrive dopo apre una conversazione nuova della home, con quella riga davanti.
+    if (chat.app) {
+      if (chatId) { closeCurrentChat(); Term.nuovaChat(false); }
+      chatId = null;
+      threadHistory = [];
+      chiudiRipresa();
+      aggiornaTasto();
+      bubblesEl.innerHTML = '';
+      goThread();
+      const vista = await Righe.mostraSola(chat);
+      inputEl.focus();
+      return vista;
+    }
     chatId = chat.id;
     threadHistory = [];
     chiudiRipresa();
@@ -368,6 +390,7 @@
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
       if (text.trim() || fotoViste.length) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        if (m.ts) b.dataset.ts = m.ts;
         fotoViste.forEach((src, i) => {
           const img = document.createElement('img');
           img.src = src;
@@ -420,6 +443,7 @@
     )));
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
+    Righe.aggiorna({ riposa: true }).catch(() => {});
     return true;
   }
 
@@ -632,6 +656,8 @@
     const div = document.createElement('div');
     div.className = `dash-bubble dash-bubble-${role === 'user' ? 'user' : 'filo'}`;
     if (pending) div.classList.add('dash-bubble-pending');
+    // L'ora la usa chi mette al loro posto nel tempo le righe delle altre app (dashboard-righe.js).
+    div.dataset.ts = new Date().toISOString();
     // #162 — testo vuoto (Filo ha solo eseguito un'azione, es. aperto un link):
     // niente nodo di testo, la bolla conterrà solo i chip d'azione. Marchiamo
     // la bolla così il CSS può stringere i margini quando è "solo azioni".
@@ -2181,6 +2207,7 @@
       const opened = await reopenChat(reopenId).catch((e) => { console.warn('[Filo] riapertura chat', e); return false; });
       if (!opened) await loadDashboard().catch((e) => console.warn('[Filo] dashboard load', e));
     }
+    if (body.dataset.state !== 'thread') Righe.aggiorna().catch(() => {});
     if (onbState) await Accoglienza.openOnboarding(onbState);
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.

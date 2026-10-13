@@ -851,6 +851,7 @@
     const i = trash.findIndex((e) => e.id === entryId);
     if (i < 0) return null;
     const [entry] = trash.splice(i, 1);
+    if (entry && entry.file && entry.file.id) dimenticaNelFilo({ prefisso: `${entry.file.id}:` });
     // Lo storico arriva dall'archivio in modo asincrono: aspetta che sia
     // caricato, altrimenti una pulizia fatta troppo presto verrebbe riscritta
     // dal caricamento e lascerebbe lo storico di un file che non esiste più.
@@ -1116,6 +1117,7 @@
     }
     writeCollection();
     renderDocSwitcher();
+    rinominaNelFilo(id, f && f.meta && f.meta.title);
   }
 
   // ── Titolo automatico dal contenuto (#379.4) ──────────────────────────
@@ -1197,6 +1199,7 @@
     }
     writeCollection();
     renderDocSwitcher();
+    rinominaNelFilo(id, f && f.meta && f.meta.title);
     return true;
   }
 
@@ -3826,6 +3829,9 @@
       input.value = '';
       m.data.messages.push({ role: 'user', content: text });
       renderLog();
+      // Il documento si fissa alla domanda: la risposta resta sua anche se intanto se ne apre un altro.
+      const conv = conversazioneDelModulo(m);
+      annotaNelFilo(conv, 'user', text);
       const thinking = { role: 'assistant', content: '…' };
       m.data.messages.push(thinking);
       renderLog();
@@ -3859,6 +3865,7 @@
           } else {
             thinking.content = raw;
           }
+          annotaNelFilo(conv, 'filo', thinking.content);
         }
       } catch (e) {
         thinking.content = erroreInChat({ error: e && e.message, code: e && e.code }, 'nessuna risposta');
@@ -3873,6 +3880,29 @@
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
+  }
+
+  // La chat di un modulo entra nel filo come riga ripiegata (#974): documento e modulo dicono quale conversazione.
+  function conversazioneDelModulo(m) {
+    if (!doc || !m) return null;
+    return {
+      rif: `${doc.id}:${m.id}`,
+      soggetto: (doc.meta && doc.meta.title) || STORE.DEFAULT_TITLE,
+      dove: `filo://editor/editor.html?file=${encodeURIComponent(doc.id)}`,
+    };
+  }
+  function annotaNelFilo(conv, role, text) {
+    if (!conv || !String(text || '').trim()) return;
+    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP, app: 'editor', ...conv, messaggi: [{ role, text }] });
+  }
+  // Il documento rinominato (a mano o dal titolo automatico): le righe delle sue chat dicono il nome nuovo.
+  function rinominaNelFilo(id, title) {
+    if (!id) return;
+    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP_RINOMINA, app: 'editor', prefisso: `${id}:`, soggetto: title || STORE.DEFAULT_TITLE });
+  }
+  // Una chat che l'Editor butta via davvero se ne va anche dal filo.
+  function dimenticaNelFilo(campi) {
+    sendMessage({ type: MSG.FILO_CONVERSAZIONE_APP_DIMENTICA, app: 'editor', ...campi });
   }
 
   function sendMessage(msg) {
@@ -3951,6 +3981,7 @@
     if (deletable) $('cfgDelete').addEventListener('click', () => {
       // Guardia difensiva: un modulo appuntato non è mai eliminabile.
       if (isPinned(m)) { closeOverlay(); return; }
+      if (m.type === 'chat') dimenticaNelFilo({ rif: `${doc.id}:${m.id}` });
       doc.modules = doc.modules.filter((x) => x.id !== m.id);
       closeOverlay(); renderGrid(); markDirty();
     });
