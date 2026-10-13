@@ -893,6 +893,8 @@ async function getWorkerLog(idToken, { severo = false } = {}) {
       role: typeof e.role === 'string' ? e.role : '',
       startedAt: typeof e.startedAt === 'string' ? e.startedAt : '',
       num: e.num == null ? '' : String(e.num),
+      // Una parola sola: è una chiave di etichetta, non un testo da mostrare.
+      ...(typeof e.caso === 'string' && /^[a-z_-]{1,40}$/.test(e.caso) ? { caso: e.caso } : {}),
     }))
     // Più recenti prima: dispatch le accoda in ordine cronologico.
     .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
