@@ -362,7 +362,8 @@ test('con tante reti conosciute il riquadro scorre, con la rotella e con le frec
 });
 
 test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'elenco dei dispositivi, e le letture non si accodano', async ({ app }) => {
-  await computerFinto(app, { letturaMs: 4000, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  // Una lettura lunga: sulla macchina carica della suite tre aperture con Esc arrivavano a superare quattro secondi.
+  await computerFinto(app, { letturaMs: 12_000, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
   // Aperto e richiuso due volte cercando la voce giusta, poi il gesto.
@@ -377,7 +378,7 @@ test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'e
   await expect.poll(async () => (await computer(app)).bluetooth.acceso, { timeout: 2_000 }).toBe(false);
   await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 2_000 });
   // Spento il Bluetooth l'elenco si rilegge una volta, e arriva nel riquadro aperto.
-  await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 10_000 });
+  await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 25_000 });
   expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(2);
 });
 

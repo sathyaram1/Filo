@@ -26,6 +26,7 @@
         'Nella stessa pagina c\'è un campo per cercare fra le voci copiate: con la cronologia piena trovi subito quella da togliere, senza scorrerle tutte.',
         'Cliccando una voce della cronologia la rimetti negli appunti, pronta da incollare dove vuoi.',
         'Nella cronologia del menu "Incolla" le immagini copiate si vedono in miniatura: due schermate copiate una dietro l\'altra non si leggono più tutte e due "Immagine".',
+        'Nel terminale della home, se incolli in un comando un percorso con spazi, per esempio la tua cartella utente con nome e cognome, Filo lo mette fra virgolette e le vedi prima di premere Invio. Se un comando scritto a mano fallisce perché le virgolette mancavano, sotto l\'errore trovi lo stesso comando corretto: premi «Esegui» e parte.',
         'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
       ],
       fixes: [
@@ -88,6 +89,8 @@
         'Quando correggi una parola, le sottolineature delle altre parole restano al loro posto. Prima le blu sparivano per qualche istante mentre Filo ricontrollava il testo, e le rosse dopo ogni correzione scelta col tasto destro. Una correzione presa dal menu adesso si annulla con Ctrl+Z (Cmd+Z su Mac).',
         'Nella barra laterale a scomparsa il nome di un\'icona sparisce appena sposti il puntatore dall\'icona, la premi o la barra si chiude. Prima poteva restare sopra la pagina anche a barra chiusa.',
         'Se mandi una segnalazione mentre quella di prima sta ancora partendo, parte anche lei. Prima restava ferma finché non ne mandavi un\'altra o non riaprivi Filo.',
+        'Se Filo fa molti passi senza arrivare a una risposta, adesso lo scrive in chat e ti dà il tasto «Continua», che lo fa ripartire da dove era arrivato senza rifare le ricerche già fatte. Prima la conversazione poteva finire con «Ha cercato sul web 9 volte» e nient\'altro.',
+        'Nella Cronologia AI il filtro per tipo elenca ogni nome una volta sola, e scegliendo «Aiuto» vedi tutte le richieste fatte all\'Aiuto. Prima lo stesso nome poteva comparire due o tre volte, e ognuno mostrava solo una parte delle righe.',
       ],
     },
     {

@@ -13,6 +13,10 @@
 
   function $(id) { return document.getElementById(id); }
 
+  // Un numero scritto in una manopola parte anche dalle uscite che non toccano il campo: pausa, Ctrl+W, ricarica, scheda
+  // chiusa (#666). Pattern «un testo scritto in una casella si salva da solo, o lo perdi».
+  const caselle = window.SN_CASELLE.crea();
+
   // ── Owner: codici, regali, chi ha cosa ─────────────────────────────────────
   let overviewLoaded = false;
   // La prima lettura riempie i campi delle manopole; quelle dopo rispettano
@@ -67,6 +71,8 @@
     schedeChieste.clear();
     const users = (o.users || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
     table.hidden = users.length === 0;
+    ricevuti.clear();
+    for (const u of users) ricevuti.set(u.pseudonym, ricevutiIn(u));
     for (const u of users) {
       const tr = document.createElement('tr');
       const b = u.balance || {};
@@ -155,21 +161,34 @@
     $('ownerKnobs').hidden = !visibili;
   }
 
+  // Il server ha risposto con un numero d'errore, o la richiesta non è mai partita: quello che si chiedeva di sicuro non
+  // è successo. Il resto (connessione caduta a metà) lascia l'esito ignoto.
+  function guastoCerto(raw) {
+    return /not_admin|not_signed_in|sessione scaduta|callable \w+ \d{3}|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ENETUNREACH/i.test(String(raw || ''));
+  }
+
+  function bottoneRiprova(azione, titolo) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn sn-btn-secondary';
+    b.textContent = 'Riprova';
+    b.title = titolo;
+    b.addEventListener('click', () => {
+      if (b.disabled) return;
+      b.disabled = true;
+      Promise.resolve().then(azione).catch(() => {});
+    });
+    return b;
+  }
+
   function guastoVista(errore) {
     if (errore) console.warn('[credits/owner] vista non arrivata:', errore);
     const p = $('ownerTotals');
     p.textContent = `${conMaiuscola(fraseGuasto(errore))}. `;
-    const riprova = document.createElement('button');
-    riprova.type = 'button';
-    riprova.className = 'sn-btn sn-btn-secondary';
-    riprova.textContent = 'Riprova';
-    riprova.title = 'Richiedi la vista al server';
-    riprova.addEventListener('click', () => {
-      riprova.disabled = true;
+    p.appendChild(bottoneRiprova(() => {
       p.textContent = 'Chiedo al server…';
-      loadOverview().catch(() => {});
-    });
-    p.appendChild(riprova);
+      return loadOverview();
+    }, 'Richiedi la vista al server'));
     // Senza i numeri del server non c'è niente da mettere nei campi.
     if (!campi.size) mostraManopole(false);
   }
@@ -285,13 +304,27 @@
       riga.append(label, controlli, msg);
       scatola.appendChild(riga);
 
-      campi.set(k.chiave, CN.collega({
-        input, salvaBtn: salva, rimetti, msg,
-        regole: { min: k.min, max: k.max, intero: true, etichetta: k.etichetta },
+      const regole = { min: k.min, max: k.max, intero: true, etichetta: k.etichetta };
+      const campo = CN.collega({
+        input, salvaBtn: salva, rimetti, msg, regole,
         salva: (valore) => salvaManopola(k.chiave, valore),
         // Cambiata una manopola, i numeri calcolati accanto non valgono più.
         onSalva: () => { loadOverview().catch(() => {}); },
-      }));
+      });
+      campi.set(k.chiave, campo);
+
+      // Un numero a metà vale altro e ha effetto per tutti: aspetta la pausa lunga, o l'uscita. Un numero storto non
+      // parte, e lo dice all'uscita vera, non mentre si scrive.
+      const nome = `knob-${k.chiave}`;
+      caselle.registra(nome, (avvisi) => {
+        if (campo.stato().pulito) return;
+        if (!avvisi && !CN.controllaCampo(input, regole).ok) return;
+        campo.salvaOra({ riprendiIlFuoco: false }).catch(() => {});
+      });
+      input.addEventListener('input', (e) => {
+        if (campo.stato().pulito) caselle.spedita(nome);
+        else caselle.cambiato(nome, e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS });
+      });
     }
   }
 
@@ -699,24 +732,46 @@
     return parts.length ? ` (${parts.join(', ')})` : '';
   }
 
-  async function ownerInvites(ev) {
-    ev.preventDefault();
-    const btn = $('ownerInvitesBtn');
+  // La riga sotto i due moduli: un esito, e quando qualcosa non è andato un «Riprova» che rifà la stessa richiesta.
+  function esitoModulo(testo, { errore = false, riprova = null, titolo = '' } = {}) {
     const msg = $('ownerMsg');
+    msg.hidden = false;
+    msg.classList.toggle('is-error', errore);
+    msg.classList.toggle('is-ok', !errore);
+    msg.textContent = testo;
+    if (riprova) {
+      msg.append(' ');
+      msg.appendChild(bottoneRiprova(riprova, titolo));
+    }
+  }
+
+  function ownerInvites(ev) {
+    ev.preventDefault();
     // Il controllo lo fa Filo, con una frase sua: la bolla del browser (min/max
     // del campo) parlava al posto della pagina (verifica del ramo -b, secondo giro).
     const count = numeroIntero($('ownerInviteCount'));
     if (count == null || count < 1 || count > 200) {
-      return rifiuta(msg, $('ownerInviteCount'), 'Quanti codici? Un numero da 1 a 200.');
+      return rifiuta($('ownerMsg'), $('ownerInviteCount'), 'Quanti codici? Un numero da 1 a 200.');
     }
+    return generaCodici(count);
+  }
+
+  async function generaCodici(count) {
+    const btn = $('ownerInvitesBtn');
     btn.disabled = true;
     const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_INVITES, count }).catch(() => null);
     btn.disabled = false;
-    msg.hidden = false;
-    msg.classList.remove('is-error', 'is-ok');
-    if (!(r && r.ok)) { msg.textContent = `Codici non generati${r && r.error ? ` (${r.error})` : ''}.`; msg.classList.add('is-error'); return; }
-    msg.textContent = `${r.codes.length} codici nuovi. Li ritrovi qui sotto anche dopo.`;
-    msg.classList.add('is-ok');
+    if (!(r && r.ok)) {
+      // La risposta del server (nome della chiamata, numero dell'errore) resta nella console.
+      if (r && r.error) console.warn('[credits/owner] codici non generati:', r.error);
+      esitoModulo(`Codici non generati: ${fraseGuasto(r && r.error)}.`, {
+        errore: true,
+        riprova: () => generaCodici(count),
+        titolo: `Chiedi di nuovo ${count === 1 ? 'un codice' : `${formatInt(count)} codici`}`,
+      });
+      return;
+    }
+    esitoModulo(`${r.codes.length} codici nuovi. Li ritrovi qui sotto anche dopo.`);
     const list = $('ownerCodes');
     $('ownerCodesTitle').hidden = false;
     // Quanti posti abbia un invito lo sa il server, non chi l'ha chiesto: la
@@ -731,7 +786,7 @@
     }
   }
 
-  async function ownerGrant(ev) {
+  function ownerGrant(ev) {
     ev.preventDefault();
     const msg = $('ownerMsg');
     const pseudonym = String($('ownerGrantPseudonym').value || '').trim();
@@ -740,30 +795,79 @@
     if (credits == null || credits < 1) {
       return rifiuta(msg, $('ownerGrantCredits'), 'Quanti crediti? Un numero intero, almeno 1.');
     }
+    return regala(pseudonym, credits, ricevuti.has(pseudonym) ? ricevuti.get(pseudonym) : null);
+  }
+
+  // Quanto ha ricevuto in tutto ogni persona, all'ultima lettura della vista: è il metro per capire se un regalo
+  // dall'esito ignoto è arrivato, prima di rifarlo.
+  const ricevuti = new Map();
+  function ricevutiIn(u) {
+    const n = Number(u && u.balance && u.balance.creditsGranted);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  async function regala(pseudonym, credits, prima) {
     $('ownerGrantBtn').disabled = true;
     const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_GRANT, pseudonym, credits, why: 'owner' }).catch(() => null);
     $('ownerGrantBtn').disabled = false;
-    msg.hidden = false;
-    msg.classList.remove('is-error', 'is-ok');
     const res = r && r.ok && r.result;
     if (res && res.ok) {
-      msg.textContent = `+${formatInt(res.credits)} crediti a ${pseudonym}.`;
-      msg.classList.add('is-ok');
-      $('ownerGrantCredits').value = '';
+      esitoModulo(`+${formatInt(res.credits)} crediti a ${pseudonym}.`);
+      if ($('ownerGrantPseudonym').value.trim() === pseudonym) $('ownerGrantCredits').value = '';
       // La pagina Crediti, se aperta, si aggiorna da sola (il main avvisa
       // le pagine al regalo); qui si rilegge la vista.
       loadOverview().catch(() => {});
       return;
     }
-    const reason = (res && res.reason) || (r && r.error) || 'errore';
-    const why = {
-      no_wallet: 'nessun utente con questo pseudonimo',
-      global_cap: `oltre il tetto globale (tetti ${fmtUsd(res && res.totalLimitUsd)} + ${fmtUsd(res && res.deltaUsd)} > ${fmtUsd(res && res.maxGrantUsd)}): alza il tetto in configurazione o carica OpenRouter`,
-      missing_exchange_rate: 'manca il cambio del giorno',
-      provider_error: 'OpenRouter non ha accettato il tetto nuovo, niente è cambiato',
-    }[reason] || reason;
-    msg.textContent = `Regalo non fatto: ${why}.`;
-    msg.classList.add('is-error');
+    const ancora = { errore: true, titolo: `Regala di nuovo ${formatInt(credits)} crediti a ${pseudonym}` };
+    if (res) {
+      const why = {
+        no_wallet: 'nessun utente con questo pseudonimo',
+        global_cap: `oltre il tetto globale (tetti ${fmtUsd(res.totalLimitUsd)} + ${fmtUsd(res.deltaUsd)} > ${fmtUsd(res.maxGrantUsd)}): alza il tetto in configurazione o carica OpenRouter`,
+        missing_exchange_rate: 'manca il cambio del giorno',
+        nothing_to_grant: 'zero crediti non sono un regalo',
+        provider_error: 'OpenRouter non ha accettato il tetto nuovo, niente è cambiato',
+      }[res.reason];
+      if (!why) console.warn('[credits/owner] regalo rifiutato:', res.reason);
+      esitoModulo(`Regalo non fatto: ${why || 'il server dei crediti non l’ha accettato'}.`, {
+        ...ancora,
+        riprova: res.reason === 'provider_error' ? () => regala(pseudonym, credits, prima) : null,
+      });
+      return;
+    }
+    if (r && r.error) console.warn('[credits/owner] regalo non arrivato al server:', r.error);
+    if (guastoCerto(r && r.error)) {
+      esitoModulo(`Regalo non fatto: ${fraseGuasto(r && r.error)}.`, { ...ancora, riprova: () => regala(pseudonym, credits, prima) });
+      return;
+    }
+    // La connessione è caduta dopo la partenza: il regalo può esserci. Due clic su «Riprova» non devono valere due regali.
+    esitoModulo(`Non so se il regalo è arrivato: ${fraseGuasto(r && r.error)}.`, {
+      ...ancora,
+      titolo: 'Guarda se il regalo è arrivato, e se no rifallo',
+      riprova: () => riprovaRegalo(pseudonym, credits, prima),
+    });
+  }
+
+  async function riprovaRegalo(pseudonym, credits, prima) {
+    const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OVERVIEW }).catch(() => null);
+    const o = r && r.ok && r.overview;
+    if (!o) {
+      if (r && r.error) console.warn('[credits/owner] vista non arrivata:', r.error);
+      esitoModulo(`Non so ancora se il regalo è arrivato: ${fraseGuasto(r && r.error)}.`, {
+        errore: true,
+        titolo: 'Guarda se il regalo è arrivato, e se no rifallo',
+        riprova: () => riprovaRegalo(pseudonym, credits, prima),
+      });
+      return;
+    }
+    const lei = (o.users || []).find((u) => u && u.pseudonym === pseudonym);
+    const ora = lei ? ricevutiIn(lei) : null;
+    if (prima != null && ora != null && ora - prima >= credits) {
+      esitoModulo(`Il regalo era arrivato: +${formatInt(credits)} crediti a ${pseudonym}.`);
+      loadOverview().catch(() => {});
+      return;
+    }
+    await regala(pseudonym, credits, ora);
   }
 
   // Il numero intero scritto in un campo numerico, o null se non è un intero
@@ -828,8 +932,8 @@
     } catch (_) { return ''; }
   }
 
-  $('ownerInvitesForm').addEventListener('submit', (ev) => { ownerInvites(ev).catch(() => {}); });
-  $('ownerGrantForm').addEventListener('submit', (ev) => { ownerGrant(ev).catch(() => {}); });
+  $('ownerInvitesForm').addEventListener('submit', (ev) => { Promise.resolve(ownerInvites(ev)).catch(() => {}); });
+  $('ownerGrantForm').addEventListener('submit', (ev) => { Promise.resolve(ownerGrant(ev)).catch(() => {}); });
 
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {

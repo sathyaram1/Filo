@@ -49,6 +49,11 @@ module.exports = function register(on, ctx) {
     return { ok: true, inVista: tabs.inVista(sender.tab.id) };
   });
 
+  on(MSG.CASELLE_IN_SOSPESO, soloFilo(async (msg, sender) => {
+    if (sender && sender.wc) require('../../tabs/chiusuraConCaselle').segna(sender.wc, Boolean(msg && msg.inSospeso));
+    return { ok: true };
+  }));
+
   on(MSG.TAB_IDENTITY_COLOR, async (msg, sender) => {
     // Colore identità del sito (§1.2) → cachato per dominio dal TabManager e
     // mescolato col fondo della barra nelle tab inattive.

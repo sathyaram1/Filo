@@ -94,3 +94,64 @@ test('pagina dei feedback: stessa forma accanto al titolo, col motivo sotto il p
   expect(await titolo('Pronto ma bloccato').getAttribute('title')).toMatch(/sicurezza/i);
   await page.locator('.fb-card').first().screenshot({ path: 'tests/.shots/segno-fermata-feedback.png' });
 });
+
+// #1060: «Richiede lavoro locale» si riconosce a colpo d'occhio: rombo azzurro come lo schermo di 💻, in lista e nella fila.
+const LOCALE = {
+  ...base, _id: 'fb-loc', seq: 806, name: 'Va finito in locale', text: 'f', clientId: 'local:claude',
+  status: 'design', statusReason: 'locale', pipeline: giudici('aligned'),
+  notes: "Report.\n\n--- Aggiornamento dell'agente del 06/10/26, 03:58 ---\nRichiede lavoro locale. Dal contenitore la rete è chiusa: lancia lo script sulla tua macchina.",
+};
+const AZZURRO = 'rgb(38, 201, 252)';
+const VERDE = 'rgb(46, 158, 91)';
+const colore = (loc) => loc.evaluate((el) => getComputedStyle(el).color);
+
+test('richiede lavoro locale: rombo azzurro in lista e nel dettaglio, che aperto dice perché', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [LOCALE, DOMANDA]);
+
+  await expect(segno(page, 'Va finito in locale')).toHaveAttribute('data-forma', 'rombo');
+  await expect(segno(page, 'Va finito in locale')).toHaveAttribute('title', 'Richiede lavoro locale');
+  expect(await colore(segno(page, 'Va finito in locale'))).toBe(AZZURRO);
+  expect(await colore(segno(page, 'Ha domande'))).toBe(VERDE);
+
+  await page.evaluate((id) => window.__mgTest.openDetail(id), LOCALE._id);
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).toHaveClass(/mg-forma--locale/);
+  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  await expect(rombo).toHaveAttribute('title', 'Richiede lavoro locale');
+  expect(await colore(rombo)).toBe(AZZURRO);
+
+  await rombo.click();
+  await expect(page.locator('#mgSideTitle')).toHaveText('Richiede lavoro locale');
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo).toContainText('lancia lo script sulla tua macchina');
+  await expect(corpo).toContainText('Lavoro locale');
+  await expect(corpo).not.toContainText('Nessuna segnalazione');
+
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.waitForTimeout(150);
+    expect(await colore(rombo)).toBe(AZZURRO);
+    await page.locator('#mgList').screenshot({ path: `tests/.shots/rombo-locale-lista-${tema}.png` });
+    await page.locator('#mgLivelliRow').screenshot({ path: `tests/.shots/rombo-locale-fila-${tema}.png` });
+  }
+  await page.screenshot({ path: 'tests/.shots/rombo-locale-pagina.png' });
+
+  // Approvato come lavoro locale esce dai Ricevuti: il rombo torna grigio e il segno sparisce.
+  await page.evaluate((fb) => window.__mgTest.setData([fb]), { ...LOCALE, status: 'todo', statusReason: null });
+  await expect(page.locator('.mg-segno-fermata[data-forma="rombo"]')).toHaveCount(0);
+});
+
+test('pagina dei feedback: anche lì il rombo di chi chiede lavoro locale è azzurro', async ({ openTab }) => {
+  const page = await openTab(FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
+  await page.evaluate(() => window.__fbTest.setAdmin(true));
+  await page.evaluate((fbs) => window.__fbTest.setData(fbs), [LOCALE, DOMANDA]);
+  await page.evaluate(() => window.__fbTest.setTab('inbox'));
+  const titolo = (t) => page.locator('.fb-card', { hasText: t }).locator('.fb-title .fb-segno');
+  await expect(titolo('Va finito in locale')).toHaveAttribute('data-forma', 'rombo');
+  expect(await colore(titolo('Va finito in locale'))).toBe(AZZURRO);
+  expect(await colore(titolo('Ha domande'))).toBe(VERDE);
+  await page.locator('.fb-card', { hasText: 'Va finito in locale' }).screenshot({ path: 'tests/.shots/rombo-locale-feedback.png' });
+});

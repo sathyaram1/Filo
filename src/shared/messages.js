@@ -468,6 +468,8 @@
     // TAB_IN_VISTA (solo alle pagine filo://).
     TAB_IN_VISTA_GET: 'tab_in_vista_get',            // {} → { ok, inVista }
     TAB_IN_VISTA: 'tab_in_vista',                    // broadcast { inVista }
+    // Una pagina filo:// ha caselle scritte e non ancora spedite (SN_CASELLE): chiudere la sua scheda aspetta che spedisca.
+    CASELLE_IN_SOSPESO: 'caselle_in_sospeso',        // { inSospeso } → { ok }
     // Detta e Incolla di Filo su una pagina web: microfono o appunti per pochi secondi, senza domanda al sito (#591.1).
     PERMESSO_FILO: 'permesso_filo',                  // { tipo: 'media'|'appunti' } → { ok }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.

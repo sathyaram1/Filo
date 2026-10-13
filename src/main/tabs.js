@@ -20,6 +20,7 @@ const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
+const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
 require('../shared/authPopup');
@@ -1107,7 +1108,7 @@ class TabManager {
     this._archiveClosedTab(tab);
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-    try { tab.view.webContents.close(); } catch (_) {}
+    ChiusuraConCaselle.chiudi(tab.view.webContents);
     this.tabs.splice(idx, 1);
     if (this.activeId === id) {
       // Chiudendo la tab attiva, torna alla PENULTIMA tab che l'utente stava
@@ -1218,7 +1219,7 @@ class TabManager {
       this._archiveClosedTab(tab); // §3.1 — anche "chiudi tutto" archivia
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-      try { tab.view.webContents.close(); } catch (_) {}
+      ChiusuraConCaselle.chiudi(tab.view.webContents);
     }
     this.tabs = [];
     this.activeId = null;
@@ -1887,7 +1888,7 @@ class TabManager {
       tab.storia = Storia.conserva(tab.storia, this._vociDellaVista(tab), modo, url);
     }
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-    try { tab.view.webContents.close(); } catch (_) {}
+    ChiusuraConCaselle.chiudi(tab.view.webContents);
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
     tab.view = view;
     tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '', meta: { url, titolo: opts.titolo || '' } };

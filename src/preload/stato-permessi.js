@@ -1,6 +1,10 @@
-// Sorgente iniettato nel main world di una pagina web (page-preload.js), prima dei suoi script: le notifiche si leggono
-// «da chiedere» finché l'utente non ha deciso, come in Chrome. Non concede niente: le regole stanno in
+// Sorgente iniettato nel main world di una pagina web (page-preload.js), prima dei suoi script: notifiche e scrittura sui
+// file si leggono «da chiedere» finché l'utente non ha deciso, come in Chrome. Non concede niente: le regole stanno in
 // src/main/services/permessiPagine.js, e una pagina che manomette questo override inganna solo se stessa.
+
+const SCRITTURA = 'filo:scrittura';
+const SCRITTURA_FINE = 'filo:scrittura-fine';
+const SCRITTURA_NIENTE = 'filo:scrittura-niente';
 
 function buildStatoPermessiSource(stato) {
   const iniziale = ['granted', 'denied', 'default'].includes(stato && stato.notifiche) ? stato.notifiche : 'default';
@@ -54,7 +58,80 @@ function buildStatoPermessiSource(stato) {
     } };
     try { Object.defineProperty(P, 'query', { value: o.query, writable: true, configurable: true, enumerable: true }); } catch (e) {}
   }
-})();`;
+})();
+${SORGENTE_SCRITTURA}`;
 }
 
-module.exports = { buildStatoPermessiSource };
+// File e cartelle (#1069): da Electron 39 Chromium dice «concesso» o «negato» e non chiede mai. La domanda la fa Filo
+// (permessiPagine.chiediScrittura) prima di ogni scrittura non ancora concessa; l'esito vero si rilegge da Chromium.
+const SORGENTE_SCRITTURA = `(function(){
+  'use strict';
+  var H = window.FileSystemHandle && window.FileSystemHandle.prototype;
+  if (!H || typeof H.queryPermission !== 'function' || typeof H.requestPermission !== 'function') return;
+  var leggi = H.queryPermission, chiedi = H.requestPermission;
+  var T = EventTarget.prototype, manda = T.dispatchEvent, ascolta = T.addEventListener, smetti = T.removeEventListener;
+  var Ev = Event, DE = DOMException, FINE = ${JSON.stringify(SCRITTURA_FINE)}, NIENTE = ${JSON.stringify(SCRITTURA_NIENTE)};
+  var ua = navigator.userActivation;
+  var RW = { mode: 'readwrite' };
+  // Chi ha avuto il no su questa maniglia lo legge come negato; una maniglia nuova torna «da chiedere».
+  var negati = new WeakSet();
+  function scrive(d) { return Boolean(d && d.mode && d.mode !== 'read'); }
+  function attiva() { try { return Boolean(ua && ua.isActive); } catch (e) { return false; } }
+  // Risolve true se Filo ha avuto una risposta (sì, no, o il no ricordato), false se non ha chiesto.
+  function aFilo() {
+    return new Promise(function (ok) {
+      function fine(e) { smetti.call(window, FINE, fine, true); smetti.call(window, NIENTE, fine, true); ok(e.type === FINE); }
+      ascolta.call(window, FINE, fine, true);
+      ascolta.call(window, NIENTE, fine, true);
+      manda.call(window, new Ev(${JSON.stringify(SCRITTURA)}));
+    });
+  }
+  function richiedi(h, d, a) {
+    return chiedi.apply(h, a).then(function (s) {
+      if (s !== 'denied' || !scrive(d) || negati.has(h)) return s;
+      if (!attiva()) throw new DE('User activation is required to request permissions.', 'SecurityError');
+      return aFilo().then(function (risposto) {
+        return chiedi.apply(h, a).then(function (x) {
+          if (x === 'denied' && risposto) negati.add(h);
+          return x;
+        });
+      });
+    });
+  }
+  function metti(P, nome, f) {
+    if (P && typeof P[nome] === 'function') try { Object.defineProperty(P, nome, { value: f, writable: true, configurable: true, enumerable: true }); } catch (e) {}
+  }
+  var o = {
+    queryPermission: function queryPermission(d) {
+      var h = this;
+      return leggi.apply(h, arguments).then(function (s) { return s === 'denied' && scrive(d) && !negati.has(h) ? 'prompt' : s; });
+    },
+    requestPermission: function requestPermission(d) { return richiedi(this, d, arguments); },
+  };
+  metti(H, 'queryPermission', o.queryPermission);
+  metti(H, 'requestPermission', o.requestPermission);
+  // In Chrome scrivere, creare, cancellare e spostare chiedono da sé: qui la domanda va fatta prima.
+  function primaChiedi(P, nome, serve) {
+    var f = P && P[nome];
+    if (typeof f !== 'function') return;
+    var w = { f: function () {
+      var h = this, a = arguments;
+      if (!serve(a)) return f.apply(h, a);
+      return richiedi(h, RW, [RW]).catch(function () {}).then(function () { return f.apply(h, a); });
+    } };
+    metti(P, nome, w.f);
+  }
+  var D = window.FileSystemDirectoryHandle && window.FileSystemDirectoryHandle.prototype;
+  var F = window.FileSystemFileHandle && window.FileSystemFileHandle.prototype;
+  var sempre = function () { return true; };
+  var crea = function (a) { return Boolean(a[1] && a[1].create); };
+  primaChiedi(F, 'createWritable', sempre);
+  primaChiedi(D, 'getFileHandle', crea);
+  primaChiedi(D, 'getDirectoryHandle', crea);
+  primaChiedi(D, 'removeEntry', sempre);
+  primaChiedi(F, 'move', sempre);
+  primaChiedi(D, 'move', sempre);
+  primaChiedi(H, 'remove', sempre);
+})();`;
+
+module.exports = { buildStatoPermessiSource, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE };

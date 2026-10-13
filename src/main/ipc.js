@@ -17,6 +17,7 @@ const { showTooltip, hideTooltip } = require('./popup-tooltip');
 const CartaAnteprima = require('./popup-anteprima');
 const { createSession, defaultCwd, commandExists } = require('./services/shell');
 const { resolveShell } = require('./services/terminal');
+const { virgoletteIncollando, propostaVirgolette } = require('./services/shellVirgolette');
 const SegretiLetti = require('./services/segretiLetti');
 // Quanto dell'output di un comando lanciato a mano passa dal registro dei segreti letti: quanto una pagina.
 const MAX_STAMPATO = 8000000;
@@ -168,6 +169,14 @@ function registerIpcHandlers() {
     } catch (_) {
       event.returnValue = { notifiche: 'default' };
     }
+  });
+
+  // Scrivere su un file o una cartella che la pagina ha già (#1069): la domanda, regole in services/permessiPagine.js.
+  ipcMain.handle('filo:permessi-scrittura', (event) => {
+    const wc = event.sender;
+    const top = event.senderFrame && wc.mainFrame && event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId;
+    if (!top) return null;
+    return require('./services/permessiPagine').chiediScrittura(wc);
   });
 
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
@@ -374,6 +383,17 @@ function registerIpcHandlers() {
     } catch (_) {
       return { ok: false, exists: false };
     }
+  });
+
+  // #968 — un percorso con spazi incollato nel comando prende le virgolette, e sotto un comando fallito per quelle
+  // mancanti c'è la versione giusta. Qui si risponde e basta: cambia la riga la pagina, sotto gli occhi dell'utente.
+  ipcMain.handle('shell:virgolette-incolla', async (event, opzioni = {}) => {
+    if (!(event.sender.getURL() || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    try { return { ok: true, sostituzione: await virgoletteIncollando(opzioni || {}) }; } catch (_) { return { ok: false }; }
+  });
+  ipcMain.handle('shell:proposta-virgolette', async (event, opzioni = {}) => {
+    if (!(event.sender.getURL() || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    try { return { ok: true, proposta: await propostaVirgolette(opzioni || {}) }; } catch (_) { return { ok: false }; }
   });
 
   // Questo "/dominio.tld" esiste davvero? Usato dalla barra comando della
