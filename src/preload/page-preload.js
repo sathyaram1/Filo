@@ -116,6 +116,7 @@ let menuDelSito = null;
 try {
   menuDelSito = require('./menu-del-sito.js').monta(webFrame, window);
   globalThis.__snMenuDelSito = menuDelSito;
+  if (riscrittura) riscrittura.allaRiscrittura(() => menuDelSito.rinasci());
 } catch (e) { console.error('[Filo CS] menu del sito', e); }
 function apriMenuDiFilo(e, clic = Date.now()) {
   let esito;
