@@ -994,15 +994,19 @@
    */
   function workProgress(fb, opts) {
     const { status } = normalizeStatus(fb);
-    const idx = WORK_STAGES.indexOf(status);
-    if (idx < 0) return null;
-    const steps = WORK_STEPS.map((s, i) => ({
-      key: s.key, label: s.label,
+    if (WORK_STAGES.indexOf(status) < 0) return null;
+    // Nel riallineamento la verifica è già passata: il passo in corso è il ramo da rifare, la sicurezza si ripete dopo.
+    const riallinea = inRiallineamento(fb);
+    const fasi = riallinea ? [WORK_STEPS[0], WORK_STEPS[1], STEP_RIALLINEAMENTO, WORK_STEPS[2]] : WORK_STEPS;
+    const idx = riallinea ? 2 : WORK_STAGES.indexOf(status);
+    const steps = fasi.map((s, i) => ({
+      key: s.key, label: s.label, ...(s.hint ? { hint: s.hint } : {}),
       state: i < idx ? 'done' : (i === idx ? 'current' : 'pending'),
     }));
     const now = (opts && opts.now) != null ? opts.now : Date.now();
     return {
       status,
+      riallineamento: riallinea,
       steps,
       current: steps[idx],
       active: FS().isBeating(fb, now),
