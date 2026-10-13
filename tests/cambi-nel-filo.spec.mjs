@@ -551,7 +551,7 @@ test('O — tema e accento chiesti com\'erano già: le righe lo dicono coi nomi 
   ]);
   await scrivi(page, 'tema scuro e accento verde', 'Era già così.');
   await page.locator('.dash-activity-head').click();
-  await expect(page.locator('.dash-activity-row', { hasText: 'Già così · Tema → scuro' })).toHaveCount(1);
+  await expect(page.locator('.dash-activity-row', { hasText: 'Già così · Tema → Scuro' })).toHaveCount(1);
   await expect(page.locator('.dash-activity-row', { hasText: 'Aspetto già così · Colore d\'accento: #3a7d44' })).toHaveCount(1);
   await expect(page.locator('.dash-activity-row', { hasText: '=' })).toHaveCount(0);
   await expect(page.locator('.dash-activity-row', { hasText: 'accent:' })).toHaveCount(0);
