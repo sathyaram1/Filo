@@ -264,6 +264,118 @@
     return confrontaLetto(exposedAlnum(testo), letto);
   }
 
+  // ── Quello che l'utente ha scritto nelle conversazioni (#868.6) ──────────
+  // Il modello ha davanti le parole dell'utente di ogni scheda e le chat che ripesca: un indirizzo che ne porta fuori un
+  // dato (numero, email, indirizzo di casa, codice, un pezzo lungo di frase) chiede l'OK. Le parole comuni no: coincidono
+  // con ogni ricerca. Né quello che sta nella domanda di adesso, né un link che la conversazione contiene tale e quale.
+  const CIFRE_SCRITTE = 7;
+  const TIPI_VIA = new Set([
+    'via', 'viale', 'vle', 'piazza', 'pza', 'pzza', 'piazzale', 'corso', 'cso', 'largo', 'vicolo', 'vico', 'strada',
+    'contrada', 'cda', 'località', 'localita', 'loc', 'frazione', 'fraz', 'borgo', 'lungomare', 'lungarno',
+    'lungotevere', 'salita', 'traversa', 'circonvallazione', 'calle', 'fondamenta',
+    'street', 'st', 'road', 'rd', 'avenue', 'ave', 'lane', 'ln', 'drive', 'dr', 'boulevard', 'blvd', 'court', 'ct',
+    'place', 'square', 'terrace', 'way', 'crescent', 'close', 'rue', 'allée', 'allee', 'chemin', 'impasse', 'quai',
+    'cours', 'avenida', 'avda', 'plaza', 'paseo', 'carrer', 'camino', 'rua', 'praça', 'praca', 'travessa',
+    'strasse', 'straße', 'str', 'weg', 'platz', 'gasse',
+  ]);
+  const CIVICO = /^(\d{1,4})(?:\/?([a-z]))?[,.;:)]*$/;
+  const PRIMA_DEL_CIVICO = /^(?:n|nr|no|num|civico|#)\.?$/;
+  const soloAlnum = (s) => String(s || '').replace(/[^a-z0-9]+/g, '');
+
+  // «via Garibaldi 12» → «garibaldi12», «10 Downing Street» → «10downing»: la via accanto al civico, come esce in un URL.
+  function indirizziNelTesto(testo) {
+    const out = new Set();
+    const parole = testo.split(/\s+/).filter(Boolean);
+    const civico = (w) => {
+      const m = w.replace(/^(?:n|nr|no|num)\.?(?=\d)/, '').match(CIVICO);
+      return m ? m[1] + (m[2] || '') : '';
+    };
+    for (let i = 0; i < parole.length; i++) {
+      if (!TIPI_VIA.has(parole[i].replace(/[.,;:]+$/, '').replace(/\./g, ''))) continue;
+      for (let j = i + 2; j <= i + 6 && j < parole.length; j++) {
+        const n = civico(parole[j]);
+        if (!n) continue;
+        let k = j - 1;
+        while (k > i && PRIMA_DEL_CIVICO.test(parole[k])) k--;
+        const t = k > i ? soloAlnum(parole[k]) + n : '';
+        if (t.length >= MIN_TOKEN) out.add(t);
+        break;
+      }
+      for (let j = i - 1; j >= Math.max(0, i - 4); j--) {
+        const n = civico(parole[j]);
+        if (!n) continue;
+        const t = n + soloAlnum(parole[j + 1]);
+        if (t.length >= MIN_TOKEN) out.add(t);
+        break;
+      }
+    }
+    return out;
+  }
+
+  // I dati che si riconoscono da soli: email, parole con una cifra (codici, CAP, targhe), indirizzi di casa.
+  function datiScritti(testo) {
+    const out = new Set();
+    const emailRe = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g;
+    let m;
+    while ((m = emailRe.exec(testo))) {
+      out.add(soloAlnum(m[0]));
+      const local = soloAlnum(m[0].split('@')[0]);
+      if (local.length >= MIN_TOKEN) out.add(local);
+    }
+    for (const w of testo.split(/[^a-z0-9]+/)) if (w.length >= MIN_TOKEN && /\d/.test(w)) out.add(w);
+    for (const t of indirizziNelTesto(testo)) out.add(t);
+    return out;
+  }
+
+  // Un numero scritto a gruppi («+39 347 123 4567») è un numero solo; in un URL le cifre contano anche spezzate da
+  // pochi caratteri («?a=347&b=1234567»), come per ciò che esce (formeDi).
+  const cifreScritte = (testo) => testo.replace(/(\d)[\s.\-/()]{1,3}(?=\d)/g, '$1').match(new RegExp(`\\d{${CIFRE_SCRITTE},}`, 'g')) || [];
+  const cifreVicine = (forme) => forme.flatMap((f) => f.replace(/(\d)\D{1,4}(?=\d)/g, '$1').match(new RegExp(`\\d{${CIFRE_SCRITTE},}`, 'g')) || []);
+
+  function chiaviSenzaSchema(testo) {
+    const out = new Set();
+    const re = /(?:https?:\/\/|www\.)[^\s<>"'«»]+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s<>"'«»]*/gi;
+    let m;
+    while ((m = re.exec(testo))) {
+      const l = m[0].replace(/[.,;:!?)\]»"'’]+$/, '');
+      out.add(chiaveSenzaSchema(/^https?:\/\//i.test(l) ? l : `https://${l}`));
+    }
+    return out;
+  }
+  const chiaveSenzaSchema = (url) => chiaveLink(url).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '');
+
+  // `scritto` = le parole dell'utente (e le chat ripescate) che il modello ha davanti; `domanda` = quelle di adesso.
+  function taintScritto(url, scritto, domanda = '') {
+    const testo = formaBase(String(scritto || '')).toLowerCase();
+    if (!testo.trim()) return null;
+    const esposto = carrierAlnum(url);
+    if (esposto.length < MIN_TOKEN) return null;
+    if (chiaviSenzaSchema(testo).has(chiaveSenzaSchema(url))) return null;
+    const d = formaBase(String(domanda || '')).toLowerCase();
+    const dAlnum = soloAlnum(d);
+    const dCifre = cifreVicine([d]);
+    const suo = (p) => dAlnum.includes(p) || dCifre.some((c) => c.includes(p));
+    const reason = 'contiene un dato che hai scritto in chat';
+    for (const t of datiScritti(testo)) if (esposto.includes(t) && !suo(t)) return { reason };
+    const nellUrl = cifreVicine(varianti(carrierTesto(url)));
+    for (const c of cifreScritte(testo)) {
+      for (const r of nellUrl) {
+        const pezzo = r.includes(c) ? c : (r.length > CIFRE_SCRITTE && c.includes(r) ? r : '');
+        if (pezzo && !suo(pezzo)) return { reason };
+      }
+    }
+    if (esposto.length >= FINESTRA) {
+      const grams = new Set();
+      for (let i = 0; i + FINESTRA <= esposto.length; i++) grams.add(esposto.substr(i, FINESTRA));
+      const flat = soloAlnum(testo);
+      for (let i = 0; i + FINESTRA <= flat.length; i++) {
+        const g = flat.substr(i, FINESTRA);
+        if (grams.has(g) && !dAlnum.includes(g)) return { reason };
+      }
+    }
+    return null;
+  }
+
   // Un link come lo si confronta: senza frammento né barra finale, dominio minuscolo.
   function chiaveLink(url) {
     const raw = String(url || '').trim();
