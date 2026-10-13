@@ -86,8 +86,9 @@ test('impostazione confermata con OK: la riga parla coi nomi delle Preferenze', 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 15_000 });
   await aspettaConfermaPronta(page);
   await page.evaluate(() => window.SN_CONFIRM_UI._test.scrollToEnd()).catch(() => {});
-  const stato = await page.evaluate(() => window.SN_CONFIRM_UI._test.state());
-  await clickConfirm(page, stato && stato.okDisabled === undefined && !stato.hasOk ? 'danger' : 'ok').catch(() => clickConfirm(page, 'danger'));
+  console.log('CONFERMA:', JSON.stringify(await page.evaluate(() => window.SN_CONFIRM_UI._test.state())));
+  const cliccato = await page.evaluate(() => window.SN_CONFIRM_UI._test.click('ok') || window.SN_CONFIRM_UI._test.click('danger'));
+  expect(cliccato).toBe(true);
   await expect.poll(async () => (await app.evaluate(async () => globalThis.SN_STORAGE.getSettings())).security.blockPopups).toBe(false);
   await page.locator('.dash-activity-head').first().click();
   const righe = page.locator('.dash-activity-row');
