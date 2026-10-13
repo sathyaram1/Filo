@@ -1897,10 +1897,11 @@
     };
 
     const downloadBtn = mkBtn(I18n.t('qr_download'), true);
-    downloadBtn.addEventListener('click', () => downloadQrPng(matrix, quiet, url));
+    downloadBtn.addEventListener('click', (e) => { if (gestoVero(e)) downloadQrPng(matrix, quiet, url); });
 
     const copyBtn = mkBtn(I18n.t('qr_copy_link'), false);
-    copyBtn.addEventListener('click', async () => {
+    copyBtn.addEventListener('click', async (e) => {
+      if (!gestoVero(e)) return;
       try {
         await navigator.clipboard.writeText(url);
       } catch (_) {
