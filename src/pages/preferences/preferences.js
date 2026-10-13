@@ -1097,7 +1097,7 @@
       if (vuole('tts.rate')) {
         const rate = Number(tts.rate) || 1;
         $('ttsRate').value = String(rate);
-        $('ttsRateVal').textContent = rate.toFixed(1) + '×';
+        $('ttsRateVal').textContent = unDecimale(rate) + '×';
       }
       if (vuole('tts.pitch')) {
         const pitch = Number(tts.pitch) || 1;
