@@ -364,10 +364,18 @@
     const reason = 'contiene un dato che hai scritto in chat';
     for (const t of datiScritti(testo)) if (esposto.includes(t) && !suo(t)) return { reason };
     // Un numero lungo conta anche a pezzi di nove cifre: «+39 347…» scritto, «347…» nell'URL.
+    const pezziFuori = new Set();
+    for (const r of fuori.cifre) {
+      for (const run of r.split(' ')) for (let i = 0; i + CIFRE_PEZZO <= run.length; i++) pezziFuori.add(run.substr(i, CIFRE_PEZZO));
+    }
     for (const c of cifreScritte(testo)) {
-      for (let i = 0; i + Math.min(c.length, CIFRE_PEZZO) <= c.length; i++) {
-        const p = c.substr(i, Math.min(c.length, CIFRE_PEZZO));
-        if (fuori.cifre.some((r) => r.includes(p)) && !suo(p)) return { reason };
+      if (c.length < CIFRE_PEZZO) {
+        if (fuori.cifre.some((r) => r.includes(c)) && !suo(c)) return { reason };
+        continue;
+      }
+      for (let i = 0; i + CIFRE_PEZZO <= c.length; i++) {
+        const p = c.substr(i, CIFRE_PEZZO);
+        if (pezziFuori.has(p) && !suo(p)) return { reason };
       }
     }
     if (esposto.length >= FINESTRA) {
