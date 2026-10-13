@@ -335,7 +335,7 @@
     }
     return out;
   }
-  const DOPO_LA_PAROLA = /\b(?:password|passwd|pwd|passphrase|passcode|parola d'ordine|parola chiave|pin|codice|chiave)\b[^\n.;]{0,40}?(?:\s(?:è|e'|era|is)\s|:|=)\s*["'«“]?([^\s"'»”,;]+)/g;
+  const DOPO_LA_PAROLA = /\b(?:password|passwd|pwd|passphrase|passcode|parola d'ordine)\b[^\n.;]{0,40}?(?:\s(?:è|e'|era|is)\s|:|=)\s*["'«“]?([^\s"'»”,;]+)/g;
 
   // Un numero scritto a gruppi («+39 347 123 4567») è un numero solo; in un URL le cifre contano anche spezzate da
   // pochi caratteri («?a=347&b=1234567»), come per ciò che esce (formeDi).
