@@ -134,6 +134,8 @@
     // niente da disfare.
     let precedente = null;
     let inCorso = false;
+    // Un salvataggio chiesto mentre un altro è in viaggio (Invio e subito una ricarica): parte appena quello torna.
+    let ancora = false;
 
     // I limiti li sa solo chi collega: scriverli anche nell'HTML li fa
     // divergere. Servono al passo delle frecce e ai lettori di schermo, non
