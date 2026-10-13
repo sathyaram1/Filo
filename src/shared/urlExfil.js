@@ -347,7 +347,7 @@
     const out = [];
     const prendi = (re, soloCifre) => {
       for (const m of testo.matchAll(re)) {
-        const coda = testo.slice(m.index + m[0].length, m.index + m[0].length + 200).split(/[\n.,;!?]/)[0];
+        const coda = testo.slice(m.index + m[0].length, m.index + m[0].length + 200).split(/\n|[.,;!?](?=\s|$)/)[0];
         for (const w of coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO)) {
           const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
           const cifre = /\d/.test(t);

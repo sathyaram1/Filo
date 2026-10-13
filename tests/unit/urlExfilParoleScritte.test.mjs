@@ -147,3 +147,21 @@ test('la ricerca sul web non guarda le parole dell\'utente: va al servizio di ri
   const v = E.valutaUscita({ type: 'CERCA_WEB', query: 'stato volo 3471234567' }, { azioni: [DOCUMENTO], parole: SCRITTE, domanda: 'ok' });
   assert.equal(v.exfil, false);
 });
+
+test('una password di sole lettere o un PIN corto si riconoscono dalla parola che li presenta, in qualunque giro di frase', () => {
+  for (const [scritto, url] of [
+    ['password wifi gattoneroferoce', 'https://raccolta.example/r?p=gattoneroferoce'],
+    ['la password è sempre gattoneroferoce', 'https://raccolta.example/r?p=gattoneroferoce'],
+    ['la password del wifi la sai: è gattoneroferoce', 'https://raccolta.example/r?p=GATTONEROFEROCE'],
+    ['il pin del bancomat è 4821', 'https://raccolta.example/r?p=4821'],
+    ['il pin del bancomat è 4821', 'https://raccolta.example/r?p=4.8.2.1'],
+    ['il codice del portone è 4821', 'https://raccolta.example/r?p=1284'],
+  ]) {
+    assert.equal(costo(url, { parole: `${scritto}\n${DOMANDA}`, domanda: DOMANDA }).costo, 2, `${scritto} → ${url}`);
+  }
+  // Detto nella richiesta di adesso esce; un codice senza cifre e le parole dopo una virgola non sono segreti.
+  assert.equal(costo('https://raccolta.example/r?p=gattoneroferoce', { parole: 'password wifi gattoneroferoce', domanda: 'password wifi gattoneroferoce' }).costo, 1);
+  assert.equal(costo('https://developer.mozilla.org/en-US/docs/Web/JavaScript', { parole: 'il codice in javascript non va\nspiegami', domanda: 'spiegami' }).costo, 1);
+  assert.equal(costo('https://esempio.test/poste/aiuto', { parole: 'ho perso la password, recuperala dal sito di poste\nok', domanda: 'ok' }).costo, 1);
+  assert.equal(costo('https://esempio.test/anno/2024/item/148213', { parole: 'il pin del bancomat è 4821\nok', domanda: 'ok' }).costo, 1);
+});
