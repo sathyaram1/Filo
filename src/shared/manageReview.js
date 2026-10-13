@@ -1455,14 +1455,53 @@
     });
   }
 
+  /** Chi ci lavora l'ha rimandata all'owner perché si finisce solo in locale? PURA. */
+  function chiedeLavoroLocale(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    const norm = normalizeStatus(fb);
+    return norm.status === 'design' && String(norm.statusReason || '') === 'locale';
+  }
+
+  const L3_LOCALE = 'Richiede lavoro locale';
+
+  // Il rombo azzurro (#1060): lo stato basta a dirlo, quindi si colora anche prima che arrivi il documento intero.
+  function livelloL3Locale(fb, l, letto) {
+    const nota = judgesNote(fb);
+    const righe = (nota && nota.text) ? [riga('In breve', nota.text)] : [];
+    if (!letto) {
+      return forma('l3', 'rombo', L3_LOCALE, 'locale', 'nonletto', {
+        titolo: L3_LOCALE, righe,
+        testo: 'Il resto di questa segnalazione non è ancora arrivato: il perché lo scrive chi ci ha lavorato.',
+        azioni: [],
+      });
+    }
+    const domanda = ultimaDomanda(fb);
+    if (domanda && domanda.ts) righe.push(riga('Quando', istanteDelTurno(domanda.ts)));
+    const conversazioneCifrata = valueUnreadable(fb && fb.notes);
+    const perche = conversazioneCifrata ? TESTO_CIFRATO : ((domanda && domanda.body) || '');
+    const testoL = l ? String(l.testo || '').trim() : '';
+    const segnalazione = !testoL || perche.includes(testoL) ? ''
+      : (valueUnreadable(l.testo) ? TESTO_CIFRATO : testoL);
+    return forma('l3', 'rombo', L3_LOCALE, 'locale', 'locale', {
+      titolo: L3_LOCALE,
+      righe,
+      testo: perche && segnalazione ? `## ${L3_LOCALE}\n${perche}\n\n## Segnalazione\n${segnalazione}`
+        : (perche || segnalazione),
+      illeggibile: conversazioneCifrata && !segnalazione,
+      azioni: [],
+    });
+  }
+
   function livelloL3(fb, opts) {
     const attesa = aspettaRisposta(fb);
-    // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
-    if (opts && opts.dettaglioLetto === false) {
-      return nonLetto('l3', 'rombo', attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
-    }
+    const letto = !(opts && opts.dettaglioLetto === false);
     const l = livelliOf(fb).l3;
     const segnalato = !!(l && String(l.esito || '').trim());
+    if (chiedeLavoroLocale(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto);
+    // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
+    if (!letto) {
+      return nonLetto('l3', 'rombo', attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
+    }
     const titolo = !attesa ? 'Segnalazione di Claude'
       : segnalato ? 'Domande e segnalazione di Claude' : 'Domande di Claude';
     const domanda = attesa ? ultimaDomanda(fb) : null;
