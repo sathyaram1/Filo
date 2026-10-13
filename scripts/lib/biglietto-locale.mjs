@@ -198,7 +198,7 @@ export async function trovaBiglietto({ env, cwd, deps = {} } = {}) {
 export async function rigaSporco(cosa, motivi, opts = {}) {
   const testo = `${cosa}: ${motivi.join('; ')}`;
   const r = await sporca(testo, opts);
-  if (r.senzaBiglietto) return 'Nessun biglietto della sessione: era già non fidata.';
+  if (r.senzaBiglietto) return `Nessun biglietto trovato da qui, quindi niente sporcato: ciò che scrivi da questo repo nasce non fidato, ma se la sessione ne ha uno in un altro repo dichiaralo da lì con node scripts/biglietto.mjs sporca "${cosa}".`;
   if (r.sporcati) return `Biglietto della sessione sporcato (${motivi.join('; ')}): da qui ciò che scrivi nasce non fidato.`;
   return `Biglietto NON sporcato (${r.errori.join('; ')}): dichiaralo con node scripts/biglietto.mjs sporca "${cosa}".`;
 }
