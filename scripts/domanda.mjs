@@ -277,8 +277,14 @@ export async function esegui(argv, io = {}) {
       if (r.altre) scrivi(`\nCe ne sono altre oltre le prime ${(r.domande || []).length}: il server non le ha mandate tutte.`);
       return 0;
     }
+    // Col token del proprietario il server non distingue una sessione dall'owner: la sessione lo dice, col suo biglietto,
+    // e le sue parole prendono la fiducia del biglietto invece di valere come dell'owner.
+    const daSessione = async () => {
+      const s = await bigliettoLocale();
+      return s ? { sessione: true, biglietto: s } : { sessione: true };
+    };
     if (a.cmd === 'archivia' || a.cmd === 'riapri') {
-      const r = await chiama({ op: a.cmd, id: a.id });
+      const r = await chiama(Object.assign({ op: a.cmd, id: a.id }, await daSessione()));
       scrivi(`OK: ${a.id} è ${visibile((r.domanda && r.domanda.stato) || '?')}.`);
       return 0;
     }
