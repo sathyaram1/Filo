@@ -137,6 +137,8 @@ test('sporca: il biglietto della sessione, col motivo, e nessun altro; senza big
     assert.equal(s.biglietti[SEGRETO('a')].fiducia, 'non_fidato');
     assert.equal(s.biglietti[SEGRETO('b')].fiducia, 'fidato', 'l’altra sessione aperta non ha letto niente: resta pulita');
     assert.deepEqual(await B.sporca('pagina web', { env: {}, cwd: dir, deps: s.deps }), { sporcati: 0, errori: [], senzaBiglietto: true }, 'senza il nome della sessione non sporca le altre');
+    // Una sessione che all'avvio non ha preso il biglietto non registra col biglietto pulito di un'altra.
+    assert.deepEqual(await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), env: { CLAUDE_CODE_SESSION_ID: 'senza' }, cwd: dir, deps: { ...s.deps, commitDelRamo: () => [] } }), { ok: false, senzaBiglietto: true });
     assert.equal(s.biglietti[SEGRETO('b')].fiducia, 'fidato');
     assert.equal((await B.sporca('  ', { env: sessA, cwd: dir, deps: s.deps })).errori.length, 1, 'il motivo è obbligatorio');
     const giu = await B.sporca('x', { env: sessA, cwd: dir, deps: server({}, { rompi: true }).deps });
