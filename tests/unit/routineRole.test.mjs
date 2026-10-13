@@ -8,6 +8,7 @@
 //   scritto dal dispatcher venga ritrovato da chi accoda — anche da una cartella
 //   di lavoro separata — e che un marcatore vecchio non firmi feedback altrui.
 
+import '../helpers/senzaSessione.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
