@@ -25,7 +25,6 @@ async function ownerPronto() {
 const TECNICO = /callable|walletCreateInvites|walletGrant|walletUserDetail|INTERNAL|PERMISSION_DENIED|\b(4\d\d|5\d\d)\b|[{}]|fetch failed|ECONN/i;
 
 test('se il server non risponde, «Genera» lo dice con una frase e non con la risposta del server', async () => {
-  test.fail(true, 'il modulo dei codici mostra ancora la risposta tecnica del server');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {
@@ -45,7 +44,6 @@ test('se il server non risponde, «Genera» lo dice con una frase e non con la r
 });
 
 test('se il server non risponde, «Regala» lo dice con una frase e non con la risposta del server', async () => {
-  test.fail(true, 'il modulo del regalo mostra ancora la risposta tecnica del server');
   test.setTimeout(240_000);
   const filo = await ownerPronto();
   try {

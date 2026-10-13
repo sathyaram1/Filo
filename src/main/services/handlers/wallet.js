@@ -639,7 +639,11 @@ module.exports = function register(on, ctx) {
   // ── Owner ─────────────────────────────────────────────────────────────────
   const ownerOnly = (fn) => filoOnly(async (msg) => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
-    try { return { ok: true, ...(await fn(msg)) }; } catch (e) { return { ok: false, error: String(e?.message || e) }; }
+    try { return { ok: true, ...(await fn(msg)) }; } catch (e) {
+      // Il codice di rete dice se la richiesta è partita: la pagina lo usa per sapere se un regalo può essere arrivato.
+      const rete = e && e.cause && e.cause.code ? ` (${e.cause.code})` : '';
+      return { ok: false, error: String(e?.message || e) + rete };
+    }
   });
   on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await callable('walletOverview', {}, { asOwner: true }) })));
   on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => {

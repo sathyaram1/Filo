@@ -443,6 +443,40 @@ test('un numero lasciato a metà parte da solo, si vede finché non è partito, 
   expect(configDoc.dailyCredits).toBe(250);
 });
 
+// #666 — le uscite che non toccano il campo: ricaricare la pagina o chiudere la scheda col cursore ancora dentro
+// buttavano via il numero, in silenzio. Nessun tasto, nessun clic altrove: Playwright non fa perdere il fuoco.
+test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda col cursore ancora nel campo', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+
+  await page.fill('#knob-dailyCredits', '500');
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
+  expect(patch.length).toBe(0);
+  await page.reload();
+  await expect.poll(() => configDoc.dailyCredits, { timeout: 10_000 }).toBe(500);
+  expect(patch.map((p) => p.valori)).toEqual([{ dailyCredits: 500 }]);
+  // La pagina ricaricata mostra il numero che il server ha adesso.
+  await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
+  await expect(page.locator('#knob-dailyCredits')).toHaveValue('500', { timeout: 15_000 });
+
+  await page.fill('#knob-entryCredits', '4200');
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-entryCredits');
+  const shell = await primaFinestra(app);
+  const chiusa = await shell.evaluate(async () => {
+    const t = (await window.filoShell.tabs.snapshot()).tabs.find((x) => String(x.url || '').includes('owner.html'));
+    if (!t) return false;
+    await window.filoShell.tabs.close(t.id);
+    return true;
+  });
+  expect(chiusa).toBe(true);
+  await expect.poll(() => configDoc.entryCredits, { timeout: 10_000 }).toBe(4200);
+  // Spedito il numero, la pagina chiusa se ne va davvero.
+  await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents()
+    .some((w) => !w.isDestroyed() && w.getURL().includes('owner.html'))), { timeout: 5000 }).toBe(false);
+});
+
 // Il tasto destro è centrale in Filo: su una riga della tabella deve offrire
 // quello che si vuole fare a QUELLA persona. Prima si apriva il menu generale
 // della pagina, che della riga non sa niente.
