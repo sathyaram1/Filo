@@ -106,4 +106,7 @@ test('anche i numeri scritti senza Intl: millisecondi, caratteri e valori con de
   assert.equal(K.fraseCambio({ chiave: 'barraLaterale.uscitaMs', prima: 400, dopo: 1500 }), 'tempo prima che la barra laterale si chiuda: 400 ms → 1.500 ms');
   assert.equal(K.fraseCambio({ chiave: 'contestoFilo.giorni', prima: 3, dopo: 0.5 }), 'giorni di conversazioni che la chat ricorda: 3 giorni → 0,5 giorni');
   assert.equal(K.fraseCambio({ chiave: 'tts.rate', prima: 1, dopo: 1.25 }), 'velocità di lettura: 1× → 1,25×');
+  assert.equal(P.buildPreferencePartial('velocita_lettura', '1,5').label, 'Velocità lettura → 1,5×');
+  assert.equal(P.buildPreferencePartial('velocita_lettura', '1,25').label, 'Velocità lettura → 1,25×');
+  assert.equal(P.buildPreferencePartial('tono_lettura', '1,3').label, 'Tono lettura → 1,3');
 });
