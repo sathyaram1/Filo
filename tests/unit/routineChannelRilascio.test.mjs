@@ -401,6 +401,27 @@ describe('release da riga di comando', () => {
       assert.ok(g(origin, ['ls-tree', '--name-only', 'worker/13']).includes('nato-da-shell.txt'), 'il file è arrivato su origin col rilascio');
     } finally { srv.close(); }
   });
+
+  test('la sessione che lancia il file a mano non entra nella prova: niente consumo nel rilascio, niente cartella nel deposito', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { base, work } = scena();
+    const sessione = resolve(base, 'sessione-che-lancia.jsonl');
+    writeFileSync(sessione, '', 'utf8');
+    const prima = { FILO_ROUTINE: process.env.FILO_ROUTINE, FILO_TRANSCRIPT: process.env.FILO_TRANSCRIPT };
+    Object.assign(process.env, { FILO_ROUTINE: '1', FILO_TRANSCRIPT: sessione });
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/14']);
+      const r = await cli(['release', 'tkt-cli', '--senza-push', '--senza-rapporto'], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
+      });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
+      assert.equal(g(work, ['status', '--porcelain']), '');
+    } finally {
+      for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      srv.close();
+    }
+  });
 });
 
 // ─── Giro 2 della verifica (16/09/2026): il lease dopo un fetch ─────────────
