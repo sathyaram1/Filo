@@ -16,6 +16,7 @@
 //     2) che il lanciatore trovi davvero tutti i file, anche in sottocartelle,
 //        e funzioni lanciato da una cartella qualsiasi.
 
+import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
