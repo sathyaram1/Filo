@@ -3118,7 +3118,13 @@ class TabManager {
   // `navigazione`: la navigazione è già partita, e il gesto che la porta Permessi l'ha messo da parte.
   _esternoDallaPagina(wc, tabId, url, referrer, { navigazione = false } = {}) {
     const invito = Boolean(globalThis.SN_WALLET?.isInviteDeepLink?.(url));
-    if (!invito && !isOsDelegatedScheme(url)) return;
+    if (!invito && !isOsDelegatedScheme(url)) {
+      // Il clic dell'utente su un indirizzo fermato (zoommtg:, ms-teams:…) lo dice (#482); quello che la pagina tenta da sola resta muto.
+      if (Permessi.perUnaFinestra(wc, url, referrer) || (navigazione && (Permessi.gestoPerLaNavigazione(wc) || Permessi.navigazioneDaGesto(wc)))) {
+        avvisaIndirizzoFermato(url, this.win);
+      }
+      return;
+    }
     // Per l'invito il clic che ha fatto partire la navigazione lo conta `invitoFermato`, che lo spegne all'arrivo (#664).
     const gesto = Permessi.perUnaFinestra(wc, url, referrer) || (!invito && navigazione && Permessi.gestoPerLaNavigazione(wc));
     // L'invito scelto dall'utente (anche dal menu di Filo, che alla pagina non dà il gesto) lo porta dentro Filo.

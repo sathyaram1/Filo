@@ -65,10 +65,11 @@ test('la posta va al programma di posta sia aprendo una scheda nuova sia rinavig
   await expect.poll(() => esterni(app), { timeout: 6000 }).toEqual(['mailto:a@b.it', 'mailto:c@d.it?subject=Ciao']);
   await shell.waitForTimeout(500);
   expect((await schede(app)).some((u) => /google\.[a-z]+\/search/.test(u)), 'la posta non diventa una ricerca').toBe(false);
-  await expect((await avvisi()).locator('.shell-notif', { hasText: 'bloccat' })).toHaveCount(0);
+  await expect(shell.locator('.shell-notif', { hasText: 'bloccat' })).toHaveCount(0);
 });
 
-test('un collegamento di Filo (risposta in chat, «Apri in nuova scheda») verso un file lo dice', async ({ app, avvisi }) => {
+test('un collegamento di Filo (risposta in chat, «Apri in nuova scheda») verso un file lo dice', async ({ app, shell, avvisi }) => {
+  await shell.waitForFunction(() => !!window.filoShell);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.apriDaCollegamento('file:///home/utente/foto.jpg'));
   await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: /home/utente/foto.jpg')).toBeVisible({ timeout: 8000 });
 });
@@ -90,12 +91,47 @@ test('esplora: pagina interna e pagina web', async ({ app, shell, avvisi, testSe
     tm._esternoDallaPagina = (...a) => { globalThis.__visti.push(['esterno', a[2]]); return orig(...a); };
   });
   const page = await openTab(testServer.html(`<title>Web</title>
-    <a id="f" href="file:///tmp/dal-sito.pdf" style="display:block;width:300px;height:40px">file</a>
-    <a id="z" href="zoommtg://zoom.us/join?confno=1" style="display:block;width:300px;height:40px">zoom</a>
-    <a id="d" href="data:text/html,ciao" style="display:block;width:300px;height:40px">data</a>
-    <a id="fb" href="file:///tmp/dal-sito-blank.pdf" target="_blank" style="display:block;width:300px;height:40px">file blank</a>`));
-  for (const sel of ['#f', '#z', '#d', '#fb']) { await page.click(sel); await page.waitForTimeout(700); }
+    <a id="f" href="file:///tmp/dal-sito.pdf" style="position:fixed;left:0;top:0;width:300px;height:40px">file</a>
+    <a id="z" href="zoommtg://zoom.us/join?confno=1" style="position:fixed;left:0;top:50px;width:300px;height:40px">zoom</a>
+    <a id="d" href="data:text/html,ciao" style="position:fixed;left:0;top:100px;width:300px;height:40px">data</a>
+    <a id="fb" href="file:///tmp/dal-sito-blank.pdf" target="_blank" style="position:fixed;left:0;top:150px;width:300px;height:40px">file blank</a>`));
+  for (const y of [20, 70, 120, 170]) {
+    await page.mouse.click(30, y);
+    await page.waitForTimeout(900);
+    console.log('DOPO', y, JSON.stringify(await app.evaluate(() => globalThis.__visti)));
+  }
+  await page.evaluate(() => { setTimeout(() => { location.href = 'file:///tmp/senza-gesto.pdf'; }, 1500); });
+  await page.waitForTimeout(2500);
   console.log('VISTI', JSON.stringify(await app.evaluate(() => globalThis.__visti)));
   const testi = await (await avvisi().catch(() => null))?.locator('.shell-notif').allInnerTexts().catch(() => []);
   console.log('AVVISI', JSON.stringify(testi));
+});
+
+test('esplora: pagina interna', async ({ app, shell, avvisi }) => {
+  await shell.waitForFunction(() => !!window.filoShell);
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    globalThis.__visti = [];
+    const orig = tm.apriDaCollegamento.bind(tm);
+    tm.apriDaCollegamento = (...a) => { globalThis.__visti.push(['collegamento', a[0]]); return orig(...a); };
+  });
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://newtab')), { timeout: 10000 }).toBe(true);
+  const interna = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+  await interna.waitForLoadState('domcontentloaded');
+  console.log('INTERNA', interna && interna.url());
+  await interna.evaluate(() => { window.open('file:///tmp/interna-open.pdf'); });
+  await interna.waitForTimeout(1200);
+  await interna.evaluate(() => {
+    const a = document.createElement('a'); a.href = 'file:///tmp/interna-link.pdf'; a.id = 'xx'; a.textContent = 'LINK';
+    a.style.cssText = 'position:fixed;left:0;top:0;width:300px;height:60px;z-index:99999;background:red;display:block';
+    document.body.appendChild(a);
+  });
+  await interna.mouse.click(30, 30);
+  await interna.waitForTimeout(1200);
+  await interna.evaluate(() => { location.href = 'file:///tmp/interna-location.pdf'; });
+  await interna.waitForTimeout(1200);
+  console.log('VISTI-INT', JSON.stringify(await app.evaluate(() => globalThis.__visti)));
+  const testi = await shell.locator('.shell-notif').allInnerTexts().catch(() => []);
+  console.log('AVVISI-INT', JSON.stringify(testi));
 });
