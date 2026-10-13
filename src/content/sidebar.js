@@ -58,6 +58,7 @@
       rawUserMessages: [],
       feedbackShown: false,
       webSearchCount: 0,
+      documentiCount: 0,
     };
   }
   // Cap difensivo: anche se il prompt dice "max 2", l'AI potrebbe insistere.
@@ -80,6 +81,7 @@
     root.remove();
     root = null;
     history = [];
+    documenti = null;
     collapsed = false;
     aiPrefersOpen = false;
     session = null;
@@ -89,6 +91,7 @@
     if (isOpen()) return;
     if (root) close();
     history = [];
+    documenti = null;
     ripiegoDetto = false;
     ripiegoDaDire = '';
     collapsed = false;
@@ -651,6 +654,21 @@
       if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
         return { kind: 'web_search', query: obj.query.trim().slice(0, 300) };
       }
+      // Output speciale: un documento dell'utente (#947.3). Anche detto come l'azione della chat della home, che
+      // il modello conosce: da qui la cerca il main, col sì dato fuori dalla pagina.
+      const cercaDoc = obj.action === 'documenti' ? obj
+        : (obj.action === 'filo' && obj.filo && String(obj.filo.type || '').toUpperCase() === 'CERCA_DOCUMENTI' ? obj.filo : null);
+      if (cercaDoc) {
+        const cosa = cercaDoc.cosa ?? cercaDoc.query ?? cercaDoc.testo;
+        if (typeof cosa === 'string' && cosa.trim()) {
+          return {
+            kind: 'documenti',
+            cosa: cosa.trim().slice(0, 500),
+            cartella: typeof cercaDoc.cartella === 'string' ? cercaDoc.cartella.trim().slice(0, 2000) : '',
+            display: typeof obj.text === 'string' ? obj.text : '',
+          };
+        }
+      }
       // Output speciale: comando della shell di Filo (icone della barra in alto).
       // Eseguito in autonomia, senza coinvolgere l'utente. "close" è escluso.
       if (obj.action === 'shell' && typeof obj.command === 'string') {
@@ -717,12 +735,17 @@
           .slice(0, 5)
           .map((c) => ({ label: c.label.trim(), prompt: c.prompt.trim() }));
       }
+      // Il documento da mostrare dopo una ricerca: il numero del candidato (o più d'uno, al massimo tre).
+      const file = (Array.isArray(obj.file) ? obj.file : [obj.file])
+        .map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
+        .filter((n, i, a) => a.indexOf(n) === i).slice(0, 3);
       return {
         display: typeof obj.text === 'string' ? obj.text : '',
         highlight,
         choices,
         status,
         collapse: collapseFlag,
+        file,
       };
     } catch (_) {
       return fallback;
@@ -900,6 +923,159 @@
 
     // #590 — un blocco muto sembra un guasto: la lista dei siti bloccati si dice.
     return scriviEsito(label, action, res);
+  }
+
+  // ---------- Documenti dell'utente (#947.3) ----------
+  // La ricerca la fa il main, su un sito solo dopo il sì nel popup di Filo sopra la scheda. Qui arrivano nomi,
+  // cartelle coi nomi di Filo e chiavi a caso: le chiavi restano in questo mondo, nel documento del sito c'è il bottone.
+  const MAX_DOCUMENTI_PER_SESSIONE = 4;
+  const NOTA_DOCUMENTI = 'ho cercato fra i documenti dell\'utente come avevi chiesto; i candidati te li rimando qui sotto come '
+    + 'contenuto esterno, fra le marcature. Procedi ora con il JSON normale e, se uno è quello giusto, aggiungi "file": <il suo numero>';
+  let documenti = null;
+  let letturaDocumenti = null;
+
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.AIUTO_DOCUMENTI_AVANZAMENTO || !letturaDocumenti) return;
+      letturaDocumenti(Number(msg.fatti) || 0, Number(msg.totali) || 0);
+    });
+  } catch (_) {}
+
+  const breve = (t, max) => { const s = String(t || ''); return s.length > max ? `${s.slice(0, max - 1)}…` : s; };
+
+  // La riga che dice quanti documenti nuovi sta leggendo l'indice, con «Ferma»: compare solo se la lettura c'è.
+  function rigaLettura() {
+    let riga = null;
+    let testo = null;
+    const aggiorna = (fatti, totali) => {
+      if (!totali) return;
+      if (!riga) {
+        riga = appendActionLog('');
+        if (!riga) return;
+        riga.classList.add('sn-sidebar-log-intera');
+        testo = document.createElement('span');
+        const ferma = document.createElement('button');
+        ferma.type = 'button';
+        ferma.className = 'sn-sidebar-log-ferma';
+        ferma.textContent = 'Ferma';
+        ferma.title = 'Cerca solo fra quelli già letti';
+        ferma.addEventListener('click', (e) => {
+          if (!gestoVero(e)) return;
+          ferma.disabled = true;
+          Promise.resolve().then(() => chrome.runtime.sendMessage({ type: MSG.AIUTO_DOCUMENTI_FERMA })).catch(() => {});
+        });
+        riga.textContent = '· ';
+        riga.append(testo, ' ', ferma);
+      }
+      testo.textContent = `leggo i documenti nuovi: ${Math.min(fatti, totali)} di ${totali}`;
+    };
+    return { aggiorna, togli: () => { if (riga) riga.remove(); } };
+  }
+
+  // La riga dice cosa cerca; finita la ricerca, la stessa riga dice com'è andata.
+  async function cercaDocumenti(p) {
+    const riga = appendActionLog(`cerco fra i tuoi documenti «${breve(p.cosa, 80)}»`);
+    const lettura = rigaLettura();
+    letturaDocumenti = lettura.aggiorna;
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({ type: MSG.AIUTO_CERCA_DOCUMENTI, cosa: p.cosa, cartella: p.cartella || '' });
+    } catch (_) { r = null; }
+    if (letturaDocumenti === lettura.aggiorna) letturaDocumenti = null;
+    lettura.togli();
+    const esito = !r || !r.ok
+      ? `ricerca fra i documenti ${r && r.annullata ? 'annullata' : 'non riuscita'}`
+      : (r.cartellaMancante ? `cartella non trovata: ${breve(r.cartellaMancante, 80)}`
+        : `${esitoDocumenti(r)} fra i tuoi documenti «${breve(p.cosa, 60)}»${r.fermata ? ', fermata da te' : ''}`);
+    const fatta = riga || appendActionLog('');
+    if (fatta) {
+      fatta.textContent = `· ${esito}`;
+      fatta.classList.add('sn-sidebar-log-intera');
+    }
+    return r;
+  }
+
+  function esitoDocumenti(r) {
+    const n = Array.isArray(r.candidati) ? r.candidati.length : 0;
+    return n ? (n === 1 ? 'uno trovato' : `${n} trovati`) : 'nessuno trovato';
+  }
+
+  // I documenti da mostrare sotto la risposta: quelli che indica col numero; se non ne indica, quelli che nomina.
+  function fileDaMostrare(parsed, dopoDocumenti) {
+    const candidati = (documenti && documenti.candidati) || [];
+    if (!candidati.length) return [];
+    if (parsed.file && parsed.file.length) return parsed.file.map((n) => candidati.find((c) => c.n === n)).filter(Boolean);
+    if (!dopoDocumenti) return [];
+    const detto = String(parsed.display || '').toLowerCase();
+    return candidati.filter((c) => c.nome && detto.includes(String(c.nome).toLowerCase())).slice(0, 3);
+  }
+
+  async function azioneFile(btn, type, c, fallita) {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type, chiave: c.chiave }); } catch (_) { r = null; }
+    if (r && r.ok) return true;
+    const frase = (r && r.frase) || fallita;
+    btn.title = frase;
+    appendActionLog(`${breve(c.nome, 60)}: ${frase}`)?.classList.add('sn-sidebar-log-intera');
+    return false;
+  }
+
+  // Il tasto destro sul bottone apre il menu di Filo con queste voci (content.js, fileSotto).
+  const azioniDelFile = new WeakMap();
+  function fileSotto(el) {
+    if (!root || !el || !root.contains(el)) return null;
+    const btn = el.closest ? el.closest('.sn-sidebar-file') : null;
+    return (btn && azioniDelFile.get(btn)) || null;
+  }
+
+  // Un clic lo apre col programma del sistema; trascinato, è il file vero (la pagina lo riceve come da una cartella,
+  // per esempio nel campo per caricarlo); col tasto destro, anche «Mostra nella cartella».
+  function bottoneFile(c) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-file';
+    btn.draggable = true;
+    const icona = document.createElement('span');
+    icona.className = 'sn-sidebar-file-icona';
+    icona.setAttribute('aria-hidden', 'true');
+    const ICONE = global.SN_ICONS;
+    if (ICONE && typeof ICONE.readDocument === 'function') icona.innerHTML = ICONE.readDocument(15);
+    const nome = document.createElement('span');
+    nome.className = 'sn-sidebar-file-nome';
+    nome.textContent = c.nome || 'Documento';
+    btn.append(icona, nome);
+    if (c.dove) {
+      const dove = document.createElement('span');
+      dove.className = 'sn-sidebar-file-dove';
+      dove.textContent = c.dove;
+      btn.appendChild(dove);
+    }
+    btn.title = 'Apri, o trascinalo nella pagina';
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
+      azioneFile(btn, MSG.AIUTO_APRI_FILE, c, 'Il file non si è aperto');
+    });
+    btn.addEventListener('dragstart', (e) => {
+      // Il trascinamento lo fa il sistema col file vero: quello della pagina porterebbe solo il testo del bottone.
+      e.preventDefault();
+      if (!gestoVero(e)) return;
+      azioneFile(btn, MSG.AIUTO_TRASCINA_FILE, c, 'Non sono riuscito a prendere il file');
+    });
+    azioniDelFile.set(btn, [
+      { label: 'Apri', fn: () => azioneFile(btn, MSG.AIUTO_APRI_FILE, c, 'Il file non si è aperto') },
+      { label: 'Mostra nella cartella', fn: () => azioneFile(btn, MSG.AIUTO_MOSTRA_FILE, c, 'La cartella non si è aperta') },
+    ]);
+    return btn;
+  }
+
+  function mostraFile(afterEl, candidati) {
+    if (!afterEl || !candidati.length) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-files';
+    for (const c of candidati) wrap.appendChild(bottoneFile(c));
+    afterEl.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
   }
 
   // Un rifiuto spiegato dal main (uno stile oltre il tetto) arriva all'utente col
@@ -1217,7 +1393,7 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false } = {}) {
+  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false } = {}) {
     if (!root) return;
     const wasCollapsed = collapsed;
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
@@ -1338,6 +1514,50 @@
         return;
       }
 
+      // Caso speciale: un documento dell'utente (#947.3). La ricerca la fa il main; il turno dopo il modello ha i
+      // candidati e ne indica uno col numero.
+      if (parsed.kind === 'documenti') {
+        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        if (parsed.display) {
+          appendChatMessage('assistant', parsed.display);
+          history.push({ role: 'assistant', content: parsed.display });
+        }
+        history.push({ role: 'assistant', content: `(ho chiesto di cercare fra i documenti dell'utente: "${Esterno.perCanaleSistema(parsed.cosa)}")` });
+        if (session && session.documentiCount >= MAX_DOCUMENTI_PER_SESSIONE) {
+          appendActionLog('ricerca fra i documenti: limite raggiunto, ignorata');
+          setTimeout(() => submit({
+            userAction: 'limite di ricerche fra i documenti raggiunto per questa conversazione. Rispondi ora con il JSON normale usando solo ciò che già sai',
+            preActionUrl: location.href,
+          }), 50);
+          return;
+        }
+        if (session) session.documentiCount += 1;
+        const r = await cercaDocumenti(parsed);
+        if (!r || !r.ok) {
+          if (r && r.annullata) {
+            history.push({
+              role: 'user',
+              kind: 'action',
+              content: PROMPTS.turnoAutomaticoAiuto({ nota: 'l\'utente non ha dato l\'OK alla ricerca fra i suoi documenti: non riproporla se non te la richiede lui', perCronologia: true }),
+            });
+          }
+          expand({ ai: true });
+          diciRipiego();
+          return;
+        }
+        documenti = { cercato: r.cercato, candidati: Array.isArray(r.candidati) ? r.candidati : [] };
+        // Il main rimette i candidati interi; questi, senza chiavi, sono quelli che la cronologia ricorda.
+        const perCronologia = {
+          cercato: r.cercato,
+          risultati: documenti.candidati.map(({ chiave, ...c }) => c),
+          indice: r.indice || null,
+          fermata: !!r.fermata,
+          cartellaMancante: r.cartellaMancante || '',
+        };
+        setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: location.href, dopoDocumenti: true }), 50);
+        return;
+      }
+
       // Caso speciale: l'AI vuole azionare un comando rapido della barra di Filo
       // (le icone in alto: home, impostazioni, app, account, schermo intero,
       // riduci a icona). Lo eseguiamo in autonomia, come per reveal/hover, senza
@@ -1418,7 +1638,8 @@
       // Se il modello non ha messo testo ma c'è solo un highlight di routine,
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
       // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
-      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : '(risposta vuota)');
+      const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
+      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
       assistantEl = appendChatMessage('assistant', displayText);
 
       // Aggiorna la storia AI
@@ -1438,6 +1659,8 @@
       if (parsed.choices && parsed.choices.length) {
         renderChoices(assistantEl, parsed.choices);
       }
+      // Dopo le scelte: inserito subito sotto il messaggio, il documento resta sopra di loro.
+      mostraFile(assistantEl, daMostrare);
 
       // Highlight. Il tooltip on-page usa SOLO highlight.note (testo dedicato),
       // non il "text" della chat: evita di duplicare il messaggio nel riquadrino.
@@ -1607,7 +1830,7 @@
     });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata };
+  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata, fileSotto };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
   global.__filoSidebarTest = {

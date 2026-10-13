@@ -1261,6 +1261,50 @@
     for (const v of Object.keys(CARTELLE_DI_SERIE)) {
       if (!cartelleSalvate.includes(v)) box.appendChild(rigaCartella(v, { tolta: true }));
     }
+    const cercate = $('documentiCercate');
+    if (cercate) {
+      const occasionali = statoDocumenti && Array.isArray(statoDocumenti.occasionali) ? statoDocumenti.occasionali : [];
+      cercate.textContent = '';
+      for (const o of occasionali) cercate.appendChild(rigaOccasionale(o));
+      cercate.hidden = !occasionali.length;
+    }
+  }
+
+  // #947.3 — una cartella fuori elenco in cui l'utente ha chiesto di cercare: Filo tiene quello che ne ha già letto,
+  // e qui lo si vede e lo si dimentica.
+  function rigaOccasionale(o) {
+    const row = document.createElement('div');
+    row.className = 'mem-riga doc-occasionale';
+    row.dataset.occasionale = o.percorso;
+    const t = document.createElement('span');
+    t.className = 'mem-testo';
+    t.textContent = o.nome || o.percorso;
+    const dove = document.createElement('span');
+    dove.className = 'doc-dove';
+    const n = Number(o.documenti) || 0;
+    const quanti = n === 1 ? 'un documento già letto' : `${n.toLocaleString('it-IT', { useGrouping: true })} documenti già letti`;
+    dove.textContent = `${o.percorso} · ci hai cercato tu · ${quanti}${o.esiste ? '' : ' · ora non c\'è'}`;
+    t.appendChild(dove);
+    row.appendChild(t);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mem-via';
+    b.textContent = '×';
+    b.title = 'Dimentica';
+    b.setAttribute('aria-label', `Dimentica i documenti letti in ${o.nome || o.percorso}`);
+    b.addEventListener('click', () => dimenticaCartella(b, o.percorso));
+    row.appendChild(b);
+    return row;
+  }
+
+  async function dimenticaCartella(b, percorso) {
+    b.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_DIMENTICA, percorso }); } catch (_) { r = null; }
+    const hint = $('documentiHint');
+    if (hint) hint.textContent = r && r.ok && r.tolta ? 'Dimenticata' : 'Non c\'era più: ecco com\'è adesso';
+    flashSaved('documentiHint');
+    await caricaStatoDocumenti();
   }
 
   function scriviStatoDocumenti() {
@@ -1291,6 +1335,8 @@
     const elenco = Array.from(new Set(nuovo));
     disegnaCartelle(elenco);
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { documenti: { cartelle: elenco } } });
+    const hint = $('documentiHint');
+    if (hint) hint.textContent = 'Salvato';
     flashSaved('documentiHint');
     setTimeout(caricaStatoDocumenti, 400);
   }
@@ -1299,7 +1345,12 @@
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_SCEGLI_CARTELLA }); } catch (_) { r = null; }
     if (!r || !r.ok || !r.percorso) return;
-    if ((cartelleSalvate || []).includes(r.percorso)) { flashSaved('documentiHint'); return; }
+    if ((cartelleSalvate || []).includes(r.percorso)) {
+      const hint = $('documentiHint');
+      if (hint) hint.textContent = 'Salvato';
+      flashSaved('documentiHint');
+      return;
+    }
     await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
   }
 

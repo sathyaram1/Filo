@@ -337,4 +337,11 @@ function ritiraConferma(event, d) {
   if (c) c.ritira(wc, event.senderFrame || null, Number(d && d.id));
 }
 
-module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, registraFinestraDelSito, pulisci };
+// Una domanda che fa il main per una scheda: il sì vale solo se dato qui, perché lo chiede per conto di qualcosa
+// che sta nella pagina (l'Aiuto) e la pagina premerebbe un bottone suo.
+function chiediDalMain(wc, richiesta) {
+  const c = wc && !wc.isDestroyed() ? confermeDi(wc, { crea: true }) : null;
+  return c ? c.chiedi(wc, null, { ...richiesta, scriveva: false, campo: false }) : Promise.resolve(false);
+}
+
+module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, chiediDalMain, registraFinestraDelSito, pulisci };

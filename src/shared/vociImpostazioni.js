@@ -57,9 +57,11 @@
         contestoToken: 'contestoFilo.token',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle' },
+      altrove: { documentiCercate: 'cartelleCercate' },
       fuori: {},
       messaggi: {
         DOCUMENTI_STATO: 'CERCA_DOCUMENTI',
+        DOCUMENTI_DIMENTICA: 'IMPOSTA_PREFERENZA',
         DOCUMENTI_SCEGLI_CARTELLA: 'apre la finestra del sistema per scegliere una cartella: dalla chat la cartella si dice col suo percorso (cartelle_documenti)',
         FILO_MEMORY_VIEW: 'DIMENTICA',
         FILO_MEMORY_FORGET: 'DIMENTICA',
@@ -160,6 +162,12 @@
       nome: 'permessi dei siti (risposte ricordate)',
       come: 'TOGLI_PERMESSO_SITO per toglierne una',
       parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti rete file cartelle consentito negato',
+    },
+    // #947.3 — le cartelle fuori elenco in cui l'utente ha cercato: l'indice ne tiene i documenti già letti.
+    cartelleCercate: {
+      nome: 'cartelle dei documenti dove hai cercato una volta (Filo tiene i documenti già letti)',
+      come: 'IMPOSTA_PREFERENZA chiave cartelle_documenti, valore "togli <cartella>" per fargliele dimenticare',
+      parole: 'cartelle cartella documenti ricerca cercato cercata indice archivio letti dimentica',
     },
   };
 
