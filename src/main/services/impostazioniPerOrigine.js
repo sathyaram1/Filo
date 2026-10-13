@@ -15,6 +15,8 @@ const CAMPI_WEB = Object.freeze({
     saturazione_tab: true, luminosita_tab: true, opacita_tab: true,
   }),
   blocklist: true,
+  // #975 — come i siti esclusi: a ogni frame solo la voce del suo sito.
+  menuDelSito: true,
   featureFlags: Object.freeze({ spellcheck: true }),
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),
   // Quanto restano gli avvisi di Filo dentro la pagina: la durata delle Preferenze vale anche lì.
@@ -133,6 +135,7 @@ function impostazioniPerWeb(settings, indirizzi = []) {
   if (!settings || typeof settings !== 'object') return settings;
   const out = proietta(settings, CAMPI_WEB);
   if (own(out, 'blocklist')) out.blocklist = esclusiDelSito(out.blocklist, indirizzi);
+  if (own(out, 'menuDelSito')) out.menuDelSito = esclusiDelSito(out.menuDelSito, indirizzi);
   return out;
 }
 
