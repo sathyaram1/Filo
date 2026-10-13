@@ -720,12 +720,12 @@
         if (editableEl) {
           const blueIssue = SpellCheck.getSemanticIssueAt(editableEl, e.clientX, e.clientY);
           if (blueIssue) {
-            await openSpellBlueMenu(editableEl, blueIssue, e);
+            await openSpellBlueMenu(editableEl, blueIssue, e, sito);
             return;
           }
           const wordCtx = SpellCheck.getWordAt(editableEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
-            await openSpellWordMenu(editableEl, wordCtx, e);
+            await openSpellWordMenu(editableEl, wordCtx, e, sito);
             return;
           }
         }
@@ -741,12 +741,12 @@
         if (inputEl && isTextLikeInput(inputEl)) {
           const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
-            await openSpellWordMenu(inputEl, wordCtx, e);
+            await openSpellWordMenu(inputEl, wordCtx, e, sito);
             return;
           }
           // Nessuna parola sotto il cursore (es. click su area vuota): menu
           // normale, che riserva comunque lo slot per il nativo se arriva.
-          await openNormalMenuAt(e);
+          await openNormalMenuAt(e, sito);
           return;
         }
       }
@@ -754,7 +754,7 @@
       console.error('[SN] spellcheck detection fallita, apro menu normale:', err);
     }
 
-    await openNormalMenuAt(e);
+    await openNormalMenuAt(e, sito);
   }
 
   // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
@@ -786,7 +786,7 @@
     return true;
   }
 
-  async function openNormalMenuAt(e) {
+  async function openNormalMenuAt(e, sito = null) {
     // Timestamp del click destro: serve a onNextNativeSuggestion per decidere
     // se il broadcast `_spell:native` arrivato durante l'await sotto è già
     // pertinente a questa apertura del menu (altrimenti lo perdevamo).
@@ -857,6 +857,7 @@
       });
     };
 
+    conMenuDelSito(items, sito);
     Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
 
     if (wantCorrection) {
@@ -1529,7 +1530,7 @@
   // La logica di prefetch proattivo (al completamento di una parola durante la
   // digitazione e dopo gli scan blu) sta in spellcheck.js — qui ci limitiamo a
   // consumare la cache e a coprire i casi non prefetchati.
-  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent) {
+  async function openSpellWordMenu(editableEl, wordCtx, mouseEvent, sito = null) {
     const items = await buildBaseItemsAt(mouseEvent);
 
     const cached = SpellCheck.getCachedSuggestion(editableEl, wordCtx.word);
@@ -1594,6 +1595,7 @@
       );
     }
 
+    conMenuDelSito(items, sito);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
 
     // Rivela/aggiorna la riga di correzione con `corr` (e relative alternative).
@@ -1661,7 +1663,7 @@
   // Click destro su un range "blu" (issue contestuale già rilevata): la correzione
   // (o l'esplicazione del problema) è già pronta, niente loading. Click sulla riga
   // = applica; freccetta = box con la spiegazione completa.
-  async function openSpellBlueMenu(editableEl, issue, mouseEvent) {
+  async function openSpellBlueMenu(editableEl, issue, mouseEvent, sito = null) {
     const items = await buildBaseItemsAt(mouseEvent);
 
     // Etichetta della riga: la correzione, se c'è; altrimenti una sintesi della spiegazione.
@@ -1689,6 +1691,7 @@
       },
       { type: 'separator' },
     );
+    conMenuDelSito(items, sito);
     Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
   }
 
