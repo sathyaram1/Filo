@@ -61,10 +61,6 @@ const PORTE_784 = {
   catalogoModelli: ['DEFAULT_MODELS_LIST', { provider: 'openrouter' }],
   elencoFornitori: ['DEFAULT_PROVIDERS_LIST', {}],
 };
-const messaggiDa = (MSG, porte) => Object.fromEntries(Object.entries(porte).map(([nome, [k, resto]]) => {
-  if (!MSG[k]) throw new Error(`messaggio sconosciuto: ${k}`);
-  return [nome, { type: MSG[k], ...resto }];
-}));
 
 test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', async ({ app, shell }) => {
   void shell; // attende il boot: il dispatcher dev'essere montato
