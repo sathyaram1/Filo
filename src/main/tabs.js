@@ -18,6 +18,7 @@ const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
+const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
