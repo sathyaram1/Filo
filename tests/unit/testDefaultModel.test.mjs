@@ -92,7 +92,8 @@ registerAi((type, fn) => handlers.set(type, fn), {
   modelGate,
 });
 
-const testModel = (msg) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg);
+const DA_FILO = 'filo://admin-defaults/admin-defaults.html';
+const testModel = (msg, origin = DA_FILO) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg, { url: origin }, origin);
 const testProvider = (msg) => handlers.get(MSG.TEST_PROVIDER)(msg);
 
 beforeEach(() => {
