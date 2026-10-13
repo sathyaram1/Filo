@@ -132,8 +132,16 @@ try {
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
     const clic = Date.now();
-    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser.
-    if (e.shiftKey) { riservaSeLaPaginaTace(e, clic); return; }
+    // Il clic rigirato dalla voce «Menu di <sito>» è del sito (#975): se il sito tace, compare quello del browser.
+    if (menuDelSito && menuDelSito.passaAlSito()) { riservaSeLaPaginaTace(e, clic); return; }
+    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sul sito dove l'utente
+    // ha dato il tasto destro al menu del sito i due si scambiano, e senza un menu del sito resta quello di Filo.
+    const sitoPrima = !!(menuDelSito && menuDelSito.primo === true);
+    if (e.shiftKey !== sitoPrima) {
+      if (sitoPrima) filoSeLaPaginaTace(e, clic);
+      else riservaSeLaPaginaTace(e, clic);
+      return;
+    }
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
