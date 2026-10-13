@@ -66,7 +66,8 @@ function aiuto(app, incognito) {
   }, incognito);
 }
 
-test('PDF da file locale: Alt+H apre l\'Aiuto e Alt+S salva e chiude', async ({ app }) => {
+test('PDF da file locale: Alt+H apre l\'Aiuto e Alt+S salva e chiude', async ({ app, shell }) => {
+  await shell.waitForLoadState?.();
   const dir = cartellaTemporanea('pdf-locale-');
   const file = path.join(dir, 'manuale locale.pdf');
   writeFileSync(file, pdfMinimo('Manuale locale'));
