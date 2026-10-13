@@ -712,7 +712,7 @@
         // Come «Altra voce: scrivi il nome…» della pagina: un nome fuori catalogo si salva com'è scritto.
         const nome = testoVisibile(s);
         if (!nome) return null;
-        if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${nome.length} caratteri e il massimo è ${VOCE_MAX}` };
+        if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${cifre(nome.length)} caratteri e il massimo è ${VOCE_MAX}` };
         return { partial: { tts: { modelVoice: nome } }, label: `Voce naturale → "${nome}" (nome scritto a mano)` };
       },
     },
