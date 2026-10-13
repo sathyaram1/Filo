@@ -1,10 +1,11 @@
 // biglietto.mjs — il biglietto della sessione locale (SPEC-DOMANDE.md §1.2). Lo prende l'hook di avvio; da qui ci si
 // dichiara sporchi, si legge lo stato, si chiude. Nessuna strada per tornare puliti né per «segna fidato» (§1.4).
-// Le op e il file stanno in scripts/lib/biglietto-locale.mjs.
+// Le op e il file stanno in scripts/lib/biglietto-locale.mjs; `gancio` e `consegna` sono del gancio delle letture esterne.
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import * as B from './lib/biglietto-locale.mjs';
+import { gancio } from './lib/letture-esterne.mjs';
 
 export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"] | sporca "<motivo>" | stato | chiudi';
 
@@ -12,7 +13,8 @@ export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"]
 export function leggiArgomenti(argv) {
   const a = (Array.isArray(argv) ? argv : []).map(String);
   const cmd = a[0] || '';
-  if (cmd === 'stato' || cmd === 'chiudi' || cmd === 'avvio') return a.length === 1 ? { cmd } : { errore: `${cmd} non vuole altro. ${USO}` };
+  if (cmd === 'stato' || cmd === 'chiudi' || cmd === 'avvio' || cmd === 'gancio') return a.length === 1 ? { cmd } : { errore: `${cmd} non vuole altro. ${USO}` };
+  if (cmd === 'consegna') return { cmd, motivo: a.slice(1).join(' ').trim() };
   if (cmd === 'sporca') {
     const motivo = a.slice(1).join(' ').trim();
     return motivo ? { cmd, motivo } : { errore: `sporca vuole il motivo: cosa hai letto che il server non vede. ${USO}` };
@@ -39,6 +41,17 @@ async function main() {
   const args = leggiArgomenti(process.argv.slice(2));
   if (args.errore) { console.error(args.errore); return 2; }
 
+  if (args.cmd === 'gancio') {
+    // PostToolUse: annota e lancia la consegna in sottofondo, senza aspettarla. Sempre uscita 0, niente da dire.
+    gancio({ input: await leggiStdin() });
+    return 0;
+  }
+  if (args.cmd === 'consegna') {
+    // In sottofondo, lanciata dal gancio: oltre il tetto dell'avvio si lascia lo sporco annotato alla prossima occasione.
+    setTimeout(() => process.exit(0), B.TETTO_AVVIO_MS).unref();
+    for (const b of B.trovaBiglietti()) await B.consegnaSporchi(b, { aggiunta: args.motivo });
+    return 0;
+  }
   if (args.cmd === 'avvio') {
     // L'hook di avvio: una riga, sempre uscita 0, anche col server giù.
     const r = await B.avvio({ input: await leggiStdin() });
@@ -63,9 +76,10 @@ async function main() {
       console.error('Nessun biglietto trovato da qui, quindi niente sporcato: ciò che scrivi da questo repo nasce non fidato, ma se la sessione ne ha uno in un altro repo dichiaralo da lì.');
       return 1;
     }
-    if (r.errori.length) console.error(`Non sporcati: ${r.errori.join('; ')}`);
     if (r.sporcati) console.log(`Biglietto sporcato (${r.sporcati}): da qui ciò che scrivi nasce non fidato.`);
-    return r.errori.length && !r.sporcati ? 1 : 0;
+    if (r.inAttesa) console.log(`Server non raggiunto (${r.errori.join('; ')}): lo sporco è annotato in locale e parte alla prossima occasione; intanto ciò che scrivi nasce non fidato.`);
+    else if (r.errori.length) console.error(`Non sporcati: ${r.errori.join('; ')}`);
+    return r.sporcati || r.inAttesa ? 0 : 1;
   }
   if (args.cmd === 'stato') {
     const trovati = B.trovaBiglietti();
@@ -73,6 +87,7 @@ async function main() {
     const b = await B.trovaBiglietto();
     console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}`);
     if (b.errore) console.log(`Stato non letto: ${b.errore}`);
+    if (b.inAttesa) console.log(`Letture esterne annotate solo in locale, non ancora ricevute dal server: ${b.inAttesa}.`);
     const motivi = (b.stato && Array.isArray(b.stato.sporcatoDa)) ? b.stato.sporcatoDa : [];
     for (const m of motivi) console.log(`  - ${new Date(Number(m.at) || 0).toISOString()} ${String(m.motivo || '').replace(/[\u0000-\u001f\u007f]/g, ' ')}`);
     return 0;
@@ -87,6 +102,6 @@ async function main() {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().then((code) => { process.exitCode = code; }, (e) => {
     console.error(`biglietto: ${String((e && e.message) || e)}`);
-    process.exitCode = process.argv[2] === 'avvio' ? 0 : 1;
+    process.exitCode = ['avvio', 'gancio', 'consegna'].includes(process.argv[2]) ? 0 : 1;
   });
 }

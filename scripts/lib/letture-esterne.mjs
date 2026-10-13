@@ -2,7 +2,7 @@
 // strumenti portano dentro testo che il server non vede, e il gancio PostToolUse che lo annota. Non decide la fiducia
 // (la tiene il server) e non blocca mai uno strumento. Prove: tests/unit/lettureEsterne.test.mjs.
 
-import { realpathSync, spawn } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { spawn as avviaProcesso } from 'node:child_process';
 import { homedir } from 'node:os';
 import path from 'node:path';
@@ -76,18 +76,20 @@ function canonicoVero(p) {
 export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform } = {}) {
   const win = sistema === 'win32';
   const P = win ? path.win32 : path.posix;
-  const radici = [B.radiceRepo(cwd), B.radiceCondivisa(cwd), String(env.CLAUDE_PROJECT_DIR || '').trim()].filter(Boolean);
-  const server = radici.length ? cartellaDelServer(radici[radici.length > 1 ? 1 : 0]) : '';
+  const comune = B.radiceCondivisa(cwd);
+  const radici = [B.radiceRepo(cwd), comune, String(env.CLAUDE_PROJECT_DIR || '').trim()].filter(Boolean);
+  const server = comune ? cartellaDelServer(comune) : '';
   const claude = [P.join(homedir(), '.claude'), String(env.CLAUDE_CONFIG_DIR || '').trim()].filter(Boolean);
   const cartelle = [...radici, ...(server ? [P.dirname(server)] : []), ...claude].map((c) => canonicoVero(P.resolve(c)));
   const file = radici.map((r) => canonicoVero(P.join(P.dirname(P.resolve(r)), 'LOCAL.md')));
   return { cwd, win, cartelle: [...new Set(cartelle)], file: [...new Set(file)], canonico: canonicoVero };
 }
 
-/** Lancia in sottofondo la consegna dello sporco annotato accanto al biglietto `percorso`: chi chiama non aspetta. */
-export function avviaConsegna(percorso, { env = process.env } = {}) {
+/** Lancia in sottofondo la consegna dello sporco annotato accanto al biglietto `percorso` (più `motivo`, se annotarlo
+ * non è riuscito): chi chiama non aspetta. */
+export function avviaConsegna(percorso, { env = process.env, motivo = '' } = {}) {
   const script = fileURLToPath(new URL('../biglietto.mjs', import.meta.url));
-  const figlio = avviaProcesso(process.execPath, [script, 'consegna'], {
+  const figlio = avviaProcesso(process.execPath, [script, 'consegna', ...(motivo ? [motivo] : [])], {
     detached: true, stdio: 'ignore', windowsHide: true, env: { ...env, [B.ENV_FILE]: percorso },
   });
   figlio.on('error', () => {});
@@ -112,8 +114,9 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
     for (const b of biglietti) {
       // Già sporco sul server: da sporco non si torna, e una chiamata in più non cambia niente.
       if (B.sporcoSulServer(b)) continue;
-      B.annotaSporco(b, motivo, nowMs);
-      avvia(b.path, { env });
+      let annotato = true;
+      try { B.annotaSporco(b, motivo, nowMs); } catch (_) { annotato = false; }
+      avvia(b.path, { env, motivo: annotato ? '' : motivo });
     }
     return { esito: 'annotato', motivo };
   } catch (e) {

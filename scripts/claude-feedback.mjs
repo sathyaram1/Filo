@@ -198,7 +198,8 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // Nasce col documento: il server alla nascita la vede e non la fa decidere al giudice (#914).
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
-      ...(b && b.fp ? { bigliettoLocale: b.fp } : {}),
+      // Uno sporco rimasto solo in locale il server non lo vede: senza biglietto il feedback nasce non fidato.
+      ...(b && b.fp && !b.inAttesa ? { bigliettoLocale: b.fp } : {}),
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
