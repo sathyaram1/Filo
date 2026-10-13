@@ -408,6 +408,11 @@ module.exports = function register(on, ctx) {
     return { ok: true, tolte: tolte.length };
   }));
 
+  on(MSG.FILO_CONVERSAZIONE_APP_RINOMINA, soloFilo(async (msg) => ({
+    ok: true,
+    rinominate: await globalThis.SN_CONVERSAZIONI_APP.rinomina({ app: msg.app, rif: msg.rif, prefisso: msg.prefisso, soggetto: msg.soggetto }),
+  })));
+
   on(MSG.FILO_RIGHE_APP, soloFilo(async (msg) => (
     { ok: true, righe: await globalThis.SN_CONVERSAZIONI_APP.righe({ chat: msg.chat || null }) })));
 
