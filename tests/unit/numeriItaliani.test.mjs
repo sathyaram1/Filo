@@ -102,7 +102,7 @@ test('anche i numeri scritti senza Intl: millisecondi, caratteri e valori con de
   assert.equal(P.buildPreferencePartial('barra_attesa', '2,5 s').label, 'Attesa sul bordo prima che la barra si apra → 2.500 ms');
   assert.equal(P.buildPreferencePartial('barra_attesa', '9000 ms').rifiuto, '9.000 ms è fuori dai limiti: da 100 a 3.000 ms');
   assert.match(P.buildPreferencePartial('stile_agente', 'a'.repeat(1234)).rifiuto, /^lo stile è lungo 1\.234 caratteri e il massimo è /);
-  assert.match(P.vagliaLezione('a'.repeat(C.LESSON_MAX + 1000)).rifiuto, /^la lezione è lunga \d\.\d{3} caratteri/);
+  assert.match(P.lezioneDaAzione({ testo: 'a'.repeat(C.LESSON_MAX + 1000) }).rifiuto, /^la lezione è lunga \d\.\d{3} caratteri/);
   assert.equal(K.fraseCambio({ chiave: 'barraLaterale.uscitaMs', prima: 400, dopo: 1500 }), 'tempo prima che la barra laterale si chiuda: 400 ms → 1.500 ms');
   assert.equal(K.fraseCambio({ chiave: 'contestoFilo.giorni', prima: 3, dopo: 0.5 }), 'giorni di conversazioni che la chat ricorda: 3 giorni → 0,5 giorni');
   assert.equal(K.fraseCambio({ chiave: 'tts.rate', prima: 1, dopo: 1.25 }), 'velocità di lettura: 1× → 1,25×');
