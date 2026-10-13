@@ -1,5 +1,5 @@
 // Unit test di src/shared/campoNumero.js (SN_CAMPO_NUMERO) — la manopola
-// numerica delle sette impostazioni dei crediti (#652). Qui si prova la parte
+// numerica delle impostazioni dei crediti (#652). Qui si prova la parte
 // PURA: cosa è un numero buono e cosa si dice quando non lo è. La parte col
 // DOM la prova lo spec Playwright della pagina dell'owner.
 
