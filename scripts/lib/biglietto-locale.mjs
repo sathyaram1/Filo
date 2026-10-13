@@ -345,7 +345,8 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
     if (envFile) {
       try { writeFileSync(envFile, `export ${ENV_FILE}='${path.replace(/'/g, "'\\''")}'\n`, { flag: 'a', encoding: 'utf8' }); } catch (_) { /* resta la ricerca nella cartella */ }
     }
-    return { riga: `Biglietto della sessione: ${fiducia === 'fidato' ? 'pulito' : 'sporco'}${envFile ? '' : ' (CLAUDE_ENV_FILE assente: vale la cartella .claude/biglietti)'}.`, path };
+    const pulito = fiducia === 'fidato';
+    return { riga: `Biglietto della sessione: ${pulito ? 'pulito' : 'sporco'}${envFile ? '' : ' (CLAUDE_ENV_FILE assente: vale la cartella .claude/biglietti)'}.${pulito ? ` ${DICHIARA_SPORCO}` : ''}`, path };
   } catch (e) {
     // Una riga sola: l'hook stampa solo la prima, e un errore di rete porta con sé il corpo JSON della risposta.
     return { riga: `Biglietto della sessione non preso: ${String((e && e.message) || e).replace(/\s+/g, ' ').trim().slice(0, 160)}.` };
