@@ -146,10 +146,14 @@
   //   - altrimenti → ricerca Google.
   // La parte ":porta" è il motivo del fix #233: prima ogni "host:porta"
   // (localhost:3000, 127.0.0.1:8080, example.com:8443/admin) cadeva in ricerca.
+  // Indirizzi completi anche senza «//» (#482): diventati ricerca, la posta finiva su Google invece che al programma di
+  // posta, e un data:/javascript: sfuggiva all'avviso di chi lo ferma. Un altro «parola:» resta testo («ricetta: pasta»).
+  const SCHEMI_SENZA_BARRE = /^(?:mailto|tel|sms|data|javascript|file):/i;
+
   function normalizeUrl(input) {
     const raw = String(input || '').trim();
     if (!raw) return 'filo://newtab/';
-    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://')) return raw;
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://') || SCHEMI_SENZA_BARRE.test(raw)) return raw;
 
     // Isola la parte host[:porta] = tutto prima del primo separatore di path/query
     // (/, ?, #). Uno spazio interno significa "non è un indirizzo" → ricerca.
