@@ -283,7 +283,7 @@ async function leggiFile() {
     avvisa(testoIlleggibile(err, copia), CHIAVE_LETTURA);
     return;
   }
-  Disco.togliTemporanei(target).catch(() => {});
+  STATE.pulizia = Disco.togliTemporanei(target).catch(() => {});
   if (buf === null) {
     STATE.data = {};
     // Le prove automatiche (playwright.config.js) partono da un utente già accolto, da qualunque avvio: senza, la home
