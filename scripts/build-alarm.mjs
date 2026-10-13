@@ -221,6 +221,10 @@ export async function spedisciAllarme(name, text, chiavi = []) {
     const body = await res.json().catch(() => ({}));
     if (!res.ok || !body.ok) {
       console.error(`[allarme] non consegnato (${res.status}${body.reason ? ' ' + body.reason : ''}).`);
+      // In evidenza nella corsa: in coda al registro è rimasto cinque giorni senza che nessuno lo leggesse (#1210).
+      if (res.status === 401 || body.reason === 'bad_passphrase') {
+        console.error('::error::Allarme non consegnato: il server non riconosce FILO_BUILD_PASSPHRASE di questo lavoro. Va ricopiata, quella in uso, nell\'ambiente «rilascio» del repo: senza, nessun guasto della costruzione diventa un feedback e la pubblicazione non parte.');
+      }
       return false;
     }
     if (body.duplicate) {
