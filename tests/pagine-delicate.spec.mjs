@@ -22,7 +22,9 @@ async function modelliFinti(app) {
     };
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ messages }) => {
       const testo = JSON.stringify(messages);
-      globalThis.__mandato.push({ tipo: /Riassumi in italiano/.test(testo) ? 'riassunto' : 'altro', testo });
+      // La home si prepara da sola quando un modello c'è, e vede i titoli delle schede aperte: non è un lavoro di queste prove.
+      const tipo = /Riassumi in italiano/.test(testo) ? 'riassunto' : /preparare la dashboard/.test(testo) ? 'home' : 'altro';
+      globalThis.__mandato.push({ tipo, testo });
       return { text: 'Riassunto finto della pagina.', provider: 'openrouter', model: 'stub', usage: {} };
     };
   });
