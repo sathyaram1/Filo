@@ -95,6 +95,22 @@ test('la radice di React ascolta tutto: conta solo con un onContextMenu sul camm
   }
 });
 
+test('lo stesso ascoltatore sulla finestra per tanti eventi guarda i clic, non apre menu; uno suo accanto conta', () => {
+  const tutti = (e) => e;
+  const tipi = ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'click', 'auxclick', 'dblclick', 'contextmenu', 'touchstart'];
+  for (const t of tipi) finestra.addEventListener(t, tutti, true);
+  assert.equal(ascolta(), false);
+  const suo = () => {};
+  finestra.addEventListener('contextmenu', suo);
+  assert.equal(ascolta(), true);
+  finestra.removeEventListener('contextmenu', suo);
+  for (const t of tipi) finestra.removeEventListener(t, tutti, true);
+  // Pochi eventi con lo stesso ascoltatore restano un ascolto vero.
+  for (const t of ['pointerdown', 'pointerup', 'contextmenu']) finestra.addEventListener(t, tutti);
+  assert.equal(ascolta(), true);
+  for (const t of ['pointerdown', 'pointerup', 'contextmenu']) finestra.removeEventListener(t, tutti);
+});
+
 test('chi ascoltava e non ha mostrato niente non conta più, e il segreto non lo indovina chi non lo sa', () => {
   const f = () => {};
   finestra.addEventListener('contextmenu', f);

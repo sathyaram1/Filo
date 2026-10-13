@@ -13,7 +13,8 @@ const DISCENDENTI = 60;
 // sostituta di addEventListener che a chi la ispeziona sembra nativa, come nella guardia anti-fingerprint) e risponde
 // a due eventi dal nome segreto: «sul cammino di questo nodo qualcuno ascolta?» (preventDefault = sì) e «quello che
 // ascoltava qui non ha mostrato niente» (da lì in poi non conta). React iscrive la sua radice a tutti gli eventi:
-// conta solo se un elemento sul cammino ha davvero un onContextMenu.
+// conta solo se un elemento sul cammino ha davvero un onContextMenu. Lo stesso ascoltatore messo su finestra o documento
+// per tanti eventi diversi (registratori di sessione, gli strumenti dei test) guarda i clic, non apre menu.
 function sorgenteSonda(nome) {
   const n = JSON.stringify(String(nome));
   return `(function(){
@@ -24,6 +25,9 @@ function sorgenteSonda(nome) {
   var oAdd = EP.addEventListener, oRem = EP.removeEventListener;
   var ascolti = new WeakMap();
   var falliti = new WeakSet();
+  var tipiDi = new WeakMap();
+  var TIPI_GENERICO = 8;
+  var DOC = typeof document !== 'undefined' ? document : null;
   var mascherate = new WeakMap();
   function maschera(fn, orig, name) {
     var m = fn;
@@ -41,7 +45,19 @@ function sorgenteSonda(nome) {
     var b = m.get(f) & ~fase(o);
     if (b) m.set(f, b); else m.delete(f);
   }
+  function contaTipo(t, tipo, f) {
+    if ((t !== window && t !== DOC) || !f || typeof tipo !== 'string') return;
+    var v = tipiDi.get(f);
+    if (v === undefined) tipiDi.set(f, tipo);
+    else if (typeof v === 'string') { if (v !== tipo) tipiDi.set(f, new Set([v, tipo])); }
+    else v.add(tipo);
+  }
+  function generico(f) {
+    var v = tipiDi.get(f);
+    return !!v && typeof v !== 'string' && v.size >= TIPI_GENERICO;
+  }
   function segna(t, tipo, f, o) {
+    contaTipo(t, tipo, f);
     if (tipo !== 'contextmenu' || !f || (typeof f !== 'function' && typeof f !== 'object')) return;
     var s = o && typeof o === 'object' ? o.signal : null;
     if (s && s.aborted === true) return;
@@ -95,6 +111,11 @@ function sorgenteSonda(nome) {
       var nodo = cammino[i];
       var m = ascolti.get(nodo);
       if (!m || !m.size || falliti.has(nodo)) continue;
+      if (nodo === window || nodo === DOC) {
+        var proprio = false;
+        m.forEach(function (_b, f) { if (!generico(f)) proprio = true; });
+        if (!proprio) continue;
+      }
       if (radiceReact(nodo)) {
         if (react === null) react = reactConGestore(cammino);
         if (!react) continue;
