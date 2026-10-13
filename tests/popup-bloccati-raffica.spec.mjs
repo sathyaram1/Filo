@@ -9,7 +9,9 @@ const finestraBassa = (app) => app.evaluate(({ BrowserWindow }) => {
 const posa = (app) => app.evaluate(({ BrowserWindow }) => {
   const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
   const [W, H] = win.getContentSize();
-  return { b: win._filoTabs.avvisi.vista.getBounds(), W, H, alto: win._filoTabs._altezzaCornice(), schede: win._filoTabs.tabs.length };
+  const indirizzo = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  const pubblicita = win._filoTabs.tabs.filter((t) => /[?&]ad=/.test(indirizzo(t))).length;
+  return { b: win._filoTabs.avvisi.vista.getBounds(), W, H, alto: win._filoTabs._altezzaCornice(), pubblicita };
 });
 // Ogni pagina, al momento fissato, apre in un colpo solo `n` finestre pubblicitarie diverse: nessun gesto dell'utente.
 const raffica = (testServer, quando, n, titolo = 'Sito') => testServer.html(`<title>${titolo}</title><p>articolo</p><script>
@@ -24,7 +26,7 @@ test('una pagina che apre trenta popup insieme ha un avviso solo, in vista, e la
   await expect(carta).toBeVisible({ timeout: 8000 });
   await shell.waitForTimeout(800);
   await expect(vista.locator('.shell-notif')).toHaveCount(1);
-  expect((await posa(app)).schede, 'nessuna scheda pubblicitaria aperta').toBe(1);
+  expect((await posa(app)).pubblicita, 'nessuna scheda pubblicitaria aperta').toBe(0);
 
   await expect(carta.locator('.shell-notif-close')).toBeInViewport();
   await carta.locator('.shell-notif-close').click();
@@ -32,6 +34,11 @@ test('una pagina che apre trenta popup insieme ha un avviso solo, in vista, e la
 });
 
 test('dieci schede che aprono popup tutte insieme in una finestra bassa: pochi avvisi, dentro la pagina, tutti chiudibili', async ({ app, shell, testServer, avvisi }) => {
+  // Avvisi che restano finché l'utente non li chiude: il caso in cui una pila senza tetto cresce di più.
+  await shell.evaluate(() => window.filoShell.message({
+    type: 'update_settings',
+    settings: { notifications: { durationSec: 0, soundEnabled: false, sound: 'default' } },
+  }));
   await finestraBassa(app);
   const quando = Date.now() + 7000;
   for (let i = 0; i < 10; i++) {
@@ -53,7 +60,7 @@ test('dieci schede che aprono popup tutte insieme in una finestra bassa: pochi a
   // La più recente è in vista con la sua X; ogni altra si raggiunge scorrendo, e la sua X la chiude.
   await expect(vista.locator('.shell-notif').last().locator('.shell-notif-close')).toBeInViewport();
   for (let resto = 5; resto > 0; resto--) {
-    const x = vista.locator('.shell-notif:not([data-closing])').first().locator('.shell-notif-close');
+    const x = vista.locator('.shell-notif.show').first().locator('.shell-notif-close');
     await x.scrollIntoViewIfNeeded();
     await expect(x).toBeInViewport();
     await x.click();
