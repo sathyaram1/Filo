@@ -106,35 +106,42 @@ test('ricerca: FILO_BIGLIETTO_FILE vince; altrimenti quello col nome della sessi
   } finally { togliCartella(dir); }
 });
 
-test('fiducia della sessione: nessun biglietto o un guasto = non fidato; con più biglietti vale il più sporco', async () => {
+test('fiducia della sessione: nessun biglietto o un guasto = non fidato; lo sporco di un’altra sessione, anche finita, non conta', async () => {
   const dir = repo();
   try {
     const s = server({ [SEGRETO('a')]: { fiducia: 'fidato' }, [SEGRETO('b')]: { fiducia: 'non_fidato' } });
-    assert.equal(await B.fiduciaLocale({ env: {}, cwd: dir, deps: s.deps }), 'non_fidato', 'senza biglietto');
+    const sessA = { CLAUDE_CODE_SESSION_ID: 'a' };
+    assert.equal(await B.fiduciaLocale({ env: sessA, cwd: dir, deps: s.deps }), 'non_fidato', 'senza biglietto');
     scriviBiglietto(dir, 'a', SEGRETO('a'), FP('1'));
-    assert.equal(await B.fiduciaLocale({ env: {}, cwd: dir, deps: s.deps }), 'fidato');
+    assert.equal(await B.fiduciaLocale({ env: sessA, cwd: dir, deps: s.deps }), 'fidato');
     scriviBiglietto(dir, 'b', SEGRETO('b'), FP('2'));
-    assert.equal(await B.fiduciaLocale({ env: {}, cwd: dir, deps: s.deps }), 'non_fidato', 'vale il più sporco');
-    assert.equal((await B.trovaBiglietto({ env: {}, cwd: dir, deps: s.deps })).ticket, SEGRETO('b'));
-    assert.equal(await B.fiduciaLocale({ env: {}, cwd: dir, deps: server({}, { rompi: true }).deps }), 'non_fidato', 'server giù');
+    assert.equal(await B.fiduciaLocale({ env: sessA, cwd: dir, deps: s.deps }), 'fidato', 'il biglietto sporco di b, rimasto nella cartella, è di un’altra sessione');
+    assert.equal((await B.trovaBiglietto({ env: sessA, cwd: dir, deps: s.deps })).ticket, SEGRETO('a'));
+    assert.equal(s.chiamate.filter((c) => c.op === 'stato' && c.ticket === SEGRETO('b')).length, 0, 'al server si chiede solo il biglietto della sessione');
+    assert.equal(await B.fiduciaLocale({ env: {}, cwd: dir, deps: s.deps }), 'non_fidato', 'senza il nome della sessione');
+    assert.equal(await B.fiduciaLocale({ env: sessA, cwd: dir, deps: server({}, { rompi: true }).deps }), 'non_fidato', 'server giù');
   } finally { togliCartella(dir); }
 });
 
-test('sporca: tutti i biglietti della sessione, col motivo; senza biglietto lo dice; un guasto non lancia', async () => {
+test('sporca: il biglietto della sessione, col motivo, e nessun altro; senza biglietto lo dice; un guasto non lancia', async () => {
   const dir = repo();
   try {
     const s = server({ [SEGRETO('a')]: { fiducia: 'fidato' }, [SEGRETO('b')]: { fiducia: 'fidato' } });
-    assert.deepEqual(await B.sporca('pagina web', { env: {}, cwd: dir, deps: s.deps }), { sporcati: 0, errori: [], senzaBiglietto: true });
+    const sessA = { CLAUDE_CODE_SESSION_ID: 'a' };
+    assert.deepEqual(await B.sporca('pagina web', { env: sessA, cwd: dir, deps: s.deps }), { sporcati: 0, errori: [], senzaBiglietto: true });
     scriviBiglietto(dir, 'a', SEGRETO('a'), FP('1'));
     scriviBiglietto(dir, 'b', SEGRETO('b'), FP('2'));
-    const r = await B.sporca('pagina web', { env: {}, cwd: dir, deps: s.deps });
-    assert.equal(r.sporcati, 2);
-    assert.deepEqual(s.chiamate.filter((c) => c.op === 'sporca').map((c) => c.motivo), ['pagina web', 'pagina web']);
+    const r = await B.sporca('pagina web', { env: sessA, cwd: dir, deps: s.deps });
+    assert.equal(r.sporcati, 1);
+    assert.deepEqual(s.chiamate.filter((c) => c.op === 'sporca').map((c) => [c.ticket, c.motivo]), [[SEGRETO('a'), 'pagina web']]);
     assert.equal(s.biglietti[SEGRETO('a')].fiducia, 'non_fidato');
-    assert.equal((await B.sporca('  ', { env: {}, cwd: dir, deps: s.deps })).errori.length, 1, 'il motivo è obbligatorio');
-    const giu = await B.sporca('x', { env: {}, cwd: dir, deps: server({}, { rompi: true }).deps });
+    assert.equal(s.biglietti[SEGRETO('b')].fiducia, 'fidato', 'l’altra sessione aperta non ha letto niente: resta pulita');
+    assert.deepEqual(await B.sporca('pagina web', { env: {}, cwd: dir, deps: s.deps }), { sporcati: 0, errori: [], senzaBiglietto: true }, 'senza il nome della sessione non sporca le altre');
+    assert.equal(s.biglietti[SEGRETO('b')].fiducia, 'fidato');
+    assert.equal((await B.sporca('  ', { env: sessA, cwd: dir, deps: s.deps })).errori.length, 1, 'il motivo è obbligatorio');
+    const giu = await B.sporca('x', { env: sessA, cwd: dir, deps: server({}, { rompi: true }).deps });
     assert.equal(giu.sporcati, 0);
-    assert.equal(giu.errori.length, 2);
+    assert.equal(giu.errori.length, 1);
   } finally { togliCartella(dir); }
 });
 
