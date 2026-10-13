@@ -4,7 +4,7 @@
 
 import { realpathSync } from 'node:fs';
 import { spawn as avviaProcesso } from 'node:child_process';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as B from './biglietto-locale.mjs';
