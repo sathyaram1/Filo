@@ -1,5 +1,6 @@
 // Lavori server dalla cloud (#1159): l'aiutante di credenziali di git e la registrazione del ramo di filo-security.
 // L'aiutante risponde solo a https://github.com/sathyaram1/filo-security, e un no è uno stdout vuoto con uscita 0.
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
