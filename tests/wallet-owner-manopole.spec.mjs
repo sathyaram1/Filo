@@ -1,4 +1,4 @@
-// La pagina «Inviti e utenti» dell'owner (#652): le sette manopole dei crediti
+// La pagina «Inviti e utenti» dell'owner (#652): le manopole dei crediti
 // si cambiano da qui, i numeri che il server calcola si guardano e basta, e
 // ogni riga della tabella apre la scheda della persona.
 //
