@@ -17,7 +17,7 @@ process.env.FILO_REPO_ROOT = TMP;
 process.env.FILO_TOOLS_ROOT = REPO;
 process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
 
-const { cartellaCloneServer, cloneDentroIlRepo, testoLavoroServer, serverCtx } = await import('../../scripts/dispatch.mjs');
+const { cartellaCloneServer, cloneDentroIlRepo, testoLavoroServer, serverCtx, readRoleInstructions } = await import('../../scripts/dispatch.mjs');
 
 test('il clone del server non si committa: .gitignore lo esclude ovunque stia', () => {
   const righe = readFileSync(join(REPO, '.gitignore'), 'utf8').split(/\r?\n/).map((l) => l.trim());
