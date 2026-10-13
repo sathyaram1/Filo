@@ -763,7 +763,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: provaFallita(e) };
     }
-  });
+  }));
 
   // Catalogo modelli di un provider, recuperato dal main con le chiavi
   // predefinite: la pagina admin non vede mai le chiavi vere, quindi non può
