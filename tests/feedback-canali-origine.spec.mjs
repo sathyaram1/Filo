@@ -49,6 +49,20 @@ const SITO = { url: 'https://evil.example/pagina' };
 const SITO_CON_SCHEDA = { tab: { id: 1, url: 'https://evil.example/pagina' }, url: 'https://evil.example/pagina' };
 const PAGINA_DI_FILO = { url: 'filo://manage/manage.html' };
 
+// I codici d'invito del red team e le prove coi modelli predefiniti (#784.2): spendono le chiavi di Filo
+// o aprono il red team a chi vuole il sito. Passate come funzione: `app.evaluate` vuole dati serializzabili.
+const PORTE_784 = String((MSG) => ({
+  redteamGeneraCodici: { type: MSG.REDTEAM_GEN_CODES, count: 5 },
+  redteamElencoCodici: { type: MSG.REDTEAM_LIST_CODES },
+  redteamRevocaCodice: { type: MSG.REDTEAM_REVOKE_CODE, code: 'ABCD-EFGH' },
+  redteamApertoLettura: { type: MSG.REDTEAM_OPEN_GET },
+  redteamApertoScrittura: { type: MSG.REDTEAM_OPEN_SET, openToAll: true },
+  provaModelloScelto: { type: MSG.TEST_DEFAULT_MODEL, provider: 'openrouter', model: 'qualsiasi/modello' },
+  provaModelloPredefinito: { type: MSG.TEST_DEFAULT_MODEL, nickname: 'qualsiasi' },
+  catalogoModelli: { type: MSG.DEFAULT_MODELS_LIST, provider: 'openrouter' },
+  elencoFornitori: { type: MSG.DEFAULT_PROVIDERS_LIST },
+}));
+
 test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', async ({ app, shell }) => {
   void shell; // attende il boot: il dispatcher dev'essere montato
 
