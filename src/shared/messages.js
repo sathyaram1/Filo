@@ -763,6 +763,10 @@
     RIQUADRO_COOKIE_RITIRA: 'riquadro_cookie_ritira',   // main → pagina { token }
     RIQUADRO_COOKIE_AGGIORNA: 'riquadro_cookie_aggiorna', // main → riquadri: l'elenco o la modalità sono cambiati
     RIQUADRO_COOKIE_RISPOSTA: 'riquadro_cookie_risposta', // (pagina) { token, si } → { ok }
+    // #975 — il menu che un sito ha per il tasto destro. Il sito è quello del frame mittente, mai del messaggio.
+    MENU_DEL_SITO_APRI: 'menu_del_sito_apri',       // (pagina o riquadro) { x, y } → { ok, cliccato }
+    MENU_DEL_SITO_CAMBIA: 'menu_del_sito_cambia',   // (pagina o riquadro, tasto destro) { primo } → { ok }
+    MENU_DEL_SITO_ACCETTA: 'menu_del_sito_accetta', // (solo shell, «Sì» della proposta) { sito } → { ok }
     // Solo pagine filo:// (Sicurezza): cosa Filo ha fatto coi banner, sito per sito, nel profilo della finestra.
     COOKIES_SITES: 'cookies_sites',                 // {} → { ok, sites: [{ site, rejected, hidden, at }] }
     // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.
