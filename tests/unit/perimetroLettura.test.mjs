@@ -350,7 +350,7 @@ test('#1072.4 — un percorso di rete calcolato da un comando innocuo chiede un 
     "Join-Path '\\\\' 'evil\\x' | cd", "Join-Path -Path '\\\\' -ChildPath evil -AdditionalChildPath x | cd",
     'Split-Path -NoQualifier C:\\\\evil\\x | cd', "Split-Path -NoQualifier 'C:\\\\evil\\x' | Test-Path",
     'Split-Path C:\\\\evil\\x -NoQualifier | Test-Path', 'Split-Path -NoQualifier C:/\\evil/x | cd',
-    'Get-Date -Format "\'\'\\\\\\\\evil\\\\x" | Get-ChildItem', 'cd (Join-Path \'\\\\\' \'evil\\x\')',
+    'Get-Date -Format "\'\'\\\\\\\\evil\\\\x" | Get-ChildItem', 'cd (Split-Path -NoQualifier C:\\\\evil\\x)',
   ]) {
     const d = C.classifyDetail(cmd, WIN);
     assert.equal(d.level, 2, `"${cmd}" compone un percorso di rete: chiede un OK (è ${d.level})`);
