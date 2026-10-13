@@ -28,6 +28,7 @@
         'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
       ],
       fixes: [
+        'Dopo aver letto un documento o una pagina, Filo non apre più senza chiedertelo un link che contiene un dato che gli hai scritto in chat, come il numero di telefono o l\'indirizzo di casa: vedi l\'indirizzo intero e decidi tu. Se il dato sta nella richiesta che hai appena fatto, il link si apre subito.',
         'Su Windows, in fondo alla home, quando sei collegato al Wi-Fi vedi l\'icona del Wi-Fi col nome della rete. Prima mostrava un globo anche col Wi-Fi collegato.',
         'Filo vede ancora le foto che gli mandi in chat anche nei messaggi dopo, e puoi continuare a chiedergli di quello che c\'è dentro; riaprendo la chat le ritrovi anche tu. Prima dal secondo messaggio diceva di non vederle. Dopo una ventina di messaggi, o se riapri Filo, non le ha più davanti, ma sa che c\'erano e ti chiede di rimandarle se gli servono.',
         'Lettura ad alta voce e dettatura partono solo se Filo ammette tutti i fornitori che servono il modello. Prima ne bastava uno, e la tua voce poteva finire a quello escluso. Con un modello così Filo ti dice perché non parte, e lo vedi già quando lo scegli, nelle Opzioni o da «Detta» col tasto destro.',
