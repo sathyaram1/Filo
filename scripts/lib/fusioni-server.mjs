@@ -2,6 +2,8 @@
 // server:pubblica per tutti, poi la parte dell'app torna alle routine (mai prima del deploy). Niente qui decide la
 // fiducia: la controlla server-fondi-pratica. Regole: tests/unit/fusioniServer.test.mjs.
 
+import { USCITA_SOLO_APP } from '../server-fondi-pratica.mjs';
+
 const RAMO_RE = /^(claude|worker)\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 
 const numeroDi = (p) => (Number(p.subSeq) > 0 ? `${p.seq}.${p.subSeq}` : String(p.seq || p.feedbackId));
