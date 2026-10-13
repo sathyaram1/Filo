@@ -263,6 +263,36 @@ test('i giri prima del via libera sono i lanci del verificatore meno uno', () =>
   assert.equal(r.giri.media, (0 + 2 + 1) / 3);
 });
 
+// #532: dopo una fusione fallita il server riallinea il ramo e un verificatore controlla il rebase. Quel
+// lancio non segue una critica: contarlo farebbe sembrare bocciato un lavoro passato al primo colpo.
+test('il controllo dopo un riallineamento non è una critica', () => {
+  const r = S.compute({
+    range: S.rangeOf('30g', ORA),
+    feedbacks: [fb({ seq: 1, status: 'done' }), fb({ seq: 2, status: 'done' })],
+    workerLog: [
+      // #1: passato subito, poi un conflitto: riallineamento e il suo controllo
+      { role: 'verifier', startedAt: g(5), num: '1' },
+      { role: 'fixer', caso: 'riallineamento', startedAt: g(4), num: '1' },
+      { role: 'verifier', caso: 'riallineamento', startedAt: g(4), num: '1' },
+      // #2: una critica vera, poi lo stesso riallineamento
+      { role: 'verifier', startedAt: g(5), num: '2' },
+      { role: 'verifier', startedAt: g(4), num: '2' },
+      { role: 'fixer', caso: 'riallineamento', startedAt: g(3), num: '2' },
+      { role: 'verifier', caso: 'riallineamento', startedAt: g(3), num: '2' },
+    ],
+  });
+  const fette = Object.fromEntries(r.giri.fette.map((f) => [f.key, f.n]));
+  assert.equal(fette.g0, 1, '#1 è passato al primo colpo');
+  assert.equal(fette.g1, 1, '#2 ha avuto una critica sola');
+  assert.equal(r.giri.media, 0.5);
+  // Le barre per mestiere separano il riallineamento dal resto, e rendono conto del totale.
+  const perRuolo = Object.fromEntries(r.lanci.perRuolo.map((v) => [v.role, v.n]));
+  assert.equal(perRuolo.verifier, 3);
+  assert.equal(perRuolo['verifier:riallineamento'], 2);
+  assert.equal(perRuolo['fixer:riallineamento'], 2);
+  assert.equal(r.lanci.perRuolo.reduce((s, v) => s + v.n, 0), r.lanci.totale);
+});
+
 test('un lavoro fermato in attesa dell\'owner è una fetta sua e non sposta la media', () => {
   const r = S.compute({
     range: S.rangeOf('30g', ORA),
