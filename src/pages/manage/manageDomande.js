@@ -451,7 +451,7 @@
     };
     if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', 'Manda il testo (Ctrl+Invio)');
     tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
-    if (rispondibile) tasto('Archivia', 'archivia', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
+    if (rispondibile) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
     else if (d.esito && d.esito.archiviata) tasto('Riapri', 'riapri', 'sn-btn-secondary', 'Rimettila fra quelle da rispondere');
     box.appendChild(tasti);
     const a = avvisi.get(d.id);
@@ -863,7 +863,7 @@
       if (fai === 'testo') rispondi(id);
       else if (fai === 'consiglio') consiglioUna(id);
       else if (fai === 'discuti') discuti(id);
-      else if (fai === 'archivia') archivia(id, false);
+      else if (fai === 'chiudi') archivia(id, false);
       else if (fai === 'riapri') archivia(id, true);
     });
   }
