@@ -709,6 +709,7 @@
     // Il documento trovato dall'Aiuto (#947.3): le azioni di un file, non quelle della pagina.
     const file = self.SN_SIDEBAR?.fileSotto?.(realTarget(e));
     if (file) { Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
+    try { sitoSuo = MenuDelSito ? MenuDelSito.sonda(e, realTarget(e)) : null; } catch (_) { sitoSuo = null; }
 
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
