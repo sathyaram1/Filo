@@ -63,7 +63,7 @@
 
   // Messaggio che il main non conosce ancora, o funzione del server non pubblicata: non è un guasto da riprovare.
   function nonPubblicata(err) {
-    return /sconosciuto|non ancora pubblicat|not[ _-]?found/i.test(String(err || ''));
+    return /sconosciut|ancora pubblicat|not[ _-]?found/i.test(String(err || ''));
   }
 
   function cambia() {

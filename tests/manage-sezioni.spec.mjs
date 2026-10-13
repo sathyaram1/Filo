@@ -31,12 +31,12 @@ async function registraChiamate(page) {
 }
 const chiamate = (page) => page.evaluate(() => window.__chiamate.slice());
 
-test('la barra mostra le quattro sezioni e ogni scheda si apre dalla sua', async ({ openTab }) => {
+test('la barra mostra le sezioni e ogni scheda si apre dalla sua', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page);
 
   const sezioni = page.locator('.mg-sezione');
-  await expect(sezioni).toHaveCount(4);
+  await expect(sezioni).toHaveCount(3);
   expect((await sezioni.allInnerTexts()).map((t) => t.replace(/\s*\(.*\)$/, '').trim()))
     .toEqual(['Domande', 'Feedback', 'Routine']);
   // Si parte da Feedback: le sue schede si vedono, quelle delle altre sezioni no.
