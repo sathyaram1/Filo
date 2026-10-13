@@ -8,6 +8,7 @@
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const T = {
     elenco: MSG.DOMANDE_ELENCO || 'domande_elenco',
+    mostra: MSG.DOMANDA_MOSTRA || 'domanda_mostra',
     rispondi: MSG.DOMANDA_RISPONDI || 'domanda_rispondi',
     consiglio: MSG.DOMANDE_CONSIGLIO || 'domande_consiglio',
     archivia: MSG.DOMANDA_ARCHIVIA || 'domanda_archivia',
@@ -37,6 +38,8 @@
   // Quello che il dettaglio mostra: una domanda o un gruppo, per id fissati al clic, così una domanda appena risposta
   // resta a schermo col suo esito anche se lascia la scheda.
   let aperta = null;
+  // La domanda appena risposta: resta nel dettaglio finché non si cambia scheda o se ne apre un'altra.
+  let tieni = null;
   const scelte = new Set();
   const bozze = new Map();
   const avvisi = new Map();
@@ -165,7 +168,7 @@
     if (tab === 'domande') li.appendChild(casella([li.dataset.id], `Scegli ${li.dataset.id} per «Applica il consiglio»`));
     li.appendChild(el('span', 'mg-domanda-num', li.dataset.id));
     li.appendChild(el('span', 'mg-domanda-titolo', d.illeggibile ? 'Non si legge' : String(d.titolo || '(senza titolo)')));
-    if (tab === 'domande-archivio' || !PRIORITA[d.priorita]) li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
+    if (tab === 'domande-archivio') li.appendChild(el('span', 'mg-domanda-prio', PRIORITA[d.priorita] || ''));
     const data = quando(tab === 'domande-archivio' ? (d.modificataIl || d.creataIl) : d.creataIl);
     if (data) li.appendChild(el('span', 'mg-domanda-data', data));
     return li;
@@ -611,6 +614,7 @@
     if (r.ok) {
       if (r.domanda) aggiorna(r.domanda);
       avvisi.set(id, { testo: fatto, tipo: 'ok' });
+      tieni = id;
       carica();
     } else {
       avvisi.set(id, { testo: `Non riuscito: ${r.error || 'nessuna risposta'}`, tipo: 'err' });
@@ -639,11 +643,24 @@
     // Col testo scritto il consiglio è una scelta come le altre: le parole partono con lei.
     const d = trova(id);
     if ((bozze.get(id) || '').trim() && d && d.consiglio) return rispondi(id, d.consiglio.opzione);
-    const r = await manda(id, { type: T.consiglio, ids: [id] }, 'Applico il consiglio…');
-    if (!r) return;
+    if (inCorso.has(id)) return;
+    inCorso.add(id);
+    avvisi.set(id, { testo: 'Applico il consiglio…', tipo: '' });
+    disegnaDettaglio();
+    const r = await chiedi({ type: T.consiglio, ids: [id] });
     const e = r.ok && Array.isArray(r.esiti) ? r.esiti.find((x) => x.id === id) : null;
-    if (r.ok && e && !e.ok) return dopo(id, { ok: false, error: e.dettaglio || e.errore }, '');
-    dopo(id, r.ok && !e ? { ok: false, error: 'il server non ha detto com’è andata' } : r, 'Fatto.');
+    let fine;
+    if (!r.ok) fine = r;
+    else if (!e) fine = { ok: false, error: 'il server non ha detto com’è andata' };
+    else if (!e.ok) fine = { ok: false, error: e.dettaglio || e.errore };
+    else {
+      // L'esito del consiglio non porta la domanda: la si rilegge prima di riaccendere i pulsanti.
+      const m = await chiedi({ type: T.mostra, id });
+      if (m.ok && m.riferimenti) Object.assign(stato.riferimenti, m.riferimenti);
+      fine = { ok: true, domanda: m.ok ? m.domanda : null };
+    }
+    inCorso.delete(id);
+    dopo(id, fine, 'Fatto.');
   }
 
   async function discuti(id) {
@@ -664,16 +681,18 @@
 
   // ── Disegno e scelta di cosa mostrare ─────────────────────────────────────
   function apri(ids, gruppo) {
-    aperta = ids && ids.length ? { ids: ids.slice(), gruppo: gruppo || null } : null;
+    const nuove = ids && ids.length ? ids.slice() : [];
+    // Un esito vale per la domanda su cui si è agito: aprendone un'altra se ne va.
+    for (const id of [...avvisi.keys()]) if (!nuove.includes(id) && !inCorso.has(id)) avvisi.delete(id);
+    if (tieni && !nuove.includes(tieni)) tieni = null;
+    aperta = nuove.length ? { ids: nuove, gruppo: gruppo || null } : null;
   }
 
   // Si apre da sé la prima della scheda: la più urgente. Quella appena risposta resta finché non se ne sceglie un'altra.
   function scegliSeServe() {
     const visibili = inOrdine(scheda).map(idDi);
     if (aperta && aperta.ids.some((id) => trova(id))) {
-      const qui = aperta.ids.some((id) => visibili.includes(id));
-      const appenaRisposta = aperta.ids.some((id) => avvisi.has(id));
-      if (qui || appenaRisposta) return;
+      if (aperta.ids.some((id) => visibili.includes(id) || id === tieni)) return;
     }
     apri(visibili.length ? [visibili[0]] : null);
   }
@@ -854,7 +873,7 @@
     stato: () => stato,
     mostra(tab) {
       if (VUOTO[tab] === undefined) return;
-      if (tab !== scheda) { scheda = tab; conferma = null; }
+      if (tab !== scheda) { scheda = tab; conferma = null; tieni = null; }
       disegna();
     },
     alCambio(fn) { if (typeof fn === 'function') ascoltatori.push(fn); },
