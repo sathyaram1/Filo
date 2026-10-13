@@ -34,6 +34,7 @@ export const SHELL_HEIGHT = 88;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {} } = {}) {
+  assicuraMotore({ radice: APP_ROOT });
   // Cartella canonica e con uno spazio nel nome, come per ogni altra partenza:
   // tests/helpers/percorsi.mjs.
   const userData = cartellaTemporanea(userDataPrefix);
