@@ -1516,6 +1516,8 @@
       disegnaCartelle(cartelle);
       setTimeout(caricaStatoDocumenti, 400);
     }
+    const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
+    if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
