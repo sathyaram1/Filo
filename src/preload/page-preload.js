@@ -103,6 +103,20 @@ function menuDiRiserva(clic, motivo = '') {
 function riservaSeLaPaginaTace(e, clic) {
   setTimeout(() => { if (!e.defaultPrevented) menuDiRiserva(clic); }, 0);
 }
+// Sul sito dove il tasto destro è del suo menu (#975): dove il sito non ne ha uno, si apre quello di Filo.
+function filoSeLaPaginaTace(e, clic) {
+  const copia = fotografaClic(e);
+  setTimeout(() => {
+    if (e.defaultPrevented) return;
+    if (typeof contextMenuHandler === 'function') apriMenuDiFilo(copia, clic);
+    else menuDiRiserva(clic);
+  }, 0);
+}
+let menuDelSito = null;
+try {
+  menuDelSito = require('./menu-del-sito.js').monta(webFrame, window);
+  globalThis.__snMenuDelSito = menuDelSito;
+} catch (e) { console.error('[Filo CS] menu del sito', e); }
 function apriMenuDiFilo(e, clic = Date.now()) {
   let esito;
   try { esito = contextMenuHandler(e); } catch (err) { esito = Promise.reject(err); }
