@@ -309,3 +309,32 @@ test('avvio pulito: la riga che arriva alla sessione dice come dichiararsi sporc
     assert.equal(r2.riga.includes('biglietto.mjs sporca'), false, 'da sporco non serve dichiararsi');
   } finally { togliCartella(dir); }
 });
+
+test('da un worktree, senza la variabile come in PowerShell, il biglietto della sessione si trova e si sporca; chi non ne trova uno non dice «già non fidata»', async () => {
+  const dir = cartellaTemporanea('biglietto-wt-');
+  try {
+    const git = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, stdio: 'ignore' });
+    git('init', '-q', '-b', 'main');
+    writeFileSync(join(dir, 'x.txt'), 'x');
+    git('add', '-A');
+    git('commit', '-qm', 'base');
+    const wt = join(dir, '.claude', 'worktrees', 'lavoro');
+    git('worktree', 'add', '-q', wt, '-b', 'claude/lavoro');
+    assert.equal(B.radiceCondivisa(wt), B.radiceCondivisa(dir));
+    const s = server();
+    const avvio = await B.avvio({ input: { session_id: 'sess-wt', source: 'startup' }, env: {}, cwd: dir, deps: s.deps, haCredenziale: async () => true });
+    assert.equal(avvio.path, join(B.cartellaBiglietti(dir), 'sess-wt.json'));
+    assert.equal(await B.fiduciaLocale({ env: {}, cwd: wt, deps: s.deps }), 'fidato', 'il worktree vede il biglietto della sessione');
+    assert.equal((await B.sporca('letta una pagina web', { env: {}, cwd: wt, deps: s.deps })).sporcati, 1);
+    assert.equal(await B.fiduciaLocale({ env: { FILO_BIGLIETTO_FILE: avvio.path }, cwd: wt, deps: s.deps }), 'non_fidato', 'da Bash, con la variabile, la sessione è sporca');
+    const ripresa = await B.avvio({ input: { session_id: 'sess-wt', source: 'resume' }, env: {}, cwd: wt, deps: s.deps, haCredenziale: async () => true });
+    assert.equal(ripresa.path, avvio.path, 'una ripresa dal worktree ritrova il suo biglietto');
+    assert.match(ripresa.riga, /: sporco/);
+  } finally { togliCartella(dir); }
+  const vuoto = repo();
+  try {
+    const riga = await B.rigaSporco('letto #1', ['testo non fidato'], { env: {}, cwd: vuoto, deps: server().deps });
+    assert.doesNotMatch(riga, /già non fidata/);
+    assert.match(riga, /niente sporcato/);
+  } finally { togliCartella(vuoto); }
+});
