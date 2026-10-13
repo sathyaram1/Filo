@@ -943,6 +943,10 @@
       return { label: 'In attesa', color: null, hint: `Stato: In attesa (${reasonText(statusReason)})`, reason: statusReason, reasonText: reasonText(statusReason), showReason: true, encrypted: false };
     }
     const txt = statusReason ? reasonText(statusReason) : '';
+    // Una bocciatura e un riallineamento stanno nello stesso stato: l'etichetta li separa a colpo d'occhio.
+    if (inRiallineamento(fb)) {
+      return { label: 'Riallineamento', color: info.color || null, hint: `Stato: Riallineamento (${txt})`, reason: statusReason, reasonText: txt, showReason: true, encrypted: false };
+    }
     return {
       label: info.label,
       color: info.color || null,
