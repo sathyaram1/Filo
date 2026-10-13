@@ -28,6 +28,8 @@ module.exports = function register(on, ctx) {
   // scritto da lui può uscire (#810).
   const paroleDa = (msg) => (Array.isArray(msg && msg.parole) ? msg.parole : [])
     .filter((x) => typeof x === 'string').join('\n').slice(-200000);
+  // L'ultima è la richiesta di adesso: i dati che porta possono uscire, quelli detti prima chiedono l'OK (#868.6).
+  const domandaDa = (msg) => (Array.isArray(msg && msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').slice(-1).join('');
 
   // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
   const annunciaChat = () => {

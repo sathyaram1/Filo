@@ -4407,7 +4407,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // Le parole di adesso: un indirizzo può portarle fuori, quelle dette prima no senza un OK (#868.6). Un turno che riprende
   // rifà l'ultima richiesta della scheda; il testo di un suggerimento l'ha scritto un modello.
   const ultimaDellaScheda = conversazioneScheda.filter((m) => m && m.role !== 'filo' && !m.daModello).pop();
-  const domanda = daModello ? '' : internal ? String((ultimaDellaScheda && ultimaDellaScheda.text) || '') : String(userMessage || '');
+  const domandaDiAdesso = daModello ? '' : internal ? String((ultimaDellaScheda && ultimaDellaScheda.text) || '') : String(userMessage || '');
   for (const m of codaScheda) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     const fuori = FCx.letturaDaFuori(m);
@@ -4662,7 +4662,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, domanda, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto: azioniViste, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
