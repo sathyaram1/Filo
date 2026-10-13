@@ -20,6 +20,20 @@
     const daSpedire = new Set();
     let timer = null;
 
+    // Il main sa se c'è qualcosa da spedire: chiudendo la scheda avvisa la pagina e aspetta il «niente più» (#666). Chi
+    // spedisce manda il suo messaggio senza await davanti, così sullo stesso canale arriva prima di questo.
+    const MSG = global.SN_MSG && global.SN_MSG.MSG;
+    let segnalato = false;
+    function segnala() {
+      const ora = daSpedire.size > 0;
+      if (ora === segnalato || !MSG || !MSG.CASELLE_IN_SOSPESO) return;
+      segnalato = ora;
+      try {
+        const p = global.chrome.runtime.sendMessage({ type: MSG.CASELLE_IN_SOSPESO, inSospeso: ora });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (_) {}
+    }
+
     function parti(avvisi) {
       clearTimeout(timer);
       timer = null;
@@ -29,10 +43,12 @@
         const fn = spedizioni.get(n);
         if (fn) fn(avvisi);
       }
+      segnala();
     }
 
     function cambiato(nome, e, o) {
       daSpedire.add(nome);
+      segnala();
       if (e && e.inputType && !BATTUTA.has(e.inputType)) { parti(false); return; }
       clearTimeout(timer);
       timer = setTimeout(() => parti(false), (o && o.pausa) || PAUSA_MS);
@@ -41,6 +57,7 @@
     function spedita(nome) {
       daSpedire.delete(nome);
       if (!daSpedire.size) { clearTimeout(timer); timer = null; }
+      segnala();
     }
 
     function subito(avvisi) {
@@ -62,7 +79,6 @@
     global.document.addEventListener('visibilitychange', () => {
       if (global.document.visibilityState === 'hidden') esci();
     });
-    const MSG = global.SN_MSG && global.SN_MSG.MSG;
     if (MSG && global.chrome && global.chrome.runtime && global.chrome.runtime.onMessage) {
       global.chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.TAB_IN_VISTA && !msg.inVista) esci();
