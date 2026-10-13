@@ -6,7 +6,6 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { execFileSync } from 'node:child_process';
 import { basename, dirname, join, resolve } from 'node:path';
 
-// Nel checkout principale del repo, la stessa da ogni worktree: PowerShell la variabile non la riceve (è un percorso).
 export const CARTELLA = join('.claude', 'biglietti');
 export const ENV_FILE = 'FILO_BIGLIETTO_FILE';
 const BASE = process.env.FILO_FUNCTIONS_BASE || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
