@@ -35,10 +35,12 @@ export function motoreDelleProve({ radice = RADICE, env = process.env } = {}) {
   const atteso = electronDelLock(leggi(join(radice, 'package-lock.json')));
   let cartella = null;
   try { cartella = dirname(createRequire(join(radice, 'package.json')).resolve('electron/package.json')); } catch (_) {}
-  let pacchetto = null;
-  try { pacchetto = versione(JSON.parse(leggi(join(cartella, 'package.json'))).version); } catch (_) {}
   const override = String(env.ELECTRON_OVERRIDE_DIST_PATH || '').trim();
+  let pacchetto = null;
+  if (cartella && !override) {
+    try { pacchetto = versione(JSON.parse(leggi(join(cartella, 'package.json'))).version); } catch (_) {}
+  }
   const dist = override || (cartella ? join(cartella, 'dist') : '');
   const binario = dist ? versione(leggi(join(dist, 'version'))) : null;
-  return { atteso, pacchetto: override ? null : pacchetto, binario, ...verdettoMotore({ atteso, pacchetto: override ? null : pacchetto, binario, scelto: !!override }) };
+  return { atteso, pacchetto, binario, ...verdettoMotore({ atteso, pacchetto, binario, scelto: !!override }) };
 }
