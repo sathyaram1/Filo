@@ -1046,6 +1046,31 @@ test('workProgress: status legacy review → normalizzato a revision_capability'
   assert.equal(p.status, 'revision_capability');
 });
 
+// #532: un rientro dopo una fusione fallita e una bocciatura stanno nello stesso stato; il motivo li separa.
+test('workProgress: riallineamento → verifica fatta, riallineamento in corso, sicurezza da rifare', () => {
+  const now = Date.parse('2026-07-09T12:00:00Z');
+  const p = MR.workProgress({ status: 'revision_capability', statusReason: 'riallineamento' }, { now });
+  assert.equal(p.riallineamento, true);
+  assert.deepEqual(p.steps.map((s) => s.key), ['impl', 'verify', 'realign', 'security']);
+  assert.deepEqual(p.steps.map((s) => s.state), ['done', 'done', 'current', 'pending']);
+  assert.equal(p.current.label, 'Riallineamento');
+  assert.match(p.current.hint, /passato le verifiche/);
+  // La bocciatura resta com'era.
+  const boc = MR.workProgress({ status: 'revision_capability' }, { now });
+  assert.equal(boc.riallineamento, false);
+  assert.equal(boc.current.key, 'verify');
+});
+
+test('inRiallineamento: solo revision_capability col motivo, mai su uno stato illeggibile', () => {
+  assert.equal(MR.inRiallineamento({ status: 'revision_capability', statusReason: 'riallineamento' }), true);
+  assert.equal(MR.inRiallineamento({ status: 'revision_capability' }), false);
+  // Il motivo rimasto sul documento dopo l'uscita dallo stato non inganna la scheda.
+  assert.equal(MR.inRiallineamento({ status: 'revision_security', statusReason: 'riallineamento' }), false);
+  assert.equal(MR.inRiallineamento({ status: 'done', statusReason: 'riallineamento' }), false);
+  assert.equal(MR.inRiallineamento({ status: CIFRATO, statusReason: 'riallineamento' }), false);
+  assert.equal(MR.inRiallineamento(null), false);
+});
+
 test('listForManageTab queue: gli in-lavorazione sono PINNATI in cima, attivi prima', () => {
   const now = Date.parse('2026-07-09T12:00:00Z');
   const items = [
