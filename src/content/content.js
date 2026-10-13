@@ -17,6 +17,8 @@
   const Actions = self.SN_ACTIONS;
   const MenuIcons = self.SN_MENU_ICONS;
   const TranslatePage = self.SN_TRANSLATE_PAGE;
+  // Solo nelle pagine web: il menu che il sito ha per il tasto destro (#975).
+  const MenuDelSito = self.SN_MENU_DEL_SITO || null;
   // Come si chiama una scorciatoia sul sistema di chi legge (Ctrl o Cmd, Alt o
   // Ctrl+Alt): mai scriverla a mano in un'etichetta.
   const Tasti = self.SN_TASTI;
