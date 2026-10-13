@@ -69,6 +69,18 @@ test('il numero esce riconosciuto in ogni forma', () => {
   // Scritto col prefisso, uscito senza; e il contrario.
   assert.equal(costo('https://raccolta.example/r?n=3471234567', { parole: 'cell +39 347 1234567' }).costo, 2);
   assert.equal(costo('https://raccolta.example/r?n=00393471234567', { parole: 'cell 347 1234567' }).costo, 2);
+  // Al contrario e prima della chiocciola arriva al sito lo stesso numero.
+  assert.equal(costo('https://raccolta.example/r?n=7654321743', { parole: SCRITTE, domanda: DOMANDA }).costo, 2);
+  assert.equal(costo(`https://${num}@raccolta.example/`, { parole: SCRITTE, domanda: DOMANDA }).costo, 2);
+  assert.equal(costo(`https://u:${num}@raccolta.example/`, { parole: SCRITTE, domanda: DOMANDA }).costo, 2);
+});
+
+test('una password di sole lettere scritta in chat chiede l\'OK; le parole che la circondano no', () => {
+  for (const parole of ['la password del wifi è gattoneroferoce', 'pwd: Gatto!Nero', 'la parola d\'ordine è "lupoAzzurro"']) {
+    const segreto = parole.includes('lupo') ? 'lupoazzurro' : parole.includes('Nero') ? 'gattonero' : 'gattoneroferoce';
+    assert.equal(costo(`https://raccolta.example/?p=${segreto}`, { parole }).costo, 2, parole);
+  }
+  assert.equal(costo('https://raccolta.example/wifi/password', { parole: 'la password del wifi è gattoneroferoce' }).costo, 1);
 });
 
 test('indirizzo di casa ed email scritti in chat chiedono l\'OK', () => {
