@@ -7,7 +7,7 @@ import { temporaneaDellaCorsa, togliCartella } from '../helpers/percorsi.mjs';
 
 export default function primaDellaCorsa(config) {
   const motore = motoreDelleProve(config?.configFile ? { radice: dirname(config.configFile) } : {});
-  if (!motore.ok && !String(process.env.ELECTRON_OVERRIDE_DIST_PATH || '').trim()) throw new Error(motore.motivo);
+  if (!motore.ok && !motore.scelto) throw new Error(motore.motivo);
   if (!motore.ok) console.warn(motore.motivo);
   const temp = temporaneaDellaCorsa();
   Object.assign(process.env, { TMPDIR: temp, TEMP: temp, TMP: temp });
