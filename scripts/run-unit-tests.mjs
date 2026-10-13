@@ -3,7 +3,7 @@
 // Zero file = uscita rossa. `--list` stampa i file, `--solo` fa girare solo i file dati; ogni altro argomento è un flag di `node --test` o un file in più. Sentinella: tests/unit/unitRunner.test.mjs.
 
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
-import { resolve, dirname, join, relative, isAbsolute, sep } from 'node:path';
+import path, { resolve, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
