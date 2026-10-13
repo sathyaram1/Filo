@@ -1186,9 +1186,9 @@
       percorso: 'security.safeBrowse.sandbox',
       nome: 'Link sospetti in una finestra isolata',
       stati: ['sì', 'no'],
-      aiuto: 'true | false (segue prima in una finestra nascosta i link accorciati o con molti redirect)',
-      risk: 'Controlla la finestra isolata in cui Filo segue prima i link accorciati o con molti redirect. Spegnerla '
-        + 'fa aprire quei link direttamente, senza sapere prima dove portano.',
+      aiuto: 'true | false (finestra nascosta per provare un link sospetto prima che si apra; oggi nessuna funzione la usa)',
+      risk: 'Controlla la finestra nascosta e isolata in cui Filo proverebbe un link sospetto prima che tu lo apra. '
+        + 'Oggi nessuna funzione prova i link così: accesa o spenta, non cambia niente.',
     }),
     interruttore({
       keys: ['segnalazione_automatica', 'segnalazione automatica', 'segnalazione automatica dei problemi', 'segnalazioni automatiche', 'feedback automatico'],

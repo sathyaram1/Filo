@@ -567,11 +567,10 @@
       'Solo quando un sito resta dubbio, un modello AI valuta i soli indizi di identità del dominio ' +
       '(mai il contenuto della pagina) per decidere se avvisarti. Usa i modelli e le chiavi che hai già ' +
       'configurato.',
-    options_security_safebrowse_sandbox: 'Apri i link sospetti in una finestra isolata',
+    options_security_safebrowse_sandbox: 'Prova i link sospetti in una finestra isolata',
     options_security_safebrowse_sandbox_desc:
-      'Per i link accorciati o con molti redirect, Filo li apre prima in una finestra nascosta e senza ' +
-      'i tuoi dati, segue dove portano davvero e blocca i download automatici, così può avvisarti sulla ' +
-      'destinazione reale.',
+      'Quando Filo prova un link sospetto prima che tu lo apra, lo fa in una finestra nascosta e senza ' +
+      'i tuoi dati. Una pagina che hai già aperto non ci torna mai.',
     options_security_safebrowse_key_managed:
       'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
       'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
