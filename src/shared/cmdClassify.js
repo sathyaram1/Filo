@@ -1307,6 +1307,8 @@
         // Il valore di un gruppo può essere `env:` o `HKCU:`; Test-Path ne dice solo se esiste,
         // ma se viene dal contenuto di un file può essere un percorso di rete (#1072).
         if (t.includes(SEGNAPOSTO) && ((elenco && prog !== 'test-path') || c.valoriIgnoti)) return due(MOTIVI.ignoto);
+        // Il valore di un gruppo, se relativo, si risolve contro una cwd di rete (#1072.4).
+        if (t.includes(SEGNAPOSTO) && c.cwd && c.cwd.rete) return due(MOTIVI.rete);
         const d = dove(t, c);
         if (d === MOTIVI.rete || (elenco && d === MOTIVI.sistema)) return due(d);
       }
