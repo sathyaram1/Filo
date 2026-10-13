@@ -164,8 +164,8 @@ test('col biglietto in cartella e la sessione nella cartella di Claude, chi impo
       `import { misureCrediti } from ${url('scripts', 'routine-channel.mjs')};`,
       `test('crediti', () => { assert.deepEqual(misureCrediti({ root: ${JSON.stringify(lavoro)} }), {}); });`,
     ].join('\n'));
-    // Senza FILO_TRANSCRIPT il ripiego c'è comunque: il biglietto in cartella basta (il caso del contenitore).
-    const r = await nodeTest([prova], { FILO_ROUTINE: '1', CLAUDE_CONFIG_DIR: claude });
+    // Senza transcript dichiarato il ripiego c'è comunque: il biglietto in cartella basta (il caso del contenitore).
+    const r = await nodeTest([prova], { FILO_ROUTINE: '1', FILO_TRANSCRIPT: '', CLAUDE_CONFIG_DIR: claude });
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, /^ok \d+ - crediti$/m);
   } finally {
