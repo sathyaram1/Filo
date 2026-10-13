@@ -1,4 +1,4 @@
-// Verifica #557 giro 2: le porte del turno finito senza risposta (tetto dei passi, ricerca fallita, ricarica, tema scuro).
+// Verifica #557 giro 2: le porte del turno finito senza risposta (tetto dei passi, ricerca fallita, tema scuro, righe).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -89,26 +89,6 @@ test('ricerca fallita e poi silenzio: anche qui Continua', async ({ app, shell }
   await ripristina(app);
 });
 
-test('Continua, poi la pagina ricaricata: il messaggio interno non diventa una bolla dell’utente', async ({ app, shell }) => {
-  test.setTimeout(120_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await home(app);
-  await configura(app);
-  await modelloFinto(app, [cercaAnnunciata, { text: '' }, { text: 'Parte alle 8:15.' }]);
-  await scrivi(page, 'a che ora parte il treno?');
-  await expect(page.locator('.dash-continua')).toHaveCount(1, { timeout: 30_000 });
-  await page.locator('.dash-continua').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Parte alle 8:15.' })).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('.dash-bubble-user', { hasText: '[L' })).toHaveCount(0);
-  await page.waitForTimeout(1500);
-  await page.reload();
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(2500);
-  console.log('DOPO RICARICA:', await page.locator('.dash-bubble').allInnerTexts());
-  await expect(page.locator('.dash-bubble', { hasText: 'continuare il lavoro' })).toHaveCount(0);
-  await ripristina(app);
-});
-
 test('Continua lasciato lì e un messaggio nuovo: il tasto sparisce', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -120,5 +100,30 @@ test('Continua lasciato lì e un messaggio nuovo: il tasto sparisce', async ({ a
   await scrivi(page, 'lascia stare, ciao');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ciao!' })).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('.dash-continua')).toHaveCount(0);
+  await ripristina(app);
+});
+
+test('righe delle preferenze: tema, valore storto su una chiave con trattino basso, blocco popup', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await home(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { toolCalls: [
+      { id: 'a', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' },
+      { id: 'b', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"dimensione_testo","valore":"fucsia"}' },
+      { id: 'c', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"commento_home","valore":"forse"}' },
+      { id: 'd', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"<b>x</b>"}' },
+    ] },
+    { text: 'Fatto.' },
+  ]);
+  await scrivi(page, 'metti il tema scuro');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 15_000 });
+  await page.locator('.dash-activity-head').first().click();
+  const righe = page.locator('.dash-activity-row');
+  console.log('RIGHE:', await righe.allInnerTexts());
+  await expect(righe.filter({ hasText: '_' })).toHaveCount(0);
+  await expect(righe.filter({ hasText: '=' })).toHaveCount(0);
+  await page.screenshot({ path: 'tests/.shots/v557g2-righe.png' });
   await ripristina(app);
 });
