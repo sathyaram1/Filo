@@ -790,10 +790,11 @@
     menuAperto = { nodo, primaDelMenu: document.activeElement };
     const prima = nodo.querySelector('.dash-menu-voce');
     if (prima) prima.focus({ preventScroll: true });
+    // I tasti subito: nessun tasto ha aperto il menu, e in una scheda non in vista il timer può tardare un secondo.
+    document.addEventListener('keydown', tastiMenu, true);
     setTimeout(() => {
       if (!menuAperto || menuAperto.nodo !== nodo) return;
       document.addEventListener('mousedown', fuoriDalMenu, true);
-      document.addEventListener('keydown', tastiMenu, true);
       global.addEventListener('blur', chiudiMenu);
       global.addEventListener('resize', chiudiMenu);
     }, 0);
