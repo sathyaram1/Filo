@@ -1783,7 +1783,14 @@
   document.addEventListener('mg-scheda', (e) => {
     if (DOMANDE && DOMANDE_TABS.includes(e.detail.tab) && !e.detail.apertura) DOMANDE.carica();
   });
-  if (DOMANDE) DOMANDE.alCambio(() => updateSezioniCounts());
+  if (DOMANDE) {
+    DOMANDE.alCambio(() => updateSezioniCounts());
+    // Un feedback nominato da una domanda si apre nella sua scheda, come dall'avviso di una fusione.
+    DOMANDE.collega({
+      apriFeedback: (num) => openFeedbackByNum(String(num || '').replace(/^#/, '')),
+      apriScheda: (tab) => selectTab(tab),
+    });
+  }
 
   function schedaAttiva() {
     const btn = mgTabs.querySelector('.mg-tab.mg-tab--active');

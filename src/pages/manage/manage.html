@@ -27,6 +27,7 @@
   <script src="filo://shared/feedbackTransitions.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
+  <script src="filo://shared/domande.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
@@ -61,7 +62,7 @@
 
     /* Sulle schede-lista la colonna è alta ESATTAMENTE la finestra, non "almeno": senza quella pressione il tetto
        del riquadro delle fusioni non morde. Perché: patterns/unarea-che-si-prende-quello-che-avanza-pretende-un-tetto.md */
-    .sn-page:has(> #panel-list.mg-panel--active) { height: 100vh; }
+    .sn-page:has(> #panel-list.mg-panel--active), .sn-page:has(> #panel-domande.mg-panel--active) { height: 100vh; }
     /* Testata: altezza sua, non si lascia stringere dalla pressione qui sopra. */
     .mg-banner, .mg-sezioni, .mg-tabs, .mg-no-sections, .mg-searchbar { flex: 0 0 auto; }
 
@@ -213,21 +214,127 @@
     .mg-livello-count { opacity: 0.8; }
     .mg-livello-count:empty { display: none; }
 
-    /* Domande, fase uno: un elenco semplice finché non arriva la vista vera della domanda. */
-    .mg-domande-stato { margin: 6px 0 12px; font-size: 13px; color: var(--sn-muted); }
-    .mg-domande-stato[hidden], #mgDomandeRiprova[hidden], .mg-domande-lista[hidden] { display: none; }
-    .mg-domande-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-    .mg-domanda {
-      display: flex; align-items: baseline; gap: 10px;
-      padding: 8px 10px; border-radius: 6px; font-size: 13px;
+    /* Domande: elenco a sinistra, la domanda (o il gruppo intero) a destra; tutta l'altezza come la lista dei feedback. */
+    #panel-domande.mg-panel--active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+    .mg-dom {
+      display: grid; grid-template-columns: minmax(230px, 340px) minmax(0, 1fr); gap: 12px;
+      flex: 1 1 auto; min-height: var(--mg-aree-min);
+    }
+    .mg-dom-head { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+    .mg-dom-head-nome { flex: 1 1 auto; min-width: 0; }
+    .mg-dom-head [hidden] { display: none; }
+    .mg-dom-sel { margin: 0; flex: 0 0 auto; cursor: pointer; accent-color: var(--sn-accent); }
+    .mg-dom-consiglio {
+      all: unset; cursor: pointer; flex: 0 0 auto;
+      padding: 2px 8px; border-radius: 999px; border: 1px solid var(--sn-accent);
+      font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--sn-accent);
       transition: background 0.1s;
     }
-    .mg-domanda:hover { background: var(--sn-hover); }
+    .mg-dom-consiglio:hover { background: color-mix(in srgb, var(--sn-accent) 14%, transparent); }
+    .mg-dom-consiglio:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    .mg-domande-stato { margin: 6px 4px 12px; font-size: 13px; color: var(--sn-muted); }
+    .mg-domande-stato[hidden], #mgDomandeRiprova[hidden], .mg-domande-lista[hidden], .mg-dom-conferma[hidden] { display: none; }
+    .mg-domande-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+    .mg-domande-prio {
+      margin: 10px 4px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--sn-muted);
+    }
+    .mg-domande-prio:first-child { margin-top: 2px; }
+    .mg-domanda, .mg-domande-gruppo {
+      display: flex; align-items: baseline; gap: 8px;
+      padding: 7px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
+      border-left: 3px solid transparent;
+      transition: background 0.1s;
+    }
+    .mg-domanda:hover, .mg-domande-gruppo:hover { background: var(--sn-hover); }
+    .mg-domanda:focus-visible, .mg-domande-gruppo:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: -2px; }
+    .mg-domanda--aperta, .mg-domande-gruppo--aperto { background: var(--sn-hover); border-left-color: var(--sn-accent); }
+    .mg-domanda[data-priorita="bloccante"] { border-left-color: var(--mg-urgente-color, #c0392b); }
+    .mg-domanda--gruppo { margin-left: 14px; }
+    .mg-domande-gruppo { font-weight: 600; }
+    .mg-domande-gruppo-nome { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+    .mg-domande-gruppo-n { color: var(--sn-muted); font-weight: 400; font-variant-numeric: tabular-nums; }
     .mg-domanda-num, .mg-domanda-data { color: var(--sn-muted); font-variant-numeric: tabular-nums; flex: 0 0 auto; }
     .mg-domanda-titolo { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
     .mg-domanda-prio { flex: 0 0 auto; font-size: 11.5px; color: var(--sn-muted); }
-    .mg-domanda[data-priorita="bloccante"] .mg-domanda-prio { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
     .mg-domanda-data { font-size: 11.5px; }
+
+    /* «Applica il consiglio» sulla scelta: prima di partire l'elenco delle etichette, poi l'esito al suo posto. */
+    .mg-dom-conferma {
+      margin: 0 0 10px; padding: 10px 12px; border-radius: 8px; font-size: 13px;
+      border: 1px solid color-mix(in srgb, var(--sn-accent) 45%, var(--sn-border));
+      background: color-mix(in srgb, var(--sn-accent) 6%, transparent);
+    }
+    .mg-dom-conferma p { margin: 0 0 6px; }
+    .mg-dom-conferma-lista { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+    .mg-dom-conferma-lista li { display: flex; gap: 8px; align-items: baseline; }
+    .mg-dom-conferma-fuori { color: var(--sn-muted); }
+    .mg-dom-conferma-err { color: #c0392b; }
+
+    /* Una domanda nel dettaglio: la fiducia sta a vista, le note per gli agenti chiuse in fondo. */
+    .mg-dq-corpo { padding: 14px 18px 24px; }
+    .mg-dq + .mg-dq { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--sn-border); }
+    .mg-dq-vuoto, .mg-dq-gruppo { margin: 4px 0 14px; font-size: 13px; color: var(--sn-muted); }
+    .mg-dq-gruppo { font-weight: 600; }
+    .mg-dq-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 12px; color: var(--sn-muted); }
+    .mg-dq-num { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--sn-fg); }
+    .mg-dq-prio[data-priorita="bloccante"] { color: var(--mg-urgente-color, #c0392b); font-weight: 600; }
+    .mg-dq-fiducia { padding: 0 6px; border-radius: 999px; border: 1px solid var(--sn-border); cursor: help; }
+    .mg-dq-fiducia--no { color: #b9770e; border-color: color-mix(in srgb, #e08e0b 55%, transparent); }
+    .mg-dq-legami { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+    .mg-dq-legami-pre { margin-right: 2px; }
+    .mg-dq-legame { all: unset; cursor: pointer; color: var(--sn-accent); font-variant-numeric: tabular-nums; }
+    .mg-dq-legame:hover { text-decoration: underline; }
+    .mg-dq-legame:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; border-radius: 3px; }
+    .mg-dq-legame--muto { cursor: default; color: var(--sn-muted); }
+    .mg-dq-legame--muto:hover { text-decoration: none; }
+    .mg-dq-titolo { margin: 6px 0 12px; font-size: 18px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+    .mg-dq-sez { margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; }
+    .mg-dq-h { margin: 0 0 4px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--sn-muted); }
+    .mg-dq-md { overflow-wrap: anywhere; }
+    .mg-dq-opzioni { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .mg-dq-opzione { padding: 10px 12px; border: 1px solid var(--sn-border); border-radius: 8px; }
+    .mg-dq-opzione--consigliata { border-color: color-mix(in srgb, var(--sn-accent) 60%, var(--sn-border)); }
+    .mg-dq-opzione-testa { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-weight: 600; }
+    .mg-dq-opzione-n { color: var(--sn-muted); font-variant-numeric: tabular-nums; }
+    .mg-dq-opzione-testo { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+    .mg-dq-badge {
+      font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 999px;
+      color: var(--sn-accent); border: 1px solid var(--sn-accent);
+    }
+    .mg-dq-badge--scelta { color: #2e9e5b; border-color: #2e9e5b; }
+    .mg-dq-procontro { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 16px; margin: 6px 0 0; }
+    .mg-dq-pc { display: block; font-size: 11.5px; font-weight: 600; color: var(--sn-muted); }
+    .mg-dq-pro .mg-dq-pc { color: #2e9e5b; }
+    .mg-dq-contro .mg-dq-pc { color: #b9770e; }
+    .sn-page button.sn-btn.mg-dq-azione, .sn-page button.sn-btn.mg-dq-applica { margin-top: 8px; }
+    .mg-dq-senza-azione { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--sn-muted); cursor: help; }
+    .mg-dq-consiglio-corpo { display: flex; flex-direction: column; gap: 2px; }
+    .mg-dq-consiglio-n { font-weight: 600; }
+    .mg-dq-esito { margin: 0 0 14px; font-size: 13px; color: var(--sn-muted); }
+    .mg-dq-esito--err { color: #c0392b; }
+    .mg-dq-turni { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .mg-dq-turno { padding-left: 10px; border-left: 2px solid var(--sn-border); }
+    .mg-dq-turno[data-autore="owner"] { border-left-color: var(--sn-accent); }
+    .mg-dq-turno-testa { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 12px; color: var(--sn-muted); }
+    .mg-dq-turno-chi { font-weight: 600; color: var(--sn-fg); }
+    .mg-dq-turno-tuo { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .mg-dq-data { font-variant-numeric: tabular-nums; }
+    .mg-dq-risposta { margin: 4px 0 14px; display: flex; flex-direction: column; gap: 8px; }
+    .mg-dq-testo {
+      box-sizing: border-box; width: 100%; resize: vertical; min-height: 64px;
+      padding: 8px 10px; border-radius: 6px; border: 1px solid var(--sn-border);
+      background: var(--sn-input-bg, transparent); color: var(--sn-fg); font: inherit; font-size: 13.5px;
+    }
+    .mg-dq-testo:focus { outline: none; border-color: var(--sn-accent); }
+    .mg-dq-tasti { display: flex; flex-wrap: wrap; gap: 8px; }
+    .mg-dq-msg { margin: 0; min-height: 1.4em; font-size: 12.5px; color: var(--sn-muted); }
+    .mg-dq-msg--ok { color: #2e9e5b; }
+    .mg-dq-msg--err { color: #c0392b; }
+    .mg-dq-note { margin: 4px 0 0; font-size: 13px; color: var(--sn-muted); }
+    .mg-dq-note summary { cursor: pointer; user-select: none; width: max-content; }
+    .mg-dq-note summary:hover { color: var(--sn-fg); }
+    .mg-dq-note[open] .mg-dq-md { margin-top: 6px; color: var(--sn-fg); }
 
     .mg-tabs {
       display: flex;
@@ -1613,9 +1720,25 @@
 
     <!-- Le tre schede di Domande condividono questo pannello; lo disegna manageDomande.js. -->
     <section class="mg-panel" id="panel-domande" data-panel="domande">
-      <p class="mg-domande-stato" id="mgDomandeStato" role="status">Caricamento…</p>
-      <button type="button" class="sn-btn sn-btn-secondary" id="mgDomandeRiprova" hidden>Riprova</button>
-      <ol class="mg-domande-lista" id="mgDomandeLista" hidden></ol>
+      <div class="mg-dom">
+        <div class="mg-col" id="mgDomandeCol">
+          <div class="mg-col-head mg-dom-head">
+            <input type="checkbox" class="mg-dom-sel" id="mgDomandeTutte" aria-label="Scegli tutte" title="Scegli tutte" hidden>
+            <span class="mg-dom-head-nome" id="mgDomandeTitolo">Da rispondere</span>
+            <button type="button" class="mg-dom-consiglio" id="mgDomandeConsiglioSel" hidden>Applica il consiglio</button>
+          </div>
+          <div class="mg-col-body">
+            <p class="mg-domande-stato" id="mgDomandeStato" role="status">Caricamento…</p>
+            <button type="button" class="sn-btn sn-btn-secondary" id="mgDomandeRiprova" hidden>Riprova</button>
+            <div class="mg-dom-conferma" id="mgDomandeConferma" role="status" hidden></div>
+            <ol class="mg-domande-lista" id="mgDomandeLista" hidden></ol>
+            <p class="mg-domande-stato" id="mgDomandeAltre" hidden></p>
+          </div>
+        </div>
+        <div class="mg-col" id="mgDomandaCol">
+          <div class="mg-col-body mg-dq-corpo" id="mgDomandaDettaglio"></div>
+        </div>
+      </div>
     </section>
 
     <!-- Due sorgenti, due date: i feedback (data d'invio) e il registro dei worker (data di lavorazione).
