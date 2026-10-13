@@ -56,6 +56,7 @@ test('l’owner spedisce col token fresco e la coda su disco non lo contiene mai
   });
   expect(suDisco.coda).toContain('spec-owner-1');
   expect(suDisco.coda).not.toContain('tok-owner');
+  expect(suDisco.file).toContain('spec-owner-1');
   expect(suDisco.file).not.toContain('tok-owner');
 
   // Torna la rete: il ritentativo chiede un token nuovo e parte autenticato.
