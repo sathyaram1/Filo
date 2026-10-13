@@ -40,12 +40,14 @@ test('con caselle in sospeso la pagina sa che esce, e si chiude quando dice di a
   assert.equal(wc.chiusa, 1);
 });
 
-test('una pagina che non risponde si chiude al tetto', async () => {
+test('una pagina che non risponde si chiude al tetto', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const wc = finta();
   C.segna(wc, true);
   C.chiudi(wc);
+  t.mock.timers.tick(C.TETTO_MS - 1);
   assert.equal(wc.chiusa, 0);
-  await new Promise((r) => setTimeout(r, C.TETTO_MS + 100));
+  t.mock.timers.tick(1);
   assert.equal(wc.chiusa, 1);
 });
 
