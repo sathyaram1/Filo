@@ -72,8 +72,9 @@ export function scriviFile(path, { ticket, fp, natoIl }) {
 }
 
 /**
- * I biglietti di questa sessione: quello di FILO_BIGLIETTO_FILE se vale, altrimenti tutti quelli della cartella del
- * checkout principale (più d'uno: chi chiede la fiducia prende il più sporco). Nessuno = nessun biglietto, non fidato.
+ * Il biglietto di questa sessione, in una lista di al più uno: quello di FILO_BIGLIETTO_FILE se vale, altrimenti quello
+ * col nome della sessione nella cartella del checkout principale. Mai quelli delle altre sessioni (giro 9 di #1148: da
+ * PowerShell una dichiarazione sporcava tutte le sessioni aperte); chi non trova il suo non ne ha, e vale non fidato.
  */
 export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) {
   const daEnv = String(env[ENV_FILE] || '').trim();
@@ -81,17 +82,12 @@ export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) 
     const b = leggiFile(daEnv);
     if (b) return [b];
   }
+  const sessione = String(env[ENV_SESSIONE] || '').trim();
+  if (!ID_RE.test(sessione)) return [];
   const radice = radiceCondivisa(cwd);
   if (!radice) return [];
-  const dir = cartellaBiglietti(radice);
-  if (!existsSync(dir)) return [];
-  const out = [];
-  for (const nome of readdirSync(dir)) {
-    if (!nome.endsWith('.json')) continue;
-    const b = leggiFile(join(dir, nome));
-    if (b) out.push(b);
-  }
-  return out;
+  const b = leggiFile(join(cartellaBiglietti(radice), `${sessione}.json`));
+  return b ? [b] : [];
 }
 
 // I marcatori dei turni della conversazione (gemelli di USER_TURN_RE e MODEL_TURN_RE in src/shared/feedbackThread.js).
