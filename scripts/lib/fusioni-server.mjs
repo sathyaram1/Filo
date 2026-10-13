@@ -60,7 +60,15 @@ export async function fusioniServer(dep, { prova = false } = {}) {
     }
     fuse.push({ num, id: p.feedbackId, app });
   }
-  if (prova || !fuse.length) return { fuse, ferme, pubblicato: false };
+  if (prova) return { fuse, soloApp, ferme, pubblicato: false };
+  for (const s of soloApp) {
+    try {
+      await dep.fineAttesa(s.id, { soloApp: true });
+    } catch (e) {
+      ferme.push({ num: s.num, motivo: `sul server non c’era niente da fondere, ma la pratica non è tornata alle routine: ${String((e && e.message) || e).slice(0, 200)}` });
+    }
+  }
+  if (!fuse.length) return { fuse, soloApp, ferme, pubblicato: false };
 
   // Un deploy solo, dopo tutte le fusioni: incorpora il main del server appena mosso.
   dep.log('server:pubblica');
