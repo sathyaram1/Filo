@@ -181,7 +181,7 @@ async function statiDi(biglietti, deps) {
   return out;
 }
 
-/** Il biglietto che vale per questa sessione: il più sporco fra quelli trovati. null = nessuno. */
+/** Il biglietto di questa sessione con lo stato letto dal server; illeggibile vale sporco. null = nessuno. */
 export async function trovaBiglietto({ env, cwd, deps = {} } = {}) {
   const trovati = trovaBiglietti({ env, cwd });
   if (!trovati.length) return null;
