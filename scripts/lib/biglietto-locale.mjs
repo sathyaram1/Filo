@@ -90,6 +90,22 @@ export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) 
   return b ? [b] : [];
 }
 
+/**
+ * Dove sta il biglietto di chi fa nascere una sessione (§1.2: chi continua un lavoro ne eredita la sporcizia): la
+ * variabile, o il nome di una sessione diversa da quella che nasce, come lo trova ogni comando. '' fuori da ogni
+ * sessione. Il percorso può non esistere: chi nasce da lì nasce sporco, perché nel dubbio vale sporco.
+ */
+export function percorsoDiChiLancia({ env = process.env, cwd = process.cwd(), sessioneCheNasce = '' } = {}) {
+  const daEnv = String(env[ENV_FILE] || '').trim();
+  if (daEnv && leggiFile(daEnv)) return daEnv;
+  const sessione = String(env[ENV_SESSIONE] || '').trim();
+  if (ID_RE.test(sessione) && sessione !== String(sessioneCheNasce || '').trim()) {
+    const radice = radiceCondivisa(cwd);
+    if (radice) return join(cartellaBiglietti(radice), `${sessione}.json`);
+  }
+  return daEnv;
+}
+
 // I marcatori dei turni della conversazione (gemelli di USER_TURN_RE e MODEL_TURN_RE in src/shared/feedbackThread.js).
 const TURNO_OWNER_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*.*?\s*---\s*$/;
 const TURNO_ALTRI_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*.*?\s*---\s*$/;
