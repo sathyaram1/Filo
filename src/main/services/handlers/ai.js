@@ -135,7 +135,8 @@ module.exports = function register(on, ctx) {
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
   // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
   // pagina mostra i risultati mentre arrivano. Un giro per pagina: una ricerca nuova ferma quella di prima.
-  const { daFilo } = require('./origine');
+  const { daFilo, soloFilo } = require('./origine');
+  const NON_ADMIN = () => ({ ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' });
   const { settingsForOwnerAction } = require('../resolveSupportModel');
   const giriRicerca = new Map(); // jobId → giro
   let giriFatti = 0;
