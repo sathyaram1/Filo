@@ -316,9 +316,12 @@ export async function attesePc(deps = {}) {
   return Array.isArray(r.pratiche) ? r.pratiche : [];
 }
 
-/** La parte del server è su main e pubblicata: la pratica torna alle routine per la parte dell'app. Lancia. */
-export async function fineAttesa(feedbackId, deps = {}) {
-  return chiama('fineAttesa', { feedbackId }, deps);
+/**
+ * La parte del server è su main e pubblicata, o (`soloApp`) sul server il ramo non c'è: la pratica torna alle routine per
+ * la parte dell'app. Lancia.
+ */
+export async function fineAttesa(feedbackId, { soloApp = false, ...deps } = {}) {
+  return chiama('fineAttesa', soloApp === true ? { feedbackId, soloApp: true } : { feedbackId }, deps);
 }
 
 /** Chiude i biglietti di questa sessione e ne toglie i file. */

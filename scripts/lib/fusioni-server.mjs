@@ -76,7 +76,7 @@ export async function fusioniServer(dep, { prova = false } = {}) {
   if (d.code !== 0) {
     // Le parti dell'app restano ferme: senza il server in produzione romperebbero chi le usa (mappa §3.3, rischio 7).
     ferme.push({ num: fuse.map((f) => f.num).join(', '), motivo: `fuso, ma il deploy del server non è andato:\n${coda(d.out)}` });
-    return { fuse, ferme, pubblicato: false };
+    return { fuse, soloApp, ferme, pubblicato: false };
   }
   for (const f of fuse.filter((x) => x.app > 0)) {
     try {
@@ -86,5 +86,5 @@ export async function fusioniServer(dep, { prova = false } = {}) {
       ferme.push({ num: f.num, motivo: `server in produzione, ma la pratica non è tornata alle routine: ${String((e && e.message) || e).slice(0, 200)}` });
     }
   }
-  return { fuse, ferme, pubblicato: true };
+  return { fuse, soloApp, ferme, pubblicato: true };
 }
