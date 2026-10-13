@@ -1274,6 +1274,8 @@
     // Il testo cercato non si apre mai: `grep "//TODO" a.js` non contatta nessuno, `echo //nota` che nessuno usa neanche.
     const stampaSoltanto = c.stampaLibera && STAMPANO.has(prog);
     if (!stampaSoltanto && scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
+    if (calcolaRete(prog, testi, c)) return due(MOTIVI.rete);
+    if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c)) return due(MOTIVI.rete);
     if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
     if (PROCESSI.has(prog)) return due(MOTIVI.processi);
     if (prog === 'git') return gitPerimetro(dequote(raw), c);
