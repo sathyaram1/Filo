@@ -2,6 +2,7 @@
 // come oggetto controllato con le regole condivise; un JSON storto o fuori tetto si ferma prima di chiamare.
 // Server finto su HTTP locale (FILO_ROUTINE_API), CLI vera lanciata in un processo a parte.
 
+import '../helpers/senzaSessione.mjs';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
