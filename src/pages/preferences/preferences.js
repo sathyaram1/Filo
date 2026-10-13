@@ -560,7 +560,6 @@
     note.hidden = !over && n < AGENT_STYLE_MAX * 0.8;
     note.classList.toggle('agent-style-over', over);
     $('agentStyleText').classList.toggle('agent-style-over', over);
-    const cifre = (x) => x.toLocaleString('it-IT', { useGrouping: true });
     note.textContent = over
       ? `Troppo lungo: ${cifre(n)} caratteri, il massimo è ${cifre(AGENT_STYLE_MAX)}. Non lo salvo finché non lo accorci.`
       : `${cifre(n)} / ${cifre(AGENT_STYLE_MAX)}`;
