@@ -64,6 +64,18 @@ aspettava 600 ms da `toBeVisible()` prima di premere Invio era rossa tre volte s
 quattro. Prima di un gesto che deve valere si chiede al dialogo se è pronto
 (`aspettaConfermaPronta`, `tests/helpers/confirm.mjs`), non si aspetta un tempo fisso.
 
+## La sessione che li lancia (#949.1, #1144.1)
+
+Nel contenitore delle routine la shell porta l'identità della sessione (`FILO_ROUTINE`, e
+a volte il suo transcript), e uno script del canale lanciato da un test la crede sua:
+misura il consumo vero, lo mette nel corpo che la prova confronta e scrive il suo stato
+nella cartella di prova. Il lanciatore toglie quell'identità a tutti i test
+(`ambientePerITest`, `scripts/run-unit-tests.mjs`); un file lanciato da solo con
+`node --test` non passa da lui, quindi una prova che confronta il corpo spedito da uno
+di quegli script, o lo stato della sua cartella, passa al figlio
+`ambientePerITest(process.env)` e non `process.env`. Sentinelle:
+`tests/unit/unitRunner.test.mjs` e `tests/unit/routineChannelRilascio.test.mjs`.
+
 ## La macchina dell'owner (#563)
 
 Due proprietà che le altre macchine non hanno, e ogni test che le dava per scontate
