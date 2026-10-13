@@ -51,6 +51,7 @@
   let queue = [];        // mirror in memoria del persistito
   let loaded = false;
   let flushing = false;
+  let ancora = false;    // chiesto un giro mentre un altro era in corso
   let timer = null;
   let auto = true;       // scheduling automatico (disattivabile nei test)
   let prepareFn = null;  // async (payload) -> name (titolo generato al momento dell'invio)
