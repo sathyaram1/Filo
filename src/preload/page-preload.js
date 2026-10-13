@@ -141,12 +141,7 @@ try {
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
-      if (prima) {
-        apriMenuDiFilo(e, clic, { conMaiusc: true });
-        try { e.stopImmediatePropagation(); } catch (_) {}
-        return;
-      }
-      apriMenuDiFilo(e, clic);
+      apriMenuDiFilo(e, clic, prima ? { conMaiusc: true } : undefined);
       try { e.stopImmediatePropagation(); } catch (_) {}
       return;
     }
