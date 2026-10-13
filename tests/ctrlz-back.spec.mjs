@@ -182,7 +182,9 @@ for (const [nome, tasto, mod, mac] of [['Cmd+freccia sinistra su Mac', 'Left', [
         w._filoTabs.navigate(w._filoTabs.activeId, u);
       }, b);
       await expect.poll(() => urlAttiva(app), { timeout: 10_000 }).toBe(b);
-      const page = app.windows().find((w) => w.url() === b);
+      // Il main vede l'URL nuovo prima che Playwright aggiorni la pagina: cercarla una volta sola a volte non la trova.
+      let page = null;
+      await expect.poll(() => { page = app.windows().find((w) => w.url() === b); return !!page; }, { timeout: 10_000 }).toBe(true);
       await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
       if (mac) await app.evaluate(() => { Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true }); });
       const stato = await apriCronologia(app, page, '#ta');
