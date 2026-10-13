@@ -2,7 +2,7 @@
 // domanda/risposta), lo strumento dell'owner (routine-domanda.mjs) e i testi di ruolo.
 // Il server può non avere ancora l'endpoint: allora si chiude comunque (exit 2).
 
-import '../helpers/senzaSessione.mjs';
+import { ambienteSenzaSessione } from '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -10,7 +10,6 @@ import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ambienteSenzaSessione } from '../helpers/sessioneIsolata.mjs';
 
 const QUI = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(QUI, '..', '..');

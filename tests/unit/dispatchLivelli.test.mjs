@@ -13,6 +13,7 @@
 // Senza il fix tutti questi assert sono rossi: le opzioni non esistevano, e
 // `--record-secaudit` con un argomento in più usciva con «argomento non capito».
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFile } from 'node:child_process';

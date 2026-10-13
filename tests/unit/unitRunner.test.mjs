@@ -16,11 +16,12 @@
 //     2) che il lanciatore trovi davvero tutti i file, anche in sottocartelle,
 //        e funzioni lanciato da una cartella qualsiasi.
 
+import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, isAbsolute, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 import {
@@ -35,6 +36,7 @@ import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-loc
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { concorrenzaUnit } from '../../scripts/lib/dati-worker.mjs';
+import { slugProgetto } from '../../scripts/session-report.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
@@ -648,6 +650,34 @@ test('i test non vedono chi è la sessione che li lancia: una routine e una sess
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.match(r.stdout, /^ok 1 - identita$/m);
     assert.ok(['FILO_ROUTINE', 'FILO_TRANSCRIPT', 'FILO_SESSION_ID'].every((k) => IDENTITA_SESSIONE.includes(k)), 'un elenco svuotato farebbe passare la prova senza togliere niente');
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('nemmeno dalla cartella di Claude: col biglietto in cartella un test non misura la sessione che lo lancia (#730.6)', () => {
+  const casa = cartellaTemporanea('filo-runner-claude-');
+  try {
+    // La sessione che lancia: il suo transcript sta dove il ripiego lo cerca, per la cartella da cui partono i test.
+    const claude = join(casa, 'claude-della-sessione');
+    const progetto = join(claude, 'projects', slugProgetto(ROOT));
+    mkdirSync(progetto, { recursive: true });
+    const turno = { type: 'assistant', message: { id: 'm1', model: 'claude-opus-5-5', usage: { input_tokens: 10, output_tokens: 5 } } };
+    writeFileSync(join(progetto, 'sessione-vera.jsonl'), `${JSON.stringify(turno)}\n`);
+    const lavoro = join(casa, 'lavoro');
+    mkdirSync(join(lavoro, '.claude'), { recursive: true });
+    writeFileSync(join(lavoro, '.claude', 'routine-ticket.json'), '{}');
+    const prove = join(casa, 'prove');
+    mkdirSync(prove);
+    writeFileSync(join(prove, 'crediti.test.mjs'), [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      `import { misureCrediti } from ${JSON.stringify(pathToFileURL(join(ROOT, 'scripts', 'routine-channel.mjs')).href)};`,
+      `test('crediti', () => { assert.deepEqual(misureCrediti({ root: ${JSON.stringify(lavoro)} }), {}); });`,
+    ].join('\n'));
+    const r = lanciaSu(prove, [], { CLAUDE_CONFIG_DIR: claude, FILO_ROUTINE: '1' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^ok 1 - crediti$/m);
   } finally {
     togliCartella(casa);
   }

@@ -1,17 +1,12 @@
-// Storage adapter su disco: rimpiazza chrome.storage.local.
-// Implementazione:
-//   - un singolo file JSON in userData/storage.json
-//   - lettura/scrittura atomica con write-then-rename
-//   - debounce delle scritture (100ms) per evitare I/O di troppo
-//   - listener onChanged compatibili con l'API chrome
-//
-// API esposta: get / set / remove / clear (compatibili chrome.storage.local).
+// chrome.storage.local su un file solo, userData/storage.json, scritto con debounce e sempre per intero.
+// Scrittura e lettura passano da scritturaAtomica: un file rovinato o illeggibile non viene mai sovrascritto (#1087).
+// Prove: tests/unit/storageDurevole.test.mjs, tests/unit/storageFlushRace.test.mjs.
 
 const { app, safeStorage } = require('electron');
-const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { AsyncLocalStorage } = require('node:async_hooks');
+const Disco = require('../services/scritturaAtomica');
 
 // === Cifratura a riposo delle chiavi API ===========================
 // Le chiavi API dei provider AI (settings.apiKeys) sono un segreto: a riposo NON
@@ -86,6 +81,20 @@ const STATE = {
   sporche: new Set(),
   avvisate: new Set(),
   osservate: new Set(),
+  // Il file c'è ma non si è potuto leggere né spostare: scriverci sopra lo cancellerebbe.
+  solaMemoria: false,
+  // Ogni scrittura ha il suo numero: una in volo più vecchia di quella di chiusura non le passa sopra.
+  generazione: 0,
+  genSuDisco: 0,
+  ritentaTimer: null,
+  ritentaMs: 0,
+  avvisatoSalvataggio: false,
+  ultimoErrore: null,
+  avvisi: [],
+  copia: null,
+  copiaTimer: null,
+  genCopia: 0,
+  copiaSuDisco: 0,
 };
 
 // Una chiave che qualcuno osserva in scrittura non si presta mai viva, né in lettura né in scrittura: chi muta
@@ -193,19 +202,143 @@ function loadIfNeeded() {
   return STATE.loading;
 }
 
-async function leggiFile() {
+const CHIAVE_LETTURA = 'dati-letti';
+const CHIAVE_SALVATAGGIO = 'dati-non-salvati';
+
+function avvisa(testo, chiave, durataSec = 0) {
+  STATE.avvisi.push({ testo, chiave });
   try {
-    const txt = await fsp.readFile(filePath(), 'utf8');
-    STATE.data = deserializeFromDisk(JSON.parse(txt) || {});
+    const A = require('../services/avvisoFinestra');
+    if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec });
+    else A.avvisoQuandoPronta(testo, { chiave });
+  } catch (_) {}
+}
+
+function quando(ms) {
+  try {
+    return new Date(ms).toLocaleString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (_) { return new Date(ms).toISOString(); }
+}
+
+function motivo(err) {
+  const c = err && err.code;
+  if (c === 'EACCES' || c === 'EPERM') return 'il sistema non dà il permesso';
+  if (c === 'EBUSY') return 'lo tiene aperto un altro programma';
+  if (c === 'EIO') return 'errore del disco';
+  return c || String((err && err.message) || err || 'errore sconosciuto');
+}
+
+// Solo un oggetto è uno storage: null, un numero o un elenco vengono da un file rovinato o scritto a mano.
+function interpreta(testo) {
+  try {
+    const v = JSON.parse(Disco.togliBom(testo));
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
+  } catch (_) { return null; }
+}
+
+async function leggiCopia(target) {
+  try {
+    const buf = await Disco.leggi(`${target}.bak`);
+    const dati = buf ? interpreta(buf.toString('utf8')) : null;
+    if (!dati) return null;
+    let mtime = Date.now();
+    try { mtime = (await fsp.stat(`${target}.bak`)).mtimeMs; } catch (_) {}
+    return { dati, quando: quando(mtime) };
+  } catch (_) { return null; }
+}
+
+function testoIlleggibile(err, copia) {
+  const inizio = `Filo non riesce a leggere il file con i tuoi dati (${motivo(err)}).`;
+  const fine = 'Chiudi e riapri Filo. Se succede ancora, controlla il disco.';
+  return copia
+    ? `${inizio} Ti mostra la copia di riserva del ${copia.quando}, ma in questa sessione non salva niente, per non sovrascrivere il file. ${fine}`
+    : `${inizio} Per non sovrascriverlo, in questa sessione parte vuoto e non salva niente. ${fine}`;
+}
+
+function testoRovinato(daParte, copia) {
+  if (!daParte) {
+    return copia
+      ? `Il file con i tuoi dati si è rovinato e Filo non riesce a spostarlo. Ti mostra la copia di riserva del ${copia.quando}, ma in questa sessione non salva niente, per non cancellare il file rovinato. Chiudi e riapri Filo per riprovare.`
+      : 'Il file con i tuoi dati si è rovinato e Filo non riesce a spostarlo. Per non cancellarlo, in questa sessione parte vuoto e non salva niente. Chiudi e riapri Filo per riprovare.';
+  }
+  const dove = `Il file rovinato è rimasto nella cartella dei dati, col nome «${path.basename(daParte)}».`;
+  return copia
+    ? `Il file con i tuoi dati si era rovinato. Filo è ripartito dalla copia di riserva del ${copia.quando}, quindi manca solo quello che hai cambiato dopo. ${dove}`
+    : `Il file con i tuoi dati si era rovinato e non c'era una copia di riserva, quindi Filo riparte da zero. ${dove}`;
+}
+
+// Un errore di lettura non è «non ci sono dati»: diventava uno storage vuoto, e la prima scrittura cancellava quello vero.
+async function leggiFile() {
+  const target = filePath();
+  let buf;
+  try {
+    buf = await Disco.leggi(target);
   } catch (err) {
-    if (err.code !== 'ENOENT') console.warn('[Filo storage] read failed:', err.message);
+    console.warn('[Filo storage] read failed:', err.message);
+    STATE.solaMemoria = true;
+    const copia = await leggiCopia(target);
+    STATE.data = copia ? deserializeFromDisk(copia.dati) : {};
+    STATE.loaded = true;
+    avviaVerifica();
+    avvisa(testoIlleggibile(err, copia), CHIAVE_LETTURA);
+    return;
+  }
+  Disco.togliTemporanei(target).catch(() => {});
+  if (buf === null) {
     STATE.data = {};
     // Le prove automatiche (playwright.config.js) partono da un utente già accolto, da qualunque avvio: senza, la home
     // comincia l'intervista appena c'è un modello e la chat della prova ci scrive dentro (#663.6).
-    if (err.code === 'ENOENT' && process.env.FILO_TEST_ACCOLTO === '1') STATE.data = { filo_onboarding: { done: true } };
+    if (process.env.FILO_TEST_ACCOLTO === '1') STATE.data = { filo_onboarding: { done: true } };
+    STATE.loaded = true;
+    avviaVerifica();
+    return;
   }
+  const testo = Disco.togliBom(buf.toString('utf8'));
+  const dati = interpreta(testo);
+  if (dati) {
+    STATE.data = deserializeFromDisk(dati);
+    STATE.loaded = true;
+    avviaVerifica();
+    scriviCopia(testo);
+    return;
+  }
+  let daParte = null;
+  try { daParte = await Disco.mettiDaParte(target); } catch (e) {
+    console.warn('[Filo storage] file rovinato, non spostato:', e?.message || e);
+  }
+  if (!daParte) STATE.solaMemoria = true;
+  const copia = await leggiCopia(target);
+  STATE.data = copia ? deserializeFromDisk(copia.dati) : {};
   STATE.loaded = true;
   avviaVerifica();
+  // Senza storage.json un arresto adesso farebbe ripartire vuoto il prossimo avvio, che non guarda la copia.
+  if (daParte && copia) scheduleFlush();
+  avvisa(testoRovinato(daParte, copia), CHIAVE_LETTURA);
+}
+
+// La copia di riserva segue il file con un minuto di ritardo al più: ferma all'avvio terrebbe sul disco, per tutta
+// la sessione, quello che l'utente ha appena cancellato (sentinella in tests/unit/archivedTabsStore.test.mjs).
+const COPIA_DOPO_MS = 60_000;
+
+function scriviCopia(testo) {
+  const mia = ++STATE.genCopia;
+  STATE.copia = (STATE.copia || Promise.resolve())
+    .then(() => Disco.scrivi(`${filePath()}.bak`, testo, { primaDiRinominare: () => STATE.copiaSuDisco < mia }))
+    .then((scritta) => { if (scritta) STATE.copiaSuDisco = mia; })
+    .catch((e) => console.warn('[Filo storage] copia di riserva non scritta:', e?.message || e));
+  return STATE.copia;
+}
+
+function copiaPiuTardi() {
+  if (STATE.copiaTimer || STATE.solaMemoria) return;
+  STATE.copiaTimer = setTimeout(aggiornaCopia, COPIA_DOPO_MS);
+  STATE.copiaTimer.unref?.();
+}
+
+function aggiornaCopia() {
+  if (STATE.copiaTimer) { clearTimeout(STATE.copiaTimer); STATE.copiaTimer = null; }
+  if (STATE.solaMemoria) return Promise.resolve();
+  return scriviCopia(testoDelFile());
 }
 
 function scheduleFlush() {
@@ -213,10 +346,8 @@ function scheduleFlush() {
   STATE.flushTimer = setTimeout(flush, 100);
 }
 
-// I flush sono SERIALIZZATI: due flush concorrenti condividono lo stesso file
-// .tmp, e la rename del secondo trova il tmp già consumato dal primo (ENOENT).
-// Con uno storage grande la scrittura async dura abbastanza da far scattare un
-// nuovo timer di debounce mentre la precedente è ancora in volo.
+// I flush sono SERIALIZZATI: con uno storage grande la scrittura dura più del debounce, e due in volo
+// possono arrivare alla rename in ordine inverso, lasciando sul disco la copia più vecchia.
 async function flush() {
   STATE.flushTimer = null;
   STATE.flushChain = (STATE.flushChain || Promise.resolve()).then(doFlush);
@@ -233,14 +364,20 @@ function flushNow() {
 }
 
 // Attende che non resti NIENTE in sospeso: né un flush in attesa del debounce,
-// né uno in volo. Se il debounce è pendente lo fa scattare subito invece di
-// aspettarlo, così non c'è nessuna attesa a tempo.
+// né uno in volo, né la copia di riserva in attesa del suo minuto. Quello che è
+// in attesa lo fa scattare subito, così non c'è nessuna attesa a tempo.
 //
 // Serve ai test: aspettare "abbastanza secondi" che una scrittura grande
 // arrivi su disco è affidabile a macchina scarica e diventa un falso allarme
 // sotto carico — e il fallimento che ne esce parla di dati incoerenti invece
 // che di un'attesa scaduta, mandando fuori strada chi lo legge.
 async function whenSettled() {
+  await scrittureFerme();
+  if (STATE.copiaTimer) await aggiornaCopia();
+  else await STATE.copia;
+}
+
+async function scrittureFerme() {
   for (let i = 0; i < 1000; i++) {
     if (STATE.flushTimer) {
       clearTimeout(STATE.flushTimer);
@@ -315,27 +452,66 @@ function avviaVerifica() {
 
 async function doFlush() {
   const target = filePath();
-  const tmp = target + '.tmp';
-  // Contatore delle scritture in volo. È l'INVARIANTE del serializzatore qui
-  // sopra: due doFlush insieme condividono lo stesso file temporaneo e la
-  // seconda rename non lo trova più. Il guasto vero (ENOENT) dipende da quale
-  // dei due arriva prima, quindi un test che aspetta di vederlo è ballerino per
-  // costruzione; questo contatore invece si rompe SEMPRE se la serializzazione
-  // salta. Costa due somme per scrittura.
+  if (STATE.solaMemoria) return;
+  // Contatore delle scritture in volo: è l'invariante del serializzatore qui sopra, e a differenza del
+  // guasto (che dipende dall'ordine di arrivo) si rompe SEMPRE se la serializzazione salta.
   STATE.flushInFlight = (STATE.flushInFlight || 0) + 1;
   if (STATE.flushInFlight > (STATE.flushMaxInFlight || 0)) STATE.flushMaxInFlight = STATE.flushInFlight;
+  const mia = ++STATE.generazione;
   try {
     const txt = testoDelFile();
-    await fsp.mkdir(path.dirname(target), { recursive: true });
-    await fsp.writeFile(tmp, txt, 'utf8');
-    await fsp.rename(tmp, target);
+    const scritta = await Disco.scrivi(target, txt, { primaDiRinominare: () => STATE.genSuDisco < mia });
+    if (scritta) STATE.genSuDisco = mia;
+    salvataggioRiuscito();
+    copiaPiuTardi();
   } catch (err) {
     console.error('[Filo storage] flush failed:', err);
     // Il file non ha l'ultima versione: la prossima set non va scartata come «già scritta».
     STATE.testi.clear();
+    salvataggioFallito(err);
   } finally {
     STATE.flushInFlight -= 1;
   }
+}
+
+function testoNonSalvato(err) {
+  const c = err && err.code;
+  const resta = 'Il file salvato prima resta intatto, e quello che fai adesso resta in memoria finché Filo è aperto.';
+  if (c === 'ENOSPC') return `Il disco è pieno e Filo non riesce a salvare i tuoi dati. ${resta} Libera un po' di spazio e Filo riprova da solo.`;
+  if (c === 'EACCES' || c === 'EPERM' || c === 'EROFS') return `Filo non riesce a salvare i tuoi dati perché il sistema non gli lascia scrivere nella sua cartella. ${resta} Filo riprova da solo.`;
+  return `Filo non riesce a salvare i tuoi dati sul disco (${motivo(err)}). ${resta} Filo riprova da solo.`;
+}
+
+// Se nessuno scrive più il debounce non riparte: il ritentativo sì, con attese che crescono fino a cinque minuti.
+function salvataggioFallito(err) {
+  STATE.ultimoErrore = { code: (err && err.code) || '', message: String((err && err.message) || err), at: Date.now() };
+  if (!STATE.avvisatoSalvataggio) {
+    STATE.avvisatoSalvataggio = true;
+    avvisa(testoNonSalvato(err), CHIAVE_SALVATAGGIO);
+  }
+  STATE.ritentaMs = Math.min(Math.max(STATE.ritentaMs * 2, 10_000), 5 * 60_000);
+  if (!STATE.ritentaTimer) {
+    STATE.ritentaTimer = setTimeout(() => { STATE.ritentaTimer = null; flush(); }, STATE.ritentaMs);
+    STATE.ritentaTimer.unref?.();
+  }
+}
+
+function salvataggioRiuscito() {
+  const eraFallito = !!STATE.ultimoErrore;
+  STATE.ultimoErrore = null;
+  STATE.ritentaMs = 0;
+  if (STATE.ritentaTimer) { clearTimeout(STATE.ritentaTimer); STATE.ritentaTimer = null; }
+  if (eraFallito && STATE.avvisatoSalvataggio) avvisa('I tuoi dati sono di nuovo salvati.', CHIAVE_SALVATAGGIO, 6);
+}
+
+/** Per le prove e per chi deve dire all'utente se i suoi dati arrivano sul disco. */
+function statoDisco() {
+  return {
+    solaMemoria: STATE.solaMemoria,
+    ultimoErrore: STATE.ultimoErrore,
+    avvisi: STATE.avvisi.slice(),
+    copia: STATE.copia,
+  };
 }
 
 /** Quante scritture su disco sono arrivate a sovrapporsi (deve restare 1). */
@@ -479,6 +655,20 @@ async function clear() {
   for (const k of Object.keys(changes)) dimenticaTesto(k);
   scheduleFlush();
   emitChange(changes);
+  await togliCopie();
+}
+
+// «Cancella tutto» vale anche per la copia di riserva e per i file rovinati messi da parte: hanno gli stessi dati.
+async function togliCopie() {
+  const target = filePath();
+  try { await STATE.copia; } catch (_) {}
+  await fsp.rm(`${target}.bak`, { force: true }).catch(() => {});
+  try {
+    const base = `${path.basename(target)}.rovinato-`;
+    for (const n of await fsp.readdir(path.dirname(target))) {
+      if (n.startsWith(base)) await fsp.rm(path.join(path.dirname(target), n), { force: true }).catch(() => {});
+    }
+  } catch (_) {}
 }
 
 function dimenticaTesto(k) {
@@ -500,12 +690,25 @@ function onScrittura(fn, chiavi = []) {
   return () => STATE.scritture.delete(fn);
 }
 
-// Flush sincrono best-effort prima della chiusura: riserializza tutto, così niente cambiato senza set resta fuori.
+// Alla chiusura, dove non si può aspettare: sincrona, ma se non arriva in fondo il file di prima resta com'era.
+// Riserializza tutto, così niente cambiato senza set resta fuori.
 function flushSync() {
+  if (!STATE.loaded || STATE.solaMemoria) return;
+  const mia = ++STATE.generazione;
+  const testo = testoDelFile({ tutte: true });
   try {
-    if (!STATE.loaded) return;
-    fs.writeFileSync(filePath(), testoDelFile({ tutte: true }), 'utf8');
-  } catch (e) { /* ignore */ }
+    Disco.scriviSync(filePath(), testo);
+    STATE.genSuDisco = mia;
+  } catch (e) { console.error('[Filo storage] flush failed alla chiusura:', e?.message || e); return; }
+  // Una copia in attesa del suo minuto non arriverebbe più: si scrive adesso, o resterebbe quella con i dati cancellati.
+  if (!STATE.copiaTimer) return;
+  clearTimeout(STATE.copiaTimer);
+  STATE.copiaTimer = null;
+  const miaCopia = ++STATE.genCopia;
+  try {
+    Disco.scriviSync(`${filePath()}.bak`, testo);
+    STATE.copiaSuDisco = miaCopia;
+  } catch (e) { console.warn('[Filo storage] copia di riserva non scritta alla chiusura:', e?.message || e); }
 }
 
 // Scrittura sincrona best-effort: aggiorna lo stato in memoria e scrive subito
@@ -532,6 +735,7 @@ module.exports = {
   flushNow,
   maxFlushOverlap,
   verificaMutazioni,
+  statoDisco,
   setSync,
   runIncognito,
   runNormale,
