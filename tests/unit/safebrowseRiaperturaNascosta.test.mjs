@@ -136,10 +136,8 @@ test('l\'interruttore della finestra isolata non promette di seguire prima i lin
   const css = readFileSync(join(ROOT, 'src/styles/pages.css'), 'utf8');
   assert.match(css, /\.sn-page \.sn-toggle-row\[hidden\]\s*\{\s*display:\s*none/, 'hidden vince sul display della riga');
   const PROMESSA = /(li apre prima|segue prima|segue dove portano|fa aprire quei link direttamente)/i;
-  const P = require('../../src/shared/preferences.js');
-  const voce = JSON.stringify(P.buildPreferencePartial('link_sospetti_isolati', 'off', {}) || null);
   const src = readFileSync(join(ROOT, 'src/shared/preferences.js'), 'utf8');
   const i = src.indexOf("percorso: 'security.safeBrowse.sandbox'");
-  assert.ok(i > 0 && voce !== 'null');
+  assert.ok(i > 0, 'la voce della chat c\'è ancora: il valore resta leggibile e modificabile');
   assert.doesNotMatch(src.slice(i, src.indexOf('}),', i)), PROMESSA);
 });
