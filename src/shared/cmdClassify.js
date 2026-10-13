@@ -1226,7 +1226,7 @@
     const assoluto = { ...c, cwd: null };
     const inRete = (p) => !!p && dove(p, assoluto) === MOTIVI.rete;
     if (prog === 'join-path') {
-      const resolve = testi.some((t) => /^-r/i.test(t) && 'resolve'.startsWith(t.slice(1).toLowerCase()));
+      const resolve = testi.some((t) => parametro(t, 'resolve', 1));
       if (c.stampaLibera && !resolve) return false;
       const parti = [];
       for (const t of testi) {
