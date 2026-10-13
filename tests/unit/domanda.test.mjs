@@ -162,7 +162,7 @@ test('archivia e riapri passano al server; un elenco oltre il tetto lo dice', as
   assert.ok(leggiArgomenti(['riapri']).errore);
   const f = finto({ archivia: { ok: true, domanda: { stato: 'chiusa' } }, elenco: { ok: true, domande: [{ id: 'D-1', priorita: 'bloccante', stato: 'aperta' }], altre: true } });
   assert.equal(await esegui(['archivia', 'D-4'], f.io), 0);
-  assert.deepEqual(f.chiamate[0], { op: 'archivia', id: 'D-4' });
+  assert.deepEqual(f.chiamate[0], { op: 'archivia', id: 'D-4', sessione: true });
   assert.match(f.out.join('\n'), /D-4 è chiusa/);
   assert.equal(await esegui(['elenco'], f.io), 0);
   assert.match(f.out.join('\n'), /Ce ne sono altre oltre le prime 1/);
