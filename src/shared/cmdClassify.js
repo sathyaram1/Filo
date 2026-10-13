@@ -440,10 +440,6 @@
   // I distruttivi di git (reset --hard, clean, branch -D, push --force…)
   // li intercetta DANGEROUS_FLAG_RE o il fatto che siano fuori dalle due liste.
   const GIT_DESTROY = new Set(['reset', 'clean', 'rm', 'gc', 'filter-branch', 'update-ref', 'prune']);
-  // Sotto-comandi che, davanti a un nome senza `--`, guardano se esiste come file
-  // nella cartella di lavoro per capire se è un rev o un percorso: in una cwd di
-  // rete quel controllo manda il nome al remoto, come farebbe `ls` (#1072.4).
-  const GIT_NOME_IN_CWD = new Set(['log', 'show', 'diff', 'rev-parse', 'blame', 'shortlog', 'whatchanged']);
 
   // npm/pip: il livello dipende dal sotto-comando.
   // NB: 'config' NON sta qui: `npm/pip config` è duale (get/list leggono, set/
