@@ -130,11 +130,22 @@ try {
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
     const clic = Date.now();
-    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser.
-    if (e.shiftKey) { riservaSeLaPaginaTace(e, clic); return; }
+    const prima = typeof contextMenuHandler === 'function' && sitoPrima();
+    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sui siti dove il tasto
+    // destro apre il loro menu, Shift è la strada per quello di Filo.
+    if (e.shiftKey && !prima) { riservaSeLaPaginaTace(e, clic); return; }
+    if (prima && !e.shiftKey) {
+      MenuDelSito.lasciaAllaPagina(e, (copia) => apriMenuDiFilo(copia, clic));
+      return;
+    }
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
+      if (prima) {
+        apriMenuDiFilo(e, clic, { conMaiusc: true });
+        try { e.stopImmediatePropagation(); } catch (_) {}
+        return;
+      }
       apriMenuDiFilo(e, clic);
       try { e.stopImmediatePropagation(); } catch (_) {}
       return;
