@@ -242,6 +242,7 @@ test('con la sessione del proprietario aperta, un sito visitato non genera codic
   expect(out.usciteDaiSiti, 'una richiesta di un sito è uscita verso il red team o verso il catalogo dei modelli').toEqual([]);
 
   // Da una pagina di Filo, con l'owner dentro, le stesse porte si aprono: la richiesta arriva fino alla rete.
+  expect(Object.keys(out.filo)).toHaveLength(5);
   for (const porta of Object.keys(out.filo)) {
     expect(String(out.filo[porta].code || ''), `filo/${porta}`).not.toMatch(/forbidden|not_admin/);
     expect(String(out.filo[porta].error || ''), `filo/${porta}: doveva arrivare alla rete`).toContain('rete finta');
