@@ -45,13 +45,14 @@
     return `${quantiMessaggi(n)} ${a.nel}${s ? ` su ${s}` : ''}`;
   }
 
-  // Al modello la riga, non lo scambio: il testo si rilegge con CERCA_CHAT e l'id. Il soggetto fra caporali, così
-  // un titolo che somiglia a una frase resta un nome.
+  // Al modello la riga, non lo scambio: il testo si rilegge con CERCA_CHAT e l'id. Il soggetto fra caporali e senza
+  // marcature, così il nome di un mazzo importato o di un documento resta un nome e non apre una busta.
   function testoPerModello(c) {
     const a = c && APP[c.app];
     if (!a) return '';
     const n = Array.isArray(c.messages) ? c.messages.length : 0;
-    const s = soggetto(c.soggetto);
+    const E = global.SN_ESTERNO;
+    const s = E && typeof E.neutralizza === 'function' ? E.neutralizza(soggetto(c.soggetto), { unaRiga: true }).trim() : soggetto(c.soggetto);
     return `(conversazione ${a.nel}${s ? ` su «${s}»` : ''}: ${quantiMessaggi(n)} fra l'utente e Filo. `
       + `Il testo non è qui: si rilegge con CERCA_CHAT e id "${c.id}")`;
   }
