@@ -556,8 +556,13 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
   - agire verso l'esterno.
 - **Nessun ambito** può approvare blocchi di sicurezza, cambiare la fiducia,
   creare ambiti o toccare le chiavi.
-- **I segreti** (casella di posta) stanno solo nell'ambiente cloud del compito
-  che li usa. Gli ambienti li crea l'owner.
+- **I segreti** stanno solo nell'ambiente cloud del compito che li usa. Gli
+  ambienti li crea l'owner.
+- **La casella di posta** la legge e la scrive solo il server: le credenziali
+  non arrivano mai a un agente. Chi legge la posta legge testo non fidato, e
+  con la password potrebbe anche spedire. L'agente riceve i messaggi come dati
+  e propone bozze; il server manda quelle approvate (azione `invia_mail`,
+  § 3.3).
 
 ### 5.2 Gli ambiti iniziali
 
