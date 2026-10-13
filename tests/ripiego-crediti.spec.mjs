@@ -981,21 +981,28 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
     await expect.poll(() => seen.completions.slice(prima).map((c) => c.key).join(','), { timeout: 10_000 }).toContain(PERSONAL_KEY);
   };
 
-  // Selezionata col mouse, come fa l'utente: la spiegazione anticipata parte solo dietro un gesto vero (#1070), ed è
-  // lei la risposta pagata che nessuno legge; il riquadro chiuso prima della sua risposta ferma la sua chiamata.
+  // «spiega» chiuso mentre la risposta pagata arriva: OpenRouter ha già aperto lo stream con la chiave personale, il
+  // riquadro chiuso ferma la sua chiamata, e l'avviso deve venire da lei. Selezione da script, senza gesto: nessuna
+  // spiegazione anticipata (#1070) che lo dica al posto suo (#1071.4).
   let prima = seen.completions.length;
-  await selezionaColMouse(page, '#t');
-  await expect.poll(() => seen.completions.slice(prima).some((c) => c.lastText.includes('ha selezionato un testo')),
-    { timeout: 10_000 }).toBe(true);
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup'))?.visibile, { timeout: 10000 }).toBe(true);
   await allaPersonale(prima);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('walletOwnKeyRefusal', null))?.usedCredits === true),
+    { timeout: 10_000 }).toBe(true);
   await clicca(app, page, '.sn-popup .sn-popup-close');
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
+  expect(seen.completions.slice(prima).filter((c) => c.lastText.includes('ha selezionato un testo'))).toEqual([]);
+  expect(await testoDi(app, page, '.sn-popup')).toBe('');
 
   // Il riquadro di modifica, chiuso con Esc prima della proposta. L'avviso sopra ha già parlato:
   // si riparte da una chiave nuova, come chi la cambia, per sentirlo di nuovo.
