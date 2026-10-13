@@ -303,10 +303,9 @@
   // non si muove più: quello che avanza sono file spaiate, che non sono una
   // marcatura di niente.
   //
-  // Si legge a scansione, una fila alla volta, e non con una regex: la regex
-  // ripartiva da ogni parentesi di una fila lunga, e ottomila «<» in un
-  // llms.txt fermavano il processo principale per secondi (#1173.1). La forma
-  // è la stessa: tests/unit/contenutoEsterno.test.mjs la confronta con la regex.
+  // A scansione e non a regex: la regex ripartiva da ogni parentesi di una fila
+  // lunga, e ottomila «<» in un llms.txt fermavano il main per secondi
+  // (#1173.1). Stessa forma: il test unitario la confronta con la regex.
   const MEZZO_MAX = 120;
   const FILA_MIN = 3;
   const APERTA = 0x3C;
