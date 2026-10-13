@@ -1,0 +1,38 @@
+// La riga che dice all'utente quale indirizzo Filo ha fermato per sicurezza e perché (#482). PURA, senza electron.
+// Non decide cosa fermare (lo fa isWebUnsafeNav in tabs.js) e non offre «Apri comunque»: qui non c'è niente da scavalcare.
+// Prova: tests/unit/indirizzoFermato.test.mjs.
+
+// L'indirizzo lo può aver scritto una pagina o un modello: si accorcia in mezzo, così restano l'inizio e il nome del file.
+const MAX_PERCORSO = 56;
+const MAX_SCHEMA = 24;
+
+function accorciato(s, max = MAX_PERCORSO) {
+  const t = String(s || '').replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const testa = Math.ceil((max - 1) / 3);
+  return `${t.slice(0, testa)}…${t.slice(t.length - (max - 1 - testa))}`;
+}
+
+function decodificato(s) {
+  try { return decodeURIComponent(s); } catch (_) { return s; }
+}
+
+// { testo, chiave } della notifica, o null se l'indirizzo non si legge. La chiave tiene una notifica per indirizzo.
+function avvisoIndirizzoFermato(rawUrl) {
+  let u;
+  try { u = new URL(String(rawUrl || '').trim()); } catch (_) { return null; }
+  const schema = u.protocol.toLowerCase();
+  let testo;
+  if (schema === 'file:') {
+    // file:///C:/x arriva come «/C:/x»: la barra davanti alla lettera del disco non è del percorso.
+    const percorso = decodificato(u.pathname).replace(/^\/(?=[a-z]:)/i, '') || '/';
+    if (u.hostname) testo = `Percorso di rete bloccato per sicurezza: ${accorciato(`//${u.hostname}${percorso}`)}`;
+    else if (/\/$/.test(percorso)) testo = `Cartella del computer bloccata per sicurezza: ${accorciato(percorso)}`;
+    else testo = `File del computer bloccato per sicurezza: ${accorciato(percorso)}`;
+  } else {
+    testo = `Indirizzo «${accorciato(schema, MAX_SCHEMA)}» bloccato per sicurezza`;
+  }
+  return { testo, chiave: `indirizzo-fermato:${testo}` };
+}
+
+module.exports = { avvisoIndirizzoFermato };
