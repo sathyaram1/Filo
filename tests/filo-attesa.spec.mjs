@@ -666,6 +666,7 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
 
 // L'altro lato di L2 (#814.2): il titolo c'è ma il modello sta ancora scrivendo la chiamata. Il fermo la annulla, e
 // «riprendi» lascia il modello libero di cercare: la ricerca si fa una volta, dopo, e non risulta fatta prima.
+// La chiamata resta a metà fino al fermo: «non ancora partita» a orologio (3 s) su una macchina carica diventa «partita».
 test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «riprendi» la fa, una volta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -673,7 +674,7 @@ test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «ripr
   await configureModel(app);
   await ricercaLenta(app, 300);
   await copione(app, [
-    { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 3_000, strumenti: [{ id: 'n1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
+    { pensa: ['Cerco gli orari. '], ogni: 100, finoAlFermo: true, strumenti: [{ id: 'n1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['Riprendo: cerco. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'n2', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['Ho gli orari. '], ogni: 100, testo: 'Ecco gli orari.' },
   ]);
