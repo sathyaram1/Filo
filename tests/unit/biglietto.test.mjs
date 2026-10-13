@@ -313,15 +313,15 @@ test('avvio: il figlio il cui biglietto del padre non si legge (file sparito, o 
   } finally { togliCartella(dir); }
 });
 
-test('avvio pulito: la riga che arriva alla sessione dice come dichiararsi sporca dopo una lettura esterna, in una riga sola', async () => {
-  // L'hook passa alla sessione solo la prima riga: senza l'avviso lì, una pagina web o una mail lette in locale lasciano il biglietto pulito.
+test('avvio pulito: la riga che arriva alla sessione dice cosa sporca da solo e cosa va dichiarato a mano, in una riga sola', async () => {
+  // L'hook passa alla sessione solo la prima riga: senza l'avviso lì, ciò che il gancio delle letture esterne non vede (#1211) lascia il biglietto pulito.
   const dir = repo();
   try {
     const s = server();
     const r = await B.avvio({ input: { session_id: 'nuova', source: 'startup' }, env: { CLAUDE_ENV_FILE: join(dir, 'env.sh') }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
     assert.match(r.riga, /^Biglietto della sessione: pulito\./);
     assert.ok(r.riga.includes('node scripts/biglietto.mjs sporca "'), r.riga);
-    for (const caso of ['pagina web', 'browser', 'posta', 'fuori dal repo', 'sotto-agente']) assert.ok(r.riga.includes(caso), `manca «${caso}»: ${r.riga}`);
+    for (const caso of ['pagine web', 'browser', 'posta', 'MCP', 'fuori dal repo', 'da sole', 'sotto-agenti', 'comando di shell']) assert.ok(r.riga.includes(caso), `manca «${caso}»: ${r.riga}`);
     assert.equal(r.riga.split('\n').length, 1);
     const sporca = server({ [SEGRETO('z')]: { fiducia: 'non_fidato' } });
     scriviBiglietto(dir, 'ripresa-2', SEGRETO('z'), FP('9'));
@@ -383,5 +383,107 @@ test('un figlio nasce con la fiducia di chi lo lancia anche da PowerShell: orche
     // Fuori da ogni sessione, dal terminale dell'owner, o con l'hook che vede il proprio nome: nasce pulito.
     assert.match((await nasce('dal-terminale', envFiglio({ PATH: '/bin' }, { cwd: dir }))).riga, /: pulito/);
     assert.match((await nasce('sola', { CLAUDE_CODE_SESSION_ID: 'sola' })).riga, /: pulito/);
+  } finally { togliCartella(dir); }
+});
+
+// ── Lo sporco annotato in locale quando il server non risponde (#1211) ──
+
+/** Un server dove `sporca` non arriva e il resto sì: lo stato risponde ancora «pulito». */
+function senzaSporca(s) {
+  return { ...s.deps, fetchImpl: async (url, init) => (JSON.parse(init.body).data.op === 'sporca' ? Promise.reject(new TypeError('fetch failed')) : s.deps.fetchImpl(url, init)) };
+}
+
+test('sporca col server giù: lo sporco resta annotato, il biglietto vale sporco anche qui e non registra rami; alla prossima occasione parte', async () => {
+  const dir = repo();
+  try {
+    const s = server({ [SEGRETO('a')]: { fiducia: 'fidato' } });
+    const sess = { CLAUDE_CODE_SESSION_ID: 'a' };
+    scriviBiglietto(dir, 'a', SEGRETO('a'), FP('1'));
+    const r = await B.sporca('pagina web', { env: sess, cwd: dir, deps: senzaSporca(s) });
+    assert.deepEqual([r.sporcati, r.inAttesa, r.errori.length], [0, 1, 1]);
+    assert.match(await B.rigaSporco('letto #9', ['testo non fidato'], { env: sess, cwd: dir, deps: senzaSporca(s) }), /annotato in locale/);
+    assert.equal(s.biglietti[SEGRETO('a')].fiducia, 'fidato', 'il server non l’ha ricevuto');
+    const [b] = B.trovaBiglietti({ env: sess, cwd: dir });
+    assert.deepEqual(B.sporchiInAttesa(b).map((v) => v.motivo), ['pagina web', 'letto #9: testo non fidato']);
+    // Lo stato del server dice pulito, ma qui si sa di più: sporco, e niente parte col suo nome.
+    assert.equal(await B.fiduciaLocale({ env: sess, cwd: dir, deps: senzaSporca(s) }), 'non_fidato');
+    assert.equal((await B.trovaBiglietto({ env: sess, cwd: dir, deps: senzaSporca(s) })).inAttesa, 2);
+    const reg = await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), env: sess, cwd: dir, deps: { ...senzaSporca(s), commitDelRamo: () => [] } });
+    assert.equal(reg.ok, false);
+    assert.match(reg.errore, /solo in locale/);
+    assert.equal(s.chiamate.filter((c) => c.op === 'ramo').length, 0);
+    // Il server torna: la prima chiamata che passa dal biglietto consegna tutto, una volta sola.
+    assert.equal(await B.fiduciaLocale({ env: sess, cwd: dir, deps: s.deps }), 'non_fidato');
+    assert.equal(s.biglietti[SEGRETO('a')].fiducia, 'non_fidato');
+    const consegnate = s.chiamate.filter((c) => c.op === 'sporca').map((c) => c.motivo);
+    assert.equal(consegnate.at(-1), 'pagina web; letto #9: testo non fidato');
+    assert.deepEqual(B.sporchiInAttesa(b), []);
+    assert.equal(B.sporcoSulServer(b), true, 'il gancio non richiama il server per un biglietto già sporco');
+    const prima = s.chiamate.length;
+    await B.fiduciaLocale({ env: sess, cwd: dir, deps: s.deps });
+    assert.equal(s.chiamate.filter((c, i) => i >= prima && c.op === 'sporca').length, 0, 'niente da riconsegnare');
+  } finally { togliCartella(dir); }
+});
+
+test('sporca: se non riesce nemmeno ad annotare, il motivo va al server lo stesso', async () => {
+  const dir = repo();
+  try {
+    const s = server({ [SEGRETO('a')]: { fiducia: 'fidato' } });
+    scriviBiglietto(dir, 'a', SEGRETO('a'), FP('1'));
+    writeFileSync(join(B.cartellaBiglietti(dir), 'sporchi'), 'non una cartella');
+    const r = await B.sporca('pagina web', { env: { CLAUDE_CODE_SESSION_ID: 'a' }, cwd: dir, deps: s.deps });
+    assert.equal(r.sporcati, 1);
+    assert.deepEqual(s.chiamate.filter((c) => c.op === 'sporca').map((c) => c.motivo), ['pagina web']);
+    const giu = await B.sporca('pagina web', { env: { CLAUDE_CODE_SESSION_ID: 'a' }, cwd: dir, deps: server({}, { rompi: true }).deps });
+    assert.deepEqual([giu.sporcati, giu.inAttesa], [0, undefined], 'né annotato né consegnato: lo dice, non lo dà per fatto');
+    assert.match(await B.rigaSporco('letto #9', ['x'], { env: { CLAUDE_CODE_SESSION_ID: 'a' }, cwd: dir, deps: server({}, { rompi: true }).deps }), /NON sporcato/);
+  } finally { togliCartella(dir); }
+});
+
+test('motivoDaConsegnare: senza doppioni, con un tetto che dice quante ne mancano, e l’ora della lettura se arriva tardi', () => {
+  assert.equal(B.motivoDaConsegnare([{ motivo: 'WebFetch (a.it)', at: 1000 }, { motivo: 'WebFetch (a.it)', at: 2000 }], 3000), 'WebFetch (a.it)');
+  const molte = Array.from({ length: 8 }, (_, i) => ({ motivo: `mcp__x__${i}`, at: 1000 }));
+  assert.match(B.motivoDaConsegnare(molte, 2000), /mcp__x__4; e altre 3 letture$/);
+  const tardi = B.motivoDaConsegnare([{ motivo: 'WebSearch', at: Date.parse('2026-10-13T07:00:00Z') }], Date.parse('2026-10-13T09:00:00Z'));
+  assert.equal(tardi, 'WebSearch (letto il 2026-10-13T07:00:00.000Z, consegnato in ritardo)');
+  assert.ok(B.motivoDaConsegnare([{ motivo: 'x'.repeat(500), at: 1 }], 10 * 60 * 1000).length < 300);
+  assert.equal(B.motivoDaConsegnare([{ motivo: '', at: 0 }], 5), 'lettura esterna');
+});
+
+test('avvio: chi eredita, o riprende, un biglietto con sporco solo annotato nasce sporco anche se il server dice pulito', async () => {
+  const dir = repo();
+  try {
+    const s = server({ [SEGRETO('p')]: { fiducia: 'fidato' } });
+    const padre = scriviBiglietto(dir, 'padre', SEGRETO('p'), FP('3'));
+    await B.sporca('pagina web', { env: { FILO_BIGLIETTO_FILE: padre }, cwd: dir, deps: senzaSporca(s) });
+    const figlio = await B.avvio({ input: { session_id: 'figlio', source: 'startup' }, env: { FILO_BIGLIETTO_FILE: padre }, cwd: dir, deps: senzaSporca(s), haCredenziale: conCredenziale });
+    assert.match(figlio.riga, /: sporco/);
+    assert.equal(figlio.path, padre);
+    // La copia col nome del figlio vede lo stesso sporco: sta accanto, per impronta.
+    assert.equal(await B.fiduciaLocale({ env: { CLAUDE_CODE_SESSION_ID: 'figlio' }, cwd: dir, deps: senzaSporca(s) }), 'non_fidato');
+    const ripresa = await B.avvio({ input: { session_id: 'padre', source: 'resume' }, env: {}, cwd: dir, deps: senzaSporca(s), haCredenziale: conCredenziale });
+    assert.match(ripresa.riga, /: sporco/);
+    assert.equal(s.biglietti[SEGRETO('p')].fiducia, 'fidato');
+    // Col server di nuovo raggiungibile l'avvio stesso consegna.
+    await B.avvio({ input: { session_id: 'figlio2', source: 'startup' }, env: { FILO_BIGLIETTO_FILE: padre }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    assert.equal(s.biglietti[SEGRETO('p')].fiducia, 'non_fidato');
+  } finally { togliCartella(dir); }
+});
+
+test('chiudi: consegna prima lo sporco annotato; chiuso sul server toglie anche quello, se la chiusura non passa lo lascia', async () => {
+  const dir = repo();
+  try {
+    const s = server({ [SEGRETO('c')]: { fiducia: 'fidato' }, [SEGRETO('d')]: { fiducia: 'fidato' } });
+    scriviBiglietto(dir, 'c', SEGRETO('c'), FP('4'));
+    await B.sporca('pagina web', { env: { CLAUDE_CODE_SESSION_ID: 'c' }, cwd: dir, deps: senzaSporca(s) });
+    const [b] = B.trovaBiglietti({ env: { CLAUDE_CODE_SESSION_ID: 'c' }, cwd: dir });
+    assert.equal((await B.chiudi({ env: { CLAUDE_CODE_SESSION_ID: 'c' }, cwd: dir, deps: s.deps })).chiusi, 1);
+    assert.deepEqual(s.chiamate.filter((c) => c.op === 'sporca' || c.op === 'chiudi').map((c) => c.op).slice(-2), ['sporca', 'chiudi']);
+    assert.equal(existsSync(B.cartellaSporchi(b)), false);
+    scriviBiglietto(dir, 'd', SEGRETO('d'), FP('5'));
+    await B.sporca('pagina web', { env: { CLAUDE_CODE_SESSION_ID: 'd' }, cwd: dir, deps: senzaSporca(s) });
+    const [d] = B.trovaBiglietti({ env: { CLAUDE_CODE_SESSION_ID: 'd' }, cwd: dir });
+    await B.chiudi({ env: { CLAUDE_CODE_SESSION_ID: 'd' }, cwd: dir, deps: server({}, { rompi: true }).deps });
+    assert.equal(B.sporchiInAttesa(d).length, 1, 'aperto sul server, la copia di un figlio lo può ancora usare');
   } finally { togliCartella(dir); }
 });
