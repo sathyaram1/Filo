@@ -1802,7 +1802,7 @@
     // copia che un giorno dice di sì dove questa dice di no.
     classifyLegacyBlock,
     classifyBlock, sortReview, REASONS, manageTabFor, listForManageTab, priorityOf,
-    workProgress, WORK_STAGES, inRiallineamento,
+    workProgress, WORK_STAGES, inRiallineamento, motivoDiStato,
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
