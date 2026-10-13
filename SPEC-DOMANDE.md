@@ -273,6 +273,10 @@ Tipi ammessi:
 - `esperimento` (approva un esperimento del monitoraggio oltre il suo budget,
   § 4.8);
 - `cancella_rami` (cancella i rami elencati nell'azione, § 4.7);
+- `invia_mail` (il server manda la mail: destinatario, oggetto, testo, e i
+  solleciti con il loro testo e dopo quanti giorni lavorativi. Un sollecito
+  parte solo se nella stessa conversazione non è arrivata risposta. L'owner
+  può correggere il testo prima di approvare, e il testo corretto è suo);
 - `compito` (l'opzione richiede lavoro: nasce il compito della § 3.5).
 
 Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
