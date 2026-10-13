@@ -1896,11 +1896,18 @@
     return codaPopup;
   }
 
+  // Si scioglie quando questa home ha avuto risposta sulle ricompense dell'avvio, o ha deciso di non chiederle:
+  // gli spec la aspettano invece di un tempo fisso (#1212).
+  let fineRicompenseAvvio = () => {};
+  const ricompenseAvvio = new Promise((ok) => { fineRicompenseAvvio = ok; });
+
   async function maybeShowFeedbackRewards() {
-    let res;
-    try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
-    if (!res || !res.ok || !Array.isArray(res.rewards) || !res.rewards.length) return;
-    renderFeedbackRewards(res.rewards, res.totalCredits || 0);
+    try {
+      let res;
+      try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
+      if (!res || !res.ok || !Array.isArray(res.rewards) || !res.rewards.length) return;
+      renderFeedbackRewards(res.rewards, res.totalCredits || 0);
+    } finally { fineRicompenseAvvio(); }
   }
 
   // Anima alcune "monete credito" dorate dal centro dello schermo verso l'icona
