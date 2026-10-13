@@ -70,8 +70,8 @@ export function scriviFile(path, { ticket, fp, natoIl }) {
 }
 
 /**
- * I biglietti di questa sessione: quello di FILO_BIGLIETTO_FILE se vale, altrimenti tutti quelli della cartella della
- * radice del repo (più d'uno: chi chiede la fiducia prende il più sporco). Nessuno = nessun biglietto, non fidato.
+ * I biglietti di questa sessione: quello di FILO_BIGLIETTO_FILE se vale, altrimenti tutti quelli della cartella del
+ * checkout principale (più d'uno: chi chiede la fiducia prende il più sporco). Nessuno = nessun biglietto, non fidato.
  */
 export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) {
   const daEnv = String(env[ENV_FILE] || '').trim();
@@ -79,7 +79,7 @@ export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) 
     const b = leggiFile(daEnv);
     if (b) return [b];
   }
-  const radice = radiceRepo(cwd);
+  const radice = radiceCondivisa(cwd);
   if (!radice) return [];
   const dir = cartellaBiglietti(radice);
   if (!existsSync(dir)) return [];
