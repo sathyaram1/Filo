@@ -82,8 +82,7 @@ test('Cronologia AI: ogni nome una volta, e la voce tiene tutte le righe con que
 
     // «Cancella tutto»: il menu si svuota dei nomi.
     await page.click('#clear');
-    const ok = page.locator('.sn-confirm-ok, [data-confirm-ok], button:has-text("Cancella")').last();
-    if (await ok.count()) await ok.click().catch(() => {});
+    await clickConfirm(page, 'ok', { timeout: 5_000 });
     await expect(page.locator('.sn-history-item')).toHaveCount(0);
     await expect(page.locator('#filter option')).toHaveCount(1);
   } finally {
