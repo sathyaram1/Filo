@@ -675,9 +675,12 @@
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
-  async function onContextMenu(e) {
+  // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
+  async function onContextMenu(e, opzioni) {
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
-    if (e.shiftKey) return;
+    if (e.shiftKey && !(opzioni && opzioni.conMaiusc)) return;
+    // Prima di ogni attesa: dopo, il cammino dell'evento non c'è più.
+    const sito = statoMenuDelSito(e);
 
     // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
     // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto
