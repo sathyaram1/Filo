@@ -111,6 +111,6 @@ test('ensure-electron non dice «già pronto» su un pacchetto rimasto indietro:
     const r = spawnSync(process.execPath, [join(dir, 'scripts', 'ensure-electron.mjs')], { encoding: 'utf8' });
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.doesNotMatch(r.stdout, /già pronto/);
-    assert.match(r.stdout, /Electron 33\.2\.0, ma il progetto chiede 44\.7\.0/);
+    assert.match(r.stdout, /Electron 33\.2\.0 e package-lock\.json chiede la 44\.7\.0/);
   } finally { togliCartella(dir); }
 });
