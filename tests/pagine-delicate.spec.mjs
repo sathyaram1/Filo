@@ -22,7 +22,9 @@ async function modelliFinti(app) {
     };
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ messages }) => {
       const testo = JSON.stringify(messages);
-      globalThis.__mandato.push({ tipo: /Riassumi in italiano/.test(testo) ? 'riassunto' : 'altro', testo });
+      // La home si prepara da sola quando un modello c'è, e vede i titoli delle schede aperte: non è un lavoro di queste prove.
+      const tipo = /Riassumi in italiano/.test(testo) ? 'riassunto' : /preparare la dashboard/.test(testo) ? 'home' : 'altro';
+      globalThis.__mandato.push({ tipo, testo });
       return { text: 'Riassunto finto della pagina.', provider: 'openrouter', model: 'stub', usage: {} };
     };
   });
@@ -96,7 +98,7 @@ test('con il riassunto delle schede chiuse spento non parte niente, e la scheda 
 
   const partito = await mandato(app);
   expect(partito.filter((m) => m.tipo === 'riassunto')).toEqual([]);
-  expect(partito.some((m) => /lievito|Ricetta del pane/.test(m.testo))).toBe(false);
+  expect(partito.some((m) => m.tipo !== 'home' && /lievito|Ricetta del pane/.test(m.testo))).toBe(false);
 });
 
 test('la pulizia automatica delle schede: di una pagina delicata al modello va solo il tipo, mai titolo, indirizzo o testo', async ({ app }) => {

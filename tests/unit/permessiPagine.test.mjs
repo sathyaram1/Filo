@@ -4,7 +4,9 @@
 import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, utimesSync } from 'node:fs';
+import { join } from 'node:path';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const Permessi = require('../../src/main/services/permessiPagine.js');
@@ -536,7 +538,10 @@ test('leggere la cartella o il file scelti nel selettore passa senza domanda: la
   assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('readable')), [true]);
   assert.deepEqual(chiedi(ses, wc, 'fileSystem', cartella('readable', '/home/anna/nota.txt', false)), [true]);
   assert.equal(ses.avvisi.length, 0);
-  assert.equal(ses.controllo(wc, 'fileSystem', 'https://carica-foto.example', {}), true, 'il controllo non chiude la lettura');
+  assert.equal(ses.controllo(wc, 'fileSystem', 'https://carica-foto.example', cartella('readable')), true, 'il controllo non chiude la lettura');
+  // Da Electron 39 il controllo è lo stato del file: un sì qui scriverebbe senza domanda.
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://carica-foto.example/', cartella('writable')), false);
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://carica-foto.example/', {}), false);
 });
 
 test('scrivere nella cartella data da leggere si chiede col nome della cartella; il no resta per il sito, la lettura no', () => {
@@ -596,4 +601,47 @@ test('dalla chat la risposta sulla modifica dei file si toglie come le altre', a
   const r = Permessi.togliPerChat('carica-foto.example', 'cartelle');
   assert.equal(r.tolte.length, 1);
   assert.deepEqual(chiedi(disco, wc, 'fileSystem', cartella('writable')), [], 'tolta: si richiede');
+});
+
+// Electron 39+ non manda più la richiesta di scrittura su una maniglia che il sito ha già: la fa partire la pagina.
+test('la pagina chiede di scrivere sulla cartella appena controllata: dopo un gesto vero, col suo nome, e il sì apre il controllo', async () => {
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://carica-foto.example/album');
+  wc.session = ses;
+  Permessi.seguiGesti(wc);
+  assert.equal(await Permessi.chiediScrittura(wc), null, 'nessun file controllato: niente domanda');
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://carica-foto.example/', cartella('writable')), false);
+  assert.equal(await Permessi.chiediScrittura(wc), null, 'senza un gesto vero niente domanda');
+  assert.equal(ses.avvisi.length, 0);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  const esito = Permessi.chiediScrittura(wc);
+  const domanda = ses.avvisi.find((a) => a.evento === 'chiedi').dati;
+  assert.deepEqual(domanda.oggetto, { nome: 'foto da caricare', percorso: '/home/anna/foto da caricare', cartella: true });
+  Permessi.rispondi(domanda.id, true);
+  assert.equal(await esito, true);
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://carica-foto.example/', cartella('writable')), true);
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://altro.example/', cartella('writable')), false, 'il sì vale per quel sito');
+});
+
+test('il file scelto in «Salva con nome» si scrive senza domanda, anche dopo un no; un file con dentro qualcosa no', (t) => {
+  const dir = cartellaTemporanea('filo-test-salva-');
+  t.after(() => togliCartella(dir));
+  const ses = sessioneFinta();
+  const wc = wcFinto('https://editor.example/');
+  chiedi(ses, wc, 'fileSystem', cartella('writable', '/home/anna/progetto'));
+  Permessi.rispondi(ses.avvisi.at(-1).dati.id, false);
+  const salvato = join(dir, 'disegno.svg');
+  writeFileSync(salvato, '');
+  const pieno = join(dir, 'nota.txt');
+  writeFileSync(pieno, 'testo');
+  const vecchio = join(dir, 'vuoto.txt');
+  writeFileSync(vecchio, '');
+  utimesSync(vecchio, new Date(Date.now() - 3_600_000), new Date(Date.now() - 3_600_000));
+  const controlla = (p) => ses.controllo(null, 'fileSystem', 'https://editor.example/', cartella('writable', p, false));
+  assert.equal(controlla(salvato), true);
+  writeFileSync(salvato, '<svg/>');
+  assert.equal(controlla(salvato), true, 'resta scrivibile dopo la prima scrittura');
+  assert.equal(controlla(pieno), false);
+  assert.equal(controlla(vecchio), false);
+  assert.equal(ses.controllo(null, 'fileSystem', 'https://editor.example/', cartella('writable', dir, true)), false, 'una cartella non è un salvataggio');
 });

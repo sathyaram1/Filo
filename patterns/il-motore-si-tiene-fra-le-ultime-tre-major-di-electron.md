@@ -27,7 +27,8 @@ salto si alzano lì `MAJOR` e `USCITA_STABILE`.
 ## Cosa si è rotto da 33 a 44
 
 - **Gli appunti nel main sono asincroni** (44): `readText`/`writeText` rendono una Promise, `readImage` e gli altri
-  lettori dedicati non ci sono più (si legge con `clipboard.read()` e il tipo MIME).
+  lettori dedicati non ci sono più (si legge con `clipboard.read()` e il tipo MIME). Una lettura senza `await` dà un
+  oggetto e sbaglia in silenzio: sentinella `tests/unit/appuntiDelMain.test.mjs`.
 - **La prima finestra arriva vuota a Playwright** (44): si prende con `primaFinestra(app)`
   (`tests/helpers/primaFinestra.mjs`), mai con `firstWindow()` nudo.
 - **Su Linux, in una sessione Wayland, Chromium parte su Wayland** (38): il lanciatore del pacchetto lo riporta su X,

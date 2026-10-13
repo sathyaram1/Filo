@@ -242,9 +242,18 @@ if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
   if (/^(https?|blob):/i.test(loc)) {
-    const { buildStatoPermessiSource } = require('./stato-permessi.js');
+    const { buildStatoPermessiSource, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE } = require('./stato-permessi.js');
     // Senza gesto: con `true` la pagina riceverebbe un clic mai fatto.
     webFrame.executeJavaScript(buildStatoPermessiSource(ipcRenderer.sendSync('filo:permessi-stato', loc)), false).catch(() => {});
+    // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
+    const scrittura = () => {
+      ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
+        .then((r) => window.dispatchEvent(new Event(r === null ? SCRITTURA_NIENTE : SCRITTURA_FINE)));
+    };
+    // La riscrittura da capo (document.open) toglie gli ascolti della finestra: si rimettono.
+    const ascoltaScrittura = () => window.addEventListener(SCRITTURA, scrittura, true);
+    ascoltaScrittura();
+    new MutationObserver(ascoltaScrittura).observe(document, { childList: true });
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
