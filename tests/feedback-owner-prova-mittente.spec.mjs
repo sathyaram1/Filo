@@ -48,7 +48,8 @@ test('l’owner spedisce col token fresco e la coda su disco non lo contiene mai
   const suDisco = await app.evaluate(async () => {
     const fs = process.getBuiltinModule('fs');
     const path = process.getBuiltinModule('path');
-    await new Promise((r) => setTimeout(r, 400)); // il debounce dello storage
+    // Il file si legge a scritture ferme: dopo un tempo fisso, sotto carico, poteva non esserci ancora (#1212).
+    await globalThis.__filoStorage.whenSettled();
     const coda = await globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.FEEDBACK_OUTBOX, []);
     const file = path.join(process.env.FILO_USER_DATA, 'storage.json');
     return { coda: JSON.stringify(coda), file: fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '' };
