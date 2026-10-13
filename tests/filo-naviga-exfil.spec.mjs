@@ -331,6 +331,7 @@ test('assistente sulla pagina: il collegamento col numero detto prima chiede l\'
   const forgiato = await manda({ type: 'apri_collegamento_filo', url: LINK, parole, confermato: true });
   expect(forgiato.aperto).toBe(false);
   expect(String(forgiato.conferma)).toContain('dato che hai scritto in chat');
+  expect((await manda({ type: 'apri_collegamento_filo', url: LINK, parole, confermato: true })).aperto, 'due OK forgiati di fila').toBe(false);
   const chiesto = await manda({ type: 'apri_collegamento_filo', url: LINK, parole });
   expect(chiesto.aperto).toBe(false);
   expect(String(chiesto.conferma)).toContain(LINK);
