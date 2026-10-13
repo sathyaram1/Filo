@@ -82,8 +82,7 @@ test('chi non è l’owner spedisce anonimo come prima, senza che si chieda un t
 });
 
 // #912: senza accesso valido la voce dell'owner non parte da anonima: aspetta, la cornice lo dice, e parte con la prova
-// quando l'owner rientra. Il rientro passa dall'accesso vero (solo il dialogo di Google è finto): prima il token tornava
-// da solo e la voce aspettava il giro del backoff, che con la macchina carica cadeva oltre il tetto del test (#1212).
+// quando l'owner rientra, dall'accesso vero col solo dialogo di Google finto (#1212: non al giro del backoff).
 test('l’owner senza accesso aspetta invece di partire da utente, e parte con la prova quando l’accesso torna', async ({ app, avvisi }) => {
   await banco(app, { admin: true });
   await app.evaluate(() => {
