@@ -1344,6 +1344,9 @@
     const righe = [];
     const b = stateBadge(fb);
     if (b) righe.push(riga('Stato', b.label + (b.showReason ? ` — ${b.reasonText}` : '')));
+    if (inRiallineamento(fb)) {
+      righe.push(riga('In breve', 'Il codice aveva passato verifica e sicurezza; main è andato avanti e il ramo si rifà sopra. Non è una bocciatura: il conto delle critiche non cambia.'));
+    }
     const nota = judgesNote(fb);
     if (nota && nota.text) righe.push(riga('In breve', nota.text));
     return righe;
