@@ -18,7 +18,7 @@ function segna(wc, si) {
 
 function chiudi(wc) {
   if (!wc) return;
-  try { if (wc.isDestroyed()) return; } catch (_) { return; }
+  try { if (typeof wc.isDestroyed === 'function' && wc.isDestroyed()) return; } catch (_) {}
   if (attese.has(wc)) return;
   if (!inSospeso.has(wc)) { try { wc.close(); } catch (_) {} return; }
   let timer = null;
