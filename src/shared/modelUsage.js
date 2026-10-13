@@ -44,7 +44,7 @@
 
   // Dove si imposta, in parole. Testo per l'utente: niente percorsi di file.
   const WHERE_USER = 'Opzioni → Modelli';
-  const WHERE_OWNER = 'Gestione → Modelli di supporto (riservato a chi gestisce Filo)';
+  const WHERE_OWNER = 'Gestione → Automazioni → Modelli di supporto (riservato a chi gestisce Filo)';
 
   function user(id, label, area, action, note) {
     return { id, label, area, from: 'user', ref: action, where: WHERE_USER, note: note || '' };

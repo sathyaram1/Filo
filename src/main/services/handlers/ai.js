@@ -113,6 +113,12 @@ module.exports = function register(on, ctx) {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
+    // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
+    const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
+    if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {
+      const d = esterno.documenti ? require('../aiutoDocumenti').perIlModello(sender && sender.wc) : null;
+      if (d) esterno.documenti = d; else delete esterno.documenti;
+    }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
@@ -129,7 +135,8 @@ module.exports = function register(on, ctx) {
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
   // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
   // pagina mostra i risultati mentre arrivano. Un giro per pagina: una ricerca nuova ferma quella di prima.
-  const { daFilo } = require('./origine');
+  const { daFilo, soloFilo } = require('./origine');
+  const NON_ADMIN = () => ({ ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' });
   const { settingsForOwnerAction } = require('../resolveSupportModel');
   const giriRicerca = new Map(); // jobId → giro
   let giriFatti = 0;
@@ -166,9 +173,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.MANAGE_SEARCH_CLASSIFY, async (msg, sender, origin) => {
     if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    if (!isAdmin()) {
-      return { ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-    }
+    if (!isAdmin()) return NON_ADMIN();
     const op = msg && msg.op;
     const jobId = msg && typeof msg.jobId === 'string' ? msg.jobId : '';
     if (op === 'stop') { fermaGiro(jobId); return { ok: true }; }
@@ -547,6 +552,40 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Lo stesso verdetto di ensureAllowedHost (openrouter.js), chiesto mentre si sceglie il modello.
+  // Da un sito vale solo un nickname del registro: un id qualunque lo mandano solo le pagine di Filo.
+  on(MSG.AUDIO_HOST_CHECK, async (msg, sender, origin) => {
+    const A = SN_CONST.ACTIONS;
+    const fn = msg.action === A.TTS ? 'audio_host_fn_tts' : (msg.action === A.TRANSCRIBE_AUDIO ? 'audio_host_fn_stt' : '');
+    if (!fn) return { ok: true, verdict: 'na' };
+    const s = await getEffectiveSettings();
+    const interna = daFilo(origin, sender);
+    let routing = providerRouting(s);
+    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando.
+    if (interna && Array.isArray(msg.excluded)) {
+      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string') });
+    }
+    let entry = null;
+    if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {
+      entry = { provider: msg.provider, model: msg.model.trim() };
+    } else {
+      const raw = (s.modelRegistry || {})[String(msg.nickname || '').trim()];
+      if (raw) entry = registryEntryToSingle(raw);
+    }
+    if (!entry || !entry.model) return { ok: true, verdict: 'na' };
+    const v = await modelGate.hostVerdict({
+      provider: entry.provider, apiKey: (s.apiKeys && s.apiKeys[entry.provider]) || '', model: entry.model, providerRouting: routing,
+    });
+    if (v.ok) return { ok: true, verdict: 'ok' };
+    const many = v.excluded.length > 1 ? '_many' : '';
+    const key = v.reason === 'unknown' ? 'audio_host_warn_unknown' : `audio_host_warn_${v.reason}${many}`;
+    const I18n = globalThis.SN_I18N;
+    const label = String((typeof msg.label === 'string' && msg.label.trim()) || msg.nickname || entry.model).slice(0, 120);
+    const nomi = new Intl.ListFormat('it', { type: 'conjunction' }).format(v.excluded);
+    const warning = I18n ? I18n.t(key, label, I18n.t(fn), nomi) : key;
+    return { ok: true, verdict: v.reason, hosts: v.excluded, warning };
+  });
+
   // Normalizza una entry del registry (nuovo schema { provider, model } o
   // vecchio duale { openrouter, … }) in { provider, model } — stessa logica
   // delle pagine Opzioni/admin.
@@ -642,7 +681,9 @@ module.exports = function register(on, ctx) {
     return (eff.apiKeys || {})[provider] || '';
   }
 
-  on(MSG.TEST_DEFAULT_MODEL, async (msg) => {
+  // Le prove spendono le chiavi predefinite: le chiedono solo le Opzioni e l'editor dei predefiniti,
+  // mai un sito visitato (#784.2).
+  on(MSG.TEST_DEFAULT_MODEL, soloFilo(async (msg) => {
     try {
       const nickname = (msg.nickname || '').trim();
       const explicitModel = (msg.model || '').trim();
@@ -653,9 +694,7 @@ module.exports = function register(on, ctx) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
         // riservato agli amministratori.
-        if (!isAdmin()) {
-          return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-        }
+        if (!isAdmin()) return NON_ADMIN();
         provider = 'openrouter';
         modelId = explicitModel;
       } else {
@@ -724,7 +763,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: provaFallita(e) };
     }
-  });
+  }));
 
   // Catalogo modelli di un provider, recuperato dal main con le chiavi
   // predefinite: la pagina admin non vede mai le chiavi vere, quindi non può
@@ -732,11 +771,9 @@ module.exports = function register(on, ctx) {
   // chiavi dell'utente). Solo metadati, nessuna inferenza. Ritorna
   // { ok, items: [{ id, label }] } già ordinati dal più recente e con
   // l'etichetta di categoria (Testo / Multimodale / Sintesi vocale / …).
-  on(MSG.DEFAULT_MODELS_LIST, async (msg) => {
+  on(MSG.DEFAULT_MODELS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const provider = 'openrouter';
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const apiKey = await defaultKeyFor(provider, Defaults.get());
@@ -759,15 +796,13 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
   // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
-  on(MSG.DEFAULT_PROVIDERS_LIST, async () => {
+  on(MSG.DEFAULT_PROVIDERS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const res = await fetch('https://openrouter.ai/api/v1/providers');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -779,7 +814,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // La domanda esce verso il motore di ricerca: passa dalla porta delle uscite come la
   // ricerca della chat (#810). Solo il blocco: qui non c'è un popup per l'OK in più.

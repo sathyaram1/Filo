@@ -373,7 +373,7 @@ Da oggi la fusione è una consegna del canale come le altre:
   la fusione nella collezione delle approvazioni con `preapproved: true`,
   `skippedL5: true`, `motivo: 'fiducia'` e **l'elenco intero** di ciò che L5
   aveva segnalato. Il blocco resta nel registro dei rifiuti. L'owner rilegge a
-  posteriori in Gestione → Automazioni, «Fuse senza chiedere». Lo stesso vale
+  posteriori in Gestione → Log, «Fuse senza chiedere». Lo stesso vale
   per «Salta il controllo» e per il finish locale (registro scritto da
   `verify-local start` e `finish` col biglietto della sessione). Lavoro non
   fidato → richiesta all'owner come prima. `mergePreapproved` non si scrive

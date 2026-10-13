@@ -1130,6 +1130,24 @@ const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo
 const SOLLECITO_DOPO_RIFIUTO = '[Il tuo ultimo messaggio è vuoto. Il testo che hai scritto insieme alle azioni l\'utente non l\'ha letto come risposta, '
   + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra.]';
 
+// Azioni che mettono un bottone in chat e basta: il loro esito si sa già quando le si chiama. Il bottone dell'evento
+// lo aziona l'utente, quindi non risulta «eseguito»: conta che sia in chat.
+const AZIONI_SOLO_BOTTONE = new Set(['APRI_FILE', 'EVENTO_CALENDARIO']);
+const soloBottone = (type) => AZIONI_SOLO_BOTTONE.has(String(type || '').toUpperCase());
+// Un giro di sole azioni così non dà al modello niente da leggere: il testo scritto insieme è già la risposta, non una
+// nota di lavoro, anche se il giro dopo aggiunge una frase («ti ho messo il bottone», #1167).
+const giroDiSoliBottoni = (results) => results.length > 0 && results.every(({ action, res }) => !!res
+  && !res.rejected && res.kept && !res.needsConfirm && !(res.output && res.output.blocked)
+  && soloBottone(action && action.type));
+// Al modello si dice sempre dove è finito il testo del giro: «l'utente la sta leggendo» solo se è rimasto nella bolla.
+// Un testo finito fra le note senza dirglielo restava sepolto lì, con qualunque azione nel giro (#1167).
+const NON_RIPETERE_LA_RISPOSTA = 'Il testo che hai scritto insieme a questa chiamata l\'utente lo sta leggendo come risposta: non ripeterlo e non '
+  + 'annunciare il bottone. Se non hai altro da fare, chiudi senza scrivere altro.';
+const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate l\'utente lo vede fra le note di lavoro, non come risposta: '
+  + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
+const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
+const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
 function refreshProxyRulesAllWindows() {
@@ -1333,6 +1351,13 @@ function perimetroLettura(sender) {
   return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
 }
 
+// La shell delle Preferenze che eseguirà i comandi dell'assistente, già risolta per questo sistema.
+async function shellDeiComandi() {
+  let settings = {};
+  try { settings = await Storage.getSettings(); } catch (_) {}
+  return require('./terminal').resolveShell(settings.terminal && settings.terminal.shell);
+}
+
 async function segretiCustoditi() {
   let salvate = {};
   let effettive = {};
@@ -1405,6 +1430,11 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
     const t = risultati.filter(Boolean).map((r) => `${r.title || ''}\n${r.url || ''}\n${r.snippet || ''}`).join('\n');
     fonti.push({ testo: t, fonte: 'dai risultati di una ricerca' });
   }
+  const documenti = payload && payload.esterno && payload.esterno.documenti && payload.esterno.documenti.risultati;
+  if (Array.isArray(documenti)) {
+    const t = documenti.filter(Boolean).map((r) => `${r.nome || ''}\n${r.inizio || ''}\n${r.squarcio || ''}`).join('\n');
+    fonti.push({ testo: t, fonte: 'dai documenti trovati sul disco' });
+  }
   let reg = LETTI_DALL_AIUTO.get(wc);
   if (!reg) {
     reg = SegretiLetti.registro(MAX_LETTI_AIUTO);
@@ -1449,7 +1479,7 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-async function controllaUscita(action, { sender = null, contesto = null, parole = '' } = {}) {
+async function controllaUscita(action, { sender = null, contesto = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
@@ -1461,6 +1491,7 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
     pagina: daPagina ? await testoDellaPagina(sender) : null,
     letti: (daPagina ? lettiDallAiuto(sender) : []).concat(SegretiLetti.tutti()),
     parole: typeof parole === 'string' ? parole : '',
+    domanda: typeof domanda === 'string' ? domanda : '',
     memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
     daPagina,
   });
@@ -1469,7 +1500,68 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
 // Un indirizzo che una pagina di Filo apre o passa al sistema l'ha scelto quasi sempre un modello (#810): passa dalla
 // porta qualunque gesto l'abbia chiesto (clic, menu del tasto destro, posta). Fermato, la pagina lo dice se `avvisa`.
 const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
-async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA' } = {}) {
+
+// #868.6 — un collegamento che un modello scrive, cliccato, chiede lo stesso OK che chiederebbe se lo aprisse lui. Il
+// verdetto lo dà chi ha il contesto quando il collegamento nasce (risposta della chat, home); al clic lo si ritrova qui.
+const LINK_DA_CONFERMARE = new Map(); // chiave del link → motivo
+const MAX_LINK_DA_CONFERMARE = 5000;
+const chiaveLinkUscita = (url) => {
+  const raw = String(url || '').trim();
+  try { const u = new URL(raw); return `${u.protocol}//${u.username}:${u.password}@${u.host.toLowerCase()}${u.pathname}${u.search}`; } catch (_) { return raw; }
+};
+function segnaLinkDaConfermare(url, motivo) {
+  const k = chiaveLinkUscita(url);
+  LINK_DA_CONFERMARE.delete(k);
+  LINK_DA_CONFERMARE.set(k, String(motivo || ''));
+  while (LINK_DA_CONFERMARE.size > MAX_LINK_DA_CONFERMARE) LINK_DA_CONFERMARE.delete(LINK_DA_CONFERMARE.keys().next().value);
+}
+// Le richieste di OK mostrate a una pagina web: solo quella pagina, per quel link, può tornare con l'OK (#250).
+const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
+
+const LINK_NEL_TESTO = /https?:\/\/[^\s<>"'`)\]]+/gi;
+const ENTITA_HREF = { '&amp;': '&', '&#39;': "'", '&quot;': '"', '&lt;': '<', '&gt;': '>' };
+// Gli indirizzi che la chat rende cliccabili, presi dallo stesso disegnatore che li disegna: ogni differenza fra come
+// li legge il controllo e come diventano collegamenti era una porta (#868.6). Il testo nudo resta, per gli altri disegni.
+function indirizziCliccabili(testo) {
+  const t = String(testo || '');
+  const out = [...t.matchAll(LINK_NEL_TESTO)].map((m) => m[0].replace(/[.,;:!?]+$/, ''));
+  try {
+    if (!globalThis.SN_MARKDOWN) require('../../shared/filoMarkdown.js');
+    const html = globalThis.SN_MARKDOWN.render(t);
+    for (const m of html.matchAll(/<a [^>]*href="([^"]*)"/g)) out.push(m[1].replace(/&(?:amp|#39|quot|lt|gt);/g, (e) => ENTITA_HREF[e]));
+  } catch (_) {}
+  return out;
+}
+// I collegamenti web di un testo scritto da un modello che, aperti da lui con questo contesto, chiederebbero l'OK.
+// `indirizzi` = quelli dei bottoni che il modello ha messo sotto la risposta, cliccabili come i collegamenti.
+async function linkCheChiedonoOk(testo, { sender = null, contesto = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
+  const out = [];
+  const visti = new Set();
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  let impostazioni = null;
+  for (const grezzo of [...indirizzi, ...indirizziCliccabili(testo)]) {
+    const url = typeof grezzo === 'string' ? grezzo.trim() : '';
+    if (!/^https?:\/\//i.test(url)) continue;
+    const k = chiaveLinkUscita(url);
+    if (visti.has(k) || visti.size >= 200) continue;
+    visti.add(k);
+    let u = null;
+    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, parole, domanda }); } catch (_) { u = null; }
+    if (!u || u.blocca || !u.exfil) continue;
+    let chiede = sempre;
+    if (!chiede && Levels) {
+      if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
+      const ing = Levels.ingressi({ type: 'NAVIGA', url, _exfil: true, _exfilReason: u.reason }, { richiesta, impostazioni });
+      chiede = !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+    }
+    if (!chiede) continue;
+    segnaLinkDaConfermare(url, u.reason);
+    out.push({ url, motivo: u.reason });
+  }
+  return out;
+}
+
+async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false } = {}) {
   const indirizzo = String(url || '').trim();
   let pagina = '';
   try { pagina = wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { pagina = ''; }
@@ -1482,6 +1574,29 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
   if (u.blocca) {
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
+  }
+  // Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente nel link chiede l'OK come per NAVIGA.
+  const daSito = /^https?:/i.test(pagina);
+  const k = chiaveLinkUscita(indirizzo);
+  const motivo = LINK_DA_CONFERMARE.get(k) ?? (chiedi ? String(chiedi) : '') ?? '';
+  let daChiedere = /^https?:/i.test(indirizzo) && (LINK_DA_CONFERMARE.has(k) || !!chiedi);
+  if (!daChiedere && daSito && u.exfil && /^https?:/i.test(indirizzo)) {
+    const Levels = globalThis.SN_ACTION_LEVELS;
+    let impostazioni = {};
+    try { impostazioni = await Storage.getSettings(); } catch (_) {}
+    const ing = Levels ? Levels.ingressi({ type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: u.reason }, { impostazioni }) : null;
+    daChiedere = !ing || decisioneAutonomia(ing, { sender: { wc, url: pagina }, assistente: true, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+  }
+  if (daChiedere) {
+    const chiesti = daSito && wc ? (OK_CHIESTI_AI_SITI.get(wc) || new Set()) : null;
+    const ok = confermato && (!chiesti || chiesti.delete(k));
+    if (!ok) {
+      // Un OK arrivato senza la domanda non ne apre una: altrimenti due OK forgiati di fila aprirebbero.
+      if (chiesti && !confermato) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
+      const Levels = globalThis.SN_ACTION_LEVELS;
+      const azione = { type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: motivo || u.reason || '' };
+      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo };
+    }
   }
   if (typeof apri === 'function') apri();
   return { aperto: true };
@@ -1821,6 +1936,7 @@ async function executeFiloAction(action, opzioni = {}) {
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
+  domanda = '',
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -1879,6 +1995,9 @@ async function eseguiAzioneFilo(action, {
       if (built && built.elenco) {
         const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
         if (r.invariato) action._invariato = r.invariato;
+        // #947.3 — «togli» una cartella dove l'utente ha cercato una volta: non è nell'elenco, ma c'è da dimenticare.
+        if (r.invariato && built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli'
+          && (await require('./documentiIndice').occasionaliFra(built.elenco.voci)).length) delete action._invariato;
         // #947 — una cartella dei documenti che non c'è non entra nell'elenco: si dice subito, senza chiedere un OK a vuoto.
         if (!r.invariato && built.elenco.percorso === 'documenti.cartelle' && built.elenco.op !== 'togli') {
           const mancanti = await require('./documentiIndice').cartelleMancanti(built.elenco.voci);
@@ -1896,7 +2015,7 @@ async function eseguiAzioneFilo(action, {
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
   // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
   try {
-    const u = await controllaUscita(action, { sender, contesto, parole });
+    const u = await controllaUscita(action, { sender, contesto, parole, domanda });
     if (u.blocca) {
       const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
       return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
@@ -1991,6 +2110,8 @@ async function eseguiAzioneFilo(action, {
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
+  // Il comando si giudica come lo legge la shell che lo eseguirà, e parte con quella stessa (#1072.1: cmd toglie i `^`).
+  if (type === 'ESEGUI_COMANDO') action._perimetro.shell = await shellDeiComandi();
 
   // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
   // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
@@ -2275,18 +2396,28 @@ async function eseguiAzioneFilo(action, {
         const state = await FiloMem.getOnboarding();
         if (state.done) return { executed: false, kept: false };
         const raw = action.spunta ?? action.spunte ?? action.fatto ?? action.done_items ?? action.ids;
-        const ids = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-        const { state: ticked } = Onboarding.tick(state, ids);
         const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+        // #1188 — la scelta dell'autonomia la fa l'utente sotto la risposta: qui si mostra e basta, il livello no.
+        // Finché è a schermo senza risposta la voce non si spunta e l'intervista non si chiude, anche da un'altra
+        // azione dello stesso turno: chiusa, la scelta sparirebbe con la chat. La regola sta nello stato dell'intervista.
+        const sceltaAutonomia = truthy(action.autonomia);
+        const inSospeso = sceltaAutonomia || Onboarding.autonomiaInSospeso(state);
+        const ids = (Array.isArray(raw) ? raw : (raw ? [raw] : []))
+          .filter((x) => !(inSospeso && String(x || '').trim().toLowerCase() === 'autonomia'));
+        const spuntato = Onboarding.tick(state, ids).state;
+        const ticked = sceltaAutonomia ? Onboarding.mostraSceltaAutonomia(spuntato) : spuntato;
         // L'intervista finisce quando lo dice Filo, quando l'elenco è finito, o
         // quando è andata troppo per le lunghe: chiudere è comunque lo stato in
         // cui l'utente vuole trovarsi, e da Preferenze la si rilancia.
-        const wantsEnd = truthy(action.fine ?? action.chiudi ?? action.done ?? action.finito);
+        const wantsEnd = !inSospeso && truthy(action.fine ?? action.chiudi ?? action.done ?? action.finito);
         const next = (wantsEnd || Onboarding.shouldForceClose(ticked))
           ? Onboarding.close(ticked)
           : ticked;
         await saveOnboarding(next);
-        return { executed: true, kept: false };
+        if (!sceltaAutonomia) return { executed: true, kept: false };
+        let livello = '';
+        try { livello = globalThis.SN_AUTONOMIA.livelloAttivo(((await Storage.getSettings()) || {}).autonomia?.livello); } catch (_) {}
+        return { executed: true, kept: true, output: { sceltaAutonomia: true, livello } };
       }
       case 'SALVA_LEZIONE': {
         // Qui ci si arriva solo dopo l'OK dell'utente sul testo esatto (livello
@@ -2355,8 +2486,14 @@ async function eseguiAzioneFilo(action, {
         if (action._invariato) return { executed: false, kept: false, output: { error: action._invariato, invariato: true } };
         // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
         let partial = built.partial;
+        let dimenticate = 0;
         if (built.elenco) {
           const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          if (built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli') {
+            const Indice = require('./documentiIndice');
+            for (const c of await Indice.occasionaliFra(built.elenco.voci)) dimenticate += (await Indice.dimentica(c)).tolta ? 1 : 0;
+          }
+          if (r.invariato && dimenticate) return { executed: true, kept: true, output: { etichetta: `${built.label} (Filo ne dimentica i documenti già letti)` } };
           if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
           partial = r.partial;
         }
@@ -2446,7 +2583,12 @@ async function eseguiAzioneFilo(action, {
         const settings = await Storage.getSettings();
         let permessiSiti = null;
         try { permessiSiti = require('./permessiPagine').righeRicordate(); } catch (_) {}
-        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti } });
+        let cartelleCercate = null;
+        try {
+          cartelleCercate = (await require('./documentiIndice').stato()).occasionali
+            .map((o) => `${o.nome} (${o.percorso}, ${o.documenti} documenti già letti${o.esiste ? '' : ', ora non c\'è'})`);
+        } catch (_) {}
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti, cartelleCercate } });
         return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
       }
       case 'TOGLI_PERMESSO_SITO': {
@@ -2781,9 +2923,7 @@ async function eseguiAzioneFilo(action, {
         // che il gate ha valutato e ciò che lanciamo (stessa stringa `comando`).
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim();
         if (!cmd) return { executed: false, kept: true, output: { command: '', blocked: 'empty' } };
-        let settings = {};
-        try { settings = await Storage.getSettings(); } catch (_) {}
-        const shell = settings.terminal && settings.terminal.shell;
+        const shell = (action._perimetro && action._perimetro.shell) || await shellDeiComandi();
         const { runCommand } = require('./terminal');
         // cwd PERSISTENTE: partiamo dalla cartella corrente dell'assistente e
         // catturiamo quella risultante, così un `cd` resta valido per il comando
@@ -3586,67 +3726,15 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
-// #947 — re-immissione di quello che CERCA_DOCUMENTI ha trovato. Fuori dalla busta solo le frasi di Filo e i
-// numeri dell'indice; nomi, cartelle, percorsi e pezzi di testo stanno dentro: li ha scritti chi ha fatto i file.
-function dataBreve(ms) {
-  const d = new Date(Number(ms) || 0);
-  return Number.isNaN(d.getTime()) || !ms ? '' : d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+// #947 — re-immissione di quello che CERCA_DOCUMENTI ha trovato: la compone PROMPTS.documentiTrovati, la stessa
+// dell'Aiuto di una scheda.
 function documentSearchesForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
-  const E = globalThis.SN_ESTERNO;
   const blocks = [];
   for (const a of actions) {
     if (!a || String(a.type || '').toUpperCase() !== 'CERCA_DOCUMENTI') continue;
-    const out = a._output;
-    if (!out || !('cercato' in out)) continue;
-    const cercato = E.perCanaleSistema(out.cercato || '');
-    if (out.errore) { blocks.push(`[La ricerca fra i documenti "${cercato}" non è riuscita: dillo all'utente.]`); continue; }
-    if (out.cartellaMancante) {
-      blocks.push(`[La cartella "${E.perCanaleSistema(out.cartellaMancante)}" non c'è sul computer: chiedi all'utente dove sta, o cerca senza cartella.]`);
-      continue;
-    }
-    const ind = out.indice || {};
-    const cartelle = (Array.isArray(ind.cartelle) ? ind.cartelle : []).map((c) => `${E.perCanaleSistema(c.nome || '')}${c.esiste ? (c.negata ? ' (il sistema non la lascia leggere)' : '') : ' (non c\'è)'}`);
-    const dove = cartelle.length ? `nelle cartelle ${cartelle.join(', ')}` : 'in nessuna cartella (l\'elenco è vuoto: si cambia con la preferenza cartelle_documenti)';
-    const conti = `${ind.documenti || 0} documenti${ind.scansioni ? `, di cui ${ind.scansioni} scansioni senza testo (si trovano solo per nome)` : ''}`
-      + `${ind.senzaTesto ? `, ${ind.senzaTesto} di cui Filo non sa leggere il testo` : ''}`;
-    const note = [];
-    if (out.fermata) note.push('L\'utente ha FERMATO la ricerca mentre Filo leggeva i documenti nuovi: i risultati vengono solo da quelli già letti. Dillo in una riga.');
-    if (ind.troppi) note.push('Le cartelle hanno più documenti di quanti Filo ne guardi in un giro: alcuni possono mancare.');
-    const negate = Array.isArray(ind.negate) ? ind.negate : [];
-    if (negate.length) {
-      note.push(`Il sistema NON lascia leggere a Filo ${negate.map((c) => E.perCanaleSistema(c.nome || c.percorso || '')).join(', ')}: lì non ha guardato, `
-        + `quindi non dire che il documento non c'è. Spiega all'utente che manca il permesso e come darlo (${E.perCanaleSistema(ind.comePermesso || '')}), poi di richiedere.`);
-    }
-    const r = Array.isArray(out.risultati) ? out.risultati : [];
-    if (!r.length) {
-      blocks.push(`[Nessun documento combacia con "${cercato}" fra i ${conti} ${dove}. `
-        + 'Riprova con altre parole che quel documento conterrebbe (l\'ente che lo manda, il tipo, il mese scritto in numeri, l\'anno) prima di '
-        + 'dire all\'utente che non c\'è; se non c\'è, digli in quali cartelle hai guardato e che può aggiungerne.'
-        + `${note.length ? ` ${note.join(' ')}` : ''}]`);
-      continue;
-    }
-    const righe = r.map((x, i) => {
-      const tipo = x.tipo === 'pdf' ? `PDF${x.pagine ? `, ${x.pagine} ${x.pagine === 1 ? 'pagina' : 'pagine'}` : ''}` : (x.tipo || '');
-      const stato = x.scansione ? ' · SCANSIONE: niente testo, trovato solo per il nome'
-        : (x.senzaTesto === 'nuvola' ? ' · sta solo nel cloud (OneDrive, iCloud): Filo non lo scarica per leggerlo, trovato solo per il nome'
-          : (x.senzaTesto ? ' · testo non leggibile da Filo, trovato solo per il nome' : ''));
-      return [
-        `${i + 1}. ${x.nome} · ${dataBreve(x.data)} · ${tipo}${stato}`,
-        `   percorso: ${x.percorso}`,
-        x.inizio ? `   inizio: ${x.inizio}` : '',
-        x.squarcio ? `   testo: ${x.squarcio}` : '',
-        `   combacia con: ${(x.trovati || []).join(', ')}`,
-      ].filter(Boolean).join('\n');
-    });
-    blocks.push(
-      `[Ricerca fra i documenti dell'utente: "${cercato}". Ho guardato ${conti} ${dove}. I candidati, dal più probabile:]\n`
-      + E.imbusta({ tipo: 'DOCUMENTI_TROVATI', testo: righe.join('\n'), conIntestazione: true })
-      + '\n[Scegli tu quello giusto guardando il testo (periodo, tipo, ente, data): mostralo con APRI_FILE col suo percorso e di\' in una '
-      + 'frase perché è quello. Se due si somigliano, leggili con LEGGI_DOCUMENTO prima di scegliere. Non inventare quello che il testo non dice.'
-      + `${note.length ? ` ${note.join(' ')}` : ''}]`,
-    );
+    const t = PROMPTS.documentiTrovati(a._output, { per: 'chat' });
+    if (t) blocks.push(t);
   }
   return blocks.join('\n\n').trim();
 }
@@ -3816,7 +3904,7 @@ const LEGACY_CONTINUE_NUDGE =
 // conferma, proposto come bottone, rifiutato. La riga sulla conferma dice
 // esplicitamente di NON richiamare l'azione: il popup è già davanti all'utente,
 // e un modello che la ritenta lo farebbe comparire due volte.
-function toolResultText({ action, res, rendered }) {
+function toolResultText({ action, res, rendered }, giro = null) {
   const type = String(action.type || '').toUpperCase();
   const describe = () => { try { return descriviPerModello(action) || type; } catch (_) { return type; } };
   // `rejected` è il solo «non è un'azione» (fuori registro, argomenti rotti,
@@ -3934,6 +4022,16 @@ function toolResultText({ action, res, rendered }) {
     const saltati = Array.isArray(o.saltati) && o.saltati.length
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
+  }
+  if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
+    const A = globalThis.SN_AUTONOMIA;
+    const ora = A ? A.infoLivello(res.output.livello).nome : '';
+    return `Sotto la tua risposta l'utente vede i livelli di autonomia${ora ? ` (adesso è ${ora})` : ''} e sceglie lui con un clic: `
+      + `la scelta ti arriva come suo messaggio. Non dire di averlo cambiato tu.${doveStaIlTesto(giro)}`;
+  }
+  if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
+  if (soloBottone(type) && res.kept && !res.needsConfirm) {
+    return `Proposta all'utente come bottone in chat, sotto la tua risposta: ${describe()}.${doveStaIlTesto(giro)}`;
   }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
@@ -4357,6 +4455,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // Il compito è la conversazione di questa scheda come la vede il modello: nel filo, più la coda.
   const conversazioneScheda = filo && chatId ? [...vistiDalFilo.filter((m) => m && m.chat === chatId), ...codaScheda] : codaScheda;
   const richiesta = [...conversazioneScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
+  // Le parole di adesso: un indirizzo può portarle fuori, quelle dette prima no senza un OK (#868.6). Un turno che riprende
+  // rifà l'ultima richiesta della scheda; il testo di un suggerimento l'ha scritto un modello.
+  const ultimaDellaScheda = conversazioneScheda.filter((m) => m && m.role !== 'filo' && !m.daModello).pop();
+  const domandaDiAdesso = daModello ? '' : internal ? String((ultimaDellaScheda && ultimaDellaScheda.text) || '') : String(userMessage || '');
   for (const m of codaScheda) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     const fuori = FCx.letturaDaFuori(m);
@@ -4456,6 +4558,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const rawActions = [];
   const renderedActions = [];
   const notes = [];
+  // I testi dei giri di soli bottoni, in ordine: aprono la risposta (#1167). Una nota scritta prima dell'ultimo di
+  // loro non diventa risposta a giro finale muto.
+  const risposta = [];
+  let noteAllaRisposta = 0;
   // Quante note erano già scritte all'ultimo «non disponibile»: quelle lo
   // davano per fatto, una nota successiva è scritta sapendolo (#771).
   let noteAlRifiuto = -1;
@@ -4530,6 +4636,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     nascostiDellaChat = nascostiDi(filo);
     return true;
   };
+  // Turno finito prima del suo ultimo giro (fermato, o un guasto): nell'archivio restano le azioni successe davvero e la
+  // parte di risposta già scritta coi bottoni, come nella bolla. Riaperta, la chat racconta lo stesso.
+  const archiviaGiaFatto = async () => {
+    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
+    const giaScritta = unisciTesti(risposta);
+    if (!chatId || (!successe.length && !giaScritta)) return;
+    const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+    const dopo = await appendToChatArchive(chatId, { role: 'filo', text: giaScritta, actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    const ultimo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
+    if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
+  };
   let fermato = false;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
@@ -4596,7 +4713,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto: azioniViste, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -4652,10 +4769,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       if (fermato) break;
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
-      if (text.trim()) notes.push(text.trim());
+      // Quello di un giro di soli bottoni invece resta nella bolla.
+      const diRisposta = !!text.trim() && giroDiSoliBottoni(results);
+      const fraLeNote = !!text.trim() && !diRisposta;
+      if (diRisposta) {
+        risposta.push(text.trim());
+        noteAllaRisposta = notes.length;
+        // Scritto dopo aver letto ogni esito: un «non disponibile» precedente non lo smentisce più.
+        noteAlRifiuto = -1;
+      } else if (text.trim()) notes.push(text.trim());
       if (roundRendered.some(esitoNonDisponibile)) noteAlRifiuto = notes.length;
-      push('filo:action', { kind: 'round', text });
-      textReply = text;
+      push('filo:action', { kind: 'round', text, ...(diRisposta ? { risposta: true } : {}) });
+      textReply = diRisposta ? '' : text;
       reasoningDetails = r.reasoningDetails || [];
       if (legacy) {
         // Formato vecchio: si prosegue solo se un esito deve tornare al modello
@@ -4663,11 +4788,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         const obs = observationsForPrompt(roundRendered);
         if (!obs || roundRendered.some((x) => x._confirm)) { exhausted = false; break; }
         threadMessages.push({ role: 'assistant', content: r.text });
-        threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}` });
+        threadMessages.push({ role: 'user', content: `${obs}\n\n${LEGACY_CONTINUE_NUDGE}${fraLeNote ? `\n\n${RISPOSTA_FRA_LE_NOTE}` : ''}` });
         continue;
       }
       threadMessages.push(Tools.assistantMessage({ text, toolCalls, reasoningDetails: r.reasoningDetails }));
-      for (const x of results) threadMessages.push(Tools.toolMessage(x.action._callId, toolResultText(x)));
+      results.forEach((x, i) => {
+        const esito = toolResultText(x, { risposta: diRisposta });
+        threadMessages.push(Tools.toolMessage(x.action._callId, fraLeNote && i === results.length - 1 ? `${esito} ${RISPOSTA_FRA_LE_NOTE}` : esito));
+      });
     }
   } catch (e) {
     // Il turno è fallito (rete, provider, crediti): la prenotazione della
@@ -4678,6 +4806,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // c'è). Viaggiano con l'errore, così un «Riprova» riparte sapendo cosa era
     // già stato fatto invece di rifarlo.
     try { e.filoActions = renderedActions; } catch (_) {}
+    // La risposta scritta coi bottoni era già arrivata: un giro dopo che fallisce non la toglie dalla chat (#1167).
+    if (unisciTesti(risposta)) {
+      try { await archiviaGiaFatto(); } catch (err) { console.warn('[Filo] archivio della risposta prima del guasto:', err?.message || err); }
+    }
     throw e;
   } finally {
     if (reasoningReqId && turniInCorso.get(String(reasoningReqId)) === turno) turniInCorso.delete(String(reasoningReqId));
@@ -4686,15 +4818,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // Lo stop resta scritto nell'intervista: una scheda nuova o una pagina ricaricata non rifà il turno fermato.
     if (onbActive) await saveOnboarding(Onboarding.segnaFermato(await FiloMem.getOnboarding()));
     if (onbActive && !internal) releaseOnboardingResume();
-    // Nell'archivio della chat restano le azioni che sono successe davvero: riaperta, la chat racconta cosa era stato
-    // fatto prima che l'utente fermasse.
-    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
-    if (chatId && successe.length) {
-      const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
-      const dopo = await appendToChatArchive(chatId, { role: 'filo', text: '', actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
-      const fermo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
-      if (fermo && fermo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, fermo.ts, { azioni: successe });
-    }
+    await archiviaGiaFatto();
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
       model: r && r.model, provider: r && r.provider,
@@ -4705,23 +4829,29 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // placeholder confuso ("hai scritto tu vuoto o è stato prodotto da filo?").
   // Il fallback "(vuoto)" resta SOLO per la risposta davvero vuota (niente
   // testo E niente azioni), che sarebbe altrimenti una bolla muta.
+  // La nota che diventa risposta: la scheda la toglie dal blocco, dove l'aveva già messa.
+  let notaRisposta = '';
   if (exhausted) {
     const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
-    const last = String(textReply || '').trim();
+    const last = unisciTesti([...risposta, textReply]);
     textReply = last ? `${last}\n\n${stop}` : stop;
   } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
     // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
     // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
-    const prima = notes.pop();
-    textReply = prima
+    const prima = notes.length > noteAllaRisposta ? notes.pop() : '';
+    if (prima) notaRisposta = prima;
+    textReply = unisciTesti([...risposta, prima
       ? `${RISPOSTA_PROXY_NON_DISPONIBILE}\n\nPrima di saperlo avevo scritto: «${prima}»`
-      : RISPOSTA_PROXY_NON_DISPONIBILE;
-  } else if (!String(textReply || '').trim() && notes.length) {
+      : RISPOSTA_PROXY_NON_DISPONIBILE]);
+  } else if (!String(textReply || '').trim() && notes.length > noteAllaRisposta) {
     // Ultimo giro muto dopo un giro con azioni: la frase scritta insieme alle
     // azioni («Ti metto la sveglia alle 7, buonanotte!») era la risposta, non
     // una nota di lavoro. Lasciarla nel blocco chiuso voleva dire un turno
     // senza nessuna bolla. Torna alla scheda come testo, e non più come nota.
-    textReply = notes.pop();
+    notaRisposta = notes.pop();
+    textReply = unisciTesti([...risposta, notaRisposta]);
+  } else {
+    textReply = unisciTesti([...risposta, textReply]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
@@ -4758,6 +4888,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
   let lettiRisposta = [];
   try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
+  // I collegamenti della risposta che il modello non avrebbe potuto aprire senza un OK lo chiedono anche al clic (#868.6).
+  let linkDaConfermare = [];
+  try {
+    linkDaConfermare = await linkCheChiedonoOk(textReply, {
+      sender, contesto: azioniViste, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
+      indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
+    });
+  } catch (e) { console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e); }
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
@@ -4771,6 +4909,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       {
         role: 'filo', text: textReply, actions: successe,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
+        ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(cambi.length ? { cambi } : {}),
       },
       { onboarding: onbActive },
@@ -4796,7 +4935,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (onbActive) {
     let after = await FiloMem.getOnboarding();
     if (textReply && textReply !== '(vuoto)') {
-      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply, ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}) });
+      after = Onboarding.appendTurn(after, {
+        role: 'filo', text: textReply,
+        ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}),
+        ...(renderedActions.some((x) => x && x._output && x._output.sceltaAutonomia) ? { autonomia: true } : {}),
+      });
     }
     if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
     await saveOnboarding(after);
@@ -4827,7 +4970,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // giro: la scheda li tiene con la conversazione, e il ragionamento torna
     // al modello al turno dopo.
     notes, reasoningDetails,
+    ...(notaRisposta ? { notaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
+    ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
     ...(keyFallback ? { keyFallback } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
@@ -4935,7 +5080,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     openTabsCount, partOfDay, dayType, dateKey,
   });
 
-  return { settings, canServe, payload, signature, saved };
+  // Le parole dell'utente che la home ha davanti: un suggerimento che le porta fuori chiede l'OK al clic (#868.6).
+  const parole = conversazioni.filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || '')).join('\n');
+  return { settings, canServe, payload, signature, saved, parole };
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
@@ -5116,7 +5263,14 @@ async function generateDashboardFromInputs(inputs) {
   for (let i = 0; i < suggestions.length; i++) {
     let u = null;
     try { u = suggestions[i].action ? await controllaUscita(suggestions[i].action) : null; } catch (_) {}
-    if (u && u.blocca) suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase };
+    if (u && u.blocca) { suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase }; continue; }
+    // La home legge titoli di pagine e frasi di Filo, cioè testo di altri: un indirizzo con un dato dell'utente chiede l'OK.
+    const a = suggestions[i].action;
+    const url = a && /^(?:NAVIGA|APRI_FILE)$/i.test(String(a.type || '')) ? String(a.url || a.path || '') : '';
+    if (!/^https?:/i.test(url)) continue;
+    let chiede = [];
+    try { chiede = await linkCheChiedonoOk('', { parole: inputs.parole || '', sempre: true, indirizzi: [url] }); } catch (_) { chiede = []; }
+    if (chiede.length) suggestions[i] = { ...suggestions[i], chiedeOk: chiede[0].motivo };
   }
   await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
   return { message, suggestions, ts: new Date().toISOString() };
@@ -5272,6 +5426,7 @@ const handlerCtx = {
   ricordaLettoInChat,
   decisioneAzionePagina,
   segnaLetturaAiuto,
+  fileScaricato,
   nuovaConversazioneAiuto,
   maybeRunCompactor,
   // Archivio delle chat (#525)

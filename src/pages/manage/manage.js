@@ -3,8 +3,8 @@
 // layout a 3 colonne (lista filtrata per tab / dettaglio / pannello laterale):
 // la lista a sinistra mostra il sottoinsieme di feedback della tab corrente,
 // il dettaglio al centro ne mostra la conversazione + azioni contestuali
-// (sblocco per i bloccati, risposta per i chiarimenti). Le tab "Statistiche
-// Red Team" e "Modelli di supporto" sono segnaposto per ora.
+// (sblocco per i bloccati, risposta per i chiarimenti). "Automazioni" tiene
+// anche i Modelli di supporto (#1110); la traccia delle fusioni sta nel Log.
 
 (function () {
   'use strict';
@@ -77,6 +77,10 @@
   const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
   const mgAccountsWarn    = document.getElementById('mgAccountsWarn');
   const mgPriorityWarn    = document.getElementById('mgPriorityWarn');
+  // Modello e sforzo per fase: le tendine le crea buildRoleModels, una per `${ruolo}.${campo}`.
+  const mgRoleModels      = document.getElementById('mgRoleModels');
+  const mgRoleModelsMsg   = document.getElementById('mgRoleModelsMsg');
+  const roleSelects       = new Map();
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
@@ -141,16 +145,15 @@
   const mgReopenConfirm = document.getElementById('mgReopenConfirmBtn');
   const mgSegnoConferma = document.getElementById('mgSegnoConferma');
 
-  // Risposta ai chiarimenti (owner-only)
-  const mgClarify     = document.getElementById('mgClarify');
-  const mgClarifyText = document.getElementById('mgClarifyText');
-  const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
-  const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
-  // La casella sotto la conversazione e quella nel pannello del rombo verde
-  // (#1033) sono la stessa risposta: una bozza per pratica, fuori dai nodi che
-  // i ridisegni ricostruiscono, e un solo invio per volta.
+  // Risposta alle domande di Claude (owner-only), nel pannello del rombo verde:
+  // bozza ed esito stanno fuori dai nodi che i ridisegni ricostruiscono, un
+  // solo invio per volta per pratica.
   const bozzeRisposta = new Map();
   const rispostaInVolo = new Set();
+  let esitoRisposta = { text: '', kind: '' };
+  // La pratica che aveva già le domande al disegno prima: il pannello si apre
+  // da sé quando arrivano, non a ogni ridisegno dopo che l'owner l'ha chiuso.
+  let attesaDisegnata = null;
   // Frase per chi ha segnalato: il modulo (`mgUserNote`) sta chiuso finché non
   // lo si apre col tasto della barra (`mgUserNoteToggle`).
   const mgUserNote       = document.getElementById('mgUserNote');
@@ -371,7 +374,16 @@
   // Vero da quando l'avvio ha chiesto le impostazioni: un accesso arrivato dopo le richiede di nuovo.
   let impostazioniAvviate = false;
   function caricaImpostazioni() {
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadJudgeTimeout(), loadMergeApprovals()]);
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
+      .finally(fineLetturaAutomazioni);
+  }
+
+  // Finché la prima lettura non risponde i controlli non mostrano un valore (regola nel CSS di manage.html).
+  function fineLetturaAutomazioni() {
+    const pan = document.getElementById('panel-automation');
+    if (!pan) return;
+    pan.classList.remove('mg-in-lettura');
+    pan.removeAttribute('aria-busy');
   }
 
   async function refreshAuth() {
@@ -387,6 +399,8 @@
     applyAutoModeGate();
     // Sbloccati, i campi mostrerebbero ciò che si è letto da non owner (cioè niente): si rilegge dal server.
     if (isAdmin && !eraAdmin && impostazioniAvviate) await caricaImpostazioni();
+    // Stessa pagina, stessa regola: i Modelli di supporto rifiutati da non owner si rileggono anche loro.
+    if (isAdmin && !eraAdmin) rileggiModelliRifiutati();
   }
 
   mgSignInBtn.addEventListener('click', () => {
@@ -664,7 +678,7 @@
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgProberIdle, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
-      mgAccountA, mgAccountB, ...mgPriorityRadios, mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
+      mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
       if (el) el.disabled = !isAdmin;
     }
   }
@@ -1067,6 +1081,163 @@
     });
   }
 
+  // ── Modello e sforzo per fase (config/routines.roleModels, #1193) ──────────
+  // Ogni tendina salva la sua sola foglia appena cambia. Stesse regole delle sessioni qui sopra: mai un valore
+  // non letto sullo schermo, e una risposta partita prima non riscrive una scelta confermata dopo (#675).
+  const ROLE_GET = (window.SN_MSG?.MSG?.AUTOMATION_ROLE_MODELS_GET) || 'automation_role_models_get';
+  const ROLE_SET = (window.SN_MSG?.MSG?.AUTOMATION_ROLE_MODELS_SET) || 'automation_role_models_set';
+  const RM = window.SN_ROUTINE_MODELLI;
+  const roleState = {};
+  const roleNoti = new Set();
+  const roleFermo = {};
+  const roleInAttesa = [];
+  let roleTick = 0;
+  let roleAccolto = 0;
+  // Prima della prima risposta la pagina non sa ancora niente, e non è il caso di dire «non letto».
+  let roleTentato = false;
+  let roleEsito = { testo: '', kind: null };
+
+  function buildRoleModels() {
+    if (!mgRoleModels || !RM) return;
+    const cella = (cls, testo) => {
+      const s = document.createElement('span');
+      s.className = cls;
+      s.textContent = testo;
+      return s;
+    };
+    mgRoleModels.append(...RM.CAMPI.map((c) => cella('mg-role-head', RM.NOME_CAMPO[c])));
+    for (const r of RM.RUOLI) {
+      mgRoleModels.append(cella('mg-role-name', r.nome));
+      for (const campo of RM.CAMPI) {
+        const sel = document.createElement('select');
+        sel.dataset.ruolo = r.id;
+        sel.dataset.campo = campo;
+        sel.setAttribute('aria-label', `${RM.NOME_CAMPO[campo]}: ${r.nome}`);
+        sel.append(new Option(RM.VUOTO, ''));
+        for (const s of RM.SCELTE[campo]) sel.append(new Option(s.nome, s.id));
+        sel.disabled = !isAdmin;
+        sel.addEventListener('change', () => saveRoleModel(r.id, campo, sel.value));
+        mgRoleModels.append(sel);
+        // Non letto finché il server non risponde: la prima voce sarebbe già una risposta.
+        sel.selectedIndex = -1;
+        roleSelects.set(`${r.id}.${campo}`, sel);
+      }
+    }
+  }
+
+  const roleScelta = (chiave) => {
+    for (let i = roleInAttesa.length - 1; i >= 0; i--) if (roleInAttesa[i].chiave === chiave) return roleInAttesa[i].valore;
+    return roleNoti.has(chiave) ? roleState[chiave] : null;
+  };
+
+  function mostraRoleMsg() {
+    if (!mgRoleModelsMsg) return;
+    const ignoti = roleTentato && [...roleSelects.keys()].some((k) => roleScelta(k) === null);
+    const avvisa = ignoti && (!roleEsito.testo || roleEsito.kind === 'err');
+    mgRoleModelsMsg.textContent = avvisa ? [roleEsito.testo, SESSIONS_NON_LETTO].filter(Boolean).join(' ') : roleEsito.testo;
+    mgRoleModelsMsg.classList.toggle('mg-ok', !avvisa && roleEsito.kind === 'ok');
+    mgRoleModelsMsg.classList.toggle('mg-err', avvisa || roleEsito.kind === 'err');
+  }
+
+  function setRoleMsg(testo, kind) {
+    roleEsito = { testo: testo || '', kind: kind || null };
+    mostraRoleMsg();
+  }
+
+  function reflectRoleModels() {
+    for (const [chiave, sel] of roleSelects) {
+      const v = roleScelta(chiave);
+      for (const o of [...sel.options]) if (o.dataset.fuori && o.value !== v) o.remove();
+      // Non letto: nessuna voce scelta, nemmeno «definizione dell'agente», che sarebbe già una risposta.
+      if (v === null) { sel.selectedIndex = -1; continue; }
+      if (![...sel.options].some((o) => o.value === v)) {
+        // Scritto a mano nel documento: si mostra com'è, e non si può riscegliere.
+        const o = new Option(`${v} (fuori elenco)`, v);
+        o.dataset.fuori = '1';
+        o.disabled = true;
+        sel.append(o);
+      }
+      sel.value = v;
+    }
+    mostraRoleMsg();
+  }
+
+  /** Una tabella intera dal server: vale se nessuna lettura partita dopo è già sullo schermo. */
+  function accogliRuoli(tabella, nato) {
+    if (nato < roleAccolto) return;
+    roleAccolto = nato;
+    const doc = RM.leggiDoc({ [RM.CAMPO]: tabella });
+    for (const r of RM.RUOLI) {
+      for (const campo of RM.CAMPI) {
+        const k = `${r.id}.${campo}`;
+        // Confermato da una scrittura arrivata dopo la partenza di questa lettura, che può averlo letto prima.
+        if ((roleFermo[k] || 0) > nato) continue;
+        roleState[k] = doc[r.id][campo];
+        roleNoti.add(k);
+      }
+    }
+  }
+
+  function loadRoleModels() {
+    if (!RM) return Promise.resolve();
+    const nato = ++roleTick;
+    return (async () => {
+      let r = null;
+      try { r = await sendToMain({ type: ROLE_GET }); } catch (_) { /* come una lettura fallita */ }
+      if (nato < roleAccolto) return;
+      roleTentato = true;
+      if (r && r.ok) {
+        accogliRuoli(r.roleModels, nato);
+      } else {
+        // Restano note solo le foglie confermate da una scrittura arrivata dopo la partenza di questa lettura.
+        for (const k of [...roleNoti]) if ((roleFermo[k] || 0) <= nato) roleNoti.delete(k);
+        if (roleEsito.kind === 'ok') roleEsito = { testo: '', kind: null };
+      }
+      reflectRoleModels();
+    })();
+  }
+
+  function saveRoleModel(ruolo, campo, valore) {
+    const esito = RM.valida({ ruolo, campo, valore });
+    if (!esito.ok) {
+      reflectRoleModels();
+      setRoleMsg(esito.testo, 'err');
+      return Promise.resolve(false);
+    }
+    const chiave = `${ruolo}.${campo}`;
+    const scelta = { chiave, valore };
+    roleInAttesa.push(scelta);
+    setRoleMsg('Salvo…', null);
+    const nome = RM.nomeRuolo(ruolo);
+    // Una fila sola per tutte le tendine: le risposte arrivano nell'ordine delle scelte.
+    return inFila('roleModels', async () => {
+      const nato = ++roleTick;
+      let r = null;
+      let errore = null;
+      try { r = await sendToMain({ type: ROLE_SET, ruolo, campo, valore }); } catch (err) { errore = err; }
+      roleInAttesa.splice(roleInAttesa.indexOf(scelta), 1);
+      if (!r || !r.ok) {
+        reflectRoleModels();
+        setRoleMsg(`${nome}: salvataggio fallito, la scelta NON è cambiata.`, 'err');
+        const motivo = errore || r?.error;
+        if (motivo) console.error('[manage] salvataggio modello per fase:', motivo);
+        return false;
+      }
+      roleState[chiave] = valore;
+      roleNoti.add(chiave);
+      roleFermo[chiave] = ++roleTick;
+      if (r.letto && r.roleModels) accogliRuoli(r.roleModels, nato);
+      reflectRoleModels();
+      // «Salvato» parla di quello che si vede: non mentre un'altra scelta è ancora per strada.
+      if (!roleInAttesa.length) {
+        setRoleMsg(r.letto ? `${nome}: salvato.` : `${nome}: salvato. Il resto non l'ho potuto rileggere dal server.`, 'ok');
+      }
+      return true;
+    });
+  }
+
+  buildRoleModels();
+
 
   // ── Timeout dei giudici ────────────────────────────────────────────────────
   // Fonte di verità: config/supportModels (campo `judgeTimeoutMs`, in MS), che il
@@ -1338,11 +1509,24 @@
   // una scheda dove vivere, e finiscono in Automazioni con gli stessi tasti.
   // Nasconderle sarebbe un ramo fermo per sempre senza dirlo.
   //
-  // Le decisioni già prese restano elencate in Automazioni: un'eccezione ai
-  // controlli di sicurezza deve lasciare una traccia che si può guardare.
+  // Le decisioni già prese restano elencate nel Log: un'eccezione ai controlli
+  // di sicurezza deve lasciare una traccia che si può guardare. In Automazioni
+  // costringevano a scorrere prima delle impostazioni (#1110).
   const mgMergeApprovalsOrphans = document.getElementById('mgMergeApprovalsOrphans');
   const mgMergeApprovalsRecent = document.getElementById('mgMergeApprovalsRecent');
   const mgMergeApprovalsPreapproved = document.getElementById('mgMergeApprovalsPreapproved');
+  const mgFusioniSection = document.getElementById('mgFusioniSection');
+  const mgFusioniEmpty = document.getElementById('mgFusioniEmpty');
+
+  // La colonna delle fusioni decise si mostra solo con un elenco letto davvero:
+  // prima, o a lettura fallita, un «nessuna» sarebbe un dato inventato.
+  function aggiornaSezioneFusioni(letto) {
+    if (!mgFusioniSection) return;
+    mgFusioniSection.hidden = !letto;
+    if (!mgFusioniEmpty) return;
+    const vuota = [mgMergeApprovalsRecent, mgMergeApprovalsPreapproved].every((el) => !el || el.hidden);
+    mgFusioniEmpty.hidden = !vuota;
+  }
 
   // Gli elenchi del server, così come sono arrivati: il quadrato di ogni scheda
   // e il bordo delle card in lista li leggono da qui. Restano in memoria fra un
@@ -1405,6 +1589,8 @@
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
     if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
+    // Dal Log o da Automazioni il dettaglio sta in un pannello che non è a schermo.
+    else if (!LIST_TABS.includes(schedaAttiva())) selectTab(currentTab);
     openDetail(fb._id);
   }
 
@@ -1488,6 +1674,7 @@
         mgMergeApprovalsPreapproved.replaceChildren();
         mgMergeApprovalsPreapproved.hidden = true;
       }
+      aggiornaSezioneFusioni(false);
       riflettiFusioni();
       return 0;
     };
@@ -1523,6 +1710,7 @@
         onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
       });
     }
+    aggiornaSezioneFusioni(true);
     return n;
   }
 
@@ -1587,13 +1775,17 @@
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
-      mgClarify.hidden = true;
       collassaFrase();
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
       renderList();
     }
+  }
+
+  function schedaAttiva() {
+    const btn = mgTabs.querySelector('.mg-tab.mg-tab--active');
+    return btn ? btn.dataset.tab : '';
   }
 
   mgTabs.addEventListener('click', (e) => {
@@ -2699,7 +2891,7 @@
     Promise.resolve().then(() => sendToMain({ type: CLASSIFY_MSG, op: 'stop', jobId })).catch(() => {});
   }
 
-  const numIt = (n) => Number(n || 0).toLocaleString('it-IT');
+  const numIt = (n) => Number(n || 0).toLocaleString('it-IT', { useGrouping: true });
 
   // null nasconde la barra; altrimenti quanti feedback ha già letto il classificatore, su quanti.
   function showClassifyProgress(state) {
@@ -3129,10 +3321,7 @@
     // pratica che potrebbe essere già chiusa è peggio che non offrire niente.
     renderActions(fb);
     disegnaSegnoTestata(fb);
-    mgClarify.hidden = !rispostaOfferta(fb);
-    mgClarifyText.value = bozzeRisposta.get(fb._id) || '';
     if (!ridisegno) setClarifyMsg('', '');
-    mgClarifyBtn.disabled = rispostaInVolo.has(fb._id);
 
     // Gestione (⭐ + archivia/ripristina): visibile per l'owner su QUALUNQUE
     // feedback selezionato, accanto alle azioni contestuali.
@@ -3172,13 +3361,17 @@
     // pratica) la forma che l'owner stava leggendo resta aperta e si riempie
     // di nuovo, come già fa quando cambia l'elenco delle fusioni; a chiuderlo
     // era ogni ridisegno, e con una segnalazione lunga si perdeva il punto.
-    // Cambiando pratica si chiude, come sempre.
+    // Cambiando pratica si chiude, come sempre. Su una pratica che aspetta la
+    // risposta dell'owner si apre invece il rombo verde: lì si risponde (#1061).
+    const domandeGiaDisegnate = ridisegno && attesaDisegnata === fb._id;
+    attesaDisegnata = rispostaOfferta(fb) ? fb._id : null;
     if (ridisegno && livelloAperto) {
       quandoPannelloLibero(() => {
         if (selectedId !== fb._id || !livelloAperto) return;
         riapriPannelloLivello(allFeedbacks.find((f) => f._id === fb._id) || fb);
       });
-    } else closeSidebar();
+    } else if (attesaDisegnata && !domandeGiaDisegnate) openSidebarLivello(fb, 'l3');
+    else closeSidebar();
   }
 
   // Riapre il pannello sulla forma già scelta, tenendo il punto di scorrimento.
@@ -3518,7 +3711,6 @@
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
       mgActions.hidden = true;
-      mgClarify.hidden = true;
       collassaFrase();
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
@@ -3909,33 +4101,27 @@
 
   mgStarBtn.addEventListener('click', toggleStarred);
 
-  // Le due caselle e il rombo verde della fila nascono dalla stessa domanda.
+  // La casella della risposta e il rombo verde della fila nascono dalla stessa domanda.
   function rispostaOfferta(fb) {
     return !!(isAdmin && fb && statoLeggibile(fb) && MR.aspettaRisposta(fb));
   }
-  function caselleRisposta() {
-    return [mgClarifyText, document.getElementById('mgSideRispostaText')].filter(Boolean);
-  }
-  function scriviBozzaRisposta(origine) {
+  function scriviBozzaRisposta(casella) {
     if (!selectedId) return;
-    const v = origine.value || '';
+    const v = casella.value || '';
     if (v) bozzeRisposta.set(selectedId, v); else bozzeRisposta.delete(selectedId);
-    for (const c of caselleRisposta()) if (c !== origine) c.value = v;
-  }
-  function bottoniRisposta(disabled) {
-    for (const b of [mgClarifyBtn, document.getElementById('mgSideRispostaBtn')]) if (b) b.disabled = disabled;
   }
   function tastiRisposta(e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendClarifyReply(e.currentTarget); }
   }
 
+  function riflettiEsitoRisposta(el) {
+    el.textContent = esitoRisposta.text;
+    el.className = 'mg-action-msg' + (esitoRisposta.kind ? ` mg-${esitoRisposta.kind}` : '');
+  }
   function setClarifyMsg(text, kind) {
-    const side = document.getElementById('mgSideRispostaMsg');
-    for (const el of [mgClarifyMsg, side]) {
-      if (!el) continue;
-      el.textContent = text || '';
-      el.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
-    }
+    esitoRisposta = { text: text || '', kind: kind || '' };
+    const el = document.getElementById('mgSideRispostaMsg');
+    if (el) riflettiEsitoRisposta(el);
   }
 
   // Risposta dell'owner a un feedback in `clarify`: la risposta si appende alle
@@ -3945,9 +4131,8 @@
     if (!selectedId) return;
     const id = selectedId;
     if (rispostaInVolo.has(id)) return;
-    const casella = (origine && origine.tagName === 'TEXTAREA') ? origine : mgClarifyText;
     const reply = (bozzeRisposta.get(id) || '').trim();
-    if (!reply) { casella.focus(); return; }
+    if (!reply) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
@@ -3974,7 +4159,7 @@
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
 
     rispostaInVolo.add(id);
-    bottoniRisposta(true);
+    bottoneRisposta();
     setClarifyMsg('Invio in corso…', '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, status: 'todo', notes: newNotes });
@@ -3990,7 +4175,6 @@
       selectedId = null;
       mgDetail.hidden = true;
       mgDetailEmpty.hidden = false;
-      mgClarify.hidden = true;
       collassaFrase();
       if (mgOwnerBar) mgOwnerBar.hidden = true;
       closeSidebar();
@@ -4000,15 +4184,17 @@
       setClarifyMsg(e.message || 'Errore nell\'invio', 'err');
     } finally {
       rispostaInVolo.delete(id);
-      bottoniRisposta(false);
+      bottoneRisposta();
     }
   }
 
-  mgClarifyBtn.addEventListener('click', () => sendClarifyReply(mgClarifyText));
-  mgClarifyText.addEventListener('input', () => scriviBozzaRisposta(mgClarifyText));
-  mgClarifyText.addEventListener('keydown', tastiRisposta);
+  // Il tasto è uno solo e segue la pratica che il pannello mostra ADESSO.
+  function bottoneRisposta() {
+    const b = document.getElementById('mgSideRispostaBtn');
+    if (b) b.disabled = rispostaInVolo.has(selectedId);
+  }
 
-  // La stessa casella dentro il pannello del rombo verde, sotto le domande.
+  // Nel pannello del rombo verde, sotto le domande: l'unico posto dove si risponde (#1061).
   function pannelloRisposta(fb) {
     const box = document.createElement('div');
     box.className = 'mg-liv-risposta';
@@ -4033,9 +4219,7 @@
     const msg = document.createElement('span');
     msg.id = 'mgSideRispostaMsg';
     msg.setAttribute('role', 'status');
-    // Un esito solo per le due caselle: il pannello lo riprende da quella sotto la conversazione.
-    msg.className = mgClarifyMsg.className;
-    msg.textContent = mgClarifyMsg.textContent;
+    riflettiEsitoRisposta(msg);
     riga.appendChild(btn); riga.appendChild(msg);
     box.appendChild(t); box.appendChild(riga);
     return box;
@@ -5201,12 +5385,16 @@
     if (ridisegnoRimandato === null) return;
     ridisegnaRispettandoLaBozza(ridisegnoRimandato);
   }
-  if (mgDetail) {
+  {
     // `focusout` arriva mentre il fuoco è ancora sul campo che lo perde: il
     // rinvio di un giro fa trovare a detailBeingEdited() la situazione vera.
+    // Anche il pannello: la risposta alle domande si scrive lì.
     const piuTardi = () => setTimeout(riprendiRidisegnoRimandato, 0);
-    mgDetail.addEventListener('input', piuTardi);
-    mgDetail.addEventListener('focusout', piuTardi);
+    for (const el of [mgDetail, mgSide]) {
+      if (!el) continue;
+      el.addEventListener('input', piuTardi);
+      el.addEventListener('focusout', piuTardi);
+    }
   }
 
   // La scheda aperta non è più in pagina: il pannello non può mostrare un
@@ -5370,6 +5558,8 @@
     loadCaps,
     // Ri-legge le scelte sulle sessioni delle routine (IPC) — per i test.
     loadSessions,
+    // Ri-legge modello e sforzo per fase (IPC) — per i test.
+    loadRoleModels,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
     // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
@@ -5671,6 +5861,10 @@
     }
   }
 
+  function rileggiModelliRifiutati() {
+    if (!smLoaded && !smLoading && mgSmDenied && !mgSmDenied.hidden) loadSupportModels();
+  }
+
   // Render dell'editor (chiave + registro giudici + nickname + slot) e reveal.
   // Estratta da loadSupportModels così i test possono esercitarla senza il canale.
   function renderSupportModelsEditor(models) {
@@ -5724,12 +5918,10 @@
     if (mgSmRegistryList) mgSmRegistryList.appendChild(makeRegistryRow('', {}));
   });
 
-  // Caricamento pigro: avviene la prima volta che l'utente seleziona la tab
-  // "Modelli di supporto". La funzione selectTab già esiste e gestisce il
-  // pannello; qui interceptiamo il click sulla tab models.
+  // Caricamento pigro: alla prima apertura di "Automazioni", che li ospita (#1110).
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'models') return;
+    if (!btn || btn.dataset.tab !== 'automation') return;
     if (!smLoaded && !smLoading) loadSupportModels();
   });
 
@@ -5742,13 +5934,13 @@
     loadWorkerLog();
   });
 
-  // Tab "Ricevuti" (l'avviso da decidere) e "Automazioni" (la traccia delle
-  // decisioni passate): le fusioni si rileggono a OGNI apertura — una
+  // "Ricevuti" e "Automazioni" (le richieste da decidere) e "Log" (la traccia
+  // delle decisioni passate): le fusioni si rileggono a OGNI apertura — una
   // richiesta già decisa o appena arrivata renderebbe la sezione una
   // fotografia vecchia.
   mgTabs.addEventListener('click', (e) => {
     const btn = e.target.closest('.mg-tab');
-    if (!btn || (btn.dataset.tab !== 'automation' && btn.dataset.tab !== 'inbox')) return;
+    if (!btn || !['automation', 'inbox', 'log'].includes(btn.dataset.tab)) return;
     loadMergeApprovals();
   });
 
@@ -7389,7 +7581,8 @@
     startLive();
   }
 
-  const bootDone = init().catch((e) => { console.error('[manage] init:', e); });
+  // Un avvio rotto prima della lettura non deve lasciare le automazioni senza valori per sempre.
+  const bootDone = init().catch((e) => { console.error('[manage] init:', e); }).finally(fineLetturaAutomazioni);
   // Gli spec devono poter aspettare la FINE del caricamento vero (Firestore)
   // prima di iniettare dati finti: se il caricamento atterra a metà test, li
   // sovrascrive e il test diventa rumore.

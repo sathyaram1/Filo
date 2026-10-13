@@ -341,6 +341,8 @@
   let isAdmin = false;
   // Falso quando manca il portachiavi di sistema: l'accesso vale fino alla chiusura.
   let authRemembered = true;
+  // Un account Google nelle schede (#1123): è un accesso diverso da quello a Filo, e il menu lo dice.
+  let googleNelleSchede = false;
 
   function shortName(p) {
     if (!p) return '';
@@ -381,12 +383,13 @@
     }
   }
 
-  async function refreshAuth() {
+  async function refreshAuth(opzioni) {
     try {
-      const r = await api.auth.status();
+      const r = await api.auth.status(opzioni);
       authProfile = (r && r.ok && r.signedIn) ? r.profile : null;
       isAdmin = !!(r && r.ok && r.signedIn && r.isAdmin);
       authRemembered = !(r && r.remembered === false);
+      googleNelleSchede = !!(r && r.googleNelleSchede);
     } catch (_) {
       authProfile = null;
       isAdmin = false;
@@ -408,6 +411,16 @@
     }
   }
 
+  // YouTube, Gmail e Drive nelle schede: l'accesso a Google si apre in una scheda, con l'email già scritta.
+  async function collegaGoogle() {
+    try {
+      const r = await api.message({ type: 'auth_collega_google' });
+      if (r && r.ok === false) showToast(r.error || 'Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+    } catch (_) {
+      showToast('Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+    }
+  }
+
   async function doSignOut() {
     try { await api.auth.signOut(); } catch (_) {}
     authProfile = null; isAdmin = false; renderAccount();
@@ -418,17 +431,20 @@
     // finestra incognito" — spostata qui dal menu Impostazioni — è raggiungibile
     // in entrambi gli stati. Da loggato mostra email + incognito + Esci; da
     // sloggato mostra "Accedi con Google" + incognito.
-    accountBtn.addEventListener('click', () => {
+    accountBtn.addEventListener('click', async () => {
       if (authBusy) return;
+      // Google nelle schede cambia senza avvisi (un accesso o un'uscita fatti in una scheda): si chiede adesso.
+      if (authProfile) await refreshAuth({ senzaRete: true });
       if (authProfile) {
         const label = shortName(authProfile);
         showNativeMenu(accountBtn, [
           { label: authProfile.email || label, disabled: true },
           ...(authRemembered ? [] : [{ label: 'Accesso valido fino alla chiusura di Filo', disabled: true }]),
           { type: 'separator' },
+          ...(googleNelleSchede ? [] : [{ label: 'Collega anche i prodotti Google', icon: 'user', action: 'collega-google' }]),
           { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
           { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
-          { label: 'Esci', icon: 'close', action: 'auth-signout' },
+          { label: googleNelleSchede ? 'Esci da Filo (Google resta collegato)' : 'Esci da Filo', icon: 'close', action: 'auth-signout' },
         ]);
       } else {
         showNativeMenu(accountBtn, [
@@ -444,6 +460,7 @@
       api.onMenuAction((action) => {
         if (action === 'auth-signout') doSignOut();
         else if (action === 'auth-signin') doSignIn();
+        else if (action === 'collega-google') collegaGoogle();
       });
     }
     // Aggiorna l'icona quando il main segnala un cambio sessione.
@@ -452,6 +469,8 @@
         authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
         authRemembered = m.remembered !== false;
         if (!authProfile || authRemembered) NOTIFS.dismissKey('accesso-non-ricordato');
+        // «Continua nel browser» (#1123) non serve più a chi è entrato.
+        if (authProfile) NOTIFS.dismissKey('accesso-nel-browser');
         renderAccount();
       });
     }
@@ -1083,6 +1102,24 @@
   // La barra si riconcilia per id (#1089): un aggiornamento tocca solo le schede cambiate e i nodi restano gli
   // stessi, così bagliore audio e suggerimenti non ripartono; misure e scorrimento si rifanno solo quando servono.
   const schedeVive = new Map(); // id → .tab
+
+  // Il main rispedisce un'icona solo quando cambia (`faviconUguale`): le altre si riprendono dall'ultimo snapshot.
+  // Solo byte già scaricati dal main con la sessione della scheda: un indirizzo qui girerebbe nella sessione della barra (#1083).
+  const iconeNote = new Map(); // id → { dato, giro }
+  function conIcone(snap) {
+    if (!snap || !Array.isArray(snap.tabs)) return snap;
+    const vive = new Map();
+    for (const t of snap.tabs) {
+      const id = String(t.id);
+      const prima = iconeNote.get(id);
+      if (t.faviconUguale) t.favicon = prima ? prima.dato : '';
+      const dato = /^data:image\//.test(t.favicon || '') ? t.favicon : '';
+      vive.set(id, prima && prima.dato === dato ? prima : { dato, giro: (prima ? prima.giro : 0) + 1 });
+    }
+    iconeNote.clear();
+    for (const [id, nota] of vive) iconeNote.set(id, nota);
+    return snap;
+  }
   const STILI_SCHEDA = ['--tab-active', '--tab-ink', '--tab-bg-eff', '--tab-bg-hover', '--tab-glow-color'];
   let firmaMisura = '';
   let attivaInVista = null;
@@ -1143,7 +1180,9 @@
       const glow = hasColorIdentity(t.color) ? t.color : coloreDelSito(t);
       if (glow) d.stili['--tab-glow-color'] = glow;
     }
-    d.icona = t.loading ? null : (t.favicon || '');
+    // Nella firma l'icona entra col suo numero di giro: un data: URL da centinaia di KB a ogni ridisegno bloccava la barra.
+    const nota = iconeNote.get(String(t.id));
+    d.icona = t.loading ? null : (nota && nota.dato ? nota.giro : '');
     d.paese = t.proxy && t.proxy.country ? String(t.proxy.country).toUpperCase() : '';
     d.titolo = tabLabel(t);
     d.audio = t.muted ? 'muta' : suona ? 'suona' : '';
@@ -1187,7 +1226,8 @@
 
     const p = el._parti;
     p.ico.className = d.icona === null ? 'spinner' : 'favicon';
-    p.ico.style.backgroundImage = d.icona ? `url("${d.icona}")` : '';
+    const nota = d.icona ? iconeNote.get(id) : null;
+    p.ico.style.backgroundImage = nota && nota.dato ? `url("${nota.dato}")` : '';
 
     // Indicatore "aperta da un altro paese": globo + codice paese accanto al
     // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
@@ -1667,6 +1707,8 @@
               onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
             };
           }
+          // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
+          if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
           if (a && a.aggiornaFilo && !a.onClick) {
             return {
@@ -2231,10 +2273,10 @@
 
   api.tabs.onUpdate((snap) => {
     fermaLarghezzeSeChiusa(snap);
-    state = snap;
+    state = conIcone(snap);
     render();
   });
-  api.tabs.snapshot().then((snap) => { state = snap; render(); });
+  api.tabs.snapshot().then((snap) => { state = conIcone(snap); render(); });
 
   // ─── Velo d'ombra "modalità annotazione" feedback ──────────────────────────
   // Il box feedback vive in un content script sulla pagina e da lì oscura solo
@@ -2423,6 +2465,13 @@
       if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
       if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
       if (d.tipo === 'rete') return { testo: 'vuole collegarsi agli apparecchi della tua rete', icone: ['wifi'] };
+      if (d.tipo === 'file') {
+        const o = d.oggetto || {};
+        const nome = String(o.nome || '');
+        if (!nome) return { testo: 'vuole modificare i tuoi file', icone: ['pencil'] };
+        if (o.cartella) return { testo: 'vuole creare, modificare e cancellare file in', nome, percorso: o.percorso, icone: ['folder'] };
+        return { testo: 'vuole modificare', nome, percorso: o.percorso, icone: ['pencil'] };
+      }
       const parti = Array.isArray(d.parti) ? d.parti : [];
       const mic = parti.includes('audio');
       const cam = parti.includes('video');
@@ -2490,6 +2539,15 @@
       testo.className = 'permesso-cosa';
       testo.textContent = cosa.testo;
       msg.append(chi, ' ', testo);
+      if (cosa.nome) {
+        // Un nome lunghissimo non spinge giù la pagina di righe: si accorcia in mezzo, l'estensione resta, intero al passaggio.
+        const n = document.createElement('strong');
+        n.className = 'permesso-oggetto';
+        const c = Array.from(cosa.nome);
+        n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
+        n.title = String(cosa.percorso || cosa.nome);
+        msg.append(' ', n);
+      }
       const si = document.createElement('button');
       si.type = 'button';
       si.className = 'permesso-btn permesso-si';

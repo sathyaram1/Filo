@@ -303,7 +303,7 @@ test('il classificatore si sceglie in Modelli di supporto e la scelta si salva',
   await preparaOwner(app, { supportDoc: { judge1: 'flash' } });
   const page = await openTab(URL);
   await page.waitForFunction(() => window.filo && window.__mgTest);
-  await page.locator('.mg-tab[data-tab="models"]').click();
+  await page.locator('.mg-tab[data-tab="automation"]').click();
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 8000 });
   const slot = page.locator('.mg-sm-slot[data-slot="manageSearchClassifier"]');
   await expect(slot.locator('label')).toHaveText('Classificatore della ricerca');

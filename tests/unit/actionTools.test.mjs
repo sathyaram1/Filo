@@ -53,6 +53,14 @@ test('le definizioni hanno la forma che il fornitore capisce', () => {
   assert.equal(onb.length, defs.length + 1);
 });
 
+test('ONBOARDING: le voci da spuntare sono quelle dell’intervista, e c’è la scelta dell’autonomia (#1188)', () => {
+  const onb = Tools.definitions({ sistema: 'win32', onboarding: true }).find((d) => d.function.name === 'ONBOARDING');
+  const props = onb.function.parameters.properties;
+  assert.deepEqual(props.spunta.items.enum, globalThis.SN_ONBOARDING.ITEM_IDS, 'una voce nuova dell’intervista arriva da sola allo strumento');
+  assert.ok(props.spunta.items.enum.includes('autonomia'));
+  assert.equal(props.autonomia.type, 'boolean');
+});
+
 test('le descrizioni che dipendono dal sistema lo dicono per quel sistema', () => {
   const win = Tools.definitions({ sistema: 'win32' }).find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
   const mac = Tools.definitions({ sistema: 'darwin' }).find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;

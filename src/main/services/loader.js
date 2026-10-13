@@ -21,6 +21,9 @@ require(path.join(SHARED, 'contenutoEsterno.js'));
 require(path.join(SHARED, 'filoUi.js'));
 require(path.join(SHARED, 'messages.js'));
 require(path.join(SHARED, 'i18n.js'));
+// Cronologia appunti: la chiave di una voce e i testi delle sue azioni, uguali
+// per il menu "Incolla", la pagina della Sicurezza e chi la tiene su disco (#256).
+require(path.join(SHARED, 'clipboardHistory.js'));
 // Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd):
 // serve a chiunque disegni un'etichetta, quindi sta in alto.
 require(path.join(SHARED, 'tasti.js'));
@@ -92,6 +95,7 @@ require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: ri
 require(path.join(SHARED, 'campoNumero.js'));
 // Come partono le sessioni delle routine: stesse regole in pagina e nel main.
 require(path.join(SHARED, 'routineSessioni.js'));
+require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
@@ -116,6 +120,7 @@ if (process.env.NODE_ENV === 'test') {
 }
 require(path.join(SHARED, 'patchNotes.js'));
 require(path.join(SHARED, 'capabilities.js'));
+require(path.join(SHARED, 'serviziEsterni.js'));  // #849 — i servizi esterni che Filo contatta, come dati
 // Documenti di trasparenza (generati da transparency/*.md): servono all'agente
 // per rispondere quando l'utente chiede conto di una scelta. Il gemello
 // transparencyUi.js NON si carica qui: è codice di pagina, tocca il DOM.

@@ -106,7 +106,8 @@ function osserva(changes, { incognito }) {
 
 let staccato = null;
 function avvia() {
-  if (!staccato) staccato = Disco.onScrittura(osserva);
+  const C = CHIAVI();
+  if (!staccato) staccato = Disco.onScrittura(osserva, [C.SETTINGS, C.FILO_TIMERS, C.FILO_PROXY_RULES]);
 }
 
 // Lo zoom non passa dallo storage: lo salva Chromium per sito. Il punto in cui il main lo viene a

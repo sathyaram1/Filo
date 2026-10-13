@@ -231,7 +231,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
           : r.approvato ? `feedback ${r.daRoutine ? 'di una routine' : 'di un utente'} che hai approvato come lavoro locale` : 'mittente provato';
         righe.push(`  L5 saltato: lavoro locale di ${pratica}, ${perche}.`);
         righe.push(blocchi.length
-          ? `  Blocchi registrati (${blocchi.length}), li rileggi in Gestione → Automazioni, «Fuse senza chiedere»:\n${blocchi.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
+          ? `  Blocchi registrati (${blocchi.length}), li rileggi in Gestione → Log, «Fuse senza chiedere»:\n${blocchi.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
           : '  Nessun blocco registrato: i controlli non avrebbero fermato niente.');
         if (blocchi.length && !r.record) righe.push('  La traccia dei blocchi NON si è registrata: l’elenco resta solo nella nota della pratica e nei log del server.');
       }

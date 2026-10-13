@@ -257,12 +257,12 @@
     },
     TOGLI_PERMESSO_SITO: {
       description: 'Toglie una risposta che Filo ricorda per un sito (microfono, fotocamera, appunti, posizione, notifiche, '
-        + 'schermi, presenza, strumenti, rete locale), come «Togli» nella pagina Sicurezza: «togli il microfono a meet.google.com», '
+        + 'schermi, presenza, strumenti, rete locale, file), come «Togli» nella pagina Sicurezza: «togli il microfono a meet.google.com», '
         + '«non ricordare più cosa ho risposto a example.com». Quali risposte ci sono lo dice LEGGI_IMPOSTAZIONI. '
         + 'Toglierla non concede niente: alla prossima richiesta il sito torna a chiedere.',
       properties: {
         sito: S('Il sito, come meet.google.com; vale anche per i suoi sottodomini.'),
-        permesso: S('Quale permesso ("microfono", "fotocamera", "appunti", "posizione", "notifiche", "schermi", "presenza", "strumenti", "rete"); ometti per toglierle tutte.'),
+        permesso: S('Quale permesso ("microfono", "fotocamera", "appunti", "posizione", "notifiche", "schermi", "presenza", "strumenti", "rete", "file"); ometti per toglierle tutte.'),
       },
       required: ['sito'],
     },
@@ -535,10 +535,14 @@
     // Disponibile solo durante l'intervista di benvenuto (#524): la aggiunge
     // `definitions({ onboarding: true })`.
     ONBOARDING: {
-      description: 'Segna cosa hai scoperto o detto nell\'intervista di benvenuto, e/o la chiude. Chiamalo nello STESSO turno in cui hai scoperto o detto una voce: se non la spunti, te la ritrovi davanti al turno dopo.',
-      properties: {
-        spunta: { type: 'array', items: { type: 'string', enum: ['profilo', 'stile', 'estetica', 'privacy', 'modelli', 'crediti'] }, description: 'Le voci fatte.' },
-        fine: B('true per chiudere l\'intervista (l\'utente lo chiede, o l\'elenco è finito).'),
+      description: 'Segna cosa hai scoperto o detto nell\'intervista di benvenuto, e/o la chiude. Chiamalo nello STESSO turno in cui hai scoperto o detto una voce: se non la spunti, te la ritrovi davanti al turno dopo. Con autonomia: true mostra sotto la tua risposta i livelli di autonomia, e l\'utente sceglie con un clic.',
+      properties: () => {
+        const O = modulo('SN_ONBOARDING', './onboarding.js');
+        return {
+          spunta: { type: 'array', items: { type: 'string', enum: O ? O.ITEM_IDS.slice() : [] }, description: 'Le voci fatte.' },
+          autonomia: B('true per mostrare sotto la tua risposta la scelta del livello di autonomia: la fa l\'utente con un clic. La voce autonomia si spunta dopo, quando ha scelto.'),
+          fine: B('true per chiudere l\'intervista (l\'utente lo chiede, o l\'elenco è finito).'),
+        };
       },
       required: [],
       soloOnboarding: true,

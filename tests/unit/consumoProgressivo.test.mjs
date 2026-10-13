@@ -48,6 +48,22 @@ test('un messaggio diviso fra due letture vale la sua ULTIMA usage, come nel rap
   } finally { togliCartella(casa); }
 });
 
+test('Haiku 5.5 nel battito: stesso listino e stessa soglia per richiesta del rapporto di fine sessione', async () => {
+  const { casa, principale } = progetto();
+  try {
+    const haiku = (id, cr) => `${JSON.stringify({
+      type: 'assistant', sessionId: 'sess-a', timestamp: '2026-10-09T10:00:00.000Z',
+      message: { id, model: 'claude-haiku-5-5', usage: { input_tokens: 0, cache_read_input_tokens: cr, cache_creation_input_tokens: 0, output_tokens: 100 } },
+    })}\n`;
+    writeFileSync(principale, haiku('h1', 50000) + haiku('h2', 150000));
+    const t = totaliDi(avanzaFile(principale, null));
+    // h1: 50.000·0,01 + 100·0,50 = 550; h2 passa la soglia: 150.000·0,05 + 100·2,50 = 7750
+    assert.ok(Math.abs(t.costo - 8300 / 1e6) < 1e-12, String(t.costo));
+    const rep = await rapportoDi(principale);
+    assert.equal(Math.round(t.costo * 10000) / 10000, rep.costUsd);
+  } finally { togliCartella(casa); }
+});
+
 test('le righe che Claude Code riscrive in coda riprendendo una sessione non si ricontano, anche lette a pezzi', async () => {
   const { casa, principale } = progetto();
   try {

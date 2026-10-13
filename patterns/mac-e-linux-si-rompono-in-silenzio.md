@@ -68,6 +68,14 @@ aggiunge lì.
 
 - **Ctrl resta Ctrl.** Su Linux non c'è Cmd e non c'è la barra dei menu
   dell'applicazione: `SN_TASTI` lo sa già, non servono rami per Linux.
+- **I caratteri sono più larghi di Segoe UI.** `--sn-font` lì cade su un altro font (Inter
+  nel contenitore delle routine): una scritta che su Windows sta in una riga va a capo, e
+  un tetto d'altezza fisso fa scorrere un testo che doveva leggersi tutto. Un'impaginazione
+  si regge sulla misura vera (la scatola presa prima di cambiare la scritta, un tetto
+  relativo allo spazio che c'è), mai sui pixel visti su Windows. Per lo stesso motivo un
+  rosso d'impaginazione nel contenitore è quello che vede un utente Linux, non un rosso
+  d'ambiente: si corregge, non si mette fra i rossi noti (#663.4: il tasto Approva armato
+  e la casella della chat dell'editor, corretti da #256.3 e #530.5).
 - **La modalità terminale non è PowerShell.** Fuori da Windows si parte da `/bin/sh`, o
   da `bash` se l'utente l'ha scelto nelle Preferenze. La regola sta solo in `resolveShell`
   di `src/main/services/terminal.js`: la sessione persistente

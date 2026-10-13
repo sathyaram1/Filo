@@ -176,7 +176,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
     return { ok: false, codice: EXIT.RIFIUTATO, motivo: 'manca il token admin: senza la prova del mittente il feedback sarebbe di un utente. Rigenera le credenziali: node scripts/admin-login.mjs' };
   }
 
-  // Il biglietto della sessione: quello che vale (il più sporco); senza, o col server giù, il feedback nasce non fidato.
+  // Il biglietto della sessione; senza, o col server giù, il feedback nasce non fidato.
   const b = biglietto || await trovaBiglietto().catch(() => null);
   let res;
   try {

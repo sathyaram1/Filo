@@ -30,7 +30,10 @@
     menu_paste_no_results: 'Nessun risultato',
     menu_paste_remove: 'Rimuovi dalla cronologia',
     menu_paste_clear: 'Svuota cronologia',
-    menu_paste_clear_confirm: 'Vuoi svuotare tutta la cronologia degli appunti? Le voci copiate finora verranno eliminate.',
+    menu_paste_clear_confirm_one: 'Vuoi svuotare la cronologia degli appunti? Sparisce l\'unica voce copiata finora, e non si può riavere.',
+    menu_paste_clear_confirm_n: 'Vuoi svuotare la cronologia degli appunti? Spariscono tutte e %d le voci copiate finora, e non si possono riavere.',
+    menu_paste_clear_confirm_hidden: 'La ricerca che hai scritto ne mostra %d: spariscono anche le altre.',
+    menu_paste_removed: 'Rimossa',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina
@@ -98,6 +101,18 @@
     // Voce e dettatura: nessun host ammesso, la richiesta non parte (#713).
     err_audio_no_allowed_host: 'Il modello «%s» lo serve solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
     err_audio_no_allowed_host_many: 'Il modello «%s» lo servono solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
+    // Host misti o ignoti (#1141): sugli endpoint audio il router sceglie per prezzo, anche l'host escluso.
+    err_audio_mixed_host: 'Il modello «%s» lo serve anche %s, che Filo esclude, e con l\'audio non posso impedire che tocchi a lui. Non ho mandato niente: scegli un altro modello.',
+    err_audio_mixed_host_many: 'Il modello «%s» lo servono anche %s, che Filo esclude, e con l\'audio non posso impedire che tocchi a loro. Non ho mandato niente: scegli un altro modello.',
+    err_audio_hosts_unknown: 'Non so chi serve il modello «%s»: potrebbe essere un fornitore che Filo esclude. Non ho mandato niente: riprova fra poco o scegli un altro modello.',
+    // Lo stesso verdetto mentre si sceglie il modello (Opzioni, «Detta» dal tasto destro). %s = modello, funzione, host.
+    audio_host_fn_tts: 'la lettura ad alta voce',
+    audio_host_fn_stt: 'la dettatura',
+    audio_host_warn_excluded: 'Con «%s» %s non parte: lo serve solo %s, che Filo esclude.',
+    audio_host_warn_excluded_many: 'Con «%s» %s non parte: lo servono solo %s, che Filo esclude.',
+    audio_host_warn_mixed: 'Con «%s» %s non parte: lo serve anche %s, che Filo esclude.',
+    audio_host_warn_mixed_many: 'Con «%s» %s non parte: lo servono anche %s, che Filo esclude.',
+    audio_host_warn_unknown: 'Con «%s» %s non parte finché non so chi lo serve, e ora non riesco a saperlo.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
@@ -203,14 +218,14 @@
       '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Opzioni → Modelli per azione, oppure spegnere «Solo modelli a pesi aperti».',
     // Le funzioni di chi gestisce Filo non stanno nelle Opzioni: il modello si cambia in Gestione (#1118).
     err_open_weights_only_no_model_owner:
-      '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Gestione → Modelli di supporto, oppure spegnere «Solo modelli a pesi aperti».',
+      '«%s» è ferma: hai scelto solo modelli a pesi aperti e per questa funzione non ce n\'è uno equivalente (%s). Puoi assegnarle un modello a pesi aperti in Gestione → Automazioni, fra i Modelli di supporto, oppure spegnere «Solo modelli a pesi aperti».',
     err_open_weights_only_provider_blocked:
       'Hai scelto solo modelli a pesi aperti: questo fornitore è l\'API di chi produce i modelli e resta spento. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_open_weights_only_model_blocked:
       'Hai scelto solo modelli a pesi aperti: «%s» non lo è, quindi la prova non parte. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_model_where_own: 'Lo imposti in Opzioni → Modelli per azione.',
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
-    err_model_where_owner: 'Lo imposti in Gestione → Modelli di supporto.',
+    err_model_where_owner: 'Lo imposti in Gestione → Automazioni, fra i Modelli di supporto.',
 
     // Toast
     toast_saved: 'Salvata in: %s',
@@ -270,6 +285,10 @@
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
+    // Una selezione di soli spazi (o a capo, o tabulazioni) si copia per
+    // sbaglio: senza un'etichetta diventa una riga vuota che non si capisce.
+    clipboard_only_spaces: 'Spazi vuoti (%d caratteri)',
+    clipboard_empty_entry: 'Voce vuota',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
     clipboard_image_delicata: 'Immagine da una pagina delicata',
 
@@ -629,6 +648,9 @@
     riquadro_cookie_domanda: 'Attivo i cookie di %s per questo contenuto?',
     riquadro_cookie_si: 'Sì',
     riquadro_cookie_no: 'No',
+    riquadro_cookie_conferma: 'I contenuti di %s dentro le pagine di altri siti terranno i loro cookie, e questo si ricarica. '
+      + 'Li togli dal tasto destro sul contenuto.',
+    riquadro_cookie_attiva: 'Attiva',
     riquadro_cookie_fatto: 'Cookie di %s attivi: ricarico il contenuto',
     riquadro_cookie_menu_attiva: 'Attiva i cookie di %s qui',
     riquadro_cookie_menu_togli: 'Togli i cookie riattivati di %s',
@@ -653,6 +675,7 @@
     options_site_perms_part_presenza: 'Presenza al computer',
     options_site_perms_part_strumenti: 'Strumenti musicali',
     options_site_perms_part_rete: 'Rete locale',
+    options_site_perms_part_file: 'Modifica dei file',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:
@@ -670,6 +693,28 @@
     options_fp_mode_privacy_desc:
       'Come l\'Automatico, ma cambi "impronta" a ogni avvio di Filo: i siti non possono riconoscerti ' +
       'nemmeno fra una sessione e l\'altra. In rari casi qualche CAPTCHA in più.',
+    // Cronologia appunti nella pagina Sicurezza (#256). Il menu del tasto destro
+    // la mostra solo dentro un campo di testo: chi ha appena copiato una password
+    // leggendo un articolo non ha nessun campo da cliccare. Qui è sempre
+    // raggiungibile, con le stesse due azioni del menu (togli una voce, svuota).
+    security_clipboard_title: 'Cronologia appunti',
+    security_clipboard_desc:
+      'Quello che hai copiato di recente: Filo lo tiene da parte per riproportelo ' +
+      'quando incolli. Se ci è finita una password o un testo privato, toglilo da qui.',
+    security_clipboard_empty: 'Non c\'è niente: nessun testo o immagine copiato di recente.',
+    security_clipboard_image: 'Immagine',
+    security_clipboard_search: 'Cerca fra le voci copiate…',
+    security_clipboard_no_results: 'Nessuna voce copiata corrisponde.',
+    security_clipboard_remove: 'Rimuovi',
+    security_clipboard_remove_title: 'Rimuovi questa voce dalla cronologia',
+    security_clipboard_removed: 'Voce rimossa',
+    security_clipboard_gone: 'Rimossa',
+    security_clipboard_copy_title: 'Rimetti questa voce negli appunti',
+    security_clipboard_copied: 'Rimessa negli appunti',
+    security_clipboard_pending: 'Hai copiato altre %d cose: allontana il puntatore dalla lista e compaiono.',
+    security_clipboard_pending_one: 'Hai copiato un\'altra cosa: allontana il puntatore dalla lista e compare.',
+    security_clipboard_cleared: 'Cronologia svuotata',
+    security_clipboard_fail: 'Non è riuscito',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
@@ -700,16 +745,30 @@
     security_visite_nessuna: 'Nessuna pagina da cancellare',
     security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto,
+    // %6 = security_import_nulla_perso o security_import_escono_mie
     security_import_confirm_text:
       'Da "%1"%2: %3 e %4%5.\n\n' +
-      'Nulla di ciò che hai ora viene cancellato: le liste (chat, pagine visitate, pagine salvate, ' +
+      '%6le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
-      'quello del backup. Le impostazioni del backup diventano attive subito.',
+      'quello del backup. Le impostazioni del backup diventano attive subito. ' +
+      'Della spesa resta, mese per mese, la più alta fra adesso e il backup. ' +
+      'I crediti e le schede aperte restano quelli di adesso.',
+    // Righe in fondo alla conferma, solo quando servono. %1 = numero
+    security_import_images_lost: 'Immagini che non si leggono: %1. Al loro posto non ci sarà niente.',
+    security_import_filo_lost: 'Le chat e le pagine visitate del backup non si leggono.',
+    // %1 = quante restano fuori, %2 = il tetto
+    security_import_pages_out: 'Pagine salvate che non entrano: %1. L’elenco ne tiene %2, le più recenti.',
+    security_import_pages_out_mine: 'Fra queste, pagine che hai salvato adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_nulla_perso: 'Nulla di ciò che hai ora viene cancellato: ',
+    security_import_escono_mie: 'Di ciò che hai ora escono solo le pagine salvate più vecchie, contate qui sotto: ',
     security_import_confirm_ok: 'Importa',
     security_import_done: 'Dati importati',
     security_import_invalid: 'Non è un archivio esportato da Filo',
+    security_import_damaged: 'L’archivio è rovinato e Filo non ne legge i dati',
+    security_import_compressed: 'L’archivio è compresso in un formato che Filo non legge (bzip2 o LZMA): ricomprimilo come zip normale e riprova',
+    security_import_encrypted: 'L’archivio è protetto da una password: scompattalo, ricomprimilo senza password e riprova',
     security_import_fail: 'Importazione non riuscita',
 
     // Home

@@ -19,6 +19,7 @@ const ghExeFinto = (bin) => copyFileSync(process.execPath, join(bin, 'gh.exe'));
 const {
   scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, SOGLIA_ORE, CHIAVE_FERMO,
   oreDalPrimoVerde, testoFermoDopoIlVerde, SOGLIA_VERDE_ORE, CHIAVE_FERMO_DOPO_VERDE, chiaveDelFermo,
+  passaIlCancello, LAVORO_UNIT_WINDOWS,
 } = await import('../../scripts/ultima-suite-verde.mjs');
 
 // main dal più nuovo: c5 è la punta, c1 il più vecchio.
@@ -74,6 +75,58 @@ describe('il commit più nuovo di main con la suite verde', () => {
   test('di più corse verdi sullo stesso commit si tiene la prima (la più nuova)', () => {
     const v = corseVerdi([corsa('c4', 'success', { html_url: 'nuova' }), corsa('c4', 'success', { html_url: 'vecchia' })]);
     assert.equal(v.get('c4').html_url, 'nuova');
+  });
+});
+
+// #1184: un verde della sola suite Playwright che il cancello su Windows rifiutava, scelto a ogni giro per cinque giorni.
+describe('verde vuol dire anche unit test passati su Windows, come il cancello di pubblicazione', () => {
+  const lavoro = (name, conclusion) => ({ name, conclusion });
+
+  test('passa solo con il lavoro degli unit su Windows riuscito', () => {
+    assert.equal(LAVORO_UNIT_WINDOWS, 'unit-windows');
+    assert.equal(passaIlCancello([lavoro('suite', 'success'), lavoro('unit-windows', 'success')]), true);
+    assert.equal(passaIlCancello([lavoro('suite', 'success')]), false, 'una corsa di prima del lavoro non garantisce Windows');
+    assert.equal(passaIlCancello([lavoro('suite', 'success'), lavoro('unit-windows', 'skipped')]), false, 'saltato non è passato');
+    assert.equal(passaIlCancello([lavoro('unit-windows', 'failure')]), false);
+    assert.equal(passaIlCancello([lavoro('unit-windows-vecchio', 'success')]), false, 'il nome è quello esatto');
+    assert.equal(passaIlCancello(undefined), false);
+    assert.equal(passaIlCancello([null]), false);
+  });
+
+  test('il verde che il cancello rifiuterebbe si salta: vince il più nuovo che passa anche Windows', () => {
+    const conWindows = new Set(['c2']);
+    const valida = (r) => conWindows.has(r.head_sha);
+    assert.equal(scegliUltimoVerde([corsa('c4'), corsa('c2')], MAIN, valida), 'c2');
+    assert.equal(scegliUltimoVerde([corsa('c4')], MAIN, valida), '', 'nessun verde pieno: niente da pubblicare');
+    assert.equal(scegliUltimoVerde([corsa('c4'), corsa('c2')], MAIN), 'c4', 'senza la domanda vale la sola suite');
+  });
+
+  test('si chiede ai lavori solo dei verdi in main, dal più nuovo, fino al primo che passa', () => {
+    const chieste = [];
+    const valida = (r) => { chieste.push(r.head_sha); return r.head_sha === 'c3'; };
+    scegliUltimoVerde([corsa('ramo'), corsa('c1'), corsa('c3'), corsa('c4'), corsa('c5', 'failure')], MAIN, valida);
+    assert.deepEqual(chieste, ['c4', 'c3']);
+  });
+
+  test('da quando c\'è un verde da pubblicare conta solo il verde pieno', () => {
+    const antenato = (a, b) => MAIN.indexOf(a) >= MAIN.indexOf(b);
+    const adesso = Date.parse('2026-09-28T12:00:00Z');
+    const corse = [
+      corsa('c4', 'success', { updated_at: '2026-09-28T10:00:00Z' }),
+      corsa('c3', 'success', { updated_at: '2026-09-24T12:00:00Z' }),
+    ];
+    assert.equal(oreDalPrimoVerde(corse, MAIN, 'c2', antenato, adesso, (r) => r.head_sha === 'c4'), 2,
+      'c3 non è mai stato pubblicabile: il fermo non parte da lui');
+  });
+
+  test('il feedback del fermo senza verde nomina il verde scartato e dice perché', () => {
+    const { testo } = testoRilascioFermo({
+      tag: 'v0.2.237', oreDallUltima: 112, commitDopoTag: 39, verde: '',
+      scartata: corsa('52bb144133'), corse: [],
+    });
+    assert.match(testo, /52bb144133 \(https:\/\/github\.com\/o\/r\/actions\/runs\/52bb144133\)/);
+    assert.match(testo, /unit test su Windows/);
+    assert.doesNotMatch(testoRilascioFermo({ tag: 'v1', oreDallUltima: 72, verde: '' }).testo, /non ha passato/);
   });
 });
 
@@ -187,11 +240,15 @@ const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
 if (p.includes('/actions/workflows/suite.yml/runs')) {
   const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
   process.stdout.write(JSON.stringify({ workflow_runs: runs }));
+} else if (/actions[/]runs[/][^/]+[/]jobs/.test(p)) {
+  const id = p.match(/actions[/]runs[/]([^/]+)[/]jobs/)[1];
+  const windows = (s.senzaWindows || []).map(String).includes(id) ? [] : [{ name: 'unit-windows', conclusion: 'success' }];
+  process.stdout.write(JSON.stringify({ jobs: [{ name: 'suite', conclusion: 'success' }, ...windows] }));
 } else if (p.includes('/releases/tags/')) process.stdout.write(JSON.stringify({ published_at: s.pubblicata }));
 else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
 `;
 
-  async function scegli({ oreVersione, oreVerde }) {
+  async function scegli({ oreVersione, oreVerde, senzaWindows = false }) {
     const tmp = cartellaTemporanea('filo-scelta-vera-');
     const repo = join(tmp, 'main');
     const ricevute = [];
@@ -227,10 +284,11 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
         writeFileSync(join(bin, 'gh'), `#!${process.execPath}\n${CORPO_GH}`);
         chmodSync(join(bin, 'gh'), 0o755);
       }
-      const corsaDi = (s, conclusion, ore) => ({ head_sha: s, conclusion, status: 'completed', event: 'push', head_branch: 'main',
-        created_at: oreFa(ore + 1), updated_at: oreFa(ore), html_url: `https://github.com/o/r/actions/runs/${ore}` });
+      const corsaDi = (s, conclusion, ore) => ({ id: ore * 10, head_sha: s, conclusion, status: 'completed', event: 'push',
+        head_branch: 'main', created_at: oreFa(ore + 1), updated_at: oreFa(ore), html_url: `https://github.com/o/r/actions/runs/${ore}` });
       writeFileSync(join(tmp, 'stato.json'), JSON.stringify({
         pubblicata: oreFa(oreVersione), runs: [corsaDi(sha[2], 'failure', 0.5), corsaDi(sha[1], 'success', oreVerde)],
+        senzaWindows: senzaWindows ? [oreVerde * 10] : [],
       }));
       const env = {
         ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, FAKE_GH_STATO: join(tmp, 'stato.json'),
@@ -241,7 +299,8 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
       const codice = await new Promise((ok) => {
         execFile(process.execPath, [SCRIPT], { cwd: repo, env }, (err) => ok(err ? (err.code ?? 1) : 0));
       });
-      return { codice, ricevute, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), verde: sha[1] };
+      return { codice, ricevute, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), verde: sha[1],
+        riassunto: readFileSync(join(tmp, 'riassunto.md'), 'utf8') };
     } finally {
       await new Promise((ok) => srv.close(ok));
       togliCartella(tmp, { tentativi: 10 });
@@ -263,6 +322,17 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
     assert.equal(r.ricevute.length, 0);
     assert.equal(r.output.trim(), `sha=${r.verde}`);
   });
+
+  test('#1184: un verde della sola suite Playwright non si sceglie, e il fermo dice che è senza verde e perché', async () => {
+    const r = await scegli({ oreVersione: 112, oreVerde: 108, senzaWindows: true });
+    assert.equal(r.output.trim(), 'sha=', 'il cancello su Windows lo rifiuterebbe a ogni giro: non si prova nemmeno');
+    assert.equal(r.ricevute.length, 1);
+    assert.deepEqual(r.ricevute[0].keys, [chiaveDelFermo(CHIAVE_FERMO, 'v0.2.228')], 'è un fermo senza verde, non dopo il verde');
+    assert.ok(r.ricevute[0].text.includes(r.verde), 'il feedback nomina il verde scartato');
+    assert.match(r.ricevute[0].text, /unit test su Windows/);
+    assert.ok(r.riassunto.includes(r.verde), 'anche il riassunto della corsa dice perché quel verde non conta');
+    assert.equal(r.codice, 1);
+  });
 });
 
 // Il caso di #569: il feedback di un fermo resta aperto (parcheggiato) anche dopo che una versione è uscita. Il server
@@ -278,11 +348,13 @@ const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
 if (p.includes('/actions/workflows/suite.yml/runs')) {
   const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
   process.stdout.write(JSON.stringify({ workflow_runs: runs }));
+} else if (/actions[/]runs[/][^/]+[/]jobs/.test(p)) {
+  process.stdout.write(JSON.stringify({ jobs: [{ name: 'suite', conclusion: 'success' }, { name: 'unit-windows', conclusion: 'success' }] }));
 } else if (p.includes('/releases/tags/')) process.stdout.write(JSON.stringify({ published_at: s.pubblicata }));
 else process.stdout.write(JSON.stringify({ workflow_runs: [] }));
 `;
-  const corsaDi = (sha, conclusion, ore) => ({ head_sha: sha, conclusion, status: 'completed', event: 'push', head_branch: 'main',
-    created_at: oreFa(ore + 1), updated_at: oreFa(ore), html_url: `https://github.com/o/r/actions/runs/${Math.round(ore)}` });
+  const corsaDi = (sha, conclusion, ore) => ({ id: Math.round(ore), head_sha: sha, conclusion, status: 'completed', event: 'push',
+    head_branch: 'main', created_at: oreFa(ore + 1), updated_at: oreFa(ore), html_url: `https://github.com/o/r/actions/runs/${Math.round(ore)}` });
 
   async function dueFermi(verdi) {
     const tmp = cartellaTemporanea('filo-due-fermi-');

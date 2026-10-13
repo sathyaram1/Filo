@@ -5,7 +5,9 @@
 **La regola.** Chi legge da sé tanti file dell'utente (un indice, un giro in
 sottofondo) non apre un file che sta solo nel cloud, e su macOS non tocca
 Documenti, Scrivania e Download prima che l'utente abbia chiesto qualcosa che li
-riguarda.
+riguarda. Non entra nelle cartelle che la lettura di un file tratta da private,
+se non è l'utente a nominarle; e quello che ha letto in una cartella chiesta per
+l'occasione lo tiene finché il file non cambia.
 
 ## Il caso (#947)
 
@@ -35,6 +37,30 @@ Windows con un disco normale non si vedono:
   modello e in Preferenze, col modo di dare il permesso; le frasi che spiegano la
   richiesta stanno nell'`extendInfo` del pacchetto.
 
+## Due elenchi della stessa regola (#947.3)
+
+- **Le cartelle private.** «Cerca in tutta la mia cartella» faceva entrare
+  l'indice nella Libreria del Mac: allegati della posta, dati delle altre app,
+  e su un Mac recente le richieste di permesso del sistema. Per leggere un solo
+  file lì Filo chiedeva un OK, e su Windows AppData stava nell'elenco delle
+  cartelle saltate: due elenchi della stessa regola che divergevano. Adesso il
+  giro chiede a `SN_CMD_CLASSIFY.privato` (la regola della lettura) se una
+  cartella è privata, e non ci entra a meno che la cartella chiesta non sia già
+  lì dentro. La stessa regola filtra i candidati di una ricerca: quello letto
+  nella Libreria, chiesta per nome, non torna con la cartella personale.
+  Dentro la Libreria però il Mac tiene iCloud Drive (`Mobile Documents`) e le
+  cartelle di Dropbox, OneDrive e Google Drive (`CloudStorage`): per la regola
+  sono documenti, e il giro scende dalla Libreria solo lì
+  (`SN_CMD_CLASSIFY.aperteDentro`), senza elencarne il resto.
+- **Le cartelle chieste per l'occasione.** Una cartella fuori elenco
+  («cerca nell'Archivio») usciva dall'indice al primo giro sulle cartelle di
+  sempre, e la richiesta dopo rileggeva tutto: con migliaia di PDF, minuti. Ora
+  l'indice ricorda la cartella (una riga `{ o }` nel suo file) e ne tiene i
+  documenti finché non cambiano; il giro di sempre non ci passa. Si vede e si
+  dimentica in Preferenze, o in chat con «togli» sulla preferenza delle
+  cartelle. Una cartella entrata nell'elenco smette di essere «per
+  l'occasione»: tolta dall'elenco, esce dall'indice come le altre.
+
 Il resto del giro segue
 [Il computer si legge senza permessi e finché serve](il-computer-si-legge-senza-permessi-e-finche-serve.md):
 il testo si estrae in un processo a parte (`utilityProcess`), uno alla volta, e
@@ -42,7 +68,8 @@ il lettore si spegne quando non serve.
 
 ## Dove vive
 
-- `src/main/services/documentiIndice.js`: `soloNelCloud`, `giroInSottofondo`.
+- `src/main/services/documentiIndice.js`: `soloNelCloud`, `giroInSottofondo`,
+  `privata`, `occasionali`.
 - Prove: `tests/unit/documentiRicerca.test.mjs` (un file sparso fa da
   segnaposto; la piattaforma Mac simulata).
 

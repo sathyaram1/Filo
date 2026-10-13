@@ -26,6 +26,8 @@ if (process.argv.some((a) => a === '--headed' || a === '--ui' || a === '--debug'
   process.env.FILO_TEST_VISIBLE = '1';
 }
 if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
+// Ogni Filo aperto da una prova parte già accolto (src/main/shim/storage.js); chi prova l'accoglienza passa '0'.
+process.env.FILO_TEST_ACCOLTO = '1';
 
 export default defineConfig({
   testDir: './tests',

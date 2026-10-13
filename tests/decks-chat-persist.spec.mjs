@@ -51,6 +51,8 @@ async function mockProvider(app) {
     globalThis.__chatCalls = [];
     globalThis.__trattieni = null;
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // La home aperta scrive il suo saluto col modello: non è una chiamata della chat dei mazzi.
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       // Il giudice dei risultati (#382) le tiene tutte: qui si prova la chat, non il filtro.
       const prompt = String(messages[messages.length - 1].content || '');
       if (/CARTE CANDIDATE/.test(prompt)) {

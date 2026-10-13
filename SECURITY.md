@@ -102,15 +102,21 @@ sito web. Seguiamo lo standard **RFC 8252 ("OAuth 2.0 for Native Apps")**:
   un segreto generato al volo (`code_verifier`), impedendo l'intercettazione
   del codice di autorizzazione (`src/main/auth/pkce.js`,
   `src/main/auth/config.js`).
-- **Consenso nel browser di sistema, non in una webview interna.** La
-  schermata di login Google si apre nel tuo browser predefinito. Non la
-  mostriamo dentro una finestra di Filo: le webview embeddate sono un classico
-  vettore di phishing (e Google stesso le blocca). Così puoi sempre verificare
-  nella barra degli indirizzi del browser che stai parlando davvero con Google.
+- **Consenso in una scheda di Filo, non in una webview incorporata (#1123).**
+  Filo è un browser completo: la schermata di login Google si apre in una
+  scheda normale, la stessa in cui apriresti accounts.google.com a mano, con
+  lo user agent di sempre. Così l'accesso a Google vale anche per YouTube,
+  Gmail e Drive nelle schede. Se Google rifiuta l'accesso lì dentro («browser
+  non sicuro», `disallowed_useragent`, una sua pagina d'errore), Filo lo
+  riconosce, chiude la scheda e apre lo stesso indirizzo nel browser di
+  sistema: l'accesso a Filo riesce lo stesso. Il controllo di Google non si
+  aggira.
 - **Redirect su loopback locale** (`http://127.0.0.1:<porta>`): Filo apre un
   micro-server temporaneo solo su `127.0.0.1` per ricevere il codice di
   autorizzazione, poi lo chiude. Niente di questo è esposto in rete
-  (`src/main/auth/google-auth.js`).
+  (`src/main/auth/google-auth.js`). Il micro-server ascolta solo la risposta
+  che porta il codice casuale (`state`) creato per quell'accesso. Un altro
+  programma del computer che gli scrive riceve un rifiuto, e l'accesso continua.
 
 ---
 

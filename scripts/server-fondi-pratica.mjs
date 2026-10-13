@@ -228,7 +228,9 @@ export async function esegui(argv, deps = {}) {
     const lav = await of.praticaPerLaSessione(r.id, { bearer });
     if (!lav.ok) { err(`${of.rifiutoPratica(a.pratica, lav)}\nNon ho toccato niente.`); return 3; }
     // §1.6: un lavoro sul server dev'essere fidato. server:fondi spinge main senza L5 né server: il controllo sta qui.
-    if (lav.fiducia !== 'fidato') {
+    // Campo che la migrazione non ha ancora scritto: vale la regola di prima, il mittente provato che localSenderCheck ha
+    // già controllato (decisione dell'owner, 11/10). Senza, la fusione del server di #1148 aspetterebbe la sua stessa migrazione.
+    if (lav.fiducia !== 'fidato' && !lav.primaDellaMigrazione) {
       err(`La pratica ${chi} non è fidata: un lavoro sul server si fonde solo su una pratica fidata. La segna fidata l’owner, in Gestione, dopo averne letto il testo. Non ho toccato niente.`);
       return 3;
     }

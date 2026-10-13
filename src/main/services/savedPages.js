@@ -56,9 +56,20 @@
       categoryConfidence: page.categoryConfidence || null,
     };
     pages.unshift(entry);
-    if (pages.length > SAVED_PAGES_LIMIT) pages.length = SAVED_PAGES_LIMIT;
+    const fuori = pages.length > SAVED_PAGES_LIMIT ? pages.splice(SAVED_PAGES_LIMIT) : [];
     await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: pages });
+    if (fuori.length) dichiaraUscite(fuori);
     return entry;
+  }
+
+  // L'elenco vive in storage.json, che si riscrive intero: il tetto resta, ma chi esce lo si dice (#1088).
+  // In fondo stanno le più vecchie: save() mette in cima e l'importazione ordina per data.
+  function dichiaraUscite(fuori) {
+    const nome = (p) => `«${String((p && (p.title || p.url)) || '').slice(0, 80)}»`;
+    const testo = fuori.length === 1
+      ? `Le pagine salvate per dopo sono al massimo ${SAVED_PAGES_LIMIT}. ${nome(fuori[0])}, la più vecchia, è uscita dall’elenco.`
+      : `Le pagine salvate per dopo sono al massimo ${SAVED_PAGES_LIMIT}. Le ${fuori.length} più vecchie sono uscite dall’elenco.`;
+    try { require('./avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'pagine-salvate-tetto' }); } catch (_) {}
   }
 
   // Aggiorna SOLO la miniatura di una scheda già salvata (per id). Serve al

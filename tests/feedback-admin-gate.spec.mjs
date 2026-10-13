@@ -11,6 +11,7 @@
 // spostare un feedback in "todo". Ora feedback_update da sloggato torna ok:false.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { googleFinto } from './helpers/googleFinto.mjs';
 
 const FEEDBACK_URL = 'filo://feedback/feedback.html';
 
@@ -39,7 +40,9 @@ test('feedback: il main rifiuta feedback_update da utente non admin', async ({ o
   expect(String(res.error || '')).toMatch(/amministrator/i);
 });
 
-test('feedback: un accesso non riuscito dal banner dice il perché lì, senza finestre di sistema', async ({ app, openTab }) => {
+test('feedback: un accesso non riuscito dal banner dice il perché lì, senza finestre di sistema', async ({ app, openTab, testServer }) => {
+  // Google rifiuta la scheda d'accesso (#1123) e il browser di ripiego non si apre.
+  await googleFinto(app, testServer, { rifiuta: true });
   await app.evaluate(({ shell }) => { shell.openExternal = async () => { throw new Error('Failed to open'); }; });
   const page = await openTab(FEEDBACK_URL);
   await expect(page.locator('#adminSignIn')).toBeVisible({ timeout: 8_000 });

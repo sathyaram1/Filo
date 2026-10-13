@@ -35,7 +35,7 @@
     // APPLICA dopo la conferma dell'utente. Come EXPORT_DATA sono riservati
     // all'origine filo://: una pagina web non deve poter aprire un file dialog
     // né riscrivere lo storage (comprese le chiavi API).
-    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, token }
+    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
     IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
@@ -200,10 +200,11 @@
     //   è su questo computer: il server ne emette un'altra (la vecchia si
     //   spegne, il saldo resta). { } → { ok, status, message, state? }
     WALLET_REISSUE: 'wallet_reissue',
-    // WALLET_RESET_IDENTITY: l'identità dell'installazione è stata annullata
-    //   sul server (il portafoglio legato a essa non si raggiunge più):
-    //   l'utente sceglie di ricominciare con un'identità nuova e un nuovo
-    //   invito. { } → { ok, state }
+    // WALLET_RESET_IDENTITY: l'identità dell'installazione è annullata sul
+    //   server o illeggibile qui (il portafoglio legato a essa non si
+    //   raggiunge): l'utente sceglie di ricominciare con un'identità nuova e
+    //   un nuovo invito. I file di prima restano accanto.
+    //   { confermato: true } → { ok, state } | { ok:false, status:'needs_confirm'|'identity_ok'|'not_reachable' }
     WALLET_RESET_IDENTITY: 'wallet_reset_identity',
     // WALLET_OWN_KEY_INFO (#629): spesa e residuo che OpenRouter dichiara per
     //   la chiave OpenRouter scritta dall'utente (la pagina Crediti li mostra;
@@ -344,6 +345,24 @@
     DOCUMENTI_STATO: 'documenti_stato',
     // {} → { ok, percorso } | { ok:false } (annullata)
     DOCUMENTI_SCEGLI_CARTELLA: 'documenti_scegli_cartella',
+    // #947.3 — toglie dall'indice una cartella cercata per l'occasione (Preferenze). Solo da Filo.
+    // { percorso } → { ok, tolta, documenti }
+    DOCUMENTI_DIMENTICA: 'documenti_dimentica',
+    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto vive nella pagina: su un sito
+    // la ricerca parte solo dopo il sì nella vista di Filo sopra la scheda (confermeSopraPagina), e alla pagina tornano
+    // nomi, cartelle dette coi nomi di Filo e chiavi a caso, mai percorsi. Le chiavi valgono solo per la scheda che ha
+    // cercato. Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
+    // { cosa, cartella? } → { ok, cercato, candidati: [{ n, nome, dove, tipo, data, chiave }], indice, fermata } | { ok:false, annullata }
+    AIUTO_CERCA_DOCUMENTI: 'aiuto_cerca_documenti',
+    // {} → { ok }: ferma la lettura dei documenti nuovi; la ricerca risponde con quelli già letti.
+    AIUTO_DOCUMENTI_FERMA: 'aiuto_documenti_ferma',
+    // main → la pagina che cerca: { fatti, totali } mentre l'indice legge i documenti nuovi (niente nomi).
+    AIUTO_DOCUMENTI_AVANZAMENTO: 'aiuto_documenti_avanzamento',
+    // { chiave } → { ok } | { ok:false, frase }: apre il documento, lo mostra nella cartella, o ne avvia il trascinamento
+    // vero (un file che la pagina riceve al rilascio, come da una cartella).
+    AIUTO_APRI_FILE: 'aiuto_apri_file',
+    AIUTO_MOSTRA_FILE: 'aiuto_mostra_file',
+    AIUTO_TRASCINA_FILE: 'aiuto_trascina_file',
     // Segnale BROADCAST main→superfici: "la cronologia scaricamenti è cambiata"
     // (parte/avanza/finisce un download). VOLUTAMENTE contentless (nessun nome
     // file né percorso): la pagina filo://downloads lo riceve e ri-legge la
@@ -354,6 +373,9 @@
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }
+    // Voce o dettatura partirebbero col modello scelto? (#1141) { action, nickname } da chiunque (la scelta di
+    // «Detta» vive nei siti); { action, provider, model } solo da filo://. → { verdict, hosts?, warning? }
+    AUDIO_HOST_CHECK: 'audio_host_check',
     // Test di un modello del registry PREDEFINITO con le chiavi predefinite.
     // { nickname } → risolve nel registry predefinito (lista read-only Opzioni);
     // { provider, model } → testa la riga così com'è scritta, anche non ancora
@@ -619,6 +641,13 @@
     // Le legge il SERVER quando accende le sessioni. Owner-only.
     AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff } | { ok:false, error }
     AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff? } → come sopra | { ok:false, error }
+    // Modello e sforzo del worker per fase (doc config/routines, campo
+    // `roleModels` = { ruolo: { model?, effort? } }; regole in
+    // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore
+    // vuoto = vale la definizione dell'agente. Le legge il SERVER quando
+    // consegna un biglietto. Owner-only.
+    AUTOMATION_ROLE_MODELS_GET: 'automation_role_models_get', // → { ok, roleModels } | { ok:false, error }
+    AUTOMATION_ROLE_MODELS_SET: 'automation_role_models_set', // { ruolo, campo, valore } → { ok, letto, scritto, roleModels? } | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
@@ -748,7 +777,8 @@
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
     AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile, isAdmin, remembered }; a un sito solo { ok, signedIn, isAdmin } | { ok: false, code, error: frase per l'utente }
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
-    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, isAdmin, profile|null, uid, remembered }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_STATUS: 'auth_status',                    // { senzaRete? } → { ok, signedIn, isAdmin, profile|null, uid (non con senzaRete), remembered, googleNelleSchede }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_COLLEGA_GOOGLE: 'auth_collega_google',    // solo da Filo: apre l'accesso web a Google in una scheda (#1123) → { ok } | { ok: false, error }
     AUTH_CHANGED: 'auth_changed',                  // broadcast alle sole pagine di Filo → { signedIn, isAdmin, profile|null, remembered }
 
     // Clipboard history (per il menu "Incolla"). Chi legge e chi scrive da un sito: services/appuntiDaiSiti.js. L'elenco
@@ -758,6 +788,13 @@
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',
+    // Broadcast alle sole pagine filo:// quando la cronologia appunti cambia
+    // (copia nuova, voce tolta, svuotamento, descrizione di un'immagine
+    // arrivata). Non porta le voci con sé: chi lo riceve rilegge la cronologia
+    // con GET_CLIPBOARD_HISTORY. Così una scheda ferma sulla pagina della
+    // sicurezza non mostra più una lista vecchia, e nessun elenco di ciò che
+    // l'utente ha copiato viaggia verso schede che non l'hanno chiesto.
+    CLIPBOARD_HISTORY_UPDATED: 'clipboard_history_updated',
 
     // Categorie (Fase 2)
     GET_CATEGORIES: 'get_categories',

@@ -459,8 +459,11 @@
     // Prefetch "Spiega" appena l'utente seleziona del testo, così quando apre il
     // menu il risultato è già in cache. Debounce + dedup gestiti dallo scheduler.
     document.addEventListener('selectionchange', Actions.schedulePrefetchExplain);
-    // Chi si ferma prima di rilasciare il mouse non cambia più la selezione: il rilascio, gesto vero, la prepara (#1070).
-    document.addEventListener('mouseup', (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
+    // Chi si ferma prima di rilasciare il mouse o il dito non cambia più la selezione: il rilascio, gesto vero, la
+    // prepara (#1070); la pressione lunga del dito seleziona prima del rilascio.
+    for (const tipo of ['mouseup', 'touchend']) {
+      document.addEventListener(tipo, (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
+    }
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
@@ -699,6 +702,9 @@
 
     const avviso = self.SN_AVVISI?.avvisoSotto?.(realTarget(e));
     if (avviso) { openAvvisoMenu(avviso, e); return; }
+    // Il documento trovato dall'Aiuto (#947.3): le azioni di un file, non quelle della pagina.
+    const file = self.SN_SIDEBAR?.fileSotto?.(realTarget(e));
+    if (file) { Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
 
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la

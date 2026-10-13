@@ -152,11 +152,11 @@ test('il portafoglio avvisa chi tiene il conto della prontezza', () => {
     wallet.save({ key: 'sk-or-personale', pseudonym: 'prova' });
     assert.equal(avvisi, 1, 'la chiave depositata deve avvisare');
     assert.equal(wallet.personalKey(), 'sk-or-personale');
-    wallet.clear();
+    wallet.metteDaParte();
     assert.equal(avvisi, 2, 'la chiave tolta deve avvisare');
     assert.equal(wallet.personalKey(), '');
   } finally {
     globalThis.SN_PRONTEZZA_CAMBIATA = prima;
-    wallet.clear();
+    wallet.metteDaParte();
   }
 });

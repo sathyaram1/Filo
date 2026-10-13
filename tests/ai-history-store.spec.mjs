@@ -15,6 +15,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { clickConfirm } from './helpers/confirm.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const cartellaDati = (app) => app.evaluate(() => process.env.FILO_USER_DATA);
@@ -232,7 +233,7 @@ testSenzaFixture('una cronologia oltre i 4 MB in storage.json si migra intera, e
     const dopo = await app.evaluate(async () => globalThis.SN_HISTORY.list());
     expect(dopo).toEqual(vecchia);
 
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
     let page = null;
     await expect.poll(() => { page = app.windows().find((w) => w.url().startsWith('filo://history')); return !!page; }).toBe(true);
