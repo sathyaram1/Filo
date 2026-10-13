@@ -1167,9 +1167,9 @@
     const args = gitArgsAfterSub(trimmed);
     const libero = args.includes('--no-index');
     const sep = args.indexOf('--');
-    // In una cwd di rete il nome che git risolve contro la cartella (anche prima
-    // del `--`) va al remoto: lo si misura come un percorso, come `ls` (#1072.4).
-    const reteNome = !!(c.cwd && c.cwd.rete) && GIT_NOME_IN_CWD.has(sub);
+    // In una cwd di rete ogni nome dato a git va al remoto: come file della cartella
+    // o come riferimento (`.git/refs/<nome>`). Lo si misura come un percorso, come `ls` (#1072.4).
+    const reteNome = !!(c.cwd && c.cwd.rete);
     const percorsi = [];
     args.forEach((a, i) => {
       if (a.startsWith('-')) return;
