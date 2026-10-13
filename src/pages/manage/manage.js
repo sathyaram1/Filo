@@ -2590,7 +2590,9 @@
       : `<span class="mg-work-idle">${
           progress.current.key === 'impl'
             ? 'Nessuna istanza al lavoro: rientra in coda da solo'
-            : 'Nessuna istanza al lavoro: in attesa di un verificatore'
+            : progress.current.key === 'realign'
+              ? 'Nessuna istanza al lavoro: in attesa del riallineamento'
+              : 'Nessuna istanza al lavoro: in attesa di un verificatore'
         }</span>`;
     return `<div class="mg-item-state">${steps}${who}</div>`;
   }
