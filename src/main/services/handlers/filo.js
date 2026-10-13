@@ -558,21 +558,23 @@ module.exports = function register(on, ctx) {
   })));
   on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
 
-  // F4 — «Annulla» del toast: scrive `ignored` con le credenziali di chi è dentro, quindi la chiede solo la shell,
-  // e solo per un auto-feedback partito da qui (#784.3). Senza la sessione dell'owner le regole rifiutano: resta `new`.
+  // F4 — «Annulla» del toast: scrive `ignored` con le credenziali di chi è dentro, quindi mai per un sito e solo per
+  // un auto-feedback partito da qui (#784.3). Senza la sessione dell'owner le regole rifiutano e resta `new`.
   on(MSG.CANCEL_AUTO_FEEDBACK, soloSuperficiDiFilo(async (msg) => {
     const id = String(msg && msg.id || '').trim();
     if (!id) return { ok: false, error: 'id mancante' };
     if (!autoFeedbackAnnullabili.has(id)) return { ok: false, error: 'non è una segnalazione partita da qui' };
     const FB = globalThis.SN_FEEDBACK;
     if (!FB || typeof FB.updateStatus !== 'function') return { ok: false, error: 'FB non disponibile' };
+    // Tolto prima di scrivere: un doppio clic non scrive due volte; se la scrittura fallisce torna annullabile.
+    autoFeedbackAnnullabili.delete(id);
     try {
       const auth = require('../../auth/google-auth');
       const idToken = await auth.getIdToken().catch(() => null);
       await FB.updateStatus(id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' }, { idToken: idToken || undefined });
-      autoFeedbackAnnullabili.delete(id);
       return { ok: true };
     } catch (e) {
+      autoFeedbackAnnullabili.add(id);
       console.warn('[F4] cancel auto-feedback fallito:', e?.message || e);
       // Non un errore fatale: il feedback rimane ma non interferisce con il triage.
       return { ok: false, error: e?.message || String(e) };
