@@ -678,8 +678,9 @@
   // Handler contextmenu
   // ------------------------------------------------------------
   async function onContextMenu(e) {
-    // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
-    if (e.shiftKey) return;
+    // Shift lo decide il ponte del page-preload, che sul sito col menu del sito al tasto destro lo manda qui (#975);
+    // nelle pagine filo:// l'ascolto qui sotto.
+    sitoSuo = null;
 
     // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
     // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto
