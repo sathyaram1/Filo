@@ -665,9 +665,8 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await ripristina(app);
 });
 
-// L'altro lato di L2 (#814.2): il titolo c'è ma il modello sta ancora scrivendo la chiamata. Il fermo la annulla, e
-// «riprendi» lascia il modello libero di cercare: la ricerca si fa una volta, dopo, e non risulta fatta prima.
-// La chiamata resta a metà fino al fermo: «non ancora partita» a orologio (3 s) su una macchina carica diventa «partita».
+// L'altro lato di L2 (#814.2): il modello scrive ancora la chiamata, trattenuta fino al fermo (non a orologio), che la
+// annulla; «riprendi» lascia il modello libero di cercare: la ricerca si fa una volta, dopo, e non risulta fatta prima.
 test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «riprendi» la fa, una volta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
