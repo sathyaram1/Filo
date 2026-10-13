@@ -164,6 +164,9 @@ export async function inviaAllarme(name, text, chiavi = []) {
   if (!(await spedisciAllarme(name, text, chiavi))) process.exit(1);
 }
 
+/** Dove va la parola della costruzione: i lavori la leggono dall'ambiente, che fa ombra al segreto omonimo del repo. */
+export const DOVE_VA_LA_PAROLA = 'nell\'ambiente «rilascio» del repo (Settings → Environments → rilascio): quella col nome uguale fra i segreti del repo non la legge nessuno';
+
 let bordiDetti = false;
 
 /**
