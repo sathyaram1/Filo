@@ -240,7 +240,7 @@ export function leggiUscitaClaude(stdout, stderr = '', code = 0) {
 
 // Le variabili della sessione che lancia: un'istanza figlia che le eredita si crede dentro di lei (e CLAUDE_EFFORT batte --effort).
 const DELLA_SESSIONE = /^(CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_ID|HOST_SESSION_ID|CHILD_SESSION|SESSION_ATTENDED|ENTRYPOINT|EXECPATH|MESSAGING_\w+|SDK_HAS_HOST_AUTH_REFRESH))$/;
-/** L'ambiente di un'istanza figlia: senza la sessione che lancia, ma col suo biglietto, trovato anche da PowerShell (#1148). */
+/** L'ambiente di un'istanza figlia: senza la sessione che lancia, ma col suo biglietto (#1148). */
 export function envFiglio(env, { cwd = process.cwd() } = {}) {
   const out = Object.fromEntries(Object.entries(env || {}).filter(([k]) => !DELLA_SESSIONE.test(k)));
   const biglietto = percorsoDiChiLancia({ env: env || {}, cwd });
