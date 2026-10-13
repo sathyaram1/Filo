@@ -201,7 +201,8 @@
       if (!r || !r.ok) {
         dillo(`Non salvato: ${(r && r.errore) || 'il server non ha risposto'}.`, 'is-error');
         aggiornaRimetti();
-        riparti();
+        // Lo stesso numero appena rifiutato non si rimanda da solo: si rimanda quello scritto dopo.
+        riparti(scritto);
         return;
       }
       // Il campo mostra quello che il server ha, non quello che era stato
@@ -216,13 +217,13 @@
       aggiornaRimetti();
       dillo(comeRipristino ? 'Rimesso com’era.' : 'Salvato.', 'is-ok');
       if (typeof onSalva === 'function') { try { onSalva(); } catch (_) {} }
-      riparti();
+      riparti(attuale);
     }
 
-    function riparti() {
+    function riparti(giaFatto) {
       if (!ancora) return;
       ancora = false;
-      if (String(input.value) !== attuale) salvaOra({ riprendiIlFuoco: false }).catch(() => {});
+      if (String(input.value) !== giaFatto) salvaOra({ riprendiIlFuoco: false }).catch(() => {});
     }
 
     // `riprendiIlFuoco`: chi ha premuto Salva vuole il cursore nel campo da
