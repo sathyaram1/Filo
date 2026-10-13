@@ -8,6 +8,7 @@
 // Rete finta come in routineChannel.test.mjs (fetchImpl); per la riga di
 // comando un server HTTP locale come in sealConsegna.test.mjs.
 
+import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
