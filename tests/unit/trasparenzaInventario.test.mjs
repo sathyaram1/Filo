@@ -39,6 +39,7 @@ const CARTELLA_DATI = {
   'storage.json': { frase: 'Tutto quello che Filo sa di te vive nella sua cartella dei dati' },
   'identity.bin': { frase: 'un account anonimo che Filo crea da solo' },
   'wallet.bin': { frase: 'la chiave dei crediti e il tuo accesso Google' },
+  'wallet-stato.bin': { frase: 'l\'ultimo stato del tuo portafoglio letto dal server' },
   'auth.bin': { frase: 'la chiave dei crediti e il tuo accesso Google' },
   'segreti-letti.bin': { frase: 'E per un mese i segreti letti' },
   'archivio-schede': { frase: 'le schede aperte e quelle archiviate' },

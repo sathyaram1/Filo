@@ -8,7 +8,7 @@ import {
   unlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve, win32 } from 'node:path';
+import path, { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sommaRiepiloghi, perLaRiga, SOLO } from '../run-unit-tests.mjs';
 
@@ -30,9 +30,9 @@ const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) ||
 // Linux «C:\…» restava intero e la stessa chiave usciva diversa.
 const assoluto = (p) => win32.isAbsolute(p);
 
-/** Un test rosso in una riga che due cartelle diverse scrivono uguale. PURA. */
-export function chiaveTest(r, root) {
-  let file = r && r.file ? perLaRiga(String(r.file), root) : '?';
+/** Un test rosso in una riga che due cartelle diverse, anche di sistemi diversi, scrivono uguale. `p` come perLaRiga. PURA. */
+export function chiaveTest(r, root, p = path) {
+  let file = r && r.file ? perLaRiga(String(r.file), root, p) : '?';
   // Fuori dalla cartella (forma corta e lunga dello stesso percorso su Windows): conta il pezzo da tests/ in poi.
   if (assoluto(file)) {
     const barre = file.replace(/\\/g, '/');

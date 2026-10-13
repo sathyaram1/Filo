@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 import { pidMorto } from '../helpers/processi.mjs';
@@ -38,18 +38,28 @@ test('esito: rosso anche su main fonde, ma non se la fusione rompe test che su m
   assert.equal(decidiEsito({ fusione: { ok: false, rossi: [] }, main: { ok: false, rossi: ['x'] } }).esito, 'rosso_anche_su_main');
 });
 
-test('lo stesso test rosso ha la stessa chiave in due cartelle diverse', () => {
-  const a = chiaveTest({ nome: 'n', file: join('/tmp/x/fusione', 'tests', 'unit', 'a.test.mjs') }, '/tmp/x/fusione');
-  const b = chiaveTest({ nome: 'n', file: join('/tmp/x/main', 'tests', 'unit', 'a.test.mjs') }, '/tmp/x/main');
-  assert.equal(a, 'tests/unit/a.test.mjs › n');
-  assert.equal(a, b);
-  // Fuori dalla cartella (forma corta e lunga di Windows): conta il pezzo da tests/.
-  assert.equal(chiaveTest({ nome: 'n', file: 'C:\\ALTRO~1\\fusione\\tests\\unit\\a.test.mjs' }, 'C:\\altro nome\\fusione'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: 'C:\\altro nome\\main\\tests\\unit\\a.test.mjs' }, 'C:\\ALTRO~1\\main'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: '\\\\srv\\cond\\main\\tests\\unit\\a.test.mjs' }, 'D:\\main'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: '/private/tmp/x/fusione/tests/unit/a.test.mjs' }, '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: '/private/var/x/fusione/tests/unit/a.test.mjs' }, '/var/x/fusione'), 'tests/unit/a.test.mjs › n');
-  assert.equal(chiaveTest({ nome: 'n', file: '/altro/fusione/tests/unit/a.test.mjs' }, '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
+// I percorsi li sceglie la prova: nata su Windows e verde lì, la stessa prova era rossa nei contenitori Linux (#737.3).
+for (const [so, p] of [['Linux', posix], ['Windows', win32]]) {
+  test(`lo stesso test rosso ha la stessa chiave in due cartelle diverse (percorsi di ${so})`, () => {
+    const chiave = (file, root) => chiaveTest({ nome: 'n', file }, root, p);
+    const a = chiave(p.join('/tmp/x/fusione', 'tests', 'unit', 'a.test.mjs'), '/tmp/x/fusione');
+    assert.equal(a, 'tests/unit/a.test.mjs › n');
+    assert.equal(a, chiave(p.join('/tmp/x/main', 'tests', 'unit', 'a.test.mjs'), '/tmp/x/main'));
+    assert.equal(chiave('C:\\x\\fusione\\tests\\unit\\a.test.mjs', 'C:\\x\\fusione'), 'tests/unit/a.test.mjs › n');
+    // Fuori dalla cartella (forma corta e lunga di Windows): conta il pezzo da tests/.
+    assert.equal(chiave('C:\\ALTRO~1\\fusione\\tests\\unit\\a.test.mjs', 'C:\\altro nome\\fusione'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('C:\\altro nome\\main\\tests\\unit\\a.test.mjs', 'C:\\ALTRO~1\\main'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('C:/altro nome/main/tests/unit/a.test.mjs', 'C:\\ALTRO~1\\main'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('\\\\srv\\cond\\main\\tests\\unit\\a.test.mjs', 'D:\\main'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('/private/tmp/x/fusione/tests/unit/a.test.mjs', '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('/private/var/x/fusione/tests/unit/a.test.mjs', '/var/x/fusione'), 'tests/unit/a.test.mjs › n');
+    assert.equal(chiave('/altro/fusione/tests/unit/a.test.mjs', '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
+  });
+}
+
+test('senza percorsi scelti valgono quelli del sistema', () => {
+  const root = join(tmpdir(), 'fusione');
+  assert.equal(chiaveTest({ nome: 'n', file: join(root, 'tests', 'unit', 'a.test.mjs') }, root), 'tests/unit/a.test.mjs › n');
 });
 
 test('una chiave rimasta assoluta, in qualunque forma, non è un file da riprovare', () => {

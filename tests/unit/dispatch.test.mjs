@@ -11,6 +11,7 @@
 // (SPEC-RIDISEGNO-MAX.md §1; la copia viva delle regole è
 // filo-security/functions/src/routine/select.js, coi suoi test).
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

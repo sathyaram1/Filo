@@ -8,6 +8,7 @@
 //   sigillata. Un controllo sulle sole funzioni non vedrebbe un campo scartato dalla
 //   riga di comando, che è già successo una volta.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
