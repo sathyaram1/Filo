@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ambienteSenzaSessione } from '../helpers/sessioneIsolata.mjs';
 
 const QUI = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(QUI, '..', '..');
