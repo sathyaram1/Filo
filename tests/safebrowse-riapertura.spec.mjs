@@ -50,7 +50,6 @@ test('Sicurezza non mostra l\'interruttore della finestra isolata, che oggi non 
   await page.waitForSelector('#sec-safebrowse', { timeout: 8_000 });
   await expect(page.locator('#sec-safebrowse-llm')).toBeVisible();
   await expect(page.locator('#sec-safebrowse-sandbox')).toBeHidden();
-  await page.screenshot({ path: 'tests/.shots/1081-sicurezza.png', fullPage: true });
 });
 
 test('in incognito una pagina http con la password ha il suo avviso, senza giudizio del modello né seconda visita', async ({ app, shell }) => {
