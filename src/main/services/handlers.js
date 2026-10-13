@@ -4897,6 +4897,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
   let lettiRisposta = [];
   try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
+  // I collegamenti della risposta che il modello non avrebbe potuto aprire senza un OK lo chiedono anche al clic (#868.6).
+  let linkDaConfermare = [];
+  try {
+    linkDaConfermare = await linkCheChiedonoOk(textReply, {
+      sender, contesto: azioniViste, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
+    });
+  } catch (e) { console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e); }
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
@@ -4910,6 +4917,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       {
         role: 'filo', text: textReply, actions: successe,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
+        ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(cambi.length ? { cambi } : {}),
       },
       { onboarding: onbActive },
@@ -4972,6 +4980,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     notes, reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
+    ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
     ...(keyFallback ? { keyFallback } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.

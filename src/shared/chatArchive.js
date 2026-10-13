@@ -390,6 +390,12 @@
       // I cambi di stato chiesti con quel messaggio (#867): riaperta, la bolla dell'utente ritrova il suo segno.
       const cambi = (Array.isArray(turn.cambi) ? turn.cambi : []).filter((id) => typeof id === 'string' && /^c[0-9a-f]+$/.test(id));
       if (cambi.length) out.cambi = cambi;
+      // I collegamenti che al clic chiedono l'OK (#868.6): riaperta, la chat lo chiede ancora.
+      const linkDaConfermare = (Array.isArray(turn.linkDaConfermare) ? turn.linkDaConfermare : [])
+        .filter((x) => x && typeof x.url === 'string' && x.url)
+        .slice(0, 200)
+        .map((x) => ({ url: x.url.slice(0, 8192), motivo: String(x.motivo || '').slice(0, 200) }));
+      if (linkDaConfermare.length) out.linkDaConfermare = linkDaConfermare;
     }
     return out;
   }
