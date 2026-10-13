@@ -2241,6 +2241,7 @@
     }
     if (msg?.type === MSG.SETTINGS_UPDATED) {
       settings = msg.settings;
+      MenuDelSito?.allinea(isBlocked() ? {} : settings);
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
       self.SN_AVVISI?.imposta(settings.notifications);
