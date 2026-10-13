@@ -135,6 +135,7 @@ function impostazioniPerWeb(settings, indirizzi = []) {
   if (!settings || typeof settings !== 'object') return settings;
   const out = proietta(settings, CAMPI_WEB);
   if (own(out, 'blocklist')) out.blocklist = esclusiDelSito(out.blocklist, indirizzi);
+  if (out.menuDelSito && own(out.menuDelSito, 'siti')) out.menuDelSito.siti = esclusiDelSito(out.menuDelSito.siti, indirizzi);
   return out;
 }
 
