@@ -6,8 +6,9 @@ module.exports = function register(on, ctx) {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
-    saveOnboarding, finishOnboarding, claimOnboardingResume,
+    saveOnboarding, finishOnboarding, claimOnboardingResume, autoFeedbackAnnullabili,
   } = ctx;
+  const { soloFilo: soloSuperficiDiFilo } = require('./origine');
   const { SN_CONST } = globalThis;
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
