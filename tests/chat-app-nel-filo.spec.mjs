@@ -237,7 +237,10 @@ test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Mostra lo scambio', { exact: true })).toBeVisible();
   await expect(menu.getByText("Apri nell'Editor", { exact: true })).toBeVisible();
-  await expect(menu.getByText('Copia lo scambio', { exact: true })).toBeVisible();
+  await menu.getByText('Copia lo scambio', { exact: true }).click();
+  await expect(riga.locator('.dash-riga-app-ora')).toHaveText('copiato');
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toContain('Tu: Mi riassumi i licheni?');
+  await riga.locator('.dash-riga-app-testa').click({ button: 'right' });
   await menu.getByText('Togli dal filo', { exact: true }).click();
   await clickConfirm(casa, 'ok');
   await expect(riga).toHaveCount(0);
