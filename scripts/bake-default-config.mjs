@@ -178,7 +178,7 @@ export function descriviEsitoServer(esito) {
     case 'passphrase-assente':
       return 'La costruzione non ha nemmeno interrogato il server: FILO_BUILD_PASSPHRASE è assente dal job.';
     case 'rifiutato':
-      return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata.`;
+      return `Il server ha rifiutato la richiesta (ok:false${e.reason ? `, reason: ${e.reason}` : ''}): la parola d'ordine FILO_BUILD_PASSPHRASE è sbagliata, scaduta o revocata. Va ricopiata ${DOVE_VA_LA_PAROLA}.`;
     case 'http':
       return `Il server ha risposto HTTP ${e.status}.`;
     case 'rete':
