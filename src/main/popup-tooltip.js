@@ -38,7 +38,7 @@ html,body{background:transparent;overflow:hidden;height:100%;
 :root.dark{--bg:#1d1a16;--fg:#f1e7d6;--border:#3b332a}
 </style></head><body><div id="tip"></div>
 <script>
-  // API minimale: il main process chiama webContents.send('set', {text, dark})
+  // API minimale: il main process chiama webContents.send('set', {text, dark, giro}); 'size' riporta il giro.
   const tip = document.getElementById('tip');
   const { ipcRenderer } = require('electron');
   ipcRenderer.on('set', (_e, { text, dark, giro }) => {
