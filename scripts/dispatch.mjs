@@ -697,7 +697,8 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
   const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
   if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
   const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
-  const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
+  // Il contratto ha pezzi in comune con halt (la domanda di fine sessione): si espande come i ruoli.
+  const contract = existsSync(c) ? espandiInclusioni(readFileSync(c, 'utf8'), ROLES_DIR) : '';
   const testo = contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
   // Le ricette dicono `node scripts/…`, che dalla cartella di lavoro porta agli
   // strumenti DEL RAMO. Quando gli strumenti sono la copia fissata, il percorso

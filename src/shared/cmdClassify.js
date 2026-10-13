@@ -838,6 +838,9 @@
   ]);
   // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
   const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
+  // Dentro la Libreria del Mac stanno anche i documenti nel cloud dell'utente (iCloud Drive; Dropbox, OneDrive e
+  // Google Drive da macOS 12): si leggono come Documenti (#947.3).
+  const PROFILO_APERTE = { library: ['Mobile Documents', 'CloudStorage'] };
   const JOLLY = /[*?[\]{}\uFFFD]/;
   // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
   const SEGNAPOSTO = '$_\uE000';
@@ -989,7 +992,8 @@
   function contesto(ctx) {
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
     const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti) };
+    const shell = String(x.shell || '').toLowerCase();
+    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
@@ -1024,7 +1028,8 @@
       }
       if (i === 0) {
         const n = nomeNorm(s);
-        if (PROFILO.has(n) || n.startsWith('ntuser')) return MOTIVI.nascosto;
+        const aperta = sotto.length > 1 && (PROFILO_APERTE[n] || []).some((a) => nomeNorm(a) === nomeNorm(sotto[1]));
+        if ((PROFILO.has(n) || n.startsWith('ntuser')) && !aperta) return MOTIVI.nascosto;
       }
     }
     return '';
@@ -1479,11 +1484,36 @@
     return det;
   }
 
+  // cmd toglie ogni `^` fuori dalle virgolette prima di passare il comando: `^.ssh` è `.ssh`, `^\^\host` è
+  // `\\host`, `-^-force` è `--force` (#1072.1). null dove qui non si legge come cmd: un `^` in coda (si
+  // prende la riga dopo), su un separatore (diventa testo), accanto alle espansioni `%` (fatte prima) e `!`.
+  function comeCmd(cmd) {
+    let out = '';
+    let virgolette = false;
+    let tolti = false;
+    for (let i = 0; i < cmd.length; i++) {
+      const ch = cmd[i];
+      if (ch !== '^' || virgolette) {
+        if (ch === '"') virgolette = !virgolette;
+        out += ch;
+        continue;
+      }
+      const dopo = cmd[i + 1];
+      if (dopo === undefined || /[&|<>()%\r\n]/.test(dopo)) return null;
+      out += dopo; // `^"` non apre né chiude le virgolette
+      i += 1;
+      tolti = true;
+    }
+    if ((tolti && out.includes('%')) || (out.includes('!') && out.includes('^'))) return null;
+    return out;
+  }
+
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
   // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
-  // devono vedere il comando che la shell esegue, non la sua grafia (#1072).
+  // devono vedere il comando che la shell esegue, non la sua grafia (#1072). Per cmd quei segni sono testo.
   function comeLaShell(cmd, c) {
     if (!c.win) return cmd;
+    if (c.shell === 'cmd') return comeCmd(cmd);
     return cmd.replace(/[\u201C-\u201F]/g, '"')
       .replace(/[\u2018-\u201B]/g, "'")
       .replace(/(^|[\s(,;|&{=])[\u2013-\u2015]/g, '$1-');
@@ -1492,7 +1522,8 @@
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
-    return classifica(comeLaShell(cmd, c), c, 0);
+    const letto = comeLaShell(cmd, c);
+    return letto == null ? TRE : classifica(letto, c, 0);
   }
 
   // Un comando senza gruppi: sequenze, pipeline e comandi singoli.
@@ -1559,5 +1590,19 @@
     return fuoriDa(p, contesto(ctx));
   }
 
-  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, programOf, subcommandOf };
+  // Nella cartella personale ma privato per la lettura (nascosto, cartella di profilo come la Libreria del Mac): chi
+  // legge in blocco non ci entra se la cartella chiesta non è già lì dentro (#947.3).
+  function privato(percorso, ctx) {
+    return fuoriPerimetro(percorso, ctx) === MOTIVI.nascosto;
+  }
+
+  // Le cartelle aperte dentro `percorso`, se è proprio una cartella di profilo: chi legge in blocco scende solo lì.
+  function aperteDentro(percorso, ctx) {
+    const c = contesto(ctx);
+    const r = dove(String(percorso == null ? '' : percorso).trim(), c);
+    if (!r || typeof r !== 'object' || !dentroCasa(r, c) || r.segs.length !== c.home.segs.length + 1) return [];
+    return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
+  }
+
+  global.SN_CMD_CLASSIFY = { classify, classifyDetail, fuoriPerimetro, privato, aperteDentro, programOf, subcommandOf, comeCmd };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

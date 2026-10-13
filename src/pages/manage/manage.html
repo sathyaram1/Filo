@@ -1430,16 +1430,7 @@
             <!-- Avanzamento della lavorazione: i tre passaggi dell'iter e se un'istanza ci sta lavorando adesso. -->
             <div class="mg-work-state" id="mgWorkState" hidden></div>
             <div class="mg-thread" id="mgThread"></div>
-            <!-- Risposta ai chiarimenti: sui feedback in `clarify` l'owner risponde alle domande di Filo, la risposta si
-               aggiunge alle note e il feedback rientra in coda. Sta sopra la barra perché risponde alla conversazione. -->
-            <div class="mg-actions" id="mgClarify" hidden>
-              <textarea id="mgClarifyText" class="mg-accept-comment" rows="3"
-                placeholder="Rispondi alle domande di Filo qui sopra…"></textarea>
-              <div class="mg-actions-row">
-                <button type="button" class="sn-btn" id="mgClarifyBtn">Invia risposta</button>
-                <span class="mg-action-msg" id="mgClarifyMsg" role="status"></span>
-              </div>
-            </div>
+            <!-- Alle domande di Claude si risponde solo dal pannello del rombo verde, che si apre da sé (#1061). -->
 
             <!-- Tutti i tasti dell'owner su UNA riga: impilati in tre blocchi schiacciavano in alto la conversazione. -->
             <div class="mg-owner" id="mgOwnerBar" hidden>

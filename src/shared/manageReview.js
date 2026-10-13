@@ -1413,9 +1413,9 @@
   /**
    * Questa pratica aspetta una risposta dell'owner? PURA.
    *
-   * Porta unica: la casella «Rispondi alle domande di Filo» e il rombo verde
-   * devono comparire insieme, e chiedendolo in due punti divergevano (la
-   * casella usciva anche sulla forma legacy `clarify`, il rombo no).
+   * Porta unica: la casella della risposta e il rombo verde devono comparire
+   * insieme, e chiedendolo in due punti divergevano (la casella usciva anche
+   * sulla forma legacy `clarify`, il rombo no).
    */
   function aspettaRisposta(fb) {
     if (!fb || statusUnreadable(fb)) return false;

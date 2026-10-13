@@ -1351,6 +1351,13 @@ function perimetroLettura(sender) {
   return { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
 }
 
+// La shell delle Preferenze che eseguirà i comandi dell'assistente, già risolta per questo sistema.
+async function shellDeiComandi() {
+  let settings = {};
+  try { settings = await Storage.getSettings(); } catch (_) {}
+  return require('./terminal').resolveShell(settings.terminal && settings.terminal.shell);
+}
+
 async function segretiCustoditi() {
   let salvate = {};
   let effettive = {};
@@ -1422,6 +1429,11 @@ async function ricordaLettoDallAiuto(sender, payload = null) {
   if (Array.isArray(risultati)) {
     const t = risultati.filter(Boolean).map((r) => `${r.title || ''}\n${r.url || ''}\n${r.snippet || ''}`).join('\n');
     fonti.push({ testo: t, fonte: 'dai risultati di una ricerca' });
+  }
+  const documenti = payload && payload.esterno && payload.esterno.documenti && payload.esterno.documenti.risultati;
+  if (Array.isArray(documenti)) {
+    const t = documenti.filter(Boolean).map((r) => `${r.nome || ''}\n${r.inizio || ''}\n${r.squarcio || ''}`).join('\n');
+    fonti.push({ testo: t, fonte: 'dai documenti trovati sul disco' });
   }
   let reg = LETTI_DALL_AIUTO.get(wc);
   if (!reg) {
@@ -1897,6 +1909,9 @@ async function eseguiAzioneFilo(action, {
       if (built && built.elenco) {
         const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
         if (r.invariato) action._invariato = r.invariato;
+        // #947.3 — «togli» una cartella dove l'utente ha cercato una volta: non è nell'elenco, ma c'è da dimenticare.
+        if (r.invariato && built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli'
+          && (await require('./documentiIndice').occasionaliFra(built.elenco.voci)).length) delete action._invariato;
         // #947 — una cartella dei documenti che non c'è non entra nell'elenco: si dice subito, senza chiedere un OK a vuoto.
         if (!r.invariato && built.elenco.percorso === 'documenti.cartelle' && built.elenco.op !== 'togli') {
           const mancanti = await require('./documentiIndice').cartelleMancanti(built.elenco.voci);
@@ -2009,6 +2024,8 @@ async function eseguiAzioneFilo(action, {
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
+  // Il comando si giudica come lo legge la shell che lo eseguirà, e parte con quella stessa (#1072.1: cmd toglie i `^`).
+  if (type === 'ESEGUI_COMANDO') action._perimetro.shell = await shellDeiComandi();
 
   // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
   // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
@@ -2293,18 +2310,28 @@ async function eseguiAzioneFilo(action, {
         const state = await FiloMem.getOnboarding();
         if (state.done) return { executed: false, kept: false };
         const raw = action.spunta ?? action.spunte ?? action.fatto ?? action.done_items ?? action.ids;
-        const ids = Array.isArray(raw) ? raw : (raw ? [raw] : []);
-        const { state: ticked } = Onboarding.tick(state, ids);
         const truthy = (v) => v === true || v === 1 || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+        // #1188 — la scelta dell'autonomia la fa l'utente sotto la risposta: qui si mostra e basta, il livello no.
+        // Finché è a schermo senza risposta la voce non si spunta e l'intervista non si chiude, anche da un'altra
+        // azione dello stesso turno: chiusa, la scelta sparirebbe con la chat. La regola sta nello stato dell'intervista.
+        const sceltaAutonomia = truthy(action.autonomia);
+        const inSospeso = sceltaAutonomia || Onboarding.autonomiaInSospeso(state);
+        const ids = (Array.isArray(raw) ? raw : (raw ? [raw] : []))
+          .filter((x) => !(inSospeso && String(x || '').trim().toLowerCase() === 'autonomia'));
+        const spuntato = Onboarding.tick(state, ids).state;
+        const ticked = sceltaAutonomia ? Onboarding.mostraSceltaAutonomia(spuntato) : spuntato;
         // L'intervista finisce quando lo dice Filo, quando l'elenco è finito, o
         // quando è andata troppo per le lunghe: chiudere è comunque lo stato in
         // cui l'utente vuole trovarsi, e da Preferenze la si rilancia.
-        const wantsEnd = truthy(action.fine ?? action.chiudi ?? action.done ?? action.finito);
+        const wantsEnd = !inSospeso && truthy(action.fine ?? action.chiudi ?? action.done ?? action.finito);
         const next = (wantsEnd || Onboarding.shouldForceClose(ticked))
           ? Onboarding.close(ticked)
           : ticked;
         await saveOnboarding(next);
-        return { executed: true, kept: false };
+        if (!sceltaAutonomia) return { executed: true, kept: false };
+        let livello = '';
+        try { livello = globalThis.SN_AUTONOMIA.livelloAttivo(((await Storage.getSettings()) || {}).autonomia?.livello); } catch (_) {}
+        return { executed: true, kept: true, output: { sceltaAutonomia: true, livello } };
       }
       case 'SALVA_LEZIONE': {
         // Qui ci si arriva solo dopo l'OK dell'utente sul testo esatto (livello
@@ -2373,8 +2400,14 @@ async function eseguiAzioneFilo(action, {
         if (action._invariato) return { executed: false, kept: false, output: { error: action._invariato, invariato: true } };
         // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
         let partial = built.partial;
+        let dimenticate = 0;
         if (built.elenco) {
           const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          if (built.elenco.percorso === 'documenti.cartelle' && built.elenco.op === 'togli') {
+            const Indice = require('./documentiIndice');
+            for (const c of await Indice.occasionaliFra(built.elenco.voci)) dimenticate += (await Indice.dimentica(c)).tolta ? 1 : 0;
+          }
+          if (r.invariato && dimenticate) return { executed: true, kept: true, output: { etichetta: `${built.label} (Filo ne dimentica i documenti già letti)` } };
           if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
           partial = r.partial;
         }
@@ -2464,7 +2497,12 @@ async function eseguiAzioneFilo(action, {
         const settings = await Storage.getSettings();
         let permessiSiti = null;
         try { permessiSiti = require('./permessiPagine').righeRicordate(); } catch (_) {}
-        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti } });
+        let cartelleCercate = null;
+        try {
+          cartelleCercate = (await require('./documentiIndice').stato()).occasionali
+            .map((o) => `${o.nome} (${o.percorso}, ${o.documenti} documenti già letti${o.esiste ? '' : ', ora non c\'è'})`);
+        } catch (_) {}
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti, cartelleCercate } });
         return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
       }
       case 'TOGLI_PERMESSO_SITO': {
@@ -2799,9 +2837,7 @@ async function eseguiAzioneFilo(action, {
         // che il gate ha valutato e ciò che lanciamo (stessa stringa `comando`).
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim();
         if (!cmd) return { executed: false, kept: true, output: { command: '', blocked: 'empty' } };
-        let settings = {};
-        try { settings = await Storage.getSettings(); } catch (_) {}
-        const shell = settings.terminal && settings.terminal.shell;
+        const shell = (action._perimetro && action._perimetro.shell) || await shellDeiComandi();
         const { runCommand } = require('./terminal');
         // cwd PERSISTENTE: partiamo dalla cartella corrente dell'assistente e
         // catturiamo quella risultante, così un `cd` resta valido per il comando
@@ -3604,67 +3640,15 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
-// #947 — re-immissione di quello che CERCA_DOCUMENTI ha trovato. Fuori dalla busta solo le frasi di Filo e i
-// numeri dell'indice; nomi, cartelle, percorsi e pezzi di testo stanno dentro: li ha scritti chi ha fatto i file.
-function dataBreve(ms) {
-  const d = new Date(Number(ms) || 0);
-  return Number.isNaN(d.getTime()) || !ms ? '' : d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+// #947 — re-immissione di quello che CERCA_DOCUMENTI ha trovato: la compone PROMPTS.documentiTrovati, la stessa
+// dell'Aiuto di una scheda.
 function documentSearchesForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
-  const E = globalThis.SN_ESTERNO;
   const blocks = [];
   for (const a of actions) {
     if (!a || String(a.type || '').toUpperCase() !== 'CERCA_DOCUMENTI') continue;
-    const out = a._output;
-    if (!out || !('cercato' in out)) continue;
-    const cercato = E.perCanaleSistema(out.cercato || '');
-    if (out.errore) { blocks.push(`[La ricerca fra i documenti "${cercato}" non è riuscita: dillo all'utente.]`); continue; }
-    if (out.cartellaMancante) {
-      blocks.push(`[La cartella "${E.perCanaleSistema(out.cartellaMancante)}" non c'è sul computer: chiedi all'utente dove sta, o cerca senza cartella.]`);
-      continue;
-    }
-    const ind = out.indice || {};
-    const cartelle = (Array.isArray(ind.cartelle) ? ind.cartelle : []).map((c) => `${E.perCanaleSistema(c.nome || '')}${c.esiste ? (c.negata ? ' (il sistema non la lascia leggere)' : '') : ' (non c\'è)'}`);
-    const dove = cartelle.length ? `nelle cartelle ${cartelle.join(', ')}` : 'in nessuna cartella (l\'elenco è vuoto: si cambia con la preferenza cartelle_documenti)';
-    const conti = `${ind.documenti || 0} documenti${ind.scansioni ? `, di cui ${ind.scansioni} scansioni senza testo (si trovano solo per nome)` : ''}`
-      + `${ind.senzaTesto ? `, ${ind.senzaTesto} di cui Filo non sa leggere il testo` : ''}`;
-    const note = [];
-    if (out.fermata) note.push('L\'utente ha FERMATO la ricerca mentre Filo leggeva i documenti nuovi: i risultati vengono solo da quelli già letti. Dillo in una riga.');
-    if (ind.troppi) note.push('Le cartelle hanno più documenti di quanti Filo ne guardi in un giro: alcuni possono mancare.');
-    const negate = Array.isArray(ind.negate) ? ind.negate : [];
-    if (negate.length) {
-      note.push(`Il sistema NON lascia leggere a Filo ${negate.map((c) => E.perCanaleSistema(c.nome || c.percorso || '')).join(', ')}: lì non ha guardato, `
-        + `quindi non dire che il documento non c'è. Spiega all'utente che manca il permesso e come darlo (${E.perCanaleSistema(ind.comePermesso || '')}), poi di richiedere.`);
-    }
-    const r = Array.isArray(out.risultati) ? out.risultati : [];
-    if (!r.length) {
-      blocks.push(`[Nessun documento combacia con "${cercato}" fra i ${conti} ${dove}. `
-        + 'Riprova con altre parole che quel documento conterrebbe (l\'ente che lo manda, il tipo, il mese scritto in numeri, l\'anno) prima di '
-        + 'dire all\'utente che non c\'è; se non c\'è, digli in quali cartelle hai guardato e che può aggiungerne.'
-        + `${note.length ? ` ${note.join(' ')}` : ''}]`);
-      continue;
-    }
-    const righe = r.map((x, i) => {
-      const tipo = x.tipo === 'pdf' ? `PDF${x.pagine ? `, ${x.pagine} ${x.pagine === 1 ? 'pagina' : 'pagine'}` : ''}` : (x.tipo || '');
-      const stato = x.scansione ? ' · SCANSIONE: niente testo, trovato solo per il nome'
-        : (x.senzaTesto === 'nuvola' ? ' · sta solo nel cloud (OneDrive, iCloud): Filo non lo scarica per leggerlo, trovato solo per il nome'
-          : (x.senzaTesto ? ' · testo non leggibile da Filo, trovato solo per il nome' : ''));
-      return [
-        `${i + 1}. ${x.nome} · ${dataBreve(x.data)} · ${tipo}${stato}`,
-        `   percorso: ${x.percorso}`,
-        x.inizio ? `   inizio: ${x.inizio}` : '',
-        x.squarcio ? `   testo: ${x.squarcio}` : '',
-        `   combacia con: ${(x.trovati || []).join(', ')}`,
-      ].filter(Boolean).join('\n');
-    });
-    blocks.push(
-      `[Ricerca fra i documenti dell'utente: "${cercato}". Ho guardato ${conti} ${dove}. I candidati, dal più probabile:]\n`
-      + E.imbusta({ tipo: 'DOCUMENTI_TROVATI', testo: righe.join('\n'), conIntestazione: true })
-      + '\n[Scegli tu quello giusto guardando il testo (periodo, tipo, ente, data): mostralo con APRI_FILE col suo percorso e di\' in una '
-      + 'frase perché è quello. Se due si somigliano, leggili con LEGGI_DOCUMENTO prima di scegliere. Non inventare quello che il testo non dice.'
-      + `${note.length ? ` ${note.join(' ')}` : ''}]`,
-    );
+    const t = PROMPTS.documentiTrovati(a._output, { per: 'chat' });
+    if (t) blocks.push(t);
   }
   return blocks.join('\n\n').trim();
 }
@@ -3952,6 +3936,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
     const saltati = Array.isArray(o.saltati) && o.saltati.length
       ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
     return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
+  }
+  if (type === 'ONBOARDING' && res.executed && res.output && res.output.sceltaAutonomia) {
+    const A = globalThis.SN_AUTONOMIA;
+    const ora = A ? A.infoLivello(res.output.livello).nome : '';
+    return `Sotto la tua risposta l'utente vede i livelli di autonomia${ora ? ` (adesso è ${ora})` : ''} e sceglie lui con un clic: `
+      + `la scelta ti arriva come suo messaggio. Non dire di averlo cambiato tu.${doveStaIlTesto(giro)}`;
   }
   if (type === 'APRI_FILE' && res.executed) return `Bottone del file mostrato all'utente, sotto la tua risposta.${doveStaIlTesto(giro)}`;
   if (soloBottone(type) && res.kept && !res.needsConfirm) {
@@ -4846,7 +4836,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (onbActive) {
     let after = await FiloMem.getOnboarding();
     if (textReply && textReply !== '(vuoto)') {
-      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply, ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}) });
+      after = Onboarding.appendTurn(after, {
+        role: 'filo', text: textReply,
+        ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}),
+        ...(renderedActions.some((x) => x && x._output && x._output.sceltaAutonomia) ? { autonomia: true } : {}),
+      });
     }
     if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
     await saveOnboarding(after);
@@ -5323,6 +5317,7 @@ const handlerCtx = {
   ricordaLettoInChat,
   decisioneAzionePagina,
   segnaLetturaAiuto,
+  fileScaricato,
   nuovaConversazioneAiuto,
   maybeRunCompactor,
   // Archivio delle chat (#525)

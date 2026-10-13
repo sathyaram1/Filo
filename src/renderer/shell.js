@@ -341,6 +341,8 @@
   let isAdmin = false;
   // Falso quando manca il portachiavi di sistema: l'accesso vale fino alla chiusura.
   let authRemembered = true;
+  // Un account Google nelle schede (#1123): è un accesso diverso da quello a Filo, e il menu lo dice.
+  let googleNelleSchede = false;
 
   function shortName(p) {
     if (!p) return '';
@@ -381,12 +383,13 @@
     }
   }
 
-  async function refreshAuth() {
+  async function refreshAuth(opzioni) {
     try {
-      const r = await api.auth.status();
+      const r = await api.auth.status(opzioni);
       authProfile = (r && r.ok && r.signedIn) ? r.profile : null;
       isAdmin = !!(r && r.ok && r.signedIn && r.isAdmin);
       authRemembered = !(r && r.remembered === false);
+      googleNelleSchede = !!(r && r.googleNelleSchede);
     } catch (_) {
       authProfile = null;
       isAdmin = false;
@@ -408,6 +411,16 @@
     }
   }
 
+  // YouTube, Gmail e Drive nelle schede: l'accesso a Google si apre in una scheda, con l'email già scritta.
+  async function collegaGoogle() {
+    try {
+      const r = await api.message({ type: 'auth_collega_google' });
+      if (r && r.ok === false) showToast(r.error || 'Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+    } catch (_) {
+      showToast('Non sono riuscito ad aprire l\'accesso a Google. Riprova.');
+    }
+  }
+
   async function doSignOut() {
     try { await api.auth.signOut(); } catch (_) {}
     authProfile = null; isAdmin = false; renderAccount();
@@ -418,17 +431,20 @@
     // finestra incognito" — spostata qui dal menu Impostazioni — è raggiungibile
     // in entrambi gli stati. Da loggato mostra email + incognito + Esci; da
     // sloggato mostra "Accedi con Google" + incognito.
-    accountBtn.addEventListener('click', () => {
+    accountBtn.addEventListener('click', async () => {
       if (authBusy) return;
+      // Google nelle schede cambia senza avvisi (un accesso o un'uscita fatti in una scheda): si chiede adesso.
+      if (authProfile) await refreshAuth({ senzaRete: true });
       if (authProfile) {
         const label = shortName(authProfile);
         showNativeMenu(accountBtn, [
           { label: authProfile.email || label, disabled: true },
           ...(authRemembered ? [] : [{ label: 'Accesso valido fino alla chiusura di Filo', disabled: true }]),
           { type: 'separator' },
+          ...(googleNelleSchede ? [] : [{ label: 'Collega anche i prodotti Google', icon: 'user', action: 'collega-google' }]),
           { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
           { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
-          { label: 'Esci', icon: 'close', action: 'auth-signout' },
+          { label: googleNelleSchede ? 'Esci da Filo (Google resta collegato)' : 'Esci da Filo', icon: 'close', action: 'auth-signout' },
         ]);
       } else {
         showNativeMenu(accountBtn, [
@@ -444,6 +460,7 @@
       api.onMenuAction((action) => {
         if (action === 'auth-signout') doSignOut();
         else if (action === 'auth-signin') doSignIn();
+        else if (action === 'collega-google') collegaGoogle();
       });
     }
     // Aggiorna l'icona quando il main segnala un cambio sessione.
@@ -452,6 +469,8 @@
         authProfile = m.profile || null; isAdmin = !!(m && m.isAdmin);
         authRemembered = m.remembered !== false;
         if (!authProfile || authRemembered) NOTIFS.dismissKey('accesso-non-ricordato');
+        // «Continua nel browser» (#1123) non serve più a chi è entrato.
+        if (authProfile) NOTIFS.dismissKey('accesso-nel-browser');
         renderAccount();
       });
     }
@@ -1688,6 +1707,8 @@
               onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
             };
           }
+          // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
+          if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
           if (a && a.aggiornaFilo && !a.onClick) {
             return {

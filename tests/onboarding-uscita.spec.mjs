@@ -22,6 +22,8 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+test.use({ accoglienzaFatta: false });
+
 function newtabWindows(app) {
   return app.windows().filter((w) => w.url().startsWith('filo://newtab'));
 }

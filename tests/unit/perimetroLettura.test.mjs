@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -350,4 +352,84 @@ test('#1072 — su Windows si legge il comando come lo spezza PowerShell: virgol
   assert.equal(lvl('Get-Content “notes.txt”', WIN), 1);
   // In bash `\ ` protegge lo spazio: è un nome solo, nella cartella di lavoro.
   assert.equal(lvl('cat my\\ file.txt', { win: false, maiuscole: false, home: '/home/a', cwd: '/home/a/p' }), 1);
+});
+
+// #1072.1 — con cmd scelto nelle Preferenze il `^` protegge il carattere dopo e sparisce: i controlli guardano il
+// comando che cmd passa al programma, non la sua grafia. Con PowerShell `^` è un carattere come un altro.
+const WIN_CMD = { ...WIN, shell: 'cmd' };
+
+test('#1072.1 — con cmd il `^` non nasconde un percorso di rete', () => {
+  for (const cmd of ['dir ^\\^\\host\\x', 'dir ^\\\\host\\x', 'type ^\\^\\host\\x\\a.txt', 'cd ^\\^\\host\\x', 'pushd ^\\^\\host\\x',
+    'dir ^/^/host/x', 'type ^"\\\\host\\x\\a.txt^"', 'tree ^\\^\\host\\x']) {
+    const d = C.classifyDetail(cmd, WIN_CMD);
+    assert.equal(d.level, 2, `"${cmd}" con cmd contatta un altro computer: chiede un OK`);
+    assert.match(d.motivo, /altro computer della rete/, cmd);
+  }
+});
+
+test('#1072.1 — con cmd il `^` non nasconde un file nascosto o una cartella di profilo', () => {
+  for (const cmd of ['type C:\\Users\\Mario\\^.ssh\\id_rsa', 'type ^.ssh\\id_rsa', 'more ^.aws\\credentials',
+    'type ^"C:\\Users\\Mario\\^.ssh\\id_rsa^"', 'type C:\\Users\\Mario\\App^Data\\Roaming\\Filo\\storage.json',
+    'type ^_netrc', 'findstr password ^.git-credentials']) {
+    const d = C.classifyDetail(cmd, WIN_CMD);
+    assert.equal(d.level, 2, `"${cmd}" con cmd legge un file nascosto: chiede un OK`);
+    assert.match(d.motivo, /nascosto/, cmd);
+  }
+  const a = { type: 'ESEGUI_COMANDO', comando: 'type C:\\Users\\Mario\\^.ssh\\id_rsa', _perimetro: WIN_CMD };
+  assert.equal(AL.costoFor(a), 2);
+  assert.match(AL.describe(a), /Perché te lo chiedo: legge un file nascosto/);
+});
+
+test('#1072.1 — con cmd il `^` non nasconde un flag pericoloso, e le forme che cmd legge diverse restano «conferma»', () => {
+  for (const cmd of ['git push -^-force', 'git push origin ^-^-force', 'git checkout ^.', 'git reset -^-hard']) {
+    assert.equal(lvl(cmd, WIN_CMD), 3, `"${cmd}" con cmd è il comando distruttivo`);
+  }
+  // Un `^` in coda prende la riga dopo; su un separatore lo fa diventare testo, che finisce a un altro programma;
+  // le espansioni `%` vengono prima dei `^`, quelle `!` dopo.
+  for (const cmd of ['dir ^', 'findstr x a.txt ^&^& findstr \\\\host\\y b.txt', 'type a.txt ^| findstr x \\\\host\\y',
+    'type ^(a.txt^)', 'type a.txt ^> b.txt', 'type %US^ERPROFILE%\\x.txt', 'type ^^.ssh\\id_rsa!']) {
+    assert.equal(lvl(cmd, WIN_CMD), 3, cmd);
+  }
+});
+
+test('#1072.1 — con cmd le letture di tutti i giorni restano libere; con PowerShell `^` resta un carattere', () => {
+  for (const cmd of ['dir', 'dir Documenti', 'type nota.txt', 'git log HEAD^^', 'git show HEAD^^:src/a.js', 'echo ^\\^\\host\\x',
+    'dir ^"Documenti personali^"', 'type "^.ssh"', 'findstr /r "^errore" log.txt']) {
+    assert.deepEqual(C.classifyDetail(cmd, WIN_CMD), { level: 1, motivo: '' }, cmd);
+  }
+  for (const ctx of [WIN, { ...WIN, shell: 'powershell' }]) {
+    for (const cmd of ['git diff HEAD^', 'git log HEAD^..HEAD', 'type C:\\Users\\Mario\\^.ssh\\id_rsa']) {
+      assert.equal(lvl(cmd, ctx), 1, `"${cmd}" con PowerShell legge un nome che contiene davvero ^`);
+    }
+  }
+  // Le virgolette tipografiche le converte PowerShell, non cmd: per cmd sono testo e `^` dopo resta un escape.
+  assert.match(C.classifyDetail('type C:\\Users\\Mario\\“x” ^.ssh\\id_rsa', WIN_CMD).motivo, /nascosto/);
+});
+
+test('#1072.1 — un download scritto con `^` o con le virgolette resta testo del web, non l\'uscita di un comando', () => {
+  const fonte = (comando, stdout = '<html>') => AL.fonteDi({ type: 'ESEGUI_COMANDO', comando, _output: { stdout } });
+  for (const comando of ['c^url h^ttps://x.it', 'w^get x.it/a', 'c"u"rl x.it', 'Invoke-We^bRequest x.it', 'curl ht""tps://x.it']) {
+    assert.equal(fonte(comando).classe, 5, comando);
+    assert.equal(fonte(comando).chiave, 'web:comando', comando);
+  }
+  assert.equal(fonte('type nota.txt', 'ciao').chiave, 'terminale:uscita');
+});
+
+// Su Linux cmd non c'è (la shell si risolve in sh): resta la regola del main, scritta.
+test('#1072.1 — il comando dell\'assistente si giudica con la shell delle Preferenze, e parte con quella stessa', () => {
+  const src = readFileSync(join(__dirname, '..', '..', 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  assert.match(src, /if \(type === 'ESEGUI_COMANDO'\) action\._perimetro\.shell = await shellDeiComandi\(\);/);
+  const esegui = src.slice(src.indexOf("case 'ESEGUI_COMANDO': {")).slice(0, 1500);
+  assert.match(esegui, /const shell = \(action\._perimetro && action\._perimetro\.shell\) \|\| await shellDeiComandi\(\);/);
+  assert.match(esegui, /runCommand\(cmd, \{ shell,/);
+});
+
+// Su Windows la prova contro cmd vero: `echo` stampa il comando come cmd lo passa al programma.
+test('#1072.1 — la lettura dei `^` è quella di cmd vero', { skip: process.platform !== 'win32' && 'cmd esiste solo su Windows' }, async () => {
+  const T = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'terminal.js'));
+  for (const x of ['dir ^\\^\\host\\x', 'type C:\\Users\\nome\\^.ssh\\id_rsa', 'a^^b', '^"a ^.b^" ^.c', '"a ^.b" ^.c', 'git push -^-force']) {
+    const out = await T.runCommand(`echo ${x}`, { shell: 'cmd', timeoutMs: TETTO_ATTESA_MS });
+    assert.equal(out.code, 0, out.stderr);
+    assert.equal(out.stdout.trim(), C.comeCmd(x), x);
+  }
 });

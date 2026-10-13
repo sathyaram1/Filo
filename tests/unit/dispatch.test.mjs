@@ -798,6 +798,35 @@ test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comun
   assert.equal(readRoleInstructions('off'), '');
 });
 
+test('emit halt: il testo consegnato chiede la domanda di fine sessione PRIMA del rilascio col guasto (#1205)', () => {
+  // Le sessioni andate storte sono quelle che all'owner interessano di più: halt
+  // non riceve il contratto (non lavora), ma la sua parte sulla domanda sì.
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'halt.md' || f === 'resolver.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit({ role: 'halt', kind: 'transient', message: 'canale giù' }, {}); } finally { process.stdout.write = real; }
+  const t = JSON.parse(out).instructions;
+  const domanda = t.indexOf('routine-channel.mjs domanda --biglietto <biglietto>');
+  const rilascio = t.indexOf('routine-channel.mjs release <biglietto> --role halt --guasto');
+  assert.ok(domanda > -1, 'halt riceve la domanda di fine sessione');
+  assert.ok(rilascio > -1, 'e il rilascio col guasto');
+  assert.ok(domanda < rilascio, 'la domanda viene prima: a biglietto rilasciato non si può più chiedere');
+  assert.match(t.replace(/\s+/g, ' '), /Se la domanda non arriva \(exit diverso da 0\), rilascia e basta/);
+  assert.ok(!t.includes('Contratto comune dei worker') && !/<!--\s*includi:/.test(t), 'del contratto solo la domanda, e niente richiami rimasti');
+  // Un testo solo per due destinatari: i ruoli lavoranti la ricevono dal contratto, uguale.
+  const nw = readRoleInstructions('new-work');
+  assert.ok(nw.includes('Contratto comune dei worker') && !/<!--\s*includi:/.test(nw));
+  const pezzo = (s) => s.slice(s.indexOf('- la domanda di fine sessione'), s.indexOf('rilascia e basta;'));
+  assert.ok(pezzo(t).length > 100);
+  assert.equal(pezzo(nw), pezzo(t));
+});
+
 test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', () => {
   // Il preflight consegna orchestrator.md, dispatch consegna gli altri: un file
   // spostato o svuotato è un ruolo che parte senza istruzioni.

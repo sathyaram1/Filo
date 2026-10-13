@@ -11,15 +11,14 @@
   const CHIUDE = 'chiude'; // chiude una parola: il controllo della parola appena scritta
   const TUTTI = Object.freeze([SELEZIONA, CHIUDE]);
   // Niente mousemove: passarci sopra non è chiedere qualcosa, e una pagina ci si aggancerebbe.
-  const TIPI_EVENTO = Object.freeze({
-    mousedown: [SELEZIONA], mouseup: [SELEZIONA], pointerdown: [SELEZIONA], pointerup: [SELEZIONA],
-    touchstart: [SELEZIONA], touchend: [SELEZIONA], dblclick: [SELEZIONA],
-    paste: [CHIUDE], drop: [CHIUDE], compositionend: [CHIUDE],
-  });
-  const EVENTI = Object.freeze(['keydown', 'keyup', ...Object.keys(TIPI_EVENTO)]);
+  const TIPI_EVENTO = Object.freeze({ dblclick: [SELEZIONA], paste: [CHIUDE], drop: [CHIUDE], compositionend: [CHIUDE] });
   const PRESSIONI = new Set(['mousedown', 'pointerdown', 'touchstart']);
   const RILASCI = new Set(['mouseup', 'pointerup', 'touchend']);
+  const EVENTI = Object.freeze(['keydown', 'keyup', ...PRESSIONI, ...RILASCI, ...Object.keys(TIPI_EVENTO)]);
   const SPOSTA = /^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/;
+  // Oltre il tremolio di un clic (e di un tocco, che Chromium tiene fermo fino a 15 px): sotto, nessun trascinamento.
+  const SPOSTAMENTO_PX = Object.freeze({ puntatore: 3, dito: 15 });
+  const PRESSIONE_LUNGA_MS = 400;
 
   // Seleziona solo Maiusc con un tasto di spostamento o «seleziona tutto»; chiude una parola uno spazio, una
   // punteggiatura, Invio. Le tastiere che non dicono il tasto (virtuali, IME) possono aver chiuso una parola.
@@ -31,6 +30,21 @@
     const separatore = [...k].length === 1 && !/[\p{L}\p{N}\p{M}]/u.test(k);
     if (!mod && (separatore || k === 'Enter' || k === 'Unidentified' || k === 'Process')) tipi.push(CHIUDE);
     return tipi;
+  }
+
+  function famigliaDi(e) {
+    return String(e.type).startsWith('touch') || e.pointerType === 'touch' ? 'dito' : 'puntatore';
+  }
+
+  // Un clic semplice non seleziona niente: se dopo compare una selezione l'ha fatta la pagina (#1070.1). Mouse e dito
+  // selezionano trascinando, col doppio o triplo clic, con Maiusc+clic, e il dito con una pressione lunga.
+  function selezionaColPuntatore(e, luogo, pressione, adesso) {
+    if (e.shiftKey || (Number(e.detail) || 0) >= 2) return true;
+    if (!RILASCI.has(e.type) || !pressione) return false;
+    const famiglia = famigliaDi(e);
+    if (luogo.x !== null && pressione.x !== null
+      && Math.hypot(luogo.x - pressione.x, luogo.y - pressione.y) > SPOSTAMENTO_PX[famiglia]) return true;
+    return famiglia === 'dito' && adesso - pressione.t >= PRESSIONE_LUNGA_MS;
   }
 
   // Dove ha toccato un gesto: l'elemento vero (anche dentro un componente) e, per mouse e dito, il punto.
@@ -89,7 +103,7 @@
   function crea(ora = () => Date.now()) {
     let ultimo = 0;
     let corrente = null; // il gesto in corso: una pressione, anche tenuta, è un gesto solo
-    let pressione = null; // l'ultima pressione di mouse o dito: il rilascio tocca anche dove è cominciata
+    const pressioni = new Map(); // famiglia → l'ultima pressione: il rilascio tocca anche dove è cominciata
     let contatore = 0;
     const ultimoDi = new Map(); // tipo → l'ultimo gesto che lo chiede
     const premuti = new Map(); // tasto → il gesto della sua pressione
@@ -138,9 +152,12 @@
         }
         return;
       }
-      const g = segna(TIPI_EVENTO[e.type] || [], luogo);
-      if (PRESSIONI.has(e.type)) pressione = g;
-      else if (RILASCI.has(e.type) && pressione) for (const l of pressione.luoghi) if (!g.luoghi.includes(l)) g.luoghi.push(l);
+      if (!PRESSIONI.has(e.type) && !RILASCI.has(e.type)) { segna(TIPI_EVENTO[e.type] || [], luogo); return; }
+      const famiglia = famigliaDi(e);
+      const da = RILASCI.has(e.type) ? pressioni.get(famiglia) || null : null;
+      const g = segna(selezionaColPuntatore(e, luogo, da, ora()) ? [SELEZIONA] : [], luogo);
+      if (PRESSIONI.has(e.type)) pressioni.set(famiglia, { x: luogo.x, y: luogo.y, t: g.t, g });
+      else if (da) for (const l of da.g.luoghi) if (!g.luoghi.includes(l)) g.luoghi.push(l);
     }
     function ascolta(target) {
       if (!target || typeof target.addEventListener !== 'function') return;
@@ -151,5 +168,8 @@
 
   const gesto = crea();
   if (typeof window !== 'undefined') gesto.ascolta(window);
-  global.SN_GESTO = { FINESTRA_MS, EVENTI, SELEZIONA, CHIUDE, tipiDelTasto, luogoDi, dentro, sullaSelezione, crea, ...gesto };
+  global.SN_GESTO = {
+    FINESTRA_MS, EVENTI, SELEZIONA, CHIUDE, SPOSTAMENTO_PX, PRESSIONE_LUNGA_MS,
+    tipiDelTasto, luogoDi, dentro, sullaSelezione, crea, ...gesto,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

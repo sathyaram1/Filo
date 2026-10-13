@@ -74,8 +74,8 @@ test('il segno di una domanda sparisce quando la risposta parte', async ({ openT
   await expect(segno(page, 'Ha domande')).toHaveAttribute('data-forma', 'rombo');
 
   await page.evaluate((id) => window.__mgTest.openDetail(id), DOMANDA._id);
-  await page.fill('#mgClarifyText', 'Il blu.');
-  await page.click('#mgClarifyBtn');
+  await page.fill('#mgSideRispostaText', 'Il blu.');
+  await page.click('#mgSideRispostaBtn');
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
   await expect(page.locator('.mg-segno-fermata[data-forma="rombo"]')).toHaveCount(0);
   await expect(segno(page, 'Attacco dai giudici')).toHaveAttribute('data-forma', 'cerchio');

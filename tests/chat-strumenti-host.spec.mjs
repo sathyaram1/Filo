@@ -21,7 +21,6 @@ async function newtabPage(app) {
 async function preparaRouter(app, modo, rifiuto = NO_PARAMS) {
   await app.evaluate(async (_e, { modo, rifiuto }) => {
     const C = globalThis.SN_CONST;
-    await chrome.storage.local.set({ filo_onboarding: { done: true } }); // altrimenti la home aperta comincia l'accoglienza (#663)
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       openWeightsOnly: false,

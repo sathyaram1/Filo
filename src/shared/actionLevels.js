@@ -357,6 +357,7 @@
       costo: 1,
       campo: null,
       describe: (a) => {
+        if (a && /^(true|1|si|sì|yes)$/i.test(String(a.autonomia ?? ''))) return 'Mostrarti i livelli di autonomia, da scegliere tu';
         if (a && (a.fine ?? a.chiudi ?? a.done)) return 'Chiudere l’intervista di benvenuto';
         const ids = Array.isArray(a?.spunta) ? a.spunta : [];
         return `Segnare come fatto nell’intervista di benvenuto${ids.length ? `: ${ids.join(', ')}` : ''}`;
@@ -634,7 +635,8 @@
         const t = `${typeof out.stdout === 'string' ? out.stdout : ''}${typeof out.stderr === 'string' ? out.stderr : ''}`;
         if (!t.trim()) return null;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
-        return SCARICA.test(cmd)
+        // Le shell tolgono `^` (cmd), virgolette e backtick prima di eseguire: `c^url` è curl (#1072.1).
+        return SCARICA.test(cmd) || SCARICA.test(cmd.replace(/[\^"'`]/g, ''))
           ? { classe: 5, campo: 'terminale', chiave: 'web:comando', motivo: 'ho scaricato una pagina dal web con un comando' }
           : { classe: 4, campo: 'terminale', chiave: 'terminale:uscita', motivo: 'ho letto l\'uscita di un comando' };
       },

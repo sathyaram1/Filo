@@ -186,7 +186,7 @@ test('un giro non porta via sezione, scorrimento, scheda aperta, bozza e menu ap
   });
   expect(await primaVisibile()).toBe('f680');
   await page.locator('.mg-item[data-id="f680"]').click();
-  await page.locator('#mgClarifyText').fill('Risposta a metà');
+  await page.locator('#mgSideRispostaText').fill('Risposta a metà');
 
   // Altrove due schede sopra la vista escono dai Ricevuti e una cambia titolo.
   await ilServerScrive(page, 'f700', { status: 'todo', statusReason: null });
@@ -198,7 +198,7 @@ test('un giro non porta via sezione, scorrimento, scheda aperta, bozza e menu ap
   expect(await primaVisibile()).toBe('f680');
   await expect(page.locator('.mg-item--selected')).toHaveAttribute('data-id', 'f680');
   await expect(page.locator('.mg-item[data-id="f680"] .mg-item-title')).toHaveText('Titolo riscritto');
-  await expect(page.locator('#mgClarifyText')).toHaveValue('Risposta a metà');
+  await expect(page.locator('#mgSideRispostaText')).toHaveValue('Risposta a metà');
 
   // Il menu dell'ordinamento aperto resta aperto mentre la lista si riallinea.
   await page.locator('#mgSortBtn').click();

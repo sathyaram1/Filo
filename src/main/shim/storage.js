@@ -200,6 +200,9 @@ async function leggiFile() {
   } catch (err) {
     if (err.code !== 'ENOENT') console.warn('[Filo storage] read failed:', err.message);
     STATE.data = {};
+    // Le prove automatiche (playwright.config.js) partono da un utente già accolto, da qualunque avvio: senza, la home
+    // comincia l'intervista appena c'è un modello e la chat della prova ci scrive dentro (#663.6).
+    if (err.code === 'ENOENT' && process.env.FILO_TEST_ACCOLTO === '1') STATE.data = { filo_onboarding: { done: true } };
   }
   STATE.loaded = true;
   avviaVerifica();
