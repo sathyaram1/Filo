@@ -1514,16 +1514,31 @@ function segnaLinkDaConfermare(url, motivo) {
 const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
 
 const LINK_NEL_TESTO = /https?:\/\/[^\s<>"'`)\]]+/gi;
+const ENTITA_HREF = { '&amp;': '&', '&#39;': "'", '&quot;': '"', '&lt;': '<', '&gt;': '>' };
+// Gli indirizzi che la chat rende cliccabili, presi dallo stesso disegnatore che li disegna: ogni differenza fra come
+// li legge il controllo e come diventano collegamenti era una porta (#868.6). Il testo nudo resta, per gli altri disegni.
+function indirizziCliccabili(testo) {
+  const t = String(testo || '');
+  const out = [...t.matchAll(LINK_NEL_TESTO)].map((m) => m[0].replace(/[.,;:!?]+$/, ''));
+  try {
+    if (!globalThis.SN_MARKDOWN) require('../../shared/filoMarkdown.js');
+    const html = globalThis.SN_MARKDOWN.render(t);
+    for (const m of html.matchAll(/<a [^>]*href="([^"]*)"/g)) out.push(m[1].replace(/&(?:amp|#39|quot|lt|gt);/g, (e) => ENTITA_HREF[e]));
+  } catch (_) {}
+  return out;
+}
 // I collegamenti web di un testo scritto da un modello che, aperti da lui con questo contesto, chiederebbero l'OK.
-async function linkCheChiedonoOk(testo, { sender = null, contesto = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false } = {}) {
+// `indirizzi` = quelli dei bottoni che il modello ha messo sotto la risposta, cliccabili come i collegamenti.
+async function linkCheChiedonoOk(testo, { sender = null, contesto = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
   const out = [];
   const visti = new Set();
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = null;
-  for (const m of String(testo || '').matchAll(LINK_NEL_TESTO)) {
-    const url = m[0].replace(/[.,;:!?]+$/, '');
-    if (visti.has(url) || visti.size >= 200) continue;
-    visti.add(url);
+  for (const url of [...indirizzi, ...indirizziCliccabili(testo)]) {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) continue;
+    const k = chiaveLinkUscita(url);
+    if (visti.has(k) || visti.size >= 200) continue;
+    visti.add(k);
     let u = null;
     try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, parole, domanda }); } catch (_) { u = null; }
     if (!u || u.blocca || !u.exfil) continue;
