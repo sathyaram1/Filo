@@ -1495,7 +1495,52 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
 // Un indirizzo che una pagina di Filo apre o passa al sistema l'ha scelto quasi sempre un modello (#810): passa dalla
 // porta qualunque gesto l'abbia chiesto (clic, menu del tasto destro, posta). Fermato, la pagina lo dice se `avvisa`.
 const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
-async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA' } = {}) {
+
+// #868.6 — un collegamento che un modello scrive, cliccato, chiede lo stesso OK che chiederebbe se lo aprisse lui. Il
+// verdetto lo dà chi ha il contesto quando il collegamento nasce (risposta della chat, home); al clic lo si ritrova qui.
+const LINK_DA_CONFERMARE = new Map(); // chiave del link → motivo
+const MAX_LINK_DA_CONFERMARE = 5000;
+const chiaveLinkUscita = (url) => {
+  const raw = String(url || '').trim();
+  try { const u = new URL(raw); return `${u.protocol}//${u.username}:${u.password}@${u.host.toLowerCase()}${u.pathname}${u.search}`; } catch (_) { return raw; }
+};
+function segnaLinkDaConfermare(url, motivo) {
+  const k = chiaveLinkUscita(url);
+  LINK_DA_CONFERMARE.delete(k);
+  LINK_DA_CONFERMARE.set(k, String(motivo || ''));
+  while (LINK_DA_CONFERMARE.size > MAX_LINK_DA_CONFERMARE) LINK_DA_CONFERMARE.delete(LINK_DA_CONFERMARE.keys().next().value);
+}
+// Le richieste di OK mostrate a una pagina web: solo quella pagina, per quel link, può tornare con l'OK (#250).
+const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
+
+const LINK_NEL_TESTO = /https?:\/\/[^\s<>"'`)\]]+/gi;
+// I collegamenti web di un testo scritto da un modello che, aperti da lui con questo contesto, chiederebbero l'OK.
+async function linkCheChiedonoOk(testo, { sender = null, contesto = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false } = {}) {
+  const out = [];
+  const visti = new Set();
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  let impostazioni = null;
+  for (const m of String(testo || '').matchAll(LINK_NEL_TESTO)) {
+    const url = m[0].replace(/[.,;:!?]+$/, '');
+    if (visti.has(url) || visti.size >= 200) continue;
+    visti.add(url);
+    let u = null;
+    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, parole, domanda }); } catch (_) { u = null; }
+    if (!u || u.blocca || !u.exfil) continue;
+    let chiede = sempre;
+    if (!chiede && Levels) {
+      if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
+      const ing = Levels.ingressi({ type: 'NAVIGA', url, _exfil: true, _exfilReason: u.reason }, { richiesta, impostazioni });
+      chiede = !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+    }
+    if (!chiede) continue;
+    segnaLinkDaConfermare(url, u.reason);
+    out.push({ url, motivo: u.reason });
+  }
+  return out;
+}
+
+async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false } = {}) {
   const indirizzo = String(url || '').trim();
   let pagina = '';
   try { pagina = wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { pagina = ''; }
@@ -1508,6 +1553,21 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
   if (u.blocca) {
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
+  }
+  // Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente nel link chiede l'OK come per NAVIGA.
+  const daSito = /^https?:/i.test(pagina);
+  const k = chiaveLinkUscita(indirizzo);
+  const motivo = LINK_DA_CONFERMARE.get(k) ?? (chiedi ? String(chiedi) : '') ?? '';
+  const daChiedere = /^https?:/i.test(indirizzo) && (LINK_DA_CONFERMARE.has(k) || !!chiedi || (daSito && u.exfil));
+  if (daChiedere) {
+    const chiesti = daSito && wc ? (OK_CHIESTI_AI_SITI.get(wc) || new Set()) : null;
+    const ok = confermato && (!chiesti || chiesti.delete(k));
+    if (!ok) {
+      if (chiesti) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
+      const Levels = globalThis.SN_ACTION_LEVELS;
+      const azione = { type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: motivo || u.reason || '' };
+      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo };
+    }
   }
   if (typeof apri === 'function') apri();
   return { aperto: true };
