@@ -30,6 +30,15 @@ export function verdettoMotore({ atteso, pacchetto, binario, scelto = false }) {
   };
 }
 
+// Dove la trova Playwright: `require('electron/index.js')` dal suo playwright-core, che può stare altrove.
+function cartellaElectron(radice) {
+  const daRadice = createRequire(join(radice, 'package.json'));
+  for (const base of [() => daRadice.resolve('playwright-core/package.json'), () => join(radice, 'package.json')]) {
+    try { return dirname(createRequire(base()).resolve('electron/package.json')); } catch (_) {}
+  }
+  return null;
+}
+
 /** Il motore che userebbe una corsa lanciata da `radice` (la cartella di playwright.config.js). */
 export function motoreDelleProve({ radice = RADICE, env = process.env } = {}) {
   const atteso = electronDelLock(leggi(join(radice, 'package-lock.json')));
