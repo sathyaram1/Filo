@@ -157,15 +157,18 @@ test('prendi scrive il file; registra il ramo col biglietto della sessione; chiu
     assert.equal(s.chiamate[0].sessione, 'sess-1');
     const commits = [{ sha: 'a'.repeat(40), at: 1000 }];
     const conCommit = { ...s.deps, commitDelRamo: (cartella, sha) => (cartella === dir && sha === 'a'.repeat(40) ? commits : null) };
-    const r = await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', env: {}, cwd: dir, deps: conCommit });
+    const sess = { CLAUDE_CODE_SESSION_ID: 'sess-1' };
+    const r = await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', env: sess, cwd: dir, deps: conCommit });
     assert.deepEqual(r, { ok: true, ramoFidato: true, fiducia: 'fidato' });
     const { ora, ...resto } = s.chiamate.at(-1);
     assert.ok(Math.abs(ora - Date.now()) < 60000, 'l’ora della macchina, per portare le date dei commit sull’orologio del server');
     assert.deepEqual(resto, { op: 'ramo', ticket: JSON.parse(readFileSync(p.path, 'utf8')).ticket, repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'f1', commits });
-    const c = await B.chiudi({ env: {}, cwd: dir, deps: s.deps });
+    const c = await B.chiudi({ env: sess, cwd: dir, deps: s.deps });
     assert.equal(c.chiusi, 1);
     assert.equal(existsSync(p.path), false);
-    assert.deepEqual(await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), env: {}, cwd: dir, deps: s.deps }), { ok: false, senzaBiglietto: true });
+    assert.equal(existsSync(altra), true, 'il biglietto di un’altra sessione resta');
+    assert.equal(s.chiamate.filter((x) => x.op === 'chiudi').length, 1);
+    assert.deepEqual(await B.registraRamo({ repo: 'app', ramo: 'claude/x', sha: 'a'.repeat(40), env: sess, cwd: dir, deps: s.deps }), { ok: false, senzaBiglietto: true }, 'chiuso il suo, non prende quello di un’altra sessione');
   } finally { togliCartella(dir); }
 });
 
@@ -194,7 +197,7 @@ test('avvio: sessione nuova → biglietto pulito, e FILO_BIGLIETTO_FILE in CLAUD
     assert.match(r.riga, /pulito/);
     assert.equal(r.path, join(B.cartellaBiglietti(dir), 'nuova.json'));
     assert.equal(readFileSync(envFile, 'utf8'), `export FILO_BIGLIETTO_FILE='${r.path}'\n`);
-    // Senza CLAUDE_ENV_FILE lo dice: gli strumenti cercheranno nella cartella.
+    // Senza CLAUDE_ENV_FILE lo dice: gli strumenti cercheranno il biglietto col nome della sessione.
     const r2 = await B.avvio({ input: { session_id: 'altra' }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
     assert.match(r2.riga, /CLAUDE_ENV_FILE assente/);
   } finally { togliCartella(dir); }
@@ -226,6 +229,8 @@ test('avvio: un figlio con FILO_BIGLIETTO_FILE vivo lo eredita; chiuso, ne prend
     assert.equal(r.path, padre);
     assert.match(r.riga, /sporco/, 'il figlio eredita la fiducia del padre adesso');
     assert.equal(s.chiamate.some((c) => c.op === 'prendi'), false);
+    // Il figlio ha un nome di sessione suo: i suoi comandi senza la variabile, PowerShell, trovano lo stesso biglietto.
+    assert.deepEqual(B.trovaBiglietti({ env: { CLAUDE_CODE_SESSION_ID: 'figlio' }, cwd: dir }).map((x) => x.ticket), [SEGRETO('p')]);
     const chiuso = scriviBiglietto(dir, 'chiuso', SEGRETO('q'), FP('4'));
     const r2 = await B.avvio({ input: { session_id: 'figlio2' }, env: { FILO_BIGLIETTO_FILE: chiuso }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
     assert.notEqual(r2.path, chiuso);
@@ -323,7 +328,7 @@ test('avvio pulito: la riga che arriva alla sessione dice come dichiararsi sporc
   } finally { togliCartella(dir); }
 });
 
-test('da un worktree, senza la variabile come in PowerShell, il biglietto della sessione si trova e si sporca; chi non ne trova uno non dice «già non fidata»', async () => {
+test('da un worktree, senza la variabile come in PowerShell, il biglietto della sessione si trova col suo nome e si sporca, e solo quello; chi non ne trova uno non dice «già non fidata»', async () => {
   const dir = cartellaTemporanea('biglietto-wt-');
   try {
     const git = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, stdio: 'ignore' });
@@ -337,8 +342,11 @@ test('da un worktree, senza la variabile come in PowerShell, il biglietto della 
     const s = server();
     const avvio = await B.avvio({ input: { session_id: 'sess-wt', source: 'startup' }, env: {}, cwd: dir, deps: s.deps, haCredenziale: async () => true });
     assert.equal(avvio.path, join(B.cartellaBiglietti(dir), 'sess-wt.json'));
-    assert.equal(await B.fiduciaLocale({ env: {}, cwd: wt, deps: s.deps }), 'fidato', 'il worktree vede il biglietto della sessione');
-    assert.equal((await B.sporca('letta una pagina web', { env: {}, cwd: wt, deps: s.deps })).sporcati, 1);
+    const altra = await B.avvio({ input: { session_id: 'sess-altra', source: 'startup' }, env: {}, cwd: wt, deps: s.deps, haCredenziale: async () => true });
+    const powershell = { CLAUDE_CODE_SESSION_ID: 'sess-wt' };
+    assert.equal(await B.fiduciaLocale({ env: powershell, cwd: wt, deps: s.deps }), 'fidato', 'il worktree vede il biglietto della sessione');
+    assert.equal((await B.sporca('letta una pagina web', { env: powershell, cwd: wt, deps: s.deps })).sporcati, 1);
+    assert.equal(await B.fiduciaLocale({ env: { FILO_BIGLIETTO_FILE: altra.path }, cwd: dir, deps: s.deps }), 'fidato', 'l’altra sessione aperta non ha letto niente');
     assert.equal(await B.fiduciaLocale({ env: { FILO_BIGLIETTO_FILE: avvio.path }, cwd: wt, deps: s.deps }), 'non_fidato', 'da Bash, con la variabile, la sessione è sporca');
     const ripresa = await B.avvio({ input: { session_id: 'sess-wt', source: 'resume' }, env: {}, cwd: wt, deps: s.deps, haCredenziale: async () => true });
     assert.equal(ripresa.path, avvio.path, 'una ripresa dal worktree ritrova il suo biglietto');

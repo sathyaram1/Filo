@@ -362,7 +362,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
     }
     const envFile = String(env.CLAUDE_ENV_FILE || '').trim();
     if (envFile) {
-      try { writeFileSync(envFile, `export ${ENV_FILE}='${path.replace(/'/g, "'\\''")}'\n`, { flag: 'a', encoding: 'utf8' }); } catch (_) { /* resta la ricerca nella cartella */ }
+      try { writeFileSync(envFile, `export ${ENV_FILE}='${path.replace(/'/g, "'\\''")}'\n`, { flag: 'a', encoding: 'utf8' }); } catch (_) { /* resta la ricerca col nome della sessione */ }
     }
     const pulito = fiducia === 'fidato';
     return { riga: `Biglietto della sessione: ${pulito ? 'pulito' : 'sporco'}${envFile ? '' : ' (CLAUDE_ENV_FILE assente: vale il biglietto col nome della sessione)'}.${pulito ? ` ${DICHIARA_SPORCO}` : ''}`, path };
