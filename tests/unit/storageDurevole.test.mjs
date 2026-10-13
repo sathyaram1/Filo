@@ -211,6 +211,22 @@ test('la scrittura di chiusura che si ferma a metà lascia il file di prima', as
   assert.deepEqual(JSON.parse(fs.readFileSync(file(), 'utf8')), { v: 1 });
 });
 
+// Chiudere mentre una scrittura asincrona è a metà lascia il suo temporaneo: la chiusura non può aspettarla.
+test('i temporanei di una chiusura a metà scrittura li toglie l\'avvio dopo, e i dati restano quelli', async () => {
+  const altro = process.pid + 1;
+  const { dir, Storage, file } = avvio({
+    'storage.json': '{"v":2}',
+    'storage.json.bak': '{"v":1}',
+    [`storage.json.bak.tmp-${altro}-3`]: '{"v":2,"me',
+    [`storage.json.tmp-${altro}-4`]: '{"v":3',
+  });
+  assert.deepEqual(await Storage.get(null), { v: 2 });
+  await Storage.whenSettled();
+  assert.deepEqual(fs.readdirSync(dir).filter((n) => n.includes('.tmp')), []);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file(), 'utf8')), { v: 2 });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file('storage.json.bak'), 'utf8')), { v: 2 });
+});
+
 test('cancellare tutto porta via anche la copia di riserva e i file rovinati', async () => {
   tace();
   const { dir, Storage } = avvio({ 'storage.json': '{"a":"privato-1087",', 'storage.json.bak': '{"a":"privato-1087"}' });
