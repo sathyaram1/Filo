@@ -7,6 +7,7 @@
   const { MSG } = global.SN_MSG;
   let d = null;
   const righe = new Map();
+  const fisse = new Set();
   let giro = 0;
   let attesa = null;
 
@@ -139,13 +140,16 @@
 
   async function togli(r) {
     const C = global.SN_CONFIRM_UI;
-    const testo = `«${r.vista.testo}» sparisce dal filo: Filo non la ritrova più cercando.`
-      + (r.vista.app === 'aiuto' ? '' : ` Nell'${r.vista.app === 'mazzi' ? 'app Mazzi' : 'Editor'} la conversazione resta.`);
+    const a = global.SN_FILO_APP && global.SN_FILO_APP.APP[r.vista.app];
+    // L'Aiuto non tiene la sua conversazione: il filo è l'unica copia. Editor e Mazzi la tengono.
+    const resta = a && r.vista.app !== 'aiuto' ? ` ${a.nel[0].toUpperCase()}${a.nel.slice(1)} la conversazione resta.` : '';
+    const testo = `«${r.vista.testo}» sparisce dal filo, e Filo non la ritrova più cercando.${resta}`;
     const ok = C ? await C.confirm({ title: 'Togliere la conversazione dal filo?', text: testo, okLabel: 'Togli' }) : false;
     if (!ok) return;
     await d.send({ type: MSG.FILO_CHAT_DELETE, id: r.vista.id });
     r.el.remove();
     righe.delete(r.vista.id);
+    fisse.delete(r.vista.id);
     vuoto();
   }
 
@@ -160,7 +164,7 @@
     const r = rigaDi(target);
     if (!r) return [];
     const voci = [
-      { type: 'item', icon: icona(r.aperta ? 'chevronUp' : 'chevronDown', 16), label: r.aperta ? 'Chiudi lo scambio' : 'Mostra lo scambio', onClick: () => alterna(r).catch(() => {}) },
+      { type: 'item', icon: icona('caretDown', 16), label: r.aperta ? 'Chiudi lo scambio' : 'Mostra lo scambio', onClick: () => alterna(r).catch(() => {}) },
     ];
     if (r.vista.dove && VAI[r.vista.app]) voci.push({ type: 'item', icon: icona(r.vista.icona, 16), label: VAI[r.vista.app], onClick: () => apri(r) });
     voci.push({ type: 'item', icon: icona('copy', 16), label: 'Copia lo scambio', onClick: () => copia(r).catch(() => {}) });
@@ -172,23 +176,25 @@
     if (d && d.homeEl) d.homeEl.hidden = !d.homeEl.querySelector('.dash-riga-app');
   }
 
-  async function aggiorna() {
+  // `riposa`: la conversazione è stata ridisegnata da capo (riaperta), ogni riga torna al suo posto nel tempo.
+  async function aggiorna({ riposa = false } = {}) {
     if (!d) return;
     const mio = ++giro;
     const chat = d.inThread() ? d.chatId() : null;
     const res = await d.send({ type: MSG.FILO_RIGHE_APP, chat });
     if (mio !== giro || !res || !res.ok || !Array.isArray(res.righe)) return;
     const cont = contenitore();
+    for (const id of [...fisse]) if (!righe.has(id) || !righe.get(id).el.isConnected) fisse.delete(id);
     const ids = new Set(res.righe.map((v) => v.id));
     for (const [id, r] of righe) {
-      if (!ids.has(id)) { r.el.remove(); righe.delete(id); }
+      if (!ids.has(id) && !fisse.has(id)) { r.el.remove(); righe.delete(id); }
     }
     for (const v of res.righe) {
       let r = righe.get(v.id);
       if (!r) { r = crea(v); righe.set(v.id, r); posa(r, cont); continue; }
       disegna(r, v);
       // Passata dalla home vuota alla conversazione (o tornata indietro): la stessa riga, aperta com'era.
-      if (r.el.parentElement !== cont) posa(r, cont);
+      if (riposa || r.el.parentElement !== cont) posa(r, cont);
     }
     vuoto();
   }
@@ -198,21 +204,18 @@
     attesa = setTimeout(() => { aggiorna().catch(() => {}); }, 80);
   }
 
-  // Una conversazione mostrata da sola, aperta (dalla Cronologia, o da un link con ?chat=).
+  // Una conversazione mostrata da sola e aperta (dalla Cronologia, o da un link con ?chat=): resta finché la
+  // conversazione a schermo è questa, anche se non è fra le righe del momento.
   async function mostraSola(chat) {
-    const A = { editor: 'editor', mazzi: 'decks', aiuto: 'question' };
-    const v = {
-      id: chat.id, app: chat.app, icona: A[chat.app] || 'question', soggetto: chat.soggetto || '',
-      testo: '', n: (chat.messages || []).length, inizio: (chat.messages && chat.messages[0] && chat.messages[0].ts) || chat.startedAt,
-      dove: chat.dove || '',
-    };
-    const res = await d.send({ type: MSG.FILO_RIGHE_APP, chat: null });
-    const nota = (res && res.ok && Array.isArray(res.righe) ? res.righe : []).find((x) => x.id === chat.id);
-    v.testo = nota ? nota.testo : (chat.title || '');
+    const A = global.SN_FILO_APP;
+    if (!A || !A.eApp(chat && chat.app) || !(chat.messages || []).length) return false;
+    const v = A.vista(chat);
     let r = righe.get(chat.id);
     if (!r) { r = crea(v); righe.set(chat.id, r); } else disegna(r, v);
-    d.bubblesEl.appendChild(r.el);
+    fisse.add(chat.id);
+    posa(r, d.bubblesEl);
     await alterna(r, true);
+    return true;
   }
 
   function init(deps) {
