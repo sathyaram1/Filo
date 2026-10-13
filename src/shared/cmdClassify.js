@@ -1237,12 +1237,12 @@
       return inRete(parti.join('\\'));
     }
     if (prog === 'split-path') {
-      if (c.stampaLibera || !testi.some((t) => /^-noq/i.test(t))) return false;
+      if (c.stampaLibera || !testi.some((t) => parametro(t, 'noqualifier', 1))) return false;
       for (const t of testi) {
         const v = valoreDuePunti(t);
         const cand = v != null ? v : (t.startsWith('-') ? null : t);
-        // -NoQualifier toglie solo la radice di un'unità (`C:`): ciò che resta può essere `\\host`.
-        if (cand != null && cand.split(',').some((q) => inRete(q.replace(/^[A-Za-z]:/, '')))) return true;
+        // Tolta la qualifica, ciò che resta può essere `\\host`.
+        if (cand != null && cand.split(',').some((q) => inRete(senzaQualifica(q)))) return true;
       }
       return false;
     }
