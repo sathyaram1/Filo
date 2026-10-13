@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
+import { conta } from './helpers/riquadri.mjs';
 
 const SEGRETO = 'pw-Segreta-589-otto';
 
