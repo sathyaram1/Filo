@@ -319,7 +319,7 @@ export async function esegui(argv, io = {}) {
         daMandare.push(id);
       }
       if (!daMandare.length) { errore('RIFIUTATO: nessun consiglio applicabile da qui.'); return 1; }
-      const r = await chiama({ op: 'consiglio', ids: daMandare });
+      const r = await chiama(Object.assign({ op: 'consiglio', ids: daMandare }, await daSessione()));
       for (const e of Array.isArray(r.esiti) ? r.esiti : []) {
         scrivi(`${visibile(e.id)}: ${e.ok ? `fatto${e.etichetta ? `, ${visibile(e.etichetta)}` : ''}` : `non applicato (${visibile(e.errore || '?')})`}`);
       }
