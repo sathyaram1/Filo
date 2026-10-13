@@ -1228,6 +1228,7 @@
       if (c.stampaLibera && !resolve) return false;
       const parti = [];
       for (const t of testi) {
+        if (parametro(t, 'resolve', 1)) continue; // `-Resolve:$true` non è un pezzo del percorso
         const v = valoreDuePunti(t);
         if (v != null) { parti.push(...v.split(',')); continue; }
         if (!t.startsWith('-')) parti.push(...t.split(','));
