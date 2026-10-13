@@ -32,6 +32,8 @@ function finestra({ incognito = false } = {}) {
   schede.incognito = incognito;
   schede.activeId = 1;
   schede.layout = () => {};
+  schede.openTab = () => 2;
+  schede._siteAllowedIn = () => false;
   const pagina = { url: '' };
   const campo = { executeJavaScript: async () => ({ hasPassword: true, shownPassword: true, hasPayment: false, shownPayment: false }) };
   const wc = { getURL: () => pagina.url, isDestroyed: () => false, send() {}, mainFrame: { framesInSubtree: [campo] } };
@@ -120,7 +122,7 @@ test('ogni verifica di una pagina passa dalla porta che conosce l\'incognito', (
   }
   const porta = chiamate.filter((c) => c.startsWith('src/main/tabs/tabSafebrowse.js:'));
   assert.equal(porta.length, 1, `una sola chiamata, in _sbAnalizza: ${porta.join(', ')}`);
-  assert.deepEqual(chiamate.filter((c) => !porta.includes(c) && !c.startsWith('src/shared/dictationSegmenter.js')), [],
+  assert.deepEqual(chiamate.filter((c) => !porta.includes(c)), [],
     'una verifica nuova passa da _sbAnalizza, o l\'incognito non la ferma');
   assert.deepEqual(daAprire, [], 'chi prova un link prima che si apra aggiorna transparency/privacy.md («Gli altri servizi» e punti deboli), poi questa lista');
 });
