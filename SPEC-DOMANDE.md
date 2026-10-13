@@ -954,7 +954,8 @@ lavorano in locale.
    agenti.
 7. Registro, revisione quotidiana, risposte automatiche.
 8. Compiti ricorrenti, ruolo `compito`, ambiti `coda`/`unisci`/`domande`/
-   `monitor`/`rami`, segnalazioni, domanda di fine turno per tutti i ruoli.
+   `monitor`/`rami`/`audit`, rapporto che passa all'istanza successiva,
+   segnalazioni, domanda di fine turno per tutti i ruoli.
 9. Gestione del lavoro (§ 4.3–4.8): taccuino, sveglie, controllo del
    monitoraggio, lanci per numeri, curva del parallelismo applicata dal
    server, indicatori, ambito `esperimento`, budget, rapporto settimanale,
