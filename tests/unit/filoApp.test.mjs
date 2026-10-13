@@ -93,7 +93,7 @@ test('un’app sconosciuta, un riferimento vuoto o solo spazi non scrivono nient
 });
 
 test('il soggetto è un’etichetta su una riga: a capo e caratteri di controllo non passano', () => {
-  assert.equal(A.soggetto('  tesi\n\u0007di laurea  '), 'tesi di laurea');
+  assert.equal(A.soggetto('  tesi\n\u0007di laurea\u2028 '), 'tesi di laurea');
   assert.equal(A.soggetto('x'.repeat(500)).length, 120);
   assert.equal(A.testoRiga({ app: 'aiuto', soggetto: 'wikipedia.org', messages: [{}] }), "1 messaggio nell'Aiuto su wikipedia.org");
   assert.equal(A.testoRiga({ app: 'mazzi', soggetto: 'Atraxa', messages: [{}, {}, {}] }), '3 messaggi nei Mazzi su Atraxa');

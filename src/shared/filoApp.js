@@ -21,7 +21,7 @@
 
   // Il nome di un documento, di un mazzo, di un sito: un'etichetta su una riga.
   function soggetto(s) {
-    const t = String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f  ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const t = String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim();
     return t.length > SOGGETTO_MAX ? `${t.slice(0, SOGGETTO_MAX - 1)}…` : t;
   }
 
