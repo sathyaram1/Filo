@@ -38,7 +38,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
-import { electronDelLock } from './lib/electron-del-lock.mjs';
+import { electronDelLock, verdettoMotore } from '../tests/helpers/motoreDelleProve.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
