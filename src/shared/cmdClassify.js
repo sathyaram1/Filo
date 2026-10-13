@@ -1050,6 +1050,18 @@
     return m ? m[1] : null;
   }
 
+  // PowerShell accetta un parametro abbreviato a ogni prefisso non ambiguo: `-N` è `-NoQualifier` (#1072.4).
+  function parametro(t, nome, min) {
+    const m = /^-([A-Za-z]+)(?::|$)/.exec(String(t || ''));
+    return !!m && m[1].length >= min && nome.startsWith(m[1].toLowerCase());
+  }
+
+  // Ciò che `Split-Path -NoQualifier` lascia: via `Provider::` o il nome di un'unità qualsiasi (`C:`, `Env:`, `HKCU:`).
+  function senzaQualifica(q) {
+    const p = /^[^\\/]*?::/.exec(q);
+    return p ? q.slice(p[0].length) : q.replace(/^[^\\/:]+:/, '');
+  }
+
   function primoFuori(lista, c) {
     for (const p of lista) {
       // La virgola in PowerShell costruisce un array: `a,b` sono DUE percorsi.
