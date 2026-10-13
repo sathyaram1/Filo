@@ -715,7 +715,9 @@ scrive: con i compiti quella lettura si toglie.
   - archivia gli stantii e i già fatti;
   - rivede le priorità con la scala 3/2/1/0.
 
-  Quelli che aspettano una scelta li segnala alla revisione delle domande.
+  Quelli che aspettano una scelta li segnala alla revisione delle domande. Il
+  rapporto va al monitoraggio, che può anche lanciare il riordino fuori
+  cadenza (§ 4.3).
 - I feedback a bassa priorità che si accumulano sono normali: aspettano i
   crediti (§ 8).
 - I lavori `localOnly` di oggi diventano **lavori server**: lavori che hanno
