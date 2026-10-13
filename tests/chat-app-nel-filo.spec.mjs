@@ -89,9 +89,12 @@ test('un messaggio nella chat dell’Editor: nella home la riga ripiegata col nu
   await expect(riga.locator('.dash-riga-app-msg-filo')).toHaveText('Il capitolo sui licheni va accorciato di metà.');
   await expect(riga.locator('.dash-riga-app-vai')).toHaveText("Apri nell'Editor");
   mkdirSync(SHOTS, { recursive: true });
+  await casa.mouse.move(5, 790);
   await casa.screenshot({ path: `${SHOTS}/974-home-riga-editor.png` });
-  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
   await expect(casa.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
+  // La riga cambia colore con una transizione: la foto dopo che è finita.
+  await expect.poll(() => riga.locator('.dash-riga-app-testa').evaluate((b) => getComputedStyle(b).backgroundColor)).toBe('rgb(37, 33, 28)');
   await casa.screenshot({ path: `${SHOTS}/974-home-riga-editor-scuro.png` });
 
   // «Apri nell'Editor» riporta al documento di quella conversazione.
@@ -167,8 +170,8 @@ test('una conversazione con l’Aiuto sopra un sito: la riga col nome del sito, 
 
   // Chiusa e riaperta, l'Aiuto comincia un'altra conversazione: una riga sua.
   await attiva(shell, 'http://127.0.0.1');
-  await sito.evaluate(() => window.SN_SIDEBAR && window.SN_SIDEBAR.close && window.SN_SIDEBAR.close());
-  await sito.locator('.sn-sidebar').waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+  await sito.locator('.sn-sidebar-close').click();
+  await expect(sito.locator('.sn-sidebar')).toHaveCount(0);
   await apri();
   await sito.fill('.sn-sidebar-input textarea', 'e il modulo?');
   await sito.press('.sn-sidebar-input textarea', 'Enter');
@@ -202,6 +205,9 @@ test('con modello finto la chat della home ha davanti la riga, non lo scambio, e
   expect(riletta).toContain('Utente: Il capitolo sui licheni crostosi è troppo lungo?');
   expect(riletta).toContain('Filo: Il capitolo sui licheni va accorciato di metà.');
 
+  await casa.mouse.move(5, 790);
+  mkdirSync(SHOTS, { recursive: true });
+  await casa.screenshot({ path: `${SHOTS}/974-home-riga-nella-conversazione.png` });
   // La riga sta nella conversazione della home in testa, prima della domanda.
   const ordine = await casa.locator('#bubbles > *').evaluateAll((els) => els.map((e) => e.className.split(' ')[0]));
   expect(ordine.indexOf('dash-riga-app')).toBeGreaterThanOrEqual(0);
@@ -218,6 +224,10 @@ test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col
   const voce = archivio.locator('.arc-chat[data-app="editor"]');
   await expect(voce.locator('.arc-chat-title')).toHaveText('Editor · appunti', { timeout: 10_000 });
   await expect(voce.locator('.arc-chat-date')).not.toHaveText('In corso');
+  // La ricerca della Cronologia la trova dal testo dello scambio.
+  await archivio.fill('#search', 'licheni');
+  await expect(voce).toBeVisible({ timeout: 10_000 });
+  await archivio.fill('#search', '');
 
   await attiva(shell, 'filo://newtab');
   const riga = casa.locator('#righeApp .dash-riga-app');
@@ -233,7 +243,7 @@ test('la riga si toglie dal filo col tasto destro, e la Cronologia la mostra col
   await expect(riga).toHaveCount(0);
   await expect.poll(async () => (await righeFilo(app)).length).toBe(0);
   // La Cronologia aperta si riallinea da sola.
-  await expect(voce).toHaveCount(0, { timeout: 10_000 });
+  await expect(voce).toBeHidden({ timeout: 10_000 });
 });
 
 test('da un sito parla solo l’Aiuto, e il sito lo dice l’indirizzo di chi manda; righe e cancellazioni solo da Filo', async ({ app }) => {
@@ -253,4 +263,22 @@ test('da un sito parla solo l’Aiuto, e il sito lo dice l’indirizzo di chi ma
   expect(r.righe.code).toBe('forbidden');
   expect(r.via.code).toBe('forbidden');
   expect(r.chats).toEqual([{ app: 'aiuto', soggetto: 'ostile.example', dove: 'https://ostile.example/pagina?x=1', rif: 'ostile.example|1' }]);
+});
+
+test('con una conversazione della home aperta, la riga di un’app nata adesso arriva da sola in fondo', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await prepara(app);
+  const casa = await home(app);
+  await modelloFinto(app, [{ text: 'Ciao, dimmi.' }]);
+  await chiedi(casa, 'ciao Filo');
+  await expect(casa.locator('.dash-bubble-filo', { hasText: 'Ciao, dimmi.' })).toBeVisible({ timeout: 15_000 });
+  await prepara(app);
+  await chatDellEditor(openTab, 'tesi', 'E il capitolo sui licheni?');
+  await attiva(shell, 'filo://newtab');
+  const riga = casa.locator('#bubbles .dash-riga-app');
+  await expect(riga.locator('.dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi", { timeout: 10_000 });
+  const ordine = await casa.locator('#bubbles > *').evaluateAll((els) => els.map((e) => e.className.split(' ')[0]));
+  expect(ordine[ordine.length - 1]).toBe('dash-riga-app');
+  expect(ordine.indexOf('dash-bubble')).toBeLessThan(ordine.indexOf('dash-riga-app'));
+  await expect(casa.locator('#righeApp')).toBeHidden();
 });
