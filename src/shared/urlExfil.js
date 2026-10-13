@@ -369,15 +369,19 @@
     const dCifre = cifreVicine([d]);
     const suo = (p) => dAlnum.includes(p) || dCifre.some((c) => c.includes(p));
     const reason = 'contiene un dato che hai scritto in chat';
-    for (const t of datiScritti(testo)) if (esposto.includes(t) && !suo(t)) return { reason };
+    // Al contrario esce uguale: chi riceve lo rigira.
+    const rovescia = (s) => [...s].reverse().join('');
+    const esposti = [esposto, rovescia(esposto)];
+    for (const t of datiScritti(testo)) if (esposti.some((e) => e.includes(t)) && !suo(t)) return { reason };
     // Un numero lungo conta anche a pezzi di nove cifre: «+39 347…» scritto, «347…» nell'URL.
+    const cifreFuori = fuori.cifre.flatMap((r) => [r, rovescia(r)]);
     const pezziFuori = new Set();
-    for (const r of fuori.cifre) {
+    for (const r of cifreFuori) {
       for (const run of r.split(' ')) for (let i = 0; i + CIFRE_PEZZO <= run.length; i++) pezziFuori.add(run.substr(i, CIFRE_PEZZO));
     }
     for (const c of cifreScritte(testo)) {
       if (c.length < CIFRE_PEZZO) {
-        if (fuori.cifre.some((r) => r.includes(c)) && !suo(c)) return { reason };
+        if (cifreFuori.some((r) => r.includes(c)) && !suo(c)) return { reason };
         continue;
       }
       for (let i = 0; i + CIFRE_PEZZO <= c.length; i++) {
