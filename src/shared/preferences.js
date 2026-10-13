@@ -360,8 +360,8 @@
     if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 10)) n *= 1000;
     n = Math.round(n);
     const [min, max] = global.SN_CONST.BARRA_LATERALE_LIMITI[campo];
-    if (n < min || n > max) return { rifiuto: `${n} ms è fuori dai limiti: da ${min} a ${max} ms` };
-    return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(n) };
+    if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+    return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(cifre(n)) };
   }
 
   // Quanto stringe un modo: scendere di rigore abbassa una difesa. Il valore attuale ignoto vale il più stretto.
