@@ -1896,11 +1896,18 @@
     return codaPopup;
   }
 
+  // Si scioglie quando questa home ha avuto risposta sulle ricompense dell'avvio, o ha deciso di non chiederle:
+  // gli spec la aspettano invece di un tempo fisso (#1212).
+  let fineRicompenseAvvio = () => {};
+  const ricompenseAvvio = new Promise((ok) => { fineRicompenseAvvio = ok; });
+
   async function maybeShowFeedbackRewards() {
-    let res;
-    try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
-    if (!res || !res.ok || !Array.isArray(res.rewards) || !res.rewards.length) return;
-    renderFeedbackRewards(res.rewards, res.totalCredits || 0);
+    try {
+      let res;
+      try { res = await send({ type: MSG.GET_FEEDBACK_REWARDS }); } catch (_) { return; }
+      if (!res || !res.ok || !Array.isArray(res.rewards) || !res.rewards.length) return;
+      renderFeedbackRewards(res.rewards, res.totalCredits || 0);
+    } finally { fineRicompenseAvvio(); }
   }
 
   // Anima alcune "monete credito" dorate dal centro dello schermo verso l'icona
@@ -2149,7 +2156,7 @@
     // nessuno. Chiederlo all'apertura non costa un giro dal server (l'avviso
     // è scritto in locale) e non dipende più da chi arriva prima.
     inCodaPopup(chiediBenvenuto);
-    if (onbState) return;
+    if (onbState) { fineRicompenseAvvio(); return; }
     inCodaPopup(async () => {
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
@@ -2166,5 +2173,6 @@
     applyCommandCwd: Term.applyCommandCwd,
     getCwd: Term.getCwd,
     refreshAccountControl,
+    ricompenseAvvio: () => ricompenseAvvio,
   };
 })();

@@ -54,6 +54,18 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
   else { try { process.kill(-pid, 'SIGKILL'); } catch (_) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} } }
 }
 
+// Una finestra arriva quando arriva: con la macchina carica ci mette più di dieci secondi (#1212). L'attesa la
+// ferma il tetto del test, non un tempo suo, e il rosso dice quale finestra mancava.
+export async function aspettaFinestra(app, trova, perche) {
+  let win = null;
+  const cerca = () => {
+    win = app.windows().find((w) => { try { return trova(w); } catch (_) { return false; } }) || null;
+    return Boolean(win);
+  };
+  await expect.poll(cerca, { message: perche, timeout: 0, intervals: [100] }).toBe(true);
+  return win;
+}
+
 // Quello che l'app scrive su stdout/stderr (in test le righe render-process-gone e did-fail-load)
 // Playwright non lo mostra: senza, un rosso che c'è solo in GitHub non si spiega (#639).
 const TETTO_RIGHE_APP = 20_000;
@@ -156,15 +168,7 @@ export const test = base.extend({
   // La vista che disegna sopra la pagina gli avvisi della barra (#588.5); nasce al primo avviso.
   // La pila nella shell è solo il modello, nascosto: quello che l'utente vede e clicca sta qui.
   avvisi: async ({ app }, use) => {
-    await use(async () => {
-      const scadenza = Date.now() + 10_000;
-      while (Date.now() < scadenza) {
-        const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avvisi.html'); } catch (_) { return false; } });
-        if (p) return p;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      throw new Error('avvisi: la vista degli avvisi non è nata');
-    });
+    await use(() => aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'avvisi: la vista degli avvisi non è nata'));
   },
 
   // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
@@ -175,17 +179,7 @@ export const test = base.extend({
     const fn = async (url) => {
       const target = new URL(url).hostname;
       await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-      const deadline = Date.now() + 10_000;
-      let page = null;
-      while (Date.now() < deadline) {
-        page = app.windows().find((w) => {
-          try { return new URL(w.url()).hostname === target; }
-          catch (_) { return false; }
-        });
-        if (page) break;
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      if (!page) throw new Error(`openTab: nessuna window per ${url}`);
+      const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === target, `openTab: nessuna window per ${url}`);
       await page.waitForLoadState('domcontentloaded').catch(() => {});
       return page;
     };
