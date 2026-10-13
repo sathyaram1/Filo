@@ -569,11 +569,12 @@ module.exports = function register(on, ctx) {
       const auth = require('../../auth/google-auth');
       const idToken = await auth.getIdToken().catch(() => null);
       await FB.updateStatus(id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' }, { idToken: idToken || undefined });
+      autoFeedbackAnnullabili.delete(id);
       return { ok: true };
     } catch (e) {
       console.warn('[F4] cancel auto-feedback fallito:', e?.message || e);
       // Non un errore fatale: il feedback rimane ma non interferisce con il triage.
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 };
