@@ -4717,6 +4717,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         break;
       }
       if (turno.fermato) { fermato = true; break; }
+      passi += 1;
       const roundRendered = [];
       const results = [];
       // Le aperture di pagina di fila partono insieme: ognuna aspetta l'esito della sua scheda,
