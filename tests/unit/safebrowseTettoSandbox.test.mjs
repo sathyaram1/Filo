@@ -102,7 +102,7 @@ test('sottodomini sempre nuovi dello stesso dominio: qualche giudizio del modell
     const giro = async (n) => {
       for (let i = 0; i < n; i++) {
         const url = `http://x${Math.random().toString(36).slice(2)}${i}.esempio-ostile.com/`;
-        const v = SB.analyze(url, {}, () => {});
+        const v = SB.analyze(url, { daAprire: true }, () => {});
         assert.equal(v.needsLlm, true, url);
       }
       await SB._settled();
@@ -113,7 +113,7 @@ test('sottodomini sempre nuovi dello stesso dominio: qualche giudizio del modell
     assert.equal(sandbox, SB.DEEP_BUDGET);
     // Un altro dominio ha il suo conto.
     await giro(1);
-    SB.analyze('http://a.altro-dominio.com/', {}, () => {});
+    SB.analyze('http://a.altro-dominio.com/', { daAprire: true }, () => {});
     await SB._settled();
     assert.equal(giudizi, SB.DEEP_BUDGET + 1);
   } finally {

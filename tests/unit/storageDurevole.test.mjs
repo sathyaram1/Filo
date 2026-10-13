@@ -38,6 +38,7 @@ function scritturaInterrotta(dest, dati) {
   throw errore('ENOSPC');
 }
 
+let aperto = null;
 // Ogni prova ha la sua cartella dei dati e un modulo appena caricato: è un avvio di Filo.
 function avvio(file = {}) {
   const dir = cartellaTemporanea('filo-storage-durevole-');
@@ -45,7 +46,8 @@ function avvio(file = {}) {
   for (const [nome, testo] of Object.entries(file)) fs.writeFileSync(join(dir, nome), testo);
   process.env.FILO_USER_DATA = dir;
   delete require.cache[require.resolve(PERCORSO)];
-  return { dir, Storage: require(PERCORSO), file: (n = 'storage.json') => join(dir, n) };
+  aperto = require(PERCORSO);
+  return { dir, Storage: aperto, file: (n = 'storage.json') => join(dir, n) };
 }
 
 const tace = () => {
@@ -54,8 +56,11 @@ const tace = () => {
   ripristini.push(() => { [console.error, console.warn] = veri; });
 };
 
-afterEach(() => {
+afterEach(async () => {
   while (ripristini.length) ripristini.pop()();
+  // La copia dell'avvio può essere ancora in scrittura: a cartella tolta fallisce, e l'avviso esce nella prova dopo.
+  await aperto?.statoDisco().copia;
+  aperto = null;
   while (cartelle.length) togliCartella(cartelle.pop());
 });
 
@@ -131,6 +136,8 @@ test('una scrittura che fallisce a metà lascia il file di prima leggibile, avvi
   tace();
   const { dir, Storage, file } = avvio({ 'storage.json': '{"v":1}' });
   await Storage.get(null);
+  // Sotto carico la copia dell'avvio è ancora in scrittura, e il suo temporaneo non è della scrittura che fallisce.
+  await Storage.statoDisco().copia;
   sostituisci(fsp, 'open', (vero) => async (p, ...resto) => {
     const fh = await vero(p, ...resto);
     if (String(p).includes('storage.json.tmp-')) {
@@ -202,6 +209,22 @@ test('la scrittura di chiusura che si ferma a metà lascia il file di prima', as
   Storage.setSync({ v: 2 });
   ripristini.pop()();
   assert.deepEqual(JSON.parse(fs.readFileSync(file(), 'utf8')), { v: 1 });
+});
+
+// Chiudere mentre una scrittura asincrona è a metà lascia il suo temporaneo: la chiusura non può aspettarla.
+test('i temporanei di una chiusura a metà scrittura li toglie l\'avvio dopo, e i dati restano quelli', async () => {
+  const altro = process.pid + 1;
+  const { dir, Storage, file } = avvio({
+    'storage.json': '{"v":2}',
+    'storage.json.bak': '{"v":1}',
+    [`storage.json.bak.tmp-${altro}-3`]: '{"v":2,"me',
+    [`storage.json.tmp-${altro}-4`]: '{"v":3',
+  });
+  assert.deepEqual(await Storage.get(null), { v: 2 });
+  await Storage.whenSettled();
+  assert.deepEqual(fs.readdirSync(dir).filter((n) => n.includes('.tmp')), []);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file(), 'utf8')), { v: 2 });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file('storage.json.bak'), 'utf8')), { v: 2 });
 });
 
 test('cancellare tutto porta via anche la copia di riserva e i file rovinati', async () => {
