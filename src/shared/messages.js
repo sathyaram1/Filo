@@ -515,6 +515,7 @@
     SHOW_TOAST: 'show_toast',                      // { text, duration? }
     // F4 — Annulla un auto-feedback appena inviato (undo dal toast). Marca il
     // feedback come `ignored` così non compare nel triage. { id } → { ok }
+    // Solo da una superficie di Filo, e solo per un id che questo Filo ha appena mandato (#784.3).
     CANCEL_AUTO_FEEDBACK: 'cancel_auto_feedback', // { id }
     // Entra/esce dalla "modalità annotazione" del box feedback: il box vive in
     // un content script sulla pagina (WebContentsView) e da lì non può oscurare
