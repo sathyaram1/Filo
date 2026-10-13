@@ -99,3 +99,18 @@ test('testo di ricerca resta ricerca (parola singola, frase con spazi, ratio con
 test('IP pubblico letterale con porta → https', () => {
   assert.equal(normalizeUrl('8.8.8.8:443'), 'https://8.8.8.8:443');
 });
+
+// #482 — posta, telefono e gli schemi che Filo ferma sono già indirizzi: rinavigando una scheda la posta finiva in una
+// ricerca su Google invece che al programma di posta, come succede aprendo una scheda nuova.
+test('#482 mailto:/tel:/sms:/data:/javascript:/file: senza «//» restano indirizzi, non ricerche', () => {
+  for (const u of ['mailto:a@b.it', 'MAILTO:a@b.it?subject=ciao', 'tel:+390612345', 'tel:12345', 'sms:+39333', 'data:text/html,<b>x</b>', 'javascript:alert(1)', 'file:C:/x.txt']) {
+    assert.equal(normalizeUrl(u), u, u);
+  }
+  assert.equal(normalizeUrl('  mailto:a@b.it  '), 'mailto:a@b.it');
+});
+
+test('#482 una parola seguita da due punti resta una ricerca', () => {
+  assert.ok(normalizeUrl('ricetta: carbonara').startsWith('https://www.google.com/search?q='));
+  assert.ok(normalizeUrl('ricetta:carbonara').startsWith('https://www.google.com/search?q='));
+  assert.ok(normalizeUrl('posta: come si scrive').startsWith('https://www.google.com/search?q='));
+});
