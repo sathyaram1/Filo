@@ -201,11 +201,14 @@
       if (!r || !r.ok) {
         dillo(`Non salvato: ${(r && r.errore) || 'il server non ha risposto'}.`, 'is-error');
         aggiornaRimetti();
+        riparti();
         return;
       }
       // Il campo mostra quello che il server ha, non quello che era stato
-      // digitato.
-      mostra(r.valore == null ? valore : r.valore);
+      // digitato. Tranne se nel frattempo ci si è scritto altro: resta lì, da spedire.
+      const letto = r.valore == null ? valore : r.valore;
+      if (String(input.value) === scritto) mostra(letto);
+      else attuale = String(letto);
       // Se prima non c'era niente sul server, non c'è un «com'era» a cui
       // tornare: rimetterlo vorrebbe dire scrivere uno zero che nessuno ha mai
       // messo.
@@ -213,6 +216,13 @@
       aggiornaRimetti();
       dillo(comeRipristino ? 'Rimesso com’era.' : 'Salvato.', 'is-ok');
       if (typeof onSalva === 'function') { try { onSalva(); } catch (_) {} }
+      riparti();
+    }
+
+    function riparti() {
+      if (!ancora) return;
+      ancora = false;
+      if (String(input.value) !== attuale) salvaOra({ riprendiIlFuoco: false }).catch(() => {});
     }
 
     // `riprendiIlFuoco`: chi ha premuto Salva vuole il cursore nel campo da
