@@ -363,7 +363,7 @@ che l'audit sa da quale commit ripartire e la potatura quanti rami sono nuovi.
 | Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale |
 |---|---|---|---|---|
 | ogni giorno | revisione delle domande (§ 3.6) | `domande` | 30 | Opus |
-| ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus |
+| ogni giorno | opportunità e posta: incentivi, crediti, programmi; la casella di Filo | `posta` | 30 | Opus |
 | ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus |
 | lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) |
 | lunedì | potatura dei rami (§ 4.7) | `rami` | 5 | Opus; Haiku da provare |
