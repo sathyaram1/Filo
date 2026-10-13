@@ -90,11 +90,8 @@ export function trovaBiglietti({ env = process.env, cwd = process.cwd() } = {}) 
   return b ? [b] : [];
 }
 
-/**
- * Dove sta il biglietto di chi fa nascere una sessione (§1.2: chi continua un lavoro ne eredita la sporcizia): la
- * variabile, o il nome di una sessione diversa da quella che nasce, come lo trova ogni comando. '' fuori da ogni
- * sessione. Il percorso può non esistere: chi nasce da lì nasce sporco, perché nel dubbio vale sporco.
- */
+/** Il biglietto di chi fa nascere una sessione (§1.2): la variabile, o il nome di un'altra sessione; '' fuori da ogni
+ * sessione. Un percorso che non esiste fa nascere sporco: chi continua un lavoro ne eredita la sporcizia. */
 export function percorsoDiChiLancia({ env = process.env, cwd = process.cwd(), sessioneCheNasce = '' } = {}) {
   const daEnv = String(env[ENV_FILE] || '').trim();
   if (daEnv && leggiFile(daEnv)) return daEnv;
