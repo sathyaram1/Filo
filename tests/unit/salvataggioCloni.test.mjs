@@ -1,6 +1,7 @@
 // Il salvataggio automatico salva solo la cartella di chi ha modificato (#1157): clone, worktree, due insieme, battito.
 // Scena e lancio dell'hook in tests/helpers/scenaHook.mjs; stanno fuori da autoCommitGate per il tetto di tempo per file.
 
+import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

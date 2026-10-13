@@ -3,6 +3,7 @@
 // provava a passare la segnalazione sulla riga di comando e sbagliava due
 // volte (verifica del ramo claude/livelli, giro 1).
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

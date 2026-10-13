@@ -14,6 +14,7 @@
 //        0 fuso · 10 bloccato (L5) · 20 conflitto · 1 errore/rifiuto.
 //      Server finto via FILO_ROUTINE_API, come in routineChain.test.mjs.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
