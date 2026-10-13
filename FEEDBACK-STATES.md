@@ -47,7 +47,8 @@ DB3 esistente), poi "Risolti".
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
 (string breve opzionale per il sottotesto in dashboard, MAI per la logica: `clarify`,
 `loop`, `decisione`, `secaudit`, `l5`, `arenato`, `locale` (§5, §4b), `attesa_origine`,
-`origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8);
+`origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8),
+`riallineamento` (su `revision_capability` dopo una fusione fallita, §3);
 il giudizio dei giudici non ne scrive: `judges` lo ricava solo la normalizzazione dello
 storico, e la frase «Panel incompleto…» la dashboard dai verdetti, `judgesNote`), `workingSince`
 (ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
