@@ -19,6 +19,10 @@ salto si alzano lì `MAJOR` e `USCITA_STABILE`.
   questa.
 - **Il binario**: dalla 42 `npm install` non lo scarica più, lo scarica `require('electron')` al primo uso. Nel
   contenitore delle routine il download di Electron non passa dal proxy: `node scripts/ensure-electron.mjs`.
+- **Dopo il salto, chi non reinstalla prova sul motore vecchio**: le prove scritte per il nuovo diventano rosse e
+  sembrano regressioni (#1141.5: il visore PDF «non compare» su Electron 33). Per questo ogni corsa di Playwright,
+  `test:smoke`, `test:shoot` e `test:explore` si fermano se il motore installato non è quello del lockfile
+  (`tests/helpers/motoreDelleProve.mjs`); un binario scelto con `ELECTRON_OVERRIDE_DIST_PATH` lo dicono e proseguono.
 
 ## Cosa si è rotto da 33 a 44
 

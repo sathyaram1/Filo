@@ -362,3 +362,54 @@ test('#912 owner col token rifiutato: la voce resta in coda invece di partire da
   assert.deepEqual(avvisi, ['o3']);
   assert.ok(state.calls.every((c) => c.opts && c.opts.soloAdmin === true));
 });
+
+// #1212 — LA CODA SI SVEGLIA QUANDO SERVE, NON AL GIRO DEL BACKOFF.
+//
+// Qui i timer sono quelli veri: è proprio il giro già fissato a trattenere la voce.
+async function aspetta(cond, ms = 2000) {
+  const fine = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > fine) throw new Error('la coda non si è mossa');
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
+test('#1212 l’owner che rientra non aspetta il giro del backoff già fissato', async () => {
+  const { OB, state } = setup();
+  conSubmitRegistrata(state);
+  let token = '';
+  OB.init({ tokenOwner: async () => token, backoffMin: 60_000, backoffMax: 60_000 });
+  OB._setAuto(true);
+  try {
+    state.online = true;
+    await OB.enqueue({ submissionId: 'o5', clientId: 'owner:abc', text: 'rientro' }, { dallOwner: true });
+    await aspetta(() => OB._peek()[0] && OB._peek()[0].attesaAccesso);
+    token = 'tok';
+    OB.accessoCambiato();
+    await aspetta(() => OB.size() === 0);
+    assert.equal(state.calls.length, 1);
+    assert.equal(state.calls[0].opts.idToken, 'tok');
+  } finally { OB._setAuto(false); }
+});
+
+test('#1212 un feedback accodato mentre un altro sta partendo parte anche lui', async () => {
+  const { OB, state } = setup();
+  let sblocca;
+  const primoInViaggio = new Promise((r) => { sblocca = r; });
+  globalThis.SN_FEEDBACK.submit = async (payload) => {
+    state.calls.push(payload.submissionId);
+    if (payload.submissionId === 'a') await primoInViaggio;
+    return { id: 'srv_' + payload.submissionId, failed: [] };
+  };
+  OB._setAuto(true);
+  try {
+    await OB.enqueue({ submissionId: 'a', text: 'primo, con gli allegati che salgono' });
+    await aspetta(() => state.calls.includes('a'));
+    await OB.enqueue({ submissionId: 'b', text: 'secondo' });
+    // Il giro chiesto dal secondo invio scatta prima di questo timer, quindi mentre il primo è ancora in viaggio.
+    await new Promise((r) => setTimeout(r, 5));
+    sblocca();
+    await aspetta(() => OB.size() === 0);
+    assert.deepEqual(state.calls, ['a', 'b']);
+  } finally { OB._setAuto(false); }
+});

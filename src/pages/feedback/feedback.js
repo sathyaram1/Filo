@@ -2260,6 +2260,8 @@
     pollNow() { return live ? live.giro({ force: true }) : Promise.resolve({ changed: 0 }); },
     liveMessage(m) { return live ? live.applicaEsito(m) : Promise.resolve({ changed: 0 }); },
     isLiveOn() { return !!(live && live.acceso()); },
+    // Quello che la pagina sa dal main: gli spec aspettano questo invece di un tempo fisso (#1212).
+    inVista() { return !!(live && live.inVista()); },
     liveArrivate() { return live ? Array.from(live.arrivate) : []; },
     caricaFusioni: (gia) => caricaFusioni(gia),
     fusioni: () => fusioni,
