@@ -475,7 +475,7 @@ test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente 
   // Invia feedback: l'utente apre il modulo e mette il cursore nella casella.
   await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
   await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
-  await clicca(app, page, '.sn-fb-text');
+  await scrivi(app, page, '.sn-fb-text', 'Il tasto indietro non va');
   await page.evaluate(() => window.martella(3000));
   await page.waitForTimeout(500);
   expect(await inviati(app, page), 'nessuna segnalazione partita dalla pagina').toEqual([]);
@@ -483,4 +483,5 @@ test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente 
   // Il clic vero dell'utente invia quello che c'è nella casella.
   await clicca(app, page, '.sn-fb-send');
   await expect.poll(async () => (await inviati(app, page)).length).toBe(1);
+  expect((await inviati(app, page))[0]).toContain('Il tasto indietro non va');
 });
