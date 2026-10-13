@@ -357,10 +357,12 @@ l'ambito, non il ruolo.
 | ogni giorno | posta di Filo: legge e prepara domande con le bozze di risposta | `posta` | 30 | Opus |
 | ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus |
 | lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) |
-| lunedì | potatura dei rami fusi | `rami` | 5 | Opus; Haiku da provare |
+| lunedì | potatura dei rami (§ 4.7) | `rami` | 5 | Opus; Haiku da provare |
 | domenica | audit di sicurezza | `lavoro` | 45 | Opus |
 
-Si vedono e si cambiano in Routine → Compiti ricorrenti.
+Si vedono e si cambiano in Routine → Compiti ricorrenti. Monitoraggio, riordino
+e potatura sono la **gestione del lavoro** (§ 4.3): il monitoraggio può
+lanciare gli altri due anche fuori cadenza.
 
 ### 4.2 Due canali di aggiornamento
 
