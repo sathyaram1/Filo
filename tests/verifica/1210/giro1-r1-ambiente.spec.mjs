@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { messageForBump } from '../../../scripts/release-bump.mjs';
 
 test('r1 parola rifiutata all\'aumento di versione: il messaggio manda all\'ambiente «rilascio»', () => {
-  const msg = messageForBump({ kind: 'denied' });
+  const msg = messageForBump({ outcome: 'denied' });
   expect(msg).toContain('rilascio');
   expect(msg).not.toMatch(/segreto FILO_BUILD_PASSPHRASE del repo/);
 });
