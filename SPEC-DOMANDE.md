@@ -270,7 +270,9 @@ Tipi ammessi:
 - `approva_locale`;
 - `automazione` (accendi o spegni una voce);
 - `ambito` (approva un ambito nuovo, § 5.3);
-- `esperimento` (approva un esperimento del monitor, § 4.3);
+- `esperimento` (approva un esperimento del monitoraggio oltre il suo budget,
+  § 4.8);
+- `cancella_rami` (cancella i rami elencati nell'azione, § 4.7);
 - `compito` (l'opzione richiede lavoro: nasce il compito della § 3.5).
 
 Le azioni di sicurezza non stanno qui: si fanno in Ricevuti (§ 2.2).
