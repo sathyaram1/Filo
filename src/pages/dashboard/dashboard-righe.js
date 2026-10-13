@@ -88,8 +88,15 @@
   function messaggio(m) {
     const div = document.createElement('div');
     div.className = `dash-riga-app-msg dash-riga-app-msg-${m.role === 'user' ? 'user' : 'filo'}`;
-    // Testo, mai markup: una risposta dell'Aiuto ripete quello che una pagina le ha fatto leggere.
-    div.textContent = String(m.text || '');
+    // Le risposte di Filo con la formattazione leggera della home (come nell'app dove sono nate): il renderer escapa
+    // l'HTML e filtra i link. Le domande dell'utente restano letterali.
+    const testo = String(m.text || '');
+    if (m.role !== 'user' && global.SN_MARKDOWN) {
+      div.innerHTML = global.SN_MARKDOWN.render(testo);
+      div.classList.add('dash-bubble-md');
+    } else {
+      div.textContent = testo;
+    }
     return div;
   }
 
