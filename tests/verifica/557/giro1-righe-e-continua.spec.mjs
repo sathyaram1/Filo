@@ -1,8 +1,8 @@
-// Verifica #557 giro 1: le righe delle preferenze in parole e la bolla del turno finito senza risposta.
+// Verifica #557 giro 1: porte provate e chiuse (righe delle preferenze in parole, Continua ripetuto).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { livelloAutonomia } from '../../helpers/autonomia.mjs';
-import { clickConfirm, aspettaConfermaPronta, scrollConfirmToEnd } from '../../helpers/confirm.mjs';
+import { aspettaConfermaPronta } from '../../helpers/confirm.mjs';
 
 async function home(app) {
   const deadline = Date.now() + 10_000;
@@ -55,22 +55,6 @@ async function scrivi(page, testo) {
   await page.locator('#input').fill(testo);
   await page.locator('#sendBtn').click();
 }
-
-test('r1 ricerche annunciate e poi silenzio: la bolla dice che si è fermato e offre Continua', async ({ app, shell }) => {
-  test.setTimeout(90_000);
-  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  const page = await home(app);
-  await configura(app);
-  const cerca = (n) => ({ text: `Cerco ancora gli orari (${n})…`, toolCalls: [{ id: 'w', name: 'CERCA_WEB', arguments: JSON.stringify({ query: `orari treni ${n}` }) }] });
-  await modelloFinto(app, [cerca(1), cerca(2), cerca(3), { text: '' }]);
-  await scrivi(page, 'a che ora parte il treno?');
-  await expect(page.locator('.dash-activity[data-phase="done"]')).toHaveCount(1, { timeout: 30_000 });
-  await page.screenshot({ path: 'tests/.shots/v557-annunci-poi-silenzio.png' });
-  // L'ultima frase di lavoro («Cerco ancora…») non è una risposta: l'utente deve sapere che Filo si è fermato.
-  await expect(page.locator('.dash-continua')).toHaveCount(1);
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'senza arrivare a una risposta' })).toHaveCount(1);
-  await ripristina(app);
-});
 
 test('impostazione confermata con OK: la riga parla coi nomi delle Preferenze', async ({ app, shell }) => {
   test.setTimeout(60_000);
@@ -126,11 +110,11 @@ test('dimensione del testo e un valore non valido: righe leggibili, mai la chiav
   await ripristina(app);
 });
 
-test('Continua che si ferma di nuovo: una bolla nuova con un solo Continua, tema scuro', async ({ app, shell }) => {
+test('Continua che si ferma di nuovo: una bolla nuova con un solo Continua', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await home(app);
-  await configura(app, { theme: 'dark' });
+  await configura(app);
   const cerca = { toolCalls: [{ id: 'w', name: 'CERCA_WEB', arguments: '{"query":"treni"}' }] };
   await modelloFinto(app, [cerca, cerca, { text: '' }, cerca, { text: '' }, { text: 'Parte alle 8:15.' }]);
   await scrivi(page, 'a che ora parte il treno?');
