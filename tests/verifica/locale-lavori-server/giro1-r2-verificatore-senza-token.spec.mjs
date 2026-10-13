@@ -13,4 +13,6 @@ test('r2 il verificatore di un lavoro server sa cosa fare se il token non esce, 
   const rimandi = [...testo.matchAll(/come dice «([^»]+)»/g)].map((m) => m[1]);
   const mancanti = rimandi.filter((titolo) => !testo.includes(`## ${titolo}`));
   expect(mancanti).toEqual([]);
+  // Chi verifica non può consegnare uno stato (il server glielo rifiuta): non deve essere la strada che gli si indica.
+  expect(testo).not.toMatch(/deliver status/);
 });
