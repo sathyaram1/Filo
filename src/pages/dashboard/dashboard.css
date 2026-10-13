@@ -1955,6 +1955,7 @@ html, body {
   color: var(--dash-paper);
 }
 .dash-riga-app-msg-filo { align-self: flex-start; color: var(--dash-ink); }
+.dash-riga-app-msg.dash-bubble-md { white-space: normal; }
 .dash-riga-app-vuoto { font-size: 13px; font-style: italic; color: var(--dash-ink-mute); }
 .dash-riga-app-vai {
   align-self: flex-start;
