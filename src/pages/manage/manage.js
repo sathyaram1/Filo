@@ -771,7 +771,7 @@
     // mozzato con un «Salvato.» sopra.
     const max = Number(AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
     if (text.length > max) {
-      setCapMsg('fixInstructions', `Troppo lungo: ${text.length} caratteri, il massimo è ${max}. Non salvato.`, 'err');
+      setCapMsg('fixInstructions', `Troppo lungo: ${numIt(text.length)} caratteri, il massimo è ${numIt(max)}. Non salvato.`, 'err');
       return;
     }
     try {
