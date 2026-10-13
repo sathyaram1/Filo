@@ -97,10 +97,10 @@ test('i numeri delle sezioni: solo quando il dato c’è', async ({ openTab }) =
   await expect(numero('feedback')).toHaveText('(2)');
   // Routine senza fusioni in attesa non ha niente da dire.
   await expect(numero('routine')).toHaveText('');
-  // Domande: il server non le pubblica ancora, quindi nessun numero e lo si dice nel pannello.
+  // Domande: senza l'account dell'owner il main le rifiuta, quindi nessun numero e lo si dice nel pannello.
   await expect(numero('domande')).toHaveText('');
   await apriScheda(page, 'domande');
-  await expect(page.locator('#mgDomandeStato')).toContainText('non sono ancora disponibili');
+  await expect(page.locator('#mgDomandeStato')).toContainText('solo l’owner');
 
   await page.evaluate(() => window.__mgTest.setDomande([
     { id: 'D-1', numero: 1, stato: 'aperta', priorita: 'importante', titolo: 'Una', creataIl: Date.now() },
