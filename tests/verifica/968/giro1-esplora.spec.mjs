@@ -66,7 +66,6 @@ test('nome con apostrofo, dollaro e parentesi', async ({ app }) => {
   await input.fill('/ls ');
   await incolla(app, page, strana);
   await expect.poll(() => input.inputValue(), { timeout: 8_000 }).not.toBe(`/ls ${strana}`);
-  console.log('RIGA', await input.inputValue());
   await page.keyboard.press('Enter');
   await expect(page.locator('.dash-term-out').last()).toContainText('strano-968.txt', { timeout: 15_000 });
 });
@@ -97,7 +96,7 @@ test('si scrive subito dopo aver incollato', async ({ app }) => {
   await expect(input).toHaveValue(`/ls "${cartella}" -a`, { timeout: 8_000 });
 });
 
-test('proposta: file in sottocartella, percorso assoluto, e tasto da tastiera', async ({ app }) => {
+test('proposta: file in sottocartella e percorso assoluto, il tasto la esegue', async ({ app }) => {
   const { dir, cartella } = prepara();
   const page = await newtabPage(app);
   await submitInput(page, `/cd "${dir}"`);
