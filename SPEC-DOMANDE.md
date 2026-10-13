@@ -675,7 +675,6 @@ fidato e figlio. I nipoti contano come figli.
 | Compito | Urgenza |
 |---|---|
 | Gestisci la risposta | 47 |
-| Invio di una mail approvata | 46 |
 | Monitoraggio, audit di sicurezza, riordino della coda | 45 |
 | Revisione delle domande, posta | 30 |
 | Unione di feedback | 20 |
