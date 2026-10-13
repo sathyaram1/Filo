@@ -989,6 +989,13 @@
     const { status, statusReason } = normalizeStatus(fb);
     return status === 'revision_capability' && statusReason === RIALLINEAMENTO;
   }
+  // Il motivo da scrivere accanto allo stato. Quello del riallineamento vale solo nel suo stato: rimasto sul
+  // documento dopo l'uscita, direbbe «il ramo si rifà su main» a un lavoro già fuso.
+  function motivoDiStato(fb) {
+    const { statusReason } = normalizeStatus(fb);
+    if (statusReason === RIALLINEAMENTO && !inRiallineamento(fb)) return null;
+    return statusReason || null;
+  }
 
   /**
    * Stato di avanzamento di un feedback nell'iter di lavorazione, o null se
