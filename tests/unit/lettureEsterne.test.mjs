@@ -4,9 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 import * as B from '../../scripts/lib/biglietto-locale.mjs';
 import * as L from '../../scripts/lib/letture-esterne.mjs';
@@ -23,7 +24,10 @@ test('classificatore: la rete, le risorse MCP e ogni mcp__ fuori dall’elenco c
   assert.equal(L.motivoLettura({ tool_name: 'WebFetch', tool_input: { url: 'https://esempio.it/a?chiave=segreta' } }), 'WebFetch (esempio.it)');
   assert.equal(L.motivoLettura({ tool_name: 'WebFetch', tool_input: { url: 'non un indirizzo' } }), 'WebFetch');
   assert.equal(L.motivoLettura({ tool_name: 'WebSearch', tool_input: { query: 'x' } }), 'WebSearch');
-  for (const n of ['ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool']) assert.equal(L.motivoLettura({ tool_name: n }), n);
+  for (const n of ['ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool', 'ArtifactComments', 'ArtifactData']) assert.equal(L.motivoLettura({ tool_name: n }), n);
+  assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action: 'read', url: 'https://claude.ai/artifact/x' } }), 'Artifact (read)');
+  assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action: 'list', scope: 'shared' } }), 'Artifact (list)');
+  for (const action of [undefined, 'publish', 'open', 'pin', 'delete']) assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action, file_path: '/tmp/p.html' } }), '', String(action));
   for (const n of ['mcp__github__get_file_contents', 'mcp__claude-in-chrome__get_page_text', 'mcp__plugin_posta_gmail__search', 'mcp__computer-use__screenshot']) {
     assert.equal(L.motivoLettura({ tool_name: n, tool_input: {} }), n);
   }
@@ -108,11 +112,11 @@ test('gancio: annota la lettura accanto al biglietto della sessione dello stdin 
     assert.equal(L.gancio({ input: { ...input, tool_name: 'Bash' }, env: {}, avvia }).esito, 'nessuna lettura esterna');
     assert.equal(L.gancio({ input: 'storto', env: {}, avvia }).esito, 'nessuna lettura esterna');
     assert.equal(avviati.length, 1);
-    // Già sporco sul server: niente annotazioni né chiamate in più.
+    // Già sporco sul server: nessun processo in più, ma la lettura resta annotata, e un segno falso non pulisce niente.
     writeFileSync(join(B.cartellaSporchi(b), 'sul-server'), '1\n');
     L.gancio({ input, env: {}, avvia });
     assert.equal(avviati.length, 1);
-    assert.equal(B.sporchiInAttesa(b).length, 1);
+    assert.equal(B.sporchiInAttesa(b).length, 2);
   } finally { togliCartella(dir); }
 });
 
@@ -137,7 +141,7 @@ function lanciaGancio(input, { progetto = ROOT, env = {} } = {}) {
   const r = spawnSync('bash', [GANCIO], {
     input: typeof input === 'string' ? input : JSON.stringify(input),
     env: { ...base, CLAUDE_PROJECT_DIR: progetto, NODE_TEST_CONTEXT: 'child', FILO_FUNCTIONS_BASE: 'http://127.0.0.1:9', ...env },
-    encoding: 'utf8', timeout: 30000,
+    encoding: 'utf8', timeout: TETTO_ATTESA_MS,
   });
   return r;
 }
@@ -148,7 +152,7 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
   const casa = cartellaTemporanea('letture-casa-');
   try {
     const prova = (tool_name, tool_input = {}, opz = {}) => {
-      rmSync(B.cartellaSporchi(b), { recursive: true, force: true });
+      togliCartella(B.cartellaSporchi(b));
       const r = lanciaGancio({ session_id: 'sess', cwd: dir, hook_event_name: 'PostToolUse', tool_name, tool_input, tool_response: { contenuto: 'testo "con" virgolette \\ e barre' } }, opz);
       assert.equal(r.status, 0, r.stderr);
       assert.equal(r.stdout, '');
@@ -172,6 +176,7 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
       mkdirSync(join(progetto, '.git'));
       collegaCartella(join(ROOT, 'scripts'), join(progetto, 'scripts'));
       collegaCartella(fuori, join(progetto, 'collegato'));
+      writeFileSync(join(fuori, 'mail.eml'), 'Da: sconosciuto');
       assert.deepEqual(prova('Read', { file_path: join(progetto, 'collegato', 'mail.eml') }, { progetto }), ['Read fuori dal repo (mail.eml)']);
       assert.deepEqual(prova('Read', { file_path: join(progetto, 'vero.txt') }, { progetto }), []);
     } catch (e) {
@@ -187,7 +192,7 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
 
 test('cablaggio: il gancio sta dopo uno strumento riuscito e dopo uno fallito, su tutti e soli gli strumenti che possono leggere fuori', () => {
   const s = JSON.parse(readFileSync(join(ROOT, '.claude', 'settings.local.json'), 'utf8'));
-  const possibili = ['Read', ...L.STRUMENTI_ESTERNI, 'mcp__github__get_file_contents', 'mcp__plugin_posta_gmail__search', 'mcp__claude-in-chrome__navigate'];
+  const possibili = ['Read', 'Artifact', ...L.STRUMENTI_ESTERNI, 'mcp__github__get_file_contents', 'mcp__plugin_posta_gmail__search', 'mcp__claude-in-chrome__navigate'];
   for (const evento of ['PostToolUse', 'PostToolUseFailure']) {
     const voci = (s.hooks[evento] || []).filter((g) => (g.hooks || []).some((h) => /\.claude\/hooks\/letture-esterne\.sh/.test(h.command)));
     assert.equal(voci.length, 1, evento);
@@ -200,7 +205,8 @@ test('cablaggio: il gancio sta dopo uno strumento riuscito e dopo uno fallito, s
   const src = readFileSync(GANCIO, 'utf8');
   assert.doesNotMatch(src, /\r\n/, 'fine riga LF');
   assert.match(src, /\[ -n "\$FILO_ROUTINE" \] && exit 0/);
-  assert.match(src, /biglietto\.mjs" gancio/);
+  assert.match(src, /SCRIPT="\$PROJECT_DIR\/scripts\/biglietto\.mjs"/);
+  assert.match(src, /node "\$SCRIPT" gancio/);
   assert.match(src, /exit 0\s*$/);
   assert.doesNotMatch(src, /exit [1-9]/);
   assert.match(readFileSync(join(ROOT, '.claude', 'hooks', 'session-start.sh'), 'utf8'), new RegExp(`timeout ${B.TETTO_AVVIO_MS / 1000}"`), 'la consegna in sottofondo ha il tetto dell’avvio');
@@ -212,7 +218,7 @@ test('la consegna in sottofondo: esce 0 da sola anche col server irraggiungibile
     B.annotaSporco(b, 'WebSearch', 1);
     const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'biglietto.mjs'), 'consegna'], {
       env: { ...process.env, FILO_BIGLIETTO_FILE: b.path, NODE_TEST_CONTEXT: 'child', FILO_FUNCTIONS_BASE: 'http://127.0.0.1:9' },
-      encoding: 'utf8', timeout: 30000,
+      encoding: 'utf8', timeout: TETTO_ATTESA_MS,
     });
     assert.equal(r.status, 0, r.stderr);
     assert.deepEqual(B.sporchiInAttesa(b).map((v) => v.motivo), ['WebSearch']);

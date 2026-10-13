@@ -10,8 +10,11 @@ import { fileURLToPath } from 'node:url';
 import * as B from './biglietto-locale.mjs';
 import { cartellaDelServer } from './ramo-server.mjs';
 
-// Sempre esterni: la rete, e le risorse dei server MCP lette senza passare da un mcp__.
-export const STRUMENTI_ESTERNI = Object.freeze(['WebFetch', 'WebSearch', 'ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool']);
+// Sempre esterni: la rete, le risorse dei server MCP lette senza passare da un mcp__, i commenti e i dati che gli altri
+// scrivono negli artefatti.
+export const STRUMENTI_ESTERNI = Object.freeze(['WebFetch', 'WebSearch', 'ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool', 'ArtifactComments', 'ArtifactData']);
+// Artifact pubblica, e legge solo con queste azioni: una pagina, anche propria, la possono aver scritta altri.
+const ARTIFACT_LETTURE = Object.freeze(['read', 'list']);
 // Gli strumenti MCP che agiscono e rispondono con un esito, mai con testo scritto da altri. Elenco chiuso: un mcp__ che
 // non c'è sporca.
 export const MCP_SENZA_LETTURA = Object.freeze([
@@ -26,10 +29,10 @@ export const MCP_SENZA_LETTURA = Object.freeze([
 
 const pulisci = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, n);
 
-/** Questo strumento può portare dentro testo esterno? Senza guardare dove legge: serve a uscire prima di chiedere a git. PURA. */
+/** Lo strumento può portare dentro testo esterno? Senza guardare dove legge: serve a uscire prima di chiedere a git. PURA. */
 export function puoLeggereFuori(nome) {
   const n = String(nome || '');
-  return n === 'Read' || STRUMENTI_ESTERNI.includes(n) || n.startsWith('mcp__');
+  return n === 'Read' || n === 'Artifact' || STRUMENTI_ESTERNI.includes(n) || n.startsWith('mcp__');
 }
 
 function dentro(file, cartella, P, win) {
@@ -51,6 +54,7 @@ export function motivoLettura(input, ctx = {}) {
     return host ? `WebFetch (${pulisci(host, 120)})` : 'WebFetch';
   }
   if (STRUMENTI_ESTERNI.includes(nome)) return nome;
+  if (nome === 'Artifact') return ARTIFACT_LETTURE.includes(String(dati.action || '')) ? `Artifact (${dati.action})` : '';
   if (nome.startsWith('mcp__')) return MCP_SENZA_LETTURA.includes(nome) ? '' : pulisci(nome, 160);
   if (nome !== 'Read') return '';
   const grezzo = String(dati.file_path || '').trim();
@@ -65,8 +69,18 @@ export function motivoLettura(input, ctx = {}) {
   return `Read fuori dal repo (${pulisci(P.basename(file), 80)})`;
 }
 
+// Il percorso vero, collegamenti e nomi corti di Windows risolti, anche di un file che non c'è più: vale la cartella
+// esistente più vicina.
 function canonicoVero(p) {
-  try { return realpathSync.native(p); } catch (_) { return p; }
+  const coda = [];
+  let d = p;
+  for (;;) {
+    try { return path.join(realpathSync.native(d), ...coda); } catch (_) { /* si sale */ }
+    const su = path.dirname(d);
+    if (su === d) return p;
+    coda.unshift(path.basename(d));
+    d = su;
+  }
 }
 
 /**
@@ -109,13 +123,15 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
     const sessione = String(input.session_id || '').trim();
     const biglietti = B.trovaBiglietti({ env: sessione ? { ...env, [B.ENV_SESSIONE]: sessione } : env, cwd });
     if (!biglietti.length) return { esito: 'senza biglietto' };
-    const motivo = motivoLettura(input, contesto({ cwd, env }));
+    // Le cartelle fidate (altre chiamate a git) servono solo a Read.
+    const motivo = motivoLettura(input, input.tool_name === 'Read' ? contesto({ cwd, env }) : {});
     if (!motivo) return { esito: 'nessuna lettura esterna' };
     for (const b of biglietti) {
-      // Già sporco sul server: da sporco non si torna, e una chiamata in più non cambia niente.
-      if (B.sporcoSulServer(b)) continue;
       let annotato = true;
       try { B.annotaSporco(b, motivo, nowMs); } catch (_) { annotato = false; }
+      // Già sporco sul server la consegna aspetta la prossima occasione: niente processi per ogni lettura. L'annotazione
+      // resta, e da sola tiene sporco il biglietto anche se il segno l'ha scritto chi non doveva.
+      if (annotato && B.sporcoSulServer(b)) continue;
       avvia(b.path, { env, motivo: annotato ? '' : motivo });
     }
     return { esito: 'annotato', motivo };

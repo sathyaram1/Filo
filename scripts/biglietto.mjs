@@ -2,6 +2,7 @@
 // dichiara sporchi, si legge lo stato, si chiude. Nessuna strada per tornare puliti né per «segna fidato» (§1.4).
 // Le op e il file stanno in scripts/lib/biglietto-locale.mjs; `gancio` e `consegna` sono del gancio delle letture esterne.
 
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import * as B from './lib/biglietto-locale.mjs';
@@ -99,7 +100,9 @@ async function main() {
   return 0;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Col percorso vero, come node risolve il modulo principale: lanciato da un collegamento l'hook, se no, non farebbe niente.
+const lanciato = (() => { try { return realpathSync(process.argv[1]); } catch (_) { return resolve(process.argv[1] || ''); } })();
+if (process.argv[1] && lanciato === fileURLToPath(import.meta.url)) {
   main().then((code) => { process.exitCode = code; }, (e) => {
     console.error(`biglietto: ${String((e && e.message) || e)}`);
     process.exitCode = ['avvio', 'gancio', 'consegna'].includes(process.argv[2]) ? 0 : 1;

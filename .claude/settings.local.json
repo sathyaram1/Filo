@@ -51,7 +51,7 @@
         ]
       },
       {
-        "matcher": "WebFetch|WebSearch|Read|mcp__.*|ListMcpResourcesTool|ReadMcpResourceTool|ReadMcpResourceDirTool",
+        "matcher": "WebFetch|WebSearch|Read|mcp__.*|ListMcpResourcesTool|ReadMcpResourceTool|ReadMcpResourceDirTool|Artifact|ArtifactComments|ArtifactData",
         "hooks": [
           {
             "type": "command",
@@ -62,7 +62,7 @@
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "WebFetch|WebSearch|Read|mcp__.*|ListMcpResourcesTool|ReadMcpResourceTool|ReadMcpResourceDirTool",
+        "matcher": "WebFetch|WebSearch|Read|mcp__.*|ListMcpResourcesTool|ReadMcpResourceTool|ReadMcpResourceDirTool|Artifact|ArtifactComments|ArtifactData",
         "hooks": [
           {
             "type": "command",
