@@ -175,7 +175,13 @@ export const USCITA_SOLO_APP = 5;
  */
 export async function controllaRamoServer({ ramo, feedbackId, verdetto, cartella }, { lavoroDelRamo, puntaRamo = puntaRamoServer } = {}) {
   const sha = verdetto && verdetto.server && verdetto.server.sha ? String(verdetto.server.sha) : puntaRamo(cartella, ramo);
-  if (!sha) return { ok: false, codice: 1, motivo: `non trovo ${ramo} su origin del server: spingilo prima (o controlla la rete)` };
+  if (sha === null) return { ok: false, codice: 4, motivo: `origin del server non si legge, e non so se ${ramo} c'è: controlla la rete e rilancia` };
+  if (!sha) {
+    return {
+      ok: false, codice: USCITA_SOLO_APP, soloApp: true,
+      motivo: `su origin del server ${ramo} non c'è: se il lavoro sta tutto nell'app qui non c'è niente da fondere, altrimenti spingilo prima`,
+    };
+  }
   let r;
   try {
     r = await (lavoroDelRamo || (await import('./lib/biglietto-locale.mjs')).lavoroDelRamo)({ repo: 'server', ramo, sha, feedbackId });
