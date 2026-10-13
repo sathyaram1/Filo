@@ -2570,9 +2570,9 @@
     }
     const marks = { done: '✓', current: '●', pending: '○' };
     const steps = progress.steps.map((s) =>
-      `<span class="mg-step mg-step--${s.state}" title="${esc(s.label)}: ${
+      `<span class="mg-step mg-step--${s.state}" data-step="${esc(s.key)}" title="${esc(s.label)}: ${
         s.state === 'done' ? 'fatto' : s.state === 'current' ? 'in corso' : 'da fare'
-      }">${marks[s.state]} ${esc(s.label)}</span>`
+      }${s.hint ? ` — ${esc(s.hint)}` : ''}">${marks[s.state]} ${esc(s.label)}</span>`
     ).join('<span class="mg-step-sep">·</span>');
     // Quando nessuno sta lavorando, la riga deve dire una cosa VERA. Scriveva
     // "in attesa di ripresa" per una ripresa che il sistema non sapeva fare: i
