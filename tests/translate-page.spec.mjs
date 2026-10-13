@@ -1189,6 +1189,24 @@ const embedPage = (src, attrs = '') => `<!doctype html><html lang="en"><body sty
 
 const inFrame = (page, sel) => page.frameLocator('#emb').locator(sel);
 
+// Un riquadro dove nessun Filo risponde alla parola di tradurre: il main non gliela consegna. Il `sandbox` senza
+// allow-scripts non basta più a farne uno: il mondo isolato con CSP propria (#1122) ne è esente.
+async function senzaFilo(app, url) {
+  await app.evaluate(({ webContents }, url) => {
+    const proto = Object.getPrototypeOf(webContents.getAllWebContents()[0].mainFrame);
+    if (!proto.__senzaFilo) {
+      const muti = proto.__senzaFilo = new Set();
+      const send = proto.send;
+      proto.send = function (canale, msg, ...resto) {
+        if (canale === 'filo:broadcast' && msg && msg.type === 'frame_translate' && muti.has(this.url)) return;
+        return send.call(this, canale, msg, ...resto);
+      };
+    }
+    proto.__senzaFilo.add(url);
+  }, url);
+  return url;
+}
+
 test('il testo dentro un riquadro incorporato viene tradotto insieme alla pagina', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
@@ -1246,12 +1264,24 @@ test('tasto destro DENTRO il riquadro: cambia lingua anche quello sotto il curso
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
 });
 
-test('riquadro che il sito chiude a chiave: lo dice, invece di dichiarare tradotta la pagina', async ({ app, openTab, testServer }) => {
+test('riquadro che il sito chiude a chiave col sandbox: Filo ci entra lo stesso e lo traduce', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
-  // `sandbox` senza allow-scripts: lì dentro non gira nessuno script, nemmeno
-  // il nostro. Il testo resta in inglese e l'utente lo vede: va detto.
   const page = await testServer.openReady(openTab, embedPage(testServer.html(EMBED_INNER), 'sandbox'));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(inFrame(page, '#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+  expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+});
+
+test('riquadro dove nessun Filo risponde: lo dice, invece di dichiarare tradotta la pagina', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  // Il testo resta in inglese e l'utente lo vede: va detto.
+  const muto = await senzaFilo(app, testServer.html(EMBED_INNER).replace('127.0.0.1', 'blocked.test'));
+  const page = await testServer.openReady(openTab, embedPage(muto));
   await watchToasts(page);
   await clickTranslateIcon(page, '#p1');
 
@@ -1865,21 +1895,21 @@ const sentText = (app) => app.evaluate(() => (globalThis.__filoTranslatePrompts 
 test('riquadri chiusi a chiave che non si vedono: «Pagina tradotta», senza mandare a cercare niente', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
-  const lock = testServer.html(frameInner('ZZLOCK'));
+  const lock = await senzaFilo(app, testServer.html(frameInner('ZZLOCK')).replace('127.0.0.1', 'blocked.test'));
   const box = 'width:300px;height:200px;border:0';
   // Annidato: un riquadro che si vede, con dentro uno chiuso a chiave e trasparente.
   const outer = testServer.html(`<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
     <p id="obody">The outer embedded box with a comment thread written in english, long enough.</p>
-    <iframe sandbox src="${lock}" style="opacity:0;${box}"></iframe></body></html>`).replace('127.0.0.1', 'blocked.test');
+    <iframe src="${lock}" style="opacity:0;${box}"></iframe></body></html>`).replace('127.0.0.1', 'blocked.test');
   const page = await testServer.openReady(openTab, framePage(`
-    <iframe sandbox src="${lock}" style="position:absolute;left:-9999px;top:0;${box}"></iframe>
-    <iframe sandbox src="${lock}" style="opacity:0;${box}"></iframe>
-    <iframe sandbox src="${lock}" style="visibility:hidden;${box}"></iframe>
-    <iframe sandbox src="${lock}" style="position:fixed;left:0;bottom:-600px;${box}"></iframe>
-    <iframe sandbox src="${lock}" style="clip-path:inset(100%);${box}"></iframe>
-    <iframe sandbox src="${lock}" style="filter:opacity(0);${box}"></iframe>
-    <div style="opacity:0"><iframe sandbox src="${lock}" style="${box}"></iframe></div>
-    <details><summary>Show the box</summary><iframe sandbox src="${lock}" style="${box}"></iframe></details>
+    <iframe src="${lock}" style="position:absolute;left:-9999px;top:0;${box}"></iframe>
+    <iframe src="${lock}" style="opacity:0;${box}"></iframe>
+    <iframe src="${lock}" style="visibility:hidden;${box}"></iframe>
+    <iframe src="${lock}" style="position:fixed;left:0;bottom:-600px;${box}"></iframe>
+    <iframe src="${lock}" style="clip-path:inset(100%);${box}"></iframe>
+    <iframe src="${lock}" style="filter:opacity(0);${box}"></iframe>
+    <div style="opacity:0"><iframe src="${lock}" style="${box}"></iframe></div>
+    <details><summary>Show the box</summary><iframe src="${lock}" style="${box}"></iframe></details>
     <iframe id="emb" src="${outer}" style="width:520px;height:260px"></iframe>`));
   await watchToasts(page);
   await clickTranslateIcon(page, '#p1');
@@ -1890,13 +1920,14 @@ test('riquadri chiusi a chiave che non si vedono: «Pagina tradotta», senza man
 });
 
 for (const [dove, html] of [
-  ['più in basso della prima schermata', (src) => `<div style="height:2500px"></div><iframe sandbox src="${src}" style="width:520px;height:220px"></iframe>`],
-  ['in fondo a un pannello che scorre', (src) => `<div style="height:200px;overflow:auto"><div style="height:900px"></div><iframe sandbox src="${src}" style="width:420px;height:200px"></iframe></div>`],
+  ['più in basso della prima schermata', (src) => `<div style="height:2500px"></div><iframe src="${src}" style="width:520px;height:220px"></iframe>`],
+  ['in fondo a un pannello che scorre', (src) => `<div style="height:200px;overflow:auto"><div style="height:900px"></div><iframe src="${src}" style="width:420px;height:200px"></iframe></div>`],
 ]) {
   test(`riquadro chiuso a chiave ${dove}: ci si arriva, e l’avviso lo dice ancora`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120000);
     await stubTranslationProvider(app);
-    const page = await testServer.openReady(openTab, framePage(html(testServer.html(frameInner('ZZLOCK')))));
+    const muto = await senzaFilo(app, testServer.html(frameInner('ZZLOCK')).replace('127.0.0.1', 'blocked.test'));
+    const page = await testServer.openReady(openTab, framePage(html(muto)));
     await watchToasts(page);
     await clickTranslateIcon(page, '#p1');
     await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
@@ -1973,10 +2004,11 @@ test('un riquadro che non si conta non risponde al posto di uno chiuso a chiave 
   const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
   // Un pixel con script e un riquadro trasparente con script: nessuno dei due è nel conto, e un loro
   // "ci sono" coprirebbe il silenzio del riquadro chiuso a chiave, facendo dire «Pagina tradotta».
+  const muto = await senzaFilo(app, cross('ZZLOCK'));
   const page = await testServer.openReady(openTab, framePage(`
     <iframe src="${cross('ZZPIXEL')}" style="width:1px;height:1px;border:0"></iframe>
     <iframe src="${cross('ZZFADE')}" style="opacity:0;width:300px;height:200px"></iframe>
-    <iframe id="lock" sandbox src="${testServer.html(frameInner('ZZLOCK'))}" style="width:520px;height:220px"></iframe>`));
+    <iframe id="lock" src="${muto}" style="width:520px;height:220px"></iframe>`));
   await watchToasts(page);
   await clickTranslateIcon(page, '#p1');
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
@@ -1987,14 +2019,14 @@ test('un riquadro che non si conta non risponde al posto di uno chiuso a chiave 
 test('riquadri chiusi a chiave nascosti nei modi meno comuni: «Pagina tradotta», senza mandare a cercare niente', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
-  const lock = testServer.html(frameInner('ZZLOCK'));
+  const lock = await senzaFilo(app, testServer.html(frameInner('ZZLOCK')).replace('127.0.0.1', 'blocked.test'));
   const box = 'width:300px;height:200px;border:0';
   const page = await testServer.openReady(openTab, framePage(`
-    <iframe sandbox src="${lock}" style="transform:translateX(-9999px);${box}"></iframe>
-    <iframe sandbox src="${lock}" style="position:absolute;clip:rect(0 0 0 0);${box}"></iframe>
-    <iframe sandbox src="${lock}" style="clip-path:circle(0);${box}"></iframe>
-    <iframe sandbox src="${lock}" style="clip-path:polygon(0 0, 0 0, 0 0);${box}"></iframe>
-    <iframe sandbox src="${lock}" style="position:absolute;left:100%;top:0;${box}"></iframe>`).replace('<body style="', '<body style="overflow-x:hidden;'));
+    <iframe src="${lock}" style="transform:translateX(-9999px);${box}"></iframe>
+    <iframe src="${lock}" style="position:absolute;clip:rect(0 0 0 0);${box}"></iframe>
+    <iframe src="${lock}" style="clip-path:circle(0);${box}"></iframe>
+    <iframe src="${lock}" style="clip-path:polygon(0 0, 0 0, 0 0);${box}"></iframe>
+    <iframe src="${lock}" style="position:absolute;left:100%;top:0;${box}"></iframe>`).replace('<body style="', '<body style="overflow-x:hidden;'));
   await watchToasts(page);
   await clickTranslateIcon(page, '#p1');
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
@@ -2026,9 +2058,10 @@ test('riquadro con script dentro uno spazio della pagina nascosto: non si paga e
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
+  const muto = await senzaFilo(app, cross('ZZLOCK'));
   const page = await testServer.openReady(openTab, framePage(`
     <iframe src="${cross('ZZSEEN')}" style="width:520px;height:120px"></iframe>
-    <iframe sandbox src="${testServer.html(frameInner('ZZLOCK'))}" style="width:520px;height:120px"></iframe>
+    <iframe src="${muto}" style="width:520px;height:120px"></iframe>
     <iframe srcdoc="${filledWith(cross('ZZNEST'))}" style="opacity:0;width:320px;height:220px"></iframe>`));
   await page.waitForTimeout(1500);
   await watchToasts(page);
@@ -2056,13 +2089,14 @@ test('riquadro con script dentro uno spazio della pagina visibile: si traduce an
 
 // Conta la finestra da cui il riquadro si vede, non il suo rettangolo: dietro una finestrella da un pixel è un francobollo.
 for (const [nome, html] of [
-  ['la ricetta per i lettori di schermo', (src) => `<div style="position:absolute;width:1px;height:1px;overflow:hidden;margin:-1px;clip:rect(0,0,0,0)"><iframe sandbox src="${src}" style="width:300px;height:200px;border:0"></iframe></div>`],
-  ['un contenitore da un pixel', (src) => `<div style="width:1px;height:1px;overflow:hidden"><iframe sandbox src="${src}" style="width:300px;height:200px;border:0"></iframe></div>`],
+  ['la ricetta per i lettori di schermo', (src) => `<div style="position:absolute;width:1px;height:1px;overflow:hidden;margin:-1px;clip:rect(0,0,0,0)"><iframe src="${src}" style="width:300px;height:200px;border:0"></iframe></div>`],
+  ['un contenitore da un pixel', (src) => `<div style="width:1px;height:1px;overflow:hidden"><iframe src="${src}" style="width:300px;height:200px;border:0"></iframe></div>`],
 ]) {
   test(`riquadro chiuso a chiave dietro ${nome}: «Pagina tradotta», senza mandare a cercare niente`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120000);
     await stubTranslationProvider(app);
-    const page = await testServer.openReady(openTab, framePage(html(testServer.html(frameInner('ZZLOCK')))));
+    const muto = await senzaFilo(app, testServer.html(frameInner('ZZLOCK')).replace('127.0.0.1', 'blocked.test'));
+    const page = await testServer.openReady(openTab, framePage(html(muto)));
     await watchToasts(page);
     await clickTranslateIcon(page, '#p1');
     await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
@@ -2075,9 +2109,10 @@ test('riquadro con script dietro una finestrella da un pixel non si paga; uno ch
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(frameInner('ZZTINY')).replace('127.0.0.1', 'blocked.test');
+  const muto = await senzaFilo(app, testServer.html(frameInner('ZZLOCK')).replace('127.0.0.1', 'blocked.test'));
   const page = await testServer.openReady(openTab, framePage(`
     <div style="width:1px;height:1px;overflow:hidden"><iframe src="${src}" style="width:300px;height:200px;border:0"></iframe></div>
-    <div style="height:30px;overflow:hidden"><iframe sandbox src="${testServer.html(frameInner('ZZLOCK'))}" style="position:absolute;top:260px;left:20px;width:520px;height:200px"></iframe></div>`));
+    <div style="height:30px;overflow:hidden"><iframe src="${muto}" style="position:absolute;top:260px;left:20px;width:520px;height:200px"></iframe></div>`));
   await page.waitForTimeout(1000);
   await watchToasts(page);
   await clickTranslateIcon(page, '#p1');

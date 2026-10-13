@@ -477,3 +477,14 @@ test('#914 la create admin porta priorità cifrata e priorityManual; la create a
   assert.equal(admin.body.fields.priorityManual.booleanValue, true);
   assert.equal('priority' in anonimo.body.fields, false, 'il create anonimo non la ammette');
 });
+
+test('#1211 un biglietto con una lettura esterna annotata solo in locale non firma il feedback: il server lo crederebbe pulito', async () => {
+  const fp = 'e'.repeat(64);
+  await conSubmit(async () => ({ id: 'doc2', seq: 7, senderProof: 'admin' }), async (visti) => {
+    const sporcoInAttesa = await SCRIPT.apri({ titolo: 'T', testo: 'X', idToken: 'tok', biglietto: { fp, fiducia: 'non_fidato', inAttesa: 1 } });
+    assert.equal(visti.opts[0].bigliettoLocale, undefined);
+    assert.equal(sporcoInAttesa.biglietto, 'sporco');
+    await SCRIPT.apri({ titolo: 'T', testo: 'X', idToken: 'tok', biglietto: { fp, fiducia: 'non_fidato' } });
+    assert.equal(visti.opts[1].bigliettoLocale, fp, 'sporco sul server: l’impronta va, ed è il server a dirlo');
+  });
+});

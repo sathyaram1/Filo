@@ -319,7 +319,8 @@
     btn.type = 'button';
     btn.className = 'sn-sidebar-choice';
     btn.textContent = pagina.label;
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
     });
     wrap.appendChild(btn);
@@ -786,8 +787,8 @@
     return riga;
   }
 
-  // La notifica se ne va in pochi secondi, il bottone resta. Sta nel DOM della pagina, che ne guida clic
-  // e tasti: non apre niente, riporta la notifica «Sito bloccato» (che la pagina ottiene anche da sé).
+  // La notifica se ne va in pochi secondi, il bottone resta. Sta nel DOM della pagina, e un sito uscito nel
+  // frattempo dalla lista si apre subito: va avanti solo per il clic dell'utente (#592.16).
   function bottoneApriComunque(dopo, { host, url } = {}) {
     if (!dopo || !/^https?:\/\//i.test(String(url || ''))) return;
     const wrap = document.createElement('div');
@@ -797,7 +798,8 @@
     btn.className = 'sn-sidebar-choice';
     btn.textContent = `Apri comunque ${host || url}`;
     btn.title = 'Filo ti chiede conferma nella notifica «Sito bloccato»';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      if (!gestoVero(e)) return;
       Promise.resolve().then(() => chrome.runtime.sendMessage({ type: MSG.APRI_COMUNQUE, url })).catch(() => {});
     });
     wrap.appendChild(btn);

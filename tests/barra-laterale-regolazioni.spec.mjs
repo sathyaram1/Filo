@@ -61,7 +61,7 @@ test('a parole: «non aprire la barra spingendo sul bordo» la spegne, «strisci
   await pausa(700);
   expect((await statoBarra(app)).aperta).toBe(false);
 
-  expect((await applica('barra_attesa', '10 secondi')).rifiuto).toMatch(/10000 ms/);
+  expect((await applica('barra_attesa', '10 secondi')).rifiuto).toMatch(/10\.000 ms è fuori dai limiti/);
   expect((await opzioni(app)).attesaMs).toBe(250);
 
   await applica('barra_striscia', 'no');

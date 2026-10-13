@@ -20,6 +20,9 @@
   // a mano è il modo con cui il menu del tasto destro è tornato a mentire.
   const Tasti = global.SN_TASTI;
   const LinkSospetto = global.SN_LINK_SOSPETTO;
+  // I pezzi che questo file mette nel documento del sito vanno avanti solo per un tasto o un clic dell'utente: lo script
+  // della pagina li raggiunge e ci fabbrica sopra eventi (#592.16). Chiudere resta aperto a tutti.
+  const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
   // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {
@@ -1036,9 +1039,9 @@
       if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
     };
 
-    pill.addEventListener('click', () => finish(true));
+    pill.addEventListener('click', (e) => { if (gestoVero(e)) finish(true); });
     pill.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true); }
+      if ((e.key === 'Enter' || e.key === ' ') && gestoVero(e)) { e.preventDefault(); finish(true); }
     });
     // Nella pila: col puntatore sopra aspetta, come gli altri avvisi (la scheda si chiude dopo).
     timer = Popup.tempoAvviso(AUTO_CLOSE_MS, () => finish(false), { deveScadere: true });
@@ -1625,20 +1628,21 @@
         }
       }
 
+      // Il riquadro scelto diventa una chiamata al modello, un file e gli appunti: lo disegna solo il mouse dell'utente.
       overlay.addEventListener('mousedown', (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0 || !gestoVero(e)) return;
         dragging = true;
         startX = curX = e.clientX;
         startY = curY = e.clientY;
         updateMask(startX, startY, startX, startY);
       });
       overlay.addEventListener('mousemove', (e) => {
-        if (!dragging) return;
+        if (!dragging || !gestoVero(e)) return;
         curX = e.clientX; curY = e.clientY;
         updateMask(startX, startY, curX, curY);
       });
       overlay.addEventListener('mouseup', (e) => {
-        if (!dragging) return;
+        if (!dragging || !gestoVero(e)) return;
         dragging = false;
         curX = e.clientX; curY = e.clientY;
         finish();
@@ -1893,10 +1897,11 @@
     };
 
     const downloadBtn = mkBtn(I18n.t('qr_download'), true);
-    downloadBtn.addEventListener('click', () => downloadQrPng(matrix, quiet, url));
+    downloadBtn.addEventListener('click', (e) => { if (gestoVero(e)) downloadQrPng(matrix, quiet, url); });
 
     const copyBtn = mkBtn(I18n.t('qr_copy_link'), false);
-    copyBtn.addEventListener('click', async () => {
+    copyBtn.addEventListener('click', async (e) => {
+      if (!gestoVero(e)) return;
       try {
         await navigator.clipboard.writeText(url);
       } catch (_) {

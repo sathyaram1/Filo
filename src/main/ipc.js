@@ -170,6 +170,14 @@ function registerIpcHandlers() {
     }
   });
 
+  // Scrivere su un file o una cartella che la pagina ha già (#1069): la domanda, regole in services/permessiPagine.js.
+  ipcMain.handle('filo:permessi-scrittura', (event) => {
+    const wc = event.sender;
+    const top = event.senderFrame && wc.mainFrame && event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId;
+    if (!top) return null;
+    return require('./services/permessiPagine').chiediScrittura(wc);
+  });
+
   // #405 — l'utente sta interagendo con QUESTO frame (la pagina o uno dei suoi
   // riquadri incorporati). Serve alle scorciatoie che lavorano sulla selezione:
   // vanno consegnate a chi ha davvero il testo selezionato. Nessun dato nel

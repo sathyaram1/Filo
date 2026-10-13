@@ -29,33 +29,30 @@
     render();
   }
 
-  // Popola il menu "filtra per tipo" con SOLO i tipi di azione realmente
-  // presenti in cronologia (niente opzioni per funzioni mai usate), ciascuno con
-  // la sua etichetta leggibile. Così il filtro copre da sé ogni azione — comprese
-  // quelle nuove — senza restare disallineato da una lista hard-coded.
+  // Il menu "filtra per tipo" elenca solo i tipi presenti, e per ETICHETTA, non
+  // per codice: più codici interni portano lo stesso nome (#481), e la voce deve
+  // tenere tutte le righe che mostrano quel nome.
   function buildFilterOptions() {
     const sel = $('filter');
     const current = sel.value;
     const seen = new Set();
     for (const it of items) {
-      if (it && it.action) seen.add(it.action);
+      if (it && it.action) seen.add(formatActionLabel(it.action));
     }
-    const opts = [...seen]
-      .map((a) => ({ value: a, label: formatActionLabel(a) }))
-      .sort((x, y) => x.label.localeCompare(y.label, 'it'));
+    seen.delete('');
+    const labels = [...seen].sort((x, y) => x.localeCompare(y, 'it'));
 
     sel.innerHTML = '';
     const all = document.createElement('option');
     all.value = '';
     all.textContent = I18n.t('history_filter_all');
     sel.appendChild(all);
-    for (const o of opts) {
+    for (const label of labels) {
       const opt = document.createElement('option');
-      opt.value = o.value;
-      opt.textContent = o.label;
+      opt.value = label;
+      opt.textContent = label;
       sel.appendChild(opt);
     }
-    // Mantieni la scelta corrente se ancora valida (es. dopo un reload dati).
     sel.value = seen.has(current) ? current : '';
   }
 
@@ -66,7 +63,7 @@
     list.innerHTML = '';
 
     let filtered = items;
-    if (filter) filtered = filtered.filter((it) => it.action === filter);
+    if (filter) filtered = filtered.filter((it) => it && it.action && formatActionLabel(it.action) === filter);
     if (q) {
       filtered = filtered.filter((it) => {
         // Cerca SOLO sui testi che la voce mostra davvero — non su

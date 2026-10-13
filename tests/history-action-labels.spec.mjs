@@ -79,20 +79,20 @@ test('history page shows readable labels and filter options for all action types
       expect(metaText).toContain(label);
     }
 
-    // Il menu filtro contiene un'opzione per ogni tipo presente (value = codice,
-    // testo = etichetta leggibile), più "Tutte".
+    // Il menu filtro contiene un'opzione per ogni tipo presente, per etichetta
+    // leggibile (#481: le opzioni sono raggruppate per nome), più "Tutte".
     const options = await page.locator('#filter option').evaluateAll((els) =>
       els.map((el) => ({ value: el.value, text: el.textContent })));
     expect(options[0].value).toBe(''); // "Tutte"
+    for (const label of ['Descrivi immagine', 'Trascrivi immagine (OCR)', 'Dettatura', 'Modifica testo', 'Spiega link']) {
+      expect(options.some((o) => o.text === label), `opzione filtro mancante per ${label}`).toBe(true);
+    }
     for (const code of RAW_CODES) {
-      const opt = options.find((o) => o.value === code);
-      expect(opt, `opzione filtro mancante per ${code}`).toBeTruthy();
-      expect(opt.text).not.toBe(code); // etichetta leggibile, non codice grezzo
-      expect(opt.text.length).toBeGreaterThan(0);
+      expect(options.some((o) => o.text === code), `il codice grezzo ${code} non deve comparire nel menu`).toBe(false);
     }
 
     // Filtrando per un tipo, la lista mostra solo quelle voci.
-    await page.selectOption('#filter', 'edit_text');
+    await page.selectOption('#filter', { label: 'Modifica testo' });
     await expect(page.locator('.sn-history-item')).toHaveCount(1);
     await expect(page.locator('#list')).toContainText('Modifica testo');
   } finally {

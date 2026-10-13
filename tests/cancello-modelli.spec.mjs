@@ -6,6 +6,8 @@ import { test, expect } from './fixtures/electron.mjs';
 
 // Configurazione di prova, fornitore finto che conta le chiamate, spesa del mese spinta oltre il limite.
 async function prepara(app) {
+  // Il giudice si aggancia all'avvio, dopo che l'app è già raggiungibile: senza aspettarlo «non chiama» per finta.
+  await expect.poll(() => app.evaluate(() => globalThis.SN_SAFEBROWSE.activeProviders().llm), { timeout: 15_000 }).toBe(true);
   await app.evaluate(async () => {
     const T = globalThis.SN_TEST_MODELS;
     await globalThis.SN_STORAGE.updateSettings({
@@ -23,7 +25,8 @@ async function prepara(app) {
     };
     const finto = async ({ attempts, messages }) => {
       const testo = JSON.stringify(messages || []);
-      globalThis.__cancello.chiamate.push(testo.includes('METADATI') ? 'giudice' : 'testo');
+      // La home si prepara da sola appena c'è un modello: non è uno dei chiamanti di servizio contati qui.
+      if (!testo.includes('preparare la dashboard')) globalThis.__cancello.chiamate.push(testo.includes('METADATI') ? 'giudice' : 'testo');
       const text = testo.includes('METADATI') ? '{"suspicious":false,"reason":null,"confidence":"low"}' : 'geo_block';
       return { text, provider: attempts[0].provider, model: attempts[0].model, servedBy: 'DeepInfra', usage: { promptTokens: 200, completionTokens: 5, costUsd: 0.0005 } };
     };
