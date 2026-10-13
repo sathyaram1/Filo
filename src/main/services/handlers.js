@@ -4127,6 +4127,9 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
 // confermare (#360). In quel caso NON mandiamo anche quella anonima: sarebbero
 // due segnalazioni per lo stesso buco, e quella che l'utente autorizza è più
 // utile (dice cosa aveva chiesto) di quella generica.
+//
+// «Annulla» ignora solo gli id partiti da qui: quelli della bacheca li legge chiunque (#784.3).
+const autoFeedbackAnnullabili = new Set();
 async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false }) {
   try {
     if (proposed) return;
