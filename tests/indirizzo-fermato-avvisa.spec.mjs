@@ -71,7 +71,7 @@ test('la posta va al programma di posta sia aprendo una scheda nuova sia rinavig
   expect(await nelModello(shell, 'bloccat')).toBe(0);
 });
 
-test('un collegamento di Filo (risposta in chat, «Apri in nuova scheda») verso un file lo dice', async ({ app, shell, avvisi }) => {
+test('«Apri in nuova scheda» del tasto destro su un collegamento a un file lo dice', async ({ app, shell, avvisi }) => {
   await shell.waitForFunction(() => !!window.filoShell);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.apriDaCollegamento('file:///home/utente/foto.jpg'));
   await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: /home/utente/foto.jpg')).toBeVisible({ timeout: 8000 });
