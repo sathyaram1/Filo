@@ -866,7 +866,7 @@
       });
     };
 
-    Menu.open({ x: e.clientX, y: e.clientY, items, keepOnScroll: !!selInfo });
+    Menu.open({ x: e.clientX, y: e.clientY, items: conMenuDelSito(items), keepOnScroll: !!selInfo });
 
     if (wantCorrection) {
       // Passa il timestamp di apertura: se il broadcast nativo è già arrivato
