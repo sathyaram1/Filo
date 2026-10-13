@@ -128,7 +128,7 @@ test('consiglio: le domande col consiglio di consenso restano fuori, le altre pa
     consiglio: { ok: true, esiti: [{ id: 'D-1', ok: true, etichetta: 'Archivia #8' }] },
   });
   assert.equal(await esegui(['consiglio', 'D-1', 'D-2'], f.io), 1);
-  assert.deepEqual(f.chiamate.at(-1), { op: 'consiglio', ids: ['D-1'] });
+  assert.deepEqual(f.chiamate.at(-1), { op: 'consiglio', ids: ['D-1'], sessione: true });
   assert.match(f.err.join('\n'), /D-2: il consiglio vale solo dalla finestra di Filo/);
   assert.match(f.out.join('\n'), /D-1: fatto, Archivia #8/);
 });
