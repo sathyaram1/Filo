@@ -1185,6 +1185,83 @@
     });
   }
 
+  // Il testo che `Get-Date -Format` stampa: le sequenze di .NET (`\c` è `c`,
+  // `'...'`/`"..."` sono letterali) risolte, così un formato costruito per valere
+  // `\\host\x` si riconosce (#1072.4). I segnaposto di data (y, M…) restano com'erano:
+  // non possono creare `\`, quindi al più aggiungono testo innocuo.
+  function formatoData(fmt) {
+    let out = '';
+    for (let i = 0; i < fmt.length; i++) {
+      const ch = fmt[i];
+      if (ch === '\\') { out += fmt[i + 1] || ''; i += 1; } else if (ch === '\'' || ch === '"') {
+        const j = fmt.indexOf(ch, i + 1);
+        if (j < 0) { out += fmt.slice(i + 1); break; }
+        out += fmt.slice(i + 1, j);
+        i = j;
+      } else out += ch;
+    }
+    return out;
+  }
+
+  // Un cmdlet di lettura può COMPORRE un percorso di rete da pezzi che da soli non
+  // lo sono (#1072.4): Join-Path li concatena, Split-Path -NoQualifier toglie
+  // l'unità e scopre un `\\host`, Get-Date -Format stampa un testo fisso. Come
+  // echo, da solo stampa e resta libero; ma se lo apre (Join-Path -Resolve) o lo
+  // passa a chi lo apre (tubo, gruppo → `c.stampaLibera` è falso) chiede un OK.
+  function calcolaRete(prog, testi, c) {
+    const assoluto = { ...c, cwd: null };
+    const inRete = (p) => !!p && dove(p, assoluto) === MOTIVI.rete;
+    if (prog === 'join-path') {
+      const resolve = testi.some((t) => /^-r/i.test(t) && 'resolve'.startsWith(t.slice(1).toLowerCase()));
+      if (c.stampaLibera && !resolve) return false;
+      const parti = [];
+      for (const t of testi) {
+        const v = valoreDuePunti(t);
+        if (v != null) { parti.push(...v.split(',')); continue; }
+        if (!t.startsWith('-')) parti.push(...t.split(','));
+      }
+      return inRete(parti.join('\\'));
+    }
+    if (prog === 'split-path') {
+      if (c.stampaLibera || !testi.some((t) => /^-noq/i.test(t))) return false;
+      for (const t of testi) {
+        const v = valoreDuePunti(t);
+        const cand = v != null ? v : (t.startsWith('-') ? null : t);
+        // -NoQualifier toglie solo la radice di un'unità (`C:`): ciò che resta può essere `\\host`.
+        if (cand != null && cand.split(',').some((q) => inRete(q.replace(/^[A-Za-z]:/, '')))) return true;
+      }
+      return false;
+    }
+    if (prog === 'get-date') {
+      if (c.stampaLibera) return false;
+      for (let i = 0; i < testi.length; i++) {
+        const t = testi[i];
+        if (!/^-f/i.test(t)) continue;
+        const v = valoreDuePunti(t);
+        if (v != null) { if (inRete(formatoData(v))) return true; continue; }
+        if ('format'.startsWith(t.slice(1).toLowerCase())) { if (inRete(formatoData(testi[i + 1] || ''))) return true; i += 1; }
+      }
+      return false;
+    }
+    return false;
+  }
+
+  // Comandi "liberi" che risolvono un nome scelto dal modello contro la cartella
+  // di lavoro: in una cwd di rete lo mandano al remoto come farebbe `ls` (#1072.4).
+  // Get-Command/Get-Help cercano il file/comando indicato; where.exe (shell cmd)
+  // guarda prima nella cartella corrente. git lo fa in gitPerimetro.
+  function cercaNomeInRete(prog, testi, c) {
+    if (prog === 'get-command' || prog === 'get-help') {
+      return testi.some((t) => {
+        const v = valoreDuePunti(t);
+        const nome = v != null ? v : (t.startsWith('-') ? null : t);
+        return nome != null && dove(nome, c) === MOTIVI.rete;
+      });
+    }
+    if (prog === 'where') return testi.some((t) => t && !/^[-/]/.test(t));
+    return false;
+  }
+
   // Livello di un comando già riconosciuto come lettura (livello 1 di base).
   function perimetroDi(raw, c) {
     const prog = programOf(dequote(raw));
