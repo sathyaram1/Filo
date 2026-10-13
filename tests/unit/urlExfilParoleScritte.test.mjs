@@ -1,11 +1,13 @@
 // #868.6 — un indirizzo che porta fuori un dato scritto dall'utente in chat (numero, email, indirizzo di casa) chiede
 // l'OK come quelli della memoria; le parole della domanda di adesso, i link scritti o trovati e le parole comuni no.
+// Regole: src/shared/urlExfil.js, taintScritto.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -120,11 +122,13 @@ test('le parole comuni scritte prima non fanno chiedere: coincidono con ogni ric
   ]) assert.equal(costo(url, { parole: `${parole}\n${SCRITTE}`, domanda: 'ok' }).costo, 1, url);
 });
 
-test('un testo lunghissimo incollato non blocca la porta', () => {
-  const parole = `${'a-'.repeat(200000)}x@y\n${'Q'.repeat(400000)}`;
-  const t0 = Date.now();
-  assert.equal(costo('https://meteo.example/?q=meteo+domani', { parole }).costo, 1);
-  assert.ok(Date.now() - t0 < 2000, `${Date.now() - t0} ms`);
+test('un testo lunghissimo incollato non blocca la porta: il costo cresce col testo, non col suo quadrato', () => {
+  const parole = `${'a-'.repeat(200000)}x@y\n${'Q'.repeat(400000)}\n${'4 '.repeat(100000)}\n${'via '.repeat(50000)}`;
+  let r;
+  // Lineare sta sotto le trenta unità; una regex quadratica su questi testi ne costerebbe migliaia.
+  const c = costoInUnita(() => { r = costo('https://meteo.example/?q=meteo+domani', { parole }); }, { tetto: 80, giri: 3 });
+  assert.ok(c.entro, c.come);
+  assert.equal(r.costo, 1);
 });
 
 test('la ricerca sul web non guarda le parole dell\'utente: va al servizio di ricerca, non a un sito scelto da altri', () => {
