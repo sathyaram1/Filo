@@ -362,7 +362,7 @@ l'ambito, non il ruolo.
 | ogni giorno | monitoraggio (§ 4.3) | `monitor` | 45 | Opus |
 | lunedì | riordino della coda (§ 6.6) | `coda` | 45 | Opus; Haiku da provare (rischia i 100k token) |
 | lunedì | potatura dei rami (§ 4.7) | `rami` | 5 | Opus; Haiku da provare |
-| domenica | audit di sicurezza | `lavoro` | 45 | Opus |
+| domenica | audit di sicurezza | `audit` | 45 | Opus |
 
 Si vedono e si cambiano in Routine → Compiti ricorrenti. Monitoraggio, riordino
 e potatura sono la **gestione del lavoro** (§ 4.3): il monitoraggio può
