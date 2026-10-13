@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import * as B from '../../scripts/lib/biglietto-locale.mjs';
 import { leggiArgomenti } from '../../scripts/biglietto.mjs';
+import { envFiglio } from '../../scripts/orchestratore-locale.mjs';
 import { SESSION_MARKERS } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -360,4 +361,27 @@ test('da un worktree, senza la variabile come in PowerShell, il biglietto della 
     assert.doesNotMatch(riga, /già non fidata/);
     assert.match(riga, /niente sporcato/);
   } finally { togliCartella(vuoto); }
+});
+
+test('un figlio nasce con la fiducia di chi lo lancia anche da PowerShell: orchestratore e istanza lanciata a mano', async () => {
+  const dir = repo();
+  try {
+    const s = server();
+    const powershell = (sessione) => ({ CLAUDE_CODE_SESSION_ID: sessione, CLAUDECODE: '1', PATH: '/bin' });
+    const nasce = (sessione, env) => B.avvio({ input: { session_id: sessione, source: 'startup' }, env, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    const padre = await nasce('padre', {});
+    assert.equal((await B.sporca('letta una pagina web', { env: powershell('padre'), cwd: dir, deps: s.deps })).sporcati, 1);
+    // L'orchestratore lanciato da PowerShell non ha la variabile del percorso: ha il nome della sessione.
+    const env = envFiglio(powershell('padre'), { cwd: dir });
+    assert.equal(env.FILO_BIGLIETTO_FILE, padre.path);
+    assert.match((await nasce('figlio', env)).riga, /: sporco/);
+    assert.equal(await B.fiduciaLocale({ env: { CLAUDE_CODE_SESSION_ID: 'figlio' }, cwd: dir, deps: s.deps }), 'non_fidato');
+    // Un'istanza lanciata a mano da PowerShell: il suo hook vede il nome della sessione che la lancia.
+    assert.match((await nasce('a-mano', powershell('padre'))).riga, /: sporco/);
+    // Chi lancia è in una sessione senza biglietto: nel dubbio il figlio nasce sporco.
+    assert.match((await nasce('figlio-senza', envFiglio(powershell('mai-preso'), { cwd: dir }))).riga, /: sporco/);
+    // Fuori da ogni sessione, dal terminale dell'owner, o con l'hook che vede il proprio nome: nasce pulito.
+    assert.match((await nasce('dal-terminale', envFiglio({ PATH: '/bin' }, { cwd: dir }))).riga, /: pulito/);
+    assert.match((await nasce('sola', { CLAUDE_CODE_SESSION_ID: 'sola' })).riga, /: pulito/);
+  } finally { togliCartella(dir); }
 });
