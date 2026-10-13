@@ -2481,7 +2481,7 @@
         ? MR.REASONS.secaudit.color
         : (cl ? cl.color : (aligned ? MR.ALIGNED_COLOR : 'transparent'));
       // Una riga sola: #N · segno · titolo (ellissi). Il bordo è la famiglia del motivo, il segno chi l'ha fermata.
-      const norm = leggibile ? MR.normalizeStatus(fb) : { status: null, statusReason: null };
+      const motivo = leggibile ? MR.motivoDiStato(fb) : null;
       // Quante volte questo lavoro si è arenato ed è rientrato in coda da solo.
       // Senza scriverlo da qualche parte, un feedback che si impianta sempre
       // sullo stesso scoglio sembra semplicemente lento.
