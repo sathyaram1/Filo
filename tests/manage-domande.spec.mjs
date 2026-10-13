@@ -1,6 +1,5 @@
-// #1150 (SPEC-DOMANDE §2.1, §3): la sezione Domande. Con una domanda bloccante Gestione si apre lì; senza, sui
-// Ricevuti se non sono vuoti; un clic dell'utente vince sulla scelta automatica. Fase uno: elenco semplice,
-// e finché il server non pubblica le domande la pagina lo dice senza numeri.
+// #1150 (SPEC-DOMANDE §2.1, §3): la sezione Domande. Apertura su una bloccante, elenco e domanda intera, pulsanti
+// dalle azioni e non dal testo, risposte, «applica il consiglio» con l'elenco prima di partire; il main è finto.
 import { test, expect } from './fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
