@@ -875,8 +875,8 @@ async function setCreditsKnobs(patch, idToken) {
 }
 
 // Log dei worker delle routine (config/automation, campo `workerLog`): elenco
-// delle ultime esecuzioni di scripts/dispatch.mjs, ciascuna { role, startedAt,
-// num }. Lo scrive dispatch a ogni worker spawnato; qui lo LEGGIAMO soltanto
+// delle ultime esecuzioni, ciascuna { role, startedAt, num, caso? } (`caso`:
+// `riallineamento` | `ripresa`, #532). Lo scrive il server al rilascio del biglietto; qui lo LEGGIAMO soltanto
 // (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
 // PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
 // campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
