@@ -1,5 +1,5 @@
-// Caselle senza «Salva» nelle pagine filo://: quello che si scrive parte dopo una pausa e al primo segno di uscita,
-// perché chiudere la scheda non avvisa la pagina (#590.2, #590.5). Non salva niente da sé: chiama chi la pagina registra.
+// Caselle senza «Salva» nelle pagine filo://: quello che si scrive parte dopo una pausa, al primo segno di uscita e prima
+// che la scheda si chiuda (#590.2, #590.5, #666). Non salva niente da sé: chiama chi la pagina registra.
 // Regole: patterns/un-testo-scritto-in-una-casella-si-salva-da-solo-o-lo-perdi.md.
 
 (function (global) {
