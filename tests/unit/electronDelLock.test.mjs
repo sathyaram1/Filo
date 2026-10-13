@@ -64,7 +64,7 @@ test('con ELECTRON_OVERRIDE_DIST_PATH si confronta il binario che partirà davve
   writeFileSync(join(altro, 'version'), '33.2.0');
   const e = electronDelLock(dir, { env: { ELECTRON_OVERRIDE_DIST_PATH: altro } });
   assert.equal(e.ok, false);
-  assert.match(e.motivo, /ELECTRON_OVERRIDE_DIST_PATH/);
+  assert.match(e.motivo, /ELECTRON_OVERRIDE_DIST_PATH .*Electron 33\.2\.0.*Togli la variabile/s);
 }));
 
 test('ensure-electron non dice «già pronto» su un pacchetto rimasto indietro: esce con 1 e il motivo', { skip: process.platform !== 'linux' || process.arch !== 'x64' ? 'agisce solo su Linux x64' : false }, () => conRepo({ pacchetto: '33.2.0', binario: '33.2.0' }, (dir) => {
