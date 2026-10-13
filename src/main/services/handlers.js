@@ -1985,7 +1985,7 @@ async function eseguiAzioneFilo(action, {
     try {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
-      if (setter && setter.scrive.includes('security.pagineDelicate.siti')) {
+      if (setter && (setter.scrive.includes('security.pagineDelicate.siti') || setter.scrive.includes('menuDelSito.siti'))) {
         const { tm, tab } = targetWebTab(sender);
         const schede = tm ? tm.tabs.filter((t) => !t.isInternal).map((t) => ({ url: t.url, title: t.title })) : [];
         const r = globalThis.SN_PAGINE_DELICATE.risolviSchede(
