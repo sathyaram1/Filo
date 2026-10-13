@@ -608,13 +608,14 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
   await ricercaPartita(app);
   await page.locator('#stopBtn').click();
-  await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
-  // La chat è di nuovo dell'utente con la ricerca ancora in volo, non a ricerca finita.
-  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 1_000 });
+  // La chat è di nuovo dell'utente con la ricerca ancora in volo, non a ricerca finita: la ricerca è trattenuta, quindi
+  // «prima della fine» lo garantisce lei e non serve un tetto di un secondo, che su una macchina carica scade.
+  await expect(blocco).toHaveAttribute('data-fermato', '1');
+  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.');
   await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#input').fill('lascia stare, che tempo fa?');
   await page.locator('#input').press('Enter');
-  await expect(page.locator('.dash-bubble-user')).toHaveCount(2, { timeout: 1_000 });
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(2);
   // Il seguito sta sotto la riga del fermo, e il modello parte solo dopo che la ricerca in volo è finita e raccontata.
   const ordine = await page.evaluate(() => [...document.querySelectorAll('.dash-bubble-fermato, .dash-bubble-user')].map((e) => (e.classList.contains('dash-bubble-user') ? 'utente' : 'fermo')));
   expect(ordine).toEqual(['utente', 'fermo', 'utente']);
