@@ -70,6 +70,7 @@ function configDiPartenza() {
     invitesMaxUses: 3,
     maxGrantCredits: 70000,
     rewardFeedbackSent: 10,
+    rewardFeedbackSentPerDay: 5,
     rewardFeedbackClosed: 50,
     invitesRemaining: 9,
     eurUsd: 1.17,
