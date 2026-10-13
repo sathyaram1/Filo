@@ -312,14 +312,16 @@
     return out;
   }
 
-  // I dati che si riconoscono da soli: email, parole con una cifra (codici, CAP, targhe), indirizzi di casa.
+  // I dati che si riconoscono da soli: email, parole con una cifra (codici, CAP, targhe), indirizzi di casa. Le email
+  // si cercano parola per parola: su un testo incollato lunghissimo la regex sull'intero sarebbe quadratica.
+  const EMAIL = /^[^a-z0-9]*([a-z0-9._%+-]+)@[a-z0-9.-]+\.[a-z]{2,}/;
   function datiScritti(testo) {
     const out = new Set();
-    const emailRe = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/g;
-    let m;
-    while ((m = emailRe.exec(testo))) {
+    for (const w of testo.split(/\s+/)) {
+      const m = w.length <= 320 && w.includes('@') ? w.match(EMAIL) : null;
+      if (!m) continue;
       out.add(soloAlnum(m[0]));
-      const local = soloAlnum(m[0].split('@')[0]);
+      const local = soloAlnum(m[1]);
       if (local.length >= MIN_TOKEN) out.add(local);
     }
     for (const w of testo.split(/[^a-z0-9]+/)) if (w.length >= MIN_TOKEN && /\d/.test(w)) out.add(w);
@@ -329,20 +331,21 @@
 
   // Un numero scritto a gruppi («+39 347 123 4567») è un numero solo; in un URL le cifre contano anche spezzate da
   // pochi caratteri («?a=347&b=1234567»), come per ciò che esce (formeDi).
-  const cifreScritte = (testo) => testo.replace(/(\d)[\s.\-/()]{1,3}(?=\d)/g, '$1').match(new RegExp(`\\d{${CIFRE_SCRITTE},}`, 'g')) || [];
-  const cifreVicine = (forme) => forme.flatMap((f) => f.replace(/(\d)\D{1,4}(?=\d)/g, '$1').match(new RegExp(`\\d{${CIFRE_SCRITTE},}`, 'g')) || []);
+  const RUN_CIFRE = new RegExp(`\\d{${CIFRE_SCRITTE},}`, 'g');
+  const cifreScritte = (testo) => testo.replace(/(\d)[\s.()/-]{1,3}(?=\d)/g, '$1').match(RUN_CIFRE) || [];
+  const cifreVicine = (forme) => forme.flatMap((f) => f.replace(/(\d)\D{1,4}(?=\d)/g, '$1').match(RUN_CIFRE) || []);
 
+  const chiaveSenzaSchema = (url) => chiaveLink(url).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '');
+  const LINK_SCRITTO = /^(?:https?:\/\/|www\.|(?:[a-z0-9-]+\.)+[a-z]{2,}\/)/;
   function chiaviSenzaSchema(testo) {
     const out = new Set();
-    const re = /(?:https?:\/\/|www\.)[^\s<>"'«»]+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s<>"'«»]*/gi;
-    let m;
-    while ((m = re.exec(testo))) {
-      const l = m[0].replace(/[.,;:!?)\]»"'’]+$/, '');
-      out.add(chiaveSenzaSchema(/^https?:\/\//i.test(l) ? l : `https://${l}`));
+    for (const w of testo.split(/[\s<>"'«»]+/)) {
+      if (w.length > 4096 || !LINK_SCRITTO.test(w)) continue;
+      const l = w.replace(/[.,;:!?)\]’]+$/, '');
+      out.add(chiaveSenzaSchema(/^https?:\/\//.test(l) ? l : `https://${l}`));
     }
     return out;
   }
-  const chiaveSenzaSchema = (url) => chiaveLink(url).replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '');
 
   // `scritto` = le parole dell'utente (e le chat ripescate) che il modello ha davanti; `domanda` = quelle di adesso.
   function taintScritto(url, scritto, domanda = '') {
