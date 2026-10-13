@@ -132,6 +132,18 @@ test('gancio: annota la lettura accanto al biglietto della sessione dello stdin 
   } finally { togliCartella(dir); }
 });
 
+test('gancio: con la cartella corrente fuori dal progetto trova il biglietto nel progetto da cui la sessione è partita (#1211 giro 1)', () => {
+  const { dir, b } = conBiglietto();
+  const altrove = cartellaTemporanea('letture-altrove-');
+  try {
+    const avviati = [];
+    const input = { session_id: 'sess', cwd: altrove, tool_name: 'WebSearch', tool_input: { query: 'q' } };
+    assert.equal(L.gancio({ input, env: { CLAUDE_PROJECT_DIR: dir }, avvia: (p) => avviati.push(p) }).esito, 'annotato');
+    assert.deepEqual(B.sporchiInAttesa(b).map((v) => v.motivo), ['WebSearch']);
+    assert.deepEqual(avviati, [b.path]);
+  } finally { togliCartella(dir); togliCartella(altrove); }
+});
+
 test('gancio: se non riesce ad annotare, la consegna in sottofondo porta il motivo; un guasto non lancia mai', () => {
   const { dir, b } = conBiglietto();
   try {
