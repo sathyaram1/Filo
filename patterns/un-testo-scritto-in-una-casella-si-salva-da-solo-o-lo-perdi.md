@@ -70,7 +70,14 @@ sito e concludeva che la lista non funzionava (#590.2).
 
 - **Chiudere una scheda non dà alla pagina nessun evento.** Filo la chiude con
   `webContents.close()`: niente `beforeunload`, `pagehide` o `visibilitychange`.
-  Quello che non è partito prima non parte più.
+  Per questo una pagina con caselle scritte e non spedite lo dice al main
+  (`CASELLE_IN_SOSPESO`, al primo carattere e quando ha spedito): chiudendo la
+  sua scheda il main toglie la vista, le manda `TAB_IN_VISTA` falso e chiude la
+  pagina quando risponde «niente più», al più dopo due secondi
+  (`src/main/tabs/chiusuraConCaselle.js`, #666). Chi spedisce manda il suo
+  messaggio senza `await` davanti, così arriva prima del «niente più». Le prove
+  chiudevano con `filoShell.tabs.close` senza nessun fuoco perso: prima di
+  questo il numero si perdeva.
 - **Quindi il testo parte mentre si scrive**, dopo una pausa breve, e subito al
   primo segno di uscita: il Ctrl, Cmd o Alt premuto da solo (arriva alla pagina
   prima della lettera di Ctrl+W, Ctrl+Tab o Alt+cifra, che il main si tiene), il
