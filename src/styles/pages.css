@@ -132,6 +132,7 @@ html, body {
   display: block;
   margin-top: 14px;
 }
+.sn-page .sn-toggle-row[hidden] { display: none; }
 .sn-page .sn-toggle-row > label {
   display: flex;
   align-items: center;
