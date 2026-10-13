@@ -85,6 +85,7 @@
         'Anche la proposta di aprire una pagina da un altro paese compare sopra la pagina: il sito non può nasconderla né rispondere al posto tuo.',
         'Quando Filo propone di attivare i cookie di un contenuto incorporato, il «Sì» si conferma in un popup sopra la pagina. Un sito non può farti attivare i cookie mentre credi di rispondere a un\'altra domanda.',
         'Quando correggi una parola, le sottolineature delle altre parole restano al loro posto. Prima le blu sparivano per qualche istante mentre Filo ricontrollava il testo, e le rosse dopo ogni correzione scelta col tasto destro. Una correzione presa dal menu adesso si annulla con Ctrl+Z (Cmd+Z su Mac).',
+        'Se mandi una segnalazione mentre quella di prima sta ancora partendo, parte anche lei. Prima restava ferma finché non ne mandavi un\'altra o non riaprivi Filo.',
       ],
     },
     {
