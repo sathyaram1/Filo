@@ -413,6 +413,7 @@
     if (isAdmin && !eraAdmin && impostazioniAvviate) await caricaImpostazioni();
     // Stessa pagina, stessa regola: i Modelli di supporto rifiutati da non owner si rileggono anche loro.
     if (isAdmin && !eraAdmin) rileggiModelliRifiutati();
+    if (isAdmin && !eraAdmin && DOMANDE && DOMANDE.stato().soloOwner) DOMANDE.carica();
   }
 
   mgSignInBtn.addEventListener('click', () => {
