@@ -291,3 +291,21 @@ test('avvio: il figlio il cui biglietto del padre non si legge (file sparito, o 
     assert.equal(giu.chiamate.filter((c) => c.op === 'prendi' && !c.sporco).length, 0);
   } finally { togliCartella(dir); }
 });
+
+test('avvio pulito: la riga che arriva alla sessione dice come dichiararsi sporca dopo una lettura esterna, in una riga sola', async () => {
+  // L'hook passa alla sessione solo la prima riga: senza l'avviso lì, una pagina web o una mail lette in locale lasciano il biglietto pulito.
+  const dir = repo();
+  try {
+    const s = server();
+    const r = await B.avvio({ input: { session_id: 'nuova', source: 'startup' }, env: { CLAUDE_ENV_FILE: join(dir, 'env.sh') }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    assert.match(r.riga, /^Biglietto della sessione: pulito\./);
+    assert.ok(r.riga.includes('node scripts/biglietto.mjs sporca "'), r.riga);
+    for (const caso of ['pagina web', 'browser', 'posta', 'fuori dal repo', 'sotto-agente']) assert.ok(r.riga.includes(caso), `manca «${caso}»: ${r.riga}`);
+    assert.equal(r.riga.split('\n').length, 1);
+    const sporca = server({ [SEGRETO('z')]: { fiducia: 'non_fidato' } });
+    scriviBiglietto(dir, 'ripresa-2', SEGRETO('z'), FP('9'));
+    const r2 = await B.avvio({ input: { session_id: 'ripresa-2', source: 'resume' }, env: {}, cwd: dir, deps: sporca.deps, haCredenziale: conCredenziale });
+    assert.match(r2.riga, /sporco/);
+    assert.equal(r2.riga.includes('biglietto.mjs sporca'), false, 'da sporco non serve dichiararsi');
+  } finally { togliCartella(dir); }
+});
