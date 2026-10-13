@@ -164,9 +164,26 @@ export async function inviaAllarme(name, text, chiavi = []) {
   if (!(await spedisciAllarme(name, text, chiavi))) process.exit(1);
 }
 
+let bordiDetti = false;
+
+/**
+ * FILO_BUILD_PASSPHRASE senza spazi né a capo ai bordi, che il server non perdona: copiata con la riga rientrata di
+ * routine-keys finiva nel segreto con quattro spazi davanti, e allarmi, chiavi e numero di versione tacevano (#1210).
+ */
+export function parolaDellaCostruzione(env = process.env) {
+  const grezza = typeof env?.FILO_BUILD_PASSPHRASE === 'string' ? env.FILO_BUILD_PASSPHRASE : '';
+  const parola = grezza.trim();
+  if (parola && parola !== grezza && !bordiDetti) {
+    bordiDetti = true;
+    // stderr: lo stdout di release-bump porta solo il numero di versione.
+    console.warn('::warning::FILO_BUILD_PASSPHRASE ha spazi o a capo ai bordi: tolti prima di spedirla. Il segreto va ricopiato senza, nell\'ambiente «rilascio» del repo.');
+  }
+  return parola;
+}
+
 /** Come inviaAllarme, ma dice se è arrivato invece di fermare il processo: per chi deve proseguire comunque. */
 export async function spedisciAllarme(name, text, chiavi = []) {
-  const passphrase = process.env.FILO_BUILD_PASSPHRASE;
+  const passphrase = parolaDellaCostruzione();
 
   if (!passphrase) {
     console.error('[allarme] FILO_BUILD_PASSPHRASE assente: non posso avvisare nessuno.');
