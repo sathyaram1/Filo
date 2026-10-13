@@ -1117,6 +1117,7 @@
     }
     writeCollection();
     renderDocSwitcher();
+    rinominaNelFilo(id, f && f.meta && f.meta.title);
   }
 
   // ── Titolo automatico dal contenuto (#379.4) ──────────────────────────
