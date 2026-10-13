@@ -8,7 +8,6 @@ import Module, { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
-import fsp from 'node:fs/promises';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
@@ -36,9 +35,11 @@ Module._load = function (request, parent, isMain) {
 const Storage = require(join(__dirname, '..', '..', 'src', 'main', 'shim', 'storage.js'));
 const FILE = join(userData, 'storage.json');
 
+// Il file lo scrive scritturaAtomica (#1087): si contano le sue scritture, non quelle di fs.
+const Disco = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'scritturaAtomica.js'));
 let scritture = 0;
-const writeFileVero = fsp.writeFile;
-fsp.writeFile = function (...a) { scritture++; return writeFileVero.apply(this, a); };
+const scriviVero = Disco.scrivi;
+Disco.scrivi = function (...a) { if (a[0] === FILE) scritture++; return scriviVero.apply(this, a); };
 
 const leggiFile = () => readFileSync(FILE, 'utf8');
 
@@ -70,8 +71,8 @@ test('4 MB di storage: una scritta su una chiave piccola non riserializza il res
       const t0 = performance.now();
       const testo = await new Promise((resolve) => {
         // Il tempo che conta è quello del processo principale: dalla partenza del flush a quando passa il file al disco.
-        const vero = fsp.writeFile;
-        fsp.writeFile = function (p, txt, ...r) { tempi.push(performance.now() - t0); fsp.writeFile = vero; resolve(txt); return vero.call(this, p, txt, ...r); };
+        const vero = Disco.scrivi;
+        Disco.scrivi = function (p, txt, ...r) { tempi.push(performance.now() - t0); Disco.scrivi = vero; resolve(txt); return vero.call(this, p, txt, ...r); };
         Storage.flushNow();
       });
       assert.ok(testo.length > 4 * 1024 * 1024);
