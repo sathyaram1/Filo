@@ -83,10 +83,16 @@
   async function apriCollegamento(a, { sfondo = false } = {}) {
     const url = a && a.getAttribute ? a.getAttribute('href') : '';
     if (!url) return;
+    const msg = { type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo };
     let r = null;
-    try {
-      r = await chrome.runtime.sendMessage({ type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo });
-    } catch (_) {}
+    try { r = await chrome.runtime.sendMessage(msg); } catch (_) {}
+    // Un dato dell'utente in un link scritto sopra una pagina chiede l'OK, come se lo aprisse l'assistente (#868.6).
+    if (r && r.conferma) {
+      const Ui = global.SN_CONFIRM_UI;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : false;
+      if (!ok) return;
+      try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
+    }
     if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
   }
 
