@@ -662,7 +662,7 @@
       return ferma(x.regola, x.fonte);
     }
     for (const f of saturi) if (pezzoPresente(u, f.testo, parole)) return ferma('codice', f.fonte);
-    return valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente);
+    return valutaAvvisi(tipo, action, avvisi, niente);
   }
 
   // Un testo con più segreti di quanti se ne tengano è costruito apposta per nascondere quello vero (#810): lì ferma
