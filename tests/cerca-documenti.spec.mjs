@@ -223,6 +223,33 @@ test('le cartelle si cambiano in Preferenze: togli, rimetti, aggiungi; la ricerc
   }
 });
 
+// #947.3 — una cartella fuori elenco in cui l'utente ha chiesto di cercare resta nell'indice: si vede in Preferenze e
+// da lì si dimentica.
+test('una cartella cercata per l\'occasione si vede in Preferenze, coi documenti tenuti, e si dimentica', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const archivio = cartellaTemporanea('filo-archivio-');
+  writeFileSync(join(archivio, 'affitto.txt'), 'Contratto di locazione ad uso abitativo');
+  writeFileSync(join(archivio, 'luce.txt'), 'Bolletta energia elettrica marzo');
+  try {
+    const r = await app.evaluate((_e, c) => globalThis.SN_DOCUMENTI_INDICE.cerca('contratto affitto', { cartella: c }), archivio);
+    expect(r.risultati[0].nome).toBe('affitto.txt');
+    const pref = await openTab('filo://preferences/preferences.html');
+    const riga = pref.locator(`#documentiCercate .doc-occasionale[data-occasionale="${archivio.replace(/\\/g, '\\\\')}"]`);
+    await expect(riga).toBeVisible({ timeout: 10_000 });
+    await expect(riga.locator('.doc-dove')).toContainText('ci hai cercato tu · 2 documenti già letti');
+    await pref.locator('#sec-documenti').screenshot({ path: 'tests/.shots/cerca-documenti-occasionale.png' });
+    await riga.locator('.mem-via').click();
+    await expect(riga).toHaveCount(0);
+    await expect(pref.locator('#documentiHint')).toHaveText('Dimenticata');
+    const stato = await app.evaluate(() => globalThis.SN_DOCUMENTI_INDICE.stato());
+    expect(stato.occasionali.some((o) => o.percorso === archivio)).toBe(false);
+    const porta = await app.evaluate((_e, c) => globalThis.SN_HANDLE_MESSAGE({ type: 'documenti_dimentica', percorso: c }, { tab: { id: 9, url: 'http://sito-ostile.example/' }, url: 'http://sito-ostile.example/' }), archivio);
+    expect(porta.error, 'un sito non fa dimenticare niente').toBe('forbidden');
+  } finally {
+    rmSync(archivio, { recursive: true, force: true });
+  }
+});
+
 test('dalla chat: «cerca anche in quella cartella» si aggiunge, una cartella che non c\'è si rifiuta col perché', async ({ app }) => {
   test.setTimeout(60_000);
   const altrove = cartellaTemporanea('filo-chat-cartella-');
@@ -257,7 +284,7 @@ test('le porte nuove sono chiuse ai siti, e da Filo si apre un documento ma non 
     const da = (url) => (msg) => app.evaluate((_e, [m, u]) => globalThis.SN_HANDLE_MESSAGE(m, { tab: { id: 9, url: u }, url: u }), [msg, url]);
     const sito = da('http://sito-ostile.example/');
     const filo = da('filo://newtab/');
-    for (const type of ['file_apri', 'file_mostra_cartella', 'documenti_stato', 'documenti_scegli_cartella']) {
+    for (const type of ['file_apri', 'file_mostra_cartella', 'documenti_stato', 'documenti_scegli_cartella', 'documenti_dimentica']) {
       const r = await sito({ type, percorso: join(dir, 'fattura.pdf') });
       expect(r.error, `${type} accessibile da una pagina web`).toBe('forbidden');
     }
@@ -361,5 +388,21 @@ test('una cartella che il sistema non lascia leggere non passa per vuota, né in
     });
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// #256.10 — con qualche migliaio di file la riga dello stato scrive ogni numero allo stesso modo, col punto delle migliaia.
+test('lo stato dei documenti in Preferenze scrive tutti i numeri col punto delle migliaia', async ({ app, openTab }) => {
+  await app.evaluate(() => {
+    const I = globalThis.SN_DOCUMENTI_INDICE;
+    I.__statoVero = I.stato;
+    I.stato = async () => ({ documenti: 5000, scansioni: 1200, inCorso: { fatti: 1233, totali: 5000 } });
+  });
+  try {
+    const pref = await openTab('filo://preferences/preferences.html');
+    await expect(pref.locator('#documentiStato'))
+      .toHaveText('5.000 documenti, di cui 1.200 scansioni senza testo · ne sto leggendo 1.234 di 5.000', { timeout: 10_000 });
+  } finally {
+    await app.evaluate(() => { const I = globalThis.SN_DOCUMENTI_INDICE; I.stato = I.__statoVero; delete I.__statoVero; });
   }
 });

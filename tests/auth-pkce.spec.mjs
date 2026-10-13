@@ -46,12 +46,11 @@ test('loopback OAuth: code valido col giusto state viene accettato', async () =>
   expect(code).toBe('abc123');
 });
 
-test('loopback OAuth: state errato viene RIFIUTATO (anti-CSRF)', async () => {
+test('loopback OAuth: state errato viene RIFIUTATO (anti-CSRF) e l\'accesso vero resta in ascolto (#1086)', async () => {
   const expectedState = pkce.createState();
   const { redirectUri, waitForCode } = await _internals.startLoopback(expectedState);
-  // Aggancia il matcher PRIMA di scatenare il redirect, così la rejection non
-  // resta mai non gestita (evita il falso fallimento da unhandled rejection).
-  const assertion = expect(waitForCode()).rejects.toThrow(/state/i);
-  await fetch(`${redirectUri}/?code=abc123&state=stato-falso`);
-  await assertion;
+  const falso = await fetch(`${redirectUri}/?code=abc123&state=stato-falso`);
+  expect(falso.status).toBe(400);
+  await fetch(`${redirectUri}/?code=vero&state=${encodeURIComponent(expectedState)}`);
+  expect(await waitForCode()).toBe('vero');
 });

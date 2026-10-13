@@ -53,10 +53,6 @@ module.exports = function register(on, ctx) {
     } catch (_) { /* la home resta com'è: non è un motivo per fallire un riscatto */ }
   }
 
-  // Il conteggio locale già dichiarato al server a un riscatto (per non
-  // portarlo due volte). Sopravvive al riscatto e all'annullamento dell'identità.
-  const DECLARED_KEY = 'walletLocalDeclared';
-
   // Ultimi parametri del server (euro per credito, cambio, quota): servono a
   // scalare i crediti nelle righe del registro e a comporre i messaggi.
   let lastServer = null;
@@ -266,6 +262,8 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       out.identity.error = String(e?.message || e);
       out.identity.lost = e && e.code === 'identity_lost';
+      out.identity.unreadable = e && e.code === 'identity_unreadable';
+      out.identity.unreachable = e && e.code === 'servizio_non_raggiungibile';
       out.identity.offline = e && e.code === 'offline';
       // Offline (o identità che non si rinnova) con la chiave personale qui:
       // l'ultimo stato letto vale anche adesso. Il campo dell'invito e il
@@ -385,9 +383,17 @@ module.exports = function register(on, ctx) {
     return { ok: true, status, message: 'Nuova chiave pronta: i tuoi crediti si usano di nuovo da qui.', state: await readState() };
   }));
 
-  on(MSG.WALLET_RESET_IDENTITY, filoOnly(async () => {
+  // Il cancello sta qui e non nella pagina: senza un'identità persa o illeggibile ricominciare
+  // staccherebbe un portafoglio vivo, e senza il sì esplicito non si tocca niente.
+  on(MSG.WALLET_RESET_IDENTITY, filoOnly(async (msg) => {
+    let motivo = '';
+    try { await identity.getIdToken(); } catch (e) { motivo = (e && e.code) || ''; }
+    if (motivo !== 'identity_lost' && motivo !== 'identity_unreadable') {
+      return { ok: false, status: motivo ? 'not_reachable' : 'identity_ok', state: await readState() };
+    }
+    if (!msg || msg.confermato !== true) return { ok: false, status: 'needs_confirm' };
     identity.resetIdentity();
-    walletStore.clear();
+    walletStore.metteDaParte();
     lastServer = null;
     ultimaLettura = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
@@ -415,20 +421,9 @@ module.exports = function register(on, ctx) {
     if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
-    // I crediti del vecchio conteggio locale si portano sul server: chi li
-    // aveva guadagnati non deve perderli passando al portafoglio (entro un
-    // tetto che sta in configurazione lato server).
-    // Si dichiarano una volta sola: quanto è già stato dichiarato a un riscatto
-    // precedente (identità annullata e nuovo invito) non si ripresenta, il
-    // conteggio locale resta com'è e paga solo la parte guadagnata dopo.
-    let localCredits = 0;
-    let balanceNow = 0;
-    try {
-      const pub = await globalThis.SN_CREDITS?.getPublic?.();
-      balanceNow = Number(pub && (pub.balanceExact != null ? pub.balanceExact : pub.balance)) || 0;
-      const declared = Number(await globalThis.SN_STORAGE.getRaw(DECLARED_KEY, 0)) || 0;
-      localCredits = Math.max(0, Math.floor(balanceNow - declared));
-    } catch (_) { localCredits = 0; }
+    // Il conteggio locale non passa al portafoglio (#1138): il server non si fida
+    // di crediti dichiarati dal PC, e al riscatto si entra coi soli crediti d'ingresso.
+    const localCredits = 0;
     // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
     // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
     // risposta è del codice giusto (pieno, tuo, già dentro) e ferma la fila.
@@ -448,7 +443,6 @@ module.exports = function register(on, ctx) {
     }
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
-    if (localCredits > 0) { try { await globalThis.SN_STORAGE.setRaw(DECLARED_KEY, Math.floor(balanceNow)); } catch (_) {} }
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
     // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato, e
     // la home si rifà: da adesso Filo risponde.

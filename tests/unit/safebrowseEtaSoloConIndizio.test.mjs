@@ -28,17 +28,19 @@ beforeEach(() => {
 });
 afterEach(() => { Date.now = realNow; });
 
-const analizza = (url, ctx = {}) => new Promise((ok) => {
-  SB.analyze(url, ctx, ok);
-  setTimeout(ok, 30);
-});
+const analizza = async (url, ctx = {}) => {
+  let primo;
+  SB.analyze(url, ctx, (v) => { if (primo === undefined) primo = v; });
+  await SB._settled();
+  return primo;
+};
 
 test('una pagina pulita non manda il nome del sito ai registri; con una password sì, una volta', async () => {
   await analizza('https://forno-di-marco.com/', {});
   await analizza('https://forno-di-marco.com/chi-siamo', {});
   assert.deepEqual(conta.rdap, []);
   assert.deepEqual(conta.ct, []);
-  assert.equal(conta.gsb.length, 1, 'la lista nera resta consultata (e ricordata per il sito)');
+  assert.equal(conta.gsb.length, 2, 'la lista nera resta consultata, una volta per pagina: una pagina pulita non copre le altre del sito (#813)');
 
   await analizza('https://forno-di-marco.com/accedi', { hasPassword: true });
   await analizza('https://forno-di-marco.com/accedi', { hasPassword: true });

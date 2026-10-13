@@ -16,6 +16,8 @@ import {
   IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { pidMorto } from '../helpers/processi.mjs';
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..', '..');
 
@@ -538,6 +540,35 @@ test('modello e sforzo dei ruoli vengono dagli agenti delle routine', () => {
   assert.equal(args[args.indexOf('--effort') + 1], v.effort);
 });
 
+// #1189: col biglietto del server valgono modello e sforzo che ha deciso lui, campo per campo; un valore ignoto ferma.
+test('modello e sforzo decisi dal server battono il frontmatter; senza vale il frontmatter', () => {
+  const fm = modelloDelRuolo('lavoratore', ROOT);
+  assert.deepEqual(modelloDelRuolo('lavoratore', ROOT, null), fm);
+  assert.deepEqual(modelloDelRuolo('lavoratore', ROOT, {}), fm);
+  assert.deepEqual(modelloDelRuolo('lavoratore', ROOT, { model: 'haiku', effort: 'low' }), { model: 'haiku', effort: 'low' });
+  assert.deepEqual(modelloDelRuolo('verificatore', ROOT, { model: 'fable' }), { model: 'fable', effort: modelloDelRuolo('verificatore', ROOT).effort });
+  assert.deepEqual(modelloDelRuolo('verificatore', ROOT, { effort: 'max' }), { model: modelloDelRuolo('verificatore', ROOT).model, effort: 'max' });
+  assert.throws(() => modelloDelRuolo('lavoratore', ROOT, { model: 'gpt' }), /modello deciso dal server sconosciuto/);
+  assert.throws(() => modelloDelRuolo('lavoratore', ROOT, { effort: 'altissimo' }), /sforzo deciso dal server sconosciuto/);
+});
+
+test('il motore passa all’istanza la decisione del server della pratica, o niente', async () => {
+  const b = banco({ verdetti: ['pass'] });
+  const visti = [];
+  const vera = b.dep.claude;
+  b.dep.claude = (a) => { visti.push(a.dalServer); return vera(a); };
+  await b.motore.avvia();
+  assert.ok(visti.length > 0 && visti.every((d) => d === null), 'senza biglietto del server vale il frontmatter');
+  const decisa = { ...nuovaPratica({ num: 7, slug: 'sette', richiesta: 'fai X' }), decisioneServer: { model: 'sonnet', effort: 'high' } };
+  const c = banco({ pratiche: [decisa], verdetti: ['pass'] });
+  const conServer = [];
+  const veraC = c.dep.claude;
+  c.dep.claude = (a) => { conServer.push(a.dalServer); return veraC(a); };
+  await c.motore.avvia();
+  assert.ok(conServer.length > 0);
+  for (const d of conServer) assert.deepEqual(d, { model: 'sonnet', effort: 'high' });
+});
+
 test('uscita di claude -p: esito, costo, errore', () => {
   assert.deepEqual(leggiUscitaClaude(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'ok sha', total_cost_usd: 1.2 })), { ok: true, testo: 'ok sha', costo: 1.2, errore: '' });
   const e = leggiUscitaClaude(JSON.stringify({ subtype: 'error_max_turns', is_error: true, result: '' }), '', 1);
@@ -552,9 +583,12 @@ test('accesso della riga di comando: senza, avvia si ferma prima di lanciare ist
   assert.equal(accessoDaStatus('Not logged in'), false);
 });
 
-test('l’istanza figlia non eredita la sessione che la lancia, e lo sforzo lo dice --effort', () => {
-  const e = envFiglio({ CLAUDECODE: '1', CLAUDE_EFFORT: 'low', CLAUDE_CODE_SESSION_ID: 'x', CLAUDE_CODE_MESSAGING_TOKEN: 't', PATH: '/bin', CLAUDE_CODE_OAUTH_TOKEN: 'o', ANTHROPIC_BASE_URL: 'u' });
-  assert.deepEqual(Object.keys(e).sort(), ['ANTHROPIC_BASE_URL', 'CLAUDE_CODE_OAUTH_TOKEN', 'PATH']);
+test('l’istanza figlia non eredita la sessione che la lancia, e lo sforzo lo dice --effort; il biglietto sì (#1148)', () => {
+  const e = envFiglio({ CLAUDECODE: '1', CLAUDE_EFFORT: 'low', CLAUDE_CODE_SESSION_ID: 'x', CLAUDE_CODE_MESSAGING_TOKEN: 't', PATH: '/bin', CLAUDE_CODE_OAUTH_TOKEN: 'o', ANTHROPIC_BASE_URL: 'u' }, { cwd: ROOT });
+  assert.deepEqual(Object.keys(e).sort(), ['ANTHROPIC_BASE_URL', 'CLAUDE_CODE_OAUTH_TOKEN', 'FILO_BIGLIETTO_FILE', 'PATH']);
+  assert.equal(e.FILO_BIGLIETTO_FILE.replace(/\\/g, '/').split('/').slice(-3).join('/'), '.claude/biglietti/x.json');
+  // Lanciato fuori da ogni sessione, dal terminale dell'owner: nessun biglietto da passare.
+  assert.equal('FILO_BIGLIETTO_FILE' in envFiglio({ PATH: '/bin' }, { cwd: ROOT }), false);
 });
 
 test('richiesta dalle cornici di feedback:leggi', () => {
@@ -580,7 +614,7 @@ test('trovaClaude: la variabile, poi il PATH, poi l’installazione dell’app d
 test('avvia --dry-run: il giro intero stampato, niente stato scritto, nessun processo vero', () => {
   const d = cartellaTemporanea('orch-vuoto-');
   const r = spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'avvia', '--dry-run', '4242'], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: TETTO_ATTESA_MS,
   });
   assert.equal(r.status, 0, r.stderr);
   for (const re of [/worktree add .*lavoro-4242"? -b claude\/lavoro-4242 origin\/main/, /claude -p \(lavoratore/, /verify-local\.mjs start/, /claude -p \(verificatore/, /finish-local\.mjs --feedback 4242/, /#4242 claude\/lavoro-4242: fuso/]) {
@@ -798,7 +832,7 @@ test('il lavoratore che riparte su un ramo con commit lo sa dal ramo, anche al p
 test('aggiungi: un ramo di un altro lavoro aperto si rifiuta se scelto con --slug, si evita da sé se è quello di default', () => {
   const d = cartellaTemporanea('orch-rami-');
   const agg = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'aggiungi', ...a], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: TETTO_ATTESA_MS,
   });
   assert.equal(agg('5', '--slug', 'doppio').status, 0);
   const r = agg('6', '--slug', 'doppio');
@@ -851,7 +885,7 @@ test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso
 test('lavoro rimasto a metà da un orchestratore chiuso: togli lo toglie, riprendi dice che riparte da sé; con uno vivo entrambi rifiutano', () => {
   const d = cartellaTemporanea('orch-a-meta-');
   const orch = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', ...a], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: TETTO_ATTESA_MS,
   });
   assert.equal(orch('aggiungi', '7', '--slug', 'a-meta-prova', '--richiesta', 'una prova').status, 0);
   const f = join(d, 'stato.json');
@@ -863,8 +897,7 @@ test('lavoro rimasto a metà da un orchestratore chiuso: togli lo toglie, ripren
   assert.match(orch('togli', '7').stderr, /orchestratore in corso/);
   assert.match(orch('riprendi', '7').stderr, /orchestratore in corso/);
 
-  const morto = spawnSync(process.execPath, ['-e', '']).pid;
-  writeFileSync(join(d, 'avvia.lock'), String(morto));
+  writeFileSync(join(d, 'avvia.lock'), String(pidMorto()));
   const r = orch('riprendi', '7');
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /riparte da sola col prossimo «avvia»/);
@@ -942,7 +975,7 @@ test('argomenti: opzione storpiata o di un altro comando, senza valore, che si m
 test('aggiungi e avvia dalla riga di comando: col refuso o col valore mancante niente coda e niente giro; scritti bene la richiesta arriva intera', () => {
   const d = cartellaTemporanea('orch-argomenti-');
   const orch = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', ...a], {
-    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: TETTO_ATTESA_MS,
   });
   const stato = join(d, 'stato.json');
   for (const a of [['41', '--richeista', 'solo il bottone'], ['41', '--richiesta'], ['41', '--file'], ['41', '--richiesta', '   ']]) {
@@ -976,7 +1009,7 @@ test('npm run orchestra senza «--»: le opzioni che npm si è tenuto (anche sto
 
   const d = cartellaTemporanea('orch-npm-');
   const r = spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'avvia'], {
-    cwd: ROOT, encoding: 'utf8', timeout: 60_000, env: { ...process.env, ...npm, npm_config_dry_run: 'true', FILO_ORCH_DIR: d },
+    cwd: ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS, env: { ...process.env, ...npm, npm_config_dry_run: 'true', FILO_ORCH_DIR: d },
   });
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stderr, /npm si è tenuto --dry-run: .*npm run orchestra -- avvia.*Non ho fatto niente/);

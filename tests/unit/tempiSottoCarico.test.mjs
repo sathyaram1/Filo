@@ -6,9 +6,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { collectTestFiles } from '../../scripts/run-unit-tests.mjs';
-import { costoInUnita, unitaDiRiferimento, GIRI } from '../helpers/tempoRelativo.mjs';
+import { costoInUnita, rapportoFraCosti, unitaDiRiferimento, GIRI } from '../helpers/tempoRelativo.mjs';
+import { pidMorto } from '../helpers/processi.mjs';
 
 const QUI = fileURLToPath(import.meta.url);
 const ROOT = join(dirname(QUI), '..', '..');
@@ -65,6 +66,123 @@ test('la sentinella riconosce le forme della soglia fissa, e lascia stare i time
   for (const [testo, atteso] of Object.entries(casi)) assert.deepEqual(confrontiFissi(testo), atteso, testo);
 });
 
+// Un processo vero sotto carico parte quando può (#1063): il suo tempo massimo è una guardia contro l'appeso, non una
+// misura, e si chiede a TETTO_ATTESA_MS (tests/helpers/attese.mjs). Un numero scritto lì cadeva a macchina carica.
+const TETTO_A_MANO = /\b(?:spawnSync|execFileSync|execSync|spawn|execFile|exec)\s*\([^;]*?\btimeout:\s*\d/;
+
+test('nessuno unit test dà a un processo vero un tempo massimo scritto a mano', () => {
+  assert.ok(TETTO_A_MANO.test("spawnSync(process.execPath, ['x'], { encoding: 'utf8', timeout: 60_000 });"));
+  assert.ok(TETTO_A_MANO.test('execFileSync(node, [\n  a,\n], { timeout: 20000 })'));
+  assert.ok(!TETTO_A_MANO.test("spawnSync(process.execPath, ['x'], { timeout: TETTO_ATTESA_MS });"));
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    if (TETTO_A_MANO.test(readFileSync(file, 'utf8'))) fuori.push(relative(ROOT, file).split(sep).join('/'));
+  }
+  assert.deepEqual(fuori, [], 'usa TETTO_ATTESA_MS da tests/helpers/attese.mjs: sotto carico un tetto stretto è un rosso finto');
+});
+
+// Il pid di un processo morto non si prende lanciandone uno (#1063): sotto carico il figlio non parte e non scrive
+// niente, o il suo pid torna in uso, e la prova crede viva una cosa morta.
+const PID_DI_UN_FIGLIO = [/\bspawnSync\s*\([^;]*?\)\s*\.pid\b/, /['"`]-e['"`]\s*,\s*['"`][^'"`]*console\.log\(process\.pid\)/];
+const pidDiUnFiglio = (testo) => PID_DI_UN_FIGLIO.some((re) => re.test(testo));
+
+test('nessuno unit test prende il pid di un processo morto lanciandone uno', () => {
+  assert.ok(pidDiUnFiglio("const morto = spawnSync(process.execPath, ['-e', '']).pid;"));
+  assert.ok(pidDiUnFiglio("spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim()"));
+  assert.ok(!pidDiUnFiglio("const r = spawnSync(process.execPath, ['x'], { encoding: 'utf8' });\nassert.equal(r.status, 0);"));
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    if (pidDiUnFiglio(readFileSync(file, 'utf8'))) fuori.push(relative(ROOT, file).split(sep).join('/'));
+  }
+  assert.deepEqual(fuori, [], 'usa pidMorto da tests/helpers/processi.mjs');
+});
+
+test('pidMorto dà un pid che nessun processo ha, senza lanciarne', () => {
+  const pid = pidMorto();
+  assert.ok(Number.isInteger(pid) && pid > 0 && pid !== process.pid);
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
+});
+
+// Un evento si aspetta, non si corre contro un timer (#1063): «la richiamata o 50 ms» e «la risposta o 5 secondi» su
+// una macchina carica scadono prima che il lavoro finisca. Le forme: il risolutore dato al lavoro e anche a un
+// setTimeout con un numero; una corsa fra la promessa e un setTimeout con un numero.
+const SCADENZA_A_TEMPO = [
+  /new Promise\(\(?(\w+)\)?\s*=>\s*\{(?:(?!new Promise)[\s\S]){0,400}?\b\1\b(?:(?!new Promise)[\s\S]){0,400}?setTimeout\(\s*\1\s*,\s*\d/,
+  /Promise\.race\(\[(?:(?!\]\))[\s\S]){0,300}?setTimeout\([^;]*?,\s*\d[\d_]*\s*\)/,
+];
+const scadeATempo = (testo) => SCADENZA_A_TEMPO.some((re) => re.test(testo));
+
+test('nessuno unit test aspetta un evento con una scadenza in millisecondi scritti a mano', () => {
+  assert.ok(scadeATempo("new Promise((ok) => {\n  SB.analyze(u, c, (v) => { a.push(v); ok(); });\n  setTimeout(ok, 200);\n})"));
+  assert.ok(scadeATempo('await Promise.race([chiuso, new Promise((r) => setTimeout(() => r(false), 5000))])'));
+  assert.ok(!scadeATempo('await new Promise((r) => setTimeout(r, 30));'));
+  assert.ok(!scadeATempo('new Promise((ok) => {\n  setTimeout(ok, 30);\n})'));
+  assert.ok(!scadeATempo('Promise.race([chiuso, new Promise((r) => setTimeout(() => r(false), TETTO_ATTESA_MS))])'));
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    if (scadeATempo(readFileSync(file, 'utf8'))) fuori.push(relative(ROOT, file).split(sep).join('/'));
+  }
+  assert.deepEqual(fuori, [], "aspetta l'evento (una promessa, SB._settled, aspettaChe) o usa l'orologio finto di tests/helpers/orologio.mjs");
+});
+
+// Un tempo massimo da secondi scritto a mano è sempre una guardia contro l'appeso contata sull'orologio, in qualunque
+// forma (#1063, giro 6: quindici secondi a un server finto, dentro un timer che la regola sopra non vedeva). Sotto i
+// cinque secondi, un tempo dato al codice provato è quello che la prova stessa fa scadere.
+const SECONDO_MS = 1000;
+const DATO_AL_CODICE_MS = 5000;
+const numeroScritto = (s) => (/^\s*[1-9][\d_]*\s*$/.test(s) ? Number(s.replace(/[\s_]/g, '')) : NaN);
+
+/** Le righe con un setTimeout da un secondo in su, o un timeoutMs/attesaMs da cinque, scritti come numero. */
+function tempiMassimiAMano(testo) {
+  const righe = new Set();
+  const riga = (i) => testo.slice(0, i).split('\n').length;
+  for (const m of testo.matchAll(/\bsetTimeout\(/g)) {
+    let prof = 1;
+    let virgola = -1;
+    let i = m.index + m[0].length;
+    for (; i < testo.length && prof; i++) {
+      const c = testo[i];
+      if (c === '/' && testo[i + 1] === '/') { i = testo.indexOf('\n', i); if (i < 0) break; continue; }
+      if (c === '/' && testo[i + 1] === '*') { i = testo.indexOf('*/', i + 2) + 1; if (i <= 0) break; continue; }
+      if (c === "'" || c === '"' || c === '`') {
+        for (i++; i < testo.length && testo[i] !== c; i++) if (testo[i] === '\\') i++;
+        continue;
+      }
+      if ('([{'.includes(c)) prof++;
+      else if (')]}'.includes(c)) prof--;
+      else if (c === ',' && prof === 1) virgola = i;
+    }
+    if (!prof && virgola >= 0 && numeroScritto(testo.slice(virgola + 1, i - 1)) >= SECONDO_MS) righe.add(riga(m.index));
+  }
+  for (const m of testo.matchAll(/\b(?:timeoutMs|attesaMs)\s*:\s*([1-9][\d_]*)\b/g)) {
+    if (numeroScritto(m[1]) >= DATO_AL_CODICE_MS) righe.add(riga(m.index));
+  }
+  return [...righe];
+}
+
+test('nessuno unit test aspetta con un tempo massimo da secondi scritto a mano', () => {
+  const casi = {
+    "new Promise((ok, no) => {\n  p.on('exit', no);\n  setTimeout(() => no(new Error('nessuna porta entro 15 s')), 15000).unref();\n})": [3],
+    "const stop = setTimeout(() => { try { s.kill(); } catch (_) {} // l'appeso\n  rifiuta(new Error('(muto)')); }, 15_000);": [1],
+    "T.runCommand('echo x', { shell: 'cmd', timeoutMs: 15_000 });": [1],
+    "commandExists({ command: 'node', attesaMs: 10000 });": [1],
+    "setTimeout(() => no(new Error(`nessuna porta entro ${TETTO_ATTESA_MS / 1000} s`)), TETTO_ATTESA_MS);": [],
+    'await new Promise((r) => setTimeout(r, 30));': [],
+    "esegui('ping -n 600 127.0.0.1', { timeoutMs: 1500 });": [],
+    "setTimeout(() => cb(null, out), 400);\nmock.timers.tick(5000);": [],
+  };
+  for (const [testo, atteso] of Object.entries(casi)) assert.deepEqual(tempiMassimiAMano(testo), atteso, testo);
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    for (const r of tempiMassimiAMano(readFileSync(file, 'utf8'))) fuori.push(`${relative(ROOT, file).split(sep).join('/')}:${r}`);
+  }
+  assert.deepEqual(fuori, [], 'usa TETTO_ATTESA_MS da tests/helpers/attese.mjs: un tempo massimo scritto a mano cade a macchina carica');
+});
+
 // Un orologio finto: ogni chiamata avanza del costo che le si dà, così il conto si prova senza misurare niente.
 function banco(costiOp, costiRif) {
   let adesso = 0;
@@ -103,4 +221,33 @@ test("l'unità di riferimento fa davvero del lavoro e dura abbastanza da stare s
   assert.ok(unitaDiRiferimento() > 0);
   const c = costoInUnita(() => {}, { tetto: 1 });
   assert.ok(c.msRif >= 1, c.come);
+});
+
+// Due lavori asincroni su un orologio finto: ogni chiamata avanza del costo che le tocca, nell'ordine.
+function coppia(costiA, costiB) {
+  let adesso = 0;
+  let iA = 0;
+  let iB = 0;
+  return {
+    ora: () => adesso,
+    a: async () => { adesso += costiA[Math.min(iA++, costiA.length - 1)]; },
+    b: async () => { adesso += costiB[Math.min(iB++, costiB.length - 1)]; },
+  };
+}
+
+test('rapportoFraCosti: un carico passeggero su qualche campione non conta, un costo che cresce davvero sì', async () => {
+  const pari = coppia([10], [900, 12, 800]);
+  const a = await rapportoFraCosti(pari.a, pari.b, { tetto: 3, ora: pari.ora });
+  assert.deepEqual([a.entro, a.rapporto, a.giri], [true, 1.2, 1]);
+
+  const cresce = coppia([10], [50]);
+  const b = await rapportoFraCosti(cresce.a, cresce.b, { tetto: 3, ora: cresce.ora });
+  assert.deepEqual([b.entro, b.rapporto, b.giri], [false, 5, GIRI]);
+  assert.match(b.come, /5\.00 volte \(tetto 3\)/);
+});
+
+test('rapportoFraCosti misura i due lavori a turno, non uno tutto e poi l’altro', async () => {
+  const ordine = [];
+  await rapportoFraCosti(async () => { ordine.push('a'); }, async () => { ordine.push('b'); }, { campioni: 4 });
+  assert.equal(ordine.join(''), 'abbaabba');
 });

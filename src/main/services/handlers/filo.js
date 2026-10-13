@@ -6,8 +6,9 @@ module.exports = function register(on, ctx) {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
-    saveOnboarding, finishOnboarding, claimOnboardingResume,
+    saveOnboarding, finishOnboarding, claimOnboardingResume, autoFeedbackAnnullabili,
   } = ctx;
+  const { soloFilo: soloSuperficiDiFilo } = require('./origine');
   const { SN_CONST } = globalThis;
   const FiloMem = globalThis.SN_FILO_MEMORY;
   const FiloState = globalThis.SN_FILO_STATE;
@@ -28,6 +29,8 @@ module.exports = function register(on, ctx) {
   // scritto da lui può uscire (#810).
   const paroleDa = (msg) => (Array.isArray(msg && msg.parole) ? msg.parole : [])
     .filter((x) => typeof x === 'string').join('\n').slice(-200000);
+  // L'ultima è la richiesta di adesso: i dati che porta possono uscire, quelli detti prima chiedono l'OK (#868.6).
+  const domandaDa = (msg) => (Array.isArray(msg && msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').slice(-1).join('');
 
   // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
   const annunciaChat = () => {
@@ -75,7 +78,7 @@ module.exports = function register(on, ctx) {
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg) });
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg) });
     if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
@@ -107,7 +110,7 @@ module.exports = function register(on, ctx) {
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg) });
+    const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg), domanda: domandaDa(msg) });
     if (r && r.output) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     return { ok: true, ...r };
   });
@@ -122,6 +125,7 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: false, apri: () => { if (win?._filoTabs) win._filoTabs.openTab(url); },
+      chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true,
     });
     return { ok: true, ...r };
   });
@@ -136,7 +140,7 @@ module.exports = function register(on, ctx) {
     let pagina = '';
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
     const r = await apriDaFilo(url, {
-      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato,
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
       apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo) }); },
     });
     return { ok: true, ...r, avvisato };
@@ -266,7 +270,9 @@ module.exports = function register(on, ctx) {
     const chat = await FiloChats.get(msg.id);
     // Riaperta (anche dopo un riavvio), la chat torna a dire cosa aveva letto da fuori prima di ogni clic (#810).
     try { ricordaLettoInChat([], (chat && chat.messages) || []); } catch (_) {}
-    return { ok: true, chat };
+    let conFoto = chat;
+    try { conFoto = global.SN_CONTESTO_FILO ? global.SN_CONTESTO_FILO.conFotoInMemoria(chat) : chat; } catch (_) {}
+    return { ok: true, chat: conFoto };
   });
 
   // Chiusura di una chat. La risposta NON aspetta il classificatore: chi ha
@@ -319,7 +325,7 @@ module.exports = function register(on, ctx) {
     const role = msg.role === 'user' ? 'user' : 'filo';
     // L'esito di un comando lanciato a mano l'ha scritto il comando: riaperta, la chat lo tratta da letto (#810).
     // Così il nome di un file scaricato, che sceglie il sito, quando una carta della home lo porta nel filo (#870).
-    const ESTERNI = { comando: "dall'output di un comando", download: 'dal nome di un file scaricato' };
+    const ESTERNI = { comando: globalThis.SN_FILO_CONTESTO.ESTERNO_COMANDO, download: 'dal nome di un file scaricato' };
     const esterno = role === 'filo' && Object.hasOwn(ESTERNI, msg.esterno) ? ESTERNI[msg.esterno] : '';
     // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
     const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');
@@ -552,25 +558,26 @@ module.exports = function register(on, ctx) {
   })));
   on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
 
-  // F4 — Annulla un auto-feedback appena inviato (undo dal toast).
-  // Marca il feedback come `ignored` via updateStatus. Usa l'ID token admin se
-  // disponibile (l'utente è loggato come owner); se non loggato l'undo non può
-  // scrivere su Firestore (le rules richiedono admin per update) — non è un errore
-  // fatale: l'auto-feedback rimane in stato `new` ma finisce solo nell'Agente tab.
-  on(MSG.CANCEL_AUTO_FEEDBACK, async (msg) => {
+  // F4 — «Annulla» del toast: scrive `ignored` con le credenziali di chi è dentro, quindi mai per un sito e solo per
+  // un auto-feedback partito da qui (#784.3). Senza la sessione dell'owner le regole rifiutano e resta `new`.
+  on(MSG.CANCEL_AUTO_FEEDBACK, soloSuperficiDiFilo(async (msg) => {
     const id = String(msg && msg.id || '').trim();
     if (!id) return { ok: false, error: 'id mancante' };
+    if (!autoFeedbackAnnullabili.has(id)) return { ok: false, error: 'non è una segnalazione partita da qui' };
     const FB = globalThis.SN_FEEDBACK;
     if (!FB || typeof FB.updateStatus !== 'function') return { ok: false, error: 'FB non disponibile' };
+    // Tolto prima di scrivere: un doppio clic non scrive due volte; se la scrittura fallisce torna annullabile.
+    autoFeedbackAnnullabili.delete(id);
     try {
       const auth = require('../../auth/google-auth');
       const idToken = await auth.getIdToken().catch(() => null);
       await FB.updateStatus(id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' }, { idToken: idToken || undefined });
       return { ok: true };
     } catch (e) {
+      autoFeedbackAnnullabili.add(id);
       console.warn('[F4] cancel auto-feedback fallito:', e?.message || e);
       // Non un errore fatale: il feedback rimane ma non interferisce con il triage.
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 };

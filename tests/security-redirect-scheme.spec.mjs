@@ -87,6 +87,8 @@ test('un redirect 302 verso mailto: passa dal gate Filo: pagina non dirottata, c
 
     // will-navigate vede solo l'URL http intermedio (web-safe, passa); il gate
     // deve scattare su will-redirect con l'URL mailto: di destinazione.
+    // Come il clic su un link che rimbalza su mailto: (#737.1 giro 3: la posta parte da un gesto dell'utente).
+    await page.mouse.click(5, 5);
     await page.evaluate(() => { try { window.location.href = '/to-mailto'; } catch (_) {} });
     await new Promise((r) => setTimeout(r, 800));
 

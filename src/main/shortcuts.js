@@ -171,7 +171,7 @@ async function salvaPerDopo(win, tab) {
   // I dati della scheda si fotografano prima di ogni attesa: un redirect intanto farebbe salvare la pagina sbagliata (#334).
   const url = tab.url;
   const title = tab.title;
-  const favicon = tab.favicon || '';
+  const favicon = tab.faviconUrl || '';
   if (await consegnaConRicevuta(tab, 'save-for-later')) return null;
   // Pagina che non l'ha presa (ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
   const entry = await comeLaFinestra(win, async () => {

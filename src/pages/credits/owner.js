@@ -794,7 +794,7 @@
     if (!Number.isFinite(v)) return '—';
     if (v === 0) return '0 $';
     for (const dec of [2, 4, 6, 8]) {
-      const s = new Intl.NumberFormat('it-IT', { maximumFractionDigits: dec }).format(v);
+      const s = new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: dec }).format(v);
       if (Number(s.replace(/\./g, '').replace(',', '.')) !== 0) return `${s} $`;
     }
     return v > 0 ? 'meno di 0,00000001 $' : '—';
@@ -805,21 +805,21 @@
   }
 
   function formatInt(n) {
-    return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
+    return new Intl.NumberFormat('it-IT', { useGrouping: true }).format(Math.round(Number(n) || 0));
   }
   // Crediti con al più un decimale: mostra "137" per un valore intero e "0,3"
   // per una frazione, così un consumo sotto il credito resta visibile invece di
   // sparire arrotondato a zero. Il decimale sparisce se il valore è intero.
   function formatCredits(n) {
     const v = Math.round((Number(n) || 0) * 10) / 10;
-    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 1 }).format(v);
   }
   // Un numero con la virgola come si scrive in italiano, senza zeri finti in
   // coda (0,0007 resta 0,0007, 1,17 resta 1,17).
   function formatDecimale(n, decimali) {
     const v = Number(n);
     if (!Number.isFinite(v)) return '—';
-    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: decimali }).format(v);
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: decimali }).format(v);
   }
   function formatDate(ts) {
     if (!ts) return '';

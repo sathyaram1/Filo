@@ -10,6 +10,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BACHECA = 'filo://board/board.html';
@@ -327,8 +328,9 @@ test('tasto destro su una riga: copia il testo, rimanda quella non partita già 
   await expect(bacheca.locator('.sn-fb-modal')).toHaveCount(0);
 
   await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
-  await bacheca.keyboard.press('Escape');
-  await expect(menu).toHaveCount(0);
+  await expect(menu).toBeVisible();
+  // Il menu ascolta i tasti dal giro dopo quello che l'ha aperto: un Esc partito nello stesso istante si ripete.
+  await expect.poll(async () => { await bacheca.keyboard.press('Escape'); return menu.count(); }).toBe(0);
   await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
   await menu.getByText('Togli dall’elenco').click();
   await expect(righe(bacheca)).toHaveCount(1);
@@ -362,7 +364,7 @@ async function avvia(userData) {
     cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   return { app, shell };
 }

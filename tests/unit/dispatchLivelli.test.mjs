@@ -13,6 +13,7 @@
 // Senza il fix tutti questi assert sono rossi: le opzioni non esistevano, e
 // `--record-secaudit` con un argomento in più usciva con «argomento non capito».
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync, execFile } from 'node:child_process';
@@ -20,7 +21,7 @@ import { createServer } from 'node:http';
 import { rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const TMP = cartellaTemporanea('filo-livelli-');
 process.env.FILO_DISPATCH_STATE_DIR = TMP;
@@ -242,8 +243,8 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
     assert.equal(segVer.status, 1);
     assert.match(String(segVer.stderr), /seg-manca\.md non esiste/);
   } finally {
-    rmSync(sandbox, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(sandbox);
+    togliCartella(fuori);
   }
 });
 
@@ -317,11 +318,11 @@ test('canale: deliver status --segnala manda `segnalazione` intera; file assente
     assert.equal(ricevuti.length, prima, 'niente deve partire');
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
 test('cleanup', () => {
-  rmSync(TMP, { recursive: true, force: true });
+  togliCartella(TMP);
   assert.ok(!existsSync(TMP));
 });

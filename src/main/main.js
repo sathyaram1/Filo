@@ -14,6 +14,9 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// Prima di qualsiasi sessione, che caricherebbe subito i dizionari del correttore scaricandoli da Google (#1084).
+try { require('./services/dizionari').prepara(app); } catch (_) {}
+
 // Su Windows serve un AppUserModelID esplicito perché la taskbar mostri
 // l'icona giusta (e non quella di Electron di default).
 if (process.platform === 'win32') {
@@ -43,6 +46,8 @@ try {
   });
   if (scelto) app.commandLine.appendSwitch('password-store', scelto);
 } catch (_) {}
+require('./test-window-mode').disegnaAncheFuoriSchermo(app);
+require('./test-window-mode').webglAncheSenzaScheda(app);
 
 // Carica i moduli "shared/background" portati dall'estensione. Si registrano
 // tutti su `globalThis` (pattern IIFE preservato dal codice extension), così
@@ -69,6 +74,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
     globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
     globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
+    globalThis.__filoDizionari = require('./services/dizionari');
     globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
@@ -169,23 +175,17 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// Configura le lingue del correttore ortografico NATIVO (Hunspell) di Electron.
-// Senza questa chiamata Electron usa solo la lingua di sistema: su molte
-// configurazioni i suggerimenti dietro lo zigzag rosso non arrivano (il main
-// li inoltra al menu di correzione via `_spell:native`, vedi tabs.js). La
-// vecchia estensione Chrome aveva i dizionari pronti d'ufficio; qui li
-// attiviamo esplicitamente — italiano (l'app è italiana) + lingua di sistema —
-// così la correzione in cima al menu funziona anche senza chiave LLM. NON
-// forziamo più l'inglese (#169): con il dizionario inglese sempre attivo le
-// parole italiane errate ricevevano suggerimenti inglesi ("funzion"→"function").
-// Su macOS la chiamata è ignorata (Electron usa NSSpellChecker), nessun problema.
+// Le lingue del correttore nativo: senza, Electron usa solo quella di sistema e la correzione in cima al menu
+// (`_spell:native`, tabs.js) manca sulle parole italiane. La scelta e il perché niente inglese forzato: spellLanguages.js.
 function configureSpellchecker() {
   try {
     const ses = session.defaultSession;
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
-    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale());
+    // Su Linux c'è solo Hunspell e si caricano solo i dizionari inclusi in Filo: un inglese non incluso resterebbe vuoto.
+    const inclusi = process.platform === 'linux' ? require('./services/dizionari').lingue() : [];
+    const want = globalThis.SN_SPELL_LANG.select(available, app.getLocale(), inclusi);
     if (want.length) ses.setSpellCheckerLanguages(want);
   } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
 }
@@ -202,7 +202,6 @@ app.whenReady().then(async () => {
   // è in cima allo schermo e vince sui tasti che le pagine ascoltano, quindi va
   // messa PRIMA che si apra qualsiasi finestra (vedi src/main/menu.js).
   installaMenuApplicazione();
-  require('./tabs').inoltraTastiDegliOspiti(app);
 
   const Storage = globalThis.SN_STORAGE;
   try {
@@ -214,6 +213,7 @@ app.whenReady().then(async () => {
     // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
     // nascere i cookie dei riquadri.
     try { require('./services/cookieIncorporati').init(s); } catch (_) {}
+    try { require('./services/accessoGoogle').init(); } catch (_) {}
     try { require('./services/riquadriRotti').init(s); } catch (_) {}
     // Anti-fingerprinting: carica/genera il master secret persistente e fissa
     // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
@@ -248,6 +248,8 @@ app.whenReady().then(async () => {
     try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
     // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
     setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
+    // La cronologia AI di storage.json passa ai suoi file subito, non alla prima richiesta: fino ad allora ogni scrittura la ripaga.
+    setTimeout(() => { globalThis.SN_HISTORY?.prepara().catch(() => {}); }, 2000);
   } catch (_) {}
 
   // Ripristina la sessione "Accedi con Google" persistita (non fa rete: l'ID
@@ -275,6 +277,11 @@ app.whenReady().then(async () => {
   // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+  // Chi è entrato in Filo quando l'accesso passava dal browser trova una volta l'invito a collegare YouTube, Gmail e
+  // Drive nelle schede (#1123). Nei test no: comparirebbe in mezzo agli avvisi che gli spec contano.
+  if (process.env.NODE_ENV !== 'test') {
+    setTimeout(() => { require('./auth/prodottiGoogle').invitaSeServe().catch(() => {}); }, 15_000).unref?.();
+  }
 
   // Il collegamento d'invito (#651): la dichiarazione al sistema, l'indirizzo
   // dell'avvio a freddo (Windows e Linux lo mettono fra gli argomenti) e
@@ -466,11 +473,11 @@ app.on('before-quit', () => {
   try {
     const tm = mainWindow?._filoTabs;
     const Storage = require('./shim/storage');
+    // setSync scrive già tutto il file: una seconda scrittura raddoppierebbe solo il tempo della chiusura.
     if (tm && Storage?.setSync) {
       const key = globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
       Storage.setSync({ [key]: tm.sessionState() });
-    }
-    Storage?.flushSync?.();
+    } else Storage?.flushSync?.();
   } catch (_) {}
 });
 

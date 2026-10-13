@@ -36,9 +36,11 @@ function pulisci(stato) {
 class AvvisiSopraPagina {
   // schedaAttiva: la WebContentsView della scheda in primo piano (o null). sottoIlVuoto: quello che l'utente vede
   // sotto (l'avviso del sito quando la copre), dove vanno i gesti del vuoto.
-  constructor(win, { alto = () => 0, restituisciTastiera = () => {}, schedaAttiva = () => null, sottoIlVuoto = null } = {}) {
+  // dopoInCima: chi deve restare sopra anche agli avvisi (la conferma aperta) ci torna.
+  constructor(win, { alto = () => 0, restituisciTastiera = () => {}, schedaAttiva = () => null, sottoIlVuoto = null, dopoInCima = () => {} } = {}) {
     this.win = win;
     this.sottoIlVuoto = sottoIlVuoto;
+    this.dopoInCima = dopoInCima;
     this.alto = alto;
     this.restituisciTastiera = restituisciTastiera;
     this.schedaAttiva = schedaAttiva;
@@ -193,6 +195,7 @@ class AvvisiSopraPagina {
     const cv = this.win.contentView;
     const figli = cv.children || [];
     if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    try { this.dopoInCima(); } catch (_) {}
   }
 
   _invia() {

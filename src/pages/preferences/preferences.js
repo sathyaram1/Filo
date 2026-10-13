@@ -15,6 +15,8 @@
   const CUSTOM_KEY = '__custom__';
 
   function $(id) { return document.getElementById(id); }
+  // I numeri che la pagina scrive: 1.234 e 1,5 (regola in tests/unit/numeriItaliani.test.mjs).
+  const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
 
   // Nessuna casella della pagina ha un «Salva», e chiudere o cambiare scheda non avvisa la pagina (#590.5): ognuna
   // parte da qui, dopo una pausa o al primo segno di uscita. Uscendo, i numeri fuori scala tornano al valore in uso.
@@ -353,7 +355,7 @@
       const scambi = conv.thread.filter((m) => m.role === 'user').length;
       meta.textContent = conv.current && !state.done
         ? 'in corso'
-        : `${scambi} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
+        : `${cifre(scambi)} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
       sum.appendChild(when);
       sum.appendChild(meta);
       det.appendChild(sum);
@@ -424,7 +426,7 @@
       input.step = String(m.step);
       input.spellcheck = false;
       input.autocomplete = 'off';
-      input.setAttribute('aria-label', `${m.label} (${m.min}–${m.max})`);
+      input.setAttribute('aria-label', `${m.label} (${cifre(m.min)}–${cifre(m.max)})`);
       input.addEventListener('input', (e) => onTabColorInput(m.key, e));
       input.addEventListener('blur', () => {
         if (!tabColDaSalvare.has(m.key)) tabColInCorso.delete(m.key);
@@ -436,7 +438,7 @@
       reset.type = 'button';
       reset.className = 'sn-token-reset';
       reset.textContent = '↺';
-      reset.title = `Ripristina il predefinito (${m.def})`;
+      reset.title = `Ripristina il predefinito (${cifre(m.def)})`;
       reset.setAttribute('aria-label', `Ripristina ${m.key}`);
       reset.addEventListener('click', () => resetTabColorParam(m.key));
       row.appendChild(reset);
@@ -447,7 +449,7 @@
       help.hidden = false;
       help.style.color = 'var(--sn-muted, #888)';
       help.style.gridColumn = '2 / -1';
-      help.textContent = `intervallo ${m.min}–${m.max} · ${m.comment}`;
+      help.textContent = `intervallo ${cifre(m.min)}–${cifre(m.max)} · ${m.comment}`;
       row.appendChild(help);
 
       box.appendChild(row);
@@ -558,8 +560,8 @@
     note.classList.toggle('agent-style-over', over);
     $('agentStyleText').classList.toggle('agent-style-over', over);
     note.textContent = over
-      ? `Troppo lungo: ${n} caratteri, il massimo è ${AGENT_STYLE_MAX}. Non lo salvo finché non lo accorci.`
-      : `${n} / ${AGENT_STYLE_MAX}`;
+      ? `Troppo lungo: ${cifre(n)} caratteri, il massimo è ${cifre(AGENT_STYLE_MAX)}. Non lo salvo finché non lo accorci.`
+      : `${cifre(n)} / ${cifre(AGENT_STYLE_MAX)}`;
     mostraTuttoLoStile();
     return !over;
   }
@@ -873,6 +875,8 @@
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
       case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
       case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
+      case 'contestoFilo.giorni': return tettoContesto('giorni', $('contestoGiorni').value);
+      case 'contestoFilo.token': return tettoContesto('token', $('contestoToken').value);
       default: return undefined;
     }
   }
@@ -921,8 +925,32 @@
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
       case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
+      case 'contestoFilo.giorni': return tettoContesto('giorni', s.contestoFilo && s.contestoFilo.giorni);
+      case 'contestoFilo.token': return tettoContesto('token', s.contestoFilo && s.contestoFilo.token);
       default: return undefined;
     }
+  }
+
+  // Quanto ricorda la chat (#868): vuoto = come i predefiniti; fuori scala si riporta dentro come fa il main.
+  function tettoContesto(k, v) {
+    const FC = window.SN_FILO_CONTESTO;
+    const c = FC.numeroIn(v, FC.LIMITI[k]);
+    return c != null && k === 'token' ? Math.round(c) : c;
+  }
+  function canonContesto() {
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      const v = tettoContesto(k, $(id).value);
+      $(id).value = v == null ? '' : String(v);
+    }
+  }
+  // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
+  async function segnapostiContesto() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
+      const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
+      if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
+      if (d.token != null) $('contestoToken').placeholder = String(d.token);
+    } catch (_) {}
   }
 
   function scriviTempiVoce() {
@@ -1051,6 +1079,10 @@
     if (vuole('dictation.cancelSec')) $('dictationCancel').value = String(tempiVoce.cancelSec);
     scriviTempiVoce();
 
+    const cf = settings.contestoFilo || {};
+    if (vuole('contestoFilo.giorni')) $('contestoGiorni').value = cf.giorni == null ? '' : String(cf.giorni);
+    if (vuole('contestoFilo.token')) $('contestoToken').value = cf.token == null ? '' : String(cf.token);
+
     if (vuole('timerRingtone')) {
       const ringtone = settings.timerRingtone || 'default';
       const ringOpt = [...$('timerRingtone').options].find((o) => o.value === ringtone);
@@ -1064,12 +1096,12 @@
       if (vuole('tts.rate')) {
         const rate = Number(tts.rate) || 1;
         $('ttsRate').value = String(rate);
-        $('ttsRateVal').textContent = rate.toFixed(1) + '×';
+        $('ttsRateVal').textContent = rate.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
       }
       if (vuole('tts.pitch')) {
         const pitch = Number(tts.pitch) || 1;
         $('ttsPitch').value = String(pitch);
-        $('ttsPitchVal').textContent = pitch.toFixed(1);
+        $('ttsPitchVal').textContent = pitch.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
       }
       if (vuole('tts.voice')) populateVoices(tts.voice || '');
     }
@@ -1231,16 +1263,61 @@
     for (const v of Object.keys(CARTELLE_DI_SERIE)) {
       if (!cartelleSalvate.includes(v)) box.appendChild(rigaCartella(v, { tolta: true }));
     }
+    const cercate = $('documentiCercate');
+    if (cercate) {
+      const occasionali = statoDocumenti && Array.isArray(statoDocumenti.occasionali) ? statoDocumenti.occasionali : [];
+      cercate.textContent = '';
+      for (const o of occasionali) cercate.appendChild(rigaOccasionale(o));
+      cercate.hidden = !occasionali.length;
+    }
+  }
+
+  // #947.3 — una cartella fuori elenco in cui l'utente ha chiesto di cercare: Filo tiene quello che ne ha già letto,
+  // e qui lo si vede e lo si dimentica.
+  function rigaOccasionale(o) {
+    const row = document.createElement('div');
+    row.className = 'mem-riga doc-occasionale';
+    row.dataset.occasionale = o.percorso;
+    const t = document.createElement('span');
+    t.className = 'mem-testo';
+    t.textContent = o.nome || o.percorso;
+    const dove = document.createElement('span');
+    dove.className = 'doc-dove';
+    const n = Number(o.documenti) || 0;
+    const quanti = n === 1 ? 'un documento già letto' : `${cifre(n)} documenti già letti`;
+    dove.textContent = `${o.percorso} · ci hai cercato tu · ${quanti}${o.esiste ? '' : ' · ora non c\'è'}`;
+    t.appendChild(dove);
+    row.appendChild(t);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mem-via';
+    b.textContent = '×';
+    b.title = 'Dimentica';
+    b.setAttribute('aria-label', `Dimentica i documenti letti in ${o.nome || o.percorso}`);
+    b.addEventListener('click', () => dimenticaCartella(b, o.percorso));
+    row.appendChild(b);
+    return row;
+  }
+
+  async function dimenticaCartella(b, percorso) {
+    b.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_DIMENTICA, percorso }); } catch (_) { r = null; }
+    const hint = $('documentiHint');
+    if (hint) hint.textContent = r && r.ok && r.tolta ? 'Dimenticata' : 'Non c\'era più: ecco com\'è adesso';
+    flashSaved('documentiHint');
+    await caricaStatoDocumenti();
   }
 
   function scriviStatoDocumenti() {
     const el = $('documentiStato');
     if (!el || !statoDocumenti) return;
     const s = statoDocumenti;
+    const cifre = (x) => Number(x).toLocaleString('it-IT', { useGrouping: true });
     const n = Number(s.documenti) || 0;
-    let t = n === 1 ? 'Un documento' : `${n.toLocaleString('it-IT')} documenti`;
-    if (s.scansioni) t += `, di cui ${s.scansioni} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
-    if (s.inCorso && s.inCorso.totali) t += ` · ne sto leggendo ${Math.min(s.inCorso.fatti + 1, s.inCorso.totali)} di ${s.inCorso.totali}`;
+    let t = n === 1 ? 'Un documento' : `${cifre(n)} documenti`;
+    if (s.scansioni) t += `, di cui ${cifre(s.scansioni)} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
+    if (s.inCorso && s.inCorso.totali) t += ` · ne sto leggendo ${cifre(Math.min(s.inCorso.fatti + 1, s.inCorso.totali))} di ${cifre(s.inCorso.totali)}`;
     el.textContent = cartelleSalvate && cartelleSalvate.length ? t : '';
   }
 
@@ -1261,6 +1338,8 @@
     const elenco = Array.from(new Set(nuovo));
     disegnaCartelle(elenco);
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { documenti: { cartelle: elenco } } });
+    const hint = $('documentiHint');
+    if (hint) hint.textContent = 'Salvato';
     flashSaved('documentiHint');
     setTimeout(caricaStatoDocumenti, 400);
   }
@@ -1269,7 +1348,12 @@
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.DOCUMENTI_SCEGLI_CARTELLA }); } catch (_) { r = null; }
     if (!r || !r.ok || !r.percorso) return;
-    if ((cartelleSalvate || []).includes(r.percorso)) { flashSaved('documentiHint'); return; }
+    if ((cartelleSalvate || []).includes(r.percorso)) {
+      const hint = $('documentiHint');
+      if (hint) hint.textContent = 'Salvato';
+      flashSaved('documentiHint');
+      return;
+    }
     await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
   }
 
@@ -1321,16 +1405,10 @@
     if (serve === 'no') { mostraAutonomia(livelloSalvato); return; }
     if (serve === 'conferma') {
       sceltaInCorso = true;
-      const info = Autonomia.infoLivello(nuovo);
       const Ui = window.SN_CONFIRM_UI;
       let ok = false;
       try {
-        ok = Ui ? await Ui.confirmTyped({
-          title: `Autonomia: ${info.nome}`,
-          text: `Filo farà da solo più cose di adesso.\n\n${info.frase}`,
-          avviso: 'Così Filo si fida di più.',
-          okLabel: 'Cambia',
-        }) : false;
+        ok = Ui ? await Ui.confirmTyped(Autonomia.confermaAlzata(nuovo)) : false;
       } finally { sceltaInCorso = false; }
       if (!ok) { mostraAutonomia(livelloSalvato); return; }
     }
@@ -1447,6 +1525,12 @@
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('aggiornamentiAutomatici').addEventListener('change', persist);
+    for (const id of ['contestoGiorni', 'contestoToken']) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
+      $(id).addEventListener('blur', canonContesto);
+    }
+    segnapostiContesto();
     $('terminalShell').addEventListener('change', persist);
     $('barraSpinta').addEventListener('change', persist);
     $('barraStriscia').addEventListener('change', persist);
@@ -1463,11 +1547,11 @@
     }
     $('ttsVoice').addEventListener('change', persist);
     $('ttsRate').addEventListener('input', (e) => {
-      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toFixed(1) + '×';
+      $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '×';
       caselle.cambiato('pref', e);
     });
     $('ttsPitch').addEventListener('input', (e) => {
-      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toFixed(1);
+      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
       caselle.cambiato('pref', e);
     });
     $('ttsPreview').addEventListener('click', previewTts);

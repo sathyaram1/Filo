@@ -1500,27 +1500,34 @@ html, body {
 .dash-lightbox.open { display: flex; }
 .dash-lightbox img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
 
-/* Il livello di autonomia (#530): tacche come una carica, piene fino al livello scelto. */
-.dash-autonomia {
-  /* In basso come l'invio: quando il testo va a capo resta sulla riga dei bottoni. */
-  align-self: flex-end;
-  margin-bottom: 2px;
+/* La scelta dell'autonomia nell'intervista (#1188): i livelli come pillole con le tacche di una carica, piene fino
+   al livello; sotto, la frase del livello su cui si passa (o di quello scelto). */
+.dash-autonomia-scelta { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
+.dash-autonomia-livelli { display: flex; flex-wrap: wrap; gap: 8px; }
+.dash-autonomia-livello {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 32px;
-  padding: 0 10px 0 12px;
-  border: none;
+  padding: 6px 13px 6px 11px;
+  border: 1px solid var(--dash-line-strong);
   border-radius: 999px;
   background: transparent;
-  color: var(--dash-ink-mute);
+  color: var(--dash-ink);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.dash-autonomia:hover, .dash-autonomia:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
+.dash-autonomia-livello:hover, .dash-autonomia-livello:focus-visible { background: var(--dash-line); border-color: var(--dash-ink-mute); outline: none; }
+.dash-autonomia-livello.scelto { border-color: var(--dash-ink); background: var(--dash-ink); color: var(--dash-paper); }
+.dash-autonomia-livello.scelto:hover, .dash-autonomia-livello.scelto:focus-visible { opacity: 0.88; }
+.dash-autonomia-livello.scelto .dash-autonomia-tacca:not(.piena) { background: var(--dash-paper); opacity: 0.35; }
+/* Frase e misure nella stessa cella: l'altezza è quella della frase più lunga, e il cursore non sposta niente. */
+.dash-autonomia-frase-posto { display: grid; font-size: 12.5px; line-height: 1.45; color: var(--dash-ink-soft); }
+.dash-autonomia-frase-posto > * { grid-area: 1 / 1; }
+.dash-autonomia-frase-misura { visibility: hidden; pointer-events: none; }
+.dash-autonomia-frase { min-height: 1.45em; }
 .dash-autonomia-tacche { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
 .dash-autonomia-tacca { width: 3px; border-radius: 1px; background: var(--dash-line-strong); }
 .dash-autonomia-tacca:nth-child(1) { height: 5px; }

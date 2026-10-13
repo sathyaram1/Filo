@@ -2,8 +2,8 @@
 #
 # COSA FA
 #   Ogni sei ore (cron) il job `scegli` prende il commit PIU' NUOVO di `main`
-#   la cui suite Playwright completa e' verde (la suite gira a ogni fusione, in
-#   suite.yml). Se e' piu' nuovo dell'ultima release: CHIEDE AL SERVER il
+#   la cui suite e' verde (Playwright su Linux e unit su Windows, a ogni fusione,
+#   in suite.yml). Se e' piu' nuovo dell'ultima release: CHIEDE AL SERVER il
 #   numero della versione nuova, builda ESATTAMENTE quel commit (installer NSIS
 #   per Windows, poi Mac e Linux) e lo pubblica come nuova GitHub Release.
 #   L'auto-update dentro Filo (electron-updater) la vede e aggiorna i tester.
@@ -23,9 +23,17 @@
 #   server, non qui.
 #
 # AUTENTICAZIONE
-#   · GITHUB_TOKEN effimero di Actions: crea e pubblica la Release. Le
-#     "Workflow permissions" del repo devono essere su "Read and write"
-#     (Settings -> Actions -> General).
+#   · I segreti stanno nell'ambiente `rilascio`, aperto al solo `main`: ogni
+#     job che ne legge uno lo dichiara, cosi' un workflow spinto su un ramo
+#     non li vede (#1073, tests/unit/catenaPubblicazione.test.mjs).
+#   · GITHUB_TOKEN effimero di Actions: crea la bozza e allega i file. I
+#     permessi li dichiara questo file: le impostazioni del repo possono
+#     restare su sola lettura.
+#   · L'app di pubblicazione, se `vars.FILO_RILASCIO_APP_ID` c'e': rende
+#     pubblica la bozza, il passo che crea il tag v*, e la regola su TUTTI i
+#     tag lascia passare solo lei: il download del sito prende la release piu'
+#     recente qualunque tag abbia (l'app rifiuta un tag che non sia
+#     v<versione>, il sito no). Senza variabile resta il GITHUB_TOKEN.
 #   · FILO_BUILD_PASSPHRASE: la parola d'ordine di scopo `build`, la stessa che
 #     apre le chiavi di default e l'allarme. Apre SOLO quelle tre cose, e
 #     l'aumento di versione non accetta da qui nessun numero e nessun
@@ -83,6 +91,7 @@ jobs:
     # codice e' quello di un tag, gia' provato.
     if: ${{ !inputs.ripubblica_mac && !inputs.ripubblica_linux }}
     runs-on: ubuntu-latest
+    environment: rilascio
     permissions:
       contents: read
       actions: read
@@ -113,6 +122,7 @@ jobs:
     # `success()` per esteso: con `scegli` rosso qui non si parte.
     if: ${{ success() && needs.scegli.outputs.sha != '' }}
     runs-on: windows-latest
+    environment: rilascio
     outputs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.bump.outputs.version }}
@@ -180,8 +190,7 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          set -o pipefail
-          npm run test:unit 2>&1 | tee unit.log
+          node scripts/unit-con-riprova.mjs --registro unit.log
           echo "unit_ok=1" >> "$GITHUB_OUTPUT"
 
       # Rosso = NON si pubblica, e il guasto diventa un feedback in coda: al
@@ -195,7 +204,28 @@ jobs:
         shell: bash
         run: |
           echo "::error::Controlli automatici rossi: pubblicazione annullata."
-          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti sul ramo principale: la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. Capisci quale modifica li ha rotti e sistemala; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
+          # Il commit provato e' l'ultimo di main con la suite verde, a volte giorni indietro: se ogni rosso e' gia' verde
+          # sulla punta, il feedback chiederebbe un lavoro fatto e si riaprirebbe a ogni chiusura (#1185). Nel dubbio si apre.
+          PROVATO=$(git rev-parse --short HEAD)
+          GIA_VERDI=""
+          # La copia della punta sta dentro il repo: i suoi test trovano node_modules risalendo.
+          if git fetch --quiet origin main && [ "$(git rev-parse FETCH_HEAD)" != "$(git rev-parse HEAD)" ] \
+            && git worktree add --quiet --detach .punta-main FETCH_HEAD; then
+            PUNTA=$(git rev-parse --short FETCH_HEAD)
+            if GIA_VERDI=$(node .punta-main/scripts/rossi-sulla-punta.mjs unit.log); then
+              git worktree remove --force .punta-main || true
+              echo "::warning::I rossi del commit provato ${PROVATO} sono gia' verdi sulla punta di main (${PUNTA}): nessun feedback. La versione esce col primo commit di main con la suite verde."
+              { echo "## Rossi gia' corretti su main"; echo; echo "Rossi su ${PROVATO}, verdi sulla punta ${PUNTA}:"; printf -- '- %s\n' $GIA_VERDI; } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            git worktree remove --force .punta-main || true
+          fi
+          SULLA_PUNTA=""
+          if [ -n "$GIA_VERDI" ]; then
+            SULLA_PUNTA="
+          Gia' verdi sulla punta di main, da non correggere: $(echo $GIA_VERDI)"
+          fi
+          PREMESSA="Il cancello prima della pubblicazione ha trovato dei controlli automatici falliti su Windows sul commit ${PROVATO} (il piu nuovo di main con la suite verde, non la punta di main): la nuova versione NON e stata pubblicata e gli utenti restano sull ultima buona. La suite di quel commit aveva gia passato gli stessi test su Windows: se ora sono rossi, di norma il test dipende dai tempi o dalla macchina. Capisci perche e sistemalo; se invece il controllo e diventato obsoleto rispetto a come funziona oggi l app, aggiorna il controllo. Coda dell ultima esecuzione:"
           # I test rossi stanno all'INIZIO del log (una riga «not ok» per
           # ciascuno), la coda porta solo il riepilogo: prima si elencano
           # quelli, poi la coda. Un allarme con la sola coda non diceva quali
@@ -217,6 +247,8 @@ jobs:
           fi
           TAIL=$(tail -c 2500 unit.log 2>/dev/null || echo "(nessun output)")
           TESTO="${PREMESSA}
+
+          Commit provato: ${PROVATO}, l'ultimo di main con la suite verde.${SULLA_PUNTA}
 
           Test rossi:
           ${ROSSI:-(nessuna riga not ok: guarda la coda)}
@@ -258,6 +290,19 @@ jobs:
           # utenti. Se il server la restituisce gia', questo secret non serve.
           FILO_DEFAULT_SAFEBROWSING_KEY: ${{ secrets.FILO_DEFAULT_SAFEBROWSING_KEY }}
         run: node scripts/bake-default-config.mjs
+
+      # Prima del numero, come i cancelli: un'app configurata male ferma il giro
+      # senza consumare una versione. Il token vale un'ora, e la build parte
+      # subito dopo. Mac e Linux allegano a una release che c'e' gia', senza
+      # creare tag: a loro basta il GITHUB_TOKEN.
+      - name: Token dell'app di pubblicazione (se configurata)
+        id: app
+        if: steps.check.outputs.should_release == 'true' && vars.FILO_RILASCIO_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.FILO_RILASCIO_APP_ID }}
+          private-key: ${{ secrets.FILO_RILASCIO_APP_KEY }}
+          permission-contents: write
 
       # ─── IL NUMERO DI VERSIONE LO SCRIVE IL SERVER ───────────────────────
       # Prima qui si faceva `npm version patch` + `git push origin HEAD:main`.
@@ -320,7 +365,7 @@ jobs:
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
         run: npm run release
 
@@ -331,7 +376,7 @@ jobs:
       - name: I file per Windows sono davvero nella bozza?
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -eo pipefail
@@ -360,7 +405,7 @@ jobs:
         # l'URL .../releases/latest/download/Filo-Setup.exe punti a questa.
         if: steps.check.outputs.should_release == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         shell: bash
         # --target: il tag nasce sul commit costruito, non sulla punta di main
         # al momento della pubblicazione (il confronto "c'e' qualcosa di nuovo"
@@ -405,6 +450,7 @@ jobs:
     # verrebbe saltato con lui.
     if: ${{ !cancelled() && (inputs.ripubblica_mac || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: macos-latest
+    environment: rilascio
     continue-on-error: true
     outputs:
       allarme: ${{ steps.allarme.outputs.esito }}
@@ -642,6 +688,7 @@ jobs:
     # verrebbe saltato con lui.
     if: ${{ !cancelled() && (inputs.ripubblica_linux || (needs.release.result == 'success' && needs.release.outputs.should_release == 'true' && needs.release.outputs.version != '')) }}
     runs-on: ubuntu-latest
+    environment: rilascio
     continue-on-error: true
     outputs:
       allarme: ${{ steps.allarme.outputs.esito }}

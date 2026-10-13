@@ -792,6 +792,12 @@
       // esposti alle pagine — vedi SECURITY.md §3).
       const r = await sendToMain({ type: 'feedback_update', id, ...payload });
       if (!r || r.ok === false) throw new Error(r?.error || 'aggiornamento rifiutato');
+      // Il sì come lavoro locale, dato leggendo il testo, è anche fiducia (#1148, come nella gemella): la scrive il server.
+      if (payload.localApproval === true && item.fiducia !== 'fidato') {
+        const f = await sendToMain({ type: (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna', feedbackId: id }).catch((err) => ({ ok: false, error: err?.message }));
+        if (f && f.ok) item.fiducia = 'fidato';
+        else alert(`Nei Lavori locali, ma non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}. Alla fusione ti chiederà il via libera.`);
+      }
       return true;
     } catch (e) {
       Object.assign(item, prev);

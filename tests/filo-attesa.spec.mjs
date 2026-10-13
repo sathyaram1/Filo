@@ -33,16 +33,6 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
-// L'accoglienza di un profilo nuovo, a metà, ridisegna la conversazione quando la home si ricarica: qui serve chiusa.
-async function senzaAccoglienza(app, page) {
-  await app.evaluate(async () => {
-    const M = globalThis.SN_FILO_MEMORY;
-    await M.setOnboarding(globalThis.SN_ONBOARDING.close(await M.getOnboarding()));
-  });
-  await page.reload();
-  await expect(page.locator('#input')).toBeVisible();
-}
-
 async function configureModel(app) {
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
@@ -56,7 +46,8 @@ async function configureModel(app) {
 }
 
 // Un modello finto a copione. Ogni passo: { pensa: [pezzi], ogni: ms, strumenti: [{id,name,arguments}],
-// dopoStrumenti: ms, testo, sordo }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti e gli stop.
+// dopoStrumenti: ms, finoAlFermo, testo, sordo }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti
+// e gli stop. `finoAlFermo`: la chiamata degli strumenti resta a metà finché lo stop non la interrompe.
 async function copione(app, passi) {
   await app.evaluate(async (_, passiJson) => {
     const passi = JSON.parse(passiJson);
@@ -83,7 +74,7 @@ async function copione(app, passi) {
       }
       if (p.strumenti && p.strumenti.length) {
         for (const s of p.strumenti) { try { onToolCall && onToolCall({ id: s.id, name: s.name }); } catch (_) {} }
-        await aspetta(p.dopoStrumenti || 200);
+        await aspetta(p.finoAlFermo ? 2 ** 31 - 1 : (p.dopoStrumenti || 200));
         return { ...base, text: '', toolCalls: p.strumenti, finishReason: 'tool_calls' };
       }
       const testo = p.testo || 'Fatto.';
@@ -114,7 +105,6 @@ test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitol
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await copione(app, [
     {
       pensa: PENSIERO_1, ogni: 450, dopoStrumenti: 1200,
@@ -215,7 +205,6 @@ test('A2 — tema scuro: il filo e il gomitolo restano nel colore d\'accento', a
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await impostazioni(app, { theme: 'dark' });
   await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
   await copione(app, [
@@ -241,7 +230,6 @@ test('B — un passo che non riesce: il cappio si stringe e si riapre, il puntin
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await copione(app, [
     { pensa: ['Leggo il documento. '], ogni: 300, strumenti: [{ id: 'b1', name: 'LEGGI_DOCUMENTO', arguments: '{"percorso":"~/non-esiste-davvero-578.pdf"}' }] },
     { pensa: ['Non c\'è. '], ogni: 300, testo: 'Quel documento non c\'è.' },
@@ -267,7 +255,6 @@ test('C — il quadrato ferma subito: filo tagliato, ragionamento a metà aperto
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await copione(app, [
     { pensa: ['Cerco di capire cosa intende. ', 'Forse vuole un elenco lunghissimo, ', 'ci vorrà parecchio. ', 'Continuo a pensare. ', 'Ancora. ', 'Ancora un po\'. '], ogni: 900, testo: 'Non dovresti leggermi.' },
   ]);
@@ -323,7 +310,6 @@ test('D — riprendere non riesegue le azioni già fatte, e il modello sa che er
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await copione(app, [
     { pensa: ['Avvio il timer. '], ogni: 200, strumenti: [{ id: 'd1', name: 'TIMER', arguments: '{"secondi":120,"etichetta":"Tè"}' }] },
     { pensa: ['Ora penso a lungo a cosa dire. ', 'Molto a lungo. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' },
@@ -365,7 +351,6 @@ test('E — Invio ferma come il quadrato, e un\'azione nominata dopo lo stop non
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   // Il modello finto non ascolta lo stop: la sua chiamata finisce lo stesso e chiede un timer. Non deve partire.
   await copione(app, [
     { pensa: ['Metto un timer. '], ogni: 200, strumenti: [{ id: 'e1', name: 'TIMER', arguments: '{"secondi":60,"etichetta":"Mai"}' }], dopoStrumenti: 2500, sordo: true },
@@ -386,7 +371,6 @@ test('F — l\'opacità della trama è un token estetico che arriva fino alla ch
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await impostazioni(app, { themeTokens: { 'filo.trama.opacity': '0.25' } });
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dash-trama-opacity').trim()), { timeout: 5_000 })
     .toBe('0.25');
@@ -406,7 +390,6 @@ test('G — il tasto destro sul blocco che lavora offre «Ferma», poi «Riprend
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await copione(app, [
     { pensa: ['Ci penso a lungo. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' },
     { pensa: ['Riprendo. '], ogni: 200, testo: 'Eccomi di nuovo.' },
@@ -434,7 +417,6 @@ test('H — con meno movimento il filo non ondeggia e il gomitolo compare già f
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await copione(app, [{ pensa: ['Ci penso con calma. ', 'Ancora un momento. ', 'Quasi. ', 'Ecco. '], ogni: 700, testo: 'Calmo.' }]);
   await page.locator('#input').fill('ciao');
@@ -458,7 +440,6 @@ test('I — chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) ferma e 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   const lungo = { pensa: ['Penso a lungo. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' };
   await copione(app, [lungo, lungo, lungo, { pensa: ['Riprendo. '], ogni: 200, testo: 'Ripreso apposta.' }]);
   const trama = page.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama');
@@ -515,7 +496,6 @@ test('J — un gomitolo grosso lascia al riassunto la stessa aria di uno piccolo
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const aria = (blocco) => blocco.evaluate((b) => {
     const filo = b.querySelector('.dash-activity-filo-tratto').getBoundingClientRect();
@@ -562,7 +542,6 @@ test('K — fermato mentre Filo prepara ancora la richiesta: niente parte, e lo 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
   // Prima del modello si leggono saldo, batteria e rete: su una macchina vera anche mezzo secondo. Qui 800 ms.
   await app.evaluate(() => {
     const S = globalThis.SN_SISTEMA_MAIN;
@@ -588,16 +567,29 @@ test('K — fermato mentre Filo prepara ancora la richiesta: niente parte, e lo 
   await ripristina(app);
 });
 
-// Una ricerca sul web lenta (una rete che tarda): conta le chiamate.
-async function ricercaLenta(app, ms) {
+// Una ricerca sul web lenta (una rete che tarda): conta le chiamate partite e finite. Senza durata resta in volo finché
+// la prova non la lascia andare: un «ancora in volo» misurato a orologio diventa rosso su una macchina carica (#814.6).
+async function ricercaLenta(app, ms = null) {
   await app.evaluate((_, durata) => {
     globalThis.__ricerche = 0;
+    globalThis.__ricercheFinite = 0;
+    const trattenuta = durata == null ? new Promise((ok) => { globalThis.__lasciaRicerca = ok; }) : null;
     globalThis.SN_WEB_SEARCH = { search: async () => {
       globalThis.__ricerche += 1;
-      await new Promise((r) => setTimeout(r, durata));
+      await (trattenuta || new Promise((r) => setTimeout(r, durata)));
+      globalThis.__ricercheFinite += 1;
       return { results: [{ title: 'Orari', url: 'https://example.com/orari', content: 'treni' }], provider: 'finto' };
     } };
   }, ms);
+}
+async function lasciaLaRicerca(app) {
+  await app.evaluate(() => globalThis.__lasciaRicerca());
+}
+
+// «In volo» si aspetta, non si presume: il titolo «Cerco sul web» compare quando il modello chiama lo strumento, prima
+// che la sua risposta finisca; un fermo in quel momento ferma il modello e la ricerca non parte affatto.
+async function ricercaPartita(app) {
+  await expect.poll(() => app.evaluate(() => globalThis.__ricerche), { timeout: 5_000 }).toBe(1);
 }
 
 test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il seguito parte sapendo cosa è stato fatto', async ({ app, shell }) => {
@@ -605,8 +597,7 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
-  await ricercaLenta(app, 5_000);
+  await ricercaLenta(app);
   await copione(app, [
     { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'l1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['Il tempo: rispondo. '], ogni: 100, testo: 'Oggi sole.' },
@@ -615,18 +606,22 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity');
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
-  await page.waitForTimeout(500);
+  await ricercaPartita(app);
   await page.locator('#stopBtn').click();
-  await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
-  // La chat è di nuovo dell'utente subito, non a ricerca finita.
-  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 1_000 });
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  // La chat è di nuovo dell'utente con la ricerca ancora in volo, non a ricerca finita: la ricerca è trattenuta, quindi
+  // «prima della fine» lo garantisce lei e non serve un tetto di un secondo, che su una macchina carica scade.
+  await expect(blocco).toHaveAttribute('data-fermato', '1');
+  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.');
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#input').fill('lascia stare, che tempo fa?');
   await page.locator('#input').press('Enter');
-  await expect(page.locator('.dash-bubble-user')).toHaveCount(2, { timeout: 1_000 });
-  // Il seguito sta sotto la riga del fermo, e la risposta arriva dopo che la ricerca in volo è finita e raccontata.
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(2);
+  // Il seguito sta sotto la riga del fermo, e il modello parte solo dopo che la ricerca in volo è finita e raccontata.
   const ordine = await page.evaluate(() => [...document.querySelectorAll('.dash-bubble-fermato, .dash-bubble-user')].map((e) => (e.classList.contains('dash-bubble-user') ? 'utente' : 'fermo')));
   expect(ordine).toEqual(['utente', 'fermo', 'utente']);
+  await page.waitForTimeout(500);
+  expect(await app.evaluate(() => [globalThis.__ricercheFinite, globalThis.__messaggi.length])).toEqual([0, 1]);
+  await lasciaLaRicerca(app);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Oggi sole.' })).toBeVisible({ timeout: 10_000 });
   await expect(blocco.first().locator('.dash-activity-seg-head').first()).toHaveText(/Cercato sul web/);
   await expect(blocco.first().locator('.dash-activity-label')).toHaveText(/^Fermato · /);
@@ -644,8 +639,7 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await senzaAccoglienza(app, page);
-  await ricercaLenta(app, 4_000);
+  await ricercaLenta(app);
   await copione(app, [
     { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'm1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['La ricerca c\'è già. '], ogni: 100, testo: 'Ecco gli orari.' },
@@ -653,9 +647,15 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await page.locator('#input').fill('orari treni');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
+  await ricercaPartita(app);
   await page.locator('#stopBtn').click();
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#sendBtn').click();
+  // Premuto con la ricerca ancora in volo: la ripresa la aspetta invece di rifarla o di partire senza saperne l'esito.
+  await expect(page.locator('#sendBtn')).toBeHidden();
+  await page.waitForTimeout(500);
+  expect(await app.evaluate(() => [globalThis.__ricercheFinite, globalThis.__messaggi.length])).toEqual([0, 1]);
+  await lasciaLaRicerca(app);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco gli orari.' })).toBeVisible({ timeout: 10_000 });
   expect(await app.evaluate(() => globalThis.__ricerche)).toBe(1);
   expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(2);
@@ -665,46 +665,84 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await ripristina(app);
 });
 
-test('M — accoglienza fermata: una scheda nuova o la pagina ricaricata non rifà il turno, e «riprendi» c\'è anche lì', async ({ app, shell }) => {
-  test.setTimeout(90_000);
+// L'altro lato di L2 (#814.2): il modello scrive ancora la chiamata, trattenuta fino al fermo (non a orologio), che la
+// annulla; «riprendi» lascia il modello libero di cercare: la ricerca si fa una volta, dopo, e non risulta fatta prima.
+test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «riprendi» la fa, una volta', async ({ app, shell }) => {
+  test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  await ricercaLenta(app, 300);
   await copione(app, [
-    { pensa: ['Penso a lungo a come presentarmi. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' },
-    { pensa: ['Riprendo. '], ogni: 200, testo: 'Piacere Luca, ripreso apposta.' },
+    { pensa: ['Cerco gli orari. '], ogni: 100, finoAlFermo: true, strumenti: [{ id: 'n1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
+    { pensa: ['Riprendo: cerco. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'n2', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
+    { pensa: ['Ho gli orari. '], ogni: 100, testo: 'Ecco gli orari.' },
   ]);
-  // Profilo nuovo: la prima conversazione è l'accoglienza.
-  await page.reload();
-  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
-  await expect(page.locator('#input')).toBeVisible();
-  await page.locator('#input').fill('mi chiamo Luca');
-  await page.locator('#input').press('Enter');
-  await expect(page.locator('.dash-activity-trama').last()).toContainText('lungo', { timeout: 6_000 });
-  await page.locator('#stopBtn').click();
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 3_000 });
-
-  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
-  await expect.poll(() => app.windows().filter((w) => w.url().startsWith('filo://newtab')).length, { timeout: 10_000 }).toBe(2);
-  const nuova = app.windows().find((w) => w.url().startsWith('filo://newtab') && w !== page);
-  await expect(nuova.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 8_000 });
-  await expect(nuova.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
-  await page.waitForTimeout(2_000);
-  expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(1);
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
-
-  await page.reload();
-  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 15_000 });
-  await page.waitForTimeout(1_500);
-  expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(1);
-  // Riprendere resta la scelta dell'utente, e funziona anche dopo il ricaricamento.
-  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+  await page.locator('#input').fill('orari treni');
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'ripreso apposta' })).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
-  expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(2);
-  // L'altra scheda si riallinea: la risposta c'è, e il tasto non offre più di riprendere.
-  await expect(nuova.locator('.dash-bubble-filo', { hasText: 'ripreso apposta' })).toBeVisible({ timeout: 8_000 });
-  await expect(nuova.locator('#sendBtn')).toHaveAttribute('aria-label', 'Invia');
+  const blocco = page.locator('.dash-activity').first();
+  await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
+  await page.locator('#stopBtn').click();
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+  // Lo schermo non dice più che sta cercando, e la ricerca non parte nemmeno in ritardo.
+  await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText('Fermato qui');
+  await page.waitForTimeout(500);
+  expect(await app.evaluate(() => globalThis.__ricerche)).toBe(0);
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco gli orari.' })).toBeVisible({ timeout: 10_000 });
+  expect(await app.evaluate(() => globalThis.__ricerche)).toBe(1);
+  await expect(page.locator('.dash-activity-seg-head', { hasText: 'Cercato sul web' })).toHaveCount(1);
+  const ripresa = await app.evaluate(() => globalThis.__messaggi[1]);
+  const testo = ripresa.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+  expect(testo).toContain('riprendere il lavoro da dove ti eri fermato');
+  expect(testo).not.toContain('ERANO GIÀ STATE FATTE');
   await ripristina(app);
+});
+
+test.describe(() => {
+  test.use({ accoglienzaFatta: false });
+
+  test('M — accoglienza fermata: una scheda nuova o la pagina ricaricata non rifà il turno, e «riprendi» c\'è anche lì', async ({ app, shell }) => {
+    test.setTimeout(90_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtabPage(app);
+    await configureModel(app);
+    await copione(app, [
+      { pensa: ['Penso a lungo a come presentarmi. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' },
+      { pensa: ['Riprendo. '], ogni: 200, testo: 'Piacere Luca, ripreso apposta.' },
+    ]);
+    // Profilo nuovo: la prima conversazione è l'accoglienza.
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+    await expect(page.locator('#input')).toBeVisible();
+    await page.locator('#input').fill('mi chiamo Luca');
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('.dash-activity-trama').last()).toContainText('lungo', { timeout: 6_000 });
+    await page.locator('#stopBtn').click();
+    await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 3_000 });
+
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+    await expect.poll(() => app.windows().filter((w) => w.url().startsWith('filo://newtab')).length, { timeout: 10_000 }).toBe(2);
+    const nuova = app.windows().find((w) => w.url().startsWith('filo://newtab') && w !== page);
+    await expect(nuova.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 8_000 });
+    await expect(nuova.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+    await page.waitForTimeout(2_000);
+    expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(1);
+    await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+
+    await page.reload();
+    await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 15_000 });
+    await page.waitForTimeout(1_500);
+    expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(1);
+    // Riprendere resta la scelta dell'utente, e funziona anche dopo il ricaricamento.
+    await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'ripreso apposta' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
+    expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(2);
+    // L'altra scheda si riallinea: la risposta c'è, e il tasto non offre più di riprendere.
+    await expect(nuova.locator('.dash-bubble-filo', { hasText: 'ripreso apposta' })).toBeVisible({ timeout: 8_000 });
+    await expect(nuova.locator('#sendBtn')).toHaveAttribute('aria-label', 'Invia');
+    await ripristina(app);
+  });
 });

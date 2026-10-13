@@ -11,9 +11,14 @@
   const sino = (si, no) => (v) => (v ? si : no);
   const ATTIVO = sino('attivo', 'spento');
   const ATTIVA = sino('attiva', 'spenta');
-  const numero = (v) => String(Number(v)).replace('.', ',');
+  // I decimali restano quelli che il valore ha davvero; la parte intera prende il punto delle migliaia (1.500 ms).
+  const intero = (n) => n.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
+  const numero = (v) => {
+    const [i, d] = String(Number(v)).split('.');
+    return /^-?\d+$/.test(i) ? `${intero(Number(i))}${d ? `,${d}` : ''}` : String(Number(v)).replace('.', ',');
+  };
   const percento = (v) => `${Math.round(Number(v) * 100)}%`;
-  const millisecondi = (v) => `${Math.round(Number(v))} ms`;
+  const millisecondi = (v) => `${intero(Math.round(Number(v)))} ms`;
 
   function etichettaColoreTab(k) {
     const meta = global.SN_TAB_COLOR && Array.isArray(global.SN_TAB_COLOR.IDENTITY_PARAM_META)
@@ -57,6 +62,16 @@
     'dictation.autoSend': { nome: 'invio di quello che detti nelle chat', valore: sino('da solo', 'a mano, dopo averlo corretto'), livello: 1 },
     'dictation.silenceSec': { nome: 'pausa che chiude il microfono delle chat', valore: (v) => `${numero(v)} s`, livello: 1 },
     'dictation.cancelSec': { nome: 'tempo per annullare l\'invio vocale', valore: (v) => `${numero(v)} s`, livello: 1 },
+    'contestoFilo.giorni': {
+      nome: 'giorni di conversazioni che la chat ricorda',
+      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${numero(v)} ${Number(v) === 1 ? 'giorno' : 'giorni'}`),
+      livello: 2,
+    },
+    'contestoFilo.token': {
+      nome: 'tetto in token di quello che la chat ricorda',
+      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      livello: 2,
+    },
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
     'autoArchive.onIdle': { nome: 'archiviazione quando Filo è inattivo', valore: ATTIVA, livello: 1 },
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },
@@ -81,7 +96,11 @@
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
     'modelRegistry.*': { nome: (k) => `modello «${k}»`, valore: (v) => (v && v.model ? v.model : 'non c\'è'), livello: 2 },
-    monthlyLimitEur: { nome: 'limite di spesa mensile', valore: (v) => `${numero(v)} €`, livello: 2 },
+    monthlyLimitEur: {
+      nome: 'limite di spesa mensile',
+      valore: (v) => `${Number(v).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(Number(v)) ? 0 : 2, maximumFractionDigits: 2 })} €`,
+      livello: 2,
+    },
     'security.protectIpLeak': { nome: 'protezione dell\'IP locale (WebRTC)', valore: ATTIVA, livello: 2 },
     'security.blockPopups': { nome: 'blocco dei popup non richiesti', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.enabled': { nome: 'avviso sui siti pericolosi', valore: ATTIVO, livello: 2 },
@@ -94,6 +113,7 @@
     'security.cookies.bannerSites': { nome: 'siti dove vedi i banner dei cookie', elenco: true, livello: 2 },
     'security.cookies.loggedSites': { nome: 'siti dove sei entrato', elenco: true, livello: 2 },
     'security.cookies.embedSites': { nome: 'contenuti incorporati con i cookie riattivati', elenco: true, livello: 2 },
+    'security.riquadriRotti.modello': { nome: 'riconoscimento con un modello dei contenuti incorporati rotti', valore: ATTIVO, livello: 1 },
     'security.fingerprint.mode': { nome: 'protezione dal fingerprinting', valori: { off: 'spenta', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.adblock.enabled': { nome: 'blocco di pubblicità e tracker', valore: ATTIVO, livello: 2 },
     'security.adSkip.enabled': { nome: 'salta le pubblicità dei video', valore: ATTIVO, livello: 1 },

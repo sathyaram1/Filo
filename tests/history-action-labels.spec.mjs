@@ -5,6 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback #272: nella pagina Cronologia AI alcune azioni (descrivi immagine,
 // trascrizione vocale/OCR, modifica testo, spiega link) comparivano col loro
@@ -57,7 +58,7 @@ test('history page shows readable labels and filter options for all action types
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
     const page = await findTabPage(app, 'history');

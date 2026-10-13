@@ -35,7 +35,7 @@
     // APPLICA dopo la conferma dell'utente. Come EXPORT_DATA sono riservati
     // all'origine filo://: una pagina web non deve poter aprire un file dialog
     // né riscrivere lo storage (comprese le chiavi API).
-    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, token }
+    IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
     IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
@@ -200,10 +200,11 @@
     //   è su questo computer: il server ne emette un'altra (la vecchia si
     //   spegne, il saldo resta). { } → { ok, status, message, state? }
     WALLET_REISSUE: 'wallet_reissue',
-    // WALLET_RESET_IDENTITY: l'identità dell'installazione è stata annullata
-    //   sul server (il portafoglio legato a essa non si raggiunge più):
-    //   l'utente sceglie di ricominciare con un'identità nuova e un nuovo
-    //   invito. { } → { ok, state }
+    // WALLET_RESET_IDENTITY: l'identità dell'installazione è annullata sul
+    //   server o illeggibile qui (il portafoglio legato a essa non si
+    //   raggiunge): l'utente sceglie di ricominciare con un'identità nuova e
+    //   un nuovo invito. I file di prima restano accanto.
+    //   { confermato: true } → { ok, state } | { ok:false, status:'needs_confirm'|'identity_ok'|'not_reachable' }
     WALLET_RESET_IDENTITY: 'wallet_reset_identity',
     // WALLET_OWN_KEY_INFO (#629): spesa e residuo che OpenRouter dichiara per
     //   la chiave OpenRouter scritta dall'utente (la pagina Crediti li mostra;
@@ -344,6 +345,24 @@
     DOCUMENTI_STATO: 'documenti_stato',
     // {} → { ok, percorso } | { ok:false } (annullata)
     DOCUMENTI_SCEGLI_CARTELLA: 'documenti_scegli_cartella',
+    // #947.3 — toglie dall'indice una cartella cercata per l'occasione (Preferenze). Solo da Filo.
+    // { percorso } → { ok, tolta, documenti }
+    DOCUMENTI_DIMENTICA: 'documenti_dimentica',
+    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto vive nella pagina: su un sito
+    // la ricerca parte solo dopo il sì nella vista di Filo sopra la scheda (confermeSopraPagina), e alla pagina tornano
+    // nomi, cartelle dette coi nomi di Filo e chiavi a caso, mai percorsi. Le chiavi valgono solo per la scheda che ha
+    // cercato. Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
+    // { cosa, cartella? } → { ok, cercato, candidati: [{ n, nome, dove, tipo, data, chiave }], indice, fermata } | { ok:false, annullata }
+    AIUTO_CERCA_DOCUMENTI: 'aiuto_cerca_documenti',
+    // {} → { ok }: ferma la lettura dei documenti nuovi; la ricerca risponde con quelli già letti.
+    AIUTO_DOCUMENTI_FERMA: 'aiuto_documenti_ferma',
+    // main → la pagina che cerca: { fatti, totali } mentre l'indice legge i documenti nuovi (niente nomi).
+    AIUTO_DOCUMENTI_AVANZAMENTO: 'aiuto_documenti_avanzamento',
+    // { chiave } → { ok } | { ok:false, frase }: apre il documento, lo mostra nella cartella, o ne avvia il trascinamento
+    // vero (un file che la pagina riceve al rilascio, come da una cartella).
+    AIUTO_APRI_FILE: 'aiuto_apri_file',
+    AIUTO_MOSTRA_FILE: 'aiuto_mostra_file',
+    AIUTO_TRASCINA_FILE: 'aiuto_trascina_file',
     // Segnale BROADCAST main→superfici: "la cronologia scaricamenti è cambiata"
     // (parte/avanza/finisce un download). VOLUTAMENTE contentless (nessun nome
     // file né percorso): la pagina filo://downloads lo riceve e ri-legge la
@@ -354,6 +373,9 @@
     // Test provider: misura latenza al primo token e token al secondo
     // su un piccolo prompt fisso. Usato dalla pagina Opzioni.
     TEST_PROVIDER: 'test_provider',                 // { provider, apiKey, model? }
+    // Voce o dettatura partirebbero col modello scelto? (#1141) { action, nickname } da chiunque (la scelta di
+    // «Detta» vive nei siti); { action, provider, model } solo da filo://. → { verdict, hosts?, warning? }
+    AUDIO_HOST_CHECK: 'audio_host_check',
     // Test di un modello del registry PREDEFINITO con le chiavi predefinite.
     // { nickname } → risolve nel registry predefinito (lista read-only Opzioni);
     // { provider, model } → testa la riga così com'è scritta, anche non ancora
@@ -493,6 +515,7 @@
     SHOW_TOAST: 'show_toast',                      // { text, duration? }
     // F4 — Annulla un auto-feedback appena inviato (undo dal toast). Marca il
     // feedback come `ignored` così non compare nel triage. { id } → { ok }
+    // Solo da una superficie di Filo, e solo per un id che questo Filo ha appena mandato (#784.3).
     CANCEL_AUTO_FEEDBACK: 'cancel_auto_feedback', // { id }
     // Entra/esce dalla "modalità annotazione" del box feedback: il box vive in
     // un content script sulla pagina (WebContentsView) e da lì non può oscurare
@@ -516,7 +539,7 @@
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
-    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, mergePreapproved?: bool, localOnly?: bool, localApproval?: true, senderProof?: 'admin' }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, localOnly?: bool, localApproval?: true }
     // #583 — LETTURA dei feedback per le superfici dell'owner. La collezione
     // non è più pubblica: leggono solo l'admin e il server. L'ID token vive nel
     // main e non deve arrivare in una pagina, quindi la pagina CHIEDE la
@@ -580,6 +603,11 @@
     // Tutto letto anche dal backend filo-security (DD3).
     SUPPORT_MODELS_GET: 'support_models_get',      // → { ok, models } | { ok:false, error }
     SUPPORT_MODELS_UPDATE: 'support_models_update',// { models, judgeRegistry?, openrouterKey? } → { ok, models } | { ok:false, error }
+    // Il classificatore della ricerca fra i feedback (#1118), riservato a chi li gestisce. Il giro gira nel main:
+    // { op:'start', query, candidates:[{id,title,text}] } → { ok, jobId, total } | { ok:false, code, error };
+    // { op:'status', jobId } → { ok, done, total, hits:[{id,p}], finished, skipped, error, code };
+    // { op:'stop', jobId } → { ok }.
+    MANAGE_SEARCH_CLASSIFY: 'manage_search_classify',
     // Ri-valutazione owner dei feedback "non filtrati" (panel parziale): la
     // dashboard passa gli id dei feedback bianchi; il backend ri-esegue SOLO i
     // giudici mancanti e riscrive il pipeline. Owner-only.
@@ -614,6 +642,13 @@
     // Le legge il SERVER quando accende le sessioni. Owner-only.
     AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff } | { ok:false, error }
     AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff? } → come sopra | { ok:false, error }
+    // Modello e sforzo del worker per fase (doc config/routines, campo
+    // `roleModels` = { ruolo: { model?, effort? } }; regole in
+    // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore
+    // vuoto = vale la definizione dell'agente. Le legge il SERVER quando
+    // consegna un biglietto. Owner-only.
+    AUTOMATION_ROLE_MODELS_GET: 'automation_role_models_get', // → { ok, roleModels } | { ok:false, error }
+    AUTOMATION_ROLE_MODELS_SET: 'automation_role_models_set', // { ruolo, campo, valore } → { ok, letto, scritto, roleModels? } | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
@@ -648,6 +683,17 @@
     // `clear` toglie il segno solo con la frase della conferma, che la pagina manda dopo il sì dell'owner.
     // Solo pagine `filo://`, solo il proprietario.
     FEEDBACK_SENDER_FLAG: 'feedback_sender_flag', // { feedbackId, action:'read'|'clear', conferma? } → { ok, flagged, reason, flaggedAt, clearedAt } | { ok:false, error }
+    // Le domande all'owner (#1149, SPEC-DOMANDE.md §3), dalla callable ownerDomande: le azioni le applica il server,
+    // che decide anche chi ha scritto ogni turno. Solo pagine `filo://`, solo il proprietario.
+    DOMANDE_ELENCO: 'domande_elenco',       // { dopo?:<ms>, tutte?:bool } → { ok, domande:[…], riferimenti:{}, adesso } | { ok:false, error }
+    DOMANDA_MOSTRA: 'domanda_mostra',       // { id:'D-n' } → { ok, domanda, riferimenti } | { ok:false, error }
+    DOMANDA_RISPONDI: 'domanda_rispondi',   // { id, scelta?:<indice>, testo? } → { ok, domanda, esito } | { ok:false, error }
+    DOMANDE_CONSIGLIO: 'domande_consiglio', // { ids:['D-n'…] } → { ok, esiti:[{ id, ok, etichetta?, errore? }] } | { ok:false, error }
+    DOMANDA_ARCHIVIA: 'domanda_archivia',   // { id } → { ok, domanda } (chiusa senza azioni) | { ok:false, error }
+    DOMANDA_RIAPRI: 'domanda_riapri',       // { id } → { ok, domanda } (solo un'archiviata senza azioni) | { ok:false, error }
+    // «Segna fidato» (#1148, SPEC-DOMANDE.md §1.5): la fiducia la scrive solo il server (callable ownerFiducia).
+    // Solo pagine `filo://`, solo il proprietario. Callable non ancora pubblicata → errore che lo dice.
+    FIDUCIA_SEGNA: 'fiducia_segna', // { feedbackId, fidato?: false per toglierla } → { ok, fiducia } | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
@@ -740,7 +786,8 @@
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
     AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile, isAdmin, remembered }; a un sito solo { ok, signedIn, isAdmin } | { ok: false, code, error: frase per l'utente }
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
-    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, isAdmin, profile|null, uid, remembered }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_STATUS: 'auth_status',                    // { senzaRete? } → { ok, signedIn, isAdmin, profile|null, uid (non con senzaRete), remembered, googleNelleSchede }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_COLLEGA_GOOGLE: 'auth_collega_google',    // solo da Filo: apre l'accesso web a Google in una scheda (#1123) → { ok } | { ok: false, error }
     AUTH_CHANGED: 'auth_changed',                  // broadcast alle sole pagine di Filo → { signedIn, isAdmin, profile|null, remembered }
 
     // Clipboard history (per il menu "Incolla"). Chi legge e chi scrive da un sito: services/appuntiDaiSiti.js. L'elenco
@@ -750,6 +797,13 @@
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',
+    // Broadcast alle sole pagine filo:// quando la cronologia appunti cambia
+    // (copia nuova, voce tolta, svuotamento, descrizione di un'immagine
+    // arrivata). Non porta le voci con sé: chi lo riceve rilegge la cronologia
+    // con GET_CLIPBOARD_HISTORY. Così una scheda ferma sulla pagina della
+    // sicurezza non mostra più una lista vecchia, e nessun elenco di ciò che
+    // l'utente ha copiato viaggia verso schede che non l'hanno chiesto.
+    CLIPBOARD_HISTORY_UPDATED: 'clipboard_history_updated',
 
     // Categorie (Fase 2)
     GET_CATEGORIES: 'get_categories',

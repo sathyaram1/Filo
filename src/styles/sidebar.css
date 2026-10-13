@@ -161,6 +161,56 @@
   border-color: var(--sn-border);
 }
 
+/* Il documento trovato (#947.3): un bottone che si apre o si trascina nella pagina, come il file in una cartella. */
+.sn-sidebar-files {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: -4px;
+  min-width: 0;
+}
+.sn-sidebar-file {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 7px 12px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: grab;
+  user-select: none;
+  /* `all: unset` toglie anche il trascinamento che `draggable` dà al bottone. */
+  -webkit-user-drag: element;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+.sn-sidebar-file:hover { border-color: var(--sn-accent); background: var(--sn-hover, rgba(127,127,127,0.10)); }
+.sn-sidebar-file:active { transform: scale(0.98); cursor: grabbing; }
+.sn-sidebar-file:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+.sn-sidebar-file-icona { display: inline-flex; flex-shrink: 0; color: var(--sn-accent); }
+.sn-sidebar-file-nome { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sn-sidebar-file-dove { color: var(--sn-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sn-sidebar-log-ferma {
+  all: unset;
+  cursor: pointer;
+  margin-left: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--sn-border);
+  border-radius: 999px;
+  color: var(--sn-fg);
+  font-size: 11px;
+  transition: border-color 120ms ease;
+}
+.sn-sidebar-log-ferma:hover { border-color: var(--sn-accent); }
+.sn-sidebar-log-ferma:disabled { opacity: 0.5; cursor: default; }
+
 .sn-sidebar-log {
   align-self: flex-start;
   color: var(--sn-muted);
@@ -325,43 +375,7 @@
   align-items: center;
 }
 
-.sn-sidebar-feedback-btn {
-  all: unset;
-  cursor: pointer;
-  padding: 5px 12px;
-  background: var(--sn-bg);
-  color: var(--sn-fg);
-  border: 1px solid var(--sn-border);
-  border-radius: 999px;
-  font-size: 12px;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-.sn-sidebar-feedback-btn:hover {
-  background: var(--sn-accent);
-  color: #fff;
-  border-color: var(--sn-accent);
-}
-.sn-sidebar-feedback-btn:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-.sn-sidebar-feedback-btn:disabled:hover {
-  background: var(--sn-bg);
-  color: var(--sn-fg);
-  border-color: var(--sn-border);
-}
-
-.sn-sidebar-feedback-skip {
-  all: unset;
-  cursor: pointer;
-  margin-left: auto;
-  padding: 0 6px;
-  color: var(--sn-muted);
-  font-size: 14px;
-  line-height: 1;
-}
-.sn-sidebar-feedback-skip:hover { color: var(--sn-fg); }
-.sn-sidebar-feedback-skip:disabled { opacity: 0.5; cursor: default; }
+/* I bottoni della risposta stanno in uno Shadow DOM chiuso, col loro stile: src/content/sidebar.js (#592.6). */
 
 .sn-sidebar-feedback-thanks {
   font-size: 11px;

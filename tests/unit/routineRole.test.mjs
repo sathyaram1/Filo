@@ -8,11 +8,12 @@
 //   scritto dal dispatcher venga ritrovato da chi accoda — anche da una cartella
 //   di lavoro separata — e che un marcatore vecchio non firmi feedback altrui.
 
+import '../helpers/senzaSessione.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const {
   normalizeRole, isFresh, writeRole, readRole, clearRole, roleFile, MAX_AGE_MS,
@@ -63,7 +64,7 @@ test('writeRole → readRole: chi accoda ritrova il ruolo scritto dal dispatcher
     clearRole(root);
     assert.equal(readRole(root), '');
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    togliCartella(root);
   }
 });
 
@@ -73,7 +74,7 @@ test('writeRole: un ruolo non riconosciuto non lascia traccia', () => {
     assert.equal(writeRole(root, 'halt'), null);
     assert.equal(readRole(root), '');
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    togliCartella(root);
   }
 });
 
@@ -85,7 +86,7 @@ test('readRole: un marcatore scaduto vale come "non lo so"', () => {
     writeFileSync(roleFile(root), JSON.stringify({ role: 'prober', since: old }), 'utf8');
     assert.equal(readRole(root), '');
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    togliCartella(root);
   }
 });
 
@@ -102,6 +103,6 @@ test('readRole: la variabile d’ambiente esplicita vince sul marcatore', () => 
   } finally {
     if (prev === undefined) delete process.env.FILO_ROUTINE_ROLE;
     else process.env.FILO_ROUTINE_ROLE = prev;
-    rmSync(root, { recursive: true, force: true });
+    togliCartella(root);
   }
 });

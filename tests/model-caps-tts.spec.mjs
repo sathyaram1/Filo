@@ -119,7 +119,14 @@ test('Validazione: il dropdown disabilita i modelli non adatti alla funzione', a
 
 test('Validazione: assegnare un modello TTS a una funzione di testo è bloccato e non salvato', async ({ openTab }) => {
   const page = await openTab(OPTIONS_URL);
+  await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
+  await page.evaluate(() => {
+    window.__echi = 0;
+    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === window.SN_MSG.MSG.SETTINGS_UPDATED) window.__echi++; });
+  });
   await revealAdvanced(page);
+  await expect.poll(() => page.evaluate(() => window.__echi), { timeout: 8_000 }).toBeGreaterThan(0);
+  const echiPrima = await page.evaluate(() => window.__echi);
 
   const seg = actionCell(page, 'Spiega (inline)').locator('.sn-chain-seg').first();
   const input = seg.locator('.sn-chain-input');
@@ -129,12 +136,45 @@ test('Validazione: assegnare un modello TTS a una funzione di testo è bloccato 
   // Compare il messaggio di blocco e il valore viene ripristinato (non 'kokoro').
   await expect(seg.locator('.sn-chain-msg')).toBeVisible({ timeout: 4_000 });
   await expect(input).not.toHaveValue('kokoro');
+  // Il rifiuto salva subito la catena ripristinata: la spiegazione resta anche dopo che quel salvataggio è tornato
+  // indietro alla pagina (#667.7), non solo per l'istante prima.
+  await expect.poll(() => page.evaluate(() => window.__echi), { timeout: 8_000 }).toBeGreaterThan(echiPrima);
+  await expect(seg.locator('.sn-chain-msg')).toHaveText(/Modello non adatto: \S/);
 
   const savedExplain = await page.evaluate(async () => {
     const s = await window.SN_STORAGE.getSettings();
     return s.models[window.SN_CONST.ACTIONS.EXPLAIN] || '';
   });
   expect(savedExplain).not.toContain('kokoro');
+});
+
+// #814.5: i passi della segnalazione a mano, scritto a tastiera e uscita col clic altrove; la spiegazione deve reggere
+// al ritorno del salvataggio, che ridisegnando la griglia la portava via.
+test('Validazione: kokoro scritto a tastiera in Spiega e uscita col clic, la spiegazione resta', async ({ openTab }) => {
+  const page = await openTab(OPTIONS_URL);
+  await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
+  await page.evaluate(() => {
+    window.__echi = 0;
+    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === window.SN_MSG.MSG.SETTINGS_UPDATED) window.__echi++; });
+  });
+  await revealAdvanced(page);
+  await expect.poll(() => page.evaluate(() => window.__echi), { timeout: 8_000 }).toBeGreaterThan(0);
+
+  const seg = actionCell(page, 'Spiega (inline)').locator('.sn-chain-seg').first();
+  const input = seg.locator('.sn-chain-input');
+  const prima = await input.inputValue();
+  const echiPrima = await page.evaluate(() => window.__echi);
+  await input.click();
+  await input.press('ControlOrMeta+a');
+  await input.pressSequentially('kokoro', { delay: 20 });
+  await page.click('#h-models');
+
+  await expect(seg.locator('.sn-chain-msg')).toHaveText(/Modello non adatto: \S/, { timeout: 4_000 });
+  await expect.poll(() => page.evaluate(() => window.__echi), { timeout: 8_000 }).toBeGreaterThan(echiPrima);
+  await expect(seg.locator('.sn-chain-msg')).toHaveText(/Modello non adatto: \S/);
+  await expect(input).toHaveValue(prima);
+  const salvato = await page.evaluate(async () => (await window.SN_STORAGE.getSettings()).models[window.SN_CONST.ACTIONS.EXPLAIN] || '');
+  expect(salvato).not.toContain('kokoro');
 });
 
 test('TTS: l\'azione di sintesi vocale degrada con grazia senza chiave (fallback)', async ({ openTab }) => {

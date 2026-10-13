@@ -85,7 +85,7 @@
         const end = activeEl.selectionEnd ?? 0;
         activeEl.value = activeEl.value.slice(0, start) + activeEl.value.slice(end);
         activeEl.setSelectionRange(start, start);
-        activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        activeEl.dispatchEvent(nostro(new Event('input', { bubbles: true })));
       } else {
         document.execCommand('delete');
       }
@@ -110,6 +110,9 @@
   // ------------------------------------------------------------
   // Incolla (da clipboard e da cronologia)
   // ------------------------------------------------------------
+  // Ciò che scriviamo noi in un campo di un riquadro di Filo lo deve sentire anche il riquadro, che ai finti è chiuso.
+  const nostro = (ev) => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(ev) : ev);
+
   // Incolla dagli appunti: prova prima a leggere immagini, poi testo.
   async function pasteFromClipboard() {
     deps.restorePasteContext();
@@ -131,9 +134,9 @@
             if (targetKind === 'input') {
               // input/textarea non supportano immagini: prova a delegare ad
               // un handler custom (es. il modal feedback) via evento bubbling.
-              const pasteEvt = new CustomEvent('filo:paste-image', {
+              const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
                 bubbles: true, cancelable: true, detail: { blob },
-              });
+              }));
               if (ctx.el && ctx.el.dispatchEvent(pasteEvt) === false) {
                 return;
               }
@@ -142,7 +145,7 @@
               if (textType) {
                 const text = await (await it.getType(textType)).text();
                 insertTextAtSelection(text);
-                pushClipboardEntry({ type: 'text', text });
+                pushClipboardEntry({ type: 'text', text }, 'paste');
               } else {
                 Popup.showToast(I18n.t('toast_cannot_paste_image'));
               }
@@ -159,7 +162,7 @@
               return;
             }
             const description = await describeImage(blob);
-            pushClipboardEntry({ type: 'image', dataUrl, description });
+            pushClipboardEntry({ type: 'image', dataUrl, description }, 'paste');
             Popup.showToast(I18n.t('toast_pasted_image'));
             return;
           }
@@ -174,7 +177,7 @@
       if (!text) return;
       deps.restorePasteContext();
       insertTextAtSelection(text);
-      pushClipboardEntry({ type: 'text', text });
+      pushClipboardEntry({ type: 'text', text }, 'paste');
     } catch (_) {}
   }
 
@@ -197,9 +200,9 @@
       // feedback, barra input dashboard, ecc.) possono allegarla. Senza questa
       // delega l'Incolla→cronologia falliva ovunque Ctrl+V su immagine funziona.
       if (ctx?.kind === 'input' && blob) {
-        const pasteEvt = new CustomEvent('filo:paste-image', {
+        const pasteEvt = nostro(new CustomEvent('filo:paste-image', {
           bubbles: true, cancelable: true, detail: { blob },
-        });
+        }));
         if (ctx.el.dispatchEvent(pasteEvt) === false) {
           Popup.showToast(I18n.t('toast_pasted_image'));
           return;
@@ -301,7 +304,7 @@
       ctx.start = caret;
       ctx.end = caret;
       // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text }));
+      el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text })));
     } else if (kind === 'ce') {
       el.focus();
       // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:
@@ -416,8 +419,10 @@
     } catch (_) { return { canBack: true, canFwd: true }; }
   }
 
-  function pushClipboardEntry(entry) {
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
+  // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
+  // incolla, non da una copia scelta: una voce appena tolta non rientra così.
+  function pushClipboardEntry(entry, via) {
+    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry, via }).catch(() => {});
     // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
     if (entry?.type === 'image' && entry.dataUrl) {
       requestImageDescription(entry.dataUrl).catch(() => {});
@@ -1205,8 +1210,15 @@
     return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
   }
 
+  // Una voce del menu di Filo non usa il gesto della pagina (è di Filo): l'indirizzo scelto lo dichiara prima (#737.1).
+  function apriInSchedaNuova(url) {
+    if (!url) return;
+    try { if (typeof global.SN_APERTURA_SCELTA === 'function') global.SN_APERTURA_SCELTA(url); } catch (_) {}
+    window.open(url, '_blank', 'noopener');
+  }
+
   function searchTextOnWeb(text) {
-    window.open(searchUrlFor(text), '_blank', 'noopener');
+    apriInSchedaNuova(searchUrlFor(text));
   }
 
   // ------------------------------------------------------------
@@ -1439,7 +1451,7 @@
 
   function searchImageOnWeb(imgEl) {
     const url = imageSearchUrlFor(imgEl);
-    if (url) window.open(url, '_blank', 'noopener');
+    apriInSchedaNuova(url);
   }
 
   // ------------------------------------------------------------
@@ -2003,6 +2015,7 @@
     shareCurrentPage,
     shareLink,
     searchTextOnWeb,
+    apriInSchedaNuova,
     searchUrlFor,
     searchImageOnWeb,
     imageSearchUrlFor,

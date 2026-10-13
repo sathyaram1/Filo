@@ -82,9 +82,11 @@ import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
 import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import { installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
 } from './lib/ramo-server.mjs';
+import { registraRamo } from './lib/biglietto-locale.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
 
@@ -944,6 +946,8 @@ function realignBeforeStart(root = ROOT) {
   // frattempo sullo stesso ramo. La destinazione è nel refspec, per intero:
   // non la sceglie la configurazione locale di git (stessa forma di ogni altra
   // spedizione del repo).
+  // Il riallineamento spedisce anche i commit locali non ancora partiti: il pre-push ferma una copia dei dati (#1108).
+  try { installaControlloSpedizione(root); } catch (_) { /* senza, il push parte come prima */ }
   const push = tryGit(['push', '--force-with-lease', 'origin', `refs/heads/${branch}:refs/heads/${branch}`], root);
   if (!push.ok) {
     console.error(`Ramo riallineato qui, ma non riesco a rispedirlo su origin:\n${push.out.slice(0, 300)}`);
@@ -973,6 +977,28 @@ export function shaPrimaAllineato(shaPrima, root = ROOT, base = `origin/${MAIN}`
 
 export function currentBranch(root = ROOT) { return git(['rev-parse', '--abbrev-ref', 'HEAD'], root); }
 export function headSha(root = ROOT) { return git(['rev-parse', 'HEAD'], root); }
+
+/** La riga che dice com'è andata la registrazione del ramo nel registro del server (#1148). PURA. */
+export function rigaRegistro(repo, r) {
+  const chi = repo === 'server' ? 'del server' : 'dell’app';
+  const sporcata = r && r.sporcato ? ` Questa sessione si è sporcata (${String(r.sporcato).slice(0, 200)}): da qui ciò che scrive nasce non fidato.` : '';
+  if (r && r.ok) return `Registro del ramo ${chi}: ${r.ramoFidato ? 'lavoro fidato, scritto solo da sessioni pulite' : 'non fidato: se i controlli lo fermano, la fusione aspetterà il tuo sì'}.${sporcata}`;
+  if (r && r.senzaBiglietto) return `Registro del ramo ${chi}: questa sessione non ha un biglietto (node scripts/biglietto.mjs stato), il lavoro non risulta fidato.`;
+  return `Registro del ramo ${chi} non scritto (${String((r && r.errore) || 'motivo sconosciuto').slice(0, 160)}): il lavoro non risulta fidato.`;
+}
+
+/**
+ * Questa sessione ha scritto la punta di adesso (#1148): una voce nel registro dei rami, con la fiducia del suo
+ * biglietto in questo momento e i commit del ramo letti nel suo deposito. La chiamano start e finish. Mai un'eccezione:
+ * senza voce il lavoro non è fidato.
+ */
+export async function registraNelRegistro({ ramo, sha, feedbackId = '', server = null, root = ROOT }, registra = registraRamo) {
+  const righe = [rigaRegistro('app', await registra({ repo: 'app', ramo, sha, feedbackId, cartella: root }))];
+  if (server && server.ramo && server.sha) {
+    righe.push(rigaRegistro('server', await registra({ repo: 'server', ramo: server.ramo, sha: server.sha, feedbackId, cartella: server.radice || server.checkout || '' })));
+  }
+  return righe;
+}
 /** Ci sono modifiche non salvate (anche solo nell'area di stage)? */
 export function isDirty(root = ROOT) { return git(['status', '--porcelain'], root).length > 0; }
 
@@ -1299,6 +1325,7 @@ if (isMain) {
       }
     }
     writeState(state);
+    for (const riga of await registraNelRegistro({ ramo: b, sha: state[b].requestedSha || headSha(), feedbackId: state[b].feedbackId || '', server: srvStart })) console.error(riga);
     // La pratica racconta il lavoro: presa in carico al primo giro, e a ogni giro com'è andato quello prima.
     if (state[b].feedbackId) {
       const { annotaPratica } = await import('./owner-feedback.mjs');

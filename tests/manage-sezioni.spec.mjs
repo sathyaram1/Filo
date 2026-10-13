@@ -38,17 +38,17 @@ test('la barra mostra le quattro sezioni e ogni scheda si apre dalla sua', async
   const sezioni = page.locator('.mg-sezione');
   await expect(sezioni).toHaveCount(4);
   expect((await sezioni.allInnerTexts()).map((t) => t.replace(/\s*\(.*\)$/, '').trim()))
-    .toEqual(['Domande', 'Feedback', 'Routine', 'Impostazioni predefinite']);
+    .toEqual(['Domande', 'Feedback', 'Routine']);
   // Si parte da Feedback: le sue schede si vedono, quelle delle altre sezioni no.
   await expect(page.locator('.mg-sezione[data-sezione="feedback"]')).toHaveClass(/mg-sezione--active/);
   for (const t of ['inbox', 'queue', 'local', 'resolved', 'archived', 'fbstats', 'stats']) {
     await expect(page.locator(`.mg-tab[data-tab="${t}"]`), t).toBeVisible();
   }
-  for (const t of ['automation', 'log', 'models', 'domande', 'domande-lavoro', 'domande-archivio']) {
+  for (const t of ['automation', 'log', 'domande', 'domande-lavoro', 'domande-archivio']) {
     await expect(page.locator(`.mg-tab[data-tab="${t}"]`), t).toBeHidden();
   }
 
-  const panelDi = { automation: 'panel-automation', log: 'panel-log', models: 'panel-models', fbstats: 'panel-fbstats', stats: 'panel-stats', queue: 'panel-list', domande: 'panel-domande' };
+  const panelDi = { automation: 'panel-automation', log: 'panel-log', fbstats: 'panel-fbstats', stats: 'panel-stats', queue: 'panel-list', domande: 'panel-domande' };
   for (const [tab, panel] of Object.entries(panelDi)) {
     await apriScheda(page, tab);
     await expect(page.locator(`#${panel}`), tab).toHaveClass(/mg-panel--active/);
@@ -95,8 +95,7 @@ test('i numeri delle sezioni: solo quando il dato c’è', async ({ openTab }) =
     fb('i1', 1, 'unlabeled'), fb('i2', 2, 'design', { statusReason: 'secaudit' }), fb('q1', 3, 'todo'),
   ]);
   await expect(numero('feedback')).toHaveText('(2)');
-  // Impostazioni non elenca niente; Routine senza fusioni in attesa non ha niente da dire.
-  await expect(numero('impostazioni')).toHaveText('');
+  // Routine senza fusioni in attesa non ha niente da dire.
   await expect(numero('routine')).toHaveText('');
   // Domande: il server non le pubblica ancora, quindi nessun numero e lo si dice nel pannello.
   await expect(numero('domande')).toHaveText('');
@@ -149,7 +148,7 @@ test('la lente da un’altra sezione porta ai feedback e cerca lì', async ({ op
   const page = await openTab(MANAGE);
   await apri(page);
   await page.evaluate((items) => window.__mgTest.setData(items), [fb('i1', 1, 'unlabeled')]);
-  await apriScheda(page, 'models');
+  await apriScheda(page, 'automation');
   await page.locator('#mgSearchToggle').click();
   await expect(page.locator('#mgSearchInput')).toBeVisible();
   await expect(page.locator('#panel-list')).toHaveClass(/mg-panel--active/);

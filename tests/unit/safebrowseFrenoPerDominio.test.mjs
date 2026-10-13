@@ -19,10 +19,12 @@ beforeEach(() => {
   SB.setProviders({ gsb: null, rdap: null, ct: null, llm: null, sandbox: null });
 });
 
-const analizza = (url, ctx) => new Promise((ok) => {
-  SB.analyze(url, ctx, ok);
-  setTimeout(ok, 30);
-});
+const analizza = async (url, ctx = {}) => {
+  let primo;
+  SB.analyze(url, ctx, (v) => { if (primo === undefined) primo = v; });
+  await SB._settled();
+  return primo;
+};
 
 const finestraCheTrova = (aperte) => async (u) => {
   aperte.push(u);
@@ -84,11 +86,8 @@ test('il secondo sito dello stesso dominio ha il suo controllo e il suo verdetto
   });
   const aggiornati = [];
   const primo = analizza('https://accesso.dominio-gemello.com/login', LOGIN);
-  const inVolo = new Promise((ok) => {
-    SB.analyze('https://verifica.dominio-gemello.com/login', LOGIN, (v) => { aggiornati.push(v.level); ok(); });
-    setTimeout(ok, 200);
-  });
-  await Promise.all([primo, inVolo]);
+  SB.analyze('https://verifica.dominio-gemello.com/login', LOGIN, (v) => { aggiornati.push(v.level); });
+  await Promise.all([primo, SB._settled()]);
   assert.deepEqual(aggiornati, ['pericoloso'], 'la pagina dove l\'utente arriva riceve il suo avviso');
   for (const s of ['accesso', 'verifica']) {
     assert.equal(SB.checkSync(`https://${s}.dominio-gemello.com/login`, LOGIN).level, 'pericoloso', s);
@@ -103,10 +102,8 @@ test('due analisi dello stesso sito con gli stessi indizi in volo insieme fanno 
   let giudizi = 0;
   SB.setProviders({ llm: async () => { giudizi++; await new Promise((r) => setTimeout(r, 10)); return { suspicious: true, reason: 'x' }; } });
   const aggiornati = [];
-  await Promise.all([1, 2].map(() => new Promise((ok) => {
-    SB.analyze('https://accesso.dominio-doppio.com/login', LOGIN, (v) => { aggiornati.push(v.level); ok(); });
-    setTimeout(ok, 200);
-  })));
+  for (let i = 0; i < 2; i++) SB.analyze('https://accesso.dominio-doppio.com/login', LOGIN, (v) => { aggiornati.push(v.level); });
+  await SB._settled();
   assert.equal(giudizi, 1);
   assert.deepEqual(aggiornati, ['sospetto', 'sospetto'], 'tutte e due le analisi ricevono la risposta');
 });

@@ -317,23 +317,40 @@
     return null;
   }
 
+  // Da un riquadro chiuso di Filo (feedback, spiegazione) il focus arriva all'host: il campo vero lo sa SN_FILO_UI,
+  // e l'overlay sta dentro lo stesso riquadro, perché ripete il testo e nel documento del sito lo leggerebbe (#1071).
+  function editabileDellEvento(e) {
+    const UI = global.SN_FILO_UI;
+    const t = e && e.target;
+    const riquadro = !!(UI && UI.bersaglio && t && t.hasAttribute && t.hasAttribute(UI.RIQUADRO));
+    return findSupportedEditable(riquadro ? UI.bersaglio(e) : t);
+  }
+  function radiceDi(el) {
+    try {
+      const r = el.getRootNode();
+      const UI = global.SN_FILO_UI;
+      if (r && r !== document && r.host && UI && r.host.hasAttribute(UI.RIQUADRO)) return r;
+    } catch (_) {}
+    return null;
+  }
+
   // ============================================================================
   // Focus lifecycle
   // ============================================================================
   function onFocusIn(e) {
     if (!isEnabled()) return;
-    const el = findSupportedEditable(e.target);
+    const el = editabileDellEvento(e);
     if (!el) return;
     attach(el);
   }
 
   function onFocusOut(e) {
-    const el = findSupportedEditable(e.target);
+    const el = editabileDellEvento(e);
     if (!el) return;
     // Mantieni l'overlay finché l'utente sta interagendo col popup correzione,
     // altrimenti il click destro su un range blu lo nasconde subito.
     setTimeout(() => {
-      if (document.activeElement === el) return;
+      if ((radiceDi(el) || document).activeElement === el) return;
       detach(el);
     }, 200);
   }
@@ -341,15 +358,8 @@
   function suInput(state) {
     // 1) autocorrect istantaneo
     tryAutocorrect(state);
-    // 2) gli issue blu hanno offset relativi al testo precedente: digitare anche
-    // un solo carattere prima della fine può sfasare l'intero set. Cancellali
-    // subito; verranno ricostruiti dal prossimo scan (debounce 1.5s). Senza
-    // questo, "Risolvi" può applicare il fix sul range sbagliato e "mangiare"
-    // la frase.
-    if (state.issues.length) {
-      state.issues = [];
-      renderOverlayContent(state);
-    }
+    // 2) gli issue blu seguono il testo fino al prossimo scan
+    seguiIlTesto(state);
     // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello. Lo scan già chiesto
     // da un gesto (un tasto tenuto premuto) si sposta soltanto: resta una chiamata, sul testo finale.
     if (!prendeGesto(state)) {
@@ -374,6 +384,8 @@
         el,
         overlay: null,
         issues: [],
+        // Il testo a cui si riferiscono gli offset di `issues`.
+        testoIssues: '',
         lastScannedText: '',
         timer: null,
         ro: null,
@@ -432,19 +444,19 @@
   ];
 
   function ensureOverlay(state) {
-    if (state.overlay && document.body.contains(state.overlay)) return;
+    if (state.overlay && state.overlay.isConnected) return;
     const o = document.createElement('div');
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(o);
+    (radiceDi(state.el) || document.body).appendChild(o);
     state.overlay = o;
   }
 
   function syncOverlay(state) {
     const o = state.overlay;
     const el = state.el;
-    if (!o || !el || !document.body.contains(el)) return;
+    if (!o || !el || !el.isConnected) return;
 
     const cs = window.getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -524,6 +536,49 @@
     o.appendChild(frag);
   }
 
+  // Chi corregge una parola perde il segno di quella: gli altri restano dov'erano finché lo scan dopo non li rinnova
+  // (#1111), sugli offset giusti per «Risolvi».
+  function seguiIlTesto(state) {
+    const ora = getEditableText(state.el);
+    if (ora === state.testoIssues) return;
+    const prima = state.testoIssues;
+    state.testoIssues = ora;
+    if (!state.issues.length) return;
+    const { issues, perse } = riallineaIssues(state.issues, prima, ora);
+    state.issues = issues;
+    // Un segno perso torna solo da uno scan, anche se il testo ritorna quello già controllato.
+    if (perse) state.lastScannedText = '';
+    renderOverlayContent(state);
+  }
+
+  // Prima del cambio resta, dopo scorre; chi tocca il cambio, o la cui parola il cambio allunga o fonde con un'altra
+  // (un bordo che passa da separatore a lettera), si perde.
+  function riallineaIssues(issues, vecchio, nuovo) {
+    const lista = Array.isArray(issues) ? issues : [];
+    vecchio = String(vecchio ?? '');
+    nuovo = String(nuovo ?? '');
+    if (!lista.length || vecchio === nuovo) return { issues: lista, perse: false };
+    const corto = Math.min(vecchio.length, nuovo.length);
+    let p = 0;
+    while (p < corto && vecchio[p] === nuovo[p]) p++;
+    let s = 0;
+    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
+    const fineCambio = vecchio.length - s;
+    const delta = nuovo.length - vecchio.length;
+    const out = [];
+    for (const it of lista) {
+      let da;
+      if (it.end <= p) da = it.start;
+      else if (it.start >= fineCambio) da = it.start + delta;
+      else continue;
+      const a = da + (it.end - it.start);
+      if (isWordCharLocal(vecchio[it.start - 1]) !== isWordCharLocal(nuovo[da - 1])) continue;
+      if (isWordCharLocal(vecchio[it.end]) !== isWordCharLocal(nuovo[a])) continue;
+      out.push(da === it.start ? it : { ...it, start: da, end: a });
+    }
+    return { issues: out, perse: out.length !== lista.length };
+  }
+
   // ============================================================================
   // Scan LLM (zigzag blu)
   // ============================================================================
@@ -552,7 +607,7 @@
   }
 
   async function scanText(state) {
-    if (!state || !state.el || !document.body.contains(state.el)) return;
+    if (!state || !state.el || !state.el.isConnected) return;
     if (document.hidden) { state.rimandato = true; return; }
     state.rimandato = false;
     const text = getEditableText(state.el);
@@ -560,6 +615,7 @@
     // Reset se il testo è troppo corto o invariato
     if (!text || text.length < MIN_TEXT_LENGTH) {
       state.issues = [];
+      state.testoIssues = text;
       state.lastScannedText = text;
       renderOverlayContent(state);
       return;
@@ -598,6 +654,7 @@
     }
     const allIssues = buildIssues(parseIssues(res.text), text);
     state.issues = allIssues;
+    state.testoIssues = text;
     state.lastScannedText = text;
     renderOverlayContent(state);
     // Prefetch delle correzioni a singola parola: per ogni issue blu su 1 parola
@@ -1119,6 +1176,31 @@
   // ============================================================================
   // Applicazione correzioni
   // ============================================================================
+  // Come una battuta, dall'editing del browser: il correttore nativo sposta i segni delle altre parole invece di
+  // perderli (riscrivere il valore cancella tutto lo zigzag rosso del campo, #1111), e Ctrl+Z annulla la correzione.
+  // Falso se il campo è rimasto com'era: allora lo si riscrive.
+  function sostituisciComeBattuta(el, range, testo, cursorMode) {
+    testo = String(testo ?? '');
+    const prima = el.value;
+    const caret = el.selectionEnd;
+    // Una battuta rispetta maxlength e taglierebbe la correzione a metà.
+    if (el.maxLength >= 0 && prima.length - (range.end - range.start) + testo.length > el.maxLength) return false;
+    try {
+      const radice = el.getRootNode();
+      if (radice.activeElement !== el) el.focus({ preventScroll: true });
+      if (radice.activeElement !== el) return false;
+      el.setSelectionRange(range.start, range.end);
+      if (testo) document.execCommand('insertText', false, testo);
+      else if (range.end > range.start) document.execCommand('delete', false);
+    } catch (_) {}
+    if (el.value === prima) return false;
+    if (cursorMode === 'preserve' && typeof caret === 'number') {
+      const dove = caret >= range.end ? caret + testo.length - (range.end - range.start) : caret;
+      try { el.setSelectionRange(dove, dove); } catch (_) {}
+    }
+    return true;
+  }
+
   function applyFix(el, range, replacement, opts = {}) {
     const safeReplacement = String(replacement == null ? '' : replacement);
     // 'end' = caret a fine inserzione (popup correttore manuale).
@@ -1148,18 +1230,19 @@
         console.warn('[SN] applyFix: range fuori bounds, skip', { range, length: v.length });
         return;
       }
-      // Usa setRangeText (API standard): più robusta del concat manuale e
-      // mantiene correttamente l'undo stack del browser.
-      try {
-        el.setRangeText(safeReplacement, range.start, range.end, cursorMode === 'preserve' ? 'preserve' : 'end');
-      } catch (_) {
-        const before = v.slice(0, range.start);
-        const after = v.slice(range.end);
-        el.value = before + safeReplacement + after;
-        const caret = before.length + safeReplacement.length;
-        try { el.setSelectionRange(caret, caret); } catch (_) {}
+      if (!sostituisciComeBattuta(el, range, safeReplacement, cursorMode)) {
+        try {
+          el.setRangeText(safeReplacement, range.start, range.end, cursorMode === 'preserve' ? 'preserve' : 'end');
+        } catch (_) {
+          const before = v.slice(0, range.start);
+          const after = v.slice(range.end);
+          el.value = before + safeReplacement + after;
+          const caret = before.length + safeReplacement.length;
+          try { el.setSelectionRange(caret, caret); } catch (_) {}
+        }
+        // Segnato come nostro: un campo di un riquadro di Filo, chiuso ai finti, deve sentire la correzione.
+        el.dispatchEvent(global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
       }
-      el.dispatchEvent(new Event('input', { bubbles: true }));
     } else {
       const text = el.textContent || '';
       if (range.start < 0 || range.end > text.length || range.end <= range.start) {
@@ -1242,10 +1325,13 @@
         }
       }
     }
-    // Rimuovi l'issue dallo stato e ridisegna; il prossimo scan rivaluterà.
+    // L'issue corretto cade col testo che cambia (anche se l'input non è arrivato); il prossimo scan rivaluterà.
     const state = monitored.get(el);
     if (state) {
-      state.issues = (state.issues || []).filter((i) => !(i.start === range.start && i.end === range.end));
+      seguiIlTesto(state);
+      if (getEditableText(el) === currentText) {
+        state.issues = state.issues.filter((i) => !(i.start === range.start && i.end === range.end));
+      }
       state.lastScannedText = '';
       renderOverlayContent(state);
       scheduleScan(state);
@@ -1378,6 +1464,8 @@
     getInputWordAt,
     requestWordSuggestion,
     applyFix,
+    sostituisciComeBattuta,
+    riallineaIssues,
     addToDictionary,
     isInDictionary,
     setAutocorrect,

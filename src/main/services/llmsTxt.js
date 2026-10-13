@@ -1,18 +1,18 @@
-// Fetcher di /llms.txt — convenzione emergente per dare istruzioni "machine
-// readable" ai bot/LLM su come usare un sito (https://llmstxt.org).
-//
-// Per ogni dominio proviamo HEAD/GET su https://<host>/llms.txt una volta
-// ogni 24h. La risposta (o l'assenza) viene cacheata in chrome.storage.local.
-// Cap testo: 20 KB (~5k token), oltre quella soglia tronchiamo.
-//
-// Espone SN_LLMS_TXT = { get(domain) → { text, cachedAt, present } | null }.
+// Il /llms.txt del sito su cui si apre l'Aiuto (https://llmstxt.org), in cache 24 ore per dominio: SN_LLMS_TXT.get.
+// Finisce nel prompt di un agente che agisce sulla pagina: si legge solo da quel sito, mai da un redirect verso
+// un altro o verso la rete di casa. Prove: tests/unit/llmsTxt.test.mjs.
 
 (function (global) {
   'use strict';
 
+  const { safeFetch, leggiTesto } = require('./safe-fetch');
+  const Sito = require('./stessoSito');
+
   const STORAGE_KEY = 'sn_llmstxt_cache';
   const TTL_MS = 24 * 60 * 60 * 1000;       // 24h
   const MAX_BYTES = 20 * 1024;              // 20KB
+  // Una voce scritta prima del #1082 può essere un servizio della rete di casa raggiunto con un redirect: si rilegge.
+  const VERSIONE = 2;
   const FETCH_TIMEOUT_MS = 4000;
   // Bound difensivo sul totale della cache (#domini): evita che cresca
   // indefinitamente. Quando lo superiamo, scartiamo gli entry più vecchi.
@@ -27,36 +27,34 @@
   }
 
   function fresh(entry) {
-    return entry && (Date.now() - (entry.cachedAt || 0)) < TTL_MS;
+    return !!entry && entry.v === VERSIONE && (Date.now() - (entry.cachedAt || 0)) < TTL_MS;
   }
 
-  // Tronca a MAX_BYTES preservando la testa del file (di solito è la parte
-  // più informativa, e la convenzione llms.txt mette in alto la sintesi).
-  function truncate(text) {
-    if (typeof text !== 'string') return '';
-    // Bytes pessimisti: 1 char ≤ 4 byte UTF-8. Tagliamo per char a MAX_BYTES.
-    if (text.length <= MAX_BYTES) return text;
-    return text.slice(0, MAX_BYTES) + '\n…[troncato]';
+  // Si segue un redirect solo dentro il sito di partenza (example.com → www.example.com) e solo in https.
+  function stessoSito(partenza, prossimo) {
+    if (prossimo.protocol !== 'https:') return false;
+    const sito = Sito.sitoDi(partenza.href);
+    return !!sito && Sito.sitoDi(prossimo.href) === sito;
   }
 
   async function fetchOnce(url) {
     const ac = new AbortController();
+    // Il tempo copre anche il corpo: un sito che lo manda a gocce non deve tenere ferma la risposta dell'Aiuto.
     const t = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
     try {
-      const r = await fetch(url, { method: 'GET', signal: ac.signal, redirect: 'follow' });
-      clearTimeout(t);
-      if (!r.ok) return { present: false, text: '' };
+      const r = await safeFetch(url, { signal: ac.signal, redirectAmmesso: stessoSito, lanSeGiaDiPartenza: true });
+      if (!r.ok) { try { r.body?.cancel?.(); } catch (_) {} return { present: false, text: '' }; }
       const ct = r.headers.get('content-type') || '';
-      // Evita di scaricare HTML di una pagina 404 mascherata da 200.
-      if (ct.includes('text/html')) return { present: false, text: '' };
-      const raw = await r.text();
-      // Heuristica: se il body sembra HTML (caso comune di SPA che ritornano
-      // index.html per ogni path), considera il file assente.
-      if (/^\s*<!DOCTYPE\s+html|^\s*<html[\s>]/i.test(raw)) return { present: false, text: '' };
-      return { present: true, text: truncate(raw) };
+      // Una pagina 404 servita come 200 non è un llms.txt.
+      if (ct.includes('text/html')) { try { r.body?.cancel?.(); } catch (_) {} return { present: false, text: '' }; }
+      const { testo, tagliato } = await leggiTesto(r, MAX_BYTES);
+      // Le SPA rispondono con index.html a ogni indirizzo, anche senza dichiararlo.
+      if (/^\s*<!DOCTYPE\s+html|^\s*<html[\s>]/i.test(testo)) return { present: false, text: '' };
+      return { present: true, text: tagliato ? testo + '\n…[troncato]' : testo };
     } catch (_) {
-      clearTimeout(t);
       return { present: false, text: '' };
+    } finally {
+      clearTimeout(t);
     }
   }
 
@@ -85,6 +83,7 @@
       text: fetched.text,
       present: fetched.present,
       cachedAt: Date.now(),
+      v: VERSIONE,
     };
     cache[domain] = entry;
     await writeCache(await pruneIfNeeded(cache));

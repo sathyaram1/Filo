@@ -60,6 +60,9 @@
     const n = parseFloat(s);
     return Number.isFinite(n) ? n : NaN;
   }
+  // Il verso opposto, per i numeri interi che l'utente legge: 1.500 ms, 1.200 caratteri.
+  const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
+  const decimali = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 2 });
 
   // I toni della suoneria e degli avvisi: gli id sono quelli di SN_SOUNDS (sounds.js).
   const TONI = {
@@ -104,6 +107,19 @@
         return { partial: nidifica(percorso, b), label: `${nome} → ${b ? stati[0] : stati[1]}` };
       },
     };
+  }
+
+  // I limiti dei due tetti stanno con la loro regola (filoContesto.js), che nel main è già caricata.
+  function contestoFilo() {
+    if (!global.SN_FILO_CONTESTO && typeof require === 'function') require('./filoContesto.js');
+    return global.SN_FILO_CONTESTO;
+  }
+
+  // «predefinito», «di serie», «come prima»: torna al valore dei Modelli predefiniti.
+  function predefinito(v) {
+    if (v === null) return true;
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    return ['predefinito', 'predefiniti', 'di serie', 'default', 'come i predefiniti', 'automatico', 'azzera', 'reset'].includes(s);
   }
 
   function nidifica(percorso, valore) {
@@ -254,7 +270,8 @@
       scrive: [percorso],
       aiuto: '"aggiungi <cartella>" | "togli <cartella>" | "solo <cartella>" | "svuota" (le cartelle in cui Filo cerca i '
         + 'documenti per contenuto; di serie Documenti, Download e Scrivania; le altre col percorso intero o con ~, più '
-        + 'cartelle separate da punto e virgola; svuotato, Filo non legge più nessun documento)',
+        + 'cartelle separate da punto e virgola; svuotato, Filo non legge più nessun documento; «togli» fa dimenticare anche '
+        + 'una cartella dove l\'utente ha cercato una volta, coi documenti che Filo ne ha già letto)',
       costo: 2,
       // Una cartella in più è un posto in più dove Filo legge: abbassa una difesa come aggiungere un sito fidato.
       allenta: (r) => !!r.elenco && r.elenco.op !== 'togli' && r.elenco.voci.length > 0,
@@ -344,8 +361,8 @@
     if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 10)) n *= 1000;
     n = Math.round(n);
     const [min, max] = global.SN_CONST.BARRA_LATERALE_LIMITI[campo];
-    if (n < min || n > max) return { rifiuto: `${n} ms è fuori dai limiti: da ${min} a ${max} ms` };
-    return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(n) };
+    if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
+    return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(cifre(n)) };
   }
 
   // Quanto stringe un modo: scendere di rigore abbassa una difesa. Il valore attuale ignoto vale il più stretto.
@@ -447,7 +464,7 @@
         const C = global.SN_CONST;
         const n = C.agentStyleLength(s);
         if (n > C.AGENT_STYLE_MAX) {
-          return { rifiuto: `lo stile è lungo ${n} caratteri e il massimo è ${C.AGENT_STYLE_MAX}` };
+          return { rifiuto: `lo stile è lungo ${cifre(n)} caratteri e il massimo è ${cifre(C.AGENT_STYLE_MAX)}` };
         }
         return { partial: { agentStyle: s }, label: "Stile dell'agente", testo: s };
       },
@@ -639,7 +656,7 @@
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
         n = Math.max(0.5, Math.min(2, n));
-        return { partial: { tts: { rate: n } }, label: `Velocità lettura → ${n.toFixed(1)}×` };
+        return { partial: { tts: { rate: n } }, label: `Velocità lettura → ${decimali(n)}×` };
       },
     },
     {
@@ -651,7 +668,7 @@
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n)) return null;
         n = Math.max(0, Math.min(2, n));
-        return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${n.toFixed(1)}` };
+        return { partial: { tts: { pitch: n } }, label: `Tono lettura → ${decimali(n)}` };
       },
     },
     {
@@ -696,7 +713,7 @@
         // Come «Altra voce: scrivi il nome…» della pagina: un nome fuori catalogo si salva com'è scritto.
         const nome = testoVisibile(s);
         if (!nome) return null;
-        if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${nome.length} caratteri e il massimo è ${VOCE_MAX}` };
+        if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${cifre(nome.length)} caratteri e il massimo è ${VOCE_MAX}` };
         return { partial: { tts: { modelVoice: nome } }, label: `Voce naturale → "${nome}" (nome scritto a mano)` };
       },
     },
@@ -962,8 +979,8 @@
         let n = parseItalianNumber(v);
         if (!Number.isFinite(n) || n < 0) return null;
         n = Math.min(10000, n);
-        const eur = Number.isInteger(n) ? String(n) : n.toFixed(2);
-        return { partial: { monthlyLimitEur: n }, label: `Limite di spesa mensile → ${eur}€` };
+        const eur = n.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
+        return { partial: { monthlyLimitEur: n }, label: `Limite di spesa mensile → ${eur} €` };
       },
     },
 
@@ -1293,6 +1310,43 @@
         return { partial: { dictation: { cancelSec } }, label: `Tempo per annullare l'invio vocale → ${String(cancelSec).replace('.', ',')} s` };
       },
     },
+    // ── #868: quanto filo la chat ha davanti (vince il minore dei due tetti) ──
+    {
+      scrive: ['contestoFilo.giorni'],
+      aiuto: 'giorni 0,5-365, o "predefinito" (quanti giorni di conversazioni, da tutte le schede, la chat ha davanti a ogni messaggio)',
+      keys: ['giorni_ricordati', 'giorni ricordati', 'giorni di memoria della chat', 'giorni di conversazione', 'giorni del contesto',
+        'memoria della chat in giorni', 'contestofilo.giorni'],
+      costo: 2,
+      risk: 'Più giorni: Filo ricorda più conversazioni senza cercarle, ma ogni messaggio costa di più e la risposta può arrivare più tardi. Meno giorni: costa meno, e il resto lo ritrova cercando.',
+      build(v) {
+        if (predefinito(v)) return { partial: { contestoFilo: { giorni: null } }, label: 'Giorni di conversazioni che la chat ricorda → come i predefiniti' };
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        let n = parseItalianNumber(s.replace(/^(un|una|uno)\b/, '1'));
+        if (!Number.isFinite(n)) return null;
+        if (/\bor[ae]\b/.test(s)) n /= 24;
+        else if (/settiman/.test(s)) n *= 7;
+        else if (/\bmes[ei]\b/.test(s)) n *= 30;
+        const giorni = contestoFilo().numeroIn(n, contestoFilo().LIMITI.giorni);
+        return { partial: { contestoFilo: { giorni } }, label: `Giorni di conversazioni che la chat ricorda → ${String(giorni).replace('.', ',')}` };
+      },
+    },
+    {
+      scrive: ['contestoFilo.token'],
+      aiuto: 'token 2.000-2.000.000, o "predefinito" (il tetto in token di quello che la chat ha davanti; vince il minore fra questo e i giorni)',
+      keys: ['token_ricordati', 'token ricordati', 'tetto del contesto', 'tetto di token', 'token del contesto', 'contestofilo.token'],
+      costo: 2,
+      risk: 'Un tetto più alto fa ricordare più conversazioni a ogni messaggio, e ogni messaggio costa di più; uno più basso costa meno e ricorda meno senza cercare.',
+      build(v) {
+        if (predefinito(v)) return { partial: { contestoFilo: { token: null } }, label: 'Tetto in token della chat → come i predefiniti' };
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        let n = parseItalianNumber(s);
+        if (!Number.isFinite(n)) return null;
+        if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
+        else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
+        const token = Math.round(contestoFilo().numeroIn(n, contestoFilo().LIMITI.token));
+        return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
+      },
+    },
     // ── #1004: cosa delle pagine va ai modelli senza che l'utente lo chieda ──
     {
       scrive: ['riassuntoSchede.enabled'],
@@ -1304,6 +1358,18 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { riassuntoSchede: { enabled: b } }, label: `Riassunto delle schede chiuse → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    {
+      scrive: ['security.riquadriRotti.modello'],
+      aiuto: 'true | false (un contenuto incorporato di un altro sito rimasto vuoto, che Filo non riconosce da solo, va in foto a un modello per capire se sono i cookie rifiutati; spento, nessuna foto parte e quel riquadro si riattiva col tasto destro)',
+      costo: 1,
+      keys: ['riquadri_rotti_modello', 'contenuti incorporati rotti', 'riconoscimento dei contenuti incorporati rotti',
+        'riconosci con un modello i contenuti incorporati rotti', 'riquadri rotti', 'riquadri rotti dai cookie', 'foto dei riquadri'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { riquadriRotti: { modello: b } } }, label: `Contenuti incorporati rotti guardati da un modello → ${b ? 'sì' : 'no'}` };
       },
     },
     interruttore({
@@ -1495,7 +1561,7 @@
     if (!testo) return { testo: '' };
     const C = global.SN_CONST;
     const n = C.agentStyleLength(testo);
-    if (n > C.LESSON_MAX) return { testo, rifiuto: `la lezione è lunga ${n} caratteri e il massimo è ${C.LESSON_MAX}` };
+    if (n > C.LESSON_MAX) return { testo, rifiuto: `la lezione è lunga ${cifre(n)} caratteri e il massimo è ${cifre(C.LESSON_MAX)}` };
     return { testo };
   }
 

@@ -8,6 +8,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { confermaSopraPagina, aspettaConfermaPronta, mouseClickConfirm, confirmState } from './helpers/confirm.mjs';
 
 const LARGO = 420;
 const ALTO = 300;
@@ -46,6 +47,16 @@ async function serve() {
     if (u.pathname === '/due') {
       const ri = (id) => `<iframe id="${id}" width="400" height="220" style="border:0" src="http://b.localhost:${porta}/post?n=${id}"></iframe>`;
       html(`<p>articolo</p>${ri('r1')}<p>mezzo</p>${ri('r2')}`);
+      return;
+    }
+    // Una pagina scritta contro Filo: la proposta trasparente, e sotto di lei una domanda innocua del sito (#592.6).
+    if (u.pathname === '/ostile') {
+      html(`<style>[data-filo-riquadro-cookie]{opacity:0 !important}
+        #finto{position:absolute;left:0;top:0;width:${LARGO}px;height:${ALTO}px;z-index:2147483645;background:#fff;
+          display:flex;justify-content:center;gap:10px;padding-top:40px;box-sizing:border-box}</style>
+        <p>articolo</p><div style="position:relative">
+        <iframe id="ri" width="${LARGO}" height="${ALTO}" style="border:0" src="http://b.localhost:${porta}/post"></iframe>
+        <div id="finto">Chiudo la pubblicità? <b>Sì</b> <b>No</b></div></div>`);
       return;
     }
     if (u.pathname === '/post') {
@@ -113,6 +124,8 @@ async function prepara(app, { risposta = '{"rotto": true, "servizio": "Cosmo"}' 
     globalThis.SN_URL_NAV.isHomeNetworkUrl = () => false;
     globalThis.__chiamateRiquadri = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // La home aperta scrive il suo saluto col modello: non è una chiamata dei riquadri.
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       const u = messages.find((m) => m.role === 'user');
       const img = Array.isArray(u.content) ? u.content.find((p) => p.type === 'image_url') : null;
       let misura = null;
@@ -144,6 +157,14 @@ async function aspettaProposta(app, frammento) {
   return lista[0];
 }
 
+// «Sì» sulla proposta apre il popup sopra la scheda (#592.6): è lì che il sì vale.
+async function si(app, page, p) {
+  await page.mouse.click(p.si.x, p.si.y);
+  const sopra = await confermaSopraPagina(app);
+  await aspettaConfermaPronta(sopra);
+  await mouseClickConfirm(sopra, 'ok');
+}
+
 const cookieVista = (app) => app.evaluate(async ({ session }) => {
   const lista = await session.defaultSession.cookies.get({ name: 'vista' });
   return lista.map((c) => ({ dominio: c.domain, session: !!c.session }));
@@ -168,7 +189,7 @@ test('servizio noto col segnaposto: la proposta compare senza il modello, «Sì�
     expect(p.si.y).toBeLessThan(p.riquadro.y);
     expect(await chiamate(app)).toEqual([]);
 
-    await page.mouse.click(p.si.x, p.si.y);
+    await si(app, page, p);
     await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('Il post: tramonto sul mare', { timeout: 10_000 });
     expect(await impostazioni(app)).toEqual(['b.localhost']);
     // Il servizio adesso tiene i suoi cookie come un sito dove sei entrato: non durano più solo la visita.
@@ -193,7 +214,7 @@ test('riquadro sconosciuto rotto: una chiamata al modello con l\'immagine del so
     expect(Math.abs(c[0].misura.width - LARGO)).toBeLessThanOrEqual(2);
     expect(Math.abs(c[0].misura.height - ALTO)).toBeLessThanOrEqual(2);
 
-    await page.mouse.click(p.si.x, p.si.y);
+    await si(app, page, p);
     await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('La mappa del quartiere', { timeout: 10_000 });
     expect(await impostazioni(app)).toEqual(['cosmo.localhost']);
     // Ricaricato e funzionante: non lo si riguarda.
@@ -273,7 +294,7 @@ test('in Privacy: «Sì» fa sopravvivere i cookie del servizio nello spazio del
 
     const page = await openTab(srv.art('b', 'post'));
     const p = await aspettaProposta(app, 'a.localhost');
-    await page.mouse.click(p.si.x, p.si.y);
+    await si(app, page, p);
     await expect(page.frameLocator('#ri').locator('#ok')).toBeVisible({ timeout: 10_000 });
 
     // Uscito dal sito (scheda chiusa, margine passato) lo spazio si butta: il riquadro di Fotogrammi resta servito.
@@ -304,7 +325,7 @@ test('rimandato all\'accesso su un altro sottodominio: la proposta compare sopra
     expect(p.visibile).toBe(true);
     expect(p.si.y).toBeGreaterThan(p.riquadro.y - ALTO / 2);
     expect(p.si.y).toBeLessThan(p.riquadro.y);
-    await page.mouse.click(p.si.x, p.si.y);
+    await si(app, page, p);
     await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('Il contenuto dopo l\'accesso', { timeout: 10_000 });
     expect(await chiamate(app)).toEqual([]);
   } finally {
@@ -408,6 +429,85 @@ test('il riquadro sconosciuto rotto scorso via prima della foto riceve la propos
     const p = await aspettaProposta(app, 'a.localhost');
     expect(p.visibile).toBe(true);
     expect((await chiamate(app)).length).toBe(1);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+// #1084: la foto al modello parte da sola, quindi si spegne. Spento, nessuna foto; le regole e il tasto destro restano.
+test('spento in Sicurezza: il riquadro sconosciuto non va al modello, il servizio noto sì, e il tasto destro lo riattiva', async ({ app, openTab }) => {
+  const srv = await serve();
+  const modello = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.riquadriRotti?.modello);
+  try {
+    await prepara(app);
+    const sec = await openTab('filo://security/');
+    const casella = sec.locator('#sec-riquadri-modello');
+    await expect(casella).toBeChecked({ timeout: 8_000 });
+    await expect(sec.locator('#sec-riquadri-modello-row')).toContainText('Riconosci con un modello i contenuti incorporati rotti');
+    await sec.locator('#sec-riquadri-modello-row').scrollIntoViewIfNeeded();
+    await sec.screenshot({ path: 'tests/.shots/riquadri-modello-interruttore.png' });
+    await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
+    await expect(sec.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
+    await sec.screenshot({ path: 'tests/.shots/riquadri-modello-interruttore-scuro.png' });
+    // In Manuale Filo non rifiuta cookie: l'interruttore non conta e si spegne a vista.
+    await sec.locator('#cookie-mode-manual').check();
+    await expect(casella).toBeDisabled();
+    await sec.locator('#cookie-mode-default').check();
+    await expect(casella).toBeEnabled();
+    await casella.click();
+    await expect.poll(modello, { timeout: 5_000 }).toBe(false);
+
+    const page = await openTab(srv.art('cosmo', 'vuoto'));
+    await expect(page.frameLocator('#ri').locator('button')).toBeVisible();
+    await page.waitForTimeout(10_000);
+    expect(await chiamate(app)).toEqual([]);
+    expect(await proposte(app, 'a.localhost')).toEqual([]);
+    const ri = page.frameLocator('#ri');
+    await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
+    await ri.locator('.sn-menu').getByText('Attiva i cookie di cosmo.localhost qui', { exact: true }).click();
+    await expect(ri.locator('#ok')).toHaveText('La mappa del quartiere', { timeout: 10_000 });
+
+    const noto = await openTab(srv.artSu('e', 'b', 'post'));
+    const p = await aspettaProposta(app, 'e.localhost');
+    expect(p.testo).toBe('Attivo i cookie di Fotogrammi per questo contenuto?');
+    expect(await chiamate(app)).toEqual([]);
+    await noto.close();
+
+    // Riacceso dalla chat, il riquadro sconosciuto di un'altra pagina torna dal modello.
+    const r = await app.evaluate(() => globalThis.SN_PREF.buildPreferencePartial('riquadri_rotti_modello', 'sì'));
+    await app.evaluate((_electron, partial) => globalThis.__filoHandlers.applySettingsUpdate(partial), r.partial);
+    await expect.poll(modello, { timeout: 5_000 }).toBe(true);
+    await expect(casella).toBeChecked({ timeout: 5_000 });
+    await openTab(srv.artSu('f', 'd', 'vuoto'));
+    await aspettaProposta(app, 'f.localhost');
+    expect((await chiamate(app)).length).toBe(1);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('una pagina che copre la proposta con una sua domanda: il «Sì» chiede nel popup sopra la scheda, e solo lì vale', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.pagina('ostile'));
+    const p = await aspettaProposta(app, 'a.localhost');
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('[data-filo-riquadro-cookie]')).opacity)).toBe('0');
+    await page.mouse.click(p.si.x, p.si.y);
+    // L'utente credeva di chiudere una pubblicità: il popup gli dice cosa sta per concedere, e lui annulla.
+    const sopra = await confermaSopraPagina(app);
+    const domanda = await confirmState(sopra);
+    expect(`${domanda.title}\n${domanda.text}`).toContain('Attivo i cookie di Fotogrammi per questo contenuto?');
+    await sopra.screenshot({ path: 'tests/.shots/riquadro-rotto-conferma.png' });
+    await aspettaConfermaPronta(sopra);
+    await mouseClickConfirm(sopra, 'cancel');
+    await expect.poll(() => confirmState(sopra).catch(() => null), { timeout: 5_000 }).toBe(null);
+    await page.waitForTimeout(500);
+    expect(await impostazioni(app)).toEqual([]);
+    // La proposta resta: un altro «Sì», confermato nel popup, attiva davvero.
+    await si(app, page, p);
+    await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('Il post: tramonto sul mare', { timeout: 10_000 });
+    expect(await impostazioni(app)).toEqual(['b.localhost']);
   } finally {
     await srv.chiudi();
   }

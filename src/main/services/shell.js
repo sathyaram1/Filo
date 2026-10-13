@@ -114,6 +114,20 @@ function cartellaViva(p) {
   try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
+// Le lettere d'unità viste puntare a un altro computer: `pushd \\host\x` di cmd ne crea una, e da lì un `dir`
+// manda nomi a quel computer come col percorso scritto per intero (#1072). Fuori da Windows non ci sono lettere.
+const _unita = new Map();
+function unitaDiRete(cwd, { win = process.platform === 'win32', realpath = (p) => fs.realpathSync.native(p) } = {}) {
+  if (!win) return [];
+  const m = /^([A-Za-z]):/.exec(String(cwd || ''));
+  const u = m && `${m[1].toLowerCase()}:`;
+  if (u && !_unita.has(u)) {
+    // Windows risolve un'unità di rete nel suo percorso `\\host\cartella`; un errore non si ricorda, si riprova.
+    try { _unita.set(u, /^(?:[\\/]{2}[^\\/?.]|\\\\\?\\UNC\\)/i.test(realpath(`${u}\\`))); } catch (_) {}
+  }
+  return [..._unita].filter(([, rete]) => rete).map(([u]) => u);
+}
+
 // La cartella iniziale può arrivare da uno stato persistito (#259: "riparti da
 // dove eri"): se nel frattempo è stata cancellata/rinominata, spawnare con una
 // cwd inesistente farebbe morire la shell. Ripieghiamo sulla home. I path in
@@ -489,8 +503,12 @@ function existenceProbes({ shell, cmd }) {
   ];
 }
 
+// Largo perché il danno vero è un falso negativo, un comando valido colorato di rosso. Le prove passano la loro
+// attesa: con la macchina carica anche `where.exe` supera i dieci secondi (#1063).
+const ATTESA_PROBE_MS = 10000;
+
 // Esegue UN probe e risolve true se il processo esce con codice 0.
-function runProbe({ file, args, env: probeEnv }, cwd) {
+function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS) {
   return new Promise((resolve) => {
     let done = false;
     let proc;
@@ -501,18 +519,13 @@ function runProbe({ file, args, env: probeEnv }, cwd) {
       const env = probeEnv ? { ...process.env, ...probeEnv } : undefined;
       proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve(false); return; }
-    // Timeout difensivo: un resolver che si impalla non deve restare appeso.
-    // Largo di proposito (10s): qui un falso negativo è il danno vero — un
-    // comando valido colorato di rosso — mentre una risposta lenta è solo
-    // lenta. Sotto carico (antivirus su node_modules fresco, suite di test in
-    // parallelo) anche `where.exe` può metterci secondi.
-    const timer = setTimeout(() => finish(false), 10000);
+    const timer = setTimeout(() => finish(false), attesaMs);
     proc.on('error', () => { clearTimeout(timer); finish(false); });
     proc.on('exit', (code) => { clearTimeout(timer); finish(code === 0); });
   });
 }
 
-async function commandExists({ shell, cwd, command } = {}) {
+async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS } = {}) {
   const cmd = String(command == null ? '' : command).trim();
   // Niente da controllare, o token chiaramente non un nome di comando
   // (newline/null): consideralo "non esiste".
@@ -522,7 +535,7 @@ async function commandExists({ shell, cwd, command } = {}) {
     return true;
   }
   for (const probe of existenceProbes({ shell, cmd })) {
-    if (await runProbe(probe, cwd)) return true;
+    if (await runProbe(probe, cwd, attesaMs)) return true;
   }
   return false;
 }
@@ -535,7 +548,7 @@ module.exports = {
   createSession, defaultCwd, commandExists, existenceProbes,
   // La cartella di lavoro, controllata in un posto solo (#551, quarto giro):
   // la usano il comando one-shot dell'assistente e il popup di conferma.
-  cartellaViva, cartellaPerComando, usableCwd,
+  cartellaViva, cartellaPerComando, usableCwd, unitaDiRete,
   // esportata per la guardia di regressione di #551: il comando che l'utente
   // digita non deve mai arrivare a PowerShell con byte fuori dall'ASCII.
   comandoPerPowerShell,

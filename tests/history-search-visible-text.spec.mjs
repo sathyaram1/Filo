@@ -5,6 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 // Feedback #321: nella Cronologia AI la casella "Cerca" restituiva risultati
 // anche per parole che non compaiono da nessuna parte nelle voci mostrate.
@@ -63,7 +64,7 @@ test('history search: ignora le chiavi interne del payload, cerca solo i testi v
   });
 
   try {
-    const shell = await app.firstWindow();
+    const shell = await primaFinestra(app);
     await shell.waitForLoadState('domcontentloaded');
     await shell.evaluate(() => window.filoShell.tabs.open('filo://history/history.html'));
     const page = await findTabPage(app, 'history');

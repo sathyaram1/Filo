@@ -31,6 +31,7 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parolaDellaCostruzione, DOVE_VA_LA_PAROLA } from './build-alarm.mjs';
 
 // Dove vive il server. `FILO_ROUTINE_API` esiste per i test e per un eventuale
 // ambiente di prova: NON è un segreto, è solo un indirizzo.
@@ -98,7 +99,7 @@ export function messageForBump(reply) {
         + '  È voluto: un aumento a raffica brucia numeri di versione. Riprova al prossimo giro.';
     case 'denied':
       return '[release-bump] RIFIUTATO: il server non riconosce la parola d’ordine della costruzione.\n'
-        + '  Va rigenerata e rimessa nel segreto FILO_BUILD_PASSPHRASE del repo.';
+        + `  Va rigenerata e rimessa come FILO_BUILD_PASSPHRASE ${DOVE_VA_LA_PAROLA}.`;
     case 'rejected':
       return `[release-bump] RIFIUTATO: ${r.reason}.\n`
         + '  Il manifesto su main non è come il server se lo aspetta: niente è cambiato.';
@@ -141,7 +142,7 @@ export async function askServerBump({ passphrase, fetchImpl = fetch, url = RELEA
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const reply = await askServerBump({ passphrase: process.env.FILO_BUILD_PASSPHRASE || '' });
+  const reply = await askServerBump({ passphrase: parolaDellaCostruzione() });
   const code = exitCodeForBump(reply);
   console.error(messageForBump(reply));
   // Su stdout SOLO il numero, e solo se c'è: è quello che il lavoro di

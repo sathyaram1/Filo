@@ -263,6 +263,10 @@ test('#592 — in Preferenze uno stile oltre il tetto non si salva e lo dice', a
   await expect(nota).toBeVisible();
   await expect(nota).toContainText(`${troppo.length} caratteri, il massimo è ${max}`);
   await expect(nota).toHaveClass(/agent-style-over/);
+  // Dalle quattro cifre il conto prende il punto delle migliaia, come ogni numero di Filo.
+  await page.fill('#agentStyleText', 'a'.repeat(1234));
+  await expect(nota).toContainText('Troppo lungo: 1.234 caratteri');
+  await page.fill('#agentStyleText', troppo);
   await expect(page.locator('#agentStyleText')).toHaveValue(troppo);
   await page.waitForTimeout(800);
   expect(await storedStyle(app)).toBe(quasi);

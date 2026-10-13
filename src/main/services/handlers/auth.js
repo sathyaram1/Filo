@@ -3,6 +3,7 @@
 
 const path = require('node:path');
 const auth = require('../../auth/google-auth');
+const ProdottiGoogle = require('../../auth/prodottiGoogle');
 const Defaults = require('../defaultsStore');
 const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
@@ -67,6 +68,20 @@ function erroreSegno(e) {
   if (ERRORI_SEGNO[code]) return detail ? `${ERRORI_SEGNO[code]} (${detail})` : ERRORI_SEGNO[code];
   if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}${detail ? `: ${detail}` : ''}.`;
   // `fetch` fallisce con un TypeError quando il server non si raggiunge; il resto ha già la sua frase.
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Un errore di ownerDomande detto all'owner. Prima del deploy la callable non esiste (404 senza codice del
+// protocollo): lo si dice, non «riprova». Un 404 col codice è una domanda che non c'è, e la frase è del server.
+function erroreDomande(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.';
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere le domande: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
   if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
   return e?.message || 'Non riuscito.';
 }
@@ -286,9 +301,28 @@ module.exports = function register(on, ctx) {
     const signedIn = auth.isSignedIn();
     const isAdmin = auth.isAdmin();
     if (!daFilo(origin, sender)) return { ok: true, signedIn, isAdmin };
-    const uid = signedIn ? await auth.getUid() : null;
-    return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
+    // `senzaRete`: chi apre un menu non aspetta il rinnovo del token che serve all'uid.
+    const conUid = !(msg && msg.senzaRete);
+    const uid = signedIn && conUid ? await auth.getUid() : null;
+    // Se una scheda nuova su Google troverebbe un account: il menu dell'account ne fa le sue voci (#1123).
+    let googleNelleSchede = false;
+    try { googleNelleSchede = await require('../accessoGoogle').collegatoNelleSchede(); } catch (_) {}
+    const out = { ok: true, signedIn, isAdmin, profile: auth.getProfile(), remembered: auth.isRemembered(), googleNelleSchede };
+    return conUid ? { ...out, uid } : out;
   });
+
+  // YouTube, Gmail e Drive nelle schede per chi è dentro Filo (#1123). Solo da Filo: un sito non apre pagine d'accesso.
+  on(MSG.AUTH_COLLEGA_GOOGLE, soloFilo(async (msg, sender) => {
+    const win = sender && sender.win;
+    let daUrl = '';
+    try {
+      const tabs = win && win._filoTabs;
+      const attiva = tabs && tabs.tabs.find((t) => t.id === tabs.activeId);
+      daUrl = (attiva && attiva.url) || '';
+    } catch (_) {}
+    try { return ProdottiGoogle.collega({ daUrl, finestra: win }); }
+    catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  }));
 
   // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
   // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.
@@ -352,21 +386,8 @@ module.exports = function register(on, ctx) {
       // metà dei due testi (il report, cifrato, è `notes`). Va inoltrata, o la
       // dashboard resta l'unica strada da cui quella metà si perde.
       const { id, status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride } = msg;
-      // «Fondi senza chiedermelo» su questa pratica: la pagina manda solo
-      // sì/no, il CHI lo mette il main dalla sessione (l'email del token, la
-      // stessa che le regole vedono) — non è un dato che la pagina possa
-      // raccontare. `true` → { by, at }; `false` → il campo si toglie.
-      let mergePreapproved;
-      if (typeof msg.mergePreapproved === 'boolean') {
-        if (msg.mergePreapproved) {
-          let email = '';
-          try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
-          mergePreapproved = { by: email || 'owner', at: new Date().toISOString() };
-        } else {
-          mergePreapproved = null;
-        }
-      }
-      // «Solo in locale» (#908): stesso patto, il CHI lo mette il main.
+      // «Solo in locale» (#908): la pagina manda solo sì/no, il CHI lo mette il main dalla sessione (l'email del
+      // token, la stessa che le regole vedono). La fiducia non passa di qui: la scrive il server (FIDUCIA_SEGNA).
       let localOnly;
       if (typeof msg.localOnly === 'boolean') {
         let email = '';
@@ -381,11 +402,9 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
-      // «È mio» (#908): l'unico valore che l'owner può dare è la sua prova.
-      const senderProof = msg.senderProof === 'admin' ? 'admin' : undefined;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
@@ -402,11 +421,8 @@ module.exports = function register(on, ctx) {
       // dritti su quello, e l'età non conta più.
       await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
-      // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
-      // glielo dice il main, che è l'unico a saperlo. Anche il quando, che per
-      // la pagina è l'identità del segno (#701).
-      if (localOnly) return { ok: true, by: localOnly.by, at: localOnly.at };
-      return mergePreapproved ? { ok: true, by: mergePreapproved.by, at: mergePreapproved.at } : { ok: true };
+      // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
+      return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
       // Nel registro, non solo nella risposta: la pagina può aver cambiato
@@ -587,7 +603,11 @@ module.exports = function register(on, ctx) {
     try {
       await Defaults.refreshIfStale().catch(() => {});
       const d = Defaults.get();
-      return { ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {} };
+      const FC = globalThis.SN_FILO_CONTESTO;
+      return {
+        ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
+        contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
+      };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -720,6 +740,29 @@ module.exports = function register(on, ctx) {
         accountAOff: msg.accountAOff,
         accountBOff: msg.accountBOff,
       }, idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  // Modello e sforzo del worker per fase (config/routines.roleModels). Owner-only. Le legge il server
+  // quando consegna un biglietto: cambiarle qui vale dal prossimo.
+  on(MSG.AUTOMATION_ROLE_MODELS_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return { ok: true, roleModels: await Defaults.getRoutineRoleModels(idToken) };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
+  on(MSG.AUTOMATION_ROLE_MODELS_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const r = await Defaults.setRoutineRoleModel({ ruolo: msg.ruolo, campo: msg.campo, valore: msg.valore }, idToken);
+      return Object.assign({ ok: true }, r);
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -1463,6 +1506,91 @@ module.exports = function register(on, ctx) {
     // Una risposta di `clear` che non riporta l'ora la conosce comunque chi l'ha chiesta.
     if (action === 'clear' && !out.flagged && !out.clearedAt) out.clearedAt = new Date().toISOString();
     return out;
+  }));
+
+  // Le domande all'owner (#1149): il main fa solo da tramite verso ownerDomande. Le azioni le applica il server,
+  // che decide anche chi ha scritto ogni turno: la pagina non può dichiararlo.
+  async function chiamaDomande(data) {
+    let r;
+    try {
+      r = await callSecurityFunction('ownerDomande', data);
+    } catch (e) {
+      return { ok: false, error: erroreDomande(e) };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sulle domande.' };
+    return r;
+  }
+
+  on(MSG.DOMANDE_ELENCO, ownerOnly(async (msg) => {
+    const data = { op: 'elenco' };
+    if (Number.isFinite(msg?.dopo) && msg.dopo > 0) data.dopo = msg.dopo;
+    if (msg?.tutte === true) data.tutte = true;
+    const r = await chiamaDomande(data);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      domande: Array.isArray(r.domande) ? r.domande : [],
+      riferimenti: r.riferimenti && typeof r.riferimenti === 'object' ? r.riferimenti : {},
+      adesso: Number(r.adesso) || 0,
+      // Oltre il tetto dell'elenco il server lo dice: la pagina non deve credere di vederle tutte.
+      altre: r.altre === true,
+    };
+  }));
+
+  on(MSG.DOMANDA_MOSTRA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda da mostrare.' };
+    const r = await chiamaDomande({ op: 'mostra', id });
+    if (!r.ok) return r;
+    return { ok: true, domanda: r.domanda || null, riferimenti: r.riferimenti || {} };
+  }));
+
+  on(MSG.DOMANDA_RISPONDI, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda a cui rispondere.' };
+    const data = { op: 'rispondi', id };
+    if (Number.isInteger(msg?.scelta)) data.scelta = msg.scelta;
+    if (typeof msg?.testo === 'string' && msg.testo.trim()) data.testo = msg.testo;
+    if (data.scelta === undefined && data.testo === undefined) return { ok: false, error: 'Scegli un’opzione o scrivi una risposta.' };
+    const r = await chiamaDomande(data);
+    if (!r.ok) return r;
+    return { ok: true, domanda: r.domanda || null, esito: r.esito || null };
+  }));
+
+  on(MSG.DOMANDE_CONSIGLIO, ownerOnly(async (msg) => {
+    const ids = Array.isArray(msg?.ids) ? msg.ids.map((x) => String(x || '').trim()).filter(Boolean) : [];
+    if (!ids.length) return { ok: false, error: 'Nessuna domanda selezionata.' };
+    const r = await chiamaDomande({ op: 'consiglio', ids });
+    if (!r.ok) return r;
+    return { ok: true, esiti: Array.isArray(r.esiti) ? r.esiti : [] };
+  }));
+
+  for (const [tipo, op] of [[MSG.DOMANDA_ARCHIVIA, 'archivia'], [MSG.DOMANDA_RIAPRI, 'riapri']]) {
+    on(tipo, ownerOnly(async (msg) => {
+      const id = String(msg?.id || '').trim();
+      if (!id) return { ok: false, error: 'Manca la domanda.' };
+      const r = await chiamaDomande({ op, id });
+      if (!r.ok) return r;
+      return { ok: true, domanda: r.domanda || null };
+    }));
+  }
+
+  // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
+  on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    const togli = msg?.fidato === false;
+    if (!feedbackId) return { ok: false, error: 'Manca il feedback da segnare fidato.' };
+    let r;
+    try {
+      r = await callSecurityFunction('ownerFiducia', { op: togli ? 'togli' : 'segna', feedbackId });
+    } catch (e) {
+      if (e?.httpStatus === 404) return { ok: false, error: 'La funzione «segna fidato» non è ancora pubblicata sul server.' };
+      if (String(e?.code || '').toUpperCase() === 'PERMISSION_DENIED') return { ok: false, error: 'Il server dice che questo account non può segnare fidato: serve quello del proprietario.' };
+      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
+    return { ok: true, fiducia: togli ? 'non_fidato' : 'fidato' };
   }));
 
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {

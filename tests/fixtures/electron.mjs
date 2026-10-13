@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
+import { primaFinestra } from '../helpers/primaFinestra.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
@@ -82,12 +83,17 @@ function registraUsciteApp(app) {
   ].join('\n');
 }
 
+// Chi apre Filo in una prova è già stato accolto (FILO_TEST_ACCOLTO, da playwright.config.js). Una prova
+// dell'accoglienza parte dal profilo nuovo con `test.use({ accoglienzaFatta: false })`.
 export const test = base.extend({
-  app: async ({}, use, testInfo) => {
+  accoglienzaFatta: [true, { option: true }],
+
+  app: async ({ accoglienzaFatta }, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
     const userData = cartellaTemporanea('filo-test-');
+    if (typeof accoglienzaFatta !== 'boolean') throw new Error(`accoglienzaFatta vuole true o false, non ${JSON.stringify(accoglienzaFatta)}`);
     const app = await electron.launch({
       // host-resolver-rules:
       //  • "blocked.test" al loopback, così l'e2e del blocco siti
@@ -113,6 +119,7 @@ export const test = base.extend({
       env: {
         ...process.env,
         FILO_USER_DATA: userData,
+        FILO_TEST_ACCOLTO: accoglienzaFatta ? '1' : '0',
         // I download ("Salva immagine come…") finiscono qui SENZA dialogo
         // nativo (impossibile da automatizzare headless). Vive dentro
         // userData così viene ripulito insieme al resto.
@@ -141,7 +148,7 @@ export const test = base.extend({
   // Pagina della shell del browser (tab bar + barra indirizzi). È la prima
   // window che Filo apre.
   shell: async ({ app }, use) => {
-    const win = await app.firstWindow();
+    const win = await primaFinestra(app);
     await win.waitForLoadState('domcontentloaded');
     await use(win);
   },
@@ -202,17 +209,18 @@ export const test = base.extend({
         res.end(asset.body);
         return;
       }
-      const html = pages.get(id);
-      if (!html) { res.writeHead(404); res.end('not found'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
+      const page = pages.get(id);
+      if (!page) { res.writeHead(404); res.end('not found'); return; }
+      res.writeHead(200, { ...page.headers, 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(page.body);
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port;
     const api = {
-      html(body, { pubblico = false } = {}) {
+      // `headers`: intestazioni della risposta, per i siti che le usano per stringere la pagina (CSP).
+      html(body, { pubblico = false, headers = {} } = {}) {
         const id = String(++nextId);
-        pages.set(id, body);
+        pages.set(id, { body, headers });
         return `${pubblico ? this.originPubblico : this.origin}/${id}`;
       },
       /** Serve dei byte a un indirizzo di questo server e torna la URL. */

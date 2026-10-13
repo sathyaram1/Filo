@@ -19,6 +19,7 @@ import { createServer } from 'node:http';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const OWNER_EMAIL = 'owner@prova.test';
 const OWNER_REFRESH = 'rt-owner';
@@ -220,7 +221,7 @@ async function dirottaFirestore(app, b) {
 // host, e owner.html ha lo stesso host di credits.html.
 async function apriOwner(app) {
   const url = 'filo://credits/owner.html';
-  const shell = await app.firstWindow();
+  const shell = await primaFinestra(app);
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   const deadline = Date.now() + 15_000;
   let page = null;

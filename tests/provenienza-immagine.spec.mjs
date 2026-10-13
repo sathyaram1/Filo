@@ -435,7 +435,7 @@ test('credenziali valide nel formato del 2023: il menu non dice che la firma non
   expect((await riga.isVisible()) ? await riga.getAttribute('aria-label') : '').not.toMatch(/non è valida/);
 });
 
-// Le immagini non tornano nei turni dopo: la domanda fatta al messaggio seguente deve trovare l'esito (#946).
+// La domanda fatta al messaggio seguente trova l'esito (#946), insieme all'immagine che torna col suo messaggio (#1166).
 test('nella chat della Home, «è fatta con l’AI?» al messaggio dopo l’immagine trova lo stesso esito', async ({ app, openTab }) => {
   await modelloFinto(app);
   const home = await openTab('filo://newtab/');
@@ -459,7 +459,7 @@ test('nella chat della Home, «è fatta con l’AI?» al messaggio dopo l’imma
   await home.locator('#sendBtn').click();
   await expect.poll(() => app.evaluate(turno, 'ed è fatta con'), { timeout: 20000 }).not.toBe('');
   const secondo = await app.evaluate(turno, 'ed è fatta con');
-  expect(secondo).not.toContain('data:image');
+  expect(secondo).toContain('data:image');
   expect(secondo).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
   expect(secondo).toContain('messaggi precedenti di questa chat');
 });
@@ -475,7 +475,7 @@ async function copiaEIncollaInChat(app, openTab, testServer, src, domanda) {
   await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 10000 });
   await app.evaluate(({ clipboard }) => clipboard.clear());
   await menu.getByText('Copia immagine', { exact: true }).click();
-  await expect.poll(() => app.evaluate(({ clipboard }) => !clipboard.readImage().isEmpty()), { timeout: 8000 }).toBe(true);
+  await expect.poll(() => app.evaluate(async ({ clipboard }) => (await clipboard.read()).some((v) => v.types.some((t) => t.startsWith('image/')))), { timeout: 8000 }).toBe(true);
 
   const home = await openTab('filo://newtab/');
   await expect(home.locator('#input')).toBeVisible({ timeout: 10000 });

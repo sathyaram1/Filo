@@ -39,6 +39,9 @@ test('assertPublicHost blocca localhost e IP privati letterali', async () => {
   await assert.rejects(() => assertPublicHost('printer.local'));
   await assert.rejects(() => assertPublicHost('127.0.0.1'));
   await assert.rejects(() => assertPublicHost('169.254.169.254'));
+  // URL.hostname di un IPv6 ha le quadre: è un indirizzo da classificare, non un nome da chiedere al DNS.
+  await assert.rejects(() => assertPublicHost(new URL('http://[::1]/').hostname), /blocked-private-address/);
+  await assert.rejects(() => assertPublicHost('[fd00::1]'), /blocked-private-address/);
 });
 
 test('safeFetch rifiuta schemi non http/https', async () => {

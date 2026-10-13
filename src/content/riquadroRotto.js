@@ -276,8 +276,25 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     controllo = null;
   }
 
-  function rispondi(p, si, e) {
-    if (!e || !e.isTrusted) return;
+  // Il sì si dà nel popup sopra la scheda: la barra sta nel documento del sito, che la rende invisibile e ci
+  // disegna sotto una domanda sua (#592.6). Il no non concede niente e resta qui.
+  async function rispondi(p, si, e) {
+    if (!e || !e.isTrusted || p.chiede) return;
+    if (si) {
+      const Ui = global.SN_CONFIRM_UI;
+      p.chiede = true;
+      let ok = false;
+      try {
+        ok = !!Ui && await Ui.confirm({
+          title: t('riquadro_cookie_domanda', p.nome),
+          text: t('riquadro_cookie_conferma', p.nome),
+          okLabel: t('riquadro_cookie_attiva'),
+          cancelLabel: t('riquadro_cookie_no'),
+        });
+      } catch (_) { ok = false; }
+      p.chiede = false;
+      if (!ok || proposte.get(p.token) !== p) return;
+    }
     ask({ type: T_RISPOSTA, token: p.token, si });
     if (!si) { togli(p.token); return; }
     p.bar.classList.add('fatto');

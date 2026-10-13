@@ -13,6 +13,8 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
@@ -174,13 +176,18 @@ export function frontmatter(testo) {
   return out;
 }
 
-export function modelloDelRuolo(ruolo, root = ROOT) {
+/** Modello e sforzo di un ruolo: quelli che il server ha deciso per il lavoro (#1189), campo per campo, se ci sono; altrimenti il frontmatter. */
+export function modelloDelRuolo(ruolo, root = ROOT, dalServer = null) {
   const nome = AGENTE_DEL_RUOLO[ruolo];
   const f = join(root, '.claude', 'agents', `${nome}.md`);
   if (!existsSync(f)) throw new Error(`manca ${f}: modello e sforzo del ${ruolo} si leggono da lì`);
   const fm = frontmatter(readFileSync(f, 'utf8'));
   if (!fm.model || !fm.effort) throw new Error(`${f} senza model o effort nel frontmatter`);
-  return { model: fm.model, effort: fm.effort };
+  const d = dalServer || {};
+  // Un valore che non conosciamo non ripiega in silenzio sul frontmatter: sarebbe un'istanza col modello sbagliato.
+  if (d.model && !MODELLI.includes(d.model)) throw new Error(`modello deciso dal server sconosciuto: «${d.model}» (noti: ${MODELLI.join(', ')})`);
+  if (d.effort && !SFORZI.includes(d.effort)) throw new Error(`sforzo deciso dal server sconosciuto: «${d.effort}» (noti: ${SFORZI.join(', ')})`);
+  return { model: d.model || fm.model, effort: d.effort || fm.effort };
 }
 
 const confrontaVersioni = (a, b) => {
@@ -233,9 +240,12 @@ export function leggiUscitaClaude(stdout, stderr = '', code = 0) {
 
 // Le variabili della sessione che lancia: un'istanza figlia che le eredita si crede dentro di lei (e CLAUDE_EFFORT batte --effort).
 const DELLA_SESSIONE = /^(CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_ID|HOST_SESSION_ID|CHILD_SESSION|SESSION_ATTENDED|ENTRYPOINT|EXECPATH|MESSAGING_\w+|SDK_HAS_HOST_AUTH_REFRESH))$/;
-/** L'ambiente di un'istanza figlia. PURA. */
-export function envFiglio(env) {
-  return Object.fromEntries(Object.entries(env || {}).filter(([k]) => !DELLA_SESSIONE.test(k)));
+/** L'ambiente di un'istanza figlia: senza la sessione che lancia, ma col suo biglietto (#1148). */
+export function envFiglio(env, { cwd = process.cwd() } = {}) {
+  const out = Object.fromEntries(Object.entries(env || {}).filter(([k]) => !DELLA_SESSIONE.test(k)));
+  const biglietto = percorsoDiChiLancia({ env: env || {}, cwd });
+  if (biglietto) out[ENV_BIGLIETTO] = biglietto;
+  return out;
 }
 
 /** `claude auth status` → l'istanza figlia avrà un accesso suo? PURA. */
@@ -345,9 +355,13 @@ function depVere(P, opz, log) {
   return {
     store: negozio(join(P.note, 'stato.json')),
     esegui,
-    async claude({ ruolo, prompt, cwd, addDirs, nome }) {
+    async claude({ ruolo, prompt, cwd, addDirs, nome, dalServer }) {
+      let scelta;
+      try { scelta = dalServer ? modelloDelRuolo(ruolo, ROOT, dalServer) : ruoli[ruolo]; } catch (e) {
+        return { ok: false, testo: '', costo: 0, errore: e.message };
+      }
       for (const d of addDirs || []) mkdirSync(d, { recursive: true });
-      const r = await esegui(bin, argomentiClaude({ ...ruoli[ruolo], nome, addDirs, budget: opz.budgetIstanza }), {
+      const r = await esegui(bin, argomentiClaude({ ...scelta, nome, addDirs, budget: opz.budgetIstanza }), {
         cwd, input: prompt, env, timeoutMs: opz.oreIstanza * 60 * 60_000,
       });
       const f = join(P.note, 'log', `${nome.replace(/[^a-z0-9]+/gi, '-')}-${new Date().toISOString().replace(/[:.]/g, '')}.json`);
@@ -392,8 +406,8 @@ function depAVuoto(P, stato, log) {
       const r = finto(cmd, args, cwd);
       return { ...r, stdout: r.out };
     },
-    claude: async ({ ruolo, cwd, nome }) => {
-      log(`[a vuoto] claude -p (${ruolo}, ${JSON.stringify(modelloDelRuolo(ruolo))}) «${nome}» in ${cwd}`);
+    claude: async ({ ruolo, cwd, nome, dalServer }) => {
+      log(`[a vuoto] claude -p (${ruolo}, ${JSON.stringify(modelloDelRuolo(ruolo, ROOT, dalServer))}) «${nome}» in ${cwd}`);
       if (ruolo === 'verificatore') giri.set(cwd, 'superata');
       return { ok: true, testo: 'fatto', costo: 0 };
     },
@@ -476,6 +490,9 @@ async function main(argv) {
     const pid = inCorso();
     console.log(pid ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
     if (!(s.coda || []).length) console.log('Coda vuota.');
+    // Le domande le scrivono i lavoratori, che leggono testo d'utente: chi le legge si sporca prima (#1148).
+    const conDomande = (s.coda || []).filter((n) => s.pratiche[n] && s.pratiche[n].fermo && s.pratiche[n].fermo.domanda);
+    if (conDomande.length) console.log(await rigaSporco(`stato dei lavori locali (${conDomande.map((n) => `#${n}`).join(', ')})`, ['domande scritte dai lavoratori']));
     for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n]));
     return 0;
   }

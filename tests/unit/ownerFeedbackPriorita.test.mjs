@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -200,7 +201,7 @@ globalThis.fetch = async (url, opts = {}) => {
   return new Response(JSON.stringify({ name: doc.name, fields }), { status: 200 });
 };`);
   const lancia = (args, env = {}) => spawnSync(process.execPath, ['--import', pathToFileURL(finto).href, SCRIPT, ...args], {
-    encoding: 'utf8', timeout: 60000,
+    encoding: 'utf8', timeout: TETTO_ATTESA_MS,
     env: { ...process.env, FILO_ADMIN_REFRESH_TOKEN: 'finto', FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '', ...env },
   });
   const scritte = () => (existsSync(registro) ? readFileSync(registro, 'utf8').trim().split('\n').filter(Boolean).map((r) => JSON.parse(r)) : []);
@@ -232,7 +233,7 @@ test('riga di comando: valori sbagliati e accoppiate che la perderebbero si rifi
     assert.equal(r.status, 1, `«${v}»`);
     assert.match(r.stderr, /RIFIUTATO: .*0, 1, 2, 3 — non ho toccato niente/, `«${v}»: ${r.stderr}`);
   }
-  for (const altre of [['--frase', 'ciao'], ['--preapprova'], ['--solo-locale'], ['--come-routine']]) {
+  for (const altre of [['--frase', 'ciao'], ['--solo-locale'], ['--come-routine']]) {
     const r = lancia(['fid', '--priorita', '3', ...altre], senzaCredenziali);
     assert.equal(r.status, 1, altre.join(' '));
     assert.match(r.stderr, /--priorita senza stato va da sola/, r.stderr);

@@ -425,8 +425,9 @@ function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, pr
   } catch (e) {
     return { esiti, motivo: `non sono riuscito a rimettere le prove com'erano a ${String(sha).slice(0, 8)}: ${e.message}` };
   } finally {
-    for (const c of cartelle) rmSync(resolve(base, percorsoRipristino(`${c}/x`, etichetta), '..'), { recursive: true, force: true });
-    if (rapporti) rmSync(rapporti, { recursive: true, force: true });
+    // I tentativi: su Windows i processi del rilancio appena usciti tengono ancora le cartelle per un poco (#1063).
+    for (const c of cartelle) rmSync(resolve(base, percorsoRipristino(`${c}/x`, etichetta), '..'), { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    if (rapporti) try { rmSync(rapporti, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (_) { /* resta nella temporanea */ }
     if (copia) togliCopia(copia, root);
   }
 }
@@ -455,7 +456,7 @@ function copiaConAiutiDi(sha, fuori, root) {
 
 function togliCopia(dir, root) {
   try { gitOut(['worktree', 'remove', '--force', join(dir, 'albero')], root); } catch (_) { /* la cartella si toglie sotto */ }
-  rmSync(dir, { recursive: true, force: true });
+  try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (_) { /* resta nella temporanea */ }
 }
 
 function leggiJson(file) {

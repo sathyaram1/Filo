@@ -8,7 +8,7 @@
 //
 // `create` appende il blocco al container che gli si dà e ritorna l'oggetto
 // `activity` che il turno di Filo si passa di mano in mano (pushReasoning,
-// working, addRow, addCommand, azioneSenzaRiga, absorbBubble, dropNote,
+// working, addRow, addCommand, azioneSenzaRiga, absorbBubble, aggiungiNota, dropNote,
 // fineGiro, fineDiretta, endTurn, taglia, finish, remove). Il filo che lo
 // disegna sta in filo-attesa.js. Il container è esplicito apposta: chi disegna un blocco decide
 // dove, invece di scoprire a posteriori che finisce sempre nelle bolle.
@@ -28,6 +28,7 @@
   let paroleUtente = () => [];
   let apriProposta = () => {};
   let archiviaAzione = () => {};
+  let sceltaAutonomiaEl = () => null;
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
@@ -174,6 +175,13 @@
       if (seg.esito || !seg.nodo) return;
       seg.esito = seg.voci.every((x) => x.voce.esito === 'fallita') ? 'cede' : 'tiene';
       if (seg.esito === 'cede') seg.nodo.cede(); else seg.nodo.tiene();
+    }
+    function togliSeg(seg) {
+      const i = segs.indexOf(seg);
+      if (i >= 0) segs.splice(i, 1);
+      if (viva === seg) viva = null;
+      if (aperta === seg) aperta = null;
+      seg.el.remove();
     }
     function chiudiSeg(seg) {
       if (!seg) return;
@@ -391,6 +399,11 @@
         if (!bubble || !bubble.isConnected) return;
         const text = (bubble.textContent || '').trim();
         bubble.remove();
+        this.aggiungiNota(text);
+      },
+      // Il testo di un giro venuto dopo una parte di risposta (#1167): la bolla resta, la nota entra qui.
+      aggiungiNota(testo) {
+        const text = String(testo || '').trim();
         if (!text) return;
         const note = document.createElement('div');
         note.className = 'dash-activity-note';
@@ -444,9 +457,12 @@
       finish({ failed = false } = {}) {
         closeTurnReasoning();
         inDiretta = false;
-        for (const s of segs) {
+        for (const s of [...segs]) {
           if (s.stato !== 'agisce') continue;
           if (s.voci.length) { chiudiNodo(s); continue; }
+          // #1188 — senza un'azione nominata non c'è niente che non sia partito: era il posto di una nota, poi
+          // diventata la risposta. Vuota se ne va, con una nota resta com'è.
+          if (!s.attese.size) { if (!s.testo && !s.corpo.querySelector('.dash-activity-note') && !s.esiti.childElementCount) togliSeg(s); continue; }
           // Nominata ma mai partita (fermata prima, o persa per strada): il nodo non tiene e la riga lo dice.
           scrivi(s, fermato ? 'Fermato qui' : 'Non partita');
           if (s.nodo && !s.esito) { s.esito = 'cede'; s.nodo.cede(); }
@@ -500,7 +516,8 @@
     // Un'azione fermata perché avrebbe portato fuori un segreto (#810): si vede anche a blocco chiuso.
     FERMATA: (n) => (n > 1 ? `fermato ${n} azioni` : 'fermato un\'azione'),
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
-    CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
+    CERCA_CHAT: (n) => (n > 1 ? `cercato nel filo ${n} volte` : 'cercato nel filo'),
+    RICORDO_FILO: () => 'ripescato un ricordo dal filo',
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
     CERCA_DOCUMENTI: (n) => (n > 1 ? `cercato fra i tuoi documenti ${n} volte` : 'cercato fra i tuoi documenti'),
     RINOMINA_FILE: () => 'dato un nome ai file',
@@ -596,6 +613,11 @@
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
+  // «lunedì 28 set»: il giorno di una conversazione senza titolo.
+  function quandoBreve(ts) {
+    const d = new Date(ts);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
+  }
   function frasiCambi(a) {
     const l = Array.isArray(a && a._cambi) ? a._cambi : [];
     return l.map((c) => pulito(c && c.frase)).filter(Boolean).join('; ');
@@ -643,9 +665,15 @@
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
     CERCA_CHAT: (a) => {
+      // Ripescati da Filo senza che il modello li chiedesse (#868): si dice da quali conversazioni.
+      if (a._auto) {
+        const r = (a._output && Array.isArray(a._output.results)) ? a._output.results : [];
+        const quali = r.map((x) => pulito(x.title) || quandoBreve(x.date)).filter(Boolean);
+        return { icon: '💬', text: `Ricordato dal filo${quali.length ? ` · ${quali.join('; ')}` : ''}`, tipo: 'RICORDO_FILO' };
+      }
       const q = String(a.query || a.testo || '').trim();
       if (a.id && !q) return { icon: '💬', text: 'Rileggo una conversazione di prima' };
-      return { icon: '💬', text: `Cerco fra le chat di prima: ${q}` };
+      return { icon: '💬', text: `Cerco nel filo: ${q}` };
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
     LEGGI_IMPOSTAZIONI: (a) => {
@@ -683,6 +711,7 @@
       return { icon: '🧠', text: `Dimenticato · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
     },
     ONBOARDING: (a) => {
+      if (sceltaAutonomia(a)) return { icon: '👋', text: 'Accoglienza · scelta dell’autonomia' };
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
       return { icon: '👋', text: `Accoglienza · ${ids.join(', ') || 'passo fatto'}` };
@@ -957,6 +986,11 @@
     return riga;
   }
 
+  // #1188 — nell'intervista Filo mostra i livelli di autonomia e l'utente sceglie: la scelta la disegna l'accoglienza.
+  function sceltaAutonomia(a) {
+    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaAutonomia === true;
+  }
+
   // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
   // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
   function apribileComunque(a) {
@@ -1051,7 +1085,7 @@
       // bottone è come si risponde.
       const anche = aspettaUtente(a)
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
-        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a);
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || sceltaAutonomia(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -1532,6 +1566,10 @@
           const refiner = buildAestheticRefiner(a);
           if (refiner) btn.after(refiner);
         }
+        if (r && r.executed && r.output && r.output.sceltaAutonomia === true) {
+          const scelta = sceltaAutonomiaEl({ ...a, _output: r.output });
+          if (scelta) btn.after(scelta);
+        }
       }
       btn._runConfirm = runConfirm;
       btn.addEventListener('click', runConfirm);
@@ -1595,6 +1633,7 @@
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
+    if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
@@ -1888,6 +1927,7 @@
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
     if (deps.apriProposta) apriProposta = deps.apriProposta;
     if (deps.archiviaAzione) archiviaAzione = deps.archiviaAzione;
+    if (deps.sceltaAutonomia) sceltaAutonomiaEl = deps.sceltaAutonomia;
   }
 
   global.SN_DASH_ATTIVITA = {

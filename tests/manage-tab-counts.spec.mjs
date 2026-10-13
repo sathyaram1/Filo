@@ -59,9 +59,9 @@ test('#495 — le quattro schede che elencano feedback dicono quante ne contengo
   await expect(tab(page, 'resolved')).toHaveText('Risolti (4)');
   await expect(tab(page, 'archived')).toHaveText('Archiviati (1)');
 
-  // Le altre quattro schede non elencano feedback: un numero lì non vorrebbe
-  // dire niente, e infatti non c'è.
-  for (const name of ['stats', 'models', 'automation', 'log']) {
+  // Le altre schede non elencano feedback: un numero lì non vorrebbe dire
+  // niente, e infatti non c'è.
+  for (const name of ['stats', 'automation', 'log']) {
     await expect(tab(page, name)).not.toHaveText(/\d/);
   }
 
@@ -157,7 +157,7 @@ test('#495 — negli Archiviati il numero segue il filtro ⭐ (dice quello che s
 test('#495 — a finestra stretta il nome e il suo numero restano sulla stessa riga', async ({ app, openTab }) => {
   // Larghezza minima consentita alla finestra (src/main/window.js: minWidth 720).
   await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows()[0];
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     if (w) w.setContentSize(720, 800);
   });
 

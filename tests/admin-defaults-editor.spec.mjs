@@ -29,9 +29,13 @@ async function openStubbedEditor(openTab, overrides = {}) {
       excludedProviders: null,
       ...over,
     };
+    // `__defaultsMinus`: la lista del codice tranne quelle voci, letta dal codice e
+    // non ricopiata, così una voce di serie nuova non sposta l'avviso del test.
     if (fakeConfig.excludedProviders == null) {
+      const minus = new Set(fakeConfig.__defaultsMinus || []);
       Object.defineProperty(fakeConfig, 'excludedProviders', {
-        get: () => (window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [],
+        get: () => ((window.SN_CONST && window.SN_CONST.DEFAULT_EXCLUDED_PROVIDERS) || [])
+          .filter((n) => !minus.has(n)),
       });
     }
     window.__sent = [];
@@ -62,6 +66,11 @@ async function openStubbedEditor(openTab, overrides = {}) {
               { name: 'Together', slug: 'together' },
             ],
           };
+        case 'audio_host_check': {
+          // Come il main: il verdetto dipende dalla lista di esclusione che la pagina manda (#1141).
+          const misto = msg.model === 'acme/misto' && Array.isArray(msg.excluded) && msg.excluded.includes('OpenAI');
+          return misto ? { ok: true, verdict: 'mixed', warning: `Con «${msg.label}» la lettura non parte.` } : { ok: true, verdict: 'ok' };
+        }
         case 'test_default_model':
           // Il main risponderebbe ok solo se riceve la stringa modello.
           if (!msg.model) return { ok: false, error: `Modello "${msg.nickname}" non trovato` };
@@ -205,6 +214,25 @@ test('la lista dei fornitori esclusi si modifica e si salva nella config condivi
   await page.screenshot({ path: 'tests/.shots/admin-defaults-excluded.png', fullPage: true }).catch(() => {});
 });
 
+test('voce e dettatura: l\'avviso del modello segue la lista dei fornitori esclusi che si sta modificando (#1141)', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    excludedProviders: ['Google', 'OpenAI'],
+    modelRegistry: { 'voce-mista': { provider: 'openrouter', model: 'acme/misto', label: 'Voce mista', inputs: ['text'], outputs: ['audio'] } },
+    models: { tts: 'voce-mista' },
+  });
+  const idx = await page.evaluate(() => window.SN_MODEL_CHAIN.actionLabels().findIndex(([a]) => a === 'tts'));
+  const avviso = page.locator('#modelsGrid > div').nth(idx).locator('.sn-chain-warn');
+  await expect(avviso).toHaveText('Con «Voce mista» la lettura non parte.');
+  const chiesto = await page.evaluate(() => window.__sent.filter((m) => m.type === 'audio_host_check').pop());
+  expect(chiesto).toMatchObject({ action: 'tts', provider: 'openrouter', model: 'acme/misto', excluded: ['Google', 'OpenAI'] });
+
+  // Tolto OpenAI dalla lista (non ancora salvata), l'avviso se ne va.
+  await page.locator('#excludedList .sn-excluded-row').nth(1).getByRole('button', { name: 'Rimuovi' }).click();
+  await expect(avviso).toBeHidden();
+  const dopo = await page.evaluate(() => window.__sent.filter((m) => m.type === 'audio_host_check').pop());
+  expect(dopo.excluded).toEqual(['Google']);
+});
+
 test('esclusioni del codice che la lista condivisa non copre: la pagina le nomina e le rimette', async ({ openTab }) => {
   // Lista remota vecchia: non contiene Novita (né gli altri aggiunti dopo).
   const page = await openStubbedEditor(openTab, { excludedProviders: ['Google', 'OpenAI'] });
@@ -313,9 +341,7 @@ test('ogni fornitore escluso dice perché, e il perché si salva', async ({ open
 // #541 giro 1: il nome che il menu scrive per Novita è quello del catalogo; la
 // pagina deve riconoscerlo come la voce del codice, e dargli il suo motivo.
 test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e il motivo segue', async ({ openTab }) => {
-  const page = await openStubbedEditor(openTab, {
-    excludedProviders: ['Google', 'OpenAI', 'xAI', 'DeepSeek', 'Mistral', 'Moonshot AI', 'MiniMax', 'Qwen', 'Cohere', 'Meta', 'Z.AI'],
-  });
+  const page = await openStubbedEditor(openTab, { __defaultsMinus: ['Novita'] });
   await expect(page.locator('#excludedDriftText')).toContainText('Novita');
   await page.click('#addExcludedRow');
   const row = page.locator('#excludedList .sn-excluded-row').last();

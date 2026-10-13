@@ -867,6 +867,9 @@
     let authRefused = 0;
     if (idToken) {
       doc.fields.senderProof = toFsValue('admin');
+      // L'impronta del biglietto della sessione locale (#1148): il server ne legge la fiducia alla nascita.
+      const biglietto = opts && typeof opts.bigliettoLocale === 'string' && /^[0-9a-f]{64}$/.test(opts.bigliettoLocale) ? opts.bigliettoLocale : '';
+      if (biglietto) doc.fields.bigliettoLocale = toFsValue(biglietto);
       if (localOnly) {
         doc.fields.localOnly = toFsValue({
           by: String(localOnly.by || '').slice(0, 120),
@@ -892,6 +895,7 @@
       if (res.status === 401 || res.status === 403) {
         authRefused = res.status;
         delete doc.fields.senderProof;
+        delete doc.fields.bigliettoLocale;
         delete doc.fields.priority;
         delete doc.fields.priorityManual;
         res = null;
@@ -980,7 +984,7 @@
   const CAMPI_LISTA = [
     'archiveOverride', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
-    'clientIdHash', 'createdAt', 'localApproval', 'localMerges', 'localOnly', 'mergePreapproved', 'name', 'parentId', 'pipeline',
+    'clientIdHash', 'createdAt', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly', 'name', 'parentId', 'pipeline',
     'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
     'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
@@ -1959,7 +1963,7 @@
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -2054,21 +2058,9 @@
     // Override owner per l'auto-archiviazione a punteggio (DC3, vedi
     // boardArchive.js): 'archived' | 'keep_open' | '' (nessun override).
     if (archiveOverride !== undefined) { fields.archiveOverride = toFsValue(archiveOverride); mask.push('archiveOverride'); }
-    // La pre-approvazione della fusione, per QUESTA pratica: `{ by, at }` per
-    // metterla, `null` per toglierla. Togliere è CANCELLARE il campo: la maschera
-    // lo nomina e i campi non lo portano, che per Firestore vuol dire "via".
-    // Un `null` scritto come valore resterebbe sul documento e le regole lo
-    // respingerebbero (vogliono una mappa, quando c'è).
-    if (mergePreapproved !== undefined) {
-      if (mergePreapproved && typeof mergePreapproved === 'object') {
-        fields.mergePreapproved = toFsValue({
-          by: String(mergePreapproved.by || '').slice(0, 120),
-          at: String(mergePreapproved.at || new Date().toISOString()).slice(0, 40),
-        });
-      }
-      mask.push('mergePreapproved');
-    }
-    // Il segno «solo in locale» (#908): stessa forma di scrittura, `at` in millisecondi.
+    // La fiducia (#1148) non si scrive da qui: la scrive solo il server, e le regole la vietano a ogni client.
+    // Il segno «solo in locale» (#908): `{ by, at }` per metterlo (`at` in millisecondi), `null` per toglierlo: la
+    // maschera lo nomina e i campi non lo portano, che per Firestore vuol dire "via".
     if (localOnly !== undefined) {
       if (localOnly && typeof localOnly === 'object') {
         fields.localOnly = toFsValue({
@@ -2087,11 +2079,6 @@
         });
       }
       mask.push('localApproval');
-    }
-    // La prova del mittente data dall'owner («È mio», #908): si aggiunge e basta, non si toglie da qui.
-    if (senderProof === 'admin') {
-      fields.senderProof = toFsValue('admin');
-      mask.push('senderProof');
     }
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.

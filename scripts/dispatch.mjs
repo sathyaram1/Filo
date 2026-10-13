@@ -85,6 +85,7 @@ import {
   testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
+import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
 import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
@@ -417,12 +418,25 @@ export function stripFileArg(list, nome) {
   return { args, file: v, error: '' };
 }
 
-/** Il payload della consegna «corretto», con la segnalazione se c'è. PURA. */
-export function fixedPayload({ report, frase, branch, segnalazione, ferma } = {}) {
+/**
+ * Il payload della consegna «corretto», con la segnalazione se c'è. `sha`: la punta della cartella, che il registro del
+ * ramo confronta con quella che troverà dopo (#1148; senza, il server segna il buco). PURA.
+ */
+export function fixedPayload({ report, frase, branch, segnalazione, ferma, sha } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
   if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
   if (ferma === true) p.stop = true;
+  if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
   return p;
+}
+
+/** Lo sha intero della punta della cartella, '' se git non risponde. */
+function puntaDellaCartella() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().toLowerCase();
+  } catch (_) {
+    return '';
+  }
 }
 
 /**
@@ -683,7 +697,8 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
   const base = existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), ROLES_DIR) : '';
   if (!base || !RUOLI_LAVORABILI.includes(role)) return absolutizeRecipe(base, TOOLS_ROOT, ROOT);
   const c = resolve(ROLES_DIR, WORKER_CONTRACT_FILE);
-  const contract = existsSync(c) ? readFileSync(c, 'utf8') : '';
+  // Il contratto ha pezzi in comune con halt (la domanda di fine sessione): si espande come i ruoli.
+  const contract = existsSync(c) ? espandiInclusioni(readFileSync(c, 'utf8'), ROLES_DIR) : '';
   const testo = contract ? `${base.replace(/\s+$/, '')}\n\n${contract}` : base;
   // Le ricette dicono `node scripts/…`, che dalla cartella di lavoro porta agli
   // strumenti DEL RAMO. Quando gli strumenti sono la copia fissata, il percorso
@@ -1305,7 +1320,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
   // La segnalazione (L3) viaggia nello stesso payload: il server la cifra e la
   // scrive in `livelli.l3`, e la appende alle note come storia della chat.
-  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma }));
+  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma, sha: puntaDellaCartella() }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }
@@ -2226,6 +2241,17 @@ if (isMainModule) {
             process.stderr.write(
               `[dispatch] ATTENZIONE: non ho potuto controllare che il progetto fosse aggiornato `
               + `(${nonVerificato}). Gli strumenti fissati potrebbero essere già vecchi.\n`);
+          }
+          // Chi ha passato il preflight è l'orchestratore: da qui la sua sessione non riceve il testo dei worker
+          // (lib/orchestratore-cieco.mjs). Senza gancio il giro non parte: meglio un giro saltato che uno che vede.
+          // Solo in cloud: sulla macchina dell'owner le impostazioni utente valgono per tutte le sue sessioni.
+          const cieco = process.env.CLAUDE_CODE_REMOTE === 'true'
+            ? installaCecita({ sessione: process.env.CLAUDE_CODE_SESSION_ID || '' })
+            : { ok: true, saltato: true };
+          if (cieco.saltato) console.error('[dispatch] ATTENZIONE: fuori dal cloud il gancio dell\'orchestratore cieco non si installa; resta quello dei worker (chiudono con FATTO).');
+          if (!cieco.ok) {
+            console.error(`[dispatch] GUASTO (transient): gancio dell'orchestratore cieco non installato in ${cieco.file} (${cieco.why})`);
+            process.exit(3);
           }
           console.log('Le tue istruzioni:\n');
           console.log(absolutizeRecipe(brief, tools, ROOT)

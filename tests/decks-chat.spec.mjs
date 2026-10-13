@@ -89,6 +89,8 @@ async function mockProvider(app) {
     });
     globalThis.__chatCalls = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // La home aperta scrive il suo saluto col modello: non è una chiamata della chat dei mazzi.
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       // Il giudice dei risultati (#382) le tiene tutte: qui si prova la chat, non il filtro.
       const prompt = String(messages[messages.length - 1].content || '');
       if (/CARTE CANDIDATE/.test(prompt)) {
@@ -258,6 +260,7 @@ test('query Scryfall rifiutata (400) → il modello la corregge e i risultati ar
     // LLM: primo turno → query ROTTA; il messaggio di sistema di correzione
     // ("(Sistema) La ricerca Scryfall…") → query corretta.
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       globalThis.__chatCalls.push(messages);
       const last = String(messages[messages.length - 1].content || '');
       const text = /\(Sistema\) La ricerca Scryfall/.test(last)
@@ -334,6 +337,7 @@ test('carte fuori dai colori del commander vengono filtrate dai risultati dell\'
     // Il modello, "aiutando", aggiunge un vincolo id:B esplicito → Scryfall
     // restituisce anche una carta NERA, fuori dall'identità Izzet (U/R).
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       globalThis.__chatCalls.push(messages);
       return {
         text: JSON.stringify({ reply: 'Ecco qualche pescata.', query: 'o:draw id:B' }),
@@ -401,6 +405,7 @@ test('doppio fallimento Scryfall → spiegazione chiara, niente codice 400', asy
   await app.evaluate(() => {
     // LLM: risponde SEMPRE con la stessa query rotta (anche al retry).
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       globalThis.__chatCalls.push(messages);
       return {
         text: JSON.stringify({ reply: 'Provo a cercare i dinosauri.', query: 't:dinosaur (o:"deal' }),

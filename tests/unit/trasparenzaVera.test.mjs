@@ -32,9 +32,13 @@ test('il terminale è acceso di serie, e i due documenti lo dicono', () => {
   legame(acceso, sicurezza, 'è acceso di serie', 'terminale acceso di serie');
 });
 
-test('Safe Browsing riceve l\'indirizzo intero, ed è fra i punti deboli', () => {
-  const intero = /threatEntries:\s*\[\{\s*url:\s*rawUrl\s*\}\]/.test(leggi('src', 'main', 'services', 'safebrowse', 'net.js'));
-  legame(intero, privacy, 'Safe Browsing riceve l\'indirizzo completo delle pagine che apri', 'indirizzo intero a Safe Browsing');
+test('a Safe Browsing escono solo prefissi dell\'impronta, e il documento non dice più che riceve l\'indirizzo', () => {
+  const net = leggi('src', 'main', 'services', 'safebrowse', 'net.js');
+  const prefissi = /hashPrefixes/.test(net) && !/threatEntries/.test(net);
+  legame(!prefissi, privacy, 'Safe Browsing riceve l\'indirizzo completo delle pagine che apri', 'indirizzo intero a Safe Browsing');
+  legame(prefissi, privacy, 'a Google manda solo i primi 4 byte di ciascuna', 'prefissi a Safe Browsing');
+  // In nessun punto del documento, non solo nella sua voce: una frase rimasta più sotto lo contraddiceva (verifica di #813).
+  if (prefissi) assert.doesNotMatch(privacy, /Safe Browsing[^.]{0,40}\bricev\w*\s+(?:gli\s+indirizzi|l['’]indirizzo)/i);
 });
 
 test('le richieste ai modelli non chiedono la ritenzione zero, ed è fra i punti deboli', () => {
@@ -70,6 +74,16 @@ test('col login Google l\'app scrive email, nome e consumi sul server, e il docu
   legame(consumi, privacy, 'escono i totali per funzione', 'consumi per funzione sul server');
 });
 
+test('l\'accesso Google si apre in una scheda di Filo, col browser come ripiego, e il documento sulla privacy lo dice', () => {
+  const auth = leggi('src', 'main', 'auth', 'google-auth.js');
+  const inScheda = /require\('\.\/accessoInScheda'\)\.apri\(/.test(auth);
+  const fidato = /trustedSites:\s*\[\.\.\.prima, G\.SITO_GOOGLE\]/.test(leggi('src', 'main', 'services', 'accessoGoogle.js'));
+  legame(inScheda, privacy, 'L\'accesso Google si apre in una scheda di Filo', 'accesso in una scheda');
+  legame(!inScheda, privacy, 'L\'accesso Google si apre nel browser;', 'accesso nel browser');
+  legame(inScheda, privacy, 'Se Google rifiuta l\'accesso dentro Filo, si apre nel browser', 'ripiego nel browser');
+  legame(fidato, privacy, 'Filo mette Google fra i siti fidati', 'Google fidato dopo un accesso in Privacy massima');
+});
+
 test('le ricerche su Google dal tasto destro sono fra gli altri servizi', () => {
   const azioni = leggi('src', 'content', 'actions.js');
   legame(/lens\.google\.com/.test(azioni), privacy, 'apre Google Lens', 'ricerca per immagine con Google Lens');
@@ -94,14 +108,15 @@ test('i pacchetti Mac e Linux ricostruiti dopo hanno la loro esecuzione, e il do
   legame(aParte, sicurezza, '«Aggiunto il pacchetto Mac a v0.2.231»', 'esecuzione a parte per i pacchetti ricostruiti');
 });
 
-test('lavoro locale e pre-approvazione fondono senza il clic e partono dal terminale, e il documento sulla sicurezza lo dice', () => {
-  const preapprova = /--preapprova/.test(leggi('scripts', 'owner-feedback.mjs'));
-  const localeSaltaL5 = /L5 saltato/.test(leggi('scripts', 'lib', 'owner-merge.mjs'));
-  legame(preapprova || localeSaltaL5, sicurezza, 'Due strade però non passano da quel clic', 'fusioni senza clic');
-  legame(preapprova || localeSaltaL5, sicurezza, 'Due strade saltano il mio clic', 'fusioni senza clic fra i punti deboli');
+test('il lavoro fidato fonde senza il clic, la pre-approvazione non c\'è più, e il documento sulla sicurezza lo dice', () => {
+  const fidatoSaltaL5 = /lavoro fidato, scritto solo da sessioni col biglietto pulito/.test(leggi('scripts', 'lib', 'owner-merge.mjs'));
+  const preapprovaTolta = /\['preapprova', SOLO_DA_GESTIONE_PREAPPROVA\]/.test(leggi('scripts', 'owner-feedback.mjs'));
+  legame(fidatoSaltaL5, sicurezza, 'Una strada però non passa da quel clic', 'fusioni senza clic');
+  legame(fidatoSaltaL5, sicurezza, '**Il lavoro fidato.**', 'il lavoro fidato salta i controlli deterministici');
+  legame(fidatoSaltaL5, sicurezza, '**Una strada salta il mio clic.**', 'fusioni senza clic fra i punti deboli');
+  legame(false, sicurezza, 'Due strade però non passano da quel clic', 'le due strade di prima');
   legame(false, sicurezza, 'Nessuno strumento da terminale lo fa', 'approvazione solo dall\'app');
-  legame(localeSaltaL5, sicurezza, '**Il lavoro locale.**', 'il lavoro locale salta i controlli deterministici');
-  legame(preapprova, sicurezza, '**Il segno «fondi senza chiedermelo».**', 'la pre-approvazione da terminale');
+  legame(!preapprovaTolta, sicurezza, 'fondi senza chiedermelo', 'la pre-approvazione');
 });
 
 test('il tasto destro su un link chiede da solo titolo e descrizione al sito e spiega il link con un modello, e il documento sulla privacy lo dice', () => {
@@ -119,4 +134,19 @@ test('il lavoro sui feedback va sul repository pubblico mentre si fa, e i due do
   legame(pubblico, sicurezza, 'La correzione però si scrive in pubblico', 'correzione scritta in pubblico');
   legame(pubblico, sicurezza, '**La correzione di un problema si vede prima che arrivi a te.**', 'correzione pubblica fra i punti deboli');
   legame(false, sicurezza, 'Vale la regola che applico a me stesso: sulla bacheca', 'la regola della divulgazione vale anche per la bacheca');
+});
+
+test('i riquadri rotti vanno in foto a un modello da soli, col tetto e l\'interruttore che il documento sulla privacy dice', () => {
+  const R = leggi('src', 'main', 'services', 'riquadriRotti.js');
+  const ora = Number((/const VISIONI_ORA = (\d+);/.exec(R) || [])[1]);
+  const lato = Number((/const LATO_MAX = (\d+);/.exec(R) || [])[1]);
+  const numeri = { 10: 'dieci', 20: 'venti', 30: 'trenta' };
+  assert.ok(numeri[ora], `tetto orario dei riquadri ${ora}: scrivilo nel documento e qui`);
+  legame(true, privacy, `al massimo ${numeri[ora]} riquadri l'ora`, 'tetto orario dei riquadri');
+  legame(true, privacy, `al massimo ${lato} pixel di lato`, 'lato della foto del riquadro');
+  // L'interruttore: di serie acceso, e il documento lo chiama col nome che ha nella pagina Sicurezza.
+  assert.match(leggi('src', 'shared', 'constants.js'), /riquadriRotti: \{\s*modello: true,/);
+  assert.match(R, /if \(!modelloAcceso \|\| typeof chiamaModello !== 'function'\) return null;/);
+  const nome = (/options_cookies_riquadri_modello: '([^']+)'/.exec(leggi('src', 'shared', 'i18n.js')) || [])[1];
+  legame(true, privacy, `Si spegne da Sicurezza («${nome}»)`, 'interruttore dei riquadri rotti');
 });
