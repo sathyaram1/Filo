@@ -1,7 +1,8 @@
 // La pagina «Inviti e utenti» (#598, solo owner): i due moduli rifiutano con
 // una frase di Filo i numeri che non vanno (zero codici, crediti con la
 // virgola, pseudonimo vuoto) invece di lasciare parlare la bolla del browser,
-// e la riga dei totali conta al singolare quando l'utente è uno.
+// un guasto del server si dice a parole con un «Riprova», e la riga dei totali
+// conta al singolare quando l'utente è uno.
 //
 // Server dei crediti e identità sono un HTTP locale, come in
 // wallet-credits.spec.mjs; l'accesso dell'owner si simula scrivendo la sua
