@@ -99,10 +99,11 @@ async function main() {
     }
     const r = await chiama({ op: 'issue', slug: nome, scope: potere, label: resto.join(' ') });
     console.log(`\nParola d'ordine per "${r.slug}" (potere: ${r.scope}):\n`);
-    console.log(`    ${r.passphrase}\n`);
+    // Da sola sulla riga, senza rientro: si copia con la riga, e i quattro spazi finivano nel segreto (#1210).
+    console.log(`${r.passphrase}\n`);
     console.log('Copiala ADESSO dove serve: non si potrà più rileggere.');
     console.log(potere === 'build'
-      ? "Va nell'ambiente della costruzione, come FILO_BUILD_PASSPHRASE."
+      ? "Va nell'ambiente «rilascio» del repo (Settings → Environments → rilascio), come FILO_BUILD_PASSPHRASE: fra i segreti del repo non la legge nessuno."
       // Una parola d'ordine di routine NON va nell'ambiente: l'ambiente lo
       // eredita ogni lavoratore che parte da lì. Sta solo nel prompt della
       // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.
