@@ -447,35 +447,41 @@
     }
     let letto = pezzi.filter(Boolean).join('\n');
     if (letto.length > MAX_LETTO) letto = letto.slice(-MAX_LETTO);
-    return { letto, nonFidato, linkNoti, esterni };
+    let scritto = conversazioni.filter(Boolean).join('\n');
+    if (scritto.length > MAX_LETTO) scritto = scritto.slice(-MAX_LETTO);
+    return { letto, nonFidato, linkNoti, esterni, scritto };
   }
 
   // Verdetto: { exfil, reason }. corpus = memoria e appunti (dati personali
-  // persistenti); letto = ciò che il modello ha letto dal computer nel turno.
+  // persistenti); letto = ciò che il modello ha letto dal computer nel turno;
+  // scritto = ciò che l'utente ha scritto in chat, tranne `domanda` (quella di adesso).
   // fromUntrusted = nel contesto è entrato testo scritto da altri: allora anche
   // la forma dell'URL conta, salvo i link citati tali e quali da una ricerca
   // (aprirli non porta fuori niente che la ricerca non contenesse già).
-  function assess(url, { corpus = '', letto = '', fromUntrusted = false, linkNoti = null } = {}) {
+  function assess(url, {
+    corpus = '', letto = '', fromUntrusted = false, linkNoti = null, scritto = '', domanda = '',
+  } = {}) {
     const link = String(url || '').trim();
     if (!link) return { exfil: false, reason: '' };
     const t = taint(link, corpus) || taintLetto(link, letto);
     if (t) return { exfil: true, reason: t.reason };
-    if (fromUntrusted && !(linkNoti && linkNoti.has(chiaveLink(link)))) {
-      const s = structural(link);
-      if (s) return { exfil: true, reason: s.reason };
-    }
+    const noto = !!(linkNoti && linkNoti.has(chiaveLink(link)));
+    const s = noto ? null : taintScritto(link, scritto, domanda) || (fromUntrusted ? structural(link) : null);
+    if (s) return { exfil: true, reason: s.reason };
     return { exfil: false, reason: '' };
   }
 
-  // NAVIGA nel turno: memoria + azioni viste dal modello + chi ha mandato.
+  // NAVIGA nel turno: memoria + azioni viste dal modello + parole dell'utente + chi ha mandato.
   // `daPagina` = l'agente vive su una pagina web, che è già nel suo contesto.
-  function valutaNaviga(url, { memoria = '', azioni = [], daPagina = false } = {}) {
+  function valutaNaviga(url, { memoria = '', azioni = [], daPagina = false, parole = '', domanda = '' } = {}) {
     const ctx = contestoDaAzioni(azioni);
     return assess(url, {
       corpus: memoria,
       letto: ctx.letto,
       fromUntrusted: !!daPagina || ctx.nonFidato,
       linkNoti: ctx.linkNoti,
+      scritto: [String(parole || ''), ctx.scritto].filter(Boolean).join('\n'),
+      domanda,
     });
   }
 
