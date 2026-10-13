@@ -21,6 +21,14 @@ restava rosso e muto).
 - **Prima di aggiungere un controllo, guarda chi è già esente**: se localhost e
   gli IP privati sono esclusi, anche i nomi della rete di casa (`nas.lan`,
   `raspberrypi.local`) lo devono essere — la simmetria mancante È il bug.
+- **Un blocco di sicurezza non si scavalca, ma si dice lo stesso** (#482): un file
+  del computer, una cartella di rete, un `data:`/`javascript:` fermati hanno una
+  notifica di solo testo (cosa e perché), mai «Apri comunque». La dice chi ferma
+  (`fermaNavigazione` in `src/main/tabs.js`, testo in
+  `src/main/services/indirizzoFermato.js`); dove a rifiutare è Chromium prima di
+  Filo (un `file:` cliccato su una pagina web) il clic lo riferisce
+  `page-preload.js`. Da una pagina, solo dopo un input vero: quello che tenta da
+  sola resta muto. Prova `tests/indirizzo-fermato-avvisa.spec.mjs`.
 - **Dove:** `showUnresolvedSite()` in `src/pages/dashboard/dashboard-comandi.js`,
   esenzioni in `src/shared/urlNav.js` (`isLocalHost`/`isLocalNetworkName`) usate
   da `src/main/services/hostResolve.js`. Test
