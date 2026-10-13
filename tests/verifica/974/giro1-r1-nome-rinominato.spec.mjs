@@ -2,7 +2,6 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home } from '../../helpers/chatFinta.mjs';
 
-const SHOTS = 'tests/.shots';
 const AIUTO = '**Iscriviti** è in alto a destra: vedi [la guida](https://example.com/guida).';
 
 async function prepara(app) {
@@ -16,16 +15,16 @@ async function prepara(app) {
     });
     const P = globalThis.SN_PROVIDERS;
     const risposta = ({ attempts, messages }) => {
-      const fatto = (text) => ({ text, model: attempts[0].model, provider: attempts[0].provider, usage: la riga dice il nome attuale del documento, anche rinominato dopo la chat. });
+      const fatto = (text) => ({ text, model: attempts[0].model, provider: attempts[0].provider, usage: {} });
       const tutto = JSON.stringify(messages);
-      const sistema = String((messages.find((m) => m.role === 'system') || la riga dice il nome attuale del documento, anche rinominato dopo la chat.).content || '');
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
       if (tutto.includes('preparare la dashboard')) return fatto('{"message":"","suggestions":[]}');
       if (sistema.includes('# Protocollo di risposta')) return fatto(JSON.stringify({ text: aiuto, status: 'done' }));
       if (sistema.includes('assistente di scrittura dentro un editor')) return fatto('Il capitolo sui licheni va accorciato di metà.');
-      return fatto('la riga dice il nome attuale del documento, anche rinominato dopo la chat.');
+      return fatto('{}');
     };
     P.completeWithFallback = async (o) => risposta(o);
-    P.streamCompleteWithFallback = async (o) => { const r = risposta(o); try { o.onDelta && o.onDelta(r.text); } catch (_) la riga dice il nome attuale del documento, anche rinominato dopo la chat. return r; };
+    P.streamCompleteWithFallback = async (o) => { const r = risposta(o); try { o.onDelta && o.onDelta(r.text); } catch (_) {} return r; };
   }, AIUTO);
 }
 

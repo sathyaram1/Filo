@@ -17,16 +17,16 @@ async function prepara(app) {
     });
     const P = globalThis.SN_PROVIDERS;
     const risposta = ({ attempts, messages }) => {
-      const fatto = (text) => ({ text, model: attempts[0].model, provider: attempts[0].provider, usage: le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito. });
+      const fatto = (text) => ({ text, model: attempts[0].model, provider: attempts[0].provider, usage: {} });
       const tutto = JSON.stringify(messages);
-      const sistema = String((messages.find((m) => m.role === 'system') || le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito.).content || '');
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
       if (tutto.includes('preparare la dashboard')) return fatto('{"message":"","suggestions":[]}');
       if (sistema.includes('# Protocollo di risposta')) return fatto(JSON.stringify({ text: aiuto, status: 'done' }));
       if (sistema.includes('assistente di scrittura dentro un editor')) return fatto('Il capitolo sui licheni va accorciato di metà.');
-      return fatto('le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito.');
+      return fatto('{}');
     };
     P.completeWithFallback = async (o) => risposta(o);
-    P.streamCompleteWithFallback = async (o) => { const r = risposta(o); try { o.onDelta && o.onDelta(r.text); } catch (_) le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito. return r; };
+    P.streamCompleteWithFallback = async (o) => { const r = risposta(o); try { o.onDelta && o.onDelta(r.text); } catch (_) {} return r; };
   }, AIUTO);
 }
 
