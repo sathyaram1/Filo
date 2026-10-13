@@ -1039,9 +1039,9 @@
       if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
     };
 
-    pill.addEventListener('click', () => finish(true));
+    pill.addEventListener('click', (e) => { if (gestoVero(e)) finish(true); });
     pill.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true); }
+      if ((e.key === 'Enter' || e.key === ' ') && gestoVero(e)) { e.preventDefault(); finish(true); }
     });
     // Nella pila: col puntatore sopra aspetta, come gli altri avvisi (la scheda si chiude dopo).
     timer = Popup.tempoAvviso(AUTO_CLOSE_MS, () => finish(false), { deveScadere: true });
