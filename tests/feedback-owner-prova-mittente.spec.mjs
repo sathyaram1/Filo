@@ -85,7 +85,10 @@ test('chi non è l’owner spedisce anonimo come prima, senza che si chieda un t
 
 // #912: senza accesso valido la voce dell'owner non parte da anonima: aspetta, la cornice lo dice, e parte con la prova
 // quando l'owner rientra, dall'accesso vero col solo dialogo di Google finto (#1212: non al giro del backoff).
-test('l’owner senza accesso aspetta invece di partire da utente, e parte con la prova quando l’accesso torna', async ({ app, avvisi }) => {
+test('l’owner senza accesso aspetta invece di partire da utente, e parte con la prova quando l’accesso torna', async ({ app, shell, avvisi }) => {
+  // Si manda da una finestra già aperta, come fa l'owner: con la cornice ancora in caricamento l'avviso aspettava il
+  // giro dopo del backoff, e con la macchina carica non arrivava in tempo (#1212).
+  await shell.waitForLoadState('load');
   await banco(app, { admin: true });
   await app.evaluate(() => {
     const Module = process.getBuiltinModule('module');
