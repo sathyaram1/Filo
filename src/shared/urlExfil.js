@@ -4,7 +4,7 @@
 // conferma). Una pagina ostile può però iniettare istruzioni nel modello
 // (prompt injection) per fargli aprire un URL che PORTA FUORI dati sensibili
 // che il modello aveva nel contesto — memoria/profilo dell'utente, appunti,
-// output di comandi — codificandoli nella query/path/sottodominio. È una GET
+// output di comandi, ciò che ha scritto in chat — codificandoli nella query/path/sottodominio. È una GET
 // silenziosa verso il server dell'attaccante.
 //
 // L'idea chiave: NON si prova a capire se un URL "sembra" sensibile (impossibile
