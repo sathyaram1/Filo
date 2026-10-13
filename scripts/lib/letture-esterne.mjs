@@ -101,16 +101,19 @@ export function cartelleTemporaneeDiClaude(radici, { env = {}, tmp = [], uid = n
  * server accanto, la cartella di Claude dell'utente e quella temporanea del progetto; e LOCAL.md sopra il repo, che la
  * sessione locale deve leggere.
  */
-export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform } = {}) {
+export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform, biglietti = [] } = {}) {
   const win = sistema === 'win32';
   const P = win ? path.win32 : path.posix;
-  // Il repo della cartella corrente vale solo se è il progetto o una sua worktree: un repo clonato da fuori in cui la
-  // sessione si è spostata resta testo altrui (#1211 giro 2).
+  // Il repo della cartella corrente vale solo se è il progetto, una sua worktree o il repo che tiene il biglietto della
+  // sessione: un repo clonato da fuori in cui la sessione si è spostata resta testo altrui (#1211 giro 2).
   const progetto = String(env.CLAUDE_PROJECT_DIR || '').trim();
   const comuneProgetto = progetto ? B.radiceCondivisa(progetto) : '';
+  const delBiglietto = biglietti.map((b) => P.dirname(P.resolve(String((b && b.path) || ''))))
+    .filter((d) => P.basename(d) === 'biglietti' && P.basename(P.dirname(d)) === '.claude').map((d) => P.dirname(P.dirname(d)));
+  const casa = [comuneProgetto, ...delBiglietto].filter(Boolean);
   const daQui = B.radiceCondivisa(cwd);
   const chiave = (c) => { const k = canonicoVero(P.resolve(c)); return win ? k.toLowerCase() : k; };
-  const suo = !!daQui && (!progetto || (!!comuneProgetto && chiave(daQui) === chiave(comuneProgetto)));
+  const suo = !!daQui && (!progetto || casa.some((c) => chiave(c) === chiave(daQui)));
   const comune = suo ? daQui : comuneProgetto;
   const radici = [suo ? B.radiceRepo(cwd) : '', comune, progetto].filter(Boolean);
   const server = comune ? cartellaDelServer(comune) : '';
@@ -153,7 +156,7 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
     if (!biglietti.length && progetto && progetto !== cwd) biglietti = B.trovaBiglietti({ env: envSessione, cwd: progetto });
     if (!biglietti.length) return { esito: 'senza biglietto' };
     // Le cartelle fidate (altre chiamate a git) servono solo a Read.
-    const motivo = motivoLettura(input, input.tool_name === 'Read' ? contesto({ cwd, env }) : {});
+    const motivo = motivoLettura(input, input.tool_name === 'Read' ? contesto({ cwd, env, biglietti }) : {});
     if (!motivo) return { esito: 'nessuna lettura esterna' };
     for (const b of biglietti) {
       let annotato = true;
