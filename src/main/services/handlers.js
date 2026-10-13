@@ -1534,8 +1534,9 @@ async function linkCheChiedonoOk(testo, { sender = null, contesto = null, fontiL
   const visti = new Set();
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = null;
-  for (const url of [...indirizzi, ...indirizziCliccabili(testo)]) {
-    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) continue;
+  for (const grezzo of [...indirizzi, ...indirizziCliccabili(testo)]) {
+    const url = typeof grezzo === 'string' ? grezzo.trim() : '';
+    if (!/^https?:\/\//i.test(url)) continue;
     const k = chiaveLinkUscita(url);
     if (visti.has(k) || visti.size >= 200) continue;
     visti.add(k);
@@ -4925,6 +4926,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   try {
     linkDaConfermare = await linkCheChiedonoOk(textReply, {
       sender, contesto: azioniViste, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
+      indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
     });
   } catch (e) { console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e); }
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
@@ -5300,7 +5302,7 @@ async function generateDashboardFromInputs(inputs) {
     const url = a && /^(?:NAVIGA|APRI_FILE)$/i.test(String(a.type || '')) ? String(a.url || a.path || '') : '';
     if (!/^https?:/i.test(url)) continue;
     let chiede = [];
-    try { chiede = await linkCheChiedonoOk(url, { parole: inputs.parole || '', sempre: true }); } catch (_) { chiede = []; }
+    try { chiede = await linkCheChiedonoOk('', { parole: inputs.parole || '', sempre: true, indirizzi: [url] }); } catch (_) { chiede = []; }
     if (chiede.length) suggestions[i] = { ...suggestions[i], chiedeOk: chiede[0].motivo };
   }
   await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });

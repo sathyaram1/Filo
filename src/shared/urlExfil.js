@@ -328,14 +328,38 @@
     }
     for (const w of testo.split(/[^a-z0-9]+/)) if (w.length >= MIN_TOKEN && /\d/.test(w)) out.add(w);
     for (const t of indirizziNelTesto(testo)) out.add(t);
-    // Una password di sole lettere è una parola qualunque: la riconosce la parola che la presenta.
-    for (const m of testo.matchAll(DOPO_LA_PAROLA)) {
-      const t = soloAlnum(m[1]);
-      if (t.length >= MIN_TOKEN) out.add(t);
-    }
     return out;
   }
-  const DOPO_LA_PAROLA = /\b(?:password|passwd|pwd|passphrase|passcode|parola d'ordine)\b[^\n.;]{0,40}?(?:\s(?:è|e'|era|is)\s|:|=)\s*["'«“]?([^\s"'»”,;]+)/g;
+
+  // Una password di sole lettere o un PIN di quattro cifre sono parole qualunque: li riconosce la parola che li
+  // presenta. Conta ogni parola della frase che la segue, in qualunque giro di frase («password wifi gattonero», «il pin
+  // del bancomat è 4821»); un codice solo se ha cifre, così «il codice in javascript» non fa di javascript un segreto.
+  const PRESENTA_PASSWORD = /\b(?:password|passwd|pwd|psw|passphrase|passcode|parola d'ordine|parola chiave)\b/g;
+  const PRESENTA_CODICE = /\b(?:pin|codice|code|combinazione|otp)\b/g;
+  const PAROLE_DOPO = 8;
+  const RIEMPITIVI = new Set([
+    'della', 'delle', 'dello', 'degli', 'nella', 'sulla', 'sempre', 'ancora', 'adesso', 'stessa', 'stesso', 'nuova',
+    'nuovo', 'vecchia', 'vecchio', 'questa', 'questo', 'quella', 'quello', 'solita', 'solito', 'uguale', 'scritta',
+    'scritto', 'cambiata', 'cambiato', 'router', 'account', 'email', 'casella', 'banca', 'bancomat', 'carta', 'portone',
+    'cancello', 'allarme', 'telefono', 'cellulare', 'computer', 'invece', 'perché', 'perche', 'quindi', 'anche', 'about',
+  ]);
+  function segretiDetti(testo) {
+    const out = [];
+    const prendi = (re, soloCifre) => {
+      for (const m of testo.matchAll(re)) {
+        const coda = testo.slice(m.index + m[0].length, m.index + m[0].length + 200).split(/[\n.,;!?]/)[0];
+        for (const w of coda.split(/\s+/).filter(Boolean).slice(0, PAROLE_DOPO)) {
+          const t = w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+          const cifre = /\d/.test(t);
+          if (cifre ? soloAlnum(t).length < 4 : (soloCifre || t.length < MIN_TOKEN || RIEMPITIVI.has(t))) continue;
+          out.push({ valore: t, regola: cifre ? 'codice' : 'password' });
+        }
+      }
+    };
+    prendi(PRESENTA_PASSWORD, false);
+    prendi(PRESENTA_CODICE, true);
+    return out;
+  }
 
   // Un numero scritto a gruppi («+39 347 123 4567») è un numero solo; in un URL le cifre contano anche spezzate da
   // pochi caratteri («?a=347&b=1234567»), come per ciò che esce (formeDi).
@@ -373,6 +397,11 @@
     const rovescia = (s) => [...s].reverse().join('');
     const esposti = [esposto, rovescia(esposto)];
     for (const t of datiScritti(testo)) if (esposti.some((e) => e.includes(t)) && !suo(t)) return { reason };
+    const detti = segretiDetti(testo);
+    if (detti.length) {
+      const nellaDomanda = d.trim() ? formeDi(d) : null;
+      for (const x of detti) if (esce(x.valore, x.regola, fuori, true) && !(nellaDomanda && esce(x.valore, x.regola, nellaDomanda))) return { reason };
+    }
     // Un numero lungo conta anche a pezzi di nove cifre: «+39 347…» scritto, «347…» nell'URL.
     const cifreFuori = fuori.cifre.flatMap((r) => [r, rovescia(r)]);
     const pezziFuori = new Set();
