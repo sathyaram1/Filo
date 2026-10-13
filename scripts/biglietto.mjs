@@ -71,7 +71,7 @@ async function main() {
     const trovati = B.trovaBiglietti();
     if (!trovati.length) { console.log('Nessun biglietto trovato da qui: ciò che la sessione scrive da questo repo vale non fidato.'); return 0; }
     const b = await B.trovaBiglietto();
-    console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}${trovati.length > 1 ? ` (${trovati.length} biglietti in questa cartella: vale il più sporco)` : ''}`);
+    console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}`);
     if (b.errore) console.log(`Stato non letto: ${b.errore}`);
     const motivi = (b.stato && Array.isArray(b.stato.sporcatoDa)) ? b.stato.sporcatoDa : [];
     for (const m of motivi) console.log(`  - ${new Date(Number(m.at) || 0).toISOString()} ${String(m.motivo || '').replace(/[\u0000-\u001f\u007f]/g, ' ')}`);
