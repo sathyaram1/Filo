@@ -80,11 +80,12 @@
         'Togliendo le voci della cronologia appunti con la tastiera il fuoco resta sulla lista, pronto per la voce dopo, anche se il mouse è fermo sopra le righe. Prima in quel caso tornava all\'inizio della pagina e per ogni voce bisognava riattraversare tutte le impostazioni col tabulatore.',
         'Le finestrelle di accesso, come quella di «Accedi con Google», hanno nel titolo il sito vero, e la pagina non può cambiarlo. Un sito non le apre più da solo. Senza un tuo clic la pagina chiesta si apre in una scheda, con l\'indirizzo in vista, oppure resta ferma se hai il blocco dei popup acceso.',
         'Nella chat dell\'editor la casella dove scrivi si allunga finché la domanda si legge tutta, anche con i caratteri più larghi di Linux. Prima si fermava a quattro righe e il testo scorreva dentro, con mezza chat vuota sopra.',
-        'Quando chiedi a Filo di cambiare il limite di spesa mensile, la conferma scrive l\'importo all\'italiana: «2.500,50 €», non più «2500.50€».',
+        'Quando chiedi a Filo di cambiare il limite di spesa mensile, la conferma scrive l\'importo all\'italiana: «2.500,50 €», non più «2500.50€». Il punto delle migliaia c\'è anche negli altri numeri da quattro cifre in su, come l\'attesa della barra laterale («1.500 ms») o i documenti letti in Preferenze, e la velocità della lettura ad alta voce si scrive con la virgola: «1,5×».',
         'Su un sito il popup con cui Filo ti chiede conferma adesso compare sopra la pagina, dove il codice del sito non arriva. Una pagina scritta apposta non può più renderlo invisibile e mostrarti al suo posto un popup finto con un altro testo. Quello che leggi è quello che confermi.',
         'Anche la proposta di aprire una pagina da un altro paese compare sopra la pagina: il sito non può nasconderla né rispondere al posto tuo.',
         'Quando Filo propone di attivare i cookie di un contenuto incorporato, il «Sì» si conferma in un popup sopra la pagina. Un sito non può farti attivare i cookie mentre credi di rispondere a un\'altra domanda.',
         'Quando correggi una parola, le sottolineature delle altre parole restano al loro posto. Prima le blu sparivano per qualche istante mentre Filo ricontrollava il testo, e le rosse dopo ogni correzione scelta col tasto destro. Una correzione presa dal menu adesso si annulla con Ctrl+Z (Cmd+Z su Mac).',
+        'Nella barra laterale a scomparsa il nome di un\'icona sparisce appena sposti il puntatore dall\'icona, la premi o la barra si chiude. Prima poteva restare sopra la pagina anche a barra chiusa.',
       ],
     },
     {

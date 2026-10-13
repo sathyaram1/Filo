@@ -808,7 +808,7 @@
     // mozzato con un «Salvato.» sopra.
     const max = Number(AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
     if (text.length > max) {
-      setCapMsg('fixInstructions', `Troppo lungo: ${text.length} caratteri, il massimo è ${max}. Non salvato.`, 'err');
+      setCapMsg('fixInstructions', `Troppo lungo: ${text.length.toLocaleString('it-IT', { useGrouping: true })} caratteri, il massimo è ${max.toLocaleString('it-IT', { useGrouping: true })}. Non salvato.`, 'err');
       return;
     }
     try {

@@ -11,9 +11,14 @@
   const sino = (si, no) => (v) => (v ? si : no);
   const ATTIVO = sino('attivo', 'spento');
   const ATTIVA = sino('attiva', 'spenta');
-  const numero = (v) => String(Number(v)).replace('.', ',');
+  // I decimali restano quelli che il valore ha davvero; la parte intera prende il punto delle migliaia (1.500 ms).
+  const intero = (n) => n.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
+  const numero = (v) => {
+    const [i, d] = String(Number(v)).split('.');
+    return /^-?\d+$/.test(i) ? `${intero(Number(i))}${d ? `,${d}` : ''}` : String(Number(v)).replace('.', ',');
+  };
   const percento = (v) => `${Math.round(Number(v) * 100)}%`;
-  const millisecondi = (v) => `${Math.round(Number(v))} ms`;
+  const millisecondi = (v) => `${intero(Math.round(Number(v)))} ms`;
 
   function etichettaColoreTab(k) {
     const meta = global.SN_TAB_COLOR && Array.isArray(global.SN_TAB_COLOR.IDENTITY_PARAM_META)
