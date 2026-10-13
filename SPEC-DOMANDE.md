@@ -218,6 +218,8 @@ dall'owner e dal server. Campi:
 - `problema`: cosa succede in pratica. Per un buco, cosa fa un attaccante; per
   una funzione, cosa vede l'utente.
 - `opzioni`: per ciascuna testo, pro, contro e `azione` strutturata (§ 3.3).
+  Vuote in un resoconto senza niente da decidere (§ 4.8): l'owner lo chiude
+  con «letto».
 - `consiglio`: l'opzione che sceglierebbe chi chiede, e perché.
 - `priorita`: `bloccante`, `importante`, `quando_puoi`.
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
