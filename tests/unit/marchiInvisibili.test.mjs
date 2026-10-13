@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import zlib from 'node:zlib';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/provenienzaImmagine.js');
@@ -122,17 +123,14 @@ test('formati e misure dove il marchio non sta non si leggono', () => {
 });
 
 test('il lettore PNG ricostruisce i pixel con ogni filtro, a 8 e 16 bit, con e senza alfa', () => {
-  const w = 37, h = 11;
+  const w = 257, h = 256;
   for (const [tipo, prof] of [[2, 8], [6, 8], [2, 16], [6, 16]]) {
-    const canali = tipo === 6 ? 4 : 3;
-    const n = w * h * canali * (prof / 8);
-    const pixel = Uint8Array.from({ length: n }, (_, i) => (i * 97 + (i >> 5) * 13) & 255);
-    const px = I.pixelPng(new Uint8Array(png(w, h, pixel, { tipo, prof })), zlib, { minimo: 0 });
+    const riga = w * (tipo === 6 ? 4 : 3) * (prof / 8);
+    const pixel = Uint8Array.from({ length: riga * h }, (_, i) => (i * 97 + (i >> 5) * 13 + (i >> 11)) & 255);
+    const px = I.pixelPng(new Uint8Array(png(w, h, pixel, { tipo, prof })), zlib);
     assert.ok(px, `tipo ${tipo} a ${prof} bit`);
-    for (let y = 0; y < h; y++) {
-      const riga = px.dati.subarray(y * px.passoRiga + 1, (y + 1) * px.passoRiga);
-      assert.deepEqual(Array.from(riga), Array.from(pixel.subarray(y * (n / h), (y + 1) * (n / h))), `riga ${y}, tipo ${tipo}/${prof}`);
-    }
+    const letti = Buffer.concat(Array.from({ length: h }, (_, y) => px.dati.subarray(y * px.passoRiga + 1, (y + 1) * px.passoRiga)));
+    assert.equal(Buffer.compare(letti, Buffer.from(pixel)), 0, `tipo ${tipo} a ${prof} bit`);
   }
 });
 
@@ -145,15 +143,16 @@ test('file rotti, enormi o gonfiati apposta finiscono in fretta e senza eccezion
 
   const enorme = png(20, 20, new Uint8Array(20 * 20 * 3));
   enorme.writeUInt32BE(100000, 16); enorme.writeUInt32BE(100000, 20);
-  let t = Date.now();
-  assert.equal(cerca(enorme), null, 'dieci miliardi di pixel dichiarati');
-  assert.ok(Date.now() - t < 200);
+  let r;
+  let c = costoInUnita(() => { r = cerca(enorme); }, { tetto: 1 });
+  assert.equal(r, null, 'dieci miliardi di pixel dichiarati');
+  assert.ok(c.entro, c.come);
 
-  // 1000×1000 dichiarati, ma un flusso che si gonfia a 600 MB.
-  const bomba = png(1000, 1000, new Uint8Array(0), { idat: zlib.deflateSync(Buffer.alloc(600 * 1024 * 1024)), filtro: () => 0 });
-  t = Date.now();
-  assert.equal(cerca(bomba), null);
-  assert.ok(Date.now() - t < 3000, `${Date.now() - t} ms`);
+  // 1000×1000 dichiarati, ma un flusso che si gonfia a 64 MB: si ferma alla misura dichiarata.
+  const bomba = png(1000, 1000, new Uint8Array(0), { idat: zlib.deflateSync(Buffer.alloc(64 * 1024 * 1024)), filtro: () => 0 });
+  c = costoInUnita(() => { r = cerca(bomba); }, { tetto: 2 });
+  assert.equal(r, null);
+  assert.ok(c.entro, c.come);
 });
 
 test('la soglia è un test esatto: le probabilità senza marchio sommano a uno e i casi piccoli tornano', () => {
@@ -162,8 +161,8 @@ test('la soglia è un test esatto: le probabilità senza marchio sommano a uno e
   // U per due e due: 1, 1, 2, 1, 1 disposizioni su sei.
   assert.deepEqual(Array.from(t).map((v) => Math.round(v * 6)), [6, 5, 4, 2, 1, 0]);
   const sdxl = I.coda(27, 21);
-  assert.ok(Math.abs(sdxl[27 * 21] - 1 / 8.71e12) / (1 / 8.71e12) < 0.01, 'la separazione perfetta di SDXL: una su C(48, 21)');
-  const sd1 = I.coda(64, 72);
+  assert.ok(Math.abs(sdxl[27 * 21] * 22314239266528 - 1) < 1e-6, 'la separazione perfetta di SDXL: una su C(48, 21)');
+  const sd1 = I.coda(68, 68);
   assert.ok(Math.abs(sd1[0] - 1) < 1e-9);
 });
 
@@ -175,4 +174,78 @@ test('la frase e la nota per il modello presentano il marchio come dichiarazione
   assert.doesNotMatch(nota.sistema, /Stable Diffusion XL/, 'il nome sta nella busta, non nella voce di Filo');
   assert.equal(P.esitoDaMarchio({ marchio: null }), null);
   assert.equal(P.esitoDaMarchio(null), null);
+});
+
+// ── Dentro Filo: il thread recintato e la lettura che usano menu, Aiuto e chat ──
+
+process.env.NODE_ENV = 'test';
+const F = require('../../src/main/services/firmatariC2pa.js');
+const isolata = require('../../src/main/services/provenienzaIsolata.js');
+// Il thread di lettura non tiene vivo il processo: senza un intervallo vero la prova finirebbe prima della risposta.
+const vivo = setInterval(() => {}, 60_000);
+test.after(() => clearInterval(vivo));
+
+test('nel thread recintato il marchio si legge, anche dentro un JPEG', async () => {
+  assert.equal((await isolata.cercaMarchi(fixture('marchio-flux.jpg'))).marchio, 'flux');
+  assert.equal((await isolata.cercaMarchi(fixture('marchio-sdxl.png'))).marchio, 'sdxl');
+  assert.deepEqual(await isolata.cercaMarchi(fixture('foto-gatto.jpg')), { marchio: null });
+});
+
+test('la lettura comune: il marchio quando il file tace, e i marchi cercati o no detti per quello che sono', async () => {
+  F._dimentica();
+  const marcata = await F.analizzaImmagine(fixture('marchio-sdxl.png'));
+  assert.equal(marcata.prova, 'marchio');
+  assert.equal(P.frase(marcata), 'Generata con l’AI: porta il marchio invisibile che Stable Diffusion XL mette nelle sue immagini.');
+
+  const spoglia = await F.analizzaImmagine(fixture('senza-marchio.png'));
+  assert.equal(spoglia.trovato, false);
+  assert.equal(spoglia.marchiCercati, true);
+  assert.match(P.notaPerModello(spoglia).sistema, /né uno dei marchi invisibili aperti che Filo sa leggere nei pixel \(Stable Diffusion XL, FLUX\.1, Stable Diffusion 1\)/);
+
+  const webp = await F.analizzaImmagine(Buffer.from('RIFF\u0000\u0000\u0000\u0000WEBPVP8 qualcosa che non si decodifica'));
+  assert.equal(webp.marchiCercati, false);
+  assert.match(P.notaPerModello(webp).sistema, /in questo file non si possono cercare/);
+  assert.doesNotMatch(P.notaPerModello(webp).sistema, /né uno dei marchi/);
+});
+
+test('se il file dichiara qualcosa, parla l’etichetta e i pixel non si guardano', async (t) => {
+  F._dimentica();
+  const marcata = fixture('marchio-sdxl.png');
+  const testo = Buffer.from('parameters\u0000un gatto, Steps: 20', 'latin1');
+  const conEtichetta = Buffer.concat([marcata.subarray(0, 33), blocco('tEXt', testo), marcata.subarray(33)]);
+  const vera = isolata.cercaMarchi;
+  let chiamate = 0;
+  isolata.cercaMarchi = (...a) => { chiamate++; return vera(...a); };
+  t.after(() => { isolata.cercaMarchi = vera; });
+  const r = await F.analizzaImmagine(conEtichetta);
+  assert.equal(r.fonte, 'png');
+  assert.equal(r.prova, 'dichiarata');
+  assert.equal(chiamate, 0);
+});
+
+test('la stessa immagine letta dal menu e poi dalla chat si decodifica una volta sola', async (t) => {
+  F._dimentica();
+  const vera = isolata.cercaMarchi;
+  let chiamate = 0;
+  isolata.cercaMarchi = (...a) => { chiamate++; return vera(...a); };
+  t.after(() => { isolata.cercaMarchi = vera; });
+  const byte = fixture('marchio-sd1.png');
+  const [a, b] = await Promise.all([F.analizzaImmagine(byte), F.analizzaImmagine(Buffer.from(byte))]);
+  const c = await F.analizzaImmagine(byte);
+  assert.equal(chiamate, 1);
+  for (const r of [a, b, c]) assert.equal(r.marchio, 'sd1');
+});
+
+test('una lettura interrotta non resta ricordata come «nessun marchio»', async (t) => {
+  F._dimentica();
+  const vera = isolata.cercaMarchi;
+  let rompi = true;
+  isolata.cercaMarchi = (...a) => (rompi ? Promise.reject(new Error('thread caduto')) : vera(...a));
+  t.after(() => { isolata.cercaMarchi = vera; });
+  const byte = fixture('marchio-sdxl.png');
+  const prima = await F.analizzaImmagine(byte);
+  assert.equal(prima.trovato, false);
+  assert.equal(prima.marchiCercati, false, 'i pixel non sono stati letti: non si dice che il marchio non c’è');
+  rompi = false;
+  assert.equal((await F.analizzaImmagine(byte)).marchio, 'sdxl');
 });

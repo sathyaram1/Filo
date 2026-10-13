@@ -26,8 +26,9 @@
   const SCALA = 36;
   // Il codificatore di riferimento rifiuta le immagini più piccole: lì un marchio non c'è.
   const MIN_PIXEL = 256 * 256;
-  // Nessuno di questi generatori scrive immagini più grandi, e ingrandirne una il marchio lo cancella.
-  const MAX_PIXEL = 4096 * 4096;
+  // Il doppio della più grande che questi generatori scrivono (2048×2048), e ingrandirla il marchio lo cancella. Una
+  // foto del telefono (12 MP) resta fuori: decodificarla costerebbe un secondo a ogni domanda in chat, per niente.
+  const MAX_PIXEL = 2 * 2048 * 2048;
   // Fissata prima di provarla sulle foto vere: una foto senza marchio supera il test di un messaggio, in un ordine
   // dei canali, con probabilità al più ALFA. Senza marchio le medie per posizione sono scambiabili, e il test è esatto.
   const ALFA = 1e-9;
