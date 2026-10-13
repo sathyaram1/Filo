@@ -974,7 +974,8 @@ lavorano in locale.
 11. Lavori server dalla cloud (§ 7).
 12. Istruzioni dei ruoli sul server (§ 9).
 13. Canale stabile (§ 4.2).
-14. Posta (`posta`, `invio`), quando l'owner ha creato l'ambiente.
+14. Opportunità e posta: il server legge e scrive la casella con le sue
+    credenziali, ambito `posta`, azione `invia_mail` coi solleciti, taccuino.
 15. Mittenti normalizzati (§ 10).
 16. Cartella padre per le sessioni cloud (§ 11).
 17. Orchestratore Haiku con worker in parallelo (§ 12): prima la misura di K e
