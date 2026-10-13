@@ -1474,7 +1474,7 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-async function controllaUscita(action, { sender = null, contesto = null, parole = '' } = {}) {
+async function controllaUscita(action, { sender = null, contesto = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
