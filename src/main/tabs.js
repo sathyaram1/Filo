@@ -3136,6 +3136,12 @@ class TabManager {
     openExternalScheme(url);
   }
 
+  // Il collegamento file: che Chromium ha rifiutato a una pagina (page-preload.js): vale solo dopo un input vero, che la pagina non finge.
+  indirizzoRifiutatoDallaPagina(wc, url) {
+    if (!/^file:/i.test(String(url || '')) || !isWebUnsafeNav(url) || !Permessi.gestoRecente(wc)) return;
+    avvisaIndirizzoFermato(url, this.win);
+  }
+
   // Il lasciapassare che «Apri» dà alla finestra di accesso che la pagina richiede su suo ordine: una volta, subito.
   _riaperturaDiAccesso(tab, url) {
     const r = tab && tab._riaperturaAccesso;
