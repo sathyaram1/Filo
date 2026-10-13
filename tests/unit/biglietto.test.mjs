@@ -145,10 +145,11 @@ test('sporca: il biglietto della sessione, col motivo, e nessun altro; senza big
   } finally { togliCartella(dir); }
 });
 
-test('prendi scrive il file; registra il ramo col biglietto più sporco; chiudi toglie i file', async () => {
+test('prendi scrive il file; registra il ramo col biglietto della sessione; chiudi toglie il suo file e non quelli delle altre', async () => {
   const dir = repo();
   try {
-    const s = server();
+    const s = server({ [SEGRETO('y')]: { fiducia: 'non_fidato' } });
+    const altra = scriviBiglietto(dir, 'finita-ieri', SEGRETO('y'), FP('8'));
     const p = await B.prendi({ sessionId: 'sess-1', cwd: dir, nowMs: 7, deps: s.deps });
     assert.equal(p.fiducia, 'fidato');
     assert.equal(p.path, join(B.cartellaBiglietti(dir), 'sess-1.json'));
