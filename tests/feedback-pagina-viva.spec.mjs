@@ -196,30 +196,35 @@ test('in secondo piano non legge, nemmeno per l\'esito di un\'altra pagina; torn
     fb('f716', 716, 'design'),
     fb('f515', 515, 'working', { workingSince: new Date().toISOString() }),
   ]);
-  await expect.poll(() => page.evaluate(() => window.__srv.letture)).toBeGreaterThan(1);
+  // I giri si contano a pagina in vista; quanto ci mettano dipende dalla macchina, non dalla pagina.
+  await expect.poll(() => page.evaluate(() => window.__srv.letture), { timeout: 0 }).toBeGreaterThan(1);
+  const inVista = () => page.evaluate(() => window.__fbTest.inVista());
 
   const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
   const feedback = snap.tabs.find((t) => String(t.url || '').startsWith('filo://feedback')).id;
   await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
-  await page.waitForTimeout(600);
+  // Si conta da quando la pagina SA di essere dietro: prima, con la macchina carica, un giro poteva ancora partire.
+  await expect.poll(inVista, { timeout: 0 }).toBe(false);
   const fuori = await page.evaluate(() => window.__srv.letture);
   await page.waitForTimeout(3000);
   expect(await page.evaluate(() => window.__srv.letture)).toBe(fuori);
 
   // Il giro di un'altra pagina arriva anche qui: le versioni restano lì, rilette solo al rientro.
+  // `liveMessage` torna a esito fuso, quindi le letture si contano subito.
   await page.evaluate(() => window.__fbTest.setLiveTiming({ pollMs: 10 * 60 * 1000 }));
   await ilServerScrive(page, 'f515', { status: 'design', statusReason: 'clarify', workingSince: null });
   await page.evaluate(() => window.__fbTest.liveMessage({
     kind: 'reconcile',
     versions: Object.values(window.__srv.docs).map((d) => ({ _id: d._id, _updateTime: d._updateTime, createdAt: d.createdAt })),
   }));
-  await page.waitForTimeout(500);
   expect(await page.evaluate(() => window.__srv.letture)).toBe(fuori);
   expect(await page.evaluate(() => window.__srv.dettagli)).toBe(0);
 
   // Al rientro il giro della pagina non porta niente: il cambio può venire solo dall'esito messo da parte.
+  // «Subito» si misura da quando la pagina sa di essere tornata davanti, non da quando la shell cambia scheda.
   await page.evaluate(() => window.__fbTest.setLiveSources({ giro: async () => ({ ok: true, giro: { kind: 'skipped' } }) }));
   await shell.evaluate((id) => window.filoShell.tabs.activate(id), feedback);
+  await expect.poll(inVista, { timeout: 0 }).toBe(true);
   await expect(linguetta(page, 'inbox')).toHaveText('Ricevuti (2)', { timeout: 4000 });
   await expect(linguetta(page, 'queue')).toHaveText('In coda (0)');
 });
