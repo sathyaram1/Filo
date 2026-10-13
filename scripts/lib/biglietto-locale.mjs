@@ -340,7 +340,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
       }
     }
     if (!path && (source === 'resume' || source === 'compact')) {
-      const radice = radiceRepo(cwd);
+      const radice = radiceCondivisa(cwd);
       const suo = radice && ID_RE.test(sessionId) ? leggiFile(join(cartellaBiglietti(radice), `${sessionId}.json`)) : null;
       if (suo) {
         path = suo.path;
