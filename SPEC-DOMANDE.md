@@ -797,8 +797,9 @@ I numeri restano dell'owner, in Routine → Crediti.
   10% resta sempre libero: il pacemaker non ci accende più niente oltre il 90%
   della settimana. Le sessioni locali dell'owner consumano da A: col dato della
   barra di stato entrano nel conto da sole. L'account B può arrivare al 100%.
-- **Passo:** ogni giorno si spende al massimo il rimasto diviso i giorni che
-  mancano al rinnovo, così la settimana non finisce il martedì.
+- **Passo:** lo decide la curva del monitoraggio (§ 4.5). Senza curva, ogni
+  giorno si spende al massimo il rimasto diviso i giorni che mancano al
+  rinnovo.
 - **Ordine:** quello della coda, cioè l'urgenza dei compiti (§ 6.3). Il passo
   e la riserva dicono quanto si spende, non cosa viene prima: la priorità 3
   resta sopra le risposte e i ricorrenti.
