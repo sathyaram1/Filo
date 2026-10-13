@@ -5,6 +5,7 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const fs = require('node:fs');
 const path = require('node:path');
 const Psl = require('./safebrowse/psl');
 const { tastoPremuto } = require('../tastoDelMouse');
@@ -26,8 +27,11 @@ const TIPI = {
   'loopback-network': 'rete',
 };
 // File e cartelle (#1069): leggere quello che l'utente ha scelto nel selettore passa, la scelta è il consenso; scriverci
-// si chiede. Il salvataggio (showSaveFilePicker) qui non arriva: Electron gli dà la scrittura da sé, come Chrome.
+// si chiede. Da Electron 39 il controllo È lo stato del file (sì o no, mai «da chiedere»): la scrittura passa solo dopo
+// un sì, la domanda la fa partire la pagina (chiediScrittura) e il salvataggio lo riconosce `salvataggio`.
 const SECONDO_L_ACCESSO = { fileSystem: (d) => (d && d.fileAccessType === 'readable' ? null : 'file') };
+// Il file scelto in «Salva con nome» Chromium lo crea o lo svuota prima di darlo alla pagina: vuoto e appena toccato.
+const SALVATAGGIO_MS = 60_000;
 // Ciò che Chrome concede di fabbrica passa senza domanda.
 const INNOCUI = new Set([
   'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'keyboardLock', 'mediaKeySystem',
@@ -43,8 +47,9 @@ const NON_DISPONIBILI = new Set([
   'system-wake-lock',
 ]);
 // Il controllo dice sì solo dopo un sì vero: la lettura sincrona degli appunti non sa chiedere, le notifiche Electron le
-// mostra a chi il controllo dà per concesse, e chi sa che sei al computer lo saprebbe senza domanda.
-const CONTROLLO_SOLO_COL_SI = new Set(['deprecated-sync-clipboard-read', 'notifications', 'idle-detection']);
+// mostra a chi il controllo dà per concesse, chi sa che sei al computer lo saprebbe senza domanda, e un file o una
+// cartella con il controllo a sì si scrivono senza domanda.
+const CONTROLLO_SOLO_COL_SI = new Set(['deprecated-sync-clipboard-read', 'notifications', 'idle-detection', 'fileSystem']);
 const SOLO_CONTROLLO = new Set(['deprecated-sync-clipboard-read']);
 // Notifiche: si chiedono solo subito dopo un gesto dell'utente sulla pagina.
 const DOPO_UN_GESTO = new Set(['notifications']);
@@ -117,6 +122,25 @@ function oggettoDi(tipo, details) {
   if (tipo !== 'file') return undefined;
   const percorso = String((details && details.filePath) || '');
   return { nome: path.basename(percorso) || percorso, percorso, cartella: Boolean(details && details.isDirectory) };
+}
+
+// Il file o la cartella su cui il sito ha appena chiesto di scrivere: è quello che la domanda nomina (chiediScrittura).
+function segnaFile(ses, origine, details) {
+  if (!details || !details.filePath) return;
+  (ses._filoUltimoFile ||= new Map()).set(origine, { percorso: String(details.filePath), cartella: Boolean(details.isDirectory), alle: Date.now() });
+}
+
+// Un file scelto per salvarci è scrivibile come in Chrome, anche dopo un no alla modifica dei file del sito.
+function salvataggio(ses, origine, details) {
+  if (!details || details.isDirectory || !details.filePath) return false;
+  const chiave = `${origine}|${details.filePath}`;
+  const salvati = (ses._filoSalvati ||= new Set());
+  if (salvati.has(chiave)) return true;
+  let st;
+  try { st = fs.statSync(String(details.filePath)); } catch (_) { return false; }
+  if (!st.isFile() || st.size !== 0 || Math.abs(Date.now() - st.mtimeMs) > SALVATAGGIO_MS) return false;
+  salvati.add(chiave);
+  return true;
 }
 
 function partiNote(details) {
@@ -440,7 +464,7 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
   if (!ses || ses._filoPermessi) return;
   ses._filoPermessi = true;
   try {
-    ses.setPermissionRequestHandler((wc, permission, callback, details) => {
+    ses.setPermissionRequestHandler(ses._filoRichiesta = (wc, permission, callback, details) => {
       if (typeof prima === 'function' && prima(wc, permission, callback, details)) return;
       const chi = origineDi(wc, details && details.requestingUrl);
       if (chi.filo) { callback(true); return; }
@@ -474,10 +498,11 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
       if (COL_GESTO_SENZA_DOMANDA.has(permission)) return gestoRecente(wc);
       const tipo = tipoDi(permission, details);
       if (!tipo) return senzaTipoPassa(permission);
+      if (tipo === 'file') segnaFile(ses, origine, details);
       const parti = partiDi(tipo, details);
       if (lasciapassareValido(wc, tipo, parti)) return true;
       const decise = parti.map((parte) => sceltePer(ses).get(`${origine}|${parte}`));
-      if (CONTROLLO_SOLO_COL_SI.has(permission)) return decise.every((x) => x === true);
+      if (CONTROLLO_SOLO_COL_SI.has(permission)) return decise.every((x) => x === true) || (tipo === 'file' && salvataggio(ses, origine, details));
       return !decise.some((x) => x === false);
     });
   } catch (_) {}
@@ -491,6 +516,20 @@ function negaTutto(ses) {
     if (typeof ses.setPermissionCheckHandler === 'function') ses.setPermissionCheckHandler(() => false);
     ses._filoPermessiNegati = true;
   } catch (_) {}
+}
+
+// La pagina che vuole scrivere su ciò che ha già lo chiede da qui (preload/stato-permessi.js): Chromium non chiama più il
+// gestore delle richieste. Vale dopo un gesto vero e per il file su cui il controllo ha appena detto no; null = non chiesto.
+function chiediScrittura(wc) {
+  return new Promise((ok) => {
+    const ses = wc && wc.session;
+    const origine = origineWeb(urlDi(wc));
+    const ultimo = origine && ses && ses._filoUltimoFile && ses._filoUltimoFile.get(origine);
+    if (!ultimo || Date.now() - ultimo.alle > GESTO_MS || typeof ses._filoRichiesta !== 'function' || !gestoRecente(wc)) { ok(null); return; }
+    ses._filoRichiesta(wc, 'fileSystem', (si) => ok(Boolean(si)), {
+      fileAccessType: 'writable', filePath: ultimo.percorso, isDirectory: ultimo.cartella, requestingUrl: urlDi(wc),
+    });
+  });
 }
 
 function rispondi(id, si) {
@@ -599,7 +638,7 @@ function statoNotifiche(ses, url) {
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
-  gestoDiFilo, aperturaScelta, perUnaFinestra,
+  gestoDiFilo, aperturaScelta, perUnaFinestra, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };

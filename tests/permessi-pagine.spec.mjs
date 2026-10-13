@@ -418,7 +418,9 @@ test('una pagina che si riscrive in un documento blob non ottiene niente senza d
   test.setTimeout(60_000);
   await app.evaluate(({ clipboard }) => clipboard.writeText('password-copiata'));
   await apri('/blob');
-  await expect(barra()).toContainText('microfono e fotocamera', { timeout: 10_000 });
+  // Quale domanda arriva prima dipende da quanto ci mette la fotocamera ad accendersi (nel contenitore delle routine oltre
+  // sei secondi): conta che il sito chieda col suo nome.
+  await expect(barra()).toContainText(/microfono e fotocamera|quello che hai copiato/, { timeout: 10_000 });
   await expect(barra().locator('strong')).toHaveText(new URL(origine).host);
   await new Promise((ok) => setTimeout(ok, 2500));
   expect(esiti).toContain('notifiche:default');
