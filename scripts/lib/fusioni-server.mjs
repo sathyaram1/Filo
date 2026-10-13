@@ -52,6 +52,12 @@ export async function fusioniServer(dep, { prova = false } = {}) {
         ferme.push({ num, motivo: `né su filo-security né nell’app c’è un ramo ${ramo} da fondere: decide l’owner` });
         continue;
       }
+      // Il ramo va in conflitto con main del server: nessuno sul PC lo riallinea, torna alle routine.
+      if (r.code === USCITA_CONFLITTO_MAIN) {
+        dep.log(`#${num} su filo-security ${ramo} va in conflitto con main: torna alle routine per il riallineamento`);
+        riallineate.push({ num, id: p.feedbackId });
+        continue;
+      }
       if (r.code !== 0) {
         ferme.push({ num, motivo: `server:fondi non ha fuso (uscita ${r.code}):\n${coda(r.out)}` });
         continue;
@@ -61,7 +67,14 @@ export async function fusioniServer(dep, { prova = false } = {}) {
     }
     fuse.push({ num, id: p.feedbackId, app });
   }
-  if (prova) return { fuse, soloApp, ferme, pubblicato: false };
+  if (prova) return { fuse, soloApp, riallineate, ferme, pubblicato: false };
+  for (const s of riallineate) {
+    try {
+      await dep.fineAttesa(s.id, { riallinea: true });
+    } catch (e) {
+      ferme.push({ num: s.num, motivo: `il ramo del server va in conflitto con main, ma la pratica non è tornata alle routine: ${String((e && e.message) || e).slice(0, 200)}` });
+    }
+  }
   for (const s of soloApp) {
     try {
       await dep.fineAttesa(s.id, { soloApp: true });
@@ -69,7 +82,7 @@ export async function fusioniServer(dep, { prova = false } = {}) {
       ferme.push({ num: s.num, motivo: `sul server non c’era niente da fondere, ma la pratica non è tornata alle routine: ${String((e && e.message) || e).slice(0, 200)}` });
     }
   }
-  if (!fuse.length) return { fuse, soloApp, ferme, pubblicato: false };
+  if (!fuse.length) return { fuse, soloApp, riallineate, ferme, pubblicato: false };
 
   // Un deploy solo, dopo tutte le fusioni: incorpora il main del server appena mosso.
   dep.log('server:pubblica');
@@ -77,7 +90,7 @@ export async function fusioniServer(dep, { prova = false } = {}) {
   if (d.code !== 0) {
     // Le parti dell'app restano ferme: senza il server in produzione romperebbero chi le usa (mappa §3.3, rischio 7).
     ferme.push({ num: fuse.map((f) => f.num).join(', '), motivo: `fuso, ma il deploy del server non è andato:\n${coda(d.out)}` });
-    return { fuse, soloApp, ferme, pubblicato: false };
+    return { fuse, soloApp, riallineate, ferme, pubblicato: false };
   }
   for (const f of fuse.filter((x) => x.app > 0)) {
     try {
@@ -87,5 +100,5 @@ export async function fusioniServer(dep, { prova = false } = {}) {
       ferme.push({ num: f.num, motivo: `server in produzione, ma la pratica non è tornata alle routine: ${String((e && e.message) || e).slice(0, 200)}` });
     }
   }
-  return { fuse, soloApp, ferme, pubblicato: true };
+  return { fuse, soloApp, riallineate, ferme, pubblicato: true };
 }

@@ -166,6 +166,8 @@ function puntaRamoServer(cartella, ramo) {
 
 // Uscita di server:fondi quando sul server il ramo non c'è: per un lavoro tutto nell'app non c'è niente da fondere (#1159).
 export const USCITA_SOLO_APP = 5;
+// La stessa dello strumento del server: un ramo worker/* va in conflitto con main del server, lo riallineano le routine.
+export const USCITA_CONFLITTO_MAIN = 6;
 
 /**
  * Il ramo del server è un lavoro fidato secondo il registro dei rami (#1159, mappa §1.6)? Vale anche per un ramo con
