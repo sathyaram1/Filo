@@ -191,8 +191,11 @@
   // dopo il tentativo. Su fallimento (offline) le voci restano in coda e, se
   // `auto`, viene pianificato un nuovo tentativo con backoff crescente.
   async function flush() {
-    if (flushing) return queue.length === 0;
+    // Il giro in corso ha già scelto le voci e letto il token: chi arriva adesso (un invio, un rientro) ne vuole
+    // un altro appena finisce, o resterebbe fermo fino al prossimo invio.
+    if (flushing) { ancora = true; return queue.length === 0; }
     flushing = true;
+    ancora = false;
     let anyFail = false;
     try {
       await load();
