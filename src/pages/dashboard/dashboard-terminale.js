@@ -399,6 +399,7 @@
       onExit: ({ code, cwd }) => {
         if (cwd) setCwd(cwd);
         finish(code === 0 ? null : `(uscita con codice ${code})`);
+        if (code !== 0) proponiVirgolette({ command, cwd: cwdDelComando, shell: shellDelComando, out, chat: chatDelComando });
       },
       onError: ({ message }) => {
         appendOut(`\n${message || 'Errore di esecuzione.'}`, true);
