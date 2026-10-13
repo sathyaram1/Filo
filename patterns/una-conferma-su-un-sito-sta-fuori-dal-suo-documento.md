@@ -67,7 +67,8 @@ nella pagina, in uno Shadow DOM chiuso.
 - **Test:** la domanda si fa partire dal mondo isolato del preload (`nelMondoDiFilo` in
   `tests/helpers/confirm.mjs`: `page.evaluate` gira nel mondo della pagina e non ci arriva), e il popup
   si guarda nella sua vista (`confermaSopraPagina`), dove valgono gli hook `_test` di sempre.
-  `tests/conferme-sopra-pagina.spec.mjs` prova la pagina ostile del rilievo e i gesti finti sull'Aiuto.
+  `tests/conferme-sopra-pagina.spec.mjs` prova la pagina ostile del rilievo, il velo sopra OK e i gesti finti
+  sull'Aiuto.
 
 ## Quando il sì apre i dati dell'utente: i documenti dall'Aiuto (#947.3)
 
