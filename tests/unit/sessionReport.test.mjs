@@ -6,6 +6,7 @@
 // `usage` ripetuta — si conta una volta; una riga può non essere JSON — si
 // salta e si annota.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, utimesSync } from 'node:fs';
