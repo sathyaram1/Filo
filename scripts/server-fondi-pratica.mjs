@@ -313,6 +313,10 @@ export async function esegui(argv, deps = {}) {
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
     }
     const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
+    if (k === USCITA_CONFLITTO_MAIN && !tardiva) {
+      err(`main del server non si è mosso. La pratica ${chi} torna alle routine per il riallineamento al giro del PC (npm run orchestra -- fusioni-server).`);
+      return k;
+    }
     if (k !== 0) {
       if (tardiva) { err(`main del server non si è mosso, e la pratica ${chi} resta chiusa com'era: sistema e rilancia lo stesso comando.`); return k; }
       await of.annotaPratica(r.id, `server:fondi si è fermato (uscita ${k}) su ${a.ramo}: main del server non si è mosso.`, { bearer }).catch(() => null);
