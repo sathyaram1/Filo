@@ -153,13 +153,19 @@ function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
 
-/** La punta di `ramo` su origin del server, appena letta: '' se il ramo non c'è o la rete non risponde. */
+/** La punta di `ramo` su origin del server, appena letta: '' se su origin il ramo non c'è, null se origin non si legge. */
 function puntaRamoServer(cartella, ramo) {
   const radice = dirname(cartella);
-  if (!gitEsito(radice, ['fetch', '--quiet', 'origin', `+refs/heads/${ramo}:refs/remotes/origin/${ramo}`]).ok) return '';
+  const elenco = gitEsito(radice, ['ls-remote', 'origin', `refs/heads/${ramo}`]);
+  if (!elenco.ok) return null;
+  if (!String(elenco.out).trim()) return '';
+  if (!gitEsito(radice, ['fetch', '--quiet', 'origin', `+refs/heads/${ramo}:refs/remotes/origin/${ramo}`]).ok) return null;
   const r = gitEsito(radice, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${ramo}`]);
-  return r.ok ? String(r.out).trim() : '';
+  return r.ok ? String(r.out).trim() : null;
 }
+
+// Uscita di server:fondi quando sul server il ramo non c'è: per un lavoro tutto nell'app non c'è niente da fondere (#1159).
+export const USCITA_SOLO_APP = 5;
 
 /**
  * Il ramo del server è un lavoro fidato secondo il registro dei rami (#1159, mappa §1.6)? Vale anche per un ramo con
