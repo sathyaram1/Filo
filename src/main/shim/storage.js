@@ -95,6 +95,7 @@ const STATE = {
   copiaTimer: null,
   genCopia: 0,
   copiaSuDisco: 0,
+  pulizia: null,
 };
 
 // Una chiave che qualcuno osserva in scrittura non si presta mai viva, né in lettura né in scrittura: chi muta
@@ -283,7 +284,7 @@ async function leggiFile() {
     avvisa(testoIlleggibile(err, copia), CHIAVE_LETTURA);
     return;
   }
-  Disco.togliTemporanei(target).catch(() => {});
+  STATE.pulizia = Disco.togliTemporanei(target).catch(() => {});
   if (buf === null) {
     STATE.data = {};
     // Le prove automatiche (playwright.config.js) partono da un utente già accolto, da qualunque avvio: senza, la home
@@ -364,8 +365,9 @@ function flushNow() {
 }
 
 // Attende che non resti NIENTE in sospeso: né un flush in attesa del debounce,
-// né uno in volo, né la copia di riserva in attesa del suo minuto. Quello che è
-// in attesa lo fa scattare subito, così non c'è nessuna attesa a tempo.
+// né uno in volo, né la copia di riserva in attesa del suo minuto, né la pulizia
+// dei temporanei dell'avvio. Quello che è in attesa lo fa scattare subito, così
+// non c'è nessuna attesa a tempo.
 //
 // Serve ai test: aspettare "abbastanza secondi" che una scrittura grande
 // arrivi su disco è affidabile a macchina scarica e diventa un falso allarme
@@ -375,6 +377,7 @@ async function whenSettled() {
   await scrittureFerme();
   if (STATE.copiaTimer) await aggiornaCopia();
   else await STATE.copia;
+  await STATE.pulizia;
 }
 
 async function scrittureFerme() {
