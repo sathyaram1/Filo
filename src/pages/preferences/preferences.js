@@ -439,7 +439,7 @@
       reset.type = 'button';
       reset.className = 'sn-token-reset';
       reset.textContent = '↺';
-      reset.title = `Ripristina il predefinito (${m.def})`;
+      reset.title = `Ripristina il predefinito (${cifre(m.def)})`;
       reset.setAttribute('aria-label', `Ripristina ${m.key}`);
       reset.addEventListener('click', () => resetTabColorParam(m.key));
       row.appendChild(reset);
