@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { cartellaInCasa } from './helpers/percorsi.mjs';
+import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
 import { writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
