@@ -1981,7 +1981,8 @@ async function eseguiAzioneFilo(action, {
       if (accoglienza && !confirmed && !assistente && setter && setter.scrive.includes('agentStyle')
         && !testoDiAltriNelleAzioni(contesto)) action._accoglienza = true;
     } catch (_) {}
-    // «Questo sito», «scheda: <titolo>» fra i siti delicati: la chat vede i titoli delle schede, non gli indirizzi (#1004).
+    // «Questo sito», «scheda: <titolo>» fra i siti delicati e quelli col menu proprio (#975): la chat vede i titoli
+    // delle schede, non gli indirizzi (#1004).
     try {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
