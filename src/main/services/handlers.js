@@ -5445,6 +5445,7 @@ const handlerCtx = {
   finishOnboarding,
   claimOnboardingResume,
   releaseOnboardingResume,
+  autoFeedbackAnnullabili,
 };
 
 require('./handlers/nav')(on, handlerCtx);
