@@ -140,6 +140,9 @@ const filoApi = {
   // Esiste questo comando nella shell? Per l'evidenziazione live (rosso = non
   // riconosciuto) della dashboard in modalità terminale.
   shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
+  // #968 — le virgolette a un percorso con spazi: appena incollato nel comando, e proposte dopo un errore.
+  shellVirgoletteIncolla: (opts) => ipcRenderer.invoke('shell:virgolette-incolla', opts),
+  shellPropostaVirgolette: (opts) => ipcRenderer.invoke('shell:proposta-virgolette', opts),
   // Questo "/dominio.tld" risolve davvero? Per colorare di rosso (e non
   // navigare verso) un sito inesistente dalla barra comando della dashboard.
   siteResolves: (opts) => ipcRenderer.invoke('net:resolves', opts),
