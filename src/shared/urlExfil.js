@@ -353,7 +353,7 @@
     if (!testo.trim()) return null;
     const esposto = carrierAlnum(url);
     if (esposto.length < MIN_TOKEN) return null;
-    if (chiaviSenzaSchema(testo).has(chiaveSenzaSchema(url))) return null;
+    if (chiaviSenzaSchema(testo).has(chiaveSenzaSchema(url).toLowerCase())) return null;
     const d = formaBase(String(domanda || '')).toLowerCase();
     const dAlnum = soloAlnum(d);
     const dCifre = cifreVicine([d]);
