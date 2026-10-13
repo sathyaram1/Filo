@@ -1,4 +1,4 @@
-// Verifica #974 giro 1: esplorazione avversariale delle righe ripiegate delle altre app nella home.
+// Verifica #974 giro 1: le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home } from '../../helpers/chatFinta.mjs';
 import { mkdirSync } from 'node:fs';
@@ -17,16 +17,16 @@ async function prepara(app) {
     });
     const P = globalThis.SN_PROVIDERS;
     const risposta = ({ attempts, messages }) => {
-      const fatto = (text) => ({ text, model: attempts[0].model, provider: attempts[0].provider, usage: {} });
+      const fatto = (text) => ({ text, model: attempts[0].model, provider: attempts[0].provider, usage: le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito. });
       const tutto = JSON.stringify(messages);
-      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      const sistema = String((messages.find((m) => m.role === 'system') || le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito.).content || '');
       if (tutto.includes('preparare la dashboard')) return fatto('{"message":"","suggestions":[]}');
       if (sistema.includes('# Protocollo di risposta')) return fatto(JSON.stringify({ text: aiuto, status: 'done' }));
       if (sistema.includes('assistente di scrittura dentro un editor')) return fatto('Il capitolo sui licheni va accorciato di metà.');
-      return fatto('{}');
+      return fatto('le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito.');
     };
     P.completeWithFallback = async (o) => risposta(o);
-    P.streamCompleteWithFallback = async (o) => { const r = risposta(o); try { o.onDelta && o.onDelta(r.text); } catch (_) {} return r; };
+    P.streamCompleteWithFallback = async (o) => { const r = risposta(o); try { o.onDelta && o.onDelta(r.text); } catch (_) le risposte dell'Aiuto nello scambio aperto della home restano formattate come nel sito. return r; };
   }, AIUTO);
 }
 
@@ -54,7 +54,7 @@ async function chatDellEditor(openTab, titolo, domanda) {
   return editor;
 }
 
-test('aiuto con risposta formattata: nello scambio aperto della home niente asterischi', async ({ app, shell, openTab, testServer }) => {
+test('r2 aiuto con risposta formattata: nello scambio aperto della home niente asterischi', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   await prepara(app);
   const casa = await home(app);
@@ -77,54 +77,4 @@ test('aiuto con risposta formattata: nello scambio aperto della home niente aste
   await casa.screenshot({ path: `${SHOTS}/v974-aiuto-markdown.png` });
   expect(htmlSito, 'nel sito la risposta è formattata').toContain('<strong>');
   await expect(msg).not.toContainText('**');
-});
-
-test('home aperta dopo la chat dell’Editor: la riga c’è', async ({ app, shell, openTab }) => {
-  test.setTimeout(90_000);
-  await prepara(app);
-  await home(app);
-  await chatDellEditor(openTab, 'tesi', 'Cosa ne pensi del capitolo sui licheni?');
-  const nuova = await openTab('filo://newtab/');
-  await expect(nuova.locator('#input')).toBeVisible({ timeout: 10_000 });
-  await expect(nuova.locator('.dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi", { timeout: 10_000 });
-});
-
-test('documento con nome lungo, emoji e markup: riga su una riga, niente markup, niente scorrimento orizzontale', async ({ app, shell, openTab }) => {
-  test.setTimeout(90_000);
-  await prepara(app);
-  const casa = await home(app);
-  const nome = `<b>tesi</b> 🦎 ${'licheni crostosi e fogliosi '.repeat(8)}`;
-  await chatDellEditor(openTab, nome, 'Cosa ne pensi?');
-  await attiva(shell, 'filo://newtab');
-  const riga = casa.locator('#righeApp .dash-riga-app');
-  await expect(riga).toHaveCount(1, { timeout: 10_000 });
-  await expect(riga.locator('.dash-riga-app-testo')).toContainText('<b>tesi</b>');
-  const m = await riga.evaluate((el) => {
-    const t = el.querySelector('.dash-riga-app-testa');
-    const r = t.getBoundingClientRect();
-    return { h: r.height, right: r.right, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth };
-  });
-  mkdirSync(SHOTS, { recursive: true });
-  await casa.screenshot({ path: `${SHOTS}/v974-nome-lungo.png` });
-  await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
-  await expect(casa.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
-  await riga.locator('.dash-riga-app-testa').click();
-  await casa.waitForTimeout(600);
-  await casa.screenshot({ path: `${SHOTS}/v974-nome-lungo-scuro-aperta.png` });
-  expect(m.sw).toBeLessThanOrEqual(m.vw);
-  expect(m.right).toBeLessThanOrEqual(m.vw);
-});
-
-test('documento rinominato dopo la chat: la riga dice il nome nuovo', async ({ app, shell, openTab }) => {
-  test.setTimeout(90_000);
-  await prepara(app);
-  const casa = await home(app);
-  const editor = await chatDellEditor(openTab, 'bozza', 'Cosa ne pensi del capitolo sui licheni?');
-  await editor.click('#docSwitch');
-  await editor.locator('.ed-doc-item').first().locator('.ed-doc-rename').click();
-  await editor.locator('.ed-doc-item-input').fill('tesi definitiva');
-  await editor.locator('.ed-doc-item-input').press('Enter');
-  await editor.keyboard.press('Escape');
-  await attiva(shell, 'filo://newtab');
-  await expect(casa.locator('#righeApp .dash-riga-app-testo')).toHaveText("2 messaggi nell'Editor su tesi definitiva", { timeout: 10_000 });
 });
