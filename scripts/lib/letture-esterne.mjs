@@ -104,8 +104,15 @@ export function cartelleTemporaneeDiClaude(radici, { env = {}, tmp = [], uid = n
 export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform } = {}) {
   const win = sistema === 'win32';
   const P = win ? path.win32 : path.posix;
-  const comune = B.radiceCondivisa(cwd);
-  const radici = [B.radiceRepo(cwd), comune, String(env.CLAUDE_PROJECT_DIR || '').trim()].filter(Boolean);
+  // Il repo della cartella corrente vale solo se è il progetto o una sua worktree: un repo clonato da fuori in cui la
+  // sessione si è spostata resta testo altrui (#1211 giro 2).
+  const progetto = String(env.CLAUDE_PROJECT_DIR || '').trim();
+  const comuneProgetto = progetto ? B.radiceCondivisa(progetto) : '';
+  const daQui = B.radiceCondivisa(cwd);
+  const chiave = (c) => { const k = canonicoVero(P.resolve(c)); return win ? k.toLowerCase() : k; };
+  const suo = !!daQui && (!progetto || (!!comuneProgetto && chiave(daQui) === chiave(comuneProgetto)));
+  const comune = suo ? daQui : comuneProgetto;
+  const radici = [suo ? B.radiceRepo(cwd) : '', comune, progetto].filter(Boolean);
   const server = comune ? cartellaDelServer(comune) : '';
   const claude = [P.join(homedir(), '.claude'), String(env.CLAUDE_CONFIG_DIR || '').trim()].filter(Boolean);
   const uid = typeof process.getuid === 'function' ? process.getuid() : null;
