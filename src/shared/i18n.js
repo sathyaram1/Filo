@@ -42,6 +42,14 @@
     menu_open_for_later: 'Aperti per dopo',
     menu_fullscreen: 'Schermo intero',
     menu_exit_fullscreen: 'Esci da schermo intero',
+    // #975 — il menu che il sito ha per il tasto destro
+    menu_del_sito: 'Menu di %s',
+    menu_del_sito_freccia: 'Il tasto destro su questo sito',
+    menu_del_sito_sempre: 'Aprilo direttamente col tasto destro',
+    menu_del_sito_filo_dopo: 'Il menu di Filo resta su Maiusc + tasto destro',
+    menu_del_sito_togli: 'Rimetti il menu di Filo al tasto destro',
+    menu_del_sito_fatto: 'Su questo sito il tasto destro apre il menu di %s',
+    menu_del_sito_tolto: 'Il tasto destro apre di nuovo il menu di Filo',
 
     // Menu — link / immagine
     menu_open_in_new_tab: 'Apri in nuova tab',
