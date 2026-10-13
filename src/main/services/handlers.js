@@ -4844,10 +4844,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // testo E niente azioni), che sarebbe altrimenti una bolla muta.
   // La nota che diventa risposta: la scheda la toglie dal blocco, dove l'aveva già messa.
   let notaRisposta = '';
+  // La scheda mette «Continua» sotto la frase: si riprende da qui, senza riscrivere la domanda.
+  let senzaRisposta = null;
   if (exhausted) {
-    const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
-    const last = unisciTesti([...risposta, textReply]);
-    textReply = last ? `${last}\n\n${stop}` : stop;
+    senzaRisposta = { passi };
+    textReply = unisciTesti([...risposta, textReply, fraseSenzaRisposta(passi)]);
   } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
     // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
     // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
