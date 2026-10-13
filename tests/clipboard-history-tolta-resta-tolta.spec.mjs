@@ -6,6 +6,7 @@ import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
 import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
+import { confermaSopraPagina, clickConfirm } from './helpers/confirm.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -80,17 +81,9 @@ async function avvia(items) {
   return ctx;
 }
 
-// Il dialogo di conferma sulle pagine web vive nel mondo isolato dei content script.
-async function confermaWeb(app, host) {
-  await new Promise((r) => setTimeout(r, 500));
-  return app.evaluate(async ({ webContents }, h) => {
-    const wc = webContents.getAllWebContents().find((c) => {
-      try { return new URL(c.getURL()).hostname === h; } catch (_) { return false; }
-    });
-    return wc.executeJavaScriptInIsolatedWorld(999, [{
-      code: '(() => window.SN_CONFIRM_UI._test.click("ok"))()',
-    }]);
-  }, host);
+// Su un sito il popup di conferma sta in una vista sopra la scheda, fuori dal suo documento (#592.6).
+async function confermaWeb(app) {
+  await clickConfirm(await confermaSopraPagina(app), 'ok');
 }
 
 const voci = (n) => Array.from({ length: n }, (_, i) => ({ type: 'text', text: `voce-${i}`, ts: 1000 - i }));
@@ -113,7 +106,7 @@ test('la segnalazione: dal menu «Incolla» si toglie una voce e si svuota tutto
     stato = await apriCronologia(c.app, web, '#ta');
     expect(stato.voci).toHaveLength(2);
     await web.mouse.click(stato.svuota.x, stato.svuota.y);
-    await confermaWeb(c.app, '127.0.0.1');
+    await confermaWeb(c.app);
     await expect.poll(() => c.disco()).toEqual([]);
   } finally { await c.chiudi(); }
 });
@@ -131,6 +124,8 @@ test('tolta dalla Sicurezza, la password non torna in cronologia al primo «Inco
     await sec.locator('#sec-clip-list .sn-clip-remove').first().click();
     await expect.poll(() => c.disco()).toEqual([]);
 
+    // Con la Sicurezza davanti l'«Incolla» della pagina non scrive in cronologia (#589.4): non proverebbe niente.
+    await c.mostraWeb();
     await web.locator('#ta').fill('');
     await web.locator('#ta').click({ button: 'right' });
     await web.locator('.sn-menu-paste-main').first().click();
@@ -157,7 +152,7 @@ test('svuotata dal menu, la cosa ancora negli appunti non rientra al primo «Inc
 
     const { svuota } = await apriCronologia(c.app, web, '#ta');
     await web.mouse.click(svuota.x, svuota.y);
-    await confermaWeb(c.app, '127.0.0.1');
+    await confermaWeb(c.app);
     await expect.poll(() => c.disco()).toEqual([]);
 
     await incolla('password-due');

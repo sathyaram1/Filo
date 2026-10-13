@@ -347,9 +347,10 @@ module.exports = function register(on, ctx) {
   // deve rientrare dal primo «Incolla» di Filo: la sua chiave resta sospesa
   // finché si incolla altro o la si ricopia apposta.
   let chiaveSospesa = '';
-  const chiaveAppunti = () => {
+  // Da Electron 44 gli appunti del main rispondono con una Promise: letta senza await la chiave era sempre ''.
+  const chiaveAppunti = async () => {
     try {
-      const t = require('electron').clipboard.readText();
+      const t = await require('electron').clipboard.readText();
       return t ? globalThis.SN_CLIPBOARD.chiave({ type: 'text', text: t }) : '';
     } catch (_) { return ''; }
   };
@@ -422,7 +423,7 @@ module.exports = function register(on, ctx) {
       return '';
     };
     const target = keyOf(e);
-    if (target && target === chiaveAppunti()) chiaveSospesa = target;
+    if (target && target === await chiaveAppunti()) chiaveSospesa = target;
     const next = arr.filter((x) => keyOf(x) !== target);
     if (next.length !== arr.length) {
       await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, next);
@@ -435,7 +436,7 @@ module.exports = function register(on, ctx) {
   on(MSG.CLEAR_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
     const prima = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
-    const inAppunti = chiaveAppunti();
+    const inAppunti = await chiaveAppunti();
     if (inAppunti && Array.isArray(prima) && prima.some((x) => globalThis.SN_CLIPBOARD.chiave(x) === inAppunti)) {
       chiaveSospesa = inAppunti;
     }
