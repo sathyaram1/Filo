@@ -1620,7 +1620,7 @@
   // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
   // devono vedere il comando che la shell esegue, non la sua grafia (#1072). Per cmd quei segni sono testo.
   // Per cmd `'` è testo (`' \\host\x '` sono tre argomenti), per i programmi C anche `\"` (findstr); i programmi
-  // MSYS (cat, ls di Git) leggono `'` come virgolette. Vale la lettura peggiore, a pari livello quella di cmd (#1072.5).
+  // MSYS (cat, ls di Git) leggono `'` come virgolette. Vale la lettura peggiore, a pari livello la prima (#1072.5).
   function comeLaShell(cmd, c) {
     if (!c.win) return [cmd];
     if (c.shell === 'cmd') {
