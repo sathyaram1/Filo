@@ -20,22 +20,50 @@ function sorgenti(dir = join(ROOT, 'src'), out = []) {
   return out;
 }
 
+// Fino alla parentesi che chiude: le opzioni possono contenere una chiamata (Math.max(0, d)).
+function argomenti(src, da) {
+  let livello = 1;
+  for (let i = da; i < src.length; i++) {
+    if (src[i] === '(') livello++;
+    else if (src[i] === ')' && --livello === 0) return src.slice(da, i);
+  }
+  return src.slice(da);
+}
+
+// Anche senza `new` e con le opzioni in una variabile: formattano uguale, e una regex sulla forma tipica non le vedeva.
+function senzaRaggruppamento(src) {
+  const fuori = [];
+  for (const m of src.matchAll(/\bIntl\.NumberFormat\(/g)) {
+    if (!argomenti(src, m.index + m[0].length).includes('useGrouping')) fuori.push(m.index);
+  }
+  for (const m of src.matchAll(/\.toLocaleString\(\s*['"]it(?:-IT)?['"]/g)) {
+    const opzioni = argomenti(src, m.index + '.toLocaleString('.length);
+    if (opzioni.includes('useGrouping') || DATA.test(opzioni)) continue;
+    if (/Date\([^)]*\)\s*$/.test(src.slice(Math.max(0, m.index - 60), m.index))) continue;
+    fuori.push(m.index);
+  }
+  return fuori;
+}
+
 test('ogni numero formattato in italiano tiene il punto delle migliaia anche a quattro cifre', () => {
   const senza = [];
   for (const p of sorgenti()) {
     const src = readFileSync(p, 'utf8');
     const dove = (i) => `${relative(ROOT, p).replace(/\\/g, '/')}:${src.slice(0, i).split('\n').length}`;
-    for (const m of src.matchAll(/new Intl\.NumberFormat\(([^)]*)\)/g)) {
-      if (!m[1].includes('useGrouping')) senza.push(dove(m.index));
-    }
-    for (const m of src.matchAll(/\.toLocaleString\(\s*['"]it(?:-IT)?['"]\s*(,\s*\{[^}]*\})?\s*\)/g)) {
-      const opzioni = m[1] || '';
-      if (opzioni.includes('useGrouping') || DATA.test(opzioni)) continue;
-      if (/Date\([^)]*\)\s*$/.test(src.slice(Math.max(0, m.index - 60), m.index))) continue;
-      senza.push(dove(m.index));
-    }
+    for (const i of senzaRaggruppamento(src)) senza.push(dove(i));
   }
   assert.deepEqual(senza, [], 'qui un numero in italiano esce senza il punto delle migliaia: aggiungi { useGrouping: true }');
+});
+
+test('il controllo riconosce ogni forma che scrive un numero, e lascia stare le date', () => {
+  const quanti = (s) => senzaRaggruppamento(s).length;
+  assert.equal(quanti("Intl.NumberFormat('it-IT').format(n)"), 1);
+  assert.equal(quanti("n.toLocaleString('it-IT', opzioni)"), 1);
+  assert.equal(quanti("new Intl.NumberFormat('it-IT', { maximumFractionDigits: Math.max(0, d) }).format(n)"), 1);
+  assert.equal(quanti("new Intl.NumberFormat('it-IT', { maximumFractionDigits: Math.max(0, d), useGrouping: true }).format(n)"), 0);
+  assert.equal(quanti("n.toLocaleString('it', { useGrouping: true, maximumFractionDigits: 2 })"), 0);
+  assert.equal(quanti("new Date(iso).toLocaleString('it-IT')"), 0);
+  assert.equal(quanti("d.toLocaleString('it-IT', { day: 'numeric', month: 'short' })"), 0);
 });
 
 test('con useGrouping il motore scrive 4.990, senza no', () => {
