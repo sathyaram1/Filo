@@ -3,7 +3,7 @@
 // Zero file = uscita rossa. `--list` stampa i file, `--solo` fa girare solo i file dati; ogni altro argomento è un flag di `node --test` o un file in più. Sentinella: tests/unit/unitRunner.test.mjs.
 
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
-import { resolve, dirname, join, relative, isAbsolute, sep } from 'node:path';
+import path, { resolve, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -59,12 +59,13 @@ export function collectTestFiles(dir = UNIT_DIR) {
 
 /**
  * Relativo alla root, così la riga non cresce col nome della cartella di lavoro; barre normali perché Node 22 legge
- * gli argomenti di `--test` come glob. Un file fuori dalla root resta assoluto. PURA.
+ * gli argomenti di `--test` come glob. Un file fuori dalla root resta assoluto. `p`: i percorsi del sistema, o
+ * quelli dell'altra piattaforma scelti da una prova. PURA.
  */
-export function perLaRiga(file, root = REPO_ROOT) {
-  const r = relative(root, file);
-  if (!r || r === '..' || r.startsWith(`..${sep}`) || isAbsolute(r)) return file;
-  return r.split(sep).join('/');
+export function perLaRiga(file, root = REPO_ROOT, p = path) {
+  const r = p.relative(root, file);
+  if (!r || r === '..' || r.startsWith(`..${p.sep}`) || p.isAbsolute(r)) return file;
+  return r.split(p.sep).join('/');
 }
 
 // Da Node 21 `node --test` legge ogni argomento come un modello: un file con quadre o tonde nel nome non girava,
