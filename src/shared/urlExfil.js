@@ -351,7 +351,9 @@
   function taintScritto(url, scritto, domanda = '') {
     const testo = formaBase(String(scritto || '')).toLowerCase();
     if (!testo.trim()) return null;
-    const esposto = carrierAlnum(url);
+    // Le forme di ciò che esce, anche in base64 o esadecimale corti: un numero di telefono codificato resta quel numero.
+    const fuori = formeDi(carrierTesto(url));
+    const esposto = fuori.alnum;
     if (esposto.length < MIN_TOKEN) return null;
     if (chiaviSenzaSchema(testo).has(chiaveSenzaSchema(url).toLowerCase())) return null;
     const d = formaBase(String(domanda || '')).toLowerCase();
