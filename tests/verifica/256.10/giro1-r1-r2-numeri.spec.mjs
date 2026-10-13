@@ -33,7 +33,7 @@ test('r1 Gestione: le istruzioni per le correzioni troppo lunghe dicono lunghezz
   const msg = [];
   const corpo = funzione('src/pages/manage/manage.js', 'saveFixInstructions');
   const salva = new Function('mgFixInstructions', 'AUTOMATION', 'setCapMsg', 'sendToMain', 'CAPS_SET',
-    `${corpo}; return saveFixInstructions();`);
+    `async ${corpo}; return saveFixInstructions();`);
   await salva({ value: 'a'.repeat(8123) }, { FIX_INSTRUCTIONS_MAX: 8000 }, (_c, t) => msg.push(t), async () => ({ ok: true }), 'x');
   expect(msg[0]).toBe('Troppo lungo: 8.123 caratteri, il massimo è 8.000. Non salvato.');
 });
