@@ -35,7 +35,8 @@ const {
 } = mod;
 
 const reply = (status, body) => ({ status, ok: status < 300, text: async () => JSON.stringify(body) });
-const quiet = { sleep: async () => {} };
+// Il biglietto nella cartella di una routine fa misurare la sessione vera anche qui dentro (#1172.1): misure finte.
+const quiet = { sleep: async () => {}, misureCrediti: () => ({}) };
 
 // ─── C. battito con stato del contenitore ────────────────────────────────────
 
