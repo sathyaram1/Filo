@@ -72,6 +72,8 @@
   let pendingFiles = [];
   // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
   let testoDaFuori = false;
+  // Il testo del Ctrl+V nativo: l'evento `input` che segue non lo porta con sé (#968).
+  let testoIncollato = null;
   const percorsiImmagini = new Map();
 
   // ===== Le parti della home =====
