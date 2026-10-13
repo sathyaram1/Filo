@@ -1558,7 +1558,14 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
   const daSito = /^https?:/i.test(pagina);
   const k = chiaveLinkUscita(indirizzo);
   const motivo = LINK_DA_CONFERMARE.get(k) ?? (chiedi ? String(chiedi) : '') ?? '';
-  const daChiedere = /^https?:/i.test(indirizzo) && (LINK_DA_CONFERMARE.has(k) || !!chiedi || (daSito && u.exfil));
+  let daChiedere = /^https?:/i.test(indirizzo) && (LINK_DA_CONFERMARE.has(k) || !!chiedi);
+  if (!daChiedere && daSito && u.exfil && /^https?:/i.test(indirizzo)) {
+    const Levels = globalThis.SN_ACTION_LEVELS;
+    let impostazioni = {};
+    try { impostazioni = await Storage.getSettings(); } catch (_) {}
+    const ing = Levels ? Levels.ingressi({ type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: u.reason }, { impostazioni }) : null;
+    daChiedere = !ing || decisioneAutonomia(ing, { sender: { wc, url: pagina }, assistente: true, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+  }
   if (daChiedere) {
     const chiesti = daSito && wc ? (OK_CHIESTI_AI_SITI.get(wc) || new Set()) : null;
     const ok = confermato && (!chiesti || chiesti.delete(k));
