@@ -1228,6 +1228,7 @@
     spam:    REASONS.spam.color,     // giallo — in sospeso, o scavalcato dall'owner
     design:  REASONS.design.color,   // verde  — passato, o una domanda per l'owner
     aligned: ALIGNED.color,          // blu    — pulito
+    locale:  LOCALE.color,           // azzurro — chiede lavoro locale
   };
 
   // Perché il filtro d'ingresso ha deciso così. I codici arrivano dal server;
