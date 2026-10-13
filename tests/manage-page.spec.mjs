@@ -703,6 +703,18 @@ test('le scelte sulle sessioni restano manovrabili anche a routine spente', asyn
   await expect(page.locator('input[name="mgPriorityAccount"][value="A"]')).toBeEnabled();
 });
 
+test('istruzioni per le correzioni troppo lunghe: il rifiuto scrive lunghezza e tetto col punto delle migliaia', async ({ openTab }) => {
+  const page = await apriAutomazioni(openTab);
+  await stubAutomation(page, { routinesEnabled: true });
+  await stubCaps(page);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadCaps());
+  await page.locator('#mgFixInstructions').fill('a'.repeat(8123));
+  await page.locator('#mgFixInstructionsSave').click();
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Troppo lungo: 8.123 caratteri, il massimo è 8.000. Non salvato.');
+  expect(await page.evaluate(() => window.__capsSets)).toEqual([]);
+});
+
 // Stub dell'IPC dei contatori del verificatore: simula il doc Firestore
 // config/routines senza rete/main. Cattura ogni `set` per provare che il valore
 // LASCIA il client (è la config che il server dei verdetti legge → "il
