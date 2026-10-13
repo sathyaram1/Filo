@@ -3,7 +3,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -98,4 +99,18 @@ test('il globalSetup di Playwright si ferma sul motore sbagliato, prima di prepa
     if (override !== undefined) process.env.ELECTRON_OVERRIDE_DIST_PATH = override;
     togliCartella(dir);
   }
+});
+
+test('ensure-electron non dice «già pronto» su un pacchetto rimasto indietro: esce con 1 e il motivo', { skip: process.platform !== 'linux' || process.arch !== 'x64' ? 'agisce solo su Linux x64' : false }, () => {
+  const dir = progetto({ pacchetto: '33.2.0', binario: '33.2.0' });
+  try {
+    mkdirSync(join(dir, 'scripts'), { recursive: true });
+    copyFileSync(join(ROOT, 'scripts', 'ensure-electron.mjs'), join(dir, 'scripts', 'ensure-electron.mjs'));
+    writeFileSync(join(dir, 'node_modules', 'electron', 'path.txt'), 'electron');
+    writeFileSync(join(dir, 'node_modules', 'electron', 'dist', 'electron'), '');
+    const r = spawnSync(process.execPath, [join(dir, 'scripts', 'ensure-electron.mjs')], { encoding: 'utf8' });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /già pronto/);
+    assert.match(r.stdout, /Electron 33\.2\.0 e package-lock\.json chiede la 44\.7\.0/);
+  } finally { togliCartella(dir); }
 });
