@@ -393,6 +393,7 @@
       // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
       const fuori = isUser ? {} : {
         ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
+        ...(Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length ? { linkDaConfermare: m.linkDaConfermare } : {}),
         ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
       };
       threadHistory.push(isUser
@@ -459,9 +460,27 @@
 
   // Un indirizzo web che un modello ha proposto qui si apre solo dal main, dopo la porta delle uscite, con
   // l'indirizzo che si apre davvero (#810). Se si ferma, la riga lo dice accanto a ciò che è stato cliccato.
-  async function apriProposta(url, vicino = null) {
+  // Un collegamento che la risposta di Filo segnava da confermare chiede l'OK anche al clic (#868.6), riaperta compresa.
+  const formaLink = (u) => { try { return new URL(String(u || '')).href; } catch (_) { return String(u || ''); } };
+  function motivoDaConfermare(url) {
+    const k = formaLink(url);
+    for (const m of threadHistory) {
+      for (const x of (m && Array.isArray(m.linkDaConfermare) ? m.linkDaConfermare : [])) {
+        if (x && formaLink(x.url) === k) return String(x.motivo || 'da confermare');
+      }
+    }
+    return '';
+  }
+  async function apriProposta(url, vicino = null, chiedi = '') {
+    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url) };
     let r = null;
-    try { r = await send({ type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente() }); } catch (_) {}
+    try { r = await send(msg); } catch (_) {}
+    if (r && r.conferma) {
+      const Ui = window.SN_CONFIRM_UI;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      if (!ok) return;
+      try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; }
+    }
     if (r && r.frase) notaFermata(r.frase, vicino);
   }
   function notaFermata(frase, vicino) {
@@ -523,10 +542,10 @@
     if (type === 'NAVIGA' && /^filo:\/\//i.test(String(a.url || ''))) {
       send({ type: MSG.OPEN_URL, url: a.url });
     } else if (type === 'NAVIGA' && a.url) {
-      apriProposta(a.url, vicino);
+      apriProposta(a.url, vicino, s.chiedeOk || '');
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
       const url = a.url || a.path;
-      if (/^https?:/.test(url)) apriProposta(url, vicino);
+      if (/^https?:/.test(url)) apriProposta(url, vicino, s.chiedeOk || '');
     } else if (type === 'CHAT' && a.prompt) {
       submitMessage(String(a.prompt), { daModello: true });
     } else {
@@ -988,6 +1007,7 @@
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
       if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
+      if (Array.isArray(r.linkDaConfermare) && r.linkDaConfermare.length) entry.linkDaConfermare = r.linkDaConfermare;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se

@@ -1479,7 +1479,7 @@ function lettiDallAiuto(sender) {
 
 // La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
 // chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
-async function controllaUscita(action, { sender = null, contesto = null, parole = '' } = {}) {
+async function controllaUscita(action, { sender = null, contesto = null, parole = '', domanda = '' } = {}) {
   const Exfil = globalThis.SN_URL_EXFIL;
   const tipo = String((action && action.type) || '').toUpperCase();
   if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
@@ -1491,6 +1491,7 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
     pagina: daPagina ? await testoDellaPagina(sender) : null,
     letti: (daPagina ? lettiDallAiuto(sender) : []).concat(SegretiLetti.tutti()),
     parole: typeof parole === 'string' ? parole : '',
+    domanda: typeof domanda === 'string' ? domanda : '',
     memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
     daPagina,
   });
@@ -1499,7 +1500,68 @@ async function controllaUscita(action, { sender = null, contesto = null, parole 
 // Un indirizzo che una pagina di Filo apre o passa al sistema l'ha scelto quasi sempre un modello (#810): passa dalla
 // porta qualunque gesto l'abbia chiesto (clic, menu del tasto destro, posta). Fermato, la pagina lo dice se `avvisa`.
 const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
-async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA' } = {}) {
+
+// #868.6 — un collegamento che un modello scrive, cliccato, chiede lo stesso OK che chiederebbe se lo aprisse lui. Il
+// verdetto lo dà chi ha il contesto quando il collegamento nasce (risposta della chat, home); al clic lo si ritrova qui.
+const LINK_DA_CONFERMARE = new Map(); // chiave del link → motivo
+const MAX_LINK_DA_CONFERMARE = 5000;
+const chiaveLinkUscita = (url) => {
+  const raw = String(url || '').trim();
+  try { const u = new URL(raw); return `${u.protocol}//${u.username}:${u.password}@${u.host.toLowerCase()}${u.pathname}${u.search}`; } catch (_) { return raw; }
+};
+function segnaLinkDaConfermare(url, motivo) {
+  const k = chiaveLinkUscita(url);
+  LINK_DA_CONFERMARE.delete(k);
+  LINK_DA_CONFERMARE.set(k, String(motivo || ''));
+  while (LINK_DA_CONFERMARE.size > MAX_LINK_DA_CONFERMARE) LINK_DA_CONFERMARE.delete(LINK_DA_CONFERMARE.keys().next().value);
+}
+// Le richieste di OK mostrate a una pagina web: solo quella pagina, per quel link, può tornare con l'OK (#250).
+const OK_CHIESTI_AI_SITI = new WeakMap(); // wc → Set di chiavi
+
+const LINK_NEL_TESTO = /https?:\/\/[^\s<>"'`)\]]+/gi;
+const ENTITA_HREF = { '&amp;': '&', '&#39;': "'", '&quot;': '"', '&lt;': '<', '&gt;': '>' };
+// Gli indirizzi che la chat rende cliccabili, presi dallo stesso disegnatore che li disegna: ogni differenza fra come
+// li legge il controllo e come diventano collegamenti era una porta (#868.6). Il testo nudo resta, per gli altri disegni.
+function indirizziCliccabili(testo) {
+  const t = String(testo || '');
+  const out = [...t.matchAll(LINK_NEL_TESTO)].map((m) => m[0].replace(/[.,;:!?]+$/, ''));
+  try {
+    if (!globalThis.SN_MARKDOWN) require('../../shared/filoMarkdown.js');
+    const html = globalThis.SN_MARKDOWN.render(t);
+    for (const m of html.matchAll(/<a [^>]*href="([^"]*)"/g)) out.push(m[1].replace(/&(?:amp|#39|quot|lt|gt);/g, (e) => ENTITA_HREF[e]));
+  } catch (_) {}
+  return out;
+}
+// I collegamenti web di un testo scritto da un modello che, aperti da lui con questo contesto, chiederebbero l'OK.
+// `indirizzi` = quelli dei bottoni che il modello ha messo sotto la risposta, cliccabili come i collegamenti.
+async function linkCheChiedonoOk(testo, { sender = null, contesto = null, fontiLette = null, parole = '', domanda = '', richiesta = '', origine = 'chat', sempre = false, indirizzi = [] } = {}) {
+  const out = [];
+  const visti = new Set();
+  const Levels = globalThis.SN_ACTION_LEVELS;
+  let impostazioni = null;
+  for (const grezzo of [...indirizzi, ...indirizziCliccabili(testo)]) {
+    const url = typeof grezzo === 'string' ? grezzo.trim() : '';
+    if (!/^https?:\/\//i.test(url)) continue;
+    const k = chiaveLinkUscita(url);
+    if (visti.has(k) || visti.size >= 200) continue;
+    visti.add(k);
+    let u = null;
+    try { u = await controllaUscita({ type: 'NAVIGA', url }, { sender, contesto, parole, domanda }); } catch (_) { u = null; }
+    if (!u || u.blocca || !u.exfil) continue;
+    let chiede = sempre;
+    if (!chiede && Levels) {
+      if (!impostazioni) { try { impostazioni = await Storage.getSettings(); } catch (_) { impostazioni = {}; } }
+      const ing = Levels.ingressi({ type: 'NAVIGA', url, _exfil: true, _exfilReason: u.reason }, { richiesta, impostazioni });
+      chiede = !ing || decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente: false, origine, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+    }
+    if (!chiede) continue;
+    segnaLinkDaConfermare(url, u.reason);
+    out.push({ url, motivo: u.reason });
+  }
+  return out;
+}
+
+async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA', chiedi = '', confermato = false } = {}) {
   const indirizzo = String(url || '').trim();
   let pagina = '';
   try { pagina = wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { pagina = ''; }
@@ -1512,6 +1574,29 @@ async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, ti
   if (u.blocca) {
     if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
     return { aperto: false, frase: u.frase };
+  }
+  // Sopra una pagina web l'agente ha letto la pagina: un dato dell'utente nel link chiede l'OK come per NAVIGA.
+  const daSito = /^https?:/i.test(pagina);
+  const k = chiaveLinkUscita(indirizzo);
+  const motivo = LINK_DA_CONFERMARE.get(k) ?? (chiedi ? String(chiedi) : '') ?? '';
+  let daChiedere = /^https?:/i.test(indirizzo) && (LINK_DA_CONFERMARE.has(k) || !!chiedi);
+  if (!daChiedere && daSito && u.exfil && /^https?:/i.test(indirizzo)) {
+    const Levels = globalThis.SN_ACTION_LEVELS;
+    let impostazioni = {};
+    try { impostazioni = await Storage.getSettings(); } catch (_) {}
+    const ing = Levels ? Levels.ingressi({ type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: u.reason }, { impostazioni }) : null;
+    daChiedere = !ing || decisioneAutonomia(ing, { sender: { wc, url: pagina }, assistente: true, dentroPerimetro: ing.dentroPerimetro, impostazioni }).risposta !== 'si';
+  }
+  if (daChiedere) {
+    const chiesti = daSito && wc ? (OK_CHIESTI_AI_SITI.get(wc) || new Set()) : null;
+    const ok = confermato && (!chiesti || chiesti.delete(k));
+    if (!ok) {
+      // Un OK arrivato senza la domanda non ne apre una: altrimenti due OK forgiati di fila aprirebbero.
+      if (chiesti && !confermato) { chiesti.add(k); OK_CHIESTI_AI_SITI.set(wc, chiesti); }
+      const Levels = globalThis.SN_ACTION_LEVELS;
+      const azione = { type: 'NAVIGA', url: indirizzo, _exfil: true, _exfilReason: motivo || u.reason || '' };
+      return { aperto: false, conferma: Levels ? Levels.describe(azione) : indirizzo };
+    }
   }
   if (typeof apri === 'function') apri();
   return { aperto: true };
@@ -1851,6 +1936,7 @@ async function executeFiloAction(action, opzioni = {}) {
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
   chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
+  domanda = '',
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -1929,7 +2015,7 @@ async function eseguiAzioneFilo(action, {
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
   // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
   try {
-    const u = await controllaUscita(action, { sender, contesto, parole });
+    const u = await controllaUscita(action, { sender, contesto, parole, domanda });
     if (u.blocca) {
       const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
       return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
@@ -4369,6 +4455,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // Il compito è la conversazione di questa scheda come la vede il modello: nel filo, più la coda.
   const conversazioneScheda = filo && chatId ? [...vistiDalFilo.filter((m) => m && m.chat === chatId), ...codaScheda] : codaScheda;
   const richiesta = [...conversazioneScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
+  // Le parole di adesso: un indirizzo può portarle fuori, quelle dette prima no senza un OK (#868.6). Un turno che riprende
+  // rifà l'ultima richiesta della scheda; il testo di un suggerimento l'ha scritto un modello.
+  const ultimaDellaScheda = conversazioneScheda.filter((m) => m && m.role !== 'filo' && !m.daModello).pop();
+  const domandaDiAdesso = daModello ? '' : internal ? String((ultimaDellaScheda && ultimaDellaScheda.text) || '') : String(userMessage || '');
   for (const m of codaScheda) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     const fuori = FCx.letturaDaFuori(m);
@@ -4623,7 +4713,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto: azioniViste, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -4798,6 +4888,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
   let lettiRisposta = [];
   try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
+  // I collegamenti della risposta che il modello non avrebbe potuto aprire senza un OK lo chiedono anche al clic (#868.6).
+  let linkDaConfermare = [];
+  try {
+    linkDaConfermare = await linkCheChiedonoOk(textReply, {
+      sender, contesto: azioniViste, fontiLette, parole: paroleUtente, domanda: domandaDiAdesso, richiesta,
+      indirizzi: renderedActions.flatMap((a) => (a ? [a.url, a.percorso, a.path, a.link, a.href] : [])),
+    });
+  } catch (e) { console.warn('[Filo] collegamenti della risposta non controllati', e?.message || e); }
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
@@ -4811,6 +4909,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       {
         role: 'filo', text: textReply, actions: successe,
         ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
+        ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
         ...(cambi.length ? { cambi } : {}),
       },
       { onboarding: onbActive },
@@ -4873,6 +4972,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     notes, reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
+    ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
     ...(keyFallback ? { keyFallback } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
@@ -4980,7 +5080,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     openTabsCount, partOfDay, dayType, dateKey,
   });
 
-  return { settings, canServe, payload, signature, saved };
+  // Le parole dell'utente che la home ha davanti: un suggerimento che le porta fuori chiede l'OK al clic (#868.6).
+  const parole = conversazioni.filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || '')).join('\n');
+  return { settings, canServe, payload, signature, saved, parole };
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
@@ -5161,7 +5263,14 @@ async function generateDashboardFromInputs(inputs) {
   for (let i = 0; i < suggestions.length; i++) {
     let u = null;
     try { u = suggestions[i].action ? await controllaUscita(suggestions[i].action) : null; } catch (_) {}
-    if (u && u.blocca) suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase };
+    if (u && u.blocca) { suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase }; continue; }
+    // La home legge titoli di pagine e frasi di Filo, cioè testo di altri: un indirizzo con un dato dell'utente chiede l'OK.
+    const a = suggestions[i].action;
+    const url = a && /^(?:NAVIGA|APRI_FILE)$/i.test(String(a.type || '')) ? String(a.url || a.path || '') : '';
+    if (!/^https?:/i.test(url)) continue;
+    let chiede = [];
+    try { chiede = await linkCheChiedonoOk('', { parole: inputs.parole || '', sempre: true, indirizzi: [url] }); } catch (_) { chiede = []; }
+    if (chiede.length) suggestions[i] = { ...suggestions[i], chiedeOk: chiede[0].motivo };
   }
   await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
   return { message, suggestions, ts: new Date().toISOString() };
