@@ -261,7 +261,10 @@
       if (!e || typeof e !== 'object') continue;
       var t = ms(e.startedAt);
       if (t == null) continue;
-      out.push({ role: String(e.role || '').trim(), t: t, num: normNum(e.num) });
+      var voce = { role: String(e.role || '').trim(), t: t, num: normNum(e.num) };
+      var caso = typeof e.caso === 'string' ? e.caso.trim() : '';
+      if (caso) voce.caso = caso;
+      out.push(voce);
     }
     out.sort(function (a, b) { return a.t - b.t; });
     return out;
