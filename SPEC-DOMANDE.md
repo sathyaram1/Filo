@@ -353,7 +353,12 @@ ancora iniziata quando nasce la successiva si chiude come «superata»: le
 istanze non si accumulano.
 
 Un ruolo generico `compito` esegue il testo del ricorrente. I permessi li dà
-l'ambito, non il ruolo.
+l'ambito, non il ruolo. I testi dei ricorrenti stanno nel repo privato del
+server (§ 9), non in questa spec.
+
+Ogni istanza chiude con un rapporto (§ 4.3), che resta legato al ricorrente:
+l'istanza successiva lo riceve col biglietto, con la fiducia che aveva. È così
+che l'audit sa da quale commit ripartire e la potatura quanti rami sono nuovi.
 
 | Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale |
 |---|---|---|---|---|
