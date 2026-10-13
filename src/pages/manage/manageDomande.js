@@ -295,9 +295,11 @@
     for (const c of Array.isArray(d.collegamenti) ? d.collegamenti : []) {
       if (!(d.origine && c.tipo === d.origine.tipo && c.id === d.origine.id)) legami.push(['', c.tipo, c.id]);
     }
-    if (legami.length) {
+    // L'origine e gli altri legami stanno in due gruppi: «da #902 #813» farebbe sembrare origine anche il secondo.
+    for (const gruppo of [legami.filter((x) => x[0]), legami.filter((x) => !x[0])]) {
+      if (!gruppo.length) continue;
       const l = el('span', 'mg-dq-legami');
-      for (const [pre, tipo, id] of legami) {
+      for (const [pre, tipo, id] of gruppo) {
         if (pre) l.appendChild(el('span', 'mg-dq-legami-pre', pre));
         l.appendChild(legame(tipo, id));
       }

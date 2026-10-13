@@ -218,7 +218,7 @@
     /* Domande: elenco a sinistra, la domanda (o il gruppo intero) a destra; tutta l'altezza come la lista dei feedback. */
     #panel-domande.mg-panel--active { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
     .mg-dom {
-      display: grid; grid-template-columns: minmax(230px, 340px) minmax(0, 1fr); gap: 12px;
+      display: grid; grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); gap: 12px;
       flex: 1 1 auto; min-height: var(--mg-aree-min);
     }
     .mg-dom-head { display: flex; align-items: center; gap: 8px; min-height: 22px; }
@@ -289,7 +289,8 @@
     .mg-dq-legame:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; border-radius: 3px; }
     .mg-dq-legame--muto { cursor: default; color: var(--sn-muted); }
     .mg-dq-legame--muto:hover { text-decoration: none; }
-    .mg-dq-titolo { margin: 6px 0 12px; font-size: 18px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+    /* Più specifico di `.sn-page h2` (pages.css): il titolo della domanda sta sotto la sua riga, senza filetto. */
+    .sn-page .mg-dq-titolo { margin: 6px 0 12px; padding: 0; border: 0; font-size: 18px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
     .mg-dq-sez { margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; }
     .mg-dq-h { margin: 0 0 4px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--sn-muted); }
     .mg-dq-md { overflow-wrap: anywhere; }
