@@ -617,10 +617,10 @@
   }
 
   // `pagina` = { testo, host } che l'agente ha davanti; `letti` = [{ valore, regola, fonte }] estratti da
-  // ciò che ha letto prima; `parole` = ciò che l'utente ha scritto (un codice suo passa). `memoria` e
-  // `daPagina` servono all'OK in più di #587. Torna { blocca, frase } oppure { exfil, reason }.
+  // ciò che ha letto prima; `parole` = ciò che l'utente ha scritto (un codice suo passa). `memoria`, `daPagina` e
+  // `domanda` (le parole di adesso, dentro `parole`) servono all'OK in più di #587. Torna { blocca, frase } oppure { exfil, reason }.
   function valutaUscita(action, {
-    segreti = [], azioni = [], pagina = null, letti = [], parole = '', memoria = '', daPagina = false,
+    segreti = [], azioni = [], pagina = null, letti = [], parole = '', memoria = '', daPagina = false, domanda = '',
   } = {}) {
     const tipo = String((action && action.type) || '').toUpperCase();
     const verbo = verboUscita(tipo);
