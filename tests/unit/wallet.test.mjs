@@ -373,7 +373,7 @@ test('un movimento del portafoglio si legge in italiano, anche con l’id attacc
 test('le manopole dei crediti hanno un nome e limiti sensati', () => {
   assert.deepEqual(W.OWNER_KNOB_KEYS, [
     'entryCredits', 'dailyCredits', 'invitesPerUser', 'invitesMaxUses',
-    'maxGrantCredits', 'rewardFeedbackSent', 'rewardFeedbackSentPerDay', 'rewardFeedbackClosed',
+    'maxGrantCredits', 'rewardFeedbackClosed', 'rewardFeedbackSent', 'rewardFeedbackSentPerDay',
   ]);
   for (const k of W.OWNER_KNOBS) {
     assert.ok(k.etichetta && k.etichetta.length > 2, `${k.chiave}: serve un nome leggibile`);
