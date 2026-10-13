@@ -640,7 +640,7 @@
       // dal totale mentre la scheda Log, che legge lo stesso registro, la
       // mostrava. Senza mestiere la chiave resta vuota e chi disegna la
       // chiama «Sconosciuto», con la stessa parola della scheda Log.
-      if (inRange(e.t, range)) { lanciTot += 1; conta(perRuolo, e.role); }
+      if (inRange(e.t, range)) { lanciTot += 1; conta(perRuolo, chiaveMestiere(e)); }
       if (e.role === 'prober') {
         if (inRange(e.t, range)) proberLanciati += 1;
         continue;
