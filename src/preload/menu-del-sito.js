@@ -1,14 +1,15 @@
-// Il menu che un sito ha per il tasto destro (#975): il mondo della pagina dice se sul punto cliccato un ascolto del
-// sito guarda il tasto destro, senza lasciargli fare altro; il ponte del page-preload gli passa il clic quando l'utente
-// lo chiede. Regole: patterns/il-menu-del-sito-e-una-voce-di-filo.md; prove: tests/menu-del-sito.spec.mjs.
+// Il menu che un sito ha per il tasto destro (#975): il mondo della pagina dice se sul punto cliccato il sito ascolta il
+// tasto destro e annulla il menu del browser, senza lasciargli disegnare niente; il ponte del page-preload gli passa il
+// clic quando l'utente lo chiede. Regole: patterns/il-menu-del-sito-e-una-voce-di-filo.md; prove: tests/menu-del-sito.spec.mjs.
 
 // Quanto resta valido «il prossimo tasto destro è del sito», dalla voce al clic rigirato dal main.
 const PASSAGGIO_MS = 1500;
+// Quanto si aspetta che il sito, annullato il menu del browser, mostri il suo.
+const ATTESA_MENU_MS = 450;
 
-// Sorgente per il mondo della pagina. La sonda è un tasto destro finto sul punto vero: il primo ascolto del sito che
-// ne legge posizione, bersaglio o tasti si ferma lì, prima di poter disegnare qualcosa, e quella lettura è la risposta.
-// Chi annulla senza guardare dove (il «niente tasto destro» dei siti) non ha un menu. React ascolta tutto dalla radice:
-// lì decidono le sue proprietà onContextMenu sul percorso.
+// Sorgente per il mondo della pagina. La sonda è un tasto destro finto sul punto vero: il primo ascolto del sito che ne
+// legge posizione, bersaglio o tasti si ferma lì, prima di poter disegnare qualcosa; chi annulla senza guardare conta
+// lo stesso. React ascolta tutto dalla radice: lì decidono le sue proprietà onContextMenu sul percorso.
 function sorgenteSonda(tipo) {
   return `(function(){
   'use strict';
@@ -18,6 +19,8 @@ function sorgenteSonda(tipo) {
   var ferma = EP.stopImmediatePropagation, annulla = EP.preventDefault, percorso = EP.composedPath;
   var chiDescr = O.getOwnPropertyDescriptor(EP, 'currentTarget');
   var chi = chiDescr && chiDescr.get;
+  var annullatoDescr = O.getOwnPropertyDescriptor(EP, 'defaultPrevented');
+  var annullato = annullatoDescr && annullatoDescr.get;
   var Evento = typeof PointerEvent === 'function' ? PointerEvent : MouseEvent;
   var NEUTRE = { constructor: 1, type: 1, isTrusted: 1, defaultPrevented: 1, returnValue: 1, cancelable: 1, bubbles: 1,
     composed: 1, eventPhase: 1, timeStamp: 1, currentTarget: 1, preventDefault: 1, stopPropagation: 1,
@@ -76,7 +79,7 @@ function sorgenteSonda(tipo) {
     });
     try { manda.call(t, ev); } catch (e) {}
     for (var i = 0; i < messe.length; i++) { try { delete ev[messe[i]]; } catch (e) {} }
-    return visto;
+    return visto || !!(annullato && annullato.call(ev));
   }
   // L'ascolto fermato dalla sonda non è un errore del sito: né la console né chi raccoglie i suoi errori lo vedono.
   aggiungi.call(W, 'error', function (e) { if (e.error === FERMO) { ferma.call(e); annulla.call(e); } }, true);
@@ -100,9 +103,29 @@ function casuale() {
   }
 }
 
-// La parte del mondo isolato: la sonda, il passaggio al sito del prossimo tasto destro e `primo` (il sito dove
-// l'utente ha scelto il menu del sito al tasto destro, che il content script tiene allineato alle impostazioni).
-function monta(webFrame, finestra = globalThis) {
+// Copia inerte del tasto destro: dopo la consegna l'evento perde composedPath() (torna vuoto), quindi l'elemento
+// reale, anche dentro uno shadow DOM, e i dati che l'handler legge si fotografano subito.
+function fotografa(e) {
+  let node = null;
+  try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; } catch (_) { node = e.target; }
+  return {
+    target: node,
+    currentTarget: node,
+    clientX: e.clientX, clientY: e.clientY,
+    pageX: e.pageX, pageY: e.pageY,
+    screenX: e.screenX, screenY: e.screenY,
+    button: e.button,
+    shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
+    defaultPrevented: false,
+    composedPath: () => (node ? [node] : []),
+    preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {},
+  };
+}
+
+// La parte del mondo isolato: la sonda, il passaggio al sito del prossimo tasto destro e `primo` (il sito dove l'utente
+// ha dato il tasto destro al menu del sito, che il content script tiene allineato alle impostazioni).
+// `apriFilo(copia)`: riapre il menu di Filo dove il sito non ha mostrato niente.
+function monta(webFrame, finestra = globalThis, { apriFilo = () => {} } = {}) {
   let tipo = '';
   const inietta = () => {
     tipo = `filo-menu-${casuale()}`;
@@ -110,12 +133,30 @@ function monta(webFrame, finestra = globalThis) {
   };
   inietta();
   let passaFino = 0;
+  // I punti dove il sito ha annullato il menu senza mostrarne uno: lì la voce non torna, finché la pagina resta.
+  const soloBlocco = new WeakSet();
+  const segnato = (n) => {
+    for (let x = n, i = 0; x && i < 1000; i++) {
+      if (soloBlocco.has(x)) return true;
+      x = x.parentNode || (x.nodeType === 11 && x.host) || null;
+    }
+    return false;
+  };
+  const diFilo = (n) => {
+    const el = n && n.nodeType === 3 ? n.parentNode : n;
+    try { return !!globalThis.SN_FILO_UI?.inside?.(el); } catch (_) { return false; }
+  };
+  const delSito = (m) => (m.type === 'childList'
+    ? [...m.addedNodes, ...m.removedNodes].some((x) => !diFilo(x))
+    : !diFilo(m.target));
+
   return {
     primo: false,
+    fotografa,
     // Una pagina che si riscrive perde gli ascolti del suo mondo: la sonda si rimette con un nome nuovo.
     rinasci: inietta,
     sonda(e, bersaglio) {
-      if (!bersaglio || typeof bersaglio.dispatchEvent !== 'function' || !tipo) return false;
+      if (!bersaglio || typeof bersaglio.dispatchEvent !== 'function' || !tipo || segnato(bersaglio)) return false;
       let q;
       try {
         q = new finestra.MouseEvent(tipo, {
@@ -132,7 +173,32 @@ function monta(webFrame, finestra = globalThis) {
       passaFino = 0;
       return true;
     },
+    // Dopo il tasto destro passato al sito. Chi lo annulla senza mostrare niente blocca e basta: lì l'utente ritrova il
+    // menu di Filo, senza la voce. `ancheSeTace`: chi passa un tasto destro finto (un riquadro) riapre Filo anche
+    // quando il sito non lo annulla, perché lì il browser non mostra il suo.
+    seguiPassaggio(copia, annullato, { ancheSeTace = false } = {}) {
+      let cambiato = false;
+      let mo = null;
+      try {
+        mo = new MutationObserver((lista) => { if (!cambiato && lista.some(delSito)) cambiato = true; });
+        mo.observe(finestra.document, { subtree: true, childList: true, attributes: true, characterData: true });
+      } catch (_) { mo = null; }
+      const fine = () => { if (mo) { try { mo.disconnect(); } catch (_) {} } };
+      setTimeout(() => {
+        if (!annullato()) {
+          fine();
+          if (ancheSeTace) apriFilo(copia);
+          return;
+        }
+        setTimeout(() => {
+          fine();
+          if (cambiato || !mo) return;
+          if (copia && copia.target) soloBlocco.add(copia.target);
+          apriFilo(copia);
+        }, ATTESA_MENU_MS);
+      }, 0);
+    },
   };
 }
 
-module.exports = { monta, sorgenteSonda, PASSAGGIO_MS };
+module.exports = { monta, sorgenteSonda, fotografa, PASSAGGIO_MS, ATTESA_MENU_MS };

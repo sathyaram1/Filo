@@ -51,7 +51,7 @@
     const p = ponte();
     if (!p || !e || !web()) return null;
     const s = { primo: p.primo === true, x: e.clientX, y: e.clientY, screenX: e.screenX, screenY: e.screenY, bersaglio };
-    if (s.primo) return s;
+    console.log('[mds] sonda', !!p, s.primo, bersaglio && bersaglio.id); if (s.primo) return s;
     return p.sonda(e, bersaglio) ? s : null;
   }
 
