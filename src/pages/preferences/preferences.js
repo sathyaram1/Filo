@@ -1551,7 +1551,7 @@
       caselle.cambiato('pref', e);
     });
     $('ttsPitch').addEventListener('input', (e) => {
-      $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toFixed(1);
+      $('ttsPitchVal').textContent = unDecimale(parseFloat($('ttsPitch').value) || 1);
       caselle.cambiato('pref', e);
     });
     $('ttsPreview').addEventListener('click', previewTts);
