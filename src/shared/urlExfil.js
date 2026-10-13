@@ -362,10 +362,11 @@
     const suo = (p) => dAlnum.includes(p) || dCifre.some((c) => c.includes(p));
     const reason = 'contiene un dato che hai scritto in chat';
     for (const t of datiScritti(testo)) if (esposto.includes(t) && !suo(t)) return { reason };
+    // Un numero lungo conta anche a pezzi di nove cifre: «+39 347…» scritto, «347…» nell'URL.
     for (const c of cifreScritte(testo)) {
-      for (const r of fuori.cifre) {
-        const pezzo = r.includes(c) ? c : (r.length > CIFRE_SCRITTE && c.includes(r) ? r : '');
-        if (pezzo && !suo(pezzo)) return { reason };
+      for (let i = 0; i + Math.min(c.length, CIFRE_PEZZO) <= c.length; i++) {
+        const p = c.substr(i, Math.min(c.length, CIFRE_PEZZO));
+        if (fuori.cifre.some((r) => r.includes(p)) && !suo(p)) return { reason };
       }
     }
     if (esposto.length >= FINESTRA) {
