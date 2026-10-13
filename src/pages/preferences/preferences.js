@@ -1315,9 +1315,9 @@
     if (!el || !statoDocumenti) return;
     const s = statoDocumenti;
     const n = Number(s.documenti) || 0;
-    let t = n === 1 ? 'Un documento' : `${n.toLocaleString('it-IT', { useGrouping: true })} documenti`;
-    if (s.scansioni) t += `, di cui ${s.scansioni} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
-    if (s.inCorso && s.inCorso.totali) t += ` · ne sto leggendo ${Math.min(s.inCorso.fatti + 1, s.inCorso.totali)} di ${s.inCorso.totali}`;
+    let t = n === 1 ? 'Un documento' : `${cifre(n)} documenti`;
+    if (s.scansioni) t += `, di cui ${cifre(s.scansioni)} ${s.scansioni === 1 ? 'scansione' : 'scansioni'} senza testo`;
+    if (s.inCorso && s.inCorso.totali) t += ` · ne sto leggendo ${cifre(Math.min(s.inCorso.fatti + 1, s.inCorso.totali))} di ${cifre(s.inCorso.totali)}`;
     el.textContent = cartelleSalvate && cartelleSalvate.length ? t : '';
   }
 
