@@ -85,6 +85,10 @@
 //         l'owner — un trade-off vero, che decide lui — letta intera dal file
 //         e scritta dal server nel livello L3 del feedback.
 //
+//   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
+//       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
+//         repo). Da lì ciò che scrivi nasce non fidato. Exit 0 = registrato, 4 = rifiutato, 3 = guasto.
+//
 //   node scripts/routine-channel.mjs compare <biglietto> <ruolo> <numero>
 //       → registra cosa aveva scelto il cammino su git accanto a cosa aveva
 //         scelto il server, e consuma il biglietto. Serve solo nella fase in
@@ -785,6 +789,17 @@ export async function compare(t, mine, opts) {
 }
 
 /**
+ * Autodichiarazione (SPEC-DOMANDE.md §1.2, #1148): chi lavora ha letto qualcosa che il server non vede (una pagina, un
+ * file fuori dal repo) e si dichiara sporco. Da qui in poi ciò che scrive nasce non fidato; nessuna strada fa il contrario.
+ */
+export async function sporca(t, motivo, opts) {
+  const { status, body } = await call('routineSporca', { ticket: t, motivo: String(motivo || '') }, opts);
+  if (status === 200 && body && body.ok) return { outcome: 'ok', fiducia: body.fiducia };
+  if (status === 404) return { outcome: 'fault', reason: 'routineSporca non è ancora pubblicata sul server' };
+  return { outcome: status >= 500 || status === 0 ? 'fault' : 'refused', reason: String((body && body.reason) || `http_${status}`) };
+}
+
+/**
  * Chiede al SERVER di fondere il ramo su main (SPEC-RIDISEGNO-MAX.md §10).
  *
  * Qui non si decide niente: il server verifica dallo stato VERO (verdetti di
@@ -1424,24 +1439,24 @@ if (isMain) {
       // scrivendo un argomento in più: bastava dichiarare l'impronta di un
       // commit che qui non c'è perché l'esito nascesse intestato a un
       // contenuto mai esaminato (verifica del giro 1 su questo lavoro).
-      if (intento === 'verdict' || intento === 'secaudit') {
-        const quale = intento === 'verdict' ? 'critica non registrata' : 'verdetto non registrato';
-        const punta = headSha(ROOT);
-        if (!punta) {
-          console.error(`${quale}: non riesco a farmi dire su quale commit è la directory, e un esito vale per il contenuto esaminato, non per il nome del ramo.`);
-          console.error('Niente è stato consegnato: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia lo stesso comando.');
-          process.exit(1);
-        }
-        // Confermare vuol dire riconoscere la stessa versione, non ricopiarla
-        // lettera per lettera: la forma corta che gli strumenti stampano
-        // dappertutto, e le maiuscole, sono lo stesso commit.
-        const conferma = confermaImpronta(data.sha, punta);
-        if (!conferma.ok) {
-          console.error(testoImprontaDiversa(quale, data.sha, punta, conferma.motivo));
-          process.exit(1);
-        }
-        data.sha = punta;
+      // Anche correzione e revisione (#1148): il registro del ramo confronta questa punta con quella che troverà chi
+      // viene dopo, e una consegna senza impronta il server la segna come buco.
+      const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato' : 'consegna non registrata';
+      const punta = headSha(ROOT);
+      if (!punta) {
+        console.error(`${quale}: non riesco a farmi dire su quale commit è la directory, e un esito vale per il contenuto esaminato, non per il nome del ramo.`);
+        console.error('Niente è stato consegnato: sistema git (sei nel deposito? c\'è un\'operazione a metà?) e rilancia lo stesso comando.');
+        process.exit(1);
       }
+      // Confermare vuol dire riconoscere la stessa versione, non ricopiarla
+      // lettera per lettera: la forma corta che gli strumenti stampano
+      // dappertutto, e le maiuscole, sono lo stesso commit.
+      const conferma = confermaImpronta(data.sha, punta);
+      if (!conferma.ok) {
+        console.error(testoImprontaDiversa(quale, data.sha, punta, conferma.motivo));
+        process.exit(1);
+      }
+      data.sha = punta;
     }
     const r = await deliver(biglietto, intento, data);
     // L'esito è REGISTRATO: adesso resta scritto anche QUI su quale contenuto è
@@ -1484,6 +1499,17 @@ if (isMain) {
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
+    console.error(`guasto ${r.reason}`); process.exit(3);
+  } else if (cmd === 'sporca') {
+    // Il biglietto è quello del giro (il marcatore lo scrive dispatch): sulla riga c'è solo il motivo.
+    const motivo = args.join(' ').trim();
+    if (!motivo) { console.error('sporca vuole il motivo: cosa hai letto che il server non vede. Il server non è stato chiamato.'); process.exit(1); }
+    const { readTicket } = await import('./lib/routine-ticket.mjs');
+    const biglietto = mano.ticket || readTicket(ROOT);
+    if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
+    const r = await sporca(biglietto, motivo);
+    if (r.outcome === 'ok') { console.log('Biglietto sporcato: da qui ciò che scrivi nasce non fidato.'); process.exit(0); }
+    if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {
     const r = await compare(args[0], { role: args[1] || '', num: args[2] || '' });

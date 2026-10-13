@@ -13,6 +13,7 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
 import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -239,9 +240,12 @@ export function leggiUscitaClaude(stdout, stderr = '', code = 0) {
 
 // Le variabili della sessione che lancia: un'istanza figlia che le eredita si crede dentro di lei (e CLAUDE_EFFORT batte --effort).
 const DELLA_SESSIONE = /^(CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_ID|HOST_SESSION_ID|CHILD_SESSION|SESSION_ATTENDED|ENTRYPOINT|EXECPATH|MESSAGING_\w+|SDK_HAS_HOST_AUTH_REFRESH))$/;
-/** L'ambiente di un'istanza figlia. PURA. */
-export function envFiglio(env) {
-  return Object.fromEntries(Object.entries(env || {}).filter(([k]) => !DELLA_SESSIONE.test(k)));
+/** L'ambiente di un'istanza figlia: senza la sessione che lancia, ma col suo biglietto (#1148). */
+export function envFiglio(env, { cwd = process.cwd() } = {}) {
+  const out = Object.fromEntries(Object.entries(env || {}).filter(([k]) => !DELLA_SESSIONE.test(k)));
+  const biglietto = percorsoDiChiLancia({ env: env || {}, cwd });
+  if (biglietto) out[ENV_BIGLIETTO] = biglietto;
+  return out;
 }
 
 /** `claude auth status` → l'istanza figlia avrà un accesso suo? PURA. */
@@ -486,6 +490,9 @@ async function main(argv) {
     const pid = inCorso();
     console.log(pid ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
     if (!(s.coda || []).length) console.log('Coda vuota.');
+    // Le domande le scrivono i lavoratori, che leggono testo d'utente: chi le legge si sporca prima (#1148).
+    const conDomande = (s.coda || []).filter((n) => s.pratiche[n] && s.pratiche[n].fermo && s.pratiche[n].fermo.domanda);
+    if (conDomande.length) console.log(await rigaSporco(`stato dei lavori locali (${conDomande.map((n) => `#${n}`).join(', ')})`, ['domande scritte dai lavoratori']));
     for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n]));
     return 0;
   }

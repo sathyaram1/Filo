@@ -418,12 +418,25 @@ export function stripFileArg(list, nome) {
   return { args, file: v, error: '' };
 }
 
-/** Il payload della consegna «corretto», con la segnalazione se c'è. PURA. */
-export function fixedPayload({ report, frase, branch, segnalazione, ferma } = {}) {
+/**
+ * Il payload della consegna «corretto», con la segnalazione se c'è. `sha`: la punta della cartella, che il registro del
+ * ramo confronta con quella che troverà dopo (#1148; senza, il server segna il buco). PURA.
+ */
+export function fixedPayload({ report, frase, branch, segnalazione, ferma, sha } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
   if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
   if (ferma === true) p.stop = true;
+  if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
   return p;
+}
+
+/** Lo sha intero della punta della cartella, '' se git non risponde. */
+function puntaDellaCartella() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().toLowerCase();
+  } catch (_) {
+    return '';
+  }
 }
 
 /**
@@ -1307,7 +1320,7 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
   // frase resta leggibile per chi ha mandato il feedback (spec §8).
   // La segnalazione (L3) viaggia nello stesso payload: il server la cifra e la
   // scrive in `livelli.l3`, e la appende alle note come storia della chat.
-  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma }));
+  const sent = await deliverToChannel('fixed', fixedPayload({ report, frase, branch: next.branch || '', segnalazione, ferma, sha: puntaDellaCartella() }));
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `consegna non accettata (${motivoRifiuto(sent)})` };
   }

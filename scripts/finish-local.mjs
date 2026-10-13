@@ -65,7 +65,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verdictForCurrentBranch, readState } from './verify-local.mjs';
+import { verdictForCurrentBranch, readState, registraNelRegistro } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
@@ -822,6 +822,8 @@ async function main() {
   //    lega al main su cui sono girati.
   // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
   const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
+  // Il registro dei rami (#1148): la punta che si fonde l'ha scritta questa sessione, con la fiducia del suo biglietto.
+  for (const riga of await registraNelRegistro({ ramo: branch, sha: cur, feedbackId: pratica ? pratica.id : '' })) console.log(`  ${riga}`);
   const primaProva = provaDaRiusare({ fatta: provaDelRamo, punta: cur });
   if (primaProva) console.log('\n▸ Unit sulla fusione: vale la prova fatta qui sopra sullo stesso ramo. Se main si è mosso, il server lo dice e la rifaccio.');
   const giro = await chiediConProva({

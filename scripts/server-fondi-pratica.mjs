@@ -194,6 +194,11 @@ export async function esegui(argv, deps = {}) {
     const chi = r.seq ? `#${r.seq}` : r.id;
     const lav = await of.praticaPerLaSessione(r.id, { bearer });
     if (!lav.ok) { err(`${of.rifiutoPratica(a.pratica, lav)}\nNon ho toccato niente.`); return 3; }
+    // §1.6: un lavoro sul server dev'essere fidato. server:fondi spinge main senza L5 né server: il controllo sta qui.
+    if (lav.fiducia !== 'fidato') {
+      err(`La pratica ${chi} non è fidata: un lavoro sul server si fonde solo su una pratica fidata. La segna fidata l’owner, in Gestione, dopo averne letto il testo. Non ho toccato niente.`);
+      return 3;
+    }
     const letta = await of.partiDellaPratica(r.id, { bearer });
     if (!letta.ok) { err(`La pratica ${chi} non si legge (${letta.motivo}). Non ho toccato niente.`); return 3; }
     // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915).

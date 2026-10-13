@@ -122,6 +122,13 @@ service cloud.firestore {
     // feedback di un utente o di una routine, e alla fusione vale quanto la prova
     // del mittente. Solo l'admin: nessun altro ramo lo nomina (sentinella
     // tests/unit/firestoreRulesLocalOnly.test.mjs). Stessa forma di localOnly.
+    // `bigliettoLocale` (#1148): l'impronta del biglietto della sessione locale che
+    // crea il feedback; il server ne legge la fiducia alla nascita.
+    function bigliettoLocaleValido(d) {
+      return !('bigliettoLocale' in d)
+        || (d.bigliettoLocale is string && d.bigliettoLocale.size() <= 64);
+    }
+
     function localApprovalValido(d) {
       return !('localApproval' in d)
         || (d.localApproval is map
@@ -296,7 +303,13 @@ service cloud.firestore {
       // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
       // (#595), la prova del mittente che il create anonimo sotto NON ammette:
       // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
+      // La fiducia (SPEC-DOMANDE.md §1) la scrive solo l'Admin SDK: nessun client,
+      // nemmeno l'admin, che è anche ogni sessione locale. `bigliettoLocale` (impronta
+      // del biglietto della sessione) solo qui, alla nascita. Sentinella:
+      // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved'])
+        && bigliettoLocaleValido(request.resource.data)
         // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
 
@@ -399,11 +412,6 @@ service cloud.firestore {
                     'updatedAt',
                     // I livelli L3/L4 (vincolo di forma: livelliValidi, in cima).
                     'livelli',
-                    // La pre-approvazione della fusione, per singola pratica:
-                    // solo l'owner la mette e la toglie (vedi il vincolo di
-                    // forma più sotto). Il server la legge prima di aprire una
-                    // richiesta di approvazione per il lavoro delle routine.
-                    'mergePreapproved',
                     // #908: il segno «solo in locale» (forma: localOnlyValido).
                     'localOnly',
                     // #915: le parti del lavoro locale già su main (forma: localMergesValido).
@@ -520,19 +528,6 @@ service cloud.firestore {
         // riapertura sullo stesso doc. Nessun vincolo di forma extra qui: il
         // ramo non-admin sotto resta l'unico modo per gli utenti di scriverlo.
         && request.resource.data.get('reopenRequests', {}) is map
-        // `mergePreapproved` { by, at }: «fondi senza chiedermelo» su QUESTA
-        // pratica. Assente = si chiede, come sempre. Toglierlo è cancellare il
-        // campo (updateMask senza valore), per questo la forma vale solo
-        // quando c'è. Solo questo ramo (admin) può scriverlo: i rami sotto
-        // (voti, richieste di riapertura) non lo ammettono.
-        && (!('mergePreapproved' in request.resource.data)
-            || (request.resource.data.mergePreapproved is map
-                && request.resource.data.mergePreapproved.keys().hasOnly(['by', 'at'])
-                && request.resource.data.mergePreapproved.get('by', '') is string
-                && request.resource.data.mergePreapproved.get('by', '').size() > 0
-                && request.resource.data.mergePreapproved.get('by', '').size() <= 120
-                && request.resource.data.mergePreapproved.get('at', '') is string
-                && request.resource.data.mergePreapproved.get('at', '').size() <= 40))
         && livelliValidi(request.resource.data)
         && localOnlyValido(request.resource.data)
         && localMergesValido(request.resource.data)

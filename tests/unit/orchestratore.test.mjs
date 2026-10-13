@@ -583,9 +583,12 @@ test('accesso della riga di comando: senza, avvia si ferma prima di lanciare ist
   assert.equal(accessoDaStatus('Not logged in'), false);
 });
 
-test('l’istanza figlia non eredita la sessione che la lancia, e lo sforzo lo dice --effort', () => {
-  const e = envFiglio({ CLAUDECODE: '1', CLAUDE_EFFORT: 'low', CLAUDE_CODE_SESSION_ID: 'x', CLAUDE_CODE_MESSAGING_TOKEN: 't', PATH: '/bin', CLAUDE_CODE_OAUTH_TOKEN: 'o', ANTHROPIC_BASE_URL: 'u' });
-  assert.deepEqual(Object.keys(e).sort(), ['ANTHROPIC_BASE_URL', 'CLAUDE_CODE_OAUTH_TOKEN', 'PATH']);
+test('l’istanza figlia non eredita la sessione che la lancia, e lo sforzo lo dice --effort; il biglietto sì (#1148)', () => {
+  const e = envFiglio({ CLAUDECODE: '1', CLAUDE_EFFORT: 'low', CLAUDE_CODE_SESSION_ID: 'x', CLAUDE_CODE_MESSAGING_TOKEN: 't', PATH: '/bin', CLAUDE_CODE_OAUTH_TOKEN: 'o', ANTHROPIC_BASE_URL: 'u' }, { cwd: ROOT });
+  assert.deepEqual(Object.keys(e).sort(), ['ANTHROPIC_BASE_URL', 'CLAUDE_CODE_OAUTH_TOKEN', 'FILO_BIGLIETTO_FILE', 'PATH']);
+  assert.equal(e.FILO_BIGLIETTO_FILE.replace(/\\/g, '/').split('/').slice(-3).join('/'), '.claude/biglietti/x.json');
+  // Lanciato fuori da ogni sessione, dal terminale dell'owner: nessun biglietto da passare.
+  assert.equal('FILO_BIGLIETTO_FILE' in envFiglio({ PATH: '/bin' }, { cwd: ROOT }), false);
 });
 
 test('richiesta dalle cornici di feedback:leggi', () => {

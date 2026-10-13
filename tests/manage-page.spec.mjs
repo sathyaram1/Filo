@@ -1985,11 +1985,10 @@ test('#497 — azioni di stato, ⭐ e frase: tutti i tasti sulla stessa riga', a
   expect(Math.abs(centri.frase - centri.azione)).toBeLessThan(6);
 });
 
-// ── #1034: anche «fondi senza chiedermelo» sta sulla riga dei tasti ────────
+// ── #1034: anche l'ultimo tasto dell'owner sta sulla riga dei tasti ────────
 // Aveva una riga sua sotto gli altri tasti, su ogni pratica aperta. Si guarda
 // alla misura della finestra di serie: i Ricevuti (il caso con più tasti fra
-// quelli di ogni giorno) e una pratica in coda col segno, dove accanto ai tasti
-// c'è anche chi l'ha messo.
+// quelli di ogni giorno) e una pratica in coda che si segna fidata (#1148).
 async function tastiDellOwner(page) {
   return page.evaluate(() => {
     const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
@@ -1997,12 +1996,11 @@ async function tastiDellOwner(page) {
       const r = b.getBoundingClientRect();
       return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, basso: r.bottom };
     });
-    const info = document.getElementById('mgPreapprovedInfo');
-    return { tasti, infoTop: vis(info) ? info.getBoundingClientRect().top : null };
+    return { tasti };
   });
 }
 
-test('#1034 — Ricevuti: anche «Senza chiedere» sta sulla riga degli altri tasti', async ({ openTab }) => {
+test('#1034 — Ricevuti: anche «Segna fidato» sta sulla riga degli altri tasti', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
@@ -2015,24 +2013,27 @@ test('#1034 — Ricevuti: anche «Senza chiedere» sta sulla riga degli altri ta
     window.__mgTest.openDetail(f._id);
   }, fb);
 
-  await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
-  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Senza chiedere');
+  await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
+  await expect(page.locator('#mgFiduciaBtn')).toHaveText('🤝 Segna fidato');
   await expect(page.locator('#mgAcceptLocalBtn')).toBeVisible();
   const { tasti } = await tastiDellOwner(page);
-  expect(tasti.map((t) => t.id)).toEqual(expect.arrayContaining(['mgAcceptBtn', 'mgArchiveBtn', 'mgStarBtn', 'mgUserNoteToggle', 'mgPreapproveBtn']));
+  expect(tasti.map((t) => t.id)).toEqual(expect.arrayContaining(['mgAcceptBtn', 'mgArchiveBtn', 'mgStarBtn', 'mgUserNoteToggle', 'mgFiduciaBtn']));
   for (const t of tasti) expect(Math.abs(t.centro - tasti[0].centro), t.id).toBeLessThan(6);
 });
 
-test('#1034 — In coda col segno: tasto acceso e chi l’ha messo, sulla stessa riga; il clic non sposta i vicini', async ({ openTab }) => {
+test('#1034 — In coda: «Segna fidato» al clic resta premuto sulla stessa riga, e i vicini non si spostano', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
   await page.evaluate(() => {
+    window.__fiducia = [];
     const orig = window.filo.message.bind(window.filo);
-    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update')
-      ? { ok: true, by: 'owner@esempio' } : orig(msg);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'fiducia_segna') { window.__fiducia.push(msg); return { ok: true, fiducia: 'fidato' }; }
+      return (msg && msg.type === 'feedback_update') ? { ok: true, by: 'owner@esempio' } : orig(msg);
+    };
   });
-  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-coda', mergePreapproved: { by: 'owner@esempio', at: '2026-09-13T07:30:00.000Z' } };
+  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-coda' };
   await page.evaluate((f) => {
     window.__mgTest.setAdmin(true);
     window.__mgTest.setData([f]);
@@ -2040,35 +2041,37 @@ test('#1034 — In coda col segno: tasto acceso e chi l’ha messo, sulla stessa
     window.__mgTest.openDetail(f._id);
   }, fb);
 
-  const tasto = page.locator('#mgPreapproveBtn');
-  await expect(tasto).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#mgPreapprovedInfo')).toContainText('owner@esempio');
+  const tasto = page.locator('#mgFiduciaBtn');
+  await expect(tasto).toBeVisible();
   const prima = await tastiDellOwner(page);
   for (const t of prima.tasti) expect(Math.abs(t.centro - prima.tasti[0].centro), t.id).toBeLessThan(6);
-  // Chi l'ha messo sta accanto ai tasti, non sotto.
-  expect(prima.infoTop).toBeLessThan(prima.tasti[0].basso);
+  const stella = await page.locator('#mgStarBtn').boundingBox();
 
-  const box = await tasto.boundingBox();
   await tasto.click();
-  await expect(tasto).toHaveAttribute('aria-pressed', 'false');
-  await expect(tasto).toHaveText('Senza chiedere');
-  const dopo = await tasto.boundingBox();
-  expect(Math.round(dopo.x)).toBe(Math.round(box.x));
-  expect(Math.round(dopo.width)).toBe(Math.round(box.width));
+  await expect(tasto).toHaveAttribute('aria-pressed', 'true');
+  await expect(tasto).toHaveText('🤝 Fidato');
+  expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: 'fb-una-riga-coda' }]);
+  const dopo = await tastiDellOwner(page);
+  for (const t of dopo.tasti) expect(Math.abs(t.centro - dopo.tasti[0].centro), t.id).toBeLessThan(6);
+  // L'esito sotto la riga la può alzare, non spostare di lato.
+  const stellaDopo = await page.locator('#mgStarBtn').boundingBox();
+  expect(Math.round(stellaDopo.x)).toBe(Math.round(stella.x));
 });
 
-// La riga non va mai a capo: con tanti tasti (spam, file sospetto, «È mio») o con la colonna stretta i tasti
-// si stringono e restano dentro la riga; chi ha messo il segno va sotto, leggibile.
+// La riga non va mai a capo: con tanti tasti (spam, file sospetto, «Segna fidato») o con la colonna stretta i tasti
+// si stringono e restano dentro la riga.
 const RIGA_BASE = { text: 'Testo.', name: 'Prova', seq: 12, subSeq: 0, createdAt: '2026-06-22T10:00:00Z', images: [] };
+// [nome, sezione, feedback, tasti visibili almeno].
 const RIGA_CASI = [
-  ['spam', 'inbox', { ...RIGA_BASE, _id: 'riga-spam', status: 'spam', clientId: 'tester@example.com' }],
-  ['mittente da riconoscere', 'inbox', { ...RIGA_BASE, _id: 'riga-mio', status: 'new', clientId: 'owner:abc' }],
-  ['file sospetto da riconoscere', 'inbox', { ...RIGA_BASE, _id: 'riga-file', status: 'suspicious_file', clientId: 'owner:abc' }],
-  ['in coda col segno da approvazione', 'queue', { ...RIGA_BASE, _id: 'riga-coda', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com',
-    mergePreapproved: { by: 'owner@esempio.it · approvazione 0123456789abcdef01234567', at: '2026-09-13T07:30:00.000Z' } }],
+  ['spam', 'inbox', { ...RIGA_BASE, _id: 'riga-spam', status: 'spam', clientId: 'tester@example.com' }, 5],
+  ['proprio non fidato', 'inbox', { ...RIGA_BASE, _id: 'riga-mio', status: 'new', clientId: 'owner:abc' }, 5],
+  ['file sospetto, non fidato', 'inbox', { ...RIGA_BASE, _id: 'riga-file', status: 'suspicious_file', clientId: 'owner:abc' }, 5],
+  ['in coda, da segnare fidato', 'queue', { ...RIGA_BASE, _id: 'riga-coda', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com' }, 4],
+  ['in coda, segnato fidato da te', 'queue', { ...RIGA_BASE, _id: 'riga-fidato', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com',
+    fiducia: 'fidato', fiduciaDa: { by: 'owner', at: Date.parse('2026-09-13T07:30:00.000Z') } }, 4],
 ];
 for (const larghezza of [1280, 960]) {
-  for (const [nome, tab, fb] of RIGA_CASI) {
+  for (const [nome, tab, fb, minimo] of RIGA_CASI) {
     test(`#1034 — finestra ${larghezza}, ${nome}: i tasti restano su una riga e dentro la colonna`, async ({ openTab, app }) => {
       const page = await openTab(URL);
       await page.waitForLoadState('domcontentloaded');
@@ -2084,7 +2087,7 @@ for (const larghezza of [1280, 960]) {
         window.__mgTest.setTab(t);
         window.__mgTest.openDetail(f._id);
       }, [fb, tab]);
-      await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
+      await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
       const m = await page.evaluate(() => {
         const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
         const riga = document.querySelector('#mgOwnerBar .mg-owner-row').getBoundingClientRect();
@@ -2096,10 +2099,9 @@ for (const larghezza of [1280, 960]) {
           const v = b.getBoundingClientRect();
           return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, destra: v.right, sinistra: v.left, largo: r.width };
         });
-        const info = document.getElementById('mgPreapprovedInfo');
-        return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti, infoLarga: vis(info) ? info.getBoundingClientRect().width : null };
+        return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti };
       });
-      expect(m.tasti.length).toBeGreaterThanOrEqual(5);
+      expect(m.tasti.length).toBeGreaterThanOrEqual(minimo);
       expect(m.destraScatola).toBeLessThanOrEqual(m.destraRiga + 1);
       for (const t of m.tasti) {
         expect(Math.abs(t.centro - m.tasti[0].centro), t.id).toBeLessThan(6);
@@ -2107,7 +2109,6 @@ for (const larghezza of [1280, 960]) {
         expect(t.sinistra, t.id).toBeGreaterThanOrEqual(m.sinistraRiga - 2);
         expect(t.largo, t.id).toBeGreaterThan(24);
       }
-      if (m.infoLarga !== null) expect(m.infoLarga).toBeGreaterThan(150);
     });
   }
 }
@@ -2120,7 +2121,10 @@ test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto'
   await page.waitForFunction(() => Math.abs(window.outerWidth - 960) < 40);
   await page.evaluate(() => {
     const orig = window.filo.message.bind(window.filo);
-    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update') ? { ok: true, by: 'owner@esempio' } : orig(msg);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'fiducia_segna') return { ok: true, fiducia: 'fidato' };
+      return (msg && msg.type === 'feedback_update') ? { ok: true, by: 'owner@esempio' } : orig(msg);
+    };
   });
   const fb = RIGA_CASI[2][2];
   await page.evaluate((f) => {
@@ -2129,11 +2133,11 @@ test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto'
     window.__mgTest.setTab('inbox');
     window.__mgTest.openDetail(f._id);
   }, fb);
-  const ultimo = page.locator('#mgPreapproveBtn');
+  const ultimo = page.locator('#mgFiduciaBtn');
   await expect(ultimo).toBeVisible();
   const dentro = () => page.evaluate(() => {
     const s = document.querySelector('#mgOwnerBar .mg-owner-tasti').getBoundingClientRect();
-    const b = document.getElementById('mgPreapproveBtn').getBoundingClientRect();
+    const b = document.getElementById('mgFiduciaBtn').getBoundingClientRect();
     return b.right <= s.right + 2;
   });
   expect(await dentro()).toBe(false);

@@ -639,7 +639,7 @@
       background: transparent;
       transition: background 0.1s;
     }
-    /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «senza chiedere»
+    /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «locale»
        insieme non ci stanno, e tagliate a metà parola non dicono più niente. */
     .mg-item:not(.mg-item--staged) { flex-wrap: wrap; }
     .mg-item:hover { background: var(--sn-hover); }
@@ -1112,34 +1112,19 @@
       border-color: #e0a30b; color: #b9770a;
       background: color-mix(in srgb, #e0a30b 12%, var(--sn-bg, transparent));
     }
-    /* Acceso = il server fonde senza chiedere: tinta d'accento e non della stella, perché è una delega. */
-    /* `all: unset` azzera anche il display di [hidden]: senza questa riga un tasto nascosto resta visibile. */
-    .mg-preapprove-btn[hidden] { display: none; }
-    .mg-preapprove-btn[aria-pressed="true"] {
+    /* «Segna fidato»: tinta d'accento e non della stella, perché è una delega. `all: unset` azzera anche il
+       display di [hidden]: senza questa riga un tasto nascosto resta visibile. */
+    .mg-fiducia-btn[hidden] { display: none; }
+    .mg-fiducia-btn:not(:disabled):hover, .mg-fiducia-btn[aria-pressed="true"] {
       border-color: var(--sn-accent); color: var(--sn-accent);
       background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
     }
-    /* Prende lo spazio che i tasti lasciano e va a capo dentro di sé: la riga dei tasti resta una. */
-    .mg-preapproved-info {
-      flex: 1 1 14em; min-width: 0;
-      font-size: 12px; line-height: 1.35;
-      color: var(--sn-muted);
-    }
-    .mg-preapproved-info[hidden] { display: none; }
-    /* Il segno in lista è piccolo e sta prima dei pallini di priorità, che si spingono a destra da soli. */
-    .mg-preapproved {
-      flex: none;
-      font-size: 10.5px;
-      line-height: 1;
-      padding: 3px 6px;
-      border-radius: 999px;
-      border: 1px solid color-mix(in srgb, var(--sn-accent) 45%, transparent);
-      color: var(--sn-accent);
-      white-space: nowrap;
+    .mg-fiducia-btn[aria-pressed="true"]:not(:disabled):hover {
+      background: color-mix(in srgb, var(--sn-accent) 22%, var(--sn-bg, transparent));
     }
 
     /* «Solo in locale»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
-    .mg-local-btn[hidden], .mg-sender-btn[hidden] { display: none; }
+    .mg-local-btn[hidden] { display: none; }
     .mg-local-btn[aria-pressed="true"] {
       border-color: var(--sn-fg); color: var(--sn-fg);
       background: color-mix(in srgb, var(--sn-fg) 8%, var(--sn-bg, transparent));
@@ -1475,20 +1460,12 @@
                       title="Scrivi la riga che leggerà chi ha segnalato">Frase</button>
                     <!-- «Solo in locale» (#908): c'è solo sui feedback dell'owner o di una sessione con la prova; testo e hover dal JS. -->
                     <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
-                    <!-- «È mio» (#908): sul prefisso dell'owner o di una sessione senza prova; solo l'owner la può dare. -->
-                    <button type="button" class="mg-star-btn mg-sender-btn" id="mgSenderBtn" hidden>🙋 È mio</button>
-                    <!-- «Fondi senza chiedermelo» (#1034): sulla riga col nome corto, lo stesso della lista; il nome intero sta
-                       nell'hover. Acceso = aria-pressed; testi e visibilità dal JS, sulle pratiche chiuse sparisce. -->
-                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
-                      aria-pressed="false" hidden>Senza chiedere</button>
-                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveRevokeBtn"
-                      hidden>Chiedimi prima</button>
+                    <!-- «Segna fidato» (#1148): al posto di «Fondi senza chiedermelo» e di «È mio». Lo scrive il server;
+                       premuto = fidato, e un clic la toglie. Testi e visibilità dal JS. -->
+                    <button type="button" class="mg-star-btn mg-fiducia-btn" id="mgFiduciaBtn" aria-pressed="false" hidden>🤝 Segna fidato</button>
                   </div>
                 </div>
                 </div>
-
-                <!-- Chi ha messo il segno: in fondo alla riga, accanto al tasto che lo dice acceso. -->
-                <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
               </div>
 
               <!-- «Il segno era un errore» (#922): la conferma dice cosa cambia, subito sotto il tasto. Testi dal JS. -->
