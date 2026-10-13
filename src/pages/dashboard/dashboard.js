@@ -1521,6 +1521,12 @@
     if (!inputEl.value) testoDaFuori = false;
     else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
     Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto();
+    // Ctrl+V porta il testo nell'evento `paste`, l'Incolla del menu di Filo in `data`.
+    if (e.inputType === 'insertFromPaste') {
+      const incollato = typeof e.data === 'string' ? e.data : testoIncollato;
+      testoIncollato = null;
+      Term.virgoletteSuInserito(incollato, inputEl.selectionEnd);
+    }
   });
 
   // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
