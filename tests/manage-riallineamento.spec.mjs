@@ -1,6 +1,7 @@
 // #532: un lavoro che rientra dopo una fusione fallita (riallineamento) non si confonde con una bocciatura del
 // verificatore: scheda in coda, dettaglio, pannello dello stato, pagina dei feedback, scheda Log e barre per
-// mestiere. Il segno lo scrive il server (`statusReason`, `caso` nel registro): qui arriva da dati finti.
+// mestiere. Il segno lo scrive il server (`statusReason`, `caso` nel registro): qui arriva da dati finti, e il
+// registro passa dal main vero.
 import { test, expect } from './fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
@@ -138,4 +139,5 @@ test('le barre per mestiere separano il riallineamento', async ({ openTab }) => 
   await expect(righe).toHaveCount(3);
   await expect(page.locator('.mg-fs-detail')).toContainText('Riallineamento');
   await expect(page.locator('.mg-fs-detail')).toContainText('Verifica del riallineamento');
+  await page.locator('.mg-fs-detail').screenshot({ path: 'tests/.shots/532-barre.png' });
 });
