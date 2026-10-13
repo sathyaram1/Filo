@@ -1366,10 +1366,12 @@
     if (!box) return;
     sitiMenuSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
     box.textContent = '';
+    const tasto = $('menuDelSitoTasto');
+    if (tasto) tasto.textContent = window.SN_TASTI ? window.SN_TASTI.etichetta('Shift') : 'Shift';
     if (!sitiMenuSalvati.length) {
       const p = document.createElement('p');
       p.className = 'sn-muted';
-      p.textContent = 'Nessun sito: il tasto destro apre sempre il menu di Filo.';
+      p.textContent = 'Nessun sito. Lo aggiungi da «Menu di …» in cima al menu di Filo, o chiedendolo a Filo.';
       box.appendChild(p);
     }
     for (const sito of sitiMenuSalvati) {
