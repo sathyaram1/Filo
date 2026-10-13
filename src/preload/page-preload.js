@@ -202,13 +202,6 @@ function fotografaClic(e) {
     composedPath: () => (node ? [node] : []),
     preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {},
   };
-  const deadline = Date.now() + 3000;
-  const tick = () => {
-    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
-    if (globalThis.__snFiloSpento === true || Date.now() > deadline) { menuDiRiserva(clic); return; }
-    setTimeout(tick, 16);
-  };
-  setTimeout(tick, 16);
 }
 
 // Modalità zoom con la rotella (clic centrale) e zoom con Ctrl/Cmd: vedi
