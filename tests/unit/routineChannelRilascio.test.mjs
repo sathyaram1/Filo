@@ -20,6 +20,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
 const { rapportoVuoto } = await import('../../scripts/session-report.mjs');
+const { ambientePerITest } = await import('../../scripts/run-unit-tests.mjs');
 
 test('il rapporto di ripiego, quando generarlo fallisce, porta la stessa versione di quello vero', () => {
   const src = readFileSync(resolve(REPO, 'scripts', 'routine-channel.mjs'), 'utf8');
