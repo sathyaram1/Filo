@@ -488,7 +488,7 @@ test('#1072.1 — con cmd le letture di tutti i giorni restano libere; con Power
 });
 
 // #1072.5 — per cmd l'apice singolo è un carattere: `' \\host\x '` sono tre argomenti, e il percorso in mezzo arriva
-// al programma da solo. I programmi MSYS (cat, ls di Git) invece lo leggono come virgolette: valgono le due letture.
+// al programma da solo. I programmi MSYS (cat, ls di Git) invece lo leggono come virgolette: valgono tutte le letture.
 test('#1072.5 — con cmd un percorso fra apici singoli non sfugge ai controlli su rete e file nascosti', () => {
   for (const [cmd, motivo] of [
     ['findstr /v \' x C:\\Users\\Mario\\.ssh\\id_rsa \'', /nascosto/],
