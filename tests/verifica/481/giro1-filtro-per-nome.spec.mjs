@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { argomentiScala } from '../../fixtures/electron.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 import { primaFinestra } from '../../helpers/primaFinestra.mjs';
+import { clickConfirm } from '../../helpers/confirm.mjs';
 
 // Verifica #481 giro 1: i passi dell'utente sul menu «filtra per tipo» della Cronologia AI,
 // con dati misti (codici omonimi, codice sconosciuto, voce senza azione) e tema scuro.
