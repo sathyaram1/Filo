@@ -123,7 +123,7 @@ test('le parole comuni scritte prima non fanno chiedere: coincidono con ogni ric
 test('un testo lunghissimo incollato non blocca la porta', () => {
   const parole = `${'a-'.repeat(200000)}x@y\n${'Q'.repeat(400000)}`;
   const t0 = Date.now();
-  assert.equal(costo('https://raccolta.example/?q=abcdefghijklmnopqrstuvwxyz', { parole }).costo, 1);
+  assert.equal(costo('https://meteo.example/?q=meteo+domani', { parole }).costo, 1);
   assert.ok(Date.now() - t0 < 2000, `${Date.now() - t0} ms`);
 });
 
