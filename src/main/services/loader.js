@@ -69,6 +69,7 @@ require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalo
 // Va PRIMA di services/filoChats.js, che ci si appoggia per scrivere.
 require(path.join(SHARED, 'chatArchive.js'));
 require(path.join(SHARED, 'filoEventi.js'));  // #866 — forma degli eventi del filo: prima di services/ilFilo.js
+require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come righe ripiegate del filo (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
@@ -154,6 +155,7 @@ require(path.join(SVC, 'archivedTabs.js'));
 require(path.join(SVC, 'segnalazioniMie.js')); // #986 — la copia locale delle segnalazioni mandate da qui
 require(path.join(SVC, 'ilFilo.js'));     // #866 — la linea del tempo: l'unico che legge e scrive il suo file
 require(path.join(SVC, 'filoChats.js'));  // #525 — dipende da SN_CHAT_ARCHIVE e SN_IL_FILO
+require(path.join(SVC, 'conversazioniApp.js'));  // #974 — dipende da SN_FILO_APP, SN_IL_FILO e SN_FILO_CHATS
 require(path.join(SVC, 'deckStore.js'));   // dipende da SN_DECKS (shared/decks.js)
 require(path.join(SVC, 'scryfall.js'));    // dipende da SN_SCRYFALL_Q (shared/scryfallQuery.js)
 require(path.join(SVC, 'deckOpinions.js')); // dipende da SN_DECK_OPINIONS + SN_SCRYFALL_Q

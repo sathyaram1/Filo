@@ -872,6 +872,18 @@
     // dell'utente. { periodo: 'ultima_ora'|'oggi'|'tutto' } → { ok, n } (quante sono / quante ne ha tolte).
     FILO_PAGINE_CONTA: 'filo_pagine_conta',
     FILO_PAGINE_CANCELLA: 'filo_pagine_cancella',
+    // #974 — le conversazioni dell'Editor, dei Mazzi e dell'Aiuto entrano nel filo come righe ripiegate.
+    // Un messaggio appena mostrato nella chat di un'app: { app, rif, soggetto, dove?, messaggi: [{ role, text }] }.
+    // Anche dai siti, ma solo l'Aiuto: lì app, soggetto (il sito) e `dove` li decide il main dall'indirizzo di chi manda.
+    FILO_CONVERSAZIONE_APP: 'filo_conversazione_app',
+    // L'app ha cancellato la sua conversazione: via anche dal filo. { app, rif } o { app, prefisso }. Solo filo://.
+    FILO_CONVERSAZIONE_APP_DIMENTICA: 'filo_conversazione_app_dimentica',
+    // Il documento dell'app ha cambiato nome: le sue righe lo seguono. { app, rif | prefisso, soggetto }. Solo filo://.
+    FILO_CONVERSAZIONE_APP_RINOMINA: 'filo_conversazione_app_rinomina',
+    // Le righe che la home mostra: { chat? } → { ok, righe }. Solo filo://.
+    FILO_RIGHE_APP: 'filo_righe_app',
+    // ANNUNCIO (main → pagine di Filo, senza dati): le righe sono cambiate, chi le mostra le richiede.
+    FILO_RIGHE_APP_CAMBIATE: 'filo_righe_app_cambiate',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
     // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
     // resoconto del riordino), il comando di terminale che l'utente ha digitato

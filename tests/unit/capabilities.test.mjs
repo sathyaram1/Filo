@@ -165,6 +165,11 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // #866 — le pagine visitate che il filo ricorda: contarle e cancellarle dalla pagina Sicurezza.
     FILO_PAGINE_CONTA: 'visited-pages',
     FILO_PAGINE_CANCELLA: 'visited-pages',
+    // #974 — le chat dell'Editor, dei Mazzi e dell'Aiuto entrano nel filo come righe ripiegate.
+    FILO_CONVERSAZIONE_APP: 'app-chats-in-filo',
+    FILO_CONVERSAZIONE_APP_DIMENTICA: 'app-chats-in-filo',
+    FILO_CONVERSAZIONE_APP_RINOMINA: 'app-chats-in-filo',
+    FILO_RIGHE_APP: 'app-chats-in-filo',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',

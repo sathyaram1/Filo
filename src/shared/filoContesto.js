@@ -315,7 +315,8 @@
     const out = [];
     const aperti = new Map();
     for (const m of Array.isArray(messaggi) ? messaggi : []) {
-      if (!m || !m.chat) continue;
+      // La riga di una conversazione di un'altra app (#974) non è uno scambio: lo scambio si cerca, non si ripesca.
+      if (!m || !m.chat || m.riga) continue;
       let t = aperti.get(m.chat);
       if (m.role === 'user' || !t) {
         t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
