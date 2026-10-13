@@ -92,7 +92,30 @@ test('rispondi: un’azione di consenso o da fare una per una non parte da una s
   }
   const ok = finto({ mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA } }, rispondi: { ok: true, domanda: { stato: 'chiusa' }, esito: { ok: true } } });
   assert.equal(await esegui(['rispondi', 'D-3', '--scelta', '1'], ok.io), 0);
-  assert.deepEqual(ok.chiamate[1], { op: 'rispondi', id: 'D-3', scelta: 0 });
+  assert.deepEqual(ok.chiamate[1], { op: 'rispondi', id: 'D-3', scelta: 0, sessione: true });
+});
+
+test('rispondi, consiglio, archivia e riapri dicono al server che scrive una sessione, col suo biglietto', async () => {
+  // Col token del proprietario il server non distingue: senza questo, le parole di una sessione sporca valgono come dell'owner.
+  const risposte = {
+    bigliettoLocale: 'segreto-locale',
+    mostra: { ok: true, domanda: { id: 'D-3', ...DOMANDA } },
+    rispondi: { ok: true, domanda: { stato: 'chiusa' }, esito: { ok: true } },
+    consiglio: { ok: true, esiti: [] },
+    archivia: { ok: true, domanda: { stato: 'chiusa' } },
+    riapri: { ok: true, domanda: { stato: 'aperta' } },
+  };
+  for (const argv of [['rispondi', 'D-3', '--scelta', '1', '--testo', 'va bene'], ['rispondi', 'D-3', '--testo', 'ne parliamo'], ['consiglio', 'D-3'], ['archivia', 'D-3'], ['riapri', 'D-3']]) {
+    const f = finto(risposte);
+    await esegui(argv, f.io);
+    const scrittura = f.chiamate.find((c) => c.op !== 'mostra');
+    assert.ok(scrittura, argv.join(' '));
+    assert.equal(scrittura.sessione, true, argv.join(' '));
+    assert.equal(scrittura.biglietto, 'segreto-locale', argv.join(' '));
+  }
+  const senza = finto({ archivia: risposte.archivia });
+  await esegui(['archivia', 'D-3'], senza.io);
+  assert.deepEqual(senza.chiamate[0], { op: 'archivia', id: 'D-3', sessione: true }, 'senza biglietto resta una sessione: non fidata');
 });
 
 test('consiglio: le domande col consiglio di consenso restano fuori, le altre partono', async () => {
