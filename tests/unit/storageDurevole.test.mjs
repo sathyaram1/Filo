@@ -136,6 +136,8 @@ test('una scrittura che fallisce a metà lascia il file di prima leggibile, avvi
   tace();
   const { dir, Storage, file } = avvio({ 'storage.json': '{"v":1}' });
   await Storage.get(null);
+  // Sotto carico la copia dell'avvio è ancora in scrittura, e il suo temporaneo non è della scrittura che fallisce.
+  await Storage.statoDisco().copia;
   sostituisci(fsp, 'open', (vero) => async (p, ...resto) => {
     const fh = await vero(p, ...resto);
     if (String(p).includes('storage.json.tmp-')) {
