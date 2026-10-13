@@ -451,6 +451,7 @@
     applySettings,
     initCwd,
     runShellCommand,
+    virgoletteSuInserito,
     nuovaChat,
     comandoInChat: () => comandoInChat,
   };
