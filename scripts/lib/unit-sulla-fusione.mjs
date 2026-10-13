@@ -8,7 +8,7 @@ import {
   unlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve, win32 } from 'node:path';
+import path, { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sommaRiepiloghi, perLaRiga, SOLO } from '../run-unit-tests.mjs';
 
