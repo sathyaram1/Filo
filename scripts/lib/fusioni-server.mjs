@@ -21,7 +21,7 @@ export async function fusioniServer(dep, { prova = false } = {}) {
   const ferme = [];
   if (!pratiche.length) {
     dep.log('Nessun lavoro server aspetta il PC.');
-    return { fuse, ferme, pubblicato: false };
+    return { fuse, soloApp, ferme, pubblicato: false };
   }
   const git = (args) => dep.esegui('git', args, { cwd: dep.radice });
   await git(['fetch', '--quiet', 'origin', 'main']);
