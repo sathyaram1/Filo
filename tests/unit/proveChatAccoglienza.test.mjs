@@ -156,7 +156,7 @@ test('ogni Filo aperto da una prova parte già accolto, se la prova non chiede i
   const ROOT = join(TESTS, '..');
   assert.match(readFileSync(join(ROOT, 'playwright.config.js'), 'utf8'), /^process\.env\.FILO_TEST_ACCOLTO = '1';$/m);
   assert.match(readFileSync(join(ROOT, 'src', 'main', 'shim', 'storage.js'), 'utf8'),
-    /if \(err\.code === 'ENOENT' && process\.env\.FILO_TEST_ACCOLTO === '1'\) STATE\.data = \{ filo_onboarding: \{ done: true \} \};/);
+    /if \(buf === null\) \{\n    STATE\.data = \{\};\n(?:\s*\/\/.*\n)*\s*if \(process\.env\.FILO_TEST_ACCOLTO === '1'\) STATE\.data = \{ filo_onboarding: \{ done: true \} \};/);
   const f = readFileSync(FIXTURE, 'utf8');
   assert.match(f, /\baccoglienzaFatta:\s*\[\s*true\s*,\s*\{\s*option:\s*true\s*\}\s*\]/);
   assert.match(f, /FILO_TEST_ACCOLTO: accoglienzaFatta \? '1' : '0'/);

@@ -13,6 +13,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const guasti = require('./guastiAccesso');
+const Disco = require('../services/scritturaAtomica');
 
 // La sessione dell'avvio in corso. Senza cifratura del sistema il disco resta
 // vuoto, ma salvare e poi rileggere `null` nello stesso processo farebbe
@@ -45,7 +46,7 @@ function save(session) {
   try {
     const { safeStorage } = require('electron');
     const enc = safeStorage.encryptString(JSON.stringify(session));
-    fs.writeFileSync(filePath(), enc, { mode: 0o600 });
+    Disco.scriviSync(filePath(), enc, { mode: 0o600 });
     return true;
   } catch (e) {
     console.error('[auth] salvataggio sessione fallito:', e?.message || e);
@@ -53,20 +54,33 @@ function save(session) {
   }
 }
 
-function decifra(file) {
+function decifraDati(raw) {
   try {
     const { safeStorage } = require('electron');
-    const j = JSON.parse(safeStorage.decryptString(fs.readFileSync(file)));
+    const j = JSON.parse(safeStorage.decryptString(raw));
     return j && j.refreshToken ? j : null;
   } catch (_) { return null; }
+}
+
+function decifra(file) {
+  try { return decifraDati(fs.readFileSync(file)); } catch (_) { return null; }
 }
 
 // Carica la sessione cifrata, o null se assente/illeggibile.
 function load() {
   if (!canEncrypt()) return inMemoria;
   const file = filePath();
-  if (fs.existsSync(file)) {
-    const dati = decifra(file);
+  Disco.togliTemporaneiUnaVolta(file);
+  let raw;
+  try {
+    raw = Disco.leggiSync(file);
+  } catch (e) {
+    // Il disco che non risponde non dice niente sul file: niente da mettere da parte.
+    console.warn('[auth] sessione non letta dal disco:', e?.message || e);
+    return inMemoria;
+  }
+  if (raw) {
+    const dati = decifraDati(raw);
     if (dati) return dati;
     // Blob corrotto o cifrato con un'altra chiave OS (portachiavi diverso, profilo ricreato): il file
     // resta da parte, perché quella chiave può tornare (#1085).

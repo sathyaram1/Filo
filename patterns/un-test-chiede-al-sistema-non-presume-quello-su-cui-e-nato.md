@@ -222,3 +222,14 @@ rosso confrontata fra due cartelle), si riconoscono entrambe le forme:
 `isAbsolute(p) || win32.isAbsolute(p)`. Un rosso solo su Linux non ferma né le fusioni
 né le versioni, quindi nessun allarme lo segnala: resta finché una routine non lo trova.
 Riferimento: `chiaveTest` in `scripts/lib/unit-sulla-fusione.mjs`.
+
+## La sessione che lancia le prove (#949.1, #1110.1)
+
+Gli strumenti delle routine misurano la sessione in cui girano: il suo nome
+(`FILO_ROUTINE`, `FILO_TRANSCRIPT`…), o, con un biglietto nella radice del repo, il
+transcript più recente della cartella. Una prova che li esegue misurava così la
+sessione che la lanciava: consumo vero nei corpi confrontati, il suo conto nella copia di
+prova, rossi solo in una routine. Il lanciatore toglie ai test nome e cartella dei
+transcript (`ambientePerITest`, sentinella in `tests/unit/unitRunner.test.mjs`); un
+figlio che una prova lancia da sé prende l'ambiente da lì, così un `node --test` a mano
+dà lo stesso esito del lanciatore.

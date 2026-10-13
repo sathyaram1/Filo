@@ -30,6 +30,7 @@ const path = require('node:path');
 const cfg = require('./config');
 const guasti = require('./guastiAccesso');
 const walletStore = require('./wallet-store');
+const Disco = require('../services/scritturaAtomica');
 
 const IDENTITY_ENDPOINT = process.env.FILO_IDENTITY_ENDPOINT
   || 'https://identitytoolkit.googleapis.com/v1/accounts:signUp';
@@ -41,6 +42,8 @@ let inflight = null;
 // un'altra in silenzio, perché il portafoglio è legato a quella. Chi legge lo
 // stato lo dice all'utente; ricominciare è una scelta sua (resetIdentity).
 let lost = false;
+// Il file c'è ma non si è lasciato leggere né spostare: un'identità nuova scritta sopra perderebbe il portafoglio (#1087).
+let fileIntoccabile = false;
 
 function erroreIdentita(code) {
   const err = new Error(code === 'identity_lost'
@@ -71,10 +74,10 @@ function canEncrypt() {
 }
 
 function persist() {
-  if (!session?.refreshToken || !canEncrypt()) return false;
+  if (!session?.refreshToken || !canEncrypt() || fileIntoccabile) return false;
   try {
     const { safeStorage } = require('electron');
-    fs.writeFileSync(filePath(), safeStorage.encryptString(JSON.stringify({ refreshToken: session.refreshToken, uid: session.uid })), { mode: 0o600 });
+    Disco.scriviSync(filePath(), safeStorage.encryptString(JSON.stringify({ refreshToken: session.refreshToken, uid: session.uid })), { mode: 0o600 });
     return true;
   } catch (e) {
     console.error('[identity] salvataggio fallito:', e?.message || e);
@@ -82,12 +85,16 @@ function persist() {
   }
 }
 
-function decifra(file) {
+function decifraDati(raw) {
   try {
     const { safeStorage } = require('electron');
-    const j = JSON.parse(safeStorage.decryptString(fs.readFileSync(file)));
+    const j = JSON.parse(safeStorage.decryptString(raw));
     return j && j.refreshToken ? j : null;
   } catch (_) { return null; }
+}
+
+function decifra(file) {
+  try { return decifraDati(fs.readFileSync(file)); } catch (_) { return null; }
 }
 
 // Un file che non si decifra (portachiavi sbagliato su Linux, DPAPI di un altro profilo su Windows) si
@@ -96,11 +103,18 @@ function decifra(file) {
 function load() {
   if (!canEncrypt()) return null;
   const file = filePath();
-  if (fs.existsSync(file)) {
-    const dati = decifra(file);
+  Disco.togliTemporaneiUnaVolta(file);
+  let raw;
+  try { raw = Disco.leggiSync(file); } catch (e) {
+    console.warn('[identity] file non letto, non lo sovrascrivo:', e?.message || e);
+    fileIntoccabile = true;
+    return null;
+  }
+  if (raw) {
+    const dati = decifraDati(raw);
     if (dati) return dati;
     console.warn('[identity] file illeggibile, lo metto da parte');
-    guasti.metteDaParte(file, 'illeggibile-' + guasti.timbro());
+    if (!guasti.metteDaParte(file, 'illeggibile-' + guasti.timbro())) fileIntoccabile = true;
     return null;
   }
   if (!walletStore.suDisco()) return null;
@@ -213,7 +227,7 @@ function _expireToken() { if (session) { session.idToken = null; session.idToken
 // Ricomincia da zero: scelta confermata dall'utente dopo che l'identità è persa o illeggibile.
 // Il file resta accanto; la prossima richiesta crea un'identità nuova.
 function resetIdentity() {
-  session = null; lost = false; inflight = null;
+  session = null; lost = false; inflight = null; fileIntoccabile = false;
   try { guasti.metteDaParte(filePath(), 'prev'); } catch (_) {}
 }
 
@@ -236,6 +250,6 @@ function segreti() { return [session?.refreshToken, session?.idToken].filter(Boo
 
 // Dopo un collegamento riuscito l'account non è più anonimo, ma il refresh
 // token resta valido e punta allo stesso uid: nulla da fare. Esposto per i test.
-function _reset() { session = null; inflight = null; }
+function _reset() { session = null; inflight = null; fileIntoccabile = false; }
 
 module.exports = { restore, segreti, getIdToken, getUid, currentIdTokenSync, hasIdentity, isLost, isUnreadable, resetIdentity, _reset, _expireToken };

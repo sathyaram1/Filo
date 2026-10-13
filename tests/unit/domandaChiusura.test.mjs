@@ -10,7 +10,6 @@ import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { senzaSessione } from '../helpers/sessione.mjs';
 
 const QUI = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(QUI, '..', '..');
@@ -24,8 +23,9 @@ const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
 
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 // Il biglietto nella cartella di una routine fa misurare la sessione vera anche senza il suo ambiente (#949.1):
-// misure finte qui; il figlio lo isola senzaSessione.
+// misure finte qui, e per il figlio un transcript che non c'è.
 const piano = { sleep: async () => {}, misureCrediti: () => ({}) };
+const NESSUN_TRANSCRIPT = resolve(QUI, 'transcript-che-non-esiste.jsonl');
 
 // ─── corpi delle richieste ──────────────────────────────────────────────────
 
@@ -160,7 +160,7 @@ function fintoServer(status, risposta) {
 
 // spawn ASINCRONO: il server finto vive in questo processo.
 function cli(port, args, stdin = '') {
-  const env = senzaSessione({ FILO_ROUTINE_API: `http://127.0.0.1:${port}` });
+  const env = { ...process.env, FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_TRANSCRIPT: NESSUN_TRANSCRIPT };
   return new Promise((risolvi) => {
     const p = spawn(process.execPath, [CANALE, ...args], { env });
     let stdout = ''; let stderr = '';
