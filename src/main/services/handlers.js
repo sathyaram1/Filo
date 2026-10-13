@@ -1147,6 +1147,12 @@ const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate
   + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+// Letture: l'esito serve solo al modello per rispondere. Un turno muto dopo sole letture non ha detto niente all'utente (#557).
+const AZIONI_DI_LETTURA = new Set([
+  'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+]);
+const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || AZIONI_DI_LETTURA.has(String(a.type || '').toUpperCase()));
+const fraseSenzaRisposta = (passi) => `Mi sono fermato dopo ${passi === 1 ? 'un passo' : `${passi} passi`} senza arrivare a una risposta.`;
 
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
