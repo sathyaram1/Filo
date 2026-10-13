@@ -237,7 +237,7 @@ export async function sporca(motivo, { env, cwd, deps = {} } = {}) {
 
 /** Prende un biglietto e scrive il suo file. → { path, fp, fiducia }. */
 export async function prendi({ sporco = false, motivo = '', sessionId = '', cwd = process.cwd(), nowMs = Date.now(), deps = {} } = {}) {
-  const radice = radiceRepo(cwd);
+  const radice = radiceCondivisa(cwd);
   if (!radice) throw new Error('fuori da un repo: il biglietto vive nella cartella .claude della radice');
   const r = await chiama('prendi', Object.assign({ sessione: String(sessionId || '').slice(0, 8) }, sporco ? { sporco: true, motivo: String(motivo || 'nato sporco') } : {}), deps);
   if (!r.ticket || !FP_RE.test(String(r.fp || ''))) throw new Error('risposta del server senza biglietto');
