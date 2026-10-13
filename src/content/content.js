@@ -675,12 +675,82 @@
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
+  // ------------------------------------------------------------
+  // Il menu che il sito si disegna da sé (#975): «Menu di <sito>» in cima, e la scelta di aprirlo subito.
+  // Chi ascolta e il clic rigiocato stanno in src/preload/menu-del-sito.js; la scelta per sito in menuDelSito.siti.
+  // ------------------------------------------------------------
+  // Il sito è quello del frame cliccato: il menu di un riquadro è del suo sito, non della pagina che lo ospita.
+  function hostQui() {
+    try { return String(location.hostname || '').toLowerCase().replace(/\.+$/, ''); } catch (_) { return ''; }
+  }
+
+  function menuDelSitoPrima() {
+    const h = hostQui();
+    const siti = settings?.menuDelSito?.siti;
+    if (!h || !Array.isArray(siti)) return false;
+    return siti.some((d) => typeof d === 'string' && d && (h === d || h.endsWith(`.${d}`)));
+  }
+
+  // Il nome che il sito dà a sé stesso; senza, il suo indirizzo. Testo della pagina: niente caratteri che girano la riga.
+  const NOME_SITO_MAX = 40;
+  function nomeDelSito() {
+    const meta = (sel) => { try { return document.querySelector(sel)?.getAttribute('content') || ''; } catch (_) { return ''; } };
+    let n = meta('meta[property="og:site_name"]') || meta('meta[name="application-name"]')
+      || meta('meta[name="apple-mobile-web-app-title"]');
+    n = String(n).replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]/g, '').replace(/\s+/g, ' ').trim();
+    if (n.length > NOME_SITO_MAX) n = `${n.slice(0, NOME_SITO_MAX - 1).trimEnd()}…`;
+    return n || hostQui().replace(/^www\./, '');
+  }
+
+  // La voce c'è se sul cammino del clic la pagina ascolta il tasto destro; col menu del sito già al primo posto,
+  // dal menu aperto con Shift c'è sempre: è da lì che si torna a quello di Filo.
+  function statoMenuDelSito(e, opzioni) {
+    const M = self.__snMenuDelSito;
+    if (!M || PAGINA_DI_FILO || !hostQui()) return null;
+    const nodo = realTarget(e);
+    if (!nodo || self.SN_FILO_UI?.inside?.(nodo)) return null;
+    const prima = menuDelSitoPrima();
+    if (!(prima && opzioni && opzioni.conMaiusc) && !M.ascolta(nodo)) return null;
+    return {
+      nodo, prima, nome: nomeDelSito(),
+      x: e.clientX, y: e.clientY, sx: e.screenX, sy: e.screenY,
+      ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey, clic: Date.now(),
+    };
+  }
+
+  function conMenuDelSito(items, sito) {
+    if (!sito) return;
+    items.unshift({
+      type: 'split',
+      label: I18n.t('menu_del_sito').replace('%s', () => sito.nome),
+      onClick: () => apriMenuDelSito(sito),
+      arrowTitle: I18n.t('menu_del_sito_scelta'),
+      subItems: [sito.prima
+        ? { label: I18n.t('menu_del_sito_torna_filo'), onClick: () => impostaMenuDelSito(false) }
+        : { label: I18n.t('menu_del_sito_sempre'), onClick: () => impostaMenuDelSito(true) }],
+    }, { type: 'separator' });
+  }
+
+  // Dopo il clic sulla voce, non dentro: il clic che risale al documento chiuderebbe il menu appena aperto.
+  function apriMenuDelSito(sito) {
+    setTimeout(async () => {
+      let esito = null;
+      try { esito = await self.__snMenuDelSito.apri(sito); } catch (_) { esito = null; }
+      if (esito !== 'menu' || sito.prima) return;
+      try { await chrome.runtime.sendMessage({ type: MSG.MENU_DEL_SITO_SCELTO }); } catch (_) {}
+    }, 0);
+  }
+
+  function impostaMenuDelSito(attivo) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.MENU_DEL_SITO_IMPOSTA, attivo, avvisa: true })).catch(() => {}); } catch (_) {}
+  }
+
   // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
   async function onContextMenu(e, opzioni) {
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch)
     if (e.shiftKey && !(opzioni && opzioni.conMaiusc)) return;
     // Prima di ogni attesa: dopo, il cammino dell'evento non c'è più.
-    const sito = statoMenuDelSito(e);
+    const sito = statoMenuDelSito(e, opzioni);
 
     // Impedisci alla pagina ospite (es. YouTube, Reddit) di gestire l'evento e
     // mostrare il SUO menu: il nostro listener è registrato per primo (vedi sotto
