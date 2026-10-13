@@ -224,7 +224,6 @@ test('#476 — un attacco confermato non premia e non annuncia niente a chi l\'h
   ]);
   await page.reload();
   await risposta(page);
-  await page.waitForTimeout(600);
 
   await expect(page.locator('#thanksOverlay')).toHaveCount(0);
   expect(await balanceOf(app)).toBe(1000); // saldo fresco, nessun accredito
