@@ -67,6 +67,15 @@
     el.append(testa, corpo);
     const r = { el, testa, ic, testo, ora, corpo, vista: null, aperta: false, n: -1 };
     testa.addEventListener('click', (e) => { e.stopPropagation(); alterna(r).catch(() => {}); });
+    // Un link di una risposta apre una scheda nuova, anche fuori dalla conversazione (home vuota).
+    corpo.addEventListener('click', (e) => {
+      const a = e.target && e.target.closest ? e.target.closest('a.filo-md-link') : null;
+      if (!a || !corpo.contains(a)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const url = a.getAttribute('href');
+      if (url) d.send({ type: MSG.OPEN_URL, url });
+    });
     disegna(r, v);
     return r;
   }
