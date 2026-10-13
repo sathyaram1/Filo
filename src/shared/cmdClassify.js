@@ -1625,7 +1625,7 @@
     if (c.shell === 'cmd') {
       const l = comeCmd(cmd);
       if (l == null) return null;
-      return l.includes("'") ? [l, l.replace(/'/g, APICE_TESTO)] : [l];
+      return l.includes("'") ? [l.replace(/'/g, APICE_TESTO), l] : [l];
     }
     return [cmd.replace(/[\u201C-\u201F]/g, '"')
       .replace(/[\u2018-\u201B]/g, "'")
