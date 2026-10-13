@@ -53,3 +53,11 @@ export function motoreDelleProve({ radice = RADICE, env = process.env } = {}) {
   const scelto = !!override;
   return { atteso, pacchetto, binario, scelto, ...verdettoMotore({ atteso, pacchetto, binario, scelto }) };
 }
+
+/** Per chi sta per aprire Electron: sul motore sbagliato si ferma, su uno scelto avvisa e prosegue. */
+export function assicuraMotore(opzioni) {
+  const m = motoreDelleProve(opzioni);
+  if (!m.ok && !m.scelto) throw new Error(m.motivo);
+  if (!m.ok) console.warn(m.motivo);
+  return m;
+}
