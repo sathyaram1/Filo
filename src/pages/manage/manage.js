@@ -5717,6 +5717,7 @@
     apriSegnalazione(id) { fsApriSegnalazione(id); },
     // Domande finte, o { errore } per un guasto finto: il main non le rimpiazza più.
     setDomande(lista, opts) { if (DOMANDE) DOMANDE.imposta(lista, opts); },
+    domandeStato() { return DOMANDE ? DOMANDE.stato() : null; },
     // Rifà la scelta d'apertura coi dati finti già in pagina; `{ comeAvvio: true }` rispetta il clic dell'utente come all'avvio.
     sceltaApertura(opts) {
       if (opts && opts.comeAvvio) { aperturaFatta = false; return sceltaApertura(); }
