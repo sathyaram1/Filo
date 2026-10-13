@@ -23,6 +23,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
 
@@ -33,6 +34,7 @@ export const SHELL_HEIGHT = 88;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {} } = {}) {
+  assicuraMotore({ radice: APP_ROOT });
   // Cartella canonica e con uno spazio nel nome, come per ogni altra partenza:
   // tests/helpers/percorsi.mjs.
   const userData = cartellaTemporanea(userDataPrefix);
