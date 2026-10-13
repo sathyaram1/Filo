@@ -100,7 +100,18 @@ c'è del lavoro. Il numero accanto al nome toglie quel giro (#495).
   hover: Domande = da rispondere, solo con le domande lette davvero; Feedback =
   i Ricevuti a filtro spento (il filtro per livello è una vista della scheda,
   non della sezione); Routine = fusioni senza segnalazione che aspettano, e lo
-  zero non si scrive perché la sezione non è vuota; Impostazioni nessuno.
+  zero non si scrive perché la sezione non è vuota. Una sezione senza una scheda
+  sua non c'è: Impostazioni predefinite torna quando ne avrà una (i Modelli di
+  supporto stanno in Automazioni, #1110).
+- **Una scheda si carica quando si mostra, non quando si clicca (#1150).** Con
+  le sezioni una scheda si apre anche dalla sua sezione, all'apertura della
+  pagina e da un salto (avviso, statistiche, lente), e nessuna di queste strade
+  clicca il suo bottone: riaprendo Gestione su «Routine → Log» il log restava su
+  «Caricamento…». `selectTab(tab)` è l'unica porta che mostra una scheda e alla
+  fine manda `mg-scheda` con `{ tab, apertura }`; ogni caricamento pigro ascolta
+  quello, anche il Red Team che sta in un file suo. `apertura` dice che l'ha
+  mostrata la scelta d'avvio: chi ha già letto all'avvio non rilegge. Prova:
+  `tests/manage-sezioni.spec.mjs`.
 - **Dove:** `manageTabCounts` in `src/shared/manageReview.js`; il tetto e la
   sua resa onesta (`LIST_PAGE_SIZE`, `listHitCap`, `countLabel`,
   `COUNT_CAP_HINT`) in `src/shared/feedback.js`; `updateTabCounts()` /
