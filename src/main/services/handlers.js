@@ -5088,7 +5088,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
     openTabsCount, partOfDay, dayType, dateKey,
   });
 
-  return { settings, canServe, payload, signature, saved };
+  // Le parole dell'utente che la home ha davanti: un suggerimento che le porta fuori chiede l'OK al clic (#868.6).
+  const parole = conversazioni.filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || '')).join('\n');
+  return { settings, canServe, payload, signature, saved, parole };
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
@@ -5269,7 +5271,14 @@ async function generateDashboardFromInputs(inputs) {
   for (let i = 0; i < suggestions.length; i++) {
     let u = null;
     try { u = suggestions[i].action ? await controllaUscita(suggestions[i].action) : null; } catch (_) {}
-    if (u && u.blocca) suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase };
+    if (u && u.blocca) { suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase }; continue; }
+    // La home legge titoli di pagine e frasi di Filo, cioè testo di altri: un indirizzo con un dato dell'utente chiede l'OK.
+    const a = suggestions[i].action;
+    const url = a && /^(?:NAVIGA|APRI_FILE)$/i.test(String(a.type || '')) ? String(a.url || a.path || '') : '';
+    if (!/^https?:/i.test(url)) continue;
+    let chiede = [];
+    try { chiede = await linkCheChiedonoOk(url, { parole: inputs.parole || '', sempre: true }); } catch (_) { chiede = []; }
+    if (chiede.length) suggestions[i] = { ...suggestions[i], chiedeOk: chiede[0].motivo };
   }
   await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
   return { message, suggestions, ts: new Date().toISOString() };
