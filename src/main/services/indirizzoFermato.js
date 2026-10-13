@@ -29,6 +29,9 @@ function avvisoIndirizzoFermato(rawUrl) {
     if (u.hostname) testo = `Percorso di rete bloccato per sicurezza: ${accorciato(`//${u.hostname}${percorso}`)}`;
     else if (/\/$/.test(percorso)) testo = `Cartella del computer bloccata per sicurezza: ${accorciato(percorso)}`;
     else testo = `File del computer bloccato per sicurezza: ${accorciato(percorso)}`;
+  } else if (/^[a-z]:$/.test(schema)) {
+    // «C:\Users\…» scritto così si legge come lo schema «c:»: è un percorso di Windows, e si mostra com'è.
+    testo = `File del computer bloccato per sicurezza: ${accorciato(String(rawUrl).trim())}`;
   } else {
     testo = `Indirizzo «${accorciato(schema, MAX_SCHEMA)}» bloccato per sicurezza`;
   }
