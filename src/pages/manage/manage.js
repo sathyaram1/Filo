@@ -2463,7 +2463,8 @@
       if (!nd) continue;
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
-      badge.textContent = `(${nd[tab]})`;
+      // Oltre il tetto dell'elenco l'archivio ha solo le più recenti: il numero è un minimo.
+      badge.textContent = `(${nd[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
       btn.appendChild(badge);
     }
 
