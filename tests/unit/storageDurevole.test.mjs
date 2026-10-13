@@ -56,8 +56,11 @@ const tace = () => {
   ripristini.push(() => { [console.error, console.warn] = veri; });
 };
 
-afterEach(() => {
+afterEach(async () => {
   while (ripristini.length) ripristini.pop()();
+  // La copia dell'avvio può essere ancora in scrittura: a cartella tolta fallisce, e l'avviso esce nella prova dopo.
+  await aperto?.statoDisco().copia;
+  aperto = null;
   while (cartelle.length) togliCartella(cartelle.pop());
 });
 
