@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fusioniServer } from '../../scripts/lib/fusioni-server.mjs';
-import { USCITA_SOLO_APP } from '../../scripts/server-fondi-pratica.mjs';
+import { USCITA_CONFLITTO_MAIN, USCITA_SOLO_APP } from '../../scripts/server-fondi-pratica.mjs';
 import { OPZIONI_DI, leggiArgomenti } from '../../scripts/orchestratore-locale.mjs';
 
 function finte({ pratiche, commitApp = {}, fondi = 0, deploy = 0, fine = () => {} }) {
@@ -23,7 +23,7 @@ function finte({ pratiche, commitApp = {}, fondi = 0, deploy = 0, fine = () => {
       return { code: 0, out: '' };
     },
     pubblica: async () => { fatti.push('server:pubblica'); return { code: deploy, out: 'deploy' }; },
-    fineAttesa: async (id, opz) => { fatti.push(`fineAttesa ${id}${opz && opz.soloApp ? ' soloApp' : ''}`); fine(id, opz); },
+    fineAttesa: async (id, opz) => { fatti.push(`fineAttesa ${id}${opz && opz.soloApp ? ' soloApp' : ''}${opz && opz.riallinea ? ' riallinea' : ''}`); fine(id, opz); },
   };
   return { dep, fatti };
 }
@@ -115,6 +115,25 @@ test('il ramo non c’è su filo-security: la parte dell’app torna alle routin
   assert.ok(!vuota.fatti.some((x) => x.startsWith('fineAttesa')));
 
   const prova = finte({ pratiche: [CON_APP], commitApp: { 'worker/f2-20261012T091500Z': 3 }, fondi: soloApp });
+  await fusioniServer(prova.dep, { prova: true });
+  assert.ok(!prova.fatti.some((x) => x.startsWith('fineAttesa')), 'a vuoto non si rimanda niente');
+});
+
+test('il ramo del server va in conflitto con main: la pratica torna alle routine per il riallineamento, le altre si fondono (#1159)', async () => {
+  const conflitto = (args) => (args.includes('f2') ? USCITA_CONFLITTO_MAIN : 0);
+  const { dep, fatti } = finte({ pratiche: [SOLO, CON_APP], commitApp: { 'worker/f2-20261012T091500Z': 3 }, fondi: conflitto });
+  const r = await fusioniServer(dep);
+  assert.deepEqual(r.ferme, []);
+  assert.deepEqual(r.riallineate.map((x) => x.id), ['f2']);
+  assert.deepEqual(r.fuse.map((x) => x.id), ['f1']);
+  assert.ok(fatti.includes('fineAttesa f2 riallinea'), fatti.join('\n'));
+  assert.ok(fatti.includes('server:pubblica'));
+
+  const vecchio = finte({ pratiche: [CON_APP], commitApp: { 'worker/f2-20261012T091500Z': 3 }, fondi: conflitto, fine: () => { throw new Error('server_non_fuso'); } });
+  const v = await fusioniServer(vecchio.dep);
+  assert.match(v.ferme[0].motivo, /conflitto con main.*non è tornata alle routine/);
+
+  const prova = finte({ pratiche: [CON_APP], commitApp: { 'worker/f2-20261012T091500Z': 3 }, fondi: conflitto });
   await fusioniServer(prova.dep, { prova: true });
   assert.ok(!prova.fatti.some((x) => x.startsWith('fineAttesa')), 'a vuoto non si rimanda niente');
 });
