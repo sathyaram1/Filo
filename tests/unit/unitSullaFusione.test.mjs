@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 import { pidMorto } from '../helpers/processi.mjs';
