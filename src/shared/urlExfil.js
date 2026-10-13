@@ -269,6 +269,7 @@
   // dato (numero, email, indirizzo di casa, codice, un pezzo lungo di frase) chiede l'OK. Le parole comuni no: coincidono
   // con ogni ricerca. Né quello che sta nella domanda di adesso, né un link che la conversazione contiene tale e quale.
   const CIFRE_SCRITTE = 7;
+  const CIFRE_PEZZO = 9;
   const TIPI_VIA = new Set([
     'via', 'viale', 'vle', 'piazza', 'pza', 'pzza', 'piazzale', 'corso', 'cso', 'largo', 'vicolo', 'vico', 'strada',
     'contrada', 'cda', 'località', 'localita', 'loc', 'frazione', 'fraz', 'borgo', 'lungomare', 'lungarno',
