@@ -38,7 +38,7 @@ test('lanciati da soli in una sessione con tutta la sua identità accesa, i file
     assert.deepEqual(Object.keys(sessione).sort(), [...IDENTITA_SESSIONE].sort(), 'ogni voce dell\'identità della sessione è accesa');
     // Con NODE_TEST_CONTEXT il figlio si crederebbe una sotto-prova di questa e non correrebbe niente.
     const { NODE_TEST_CONTEXT: _figlio, ...ambiente } = process.env;
-    const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...file.map((f) => join(QUI, f))], {
+    const r = spawnSync(process.execPath, ['--test', '--test-reporter=tap', ...fileArgs(file.map((f) => join(QUI, f)), ROOT)], {
       cwd: ROOT, env: { ...ambiente, ...sessione }, encoding: 'utf8', timeout: TETTO_ATTESA_MS, maxBuffer: 256 * 1024 * 1024,
     });
     const rossi = String(r.stdout || '').match(/^\s*not ok .*$/gm) || [];
