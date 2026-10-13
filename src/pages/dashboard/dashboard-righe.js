@@ -135,7 +135,11 @@
     const msgs = (res && res.ok && res.chat && res.chat.messages) || [];
     const testo = [r.vista.testo, ...msgs.filter((m) => m && String(m.text || '').trim())
       .map((m) => `${m.role === 'user' ? 'Tu' : 'Filo'}: ${m.text}`)].join('\n\n');
-    try { await navigator.clipboard.writeText(testo); } catch (_) {}
+    let ok = true;
+    try { await navigator.clipboard.writeText(testo); } catch (_) { ok = false; }
+    // La conferma sta sulla riga stessa, al posto dell'ora, per un attimo.
+    r.ora.textContent = ok ? 'copiato' : 'non copiato';
+    setTimeout(() => { if (r.vista) r.ora.textContent = quando(r.vista.inizio); }, 1600);
   }
 
   async function togli(r) {
