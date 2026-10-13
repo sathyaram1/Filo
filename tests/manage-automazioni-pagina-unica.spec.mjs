@@ -158,7 +158,7 @@ test('i campi di Automazioni tengono il loro stile, e il Red Team non si stira s
   expect(m.sopra).toBe(0);
   await page.screenshot({ path: 'tests/.shots/1110-campi.png' });
 
-  await page.locator('.mg-tab[data-tab="stats"]').click();
+  await apriScheda(page, 'stats');
   const rt = await page.evaluate(() => document.querySelector('#mgRtRoot .mg-auto-block').getBoundingClientRect().width);
   expect(rt).toBeLessThanOrEqual(660);
 });
