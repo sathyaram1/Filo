@@ -1,6 +1,7 @@
 // Sentinella: il biglietto a mano (`--ticket <codice>` o `--ticket=<codice>`) vale in qualunque posizione e in
 // ogni comando che usa un biglietto, con la stessa regola: sostituisce, conferma o si rifiuta, mai ignorato.
 // Il contratto dei worker dice «ripeti aggiungendo --ticket» (#724.1, #545, #587).
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

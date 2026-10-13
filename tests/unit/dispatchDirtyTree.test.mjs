@@ -2,6 +2,7 @@
 // file che il salvataggio automatico committerebbe DOPO, la registrazione
 // rifiuta prima (#256: le spec temporanee tolte tredici secondi dopo il pass
 // spostavano la punta, e il cancello respingeva il lavoro per due giorni).
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

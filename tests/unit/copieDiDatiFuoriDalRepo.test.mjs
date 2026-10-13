@@ -2,6 +2,7 @@
 // Il 02/07/2026 una copia di lavoro di 300 feedback (testi, user agent, identificativi) è stata committata e spedita
 // dal salvataggio automatico: tolta dall'albero, resta nella storia. La forma la riconosce scripts/lib/copie-di-dati.mjs.
 
+import '../helpers/senzaSessione.mjs';
 import { test, describe, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

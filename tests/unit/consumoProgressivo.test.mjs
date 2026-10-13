@@ -1,6 +1,7 @@
 // Lettore progressivo del consumo (scripts/lib/consumo-progressivo.mjs) e campi dei crediti nel battito
 // (routine-channel.mjs misureCrediti/heartbeat), su transcript finti in una cartella temporanea.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, truncateSync, writeFileSync } from 'node:fs';

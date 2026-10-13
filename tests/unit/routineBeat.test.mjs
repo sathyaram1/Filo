@@ -14,6 +14,7 @@
 //   difetto è esistito, perché quella funzione non si era mai rotta: mancava
 //   chi la chiamava.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

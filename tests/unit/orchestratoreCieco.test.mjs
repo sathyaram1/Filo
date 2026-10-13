@@ -1,6 +1,7 @@
 // L'orchestratore delle routine è cieco: il testo dei worker non gli arriva, un worker in sottofondo non parte,
 // modello e sforzo del worker sono quelli decisi dal server, e niente di questo vive in un file che il ramo del worker può cambiare.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
