@@ -23,7 +23,9 @@ const bloccoPopup = (app, acceso) => app.evaluate(({ BrowserWindow }, a) => {
   BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.security.blockPopups = a;
 }, acceso);
 
-const quante = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+// Le finestre che una pagina può far nascere: quelle di Filo no, e il menu a comparsa nasce da solo dopo l'avvio (#1090).
+const quante = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+  .filter((w) => !w.isDestroyed() && !/^(filo|data):/.test(w.webContents.getURL())).length);
 
 const finestrelle = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
   .filter((w) => !w._filoTabs && !w.isDestroyed() && /^(https?|about):/.test(w.webContents.getURL()))
