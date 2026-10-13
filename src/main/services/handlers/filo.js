@@ -557,14 +557,12 @@ module.exports = function register(on, ctx) {
   })));
   on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
 
-  // F4 — Annulla un auto-feedback appena inviato (undo dal toast).
-  // Marca il feedback come `ignored` via updateStatus. Usa l'ID token admin se
-  // disponibile (l'utente è loggato come owner); se non loggato l'undo non può
-  // scrivere su Firestore (le rules richiedono admin per update) — non è un errore
-  // fatale: l'auto-feedback rimane in stato `new` ma finisce solo nell'Agente tab.
-  on(MSG.CANCEL_AUTO_FEEDBACK, async (msg) => {
+  // F4 — «Annulla» del toast: scrive `ignored` con le credenziali di chi è dentro, quindi la chiede solo la shell,
+  // e solo per un auto-feedback partito da qui (#784.3). Senza la sessione dell'owner le regole rifiutano: resta `new`.
+  on(MSG.CANCEL_AUTO_FEEDBACK, soloSuperficiDiFilo(async (msg) => {
     const id = String(msg && msg.id || '').trim();
     if (!id) return { ok: false, error: 'id mancante' };
+    if (!autoFeedbackAnnullabili.has(id)) return { ok: false, error: 'non è una segnalazione partita da qui' };
     const FB = globalThis.SN_FEEDBACK;
     if (!FB || typeof FB.updateStatus !== 'function') return { ok: false, error: 'FB non disponibile' };
     try {
