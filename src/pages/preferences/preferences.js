@@ -427,7 +427,7 @@
       input.step = String(m.step);
       input.spellcheck = false;
       input.autocomplete = 'off';
-      input.setAttribute('aria-label', `${m.label} (${m.min}–${m.max})`);
+      input.setAttribute('aria-label', `${m.label} (${cifre(m.min)}–${cifre(m.max)})`);
       input.addEventListener('input', (e) => onTabColorInput(m.key, e));
       input.addEventListener('blur', () => {
         if (!tabColDaSalvare.has(m.key)) tabColInCorso.delete(m.key);
