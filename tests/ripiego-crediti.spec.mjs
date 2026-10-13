@@ -91,6 +91,13 @@ test.beforeAll(async () => {
         const last = msgs[msgs.length - 1] || {};
         seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
         const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? personalKeyStatus : 401);
+        // In streaming OpenRouter apre subito la risposta e la tiene viva con dei commenti finché il modello non
+        // scrive: il ritardo sta nel corpo, a ripiego già avvenuto. Senza streaming la risposta arriva tutta alla fine.
+        const aperta = body.stream === true && status === 200;
+        if (aperta) {
+          res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          res.write(': OPENROUTER PROCESSING\n\n');
+        }
         if (personalDelayMs && bearer === PERSONAL_KEY) await new Promise((r) => setTimeout(r, personalDelayMs));
         // Il 403 è quello della moderazione, come lo scrive OpenRouter: non è la chiave.
         if (status === 403) return json(res, 403, { error: { message: 'Your chosen model requires moderation and your input was flagged', code: 403, metadata: { reasons: ['x'], flagged_input: '…' } } });
