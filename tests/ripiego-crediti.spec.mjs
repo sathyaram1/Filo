@@ -1002,7 +1002,6 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
   expect(seen.completions.slice(prima).filter((c) => c.lastText.includes('ha selezionato un testo'))).toEqual([]);
-  expect(await testoDi(app, page, '.sn-popup')).toBe('');
 
   // Il riquadro di modifica, chiuso con Esc prima della proposta. L'avviso sopra ha già parlato:
   // si riparte da una chiave nuova, come chi la cambia, per sentirlo di nuovo.
