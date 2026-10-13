@@ -84,8 +84,22 @@ function canonicoVero(p) {
 }
 
 /**
+ * Le cartelle temporanee di Claude Code per i progetti `radici` (`<tmp>/claude[-uid]/<progetto>`): ci tiene le uscite
+ * dei comandi in sottofondo e gli appunti, e leggerle è leggere la shell, che non sporca. PURA.
+ */
+export function cartelleTemporaneeDiClaude(radici, { env = {}, tmp = [], uid = null, win = false } = {}) {
+  const P = win ? path.win32 : path.posix;
+  const basi = [String(env.CLAUDE_CODE_TMPDIR || '').trim(), ...tmp].filter(Boolean);
+  const nomi = Number.isInteger(uid) ? [`claude-${uid}`, 'claude'] : ['claude'];
+  // Il nome della cartella del progetto è il suo percorso con ogni carattere che non è lettera o cifra cambiato in «-».
+  const progetti = [...new Set(radici.filter(Boolean).map((r) => P.resolve(r).replace(/[^A-Za-z0-9]/g, '-')))];
+  return [...new Set(basi.flatMap((b) => nomi.flatMap((n) => progetti.map((p) => P.join(P.resolve(b), n, p)))))];
+}
+
+/**
  * Dove si legge senza sporcarsi: il repo (anche da una sua worktree, e la cartella del progetto), il checkout del
- * server accanto, la cartella di Claude dell'utente; e LOCAL.md sopra il repo, che la sessione locale deve leggere.
+ * server accanto, la cartella di Claude dell'utente e quella temporanea del progetto; e LOCAL.md sopra il repo, che la
+ * sessione locale deve leggere.
  */
 export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform } = {}) {
   const win = sistema === 'win32';
@@ -94,7 +108,10 @@ export function contestoLettura({ cwd = process.cwd(), env = process.env, sistem
   const radici = [B.radiceRepo(cwd), comune, String(env.CLAUDE_PROJECT_DIR || '').trim()].filter(Boolean);
   const server = comune ? cartellaDelServer(comune) : '';
   const claude = [P.join(homedir(), '.claude'), String(env.CLAUDE_CONFIG_DIR || '').trim()].filter(Boolean);
-  const cartelle = [...radici, ...(server ? [P.dirname(server)] : []), ...claude].map((c) => canonicoVero(P.resolve(c)));
+  const uid = typeof process.getuid === 'function' ? process.getuid() : null;
+  const tmp = [...new Set([tmpdir(), ...(win ? [] : ['/tmp'])])];
+  const temporanee = cartelleTemporaneeDiClaude(radici, { env, tmp, uid, win });
+  const cartelle = [...radici, ...(server ? [P.dirname(server)] : []), ...claude, ...temporanee].map((c) => canonicoVero(P.resolve(c)));
   const file = radici.map((r) => canonicoVero(P.join(P.dirname(P.resolve(r)), 'LOCAL.md')));
   return { cwd, win, cartelle: [...new Set(cartelle)], file: [...new Set(file)], canonico: canonicoVero };
 }
