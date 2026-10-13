@@ -1216,6 +1216,11 @@
   // Una voce del menu di Filo non usa il gesto della pagina (è di Filo): l'indirizzo scelto lo dichiara prima (#737.1).
   function apriInSchedaNuova(url) {
     if (!url) return;
+    // Questi Chromium li rifiuta a una pagina senza dire niente: li ferma il main, che lo dice (#482).
+    if (/^(?:file|data|javascript|vbscript):/i.test(String(url).trim())) {
+      chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB, url: String(url) }).catch(() => {});
+      return;
+    }
     try { if (typeof global.SN_APERTURA_SCELTA === 'function') global.SN_APERTURA_SCELTA(url); } catch (_) {}
     window.open(url, '_blank', 'noopener');
   }
