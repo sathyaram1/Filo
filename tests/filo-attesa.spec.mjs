@@ -46,7 +46,8 @@ async function configureModel(app) {
 }
 
 // Un modello finto a copione. Ogni passo: { pensa: [pezzi], ogni: ms, strumenti: [{id,name,arguments}],
-// dopoStrumenti: ms, testo, sordo }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti e gli stop.
+// dopoStrumenti: ms, finoAlFermo, testo, sordo }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti
+// e gli stop. `finoAlFermo`: la chiamata degli strumenti resta a metà finché lo stop non la interrompe.
 async function copione(app, passi) {
   await app.evaluate(async (_, passiJson) => {
     const passi = JSON.parse(passiJson);
@@ -73,7 +74,7 @@ async function copione(app, passi) {
       }
       if (p.strumenti && p.strumenti.length) {
         for (const s of p.strumenti) { try { onToolCall && onToolCall({ id: s.id, name: s.name }); } catch (_) {} }
-        await aspetta(p.dopoStrumenti || 200);
+        await aspetta(p.finoAlFermo ? 2 ** 31 - 1 : (p.dopoStrumenti || 200));
         return { ...base, text: '', toolCalls: p.strumenti, finishReason: 'tool_calls' };
       }
       const testo = p.testo || 'Fatto.';
@@ -607,13 +608,14 @@ test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il 
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
   await ricercaPartita(app);
   await page.locator('#stopBtn').click();
-  await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
-  // La chat è di nuovo dell'utente con la ricerca ancora in volo, non a ricerca finita.
-  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 1_000 });
+  // La chat è di nuovo dell'utente con la ricerca ancora in volo, non a ricerca finita: la ricerca è trattenuta, quindi
+  // «prima della fine» lo garantisce lei e non serve un tetto di un secondo, che su una macchina carica scade.
+  await expect(blocco).toHaveAttribute('data-fermato', '1');
+  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.');
   await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
   await page.locator('#input').fill('lascia stare, che tempo fa?');
   await page.locator('#input').press('Enter');
-  await expect(page.locator('.dash-bubble-user')).toHaveCount(2, { timeout: 1_000 });
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(2);
   // Il seguito sta sotto la riga del fermo, e il modello parte solo dopo che la ricerca in volo è finita e raccontata.
   const ordine = await page.evaluate(() => [...document.querySelectorAll('.dash-bubble-fermato, .dash-bubble-user')].map((e) => (e.classList.contains('dash-bubble-user') ? 'utente' : 'fermo')));
   expect(ordine).toEqual(['utente', 'fermo', 'utente']);
@@ -663,8 +665,8 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   await ripristina(app);
 });
 
-// L'altro lato di L2 (#814.2): il titolo c'è ma il modello sta ancora scrivendo la chiamata. Il fermo la annulla, e
-// «riprendi» lascia il modello libero di cercare: la ricerca si fa una volta, dopo, e non risulta fatta prima.
+// L'altro lato di L2 (#814.2): il modello scrive ancora la chiamata, trattenuta fino al fermo (non a orologio), che la
+// annulla; «riprendi» lascia il modello libero di cercare: la ricerca si fa una volta, dopo, e non risulta fatta prima.
 test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «riprendi» la fa, una volta', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -672,7 +674,7 @@ test('L3 — fermato quando la ricerca è nominata ma non ancora partita: «ripr
   await configureModel(app);
   await ricercaLenta(app, 300);
   await copione(app, [
-    { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 3_000, strumenti: [{ id: 'n1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
+    { pensa: ['Cerco gli orari. '], ogni: 100, finoAlFermo: true, strumenti: [{ id: 'n1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['Riprendo: cerco. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'n2', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
     { pensa: ['Ho gli orari. '], ogni: 100, testo: 'Ecco gli orari.' },
   ]);
