@@ -176,10 +176,21 @@ try {
 // fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
 // i dati che l'handler legge, così il menu si apre sull'elemento giusto.
 function replayContextMenu(e, clic) {
+  const copy = fotografaClic(e);
+  const deadline = Date.now() + 3000;
+  const tick = () => {
+    if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
+    if (globalThis.__snFiloSpento === true || Date.now() > deadline) { menuDiRiserva(clic); return; }
+    setTimeout(tick, 16);
+  };
+  setTimeout(tick, 16);
+}
+
+function fotografaClic(e) {
   let node = null;
   try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
   catch (_) { node = e.target; }
-  const copy = {
+  return {
     target: node,
     currentTarget: node,
     clientX: e.clientX, clientY: e.clientY,
