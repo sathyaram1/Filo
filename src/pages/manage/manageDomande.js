@@ -127,6 +127,11 @@
     const o = conOra ? { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short' };
     try { return new Date(n).toLocaleString('it-IT', o); } catch (_) { return ''; }
   }
+  // «l’11 ott», «il 12 ott»: l'articolo segue il numero.
+  function ilGiorno(ms) {
+    const t = quando(ms, true);
+    return /^(1|8|11)\D/.test(t) ? `l’${t}` : `il ${t}`;
+  }
   function idDi(d) { return d.id || (Number.isInteger(d.numero) ? D.idDi(d.numero) : ''); }
   function chiaveDi(b) { return `${b.priorita}|${String(b.gruppo || '').toLocaleLowerCase('it')}`; }
 
@@ -390,13 +395,13 @@
     let testo = '';
     let tipo = '';
     if (d.stato === 'superata') testo = 'Superata da un’altra domanda.';
-    else if (e && e.archiviata) testo = `Archiviata senza azioni${e.applicataIl ? ` il ${quando(e.applicataIl, true)}` : ''}.`;
+    else if (e && e.archiviata) testo = `Archiviata senza azioni${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
     else if (e && e.automatica) testo = 'Risposta automatica.';
     else if (e && e.ok === false && e.errore === 'in_corso') testo = 'Risposta in corso sul server…';
     else if (e && e.ok === false) { testo = 'L’ultima risposta non è stata applicata: il motivo è nella conversazione.'; tipo = 'err'; }
-    else if (d.stato === 'in_lavorazione') testo = e && e.compito && e.compito.da ? `Affidata a un agente il ${quando(e.compito.da, true)}.` : 'Affidata a un agente.';
+    else if (d.stato === 'in_lavorazione') testo = e && e.compito && e.compito.da ? `Affidata a un agente ${ilGiorno(e.compito.da)}.` : 'Affidata a un agente.';
     // Una domanda riaperta da un chiarimento può portarsi dietro l'esito di prima: «fatto» solo se è chiusa.
-    else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` il ${quando(e.applicataIl, true)}` : ''}.`;
+    else if (e && e.ok && d.stato === 'chiusa') testo = `Fatto${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
     if (!testo) return null;
     return el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
   }
