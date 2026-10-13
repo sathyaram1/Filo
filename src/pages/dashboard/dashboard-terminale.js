@@ -156,7 +156,7 @@
   }
 
   // #968 — un testo appena incollato (o trascinato) nella barra finisce in `fine`: se nel comando è un percorso
-  // intero che esiste e con gli spazi si spezzerebbe, prende le virgolette adesso, prima dell'Invio. Ctrl+Z le toglie.
+  // intero che esiste e con gli spazi si spezzerebbe, prende le virgolette adesso, prima dell'Invio. Annullando si tolgono.
   async function virgoletteSuInserito(testo, fine) {
     const V = global.SN_VIRGOLETTE;
     if (!terminalMode || !inputEl || typeof testo !== 'string' || !V || !V.forseDaQuotare(testo)) return;
@@ -238,7 +238,7 @@
       const y = e.type === 'contextmenu' && e.clientY ? e.clientY : rect.bottom;
       const voci = [];
       if (!esegui.disabled) voci.push(['Esegui', lancia]);
-      voci.push(['Modifica nella barra', nellaBarra], ['Copia il comando', copia]);
+      voci.push(['Modifica prima di eseguire', nellaBarra], ['Copia il comando', copia]);
       M.menu(x, y, voci, { ancora: esegui });
     };
     riga.addEventListener('contextmenu', menu);

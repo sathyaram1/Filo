@@ -162,7 +162,7 @@ test('#968: un comando fallito per le virgolette mancanti propone la versione gi
   await proposta.click({ button: 'right' });
   await expect(page.locator('.sn-rinomina-menu')).toBeVisible();
   await page.screenshot({ path: 'tests/.shots/968-proposta-menu.png' }).catch(() => {});
-  await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Modifica nella barra' }).click();
+  await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Modifica prima di eseguire' }).click();
   await expect(input).toHaveValue('/cd "Nome Cognome"');
   await expect(page.locator('.dash-term-cmd')).toHaveCount(3);
   await input.fill('');
