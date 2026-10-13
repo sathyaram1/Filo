@@ -1668,7 +1668,7 @@
         // Testo letto da un file, dato come percorso, può portare in rete (#1072).
         if (!noto && PERCORSO_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
         // Un nome dal tubo si risolve contro la cartella di lavoro: in rete lo riceve il remoto (#1072.4).
-        if (i > 0 && PERCORSO_DAL_TUBO.has(progs[i]) && cp.cwd && cp.cwd.rete) det = peggiore(det, due(MOTIVI.rete));
+        if (i > 0 && (PERCORSO_DAL_TUBO.has(progs[i]) || CERCANO_NOME.has(progs[i])) && cp.cwd && cp.cwd.rete) det = peggiore(det, due(MOTIVI.rete));
         // Join-Path/Split-Path sul valore del tubo compongono ciò che nessun argomento scrive (`'\\' | Join-Path`):
         // chi lo riceve come percorso chiede (noto), e Join-Path -Resolve lo apre da sé.
         if (i > 0 && progs[i] === 'join-path' && argomenti(p, c.win).some((a) => parametro(a.testo, 'resolve', 1))) det = peggiore(det, due(MOTIVI.ignoto));
