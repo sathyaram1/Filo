@@ -31,7 +31,7 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parolaDellaCostruzione } from './build-alarm.mjs';
+import { parolaDellaCostruzione, DOVE_VA_LA_PAROLA } from './build-alarm.mjs';
 
 // Dove vive il server. `FILO_ROUTINE_API` esiste per i test e per un eventuale
 // ambiente di prova: NON è un segreto, è solo un indirizzo.
