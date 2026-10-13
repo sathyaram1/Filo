@@ -65,6 +65,13 @@ try {
   process.exit(0);
 }
 
+// Un pacchetto rimasto indietro rispetto al lock non si ripara col binario: «già pronto» qui sarebbe falso.
+const delLock = electronDelLock(ROOT);
+if (!delLock.ok && delLock.pacchetto !== delLock.lock) {
+  log(delLock.motivo);
+  process.exit(1);
+}
+
 function isInstalled() {
   try {
     if (readFileSync(join(DIST, 'version'), 'utf8').replace(/^v/, '') !== version) return false;
