@@ -95,6 +95,7 @@ const STATE = {
   copiaTimer: null,
   genCopia: 0,
   copiaSuDisco: 0,
+  pulizia: null,
 };
 
 // Una chiave che qualcuno osserva in scrittura non si presta mai viva, né in lettura né in scrittura: chi muta
