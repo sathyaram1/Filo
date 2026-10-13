@@ -1,4 +1,4 @@
-// #1201 giro 1 — porta r1: l'etichetta segue il puntatore anche quando l'uscita dalla barra si perde, a barra aperta da tastiera delle icone della barra laterale.
+// #1201 giro 1 — porta r1: l'etichetta segue il puntatore anche quando l'uscita dalla barra si perde, a barra aperta da tastiera.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi } from '../../helpers/barra.mjs';
 

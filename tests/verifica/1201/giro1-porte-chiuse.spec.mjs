@@ -87,7 +87,6 @@ test('etichetta allineata all\'icona, a destra del pannello', async ({ app, open
   const p = await barra.locator('#pannello').boundingBox();
   const centroIco = misure.cb.y + misure.vista.y + r.y + r.height / 2;
   const centroTip = misure.tip.y + misure.tip.height / 2;
-  console.log(JSON.stringify({ misure, r, p, centroIco, centroTip }));
   expect(Math.abs(centroIco - centroTip)).toBeLessThan(6);
   expect(misure.tip.x).toBeGreaterThanOrEqual(misure.cb.x + misure.vista.x + p.x + p.width);
 });
