@@ -101,8 +101,15 @@ test('l’owner senza accesso aspetta invece di partire da utente, e parte con l
   await expect(vista.locator('.shell-notif-msg', { hasText: 'aspetta il tuo accesso' }).first()).toBeVisible({ timeout: 15_000 });
   expect((await banco$(app)).inviati).toEqual([]);
 
-  await app.evaluate((_e, t) => { globalThis.__banco.token = t; }, TOKEN);
-  await expect.poll(async () => (await banco$(app)).inviati.length, { timeout: 60_000 }).toBe(1);
+  const rientro = await app.evaluate(async (_e, t) => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const ga = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'))('./auth/google-auth');
+    ga.signIn = async () => { globalThis.__banco.token = t; return { email: 'owner@example.invalid', name: 'Owner' }; };
+    return globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.AUTH_SIGNIN }, { url: 'filo://newtab/' });
+  }, TOKEN);
+  expect(rientro.ok, JSON.stringify(rientro)).toBe(true);
+  await expect.poll(async () => (await banco$(app)).inviati.length).toBe(1);
   const b = await banco$(app);
   expect(b.inviati[0].clientId).toBe('owner:abc123');
   expect(b.inviati[0].opts).toEqual({ idToken: TOKEN, soloAdmin: true });
