@@ -4989,6 +4989,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // al modello al turno dopo.
     notes, reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
+    ...(senzaRisposta ? { senzaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
     ...(keyFallback ? { keyFallback } : {}),
