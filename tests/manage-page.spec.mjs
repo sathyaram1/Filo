@@ -2634,6 +2634,7 @@ test('il testo delle istruzioni di correzione oltre il tetto non viene salvato m
   const fix = page.locator('#mgFixInstructions');
   await expect(fix).toHaveValue('PRIMA');
   const max = await page.evaluate(() => window.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX);
+  const it = (n) => n.toLocaleString('it-IT', { useGrouping: true }).replace('.', '\\.');
   await fix.fill('x'.repeat(max + 1));
   await page.locator('#mgFixInstructionsSave').click();
   await expect(page.locator('#mgFixInstructionsMsg')).toHaveText(new RegExp(`Troppo lungo: ${it(max + 1)} caratteri, il massimo è ${it(max)}`));
