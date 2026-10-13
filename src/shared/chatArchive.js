@@ -394,7 +394,7 @@
       const linkDaConfermare = (Array.isArray(turn.linkDaConfermare) ? turn.linkDaConfermare : [])
         .filter((x) => x && typeof x.url === 'string' && x.url)
         .slice(0, 200)
-        .map((x) => ({ url: x.url.slice(0, 8192), motivo: String(x.motivo || '').slice(0, 200) }));
+        .map((x) => ({ url: x.url, motivo: String(x.motivo || '').slice(0, 200) }));
       if (linkDaConfermare.length) out.linkDaConfermare = linkDaConfermare;
     }
     return out;
