@@ -33,8 +33,7 @@ export function verdettoMotore({ atteso, pacchetto, binario, scelto = false }) {
 /** Il motore che userebbe una corsa lanciata da `radice` (la cartella di playwright.config.js). */
 export function motoreDelleProve({ radice = RADICE, env = process.env } = {}) {
   const atteso = electronDelLock(leggi(join(radice, 'package-lock.json')));
-  let cartella = null;
-  try { cartella = dirname(createRequire(join(radice, 'package.json')).resolve('electron/package.json')); } catch (_) {}
+  const cartella = cartellaElectron(radice);
   const override = String(env.ELECTRON_OVERRIDE_DIST_PATH || '').trim();
   let pacchetto = null;
   if (cartella && !override) {
