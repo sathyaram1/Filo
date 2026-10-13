@@ -710,6 +710,6 @@
 
   global.SN_URL_EXFIL = {
     assess, valutaNaviga, valutaRicerca, contestoDaAzioni, valutaUscita, testoUscente, lettiNelTesto, USCITE, USCITE_PAGINA, verboUscita,
-    taint, taintLetto, taintTestoLetto, structural, exposedAlnum, corpusTokens,
+    taint, taintLetto, taintTestoLetto, taintScritto, structural, exposedAlnum, corpusTokens,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
