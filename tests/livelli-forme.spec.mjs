@@ -296,7 +296,7 @@ test('domande nelle sole note: rombo verde, e dentro ci sono le domande', async 
   await apri(page, [fb]);
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
 
-  await expect(page.locator('#mgClarify')).toBeVisible();
+  await expect(page.locator('#mgSideRispostaText')).toBeVisible();
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
   await expect(rombo).toHaveClass(/mg-forma--design/);
   await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
@@ -370,7 +370,7 @@ test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di ris
   expect(await card.getAttribute('title')).toMatch(/aspetta una tua scelta/);
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
 
-  await expect(page.locator('#mgClarify')).toBeVisible();
+  await expect(page.locator('#mgSideRispostaText')).toBeVisible();
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
   await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
   expect(await rombo.getAttribute('title')).toBe('Domande e segnalazione di Claude');
@@ -563,8 +563,9 @@ async function stringiPannello(page) {
 }
 
 // Con un font più largo di Segoe UI «Approva e fondi» non stava accanto a Scarta e andava a capo: armato,
-// «Confermi?» ci stava in una riga e il tasto si abbassava di una riga (#256.3).
-test('fusione: se i tasti non stanno affiancati va a capo la fila, non la scritta di Approva', async ({ openTab }) => {
+// «Confermi?» ci stava in una riga e il tasto si abbassava di una riga (#256.3); coi caratteri di Linux succedeva
+// alla larghezza normale del pannello (#933.1).
+test('fusione: se i tasti non stanno affiancati va a capo la fila, non la scritta di Approva, e il secondo clic approva', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
   await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
@@ -581,6 +582,17 @@ test('fusione: se i tasti non stanno affiancati va a capo la fila, non la scritt
   });
   expect(await righeDi(go)).toBe(1);
   expect(await righeDi(corpo.locator('.sn-mac-btn-quiet'))).toBe(1);
+
+  const prima = await go.boundingBox();
+  // Verso il fondo del tasto: è la parte che un tasto armato più basso non copre più.
+  const punto = { x: prima.x + prima.width / 2, y: prima.y + prima.height - 6 };
+  await page.mouse.click(punto.x, punto.y);
+  await expect(go).toHaveText('Confermi?');
+  const armato = await go.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(armato[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+  expect(await page.evaluate(() => window.__chiamate)).toEqual([]);
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
 });
 
 // Il pannello di destra si stringe fino a 180px: lì «Approva e fondi» va su due righe per forza, e il tasto

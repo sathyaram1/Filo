@@ -11,7 +11,9 @@
     {
       version: '0.2.238', date: '2026-10-07',
       features: [
+        'L\'accesso a Filo con Google adesso si fa in una scheda di Filo. Appena hai scelto l\'account la scheda si chiude da sola, e YouTube, Gmail e Drive nelle schede sono già collegati allo stesso account, senza un secondo accesso. Se eri già entrato in Filo, nel menu dell\'account trovi «Collega anche i prodotti Google». Uscire da Filo non ti fa uscire da Google nelle schede. Se Google non accetta l\'accesso dentro Filo, Filo lo apre nel browser come prima e te lo dice. In Privacy massima Google e YouTube tengono i cookie nello stesso spazio, e dopo l\'accesso Google entra fra i siti fidati, così resti collegato.',
         'Chiedi a Filo un tuo documento descrivendolo, anche a voce: «mi serve la bolletta della luce di marzo». Lo trova leggendo il contenuto dei file in Documenti, Download e Scrivania, anche se si chiama «scan_00231.pdf», e ti risponde col file da aprire con un clic. Le cartelle si cambiano in Preferenze, e il testo dei documenti resta sul tuo computer.',
+        'Il documento lo trova anche l\'Aiuto di una scheda, mentre compili un modulo su un sito: chiedigli la bolletta, dai l\'OK, e trascina il file che ti propone nel campo per caricarlo.',
         'Filo legge anche i documenti Word (.docx) e LibreOffice (.odt), oltre ai PDF e ai file di testo.',
         'Filo ricorda quello che vi siete detti negli ultimi giorni anche in una scheda nuova. Se ieri gli hai detto che hai l\'esame, oggi lo sa senza che tu lo ripeta. Quando chiedi qualcosa di più vecchio ritrova da solo il pezzo di conversazione che serve, e nel blocco di attività vedi quale. Puoi chiedergli anche le pagine che hai visitato, per esempio «quella pagina sulle orche che ho chiuso ieri», e te la riapre. Quanti giorni ricorda lo scegli in Preferenze, Impostazioni avanzate.',
         'Su Windows e Linux, quando una versione nuova di Filo è pronta te lo dice un avviso in basso a destra, e nella home resta una carta con «Riavvia e aggiorna» finché non la installi. Puoi anche scrivere a Filo «aggiornati». Su Windows, se non lo premi, la versione nuova si installa la prossima volta che apri Filo: vedi la barra di avanzamento per una decina di secondi e poi Filo si riapre da solo. Prima si installava di nascosto quando lo chiudevi, e se lo riaprivi in quel momento Windows diceva che il collegamento non funzionava. Chi preferisce il modo di prima lo rimette in Preferenze, Impostazioni avanzate.',
@@ -24,8 +26,11 @@
         'Nella stessa pagina c\'è un campo per cercare fra le voci copiate: con la cronologia piena trovi subito quella da togliere, senza scorrerle tutte.',
         'Cliccando una voce della cronologia la rimetti negli appunti, pronta da incollare dove vuoi.',
         'Nella cronologia del menu "Incolla" le immagini copiate si vedono in miniatura: due schermate copiate una dietro l\'altra non si leggono più tutte e due "Immagine".',
+        'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
       ],
       fixes: [
+        'Dopo aver letto un documento o una pagina, Filo non apre più senza chiedertelo un link che contiene un dato che gli hai scritto in chat, come il numero di telefono, l\'indirizzo di casa o una password. Vale anche per i link che scrive nelle risposte e nei suggerimenti della home, quando li clicchi. Ti mostra l\'indirizzo intero e decidi tu. Se il dato sta nella richiesta che hai appena fatto, il link si apre subito.',
+        'Su Windows, in fondo alla home, quando sei collegato al Wi-Fi vedi l\'icona del Wi-Fi col nome della rete. Prima mostrava un globo anche col Wi-Fi collegato.',
         'Filo vede ancora le foto che gli mandi in chat anche nei messaggi dopo, e puoi continuare a chiedergli di quello che c\'è dentro; riaprendo la chat le ritrovi anche tu. Prima dal secondo messaggio diceva di non vederle. Dopo una ventina di messaggi, o se riapri Filo, non le ha più davanti, ma sa che c\'erano e ti chiede di rimandarle se gli servono.',
         'Lettura ad alta voce e dettatura partono solo se Filo ammette tutti i fornitori che servono il modello. Prima ne bastava uno, e la tua voce poteva finire a quello escluso. Con un modello così Filo ti dice perché non parte, e lo vedi già quando lo scegli, nelle Opzioni o da «Detta» col tasto destro.',
         'Mentre scorri o scrivi in una pagina, Filo non ridisegna più la barra delle schede e non risalva i suoi dati a ogni movimento. Menu e chat rispondono senza scatti e la batteria dura di più.',
@@ -74,6 +79,11 @@
         'Togliendo le voci della cronologia appunti con la tastiera il fuoco resta sulla lista, pronto per la voce dopo, anche se il mouse è fermo sopra le righe. Prima in quel caso tornava all\'inizio della pagina e per ogni voce bisognava riattraversare tutte le impostazioni col tabulatore.',
         'Le finestrelle di accesso, come quella di «Accedi con Google», hanno nel titolo il sito vero, e la pagina non può cambiarlo. Un sito non le apre più da solo. Senza un tuo clic la pagina chiesta si apre in una scheda, con l\'indirizzo in vista, oppure resta ferma se hai il blocco dei popup acceso.',
         'Nella chat dell\'editor la casella dove scrivi si allunga finché la domanda si legge tutta, anche con i caratteri più larghi di Linux. Prima si fermava a quattro righe e il testo scorreva dentro, con mezza chat vuota sopra.',
+        'Quando chiedi a Filo di cambiare il limite di spesa mensile, la conferma scrive l\'importo all\'italiana: «2.500,50 €», non più «2500.50€».',
+        'Su un sito il popup con cui Filo ti chiede conferma adesso compare sopra la pagina, dove il codice del sito non arriva. Una pagina scritta apposta non può più renderlo invisibile e mostrarti al suo posto un popup finto con un altro testo. Quello che leggi è quello che confermi.',
+        'Anche la proposta di aprire una pagina da un altro paese compare sopra la pagina: il sito non può nasconderla né rispondere al posto tuo.',
+        'Quando Filo propone di attivare i cookie di un contenuto incorporato, il «Sì» si conferma in un popup sopra la pagina. Un sito non può farti attivare i cookie mentre credi di rispondere a un\'altra domanda.',
+        'Quando correggi una parola, le sottolineature delle altre parole restano al loro posto. Prima le blu sparivano per qualche istante mentre Filo ricontrollava il testo, e le rosse dopo ogni correzione scelta col tasto destro. Una correzione presa dal menu adesso si annulla con Ctrl+Z (Cmd+Z su Mac).',
       ],
     },
     {

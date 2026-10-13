@@ -43,3 +43,19 @@ test('con useGrouping il motore scrive 4.990, senza no', () => {
   assert.equal(new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2 }).format(1234.5), '1.234,50');
   assert.equal((999).toLocaleString('it-IT', { useGrouping: true }), '999');
 });
+
+test('quello che legge l\'utente: tetto in token e limite di spesa col punto delle migliaia, i centesimi con la virgola', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  globalThis.self = globalThis;
+  for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'filoMemory', 'preferences', 'cambi']) {
+    require(`../../src/shared/${m}.js`);
+  }
+  const P = globalThis.SN_PREF;
+  const K = globalThis.SN_CAMBI;
+  assert.equal(P.buildPreferencePartial('token_ricordati', '4000').label, 'Tetto in token della chat → 4.000');
+  assert.equal(P.buildPreferencePartial('limite_spesa', '2.500,50 euro').label, 'Limite di spesa mensile → 2.500,50 €');
+  assert.equal(P.buildPreferencePartial('limite_spesa', '1500').label, 'Limite di spesa mensile → 1.500 €');
+  assert.equal(K.fraseCambio({ chiave: 'contestoFilo.token', prima: 2000, dopo: 4000 }), 'tetto in token di quello che la chat ricorda: 2.000 token → 4.000 token');
+  assert.equal(K.fraseCambio({ chiave: 'monthlyLimitEur', prima: 5, dopo: 2500.5 }), 'limite di spesa mensile: 5 € → 2.500,50 €');
+});

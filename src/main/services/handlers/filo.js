@@ -28,6 +28,8 @@ module.exports = function register(on, ctx) {
   // scritto da lui può uscire (#810).
   const paroleDa = (msg) => (Array.isArray(msg && msg.parole) ? msg.parole : [])
     .filter((x) => typeof x === 'string').join('\n').slice(-200000);
+  // L'ultima è la richiesta di adesso: i dati che porta possono uscire, quelli detti prima chiedono l'OK (#868.6).
+  const domandaDa = (msg) => (Array.isArray(msg && msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').slice(-1).join('');
 
   // #525 — «l'elenco delle chat è cambiato». Lo ascolta la Cronologia aperta.
   const annunciaChat = () => {
@@ -75,7 +77,7 @@ module.exports = function register(on, ctx) {
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg) });
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg), domanda: domandaDa(msg) });
     if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
@@ -107,7 +109,7 @@ module.exports = function register(on, ctx) {
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
-    const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg) });
+    const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg), domanda: domandaDa(msg) });
     if (r && r.output) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     return { ok: true, ...r };
   });
@@ -122,6 +124,7 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     const r = await apriDaFilo(url, {
       wc: sender?.wc, parole: paroleDa(msg), avvisa: false, apri: () => { if (win?._filoTabs) win._filoTabs.openTab(url); },
+      chiedi: typeof msg.chiedi === 'string' ? msg.chiedi : '', confermato: msg.confermato === true,
     });
     return { ok: true, ...r };
   });
@@ -136,7 +139,7 @@ module.exports = function register(on, ctx) {
     let pagina = '';
     try { pagina = sender?.wc ? String(sender.wc.getURL() || '') : ''; } catch (_) {}
     const r = await apriDaFilo(url, {
-      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato,
+      wc: sender?.wc, parole: paroleDa(msg), avvisa: avvisato, confermato: msg.confermato === true,
       apri: () => { if (tm) tm.apriDaCollegamento(url, { fromUrl: pagina, sfondo: !!(msg && msg.sfondo) }); },
     });
     return { ok: true, ...r, avvisato };

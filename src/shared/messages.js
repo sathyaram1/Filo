@@ -345,6 +345,24 @@
     DOCUMENTI_STATO: 'documenti_stato',
     // {} → { ok, percorso } | { ok:false } (annullata)
     DOCUMENTI_SCEGLI_CARTELLA: 'documenti_scegli_cartella',
+    // #947.3 — toglie dall'indice una cartella cercata per l'occasione (Preferenze). Solo da Filo.
+    // { percorso } → { ok, tolta, documenti }
+    DOCUMENTI_DIMENTICA: 'documenti_dimentica',
+    // #947.3 — l'Aiuto di una scheda cerca fra i documenti. APERTI AI SITI, perché l'Aiuto vive nella pagina: su un sito
+    // la ricerca parte solo dopo il sì nella vista di Filo sopra la scheda (confermeSopraPagina), e alla pagina tornano
+    // nomi, cartelle dette coi nomi di Filo e chiavi a caso, mai percorsi. Le chiavi valgono solo per la scheda che ha
+    // cercato. Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
+    // { cosa, cartella? } → { ok, cercato, candidati: [{ n, nome, dove, tipo, data, chiave }], indice, fermata } | { ok:false, annullata }
+    AIUTO_CERCA_DOCUMENTI: 'aiuto_cerca_documenti',
+    // {} → { ok }: ferma la lettura dei documenti nuovi; la ricerca risponde con quelli già letti.
+    AIUTO_DOCUMENTI_FERMA: 'aiuto_documenti_ferma',
+    // main → la pagina che cerca: { fatti, totali } mentre l'indice legge i documenti nuovi (niente nomi).
+    AIUTO_DOCUMENTI_AVANZAMENTO: 'aiuto_documenti_avanzamento',
+    // { chiave } → { ok } | { ok:false, frase }: apre il documento, lo mostra nella cartella, o ne avvia il trascinamento
+    // vero (un file che la pagina riceve al rilascio, come da una cartella).
+    AIUTO_APRI_FILE: 'aiuto_apri_file',
+    AIUTO_MOSTRA_FILE: 'aiuto_mostra_file',
+    AIUTO_TRASCINA_FILE: 'aiuto_trascina_file',
     // Segnale BROADCAST main→superfici: "la cronologia scaricamenti è cambiata"
     // (parte/avanza/finisce un download). VOLUTAMENTE contentless (nessun nome
     // file né percorso): la pagina filo://downloads lo riceve e ri-legge la
@@ -623,6 +641,13 @@
     // Le legge il SERVER quando accende le sessioni. Owner-only.
     AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff } | { ok:false, error }
     AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff? } → come sopra | { ok:false, error }
+    // Modello e sforzo del worker per fase (doc config/routines, campo
+    // `roleModels` = { ruolo: { model?, effort? } }; regole in
+    // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore
+    // vuoto = vale la definizione dell'agente. Le legge il SERVER quando
+    // consegna un biglietto. Owner-only.
+    AUTOMATION_ROLE_MODELS_GET: 'automation_role_models_get', // → { ok, roleModels } | { ok:false, error }
+    AUTOMATION_ROLE_MODELS_SET: 'automation_role_models_set', // { ruolo, campo, valore } → { ok, letto, scritto, roleModels? } | { ok:false, error }
     // Log dei worker delle routine (doc config/automation, campo `workerLog`):
     // elenco degli ultimi worker spawnati, con ruolo e istante di avvio. Lo
     // scrive scripts/dispatch.mjs a ogni spawn; lo legge la tab "Log" della
@@ -760,7 +785,8 @@
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
     AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile, isAdmin, remembered }; a un sito solo { ok, signedIn, isAdmin } | { ok: false, code, error: frase per l'utente }
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
-    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, isAdmin, profile|null, uid, remembered }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_STATUS: 'auth_status',                    // { senzaRete? } → { ok, signedIn, isAdmin, profile|null, uid (non con senzaRete), remembered, googleNelleSchede }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_COLLEGA_GOOGLE: 'auth_collega_google',    // solo da Filo: apre l'accesso web a Google in una scheda (#1123) → { ok } | { ok: false, error }
     AUTH_CHANGED: 'auth_changed',                  // broadcast alle sole pagine di Filo → { signedIn, isAdmin, profile|null, remembered }
 
     // Clipboard history (per il menu "Incolla"). Chi legge e chi scrive da un sito: services/appuntiDaiSiti.js. L'elenco

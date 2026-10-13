@@ -1,5 +1,5 @@
-// Sentinella: la casella «Rispondi alle domande di Filo» e il rombo verde
-// della fila delle forme nascono dalla stessa domanda.
+// Sentinella: la casella della risposta e il rombo verde della fila delle
+// forme nascono dalla stessa domanda.
 //
 // Chiederlo in due punti li aveva già fatti divergere: la casella compariva e
 // il rombo restava grigio, e l'owner non vedeva dalla fila che una pratica

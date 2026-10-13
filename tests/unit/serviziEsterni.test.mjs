@@ -37,6 +37,7 @@ const ESEMPI = [
   { file: 'src/shared/actionTools.js', url: 'https://…', perche: 'esempio nel testo per il modello' },
   { file: 'src/main/services/providers/openrouter.js', url: 'https://filo.local', perche: 'intestazione HTTP-Referer' },
   { file: 'src/main/services/scryfall.js', url: 'https://singolarita.com', perche: 'recapito nello User-Agent' },
+  { file: 'src/main/services/accessoGoogle.js', url: 'https://accounts.google.com/', perche: 'sceglie la sessione delle schede in cui vivono i cookie di Google' },
 ];
 
 // Indirizzi con l'host composto da un'espressione: quale servizio contattano, o perché non contattano niente.
@@ -56,6 +57,7 @@ const COMPOSTI = [
   { file: 'src/shared/preferences.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/urlExfil.js', testo: "new URL('https://' + url)", perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
   { file: 'src/shared/urlExfil.js', testo: 'new URL(`https://${url}`)', perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
+  { file: 'src/shared/urlExfil.js', testo: 'l : `https://${l}`', perche: 'la chiave di confronto di un link scritto in chat' },
 ];
 
 // Chiamate di rete che non contattano un servizio.

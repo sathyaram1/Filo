@@ -31,7 +31,6 @@
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
   const dashDir = $('dashDir');
-  const autonomiaEl = $('dashAutonomia');
 
   // ===== Stato locale =====
   let suggestions = [];
@@ -94,6 +93,7 @@
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
+    sceltaAutonomia: (a) => Accoglienza.sceltaAutonomia(a._output && a._output.livello),
     // #947 — «Metti nel messaggio» dal tasto destro di un file trovato: la stessa cosa del trascinarlo nel campo.
     allegaFile: (percorso) => { addPendingFile(percorso); inputEl.focus(); },
     archiviaAzione: (type, cambi) => {
@@ -216,6 +216,12 @@
     },
     setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
+    // Una bozza o un allegato in sospeso sono dell'utente: un clic su una scelta non li manda via con sé.
+    rispondi: (testo) => {
+      if (sending || inputEl.value.trim() || pendingImages.length || pendingFiles.length) return false;
+      submitMessage(testo);
+      return true;
+    },
   });
   Carte.init({
     send,
@@ -387,6 +393,7 @@
       // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
       const fuori = isUser ? {} : {
         ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
+        ...(Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length ? { linkDaConfermare: m.linkDaConfermare } : {}),
         ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
       };
       threadHistory.push(isUser
@@ -453,9 +460,27 @@
 
   // Un indirizzo web che un modello ha proposto qui si apre solo dal main, dopo la porta delle uscite, con
   // l'indirizzo che si apre davvero (#810). Se si ferma, la riga lo dice accanto a ciò che è stato cliccato.
-  async function apriProposta(url, vicino = null) {
+  // Un collegamento che la risposta di Filo segnava da confermare chiede l'OK anche al clic (#868.6), riaperta compresa.
+  const formaLink = (u) => { try { return new URL(String(u || '')).href; } catch (_) { return String(u || ''); } };
+  function motivoDaConfermare(url) {
+    const k = formaLink(url);
+    for (const m of threadHistory) {
+      for (const x of (m && Array.isArray(m.linkDaConfermare) ? m.linkDaConfermare : [])) {
+        if (x && formaLink(x.url) === k) return String(x.motivo || 'da confermare');
+      }
+    }
+    return '';
+  }
+  async function apriProposta(url, vicino = null, chiedi = '') {
+    const msg = { type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente(), chiedi: chiedi || motivoDaConfermare(url) };
     let r = null;
-    try { r = await send({ type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente() }); } catch (_) {}
+    try { r = await send(msg); } catch (_) {}
+    if (r && r.conferma) {
+      const Ui = window.SN_CONFIRM_UI;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      if (!ok) return;
+      try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; }
+    }
     if (r && r.frase) notaFermata(r.frase, vicino);
   }
   function notaFermata(frase, vicino) {
@@ -517,10 +542,10 @@
     if (type === 'NAVIGA' && /^filo:\/\//i.test(String(a.url || ''))) {
       send({ type: MSG.OPEN_URL, url: a.url });
     } else if (type === 'NAVIGA' && a.url) {
-      apriProposta(a.url, vicino);
+      apriProposta(a.url, vicino, s.chiedeOk || '');
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
       const url = a.url || a.path;
-      if (/^https?:/.test(url)) apriProposta(url, vicino);
+      if (/^https?:/.test(url)) apriProposta(url, vicino, s.chiedeOk || '');
     } else if (type === 'CHAT' && a.prompt) {
       submitMessage(String(a.prompt), { daModello: true });
     } else {
@@ -982,6 +1007,7 @@
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
       if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
+      if (Array.isArray(r.linkDaConfermare) && r.linkDaConfermare.length) entry.linkDaConfermare = r.linkDaConfermare;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
@@ -1525,7 +1551,7 @@
         applyHomeMessageVisibility();
       }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
-      if (msg.settings && msg.settings.autonomia) mostraAutonomia(msg.settings.autonomia);
+      if (msg.settings && msg.settings.autonomia) Accoglienza.aggiornaSceltaAutonomia(msg.settings.autonomia.livello);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
@@ -2071,35 +2097,6 @@
     }
   }
 
-  // #530 — il livello di autonomia attivo, sempre in vista accanto a dove si scrive.
-  function mostraAutonomia(aut) {
-    const A = self.SN_AUTONOMIA;
-    if (!autonomiaEl || !A) return;
-    const info = A.infoLivello(A.livelloAttivo(aut && aut.livello));
-    const livelli = A.livelliSelezionabili();
-    const n = livelli.findIndex((l) => l.id === info.id) + 1;
-    const tacche = document.createElement('span');
-    tacche.className = 'dash-autonomia-tacche';
-    tacche.setAttribute('aria-hidden', 'true');
-    for (let i = 1; i <= livelli.length; i++) {
-      const t = document.createElement('span');
-      t.className = `dash-autonomia-tacca${i <= n ? ' piena' : ''}`;
-      tacche.appendChild(t);
-    }
-    const nome = document.createElement('span');
-    nome.textContent = info.nome;
-    autonomiaEl.replaceChildren(tacche, nome);
-    autonomiaEl.dataset.livello = info.id;
-    autonomiaEl.title = 'Quanto Filo fa da solo · clic per cambiarlo';
-    autonomiaEl.setAttribute('aria-label', `Autonomia di Filo: ${info.nome}. Clic per cambiarla.`);
-    autonomiaEl.hidden = false;
-  }
-  if (autonomiaEl) {
-    autonomiaEl.addEventListener('click', () => {
-      send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#autonomia' });
-    });
-  }
-
   (async function init() {
     renderControls();
     await applySavedTheme();
@@ -2107,7 +2104,6 @@
       const settings = await self.SN_STORAGE?.getSettings?.();
       showHomeMessage = settings?.showHomeMessage !== false;
       Sistema.applicaImpostazioni(settings);
-      mostraAutonomia(settings?.autonomia);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
     } catch (_) {}

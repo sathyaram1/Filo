@@ -113,6 +113,12 @@ module.exports = function register(on, ctx) {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
+    // #947.3 — i documenti che l'Aiuto ha cercato li mette il main, mai la pagina: da lei arriva solo il segno.
+    const esterno = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.esterno;
+    if (esterno && typeof esterno === 'object' && 'documenti' in esterno) {
+      const d = esterno.documenti ? require('../aiutoDocumenti').perIlModello(sender && sender.wc) : null;
+      if (d) esterno.documenti = d; else delete esterno.documenti;
+    }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
@@ -129,7 +135,8 @@ module.exports = function register(on, ctx) {
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
   // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
   // pagina mostra i risultati mentre arrivano. Un giro per pagina: una ricerca nuova ferma quella di prima.
-  const { daFilo } = require('./origine');
+  const { daFilo, soloFilo } = require('./origine');
+  const NON_ADMIN = () => ({ ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' });
   const { settingsForOwnerAction } = require('../resolveSupportModel');
   const giriRicerca = new Map(); // jobId → giro
   let giriFatti = 0;
@@ -166,9 +173,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.MANAGE_SEARCH_CLASSIFY, async (msg, sender, origin) => {
     if (!daFilo(origin, sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    if (!isAdmin()) {
-      return { ok: false, code: 'not_admin', error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-    }
+    if (!isAdmin()) return NON_ADMIN();
     const op = msg && msg.op;
     const jobId = msg && typeof msg.jobId === 'string' ? msg.jobId : '';
     if (op === 'stop') { fermaGiro(jobId); return { ok: true }; }
@@ -676,7 +681,9 @@ module.exports = function register(on, ctx) {
     return (eff.apiKeys || {})[provider] || '';
   }
 
-  on(MSG.TEST_DEFAULT_MODEL, async (msg) => {
+  // Le prove spendono le chiavi predefinite: le chiedono solo le Opzioni e l'editor dei predefiniti,
+  // mai un sito visitato (#784.2).
+  on(MSG.TEST_DEFAULT_MODEL, soloFilo(async (msg) => {
     try {
       const nickname = (msg.nickname || '').trim();
       const explicitModel = (msg.model || '').trim();
@@ -687,9 +694,7 @@ module.exports = function register(on, ctx) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
         // riservato agli amministratori.
-        if (!isAdmin()) {
-          return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-        }
+        if (!isAdmin()) return NON_ADMIN();
         provider = 'openrouter';
         modelId = explicitModel;
       } else {
@@ -758,7 +763,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: provaFallita(e) };
     }
-  });
+  }));
 
   // Catalogo modelli di un provider, recuperato dal main con le chiavi
   // predefinite: la pagina admin non vede mai le chiavi vere, quindi non può
@@ -766,11 +771,9 @@ module.exports = function register(on, ctx) {
   // chiavi dell'utente). Solo metadati, nessuna inferenza. Ritorna
   // { ok, items: [{ id, label }] } già ordinati dal più recente e con
   // l'etichetta di categoria (Testo / Multimodale / Sintesi vocale / …).
-  on(MSG.DEFAULT_MODELS_LIST, async (msg) => {
+  on(MSG.DEFAULT_MODELS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const provider = 'openrouter';
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const apiKey = await defaultKeyFor(provider, Defaults.get());
@@ -793,15 +796,13 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
   // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
-  on(MSG.DEFAULT_PROVIDERS_LIST, async () => {
+  on(MSG.DEFAULT_PROVIDERS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const res = await fetch('https://openrouter.ai/api/v1/providers');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -813,7 +814,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // La domanda esce verso il motore di ricerca: passa dalla porta delle uscite come la
   // ricerca della chat (#810). Solo il blocco: qui non c'è un popup per l'OK in più.

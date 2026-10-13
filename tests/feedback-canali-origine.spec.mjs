@@ -22,9 +22,11 @@
 // Il secondo test guarda le ALTRE porte del proprietario che vivono nello
 // stesso canale: i modelli predefiniti (che valgono per tutte le installazioni
 // di Filo), l'automazione, i bilanci dei giri, i modelli dei giudici, i
-// registri del lavoro e delle routine. Sono la stessa famiglia e vanno chiuse
+// registri del lavoro e delle routine, i codici del red team, le prove e i
+// cataloghi dei modelli predefiniti. Sono la stessa famiglia e vanno chiuse
 // insieme: una difesa messa su quattro porte su nove è una porta aperta con
-// accanto un cartello che dice dove.
+// accanto un cartello che dice dove. Il test che segue le bussa con la
+// sessione del proprietario aperta, cioè là dove passerebbero.
 //
 // Il terzo guarda le porte VICINE, che non sono del proprietario ma di
 // chiunque abbia fatto l'accesso: uscire dall'account, votare in bacheca,
@@ -48,6 +50,19 @@ import { test, expect } from './fixtures/electron.mjs';
 const SITO = { url: 'https://evil.example/pagina' };
 const SITO_CON_SCHEDA = { tab: { id: 1, url: 'https://evil.example/pagina' }, url: 'https://evil.example/pagina' };
 const PAGINA_DI_FILO = { url: 'filo://manage/manage.html' };
+
+// I codici d'invito del red team e le prove coi modelli predefiniti (#784.2): spendono le chiavi di Filo
+// o aprono il red team a chi vuole il sito. Nome della costante e resto del messaggio: `app.evaluate` vuole dati.
+const PORTE_784 = {
+  redteamGeneraCodici: ['REDTEAM_GEN_CODES', { count: 5 }],
+  redteamElencoCodici: ['REDTEAM_LIST_CODES', {}],
+  redteamRevocaCodice: ['REDTEAM_REVOKE_CODE', { code: 'ABCD-EFGH' }],
+  redteamApertoLettura: ['REDTEAM_OPEN_GET', {}],
+  redteamApertoScrittura: ['REDTEAM_OPEN_SET', { openToAll: true }],
+  provaModelloScelto: ['TEST_DEFAULT_MODEL', { provider: 'openrouter', model: 'qualsiasi/modello' }],
+  catalogoModelli: ['DEFAULT_MODELS_LIST', { provider: 'openrouter' }],
+  elencoFornitori: ['DEFAULT_PROVIDERS_LIST', {}],
+};
 
 test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', async ({ app, shell }) => {
   void shell; // attende il boot: il dispatcher dev'essere montato
@@ -148,6 +163,7 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       // Il classificatore della ricerca spende la chiave dell'owner leggendo tutti i feedback (#1118).
       ricercaClassificatore: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'start', query: 'x', candidates: [{ id: 'a', title: 't', text: 'x' }] },
       ricercaClassificatoreStato: { type: MSG.MANAGE_SEARCH_CLASSIFY, op: 'status', jobId: 'r1' },
+      ...Object.fromEntries(Object.entries(mittenti.porte784).map(([nome, [k, resto]]) => [nome, { type: MSG[k], ...resto }])),
     });
     const esegui = async (mittente) => {
       const res = {};
@@ -161,7 +177,7 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       sitoConScheda: await esegui(mittenti.sitoConScheda),
       filo: await esegui(mittenti.filo),
     };
-  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO, porte784: PORTE_784 });
 
   for (const provenienza of ['sito', 'sitoConScheda']) {
     for (const [porta, r] of Object.entries(out[provenienza])) {
@@ -186,6 +202,62 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
     expect(r.ok, `filo/${porta}`).toBe(false);
     expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
   }
+});
+
+test('con la sessione del proprietario aperta, un sito visitato non genera codici del red team né spende le chiavi predefinite (#784.2)', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    ga.isAdmin = () => true;
+    ga.isSignedIn = () => true;
+    ga.getIdToken = async () => 'token-finto-dell-owner';
+    // Ogni uscita verso il red team o verso il catalogo dei modelli si conta e non parte.
+    const uscite = [];
+    const fetchVera = globalThis.fetch;
+    globalThis.fetch = async (url, ...resto) => {
+      const u = String((url && url.url) || url || '');
+      if (/cloudfunctions\.net\/redteam|openrouter\.ai\/api\//.test(u)) { uscite.push(u); throw new Error('rete finta'); }
+      return fetchVera(url, ...resto);
+    };
+    const MSG = globalThis.SN_MSG.MSG;
+    const porte = {
+      ...Object.fromEntries(Object.entries(mittenti.porte784).map(([nome, [c, resto]]) => [nome, { type: MSG[c], ...resto }])),
+      provaModelloPredefinito: { type: MSG.TEST_DEFAULT_MODEL, nickname: 'qualsiasi' },
+    };
+    const esegui = async (mittente, nomi = Object.keys(porte)) => {
+      const res = {};
+      for (const nome of nomi) res[nome] = await globalThis.SN_HANDLE_MESSAGE(porte[nome], mittente);
+      return res;
+    };
+    const sito = await esegui(mittenti.sito);
+    const sitoConScheda = await esegui(mittenti.sitoConScheda);
+    const usciteDaiSiti = uscite.splice(0);
+    // Da Filo solo le porte che non scrivono niente fuori di qui (l'interruttore del red team sì).
+    const filo = await esegui(mittenti.filo, mittenti.daFilo);
+    return { sito, sitoConScheda, usciteDaiSiti, usciteDaFilo: uscite.splice(0), filo };
+  }, {
+    sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: { url: 'filo://redteam/redteam.html' }, porte784: PORTE_784,
+    daFilo: ['redteamGeneraCodici', 'redteamElencoCodici', 'redteamRevocaCodice', 'catalogoModelli', 'elencoFornitori'],
+  });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    for (const [porta, r] of Object.entries(out[provenienza])) {
+      expect(r, `${provenienza}/${porta}: nessuna risposta`).toBeTruthy();
+      expect(r, `${provenienza}/${porta}: con l'owner dentro la richiesta di un sito passa`).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+    }
+  }
+  expect(out.usciteDaiSiti, 'una richiesta di un sito è uscita verso il red team o verso il catalogo dei modelli').toEqual([]);
+
+  // Da una pagina di Filo, con l'owner dentro, le stesse porte si aprono: la richiesta arriva fino alla rete.
+  expect(Object.keys(out.filo)).toHaveLength(5);
+  for (const porta of Object.keys(out.filo)) {
+    expect(String(out.filo[porta].code || ''), `filo/${porta}`).not.toMatch(/forbidden|not_admin/);
+    expect(String(out.filo[porta].error || ''), `filo/${porta}: doveva arrivare alla rete`).toContain('rete finta');
+  }
+  expect(out.usciteDaFilo.some((u) => /redteamGenerateCodes$/.test(u)), 'da Filo la generazione dei codici non è partita').toBe(true);
 });
 
 test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza', async ({ app, shell }) => {

@@ -1770,11 +1770,11 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgListHead')).toHaveText('Ricevuti (1)');
   await expect(page.locator('.mg-item')).toHaveCount(1);
 
-  // Apri il dettaglio: il box risposta chiarimenti è visibile. Con la macchina
-  // a stati `clarify` normalizza a `design` (bloccato, decide l'owner), quindi
-  // ANCHE le azioni dei Ricevuti sono legittimamente visibili accanto al box.
+  // Apri il dettaglio: il pannello del rombo si apre da sé con la casella della
+  // risposta. Con la macchina a stati `clarify` normalizza a `design` (bloccato,
+  // decide l'owner), quindi ANCHE le azioni dei Ricevuti sono visibili.
   await page.evaluate((id) => window.__mgTest.openDetail(id), CLARIFY_FB._id);
-  await expect(page.locator('#mgClarify')).toBeVisible();
+  await expect(page.locator('#mgSideRispostaText')).toBeVisible();
   await expect(page.locator('#mgActions')).toBeVisible();
   await expect(page.locator('#mgAcceptBtn')).toHaveText('→ In coda');
   // La fila dei livelli c'e' comunque, e dice la verita': un feedback mai
@@ -1786,8 +1786,8 @@ test('un feedback in `clarify` mostra il box risposta dell owner sotto Ricevuti 
   await expect(page.locator('#mgLivelliRow .mg-dot--empty')).toHaveCount(4);
 
   // Rispondi: il patch rimette in coda (todo) e appende la risposta alle note.
-  await page.locator('#mgClarifyText').fill('Intendo il pulsante in alto a destra.');
-  await page.locator('#mgClarifyBtn').click();
+  await page.locator('#mgSideRispostaText').fill('Intendo il pulsante in alto a destra.');
+  await page.locator('#mgSideRispostaBtn').click();
 
   await expect.poll(() => page.evaluate(() => window.__updates.length)).toBe(1);
   const patch = await page.evaluate(() => window.__updates[0]);

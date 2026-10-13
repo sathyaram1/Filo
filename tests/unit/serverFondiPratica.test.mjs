@@ -107,13 +107,25 @@ test('la pratica di un utente, o senza segno locale, si rifiuta prima di toccare
 test('una pratica non fidata si rifiuta prima di toccare il server, anche approvata come lavoro locale', async () => {
   const approvata = doc('p', { clientId: 'utente-7', senderProof: '', fiducia: 'non_fidato' });
   approvata.fields.localApproval = { mapValue: { fields: { by: { stringValue: 'owner@esempio' }, at: { integerValue: '1' } } } };
-  for (const d of [doc('p', { fiducia: 'non_fidato' }), doc('p', { fiducia: '' }), approvata]) {
+  const vuota = doc('p');
+  vuota.fields.fiducia = { nullValue: null };
+  for (const d of [doc('p', { fiducia: 'non_fidato' }), vuota, approvata]) {
     const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'] });
     assert.equal(r.k, 3, r.testo);
     assert.match(r.testo, /fidat/);
     assert.deepEqual(r.lanci, [], 'il server non parte');
     assert.deepEqual(r.scritture, [], 'sulla pratica non si scrive');
   }
+});
+
+// Decisione dell'owner dell'11/10: prima della migrazione una pratica locale col mittente provato segue la regola di prima.
+test('senza il campo fiducia la pratica locale col mittente provato passa; un utente no', async () => {
+  const r = await giro({ docs: { p: doc('p', { fiducia: '' }) }, argv: ['claude/x', '--feedback', 'p', '--dry-run'] });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x', '--dry-run'], pratica: '#910' }]);
+  const utente = await giro({ docs: { p: doc('p', { clientId: 'utente-7', senderProof: '', fiducia: '' }) }, argv: ['claude/x', '--feedback', 'p'] });
+  assert.equal(utente.k, 3, utente.testo);
+  assert.deepEqual(utente.lanci, []);
 });
 
 test('a vuoto: il server parte con la pratica e --dry-run, e sulla pratica non si scrive niente', async () => {

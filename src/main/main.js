@@ -213,6 +213,7 @@ app.whenReady().then(async () => {
     // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
     // nascere i cookie dei riquadri.
     try { require('./services/cookieIncorporati').init(s); } catch (_) {}
+    try { require('./services/accessoGoogle').init(); } catch (_) {}
     try { require('./services/riquadriRotti').init(s); } catch (_) {}
     // Anti-fingerprinting: carica/genera il master secret persistente e fissa
     // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
@@ -276,6 +277,11 @@ app.whenReady().then(async () => {
   // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+  // Chi è entrato in Filo quando l'accesso passava dal browser trova una volta l'invito a collegare YouTube, Gmail e
+  // Drive nelle schede (#1123). Nei test no: comparirebbe in mezzo agli avvisi che gli spec contano.
+  if (process.env.NODE_ENV !== 'test') {
+    setTimeout(() => { require('./auth/prodottiGoogle').invitaSeServe().catch(() => {}); }, 15_000).unref?.();
+  }
 
   // Il collegamento d'invito (#651): la dichiarazione al sistema, l'indirizzo
   // dell'avvio a freddo (Windows e Linux lo mettono fra gli argomenti) e

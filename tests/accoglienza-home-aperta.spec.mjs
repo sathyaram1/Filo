@@ -4,6 +4,8 @@
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 
+test.use({ accoglienzaFatta: false });
+
 let server;
 const stato = { redeemed: false, pendingCode: null, trattieni: false, trattenute: [] };
 

@@ -59,16 +59,19 @@ async function main() {
   }
   if (args.cmd === 'sporca') {
     const r = await B.sporca(args.motivo);
-    if (r.senzaBiglietto) { console.log('Nessun biglietto: questa sessione vale già non fidata.'); return 0; }
+    if (r.senzaBiglietto) {
+      console.error('Nessun biglietto trovato da qui, quindi niente sporcato: ciò che scrivi da questo repo nasce non fidato, ma se la sessione ne ha uno in un altro repo dichiaralo da lì.');
+      return 1;
+    }
     if (r.errori.length) console.error(`Non sporcati: ${r.errori.join('; ')}`);
     if (r.sporcati) console.log(`Biglietto sporcato (${r.sporcati}): da qui ciò che scrivi nasce non fidato.`);
     return r.errori.length && !r.sporcati ? 1 : 0;
   }
   if (args.cmd === 'stato') {
     const trovati = B.trovaBiglietti();
-    if (!trovati.length) { console.log('Nessun biglietto: questa sessione vale non fidata.'); return 0; }
+    if (!trovati.length) { console.log('Nessun biglietto trovato da qui: ciò che la sessione scrive da questo repo vale non fidato.'); return 0; }
     const b = await B.trovaBiglietto();
-    console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}${trovati.length > 1 ? ` (${trovati.length} biglietti in questa cartella: vale il più sporco)` : ''}`);
+    console.log(`${b.fiducia === 'fidato' ? 'Pulito' : 'Sporco'}: ${b.path}`);
     if (b.errore) console.log(`Stato non letto: ${b.errore}`);
     const motivi = (b.stato && Array.isArray(b.stato.sporcatoDa)) ? b.stato.sporcatoDa : [];
     for (const m of motivi) console.log(`  - ${new Date(Number(m.at) || 0).toISOString()} ${String(m.motivo || '').replace(/[\u0000-\u001f\u007f]/g, ' ')}`);

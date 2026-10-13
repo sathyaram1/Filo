@@ -234,7 +234,8 @@
     }
 
     function open() {
-      if (!pop.hidden) return;
+      // Il bottone non eredita `disabled` dal <select>: senza, una tendina spenta si apriva e cambiava valore.
+      if (!pop.hidden || select.disabled) return;
       buildOptions();
       pop.hidden = false;
       wrap.classList.add('sn-open');

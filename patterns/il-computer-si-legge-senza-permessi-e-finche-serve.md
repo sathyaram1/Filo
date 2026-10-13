@@ -83,6 +83,29 @@ con Internet o con un gateway (quelle virtuali lato computer non ne hanno). Una
 rotta che non si riesce a leggere non dice offline. Wi-Fi o cavo e il nome li
 dice la piattaforma.
 
+## Su Windows lo script raccoglie, la scelta la fa il JavaScript (#1114)
+
+Col Wi-Fi collegato la home mostrava il globo: il gestore delle reti, chiamato da
+PowerShell, dà l'adattatore di una connessione come Guid, e quel Guid può non
+arrivare (una struttura COM che PowerShell non converte). Senza l'adattatore non
+si sa se si esce in Wi-Fi o via cavo, e prima un errore lì cancellava tutta la
+lettura della rete. Adesso:
+
+- lo script scrive i fatti, ognuno nel suo `try`: gli adattatori accesi (tipo e
+  gateway), i profili di connessione di Windows (`NetworkInformation`, legati
+  all'adattatore da un Guid vero, col numero IANA: 71 Wi-Fi, 6 Ethernet), quello
+  che Windows usa per Internet, e le connessioni del gestore delle reti coi nomi;
+- `reteDaWindows` sceglie: vince chi ha Internet, poi chi sa come esce, poi
+  quella che Windows usa. Una VPN davanti non nasconde il Wi-Fi sotto;
+- il nome viene dal gestore delle reti, per adattatore; se il Guid manca, dal
+  nome del profilo di Windows legato all'adattatore (una VPN accesa fa uscire su
+  Internet in due); senza nemmeno quello, solo quando una connessione sola esce
+  su Internet. Altrimenti niente nome: un nome preso a caso è peggio di nessuno.
+
+La scelta così si prova in `tests/unit/statoSistema.test.mjs` su ogni macchina.
+Lo script con oggetti finti al posto di Windows si può far girare con
+PowerShell 7 su Linux: non prova le API vere, prova che lo script stia in piedi.
+
 ## La riga di Windows è tutta ASCII
 
 Lo script converte ogni carattere oltre l'ASCII in `\uXXXX` prima di scrivere:
