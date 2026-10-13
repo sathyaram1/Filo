@@ -488,7 +488,8 @@
   // CERCA_WEB nel turno: la query esce verso il motore di ricerca. Sospetta se
   // porta un segreto della memoria (solo un token forte: le parole comuni di una
   // query coincidono spesso con gli appunti) o un pezzo di ciò che è stato letto.
-  // Niente ripiego strutturale: una query non ha la forma di un URL.
+  // Niente ripiego strutturale: una query non ha la forma di un URL. Né le parole dell'utente (#868.6): la query va al
+  // servizio di ricerca, non a un indirizzo scelto da chi ha scritto nel contesto, e cercare con ciò che ha detto è il lavoro.
   function valutaRicerca(query, { memoria = '', azioni = [] } = {}) {
     const q = String(query || '').trim();
     if (!q) return { exfil: false, reason: '' };
