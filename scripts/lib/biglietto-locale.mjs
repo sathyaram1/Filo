@@ -336,10 +336,10 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
     const source = String((input && input.source) || '').trim();
     let path = '';
     let fiducia = '';
-    const daEnv = String(env[ENV_FILE] || '').trim();
+    const daEnv = percorsoDiChiLancia({ env, cwd, sessioneCheNasce: sessionId });
     if (daEnv) {
-      // Un figlio dell'orchestratore locale: eredita la fiducia del padre adesso (§12.2). Padre chiuso, file sparito o
-      // server che non risponde: non si sa da cosa nasce, quindi nasce sporco; senza server resta il padre, se c'è.
+      // Un figlio, dell'orchestratore o lanciato a mano da una sessione: eredita la fiducia del padre adesso (§12.2). Padre
+      // chiuso, file sparito o server che non risponde: non si sa da cosa nasce, quindi nasce sporco; senza server resta il padre, se c'è.
       const ereditato = leggiFile(daEnv);
       const s = ereditato ? await chiama('stato', { ticket: ereditato.ticket }, deps).catch(() => null) : null;
       if (s && s.chiuso !== true) {
