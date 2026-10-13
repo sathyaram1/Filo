@@ -356,7 +356,7 @@
       const scambi = conv.thread.filter((m) => m.role === 'user').length;
       meta.textContent = conv.current && !state.done
         ? 'in corso'
-        : `${scambi} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
+        : `${cifre(scambi)} ${scambi === 1 ? 'risposta tua' : 'tue risposte'}`;
       sum.appendChild(when);
       sum.appendChild(meta);
       det.appendChild(sum);
