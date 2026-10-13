@@ -104,7 +104,7 @@ async function main() {
     console.log(`${r.passphrase}\n`);
     console.log('Copiala ADESSO dove serve: non si potrà più rileggere.');
     console.log(potere === 'build'
-      ? "Va nell'ambiente della costruzione, come FILO_BUILD_PASSPHRASE."
+      ? `Va come FILO_BUILD_PASSPHRASE ${DOVE_VA_LA_PAROLA}.`
       // Una parola d'ordine di routine NON va nell'ambiente: l'ambiente lo
       // eredita ogni lavoratore che parte da lì. Sta solo nel prompt della
       // routine schedulata, che è l'unica cosa che l'orchestratore tiene per sé.
