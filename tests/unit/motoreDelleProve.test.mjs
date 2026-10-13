@@ -105,9 +105,7 @@ test('ensure-electron non dice «già pronto» su un pacchetto rimasto indietro:
   const dir = progetto({ pacchetto: '33.2.0', binario: '33.2.0' });
   try {
     mkdirSync(join(dir, 'scripts'), { recursive: true });
-    mkdirSync(join(dir, 'tests', 'helpers'), { recursive: true });
     copyFileSync(join(ROOT, 'scripts', 'ensure-electron.mjs'), join(dir, 'scripts', 'ensure-electron.mjs'));
-    copyFileSync(join(ROOT, 'tests', 'helpers', 'motoreDelleProve.mjs'), join(dir, 'tests', 'helpers', 'motoreDelleProve.mjs'));
     writeFileSync(join(dir, 'node_modules', 'electron', 'path.txt'), 'electron');
     writeFileSync(join(dir, 'node_modules', 'electron', 'dist', 'electron'), '');
     const r = spawnSync(process.execPath, [join(dir, 'scripts', 'ensure-electron.mjs')], { encoding: 'utf8' });
