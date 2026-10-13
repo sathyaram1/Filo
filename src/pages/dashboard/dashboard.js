@@ -2156,7 +2156,7 @@
     // nessuno. Chiederlo all'apertura non costa un giro dal server (l'avviso
     // è scritto in locale) e non dipende più da chi arriva prima.
     inCodaPopup(chiediBenvenuto);
-    if (onbState) return;
+    if (onbState) { fineRicompenseAvvio(); return; }
     inCodaPopup(async () => {
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
