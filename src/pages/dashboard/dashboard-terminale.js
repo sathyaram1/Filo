@@ -268,6 +268,8 @@
 
     // Bolla "comando" (stile utente) con il prompt digitato.
     const cmdBubble = makeBubble({ role: 'user', text: '' });
+    // Nata vuota sarebbe una bolla «solo azioni», senza fondo: il comando in chiaro su chiaro non si vedeva.
+    cmdBubble.classList.remove('dash-bubble-actions-only');
     cmdBubble.classList.add('dash-term-cmd');
     const promptLine = document.createElement('span');
     promptLine.className = 'dash-term-prompt';
