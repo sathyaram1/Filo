@@ -45,6 +45,7 @@ export async function launchFilo({ userDataPrefix = 'filo-agent-', extraEnv = {}
   // GUARDA una modifica visiva girava sempre al 100% anche con la manopola
   // accesa, e non lo diceva: chi la usava per rivedere un rosso da 125% vedeva
   // un'immagine che non c'entrava niente.
+  richiediElectronDelLock(APP_ROOT, { env });
   const app = await electron.launch({ args: [...argomentiScala, '.'], cwd: APP_ROOT, env });
   const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
