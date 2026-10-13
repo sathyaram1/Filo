@@ -59,7 +59,10 @@ async function main() {
   }
   if (args.cmd === 'sporca') {
     const r = await B.sporca(args.motivo);
-    if (r.senzaBiglietto) { console.log('Nessun biglietto: questa sessione vale già non fidata.'); return 0; }
+    if (r.senzaBiglietto) {
+      console.error('Nessun biglietto trovato da qui, quindi niente sporcato: ciò che scrivi da questo repo nasce non fidato, ma se la sessione ne ha uno in un altro repo dichiaralo da lì.');
+      return 1;
+    }
     if (r.errori.length) console.error(`Non sporcati: ${r.errori.join('; ')}`);
     if (r.sporcati) console.log(`Biglietto sporcato (${r.sporcati}): da qui ciò che scrivi nasce non fidato.`);
     return r.errori.length && !r.sporcati ? 1 : 0;
