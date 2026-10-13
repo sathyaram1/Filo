@@ -315,7 +315,7 @@ export async function praticaPerLaSessione(id, opts = {}) {
     return { ok: false, motivo: SENZA_SEGNO, utente: false, senzaSegno: true };
   }
   const avviso = [avvisoDaCampi(doc.fields), avvisoFrase(fb, id)].filter(Boolean).join('\n');
-  return { ok: true, avviso, fiducia: fb.fiducia === 'fidato' ? 'fidato' : 'non_fidato' };
+  return { ok: true, avviso, fiducia: fb.fiducia === 'fidato' ? 'fidato' : 'non_fidato', primaDellaMigrazione: fb.fiducia === undefined };
 }
 
 /** Il promemoria della frase per chi ha segnalato (regola: SN_MANAGE_REVIEW.fraseAttesa), '' se non serve. PURA. */
