@@ -391,9 +391,11 @@
   // Cosa hanno portato nel contesto le azioni viste dal modello (turni passati
   // compresi): `letto` = dati del computer, `nonFidato` = è entrato testo scritto
   // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca, `esterni` = i
-  // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810).
+  // pezzi scritti da altri con da dove vengono (la riga di un blocco li nomina, #810), `scritto` = le conversazioni
+  // ripescate, dove stanno le parole dell'utente fuori dalla finestra (#868.6).
   function contestoDaAzioni(actions) {
     const pezzi = [];
+    const conversazioni = [];
     let nonFidato = false;
     const linkNoti = new Set();
     const esterni = [];
