@@ -37,6 +37,12 @@ test('un percorso lunghissimo si accorcia in mezzo e tiene il nome del file', ()
   assert.ok(schema.length < 80, schema);
 });
 
+test('un percorso pieno di emoji si accorcia senza spezzarne una', () => {
+  const t = testo(`file:///tmp/${'📁'.repeat(80)}/foto.jpg`);
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(t), t);
+  assert.ok(t.endsWith('/foto.jpg'), t);
+});
+
 test('a capo e spazi di troppo non spezzano la riga', () => {
   assert.equal(testo('file:///tmp/a%0A%0Ab.txt'), 'File del computer bloccato per sicurezza: /tmp/a b.txt');
 });
