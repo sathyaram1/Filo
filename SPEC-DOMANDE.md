@@ -359,6 +359,9 @@ server (§ 9), non in questa spec.
 Ogni istanza chiude con un rapporto (§ 4.3), che resta legato al ricorrente:
 l'istanza successiva lo riceve col biglietto, con la fiducia che aveva. È così
 che l'audit sa da quale commit ripartire e la potatura quanti rami sono nuovi.
+Un ricorrente che segue cose lunghe settimane ha anche un **taccuino** suo sul
+server, come il monitoraggio (§ 4.3): oggi le opportunità, con le loro
+pratiche.
 
 | Quando (ora italiana) | Compito | Ambito | Urgenza | Modello iniziale |
 |---|---|---|---|---|
