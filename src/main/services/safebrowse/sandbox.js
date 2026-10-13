@@ -1,5 +1,6 @@
 // Stage 5 (detonation): apre un link sospetto in una finestra NASCOSTA e ISOLATA, segue i redirect e guarda dove finisce.
-// Solo un link non ancora aperto, mai la pagina dell'utente (regola in index.js). «Sembra pulito» vale poco: rinforza solo.
+// Solo un link non ancora aperto, mai una pagina già aperta (regola in index.js); non blocca mai il clic, e l'esito
+// può solo rinforzare un sospetto. Tetti su finestre vive, coda e vita massima (#591): una pagina ostile non ne apre a volontà.
 // Finestre vive insieme, coda e vita massima hanno un tetto (#591): una pagina ostile non deve poterne aprire a volontà.
 
 'use strict';
