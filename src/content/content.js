@@ -1603,7 +1603,7 @@
       );
     }
 
-    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items: conMenuDelSito(items), keepOnScroll: true });
 
     // Rivela/aggiorna la riga di correzione con `corr` (e relative alternative).
     const revealCorrection = (corr, alts) => {
@@ -1698,7 +1698,7 @@
       },
       { type: 'separator' },
     );
-    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items: conMenuDelSito(items), keepOnScroll: true });
   }
 
   function buildFeedbackItem() {
