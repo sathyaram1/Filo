@@ -656,7 +656,10 @@ function origineDelCheckout() {
  * @returns {string} '' se non c'è niente da dire
  */
 export function serialAwarenessNote(role, history, dropped = 0) {
-  const n = Array.isArray(history) ? history.length : 0;
+  const tutte = Array.isArray(history) ? history : [];
+  // La critica che il server scrive a un riallineamento (`caso`, #532) non parla di un difetto: non è un giro.
+  const riallineamenti = tutte.filter((h) => h && typeof h === 'object' && h.caso === 'riallineamento').length;
+  const n = tutte.length - riallineamenti;
   if (n < 2) return '';
   // Le critiche più vecchie tolte dalla serie (tetto del server): dirlo, o chi
   // legge crede che i giri mancanti non siano mai esistiti e non può
