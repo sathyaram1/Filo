@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fusioniServer } from '../../scripts/lib/fusioni-server.mjs';
+import { USCITA_SOLO_APP } from '../../scripts/server-fondi-pratica.mjs';
 import { OPZIONI_DI, leggiArgomenti } from '../../scripts/orchestratore-locale.mjs';
 
 function finte({ pratiche, commitApp = {}, fondi = 0, deploy = 0, fine = () => {} }) {
@@ -22,7 +23,7 @@ function finte({ pratiche, commitApp = {}, fondi = 0, deploy = 0, fine = () => {
       return { code: 0, out: '' };
     },
     pubblica: async () => { fatti.push('server:pubblica'); return { code: deploy, out: 'deploy' }; },
-    fineAttesa: async (id) => { fatti.push(`fineAttesa ${id}`); fine(id); },
+    fineAttesa: async (id, opz) => { fatti.push(`fineAttesa ${id}${opz && opz.soloApp ? ' soloApp' : ''}`); fine(id, opz); },
   };
   return { dep, fatti };
 }
@@ -91,6 +92,31 @@ test('ramo storto: fermo, senza lanciare niente; nessuna pratica: niente deploy'
   const vuoto = finte({ pratiche: [] });
   assert.equal((await fusioniServer(vuoto.dep)).pubblicato, false);
   assert.ok(!vuoto.fatti.includes('server:pubblica'));
+});
+
+test('il ramo non c’è su filo-security: la parte dell’app torna alle routine senza deploy; senza app si ferma (#1159)', async () => {
+  const soloApp = () => USCITA_SOLO_APP;
+  const { dep, fatti } = finte({ pratiche: [CON_APP], commitApp: { 'worker/f2-20261012T091500Z': 3 }, fondi: soloApp });
+  const r = await fusioniServer(dep);
+  assert.deepEqual(r.ferme, []);
+  assert.deepEqual(r.soloApp.map((x) => x.id), ['f2']);
+  assert.ok(fatti.includes('fineAttesa f2 soloApp'), fatti.join('\n'));
+  assert.ok(!fatti.includes('server:pubblica'), 'niente da pubblicare');
+
+  const insieme = finte({ pratiche: [SOLO, CON_APP], commitApp: { 'worker/f2-20261012T091500Z': 3 }, fondi: (args) => (args.includes('f2') ? USCITA_SOLO_APP : 0) });
+  const i = await fusioniServer(insieme.dep);
+  assert.equal(i.pubblicato, true);
+  assert.ok(insieme.fatti.includes('fineAttesa f2 soloApp'));
+  assert.ok(!insieme.fatti.some((x) => x.startsWith('fineAttesa f1')));
+
+  const vuota = finte({ pratiche: [SOLO], fondi: soloApp });
+  const v = await fusioniServer(vuota.dep);
+  assert.match(v.ferme[0].motivo, /né su filo-security né nell’app/);
+  assert.ok(!vuota.fatti.some((x) => x.startsWith('fineAttesa')));
+
+  const prova = finte({ pratiche: [CON_APP], commitApp: { 'worker/f2-20261012T091500Z': 3 }, fondi: soloApp });
+  await fusioniServer(prova.dep, { prova: true });
+  assert.ok(!prova.fatti.some((x) => x.startsWith('fineAttesa')), 'a vuoto non si rimanda niente');
 });
 
 test('orchestra -- fusioni-server: un comando suo, con --dry-run e nient’altro', () => {

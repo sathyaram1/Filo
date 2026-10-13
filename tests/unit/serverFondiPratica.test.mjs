@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
 import {
-  cartellaDelServer, leggiArgomenti, esegui, ramiApertiDellaPratica, PRATICA_ENV,
+  cartellaDelServer, leggiArgomenti, esegui, ramiApertiDellaPratica, PRATICA_ENV, USCITA_SOLO_APP,
 } from '../../scripts/server-fondi-pratica.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
 
@@ -391,10 +391,18 @@ test('registro irraggiungibile o ramo assente su origin: non si tocca niente', a
   assert.equal(giu.k, 4, giu.testo);
   assert.match(giu.testo, /registro dei rami non risponde/);
   assert.deepEqual(giu.lanci, []);
-  const assente = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], puntaRamo: () => '' });
-  assert.equal(assente.k, 1, assente.testo);
-  assert.match(assente.testo, /non trovo claude\/x su origin del server/);
+  const illeggibile = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], puntaRamo: () => null });
+  assert.equal(illeggibile.k, 4, illeggibile.testo);
+  assert.match(illeggibile.testo, /origin del server non si legge/);
+  assert.deepEqual(illeggibile.lanci, []);
+});
+
+test('ramo assente su origin del server: uscita «solo app», senza toccare niente (#1159)', async () => {
+  const assente = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'], puntaRamo: () => '' });
+  assert.equal(assente.k, USCITA_SOLO_APP, assente.testo);
+  assert.match(assente.testo, /su origin del server claude\/x non c'è: se il lavoro sta tutto nell'app/);
   assert.deepEqual(assente.lanci, []);
+  assert.deepEqual(assente.scritture, []);
 });
 
 test('leggiArgomenti: i rami delle routine (worker/…) valgono come i claude/…', () => {
