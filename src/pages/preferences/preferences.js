@@ -1478,6 +1478,7 @@
     riempi(settings);
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
+    disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
