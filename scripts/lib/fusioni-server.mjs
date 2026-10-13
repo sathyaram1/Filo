@@ -11,12 +11,13 @@ const coda = (t, n = 8) => String(t || '').trim().split('\n').slice(-n).join('\n
 
 /**
  * dep: { attese() → [{ feedbackId, seq, subSeq, branch, parti }], esegui(cmd, args, { cwd, timeoutMs }),
- *        pubblica() → { code, out }, fineAttesa(feedbackId), log(riga), radice }.
- * → { fuse: [{ num, id, app }], ferme: [{ num, motivo }], pubblicato: boolean }
+ *        pubblica() → { code, out }, fineAttesa(feedbackId, { soloApp }), log(riga), radice }.
+ * → { fuse: [{ num, id, app }], soloApp: [{ num, id, app }], ferme: [{ num, motivo }], pubblicato: boolean }
  */
 export async function fusioniServer(dep, { prova = false } = {}) {
   const pratiche = await dep.attese();
   const fuse = [];
+  const soloApp = [];
   const ferme = [];
   if (!pratiche.length) {
     dep.log('Nessun lavoro server aspetta il PC.');
