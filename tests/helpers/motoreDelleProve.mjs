@@ -42,5 +42,6 @@ export function motoreDelleProve({ radice = RADICE, env = process.env } = {}) {
   }
   const dist = override || (cartella ? join(cartella, 'dist') : '');
   const binario = dist ? versione(leggi(join(dist, 'version'))) : null;
-  return { atteso, pacchetto, binario, ...verdettoMotore({ atteso, pacchetto, binario, scelto: !!override }) };
+  const scelto = !!override;
+  return { atteso, pacchetto, binario, scelto, ...verdettoMotore({ atteso, pacchetto, binario, scelto }) };
 }
