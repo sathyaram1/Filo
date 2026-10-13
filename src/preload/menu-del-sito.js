@@ -46,7 +46,7 @@ function sorgenteSonda(nome) {
     if (b) m.set(f, b); else m.delete(f);
   }
   function contaTipo(t, tipo, f) {
-    if ((t !== window && t !== DOC) || !f || typeof tipo !== 'string') return;
+    if ((t !== window && t !== DOC) || !f || (typeof f !== 'function' && typeof f !== 'object') || typeof tipo !== 'string') return;
     var v = tipiDi.get(f);
     if (v === undefined) tipiDi.set(f, tipo);
     else if (typeof v === 'string') { if (v !== tipo) tipiDi.set(f, new Set([v, tipo])); }
