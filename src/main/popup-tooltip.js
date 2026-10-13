@@ -38,10 +38,10 @@ html,body{background:transparent;overflow:hidden;height:100%;
 :root.dark{--bg:#1d1a16;--fg:#f1e7d6;--border:#3b332a}
 </style></head><body><div id="tip"></div>
 <script>
-  // API minimale: il main process chiama webContents.send('set', {text, dark})
+  // API minimale: il main process chiama webContents.send('set', {text, dark, giro}); 'size' riporta il giro.
   const tip = document.getElementById('tip');
   const { ipcRenderer } = require('electron');
-  ipcRenderer.on('set', (_e, { text, dark }) => {
+  ipcRenderer.on('set', (_e, { text, dark, giro }) => {
     document.documentElement.classList.toggle('dark', !!dark);
     tip.textContent = text || '';
     // Misura sincrona: requestAnimationFrame non scatta quando la BrowserWindow
@@ -49,7 +49,7 @@ html,body{background:transparent;overflow:hidden;height:100%;
     // restava bloccato. getBoundingClientRect forza un layout reflow sincrono
     // anche con window nascosta, quindi le misure sono affidabili.
     const r = tip.getBoundingClientRect();
-    ipcRenderer.send('size', { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+    ipcRenderer.send('size', { w: Math.ceil(r.width), h: Math.ceil(r.height), giro });
   });
 </script></body></html>`;
 }
@@ -97,6 +97,9 @@ function ensureWin(parentWin) {
   });
   tipWin.webContents.on('ipc-message', (_e, channel, payload) => {
     if (channel === 'size' && tipWin && !tipWin.isDestroyed()) {
+      // Nascosto mentre misurava (il puntatore se n'è andato in quell'istante): hideTooltip non l'ha trovato
+      // visibile, e mostrarlo adesso lo lascerebbe appeso senza nessuno che lo tolga più.
+      if (!payload || payload.giro !== giro) return;
       const w = Math.max(20, payload.w + 4);
       const h = Math.max(16, payload.h + 4);
       tipWin.setBounds({ x: tipWin.getBounds().x, y: tipWin.getBounds().y, width: w, height: h });
@@ -116,7 +119,7 @@ function doShow(parentWin, text, x, y) {
   const px = cb.x + Math.round(x);
   const py = cb.y + Math.round(y);
   tipWin.setBounds({ x: px, y: py, width: 200, height: 30 });
-  tipWin.webContents.send('set', { text, dark: nativeTheme.shouldUseDarkColors });
+  tipWin.webContents.send('set', { text, dark: nativeTheme.shouldUseDarkColors, giro });
 }
 
 function showTooltip(parentWin, text, x, y) {
