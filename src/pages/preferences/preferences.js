@@ -1357,6 +1357,48 @@
     await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
   }
 
+  // ── Siti dove il tasto destro apre il loro menu (#975) ───────────────────
+  // Si aggiungono dal tasto destro sul sito o chiedendolo a Filo; qui si vedono tutti e si tolgono.
+  let sitiMenuSalvati = null;
+
+  function disegnaSitiMenu(elenco) {
+    const box = $('menuDelSitoSiti');
+    if (!box) return;
+    sitiMenuSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
+    box.textContent = '';
+    if (!sitiMenuSalvati.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessun sito: il tasto destro apre sempre il menu di Filo.';
+      box.appendChild(p);
+    }
+    for (const sito of sitiMenuSalvati) {
+      const row = document.createElement('div');
+      row.className = 'mem-riga';
+      row.dataset.sito = sito;
+      const t = document.createElement('span');
+      t.className = 'mem-testo';
+      t.textContent = (window.SN_NOMI_SITO && window.SN_NOMI_SITO.leggibile(sito)) || sito;
+      row.appendChild(t);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mem-via';
+      b.textContent = '×';
+      b.title = 'Torna al menu di Filo';
+      b.setAttribute('aria-label', `Su ${t.textContent} torna al menu di Filo`);
+      b.addEventListener('click', () => salvaSitiMenu((sitiMenuSalvati || []).filter((x) => x !== sito)));
+      row.appendChild(b);
+      box.appendChild(row);
+    }
+  }
+
+  async function salvaSitiMenu(nuovo) {
+    const elenco = Array.from(new Set(nuovo));
+    disegnaSitiMenu(elenco);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { menuDelSito: { siti: elenco } } });
+    flashSaved('menuDelSitoHint');
+  }
+
   let caricato = false;
 
   // ── Autonomia di Filo (#530) ─────────────────────────────────────────────
