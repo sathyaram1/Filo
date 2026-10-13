@@ -677,6 +677,14 @@
   // ------------------------------------------------------------
   // Handler contextmenu
   // ------------------------------------------------------------
+  // Il menu del sito sotto il clic di questa apertura (#975): lo dice la sonda, solo prima della prima attesa.
+  let sitoSuo = null;
+  function conMenuDelSito(items) {
+    const v = MenuDelSito && sitoSuo ? MenuDelSito.voci(sitoSuo, { incognito: inIncognito }) : [];
+    if (v.length) items.unshift(...v);
+    return items;
+  }
+
   async function onContextMenu(e) {
     // Shift lo decide il ponte del page-preload, che sul sito col menu del sito al tasto destro lo manda qui (#975);
     // nelle pagine filo:// l'ascolto qui sotto.
