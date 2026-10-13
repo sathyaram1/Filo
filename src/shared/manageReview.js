@@ -548,7 +548,7 @@
         const text = localSenderCheck(fb).ok
           ? 'Richiede lavoro locale: con «Solo lavoro locale» la prende una sessione sulla tua macchina.'
           : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro locale» lo lavora e lo chiude una sessione.';
-        return { text, color: S.design.color };
+        return { text, color: LOCALE.color };
       }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
     }
