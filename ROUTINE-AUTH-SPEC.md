@@ -231,6 +231,24 @@ guarda: è l'unica eccezione alla riga qui sopra. Un ambito sconosciuto vale
 verifica. In locale `verify-local.mjs start` fa lo stesso per la `chiusura`,
 leggendo `giroStretto` insieme ai bilanci.
 
+**Il riallineamento si riconosce dappertutto** (#532). Una fusione fallita
+(conflitto, o unit rossi sul risultato) non è una bocciatura, e chi guarda deve
+poterlo distinguere senza leggere la nota. Il server lo scrive in tre posti,
+con la stessa parola:
+
+- sul feedback, `statusReason: 'riallineamento'` insieme al rientro in
+  `revision_capability` (anche nel cammino `design → todo →
+  revision_capability` dopo un'approvazione L5); lo toglie quando la pratica
+  esce da `revision_capability`. Lo leggono la scheda in coda, l'etichetta
+  dello stato e il pannello dello stato in Gestione;
+- nella voce del registro dei worker (`config/automation.workerLog`),
+  `caso: 'riallineamento' | 'ripresa'` per il `fixer` e `caso:
+  'riallineamento'` per il `verifier` con quell'ambito. La scheda Log li
+  chiama per nome, e le statistiche non contano il controllo dopo un
+  riallineamento fra le critiche;
+- nella serie che riceve il `verifier`, `caso: 'riallineamento'` sulla critica
+  scritta dal server: dispatch non la conta come giro nell'avvertenza di serie.
+
 La riga che conta è `secaudit`: **il controllo di sicurezza non deve leggere
 testo scritto da sconosciuti**, o il testo può convincerlo. Senza chiave sulla
 macchina, quel feedback per lui è un blob illeggibile — non una regola da

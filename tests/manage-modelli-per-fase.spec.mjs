@@ -133,7 +133,7 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
 
   // Tutte le fasi, ognuna con le sue due tendine; quello che c'è già sul server si vede.
   await expect(page.locator('#mgRoleModels select')).toHaveCount(10);
-  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Correzione', 'Controllo cieco', 'Esplorazione']);
+  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Riallineamento e ripresa', 'Controllo cieco', 'Esplorazione']);
   await expect(tendina(page, 'secaudit', 'effort').locator('.sn-select-value')).toHaveText('high');
   await expect(tendina(page, 'verifier', 'model').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('');
@@ -167,7 +167,7 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
 
   await page.emulateMedia({ colorScheme: 'dark' });
   await scegli(page, 'fixer', 'model', 'Haiku');
-  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Correzione: salvato.');
+  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Riallineamento e ripresa: salvato.');
   await page.locator('#mgRoleModelsBlock').screenshot({ path: 'tests/.shots/1193-modelli-per-fase-scuro.png' });
 });
 
