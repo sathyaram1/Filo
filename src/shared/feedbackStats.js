@@ -630,7 +630,7 @@
     // «passato subito» da «Oggi» e «2 critiche» da «30 giorni».
     var verifichePerNumero = Object.create(null);
     for (i = 0; i < log.length; i++) {
-      if (log[i].role === 'verifier' && log[i].num) conta(verifichePerNumero, log[i].num);
+      if (contaComeGiro(log[i]) && log[i].num) conta(verifichePerNumero, log[i].num);
     }
     for (i = 0; i < log.length; i++) {
       var e = log[i];
