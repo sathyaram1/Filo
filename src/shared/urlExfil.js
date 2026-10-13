@@ -362,9 +362,8 @@
     const suo = (p) => dAlnum.includes(p) || dCifre.some((c) => c.includes(p));
     const reason = 'contiene un dato che hai scritto in chat';
     for (const t of datiScritti(testo)) if (esposto.includes(t) && !suo(t)) return { reason };
-    const nellUrl = cifreVicine(varianti(carrierTesto(url)));
     for (const c of cifreScritte(testo)) {
-      for (const r of nellUrl) {
+      for (const r of fuori.cifre) {
         const pezzo = r.includes(c) ? c : (r.length > CIFRE_SCRITTE && c.includes(r) ? r : '');
         if (pezzo && !suo(pezzo)) return { reason };
       }
