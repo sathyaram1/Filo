@@ -2493,7 +2493,7 @@
         Number(fb.stalls) || Number(fb.workingResets) || 0
       ));
       item.title = (num ? `#${num} · ` : '') + title
-        + (leggibile && MR.motivoDiStato(fb) ? ` — ${MR.reasonText(MR.motivoDiStato(fb))}` : '')
+        + (motivo ? ` — ${MR.reasonText(motivo)}` : '')
         + (ferma ? ` — ${fusioneTesti.tooltip}` : '')
         + (arrivata ? ' — arrivata qui mentre la pagina era aperta' : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
