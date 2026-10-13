@@ -74,7 +74,7 @@ test('r3 la parola d’ordine revocata spegne anche il token di filo-lavori del 
     'routine-leases/L1': { holder: fp, expiresAtMs: NOW + 2 * H },
     [`routine-git-tokens/${fp}`]: {
       attivo: true, emessi: 1, scadeIl: NOW + 50 * 60e3, impronta: gitToken.impronta(token),
-      cifrato: gitToken.cifra(token, `${process.env.GH_LAVORI_APP_PRIVATE_KEY}\n`),
+      cifrato: gitToken.cifra(token, R('src/routine/appAuth').normalizePem(process.env.GH_LAVORI_APP_PRIVATE_KEY)),
     },
   });
   const revocati = [];
