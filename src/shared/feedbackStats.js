@@ -275,6 +275,12 @@
   var RUOLI_LAVORO = ['new-work', 'fixer', 'resolver', 'verifier', 'secaudit'];
   function isLavoro(role) { return RUOLI_LAVORO.indexOf(role) >= 0; }
 
+  // Il controllo dopo un riallineamento (#532) è un lancio del verificatore, ma non segue una critica: il lavoro
+  // aveva passato le verifiche e la fusione è fallita. Contarlo come giro farebbe sembrare bocciato un lavoro buono.
+  function contaComeGiro(e) { return e.role === 'verifier' && e.caso !== 'riallineamento'; }
+  // La chiave delle barre «per mestiere»: il caso separa il riallineamento dalla ripresa.
+  function chiaveMestiere(e) { return e.caso ? e.role + ':' + e.caso : e.role; }
+
   // ── Conti ─────────────────────────────────────────────────────────────────
 
   function mediana(valori) {
