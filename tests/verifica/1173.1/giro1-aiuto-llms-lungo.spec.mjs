@@ -52,7 +52,7 @@ for (const [nome, testo] of [
     await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('Risposta di prova.', { timeout: 20_000 });
     const sistemi = await app.evaluate(() => globalThis.__sistemi);
     expect(sistemi.length).toBeGreaterThan(0);
-    expect(sistemi[0], 'il contenuto del llms.txt è arrivato nel prompt').toContain('<<<<<<<<<<');
+    expect(sistemi[0], 'il contenuto del llms.txt è arrivato nel prompt').toContain(testo.slice(0, 40));
     const buco = await app.evaluate(() => { clearInterval(globalThis.__battito); return globalThis.__buco; });
     expect(buco, `il main è rimasto fermo ${buco} ms`).toBeLessThan(1500);
   });
