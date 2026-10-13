@@ -771,11 +771,9 @@ module.exports = function register(on, ctx) {
   // chiavi dell'utente). Solo metadati, nessuna inferenza. Ritorna
   // { ok, items: [{ id, label }] } già ordinati dal più recente e con
   // l'etichetta di categoria (Testo / Multimodale / Sintesi vocale / …).
-  on(MSG.DEFAULT_MODELS_LIST, async (msg) => {
+  on(MSG.DEFAULT_MODELS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const provider = 'openrouter';
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const apiKey = await defaultKeyFor(provider, Defaults.get());
