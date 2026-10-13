@@ -390,3 +390,19 @@ test('una cartella che il sistema non lascia leggere non passa per vuota, né in
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// #256.10 — con qualche migliaio di file la riga dello stato scrive ogni numero allo stesso modo, col punto delle migliaia.
+test('lo stato dei documenti in Preferenze scrive tutti i numeri col punto delle migliaia', async ({ app, openTab }) => {
+  await app.evaluate(() => {
+    const I = globalThis.SN_DOCUMENTI_INDICE;
+    I.__statoVero = I.stato;
+    I.stato = async () => ({ documenti: 5000, scansioni: 1200, inCorso: { fatti: 1233, totali: 5000 } });
+  });
+  try {
+    const pref = await openTab('filo://preferences/preferences.html');
+    await expect(pref.locator('#documentiStato'))
+      .toHaveText('5.000 documenti, di cui 1.200 scansioni senza testo · ne sto leggendo 1.234 di 5.000', { timeout: 10_000 });
+  } finally {
+    await app.evaluate(() => { const I = globalThis.SN_DOCUMENTI_INDICE; I.stato = I.__statoVero; delete I.__statoVero; });
+  }
+});

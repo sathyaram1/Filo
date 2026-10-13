@@ -87,3 +87,26 @@ test('quello che legge l\'utente: tetto in token e limite di spesa col punto del
   assert.equal(K.fraseCambio({ chiave: 'contestoFilo.token', prima: 2000, dopo: 4000 }), 'tetto in token di quello che la chat ricorda: 2.000 token → 4.000 token');
   assert.equal(K.fraseCambio({ chiave: 'monthlyLimitEur', prima: 5, dopo: 2500.5 }), 'limite di spesa mensile: 5 € → 2.500,50 €');
 });
+
+test('anche i numeri scritti senza Intl: millisecondi, caratteri e valori con decimali prendono il punto delle migliaia', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  globalThis.self = globalThis;
+  for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'filoMemory', 'preferences', 'cambi']) {
+    require(`../../src/shared/${m}.js`);
+  }
+  const P = globalThis.SN_PREF;
+  const K = globalThis.SN_CAMBI;
+  const C = globalThis.SN_CONST;
+  assert.equal(P.buildPreferencePartial('barra_uscita', '1500 ms').label, 'La barra si chiude 1.500 ms dopo che il mouse esce');
+  assert.equal(P.buildPreferencePartial('barra_attesa', '2,5 s').label, 'Attesa sul bordo prima che la barra si apra → 2.500 ms');
+  assert.equal(P.buildPreferencePartial('barra_attesa', '9000 ms').rifiuto, '9.000 ms è fuori dai limiti: da 100 a 3.000 ms');
+  assert.match(P.buildPreferencePartial('stile_agente', 'a'.repeat(1234)).rifiuto, /^lo stile è lungo 1\.234 caratteri e il massimo è /);
+  assert.match(P.lezioneDaAzione({ testo: 'a'.repeat(C.LESSON_MAX + 1000) }).rifiuto, /^la lezione è lunga \d\.\d{3} caratteri/);
+  assert.equal(K.fraseCambio({ chiave: 'barraLaterale.uscitaMs', prima: 400, dopo: 1500 }), 'tempo prima che la barra laterale si chiuda: 400 ms → 1.500 ms');
+  assert.equal(K.fraseCambio({ chiave: 'contestoFilo.giorni', prima: 3, dopo: 0.5 }), 'giorni di conversazioni che la chat ricorda: 3 giorni → 0,5 giorni');
+  assert.equal(K.fraseCambio({ chiave: 'tts.rate', prima: 1, dopo: 1.25 }), 'velocità di lettura: 1× → 1,25×');
+  assert.equal(P.buildPreferencePartial('velocita_lettura', '1,5').label, 'Velocità lettura → 1,5×');
+  assert.equal(P.buildPreferencePartial('velocita_lettura', '1,25').label, 'Velocità lettura → 1,25×');
+  assert.equal(P.buildPreferencePartial('tono_lettura', '1,3').label, 'Tono lettura → 1,3');
+});

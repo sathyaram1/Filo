@@ -1,7 +1,8 @@
 // Le prove dei moduli che misurano la sessione non vedono la sessione che le lancia, comunque siano lanciate: il
 // lanciatore toglie la sua identità (#949.1), tests/helpers/senzaSessione.mjs la toglie a un `node --test` diretto (#1071.6)
-// e ai figli che le prove lanciano (#1141.1).
-import { ambienteSenzaSessione, NESSUN_TRANSCRIPT } from '../helpers/senzaSessione.mjs';
+// e tests/helpers/sessione.mjs ai figli che le prove lanciano (#1141.1).
+import '../helpers/senzaSessione.mjs';
+import { senzaSessione, NESSUN_TRANSCRIPT } from '../helpers/sessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -19,7 +20,7 @@ const ROOT = resolve(QUI, '..', '..');
 const MISURANO = /routine-channel\.mjs|session-report\.mjs|consumo-progressivo\.mjs/;
 const CANALE = resolve(ROOT, 'scripts', 'routine-channel.mjs');
 const TK = 'bigliettodiprova0123';
-const IMPORTA = /^import (?:\{[^}]*\} from )?'\.\.\/helpers\/senzaSessione\.mjs';$/m;
+const IMPORTA = /^import '\.\.\/helpers\/senzaSessione\.mjs';$/m;
 
 test('chi prova i moduli che misurano la sessione importa senzaSessione', () => {
   const testo = (f) => readFileSync(join(QUI, f), 'utf8');
@@ -75,12 +76,18 @@ test.after(() => { for (const d of fatte) { try { togliCartella(d); } catch (_) 
 test('via l\'identità della sessione, un transcript dichiarato che non c\'è, e il resto dell\'ambiente resta', () => {
   const vera = { PATH: '/bin', FILO_ROUTINE_API: 'http://x', FILO_USER_DATA: '/dati' };
   for (const k of IDENTITA_SESSIONE) vera[k] = 'valore-vero';
-  const e = ambienteSenzaSessione(vera);
+  const e = senzaSessione(vera);
   for (const k of IDENTITA_SESSIONE.filter((x) => x !== 'FILO_TRANSCRIPT')) assert.equal(k in e, false, k);
   assert.equal(e.FILO_TRANSCRIPT, NESSUN_TRANSCRIPT);
   assert.equal(existsSync(NESSUN_TRANSCRIPT), false);
   assert.deepEqual([e.PATH, e.FILO_ROUTINE_API, e.FILO_USER_DATA], ['/bin', 'http://x', '/dati']);
   assert.equal(vera.FILO_ROUTINE, 'valore-vero', 'l\'ambiente di partenza non si tocca');
+});
+
+test('il transcript dichiarato e assente vive in un aiuto solo', () => {
+  const AIUTI = resolve(QUI, '..', 'helpers');
+  const conRegola = readdirSync(AIUTI).filter((f) => f.endsWith('.mjs') && /transcript-che-non-esiste/.test(readFileSync(join(AIUTI, f), 'utf8')));
+  assert.deepEqual(conRegola, ['sessione.mjs']);
 });
 
 /** Una sessione di routine finta: il suo transcript sta dove il ripiego del «più recente» lo trova, dalla cartella del figlio. */
@@ -124,13 +131,13 @@ for (const [porta, routine] of [['FILO_ROUTINE ereditato', true], ['il biglietto
     const { lavoro, config } = sessioneFinta({ biglietto: !routine });
     const { srv, corpi, port } = await fintoServer();
     try {
-      const vera = { ...ambienteSenzaSessione(), CLAUDE_CONFIG_DIR: config, FILO_REPO_ROOT: lavoro, FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+      const vera = { ...senzaSessione(), CLAUDE_CONFIG_DIR: config, FILO_REPO_ROOT: lavoro, FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
       delete vera.FILO_TRANSCRIPT;
       if (routine) vera.FILO_ROUTINE = '1';
       const nuda = await risposta(vera, lavoro);
       assert.equal(nuda.status, 0, nuda.stderr);
       assert.equal(corpi[0].consumo && corpi[0].consumo.sessionId, 'sessione-vera', 'la sessione finta si fa misurare: la prova sotto vale');
-      const isolata = await risposta(ambienteSenzaSessione(vera), lavoro);
+      const isolata = await risposta(senzaSessione(vera), lavoro);
       assert.equal(isolata.status, 0, isolata.stderr);
       assert.deepEqual(corpi[1], { ticket: TK, op: 'answer', answer: 'niente' });
     } finally { srv.close(); }

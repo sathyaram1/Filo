@@ -2,7 +2,7 @@
 // domanda/risposta), lo strumento dell'owner (routine-domanda.mjs) e i testi di ruolo.
 // Il server può non avere ancora l'endpoint: allora si chiude comunque (exit 2).
 
-import { ambienteSenzaSessione } from '../helpers/senzaSessione.mjs';
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -21,9 +21,11 @@ const owner = await import('../../scripts/routine-domanda.mjs');
 const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
 const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
 
+const { senzaSessione } = await import('../helpers/sessione.mjs');
+
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 // Il biglietto nella cartella di una routine fa misurare la sessione vera anche senza il suo ambiente (#949.1):
-// misure finte qui; il figlio parte da ambienteSenzaSessione.
+// misure finte qui, e per il figlio senzaSessione().
 const piano = { sleep: async () => {}, misureCrediti: () => ({}) };
 
 // ─── corpi delle richieste ──────────────────────────────────────────────────
@@ -159,7 +161,7 @@ function fintoServer(status, risposta) {
 
 // spawn ASINCRONO: il server finto vive in questo processo.
 function cli(port, args, stdin = '') {
-  const env = { ...ambienteSenzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+  const env = { ...senzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
   return new Promise((risolvi) => {
     const p = spawn(process.execPath, [CANALE, ...args], { env });
     let stdout = ''; let stderr = '';
