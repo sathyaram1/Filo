@@ -191,7 +191,10 @@
     api.misure({ icone });
   }
   window.addEventListener('resize', misura);
-  nav.addEventListener('scroll', misura, { passive: true });
+  nav.addEventListener('scroll', () => {
+    if (suggDi && nav.contains(suggDi)) nascondiSuggerimento();
+    misura();
+  }, { passive: true });
 
   // ── il sistema: ora e voci fisse ─────────────────────────────────────────
   const FISSE = [
