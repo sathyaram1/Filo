@@ -20,6 +20,9 @@
   // a mano è il modo con cui il menu del tasto destro è tornato a mentire.
   const Tasti = global.SN_TASTI;
   const LinkSospetto = global.SN_LINK_SOSPETTO;
+  // I pezzi che questo file mette nel documento del sito vanno avanti solo per un tasto o un clic dell'utente: lo script
+  // della pagina li raggiunge e ci fabbrica sopra eventi (#592.16). Chiudere resta aperto a tutti.
+  const gestoVero = (e) => !!global.SN_FILO_UI?.gestoVero(e);
 
   // Dipendenze iniettate da content.js (vedi init in fondo).
   let deps = {

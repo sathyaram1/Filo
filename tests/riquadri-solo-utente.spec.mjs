@@ -437,9 +437,7 @@ const MARTELLO = `<script>
 test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente non fa partire niente: spiegazione, Modifica, feedback', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   await contaChiamate(app);
-  const page = await testServer.openReady(openTab, pagina(`<p id="parola" style="font-size:20px">supercalifragilistico</p>
-    <textarea id="campo" style="width:400px;height:80px">Un testo con un erore.</textarea>${MARTELLO}`));
-  await spiaInvii(app, page);
+  const page = await testServer.openReady(openTab, pagina(`<p id="parola" style="font-size:20px">supercalifragilistico</p>${MARTELLO}`));
 
   // Spiega: dopo la risposta l'utente mette il cursore nella casella della domanda e resta fermo.
   await page.locator('#parola').dblclick();
@@ -457,6 +455,8 @@ test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente 
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
 
   // Modifica: l'utente la apre sulla selezione e mette il cursore nell'istruzione.
+  await page.evaluate(() => document.body.insertAdjacentHTML('afterbegin', '<textarea id="campo" style="width:400px;height:80px">Un testo con un erore.</textarea>'));
+  await page.locator('#campo').click();
   await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
   await page.locator('#campo').click({ button: 'right' });
   await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
@@ -473,6 +473,7 @@ test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente 
   await expect.poll(() => conta(app, page, '.sn-editbox')).toBe(0);
 
   // Invia feedback: l'utente apre il modulo e mette il cursore nella casella.
+  await spiaInvii(app, page);
   await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
   await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
   await scrivi(app, page, '.sn-fb-text', 'Il tasto indietro non va');
