@@ -344,6 +344,9 @@ test('F — nove ricerche e poi niente: la chat dice che si è fermato con «Con
   await expect(fermo).toHaveText(/Mi sono fermato dopo 9 passi senza arrivare a una risposta\./, { timeout: 30_000 });
   await expect(page.locator('.dash-activity .dash-activity-label').first()).toHaveText(/^Ha cercato sul web 9 volte/);
   await expect(fermo.locator('.dash-continua')).toBeVisible();
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark');
+  await page.screenshot({ path: 'tests/.shots/chat-senza-risposta-scuro.png' });
 
   // Scrivere altro chiude l'offerta; un turno di sole azioni che non dice niente resta senza bolla.
   await page.locator('#input').fill('lascia stare, metti un timer per la pasta');
