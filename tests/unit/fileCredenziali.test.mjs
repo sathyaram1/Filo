@@ -106,13 +106,13 @@ test('un disco che non risponde non è «nessuna chiave»: alla domanda dopo la 
   assert.equal(W.personalKey(), 'sk-or-2');
 });
 
-test('togliere il portafoglio porta via anche l\'ultimo stato', () => {
+test('mettere da parte il portafoglio porta via anche l\'ultimo stato', () => {
   const dir = nuovaCartella();
   const W = fresco('wallet-store.js');
   W.save({ key: 'sk-or-3' });
   W.saveLastServer({ hasWallet: true });
-  W.clear();
-  assert.deepEqual(fs.readdirSync(dir), []);
+  W.metteDaParte();
+  assert.deepEqual(fs.readdirSync(dir), ['wallet.bin.prev']);
   assert.equal(W.lastServer(), null);
 });
 
@@ -143,7 +143,7 @@ test('un\'identità che non si decifra si mette da parte invece di sparire', () 
   const veroWarn = console.warn; console.warn = () => {};
   ripristini.push(() => { console.warn = veroWarn; });
   assert.equal(A.restore(), false);
-  const daParte = fs.readdirSync(dir).filter((n) => n.startsWith('identity.bin.rovinato-'));
+  const daParte = fs.readdirSync(dir).filter((n) => n.startsWith('identity.bin.illeggibile-'));
   assert.equal(daParte.length, 1);
   assert.equal(fs.readFileSync(join(dir, daParte[0]), 'utf8'), 'blob di un altro utente');
 });
