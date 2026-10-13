@@ -15,6 +15,8 @@ const CAMPI_WEB = Object.freeze({
     saturazione_tab: true, luminosita_tab: true, opacita_tab: true,
   }),
   blocklist: true,
+  // I siti dove il tasto destro apre il loro menu (#975): come i siti esclusi, arriva solo la voce del frame che chiede.
+  menuDelSito: Object.freeze({ siti: true }),
   featureFlags: Object.freeze({ spellcheck: true }),
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),
   // Quanto restano gli avvisi di Filo dentro la pagina: la durata delle Preferenze vale anche lì.
