@@ -1148,14 +1148,18 @@
 
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
   function gitPerimetro(trimmed, c) {
-    if (subcommandOf(trimmed) === 'grep') return due(MOTIVI.ricorsivo);
+    const sub = subcommandOf(trimmed);
+    if (sub === 'grep') return due(MOTIVI.ricorsivo);
     const args = gitArgsAfterSub(trimmed);
     const libero = args.includes('--no-index');
     const sep = args.indexOf('--');
+    // In una cwd di rete il nome che git risolve contro la cartella (anche prima
+    // del `--`) va al remoto: lo si misura come un percorso, come `ls` (#1072.4).
+    const reteNome = !!(c.cwd && c.cwd.rete) && GIT_NOME_IN_CWD.has(sub);
     const percorsi = [];
     args.forEach((a, i) => {
       if (a.startsWith('-')) return;
-      if (libero || (sep >= 0 && i > sep)) { percorsi.push(a); return; }
+      if (libero || (sep >= 0 && i > sep) || (reteNome && (sep < 0 || i < sep))) { percorsi.push(a); return; }
       const m = /^[^:\\/]*:(.+)$/.exec(a);
       if (m && !/^[A-Za-z]:[\\/]/.test(a)) percorsi.push(m[1]);
     });
