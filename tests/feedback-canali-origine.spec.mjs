@@ -22,9 +22,11 @@
 // Il secondo test guarda le ALTRE porte del proprietario che vivono nello
 // stesso canale: i modelli predefiniti (che valgono per tutte le installazioni
 // di Filo), l'automazione, i bilanci dei giri, i modelli dei giudici, i
-// registri del lavoro e delle routine. Sono la stessa famiglia e vanno chiuse
+// registri del lavoro e delle routine, i codici del red team, le prove e i
+// cataloghi dei modelli predefiniti. Sono la stessa famiglia e vanno chiuse
 // insieme: una difesa messa su quattro porte su nove è una porta aperta con
-// accanto un cartello che dice dove.
+// accanto un cartello che dice dove. Il test che segue le bussa con la
+// sessione del proprietario aperta, cioè là dove passerebbero.
 //
 // Il terzo guarda le porte VICINE, che non sono del proprietario ma di
 // chiunque abbia fatto l'accesso: uscire dall'account, votare in bacheca,
