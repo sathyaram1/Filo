@@ -195,7 +195,8 @@ export async function controllaRamoServer({ ramo, feedbackId, verdetto, cartella
 }
 
 /**
- * Tutto il giro; ritorna il codice d'uscita (0 fatto, 1 fermo, 2 uso, 3 pratica rifiutata, 4 server non raggiungibile).
+ * Tutto il giro; ritorna il codice d'uscita (0 fatto, 1 fermo, 2 uso, 3 pratica rifiutata, 4 server non raggiungibile,
+ * 5 ramo assente sul server: USCITA_SOLO_APP).
  * Le dipendenze si iniettano nei test; la rete passa dal fetch globale, come negli strumenti delle pratiche.
  */
 export async function esegui(argv, deps = {}) {
