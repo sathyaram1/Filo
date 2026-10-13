@@ -455,7 +455,7 @@
       self.__snSetContextMenuHandler(onContextMenu);
     } else {
       window.addEventListener('contextmenu', (e) => {
-        if (e.defaultPrevented) return; // la pagina interna ha il SUO menu
+        if (e.defaultPrevented || e.shiftKey) return; // la pagina interna ha il SUO menu; Shift lascia quello nativo
         onContextMenu(e);
       });
     }
