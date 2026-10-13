@@ -352,10 +352,7 @@ test('F — nove ricerche e poi niente: la chat dice che si è fermato con «Con
   await expect(page.locator('.dash-activity .dash-activity-label').nth(1)).toHaveText(/^Ha avviato un timer/, { timeout: 10_000 });
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Mi sono fermato' })).toHaveCount(1);
 
-  await app.evaluate(async () => {
-    globalThis.__restoreProvider6?.();
-    for (const t of await globalThis.SN_FILO_MEMORY.listTimers()) await globalThis.SN_FILO_MEMORY.removeTimer?.(t.id);
-  });
+  await app.evaluate(() => { try { globalThis.__restoreProvider6?.(); } catch (_) {} });
 });
 
 test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima degli argomenti', async ({ app, shell }) => {
