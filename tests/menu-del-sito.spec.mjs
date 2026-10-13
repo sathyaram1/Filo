@@ -3,7 +3,6 @@
 // e accettato il menu di Filo resta a Shift. Una pagina senza menu suo non ha la voce.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo } from './helpers/riquadri.mjs';
 
 const MENU_SUO = `<!doctype html><html><head><meta charset="utf-8">
 <meta property="og:site_name" content="Sito di prova"><title>Menu proprio</title>
@@ -103,49 +102,36 @@ test('«Menu di <sito>» in cima apre il menu della pagina nello stesso punto, e
   expect(await riservaAperta(app)).toBe(false);
 });
 
-// Gli strumenti di Playwright, appena una prova legge la pagina, si iscrivono anche loro al tasto destro sulla finestra
-// della pagina: dove la voce NON deve esserci si legge e si clicca solo da fuori (il mondo di Filo, il mouse vero).
-async function apriSenzaStrumenti(app, openTab, testServer, html, opzioni = {}) {
-  const page = await openTab(testServer.html(html, opzioni));
-  await expect.poll(() => nelMondoDiFilo(app, page, () => document.documentElement.dataset.filoContentReady === '1'), { timeout: 10_000 }).toBe(true);
-  return page;
-}
-async function tastoDestro(app, page, sel) {
-  const p = await nelMondoDiFilo(app, page, (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { x: r.left + 20, y: r.top + 8 }; }, sel);
-  await page.mouse.click(p.x, p.y, { button: 'right' });
-}
-// null finché il menu di Filo non c'è; poi le voci «Menu di …» che ha.
-const vociDelSito = (app, page) => nelMondoDiFilo(app, page, () => (document.querySelector('.sn-menu')
-  ? [...document.querySelectorAll('.sn-menu .sn-menu-split-main .sn-menu-label')].map((n) => n.textContent).filter((t) => /^Menu di/.test(t))
-  : null));
+const vociDelSito = (page) => page.locator('.sn-menu .sn-menu-split-main', { hasText: /^Menu di/ });
 
-test('una pagina senza menu suo, o un\'app React senza onContextMenu, non ha la voce; con onContextMenu sì', async ({ app, openTab, testServer }) => {
-  const semplice = await apriSenzaStrumenti(app, openTab, testServer, SENZA_MENU);
-  await tastoDestro(app, semplice, '#testo');
-  await expect.poll(() => vociDelSito(app, semplice)).toEqual([]);
+// Anche gli strumenti di Playwright ascoltano il tasto destro sulla finestra della pagina, con un ascoltatore solo per
+// dodici eventi: come un registratore di sessione, non sono un menu, e queste prove lo verificano di passaggio.
+test('una pagina senza menu suo, o un\'app React senza onContextMenu, non ha la voce; con onContextMenu sì', async ({ openTab, testServer }) => {
+  const semplice = await testServer.openReady(openTab, SENZA_MENU);
+  await semplice.locator('#testo').click({ button: 'right' });
+  await expect(semplice.locator('.sn-menu')).toBeVisible();
+  await expect(vociDelSito(semplice)).toHaveCount(0);
 
   // Un altro host: le schede si ritrovano per host.
-  const react = await apriSenzaStrumenti(app, openTab, testServer, COME_REACT, { pubblico: true });
-  await tastoDestro(app, react, '#senza');
-  await expect.poll(() => vociDelSito(app, react)).toEqual([]);
+  const react = await testServer.openReady(openTab, COME_REACT, { pubblico: true });
+  await react.locator('#senza').click({ button: 'right' });
+  await expect(react.locator('.sn-menu')).toBeVisible();
+  await expect(vociDelSito(react)).toHaveCount(0);
   await react.keyboard.press('Escape');
-  await tastoDestro(app, react, '#con');
-  await expect.poll(() => vociDelSito(app, react)).toEqual(['Menu di sito-pubblico.test']);
+  await react.locator('#con').click({ button: 'right' });
+  await expect(vociDelSito(react)).toHaveText(['Menu di sito-pubblico.test']);
 });
 
 test('su un sito che blocca il tasto destro senza un menu suo, la voce apre quello del browser e poi sparisce', async ({ app, openTab, testServer }) => {
-  const page = await apriSenzaStrumenti(app, openTab, testServer, SOLO_BLOCCO);
-  await tastoDestro(app, page, '#testo');
-  await expect.poll(() => vociDelSito(app, page)).toEqual(['Menu di 127.0.0.1']);
-  const voce = await nelMondoDiFilo(app, page, () => {
-    const r = document.querySelector('.sn-menu .sn-menu-split-main').getBoundingClientRect();
-    return { x: r.left + 10, y: r.top + r.height / 2 };
-  });
-  await page.mouse.click(voce.x, voce.y);
+  const page = await testServer.openReady(openTab, SOLO_BLOCCO);
+  await page.locator('#testo').click({ button: 'right' });
+  await expect(vociDelSito(page)).toHaveText(['Menu di 127.0.0.1']);
+  await vociDelSito(page).click();
   await expect.poll(() => riservaAperta(app), { timeout: 5000 }).toBe(true);
   await page.keyboard.press('Escape');
-  await tastoDestro(app, page, '#testo');
-  await expect.poll(() => vociDelSito(app, page)).toEqual([]);
+  await page.locator('#testo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible();
+  await expect(vociDelSito(page)).toHaveCount(0);
 });
 
 test('scelto tre volte, Filo propone una volta il menu del sito; accettato, il tasto destro apre quello e Shift quello di Filo', async ({ app, openTab, testServer, avvisi }) => {

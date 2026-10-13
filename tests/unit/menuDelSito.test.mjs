@@ -106,9 +106,10 @@ test('lo stesso ascoltatore sulla finestra per tanti eventi guarda i clic, non a
   finestra.removeEventListener('contextmenu', suo);
   for (const t of tipi) finestra.removeEventListener(t, tutti, true);
   // Pochi eventi con lo stesso ascoltatore restano un ascolto vero.
-  for (const t of ['pointerdown', 'pointerup', 'contextmenu']) finestra.addEventListener(t, tutti);
+  const tela = (e) => e;
+  for (const t of ['pointerdown', 'pointerup', 'contextmenu']) finestra.addEventListener(t, tela);
   assert.equal(ascolta(), true);
-  for (const t of ['pointerdown', 'pointerup', 'contextmenu']) finestra.removeEventListener(t, tutti);
+  for (const t of ['pointerdown', 'pointerup', 'contextmenu']) finestra.removeEventListener(t, tela);
 });
 
 test('chi ascoltava e non ha mostrato niente non conta più, e il segreto non lo indovina chi non lo sa', () => {
