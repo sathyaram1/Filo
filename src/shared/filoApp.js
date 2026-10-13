@@ -1,6 +1,6 @@
 // Le conversazioni delle altre app (Editor, Mazzi, Aiuto) nel filo (#974): una riga ripiegata ciascuna. Logica pura:
 // le scrive solo src/main/services/conversazioniApp.js, le mostra la home. Regole:
-// patterns/le-chat-delle-app-entrano-nel-filo-ripiegate.md, sentinella tests/unit/filoApp.test.mjs.
+// patterns/il-filo-cresce-solo-in-coda-e-cancellare-e-un-evento.md (§ chat delle altre app), sentinella tests/unit/filoApp.test.mjs.
 
 (function (global) {
   'use strict';
