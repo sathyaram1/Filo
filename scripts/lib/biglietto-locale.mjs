@@ -336,6 +336,11 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
         path = p ? p.path : ereditato.path;
         fiducia = p ? p.fiducia : 'non_fidato';
       }
+      // Il figlio ha un nome di sessione suo: la copia sotto quel nome lo fa trovare ai comandi che non hanno la variabile.
+      const radice = radiceCondivisa(cwd);
+      const suo = radice && ID_RE.test(sessionId) ? join(cartellaBiglietti(radice), `${sessionId}.json`) : '';
+      const ereditatoOra = suo && resolve(suo) !== resolve(path) ? leggiFile(path) : null;
+      if (ereditatoOra) { try { scriviFile(suo, ereditatoOra); } catch (_) { /* resta la variabile, per Bash */ } }
     }
     if (!path && (source === 'resume' || source === 'compact')) {
       const radice = radiceCondivisa(cwd);
