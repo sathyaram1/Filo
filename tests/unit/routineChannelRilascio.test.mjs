@@ -20,7 +20,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
-const { rapportoVuoto } = await import('../../scripts/session-report.mjs');
+const { rapportoVuoto, slugProgetto } = await import('../../scripts/session-report.mjs');
 const { ambientePerITest } = await import('../../scripts/run-unit-tests.mjs');
 
 test('il rapporto di ripiego, quando generarlo fallisce, porta la stessa versione di quello vero', () => {
@@ -421,6 +421,36 @@ describe('release da riga di comando', () => {
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
       assert.equal(g(work, ['status', '--porcelain']), '');
+    } finally {
+      for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      srv.close();
+    }
+  });
+
+  // La condizione della segnalazione: chi lancia si è dichiarato routine e ha un transcript, e il rilascio provato
+  // lo trovava col ripiego del «più recente». Qui la si ricrea anche fuori da una routine.
+  test('una routine che lancia le prove non entra nel rilascio provato: né il suo consumo nel corpo, né il suo stato nella cartella', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { base, work } = scena();
+    const config = resolve(base, 'claude-di-chi-lancia');
+    const progetto = resolve(config, 'projects', slugProgetto(process.cwd()));
+    mkdirSync(progetto, { recursive: true });
+    const uso = { input_tokens: 5, cache_read_input_tokens: 40000, cache_creation_input_tokens: 2000, output_tokens: 700 };
+    writeFileSync(resolve(progetto, 'sessione-di-chi-lancia.jsonl'),
+      `${JSON.stringify({ type: 'assistant', message: { id: 'm1', model: 'claude-opus-5-5', usage: uso, content: [] } })}\n`);
+    const prima = { FILO_ROUTINE: process.env.FILO_ROUTINE, CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR };
+    Object.assign(process.env, { FILO_ROUTINE: '1', CLAUDE_CONFIG_DIR: config });
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/14']);
+      writeFileSync(resolve(work, 'nato-da-shell.txt'), 'x\n', 'utf8');
+      const r = await cli(['release', 'tkt-cli', '--senza-rapporto', '--guasto', 'motivo'], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
+      });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' }, 'il consumo di chi lancia non è del rilascio provato');
+      assert.equal(g(work, ['status', '--porcelain']), '', 'niente di chi lancia resta nella cartella di prova');
+      assert.equal(g(work, ['log', '-1', '--format=%an']), 'claude-local', 'chi committa è la prova, non la routine che la lancia');
     } finally {
       for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
       srv.close();
