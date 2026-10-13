@@ -15,6 +15,9 @@
   const CUSTOM_KEY = '__custom__';
 
   function $(id) { return document.getElementById(id); }
+  // Ogni numero che la pagina scrive passa da qui: 1.234 e 1,5 (regola in tests/unit/numeriItaliani.test.mjs).
+  const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
+  const unDecimale = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   // Nessuna casella della pagina ha un «Salva», e chiudere o cambiare scheda non avvisa la pagina (#590.5): ognuna
   // parte da qui, dopo una pausa o al primo segno di uscita. Uscendo, i numeri fuori scala tornano al valore in uso.
