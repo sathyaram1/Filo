@@ -93,8 +93,10 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   letture (ricerche, file, impostazioni), il main scrive «Mi sono fermato dopo N
   passi senza arrivare a una risposta» e la bolla ha «Continua»: è lo stesso
   «riprendi» (tasto d'invio, tasto destro sul blocco), con un messaggio interno
-  che chiede di non rifare i passi. Il tasto sparisce quando l'offerta finisce
-  (#557, prove E e F di `tests/dashboard-chat-strumenti.spec.mjs`).
+  che chiede di non rifare i passi. Vale anche quando l'ultima frase di lavoro
+  («cerco ancora…») sale nella bolla: resta, e la frase si aggiunge sotto. Il
+  tasto sparisce quando l'offerta finisce (#557, prove E, F e G di
+  `tests/dashboard-chat-strumenti.spec.mjs`).
 - **Lo stop resta scritto dove si decide di riprendere.** Ogni meccanismo che
   ricostruisce il lavoro in sospeso deve sapere che è stato fermato, o lo rifà
   da solo. L'accoglienza riparte da sé quando trova in fondo un messaggio
