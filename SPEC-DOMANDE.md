@@ -376,31 +376,161 @@ lanciare gli altri due anche fuori cadenza.
 L'utente sceglie il canale nelle impostazioni. Il canale stabile è per chi
 preferisce un'esperienza più ferma, con le verifiche fatte poco prima.
 
-### 4.3 Monitoraggio
+### 4.3 Gestione del lavoro
 
-Legge i registri:
+Tre compiti gestiscono il lavoro delle routine: il **monitoraggio**, che
+decide, e il **riordino della coda** (§ 6.6) e la **potatura dei rami**
+(§ 4.7), che lavorano per lui. Lo scopo è uno: fondere più lavoro utile
+possibile per ogni credito speso, a cominciare dal più urgente. Decisioni
+dell'owner del 13/10.
 
-- costi e giri delle routine;
-- fusioni e tempi;
-- accensioni a vuoto;
-- suite, rilasci, esecuzioni in cloud;
-- **tutte le domande passate** con le risposte.
+Il monitoraggio legge i registri: costi e giri delle routine, fusioni e tempi,
+accensioni a vuoto, sessioni, suite, rilasci, esecuzioni in cloud, e **tutte le
+domande passate** con le risposte.
 
-Quando qualcosa non va, apre una domanda o un feedback.
-
-- **Ha un taccuino suo,** persistente sul server: appunti da ricontrollare il
-  giorno dopo, modifiche che sta studiando, ipotesi. Lo legge a ogni
+- **Il suo contesto è sempre non fidato:** legge testo scritto da chiunque.
+  Quindi non scrive codice e non cambia feedback. Apre feedback e domande, e i
+  suoi feedback che toccano L5 li approva l'owner (§ 1.5).
+- **Lancia riordino e potatura per numeri.** Chiede al server di anticipare
+  l'istanza di un ricorrente, al massimo con dei numeri di feedback, mai testo.
+  Come per l'unione (§ 1.3), l'istanza nasce fidata e lavora col suo ambito.
+- **Riordino e potatura gli fanno rapporto:** a fine istanza scrivono nel suo
+  taccuino cosa hanno fatto e cosa hanno trovato.
+- **Le sue leve:** ritmo e parallelismo (§ 4.5), quando lanciare riordino e
+  potatura, indagini ed esperimenti (§ 4.6), la domanda di fine turno dei ruoli
+  (§ 5.4), lo spegnimento in emergenza.
+- **Non sono sue leve:** la priorità dei feedback, i criteri di verifica, i
+  prompt dei ruoli, i blocchi di sicurezza. Può proporre di cambiarli con una
+  domanda. Così non può migliorare i suoi indicatori verificando di meno o
+  gonfiando le priorità.
+- **Spegne in emergenza** routine o account, e riaccende solo quello che ha
+  spento lui, mai quello che ha spento l'owner.
+- **Taccuino**, persistente sul server: appunti da ricontrollare, ipotesi,
+  modifiche in studio, i rapporti di riordino e potatura. Lo legge a ogni
   accensione.
-- **Propone esperimenti** (per esempio rifare un feedback con altri prompt o
-  modelli): diventano domande con azione `esperimento`.
-- **Cambia la domanda di fine turno** dei ruoli (§ 5.4).
-- **Può spegnere** routine o account in emergenza, non riaccenderli. Riaccendere
-  spende, e lo decide l'owner.
+- **Una sessione al giorno**, che riparte dal taccuino, non un contesto che vive
+  per sempre. Le indagini lunghe le fanno sotto-agenti, e il suo contesto resta
+  piccolo.
 - **Segue un problema da vicino:**
   - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
     massimo, così la cache (60 minuti) resta calda;
   - per attese più lunghe chiede al server una **sveglia**, che il pacemaker
     rispetta con un tetto suo, separato da quello del lavoro.
+- **Chi controlla lui:** se il server non lo vede scrivere nel taccuino da 26
+  ore, apre una domanda.
+
+### 4.4 Cosa minimizzare
+
+Il monitoraggio non ha un numero da massimizzare: qualunque conteggio si
+gonfia, spezzando un lavoro in tre, aprendo ogni ritrovamento a parte o alzando
+le priorità. Ha indicatori da tenere bassi, e li usa come indizi, non come
+regole.
+
+- **Lavoro a vuoto:** spesa che non finisce in una fusione al primo colpo.
+  - accensioni a vuoto e compiti morti;
+  - giri di verifica oltre il primo;
+  - riallineamenti con main;
+  - lavori archiviati dopo averci speso.
+- **Contesto inutile:** token letti che al compito non servivano. File interi
+  al posto di un pezzo, uscite non filtrate, istruzioni che il ruolo non usa,
+  rapporti di sotto-agenti incollati interi. Si giudica caso per caso, leggendo
+  le sessioni.
+- **Cache freddata:** contesto scritto in cache e non riletto prima che scada.
+  Pause più lunghe della durata della cache dentro una sessione, sessioni che
+  muoiono subito dopo una scrittura grossa, cambi di modello a metà sessione.
+
+**Vincoli**, che non devono peggiorare: regressioni dopo una fusione, suite
+rossa nuova, feedback riaperti.
+
+**Andamento**, da leggere e non da inseguire: le **radici chiuse**. Una radice
+è una segnalazione nata fuori dalle routine: dell'owner, di un utente, di una
+sessione locale. Figli e derivati non contano come risultato, e il loro costo
+si somma a quello della radice da cui vengono. Un'unione di tre radici ne
+chiude tre. I feedback che le routine aprono da sole (audit, esplorazione,
+monitoraggio) contano solo come spesa. Il costo per radice dipende anche da
+cosa c'è in coda, quindi da solo non dice se il processo è migliorato: lo
+dicono gli esperimenti (§ 4.6).
+
+### 4.5 Ritmo e parallelismo
+
+- Il monitoraggio scrive una **curva**: quanti lavori insieme (N, § 12.2) in
+  base alla quota usata e alle ore che mancano al rinnovo di ciascun account.
+  Il server la applica a ogni battito del pacemaker (10 minuti). Il
+  monitoraggio non è sempre acceso, e a pieno ritmo la quota sale di circa
+  1,4% l'ora (26/09: 662 $ in 21,5 ore).
+- **Niente tetto.** Bruciare una settimana costa solo un po' di efficienza, in
+  riallineamenti: il lavoro resta fatto. Il parallelismo giusto è quello che
+  fonde di più, non quello che spende di più. Oltre un certo N i conflitti con
+  main crescono, e il monitoraggio lo misura.
+- **Inizio settimana più pieno:** spendere presto sfrutta un rinnovo
+  anticipato, se arriva.
+- **Fine quota senza compiti morti.** Vicino al limite la curva scende, per
+  esempio 4 lavori fino al 95% e poi 1. Il server dà biglietti solo ai compiti
+  il cui costo tipico, per fase e ruolo, sta nella quota rimasta. Abbassare N
+  non ferma i lavori in corso (§ 12.2).
+- Resta la **riserva dell'owner** su A (§ 8.2). Non è un tetto al
+  parallelismo: è la quota per le sessioni locali.
+- **Senza curva**, perché il monitoraggio non è mai partito o la curva è
+  scaduta, vale il passo del § 8.2.
+
+### 4.6 Indagini ed esperimenti
+
+- **Indagini.** Quando un indicatore va male, il monitoraggio scende nel caso:
+  un feedback con molti giri di verifica (per esempio 4 o più), una sessione
+  con molto contesto inutile, una fila di compiti morti. Un sotto-agente legge
+  i motivi (rilievi dei giri, registro della sessione), e l'ipotesi va nel
+  taccuino.
+- **Esperimenti.** Un'ipotesi si prova rifacendo un lavoro già fatto con una
+  cosa cambiata: prompt del ruolo, modello, sforzo, contesto. Un esperimento è
+  un compito con ambito `esperimento`:
+  - parte da un commit fissato, lo stato di allora, col numero del feedback;
+  - porta il testo alternativo scritto dal monitoraggio, quindi non fidato;
+  - non fonde, non apre feedback né domande, spinge solo su rami
+    `esperimento/*`;
+  - non vede il `main` di oggi: in una copia del repo il ref `main` è quello
+    attuale, e un esperimento che lo legge falsa il confronto (lab di Haiku,
+    12/10);
+  - l'esito lo confronta con l'originale un giudice cieco.
+
+  Ha meno permessi di un primo lavoro, per questo lo decide il monitoraggio da
+  solo, dentro il budget (§ 4.8).
+- **Proposte.** Se un esperimento conferma l'ipotesi, il monitoraggio apre una
+  domanda con la modifica (a un prompt, ai criteri, a una regola) e le prove.
+  La approva l'owner, perché tocca tutti i lavori futuri. Gli sprechi che si
+  correggono nel codice diventano feedback.
+
+### 4.7 Potatura dei rami
+
+- **La cancellazione è meccanica.** La fa il server il lunedì, per regola: un
+  ramo fuso in `main` che nessun feedback aperto nomina. L'agente non allunga
+  l'elenco.
+- **L'agente capisce perché i rami sono lì.** Prima della cancellazione legge
+  i candidati e gli altri rami fermi (non fusi, o di feedback chiusi senza
+  fusione) e li raggruppa per causa, non uno per uno: il 07/10 erano 617. Per
+  ogni causa:
+  - un problema del processo (per esempio nessuno cancella il ramo dopo la
+    fusione) → un feedback;
+  - lavoro non fuso che forse serve → una domanda, con azioni `riprendi` o
+    `cancella_rami`.
+- Il rapporto va al monitoraggio (§ 4.3).
+
+### 4.8 Budget e rapporto settimanale
+
+- **Budget:** 200 € a settimana per tutta la gestione del lavoro: sessioni del
+  monitoraggio, indagini, esperimenti, istanze di riordino e potatura. È circa
+  il 10% della settimana di un account (§ 8.1). Il monitoraggio lo divide come
+  crede; sforare di poco va bene. Si conta come nei rapporti delle routine.
+- **Oltre il budget** chiede con una domanda, azione `esperimento`.
+- **Rapporto settimanale:** una domanda, anche senza opzioni se non c'è niente
+  da decidere. Contiene:
+  - cosa ha fatto: curve, indagini, esperimenti, feedback e domande aperti;
+  - l'andamento degli indicatori (§ 4.4) rispetto alle settimane prima;
+  - una **stima del risparmio** e quanto è costato lui, per decidere se il
+    ruolo serve ancora e con che budget. È una stima con l'incertezza
+    dichiarata: dagli esperimenti quando ci sono, altrimenti dal prima e dopo
+    di ogni modifica.
+- **In mezzo alla settimana** le domande arrivano quando servono, come tutte le
+  altre.
 
 ## 5. Ambiti: i permessi stanno sul server
 
