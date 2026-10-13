@@ -1,6 +1,6 @@
 # Rigenera le immagini di prova dei marchi invisibili (#889): python tests/fixtures/marchi/genera.py
 # Serve: pip install invisible-watermark opencv-python-headless PyWavelets numpy Pillow scikit-image
-# Le foto sono di scikit-image: astronaut, rocket e hubble_deep_field (NASA e SpaceX, pubblico dominio),
+# Le foto sono di scikit-image: astronaut e rocket (NASA e SpaceX, pubblico dominio),
 # coffee e chelsea (CC0). Ogni marchio passa dal cammino vero del suo generatore: centro di U, ordine dei
 # canali e arrotondamento sono quelli che decidono se il lettore lo trova.
 
@@ -56,5 +56,5 @@ salva(sd1(base), 'marchio-sd1.png')
 salva(flux(base), 'marchio-flux.jpg', quality=95, subsampling=0)
 
 for nome, rgb in [('astronauta', sd.astronaut()), ('gatto', sd.chelsea()), ('caffe', sd.coffee()),
-                  ('razzo', sd.rocket()), ('galassie', sd.hubble_deep_field())]:
+                  ('razzo', sd.rocket())]:
     salva(rgb, f'foto-{nome}.jpg', quality=88)
