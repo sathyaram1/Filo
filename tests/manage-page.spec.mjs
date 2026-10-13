@@ -2636,7 +2636,7 @@ test('il testo delle istruzioni di correzione oltre il tetto non viene salvato m
   const max = await page.evaluate(() => window.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX);
   await fix.fill('x'.repeat(max + 1));
   await page.locator('#mgFixInstructionsSave').click();
-  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText(new RegExp(`Troppo lungo: ${max + 1} caratteri, il massimo è ${max}`));
+  await expect(page.locator('#mgFixInstructionsMsg')).toHaveText(new RegExp(`Troppo lungo: ${it(max + 1)} caratteri, il massimo è ${it(max)}`));
   expect(await page.evaluate(() => window.__capsSets)).toEqual([]);
   expect(await page.evaluate(() => window.__capsValue.fixInstructions)).toBe('PRIMA');
   // Al tetto esatto si salva.
