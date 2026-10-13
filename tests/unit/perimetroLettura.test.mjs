@@ -340,6 +340,52 @@ test('#1072 — stampare un testo con due barre non apre niente; usato da un alt
   }
 });
 
+// #1072.4 — un percorso di rete che nessun pezzo del comando scrive per intero,
+// ma che un comando "innocuo" CALCOLA e poi apre (o passa a chi lo apre), chiede
+// un OK: la cura guarda il risultato di Join-Path/Split-Path/Get-Date, non i pezzi.
+test('#1072.4 — un percorso di rete calcolato da un comando innocuo chiede un OK', () => {
+  const rete = /altro computer della rete/;
+  for (const cmd of [
+    "Join-Path '\\\\' 'evil\\x' -Resolve", "Join-Path -Path '\\\\' -ChildPath 'evil\\x' -Resolve",
+    "Join-Path '\\\\' 'evil\\x' | cd", "Join-Path -Path '\\\\' -ChildPath evil -AdditionalChildPath x | cd",
+    'Split-Path -NoQualifier C:\\\\evil\\x | cd', "Split-Path -NoQualifier 'C:\\\\evil\\x' | Test-Path",
+    'Split-Path C:\\\\evil\\x -NoQualifier | Test-Path', 'Split-Path -NoQualifier C:/\\evil/x | cd',
+    'Get-Date -Format "\'\'\\\\\\\\evil\\\\x" | Get-ChildItem', 'cd (Join-Path \'\\\\\' \'evil\\x\')',
+  ]) {
+    const d = C.classifyDetail(cmd, WIN);
+    assert.equal(d.level, 2, `"${cmd}" compone un percorso di rete: chiede un OK (è ${d.level})`);
+    assert.match(d.motivo, rete, cmd);
+  }
+  // Lo stesso comando su un percorso locale, o che solo STAMPA il testo, resta libero.
+  for (const cmd of [
+    'Join-Path C:\\Users\\Mario x', 'Split-Path -Leaf C:\\Users\\Mario\\x.txt', 'Join-Path C:\\Users\\Mario p | cd',
+    "Join-Path '\\\\' 'evil\\x'", 'Get-Date -Format yyyy-MM-dd', 'Test-Path (Join-Path $env:USERPROFILE "Downloads")',
+  ]) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
+// #1072.4 — con la cartella di lavoro su un altro computer anche i comandi "liberi"
+// che risolvono un NOME contro la cartella (Get-Command/Get-Help, where di cmd,
+// git log/show/diff/rev-parse/blame) lo mandano al remoto: l'OK che vale per `ls`.
+test('#1072.4 — in una cwd di rete un nome cercato nella cartella chiede un OK', () => {
+  const NOMI = ['Get-Command .\\segreto', 'Get-Command -Name .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto',
+    'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log -- segreto'];
+  for (const ctx of [{ ...WIN, cwd: '\\\\host\\x' }, { ...WIN, cwd: 'Z:\\', reti: ['Z:'] }]) {
+    assert.equal(C.classifyDetail('ls segreto', ctx).level, 2, `ls in ${ctx.cwd}`);
+    for (const cmd of NOMI) {
+      const d = C.classifyDetail(cmd, ctx);
+      assert.equal(d.level, 2, `"${cmd}" in ${ctx.cwd} manda il nome al remoto: chiede un OK (è ${d.level})`);
+      assert.match(d.motivo, /altro computer della rete/, `${cmd} in ${ctx.cwd}`);
+    }
+  }
+  // Gli stessi comandi in una cartella del disco restano liberi.
+  for (const cmd of ['Get-Command .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto', 'where node',
+    'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log']) {
+    assert.equal(lvl(cmd, WIN), 1, cmd);
+  }
+});
+
 test('#1072 — su Windows si legge il comando come lo spezza PowerShell: virgolette tipografiche, trattini lunghi, `\\` in coda', () => {
   for (const cmd of ['cd “\\\\evil\\x”', 'cd ‘\\\\evil\\x’', 'Test-Path „\\\\evil\\x”', 'Get-ChildItem ‛\\\\evil\\x‛', 'cd -Path:“\\\\evil\\x”',
     'Set-Location —Path:\\\\evil\\x', 'Get-ChildItem –LiteralPath:\\\\evil\\x', 'findstr a src\\ \\\\evil\\x\\a', 'dir C:\\ \\\\evil\\x',
