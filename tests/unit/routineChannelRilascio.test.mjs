@@ -391,6 +391,25 @@ describe('release da riga di comando', () => {
     } finally { srv.close(); }
   });
 
+  test('la sessione viva di chi lancia i test non entra nel rilascio; quella data al figlio sì', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { base, work } = scena();
+    const transcript = resolve(base, 'sessione-viva.jsonl');
+    const turno = { type: 'assistant', message: { id: 'm1', model: 'claude-opus-4-8', usage: { input_tokens: 10, output_tokens: 5 } } };
+    writeFileSync(transcript, `${JSON.stringify(turno)}\n`, 'utf8');
+    const nudo = ['release', 'tkt-cli', '--senza-push', '--senza-rapporto', '--guasto', 'motivo'];
+    const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1' };
+    const rilasci = () => ricevute.filter((x) => x.url.includes('routineRelease'));
+    try {
+      const r = await cli(nudo, env, { ...process.env, FILO_ROUTINE: '1', FILO_TRANSCRIPT: transcript });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo' });
+      const d = await cli(nudo, { ...env, FILO_TRANSCRIPT: transcript });
+      assert.equal(d.code, 0, `stderr: ${d.se}`);
+      assert.equal(rilasci()[1].body.consumo.sessionId, 'sessione-viva', 'il transcript finto si misura: la prova sopra distingue');
+    } finally { srv.close(); }
+  });
+
   test('un file rimasto fuori dai commit viene committato e spedito prima del rilascio, e lo si dice', async () => {
     const { srv, port } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
     const { origin, work } = scena();
