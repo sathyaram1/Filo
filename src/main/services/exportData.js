@@ -458,6 +458,7 @@ const REGOLE_IMPORT = {
   FILO_ONBOARDING: 'stato',
   FILO_TERMINAL_CWD: 'stato',
   FILO_TERMINALE_SPIEGATO: 'stato',
+  MENU_DEL_SITO_SCELTE: 'stato',
   SITI_CON_CAMPI: 'contenuto',
   AGGIORNAMENTO_CHIESTO: 'stato',
   LAST_SEEN_VERSION: 'stato',
