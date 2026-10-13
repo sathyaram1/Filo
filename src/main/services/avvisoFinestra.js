@@ -9,8 +9,9 @@ function avvisoNellaFinestra(testo, { chiave, durataSec = 0 } = {}) {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
       const wc = win.webContents;
-      // Una cornice che sta ancora caricando non ascolta ancora.
-      if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
+      // Una cornice che sta ancora caricando non ascolta ancora; nemmeno una appena creata, che non ha cominciato
+      // a caricare e per questo non risulta «in caricamento»: l'avviso finiva a nessuno, contato come detto (#1212).
+      if (!wc || wc.isDestroyed?.() || wc.isLoading?.() || !wc.getURL?.()) continue;
       try {
         wc.send('shell:toast', { text: testo, opts: chiave ? { durationSec: durataSec, key: chiave } : { durationSec: durataSec } });
         dette++;
