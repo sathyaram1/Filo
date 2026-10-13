@@ -1268,18 +1268,28 @@
   // biglietto; qui è di sola lettura via il canale main (owner-gated).
   const WORKER_LOG_GET = (window.SN_MSG?.MSG?.WORKER_LOG_GET) || 'worker_log_get';
   // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo).
+  // Il correttore non corregge i rilievi (li corregge chi verifica, #561): riallinea il ramo o riprende dopo una
+  // risposta. Il caso lo scrive il server nella voce (`caso`, #532); una voce senza caso non sa dire quale dei due.
   const ROLE_LABELS = {
     'new-work': 'Nuovo lavoro',
     verifier:   'Verifica',
-    fixer:      'Correzione',
+    fixer:      'Riallineamento o ripresa',
     secaudit:   'Audit sicurezza',
     prober:     'Esplorazione',
     idle:       'Fermo',
     off:        'Routine spente',
   };
-  function roleLabel(role) {
-    const r = String(role || '').trim();
-    return ROLE_LABELS[r] || (r || 'Sconosciuto');
+  const CASE_LABELS = {
+    'fixer:riallineamento':    'Riallineamento',
+    'fixer:ripresa':           'Ripresa',
+    'verifier:riallineamento': 'Verifica del riallineamento',
+  };
+  // `role` può arrivare già composto («fixer:riallineamento»): è la chiave delle barre delle statistiche.
+  function roleLabel(role, caso) {
+    const [r0, c0] = String(role || '').trim().split(':');
+    const r = r0 || '';
+    const c = String(caso || c0 || '').trim();
+    return CASE_LABELS[`${r}:${c}`] || ROLE_LABELS[r] || (r || 'Sconosciuto');
   }
   let logLoaded  = false;   // true dopo il primo caricamento riuscito
   let logLoading = false;
