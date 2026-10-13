@@ -51,7 +51,7 @@ test('dentro una routine, con node --test diretto: domanda, risposta e rilascio 
     const r = await nodeTest([
       '--test-name-pattern=routineClosing col corpo giusto|risposta da stdin col biglietto|release da riga di comando',
       'tests/unit/domandaChiusura.test.mjs', 'tests/unit/routineChannelRilascio.test.mjs',
-    ], { ...process.env, ...sessione });
+    ], sessione);
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, /^ok \d+ - domanda: va a routineClosing col corpo giusto/m);
     assert.match(r.out, /^ok \d+ - CLI: risposta da stdin col biglietto/m);
