@@ -137,7 +137,10 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
   (riallineamento: main è avanzato e il merge non passa più da solo — non è una
   bocciatura di qualità, il contatore M non si muove; il ramo viene ribasato e
-  ripassa verifica e sicurezza sul contenuto nuovo).
+  ripassa verifica e sicurezza sul contenuto nuovo). Il rientro porta
+  `statusReason: riallineamento`, che il server toglie quando la pratica esce da
+  `revision_capability`: senza, in Gestione sembrava una bocciatura (#532;
+  dove altro viaggia la stessa parola: ROUTINE-AUTH-SPEC.md §6).
 - `design` —fusione bloccata da L5, approvata dall'owner e finita in conflitto→
   `revision_capability` in DUE passi: la riapertura `design → todo` a nome
   dell'owner (il click di approvazione è la sua decisione) e il rientro
