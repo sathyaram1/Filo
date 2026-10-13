@@ -11,17 +11,18 @@ const coda = (t, n = 8) => String(t || '').trim().split('\n').slice(-n).join('\n
 
 /**
  * dep: { attese() → [{ feedbackId, seq, subSeq, branch, parti }], esegui(cmd, args, { cwd, timeoutMs }),
- *        pubblica() → { code, out }, fineAttesa(feedbackId, { soloApp }), log(riga), radice }.
- * → { fuse: [{ num, id, app }], soloApp: [{ num, id, app }], ferme: [{ num, motivo }], pubblicato: boolean }
+ *        pubblica() → { code, out }, fineAttesa(feedbackId, { soloApp, riallinea }), log(riga), radice }.
+ * → { fuse: [{ num, id, app }], soloApp: [{ num, id, app }], riallineate: [{ num, id }], ferme: [{ num, motivo }], pubblicato }
  */
 export async function fusioniServer(dep, { prova = false } = {}) {
   const pratiche = await dep.attese();
   const fuse = [];
   const soloApp = [];
+  const riallineate = [];
   const ferme = [];
   if (!pratiche.length) {
     dep.log('Nessun lavoro server aspetta il PC.');
-    return { fuse, soloApp, ferme, pubblicato: false };
+    return { fuse, soloApp, riallineate, ferme, pubblicato: false };
   }
   const git = (args) => dep.esegui('git', args, { cwd: dep.radice });
   await git(['fetch', '--quiet', 'origin', 'main']);
