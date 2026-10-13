@@ -605,6 +605,7 @@
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
     arenato: 'lavorazione arenata',
+    riallineamento: 'il ramo si rifà su main, il codice aveva passato le verifiche',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
   };
