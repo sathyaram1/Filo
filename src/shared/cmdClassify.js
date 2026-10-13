@@ -1618,14 +1618,16 @@
   // Livello del comando e, se chiede conferma per il perimetro, il perché.
   // PowerShell legge “ ” „ ‟ come `"`, ‘ ’ ‚ ‛ come `'` e – — ― in testa a una parola come `-`: i controlli
   // devono vedere il comando che la shell esegue, non la sua grafia (#1072). Per cmd quei segni sono testo.
-  // Per cmd anche `'` è testo (`' \\host\x '` sono tre argomenti), ma i programmi MSYS (ls, cat di Git) lo
-  // leggono come virgolette: si giudicano le due letture e vale la peggiore, a pari livello il perché di cmd (#1072.5).
+  // Per cmd `'` è testo (`' \\host\x '` sono tre argomenti), per i programmi C anche `\"` (findstr); i programmi
+  // MSYS (cat, ls di Git) leggono `'` come virgolette. Vale la lettura peggiore, a pari livello quella di cmd (#1072.5).
   function comeLaShell(cmd, c) {
     if (!c.win) return [cmd];
     if (c.shell === 'cmd') {
       const l = comeCmd(cmd);
       if (l == null) return null;
-      return l.includes("'") ? [l.replace(/'/g, APICE_TESTO), l] : [l];
+      const interni = l.replace(/'/g, APICE_TESTO);
+      const programmiC = interni.replace(/(\\+)"/g, (m, b) => (b.length % 2 ? '\\'.repeat(b.length >> 1) + VIRGOLETTE_TESTO : m));
+      return [...new Set([interni, programmiC, l])];
     }
     return [cmd.replace(/[\u201C-\u201F]/g, '"')
       .replace(/[\u2018-\u201B]/g, "'")
