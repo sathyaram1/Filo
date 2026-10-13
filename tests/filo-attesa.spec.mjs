@@ -46,7 +46,8 @@ async function configureModel(app) {
 }
 
 // Un modello finto a copione. Ogni passo: { pensa: [pezzi], ogni: ms, strumenti: [{id,name,arguments}],
-// dopoStrumenti: ms, testo, sordo }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti e gli stop.
+// dopoStrumenti: ms, finoAlFermo, testo, sordo }. Rispetta lo stop (signal) salvo `sordo`; registra i messaggi ricevuti
+// e gli stop. `finoAlFermo`: la chiamata degli strumenti resta a metà finché lo stop non la interrompe.
 async function copione(app, passi) {
   await app.evaluate(async (_, passiJson) => {
     const passi = JSON.parse(passiJson);
