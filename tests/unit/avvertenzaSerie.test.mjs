@@ -29,3 +29,13 @@ test('il conto delle critiche tolte viaggia nel payload di chi vede la serie, e 
   assert.equal(s.historyDropped, undefined);
   assert.equal(buildPayload({ role: 'verifier', branch: 'b' }, { feedback: {}, history: [] }).historyDropped, 0);
 });
+
+// #532: la critica che il server scrive a un riallineamento (fusione fallita) non parla di un difetto.
+test('una critica di riallineamento non conta come giro, e chi verifica lo legge', () => {
+  const riall = { verdict: 'critica', critique: 'conflitto di fusione', caso: 'riallineamento' };
+  assert.equal(serialAwarenessNote('verifier', [{ critique: 'a' }, riall]), '', 'una bocciatura vera sola non è una serie');
+  const v = serialAwarenessNote('verifier', [...storia(2), riall]);
+  assert.match(v, /giro 3 di verifica/, 'due critiche vere: è il terzo giro, non il quarto');
+  assert.match(v, /Quella con `caso: riallineamento`.*non parlano di un difetto/);
+  assert.doesNotMatch(serialAwarenessNote('verifier', storia(2)), /riallineamento/, 'senza riallineamenti, niente riga');
+});
