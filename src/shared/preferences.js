@@ -1256,6 +1256,14 @@
     }),
     elencoCartelle(),
     elenco({
+      keys: ['menu_del_sito', 'menu del sito', 'menu dei siti', 'menu del sito col tasto destro', 'tasto destro al sito'],
+      percorso: 'menuDelSito',
+      nome: 'Siti dove il tasto destro apre il menu del sito',
+      aiuto: 'siti dove il tasto destro apre il menu che il sito ha (Google Docs, Figma…) e quello di Filo si apre con Maiusc + tasto destro',
+      risk: 'Cambia cosa apre il tasto destro su quei siti: aggiungerne uno fa comparire il menu del sito al posto di '
+        + 'quello di Filo, che resta su Maiusc + tasto destro; toglierlo rimette il menu di Filo.',
+    }),
+    elenco({
       keys: ['domini_esclusi', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
       percorso: 'blocklist',
       nome: 'Domini dove Filo non interviene',

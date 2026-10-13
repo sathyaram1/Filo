@@ -50,20 +50,25 @@
   function sonda(e, bersaglio) {
     const p = ponte();
     if (!p || !e || !web()) return null;
-    const s = { primo: p.primo === true, x: e.clientX, y: e.clientY, screenX: e.screenX, screenY: e.screenY, bersaglio };
-    console.log('[mds] sonda', !!p, s.primo, bersaglio && bersaglio.id); if (s.primo) return s;
+    const s = { primo: p.primo === true, copia: p.fotografa(e) };
+    if (bersaglio) s.copia.target = bersaglio;
+    if (s.primo) return s;
     return p.sonda(e, bersaglio) ? s : null;
   }
 
-  // In un riquadro il clic vero del main non arriva: la pagina del riquadro riceve il tasto destro da qui.
-  function clicNelRiquadro(s) {
-    const b = s.bersaglio;
+  // Dove il clic vero del main non arriva (un riquadro di un altro sito) il tasto destro parte da qui, e se il sito non ne fa
+  // niente torna il menu di Filo.
+  function clicFinto(p, s) {
+    const c = s.copia;
+    const b = c.target;
     if (!b || !b.isConnected || typeof b.dispatchEvent !== 'function') return;
     const Ev = typeof PointerEvent === 'function' ? PointerEvent : MouseEvent;
+    let annullato = false;
+    p.seguiPassaggio(c, () => annullato, { ancheSeTace: true });
     try {
-      b.dispatchEvent(new Ev('contextmenu', {
+      annullato = !b.dispatchEvent(new Ev('contextmenu', {
         bubbles: true, cancelable: true, composed: true, view: window, button: 2,
-        clientX: s.x, clientY: s.y, screenX: s.screenX, screenY: s.screenY, pointerType: 'mouse', isPrimary: true,
+        clientX: c.clientX, clientY: c.clientY, screenX: c.screenX, screenY: c.screenY, pointerType: 'mouse', isPrimary: true,
       }));
     } catch (_) {}
   }
@@ -72,10 +77,10 @@
     const p = ponte();
     if (!p) return;
     if (!IS_SUBFRAME) p.lasciaAlSito();
-    ask({ type: MSG.MENU_DEL_SITO_APRI, x: s.x, y: s.y }).then((r) => {
+    ask({ type: MSG.MENU_DEL_SITO_APRI, x: s.copia.clientX, y: s.copia.clientY }).then((r) => {
       if (r && r.ok && r.cliccato) return;
       p.passaAlSito();
-      clicNelRiquadro(s);
+      clicFinto(p, s);
     });
   }
 

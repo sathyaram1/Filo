@@ -15,10 +15,14 @@ const CON_MENU = `<!doctype html><html><head><meta property="og:site_name" conte
       if (!e.isTrusted) return;
       var m = document.getElementById('menu-suo');
       if (!m) { m = document.createElement('div'); m.id = 'menu-suo'; m.textContent = 'Menu della lavagna'; document.body.appendChild(m); }
-      m.style.left = e.clientX + 'px'; m.style.top = e.clientY + 'px';
+      m.style.left = (e.clientX + 4) + 'px'; m.style.top = (e.clientY + 4) + 'px'; m.hidden = false;
       m.dataset.x = String(e.clientX); m.dataset.y = String(e.clientY);
       m.dataset.volte = String(Number(m.dataset.volte || 0) + 1);
     });
+    document.addEventListener('mousedown', function (e) {
+      var m = document.getElementById('menu-suo');
+      if (m && !m.contains(e.target)) m.hidden = true;
+    }, true);
   </script>
 </body></html>`;
 
@@ -36,7 +40,7 @@ const vociDelMenu = (page) => page.locator('.sn-menu:not(.sn-menu-sub) > .sn-men
 
 async function tastoDestro(page, sel, { shift = false } = {}) {
   if (shift) await page.keyboard.down('Shift');
-  await page.locator(sel).click({ button: 'right', position: { x: 60, y: 50 } });
+  await page.locator(sel).click({ button: 'right', ...(sel === '#area' ? { position: { x: 60, y: 50 } } : {}) });
   if (shift) await page.keyboard.up('Shift');
 }
 
@@ -57,16 +61,27 @@ test('sul sito col suo menu: «Menu di Lavagna» in cima, e il clic apre il menu
   expect(Math.abs(Number(await page.locator('#menu-suo').getAttribute('data-y')) - (box.y + 50))).toBeLessThanOrEqual(2);
 });
 
-test('una pagina senza menu suo, o che blocca soltanto il tasto destro: nessuna voce in più', async ({ openTab, testServer }) => {
+test('una pagina senza menu suo: nessuna voce in più', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SENZA_MENU);
-  for (const sel of ['#area', '#blocco']) {
-    await tastoDestro(page, sel);
-    await expect(page.locator('.sn-menu').first()).toBeVisible();
-    const voci = await vociDelMenu(page);
-    expect(voci.join(' | ')).not.toContain('Menu di');
-    await page.keyboard.press('Escape');
-    await expect(page.locator('.sn-menu')).toHaveCount(0);
-  }
+  await tastoDestro(page, '#area');
+  await expect(page.locator('.sn-menu').first()).toBeVisible();
+  expect((await vociDelMenu(page)).join(' | ')).not.toContain('Menu di');
+});
+
+// Un sito che annulla il menu del browser e basta sembra uno col menu suo: la voce c'è, ma chi la sceglie ritrova
+// il menu di Filo invece di un clic a vuoto, e lì la voce non torna.
+test('un sito che blocca soltanto il tasto destro: la voce riporta al menu di Filo, e lì non torna', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, SENZA_MENU);
+  await tastoDestro(page, '#blocco');
+  await expect(page.locator('.sn-menu').first()).toBeVisible();
+  expect((await vociDelMenu(page))[0]).toBe('Menu di 127.0.0.1');
+  await page.locator('.sn-menu-split-main', { hasText: 'Menu di 127.0.0.1' }).click();
+  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 5000 });
+  expect((await vociDelMenu(page)).join(' | ')).not.toContain('Menu di');
+  await page.keyboard.press('Escape');
+  await tastoDestro(page, '#blocco');
+  await expect(page.locator('.sn-menu').first()).toBeVisible();
+  expect((await vociDelMenu(page)).join(' | ')).not.toContain('Menu di');
 });
 
 test('dopo alcune scelte Filo propone il menu del sito al tasto destro: accettato, il tasto destro è del sito e Maiusc apre Filo', async ({ openTab, testServer, avvisi }) => {

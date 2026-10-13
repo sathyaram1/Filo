@@ -11,6 +11,7 @@
     {
       version: '0.2.238', date: '2026-10-07',
       features: [
+        'Sui siti che hanno un loro menu del tasto destro, come Google Docs o Figma, il menu di Filo lo offre in cima: un clic e si apre il menu del sito nello stesso punto. Se lo scegli spesso, Filo ti propone di aprirlo direttamente col tasto destro, e il suo resta su Maiusc + tasto destro.',
         'L\'accesso a Filo con Google adesso si fa in una scheda di Filo. Appena hai scelto l\'account la scheda si chiude da sola, e YouTube, Gmail e Drive nelle schede sono già collegati allo stesso account, senza un secondo accesso. Se eri già entrato in Filo, nel menu dell\'account trovi «Collega anche i prodotti Google». Uscire da Filo non ti fa uscire da Google nelle schede. Se Google non accetta l\'accesso dentro Filo, Filo lo apre nel browser come prima e te lo dice. In Privacy massima Google e YouTube tengono i cookie nello stesso spazio, e dopo l\'accesso Google entra fra i siti fidati, così resti collegato.',
         'Chiedi a Filo un tuo documento descrivendolo, anche a voce: «mi serve la bolletta della luce di marzo». Lo trova leggendo il contenuto dei file in Documenti, Download e Scrivania, anche se si chiama «scan_00231.pdf», e ti risponde col file da aprire con un clic. Le cartelle si cambiano in Preferenze, e il testo dei documenti resta sul tuo computer.',
         'Il documento lo trova anche l\'Aiuto di una scheda, mentre compili un modulo su un sito: chiedigli la bolletta, dai l\'OK, e trascina il file che ti propone nel campo per caricarlo.',

@@ -114,7 +114,9 @@ function filoSeLaPaginaTace(e, clic) {
 }
 let menuDelSito = null;
 try {
-  menuDelSito = require('./menu-del-sito.js').monta(webFrame, window);
+  menuDelSito = require('./menu-del-sito.js').monta(webFrame, window, {
+    apriFilo: (copia) => { if (typeof contextMenuHandler === 'function') apriMenuDiFilo(copia); },
+  });
   globalThis.__snMenuDelSito = menuDelSito;
   if (riscrittura) riscrittura.allaRiscrittura(() => menuDelSito.rinasci());
 } catch (e) { console.error('[Filo CS] menu del sito', e); }
@@ -133,8 +135,13 @@ try {
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
     const clic = Date.now();
-    // Il clic rigirato dalla voce «Menu di <sito>» è del sito (#975): se il sito tace, compare quello del browser.
-    if (menuDelSito && menuDelSito.passaAlSito()) { riservaSeLaPaginaTace(e, clic); return; }
+    // Il clic rigirato dalla voce «Menu di <sito>» è del sito (#975): se il sito tace compare quello del browser, se lo
+    // annulla senza mostrare niente torna quello di Filo.
+    if (menuDelSito && menuDelSito.passaAlSito()) {
+      menuDelSito.seguiPassaggio(fotografaClic(e), () => e.defaultPrevented);
+      riservaSeLaPaginaTace(e, clic);
+      return;
+    }
     // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sul sito dove l'utente
     // ha dato il tasto destro al menu del sito i due si scambiano, e senza un menu del sito resta quello di Filo.
     const sitoPrima = !!(menuDelSito && menuDelSito.primo === true);
@@ -172,10 +179,7 @@ try {
   }
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
-// Copia inerte del clic destro da rigiocare quando l'handler vero è pronto.
-// Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
-// fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
-// i dati che l'handler legge, così il menu si apre sull'elemento giusto.
+// Il clic destro si rigioca quando l'handler vero è pronto, dalla sua copia (fotografaClic).
 function replayContextMenu(e, clic) {
   const copy = fotografaClic(e);
   const deadline = Date.now() + 3000;
@@ -188,21 +192,7 @@ function replayContextMenu(e, clic) {
 }
 
 function fotografaClic(e) {
-  let node = null;
-  try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
-  catch (_) { node = e.target; }
-  return {
-    target: node,
-    currentTarget: node,
-    clientX: e.clientX, clientY: e.clientY,
-    pageX: e.pageX, pageY: e.pageY,
-    screenX: e.screenX, screenY: e.screenY,
-    button: e.button,
-    shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
-    defaultPrevented: false,
-    composedPath: () => (node ? [node] : []),
-    preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {},
-  };
+  return require('./menu-del-sito.js').fotografa(e);
 }
 
 // Modalità zoom con la rotella (clic centrale) e zoom con Ctrl/Cmd: vedi

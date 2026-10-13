@@ -1417,6 +1417,51 @@
     flashSaved('autonomiaHint');
   }
 
+  // ── Menu dei siti col tasto destro (#975) ────────────────────────────────
+  // I siti si aggiungono dal tasto destro sul sito (o chiedendolo a Filo); qui si vedono tutti e si tolgono.
+  let menuDelSitoSalvati = null;
+
+  function disegnaMenuDelSito(elenco) {
+    const box = $('menuDelSitoElenco');
+    if (!box) return;
+    menuDelSitoSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
+    box.textContent = '';
+    if (!menuDelSitoSalvati.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessuno: su ogni sito il tasto destro apre il menu di Filo, che offre in cima quello del sito quando c\'è.';
+      box.appendChild(p);
+      return;
+    }
+    const N = window.SN_NOMI_SITO;
+    for (const sito of menuDelSitoSalvati) {
+      const nome = (N && N.leggibile && N.leggibile(sito)) || sito;
+      const row = document.createElement('div');
+      row.className = 'mem-riga';
+      row.dataset.sito = sito;
+      const t = document.createElement('span');
+      t.className = 'mem-testo';
+      t.textContent = nome;
+      row.appendChild(t);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mem-via';
+      b.textContent = '×';
+      b.title = 'Togli';
+      b.setAttribute('aria-label', `Togli ${nome}: il tasto destro torna al menu di Filo`);
+      b.addEventListener('click', () => salvaMenuDelSito((menuDelSitoSalvati || []).filter((x) => x !== sito)));
+      row.appendChild(b);
+      box.appendChild(row);
+    }
+  }
+
+  async function salvaMenuDelSito(nuovo) {
+    const elenco = Array.from(new Set(nuovo));
+    disegnaMenuDelSito(elenco);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { menuDelSito: elenco } });
+    flashSaved('menuDelSitoHint');
+  }
+
   async function load() {
     const settings = await Storage.getSettings();
     disegnaAutonomia();
@@ -1436,6 +1481,7 @@
     riempi(settings);
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
+    disegnaMenuDelSito(settings.menuDelSito);
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
@@ -1468,6 +1514,7 @@
     riempi(settings, (k) => !toccati.has(k) && valoreDelCampo(k) !== valoreSalvato(settings, k));
     riallineaToken(settings.themeTokens);
     riallineaTabColor(settings.tabColor);
+    if (JSON.stringify(settings.menuDelSito || []) !== JSON.stringify(menuDelSitoSalvati || [])) disegnaMenuDelSito(settings.menuDelSito);
     const cartelle = settings.documenti && settings.documenti.cartelle;
     if (JSON.stringify(cartelle || []) !== JSON.stringify(cartelleSalvate || [])) {
       disegnaCartelle(cartelle);

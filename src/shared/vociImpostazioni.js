@@ -56,7 +56,7 @@
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
       },
-      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle' },
+      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoElenco: 'menuDelSito' },
       altrove: { documentiCercate: 'cartelleCercate' },
       fuori: {},
       messaggi: {
