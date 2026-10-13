@@ -130,6 +130,9 @@
     // true dopo il primo comando che Filo propone o esegue in chat: la frase che
     // spiega il terminale si dice una volta sola, anche dopo un riavvio (#892).
     FILO_TERMINALE_SPIEGATO: 'filo_terminale_spiegato',
+    // { <sito>: { n, proposto, alle } }: quante volte l'utente ha scelto «Menu di <sito>» e se Filo gli ha già
+    // proposto di dare il tasto destro a quel menu, che si propone una volta sola (#975).
+    MENU_DEL_SITO_SCELTE: 'filo_menu_del_sito_scelte',
     // I siti (dominio registrabile) dove Filo ha visto un campo password o carta: restano delicati anche dopo un
     // riavvio, quando la scheda riaperta è già dentro l'area riservata e il campo non c'è più (#1004).
     SITI_CON_CAMPI: 'filo_siti_con_campi',
