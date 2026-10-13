@@ -1542,7 +1542,10 @@
 
   function valoreNoto(testo) {
     if (/[({]/.test(String(testo).replace(/'[^']*'|"[^"]*"/g, ''))) return false;
-    return String(testo).split(/;|&&|\|\|?/).every((seg) => !seg.trim() || FONTI_NOTE.has(programOf(dequote(seg.trim()))));
+    return String(testo).split(/;|&&|\|\|/).every((istr) => istr.split('|').every((seg, i) => {
+      const prog = programOf(dequote(seg.trim()));
+      return !seg.trim() || (FONTI_NOTE.has(prog) && !(i > 0 && CALCOLANO.has(prog)));
+    }));
   }
 
   function classifica(cmd, c, prof) {
