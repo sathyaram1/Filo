@@ -25,6 +25,7 @@ const sentinel = path.join(outDir, 'sentinel.json');
 // Usa il binario nativo (no .cmd shim) per evitare problemi di quoting su
 // percorsi con spazi su Windows. Lo chiede al pacchetto: da Electron 42 il
 // binario arriva al primo `require('electron')`, non con `npm install`.
+assicuraMotore({ radice: ROOT });
 const electronExe = createRequire(path.join(ROOT, 'package.json'))('electron');
 
 // Chromium si rifiuta di partire come root senza --no-sandbox (crbug.com/638180),
