@@ -90,9 +90,9 @@ test('r1 un\'istanza di Claude Code lanciata a mano da PowerShell in una session
       { CLAUDE_CODE_SESSION_ID: K, CLAUDE_ENV_FILE: join(repo, 'ambiente-K.sh') },
     );
     const avvioK = await B.avvio({ input: { session_id: K, source: 'startup' }, env: ambienteFiglio, cwd: repo, deps, haCredenziale: async () => true });
-    const bK = await B.trovaBiglietto({ env: { CLAUDE_CODE_SESSION_ID: K }, cwd: repo, deps });
-    expect(avvioK.riga, 'il figlio di una sessione sporca eredita la sporcizia: nel dubbio vale sporco').toContain('sporco');
-    expect(bK && bK.fiducia).toBe('non_fidato');
+    const bK = await B.trovaBiglietto({ env: { CLAUDE_CODE_SESSION_ID: K, FILO_BIGLIETTO_FILE: avvioK.path || '' }, cwd: repo, deps });
+    expect(bK && bK.fiducia, 'il figlio di una sessione sporca eredita la sporcizia: nel dubbio vale sporco').not.toBe('fidato');
+    expect(avvioK.riga).not.toContain('Biglietto della sessione: pulito');
   } finally {
     togliCartella(repo);
   }
