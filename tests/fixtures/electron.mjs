@@ -54,6 +54,18 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
   else { try { process.kill(-pid, 'SIGKILL'); } catch (_) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} } }
 }
 
+// Una finestra arriva quando arriva: con la macchina carica ci mette più di dieci secondi (#1212). L'attesa la
+// ferma il tetto del test, non un tempo suo, e il rosso dice quale finestra mancava.
+export async function aspettaFinestra(app, trova, perche) {
+  let win = null;
+  const cerca = () => {
+    win = app.windows().find((w) => { try { return trova(w); } catch (_) { return false; } }) || null;
+    return Boolean(win);
+  };
+  await expect.poll(cerca, { message: perche, timeout: 0, intervals: [100] }).toBe(true);
+  return win;
+}
+
 // Quello che l'app scrive su stdout/stderr (in test le righe render-process-gone e did-fail-load)
 // Playwright non lo mostra: senza, un rosso che c'è solo in GitHub non si spiega (#639).
 const TETTO_RIGHE_APP = 20_000;
