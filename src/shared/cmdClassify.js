@@ -1652,7 +1652,11 @@
         if (elenco && LETTI_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
         // Testo letto da un file, dato come percorso, può portare in rete (#1072).
         if (!noto && PERCORSO_DAL_TUBO.has(progs[i])) det = peggiore(det, due(MOTIVI.ignoto));
-        if (!FONTI_NOTE.has(progs[i]) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
+        // Un nome dal tubo si risolve contro la cartella di lavoro: in rete lo riceve il remoto (#1072.4).
+        if (i > 0 && PERCORSO_DAL_TUBO.has(progs[i]) && cp.cwd && cp.cwd.rete) det = peggiore(det, due(MOTIVI.rete));
+        // Join-Path/Split-Path sul valore del tubo compongono ciò che nessun argomento scrive (`'\\' | Join-Path`).
+        if (i > 0 && CALCOLANO.has(progs[i]) && (i < pipe.length - 1 || calcolaApre(progs[i], p, c.win))) det = peggiore(det, due(MOTIVI.ignoto));
+        if (!FONTI_NOTE.has(progs[i]) || (i > 0 && CALCOLANO.has(progs[i])) || (c.valoriIgnoti && p.includes(SEGNAPOSTO))) noto = false;
         if (ELENCA_OGGETTI.has(progs[i]) || p.includes(SEGNAPOSTO)) elenco = true;
         if (!PS_PIPE_ONLY.has(progs[i])) det = peggiore(det, perimetroDi(p, i < pipe.length - 1 ? { ...cp, stampaLibera: false } : cp));
       });
