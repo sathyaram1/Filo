@@ -328,8 +328,14 @@
     }
     for (const w of testo.split(/[^a-z0-9]+/)) if (w.length >= MIN_TOKEN && /\d/.test(w)) out.add(w);
     for (const t of indirizziNelTesto(testo)) out.add(t);
+    // Una password di sole lettere è una parola qualunque: la riconosce la parola che la presenta.
+    for (const m of testo.matchAll(DOPO_LA_PAROLA)) {
+      const t = soloAlnum(m[1]);
+      if (t.length >= MIN_TOKEN) out.add(t);
+    }
     return out;
   }
+  const DOPO_LA_PAROLA = /(?:password|passwd|pwd|passphrase|passcode|parola d'ordine|parola chiave|pin|codice|chiave)\b[^\n.;]{0,40}?(?:\bè|\be'|:|=|\bis)\s*["'«“]?([^\s"'»”,;]+)/g;
 
   // Un numero scritto a gruppi («+39 347 123 4567») è un numero solo; in un URL le cifre contano anche spezzate da
   // pochi caratteri («?a=347&b=1234567»), come per ciò che esce (formeDi).
