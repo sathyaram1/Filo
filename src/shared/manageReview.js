@@ -1830,7 +1830,7 @@
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
-    aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,
+    aspettaRisposta, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
   };
 
