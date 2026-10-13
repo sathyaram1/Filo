@@ -85,18 +85,23 @@ test('il nome del file: il session_id quando c’è, altrimenti manuale-<ms>', (
   assert.equal(B.idDelFile('../fuori', 5), 'manuale-5');
 });
 
-test('ricerca: FILO_BIGLIETTO_FILE vince; altrimenti tutti quelli della cartella; i file storti non contano', () => {
+test('ricerca: FILO_BIGLIETTO_FILE vince; altrimenti quello col nome della sessione, mai quelli delle altre; i file storti non contano', () => {
   const dir = repo();
   try {
     assert.deepEqual(B.trovaBiglietti({ env: {}, cwd: dir }), []);
     const a = scriviBiglietto(dir, 'a', SEGRETO('a'), FP('1'));
     scriviBiglietto(dir, 'b', SEGRETO('b'), FP('2'));
     writeFileSync(join(dir, '.claude', 'biglietti', 'storto.json'), '{"ticket":"corto"}');
-    assert.equal(B.trovaBiglietti({ env: {}, cwd: dir }).length, 2);
-    const solo = B.trovaBiglietti({ env: { FILO_BIGLIETTO_FILE: a }, cwd: dir });
+    assert.deepEqual(B.trovaBiglietti({ env: {}, cwd: dir }), [], 'senza il nome della sessione nessun biglietto: mai quelli delle altre');
+    assert.deepEqual(B.trovaBiglietti({ env: { CLAUDE_CODE_SESSION_ID: 'b' }, cwd: dir }).map((x) => x.ticket), [SEGRETO('b')]);
+    assert.deepEqual(B.trovaBiglietti({ env: { CLAUDE_CODE_SESSION_ID: 'c' }, cwd: dir }), [], 'una sessione senza il suo file non prende quello di un’altra');
+    assert.deepEqual(B.trovaBiglietti({ env: { CLAUDE_CODE_SESSION_ID: 'storto' }, cwd: dir }), []);
+    assert.deepEqual(B.trovaBiglietti({ env: { CLAUDE_CODE_SESSION_ID: '../a' }, cwd: dir }), [], 'il nome non esce dalla cartella');
+    const solo = B.trovaBiglietti({ env: { FILO_BIGLIETTO_FILE: a, CLAUDE_CODE_SESSION_ID: 'b' }, cwd: dir });
     assert.deepEqual(solo.map((x) => x.ticket), [SEGRETO('a')]);
-    // Un file indicato che non vale: si ripiega sulla cartella.
-    assert.equal(B.trovaBiglietti({ env: { FILO_BIGLIETTO_FILE: join(dir, 'manca.json') }, cwd: dir }).length, 2);
+    // Un file indicato che non vale: si ripiega sul nome della sessione.
+    assert.deepEqual(B.trovaBiglietti({ env: { FILO_BIGLIETTO_FILE: join(dir, 'manca.json'), CLAUDE_CODE_SESSION_ID: 'b' }, cwd: dir }).map((x) => x.ticket), [SEGRETO('b')]);
+    assert.deepEqual(B.trovaBiglietti({ env: { FILO_BIGLIETTO_FILE: join(dir, 'manca.json') }, cwd: dir }), []);
     if (process.platform !== 'win32') assert.equal(statSync(a).mode & 0o077, 0, 'leggibile solo da chi l’ha scritto');
   } finally { togliCartella(dir); }
 });
