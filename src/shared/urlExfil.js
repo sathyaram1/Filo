@@ -640,7 +640,8 @@
         return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
       }
     }
-    if (!G || !uscente.trim()) return valutaAvvisi(tipo, action, { memoria, azioni, daPagina }, niente);
+    const avvisi = { memoria, azioni, daPagina, parole, domanda };
+    if (!G || !uscente.trim()) return valutaAvvisi(tipo, action, avvisi, niente);
     const fonti = contestoDaAzioni(azioni).esterni.slice();
     if (pagina && typeof pagina.testo === 'string' && pagina.testo.trim()) {
       fonti.push({ testo: pagina.testo, fonte: pagina.host ? `dalla pagina ${pagina.host}` : 'dalla pagina' });
