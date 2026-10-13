@@ -59,6 +59,8 @@ test('nel dettaglio la striscia e il pannello dello stato dicono riallineamento,
   await expect(pannello).toContainText('Non è una bocciatura');
   await page.screenshot({ path: 'tests/.shots/532-dettaglio-chiaro.png' });
   await page.emulateMedia({ colorScheme: 'dark' });
+  // Le schede cambiano fondo con una transizione breve: la foto aspetta che finisca.
+  await page.waitForTimeout(300);
   await page.screenshot({ path: 'tests/.shots/532-dettaglio-scuro.png' });
   await page.emulateMedia({ colorScheme: 'light' });
 
