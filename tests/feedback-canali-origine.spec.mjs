@@ -217,17 +217,21 @@ test('con la sessione del proprietario aperta, un sito visitato non genera codic
       ...Object.fromEntries(Object.entries(mittenti.porte784).map(([nome, [c, resto]]) => [nome, { type: MSG[c], ...resto }])),
       provaModelloPredefinito: { type: MSG.TEST_DEFAULT_MODEL, nickname: 'qualsiasi' },
     };
-    const esegui = async (mittente) => {
+    const esegui = async (mittente, nomi = Object.keys(porte)) => {
       const res = {};
-      for (const [nome, msg] of Object.entries(porte)) res[nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
+      for (const nome of nomi) res[nome] = await globalThis.SN_HANDLE_MESSAGE(porte[nome], mittente);
       return res;
     };
     const sito = await esegui(mittenti.sito);
     const sitoConScheda = await esegui(mittenti.sitoConScheda);
     const usciteDaiSiti = uscite.splice(0);
-    const filo = await esegui(mittenti.filo);
+    // Da Filo solo le porte che non scrivono niente fuori di qui (l'interruttore del red team sì).
+    const filo = await esegui(mittenti.filo, mittenti.daFilo);
     return { sito, sitoConScheda, usciteDaiSiti, usciteDaFilo: uscite.splice(0), filo };
-  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: { url: 'filo://redteam/redteam.html' }, porte784: PORTE_784 });
+  }, {
+    sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: { url: 'filo://redteam/redteam.html' }, porte784: PORTE_784,
+    daFilo: ['redteamGeneraCodici', 'redteamElencoCodici', 'redteamRevocaCodice', 'catalogoModelli', 'elencoFornitori'],
+  });
 
   for (const provenienza of ['sito', 'sitoConScheda']) {
     for (const [porta, r] of Object.entries(out[provenienza])) {
