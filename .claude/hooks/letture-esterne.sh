@@ -7,10 +7,13 @@ INPUT=""
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
 
 # Read di un file dentro il progetto: niente da sporcare. Un «..», un escape JSON o un collegamento lungo il percorso
-# li decide node, che risolve il percorso vero.
+# li decide node, che risolve il percorso vero. Si guarda solo prima della risposta, e con un solo "tool_name": le
+# chiavi scritte da altri (la risposta, i parametri di un mcp__) non devono far saltare node.
 RE_READ='"tool_name"[[:space:]]*:[[:space:]]*"Read"'
 RE_FILE='"file_path"[[:space:]]*:[[:space:]]*"([^"]*)"'
-if [[ $INPUT =~ $RE_READ ]] && [[ $INPUT =~ $RE_FILE ]]; then
+TESTA=${INPUT%%'"tool_response"'*}
+DOPO_NOME=${TESTA#*'"tool_name"'}
+if [[ $TESTA =~ $RE_READ ]] && [[ $DOPO_NOME != *'"tool_name"'* ]] && [[ $TESTA =~ $RE_FILE ]]; then
   F=${BASH_REMATCH[1]}
   F=${F//\\\\//}
   D=${PROJECT_DIR//\\//}
