@@ -25,6 +25,7 @@
 //   node scripts/routine-keys.mjs account <nome> <A|B>
 
 import { findAdminRefreshToken, mintIdToken } from './lib/firestore-auth.mjs';
+import { DOVE_VA_LA_PAROLA } from './build-alarm.mjs';
 
 const REGIONE = 'europe-west1';
 const PROGETTO = 'filo-8b9cb';
