@@ -33,6 +33,7 @@
 // richiesta di fusione porta solo il nome del ramo, e gli assert che cercano
 // il commit sono rossi.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';

@@ -8,6 +8,7 @@
 //   esattamente il buco che la spec viene a chiudere. È una riga di codice, ed
 //   è il cardine di tutto il pezzo.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

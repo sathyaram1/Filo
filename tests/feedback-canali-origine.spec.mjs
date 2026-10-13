@@ -79,6 +79,8 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       // Iscriversi al giro è farsi mandare i feedback dell'owner a ogni
       // cambiamento: la porta più golosa di tutte per un sito visitato.
       giroIscrizione: { type: MSG.FEEDBACK_LIVE_SUBSCRIBE },
+      // L'«Annulla» del toast della segnalazione automatica: scrive `ignored` col token di chi è dentro (#784.3).
+      annullaSegnalazioneAutomatica: { type: MSG.CANCEL_AUTO_FEEDBACK, id: 'fb-uno' },
       _mittente: mittente,
     });
     const esegui = async (mittente) => {
@@ -127,6 +129,12 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
     if (porta === 'decifraAllegato') {
       expect(String(r.code || ''), `filo/${porta}: non è una questione di permessi`).not.toBe('not_admin');
       expect(String(r.error || ''), `filo/${porta}: l'indirizzo va guardato per primo`).toContain('url allegato non valido');
+      continue;
+    }
+    // L'annullo lo usa chiunque abbia visto il toast, ma solo per la segnalazione partita da qui: «fb-uno» no.
+    if (porta === 'annullaSegnalazioneAutomatica') {
+      expect(String(r.code || ''), `filo/${porta}: non è la provenienza a mancare`).not.toBe('forbidden');
+      expect(String(r.error || ''), `filo/${porta}`).toContain('partita da qui');
       continue;
     }
     expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
@@ -258,6 +266,45 @@ test('con la sessione del proprietario aperta, un sito visitato non genera codic
     expect(String(out.filo[porta].error || ''), `filo/${porta}: doveva arrivare alla rete`).toContain('rete finta');
   }
   expect(out.usciteDaFilo.some((u) => /redteamGenerateCodes$/.test(u)), 'da Filo la generazione dei codici non è partita').toBe(true);
+});
+
+test('con la sessione del proprietario aperta, un feedback preso dalla bacheca non lo annulla né un sito né la barra (#784.3)', async ({ app, shell, openTab, testServer }) => {
+  void shell;
+  await testServer.openReady(openTab, '<html><head><title>Sito</title></head><body><p>sito</p></body></html>', { pubblico: true });
+
+  const out = await app.evaluate(async ({ BrowserWindow }, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    ga.isAdmin = () => true;
+    ga.isSignedIn = () => true;
+    ga.getIdToken = async () => 'token-finto-dell-owner';
+    const scritture = [];
+    globalThis.SN_FEEDBACK.updateStatus = async (id, campi) => { scritture.push({ id, status: campi && campi.status }); };
+    const MSG = globalThis.SN_MSG.MSG;
+    const annulla = { type: MSG.CANCEL_AUTO_FEEDBACK, id: 'fb-della-bacheca' };
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const b = tm.tabs.find((t) => /sito-pubblico\.test/.test(t.url || ''));
+    const dalCanaleDelSito = await b.view.webContents.executeJavaScriptInIsolatedWorld(999, [{
+      code: `chrome.runtime.sendMessage(${JSON.stringify(annulla)})`,
+    }]);
+    return {
+      dalCanaleDelSito,
+      sito: await globalThis.SN_HANDLE_MESSAGE(annulla, mittenti.sito),
+      sitoConScheda: await globalThis.SN_HANDLE_MESSAGE(annulla, mittenti.sitoConScheda),
+      barra: await globalThis.SN_HANDLE_MESSAGE(annulla, mittenti.barra),
+      scritture,
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, barra: { url: 'filo://shell/shell.html', isShell: true } });
+
+  for (const provenienza of ['dalCanaleDelSito', 'sito', 'sitoConScheda']) {
+    expect(out[provenienza], `${provenienza}: con l'owner dentro un sito segna «ignorato» un feedback qualunque`)
+      .toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+  }
+  // La barra passa la provenienza, ma annulla solo quello che questo Filo ha appena mandato.
+  expect(out.barra.ok).toBe(false);
+  expect(String(out.barra.error || '')).toContain('partita da qui');
+  expect(out.scritture, 'un feedback non partito da qui è stato segnato «ignorato»').toEqual([]);
 });
 
 test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza', async ({ app, shell }) => {

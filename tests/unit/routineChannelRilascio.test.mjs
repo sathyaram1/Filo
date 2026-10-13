@@ -8,6 +8,7 @@
 // Rete finta come in routineChannel.test.mjs (fetchImpl); per la riga di
 // comando un server HTTP locale come in sealConsegna.test.mjs.
 
+import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
@@ -20,6 +21,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
 const { rapportoVuoto } = await import('../../scripts/session-report.mjs');
+const { ambientePerITest } = await import('../../scripts/run-unit-tests.mjs');
 
 test('il rapporto di ripiego, quando generarlo fallisce, porta la stessa versione di quello vero', () => {
   const src = readFileSync(resolve(REPO, 'scripts', 'routine-channel.mjs'), 'utf8');
@@ -325,9 +327,11 @@ function fintoServer(rispondi) {
   });
   return new Promise((ok) => srv.listen(0, '127.0.0.1', () => ok({ srv, port: srv.address().port, ricevute })));
 }
+// Il figlio non vede la sessione che lancia i test, come sotto `npm run test:unit`: col file lanciato a mano in una
+// routine misurava il consumo vero, che finiva nel rilascio e nel deposito di prova (#1123.2).
 function cli(args, env) {
   return new Promise((done) => {
-    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...process.env, ...env } },
+    execFile(process.execPath, [resolve(REPO, 'scripts', 'routine-channel.mjs'), ...args], { env: { ...ambientePerITest(process.env), ...env } },
       (err, so, se) => done({ code: err ? (err.code ?? 1) : 0, so: String(so || ''), se: String(se || '') }));
   });
 }
@@ -400,6 +404,27 @@ describe('release da riga di comando', () => {
       assert.equal(g(work, ['status', '--porcelain']), '');
       assert.ok(g(origin, ['ls-tree', '--name-only', 'worker/13']).includes('nato-da-shell.txt'), 'il file è arrivato su origin col rilascio');
     } finally { srv.close(); }
+  });
+
+  test('la sessione che lancia il file a mano non entra nella prova: niente consumo nel rilascio, niente cartella nel deposito', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { base, work } = scena();
+    const sessione = resolve(base, 'sessione-che-lancia.jsonl');
+    writeFileSync(sessione, '', 'utf8');
+    const prima = { FILO_ROUTINE: process.env.FILO_ROUTINE, FILO_TRANSCRIPT: process.env.FILO_TRANSCRIPT };
+    Object.assign(process.env, { FILO_ROUTINE: '1', FILO_TRANSCRIPT: sessione });
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/14']);
+      const r = await cli(['release', 'tkt-cli', '--senza-push', '--senza-rapporto'], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
+      });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
+      assert.equal(g(work, ['status', '--porcelain']), '');
+    } finally {
+      for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      srv.close();
+    }
   });
 });
 

@@ -6280,7 +6280,7 @@
   // zero grande si legge «non è successo niente», che è il contrario di «non lo
   // so». I conti tornano `null` quando la sorgente non ha risposto.
   // I numeri si scrivono all'italiana, come ovunque in Filo: il punto separa
-  // le migliaia e la virgola i decimali (Intl.NumberFormat('it-IT')).
+  // le migliaia e la virgola i decimali (regola: tests/unit/numeriItaliani.test.mjs).
   const FS_FMT = (() => {
     try { return new Intl.NumberFormat('it-IT', { useGrouping: true }); } catch (_) { return null; }
   })();

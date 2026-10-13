@@ -4127,6 +4127,9 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
 // confermare (#360). In quel caso NON mandiamo anche quella anonima: sarebbero
 // due segnalazioni per lo stesso buco, e quella che l'utente autorizza è più
 // utile (dice cosa aveva chiesto) di quella generica.
+//
+// «Annulla» ignora solo gli id partiti da qui: quelli della bacheca li legge chiunque (#784.3).
+const autoFeedbackAnnullabili = new Set();
 async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed = false }) {
   try {
     if (proposed) return;
@@ -4166,6 +4169,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
 
     if (!result || !result.id) return;
     const feedbackId = result.id;
+    autoFeedbackAnnullabili.add(String(feedbackId));
 
     // Toast non bloccante con undo: l'utente può annullare entro la durata del toast.
     const win = winOf(sender);
@@ -5441,6 +5445,7 @@ const handlerCtx = {
   finishOnboarding,
   claimOnboardingResume,
   releaseOnboardingResume,
+  autoFeedbackAnnullabili,
 };
 
 require('./handlers/nav')(on, handlerCtx);

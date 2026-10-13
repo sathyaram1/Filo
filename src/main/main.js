@@ -473,11 +473,11 @@ app.on('before-quit', () => {
   try {
     const tm = mainWindow?._filoTabs;
     const Storage = require('./shim/storage');
+    // setSync scrive già tutto il file: una seconda scrittura raddoppierebbe solo il tempo della chiusura.
     if (tm && Storage?.setSync) {
       const key = globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
       Storage.setSync({ [key]: tm.sessionState() });
-    }
-    Storage?.flushSync?.();
+    } else Storage?.flushSync?.();
   } catch (_) {}
 });
 
