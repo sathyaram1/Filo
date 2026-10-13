@@ -41,6 +41,16 @@ export async function fusioniServer(dep, { prova = false } = {}) {
       const args = ['scripts/server-fondi-pratica.mjs', ramo, '--feedback', p.feedbackId, ...(app ? [] : ['--solo-server']), ...(prova ? ['--dry-run'] : [])];
       dep.log(`#${num} server:fondi ${ramo}${app ? ` (la parte dell’app, ${app} commit, torna alle routine dopo il deploy)` : ' (solo server)'}`);
       const r = await dep.esegui('node', args, { cwd: dep.radice, timeoutMs: 60 * 60_000 });
+      // Sul server il ramo non c'è: il lavoro sta tutto nell'app, che torna alle routine senza aspettare un deploy.
+      if (r.code === USCITA_SOLO_APP && app > 0) {
+        dep.log(`#${num} su filo-security ${ramo} non c'è: niente da fondere sul server, la parte dell’app torna alle routine`);
+        soloApp.push({ num, id: p.feedbackId, app });
+        continue;
+      }
+      if (r.code === USCITA_SOLO_APP) {
+        ferme.push({ num, motivo: `né su filo-security né nell’app c’è un ramo ${ramo} da fondere: decide l’owner` });
+        continue;
+      }
       if (r.code !== 0) {
         ferme.push({ num, motivo: `server:fondi non ha fuso (uscita ${r.code}):\n${coda(r.out)}` });
         continue;
