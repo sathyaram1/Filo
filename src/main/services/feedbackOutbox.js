@@ -298,7 +298,7 @@
     _peek: () => queue.map(serialize),
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
-      queue = []; loaded = false; flushing = false; auto = true;
+      queue = []; loaded = false; flushing = false; ancora = false; auto = true;
       prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; onAttesaOwnerFn = null; onScadutaFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
     },
