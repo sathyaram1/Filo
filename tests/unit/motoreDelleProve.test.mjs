@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { electronDelLock, motoreDelleProve, verdettoMotore } from '../helpers/motoreDelleProve.mjs';
+import { assicuraMotore, electronDelLock, motoreDelleProve, verdettoMotore } from '../helpers/motoreDelleProve.mjs';
 import primaDellaCorsa from '../fixtures/prima-della-corsa.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
