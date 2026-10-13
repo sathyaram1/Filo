@@ -74,7 +74,7 @@ async function copione(app, passi) {
       }
       if (p.strumenti && p.strumenti.length) {
         for (const s of p.strumenti) { try { onToolCall && onToolCall({ id: s.id, name: s.name }); } catch (_) {} }
-        await aspetta(p.dopoStrumenti || 200);
+        await aspetta(p.finoAlFermo ? 2 ** 31 - 1 : (p.dopoStrumenti || 200));
         return { ...base, text: '', toolCalls: p.strumenti, finishReason: 'tool_calls' };
       }
       const testo = p.testo || 'Fatto.';
