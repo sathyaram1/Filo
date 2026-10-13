@@ -455,10 +455,11 @@
     { chiave: 'invitesPerUser', etichetta: 'Inviti per persona', min: 0, max: 1000, aiuto: 'Quanti codici riceve chi entra, da dare ad altri.' },
     { chiave: 'invitesMaxUses', etichetta: 'Persone per invito', min: 1, max: 1000, aiuto: 'Quante persone possono entrare con lo stesso codice. Vale anche per i link già in giro.' },
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
-    { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
-    // #1077: senza tetto uno pseudonimo incassa il premio d'invio a ogni feedback mandato via REST. Il server lo legge con la stessa chiave.
-    { chiave: 'rewardFeedbackSentPerDay', etichetta: 'Feedback premiati al giorno', min: 0, max: 1000000, aiuto: 'Quanti feedback inviati vengono premiati ogni giorno a una stessa persona: oltre, l’invio non paga. Il premio per un feedback risolto non ha tetto.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
+    // Premio d'invio e suo tetto in fila: nella griglia a due colonne della pagina stanno sulla stessa riga.
+    { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
+    // #1077: senza tetto uno pseudonimo incassa il premio d'invio a ogni feedback mandato via REST. Il server legge la stessa chiave.
+    { chiave: 'rewardFeedbackSentPerDay', etichetta: 'Feedback premiati al giorno', min: 0, max: 1000000, aiuto: 'Quanti feedback inviati vengono premiati ogni giorno a una stessa persona: oltre, l’invio non paga. Il premio per un feedback risolto non ha tetto.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
   function knobOf(chiave) { return OWNER_KNOBS.find((k) => k.chiave === chiave) || null; }
