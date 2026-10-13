@@ -131,6 +131,12 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       expect(String(r.error || ''), `filo/${porta}: l'indirizzo va guardato per primo`).toContain('url allegato non valido');
       continue;
     }
+    // L'annullo lo usa chiunque abbia visto il toast, ma solo per la segnalazione partita da qui: «fb-uno» no.
+    if (porta === 'annullaSegnalazioneAutomatica') {
+      expect(String(r.code || ''), `filo/${porta}: non è la provenienza a mancare`).not.toBe('forbidden');
+      expect(String(r.error || ''), `filo/${porta}`).toContain('partita da qui');
+      continue;
+    }
     expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
   }
 });
