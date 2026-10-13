@@ -239,16 +239,17 @@ async function apriOwner(app) {
   return page;
 }
 
-test('le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
+test('le manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
 
-  // Ci sono tutte e sette, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(7, { timeout: 15_000 });
+  // Ci sono tutte, col valore che ha il server adesso.
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(8, { timeout: 15_000 });
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
+  await expect(page.locator('#knob-rewardFeedbackSentPerDay')).toHaveValue('5');
 
   const msg = page.locator('#knob-dailyCredits-msg');
 
