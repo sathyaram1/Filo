@@ -212,7 +212,7 @@ export async function fiduciaLocale(opts = {}) {
 }
 
 /**
- * Sporca tutti i biglietti di questa sessione (§1.2: la sessione dichiara da sé). Mai un'eccezione: chi stampa testo
+ * Sporca il biglietto di questa sessione (§1.2: la sessione dichiara da sé). Mai un'eccezione: chi stampa testo
  * esterno non deve fermarsi per un guasto del server, e senza biglietto la sessione è già non fidata.
  * @returns {Promise<{ sporcati: number, senzaBiglietto?: true, errori: string[] }>}
  */
