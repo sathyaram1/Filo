@@ -1,5 +1,6 @@
 // Lavori server dalla cloud (#1159), lato app: il clone di filo-security non entra mai nel repo pubblico, e la busta
 // `lavoroServer` porta al worker le istruzioni del clone coi percorsi veri.
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
