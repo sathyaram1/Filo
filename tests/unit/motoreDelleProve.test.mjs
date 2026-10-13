@@ -72,7 +72,18 @@ test('un binario indicato con ELECTRON_OVERRIDE_DIST_PATH è una scelta: lo si d
     const m = motoreDelleProve({ radice: dir, env: { ELECTRON_OVERRIDE_DIST_PATH: altro } });
     assert.deepEqual([m.ok, m.scelto, m.binario], [false, true, '33.4.11']);
     assert.match(m.motivo, /per scelta/);
+    const avvisi = [];
+    const warn = console.warn;
+    console.warn = (s) => avvisi.push(s);
+    try { assicuraMotore({ radice: dir, env: { ELECTRON_OVERRIDE_DIST_PATH: altro } }); } finally { console.warn = warn; }
+    assert.equal(avvisi.length, 1);
   } finally { togliCartella(dir); togliCartella(altro); }
+});
+
+test('anche i lanci fuori dal corridore di Playwright (smoke, shoot, explore) passano dalla guardia', () => {
+  for (const f of ['tests/smoke.mjs', 'tests/agent/driver.mjs']) {
+    assert.match(readFileSync(join(ROOT, f), 'utf8'), /\bassicuraMotore\(\{ radice: /, f);
+  }
 });
 
 test('il globalSetup di Playwright si ferma sul motore sbagliato, prima di preparare la corsa', () => {
