@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { IDENTITA_SESSIONE } from '../../scripts/run-unit-tests.mjs';
 import { slugProgetto } from '../../scripts/session-report.mjs';
@@ -143,3 +143,32 @@ for (const [porta, routine] of [['FILO_ROUTINE ereditato', true], ['il biglietto
     } finally { srv.close(); }
   });
 }
+
+test('col biglietto in cartella e la sessione nella cartella di Claude, chi importa senzaSessione non misura niente (#592.18)', async () => {
+  const casa = cartellaTemporanea('prove-senza-sessione-ripiego-');
+  try {
+    const claude = join(casa, 'claude-della-sessione');
+    const progetto = join(claude, 'projects', slugProgetto(ROOT));
+    mkdirSync(progetto, { recursive: true });
+    const turno = { type: 'assistant', message: { id: 'm1', model: 'claude-opus-5-5', usage: { input_tokens: 10, output_tokens: 5 } } };
+    writeFileSync(join(progetto, 'sessione-vera.jsonl'), `${JSON.stringify(turno)}\n`);
+    const lavoro = join(casa, 'lavoro');
+    mkdirSync(join(lavoro, '.claude'), { recursive: true });
+    writeFileSync(join(lavoro, '.claude', 'routine-ticket.json'), '{}');
+    const prova = join(casa, 'crediti.test.mjs');
+    const url = (...p) => JSON.stringify(pathToFileURL(join(ROOT, ...p)).href);
+    writeFileSync(prova, [
+      `import ${url('tests', 'helpers', 'senzaSessione.mjs')};`,
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      `import { misureCrediti } from ${url('scripts', 'routine-channel.mjs')};`,
+      `test('crediti', () => { assert.deepEqual(misureCrediti({ root: ${JSON.stringify(lavoro)} }), {}); });`,
+    ].join('\n'));
+    // Senza FILO_TRANSCRIPT il ripiego c'è comunque: il biglietto in cartella basta (il caso del contenitore).
+    const r = await nodeTest([prova], { FILO_ROUTINE: '1', CLAUDE_CONFIG_DIR: claude });
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /^ok \d+ - crediti$/m);
+  } finally {
+    togliCartella(casa);
+  }
+});
