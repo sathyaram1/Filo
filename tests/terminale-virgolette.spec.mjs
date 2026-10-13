@@ -160,6 +160,8 @@ test('#968: un comando fallito per le virgolette mancanti propone la versione gi
 
   // Il tasto destro offre di correggerla a mano: la riga va nella barra, non parte.
   await proposta.click({ button: 'right' });
+  await expect(page.locator('.sn-rinomina-menu')).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/968-proposta-menu.png' }).catch(() => {});
   await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Modifica nella barra' }).click();
   await expect(input).toHaveValue('/cd "Nome Cognome"');
   await expect(page.locator('.dash-term-cmd')).toHaveCount(3);
