@@ -57,6 +57,7 @@ const COMPOSTI = [
   { file: 'src/shared/preferences.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/urlExfil.js', testo: "new URL('https://' + url)", perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
   { file: 'src/shared/urlExfil.js', testo: 'new URL(`https://${url}`)', perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
+  { file: 'src/shared/urlExfil.js', testo: 'l : `https://${l}`', perche: 'la chiave di confronto di un link scritto in chat' },
 ];
 
 // Chiamate di rete che non contattano un servizio.
