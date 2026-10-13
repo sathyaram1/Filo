@@ -62,6 +62,7 @@
   }
   // Il verso opposto, per i numeri interi che l'utente legge: 1.500 ms, 1.200 caratteri.
   const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
+  const decimali = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 2 });
 
   // I toni della suoneria e degli avvisi: gli id sono quelli di SN_SOUNDS (sounds.js).
   const TONI = {
