@@ -796,15 +796,13 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
-  });
+  }));
 
   // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
   // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
-  on(MSG.DEFAULT_PROVIDERS_LIST, async () => {
+  on(MSG.DEFAULT_PROVIDERS_LIST, soloFilo(async () => {
     try {
-      if (!isAdmin()) {
-        return { ok: false, error: 'Operazione riservata agli amministratori: accedi con un account autorizzato.' };
-      }
+      if (!isAdmin()) return NON_ADMIN();
       const res = await fetch('https://openrouter.ai/api/v1/providers');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
