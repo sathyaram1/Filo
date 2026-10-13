@@ -408,3 +408,81 @@ test('spiegazione su un sito: il clic finto del sito non apre i collegamenti del
   await page.mouse.click(punto.x, punto.y);
   await expect.poll(() => nelMondoDiFilo(app, page, () => window.__aperti)).toEqual(['https://example.org/voce']);
 });
+
+// #592.16: col riquadro aperto dall'utente e il fuoco nella sua casella, la pagina scrive e preme di continuo per tre
+// secondi, con ogni strada che ha (tasti e clic fabbricati, execCommand nel campo che ha il fuoco, requestSubmit).
+const MARTELLO = `<script>
+  window.martella = (ms) => new Promise((fine) => {
+    const stop = Date.now() + ms;
+    let giri = 0;
+    const giro = () => {
+      giri++;
+      const host = document.querySelector('[data-sn-riquadro]');
+      try { document.execCommand('insertText', false, ' domanda del sito'); } catch (_) {}
+      for (const el of [host, document.activeElement, ...document.querySelectorAll('button')].filter(Boolean)) {
+        for (const t of ['keydown', 'keypress', 'keyup']) {
+          el.dispatchEvent(new KeyboardEvent(t, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, composed: true, cancelable: true }));
+        }
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true, detail: 1 }));
+        if (typeof el.click === 'function') el.click();
+      }
+      try { document.execCommand('insertParagraph'); document.execCommand('insertLineBreak'); } catch (_) {}
+      for (const f of document.forms) try { f.requestSubmit(); } catch (_) {}
+      if (Date.now() < stop) setTimeout(giro, 20); else fine(giri);
+    };
+    giro();
+  });
+</script>`;
+
+test('la pagina che scrive e preme di continuo nei riquadri aperti dall\'utente non fa partire niente: spiegazione, Modifica, feedback', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await contaChiamate(app);
+  const page = await testServer.openReady(openTab, pagina(`<p id="parola" style="font-size:20px">supercalifragilistico</p>${MARTELLO}`));
+
+  // Spiega: dopo la risposta l'utente mette il cursore nella casella della domanda e resta fermo.
+  await page.locator('#parola').dblclick();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('Risposta del modello');
+  await expect.poll(() => domande(app)).toBe(1);
+  await clicca(app, page, '.sn-popup-input');
+  expect(await page.evaluate(() => window.martella(3000))).toBeGreaterThan(20);
+  await page.waitForTimeout(500);
+  expect(await domande(app), 'nessuna domanda partita dalla pagina').toBe(1);
+  await page.keyboard.press('Escape');
+  await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
+
+  // Modifica: l'utente la apre sulla selezione e mette il cursore nell'istruzione.
+  await page.evaluate(() => document.body.insertAdjacentHTML('afterbegin', '<textarea id="campo" style="width:400px;height:80px">Un testo con un erore.</textarea>'));
+  await page.locator('#campo').click();
+  await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu')).toBeVisible({ timeout: 10_000 });
+  await page.locator('.sn-menu .sn-menu-item', { hasText: 'Modifica' }).click();
+  await expect.poll(() => statoDi(app, page, '.sn-editbox')).not.toBeNull();
+  await page.waitForTimeout(1500);
+  const prima = await chiamate(app);
+  await clicca(app, page, '.sn-editbox-instruction');
+  await page.evaluate(() => window.martella(3000));
+  await page.waitForTimeout(500);
+  expect(await chiamate(app), 'nessuna riscrittura partita dalla pagina').toBe(prima);
+  await expect(page.locator('#campo')).toHaveValue('Un testo con un erore.');
+  await page.keyboard.press('Escape');
+  await expect.poll(() => conta(app, page, '.sn-editbox')).toBe(0);
+
+  // Invia feedback: l'utente apre il modulo e mette il cursore nella casella.
+  await spiaInvii(app, page);
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  await expect.poll(() => statoDi(app, page, '.sn-fb-text')).not.toBeNull();
+  await scrivi(app, page, '.sn-fb-text', 'Il tasto indietro non va');
+  await page.evaluate(() => window.martella(3000));
+  await page.waitForTimeout(500);
+  expect(await inviati(app, page), 'nessuna segnalazione partita dalla pagina').toEqual([]);
+  expect(await conta(app, page, '.sn-fb-modal')).toBe(1);
+  // Il clic vero dell'utente invia quello che c'è nella casella.
+  await clicca(app, page, '.sn-fb-send');
+  await expect.poll(async () => (await inviati(app, page)).length).toBe(1);
+  expect((await inviati(app, page))[0]).toContain('Il tasto indietro non va');
+});

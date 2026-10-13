@@ -29,6 +29,7 @@
         'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
       ],
       fixes: [
+        'Un sito non può più premere da sé i pezzi di Filo che compaiono nella sua pagina: la conferma di «Salva per dopo», la parte di schermo da catturare o trascrivere, i bottoni del QR e quelli sotto le risposte dell\'Aiuto. Vanno avanti solo col tuo clic o col tuo tasto.',
         'Dopo aver letto un documento o una pagina, Filo non apre più senza chiedertelo un link che contiene un dato che gli hai scritto in chat, come il numero di telefono, l\'indirizzo di casa o una password. Vale anche per i link che scrive nelle risposte e nei suggerimenti della home, quando li clicchi. Ti mostra l\'indirizzo intero e decidi tu. Se il dato sta nella richiesta che hai appena fatto, il link si apre subito.',
         'Su Windows, in fondo alla home, quando sei collegato al Wi-Fi vedi l\'icona del Wi-Fi col nome della rete. Prima mostrava un globo anche col Wi-Fi collegato.',
         'Filo vede ancora le foto che gli mandi in chat anche nei messaggi dopo, e puoi continuare a chiedergli di quello che c\'è dentro; riaprendo la chat le ritrovi anche tu. Prima dal secondo messaggio diceva di non vederle. Dopo una ventina di messaggi, o se riapri Filo, non le ha più davanti, ma sa che c\'erano e ti chiede di rimandarle se gli servono.',
