@@ -167,6 +167,7 @@
       if (it.pagina) b.addEventListener('pointerenter', (e) => { if (e.isTrusted) api.chiedi(); });
       nav.appendChild(b);
     }
+    if (suggDi && !suggDi.isConnected) nascondiSuggerimento();
     // L'icona appena arrivata si fa vedere anche se il gruppo scorre: senza, sembra che il trascinamento non abbia fatto niente.
     const arrivata = prima.size ? [...nav.querySelectorAll('.ico')].find((b) => !prima.has(b.dataset.id)) : null;
     if (arrivata) {
