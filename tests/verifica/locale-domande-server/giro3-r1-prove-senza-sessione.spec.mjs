@@ -14,7 +14,7 @@ test('r1 la sentinella delle prove senza sessione è verde sul ramo', () => {
     '--test', '--test-reporter=tap', '--test-name-pattern=importa senzaSessione', 'tests/unit/proveSenzaSessione.test.mjs',
   ], { cwd: ROOT, env, encoding: 'utf8', timeout: 4 * 60_000 });
   const out = String(r.stdout || '') + String(r.stderr || '');
-  expect(out, 'la sentinella non è partita').toMatch(/^# pass [1-9]/m);
+  expect(out, 'la sentinella non è partita').toMatch(/^(?:not )?ok \d+ - chi prova i moduli che misurano la sessione/m);
   expect(out, (out.match(/^not ok .*$|^\s+\+ .*$/gm) || []).join('\n')).toMatch(/^# fail 0$/m);
   expect(r.status).toBe(0);
 });
