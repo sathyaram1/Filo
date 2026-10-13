@@ -135,9 +135,15 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // Le porte del proprietario: prima DA DOVE (un sito visitato sulla macchina dell'owner direbbe sì
+  // a «sei l'owner?»), poi il permesso col suo motivo. La prova: tests/feedback-canali-origine.spec.mjs.
+  const soloOwner = (handler) => soloFilo(async (msg, sender, origin) => {
+    if (!auth.isAdmin()) return { ok: false, code: 'not_admin', error: 'Comando riservato al proprietario.' };
+    return handler(msg, sender, origin);
+  });
+
   // Generazione codici (SOLO owner). { count } → { ok, codes }.
-  on(MSG.REDTEAM_GEN_CODES, async (msg) => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
+  on(MSG.REDTEAM_GEN_CODES, soloOwner(async (msg) => {
     const count = Math.max(1, Math.min(200, Math.floor(Number(msg?.count) || 1)));
     try {
       const r = await callable('redteamGenerateCodes', { count });
