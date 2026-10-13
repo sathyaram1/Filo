@@ -275,7 +275,11 @@
     } finally {
       flushing = false;
     }
-    if (anyFail && queue.length) {
+    if (ancora && queue.length) {
+      ancora = false;
+      if (timer) { clearTimeout(timer); timer = null; }
+      scheduleFlush(0);
+    } else if (anyFail && queue.length) {
       const d = backoff;
       backoff = Math.min(backoffMax, Math.round(backoff * 1.7));
       scheduleFlush(d);
