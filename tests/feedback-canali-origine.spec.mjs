@@ -167,7 +167,7 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       sitoConScheda: await esegui(mittenti.sitoConScheda),
       filo: await esegui(mittenti.filo),
     };
-  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO, porte784: PORTE_784 });
 
   for (const provenienza of ['sito', 'sitoConScheda']) {
     for (const [porta, r] of Object.entries(out[provenienza])) {
@@ -192,6 +192,57 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
     expect(r.ok, `filo/${porta}`).toBe(false);
     expect(String(r.code || ''), `filo/${porta}`).toBe('not_admin');
   }
+});
+
+test('con la sessione del proprietario aperta, un sito visitato non genera codici del red team né spende le chiavi predefinite (#784.2)', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    ga.isAdmin = () => true;
+    ga.isSignedIn = () => true;
+    ga.getIdToken = async () => 'token-finto-dell-owner';
+    // Ogni uscita verso il red team o verso il catalogo dei modelli si conta e non parte.
+    const uscite = [];
+    const fetchVera = globalThis.fetch;
+    globalThis.fetch = async (url, ...resto) => {
+      const u = String((url && url.url) || url || '');
+      if (/cloudfunctions\.net\/redteam|openrouter\.ai\/api\//.test(u)) { uscite.push(u); throw new Error('rete finta'); }
+      return fetchVera(url, ...resto);
+    };
+    const MSG = globalThis.SN_MSG.MSG;
+    const porte = {
+      ...Object.fromEntries(Object.entries(mittenti.porte784).map(([nome, [c, resto]]) => [nome, { type: MSG[c], ...resto }])),
+      provaModelloPredefinito: { type: MSG.TEST_DEFAULT_MODEL, nickname: 'qualsiasi' },
+    };
+    const esegui = async (mittente) => {
+      const res = {};
+      for (const [nome, msg] of Object.entries(porte)) res[nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
+      return res;
+    };
+    const sito = await esegui(mittenti.sito);
+    const sitoConScheda = await esegui(mittenti.sitoConScheda);
+    const usciteDaiSiti = uscite.splice(0);
+    const filo = await esegui(mittenti.filo);
+    return { sito, sitoConScheda, usciteDaiSiti, usciteDaFilo: uscite.splice(0), filo };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: { url: 'filo://redteam/redteam.html' }, porte784: PORTE_784 });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    for (const [porta, r] of Object.entries(out[provenienza])) {
+      expect(r, `${provenienza}/${porta}: nessuna risposta`).toBeTruthy();
+      expect(r, `${provenienza}/${porta}: con l'owner dentro la richiesta di un sito passa`).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+    }
+  }
+  expect(out.usciteDaiSiti, 'una richiesta di un sito è uscita verso il red team o verso il catalogo dei modelli').toEqual([]);
+
+  // Da una pagina di Filo, con l'owner dentro, le stesse porte si aprono: la richiesta arriva fino alla rete.
+  for (const porta of ['redteamGeneraCodici', 'redteamElencoCodici', 'redteamRevocaCodice', 'catalogoModelli', 'elencoFornitori']) {
+    expect(String(out.filo[porta].code || ''), `filo/${porta}`).not.toMatch(/forbidden|not_admin/);
+    expect(String(out.filo[porta].error || ''), `filo/${porta}: doveva arrivare alla rete`).toContain('rete finta');
+  }
+  expect(out.usciteDaFilo.some((u) => /redteamGenerateCodes$/.test(u)), 'da Filo la generazione dei codici non è partita').toBe(true);
 });
 
 test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza', async ({ app, shell }) => {
