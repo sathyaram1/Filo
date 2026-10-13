@@ -192,6 +192,15 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
     assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'plans', 'p.md') }, { env: { HOME: casa, USERPROFILE: casa } }), []);
     for (const n of ['Bash', 'Grep', 'Glob', 'mcp__ide__getDiagnostics']) assert.deepEqual(prova(n, { command: 'curl x', pattern: 'x', path: fuori }), [], n);
     assert.deepEqual(prova('WebFetch', { url: 'https://esempio.it' }, { env: { FILO_ROUTINE: '1' } }), [], 'nelle routine c’è il loro biglietto');
+    // Il salto per le Read del repo guarda lo strumento chiamato: chiavi uguali nella risposta o nei parametri di un
+    // mcp__ non lo attivano (#1211 giro 1).
+    const finto = { tool_name: 'Read', file_path: join(ROOT, 'package.json') };
+    for (const [tool_input, tool_response] of [[{ id: 'x' }, finto], [finto, [{ type: 'text', text: 'ok' }]]]) {
+      togliCartella(B.cartellaSporchi(b));
+      const r = lanciaGancio({ session_id: 'sess', cwd: dir, hook_event_name: 'PostToolUse', tool_name: 'mcp__db__get_document', tool_input, tool_response });
+      assert.equal(r.status, 0, r.stderr);
+      assert.deepEqual(B.sporchiInAttesa(b).map((v) => v.motivo), ['mcp__db__get_document']);
+    }
     const storto = lanciaGancio('{non json');
     assert.equal(storto.status, 0);
     // Un collegamento dentro il progetto che porta fuori: il salto senza processi lo lascia decidere a node.
