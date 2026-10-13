@@ -62,23 +62,6 @@ test('premuta l’icona, la sua etichetta se ne va', async ({ app, openTab, test
   await barra.mouse.up();
 });
 
-test('il puntatore che passa su un’icona mentre la barra si chiude non lascia un’etichetta sopra la pagina', async ({ app, openTab, testServer }) => {
-  const barra = await barraAperta(app, openTab, testServer);
-  const p = await accanto(barra);
-  await barra.mouse.move(p.x, p.y);
-  const c = await barra.evaluate(() => {
-    const b = document.querySelector('#nav .ico').getBoundingClientRect();
-    return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) };
-  });
-  // Il pannello scivola via ancora visibile: il puntatore gli entra in un'icona, e la vista poi si stringe sotto
-  // di lui senza dirgli che è uscito.
-  await comandaBarra(app, 'chiudi');
-  await barra.mouse.move(c.x, c.y);
-  await expect.poll(async () => (await statoBarra(app)).bounds.width, { timeout: 4000 }).toBeLessThan(20);
-  await pausa(700);
-  expect(await etichetta(app)).toBe('');
-});
-
 test('un’etichetta chiesta a barra chiusa non compare', async ({ app, openTab, testServer }) => {
   const barra = await barraAperta(app, openTab, testServer);
   const ico = barra.locator('#nav .ico').first();
@@ -87,7 +70,10 @@ test('un’etichetta chiesta a barra chiusa non compare', async ({ app, openTab,
   await expect.poll(() => etichetta(app), { timeout: 4000 }).toBe(nome);
   await comandaBarra(app, 'chiudi');
   await expect.poll(() => etichetta(app), { timeout: 4000 }).toBe('');
-  // L'attesa dell'etichetta scattata dopo la chiusura: la richiesta arriva al main con la barra già chiusa.
+  await expect.poll(async () => (await statoBarra(app)).bounds.width, { timeout: 4000 }).toBeLessThan(20);
+  await pausa(300);
+  // Un'attesa scattata a vista già stretta (il puntatore passato su un'icona mentre il pannello scivolava via):
+  // la richiesta arriva al main con la barra chiusa, e nessuno la toglierebbe più.
   await barra.evaluate((t) => window.barra.suggerimento({ testo: t, x: 64, y: 40 }), nome);
   await pausa(700);
   expect(await etichetta(app)).toBe('');
