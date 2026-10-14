@@ -68,7 +68,8 @@ export async function fusioniServer(dep, { prova = false } = {}) {
     } else if (r.code === USCITA_CONFLITTO_MAIN) {
       // Il ramo va in conflitto con main del server: nessuno sul PC lo riallinea, torna alle routine.
       dep.log(`#${x.num} su filo-security ${x.ramo} va in conflitto con main: torna alle routine per il riallineamento`);
-      riallineate.push({ num: x.num, id: x.id, appFusa: x.appFusa });
+      riallineate.push({ num: x.num, id: x.id });
+      if (x.appFusa) ferme.push({ num: x.num, motivo: `${prima}main del server è andato avanti fra la prova a vuoto e la fusione, e il ramo ora va in conflitto: torna alle routine, e fino ad allora l’app su main parla col server di prima` });
     } else if (r.code !== 0) {
       ferme.push({ num: x.num, motivo: `${prima}server:fondi non ha fuso (uscita ${r.code}):\n${coda(r.out)}` });
     } else return false;
