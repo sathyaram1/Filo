@@ -5,7 +5,7 @@
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { IDENTITA_SESSIONE, fileArgs, flagsConAvanzamento, lanciaSorvegliato, testoFermo } from '../../scripts/run-unit-tests.mjs';
