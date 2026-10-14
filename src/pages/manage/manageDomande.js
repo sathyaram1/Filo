@@ -908,9 +908,9 @@
       finte = true;
       const errore = opts && opts.errore ? String(opts.errore) : '';
       Object.assign(stato, errore
-        ? { lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), soloOwner: !!(opts && opts.soloOwner), errore, domande: [], riferimenti: {}, altre: false }
+        ? { lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), soloOwner: !!(opts && opts.soloOwner), errore, aggiornamento: '', domande: [], riferimenti: {}, altre: false }
         : {
-          lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '',
+          lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', aggiornamento: '',
           domande: Array.isArray(lista) ? lista : [], riferimenti: (opts && opts.riferimenti) || {}, altre: !!(opts && opts.altre),
         });
       cambia();
