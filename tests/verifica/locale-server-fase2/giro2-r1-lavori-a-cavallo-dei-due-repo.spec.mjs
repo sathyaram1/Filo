@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 import {
-  ROOT, SERVER, FUNZIONI, richiediServer, sha, mainDiFilo, scriviAlbero, refDiFilo, alberoVisto, bakeIn, statoPassato,
+  SERVER, FUNZIONI, richiediServer, sha, mainDiFilo, scriviAlbero, refDiFilo, alberoVisto, bakeIn, statoPassato,
   registro, gitHubFinto, depsCancello,
 } from './aiuti-giro2.mjs';
 
