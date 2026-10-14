@@ -316,18 +316,24 @@
     } catch (_) { return true; }
   }
 
+  const CLICKABLE = 'button, a[role="button"], [role="button"], a, input[type="button"], input[type="submit"]';
+
   // Un button/link con testo di rifiuto. Dentro `root` qualsiasi; nel resto della pagina solo se
   // sta in un contenitore di consenso. Conservativo per costruzione.
-  function findRejectText(root, inConsentBox) {
+  // `seen.hidden` dice se c'era un rifiuto ancora invisibile (un banner che sta entrando in dissolvenza).
+  function findRejectText(root, inConsentBox, seen) {
     let nodes = [];
-    try { nodes = root.querySelectorAll('button, a[role="button"], [role="button"], a, input[type="button"], input[type="submit"]'); } catch (_) {}
+    try {
+      nodes = [...root.querySelectorAll(CLICKABLE)];
+      if (root.nodeType === 1 && root.matches(CLICKABLE)) nodes.unshift(root);
+    } catch (_) {}
     for (const el of nodes) {
       if (el.__filoCookieClicked) continue;
       const probe = el.tagName === 'INPUT' ? { textContent: el.value } : el;
       if (!isRejectText(probe)) continue;
       if (el.tagName === 'A' && leavesPage(el)) continue;
       if (!inConsentBox && !looksLikeConsent(el)) continue;
-      if (!isVisible(el)) continue;
+      if (!isVisible(el)) { if (seen) seen.hidden = true; continue; }
       return el;
     }
     return null;
