@@ -22,7 +22,7 @@ const IMPORTA = /^import '\.\.\/helpers\/senzaSessione\.mjs';$/m;
 let corse = 0;
 
 /**
- * Trenta file sotto carico durano quanto vuole la macchina: il tetto conta il tempo in cui niente va avanti, come nel
+ * Decine di file sotto carico durano quanto vuole la macchina: il tetto conta il tempo in cui niente va avanti, come nel
  * lanciatore, non la durata della corsa (#1214). `fermo` è il rosso col nome del file e il tempo, o null.
  */
 async function daSoli(file, sessione, { casa, tetto = TETTO_ATTESA_MS }) {
