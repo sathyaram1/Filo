@@ -1,4 +1,4 @@
-// domanda.mjs — le domande all'owner (#1149, SPEC-DOMANDE.md §3). Col biglietto delle routine `chiedi` passa dal canale;
+// domanda.mjs — le domande all'owner (#1149, SPEC-DOMANDE.md §3). Col biglietto delle routine `chiedi` e `cerca` passano dal canale;
 // il resto va a ownerDomande col segreto del biglietto locale (#1148, la fiducia), e chi stampa una non fidata si sporca.
 // Le azioni di consenso e quelle `bulk:false` non partono da qui: solo dalla finestra di Filo (regola, non muro).
 
