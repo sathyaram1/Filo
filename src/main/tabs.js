@@ -3772,6 +3772,12 @@ function origineDi(url) {
   try { return new URL(url).origin; } catch (_) { return ''; }
 }
 
+// Una scheda riaperta in coda porta il nome del suo sito finché la pagina non le dà il titolo vero.
+function titoloInAttesa(url) {
+  const host = hostOf(url);
+  return host ? host.replace(/^www\./i, '') : 'Nuova scheda';
+}
+
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.
 function hostOf(url) {
