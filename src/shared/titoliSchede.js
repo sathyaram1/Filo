@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSIONE = 'c4';
+  const VERSIONE = 'c5';
   // Oltre questa lunghezza un titolo non entra comunque intero da nessuna parte: si esamina l'inizio.
   const TETTO = 600;
   const FAMIGLIE = Object.freeze(['rivolto', 'ruolo', 'indiretto', 'memoria', 'azione', 'comportamento']);
@@ -156,8 +156,11 @@
     const n = c.codePointAt(0);
     return n >= 0xE0020 && n <= 0xE007E ? c : '';
   });
-  // Bianchi che a schermo sono uno spazio: tolti attaccherebbero le parole che separano.
-  const VUOTI = /[\u115F\u1160\u2800\u3164\uFFA0]/g;
+  // Segni che a schermo non sono lettere (riempitivi, spazio braille, tatweel): fra due parole valgono uno spazio,
+  // dentro una parola niente. Diventano VUOTO, e le letture del titolo li sciolgono nei due modi.
+  const VUOTI = /[\u0640\u115F\u1160\u2800\u3164\uFFA0]/g;
+  const VUOTO = '\uE000';
+  const VUOTO_RE = /\uE000/g;
   const SEGNI_NON_LETTO = /^[\s●•⚫⬤○⭕\u{1F534}\u{1F7E0}\u{1F7E1}\u{1F7E2}\u{1F535}\u{1F7E3}\u{1F514}\u{1F4AC}*]+/u;
   const CONTATORE = /\s*[([{]\s*\d{1,3}(?:[., ]\d{3})*\+?\s*[)\]}]/g;
   const NUMERO = /(?<![\p{L}\p{N}])\d[\d.,:/]*(?![\p{L}\p{N}])/gu;
@@ -166,7 +169,7 @@
   const TETTO_CHIAVE = 2000;
   function chiave(titolo) {
     let t = typeof titolo === 'string' ? titolo.slice(0, TETTO_CHIAVE) : '';
-    t = senzaInvisibili(t.normalize('NFC').replace(VUOTI, ' '));
+    t = senzaInvisibili(t.normalize('NFC').replace(VUOTI, VUOTO));
     // Gli spazi doppi restano: separano le parole di un titolo scritto a lettere spaziate.
     t = t.replace(/\s/g, ' ').replace(CONTATORE, '').replace(SEGNI_NON_LETTO, '').replace(NUMERO, '#');
     return t.trim();
@@ -195,18 +198,34 @@
     return m;
   })();
 
+  // Maiuscole sosia di altri alfabeti, lette PRIMA del minuscolo: «Η» greca minuscola diventa «η», che somiglia a una n.
+  // Cherokee e Lisu non li porta al latino nessuna normalizzazione.
+  const SOSIA = (() => {
+    const m = new Map();
+    const righe = {
+      'ΑΒΕΖΗΙΚΜΝΟΡΤΥΧ': 'abezhikmnoptyx',
+      'ᎪᏴᏟᎠᎬᏀᎻᎥᎫᏦᏞᎷᎾᏢᎡᏒᏚᏕᎢᏙᏉᎳᏔᏃᎽ': 'abcdeghijklmoprrssttvwwzy',
+      'ꓮꓐꓚꓓꓰꓝꓖꓧꓲꓙꓗꓡꓟꓠꓳꓑꓣꓢꓔꓴꓦꓪꓫꓬꓜ': 'abcdefghijklmnoprstuvwxyz',
+    };
+    for (const [da, a] of Object.entries(righe)) {
+      Array.from(da).forEach((c, i) => { m.set(c, a[i]); m.set(c.toLowerCase(), a[i]); });
+    }
+    return m;
+  })();
+  const SOSIA_MAIUSCOLI = /[Α-ΩᎠ-ᏽꓐ-꓿ꭰ-ꮿ]/gu;
+
   // I caratteri «tag» (U+E0020–E007E) scrivono testo invisibile: si rileggono come lettere normali.
   const TAG = /[\u{E0020}-\u{E007E}]+/gu;
 
   // Il taglio si fa sui caratteri del titolo, mai sul testo normalizzato: un carattere che si allarga (\uFDFA \u2192 diciotto
-  // lettere) spingerebbe l'ordine che lo segue oltre la lettura. Uno che si allarga oltre ALLARGATO conta come spazio.
+  // lettere) spingerebbe l'ordine che lo segue oltre la lettura. Uno che si allarga oltre ALLARGATO conta come VUOTO.
   const ALLARGATO = 4;
   const NON_ASCII = /[^\x00-\x7F]/gu;
   function base(testo) {
     let t = Array.from(String(testo || '')).slice(0, TETTO).join('');
     t = t.replace(TAG, (run) => ` ${Array.from(run, (c) => String.fromCharCode(c.codePointAt(0) - 0xE0000)).join('')} `);
-    t = t.replace(NON_ASCII, (c) => (c.normalize('NFKC').length > ALLARGATO ? ' ' : c));
-    t = senzaInvisibili(t.normalize('NFKC').replace(VUOTI, ' ')).toLowerCase();
+    t = t.replace(NON_ASCII, (c) => (c.normalize('NFKC').length > ALLARGATO ? VUOTO : c));
+    t = senzaInvisibili(t.normalize('NFKC').replace(VUOTI, VUOTO).replace(SOSIA_MAIUSCOLI, (c) => SOSIA.get(c) || c)).toLowerCase();
     let out = '';
     // Ogni segno combinante, non solo gli accenti latini: i punti vocalici ebraici sopra una lettera latina non la cambiano.
     for (const ch of t.normalize('NFD').replace(/\p{M}/gu, '')) out += CONFONDIBILI.get(ch) || ch;
