@@ -274,7 +274,7 @@
 
   // Una risposta che il modello ha dovuto fermare al tetto di lunghezza (finish_reason 'length', #1097.3): non è un
   // errore, ma chi la legge deve sapere che non è intera. La stessa frase su ogni superficie; '' se la risposta è intera.
-  const FRASE_INTERROTTA = 'La risposta si è interrotta qui: era più lunga del tetto che ha questa funzione.';
+  const FRASE_INTERROTTA = 'La risposta si è interrotta qui: ha raggiunto la lunghezza massima.';
   function rispostaInterrotta(finishReason) {
     return finishReason === 'length' ? FRASE_INTERROTTA : '';
   }

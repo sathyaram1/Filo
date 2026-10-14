@@ -4900,7 +4900,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   if (interrotta && !senzaRisposta) {
     senzaRisposta = { passi, interrotta: true };
-    textReply = unisciTesti([textReply, `_${globalThis.SN_CHAT_ERRORS.rispostaInterrotta('length')}_`]);
+    textReply = unisciTesti([textReply, globalThis.SN_CHAT_ERRORS.rispostaInterrotta('length')]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di

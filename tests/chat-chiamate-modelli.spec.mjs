@@ -4,6 +4,7 @@
 //  (B) due ricerche dello stesso giro partono insieme.
 //  (C) entrare nel campo della chat sveglia il lettore del computer anche dopo una pausa lunga, e l'attesa prima del
 //      modello finisce nella cronologia.
+//  (D) il riquadro di una spiegazione fermata dal tetto lo dice, «Continua» chiede il seguito, e la cache non la tiene.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -186,4 +187,52 @@ test('C — entrare nel campo della chat dopo una pausa sveglia il lettore del c
     globalThis.SN_SISTEMA_MAIN._perProve.inattivita();
     globalThis.SN_SISTEMA_MAIN._perProve.veglia(0);
   });
+});
+
+test('D — riquadro della risposta fermato dal tetto: la riga lo dice, «Continua» chiede il seguito, e non resta in cache', async ({ app }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__restoreD = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    globalThis.__callsD = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+      const ultimo = String(messages[messages.length - 1].content || '');
+      globalThis.__callsD.push({ maxTokens: attempts[0].maxTokens, ultimo });
+      const seguito = /Continua da dove ti sei interrotto/.test(ultimo);
+      const text = seguito ? 'e per questo si dice così.' : 'La parola viene dal latino';
+      onDelta(text);
+      return { text, usage: {}, finishReason: seguito ? 'stop' : 'length', model: attempts[0].model, provider: attempts[0].provider };
+    };
+  });
+  // Il riquadro è lo stesso su ogni pagina: qui lo si apre dalla home, dove la sua API è a portata della prova.
+  const page = await newtabPage(app);
+  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
+  const apri = () => page.evaluate(() => window.SN_POPUP.openStreaming({
+    action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
+    payload: { selection: 'parola', sentence: 'una frase con parola dentro' },
+    anchor: { x: 120, y: 300 },
+    title: 'Approfondisci',
+  }));
+  await apri();
+  const nota = page.locator('.sn-popup .sn-risposta-interrotta');
+  await expect(nota).toContainText('La risposta si è interrotta qui', { timeout: 8000 });
+  expect((await app.evaluate(() => globalThis.__callsD))[0].maxTokens).toBe(16384);
+  await page.locator('.sn-popup').first().screenshot({ path: 'tests/.shots/1097-riquadro-interrotto.png' });
+  await nota.locator('button', { hasText: 'Continua' }).click();
+  await expect(page.locator('.sn-popup')).toContainText('e per questo si dice così.', { timeout: 8000 });
+  await expect(nota.locator('button')).toHaveCount(0);
+
+  // Riaperta, la stessa domanda va di nuovo al modello: una risposta interrotta non si rilegge dalla cache.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sn-popup')).toHaveCount(0);
+  await apri();
+  await expect.poll(() => app.evaluate(() => globalThis.__callsD.length), { timeout: 8000 }).toBe(3);
+  await app.evaluate(() => globalThis.__restoreD());
 });

@@ -31,6 +31,7 @@
         'Nel terminale della home, se incolli in un comando un percorso con spazi, per esempio la tua cartella utente con nome e cognome, Filo lo mette fra virgolette e le vedi prima di premere Invio. Se un comando scritto a mano fallisce perché le virgolette mancavano, sotto l\'errore trovi lo stesso comando corretto: premi «Esegui» e parte.',
         'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
         'Col tasto destro su un\'immagine Filo riconosce anche quelle fatte con Stable Diffusion o FLUX che hanno perso le etichette: legge il marchio invisibile che questi programmi scrivono nei pixel, e lo dice in cima alla descrizione. Te lo dice anche in chat, se gli chiedi se l\'immagine è fatta con l\'AI. Un ritaglio o un ridimensionamento cancellano il marchio, quindi se non compare niente non vuol dire che la foto sia vera.',
+        'Quando una risposta di Filo è più lunga del tetto si ferma e te lo dice, con «Continua» per farla finire. Prima arrivava tagliata come se fosse intera. Vale per la chat della home, i riquadri delle spiegazioni, l\'Aiuto, l\'Editor e i Mazzi. Il tetto lo cambi in Preferenze, «Quanto può essere lunga una risposta», o chiedendolo a Filo.',
       ],
       fixes: [
         'Nella home il riquadro del Bluetooth e del Wi-Fi si chiude con Esc anche se lo premi appena aperto. Mentre legge dispositivi e reti non copre più la sua voce, e un clic sulla voce non nasconde il Bluetooth per sbaglio.',
@@ -101,6 +102,10 @@
         'Se Filo fa molti passi senza arrivare a una risposta, adesso lo scrive in chat e ti dà il tasto «Continua», che lo fa ripartire da dove era arrivato senza rifare le ricerche già fatte. Prima la conversazione poteva finire con «Ha cercato sul web 9 volte» e nient\'altro.',
         'Nella Cronologia AI il filtro per tipo elenca ogni nome una volta sola, e scegliendo «Aiuto» vedi tutte le richieste fatte all\'Aiuto. Prima lo stesso nome poteva comparire due o tre volte, e ognuno mostrava solo una parte delle righe.',
         'Se scrivi nelle Preferenze la tua chiave Tavily, le ricerche sul web di Filo usano quella. Prima Filo cercava sempre con la sua, e quando la esauriva passava a risultati peggiori anche se la tua avrebbe funzionato.',
+        'Quando Filo deve fare più ricerche o leggere più documenti per risponderti, li fa tutti insieme e la risposta arriva prima.',
+        'Dopo una pausa il primo messaggio alla chat della home parte subito: Filo rilegge batteria, rete e Bluetooth appena entri nel campo, non quando premi Invio.',
+        'Il correttore non butta più il controllo se nel frattempo hai continuato a scrivere: le parole da rivedere compaiono subito al loro posto. E un punto o uno spazio in più non lo fanno ripartire.',
+        'Se il servizio dei modelli è sovraccarico per un attimo, Filo aspetta quanto chiede e riprova, invece di passare subito a un altro modello o darti errore.',
       ],
     },
     {

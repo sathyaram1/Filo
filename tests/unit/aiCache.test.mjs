@@ -80,3 +80,10 @@ test('le voci scritte prima del tetto per funzione: una letta prende la sua funz
   assert.equal(mappa[k1].action, ACTIONS.EXPLAIN);
   assert.equal(mappa[k2], undefined);
 });
+
+test('due risposte salvate nello stesso istante restano tutte e due', async () => {
+  await Promise.all([metti(ACTIONS.EXPLAIN, 'a'), metti(ACTIONS.EXPLAIN, 'b'), metti(ACTIONS.TRANSLATE_SELECTION, 'c')]);
+  assert.equal((await leggi(ACTIONS.EXPLAIN, 'a'))?.text, 'ra');
+  assert.equal((await leggi(ACTIONS.EXPLAIN, 'b'))?.text, 'rb');
+  assert.equal((await leggi(ACTIONS.TRANSLATE_SELECTION, 'c'))?.text, 'rc');
+});

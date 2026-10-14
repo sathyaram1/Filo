@@ -41,6 +41,15 @@
 
   const ultimoUso = (e) => (e && (e.lastUsed || e.ts)) || 0;
 
+  // Le scritture rileggono e riscrivono la mappa intera: in fila, o due spiegazioni pronte insieme si cancellano a
+  // vicenda (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md). Le letture restano libere.
+  let coda = Promise.resolve();
+  function inCoda(fn) {
+    const risultato = coda.then(fn, fn);
+    coda = risultato.then(() => {}, () => {});
+    return risultato;
+  }
+
   async function get({ provider, model, messages, action = '' }) {
     if (esclusa(action)) return null;
     try {
@@ -83,32 +92,39 @@
 
   async function set({ provider, model, messages, text, usage, action = '' }) {
     if (esclusa(action)) return;
-    try {
-      const key = await hashKey({ provider, model, messages });
-      const map = await readAll();
-      const now = Date.now();
-      applicaUsati(map);
-      map[key] = { text, usage: usage || {}, provider, model, action: action || '', ts: now, lastUsed: now };
-      sfoltisci(map, now);
-      await writeAll(map);
-    } catch (_) {
-      // cache best-effort: ignora errori (storage pieno, ecc.)
-    }
+    let key;
+    try { key = await hashKey({ provider, model, messages }); } catch (_) { return; }
+    await inCoda(async () => {
+      try {
+        const map = await readAll();
+        const now = Date.now();
+        applicaUsati(map);
+        map[key] = { text, usage: usage || {}, provider, model, action: action || '', ts: now, lastUsed: now };
+        sfoltisci(map, now);
+        await writeAll(map);
+      } catch (_) {
+        // cache best-effort: ignora errori (storage pieno, ecc.)
+      }
+    });
   }
 
-  async function clear() {
-    usati.clear();
-    await chrome.storage.local.remove(STORAGE_KEYS.AI_CACHE);
+  function clear() {
+    return inCoda(async () => {
+      usati.clear();
+      await chrome.storage.local.remove(STORAGE_KEYS.AI_CACHE);
+    });
   }
 
   // Toglie le risposte che `pred` riconosce (quelle di una chat cancellata, #866).
-  async function togli(pred) {
-    const map = await readAll();
-    const via = Object.keys(map).filter((k) => map[k] && pred(map[k]));
-    if (!via.length) return 0;
-    for (const k of via) { delete map[k]; usati.delete(k); }
-    await writeAll(map);
-    return via.length;
+  function togli(pred) {
+    return inCoda(async () => {
+      const map = await readAll();
+      const via = Object.keys(map).filter((k) => map[k] && pred(map[k]));
+      if (!via.length) return 0;
+      for (const k of via) { delete map[k]; usati.delete(k); }
+      await writeAll(map);
+      return via.length;
+    });
   }
 
   global.SN_AI_CACHE = { get, set, clear, togli, hashKey, esclusa };
