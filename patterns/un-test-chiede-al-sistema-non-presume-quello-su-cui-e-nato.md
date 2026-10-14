@@ -212,8 +212,12 @@ Le forme che cadevano, e cosa le ha sostituite:
   6.000 in archivio): prima si contano le operazioni sul disco (nessuna rilettura, nessuna
   riscrittura, una riga in coda; `tests/helpers/spiaDisco.mjs`), poi il lavoro in memoria si
   misura a turno contro lo stesso lavoro su dati quasi vuoti, campione per campione, col
-  minimo di ciascuno (`rapportoFraCosti`). Una finestra di tempo fra due figli che devono
-  sovrapporsi si toglie facendoli girare in fila.
+  minimo di ciascuno (`rapportoFraCosti`). Quando i dati quasi vuoti non sono il paragone giusto
+  (un flush di 4 MB copia comunque 4 MB), si paragona lo stesso lavoro fatto per intero; e se il
+  campione ha un pezzo da non contare (la scrittura su disco), `ora` è un orologio che corre solo
+  nella finestra misurata (#1228, `tests/unit/storageScritturePerChiave.test.mjs`). Un `await` fra
+  partenza e arrivo nasconde la soglia fissa alla sentinella: lì la regola la tiene chi scrive.
+  Una finestra di tempo fra due figli che devono sovrapporsi si toglie facendoli girare in fila.
 - **La pulizia**: una cartella si toglie con `togliCartella`, che ritenta e non fa rosso il
   test quando Windows la tiene ancora; `rmSync` ricorsivo nudo nei test lo ferma una
   sentinella (`tests/unit/cartelleTemporanee.test.mjs`). Gli script che i test lanciano
