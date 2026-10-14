@@ -12,7 +12,7 @@ globalThis.chrome = globalThis.chrome || { storage: { local: { get: async () => 
 require('../../../src/main/services/deckOpinions.js');
 const S = globalThis.SN_DECK_OPINIONS_SVC;
 
-test('r9 ricerca larga a servizio occupato: smette entro mezzo minuto e non chiama per ogni lotto rimasto', async () => {
+test('r9 ricerca larga a servizio occupato: dice che il servizio è giù entro mezzo minuto', async () => {
   test.setTimeout(150_000);
   const cards = {}; const ids = [];
   for (let i = 0; i < 1050; i++) { const id = `c${i}`; ids.push(id); cards[id] = { id, name: `Card ${i}`, type_line: 'Artifact', oracle_text: `x${i}` }; }
