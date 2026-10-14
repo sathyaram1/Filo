@@ -615,6 +615,7 @@
     const frag = document.createDocumentFragment();
     if (state.el.tagName === 'TEXTAREA' || state.el.tagName === 'INPUT') scrivi(text, frag);
     else specchio(state.el, frag, scrivi);
+    if (coda) frag.appendChild(document.createTextNode(coda));
     o.innerHTML = '';
     o.appendChild(frag);
   }
