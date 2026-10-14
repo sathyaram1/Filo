@@ -350,7 +350,7 @@ export function exitCodeFor(reply) {
 export function testoEsitoServer(esito) {
   const testi = {
     attesa_suite: 'il cancello aspetta la suite di filo-security verde sul commit da fondere, e riprova da sé (prima l’app, poi il server)',
-    attesa_pc: 'il ramo del server lo porta su main il PC dell’owner',
+    attesa_pc: 'il lavoro lo porta su main il PC dell’owner, prima la parte dell’app e poi il ramo del server',
     rimandato: 'il ramo del server torna alle routine (suite rossa o conflitto con main del server)',
     all_owner: 'il lavoro sul server non è fidato: decide l’owner',
   };
