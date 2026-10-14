@@ -842,14 +842,47 @@ async function lineeDi(file) {
   return linee;
 }
 
-async function rapportoOrchestratore(principale) {
+async function rapportoOrchestratore(principale, corrente = null) {
   if (!existsSync(principale)) return null;
-  const { righe, attesaPrimaS, continua } = finestraOrchestratore(await lineeDi(principale));
+  const { righe, attesaPrimaS, continua } = finestraOrchestratore(await lineeDi(principale), { corrente });
   const r = await analizzaRighe(righe, { role: 'orchestrator', continua });
   return {
     costUsd: r.costUsd, turns: r.turns, coldTurns: r.coldTurns, rewarmTurns: r.rewarmTurns, rewarmTokens: r.rewarmTokens,
     maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, oltreSoglia: r.oltreSoglia, startedAt: r.startedAt, endedAt: r.endedAt,
   };
+}
+
+/**
+ * Il worker che sta rilasciando, come lo vede il thread principale: il sotto-agente di primo livello da cui discende
+ * `file` (chi rilascia può essere un suo figlio). { agentId, toolUseId }: il secondo dal meta, se c'è.
+ */
+function workerDelPrincipale(file) {
+  let f = file;
+  for (let i = 0; i < 8; i += 1) {
+    const su = lanciatoreDi(f);
+    if (!su || !eSottoAgente(su)) break;
+    f = su;
+  }
+  const meta = leggiMeta(f);
+  return { agentId: agentIdDi(f), toolUseId: meta && typeof meta.toolUseId === 'string' ? meta.toolUseId.trim() : '' };
+}
+
+/**
+ * Il costo dell'orchestratore dopo l'ultimo biglietto (la chiusura, o un'accensione che finisce prima del primo
+ * worker): nessun rilascio lo porta, viaggia con la sua risposta alla domanda di fine sessione. Non lancia mai.
+ */
+export async function rapportoChiusura({ transcript = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
+  const base = { v: 3, role: 'orchestrator', closing: true, notes: [] };
+  const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
+  if (!trovato.file) return { ...base, notes: [trovato.note || 'transcript non trovato'] };
+  const principale = eSottoAgente(trovato.file) ? `${dirname(dirname(trovato.file))}.jsonl` : trovato.file;
+  try {
+    const r = await rapportoOrchestratore(principale);
+    if (!r) return { ...base, notes: [`thread principale assente: ${principale}`] };
+    return { ...base, sessionId: basename(principale, '.jsonl'), ...r };
+  } catch (e) {
+    return { ...base, notes: [`thread principale illeggibile: ${String((e && e.message) || e)}`] };
+  }
 }
 
 /**
