@@ -255,8 +255,8 @@ class PropostaEmail {
     const Menu = require('./popup-menu');
     this.menuPer = c;
     Menu.showPopupMenu(this.win, [
-      { label: 'Inserisci l\'email', action: 'proposta-email:inserisci' },
-      { label: 'Non propormela più', action: 'proposta-email:spegni' },
+      { label: 'Inserisci l\'email', icon: 'user', action: 'proposta-email:inserisci' },
+      { label: 'Non propormela più', icon: 'close', action: 'proposta-email:spegni' },
     ], b.x + coord(d.x), b.y + coord(d.y), (scelta) => {
       this.menuPer = null;
       if (scelta === '@action:proposta-email:inserisci' && this.c === c) this._scegli('menu');
