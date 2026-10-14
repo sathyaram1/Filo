@@ -5,11 +5,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import zlib from 'node:zlib';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 import { letturaIsolata } from '../helpers/letturaIsolata.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/provenienzaImmagine.js');

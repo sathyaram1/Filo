@@ -542,15 +542,15 @@ test('un file appeso si chiude da solo, col suo nome e il tetto nel rosso, e gli
     writeFileSync(join(dir, 'b-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano dopo il primo appeso', () => {});\n");
     writeFileSync(join(dir, 'c-appeso-subito.test.mjs'), "setInterval(() => {}, 1000);\nawait new Promise(() => {});\n");
     writeFileSync(join(dir, 'd-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano in fondo', () => {});\n");
-    // Un tetto corto qui non fa rossi finti: i file sani finiscono in millisecondi.
-    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    // Sei secondi bastano a un file sano per partire e finire anche su una macchina lenta, dove a vuoto ci mette poco.
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '6000' };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
     assert.match(r.stdout, /^ok \d+ - sano dopo il primo appeso$/m);
     assert.match(r.stdout, /^ok \d+ - sano in fondo$/m);
-    assert.match(r.stdout, /ROSSO: .*a-appeso-dopo\.test\.mjs non è andato avanti per 3 secondi ed è stato chiuso; gli altri file sono andati avanti/);
-    assert.match(r.stdout, /ROSSO: .*c-appeso-subito\.test\.mjs non è andato avanti per 3 secondi ed è stato chiuso/);
+    assert.match(r.stdout, /ROSSO: .*a-appeso-dopo\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso; gli altri file sono andati avanti/);
+    assert.match(r.stdout, /ROSSO: .*c-appeso-subito\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso/);
     assert.match(r.stdout, /^not ok \d+ - .*c-appeso-subito\.test\.mjs$/m, 'node lo dà rosso');
     assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/);
     assert.doesNotMatch(r.stdout, /sano.*non è andato avanti/);
