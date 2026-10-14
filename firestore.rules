@@ -332,11 +332,17 @@ service cloud.firestore {
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
            'capabilityGapId', // F4: id gap capacità per dedup auto-feedback (F5)
            'walletPseudonym', // #652: pseudonimo del portafoglio — a chi accreditare il premio
-           'updatedAt'       // #676: l'ora dell'ultima scrittura — la dashboard ci chiede "cosa è cambiato?"
+           'updatedAt',      // #676: l'ora dell'ultima scrittura — la dashboard ci chiede "cosa è cambiato?"
+           'authUid'         // #1075: il mittente per il tetto di frequenza, al posto del clientId che sceglie chi scrive
           ]
         )
         && (!('updatedAt' in request.resource.data)
             || request.resource.data.updatedAt is timestamp)
+        // #1075: facoltativo (le versioni uscite creano senza accesso), ma se c'è
+        // è l'uid di chi scrive: un uid altrui farebbe pagare a lui il tetto.
+        && (!('authUid' in request.resource.data)
+            || (request.auth != null
+                && request.resource.data.authUid == request.auth.uid))
         // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
         // chi non ha un portafoglio manda il feedback e basta.
         && request.resource.data.get('walletPseudonym', '') is string
