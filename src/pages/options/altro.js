@@ -194,11 +194,11 @@
   let mostrato = null;
 
   async function save() {
-    caselle.spedita('blocklist');
+    const biglietto = caselle.spedita('blocklist');
     mostrato = $('blocklist').value;
     const blocklist = $('blocklist').value.split('\n').map((s) => s.trim()).filter(Boolean);
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist } });
-    mostraSalvato();
+    if (caselle.aggiornata('blocklist', biglietto)) mostraSalvato();
   }
 
   // Domini esclusi e nomi delle categorie non hanno un «Salva», e chiudere la scheda non avvisa la pagina (#590.5).
@@ -208,6 +208,7 @@
     uscita() {
       for (const [input, cat] of caselleCategorie) if (!input.value.trim()) input.value = cat.name;
     },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
   caselle.registra('blocklist', () => save());
 

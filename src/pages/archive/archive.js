@@ -599,6 +599,10 @@
     ]);
   }
 
+  // Il titolo si conferma quando il cursore lascia il campo: registrato qui, si
+  // conferma anche se la scheda si chiude prima.
+  const campoAlVolo = window.SN_CASELLE.alVolo();
+
   // Rinomina sul posto: il titolo diventa un campo, Invio salva, Esc lascia
   // com'era. Niente finestra di sistema — è la stessa regola per cui i menu di
   // Filo non sono quelli del browser.
@@ -618,6 +622,7 @@
     const ripristina = () => {
       if (chiuso) return;
       chiuso = true;
+      campoAlVolo.confermato();
       input.replaceWith(titleEl);
     };
     const salva = async () => {
@@ -627,6 +632,7 @@
       // niente da leggere. Vale come rinuncia.
       if (!nuovo || nuovo === (c.title || '')) { ripristina(); return; }
       chiuso = true;
+      campoAlVolo.confermato();
       try { await chrome.runtime.sendMessage({ type: MSG.FILO_CHAT_UPDATE, id: c.id, title: nuovo }); } catch (_) {}
       c.title = nuovo;
       titleEl.textContent = nuovo;
@@ -638,6 +644,7 @@
       if (e.key === 'Enter') { e.preventDefault(); salva(); }
       else if (e.key === 'Escape') { e.preventDefault(); ripristina(); }
     });
+    input.addEventListener('input', () => campoAlVolo.scrivendo(salva));
     input.addEventListener('blur', () => salva());
     // Un clic dentro il campo non deve riaprire la chat.
     input.addEventListener('click', (e) => e.stopPropagation());

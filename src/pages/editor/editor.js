@@ -406,6 +406,10 @@
       console.error('[Filo editor] save', e);
     }
   }
+  // Il nome del documento si conferma quando il cursore lascia il campo:
+  // registrato qui, si conferma anche se la scheda si chiude prima.
+  const campoAlVolo = window.SN_CASELLE.alVolo();
+
   function markDirty() {
     dirty = true;
     saveStateEl.textContent = 'Non salvato';
@@ -1463,12 +1467,14 @@
     const finish = (save) => {
       if (done) return;
       done = true;
+      campoAlVolo.confermato();
       const val = input.value;
       if (docSwitchBtn) docSwitchBtn.style.display = '';
       input.remove();
       if (save) renameFileAction(doc.id, val, { manual: true });
       else renderDocSwitcher();
     };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(() => finish(true)));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); finish(true); }
@@ -1589,9 +1595,11 @@
     const commit = (save) => {
       if (done) return;
       done = true;
+      campoAlVolo.confermato();
       if (save) renameFileAction(f.id, input.value);
       else renderDocSwitcher();
     };
+    input.addEventListener('input', () => campoAlVolo.scrivendo(() => commit(true)));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') { e.preventDefault(); commit(true); }

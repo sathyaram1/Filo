@@ -514,18 +514,21 @@ module.exports = function register(on, ctx) {
       if (modelBlocked) return { ok: false, error: modelBlocked };
       // Riga di un modello che non è di testo (voce, dettatura, indicizzazione):
       // si prova nel suo mestiere.
-      const kind = modelKind(provider, model, (s.modelRegistry || {})[msg.nickname] || null);
+      const rowEntry = (s.modelRegistry || {})[msg.nickname] || null;
+      const routing = providerRouting(s, rowEntry && rowEntry.sort);
+      const kind = modelKind(provider, model, rowEntry);
       if (kind !== 'text') {
-        return await probeNonText({ settings: s, kind, provider, apiKey, model, routing: providerRouting(s), nickname: msg.nickname || '' });
+        return await probeNonText({ settings: s, kind, provider, apiKey, model, routing, nickname: msg.nickname || '' });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
       let firstTokenMs = null;
       let charCount = 0;
-      // Anche la prova porta con sé chi NON deve servirla: senza, sarebbe
-      // l'unica richiesta di Filo che un fornitore escluso può servire.
+      // Anche la prova porta con sé chi NON deve servirla, e misura con l'ordinamento degli host e il
+      // ragionamento che la voce userebbe davvero: senza, la velocità letta parlerebbe di un'altra chiamata.
       const result = await probe({
-        settings: s, provider, apiKey, model, routing: providerRouting(s), method: 'streamComplete',
+        settings: s, provider, apiKey, model, routing, method: 'streamComplete',
+        reasoning: SN_CONST.normalizeReasoning(rowEntry && rowEntry.reasoning) || undefined,
         args: {
           messages,
           onDelta: (delta) => {
@@ -614,10 +617,10 @@ module.exports = function register(on, ctx) {
   // Le prove sono chiamate vere, pagate: passano dal cancello come le funzioni (limite, costo, chi ha servito).
   // La prova misura la chiave che l'utente ha davanti: se OpenRouter la
   // rifiuta lo deve dire, non rispondere coi crediti di Filo (#662).
-  function probe({ settings, provider, apiKey, model, routing, method, args }) {
+  function probe({ settings, provider, apiKey, model, routing, reasoning, method, args }) {
     const call = () => modelGate.call({
       action: SN_CONST.ACTIONS.PROVIDER_TEST, settings,
-      attempt: { provider, apiKey, model, providerRouting: routing }, method, args,
+      attempt: { provider, apiKey, model, providerRouting: routing, ...(reasoning ? { reasoning } : {}) }, method, args,
     });
     const K = globalThis.SN_WALLET_MAIN;
     return K && typeof K.senzaRipiego === 'function' ? K.senzaRipiego(call) : call();
@@ -690,6 +693,8 @@ module.exports = function register(on, ctx) {
       try { await Defaults.refreshIfStale(); } catch (_) {}
       const d = Defaults.get();
       let provider; let modelId; let regEntry = null;
+      // Riga non ancora salvata: ordinamento e reasoning sono quelli scritti lì.
+      let tuning = { sort: msg.sort, reasoning: msg.reasoning };
       if (explicitModel) {
         // Riga dell'editor admin, testata così com'è scritta (anche non ancora
         // salvata). Spende le chiavi predefinite su un modello arbitrario →
@@ -709,6 +714,7 @@ module.exports = function register(on, ctx) {
         const entry = registry[nickname];
         if (!entry) return { ok: false, error: `Modello "${nickname}" non trovato` };
         regEntry = entry;
+        tuning = { sort: entry.sort, reasoning: entry.reasoning };
         const single = registryEntryToSingle(entry);
         provider = single.provider || 'openrouter';
         modelId = single.model || '';
@@ -731,8 +737,14 @@ module.exports = function register(on, ctx) {
       // dell'uso reale.
       const model = modelId;
       const kind = modelKind(provider, model, regEntry);
+      // Riga dell'editor: l'ordinamento lo ha già risolto la pagina su ciò che
+      // si vede lì, quindi qui non si torna alla scelta generale salvata.
+      // Una voce predefinita si prova come la chiamerebbe questo utente: con la sua scelta personale, se ne ha una.
+      const routing = explicitModel
+        ? providerRouting({ ...eff, providerSort: '' }, tuning.sort)
+        : providerRouting(eff, SN_CONST.ordinamentoPerUtente(eff.ordineHost, tuning.sort, ''));
       if (kind !== 'text') {
-        return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing: providerRouting(eff), nickname });
+        return await probeNonText({ settings: eff, kind, provider, apiKey, model, routing, nickname });
       }
       const messages = [{ role: 'user', content: 'Conta da 1 a 20 separando con virgole, senza testo extra.' }];
       const startMs = performance.now();
@@ -740,7 +752,8 @@ module.exports = function register(on, ctx) {
       let charCount = 0;
       // Come per le richieste vere: chi è escluso non serve nemmeno una prova.
       const result = await probe({
-        settings: eff, provider, apiKey, model, routing: providerRouting(eff), method: 'streamComplete',
+        settings: eff, provider, apiKey, model, routing, method: 'streamComplete',
+        reasoning: SN_CONST.normalizeReasoning(tuning.reasoning) || undefined,
         args: {
           messages,
           onDelta: (delta) => {

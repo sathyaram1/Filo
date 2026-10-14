@@ -26,6 +26,10 @@
       canonAutoArchiveIdle();
       canonNotifDuration();
     },
+    spegni(nome) {
+      const hint = $({ token: 'tokenSavedHint', tabColor: 'tabColorSavedHint' }[nome] || 'savedHint');
+      if (hint) hint.classList.remove('sn-show');
+    },
   });
   caselle.registra('pref', () => persist());
   caselle.registra('token', () => persistTokens());
@@ -180,7 +184,7 @@
   let tokenAzzeraTutti = false;
 
   async function persistTokens() {
-    caselle.spedita('token');
+    const biglietto = caselle.spedita('token');
     const nomi = [...tokenDaSalvare];
     const tutti = tokenAzzeraTutti;
     tokenDaSalvare.clear();
@@ -206,7 +210,7 @@
       if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = v;
     }
     chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
-    flashSaved('tokenSavedHint');
+    if (caselle.aggiornata('token', biglietto)) flashSaved('tokenSavedHint');
   }
 
   // Un aggiornamento arrivato da altrove: si ridisegnano i token che l'utente
@@ -982,7 +986,7 @@
   }
 
   async function persist() {
-    caselle.spedita('pref');
+    const biglietto = caselle.spedita('pref');
     const styleOk = syncStyleNote();
     const settings = {};
     const partiti = [];
@@ -1002,7 +1006,8 @@
     Bootstrap.applyTextScale(parseFloat($('textScale').value) || 1);
     if (!partiti.length) return;
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings });
-    flashSaved();
+    // Una modifica arrivata mentre questa viaggiava: «Salvato» lo dice il salvataggio che la porta.
+    if (caselle.aggiornata('pref', biglietto)) flashSaved();
   }
 
   function buildPresetOptions() {

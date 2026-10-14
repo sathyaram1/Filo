@@ -131,6 +131,7 @@
       campi: {
         useDefaultModels: 'useDefaultModels',
         openWeightsOnly: 'openWeightsOnly',
+        ordineHost: 'ordineHost',
         apiKey: 'apiKeys.openrouter',
         apiKeyTavily: 'apiKeys.tavily',
         monthlyLimit: 'monthlyLimitEur',

@@ -229,7 +229,7 @@
         apiKey: a.apiKey,
         model: a.model,
         ...(a.reasoning !== undefined ? { reasoning: a.reasoning } : {}),
-        providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s),
+        providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s, a),
       };
       // Il testo passa dal router, che per complete e streamComplete ha già il suo smistamento per nome.
       const router = providers();

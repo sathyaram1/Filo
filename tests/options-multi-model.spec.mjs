@@ -71,7 +71,10 @@ test('Modelli: il risultato del test (latenza/token-sec) persiste tra i reload',
     row.querySelector('.sn-model-nick').value = 'provatm';
     row.querySelector('.sn-model-provider').value = 'openrouter';
     row.querySelector('.sn-model-id').value = 'anthropic/claude-3.5-haiku';
-    row._test = { ttftMs: 321, tokensPerSec: 48.5, at: new Date().toISOString() };
+    // La misura porta con sé il modello su cui è stata presa: senza, vale per
+    // un'altra riga e non va mostrata.
+    row._test = { ttftMs: 321, tokensPerSec: 48.5, at: new Date().toISOString(),
+      model: 'anthropic/claude-3.5-haiku' };
     // Forza il render immediato + il salvataggio (change bubbla fino a #page).
     row.dispatchEvent(new Event('change', { bubbles: true }));
   });
