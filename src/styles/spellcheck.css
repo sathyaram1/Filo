@@ -34,6 +34,21 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'%3E%3Cpolyline points='0,3 2,0 4,3 6,0 8,3' fill='none' stroke='%2360a5fa' stroke-width='1.2'/%3E%3C/svg%3E");
 }
 
+/* Il terzo segno (#1115): «controlla qui», non «hai sbagliato». Puntini ocra sotto il blu e il rosso, con una
+   proprietà sua (text-decoration), così sulla stessa parola convive con lo zigzag blu (sfondo). Colore e stile sono
+   token (correttore.ocra.*): i letterali qui sono i loro predefiniti, che la variabile di chi ha scelto scavalca. */
+.sn-spell-overlay .sn-coerenza {
+  text-decoration-line: underline;
+  text-decoration-style: var(--sn-spell-ocra-stile, dotted);
+  text-decoration-color: var(--sn-spell-ocra, #b07a14);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+  text-decoration-skip-ink: none;
+}
+.sn-spell-overlay[data-sn-theme="dark"] .sn-coerenza {
+  text-decoration-color: var(--sn-spell-ocra, #e2ad4d);
+}
+
 /* Popup di correzione: sostituisce il menu nativo del tasto destro sugli errori. */
 
 .sn-spell-popup {

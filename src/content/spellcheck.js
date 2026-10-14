@@ -14,6 +14,11 @@
 // │ contestuali (semantic / grammar / repetition). L'editabile reale resta │
 // │ intatto: il testo "vero" è quello sotto, lo zigzag blu è un livello    │
 // │ visivo soprapposto.                                                    │
+// │                                                                         │
+// │ OCRA (nostro, #1115) — puntini sotto ciò che non torna col contenuto:  │
+// │ date e giorni (in codice, coerenza.js) e contraddizioni con la pagina  │
+// │ o frasi poco chiare (modello, dopo una pausa più lunga). Mai applicato │
+// │ da solo; interruttore suo (featureFlags.spellcheckContext).            │
 // └────────────────────────────────────────────────────────────────────────┘
 //
 // Restrizioni intenzionali:
@@ -31,6 +36,15 @@
   const DEBOUNCE_MS = 1500;
   const MIN_TEXT_LENGTH = 8;
   const MAX_TEXT_LENGTH = 4000;
+  // L'ocra parte più di rado del blu: a una pausa vera, e solo se il testo è cambiato.
+  const OCRA_PAUSA_MS = 3500;
+  const OCRA_MAX_TEXT = 10000;
+  // Il testo della pagina intorno al campo: tetto largo, e oltre si tiene la parte più vicina al campo.
+  const CONTESTO_MAX = 12000;
+  const CONTESTO_DOPO_MAX = 3000;
+  const CONTESTO_NODI_MAX = 20000;
+  const CACHE_OCRA_MAX = 40;
+  const Coerenza = () => global.SN_COERENZA;
 
   // Stato per ogni editabile attualmente "agganciato" (focus). WeakMap per non
   // tenere riferimenti che impediscano GC se il sito rimuove l'elemento.
@@ -104,11 +118,28 @@
 
   function updateSettings(s) {
     settings = s;
-    if (!isEnabled()) detachAll();
+    if (!isEnabled() && !ocraAttiva()) { detachAll(); return; }
+    const state = activeEl && monitored.get(activeEl);
+    if (!state) return;
+    // Ogni segno si spegne col suo interruttore, e l'altro resta.
+    if (!isEnabled()) {
+      if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+      state.issues = [];
+    }
+    if (!ocraAttiva()) {
+      for (const k of ['timerOcra', 'timerDate']) if (state[k]) { clearTimeout(state[k]); state[k] = null; }
+      state.ocra = [];
+      state.ocraUltimo = '';
+    }
+    renderOverlayContent(state);
   }
 
   function isEnabled() {
     return settings?.featureFlags?.spellcheck !== false;
+  }
+
+  function ocraAttiva() {
+    return settings?.featureFlags?.spellcheckContext !== false && !!Coerenza();
   }
 
   // ============================================================================
@@ -338,7 +369,7 @@
   // Focus lifecycle
   // ============================================================================
   function onFocusIn(e) {
-    if (!isEnabled()) return;
+    if (!isEnabled() && !ocraAttiva()) return;
     const el = editabileDellEvento(e);
     if (!el) return;
     attach(el);
@@ -357,9 +388,14 @@
 
   function suInput(state) {
     // 1) autocorrect istantaneo
-    tryAutocorrect(state);
-    // 2) gli issue blu seguono il testo fino al prossimo scan
+    if (isEnabled()) tryAutocorrect(state);
+    // 2) gli issue blu e ocra seguono il testo fino al prossimo scan
     seguiIlTesto(state);
+    if (ocraAttiva()) {
+      programmaDate(state);
+      if (prendeGesto(state, null, 'coerenza') || state.timerOcra) scheduleOcra(state);
+    }
+    if (!isEnabled()) return;
     // Il testo l'ha cambiato uno script, non l'utente (#1070): niente chiamate al modello. Lo scan già chiesto
     // da un gesto (un tasto tenuto premuto) si sposta soltanto: resta una chiamata, sul testo finale.
     if (!prendeGesto(state)) {
@@ -392,6 +428,13 @@
         // Cache delle correzioni per-parola (popolata sia dal prefetch dopo lo scan
         // blu sia dalle richieste on-demand al click destro). Le chiavi sono lowercased.
         wordCache: new Map(),
+        // I segni ocra, sugli stessi offset (`testoIssues`) dei blu.
+        ocra: [],
+        ocraUltimo: '',
+        timerOcra: null,
+        timerDate: null,
+        // «Ignora» vale per quel testo: si svuota quando il campo si svuota (il messaggio è partito).
+        ocraIgnorate: new Set(),
       };
       monitored.set(el, state);
       // Un ascoltatore per casella, che guarda lo stato vivo: chi esce e rientra non lascia indietro uno stato morto
@@ -412,13 +455,17 @@
     syncOverlay(state);
     // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente, col
     // mouse sulla casella o con Tab (che cade sul campo di prima: la casella la riceve solo al rilascio).
-    if (prendeGesto(state, (l) => l.tasto === 'Tab')) scheduleScan(state);
+    if (isEnabled() && prendeGesto(state, (l) => l.tasto === 'Tab')) scheduleScan(state);
+    if (ocraAttiva()) {
+      programmaDate(state);
+      if (prendeGesto(state, (l) => l.tasto === 'Tab', 'coerenza')) scheduleOcra(state);
+    }
   }
 
   function detach(el) {
     const state = monitored.get(el);
     if (!state) return;
-    if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+    for (const k of ['timer', 'timerOcra', 'timerDate']) if (state[k]) { clearTimeout(state[k]); state[k] = null; }
     if (state.overlay) { state.overlay.remove(); state.overlay = null; }
     if (state.ro) { try { state.ro.disconnect(); } catch (_) {} state.ro = null; }
     if (activeEl === el) activeEl = null;
@@ -511,26 +558,27 @@
     const text = getEditableText(state.el);
     if (!text) { o.textContent = ''; return; }
 
-    const issues = (state.issues || [])
-      .filter((i) => i.start >= 0 && i.end <= text.length && i.end > i.start)
-      .sort((a, b) => a.start - b.start);
+    const valido = (i) => i.start >= 0 && i.end <= text.length && i.end > i.start;
+    const segni = [
+      ...(state.issues || []).filter(valido).map((i) => ({ start: i.start, end: i.end, classe: 'sn-semantic-error' })),
+      ...(state.ocra || []).filter(valido).map((i) => ({ start: i.start, end: i.end, classe: 'sn-coerenza' })),
+    ];
 
-    if (!issues.length) { o.textContent = text; return; }
+    if (!segni.length) { o.textContent = text; return; }
 
+    // Blu e ocra possono coprire la stessa parola: il testo si taglia a ogni bordo e ogni pezzo porta le classi dei
+    // segni che lo coprono (lo zigzag è uno sfondo, i puntini una sottolineatura: convivono).
+    const bordi = [...new Set([0, text.length, ...segni.flatMap((s) => [s.start, s.end])])].sort((a, b) => a - b);
     const frag = document.createDocumentFragment();
-    let pos = 0;
-    for (const issue of issues) {
-      if (issue.start > pos) {
-        frag.appendChild(document.createTextNode(text.slice(pos, issue.start)));
-      }
+    for (let k = 0; k < bordi.length - 1; k++) {
+      const a = bordi[k];
+      const b = bordi[k + 1];
+      const classi = [...new Set(segni.filter((s) => s.start <= a && s.end >= b).map((s) => s.classe))];
+      if (!classi.length) { frag.appendChild(document.createTextNode(text.slice(a, b))); continue; }
       const span = document.createElement('span');
-      span.className = 'sn-semantic-error';
-      span.textContent = text.slice(issue.start, issue.end);
+      span.className = classi.join(' ');
+      span.textContent = text.slice(a, b);
       frag.appendChild(span);
-      pos = issue.end;
-    }
-    if (pos < text.length) {
-      frag.appendChild(document.createTextNode(text.slice(pos)));
     }
     o.innerHTML = '';
     o.appendChild(frag);
@@ -543,11 +591,14 @@
     if (ora === state.testoIssues) return;
     const prima = state.testoIssues;
     state.testoIssues = ora;
-    if (!state.issues.length) return;
-    const { issues, perse } = riallineaIssues(state.issues, prima, ora);
-    state.issues = issues;
+    if (!state.issues.length && !state.ocra.length) return;
+    const blu = riallineaIssues(state.issues, prima, ora);
+    const ocra = riallineaIssues(state.ocra, prima, ora);
+    state.issues = blu.issues;
+    state.ocra = ocra.issues;
     // Un segno perso torna solo da uno scan, anche se il testo ritorna quello già controllato.
-    if (perse) state.lastScannedText = '';
+    if (blu.perse) state.lastScannedText = '';
+    if (ocra.perse) state.ocraUltimo = '';
     renderOverlayContent(state);
   }
 
@@ -584,11 +635,12 @@
   // ============================================================================
   // Solo un gesto vero caduto dentro la casella apre una chiamata al modello, e una volta sola: `input` e `focus` li
   // fabbrica anche la pagina, e scrivere nella sua ricerca non deve pagare il controllo di un'altra casella (#1070).
-  function prendeGesto(state, oppure) {
+  // Blu e ocra prendono il gesto ognuno per sé (`chi`): lo stesso tasto paga uno scan di ciascuno, non due dello stesso.
+  function prendeGesto(state, oppure, chi = 'correttore') {
     const G = global.SN_GESTO;
     if (!G) return false;
     const qui = G.dentro(state.el);
-    return G.prendi('correttore', undefined, oppure ? (l) => qui(l) || oppure(l) : qui);
+    return G.prendi(chi, undefined, oppure ? (l) => qui(l) || oppure(l) : qui);
   }
 
   function scheduleScan(state) {
@@ -601,9 +653,9 @@
   function riprendiScanRimandato() {
     if (document.hidden || !activeEl) return;
     const state = monitored.get(activeEl);
-    if (!state || !state.rimandato) return;
-    state.rimandato = false;
-    scheduleScan(state);
+    if (!state) return;
+    if (state.rimandato) { state.rimandato = false; scheduleScan(state); }
+    if (state.ocraRimandato) { state.ocraRimandato = false; scheduleOcra(state); }
   }
 
   async function scanText(state) {
@@ -614,8 +666,8 @@
 
     // Reset se il testo è troppo corto o invariato
     if (!text || text.length < MIN_TEXT_LENGTH) {
+      seguiIlTesto(state);
       state.issues = [];
-      state.testoIssues = text;
       state.lastScannedText = text;
       renderOverlayContent(state);
       return;
@@ -653,8 +705,8 @@
       return;
     }
     const allIssues = buildIssues(parseIssues(res.text), text);
+    seguiIlTesto(state);
     state.issues = allIssues;
-    state.testoIssues = text;
     state.lastScannedText = text;
     renderOverlayContent(state);
     // Prefetch delle correzioni a singola parola: per ogni issue blu su 1 parola
@@ -669,6 +721,189 @@
     prefetchSingleWordSuggestions(state, text).catch((e) => {
       console.warn('[SN] prefetch single-word failed:', e);
     });
+  }
+
+  // ============================================================================
+  // Ocra: coerenza col contesto (#1115)
+  // ============================================================================
+  // Le date si controllano in codice, quindi senza gesto né modello: a ogni pausa breve, come il blu.
+  function programmaDate(state) {
+    if (state.timerDate) clearTimeout(state.timerDate);
+    state.timerDate = setTimeout(() => { state.timerDate = null; aggiornaDate(state); }, DEBOUNCE_MS);
+  }
+
+  function aggiornaDate(state) {
+    if (!ocraAttiva() || !state.el || !state.el.isConnected) return;
+    seguiIlTesto(state);
+    const testo = getEditableText(state.el);
+    fissaOcra(state, Coerenza().dateDi(testo, new Date()), state.ocra.filter((i) => i.fonte === 'modello'));
+  }
+
+  function fissaOcra(state, date, modello) {
+    if (!getEditableText(state.el).trim()) state.ocraIgnorate.clear();
+    const ignorate = state.ocraIgnorate;
+    state.ocra = Coerenza().unisci(date, modello).filter((i) => !ignorate.has(Coerenza().chiaveIgnora(i)));
+    renderOverlayContent(state);
+  }
+
+  function scheduleOcra(state) {
+    if (!ocraAttiva()) return;
+    if (state.timerOcra) clearTimeout(state.timerOcra);
+    state.timerOcra = setTimeout(() => { state.timerOcra = null; scanOcra(state); }, OCRA_PAUSA_MS);
+  }
+
+  // La cache sta nella scheda: chiave testo + impronta del contesto + giorno (le date relative cambiano a mezzanotte).
+  const cacheOcra = new Map();
+  function ricordaOcra(chiave, segni) {
+    cacheOcra.delete(chiave);
+    cacheOcra.set(chiave, segni);
+    while (cacheOcra.size > CACHE_OCRA_MAX) cacheOcra.delete(cacheOcra.keys().next().value);
+  }
+
+  async function scanOcra(state) {
+    if (!ocraAttiva() || !state || !state.el || !state.el.isConnected) return;
+    if (document.hidden) { state.ocraRimandato = true; return; }
+    state.ocraRimandato = false;
+    const testo = getEditableText(state.el);
+    if (testo.trim().length < MIN_TEXT_LENGTH || testo === state.ocraUltimo || testo.length > OCRA_MAX_TEXT) return;
+    const C = Coerenza();
+    const contesto = contestoDelCampo(state.el);
+    const chiave = [C.impronta(testo), C.impronta(C.contestoComeTesto(contesto)), new Date().toDateString()].join('|');
+    let modello = cacheOcra.get(chiave);
+    if (!modello) {
+      let res;
+      try {
+        res = await chrome.runtime.sendMessage({
+          type: MSG.AI_REQUEST,
+          action: ACTIONS.SPELLCHECK_CONTEXT,
+          payload: { text: testo, contesto },
+        });
+      } catch (err) {
+        console.error('[SN] coerenza — sendMessage fallito:', err);
+        return;
+      }
+      // Un testo cambiato nel frattempo avrà il suo controllo: questa risposta sarebbe disallineata.
+      if (getEditableText(state.el) !== testo || !ocraAttiva()) return;
+      if (!res?.ok || typeof res.text !== 'string') {
+        console.warn('[SN] coerenza — provider:', res?.code, res?.error);
+        state.ocraUltimo = testo;
+        return;
+      }
+      modello = C.leggiRisposta(res.text, testo, contesto);
+      ricordaOcra(chiave, modello);
+    }
+    seguiIlTesto(state);
+    state.ocraUltimo = testo;
+    fissaOcra(state, C.dateDi(testo, new Date()), modello);
+  }
+
+  // Il testo della pagina intorno al campo, dal più vicino: in una chat la conversazione (gli ultimi messaggi stanno
+  // subito sopra la casella), altrove il contenuto principale. Niente di nascosto, niente UI di Filo, niente altri campi.
+  const RADICI_CONTESTO = 'main, [role="main"], #main, article, [role="dialog"], dialog';
+  const TAG_SALTATI = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'TEXTAREA', 'INPUT', 'SELECT', 'OPTION',
+    'DATALIST', 'BUTTON', 'SVG', 'svg', 'CANVAS', 'IFRAME', 'OBJECT', 'EMBED', 'VIDEO', 'AUDIO', 'NAV', 'ASIDE', 'HEAD']);
+  const RUOLI_SALTATI = new Set(['navigation', 'complementary', 'menu', 'menubar', 'listbox', 'tooltip', 'button', 'search']);
+  const TAG_IN_RIGA = new Set(['A', 'ABBR', 'B', 'BDI', 'BDO', 'CITE', 'CODE', 'DATA', 'DFN', 'EM', 'FONT', 'I', 'KBD',
+    'MARK', 'Q', 'S', 'SAMP', 'SMALL', 'SPAN', 'STRONG', 'SUB', 'SUP', 'TIME', 'U', 'VAR', 'LABEL']);
+
+  function radiceContesto(el) {
+    let r = el.parentElement && el.parentElement.closest(RADICI_CONTESTO);
+    // Un riquadro piccolo (la scheda di un post) non basta: si sale al contenitore successivo.
+    while (r) {
+      const su = r.parentElement && r.parentElement.closest(RADICI_CONTESTO);
+      const proprio = el.isContentEditable ? (el.textContent || '').length : 0;
+      if (!su || (r.textContent || '').length - proprio >= 600) break;
+      r = su;
+    }
+    if (r) return r;
+    const root = el.getRootNode();
+    if (root && root.nodeType === 11) return root;
+    return el.ownerDocument.body || el.ownerDocument.documentElement;
+  }
+
+  function contestoDelCampo(el) {
+    const vuoto = { prima: '', dopo: '', troncato: false };
+    // Nei riquadri di Filo intorno c'è Filo, non la pagina.
+    if (!el || radiceDi(el)) return vuoto;
+    try {
+      const radice = radiceContesto(el);
+      const UI = global.SN_FILO_UI;
+      const doc = el.ownerDocument;
+      const filtro = {
+        acceptNode(n) {
+          if (n === el || el.contains(n)) return NodeFilter.FILTER_REJECT;
+          if (n.nodeType === 3) return /\S/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+          if (n.contains(el)) return NodeFilter.FILTER_SKIP;
+          if (TAG_SALTATI.has(n.tagName) || (UI && UI.is(n))) return NodeFilter.FILTER_REJECT;
+          const ruolo = n.getAttribute('role');
+          if (ruolo && RUOLI_SALTATI.has(ruolo)) return NodeFilter.FILTER_REJECT;
+          if (n.getAttribute('aria-hidden') === 'true') return NodeFilter.FILTER_REJECT;
+          const ce = n.getAttribute('contenteditable');
+          if (ce === '' || ce === 'true' || ce === 'plaintext-only') return NodeFilter.FILTER_REJECT;
+          if (typeof n.checkVisibility === 'function' && !n.checkVisibility({ visibilityProperty: true })) return NodeFilter.FILTER_REJECT;
+          return n.tagName === 'BR' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        },
+      };
+      const blocco = (n) => {
+        let e = n.nodeType === 3 ? n.parentElement : n;
+        while (e && e !== radice && TAG_IN_RIGA.has(e.tagName)) e = e.parentElement;
+        return e;
+      };
+      const raccogli = (avanti, tetto) => {
+        const w = doc.createTreeWalker(radice, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, filtro);
+        w.currentNode = el;
+        const pezzi = [];
+        let lunghezza = 0;
+        let visti = 0;
+        let n;
+        while ((n = avanti ? w.nextNode() : w.previousNode())) {
+          if (++visti > CONTESTO_NODI_MAX) return { pezzi, pieno: true };
+          const t = n.nodeType === 3 ? n.nodeValue.replace(/\s+/g, ' ') : '\n';
+          pezzi.push({ t, b: n.nodeType === 3 ? blocco(n) : n });
+          lunghezza += t.length;
+          if (lunghezza > tetto) return { pezzi, pieno: true };
+        }
+        return { pezzi, pieno: false };
+      };
+      const cuci = (pezzi) => {
+        let s = '';
+        let prima = null;
+        for (const p of pezzi) {
+          if (prima && p.b !== prima) s += '\n';
+          s += p.t;
+          prima = p.b;
+        }
+        return s.replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n').trim();
+      };
+      const dopo = raccogli(true, CONTESTO_DOPO_MAX);
+      let testoDopo = cuci(dopo.pezzi);
+      if (testoDopo.length > CONTESTO_DOPO_MAX) testoDopo = testoDopo.slice(0, CONTESTO_DOPO_MAX);
+      const tettoPrima = CONTESTO_MAX - testoDopo.length;
+      const prima = raccogli(false, tettoPrima);
+      let testoPrima = cuci(prima.pezzi.reverse());
+      if (testoPrima.length > tettoPrima) testoPrima = testoPrima.slice(-tettoPrima);
+      return { prima: testoPrima, dopo: testoDopo, troncato: prima.pieno || dopo.pieno };
+    } catch (e) {
+      console.warn('[SN] coerenza — contesto non letto:', e);
+      return vuoto;
+    }
+  }
+
+  function getContextIssueAt(el, clientX, clientY) {
+    const state = monitored.get(el);
+    if (!state || !state.ocra?.length) return null;
+    const pos = caretCharOffsetFromPoint(el, clientX, clientY);
+    if (pos < 0) return null;
+    return state.ocra.find((it) => pos >= it.start && pos < it.end) || null;
+  }
+
+  // «Ignora»: quel segno, su quel testo, non torna.
+  function ignoraCoerenza(el, issue) {
+    const state = monitored.get(el);
+    if (!state || !issue) return;
+    state.ocraIgnorate.add(Coerenza().chiaveIgnora(issue));
+    state.ocra = state.ocra.filter((i) => !(i.start === issue.start && i.end === issue.end));
+    renderOverlayContent(state);
   }
 
   // ============================================================================

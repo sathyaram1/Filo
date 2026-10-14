@@ -78,6 +78,7 @@
       case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
       case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
       case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
+      case 'linea': return 'Stile non valido: dotted, dashed, wavy, solid o double.';
       default: return 'Valore non valido.';
     }
   }
