@@ -150,9 +150,25 @@
   // posta, e un data:/javascript: sfuggiva all'avviso di chi lo ferma. Un altro «parola:» resta testo («ricetta: pasta»).
   const SCHEMI_SENZA_BARRE = /^(?:mailto|tel|sms|data|javascript|file):/i;
 
+  // Un percorso del computer scritto com'è (\\nas\cartella, C:\…, /home/…, ~/…) è un file, non una ricerca (#482 giro 2):
+  // diventato ricerca, il percorso finiva su Google invece di essere fermato e detto come ogni file.
+  const RADICI_DEL_COMPUTER = /^\/(?:home|Users|tmp|private|var|etc|opt|mnt|media|Volumes|root|srv|usr|Library|Applications|System)(?:\/|$)/;
+  const pezzi = (s) => s.replace(/\\/g, '/').split('/').map((p) => encodeURIComponent(p)).join('/');
+  function percorsoDelComputer(raw) {
+    let m = /^\\\\([^\\/\s?#]+)(?:[\\/](.*))?$/.exec(raw);
+    if (m) return `file://${m[1]}/${pezzi(m[2] || '')}`;
+    m = /^([a-z]):[\\/](.*)$/i.exec(raw);
+    if (m) return `file:///${m[1]}:/${pezzi(m[2])}`;
+    if (RADICI_DEL_COMPUTER.test(raw)) return `file://${pezzi(raw)}`;
+    if (/^~(?:[\\/]|$)/.test(raw)) return `file:///${pezzi(raw)}`;
+    return null;
+  }
+
   function normalizeUrl(input) {
     const raw = String(input || '').trim();
     if (!raw) return 'filo://newtab/';
+    const file = percorsoDelComputer(raw);
+    if (file) return file;
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) || raw.startsWith('filo://') || SCHEMI_SENZA_BARRE.test(raw)) return raw;
 
     // Isola la parte host[:porta] = tutto prima del primo separatore di path/query
