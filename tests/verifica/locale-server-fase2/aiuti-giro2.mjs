@@ -62,8 +62,9 @@ export function bakeIn(publicRepo, outDir) {
 
 /** Lo stato del giro come lo lascia il server dopo il pass della verifica (che ha provato `server`) e della sicurezza. */
 export function statoPassato({ app, server, sicurezzaServer = server, ramo }) {
+  void server;
   return {
-    verifierVerdict: 'pass', verifiedSha: app, verifiedShaServer: server, lastVerdict: { ticket: 'verificatore', sha: app }, lavoroServer: true,
+    verifierVerdict: 'pass', verifiedSha: app, lastVerdict: { ticket: 'verificatore', sha: app }, lavoroServer: true,
     secauditDone: true, secauditVerdict: 'pass', secauditSha: app, secauditShaServer: sicurezzaServer, branch: ramo,
   };
 }
@@ -95,10 +96,6 @@ export function gitHubFinto({ server, app, suite = 'success' }) {
     workflowRuns: async (file, n, o = {}) => {
       chiamate.push(['workflowRuns', file, o.headSha || '', o.repo || 'app']);
       return { ok: true, runs: [{ status: 'completed', conclusion: suite, url: `https://github.com/finto/${file}`, headSha: o.headSha || '' }] };
-    },
-    isAncestor: async (base, head, o = {}) => {
-      chiamate.push(['isAncestor', base, head, o.repo || 'app']);
-      return { ok: true, ancestor: true };
     },
     compareDiff: async (head, o = {}) => {
       chiamate.push(['compareDiff', head, o.repo || 'app']);

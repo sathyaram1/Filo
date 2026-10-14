@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 import {
-  SERVER, FUNZIONI, richiediServer, sha, mainDiFilo, scriviAlbero, refDiFilo, alberoVisto, bakeIn, statoPassato,
+  ROOT, SERVER, FUNZIONI, richiediServer, sha, mainDiFilo, scriviAlbero, refDiFilo, alberoVisto, bakeIn, statoPassato,
   registro, gitHubFinto, depsCancello,
 } from './aiuti-giro2.mjs';
 
@@ -101,5 +101,15 @@ test.describe('r1 lavoro server con la parte dell’app legata al server', () =>
       const cambiati = cambiaCon(alberoVisto(refDiFilo('deploy.yml'), { suRamo: false, main, ramo }), 'pubblicazione');
       expect(cambiati, 'la pubblicazione si ferma alla guardia dopo il bake: i generati del server non sono quelli di main di Filo').toEqual([]);
     }
+  });
+
+  test('r1 dal PC il server si ripubblica dopo l’app per ogni fonte che il server incorpora', async () => {
+    const guardia = readFileSync(join(FUNZIONI, 'tools', 'guardia-deploy.js'), 'utf8');
+    const m = /const FONTI_BAKE = \[([^\]]*)\]/.exec(guardia);
+    expect(m, 'elenco delle fonti del bake nella guardia').toBeTruthy();
+    const fonti = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+    expect(fonti.length).toBeGreaterThan(0);
+    const { INCORPORATI_DAL_SERVER } = await import(new URL(`file:///${join(ROOT, 'scripts', 'lib', 'orchestratore.mjs').replace(/\\/g, '/')}`).href);
+    expect(fonti.filter((f) => !INCORPORATI_DAL_SERVER.includes(f)), 'fonti incorporate che il PC lascia pubblicare a GitHub col main di Filo di prima').toEqual([]);
   });
 });
