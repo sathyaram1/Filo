@@ -285,8 +285,8 @@ const scorre = {
     await page.keyboard.type('allora va bene, ho sentito anche gli altri e sì ci vediamo mercoledì');
     await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
     await page.waitForTimeout(300);
-  };
-  const misure = (page, sel) => page.evaluate((sel) => {
+  },
+  misure: (page, sel) => page.evaluate((sel) => {
     const f = document.querySelector(sel);
     const o = document.querySelector('.sn-spell-overlay');
     const s = document.querySelector('.sn-spell-overlay .sn-coerenza').getBoundingClientRect();
