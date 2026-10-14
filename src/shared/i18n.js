@@ -830,9 +830,9 @@
     spell_ocra_ignora: 'Ignora',
     spell_ocra_prima: 'prima: «%s»',
     spell_ocra_controlla: 'Controlla qui',
-    spell_ocra_data: 'Il %s è %s.',
+    spell_ocra_data: '%s è %s.',
     spell_ocra_relativa: '%s è %s.',
-    spell_ocra_inesistente: 'Il %s non esiste: %s ha %s giorni.',
+    spell_ocra_inesistente: '%s non esiste: %s ha %s giorni.',
 
     // Pagina Gestisci correttore
     spell_page_title: 'Filo — Correttore',

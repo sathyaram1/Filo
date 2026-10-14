@@ -160,7 +160,9 @@
 
   const nomeGiorno = (i) => LINGUE.it.giorni[i][0][0];
   const nomeMese = (i) => LINGUE.it.mesi[i][0][0];
-  const dataDetta = (d) => `${d.getDate()} ${nomeMese(d.getMonth())} ${d.getFullYear()}`;
+  // «Il 9 ottobre», «L'8 ottobre», «Il 1° ottobre».
+  const ilGiorno = (n, mese) => `${n === 8 || n === 11 ? 'L\'' : 'Il '}${n === 1 ? '1°' : n} ${nomeMese(mese)}`;
+  const dataDetta = (d) => `${ilGiorno(d.getDate(), d.getMonth())} ${d.getFullYear()}`;
 
   function suffissoInglese(n) {
     if (n % 100 >= 11 && n % 100 <= 13) return 'th';
@@ -186,7 +188,7 @@
     const scrittoAnno = annoScritto(parti.anno);
     const segno = { start: inizio, end: inizio + testo.length, segment: testo, fonte: 'data', tipo: 'falso', citazione: '', correzioni: [] };
     if (n > giorniNelMese(scrittoAnno || 2024, mese)) {
-      segno.spiegazione = t('spell_ocra_inesistente', `${n} ${nomeMese(mese)}`, nomeMese(mese), giorniNelMese(scrittoAnno || 2023, mese));
+      segno.spiegazione = t('spell_ocra_inesistente', ilGiorno(n, mese), nomeMese(mese), giorniNelMese(scrittoAnno || 2023, mese));
       return segno;
     }
     const anno = scrittoAnno || annoPiuVicino(n, mese, oggi);
