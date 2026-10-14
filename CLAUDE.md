@@ -149,11 +149,30 @@ I feedback arrivano spesso poco specificati. Il tuo lavoro è ricostruire
 - **Miglioramenti SENZA trade-off** (non costano servizi a pagamento, non
   complicano l'uso, non chiudono strade future): nel dubbio si fanno.
 - **Trade-off VERO** (velocità vs costo, semplicità vs potenza, dati
-  dell'utente, scelte di gusto): NON decidere tu, segnala all'owner.
+  dell'utente, scelte di gusto): NON decidere tu, chiedi all'owner (§ Domande
+  all'owner).
 
 Nel report: **elenca cosa hai aggiunto oltre il chiesto**, e **se hai fatto una
 cosa DIVERSA da quella chiesta dillo per primo, col perché** (anche per le
 richieste implicite, come un punto indicato in uno screenshot).
+
+## Domande all'owner
+
+Il giudizio dell'owner si chiede con una **domanda**: non con un report, una
+nota o un feedback che aspetta la sua scelta.
+
+- **Solo il giudizio vero**: trade-off vero, sicurezza, gusto, soldi. Una
+  scelta reversibile e a basso costo la prendi tu e la scrivi nel report.
+- **Come**: `node scripts/domanda.mjs chiedi <file.json | ->`, col JSON da
+  stdin o da un file FUORI dal repo (il salvataggio automatico lo
+  pubblicherebbe). Dentro: contesto, problema in pratica, opzioni con pro e
+  contro, consiglio, priorità (le bloccanti l'owner le vede per prime). Campi,
+  forma e tetti stanno in `SPEC-DOMANDE.md` §3 e in `src/shared/domande.js`:
+  si leggono lì.
+- **Le note per gli agenti** (punti del codice, cause, strade scartate) vanno
+  nel loro campo, `notePerAgenti`, non nel testo per l'owner.
+- **Una domanda non ferma il resto del lavoro**, salvo che sia bloccante: come
+  si ferma una routine lo dice il suo ruolo.
 
 ## Verifica: niente "fatto" senza aver eseguito
 
