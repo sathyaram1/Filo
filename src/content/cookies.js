@@ -808,6 +808,48 @@
     return out;
   }
 
+  // Un «rifiuta» visto nascosto resta sorvegliato finché compare: un banner già in pagina può essere mostrato
+  // a caccia chiusa senza nodi nuovi (per classe, per stile, al primo scorrimento).
+  const WATCH_MAX = 50;
+  let watched = [];
+  let watchIo = null;
+
+  function watchHidden(el) {
+    if (watched.includes(el)) return;
+    if (watched.length >= WATCH_MAX) pruneWatched();
+    if (watched.length >= WATCH_MAX) return;
+    watched.push(el);
+    try {
+      if (!watchIo && typeof IntersectionObserver === 'function') {
+        watchIo = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) scheduleScan(); });
+      }
+      if (watchIo) watchIo.observe(el);
+    } catch (_) {}
+  }
+
+  function pruneWatched() {
+    watched = watched.filter((el) => {
+      if (el.isConnected && !el.__filoCookieClicked) return true;
+      try { if (watchIo) watchIo.unobserve(el); } catch (_) {}
+      return false;
+    });
+  }
+
+  function stopWatching() {
+    watched = [];
+    if (watchIo) { try { watchIo.disconnect(); } catch (_) {} watchIo = null; }
+  }
+
+  function shownWatched() {
+    if (!watched.length) return null;
+    pruneWatched();
+    for (const el of watched) {
+      const hit = findRejectText(el, false);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
   function huntDocument() {
     fullScans++;
     const hit = handReject(null);
@@ -815,7 +857,7 @@
     const hand = handPresent();
     const comWorking = comTick(hand.skip);
     if (comWorking) return;
-    const fb = findRejectText(document, false);
+    const fb = findRejectText(document, false, { hidden: false });
     if (fb && clickEl(fb)) { noteRejected('testo'); return; }
     if (IS_TOP) { bannerTick(hand.any || com.firstSeen.size > 0); comHideTick(); }
     else frameTick(hand.any);
