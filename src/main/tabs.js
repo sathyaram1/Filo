@@ -3742,11 +3742,15 @@ class TabManager {
   }
 
   async _maybeTriageOnReopen() {
+    const inizio = Date.now();
     try {
       const s = await this._readSettings();
       const aa = s && s.autoArchive;
       if (!aa || !aa.enabled || !aa.onClose) return;
-      setTimeout(() => { this.runAutoTriage({ trigger: 'reopen' }).catch(() => {}); }, 4000);
+      // Il riordino legge il contenuto delle pagine: parte quando la coda della riapertura le ha caricate tutte.
+      await this.codaRiapertura.finita();
+      const attesa = Math.max(TRIAGE_DOPO_CODA_MS, TRIAGE_RIAPERTURA_MS - (Date.now() - inizio));
+      setTimeout(() => { this.runAutoTriage({ trigger: 'reopen' }).catch(() => {}); }, attesa);
     } catch (_) {}
   }
 }
