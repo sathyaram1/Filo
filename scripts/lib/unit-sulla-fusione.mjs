@@ -314,11 +314,16 @@ export function provaUnitSullaFusione({
   const f = gitStoria(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
   if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})`, ...misura };
   const m = git(['rev-parse', '--verify', `refs/remotes/origin/${MAIN}^{commit}`]);
-  const mainSha = m.ok ? m.out.trim() : '';
-  if (!/^[0-9a-f]{40}$/i.test(mainSha)) return { errore: 'non riesco a leggere lo sha di main' };
+  const mainOra = m.ok ? m.out.trim() : '';
+  if (!/^[0-9a-f]{40}$/i.test(mainOra)) return { errore: 'non riesco a leggere lo sha di main' };
+  const mainSha = fissato ? String(fissato).toLowerCase() : mainOra;
   if (!/^[0-9a-f]{40}$/i.test(String(punta || ''))) return { errore: 'punta del ramo non valida', mainSha };
   const storia = assicuraStoria({ git: gitStoria, mainSha, punta });
   if (storia.errore) return { errore: storia.errore, mainSha, storia: storia.storia };
+  // Un commit che non sta nella storia di main, provato come main, darebbe un verde per una fusione che non esiste.
+  if (fissato && !git(['merge-base', '--is-ancestor', mainSha, mainOra]).ok) {
+    return { errore: `lo sha dato per main (${mainSha.slice(0, 12)}) non sta nella storia di origin/main`, mainSha, storia: storia.storia };
+  }
   if (storia.storia.superficiale) scrivi(testoStoria(storia.storia));
   return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto }), storia: storia.storia };
 }
