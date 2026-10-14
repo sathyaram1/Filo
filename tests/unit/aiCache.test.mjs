@@ -55,8 +55,9 @@ test('una funzione dalle domande sempre nuove non butta fuori le spiegazioni giÃ
 });
 
 test('una lettura non riscrive la mappa, ma l\'uso recente salva la voce alla scrittura dopo', async () => {
-  for (let i = 0; i < TETTO; i++) await metti(ACTIONS.EXPLAIN, i, {});
+  for (let i = 0; i < TETTO; i++) await metti(ACTIONS.EXPLAIN, i);
   const prima = scritture;
+  await new Promise((r) => setTimeout(r, 5));
   assert.ok(await leggi(ACTIONS.EXPLAIN, 0));
   assert.ok(await leggi(ACTIONS.EXPLAIN, 0));
   assert.equal(scritture, prima, 'leggere non scrive');

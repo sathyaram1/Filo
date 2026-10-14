@@ -1142,12 +1142,9 @@ const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate
   + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
-// Letture: l'esito serve solo al modello per rispondere. Un turno muto dopo sole letture non ha detto niente all'utente (#557).
-const AZIONI_DI_LETTURA = new Set([
-  'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-]);
-// Una lettura che aspetta l'OK, o fermata per un segreto, ha già la sua parola sotto la risposta.
-const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (AZIONI_DI_LETTURA.has(String(a.type || '').toUpperCase())
+// Letture (elenco in SN_ACTION_LEVELS.LETTURE): una che aspetta l'OK, o fermata per un segreto, ha già la sua parola
+// sotto la risposta.
+const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type)
   && !a._confirm && !a._domanda && !(a._output && a._output.blocked)));
 const fraseSenzaRisposta = (passi) => `Mi sono fermato dopo ${passi === 1 ? 'un passo' : `${passi} passi`} senza arrivare a una risposta.`;
 
@@ -4740,12 +4737,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const roundRendered = [];
       const results = [];
       // Le aperture di pagina di fila partono insieme: ognuna aspetta l'esito della sua scheda,
-      // nessuna quello delle altre. Il resto resta in ordine (i suoi esiti decidono i passi dopo).
+      // nessuna quello delle altre. Così le letture di fila (#1097.2): si controllano contro quello che il modello aveva
+      // davanti a inizio giro, perché gli esiti di questo giro non li ha ancora visti (vale l'anti-esfiltrazione, #587).
+      // Il resto resta in ordine (i suoi esiti decidono i passi dopo).
       const esiti = new Map();
-      const avvia = (a) => (a._argsError
+      const vistiAInizio = azioniViste.slice();
+      const fontiAInizio = fontiLette.slice();
+      const avvia = (a, { lettura = false } = {}) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto: lettura ? vistiAInizio : azioniViste, parole: paroleUtente, domanda: domandaDiAdesso, chatId,
+          fontiLette: lettura ? fontiAInizio : fontiLette, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -4754,13 +4756,17 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           segnale: turno.ctrl.signal,
         }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
+      const lettura = (a) => !!a && !a._argsError && globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type);
       for (let i = 0; i < actions.length; i++) {
         const a = actions[i];
         if (!esiti.has(a) && turno.fermato) { fermato = true; break; }
         rawActions.push(a);
         if (!esiti.has(a)) {
-          if (apertura(a)) for (let j = i; j < actions.length && apertura(actions[j]); j++) esiti.set(actions[j], avvia(actions[j]));
-          else esiti.set(a, avvia(a));
+          // Un guasto di una partita insieme risale quando tocca a lei, non prima e non perso.
+          const lancia = (x, opz) => { const p = avvia(x, opz); p.catch(() => {}); esiti.set(x, p); };
+          if (apertura(a)) for (let j = i; j < actions.length && apertura(actions[j]); j++) lancia(actions[j]);
+          else if (lettura(a)) for (let j = i; j < actions.length && lettura(actions[j]); j++) lancia(actions[j], { lettura: true });
+          else lancia(a);
         }
         const res = await esiti.get(a);
         // Fermata (#810): l'archivio la salva come tale.
