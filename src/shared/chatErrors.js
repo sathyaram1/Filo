@@ -280,13 +280,19 @@
 
   // Una risposta che il modello ha dovuto fermare al tetto di lunghezza (finish_reason 'length', #1097.3): non è un
   // errore, ma chi la legge deve sapere che non è intera. La stessa frase su ogni superficie; '' se la risposta è intera.
-  const FRASE_INTERROTTA = 'La risposta si è interrotta qui: ha raggiunto la lunghezza massima.';
+  // Un 'error' a metà flusso è lo stesso taglio con un'altra causa: mai in cache, mai presentato come intero.
+  const FRASI_INTERROTTA = {
+    length: 'La risposta si è interrotta qui: ha raggiunto la lunghezza massima.',
+    error: 'La risposta si è interrotta qui: il servizio AI si è fermato a metà.',
+  };
+  const troncata = (finishReason) => Object.prototype.hasOwnProperty.call(FRASI_INTERROTTA, String(finishReason || ''));
   function rispostaInterrotta(finishReason) {
-    return finishReason === 'length' ? FRASE_INTERROTTA : '';
+    return troncata(finishReason) ? FRASI_INTERROTTA[finishReason] : '';
   }
+  const eFraseInterrotta = (s) => Object.values(FRASI_INTERROTTA).includes(String(s || '').trim());
 
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, CODICI_GIA_SCRITTI,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
