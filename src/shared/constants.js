@@ -2983,6 +2983,8 @@
     isProviderExcluded,
     PRODUCER_ONLY_MODELS,
     producerOnlyRule,
+    NARROW_MODELS,
+    uncoveredModelProducer,
     servedPolicyViolation,
     hostPolicyViolation,
     DICTATION_LIMITS,
