@@ -20,7 +20,7 @@ import '../helpers/senzaSessione.mjs';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
-import { join, dirname, resolve, isAbsolute, relative } from 'node:path';
+import { join, dirname, resolve, isAbsolute, relative, posix, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
