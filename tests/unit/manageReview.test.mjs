@@ -1662,14 +1662,15 @@ test('segno: il motivo si traduce se è un codice, passa com’è se è un testo
   assert.equal(MR.motivoSegnoText(null), '');
 });
 
-test('attesaServer: le tre attese di un lavoro server passato, solo in revisione (#1222)', () => {
+test('attesaServer: le due attese di un lavoro server passato, solo in revisione (#1222)', () => {
   const rev = (attesa) => ({ status: 'revision_security', attesa });
   assert.equal(MR.attesaServer(rev('fusione_server')), 'pc');
   assert.equal(MR.attesaServer(rev('suite_server')), 'suite');
-  assert.equal(MR.attesaServer(rev('deploy_server')), 'deploy');
+  // L'app si fonde prima del server: nessuno aspetta più la pubblicazione.
+  assert.equal(MR.attesaServer(rev('deploy_server')), '');
   assert.equal(MR.attesaServer(rev('')), '');
   assert.equal(MR.attesaServer(rev('toString')), '', 'solo le chiavi sue');
-  assert.equal(MR.attesaServer({ status: 'todo', attesa: 'deploy_server' }), '', 'rimessa in coda il segno vecchio non conta');
+  assert.equal(MR.attesaServer({ status: 'todo', attesa: 'suite_server' }), '', 'rimessa in coda il segno vecchio non conta');
   assert.equal(MR.attesaServer(null), '');
   assert.equal(MR.inAttesaFusioneServer(rev('fusione_server')), true);
   assert.equal(MR.inAttesaFusioneServer(rev('suite_server')), false);
