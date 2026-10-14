@@ -1,6 +1,7 @@
 // L'orchestratore dei lavori locali (#956): worktree, lavoratore, verificatori, chiusura e deploy, senza una sessione in mezzo.
 // La sessione resta per le decisioni: legge `stato` e risponde con `riprendi`. Logica e regole in scripts/lib/orchestratore.mjs.
 // Uso: npm run orchestra -- aggiungi <N>… | avvia [opzioni] [--dry-run] | stato | riprendi <N> ["risposta"] | togli <N>
+//      | fusioni-server [--dry-run] (i lavori server passati in cloud: fusione e deploy dal PC, #1159; li fa anche avvia)
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import {
@@ -13,14 +14,15 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
-import { ENV_FILE as ENV_BIGLIETTO, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, attesePc, fineAttesa, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { fusioniServer } from './lib/fusioni-server.mjs';
 import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
   + '                          avvia [--paralleli N] [--tetto N] [--derivati non-locale|locale|nessuno] [--tieni-worktree] [--budget-istanza <$>]\n'
   + '                                [--ore-istanza <ore>] [--cpu-max <%>] [--cpu-chiusura <%>] [--dry-run [<N>…]]\n'
-  + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N>';
+  + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N> | fusioni-server [--dry-run]';
 
 // Un lettore solo per ogni comando (#1027): un argomento che non torna ferma tutto prima di qualsiasi lavoro, mai preso per buono o saltato.
 const TESTO = { atteso: 'un testo', leggi: (v) => v.trim() || undefined };
@@ -51,6 +53,7 @@ export const OPZIONI_DI = Object.freeze({
   stato: {},
   riprendi: {},
   togli: {},
+  'fusioni-server': { '--dry-run': SI },
 });
 // Il trattino lungo è quello che un correttore automatico fa di «--».
 const TRATTINI = '\u2010-\u2015\u2212';
@@ -548,6 +551,22 @@ async function main(argv) {
     return 0;
   }
 
+  // I lavori server passati in cloud aspettano il PC (#1159): fusione, deploy, e la parte dell'app torna alle routine.
+  const depFusioni = (log) => ({
+    attese: () => attesePc(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P), log, radice: P.radice,
+  });
+  const righeFerme = (esito) => esito.ferme.map((f) => `#${f.num} fermo: ${f.motivo}`);
+
+  if (cmd === 'fusioni-server') {
+    const { opz, posizionali } = leggiArgomenti('fusioni-server', rest);
+    if (posizionali.length) throw erroreDiUso(`fusioni-server: argomento non capito «${posizionali[0]}»`);
+    const pid = inCorso();
+    if (pid) throw new Error(`un orchestratore è in corso (pid ${pid}): le fusioni del server le fa lui all’avvio, o rilancia quando ha finito`);
+    const esito = await fusioniServer(depFusioni((r) => console.log(r)), { prova: opz.dryRun === true });
+    for (const r of righeFerme(esito)) console.error(r);
+    return esito.ferme.length ? 2 : 0;
+  }
+
   if (cmd === 'avvia') {
     const opz = opzioniDa(rest);
     const log = (riga) => {
@@ -572,6 +591,13 @@ async function main(argv) {
     if (existsSync(lock) && vivo(Number(readFileSync(lock, 'utf8')))) throw new Error(`un orchestratore è già in corso (pid ${readFileSync(lock, 'utf8').trim()})`);
     writeFileSync(lock, String(process.pid));
     try {
+      // Prima i lavori server passati in cloud: un guasto qui (callable non pubblicata, rete) non ferma i lavori locali.
+      try {
+        const esito = await fusioniServer(depFusioni(log));
+        for (const r of righeFerme(esito)) log(r);
+      } catch (e) {
+        log(`lavori server in attesa del PC non letti: ${String((e && e.message) || e).slice(0, 200)}`);
+      }
       const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
       for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
       // 2 = qualche lavoro fermo: chi ha lanciato in sottofondo lo sa dal codice, senza leggere le righe.

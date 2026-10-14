@@ -71,7 +71,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { basename, dirname, resolve, relative, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve, relative, sep } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, withCheckpoint,
@@ -680,6 +681,30 @@ export function serialAwarenessNote(role, history, dropped = 0) {
     ].join('\n');
   }
   return '';
+}
+
+// ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ─────────────────────
+
+const LAVORO_SERVER_FILE = '_lavoro-server.md';
+
+/** Dove sta il clone di filo-security di un lavoro server: fuori dal checkout di Filo. PURA (legge l'ambiente). */
+export function cartellaCloneServer(env = process.env) {
+  return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
+}
+
+/** Il clone cade dentro il checkout di Filo? L'hook di salvataggio lo pubblicherebbe intero. PURA. */
+export function cloneDentroIlRepo(clone, root) {
+  const norm = (p) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p));
+  const r = relative(norm(root), norm(clone));
+  return r === '' || (!r.startsWith('..') && !isAbsolute(r));
+}
+
+/** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
+export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
+  const f = resolve(ROLES_DIR, LAVORO_SERVER_FILE);
+  if (!existsSync(f)) return '';
+  const avanti = (p) => String(p).split('\\').join('/');
+  return readFileSync(f, 'utf8').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
 }
 
 // L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
@@ -1886,6 +1911,8 @@ export function serverCtx(bucket, fromServer, diff = '') {
       ripresa: payload && payload.ripresa && typeof payload.ripresa === 'object' ? payload.ripresa : null,
       ...(role === 'fixer' && typeof (payload && payload.critique) === 'string' ? { critique: payload.critique } : {}),
       ...(role === 'verifier' ? { scope: payload && payload.scope, perimetro: (payload && payload.perimetro) || null } : {}),
+      // Il lavoro tocca anche filo-security (busta del server, #1159): le istruzioni del clone si accodano al ruolo.
+      ...(payload && payload.lavoroServer && typeof payload.lavoroServer === 'object' ? { lavoroServer: payload.lavoroServer } : {}),
     };
   }
   return {};
@@ -1899,6 +1926,11 @@ async function finalizeBucket(bucket, fromServer) {
     prepareForProber();
     emit(bucket, {});
     return { exit: 0 };
+  }
+
+  // Un lavoro server clona filo-security: dentro il checkout di Filo l'hook di salvataggio lo pubblicherebbe (#1159).
+  if (fromServer && fromServer.payload && fromServer.payload.lavoroServer && cloneDentroIlRepo(cartellaCloneServer(), ROOT)) {
+    return emitHalt('permanent', `il clone di filo-security (${cartellaCloneServer()}) cadrebbe dentro il checkout di Filo (${ROOT}), che si pubblica: imposta FILO_SERVER_CLONE fuori dal repo`);
   }
 
   // Il semaforo è del SERVER: l'ha preso lui rilasciando il biglietto, e vale
@@ -1999,7 +2031,8 @@ export function emit(bucket, ctx) {
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
-  const instructions = serial ? `${base.replace(/\s+$/, '')}\n\n${serial}` : base;
+  const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
+  const instructions = server || serial ? [base.replace(/\s+$/, ''), server, serial].filter(Boolean).join('\n\n') : base;
   const stampaCon = (payload) => ({ role: bucket.role, payload, claim: bucket.id || null, instructions });
   let payload = pieno;
   try {

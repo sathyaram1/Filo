@@ -52,7 +52,7 @@ test('le tab esistono col testo corretto e "Ricevuti" e\' attiva di default (DB1
   await page.evaluate(() => window.__mgTest.setData([]));
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
-  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori locali (0)');
+  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori server (0)');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');

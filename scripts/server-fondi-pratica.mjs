@@ -16,6 +16,8 @@ export { cartellaDelServer };
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Lo legge server:fondi di filo-security: senza, si rifiuta e rimanda qui.
 export const PRATICA_ENV = 'FILO_SERVER_PRATICA';
+// I lavori server delle routine hanno su filo-security il nome del ramo dell'app, `worker/<id>-<ora>` (#1159).
+export const RAMO_ROUTINE_RE = /^worker\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 const USO = 'Uso, dal repo Filo: npm run server:fondi -- claude/<ramo> --feedback <N> [--solo-server] [--dry-run]';
 
 export const SENZA_PRATICA = [
@@ -39,7 +41,9 @@ export function leggiArgomenti(argv, env = {}) {
   if (sconosciute.length) return { errore: `argomenti non capiti (${sconosciute.join(' ')})` };
   if (altri.length > 1) return { errore: `un ramo solo, non ${altri.length} (${altri.join(' ')})` };
   const ramo = ramoCanonico(altri[0]);
-  if (ramo && (!RAMO_RE.test(ramo) || /\.\.|\.lock$|\.$|\/\./.test(ramo))) return { errore: `porto su main solo rami claude/<nome>: «${altri[0]}» no` };
+  if (ramo && (!(RAMO_RE.test(ramo) || RAMO_ROUTINE_RE.test(ramo)) || /\.\.|\.lock$|\.$|\/\./.test(ramo))) {
+    return { errore: `porto su main solo rami claude/<nome>, o worker/<nome> delle routine: «${altri[0]}» no` };
+  }
   return { ramo, pratica: f.valore, dryRun, soloServer, nota: daNpm.nota };
 }
 
@@ -149,8 +153,52 @@ function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
 
+/** La punta di `ramo` su origin del server, appena letta: '' se su origin il ramo non c'è, null se origin non si legge. */
+function puntaRamoServer(cartella, ramo) {
+  const radice = dirname(cartella);
+  const elenco = gitEsito(radice, ['ls-remote', 'origin', `refs/heads/${ramo}`]);
+  if (!elenco.ok) return null;
+  if (!String(elenco.out).trim()) return '';
+  if (!gitEsito(radice, ['fetch', '--quiet', 'origin', `+refs/heads/${ramo}:refs/remotes/origin/${ramo}`]).ok) return null;
+  const r = gitEsito(radice, ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${ramo}`]);
+  return r.ok ? String(r.out).trim() : null;
+}
+
+// Uscita di server:fondi quando sul server il ramo non c'è: per un lavoro tutto nell'app non c'è niente da fondere (#1159).
+export const USCITA_SOLO_APP = 5;
+// La stessa dello strumento del server: un ramo worker/* va in conflitto con main del server, lo riallineano le routine.
+export const USCITA_CONFLITTO_MAIN = 6;
+
 /**
- * Tutto il giro; ritorna il codice d'uscita (0 fatto, 1 fermo, 2 uso, 3 pratica rifiutata, 4 server non raggiungibile).
+ * Il ramo del server è un lavoro fidato secondo il registro dei rami (#1159, mappa §1.6)? Vale anche per un ramo con
+ * voci sporche o un buco; un ramo senza registro passa solo se la pratica non è un lavoro delle routine in attesa del PC
+ * (i lavori locali di prima del registro). → { ok:true, sha } (sha = da fondere esattamente, '' = la punta del momento)
+ * | { ok:false, codice, motivo }
+ */
+export async function controllaRamoServer({ ramo, feedbackId, verdetto, cartella }, { lavoroDelRamo, puntaRamo = puntaRamoServer } = {}) {
+  const sha = verdetto && verdetto.server && verdetto.server.sha ? String(verdetto.server.sha) : puntaRamo(cartella, ramo);
+  if (sha === null) return { ok: false, codice: 4, motivo: `origin del server non si legge, e non so se ${ramo} c'è: controlla la rete e rilancia` };
+  if (!sha) {
+    return {
+      ok: false, codice: USCITA_SOLO_APP, soloApp: true,
+      motivo: `su origin del server ${ramo} non c'è: se il lavoro sta tutto nell'app qui non c'è niente da fondere, altrimenti spingilo prima`,
+    };
+  }
+  let r;
+  try {
+    r = await (lavoroDelRamo || (await import('./lib/biglietto-locale.mjs')).lavoroDelRamo)({ repo: 'server', ramo, sha, feedbackId });
+  } catch (e) {
+    return { ok: false, codice: 4, motivo: `il registro dei rami non risponde (${String((e && e.message) || e).slice(0, 200)}): senza, un ramo del server non va su main` };
+  }
+  if (r && r.registro && r.lavoroFidato === true) return { ok: true, sha };
+  if (r && r.registro) return { ok: false, codice: 3, motivo: `il ramo ${ramo} del server non è un lavoro fidato: ${r.motivo || 'motivo non detto'}. Decide l’owner` };
+  if (r && r.attesa === 'fusione_server') return { ok: false, codice: 3, motivo: `il ramo ${ramo} è di un lavoro delle routine ma non ha registro: nessuno sa chi l’ha scritto. Decide l’owner` };
+  return { ok: true, sha: '', legacy: true };
+}
+
+/**
+ * Tutto il giro; ritorna il codice d'uscita (0 fatto, 1 fermo, 2 uso, 3 pratica rifiutata, 4 server non raggiungibile,
+ * 5 ramo assente sul server: USCITA_SOLO_APP).
  * Le dipendenze si iniettano nei test; la rete passa dal fetch globale, come negli strumenti delle pratiche.
  */
 export async function esegui(argv, deps = {}) {
@@ -201,6 +249,11 @@ export async function esegui(argv, deps = {}) {
       err(`La pratica ${chi} non è fidata: un lavoro sul server si fonde solo su una pratica fidata. La segna fidata l’owner, in Gestione, dopo averne letto il testo. Non ho toccato niente.`);
       return 3;
     }
+    const ramoServer = await controllaRamoServer({ ramo: a.ramo, feedbackId: r.id, verdetto, cartella }, { lavoroDelRamo: deps.lavoroDelRamo, puntaRamo: deps.puntaRamo });
+    if (!ramoServer.ok) { err(`server:fondi: ${ramoServer.motivo}. Non ho toccato niente.`); return ramoServer.codice; }
+    if (ramoServer.legacy) log(`Il ramo ${a.ramo} non ha un registro: lavoro locale di prima del registro dei rami, vale la fiducia della pratica.`);
+    // Il registro garantisce uno sha: si fonde quello, anche senza una verifica locale (#1062, #1159).
+    const daFondere = verdetto || (ramoServer.sha ? { ok: true, server: { sha: ramoServer.sha } } : null);
     const letta = await of.partiDellaPratica(r.id, { bearer });
     if (!letta.ok) { err(`La pratica ${chi} non si legge (${letta.motivo}). Non ho toccato niente.`); return 3; }
     // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915).
@@ -246,7 +299,7 @@ export async function esegui(argv, deps = {}) {
     // La prova guarda lo stesso sha che fonderebbe la fusione vera, non la punta del ramo.
     const fissate = { lancia, fissa: deps.fissa || ramoFisso, log, err };
     if (a.dryRun) {
-      const k = lanciaFissato(cartella, a.ramo, verdetto, figlio, { ...fissate, prova: true });
+      const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, { ...fissate, prova: true });
       log(tardiva
         ? `PROVA: la pratica ${chi} non si riapre e, a fusione riuscita, ${dopo}.`
         : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
@@ -259,7 +312,11 @@ export async function esegui(argv, deps = {}) {
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
     }
-    const k = lanciaFissato(cartella, a.ramo, verdetto, figlio, fissate);
+    const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
+    if (k === USCITA_CONFLITTO_MAIN && !tardiva) {
+      err(`main del server non si è mosso. La pratica ${chi} torna alle routine per il riallineamento al giro del PC (npm run orchestra -- fusioni-server).`);
+      return k;
+    }
     if (k !== 0) {
       if (tardiva) { err(`main del server non si è mosso, e la pratica ${chi} resta chiusa com'era: sistema e rilancia lo stesso comando.`); return k; }
       await of.annotaPratica(r.id, `server:fondi si è fermato (uscita ${k}) su ${a.ramo}: main del server non si è mosso.`, { bearer }).catch(() => null);
@@ -267,7 +324,7 @@ export async function esegui(argv, deps = {}) {
       return k;
     }
     const sha = (deps.punta || puntaDelServer)(cartella);
-    const verificato = verdetto && verdetto.server ? verdetto.server.sha : '';
+    const verificato = daFondere && daFondere.server ? daFondere.server.sha : '';
     if (verificato && sha && sha !== verificato) {
       err(`Attenzione: main del server è su ${sha.slice(0, 9)}, non sullo sha verificato ${verificato.slice(0, 9)}: il ramo si è mosso fra il controllo e la fusione.`);
     }

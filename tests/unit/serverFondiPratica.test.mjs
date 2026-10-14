@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
 import {
-  cartellaDelServer, leggiArgomenti, esegui, ramiApertiDellaPratica, PRATICA_ENV,
+  cartellaDelServer, leggiArgomenti, esegui, ramiApertiDellaPratica, PRATICA_ENV, USCITA_SOLO_APP,
 } from '../../scripts/server-fondi-pratica.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
 
@@ -66,17 +66,22 @@ const ORE = 3600 * 1000;
 
 const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${sha.slice(0, 12)}`, togli: () => ({ ok: true }) });
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta }) {
+// Il registro dei rami (#1159): per difetto il ramo non ne ha uno, come i lavori locali di prima.
+const SENZA_REGISTRO = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: 'il ramo non ha un registro' });
+
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40) }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
+    const chiesti = [];
     const k = await esegui(argv, {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
       lancia: (cartella, args, env) => { lanci.push({ cartella, args, pratica: env[PRATICA_ENV] }); return codiceServer; },
       punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => verdetto, fissa,
+      lavoroDelRamo: async (x) => { chiesti.push(x); return lavoroDelRamo(x); }, puntaRamo,
     });
-    return { k, lanci, scritture, testo: righe.join('\n') };
+    return { k, lanci, scritture, chiesti, testo: righe.join('\n') };
   });
 }
 
@@ -345,4 +350,62 @@ test('la prova a vuoto con un verdetto guarda lo sha verificato, come la fusione
   assert.equal(r.k, 0, r.testo);
   assert.deepEqual(r.lanci.map((l) => l.args), [[`claude/x-verificato-${'a'.repeat(12)}`, '--dry-run']]);
   assert.deepEqual(r.scritture, []);
+});
+
+// #1159, mappa §1.6: il ramo del server dev'essere un lavoro fidato anche per il registro dei rami, non solo la pratica.
+test('un ramo del server con registro non fidato si rifiuta prima di toccare il server, col motivo', async () => {
+  const sporco = async () => ({ ok: true, registro: true, lavoroFidato: false, attesa: 'fusione_server', motivo: 'sul ramo ha scritto un biglietto sporco' });
+  const r = await giro({ docs: { p: doc('p') }, argv: ['worker/f1-20261012T090000Z', '--feedback', 'p', '--solo-server'], lavoroDelRamo: sporco });
+  assert.equal(r.k, 3, r.testo);
+  assert.match(r.testo, /non è un lavoro fidato: sul ramo ha scritto un biglietto sporco/);
+  assert.deepEqual(r.lanci, []);
+  assert.deepEqual(r.scritture, []);
+  assert.deepEqual(r.chiesti, [{ repo: 'server', ramo: 'worker/f1-20261012T090000Z', sha: 'c'.repeat(40), feedbackId: 'p' }]);
+});
+
+test('un lavoro delle routine in attesa del PC senza registro del ramo si rifiuta', async () => {
+  const senza = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: 'fusione_server', motivo: 'il ramo non ha un registro' });
+  const r = await giro({ docs: { p: doc('p') }, argv: ['worker/f1-20261012T090000Z', '--feedback', 'p', '--solo-server'], lavoroDelRamo: senza });
+  assert.equal(r.k, 3, r.testo);
+  assert.match(r.testo, /lavoro delle routine ma non ha registro/);
+  assert.deepEqual(r.lanci, []);
+});
+
+test('un ramo del server fidato per il registro si fonde fermo sullo sha controllato, anche senza verifica locale', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: 'fusione_server', motivo: '' });
+  const r = await giro({ docs: { p: doc('p') }, argv: ['worker/f1-20261012T090000Z', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.lanci.map((l) => l.args), [[`worker/f1-20261012T090000Z-verificato-${'c'.repeat(12)}`]]);
+  assert.match(r.testo, /Pratica #910 chiusa/);
+});
+
+test('senza registro e senza attesa (lavoro locale di prima) vale la fiducia della pratica, e lo si dice', async () => {
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'] });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.lanci.map((l) => l.args), [['claude/x']]);
+  assert.match(r.testo, /non ha un registro: lavoro locale di prima/);
+});
+
+test('registro irraggiungibile o ramo assente su origin: non si tocca niente', async () => {
+  const giu = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: async () => { throw new Error('la funzione localTicket non è ancora pubblicata sul server'); } });
+  assert.equal(giu.k, 4, giu.testo);
+  assert.match(giu.testo, /registro dei rami non risponde/);
+  assert.deepEqual(giu.lanci, []);
+  const illeggibile = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], puntaRamo: () => null });
+  assert.equal(illeggibile.k, 4, illeggibile.testo);
+  assert.match(illeggibile.testo, /origin del server non si legge/);
+  assert.deepEqual(illeggibile.lanci, []);
+});
+
+test('ramo assente su origin del server: uscita «solo app», senza toccare niente (#1159)', async () => {
+  const assente = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'], puntaRamo: () => '' });
+  assert.equal(assente.k, USCITA_SOLO_APP, assente.testo);
+  assert.match(assente.testo, /su origin del server claude\/x non c'è: se il lavoro sta tutto nell'app/);
+  assert.deepEqual(assente.lanci, []);
+  assert.deepEqual(assente.scritture, []);
+});
+
+test('leggiArgomenti: i rami delle routine (worker/…) valgono come i claude/…', () => {
+  assert.equal(leggiArgomenti(['worker/f1-20261012T090000Z', '--feedback', '9']).ramo, 'worker/f1-20261012T090000Z');
+  for (const no of ['worker/', 'worker/../main', 'lavoro/x']) assert.match(leggiArgomenti([no]).errore, /solo rami claude/, no);
 });
