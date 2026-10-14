@@ -136,7 +136,9 @@
     if (!c.muto) send({ type: T, fase: 'via', campo: c.dati.campo });
   }
 
+  // Conta il campo che ha davvero il fuoco: un `focusin` fabbricato dalla pagina su un altro nodo non apre niente.
   function entra(el, motivo) {
+    if (attivo() !== el) return;
     if (corrente && corrente.el === el) { corrente.muto = false; invia(motivo); return; }
     if (corrente) chiudi();
     if (!idoneo(el)) return;
