@@ -37,12 +37,9 @@ Le riletture della cache sono la voce più grossa del costo di una sessione.
 - **Chiamate indipendenti nello stesso turno**; una che dipende da un esito va
   DOPO l'esito, o nella stessa riga di shell legata al passo prima. Un test
   rosso deve fermare, non finire in coda a un commit:
-  - Bash: `npm run test:unit && git commit …`. In `npm run test:unit | tail -40
-    && git commit` l'esito che conta è quello di `tail`: o non si filtra, o
-    `set -o pipefail` prima.
-  - PowerShell 5.1: `&&` è un errore di sintassi; si scrive
-    `npm run test:unit; if ($?) { git commit … }`. Niente `2>&1` su un
-    eseguibile: rende `$?` falso anche a esito 0.
+  `npm run test:unit && git commit …`. In `npm run test:unit | tail -40 &&
+  git commit` l'esito che conta è quello di `tail`: o non si filtra, o
+  `set -o pipefail` prima.
 - **Le esplorazioni si delegano** a un sotto-agente; qui resta la conclusione.
   Più sotto-agenti insieme solo se leggono soltanto: due che scrivono si
   pestano sui lock del salvataggio automatico.
