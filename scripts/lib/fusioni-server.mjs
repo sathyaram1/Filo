@@ -19,7 +19,8 @@ const coda = (t, n = 8) => String(t || '').trim().split('\n').slice(-n).join('\n
 export async function fusioniServer(dep, { prova = false } = {}) {
   const lette = await dep.attese();
   const pratiche = Array.isArray(lette) ? lette : (lette && Array.isArray(lette.pratiche) ? lette.pratiche : []);
-  // Due deploy verdi di fila da GitHub (il server li conta): da lì pubblica deploy.yml a ogni spinta su main.
+  // L'ultimo deploy da GitHub è verde (lo legge il server): pubblica deploy.yml a ogni spinta su main, e dal PC un
+  // secondo deploy correrebbe insieme al suo.
   const daGitHub = !Array.isArray(lette) && !!(lette && lette.deployDaActions && lette.deployDaActions.affidabile === true);
   const fuse = [];
   const soloApp = [];
