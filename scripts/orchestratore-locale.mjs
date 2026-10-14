@@ -14,7 +14,7 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
-import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, fondiApp, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
 import { fusioniServer } from './lib/fusioni-server.mjs';
 import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
 

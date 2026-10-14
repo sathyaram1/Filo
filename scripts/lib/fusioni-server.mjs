@@ -126,7 +126,8 @@ export async function fusioniServer(dep, { prova = false } = {}) {
     for (const x of restano) {
       const env = filo ? Object.assign({}, process.env, { FILO_PUBLIC_REPO: filo.dir }) : null;
       dep.log(`#${x.num} server:fondi ${x.ramo}${x.appFusa ? ' (la parte dell’app è già su main)' : x.app ? ` (la parte dell’app, ${x.app} commit, torna alle routine dopo il deploy)` : ' (solo server)'}`);
-      const r = await fondi(x, x.app && !x.appFusa ? [] : ['--solo-server'], env);
+      // Con la parte dell'app già su main server:fondi chiude la pratica da sé: è l'ultima parte.
+      const r = await fondi(x, x.app ? [] : ['--solo-server'], env);
       if (fermaSe(x, r, x.appFusa ? 'la parte dell’app è già su main di Filo, il server no: ' : '')) continue;
       fuse.push({ num: x.num, id: x.id, app: x.app, appPrima: x.appFusa });
     }
