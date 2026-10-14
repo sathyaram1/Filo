@@ -15,6 +15,7 @@ const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./reso
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
+const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
@@ -4736,18 +4737,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       passi += 1;
       const roundRendered = [];
       const results = [];
-      // Le aperture di pagina di fila partono insieme: ognuna aspetta l'esito della sua scheda,
-      // nessuna quello delle altre. Così le letture di fila (#1097.2): si controllano contro quello che il modello aveva
-      // davanti a inizio giro, perché gli esiti di questo giro non li ha ancora visti (vale l'anti-esfiltrazione, #587).
-      // Il resto resta in ordine (i suoi esiti decidono i passi dopo).
-      const esiti = new Map();
-      const vistiAInizio = azioniViste.slice();
-      const fontiAInizio = fontiLette.slice();
-      const avvia = (a, { lettura = false } = {}) => (a._argsError
+      // Aperture di pagina e letture di fila partono insieme; il resto in ordine (regole in giroAzioni.js).
+      const avvia = (a, { contesto, fonti }) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: lettura ? vistiAInizio : azioniViste, parole: paroleUtente, domanda: domandaDiAdesso, chatId,
-          fontiLette: lettura ? fontiAInizio : fontiLette, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -4755,20 +4749,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           }) : null,
           segnale: turno.ctrl.signal,
         }));
-      const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
-      const lettura = (a) => !!a && !a._argsError && globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type);
-      for (let i = 0; i < actions.length; i++) {
-        const a = actions[i];
-        if (!esiti.has(a) && turno.fermato) { fermato = true; break; }
+      const dopo = async (a, res) => {
         rawActions.push(a);
-        if (!esiti.has(a)) {
-          // Un guasto di una partita insieme risale quando tocca a lei, non prima e non perso.
-          const lancia = (x, opz) => { const p = avvia(x, opz); p.catch(() => {}); esiti.set(x, p); };
-          if (apertura(a)) for (let j = i; j < actions.length && apertura(actions[j]); j++) lancia(actions[j]);
-          else if (lettura(a)) for (let j = i; j < actions.length && lettura(actions[j]); j++) lancia(actions[j], { lettura: true });
-          else lancia(a);
-        }
-        const res = await esiti.get(a);
         // Fermata (#810): l'archivio la salva come tale.
         if (res.output && res.output.blocked === 'segreto') a._output = res.output;
         // Contiene la home con il nome utente: serve solo al gate, non alla chat.
@@ -4803,8 +4785,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         azioniViste.push(rendered);
         ricordaLettoInChat([rendered]);
         await segnaFonteLetta(chatId, fontiLette, rendered);
-      }
-      if (fermato) break;
+      };
+      const partite = await GiroAzioni.eseguiGiro(actions, {
+        contesto: azioniViste, fonti: fontiLette, avvia, dopo, fermo: () => turno.fermato,
+        apertura: (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA',
+        lettura: (a) => !!a && !a._argsError && globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type),
+      });
+      if (partite.fermato) { fermato = true; break; }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       // Quello di un giro di soli bottoni invece resta nella bolla.
