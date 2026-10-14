@@ -91,8 +91,8 @@ test('4 MB di storage: una scritta su una chiave piccola non riserializza il res
     assert.ok(caratteri < 1000, `una chiave piccola ha fatto riserializzare ${caratteri} caratteri`);
   }
 
-  // Il lavoro che una regressione rimetterebbe nel flush piccolo (riserializzare, clonare, rileggere i 4 MB) costa
-  // quanto quello pieno; il tempo si confronta con il flush pieno misurato a turno, così il carico pesa su tutti e due.
+  // Non millisecondi fissi (#1228): riserializzare o clonare i 4 MB porterebbe il flush piccolo vicino al pieno, e
+  // misurati a turno il carico pesa su tutti e due. Visto: 0,1–0,2 volte il pieno, anche a macchina carica.
   let giro = 0;
   const pieno = async () => { grande[0].quando = ++giro; await Storage.set({ cronologiaGrande: grande }); await flushSenzaDisco(); };
   const piccolo = async () => { await Storage.set({ piccola: `giro ${++giro}` }); await flushSenzaDisco(); };
