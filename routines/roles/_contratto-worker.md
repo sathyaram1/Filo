@@ -17,12 +17,12 @@ REGISTRATO con gli script, mentre lavori:
 - l'esito del tuo ruolo → i comandi di registrazione/consegna del tuo
   file-ruolo;
 - i testi per l'owner e per chi ha segnalato → nelle `notes` via canale;
-- un trade-off vero o una domanda di design (CLAUDE.md § Iniziativa: non lo
-  decidi tu) → `--segnala <file.md>` sulla consegna (`--record-fixed`,
-  `--record-verifier`). Nel report da solo si perde;
+- una scelta che spetta all'owner → una domanda (CLAUDE.md § Domande
+  all'owner); se deve fermare il lavoro, anche `--segnala <file.md>` sulla
+  consegna (`--record-fixed`, `--record-verifier`). Nel report da sola si perde;
 - l'esito del controllo di sicurezza → sempre con la sua nota
   (`--record-secaudit … --nota <file.md>`), anche quando passa. I file di
-  `--segnala` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
+  `--segnala`, di `--nota` e delle domande si scrivono FUORI dal repo, nella cartella temporanea
   del sistema (per esempio `../segnala-<numero>.md`): la consegna rifiuta una
   directory con file non committati;
 <!-- includi: _domanda-fine-sessione.md -->
