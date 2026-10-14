@@ -345,8 +345,6 @@
     rot.setAttribute('aria-hidden', 'true');
     attesa.append(rot, document.createTextNode(cosa === 'wifi' ? 'Leggo le reti conosciute…' : 'Leggo i dispositivi abbinati…'));
     lista.appendChild(attesa);
-    // La riga d'attesa allunga il riquadro: senza riposizionarlo copriva la voce da cui è salito.
-    posiziona(questo.el, questo.ancora, questo.punto);
     const r = await comanda({ cosa, elenca: true });
     if (box !== questo || questo.letture !== giro) return;
     lista.replaceChildren();
