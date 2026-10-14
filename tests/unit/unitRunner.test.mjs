@@ -644,6 +644,16 @@ test('le righe che un test stampa non sono avanzamento: un file appeso che scriv
   for await (const r of avanzamento(eventi())) righe.push(r);
   assert.deepEqual(righe, ['{}\n']);
 
+  // Del test che node crea per ogni file valgono solo partenza e fine: il resto arriva anche mentre il primo è fermo.
+  const f = join(ROOT, 'tests', 'unit', 'z.test.mjs');
+  async function* delFile() {
+    for (const type of ['test:enqueue', 'test:dequeue', 'test:start', 'test:pass', 'test:complete']) yield { type, data: { nesting: 0, name: f, file: f } };
+    yield { type: 'test:pass', data: { nesting: 0, name: 'dentro', file: f } };
+  }
+  const delle = [];
+  for await (const r of avanzamento(delFile())) delle.push(r);
+  assert.deepEqual(delle, [`${JSON.stringify({ via: f })}\n`, `${JSON.stringify({ fine: f })}\n`, '{}\n']);
+
   const dir = cartellaTemporanea('filo-appeso-che-stampa-');
   try {
     writeFileSync(join(dir, 'chiacchiera.test.mjs'), "import { test } from 'node:test';\n"
