@@ -13,7 +13,7 @@
 // Filo avviato da zero (nessun profilo, nessuna chiave scritta a mano) e le
 // chiavi che arrivano comunque fino al punto in cui parte una richiesta.
 //
-// Senza il fix il terzo test è rosso: la chiave Safe Browsing non esisteva
+// Senza il fix l'ultimo test è rosso: la chiave Safe Browsing non esisteva
 // nella distribuzione del build, quindi con l'app chiusa al documento remoto il
 // primo stadio del rilevamento siti pericolosi restava spento.
 
