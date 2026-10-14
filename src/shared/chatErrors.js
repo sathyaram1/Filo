@@ -116,6 +116,7 @@
   function rimedio(x) {
     if (x && typeof x === 'object') {
       if (x.keyRefused) return 'crediti';
+      if (x.code === 'NO_TOOL_HOST' && Number(x.maxTokens) > 0) return 'preferenze';
       return RIMEDIO[String(x.code || '')] || '';
     }
     return RIMEDIO[String(x || '')] || '';
@@ -145,6 +146,7 @@
     // quanti crediti arrivano domani: vale più di qualsiasi ricostruzione.
     if (res && typeof res.userMessage === 'string' && res.userMessage) e.userMessage = res.userMessage;
     if (res && res.keyRefused) e.keyRefused = true;
+    if (res && Number(res.maxTokens) > 0) e.maxTokens = Number(res.maxTokens);
     return e;
   }
 

@@ -256,7 +256,7 @@ function registerIpcHandlers() {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
       console.error('[Filo IPC] handler error', msg?.type, err);
-      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN', keyRefused: rifiutoDellaChiave(err) };
+      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN', keyRefused: rifiutoDellaChiave(err), ...(err && err.maxTokens ? { maxTokens: err.maxTokens } : {}) };
     }
   });
 
@@ -307,6 +307,7 @@ function registerIpcHandlers() {
           provider: (err && err.provider) || '',
           userMessage: (err && typeof err.userMessage === 'string') ? err.userMessage : '',
           keyRefused: rifiutoDellaChiave(err),
+          ...(err && err.maxTokens ? { maxTokens: err.maxTokens } : {}),
         });
       } finally {
         inFlightStreams.delete(requestId);
