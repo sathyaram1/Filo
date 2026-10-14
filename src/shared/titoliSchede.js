@@ -206,9 +206,10 @@
     let t = Array.from(String(testo || '')).slice(0, TETTO).join('');
     t = t.replace(TAG, (run) => ` ${Array.from(run, (c) => String.fromCharCode(c.codePointAt(0) - 0xE0000)).join('')} `);
     t = t.replace(NON_ASCII, (c) => (c.normalize('NFKC').length > ALLARGATO ? ' ' : c));
-    t = t.normalize('NFKC').replace(INVISIBILI, '').toLowerCase();
+    t = senzaInvisibili(t.normalize('NFKC').replace(VUOTI, ' ')).toLowerCase();
     let out = '';
-    for (const ch of t.normalize('NFD').replace(/[\u0300-\u036F]/g, '')) out += CONFONDIBILI.get(ch) || ch;
+    // Ogni segno combinante, non solo gli accenti latini: i punti vocalici ebraici sopra una lettera latina non la cambiano.
+    for (const ch of t.normalize('NFD').replace(/\p{M}/gu, '')) out += CONFONDIBILI.get(ch) || ch;
     return out;
   }
 
