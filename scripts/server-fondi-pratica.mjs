@@ -159,6 +159,10 @@ function puntaDelServer(cartella) {
   try { return execFileSync('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: cartella, encoding: 'utf8' }).trim(); } catch (_) { return ''; }
 }
 
+function deployDaGitHub(cartella) {
+  return gitEsito(cartella, ['cat-file', '-e', 'refs/remotes/origin/main:.github/workflows/deploy.yml']).ok;
+}
+
 /** La punta di `ramo` su origin del server, appena letta: '' se su origin il ramo non c'è, null se origin non si legge. */
 function puntaRamoServer(cartella, ramo) {
   const radice = dirname(cartella);
