@@ -62,8 +62,10 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
       },
     });
     await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => globalThis.__pc);
-  }, { stato, dispositivi, reti, negato, letturaMs });
+  }, { stato, dispositivi, reti, negato, lettureFerme });
 }
+
+const liberaLetture = (app) => app.evaluate(() => { for (const libera of globalThis.__pcLetture.splice(0)) libera(); });
 
 const computer = (app) => app.evaluate(() => JSON.parse(JSON.stringify(globalThis.__pc)));
 const chiamate = (app) => app.evaluate(() => globalThis.__pcChiamate);
