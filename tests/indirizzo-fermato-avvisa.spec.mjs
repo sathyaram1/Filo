@@ -138,3 +138,25 @@ test('«Apri in nuova tab» del menu di Filo su un collegamento a un file di una
   await menu.getByText('Apri in nuova tab', { exact: false }).click();
   await expect(await carta(avvisi, 'File del computer bloccato per sicurezza: C:/Condivisa/listino.pdf')).toBeVisible({ timeout: 8000 });
 });
+
+// Giro 2: un percorso scritto com'è (cartella di rete, Mac, Linux) non diventa una ricerca del percorso su Google.
+for (const [percorso, testo] of [
+  ['\\\\nas\\condivisa\\bilancio.xlsx', 'Percorso di rete bloccato per sicurezza: //nas/condivisa/bilancio.xlsx'],
+  ['/home/utente/Documenti/conto.pdf', 'File del computer bloccato per sicurezza: /home/utente/Documenti/conto.pdf'],
+  ['~/Scaricati/foto.jpg', 'File del computer bloccato per sicurezza: ~/Scaricati/foto.jpg'],
+]) {
+  test(`un percorso scritto com'è (${percorso}) è fermato e detto, dall'assistente e da una scheda nuova`, async ({ app, shell, avvisi }) => {
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+    let home = null;
+    await expect.poll(() => { home = app.windows().find((w) => w.url().startsWith('filo://newtab')); return Boolean(home); }).toBe(true);
+    await home.waitForFunction(() => typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage);
+    const r = await home.evaluate((u) => chrome.runtime.sendMessage({ type: 'filo_run_action', action: { type: 'NAVIGA', url: u } }), percorso);
+    expect(r && r.output && r.output.blocked, 'l\'assistente non sa che il file è stato fermato').toBe('scheme');
+
+    const prima = await schede(app);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), percorso);
+    await expect(await carta(avvisi, testo)).toBeVisible({ timeout: 8000 });
+    expect(await schede(app)).toEqual(prima);
+    expect((await schede(app)).some((u) => /google\.[a-z]+\/search/.test(decodeURIComponent(u))), 'il percorso non diventa una ricerca').toBe(false);
+  });
+}

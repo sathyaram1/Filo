@@ -53,3 +53,7 @@ test('un indirizzo illeggibile non produce un avviso; uno uguale ha la stessa ch
   assert.equal(avvisoIndirizzoFermato('file:///a.txt').chiave, avvisoIndirizzoFermato('file:///a.txt').chiave);
   assert.notEqual(avvisoIndirizzoFermato('file:///a.txt').chiave, avvisoIndirizzoFermato('file:///b.txt').chiave);
 });
+
+test('un percorso nella cartella di casa si mostra con la tilde, come è stato scritto', () => {
+  assert.equal(testo('file:///~/Scaricati/x.pdf'), 'File del computer bloccato per sicurezza: ~/Scaricati/x.pdf');
+});

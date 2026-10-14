@@ -114,3 +114,20 @@ test('#482 una parola seguita da due punti resta una ricerca', () => {
   assert.ok(normalizeUrl('ricetta:carbonara').startsWith('https://www.google.com/search?q='));
   assert.ok(normalizeUrl('posta: come si scrive').startsWith('https://www.google.com/search?q='));
 });
+
+// #482 giro 2 — un percorso del computer scritto com'è è un file da fermare e dire, non una ricerca del percorso su Google.
+test('#482 un percorso del computer scritto com\'è diventa un file, non una ricerca', () => {
+  assert.equal(normalizeUrl('\\\\nas\\condivisa\\bilancio.xlsx'), 'file://nas/condivisa/bilancio.xlsx');
+  assert.equal(normalizeUrl('\\\\nas'), 'file://nas/');
+  assert.equal(normalizeUrl('C:\\Users\\agenti AI\\Documenti\\conto.pdf'), 'file:///C:/Users/agenti%20AI/Documenti/conto.pdf');
+  assert.equal(normalizeUrl('d:/foto/mare #2.jpg'), 'file:///d:/foto/mare%20%232.jpg');
+  assert.equal(normalizeUrl('/home/utente/Documenti/conto.pdf'), 'file:///home/utente/Documenti/conto.pdf');
+  assert.equal(normalizeUrl('/Users/mario/Desktop/'), 'file:///Users/mario/Desktop/');
+  assert.equal(normalizeUrl('~/Scaricati/x.pdf'), 'file:///~/Scaricati/x.pdf');
+});
+
+test('#482 una barra davanti a una parola qualunque non è un file', () => {
+  for (const s of ['/wiki/Roma', '/homepage', 'Users/x', '~mario']) {
+    assert.ok(normalizeUrl(s).startsWith('https://www.google.com/search?q='), s);
+  }
+});
