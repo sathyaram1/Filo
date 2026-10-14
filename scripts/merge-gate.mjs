@@ -349,8 +349,7 @@ export function exitCodeFor(reply) {
 /** Cosa sta facendo il server con la parte del server di un lavoro server. PURA. */
 export function testoEsitoServer(esito) {
   const testi = {
-    attesa_deploy: 'la parte del server è su main di filo-security; quella dell’app si fonde quando la pubblicazione da GitHub è verde',
-    attesa_suite: 'il cancello aspetta la suite di filo-security verde sul commit da fondere, e riprova da sé',
+    attesa_suite: 'il cancello aspetta la suite di filo-security verde sul commit da fondere, e riprova da sé (prima l’app, poi il server)',
     attesa_pc: 'il ramo del server lo porta su main il PC dell’owner',
     rimandato: 'il ramo del server torna alle routine (suite rossa o conflitto con main del server)',
     all_owner: 'il lavoro sul server non è fidato: decide l’owner',
