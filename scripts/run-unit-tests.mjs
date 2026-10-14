@@ -441,6 +441,61 @@ function chiudiAlbero(c) {
   }
 }
 
+/** Le righe «pid ppid riga di comando» dell'elenco dei processi, in { pid, ppid, riga }. PURA. */
+export function leggiProcessi(testo) {
+  return String(testo || '').split(/\r?\n/).flatMap((l) => {
+    const m = l.match(/^\s*(\d+)\s+(\d+)(?:\s(.*))?$/);
+    return m ? [{ pid: Number(m[1]), ppid: Number(m[2]), riga: m[3] || '' }] : [];
+  });
+}
+
+/**
+ * I processi da chiudere per fermare `file`: il figlio di `padre` (il `node --test`) che lo esegue, riconosciuto dal
+ * percorso intero sulla sua riga di comando, e i suoi discendenti. Coi percorsi di Windows barre e maiuscole non
+ * contano. PURA.
+ */
+export function processiDelFile(lista, padre, file, { root = REPO_ROOT, p = path } = {}) {
+  const win = p.sep === '\\';
+  const norma = (s) => (win ? String(s).replace(/\\/g, '/').toLowerCase() : String(s));
+  const nomi = [...new Set([file, perLaRiga(file, root, p)])].map(norma);
+  const nomina = (riga) => {
+    const r = norma(riga);
+    return nomi.some((n) => {
+      for (let i = r.indexOf(n); i !== -1; i = r.indexOf(n, i + 1)) {
+        const fine = i + n.length;
+        if ((i === 0 || ' "\'/'.includes(r[i - 1])) && (fine === r.length || ' "\''.includes(r[fine]))) return true;
+      }
+      return false;
+    });
+  };
+  const out = [];
+  const coda = lista.filter((x) => x.ppid === padre && nomina(x.riga)).map((x) => x.pid);
+  while (coda.length) {
+    const pid = coda.shift();
+    if (out.includes(pid)) continue;
+    out.push(pid);
+    for (const x of lista) if (x.ppid === pid) coda.push(x.pid);
+  }
+  return out;
+}
+
+/** Chiude il solo processo che esegue `file`, coi suoi figli: node lo dà rosso e va avanti. false se non l'ha chiuso. */
+function chiudiFile(c, file) {
+  if (process.platform === 'win32') {
+    // Solo i figli diretti del node --test: i loro discendenti li chiude /T.
+    const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      '[Console]::OutputEncoding = [Text.Encoding]::UTF8; '
+      + `Get-CimInstance Win32_Process -Filter 'ParentProcessId=${c.pid}' | ForEach-Object { '{0} {1} {2}' -f $_.ProcessId, $_.ParentProcessId, $_.CommandLine }`],
+    { encoding: 'utf8', windowsHide: true, timeout: 60_000 });
+    const figli = r.status === 0 ? processiDelFile(leggiProcessi(r.stdout), c.pid, file) : [];
+    return figli.filter((pid) => spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true }).status === 0).length > 0;
+  }
+  // -ww: righe di comando intere, anche quando l'uscita non va a un terminale.
+  const r = spawnSync('ps', ['-A', '-ww', '-o', 'pid=,ppid=,command='], { encoding: 'utf8', timeout: 60_000 });
+  const pids = r.status === 0 ? processiDelFile(leggiProcessi(r.stdout), c.pid, file) : [];
+  return pids.filter((pid) => { try { process.kill(pid, 'SIGKILL'); return true; } catch (_) { return false; } }).length > 0;
+}
+
 /**
  * Chi è la sessione che lancia i test: non arriva ai test. In una routine li faceva misurare il consumo vero, che finiva
  * nei corpi confrontati e nelle cartelle di prova: rossi anche su main, solo lì (#949.1). Chi serve un test lo mette lui.
