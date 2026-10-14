@@ -222,6 +222,88 @@ test('CLI: risposta vuota → non manda niente', async () => {
   } finally { srv.close(); }
 });
 
+// ─── #1170: il costo della chiusura viaggia con la risposta dell'orchestratore ─
+
+const RAP = { v: 3, role: 'orchestrator', closing: true, notes: [], turns: 3, costUsd: 0.01 };
+
+test('corpo: il rapporto della chiusura viaggia solo con la risposta dell\'orchestratore', () => {
+  assert.deepEqual(canale.corpoChiusura('answer', { passphrase: 'p', id: 'c1', answer: 'niente', report: RAP }),
+    { passphrase: 'p', op: 'answer', id: 'c1', answer: 'niente', report: RAP });
+  assert.deepEqual(canale.corpoChiusura('answer', { ticket: 't', answer: 'x', report: RAP }), { ticket: 't', op: 'answer', answer: 'x' },
+    'i turni di un worker li porta il suo rilascio');
+  assert.deepEqual(canale.corpoChiusura('question', { passphrase: 'p', report: RAP }), { passphrase: 'p', op: 'question' });
+});
+
+test('risposta col rapporto: se il server lo rifiuta riparte senza e lo dice; la risposta troppo lunga resta un rifiuto', async () => {
+  const prova = async (primo, secondo = { status: 200, body: { ok: true } }, cred = { passphrase: 'p', id: 'c1' }) => {
+    const corpi = [];
+    const fetchImpl = async (u, init) => {
+      corpi.push(JSON.parse(init.body));
+      const x = corpi.length === 1 ? primo : secondo;
+      return reply(x.status, x.body);
+    };
+    return { r: await canale.rispostaChiusura(cred, 'niente', { fetchImpl, ...piano }, RAP), corpi };
+  };
+  const preso = await prova({ status: 200, body: { ok: true } });
+  assert.equal(preso.r.esito, 'ok');
+  assert.equal(preso.corpi.length, 1);
+  assert.deepEqual(preso.corpi[0].report, RAP);
+  assert.equal(preso.r.avviso, undefined);
+  // Non capito, troppo grande, o un server che il campo non lo conosce ancora: la risposta arriva lo stesso.
+  for (const no of [{ status: 400, body: { ok: false, reason: 'report_malformed', detail: 'turns' } }, { status: 413, body: { ok: false, reason: 'report_too_big', bytes: 70000, max: 65536 } }, { status: 400, body: { ok: false, reason: 'bad_request' } }]) {
+    const { r, corpi } = await prova(no);
+    assert.equal(r.esito, 'ok', no.body.reason);
+    assert.equal(corpi.length, 2);
+    assert.equal('report' in corpi[1], false);
+    assert.equal(corpi[1].answer, 'niente');
+    assert.match(r.avviso, new RegExp(`${no.body.reason}.*SENZA rapporto`));
+  }
+  // Rifiutata anche senza rapporto: il rifiuto è quello vero, senza avviso sul rapporto.
+  const id = await prova({ status: 404, body: { ok: false, reason: 'bad_closing' } }, { status: 404, body: { ok: false, reason: 'bad_closing' } });
+  assert.equal(id.r.esito, 'rifiutato');
+  assert.equal(id.r.reason, 'bad_closing');
+  assert.equal(id.r.avviso, undefined);
+  // answer_too_big: da accorciare è la risposta, nessuna ritentata.
+  const lunga = await prova({ status: 413, body: { ok: false, reason: 'answer_too_big', bytes: 40000, max: 32768 } });
+  assert.equal(lunga.r.esito, 'rifiutato');
+  assert.equal(lunga.corpi.length, 1);
+  // Il worker non lo manda nemmeno se glielo si passa.
+  const worker = await prova({ status: 200, body: { ok: true } }, undefined, { ticket: 't' });
+  assert.equal('report' in worker.corpi[0], false);
+});
+
+test('CLI: la risposta dell\'orchestratore allega da sola il costo dei suoi turni dopo l\'ultimo worker', async () => {
+  const base = cartellaTemporanea('filo-1170-cli-chiusura-');
+  const { srv, richieste, port } = await fintoServer(200, { ok: true });
+  try {
+    const file = join(base, 'orch.jsonl');
+    const turno = (id, ts, cr, cw, tool) => JSON.stringify({ type: 'assistant', timestamp: ts, sessionId: 'orch', message: { id, model: 'claude-haiku-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: 10 }, content: tool ? [tool] : [{ type: 'text', text: id }] } });
+    writeFileSync(file, [
+      turno('o1', '2026-10-14T10:00:00.000Z', 0, 30000),
+      turno('o2', '2026-10-14T10:00:30.000Z', 30000, 0, { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} }),
+      JSON.stringify({ type: 'user', timestamp: '2026-10-14T10:20:00.000Z', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'ag1', content: 'Worker finito.' }] } }),
+      turno('c1', '2026-10-14T10:20:05.000Z', 30000, 500),
+      turno('c2', '2026-10-14T10:20:30.000Z', 30500, 0),
+    ].join('\n') + '\n');
+    const env = { ...senzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_TRANSCRIPT: file };
+    const r = await new Promise((risolvi) => {
+      const p = spawn(process.execPath, [CANALE, 'risposta', 'parola', 'c7'], { env });
+      let stdout = ''; let stderr = '';
+      p.stdout.on('data', (c) => { stdout += c; });
+      p.stderr.on('data', (c) => { stderr += c; });
+      p.on('close', (status) => risolvi({ status, stdout, stderr }));
+      p.stdin.end('niente\n');
+    });
+    assert.equal(r.status, 0, r.stderr);
+    const rap = richieste[0].body.report;
+    assert.equal(rap.closing, true);
+    assert.equal(rap.role, 'orchestrator');
+    assert.equal(rap.turns, 2, 'c1 e c2: o1 e o2 stanno nel rilascio del worker');
+    assert.equal(richieste[0].body.answer, 'niente');
+    assert.match(r.stderr, /chiusura dell'orchestratore: \$0\.\d{4} \(2 turni/);
+  } finally { srv.close(); togliCartella(base); }
+});
+
 // ─── lo strumento dell'owner ────────────────────────────────────────────────
 
 test('owner: sottocomandi e --n', () => {
