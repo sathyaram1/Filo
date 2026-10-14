@@ -862,7 +862,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   const compostoQui = !(payload && Array.isArray(payload.messages) && payload.messages.length);
   if (onMeta) onMeta({ model, provider: settings.provider, messages: compostoQui ? messages : null });
 
-  const cached = await AICache.get({ provider: settings.provider, model, messages });
+  const cached = await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
     if (onDelta) onDelta(cached.text);
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
