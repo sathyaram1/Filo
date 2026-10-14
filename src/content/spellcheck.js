@@ -538,7 +538,11 @@
     const barraO = Math.max(0, el.offsetHeight - el.clientHeight - px('border-top-width') - px('border-bottom-width'));
     const latoBarra = cs.direction === 'rtl' ? 'padding-left' : 'padding-right';
     if (barraV) o.style.setProperty(latoBarra, `${px(latoBarra) + barraV}px`);
-    if (barraO) o.style.setProperty('padding-bottom', `${px('padding-bottom') + barraO}px`);
+    // Sotto l'ultima riga di una casella piena c'è solo il suo margine interno: i segni stanno qualche pixel più giù del
+    // testo, e lo specchio li lascia sporgere sotto il bordo invece di tagliarli (stesso scorrimento: altezza e margine
+    // crescono insieme).
+    o.style.height = (r.height + SPORGENZA_SEGNI) + 'px';
+    o.style.setProperty('padding-bottom', `${px('padding-bottom') + barraO + SPORGENZA_SEGNI}px`);
 
     renderOverlayContent(state);
   }
