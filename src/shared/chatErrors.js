@@ -300,6 +300,11 @@
   function rispostaInterrotta(finishReason) {
     return troncata(finishReason) ? FRASI_INTERROTTA[finishReason] : '';
   }
+  // Una risposta interrotta dentro un blocco di codice: il blocco si chiude, o la frase che lo dice finisce nel codice.
+  function chiudiRecinto(t) {
+    const s = String(t || '');
+    return (s.match(/^\s*```/gm) || []).length % 2 ? `${s.replace(/\s+$/, '')}\n\`\`\`` : s;
+  }
   // Il messaggio con cui ogni chat chiede il seguito di una risposta interrotta.
   const CHIEDI_SEGUITO = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
   const eFraseInterrotta = (s) => Object.values(FRASI_INTERROTTA).includes(String(s || '').trim());
@@ -359,7 +364,7 @@
   }
 
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

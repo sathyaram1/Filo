@@ -1166,11 +1166,6 @@ const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate
   + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
-// Una risposta interrotta dentro un blocco di codice: il blocco si chiude, o la frase che lo dice finisce nel codice.
-const chiudiRecinto = (t) => {
-  const s = String(t || '');
-  return (s.match(/^\s*```/gm) || []).length % 2 ? `${s.replace(/\s+$/, '')}\n\`\`\`` : s;
-};
 // L'esito al modello di un'azione che il tetto ha tagliato a metà degli argomenti.
 const ARGOMENTI_TAGLIATI = 'non eseguita: la tua risposta ha raggiunto la lunghezza massima mentre scrivevi gli argomenti di questa azione. '
   + 'Se l\'utente ti chiede di continuare, rifalla più corta o dividila in più azioni.';
@@ -4928,7 +4923,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   if (interrotta && !senzaRisposta) {
     senzaRisposta = { passi, interrotta: true };
-    textReply = unisciTesti([chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
+    textReply = unisciTesti([globalThis.SN_CHAT_ERRORS.chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
