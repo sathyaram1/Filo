@@ -169,6 +169,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
+    "jpeg-js": "^0.4.4",
     "unpdf": "^1.8.1"
   }
 }
