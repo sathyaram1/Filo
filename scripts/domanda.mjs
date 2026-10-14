@@ -154,7 +154,21 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
     const cosa = e.azione ? (D.etichettaAzione(e.azione, riferimenti) || visibile(e.azione.tipo || '')) : 'risposta a parole';
     righe.push('', `Esito: ${cosa} · ${e.ok ? 'applicato' : `non applicato${e.errore ? ` (${visibile(e.errore)})` : ''}`}`
       + `${e.compito ? ` · compito ${visibile(e.compito.stato || '')}` : ''}`);
+    if (e.tipo === 'principio') righe.push(`  risposta automatica col principio di ${visibile(e.principio || '?')}: «${visibile(e.testoPrincipio || '')}»`);
   }
+  const prima = x.riaperta && x.riaperta.esitoPrima;
+  if (prima && prima.tipo === 'principio') {
+    righe.push('', `Riaperta dall'owner il ${quando(x.riaperta.il)}: la risposta automatica col principio di ${visibile(prima.principio || '?')} non andava.`);
+  }
+  if (x.principio && typeof x.principio.testo === 'string') {
+    const p = x.principio;
+    const segni = [fiduciaDetta(p.fiducia)];
+    if (p.daRivedere) segni.push(`da rivedere: l'owner ha riaperto ${visibile(p.daRivedere.da || '?')}`);
+    if (p.sostituitoDa) segni.push(`sostituito da ${visibile(p.sostituitoDa)}`);
+    righe.push('', `Principio (${segni.join(' · ')})`, rientro(p.testo));
+  }
+  if (x.assorbitaDa) righe.push('', `Superata: è un caso di ${visibile(x.assorbitaDa)}, che risponde anche per lei.`);
+  if (Array.isArray(x.assorbite) && x.assorbite.length) righe.push('', `Assorbe: ${x.assorbite.map((v) => visibile(v)).join(', ')}`);
   if (x.notePerAgenti) righe.push('', 'Note per gli agenti', rientro(x.notePerAgenti));
   if (x.stato === 'aperta') righe.push('', `Per rispondere: node scripts/domanda.mjs rispondi ${visibile(x.id || 'D-n')} --scelta N | --testo "…"`);
   return righe.join('\n');
