@@ -570,7 +570,7 @@ async function main(argv) {
   if (cmd === 'avvia') {
     const opz = opzioniDa(rest);
     const log = (riga) => {
-      const r = `${ora().slice(0, 19)} ${riga}`;
+      const r = `${oraLocale(ora(), { conData: true })} ${riga}`;
       console.log(r);
       if (!opz.dryRun) try { mkdirSync(P.note, { recursive: true }); writeFileSync(join(P.note, 'orchestratore.log'), `${r}\n`, { flag: 'a' }); } catch (_) { /* il log non ferma il giro */ }
     };
