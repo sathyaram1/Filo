@@ -854,6 +854,8 @@
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
+      case 'propostaEmail.attiva': return $('propostaEmailAttiva').checked;
+      case 'propostaEmail.incognito': return $('propostaEmailIncognito').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
@@ -911,6 +913,8 @@
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
+      case 'propostaEmail.attiva': return !(s.propostaEmail && s.propostaEmail.attiva === false);
+      case 'propostaEmail.incognito': return !!(s.propostaEmail && s.propostaEmail.incognito === true);
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
@@ -1079,6 +1083,9 @@
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
+    if (vuole('propostaEmail.attiva')) $('propostaEmailAttiva').checked = !(settings.propostaEmail && settings.propostaEmail.attiva === false);
+    if (vuole('propostaEmail.incognito')) $('propostaEmailIncognito').checked = !!(settings.propostaEmail && settings.propostaEmail.incognito === true);
+    $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
     if (vuole('aggiornamenti.installa')) {
       $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
     }
@@ -1615,6 +1622,12 @@
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('aggiornamentiAutomatici').addEventListener('change', persist);
+    // Spenta la proposta, «anche in incognito» non ha niente da aggiungere.
+    $('propostaEmailAttiva').addEventListener('change', () => {
+      $('propostaEmailIncognito').disabled = !$('propostaEmailAttiva').checked;
+      persist();
+    });
+    $('propostaEmailIncognito').addEventListener('change', persist);
     for (const id of ['contestoGiorni', 'contestoToken']) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));

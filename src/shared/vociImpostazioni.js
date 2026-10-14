@@ -53,6 +53,8 @@
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
+        propostaEmailAttiva: 'propostaEmail.attiva',
+        propostaEmailIncognito: 'propostaEmail.incognito',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
         lunghezzaConversazioni: 'lunghezzaRisposte.conversazioni',

@@ -1114,6 +1114,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     if (require('./adSkip').configureFromSettings(merged)) broadcastToTabs({ type: MSG.AD_SKIP_CONFIG_UPDATE });
   } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
+  try { require('../propostaEmail').impostazioni(merged); } catch (_) {}
   // Una scheda già aperta su un sito appena messo in lista si porta via subito (#590).
   try {
     for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.({ mentreScrive });
@@ -5569,6 +5570,7 @@ require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);
 require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei video da saltare
+require('./handlers/propostaEmail')(on, handlerCtx); // #1124 — l'email dell'account nei campi di accesso dei siti
 require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
