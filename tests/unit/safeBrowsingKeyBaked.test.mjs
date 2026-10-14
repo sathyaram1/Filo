@@ -110,3 +110,55 @@ test('il bake scrive la chiave Safe Browsing nel file che finisce nell’eseguib
     togliCartella(dir);
   }
 });
+
+// #1074: la chiave ruotata dall'admin sta nel campo di primo livello `safeBrowsingKey`
+// del documento dei segreti; la costruzione la prende dal server prima del segreto del job.
+test('il bake prende dal server la chiave Safe Browsing ruotata, e ignora le chiavi che non incastona', async () => {
+  const srv = createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      // La forma che il server consegnava prima del #1074: anche openrouter e gemini.
+      res.end(JSON.stringify({
+        ok: true,
+        apiKeys: { tavily: 'tav-dal-server', openrouter: 'or-di-fabbrica', gemini: 'gem-di-fabbrica' },
+        safeBrowsingKey: 'gsb-ruotata',
+      }));
+    });
+  });
+  await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+  const dir = cartellaTemporanea('filo-bake-1074-');
+  const out = join(dir, 'default-keys.generated.json');
+  const env = { ...process.env, FILO_BAKE_OUT: out };
+  for (const n of ['FILO_DEFAULT_OPENROUTER_KEY', 'FILO_DEFAULT_GEMINI_KEY']) delete env[n];
+  Object.assign(env, {
+    FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`,
+    FILO_BUILD_PASSPHRASE: 'giusta',
+    FILO_DEFAULT_TAVILY_KEY: 'tav-di-riserva',
+    FILO_DEFAULT_SAFEBROWSING_KEY: 'gsb-vecchia',
+    NO_PROXY: '127.0.0.1,localhost',
+    no_proxy: '127.0.0.1,localhost',
+  });
+  try {
+    await promisify(execFile)(process.execPath, [BAKE], { env });
+    const testo = readFileSync(out, 'utf8');
+    const j = JSON.parse(testo);
+    assert.equal(j.safeBrowsingKey, 'gsb-ruotata', 'la rotazione dell’admin deve arrivare alla versione');
+    assert.equal(j.apiKeys.tavily, 'tav-dal-server');
+    assert.deepEqual(Object.keys(j.apiKeys), CHIAVI_DEL_PACCHETTO.map((c) => c.nome));
+    assert.doesNotMatch(testo, /or-di-fabbrica|gem-di-fabbrica/);
+  } finally {
+    togliCartella(dir);
+    await new Promise((ok) => srv.close(ok));
+  }
+});
+
+test('i campi che la costruzione chiede al server sono quelli dichiarati', () => {
+  // L'elenco che il server consegna a `buildKeys` va confrontato con questo: chiavi in più
+  // viaggiano verso chi ha la parola d'ordine di build senza servire a niente.
+  assert.deepEqual(
+    [...CHIAVI_DEL_PACCHETTO, FONTE_SAFE_BROWSING].map((c) => c.server).sort(),
+    ['config/secrets.apiKeys.tavily', 'config/secrets.safeBrowsingKey'],
+    'cambiato qui, va cambiato anche l’elenco che il server consegna a buildKeys',
+  );
+});

@@ -159,13 +159,14 @@ function envKey(name) {
 //
 // `server` è il campo ESATTO del documento dei segreti: un guasto che dice
 // «manca» senza dire dove si rimedia costa a chi legge un giro d'indagine (#642).
-const CHIAVI_DEL_PACCHETTO = [
+// Esportata (con FONTE_SAFE_BROWSING) perché `buildKeys` sul server consegni questi campi e nessun altro (#1074).
+export const CHIAVI_DEL_PACCHETTO = [
   { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' },
 ];
 
 // Fuori dalla lista sopra perché non è una chiave di provider e la sua assenza
 // non ferma la pubblicazione: qui serve solo a spiegarla con le stesse parole.
-const FONTE_SAFE_BROWSING = {
+export const FONTE_SAFE_BROWSING = {
   nome: 'safeBrowsing',
   env: 'FILO_DEFAULT_SAFEBROWSING_KEY',
   server: 'config/secrets.safeBrowsingKey',
