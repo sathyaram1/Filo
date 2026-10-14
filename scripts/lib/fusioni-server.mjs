@@ -19,9 +19,9 @@ const coda = (t, n = 8) => String(t || '').trim().split('\n').slice(-n).join('\n
 export async function fusioniServer(dep, { prova = false } = {}) {
   const lette = await dep.attese();
   const pratiche = Array.isArray(lette) ? lette : (lette && Array.isArray(lette.pratiche) ? lette.pratiche : []);
-  // L'ultimo deploy da GitHub è verde (lo legge il server): pubblica deploy.yml a ogni spinta su main, e dal PC un
-  // secondo deploy correrebbe insieme al suo.
-  const daGitHub = !Array.isArray(lette) && !!(lette && lette.deployDaActions && lette.deployDaActions.affidabile === true);
+  // Il server legge le corse di deploy.yml, quindi il file è su main e la spinta del PC lo accende: un deploy dal PC
+  // correrebbe insieme al suo sulle stesse funzioni, anche prima del primo verde. Un rosso resta all'allarme.
+  const daGitHub = !Array.isArray(lette) && !!(lette && lette.deployDaActions && typeof lette.deployDaActions === 'object');
   const fuse = [];
   const soloApp = [];
   const riallineate = [];
