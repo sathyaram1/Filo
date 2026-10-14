@@ -969,7 +969,7 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
     }
     if (sottoAgente) {
       try {
-        rep.orchestrator = await rapportoOrchestratore(`${dirname(dirname(trovato.file))}.jsonl`);
+        rep.orchestrator = await rapportoOrchestratore(`${dirname(dirname(trovato.file))}.jsonl`, workerDelPrincipale(trovato.file));
       } catch (e) {
         rep.notes.push(`thread principale illeggibile: ${String((e && e.message) || e)}`);
       }
