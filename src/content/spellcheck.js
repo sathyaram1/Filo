@@ -1565,11 +1565,16 @@
     if (state) {
       seguiIlTesto(state);
       if (getEditableText(el) === currentText) {
-        state.issues = state.issues.filter((i) => !(i.start === range.start && i.end === range.end));
+        const altro = (i) => !(i.start === range.start && i.end === range.end);
+        state.issues = state.issues.filter(altro);
+        state.ocra = state.ocra.filter(altro);
       }
       state.lastScannedText = '';
       renderOverlayContent(state);
       scheduleScan(state);
+      // Una correzione scelta dal menu cambia il testo: l'ocra lo ricontrolla. L'autocorrezione (`preserve`) arriva
+      // battendo, e lì l'ocra la programma già il tasto.
+      if (cursorMode !== 'preserve' && ocraAttiva()) { programmaDate(state); scheduleOcra(state); }
     }
   }
 
