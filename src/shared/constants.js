@@ -2991,6 +2991,7 @@
     PRODUCER_ONLY_MODELS,
     producerOnlyRule,
     NARROW_MODELS,
+    modelProducer,
     uncoveredModelProducer,
     servedPolicyViolation,
     hostPolicyViolation,
