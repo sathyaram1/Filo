@@ -308,7 +308,7 @@ async function temporaneaDellaCorsa() {
 // va avanti. Il tetto conta il tempo in cui il file non va avanti, non la sua durata: sotto carico un file sano è lento
 // ma avanza (#1063).
 export const TETTO_FERMO_MS = Number(process.env.FILO_UNIT_TETTO_FERMO_MS) || 20 * 60 * 1000;
-const CONTROLLO_MS = Math.min(5000, Math.max(100, Math.floor(TETTO_FERMO_MS / 20)));
+const controlloPer = (tetto) => Math.min(5000, Math.max(100, Math.floor(tetto / 20)));
 
 /** Il tetto di node, che conta la durata del file: solo dove il lanciatore non può guardare l'avanzamento. PURA. */
 export function conTettoDiTempo(opzioni) {
@@ -528,16 +528,21 @@ export function ambientePerITest(base, temp = '') {
   return env;
 }
 
-// Con `avanzamento` (il file del suo reporter) un file che non va avanti per il tetto si chiude da solo, e la corsa
-// prosegue. Se chiuderlo non riesce, o non va avanti niente, si chiude la corsa e si dice chi era fermo.
-const lancia = (args, temp, avanzamento = null) => new Promise((ok) => {
+/**
+ * Con `avanzamento` (il file del suo reporter) un file fermo per `tetto` si chiude da solo, e la corsa prosegue; se
+ * chiuderlo non riesce, o non va avanti niente, si chiude la corsa e `fermo` dice chi era fermo. Ci passa anche una
+ * prova che fa girare altri file (#1214). `raccogli`: l'uscita torna nell'esito invece che al terminale.
+ */
+export const lanciaSorvegliato = (args, { env, avanzamento = null, tetto = TETTO_FERMO_MS, raccogli = false } = {}) => new Promise((ok) => {
   // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
-  const env = ambientePerITest(process.env, temp);
-  const c = spawn(process.execPath, args, { stdio: 'inherit', cwd: REPO_ROOT, env });
+  const c = spawn(process.execPath, args, { stdio: raccogli ? 'pipe' : 'inherit', cwd: REPO_ROOT, env });
+  const uscita = { stdout: [], stderr: [] };
+  if (raccogli) for (const k of Object.keys(uscita)) c[k].on('data', (d) => uscita[k].push(d));
+  const raccolto = () => (raccogli ? { stdout: Buffer.concat(uscita.stdout).toString('utf8'), stderr: Buffer.concat(uscita.stderr).toString('utf8') } : {});
   let fermo = null;
   const chiusi = [];
-  let eFermo = guardiaFermo();
-  const fileFermo = guardiaPerFile();
+  let eFermo = guardiaFermo(tetto);
+  const fileFermo = guardiaPerFile(tetto);
   const tempo = avanzamento && orologioMacchina();
   let letti = 0;
   const guardia = avanzamento && setInterval(() => {
@@ -556,7 +561,7 @@ const lancia = (args, temp, avanzamento = null) => new Promise((ok) => {
       chiusi.push(...riusciti);
       if (riusciti.length === daChiudere.length) {
         // Node scrive l'esito dei file chiusi fra un attimo: fino ad allora la corsa non è ferma.
-        eFermo = guardiaFermo();
+        eFermo = guardiaFermo(tetto);
         return;
       }
     }
@@ -564,11 +569,13 @@ const lancia = (args, temp, avanzamento = null) => new Promise((ok) => {
     clearInterval(guardia);
     fermo = fileInCorso(leggiRighe(avanzamento));
     chiudiAlbero(c);
-  }, CONTROLLO_MS);
-  const fine = (esito) => { if (guardia) clearInterval(guardia); ok({ ...esito, chiusi: chiusi.filter((f) => !(fermo || []).includes(f)) }); };
+  }, controlloPer(tetto));
+  const fine = (esito) => { if (guardia) clearInterval(guardia); ok({ ...esito, chiusi: chiusi.filter((f) => !(fermo || []).includes(f)), ...raccolto() }); };
   c.on('error', (error) => fine({ error }));
   c.on('close', (status, signal) => fine({ status, signal, fermo }));
 });
+
+const lancia = (args, temp, avanzamento = null) => lanciaSorvegliato(args, { env: ambientePerITest(process.env, temp), avanzamento });
 
 async function main() {
   const argv = process.argv.slice(2);

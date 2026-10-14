@@ -32,7 +32,8 @@ async function daSoli(file, sessione, { casa, tetto = TETTO_ATTESA_MS }) {
   const r = await lanciaSorvegliato(['--test', ...flagsConAvanzamento(['--test-reporter=tap'], avanzamento), ...fileArgs(file, ROOT)], {
     env: { ...ambiente, ...sessione }, avanzamento, tetto, raccogli: true,
   });
-  return { ...r, fermo: r.fermo ? testoFermo(r.fermo, tetto) : null };
+  // Un file fermo lo chiude da solo il tetto per file (#1231): è lo stesso rosso col suo nome.
+  return { ...r, fermo: r.fermo ? testoFermo(r.fermo, tetto) : r.chiusi?.length ? testoFileChiusi(r.chiusi, tetto) : null };
 }
 
 test('lanciati da soli in una sessione con tutta la sua identità accesa, i file che la leggono sono verdi (#1109.1)', async () => {
