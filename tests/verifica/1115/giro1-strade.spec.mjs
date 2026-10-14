@@ -139,3 +139,16 @@ test('il sito svuota la casella dopo l\'invio: i segni ocra spariscono', async (
   await page.evaluate(() => { const t = document.getElementById('ta'); t.value = ''; t.dispatchEvent(new Event('input', { bubbles: true })); });
   await expect(ocra(page)).toHaveCount(0, { timeout: 4000 });
 });
+
+test('col blu spento il tasto destro sui puntini mostra il riquadro dell\'ocra', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer, contraddizione(),
+    CHAT('<textarea id="ta" style="width:700px;height:100px;font:22px monospace"></textarea>'));
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ featureFlags: { spellcheck: false, spellcheckContext: true } }));
+  await page.waitForTimeout(500);
+  await page.locator('#ta').click();
+  await page.keyboard.type('sì ci vediamo mercoledì');
+  await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
+  const menu = await tastoDestro(page, ocra(page).first());
+  await expect(menu.locator('.sn-menu-coerenza-citazione')).toHaveText('prima: «ci vediamo martedì?»');
+});
