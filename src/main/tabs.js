@@ -3724,7 +3724,7 @@ class TabManager {
         return nata;
       });
       const i = activeIndex >= 0 && activeIndex < perIndice.length ? activeIndex : perIndice.length - 1;
-      const target = perIndice[i] || nate[Math.min(nate.length - 1, perIndice.slice(0, i).filter(Boolean).length)] || null;
+      const target = perIndice[i] || nate[nate.length - 1] || null;
       this.codaRiapertura.accoda(perVicinanza(nate, target));
       if (target) this.activate(target.id);
       this.codaRiapertura.avanti();
