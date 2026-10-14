@@ -336,7 +336,7 @@
       if (!isRejectText(probe)) return false;
       if (el.tagName === 'A' && leavesPage(el)) return false;
       if (!inConsentBox && !looksLikeConsent(el)) return false;
-      if (!isVisible(el)) { if (seen) seen.hidden = true; return false; }
+      if (!isVisible(el)) { if (seen) { seen.hidden = true; watchHidden(el); } return false; }
       return true;
     };
     try { if (root.nodeType === 1 && root.matches(CLICKABLE) && fits(root)) return root; } catch (_) {}
