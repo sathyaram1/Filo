@@ -20,7 +20,6 @@ test('r9 ricerca larga a servizio occupato: dice che il servizio è giù entro m
   const r = await S.filterSearch({
     criterion: 'artefatti che danno mana', cardIds: ids, cards,
     handleAIRequest: async () => {
-      chiamate += 1;
       // Il ritentativo dentro il fornitore spende il Retry-After di qualche secondo prima di arrendersi.
       await new Promise((ok) => setTimeout(ok, 3000));
       throw Object.assign(new Error('OpenRouter 429: rate limited'), { status: 429 });
