@@ -184,9 +184,31 @@ export function formattaElenco(domande) {
     if (b.priorita !== prima) { out.push(`${out.length ? '\n' : ''}${b.priorita || 'priorità ignota'}`); prima = b.priorita; }
     if (b.gruppo) out.push(`  gruppo «${visibile(b.gruppo)}»`);
     for (const d of b.domande) {
-      out.push(`${b.gruppo ? '    ' : '  '}${visibile(d.id || '?')}  ${visibile(d.titolo || '')}  [${visibile(d.stato || '?')} · ${fiduciaDetta(d.fiducia)}]`);
+      const dove = d.assorbitaDa ? ` → ${visibile(d.assorbitaDa)}` : '';
+      out.push(`${b.gruppo ? '    ' : '  '}${visibile(d.id || '?')}  ${visibile(d.titolo || '')}  [${visibile(d.stato || '?')}${dove} · ${fiduciaDetta(d.fiducia)}]`);
     }
   }
+  return out.join('\n');
+}
+
+/** Il registro per il terminale: una riga per principio, chi lo porta e se vale ancora. PURA. */
+export function formattaRegistro(r, testo = '') {
+  const voci = r && Array.isArray(r.voci) ? r.voci : [];
+  if (!voci.length) {
+    return testo
+      ? `Nessun principio risponde a «${visibile(testo)}». Prova altre parole, o \`cerca\` senza parole per leggerli tutti; se nessuno risponde, chiedi.`
+      : 'Il registro è vuoto: nessuna domanda chiusa porta ancora un principio.';
+  }
+  const out = [];
+  for (const v of voci) {
+    const segni = [v.gruppo ? `gruppo «${visibile(v.gruppo)}»` : '', fiduciaDetta(v.fiducia)];
+    if (v.daRivedere) segni.push('DA RIVEDERE: non vale, l\'owner l\'ha smentito');
+    out.push(`${visibile(v.id || '?')}  «${visibile(v.principio || '')}»`);
+    out.push(`      ${visibile(v.titolo || '')}  [${segni.filter(Boolean).join(' · ')}]`);
+  }
+  const altre = Number(r.altre) || 0;
+  if (altre > 0) out.push('', `Ce ne sono altri ${altre} meno pertinenti: stringi le parole, o \`cerca\` senza parole per leggerli tutti.`);
+  out.push('', 'Un principio che risponde si applica e si cita col suo numero (D-n) al posto della domanda.');
   return out.join('\n');
 }
 
