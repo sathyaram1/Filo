@@ -652,7 +652,10 @@ export function creaMotore(dep, opzioni = {}) {
       chiusure -= 1;
     }
     if (toccaRegole(p.fileApp) && !p.avvisi.some((a) => a.startsWith('regole'))) {
-      p.avvisi.push('regole cambiate: npm run regole:pubblica dal checkout principale su main, a Filo chiuso');
+      // Con regole.yml su main di filo-security le pubblica GitHub ogni ora: al PC resta la strada per averle subito.
+      p.avvisi.push(dep.regoleGitHub && await dep.regoleGitHub()
+        ? 'regole cambiate: le pubblica GitHub entro un’ora (regole.yml su main di filo-security); per averle subito, o se la corsa è rossa, npm run regole:pubblica dal checkout principale su main, a Filo chiuso'
+        : 'regole cambiate: npm run regole:pubblica dal checkout principale su main, a Filo chiuso');
     }
     await apriDerivati(p);
     if (!opz.tieniWorktree) await pulisci(p);
