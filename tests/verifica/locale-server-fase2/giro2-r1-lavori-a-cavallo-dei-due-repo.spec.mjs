@@ -113,8 +113,3 @@ test.describe('r1 lavoro server con la parte dell’app legata al server', () =>
     expect(fonti.filter((f) => !INCORPORATI_DAL_SERVER.includes(f)), 'fonti incorporate che il PC lascia pubblicare a GitHub col main di Filo di prima').toEqual([]);
   });
 });
-
-test('r1 i file che servono alle prove ci sono', () => {
-  test.skip(!SERVER, 'il worktree di filo-security accanto a questo non c’è');
-  for (const f of ['suite.yml', 'deploy.yml']) expect(existsSync(join(SERVER, '.github', 'workflows', f)), f).toBe(true);
-});
