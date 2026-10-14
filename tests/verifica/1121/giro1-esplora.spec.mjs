@@ -45,6 +45,9 @@ test('esplora: scelta personale chiesta a parole, coi modelli predefiniti, arriv
   await page.evaluate(async (p) => window.filo.message({ type: 'update_settings', settings: p }), esito.partial);
   // La pagina aperta si riallinea alla scelta fatta a parole.
   await expect(opzioni.locator('#ordineHost')).toHaveValue('throughput', { timeout: 5_000 });
+  const prima = await app.evaluate(() => globalThis.__richieste.map((r) => ({ url: r.url, model: r.corpo && r.corpo.model, provider: r.corpo && r.corpo.provider, primo: r.corpo && r.corpo.messages && JSON.stringify(r.corpo.messages).slice(0, 200) })));
+  console.log('PRIMA', JSON.stringify(prima));
+  await app.evaluate(() => { globalThis.__richieste.length = 0; });
 
   const flusso = await page.evaluate(async () => new Promise((risolvi) => {
     window.filo.aiStream({
@@ -56,7 +59,7 @@ test('esplora: scelta personale chiesta a parole, coi modelli predefiniti, arriv
     setTimeout(() => risolvi({ ok: false, e: 'scaduto' }), 15000);
   }));
   expect(flusso.ok, JSON.stringify(flusso)).toBe(true);
-  const viste = await app.evaluate(() => globalThis.__richieste.filter((r) => r.url.includes('/chat/completions')).map((r) => r.corpo && r.corpo.provider));
+  const viste = await app.evaluate(() => globalThis.__richieste.filter((r) => r.url.includes('/chat/completions')).map((r) => ({ ...(r.corpo && r.corpo.provider), _model: r.corpo && r.corpo.model, _m: r.corpo && JSON.stringify(r.corpo.messages).slice(0, 150) })));
   console.log('PROVIDER', JSON.stringify(viste));
   expect(viste.length).toBeGreaterThan(0);
   for (const p of viste) {
@@ -91,4 +94,27 @@ test('esplora: scelta personale chiesta a parole, coi modelli predefiniti, arriv
     await opzioni.locator('#sec-host-order').scrollIntoViewIfNeeded();
     await opzioni.screenshot({ path: `tests/.shots/1121-opzioni-${tema}.png` });
   }
+});
+
+test('esplora: Preferenze, una modifica arrivata mentre il salvataggio di prima viaggia non si fa confermare da quello', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
+  await page.evaluate(() => {
+    const vero = chrome.runtime.sendMessage.bind(chrome.runtime);
+    window.__lenti = 0;
+    chrome.runtime.sendMessage = async (m, ...r) => {
+      if (m && m.type === 'update_settings') { window.__lenti++; await new Promise((ok) => setTimeout(ok, 1500)); }
+      return vero(m, ...r);
+    };
+  });
+  const scrivi = (t) => page.evaluate((x) => { const el = document.getElementById('agentStyleText'); el.value = x; el.dispatchEvent(new Event('input', { bubbles: true })); }, t);
+  await scrivi('primo');
+  await expect.poll(() => page.evaluate(() => window.__lenti)).toBe(1);
+  await scrivi('secondo');
+  // Il primo torna intorno a 1,5 s; il secondo parte a 0,4 s e torna verso 1,9 s.
+  const accese = [];
+  for (let i = 0; i < 14; i++) { accese.push(await page.locator('#savedHint').evaluate((el) => el.classList.contains('sn-show'))); await page.waitForTimeout(100); }
+  console.log('ACCESE', JSON.stringify(accese));
+  expect(accese.slice(0, 12).some(Boolean)).toBe(false);
+  await expect(page.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 5_000 });
 });
