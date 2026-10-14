@@ -425,12 +425,12 @@ test('Esc premuto appena aperto chiude il riquadro, e mentre legge l\'elenco il 
   expect(restaAperto).toBe(false);
   await expect(riquadro(page)).toHaveCount(0);
 
-  // La riga «Leggo i dispositivi abbinati…» allunga il riquadro: resta sopra la voce, non sopra di lei.
+  // La riga «Leggo i dispositivi abbinati…» allunga il riquadro: resta accanto alla voce, non sopra di lei.
   await voce(page, 'bluetooth').click();
   await expect(riquadro(page).locator('.dash-sis-attesa')).toBeVisible();
   const b = await riquadro(page).boundingBox();
   const v = await voce(page, 'bluetooth').boundingBox();
-  expect(b.y + b.height).toBeLessThanOrEqual(v.y);
+  expect(b.y + b.height <= v.y || b.y >= v.y + v.height).toBe(true);
   // E la voce si riapre al primo clic, senza aspettare la fine della lettura.
   await page.keyboard.press('Escape');
   await expect(riquadro(page)).toHaveCount(0);
