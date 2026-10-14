@@ -120,6 +120,12 @@
       doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia). Delle pagine della rete di casa (router, NAS, stampanti) al modello non arrivano titolo, indirizzo e testo; delle pagine delicate (posta, banca, sanità, quelle con un campo password o carta, i siti delicati aggiunti da te) arriva solo il tipo, per esempio «posta».',
     },
     {
+      id: 'restore-tabs', title: 'Ritrovi le schede della volta prima', category: 'navigation',
+      desc: 'Quando riapri Filo ritrovi le schede che avevi lasciato, con davanti quella che stavi guardando. Quella si carica per prima e da sola; le altre dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se apri una scheda che non si è ancora caricata, passa davanti alle altre e si carica subito. I video delle schede riaperte non partono da soli.',
+      invoke: 'Automatico a ogni apertura di Filo.',
+      doesNot: 'Le finestre in incognito non si riaprono. Una pagina che non finisce mai di caricarsi non ferma le altre: dopo quindici secondi parte la successiva.',
+    },
+    {
       id: 'reorder-tabs', title: 'Riordina le schede per colore', category: 'navigation',
       desc: 'Riordina al volo tutte le schede aperte per colore, come succede quando riapri Filo, mettendo vicine quelle dello stesso sito o tinta.',
       invoke: 'Comando /riordina dalla nuova scheda.',
