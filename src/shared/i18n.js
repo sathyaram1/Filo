@@ -475,7 +475,7 @@
     admin_defaults_contesto_token: 'Tetto in token',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
-    admin_defaults_excluded_producer_absent: 'Oggi nessun fornitore di OpenRouter si chiama così: l\'esclusione vale da quando %s comincerà a servire i suoi modelli.',
+    admin_defaults_excluded_producer_absent: 'Oggi su OpenRouter nessun fornitore si chiama così. L\'esclusione scatta se %s comincia a servire i suoi modelli.',
     model_producer_not_excluded: '%s produce questo modello ma non è fra i fornitori esclusi, quindi può servire lui le richieste.',
     model_producer_exclude: 'Escludi %s',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
