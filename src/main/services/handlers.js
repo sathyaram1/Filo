@@ -360,16 +360,10 @@ function withDefaults(settings) {
     const provider = Defaults.fornitoreUsabile(settings.provider) ? settings.provider : d.provider;
     return { ...settings, provider, apiKeys, openWeightsOnly, excludedProviders, providerSort, security };
   }
-  const userKeys = settings.apiKeys || {};
-  const apiKeys = {};
-  // OpenRouter (#598): prima la chiave che l'utente ha scritto lui (è il suo
-  // conto, e ha scelto di usarlo), poi la chiave PERSONALE che il server ha
-  // creato al riscatto dell'invito (il suo tetto sono i suoi crediti), e solo
-  // in coda la chiave di fabbrica, che non viene più incastonata nelle
-  // versioni nuove e resta come ripiego per le installazioni vecchie.
-  const personal = personalOpenrouterKey();
-  apiKeys.openrouter = userKeys.openrouter || personal || d.apiKeys.openrouter || '';
-  apiKeys.tavily = d.apiKeys.tavily || userKeys.tavily || '';
+  // OpenRouter (#598): fra la chiave dell'utente e quella di fabbrica c'è la
+  // PERSONALE creata dal server al riscatto dell'invito (il suo tetto sono i
+  // suoi crediti). La regola dell'ordine sta in SN_CONST.effectiveApiKeys.
+  const apiKeys = SN_CONST.effectiveApiKeys(settings.apiKeys, personalOpenrouterKey(), d.apiKeys);
   return {
     ...settings,
     provider: d.provider,

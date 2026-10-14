@@ -13,7 +13,7 @@
 // Filo avviato da zero (nessun profilo, nessuna chiave scritta a mano) e le
 // chiavi che arrivano comunque fino al punto in cui parte una richiesta.
 //
-// Senza il fix il terzo test è rosso: la chiave Safe Browsing non esisteva
+// Senza il fix l'ultimo test è rosso: la chiave Safe Browsing non esisteva
 // nella distribuzione del build, quindi con l'app chiusa al documento remoto il
 // primo stadio del rilevamento siti pericolosi restava spento.
 
@@ -72,6 +72,41 @@ test('installazione nuova senza login: la richiesta parte con le chiavi di fabbr
   // vuota, in chat l'utente vede "configura una chiave".
   expect(eff.openrouter).toBe(FABBRICA.openrouter);
   expect(eff.tavily).toBe(FABBRICA.tavily);
+});
+
+// #1107 — la chiave di ricerca che l'utente scrive nelle impostazioni è quella che parte verso
+// Tavily anche con la chiave di fabbrica nel pacchetto; tolta la sua, torna quella di fabbrica.
+test('la ricerca della chat usa la chiave Tavily dell’utente, e quella di fabbrica senza', async () => {
+  const chiaviInviate = async (tavily) => app.evaluate(async (_e, tavily) => {
+    const H = globalThis.__filoHandlers;
+    await H.applySettingsUpdate({ apiKeys: { tavily } });
+    const vero = global.fetch;
+    const viste = [];
+    global.fetch = async (u, init) => {
+      if (String(u).includes('api.tavily.com')) {
+        viste.push(JSON.parse(init.body).api_key);
+        return {
+          ok: true, status: 200,
+          async json() { return { results: [{ title: 'Orche', url: 'https://example.com/orche', content: 'cetacei' }] }; },
+          async text() { return ''; },
+        };
+      }
+      return { ok: false, status: 404, async json() { return {}; }, async text() { return ''; } };
+    };
+    try {
+      const r = await H.executeFiloAction({ type: 'CERCA_WEB', query: 'orche' }, { confirmed: true });
+      return { viste, provider: r?.output?.provider || '', risultati: r?.output?.results?.length || 0 };
+    } finally { global.fetch = vero; }
+  }, tavily);
+
+  const conLaSua = await chiaviInviate('tav-dell-utente-1107');
+  expect(conLaSua.viste).toEqual(['tav-dell-utente-1107']);
+  expect(conLaSua.provider).toBe('tavily');
+  expect(conLaSua.risultati).toBe(1);
+
+  const senza = await chiaviInviate('');
+  expect(senza.viste).toEqual([FABBRICA.tavily]);
+  expect(senza.provider).toBe('tavily');
 });
 
 test('il documento dei segreti non viene mai chiesto da un’installazione normale', async () => {
