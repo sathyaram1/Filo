@@ -22,6 +22,7 @@ const USO = [
   '  rispondi D-n [--scelta N] [--testo "…" | --testo -]   N è il numero dell\'opzione come lo stampa «mostra»',
   '  consiglio D-1 [D-2 …]                 applica l\'opzione consigliata',
   '  archivia D-n | riapri D-n             la toglie senza applicare niente, o la rimette aperta',
+  '  cerca [parole chiave…]                il registro delle decisioni: i principi delle domande chiuse (senza parole, tutti)',
 ].join('\n');
 
 /** Le parole della riga di comando. PURA. @returns {{ cmd, … } | { errore }} */
