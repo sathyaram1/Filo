@@ -178,6 +178,7 @@
 
   function chiudiBox() {
     if (!box) return;
+    if (box.misura) box.misura.disconnect();
     box.el.remove();
     box = null;
     document.removeEventListener('mousedown', fuori, true);
