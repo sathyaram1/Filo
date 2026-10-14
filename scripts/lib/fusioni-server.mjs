@@ -1,7 +1,7 @@
 // I lavori server passati in cloud e fermi per il PC dell'owner (#1159, mappa §2.1): server:fondi per ognuno, un
-// server:pubblica per tutti, poi la parte dell'app torna alle routine (mai prima del deploy). Coi deploy da GitHub
-// affidabili (fase 2) il PC non pubblica: la parte dell'app la libera il server al deploy verde. Niente qui decide la
-// fiducia: la controlla server-fondi-pratica. Regole: tests/unit/fusioniServer.test.mjs.
+// server:pubblica per tutti, poi la parte dell'app torna alle routine (mai prima del deploy). Con deploy.yml su main
+// (fase 2) il PC non pubblica: la parte dell'app la libera il server al deploy verde. Niente qui decide la fiducia: la
+// controlla server-fondi-pratica. Regole: tests/unit/fusioniServer.test.mjs.
 
 import { USCITA_CONFLITTO_MAIN, USCITA_SOLO_APP } from '../server-fondi-pratica.mjs';
 
