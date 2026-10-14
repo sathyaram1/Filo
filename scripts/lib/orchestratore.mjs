@@ -617,28 +617,38 @@ export function creaMotore(dep, opzioni = {}) {
     }
     chiusure += 1;
     try {
-      // Server su main, poi l'app (che chiude la pratica), poi il deploy che incorpora il main pubblico appena fuso.
-      if (nSrv && !p.fusa.server) {
-        await git(P.serverRadice, 'push', 'origin', `refs/heads/${ramoDi(p)}:refs/heads/${ramoDi(p)}`);
-        const args = ['scripts/server-fondi-pratica.mjs', ramoDi(p), '--feedback', String(p.num), ...(nApp || p.fusa.app ? [] : ['--solo-server'])];
-        dep.log(`#${p.num} server:fondi`);
-        const r = await conRitenta(p, () => node(wt, args, 60 * 60_000), 'server:fondi');
-        if (r.code !== 0) return ferma(p, `server:fondi non ha fuso:\n${coda(r.out)}`);
-        p.fusa.server = true;
-        salva(p);
-      }
+      // Prima l'app (finish), poi il server, che chiude la pratica: la pubblicazione, da GitHub o dal PC, incorpora main
+      // di Filo che ha già la parte dell'app (#1222), come dal cancello.
+      const serverDaFondere = nSrv && !p.fusa.server;
+      if (serverDaFondere) await git(P.serverRadice, 'push', 'origin', `refs/heads/${ramoDi(p)}:refs/heads/${ramoDi(p)}`);
       if (nApp && !p.fusa.app) {
+        // L'app va su main solo se il server la può seguire: un ramo che non contiene main del server server:fondi lo rifiuta.
+        if (serverDaFondere && /^claude\//.test(ramoDi(p))
+          && (await git(P.serverRadice, 'merge-base', '--is-ancestor', 'refs/remotes/origin/main', `refs/heads/${ramoDi(p)}`)).code !== 0) {
+          return riallinea(p, 'il ramo del server non contiene main di filo-security: va riallineato prima che l’app vada su main');
+        }
         dep.log(`#${p.num} finish`);
         const e = await fondiApp(p, wt);
         if (e !== 'ok' || p.fase !== 'chiusura') return e;
         p.fusa.app = true;
         salva(p);
       }
+      if (serverDaFondere) {
+        const args = ['scripts/server-fondi-pratica.mjs', ramoDi(p), '--feedback', String(p.num), ...(nApp || p.fusa.app ? [] : ['--solo-server'])];
+        dep.log(`#${p.num} server:fondi`);
+        // Le prove del server leggono il ramo del lavoro, con la parte dell'app, come la suite di GitHub.
+        const env = Object.assign({}, process.env, { FILO_PUBLIC_REPO: wt });
+        const r = await conRitenta(p, () => node(wt, args, 60 * 60_000, env), 'server:fondi');
+        if (r.code !== 0) return ferma(p, `${nApp ? 'la parte dell’app è già su main di Filo, il server no: ' : ''}server:fondi non ha fuso:\n${coda(r.out)}`);
+        p.fusa.server = true;
+        p.serverDopoApp = true;
+        salva(p);
+      }
       if (serveDeploy(p, p.fileApp) && !p.fusa.deploy) {
-        // Con deploy.yml su main la spinta del server l'ha già pubblicata GitHub: un deploy dal PC correrebbe insieme al
-        // suo. Resta al PC solo un'app che cambia file incorporati, che nessuna spinta sul server ripubblica.
+        // Con deploy.yml su main la spinta del server l'ha già pubblicata GitHub, e dopo l'app incorpora anche i suoi file:
+        // un deploy dal PC correrebbe insieme al suo. Resta al PC un'app che cambia file incorporati senza una spinta dopo.
         const incorpora = (p.fileApp || []).some((f) => INCORPORATI_DAL_SERVER.includes(f));
-        if (p.fusa.server && !incorpora && dep.pubblicaGitHub && await dep.pubblicaGitHub()) {
+        if (p.fusa.server && (!incorpora || p.serverDopoApp) && dep.pubblicaGitHub && await dep.pubblicaGitHub()) {
           dep.log(`#${p.num} il server lo pubblica GitHub (deploy.yml): niente server:pubblica dal PC`);
           p.avvisi.push('server: lo pubblica GitHub (deploy.yml su main di filo-security); se la corsa è rossa, npm run server:pubblica da filo-security/functions');
         } else {
