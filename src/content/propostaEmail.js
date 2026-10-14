@@ -25,7 +25,7 @@
 
   // Il main scarta un messaggio di questo documento più vecchio dell'ultimo visto: l'ordine delle risposte non è garantito.
   let numero = 0;
-  let istanza = '';
+  const istanza = chiave();
   function send(msg, cb) {
     try { chrome.runtime.sendMessage({ ...msg, istanza, n: ++numero }, cb); } catch (_) { if (cb) cb(null); }
   }
