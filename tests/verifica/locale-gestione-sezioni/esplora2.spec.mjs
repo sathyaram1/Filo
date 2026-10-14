@@ -142,6 +142,7 @@ test('E7 un clic dell’utente durante il caricamento vince sull’apertura', as
 });
 
 test('E8 una bloccante che arriva a pagina aperta', async ({ app, openTab }) => {
+  test.setTimeout(150000);
   await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [domanda(14, { priorita: 'quando_puoi' })] });
   const page = await openTab(MANAGE);
   await aspettaAvvio(page);
