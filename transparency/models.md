@@ -2,7 +2,7 @@
 id: models
 title: Politica sui modelli
 subtitle: Le motivazioni etiche che governano la scelta dei modelli.
-updated: 2026-09-26
+updated: 2026-10-14
 order: 1
 ---
 
