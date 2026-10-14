@@ -30,7 +30,7 @@ const MERGE_GATE = resolve(__dirname, '..', '..', 'scripts', 'merge-gate.mjs');
 
 // ─── logica pura del CLI (niente git, niente rete) ───────────────────────────
 
-const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer } = await import('../../scripts/merge-gate.mjs');
+const { parseArgs, isValidBranch, exitCodeFor, testoRifiutoServer, testoEsitoServer } = await import('../../scripts/merge-gate.mjs');
 
 test('parseArgs: solo il source; qualunque flag è sconosciuto', () => {
   assert.deepEqual(parseArgs(['worker/1']), { source: 'worker/1', unknown: [] });

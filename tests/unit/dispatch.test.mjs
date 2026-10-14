@@ -1110,7 +1110,7 @@ test('#507: il ramo lo dice il biglietto, e le fini di giro sigillano', () => {
     'consegna e rilascio devono sigillare il punto fermo');
 });
 
-test('emit secaudit di un lavoro server: anche il diff del server, intero in un file fuori dal repo, e niente del feedback (#1159 fase 2)', () => {
+test('emit secaudit di un lavoro server: anche il diff del server, intero in un file fuori dal repo, e niente del feedback (#1222)', () => {
   const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
@@ -1126,6 +1126,7 @@ test('emit secaudit di un lavoro server: anche il diff del server, intero in un 
   try { emit(bucket, serverCtx(bucket, busta, { diff: 'diff --git a/x b/x\n+app', base: { ref: 'origin/main', sha: '2'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
   const j = JSON.parse(out);
   assert.match(j.instructions, /diffServerFile/, 'il testo del ruolo dice del diff del server');
+  assert.match(j.instructions.replace(/\s+/g, ' '), /`30` → lavoro server: la parte del server la segue il server[^`]*Non fare niente/, 'e cosa fare con l’uscita 30 del gate');
   assert.equal(j.payload.diffServer, undefined);
   assert.ok(isAbsolute(j.payload.diffServerFile));
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
