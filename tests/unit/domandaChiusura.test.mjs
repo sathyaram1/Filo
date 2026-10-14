@@ -22,6 +22,7 @@ const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
 const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
 
 const { senzaSessione } = await import('../helpers/sessione.mjs');
+const { cartellaTemporanea, togliCartella } = await import('../helpers/percorsi.mjs');
 
 const reply = (status, body) => ({ status, ok: status >= 200 && status < 300, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) });
 const piano = { sleep: async () => {} };
