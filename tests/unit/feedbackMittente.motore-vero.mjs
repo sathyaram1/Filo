@@ -1,4 +1,4 @@
-// La prova del mittente (#595), la fiducia (#1148) e l'interruttore del Red Team (#896) contro il
+// La prova del mittente (#595), l'authUid (#1075), la fiducia (#1148) e l'interruttore del Red Team (#896) contro il
 // MOTORE VERO delle regole. Non è un unit test (nome senza `.test.mjs`): serve
 // l'emulatore Firestore e Java. Si lancia come pathsRegole.motore-vero.mjs,
 // accanto (stessa cartella usa-e-getta), con questo file al posto di quello:
