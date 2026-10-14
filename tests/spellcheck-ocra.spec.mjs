@@ -273,6 +273,62 @@ test('campo modificabile su più righe: i puntini stanno sotto la parola, sulla 
   await page.screenshot({ path: 'tests/.shots/1115-ocra-righe.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
 });
 
+// Testo più alto della casella: lo specchio dei segni scorre con lei, va a capo come lei (margine interno e barra di
+// scorrimento compresi) e non taglia i segni dell'ultima riga, che stanno qualche pixel sotto il testo.
+test('casella che scorre: i segni seguono lo scorrimento e restano visibili sotto l\'ultima riga', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const righe = async (page, sel) => {
+    await page.locator(sel).click();
+    for (const r of ['uno', 'due', 'tre', 'quattro', 'cinque']) {
+      await page.keyboard.type(r);
+      await page.keyboard.press('Enter');
+    }
+    await page.keyboard.type('allora va bene, ho sentito anche gli altri e sì ci vediamo mercoledì');
+    await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
+    await page.waitForTimeout(300);
+  };
+  const misure = (page, sel) => page.evaluate((sel) => {
+    const f = document.querySelector(sel);
+    const o = document.querySelector('.sn-spell-overlay');
+    const s = document.querySelector('.sn-spell-overlay .sn-coerenza').getBoundingClientRect();
+    const fr = f.getBoundingClientRect();
+    const or = o.getBoundingClientRect();
+    let parola = null;
+    if (f.isContentEditable) {
+      const w = document.createTreeWalker(f, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const i = n.nodeValue.indexOf('mercoledì');
+        if (i < 0) continue;
+        const r = document.createRange();
+        r.setStart(n, i);
+        r.setEnd(n, i + 9);
+        const q = r.getBoundingClientRect();
+        parola = { dx: Math.abs(q.x - s.x) < 3, dy: Math.abs(q.y - s.y) < 3 };
+      }
+    }
+    return {
+      scorre: f.scrollTop > 0 && o.scrollTop === f.scrollTop,
+      // l'ultima riga è visibile nella casella e il suo segno non è tagliato dallo specchio
+      visibile: s.top >= fr.top && s.top < fr.bottom && s.bottom + 4 <= or.bottom,
+      parola,
+    };
+  }, sel);
+
+  const ce = PAGINA.replace('<textarea id="ta" spellcheck="true" lang="it" style="display:block;width:760px;height:140px;font:22px monospace"></textarea>',
+    '<div id="ce" contenteditable="true" style="width:400px;max-height:110px;overflow:auto;padding:14px;border:1px solid #999;font:22px sans-serif"></div>');
+  let page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), ce);
+  await righe(page, '#ce');
+  expect(await misure(page, '#ce')).toEqual({ scorre: true, visibile: true, parola: { dx: true, dy: true } });
+  await page.screenshot({ path: 'tests/.shots/1115-ocra-scorre-ce.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
+  await page.close();
+
+  const ta = PAGINA.replace('height:140px', 'height:90px').replace('width:760px', 'width:400px');
+  page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), ta);
+  await righe(page, '#ta');
+  expect(await misure(page, '#ta')).toEqual({ scorre: true, visibile: true, parola: null });
+  await page.screenshot({ path: 'tests/.shots/1115-ocra-scorre-ta.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
+});
+
 // Il modello al controllo dopo può segnare qualche parola in più o in meno della stessa frase: l'«Ignora» tiene.
 test('«Ignora» tiene anche se il modello al giro dopo segna un pezzo un po\' diverso della stessa frase', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
