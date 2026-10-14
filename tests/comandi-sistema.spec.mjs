@@ -391,6 +391,26 @@ test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'e
   expect(await letture()).toBe(2);
 });
 
+test('il riquadro di Bluetooth e rete: Esc appena aperto lo chiude, e mentre legge l\'elenco non copre la sua voce', async ({ app }) => {
+  await computerFinto(app, { lettureFerme: true, reti: ['Casa'], dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
+  for (const v of ['bluetooth', 'rete']) {
+    // L'Esc più svelto possibile: nello stesso giro del clic che apre.
+    await voce(page, v).evaluate((el) => { el.click(); el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    await expect(riquadro(page)).toHaveCount(0);
+    await voce(page, v).click();
+    await expect(riquadro(page).locator('.dash-sis-attesa')).toBeVisible();
+    // Un clic sulla voce mentre l'elenco si legge arriva alla voce, non a «Nascondi» in fondo al riquadro.
+    const b = await voce(page, v).boundingBox();
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    await expect(voce(page, v)).toBeVisible();
+    await expect(riquadro(page)).toHaveAttribute('data-voce', v);
+    await page.keyboard.press('Escape');
+    await expect(riquadro(page)).toHaveCount(0);
+  }
+});
+
 test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuori da Filo', async ({ app, shell }) => {
   await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   void shell;
