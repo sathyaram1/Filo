@@ -382,7 +382,7 @@ export function creaMotore(dep, opzioni = {}) {
 
   const salva = (p) => { p.aggiornato = dep.ora(); dep.store.salvaPratica(p); };
   const git = (cwd, ...args) => dep.esegui('git', args, { cwd });
-  const node = (cwd, args, timeoutMs) => dep.esegui('node', args, { cwd, timeoutMs });
+  const node = (cwd, args, timeoutMs, env) => dep.esegui('node', args, Object.assign({ cwd, timeoutMs }, env ? { env } : {}));
   const numero = (r) => (r.code === 0 ? Number(String(r.out).trim()) || 0 : 0);
 
   function ferma(p, motivo, domanda = '', altro = {}) {
