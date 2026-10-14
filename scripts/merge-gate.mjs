@@ -341,6 +341,8 @@ export function exitCodeFor(reply) {
   if (r.ok === true && r.result === 'blocked') return 10;
   // Unit rossi sul risultato della fusione (#929): come un conflitto, il server ha già instradato il riallineamento.
   if (r.ok === true && (r.result === 'conflict' || r.result === 'unit_rossi')) return 20;
+  // Lavoro server (#1159 fase 2): la parte del server la segue il server, chi chiede non fa niente.
+  if (r.ok === true && r.result === 'server') return 30;
   return 1;
 }
 
