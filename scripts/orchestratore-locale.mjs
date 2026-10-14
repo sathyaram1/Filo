@@ -355,12 +355,18 @@ async function automazioneSuMain(P, file) {
   return (await esegui('git', ['cat-file', '-e', `refs/remotes/origin/main:.github/workflows/${file}`], { cwd: P.serverRadice })).code === 0;
 }
 
-/** main di filo-security su origin, appena letto: lo sha che la pubblicazione da GitHub deve contenere. */
-async function puntaDelServer(P) {
-  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.serverRadice });
-  if (f.code !== 0) return '';
-  const r = await esegui('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: P.serverRadice });
-  return r.code === 0 ? String(r.out || '').trim() : '';
+/**
+ * main di Filo appena letto da origin, in una cartella sua fuori dal repo (un worktree staccato): le prove di server:fondi
+ * lo leggono con le parti dell'app appena fuse (#1222). → { dir, togli() } | null.
+ */
+async function filoDiMain(P) {
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.radice });
+  if (f.code !== 0) return null;
+  const dir = join(P.note, `filo-main-${Date.now()}`);
+  mkdirSync(P.note, { recursive: true });
+  const w = await esegui('git', ['worktree', 'add', '--detach', '--quiet', dir, 'refs/remotes/origin/main'], { cwd: P.radice });
+  if (w.code !== 0) return null;
+  return { dir, togli: () => esegui('git', ['worktree', 'remove', '--force', dir], { cwd: P.radice }) };
 }
 
 function depVere(P, opz, log) {
