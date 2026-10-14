@@ -162,6 +162,28 @@ test('solo server: --solo-server, niente finish', async () => {
   assert.equal(indice(b.righe(), /finish-local/), -1);
 });
 
+test('deploy.yml su main di filo-security: la spinta del server la pubblica GitHub, il PC non lancia un secondo deploy insieme', async () => {
+  const soloScript = [/diff --name-only/, { code: 0, out: 'scripts/a.mjs' }];
+  const b = banco({ risposte: [soloScript] });
+  b.dep.pubblicaGitHub = async () => true;
+  const fine = await b.motore.avvia();
+  const p = fine.pratiche[7];
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.deepEqual(p.fusa, { app: true, server: true, deploy: true });
+  assert.equal(indice(b.righe(), /server:pubblica/), -1, b.righe().join('\n'));
+  assert.match(p.avvisi.join('\n'), /lo pubblica GitHub/);
+  // Un'app che cambia un file incorporato non la ripubblica nessuna spinta sul server: il deploy resta al PC.
+  const inc = banco();
+  inc.dep.pubblicaGitHub = async () => true;
+  await inc.motore.avvia();
+  assert.ok(indice(inc.righe(), /server:pubblica/) >= 0);
+  // Senza deploy.yml su main, come prima.
+  const senza = banco({ risposte: [soloScript] });
+  senza.dep.pubblicaGitHub = async () => false;
+  await senza.motore.avvia();
+  assert.ok(indice(senza.righe(), /server:pubblica/) >= 0);
+});
+
 test('tetto dei giri: si ferma senza lanciare un verificatore in più', async () => {
   const b = banco({ verdetti: Array(10).fill('fixed'), opz: { tetto: 3 } });
   const fine = await b.motore.avvia();
