@@ -244,6 +244,29 @@ spedisci_ramo() {
   return 1
 }
 
+# Le automazioni (.github/workflows) le spinge solo l'owner, a mano: un ramo spinto con un'automazione nuova la fa
+# girare subito, senza fusione (#1140, patterns/le-automazioni-le-spinge-solo-l-owner-a-mano.md).
+AUTOMAZIONI_MARCA="le automazioni le spinge solo l'owner"
+automazioni_da_spedire() {
+  local f elenco=""
+  # -c: una fusione conta solo per cio' che cambia rispetto a TUTTI i genitori, cosi' riallineare main non ferma il ramo.
+  while IFS= read -r -d '' f; do
+    f=${f#$'\n'}
+    case "$f" in
+      .github/workflows/*) case ", $elenco, " in *", $f, "*) ;; *) elenco="$elenco${elenco:+, }$f" ;; esac ;;
+    esac
+  done < <(git log --format= --name-only --no-renames -c -z "refs/heads/$1" --not --remotes=origin 2>/dev/null)
+  REPLY=$elenco
+  [ -n "$elenco" ]
+}
+cosa_fare_automazione() {
+  if is_routine_session; then
+    REPLY="Un lavoro di routine che deve cambiare un'automazione si ferma e va ai lavori locali (consegna con --reason locale); se il cambiamento non serve, toglilo dalla storia del ramo e il salvataggio riparte."
+  else
+    REPLY="La spinge l'owner a mano, con la credenziale per le automazioni (patterns/le-automazioni-le-spinge-solo-l-owner-a-mano.md); dopo, il salvataggio riparte da solo."
+  fi
+}
+
 # Identità di chi committa: distingue nella storia le due provenienze.
 if is_routine_session; then
   COMMIT_AS_NAME="claude-routine"
