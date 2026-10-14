@@ -81,21 +81,19 @@
         const refused = { status: res.status, detail };
         // Il rifiuto si annota DOPO il ripiego: Crediti dice che Filo ha
         // usato i crediti solo se la personale ha risposto davvero.
+        const altSource = (await sourceOfKey(alt.key)) || alt.source || 'personal';
         try {
-          res = await fetch(url, makeInit(alt.key));
+          res = await fetch(url, await makeInit(alt.key, altSource));
         } catch (e) {
           try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
           throw e;
         }
         try { await K.noteOwnKeyRefusal({ ...refused, served: res.ok }); } catch (_) {}
         keyUsed = alt.key;
+        keySource = altSource;
         keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
         if (!res.ok) keyFallback.failed = res.status;
       }
-    }
-    let keySource = '';
-    if (K && typeof K.keySourceOf === 'function') {
-      try { keySource = await K.keySourceOf(keyUsed); } catch (_) { keySource = ''; }
     }
     // La chiave propria ha appena servito una chiamata: il rifiuto ricordato
     // in Crediti (se c'era) non vale più, e spesa e residuo sono cambiati.
