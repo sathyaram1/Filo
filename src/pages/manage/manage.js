@@ -5499,8 +5499,21 @@
     },
     rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(); },
     avvisi: (testo) => segnaAvvisoGiro(testo),
-    segno: () => aggiornaSegnoFerma(),
+    segno: () => { aggiornaSegnoFerma(); domandeDalVivo(); },
+    quandoInVista: () => domandeDalVivo(),
   });
+
+  // Anche le domande cambiano sul server: col ritmo del giro dal vivo, e solo in vista, se ne rileggono le cambiate.
+  // Senza, contatore e segno di una bloccante restavano quelli dell'apertura.
+  let domandePollMs = (window.SN_FEEDBACK_LIVE && window.SN_FEEDBACK_LIVE.POLL_MS) || 60000;
+  let domandeChiesteAt = Date.now();
+  function domandeDalVivo() {
+    if (!DOMANDE || !live.acceso() || !live.inVista()) return;
+    const s = DOMANDE.stato();
+    if (s.nonDisponibile || s.soloOwner || Date.now() - domandeChiesteAt < domandePollMs) return;
+    domandeChiesteAt = Date.now();
+    DOMANDE.carica();
+  }
   // Arrivate in una sezione mentre la pagina era aperta: con un ordinamento a
   // scelta possono finire a metà lista, e senza un segno l'arrivo non si vede.
   const arrivate = live.arrivate;
