@@ -83,7 +83,7 @@ await prova('create di un account anonimo col proprio authUid: accettata', () =>
   assertSucceeds(setDoc(doc(anonFirebase, 'feedback/au3'), { ...FEEDBACK, authUid: 'uid-anonimo' })));
 await prova('create di un account anonimo senza authUid: accettata', () =>
   assertSucceeds(setDoc(doc(anonFirebase, 'feedback/au4'), FEEDBACK)));
-await prova('authUid non numerico né vuoto al posto dell’uid: rifiutato', () =>
+await prova('create con authUid vuoto: rifiutata', () =>
   assertFails(setDoc(doc(anonFirebase, 'feedback/au5'), { ...FEEDBACK, authUid: '' })));
 await prova('un loggato non cambia authUid a un documento', () =>
   assertFails(updateDoc(doc(anonFirebase, 'feedback/au3'), { authUid: 'altro' })));
