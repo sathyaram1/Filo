@@ -1981,11 +1981,12 @@ async function eseguiAzioneFilo(action, {
       if (accoglienza && !confirmed && !assistente && setter && setter.scrive.includes('agentStyle')
         && !testoDiAltriNelleAzioni(contesto)) action._accoglienza = true;
     } catch (_) {}
-    // «Questo sito», «scheda: <titolo>» fra i siti delicati: la chat vede i titoli delle schede, non gli indirizzi (#1004).
+    // «Questo sito», «scheda: <titolo>» fra i siti delicati e quelli col menu proprio (#975): la chat vede i titoli
+    // delle schede, non gli indirizzi (#1004).
     try {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
-      if (setter && setter.scrive.includes('security.pagineDelicate.siti')) {
+      if (setter && (setter.scrive.includes('security.pagineDelicate.siti') || setter.scrive.includes('menuDelSito.siti'))) {
         const { tm, tab } = targetWebTab(sender);
         const schede = tm ? tm.tabs.filter((t) => !t.isInternal).map((t) => ({ url: t.url, title: t.title })) : [];
         const r = globalThis.SN_PAGINE_DELICATE.risolviSchede(
@@ -5483,6 +5484,7 @@ require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);
 require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei video da saltare
+require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente

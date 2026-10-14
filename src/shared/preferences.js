@@ -1263,6 +1263,20 @@
       risk: 'Cambia i siti dove Filo non interviene sulle pagine: lì non aggiunge niente alla pagina, '
         + 'né i suoi menu né i suoi aiuti.',
     }),
+    // #975 — non abbassa niente: cambia quale menu arriva per primo, e l'altro resta a Shift. Costo 1, come un tema.
+    {
+      ...elenco({
+        keys: ['menu_del_sito', 'menu del sito', 'siti col menu del sito', 'menu del sito col tasto destro', 'tasto destro del sito'],
+        percorso: 'menuDelSito.siti',
+        nome: 'Siti dove il tasto destro apre il menu del sito',
+        aiuto: 'siti col loro menu del tasto destro (Google Docs, Figma…) dove il tasto destro apre il menu del sito e quello di Filo '
+          + 'resta a Shift + tasto destro; per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) '
+          + 'o «scheda: <titolo come in TAB APERTE>»',
+        risk: 'Cambia su quali siti il tasto destro apre il menu del sito invece di quello di Filo; '
+          + 'il menu di Filo resta a Shift + tasto destro.',
+      }),
+      costo: 1,
+    },
 
     // ── Microfono delle chat — reversibile, innocuo → costo 1 ──
     {

@@ -1707,6 +1707,14 @@
               onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
             };
           }
+          // #975 — la proposta del menu del sito: «Sì» lo mette al primo posto su quel sito, «Annulla» lo toglie.
+          if (a && a.menuDelSito && !a.onClick) {
+            const { sito, attivo } = a.menuDelSito;
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'menu_del_sito_imposta', sito, attivo: attivo === true, avvisa: attivo === true }).catch(() => {}),
+            };
+          }
           // #1123 — «Collega»: l'accesso a Google in una scheda, come la voce del menu dell'account.
           if (a && a.collegaGoogle && !a.onClick) return { label: a.label, onClick: () => collegaGoogle() };
           // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
