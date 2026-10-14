@@ -721,16 +721,35 @@
     } catch (_) { return null; }
   }
 
+  function rewriteFrame(f) {
+    if (f.__filoNocookie) return;
+    const next = nocookieUrl(f.getAttribute('src') || '');
+    if (next && next !== f.src) {
+      f.__filoNocookie = true;
+      try { f.src = next; } catch (_) {}
+    }
+  }
+
+  // I giri guardano solo i nodi nuovi: un riquadro che riceve l'indirizzo dopo essere entrato (caricamento pigro)
+  // si riscrive quando lo riceve.
+  let srcObserver = null;
+  let srcWatched = new WeakSet();
+
+  function watchSrc(f) {
+    if (srcWatched.has(f)) return;
+    try {
+      if (!srcObserver) srcObserver = new MutationObserver((rs) => { if (active) for (const r of rs) rewriteFrame(r.target); });
+      srcObserver.observe(f, { attributes: true, attributeFilter: ['src'] });
+      srcWatched.add(f);
+    } catch (_) {}
+  }
+
   function rewriteYouTube(root) {
     let frames = [];
-    try { frames = root.querySelectorAll('iframe[src]'); } catch (_) { return; }
+    try { frames = root.nodeName === 'IFRAME' ? [root] : root.querySelectorAll('iframe'); } catch (_) { return; }
     for (const f of frames) {
-      if (f.__filoNocookie) continue;
-      const next = nocookieUrl(f.getAttribute('src') || '');
-      if (next && next !== f.src) {
-        f.__filoNocookie = true;
-        try { f.src = next; } catch (_) {}
-      }
+      rewriteFrame(f);
+      if (active && !f.__filoNocookie) watchSrc(f);
     }
   }
 
