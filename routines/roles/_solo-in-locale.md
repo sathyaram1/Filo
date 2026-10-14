@@ -1,8 +1,10 @@
 ## Se il lavoro si fa solo in locale
 
 Da qui non puoi toccare il codice del server, fare un deploy (funzioni,
-regole), usare un segreto o le credenziali dell'owner, né provare qualcosa
-sulla sua macchina. Se il feedback ha bisogno di una di queste per stare in
+regole), cambiare un'automazione in `.github/workflows` (il file non si tocca
+nemmeno: la modifica da fare si descrive nelle note), usare un segreto o le
+credenziali dell'owner, né provare qualcosa sulla sua macchina. Se il feedback
+ha bisogno di una di queste per stare in
 piedi, non aggirarla e non aprire un feedback per una sessione locale (le
 routine non ne aprono): rimandalo nei Ricevuti. Lì l'owner lo approva come
 lavoro locale, e lo prende una sessione sulla sua macchina.
