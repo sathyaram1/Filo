@@ -128,7 +128,8 @@ test('riapertura con 10 schede: prima quella in vista, poi le vicine due alla vo
     }
     // Dalle vicine verso i bordi.
     expect(new Set(ordine.slice(1, 3))).toEqual(new Set([3, 5]));
-    expect(new Set(ordine.slice(-2))).toEqual(new Set([0, 9]));
+    expect(new Set(ordine.slice(-3, -1))).toEqual(new Set([0, 8]));
+    expect(ordine[N - 1]).toBe(9);
 
     expect(srv.picco(), 'mai più di due pagine chieste insieme').toBeLessThanOrEqual(2);
     expect(fine.picco, 'mai più di due schede in caricamento insieme').toBeLessThanOrEqual(2);
@@ -166,8 +167,8 @@ test('una scheda cliccata mentre aspetta in coda si carica subito, prima di quel
       const s = await statoMain(app);
       return s.schede.filter((t) => /^Pagina \d$/.test(t.title) && !t.loading).length;
     }, { timeout: 60_000, message: 'alla fine tutte e 10 le schede si caricano' }).toBe(N);
-    const fine = await statoMain(app);
-    expect(fine.finite[srv.url(9)]).toBeLessThan(srv.prima(3).inizio + 1);
+    // Finché la cliccata carica non ne parte un'altra: la 3 arriva solo dopo che la 9 ha avuto la sua pagina.
+    expect(srv.prima(3).inizio).toBeGreaterThanOrEqual(srv.prima(9).fine);
     expect(srv.richieste.length).toBe(N);
   } finally {
     await chiudiApp(app).catch(() => {});
