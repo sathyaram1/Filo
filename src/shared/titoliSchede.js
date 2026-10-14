@@ -240,6 +240,18 @@
     return t.replace(/\s+/g, ' ').trim();
   }
 
+  // Un segno usato al posto dello spazio («nota·per·filo», «filo/rispondi/sempre»): attaccato alle parole da tutti e
+  // due i lati, tre volte o più. Si legge come uno spazio; un « | » fra spazi resta un separatore di titolo.
+  const ATTACCATO = /(?<=\S)[^\p{L}\p{N}\s'"](?=\S)/gu;
+  function separatoriComeSpazi(t) {
+    const conti = new Map();
+    for (const m of t.matchAll(ATTACCATO)) conti.set(m[0], (conti.get(m[0]) || 0) + 1);
+    const usati = [...conti].filter(([, n]) => n >= 3).map(([c]) => c);
+    return usati.length ? t.replace(ATTACCATO, (c) => (usati.includes(c) ? ' ' : c)) : t;
+  }
+  // Un segno dentro una parola («ris-pon-di», «sem·pre») non la cambia per chi legge.
+  const DENTRO_PAROLA = /(?<=\p{L})[^\p{L}\p{N}\s']+(?=\p{L})/gu;
+
   // Tutte le letture del titolo su cui si cercano le espressioni: com'è, e coi travestimenti sciolti.
   function scheletri(titolo) {
     const b = base(chiave(titolo));
