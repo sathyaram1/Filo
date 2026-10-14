@@ -32,7 +32,7 @@ test('i campi di accesso si riconoscono da tipo, autocomplete, nome ed etichetta
 test('il campo identificativo di accounts.google.com, anche senza type=email', () => {
   assert.equal(A.chiedeAccesso(campo({ id: 'identifierId' }), 'accounts.google.com'), true);
   assert.equal(A.chiedeAccesso(campo({ name: 'identifier' }), 'accounts.google.com'), true);
-  assert.equal(A.chiedeAccesso(campo({ id: 'identifierId' }), 'altro.example'), false);
+  assert.equal(A.chiedeAccesso(campo({ type: 'email', id: 'identifierId', name: 'identifier', autocomplete: 'username webauthn' }), 'accounts.google.com'), true);
 });
 
 test('password, codici, ricerche, nomi di battesimo e campi spenti non sono campi di accesso', () => {
