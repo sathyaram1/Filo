@@ -181,8 +181,9 @@ node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 
 <!-- includi: _segnala.md -->
 
-Qui il file accompagna un rilievo col `?`: la riga nella critica resta una
-riga, le scelte e i loro costi stanno nel file. Un difetto non va lì: è un
+Qui la domanda accompagna un rilievo col `?`: la riga nella critica resta una
+riga, le scelte e i loro costi stanno nella domanda, e il file di `--segnala`
+ne porta il numero. Un difetto non va lì: è un
 rilievo col suo livello. Sulla critica fermano il lavoro un rilievo interno
 di livello 2 o 3 col `?` e la segnalazione allegata, anche senza rilievi: con
 `--segnala` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
