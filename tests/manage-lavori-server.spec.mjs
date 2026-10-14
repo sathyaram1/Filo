@@ -5,6 +5,7 @@
 //   2. Automazioni: l'interruttore «Lavori server alle routine» nasce spento (campo assente), si accende e si spegne,
 //      e ogni gesto arriva al main come `lavoriServer` vero/falso; un salvataggio fallito torna indietro e lo dice.
 //   3. Una pratica passata in cloud che aspetta il PC lo dice sulla scheda («Pronto: aspetta il PC»); rimessa in coda no.
+//   4. Fase 2 (#1222): la scheda dice anche quando aspetta la suite del server o la pubblicazione da GitHub.
 
 import { test, expect } from './fixtures/electron.mjs';
 
