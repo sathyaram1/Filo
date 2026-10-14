@@ -62,10 +62,11 @@
 
   // Chi entra nel campo della chat o ci scrive manderà presto un turno che vuole lo stato di adesso: il lettore parte
   // subito, così all'invio la lettura è pronta (#1097.1). Anche con la home che lo segue: dopo una pausa dorme.
-  function scrive() {
+  // `entra`: il campo ha appena preso il fuoco, cosa rara: non aspetta il passo dei tasti.
+  function scrive({ entra = false } = {}) {
     if (!send || document.visibilityState === 'hidden') return;
     const adesso = Date.now();
-    if (adesso - svegliatoPerChat < 20 * 1000) return;
+    if (!entra && adesso - svegliatoPerChat < 20 * 1000) return;
     svegliatoPerChat = adesso;
     send({ type: MSG.SISTEMA_STATO, perChat: true }).catch(() => {});
   }

@@ -1546,7 +1546,7 @@
     inputEl.style.height = `${inputEl.scrollHeight}px`;
   }
 
-  inputEl.addEventListener('focus', () => Sistema.scrive());
+  inputEl.addEventListener('focus', () => Sistema.scrive({ entra: true }));
 
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
