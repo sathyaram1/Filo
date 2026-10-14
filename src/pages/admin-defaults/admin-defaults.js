@@ -566,8 +566,10 @@
   }
 
   function renderExcludedDrift() {
-    // Ogni cambio della lista passa di qui: l'avviso di voce e dettatura nella griglia la segue.
+    // Ogni cambio della lista passa di qui: l'avviso di voce e dettatura nella griglia la segue,
+    // e così quello del produttore sulle righe dei modelli.
     ricontrollaAvvisi();
+    checkProducers();
     const box = $('excludedDrift');
     if (!box) return;
     const missing = excludedMissingFromBuild();
