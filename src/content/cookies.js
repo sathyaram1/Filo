@@ -353,10 +353,11 @@
     return { any, skip };
   }
 
-  // Un giro delle regole a mano. Ritorna il nome del CMP su cui ha agito, o null.
-  function handReject() {
+  // Un giro delle regole a mano sul documento, o sui sottoalberi di `scope`; gli shadow root dei CMP sempre.
+  // Ritorna il nome del CMP su cui ha agito, o null.
+  function handReject(scope) {
     for (const cmp of CMPS) {
-      const searchRoots = cmp.shadowHosts ? [document, ...shadowRootsOf(cmp.shadowHosts)] : [document];
+      const searchRoots = [...(scope || [document]), ...(cmp.shadowHosts ? shadowRootsOf(cmp.shadowHosts) : [])];
       for (const root of searchRoots) {
         const btn = queryIn(root, cmp.reject);
         if (btn && clickEl(btn)) return { name: cmp.name, rejected: true };
