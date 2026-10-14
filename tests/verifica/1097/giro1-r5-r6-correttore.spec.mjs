@@ -81,10 +81,7 @@ test('r5 rientrare in un campo col testo già controllato non rifà una chiamata
 });
 
 test('r6 aggiungere o togliere un apostrofo dopo uno scan rifà il controllo', async () => {
-  const P = correttore();
-  const { soloSpaziOPunteggiatura } = vm.runInContext('SN_SPELLCHECK', vm.createContext({})) || {};
-  void soloSpaziOPunteggiatura;
-  const c = P;
+  const c = correttore();
   const el = c.campo();
   c.entra(el);
   c.scrive(el, 'ho visto un amico ieri sera');
