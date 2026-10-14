@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.239', date: '2026-10-14',
+      features: [
+        'Quando riapri Filo la scheda che stavi guardando arriva per prima. Le altre si caricano dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se ne apri una che non è ancora pronta, si carica subito.',
+      ],
+      fixes: [],
+    },
+    {
       version: '0.2.238', date: '2026-10-07',
       features: [
         'Sui siti con un loro menu del tasto destro, come Google Docs e Figma, il menu di Filo ha in cima «Menu di Google Docs»: un clic e si apre quello del sito, nello stesso punto. Se lo scegli spesso, Filo ti propone di aprirlo subito col tasto destro, e quello di Filo resta a Shift + tasto destro. Cambi idea dalle Preferenze, dal menu di Filo su quel sito o chiedendolo a Filo.',
