@@ -551,11 +551,12 @@
     fuocoPrimaDelMenu = document.activeElement;
     menu.tabIndex = -1;
     try { menu.focus(); } catch (_) {}
+    document.addEventListener('keydown', onMenuKeydown, true);
     // setTimeout: evita che il mousedown/click che ha aperto il menu lo chiuda
     // subito tramite il listener "outside click".
     setTimeout(() => {
+      if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      document.addEventListener('keydown', onMenuKeydown, true);
       window.addEventListener('scroll', closeCtxMenu, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);

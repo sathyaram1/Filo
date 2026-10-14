@@ -254,9 +254,10 @@
     menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
     openMenu = menu;
+    document.addEventListener('keydown', onMenuKeydown, true);
     setTimeout(() => {
+      if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      document.addEventListener('keydown', onMenuKeydown, true);
       window.addEventListener('scroll', closeCtxMenu, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);

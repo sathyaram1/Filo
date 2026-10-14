@@ -374,9 +374,10 @@
     menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
     menuAperto = menu;
     voce.focus();
+    document.addEventListener('keydown', tastoSulMenu, true);
     setTimeout(() => {
+      if (menuAperto !== menu) return;
       document.addEventListener('mousedown', fuoriDalMenu, true);
-      document.addEventListener('keydown', tastoSulMenu, true);
       window.addEventListener('wheel', fuoriDalMenu, true);
       window.addEventListener('resize', chiudiMenu);
     }, 0);
