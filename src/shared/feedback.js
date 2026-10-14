@@ -982,7 +982,7 @@
   // `tests/unit/feedbackCampiLista.test.mjs` confronta questi due elenchi con
   // `firestore.rules` e diventa rossa se divergono.
   const CAMPI_LISTA = [
-    'archiveOverride', 'attesa', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
+    'archiveOverride', 'attesa', 'authUid', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
     'clientIdHash', 'createdAt', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly', 'name', 'parentId', 'pipeline',
     'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
