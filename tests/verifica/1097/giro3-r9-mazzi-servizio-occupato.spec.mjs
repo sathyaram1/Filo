@@ -16,7 +16,6 @@ test('r9 ricerca larga a servizio occupato: dice che il servizio è giù entro m
   test.setTimeout(150_000);
   const cards = {}; const ids = [];
   for (let i = 0; i < 1050; i++) { const id = `c${i}`; ids.push(id); cards[id] = { id, name: `Card ${i}`, type_line: 'Artifact', oracle_text: `x${i}` }; }
-  let chiamate = 0;
   const inizio = Date.now();
   const r = await S.filterSearch({
     criterion: 'artefatti che danno mana', cardIds: ids, cards,
