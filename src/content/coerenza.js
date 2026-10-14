@@ -402,6 +402,5 @@
 
   global.SN_COERENZA = {
     dateDi, leggiRisposta, citazioneNelContesto, normalizza, unisci, chiaveIgnora, impronta, contestoComeTesto,
-    annoPiuVicino, GIORNO_MS,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
