@@ -128,9 +128,9 @@
   // ogni superficie perché una frase che nomina una pagina e non ci porta è
   // muta per chi la legge da un sito qualunque (#663).
   const RIMEDIO_PAGINE = {
-    crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti' },
-    opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni' },
-    preferenze: { url: 'filo://preferences/preferences.html#sec-lunghezza', label: 'Apri Preferenze' },
+    crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti', title: 'Controlla o togli la chiave OpenRouter' },
+    opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni', title: 'Scegli il modello per questa funzione' },
+    preferenze: { url: 'filo://preferences/preferences.html#sec-lunghezza', label: 'Apri Preferenze', title: 'Cambia quanto può essere lunga una risposta' },
   };
   function rimedioPagina(x) {
     const dove = rimedio(x);
@@ -149,6 +149,9 @@
     if (res && typeof res.userMessage === 'string' && res.userMessage) e.userMessage = res.userMessage;
     if (res && res.keyRefused) e.keyRefused = true;
     if (res && Number(res.maxTokens) > 0) e.maxTokens = Number(res.maxTokens);
+    if (res && Number(res.finestra) > 0) e.finestra = Number(res.finestra);
+    if (res && typeof res.finishReason === 'string' && res.finishReason) e.finishReason = res.finishReason;
+    if (res && res.vuota) e.vuota = true;
     return e;
   }
 
@@ -159,7 +162,7 @@
     const raw = String((e && e.message) || (typeof e === 'string' ? e : ''));
     if (e && CODICI_GIA_SCRITTI.includes(e.code)) return raw;
 
-    if (e && e.code === 'RISPOSTA_TAGLIATA') return fraseTagliata(e.finishReason);
+    if (e && e.code === 'RISPOSTA_TAGLIATA') return fraseTagliata(e.finishReason, { vuota: !!e.vuota });
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {
@@ -191,6 +194,11 @@
       if (e && e.code === 'TETTO_RISPOSTA') {
         const n = Number(e.maxTokens);
         const tetto = Number.isFinite(n) && n > 0 ? ` di ${n.toLocaleString('it-IT', { useGrouping: true })} token` : '';
+        // Testo più tetto oltre la memoria del modello: il testo da solo ci stava.
+        const f = Number(e.finestra);
+        if (Number.isFinite(f) && f > 0) {
+          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto (${f.toLocaleString('it-IT', { useGrouping: true })} token): abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», accorcia il testo, o scegli un modello con più memoria in Modelli predefiniti.`;
+        }
         return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello in Modelli predefiniti.`;
       }
       if (e && e.code === 'MODEL_UNAVAILABLE') {
@@ -296,21 +304,62 @@
   const CHIEDI_SEGUITO = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
   const eFraseInterrotta = (s) => Object.values(FRASI_INTERROTTA).includes(String(s || '').trim());
   // Per chi legge la risposta come dati (JSON, memoria riscritta, un nome): un pezzo non si usa, si dice.
-  function fraseTagliata(finishReason) {
-    return finishReason === 'error'
-      ? 'il servizio AI si è fermato a metà della risposta, e un pezzo non basta a questa funzione. Riprova.'
+  // `vuota`: il tetto è finito prima di una sola parola da mostrare, di solito nel ragionamento.
+  function fraseTagliata(finishReason, { vuota = false } = {}) {
+    if (finishReason === 'error') return 'il servizio AI si è fermato a metà della risposta, e un pezzo non basta a questa funzione. Riprova.';
+    return vuota
+      ? 'il modello ha speso tutta la lunghezza massima prima di scrivere la risposta, di solito ragionando: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.'
       : 'la risposta del modello ha raggiunto la lunghezza massima prima di finire, e un pezzo non basta a questa funzione: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.';
   }
-  function erroreTagliata(finishReason) {
-    const f = fraseTagliata(finishReason);
+  function erroreTagliata(finishReason, { vuota = false } = {}) {
+    const f = fraseTagliata(finishReason, { vuota });
     const e = new Error(f.charAt(0).toUpperCase() + f.slice(1));
     e.code = 'RISPOSTA_TAGLIATA';
     e.finishReason = finishReason;
+    if (vuota) e.vuota = true;
     return e;
+  }
+  // Una risposta tagliata che non si può mostrare: chi la legge come dati (`intera`) non ne usa un pezzo, e un taglio
+  // senza testo né azioni non ha niente da mostrare a nessuno. null se la risposta si può usare.
+  function erroreDelTaglio(r, { intera = false } = {}) {
+    if (!r || !troncata(r.finishReason)) return null;
+    const vuota = !String(r.text || '').trim() && !(Array.isArray(r.toolCalls) && r.toolCalls.length);
+    return intera || vuota ? erroreTagliata(r.finishReason, { vuota }) : null;
+  }
+
+  // Il testo di un campo di una risposta JSON tagliata a metà (l'involucro dell'Aiuto o dei mazzi): quello che il
+  // modello aveva scritto, senza graffe né sequenze di escape. null se il campo non c'è.
+  function campoDaJsonTagliato(raw, campi) {
+    const s = String(raw || '');
+    let inizio = -1;
+    for (const c of campi || []) {
+      const m = new RegExp(`"${c}"\\s*:\\s*"`).exec(s);
+      if (m && (inizio < 0 || m.index + m[0].length < inizio)) inizio = m.index + m[0].length;
+    }
+    if (inizio < 0) return null;
+    const ESC = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', '"': '"', '\\': '\\', '/': '/' };
+    let out = '';
+    for (let i = inizio; i < s.length; i++) {
+      const ch = s[i];
+      if (ch === '"') break;
+      if (ch !== '\\') { out += ch; continue; }
+      const nx = s[i + 1];
+      if (nx === undefined) break;
+      if (nx === 'u') {
+        const hex = s.slice(i + 2, i + 6);
+        if (!/^[0-9a-fA-F]{4}$/.test(hex)) break;
+        out += String.fromCharCode(parseInt(hex, 16));
+        i += 5;
+      } else {
+        out += Object.prototype.hasOwnProperty.call(ESC, nx) ? ESC[nx] : nx;
+        i += 1;
+      }
+    }
+    return out;
   }
 
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

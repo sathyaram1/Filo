@@ -358,7 +358,7 @@
     const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-    if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens });
+    if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens, apiKey, model, providerRouting });
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
@@ -397,7 +397,7 @@
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
     const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal);
-    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens });
+    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens, apiKey, model, providerRouting });
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -496,16 +496,56 @@
   }
 
   // Un rifiuto per il tetto della risposta: nessun host ammesso regge quel `max_tokens`. Si dice, col numero (#1097.3).
-  const RIFIUTO_TETTO = /max[_ ]?tokens|max(?:imum)?[_ ](?:output|completion)[_ ]tokens|output token limit/i;
-  // Finestra sforata: se il tetto da solo ne prende più di metà, stringere la conversazione non basta e la causa
-  // da dire è il tetto; sotto, resta un rifiuto di contesto che la chat sa stringere da sé.
-  function finestraPresaDalTetto(errText, maxTokens) {
-    const m = /maximum context (?:length|window) (?:is|of) ([\d.,]+)/i.exec(String(errText || ''));
-    const finestra = m ? Number(m[1].replace(/[.,]/g, '')) : NaN;
-    return Number.isFinite(finestra) && finestra > 0 && maxTokens > finestra / 2;
+  const RIFIUTO_TETTO = /max[_ ]?(?:new[_ ])?tokens|max(?:imum)?[_ ](?:output|completion)[_ ]tokens|output token limit/i;
+  const CONTESTO = /maximum context|context[ _-]?(?:length|window)|tokens? limit exceeded/i;
+  const numeroIn = (s, re) => {
+    const m = re.exec(s);
+    const n = m ? Number(String(m[1]).replace(/[.,]/g, '')) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  // Finestra sforata da testo più tetto: { finestra, testo } quando il rifiuto ne dice le misure, null se è un altro errore.
+  function sforoDiFinestra(errText, maxTokens) {
+    const s = String(errText || '');
+    if (!CONTESTO.test(s)) return null;
+    const finestra = numeroIn(s, /maximum context (?:length|window) (?:is|of) ([\d.,]+)/i)
+      || numeroIn(s, /limit exceeded:?\s*[\d.,]+\s*>\s*([\d.,]+)/i);
+    const chiesti = numeroIn(s, /requested (?:about )?([\d.,]+)/i) || numeroIn(s, /limit exceeded:?\s*([\d.,]+)\s*>/i);
+    const testo = numeroIn(s, /([\d.,]+) (?:tokens )?of (?:text )?input/i) || (chiesti && chiesti > maxTokens ? chiesti - maxTokens : null);
+    return { finestra, testo };
+  }
+  // Il tetto è la causa quando ne prende più di metà finestra, o quando il testo da solo ci starebbe: un rifiuto per
+  // un testo che da solo non ci sta resta di contesto. `stringibile`: la chat può anche accorciare la conversazione.
+  function causaTetto(status, errText, maxTokens) {
+    if (!maxTokens || ![400, 404, 413, 422].includes(status)) return null;
+    const s = String(errText || '');
+    if (/unsupported (?:parameter|value)/i.test(s)) return null;
+    const sforo = sforoDiFinestra(s, maxTokens);
+    if (!sforo) return RIFIUTO_TETTO.test(s) ? {} : null;
+    const { finestra, testo } = sforo;
+    if (finestra && maxTokens > finestra / 2) return { finestra };
+    if (finestra && testo && testo < finestra) return { finestra, stringibile: true };
+    return null;
   }
 
-  async function httpError(res, { tools = false, maxTokens = null } = {}) {
+  // Un «nessun host per i parametri chiesti» con gli strumenti e un tetto: gli host dichiarati dicono quale dei due manca.
+  // false: nessun host ammesso regge gli strumenti, il tetto non c'entra; true: li reggono, ma nessuno fino a quel
+  // tetto; null: non si sa, e la frase li nomina tutti e due.
+  async function tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools }) {
+    let hosts = null;
+    try { hosts = await modelHosts({ apiKey, model }); } catch (_) { hosts = null; }
+    if (!Array.isArray(hosts) || !hosts.length) return null;
+    const C = global.SN_CONST;
+    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
+    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    const ammessi = C && typeof C.hostPolicyViolation === 'function'
+      ? hosts.filter((h) => !C.hostPolicyViolation(h, model, excluded)) : hosts;
+    if (ammessi.some((h) => h.tools == null || h.maxOut == null)) return null;
+    const utili = tools ? ammessi.filter((h) => h.tools) : ammessi;
+    if (!utili.length) return tools ? false : null;
+    return utili.every((h) => h.maxOut < maxTokens) ? true : (tools ? null : false);
+  }
+
+  async function httpError(res, { tools = false, maxTokens = null, apiKey = '', model = '', providerRouting = null } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
@@ -515,16 +555,18 @@
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
-    const perTetto = maxTokens && (res.status === 400 || res.status === 404 || res.status === 413)
-      && (RIFIUTO_TETTO.test(errText) || finestraPresaDalTetto(errText, maxTokens));
-    if (perTetto) {
+    const perTetto = causaTetto(res.status, errText, maxTokens);
+    if (perTetto && refusal !== 'PARAMS') {
       err.code = 'TETTO_RISPOSTA';
       err.maxTokens = maxTokens;
+      if (perTetto.finestra) err.finestra = perTetto.finestra;
+      if (perTetto.stringibile) err.stringibile = true;
     } else if (refusal === 'PARAMS') {
       // Il tetto è uno dei parametri che il router fa reggere agli host: il suo «nessun host» può venire da lì.
+      const colpa = maxTokens ? await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools }) : false;
       if (tools) err.code = 'NO_TOOL_HOST';
-      else if (maxTokens) err.code = 'TETTO_RISPOSTA';
-      if (maxTokens) err.maxTokens = maxTokens;
+      else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
+      if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
     } else if (refusal) err.code = refusal;
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
@@ -560,7 +602,16 @@
     for (const e of list) {
       const name = e && typeof e.provider_name === 'string' ? e.provider_name.trim() : '';
       const tag = e && typeof e.tag === 'string' ? e.tag.trim() : '';
-      if (name || tag) hosts.push({ name, tag });
+      // Strumenti e tetto della risposta che l'host regge: dicono perché il router non ne ha trovato uno (#1097.3).
+      const params = e && Array.isArray(e.supported_parameters) ? e.supported_parameters : null;
+      const max = Number(e && e.max_completion_tokens);
+      if (name || tag) {
+        hosts.push({
+          name, tag,
+          tools: params ? params.includes('tools') : null,
+          maxOut: Number.isFinite(max) && max > 0 ? max : (e && e.max_completion_tokens === null ? Infinity : null),
+        });
+      }
     }
     return hosts;
   }

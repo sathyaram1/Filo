@@ -725,12 +725,15 @@ function createAnswerStreamer(onText) {
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
 // `intera`: chi legge la risposta come dati (JSON, memoria, etichette) non riceve mai un pezzo tagliato, ma un errore.
-async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null, intera = false }) {
-  if (intera) {
-    const r = await handleAIRequest({ action, payload, origin, onReasoning, onText, onToolCall, tools, toolChoice, signal, noCache, tempiPrima });
-    if (r && globalThis.SN_CHAT_ERRORS.troncata(r.finishReason)) throw globalThis.SN_CHAT_ERRORS.erroreTagliata(r.finishReason);
-    return r;
-  }
+// Un taglio senza niente da mostrare è un errore per tutti: «qualcosa è andato storto» non direbbe del tetto.
+async function handleAIRequest({ intera = false, ...opts }) {
+  const r = await chiamaIlModello(opts);
+  const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(r, { intera });
+  if (taglio) throw taglio;
+  return r;
+}
+
+async function chiamaIlModello({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
   const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
@@ -900,6 +903,8 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   });
 
   if (!globalThis.SN_CHAT_ERRORS.troncata(result.finishReason)) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
+  const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(result);
+  if (taglio) throw taglio;
   return {
     costEur, usage: result.usage, provider: usedProvider, model: concreteModel, keyFallback: ripiegoDaDire(result.keyFallback),
     finishReason: result.finishReason || null,
@@ -1161,6 +1166,14 @@ const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate
   + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+// Una risposta interrotta dentro un blocco di codice: il blocco si chiude, o la frase che lo dice finisce nel codice.
+const chiudiRecinto = (t) => {
+  const s = String(t || '');
+  return (s.match(/^\s*```/gm) || []).length % 2 ? `${s.replace(/\s+$/, '')}\n\`\`\`` : s;
+};
+// L'esito al modello di un'azione che il tetto ha tagliato a metà degli argomenti.
+const ARGOMENTI_TAGLIATI = 'non eseguita: la tua risposta ha raggiunto la lunghezza massima mentre scrivevi gli argomenti di questa azione. '
+  + 'Se l\'utente ti chiede di continuare, rifalla più corta o dividila in più azioni.';
 // Letture (elenco in SN_ACTION_LEVELS.LETTURE): una che aspetta l'OK, o fermata per un segreto, ha già la sua parola
 // sotto la risposta.
 const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type)
@@ -4649,7 +4662,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const stringiDopoRifiuto = async (e) => {
     const FC = globalThis.SN_FILO_CONTESTO;
     // Un rifiuto dato dal tetto della risposta non si cura stringendo la conversazione.
-    const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 && e?.code !== 'TETTO_RISPOSTA' ? FC.troppoLungo(e) : null;
+    // Se anche il testo da solo ci sta (`stringibile`), accorciare il tratto basta e non chiede niente all'utente.
+    const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 && (e?.code !== 'TETTO_RISPOSTA' || e?.stringibile) ? FC.troppoLungo(e) : null;
     if (!rifiuto) return false;
     let inviati = [];
     try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
@@ -4727,6 +4741,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const toolCalls = (Array.isArray(r.toolCalls) ? r.toolCalls : [])
         .map((c, i) => ({ ...c, id: String(c.id || '') || `call_${round}_${i}` }));
       let actions = Tools ? Tools.toolCallsToActions(toolCalls) : [];
+      // Il tetto ha tagliato gli argomenti di un'azione: il modello lo sa, e il turno si ferma con «Continua» invece di
+      // rifare la stessa azione troppo lunga a ogni giro.
+      const tagliataInAzione = globalThis.SN_CHAT_ERRORS.troncata(r.finishReason) && actions.some((a) => a._argsError);
+      if (tagliataInAzione) for (const a of actions) if (a._argsError) a._argsError = ARGOMENTI_TAGLIATI;
       // Tolleranza per il formato vecchio (JSON nel testo): le azioni passano
       // comunque dal registro invece di finire in chat come JSON grezzo.
       const legacy = (!actions.length && Tools) ? Tools.legacyEnvelope(text) : null;
@@ -4843,6 +4861,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         const esito = toolResultText(x, { risposta: diRisposta });
         threadMessages.push(Tools.toolMessage(x.action._callId, fraLeNote && i === results.length - 1 ? `${esito} ${RISPOSTA_FRA_LE_NOTE}` : esito));
       });
+      if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; break; }
     }
   } catch (e) {
     // Il turno è fallito (rete, provider, crediti): la prenotazione della
@@ -4881,7 +4900,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // La scheda mette «Continua» sotto la frase: si riprende da qui, senza riscrivere la domanda.
   let senzaRisposta = null;
   // Muto dopo sole letture: una frase di lavoro che diventa la bolla («cerco ancora…») non è una risposta (#557).
-  const mutoDopoLetture = !exhausted && !String(textReply || '').trim() && rawActions.length > 0 && soloLetture(renderedActions);
+  const mutoDopoLetture = !exhausted && !interrotta && !String(textReply || '').trim() && rawActions.length > 0 && soloLetture(renderedActions);
   if (exhausted) {
     senzaRisposta = { passi };
     textReply = unisciTesti([...risposta, textReply, fraseSenzaRisposta(passi)]);
@@ -4909,7 +4928,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   if (interrotta && !senzaRisposta) {
     senzaRisposta = { passi, interrotta: true };
-    textReply = unisciTesti([textReply, globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
+    textReply = unisciTesti([chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
