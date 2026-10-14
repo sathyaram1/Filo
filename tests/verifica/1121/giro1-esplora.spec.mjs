@@ -39,16 +39,13 @@ test('esplora: scelta personale chiesta a parole, coi modelli predefiniti, arriv
   const voci = await opzioni.locator('#ordineHost option').allTextContents();
   console.log('VOCI', JSON.stringify(voci));
 
-  const esito = await app.evaluate(async () => {
-    const r = globalThis.SN_PREF.buildPreferencePartial('chat più veloce', 'velocità');
-    await globalThis.SN_STORAGE.updateSettings(r.partial);
-    return r;
-  });
+  const esito = await app.evaluate(async () => globalThis.SN_PREF.buildPreferencePartial('chat più veloce', 'velocità'));
   console.log('PARTIAL', JSON.stringify(esito));
+  const page = await openTab('filo://dashboard/dashboard.html');
+  await page.evaluate(async (p) => window.filo.message({ type: 'update_settings', settings: p }), esito.partial);
   // La pagina aperta si riallinea alla scelta fatta a parole.
   await expect(opzioni.locator('#ordineHost')).toHaveValue('throughput', { timeout: 5_000 });
 
-  const page = await openTab('filo://dashboard/dashboard.html');
   const flusso = await page.evaluate(async () => new Promise((risolvi) => {
     window.filo.aiStream({
       action: 'explain',
