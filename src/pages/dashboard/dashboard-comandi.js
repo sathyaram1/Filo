@@ -454,7 +454,7 @@
     }
     if (isTerminalMode()) {
       // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
-      const cmd = firstToken.slice(1);
+      const cmd = programmaDi(t);
       if (!cmd) return 'none';
       if (shellCmdCache.has(cmd)) return shellCmdCache.get(cmd) ? 'shell' : 'unknown';
       return 'pending'; // verifica in corso (vedi scheduleShellWhich)
@@ -478,6 +478,12 @@
     );
   }
 
+  // Il programma di un "/comando": un percorso fra virgolette (#968) è uno solo, anche con gli spazi.
+  function programmaDi(t) {
+    const V = global.SN_VIRGOLETTE;
+    return V ? V.primoComando(t.slice(1)) : (t.split(/\s+/)[0] || '').slice(1);
+  }
+
   // Verifica (con debounce) se il primo token è un comando shell esistente e
   // poi ricolora. Debounce così il controllo parte solo quando l'utente si
   // ferma: digitando di getto "/git" i prefissi non vengono mai controllati e
@@ -485,8 +491,7 @@
   function scheduleShellWhich(value) {
     clearTimeout(whichTimer);
     whichTimer = setTimeout(async () => {
-      const firstToken = value.trim().split(/\s+/)[0];
-      const cmd = firstToken.slice(1);
+      const cmd = programmaDi(value.trim());
       if (!cmd || shellCmdCache.has(cmd)) { updateInputClass(); return; }
       let exists = false;
       try {

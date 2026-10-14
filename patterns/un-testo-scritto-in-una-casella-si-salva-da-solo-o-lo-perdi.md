@@ -70,7 +70,14 @@ sito e concludeva che la lista non funzionava (#590.2).
 
 - **Chiudere una scheda non dà alla pagina nessun evento.** Filo la chiude con
   `webContents.close()`: niente `beforeunload`, `pagehide` o `visibilitychange`.
-  Quello che non è partito prima non parte più.
+  Per questo una pagina con caselle scritte e non spedite lo dice al main
+  (`CASELLE_IN_SOSPESO`, al primo carattere e quando ha spedito): chiudendo la
+  sua scheda il main toglie la vista, le manda `TAB_IN_VISTA` falso e chiude la
+  pagina quando risponde «niente più», al più dopo due secondi
+  (`src/main/tabs/chiusuraConCaselle.js`, #666). Chi spedisce manda il suo
+  messaggio senza `await` davanti, così arriva prima del «niente più». Le prove
+  chiudevano con `filoShell.tabs.close` senza nessun fuoco perso: prima di
+  questo il numero si perdeva.
 - **Quindi il testo parte mentre si scrive**, dopo una pausa breve, e subito al
   primo segno di uscita: il Ctrl, Cmd o Alt premuto da solo (arriva alla pagina
   prima della lettera di Ctrl+W, Ctrl+Tab o Alt+cifra, che il main si tiene), il
@@ -166,3 +173,20 @@ chiavi, le ore dell'archivio automatico tornavano com'erano (#590.5).
 - **Dove:** `caselle` in `src/pages/options/altro.js`,
   `src/pages/options/options.js`, `src/pages/preferences/preferences.js`. Test:
   `tests/impostazioni-caselle-non-si-perdono.spec.mjs`.
+
+## Le manopole con «Salva» passano dallo stesso punto
+
+Nella pagina «Inviti e utenti» le manopole dei crediti hanno il loro «Salva» e
+partivano anche lasciando il campo, ma ricaricare la pagina o chiudere la
+scheda col cursore dentro buttava via il numero (#666).
+
+- **Un campo col suo «Salva» si iscrive lo stesso.** Il «Salva» resta la strada
+  esplicita; pausa lunga, Ctrl da solo, ricarica e scheda chiusa li porta
+  `SN_CASELLE`. Un numero storto non parte e lo dice all'uscita vera, non
+  mentre si scrive.
+- **La risposta di un salvataggio non cancella quello scritto dopo.** Se nel
+  campo è cambiato qualcosa mentre il server rispondeva, il campo resta com'è
+  (e resta da spedire); un salvataggio chiesto in quel mentre parte appena
+  torna la risposta.
+- **Dove:** `collega` in `src/shared/campoNumero.js`, `costruisciManopole` in
+  `src/pages/credits/owner.js`. Test: `tests/wallet-owner-manopole.spec.mjs`.

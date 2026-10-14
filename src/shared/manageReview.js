@@ -88,6 +88,11 @@
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
   }
+  // Un lavoro server passato dal verificatore aspetta il PC dell'owner (server:fondi, #1159): gemello di
+  // select.inAttesaFusioneServer nel server; fuori dalla revisione il segno vecchio non conta.
+  function inAttesaFusioneServer(fb) {
+    return !!fb && fb.attesa === 'fusione_server' && normalizeStatus(fb).status === 'revision_security';
+  }
   function isProvenLocalSender(fb) {
     return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
   }
@@ -290,6 +295,9 @@
   // ── "Allineato" LEGACY: panel completo con tutti i giudici d'accordo ──────
   // Usata SOLO da normalizeStatus per lo storico. Colore BLU (--mg-dot--aligned).
   const ALIGNED = { color: '#5b6ee0', label: 'Allineato' };
+  // Rimandato all'owner perché si finisce solo sulla sua macchina (#1060): l'azzurro dello schermo di 💻, l'icona
+  // che nella pagina vuol già dire «sessione locale». Le regole CSS lo ripetono: tests/unit/segnoFermata.test.mjs.
+  const LOCALE = { color: '#26c9fc', label: 'Lavoro locale' };
   function isAlignedLegacy(fb) {
     if (!fb) return false;
     if (classifyLegacyBlock(fb)) return false; // blocco/non-filtrato/loop → non allineato
@@ -543,9 +551,9 @@
       if (statusReason === 'locale') {
         // Fidato o già approvato: basta il segno. Gli altri passano dal sì dell'owner (#913), che li segna anche fidati.
         const text = localSenderCheck(fb).ok
-          ? 'Richiede lavoro locale: con «Solo lavoro locale» la prende una sessione sulla tua macchina.'
-          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro locale» lo lavora e lo chiude una sessione.';
-        return { text, color: S.design.color };
+          ? 'Richiede lavoro locale: con «💻 Lavoro server» passa nei Lavori server.'
+          : 'Richiede lavoro locale: decidi tu. Con «💻 Lavoro server» passa nei Lavori server.';
+        return { text, color: LOCALE.color };
       }
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
     }
@@ -733,16 +741,16 @@
       // Campo assente = pratica nata prima della migrazione (§1.7), che lo scrive dopo il deploy del server: fino ad allora
       // vale la regola di prima, mittente provato. Un non_fidato scritto resta un no.
       if (fb.fiducia === undefined || fb.fiducia === null) return { ok: true, primaDellaMigrazione: true };
-      return { ok: false, nonFidato: true, motivo: 'è tuo o di una tua sessione, ma non è fidato: segnalo fidato, o approvalo come lavoro locale' };
+      return { ok: false, nonFidato: true, motivo: 'è tuo o di una tua sessione, ma non è fidato: segnalo fidato, o approvalo come lavoro server' };
     }
     const cid = String(fb.clientId || '');
     if (LOCAL_SENDER_RE.test(cid)) {
-      return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale si lavora solo se l’owner lo approva come lavoro locale' };
+      return { ok: false, utente: true, senzaProva: true, motivo: 'il mittente non porta la prova (#595): vale come un feedback di un utente, e in locale si lavora solo se l’owner lo approva come lavoro server' };
     }
     if (RESERVED_CLIENT_RE.test(cid) && SENDER_PROOFS.includes(fb.senderProof)) {
-      return { ok: false, routine: true, motivo: 'l’ha aperto una routine: in locale si lavora solo se l’owner lo approva come lavoro locale' };
+      return { ok: false, routine: true, motivo: 'l’ha aperto una routine: in locale si lavora solo se l’owner lo approva come lavoro server' };
     }
-    return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale si lavora solo se l’owner lo approva come lavoro locale' };
+    return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale si lavora solo se l’owner lo approva come lavoro server' };
   }
 
   /**
@@ -753,9 +761,9 @@
   function localApprovalCheck(fb, opts) {
     if (!fb) return { ok: false, motivo: 'feedback non trovato' };
     if (statusUnreadable(fb)) return { ok: false, motivo: 'lo stato non si legge: non so dove sta la pratica' };
-    if (isLocalApproved(fb)) return { ok: false, motivo: 'l’hai già approvato come lavoro locale' };
+    if (isLocalApproved(fb)) return { ok: false, motivo: 'l’hai già approvato come lavoro server' };
     if (isFidato(fb)) return { ok: false, motivo: 'è fidato: basta il segno «solo in locale»' };
-    if (manageTabFor(fb, opts) !== 'inbox') return { ok: false, motivo: 'si approva come lavoro locale dai Ricevuti' };
+    if (manageTabFor(fb, opts) !== 'inbox') return { ok: false, motivo: 'si approva come lavoro server dai Ricevuti' };
     const status = normalizeStatus(fb).status;
     const segnalato = /^(attack|spam|suspicious_file)$/.test(status)
       ? `è segnalato come ${status === 'spam' ? 'spam' : status === 'attack' ? 'attacco' : 'file sospetto'}`
@@ -851,13 +859,13 @@
     const tab = manageTabFor(fb, opts);
     if (tab === 'inbox') {
       // Aspetta una decisione: approvare È scrivere `todo`. Col segno locale `todo` porta nei Lavori locali.
-      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori locali' : '→ In coda', primary: true }];
+      const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: isLocalOnly(fb) ? '→ Lavori server' : '→ In coda', primary: true }];
       // #913: approvarlo come lavoro locale. `locale` dice a chi scrive di aggiungere il segno e il sì dell'owner.
       // Rimandato nei Ricevuti perché richiede lavoro locale (--serve-locale): la decisione attesa è questa.
       if (!isLocalOnly(fb) && localApprovalCheck(fb, opts).ok) {
         const attesa = String((fb && fb.statusReason) || '') === 'locale';
         if (attesa) acts[0].primary = false;
-        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro locale', primary: attesa, locale: true });
+        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: attesa, locale: true });
       }
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
@@ -1228,6 +1236,7 @@
     spam:    REASONS.spam.color,     // giallo — in sospeso, o scavalcato dall'owner
     design:  REASONS.design.color,   // verde  — passato, o una domanda per l'owner
     aligned: ALIGNED.color,          // blu    — pulito
+    locale:  LOCALE.color,           // azzurro — chiede lavoro locale
   };
 
   // Perché il filtro d'ingresso ha deciso così. I codici arrivano dal server;
@@ -1454,14 +1463,53 @@
     });
   }
 
+  /** Chi ci lavora l'ha rimandata all'owner perché si finisce solo in locale? PURA. */
+  function chiedeLavoroLocale(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    const norm = normalizeStatus(fb);
+    return norm.status === 'design' && String(norm.statusReason || '') === 'locale';
+  }
+
+  const L3_LOCALE = 'Richiede lavoro locale';
+
+  // Il rombo azzurro (#1060): lo stato basta a dirlo, quindi si colora anche prima che arrivi il documento intero.
+  function livelloL3Locale(fb, l, letto) {
+    const nota = judgesNote(fb);
+    const righe = (nota && nota.text) ? [riga('In breve', nota.text)] : [];
+    if (!letto) {
+      return forma('l3', 'rombo', L3_LOCALE, 'locale', 'nonletto', {
+        titolo: L3_LOCALE, righe,
+        testo: 'Il resto di questa segnalazione non è ancora arrivato: il perché lo scrive chi ci ha lavorato.',
+        azioni: [],
+      });
+    }
+    const domanda = ultimaDomanda(fb);
+    if (domanda && domanda.ts) righe.push(riga('Quando', istanteDelTurno(domanda.ts)));
+    const conversazioneCifrata = valueUnreadable(fb && fb.notes);
+    const perche = conversazioneCifrata ? TESTO_CIFRATO : ((domanda && domanda.body) || '');
+    const testoL = l ? String(l.testo || '').trim() : '';
+    const segnalazione = !testoL || perche.includes(testoL) ? ''
+      : (valueUnreadable(l.testo) ? TESTO_CIFRATO : testoL);
+    return forma('l3', 'rombo', L3_LOCALE, 'locale', 'locale', {
+      titolo: L3_LOCALE,
+      righe,
+      testo: perche && segnalazione ? `## ${L3_LOCALE}\n${perche}\n\n## Segnalazione\n${segnalazione}`
+        : (perche || segnalazione),
+      illeggibile: conversazioneCifrata && !segnalazione,
+      azioni: [],
+    });
+  }
+
   function livelloL3(fb, opts) {
     const attesa = aspettaRisposta(fb);
-    // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
-    if (opts && opts.dettaglioLetto === false) {
-      return nonLetto('l3', 'rombo', attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
-    }
+    const letto = !(opts && opts.dettaglioLetto === false);
     const l = livelliOf(fb).l3;
     const segnalato = !!(l && String(l.esito || '').trim());
+    if (chiedeLavoroLocale(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto);
+    // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
+    if (!letto) {
+      return nonLetto('l3', 'rombo', attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
+    }
     const titolo = !attesa ? 'Segnalazione di Claude'
       : segnalato ? 'Domande e segnalazione di Claude' : 'Domande di Claude';
     const domanda = attesa ? ultimaDomanda(fb) : null;
@@ -1706,7 +1754,7 @@
     decisione:{ forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo su una scelta che spetta a te: aspetta una tua risposta' },
     loop:     { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La verifica ha trovato un difetto che non si corregge più da soli' },
     arenato:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La lavorazione si è arenata troppe volte' },
-    locale:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Richiede lavoro locale' },
+    locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
   };
 
   /**
@@ -1881,7 +1929,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
-    isLocalOnly, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
+    isLocalOnly, inAttesaFusioneServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,
     panelComplete, judgesNote, reasonText,
@@ -1891,7 +1939,7 @@
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
-    aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,
+    aspettaRisposta, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
     SEZIONI, sezioneDiScheda, schedaPredefinita, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,

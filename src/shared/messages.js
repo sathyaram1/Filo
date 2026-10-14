@@ -468,6 +468,8 @@
     // TAB_IN_VISTA (solo alle pagine filo://).
     TAB_IN_VISTA_GET: 'tab_in_vista_get',            // {} → { ok, inVista }
     TAB_IN_VISTA: 'tab_in_vista',                    // broadcast { inVista }
+    // Una pagina filo:// ha caselle scritte e non ancora spedite (SN_CASELLE): chiudere la sua scheda aspetta che spedisca.
+    CASELLE_IN_SOSPESO: 'caselle_in_sospeso',        // { inSospeso } → { ok }
     // Detta e Incolla di Filo su una pagina web: microfono o appunti per pochi secondi, senza domanda al sito (#591.1).
     PERMESSO_FILO: 'permesso_filo',                  // { tipo: 'media'|'appunti' } → { ok }
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
@@ -617,8 +619,8 @@
     //     DESIGN §2);
     //   `routinesEnabled` (doc config/routines) → se le routine autonome lavorano.
     // Insieme viaggiano `autoApprove` e `proberWhenIdle`.
-    AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, proberWhenIdle, routinesEnabled } | { ok:false, error }
-    AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, proberWhenIdle?, routinesEnabled? } → { ok, … } | { ok:false, error }
+    AUTOMATION_GET: 'automation_get',              // → { ok, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer } | { ok:false, error }
+    AUTOMATION_SET: 'automation_set',              // { enabled?, autoApprove?, proberWhenIdle?, routinesEnabled?, lavoriServer? } → { ok, … } | { ok:false, error }
     // I bilanci dei giri di correzione, uno per livello (doc config/routines,
     // campi `cap3`, `cap2`, `cap1`, `cap0` — feedback #561) e il testo della
     // fase 2 (`fixInstructions`, vuoto = quello del server):
@@ -870,6 +872,18 @@
     // dell'utente. { periodo: 'ultima_ora'|'oggi'|'tutto' } → { ok, n } (quante sono / quante ne ha tolte).
     FILO_PAGINE_CONTA: 'filo_pagine_conta',
     FILO_PAGINE_CANCELLA: 'filo_pagine_cancella',
+    // #974 — le conversazioni dell'Editor, dei Mazzi e dell'Aiuto entrano nel filo come righe ripiegate.
+    // Un messaggio appena mostrato nella chat di un'app: { app, rif, soggetto, dove?, messaggi: [{ role, text }] }.
+    // Anche dai siti, ma solo l'Aiuto: lì app, soggetto (il sito) e `dove` li decide il main dall'indirizzo di chi manda.
+    FILO_CONVERSAZIONE_APP: 'filo_conversazione_app',
+    // L'app ha cancellato la sua conversazione: via anche dal filo. { app, rif } o { app, prefisso }. Solo filo://.
+    FILO_CONVERSAZIONE_APP_DIMENTICA: 'filo_conversazione_app_dimentica',
+    // Il documento dell'app ha cambiato nome: le sue righe lo seguono. { app, rif | prefisso, soggetto }. Solo filo://.
+    FILO_CONVERSAZIONE_APP_RINOMINA: 'filo_conversazione_app_rinomina',
+    // Le righe che la home mostra: { chat? } → { ok, righe }. Solo filo://.
+    FILO_RIGHE_APP: 'filo_righe_app',
+    // ANNUNCIO (main → pagine di Filo, senza dati): le righe sono cambiate, chi le mostra le richiede.
+    FILO_RIGHE_APP_CAMBIATE: 'filo_righe_app_cambiate',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
     // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
     // resoconto del riordino), il comando di terminale che l'utente ha digitato

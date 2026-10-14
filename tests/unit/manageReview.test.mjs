@@ -706,7 +706,7 @@ test('Lavori locali: tutto l’iter di lavorazione ci sta, i Ricevuti e i chiusi
   // Aspetta ancora l'owner: resta nei Ricevuti, e l'approvazione dice dove va.
   const allineato = locale({ status: 'aligned', localOnly: SEGNO });
   assert.equal(MR.manageTabFor(allineato), 'inbox');
-  assert.equal(MR.ownerActionFor(allineato, 'accept').label, '→ Lavori locali');
+  assert.equal(MR.ownerActionFor(allineato, 'accept').label, '→ Lavori server');
   assert.equal(MR.ownerActionFor(locale({ status: 'aligned' }), 'accept').label, '→ In coda');
   assert.equal(MR.manageTabFor(locale({ status: 'archived', localOnly: SEGNO })), 'archived');
   assert.equal(MR.manageTabFor(locale({ status: 'done', localOnly: SEGNO, resolvedInVersion: '1.0.0' }), { releasedVersion: '2.0.0' }), 'resolved');

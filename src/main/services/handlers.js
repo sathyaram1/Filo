@@ -17,6 +17,7 @@ const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
 const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
+const ConversazioniApp = require('./conversazioniApp');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -1147,6 +1148,14 @@ const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate
   + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
+// Letture: l'esito serve solo al modello per rispondere. Un turno muto dopo sole letture non ha detto niente all'utente (#557).
+const AZIONI_DI_LETTURA = new Set([
+  'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+]);
+// Una lettura che aspetta l'OK, o fermata per un segreto, ha già la sua parola sotto la risposta.
+const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (AZIONI_DI_LETTURA.has(String(a.type || '').toUpperCase())
+  && !a._confirm && !a._domanda && !(a._output && a._output.blocked)));
+const fraseSenzaRisposta = (passi) => `Mi sono fermato dopo ${passi === 1 ? 'un passo' : `${passi} passi`} senza arrivare a una risposta.`;
 
 // Risincronizza la cache delle regole proxy in TUTTE le finestre dopo un
 // cambio (la scrittura su storage è condivisa, le cache in-memory no).
@@ -4581,6 +4590,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // rispondere: allora l'utente deve saperlo, non ricevere l'ultima nota di
   // lavoro spacciata per risposta.
   let exhausted = true;
+  // I giri con azioni: i «passi» della frase che dice che Filo si è fermato senza risposta.
+  let passi = 0;
   // Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
   // finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
   const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false };
@@ -4709,6 +4720,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         break;
       }
       if (turno.fermato) { fermato = true; break; }
+      passi += 1;
       const roundRendered = [];
       const results = [];
       // Le aperture di pagina di fila partono insieme: ognuna aspetta l'esito della sua scheda,
@@ -4835,10 +4847,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // testo E niente azioni), che sarebbe altrimenti una bolla muta.
   // La nota che diventa risposta: la scheda la toglie dal blocco, dove l'aveva già messa.
   let notaRisposta = '';
+  // La scheda mette «Continua» sotto la frase: si riprende da qui, senza riscrivere la domanda.
+  let senzaRisposta = null;
+  // Muto dopo sole letture: una frase di lavoro che diventa la bolla («cerco ancora…») non è una risposta (#557).
+  const mutoDopoLetture = !exhausted && !String(textReply || '').trim() && rawActions.length > 0 && soloLetture(renderedActions);
   if (exhausted) {
-    const stop = 'Mi sono fermato: troppi passaggi di fila senza arrivare a una risposta. Dimmi se devo continuare.';
-    const last = unisciTesti([...risposta, textReply]);
-    textReply = last ? `${last}\n\n${stop}` : stop;
+    senzaRisposta = { passi };
+    textReply = unisciTesti([...risposta, textReply, fraseSenzaRisposta(passi)]);
   } else if (!String(textReply || '').trim() && noteAlRifiuto >= 0 && notes.length <= noteAlRifiuto) {
     // Muto anche sollecitato: prima cosa non si può, poi la frase com'era, dichiarata scritta
     // prima di saperlo. Toglierla perdeva le risposte ad altro che conteneva (#771).
@@ -4856,6 +4871,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     textReply = unisciTesti([...risposta, notaRisposta]);
   } else {
     textReply = unisciTesti([...risposta, textReply]);
+  }
+  if (mutoDopoLetture) {
+    senzaRisposta = { passi };
+    textReply = unisciTesti([textReply, fraseSenzaRisposta(passi)]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
@@ -4975,6 +4994,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // al modello al turno dopo.
     notes, reasoningDetails,
     ...(notaRisposta ? { notaRisposta } : {}),
+    ...(senzaRisposta ? { senzaRisposta } : {}),
     ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(linkDaConfermare.length ? { linkDaConfermare } : {}),
     ...(keyFallback ? { keyFallback } : {}),
@@ -6296,6 +6316,17 @@ Registro.collega({
   annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
 });
 Registro.avvia();
+
+// Le righe delle conversazioni delle app (#974): la home le richiede, la Cronologia rilegge l'elenco; una tolta perché
+// l'app l'ha cancellata la dice come le chat cancellate. Quanti giorni mostrarne: quelli che la chat ha davanti.
+ConversazioniApp.collega({
+  annuncia: (tolte) => {
+    broadcastToFiloPages({ type: MSG.FILO_RIGHE_APP_CAMBIATE });
+    if (Array.isArray(tolte) && tolte.length) for (const id of tolte) broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED, cancellata: id });
+    else broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED });
+  },
+  tetti: async () => globalThis.SN_FILO_CONTESTO.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo),
+});
 
 function broadcastToTabs(message) {
   try {

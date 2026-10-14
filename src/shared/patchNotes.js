@@ -11,6 +11,7 @@
     {
       version: '0.2.238', date: '2026-10-07',
       features: [
+        'Le chat che fai nell\'Editor, nei Mazzi e nell\'Aiuto sopra un sito compaiono nella home come una riga, per esempio «4 messaggi nell\'Editor su tesi». La apri con un clic e rileggi lo scambio. Filo sa che c\'è stata e, se gliene chiedi, la ritrova senza che tu la ripeta.',
         'L\'accesso a Filo con Google adesso si fa in una scheda di Filo. Appena hai scelto l\'account la scheda si chiude da sola, e YouTube, Gmail e Drive nelle schede sono già collegati allo stesso account, senza un secondo accesso. Se eri già entrato in Filo, nel menu dell\'account trovi «Collega anche i prodotti Google». Uscire da Filo non ti fa uscire da Google nelle schede. Se Google non accetta l\'accesso dentro Filo, Filo lo apre nel browser come prima e te lo dice. In Privacy massima Google e YouTube tengono i cookie nello stesso spazio, e dopo l\'accesso Google entra fra i siti fidati, così resti collegato.',
         'Chiedi a Filo un tuo documento descrivendolo, anche a voce: «mi serve la bolletta della luce di marzo». Lo trova leggendo il contenuto dei file in Documenti, Download e Scrivania, anche se si chiama «scan_00231.pdf», e ti risponde col file da aprire con un clic. Le cartelle si cambiano in Preferenze, e il testo dei documenti resta sul tuo computer.',
         'Il documento lo trova anche l\'Aiuto di una scheda, mentre compili un modulo su un sito: chiedigli la bolletta, dai l\'OK, e trascina il file che ti propone nel campo per caricarlo.',
@@ -26,9 +27,11 @@
         'Nella stessa pagina c\'è un campo per cercare fra le voci copiate: con la cronologia piena trovi subito quella da togliere, senza scorrerle tutte.',
         'Cliccando una voce della cronologia la rimetti negli appunti, pronta da incollare dove vuoi.',
         'Nella cronologia del menu "Incolla" le immagini copiate si vedono in miniatura: due schermate copiate una dietro l\'altra non si leggono più tutte e due "Immagine".',
+        'Nel terminale della home, se incolli in un comando un percorso con spazi, per esempio la tua cartella utente con nome e cognome, Filo lo mette fra virgolette e le vedi prima di premere Invio. Se un comando scritto a mano fallisce perché le virgolette mancavano, sotto l\'errore trovi lo stesso comando corretto: premi «Esegui» e parte.',
         'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
       ],
       fixes: [
+        'Per controllare un sito Filo non riapre più di nascosto la pagina che stai visitando, come faceva coi siti in http e con quelli che avevano un indizio sospetto. Un link di conferma, o con un codice che vale una volta sola, adesso parte una volta sola. In incognito il controllo dei siti pericolosi non chiede più il giudizio di un modello e non consuma crediti. In Sicurezza non c\'è più l\'interruttore «Apri i link sospetti in una finestra isolata»: non comandava più niente.',
         'Un sito non può più premere da sé i pezzi di Filo che compaiono nella sua pagina: la conferma di «Salva per dopo», la parte di schermo da catturare o trascrivere, i bottoni del QR e quelli sotto le risposte dell\'Aiuto. Vanno avanti solo col tuo clic o col tuo tasto.',
         'Dopo aver letto un documento o una pagina, Filo non apre più senza chiedertelo un link che contiene un dato che gli hai scritto in chat, come il numero di telefono, l\'indirizzo di casa o una password. Vale anche per i link che scrive nelle risposte e nei suggerimenti della home, quando li clicchi. Ti mostra l\'indirizzo intero e decidi tu. Se il dato sta nella richiesta che hai appena fatto, il link si apre subito.',
         'Su Windows, in fondo alla home, quando sei collegato al Wi-Fi vedi l\'icona del Wi-Fi col nome della rete. Prima mostrava un globo anche col Wi-Fi collegato.',
@@ -88,6 +91,7 @@
         'Quando correggi una parola, le sottolineature delle altre parole restano al loro posto. Prima le blu sparivano per qualche istante mentre Filo ricontrollava il testo, e le rosse dopo ogni correzione scelta col tasto destro. Una correzione presa dal menu adesso si annulla con Ctrl+Z (Cmd+Z su Mac).',
         'Nella barra laterale a scomparsa il nome di un\'icona sparisce appena sposti il puntatore dall\'icona, la premi o la barra si chiude. Prima poteva restare sopra la pagina anche a barra chiusa.',
         'Se mandi una segnalazione mentre quella di prima sta ancora partendo, parte anche lei. Prima restava ferma finché non ne mandavi un\'altra o non riaprivi Filo.',
+        'Se Filo fa molti passi senza arrivare a una risposta, adesso lo scrive in chat e ti dà il tasto «Continua», che lo fa ripartire da dove era arrivato senza rifare le ricerche già fatte. Prima la conversazione poteva finire con «Ha cercato sul web 9 volte» e nient\'altro.',
         'Nella Cronologia AI il filtro per tipo elenca ogni nome una volta sola, e scegliendo «Aiuto» vedi tutte le richieste fatte all\'Aiuto. Prima lo stesso nome poteva comparire due o tre volte, e ognuno mostrava solo una parte delle righe.',
       ],
     },

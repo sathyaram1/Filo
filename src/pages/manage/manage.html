@@ -1026,6 +1026,8 @@
     .mg-forma--spam    { color: #e08e0b; }
     .mg-forma--design  { color: #2e9e5b; }
     .mg-forma--aligned { color: #5b6ee0; }
+    /* Chiede lavoro locale: l'azzurro dello schermo di 💻, l'icona che qui vuol già dire «sessione locale». */
+    .mg-forma--locale  { color: #26c9fc; }
     /* Un anello attorno alla forma scelta, così si sa cosa sta guardando il pannello di destra. */
     .mg-forma--scelta { outline: 2px solid var(--sn-accent); outline-offset: 2px; border-radius: 3px; }
     .mg-dot {
@@ -1312,6 +1314,8 @@
       color: var(--sn-muted);
       white-space: nowrap;
     }
+    /* Pronto e fermo per il PC (#1159): la tinta d'accento lo stacca dalle righe di chi sta lavorando. */
+    .mg-attesa-server { color: var(--sn-accent, var(--sn-fg)); }
 
     /* Una fusione ferma sulla scheda: stessa forma del segno qui sopra, tinta del blocco di sicurezza. Senza, una
        decisione che aspetta l'owner non si distinguerebbe scorrendo la lista. */
@@ -1527,7 +1531,7 @@
       <button type="button" class="mg-tab" data-tab="domande-archivio" role="tab" hidden>Archivio</button>
       <button type="button" class="mg-tab mg-tab--active" data-tab="inbox" role="tab">Ricevuti</button>
       <button type="button" class="mg-tab" data-tab="queue" role="tab">In coda</button>
-      <button type="button" class="mg-tab" data-tab="local" role="tab">Lavori locali</button>
+      <button type="button" class="mg-tab" data-tab="local" role="tab">Lavori server</button>
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
@@ -1937,6 +1941,16 @@
                   nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
                   <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
                 </p>
+              </section>
+
+              <!-- I lavori server alle routine (#1159): spento, restano alle sessioni locali. -->
+              <section class="mg-auto-block" id="mgLavoriServerBlock">
+                <label class="mg-switch" id="mgLavoriServerSwitch" title="Le routine lavorano anche i lavori server fidati, su filo-security, con un token da un'ora. Fusione e deploy del server li fa il tuo PC.">
+                  <span class="mg-switch-text">Lavori server alle routine</span>
+                  <input type="checkbox" id="mgLavoriServer" />
+                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                </label>
+                <span class="mg-action-msg" id="mgLavoriServerMsg" role="status"></span>
               </section>
 
               <!-- Le tre scelte su COME partono le sessioni. Restano manovrabili anche a routine spente: escludere un

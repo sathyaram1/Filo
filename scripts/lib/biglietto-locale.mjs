@@ -387,6 +387,28 @@ export async function registraRamo({ repo, ramo, sha, feedbackId = '', cartella,
   }
 }
 
+// ── Lavori server dal PC (#1159): op senza biglietto della stessa callable, solo col token dell'owner ──
+
+/** Il lavoro su `ramo` (fino a `sha`) è fidato per il registro? → { lavoroFidato, registro, attesa, motivo }; lancia. */
+export async function lavoroDelRamo({ repo, ramo, sha, feedbackId }, deps = {}) {
+  return chiama('lavoro', { repo, ramo, sha, feedbackId }, deps);
+}
+
+/** Le pratiche passate che aspettano il PC: [{ feedbackId, seq, subSeq, branch, parti }]; lancia. */
+export async function attesePc(deps = {}) {
+  const r = await chiama('attese', {}, deps);
+  return Array.isArray(r.pratiche) ? r.pratiche : [];
+}
+
+/**
+ * La parte del server è su main e pubblicata, o (`soloApp`) sul server il ramo non c'è: la pratica torna alle routine per
+ * la parte dell'app. `riallinea`: il ramo del server va in conflitto con main, e torna alle routine per riallinearlo. Lancia.
+ */
+export async function fineAttesa(feedbackId, { soloApp = false, riallinea = false, ...deps } = {}) {
+  const data = riallinea === true ? { feedbackId, riallinea: true } : soloApp === true ? { feedbackId, soloApp: true } : { feedbackId };
+  return chiama('fineAttesa', data, deps);
+}
+
 /** Chiude i biglietti di questa sessione e ne toglie i file. */
 export async function chiudi({ env, cwd, deps = {} } = {}) {
   const out = { chiusi: 0, errori: [] };

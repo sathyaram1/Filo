@@ -163,10 +163,10 @@
     {
       id: 'link-sospetto-in-prova', nome: 'Il sito di un link sospetto, aperto di nascosto',
       base: [], indirizzo: 'il sito della pagina sospetta',
-      quando: 'pagina',
-      occasione: 'quando una pagina che apri ha un sospetto che i controlli non chiudono: la si carica in una finestra nascosta e isolata per vedere dove porta',
+      quando: 'funzione',
+      occasione: 'quando Filo prova un link sospetto prima che tu lo apra, per vedere dove porta: mai una pagina che hai già aperto, mai in incognito, e oggi nessuna funzione lo chiede',
       riceve: 'una visita all’indirizzo completo, da una finestra che non ha i tuoi dati di navigazione',
-      frase: 'la carica anche in una finestra nascosta e isolata',
+      frase: 'Filo non riapre mai di nascosto una pagina che hai già aperto',
       dove: ['src/main/services/safebrowse/sandbox.js'], prova: 'loadURL(',
     },
     {

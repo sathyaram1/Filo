@@ -36,7 +36,7 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
   // Le sezioni della macchina a stati, con i Lavori locali (#908).
   const tabs = page.locator('.fb-tab');
   await expect(tabs).toHaveCount(5);
-  await expect(tabs.nth(2)).toHaveText(/Lavori locali/);
+  await expect(tabs.nth(2)).toHaveText(/Lavori server/);
 
   // Larghezza stretta davvero: qui le cinque schede NON stanno su una riga.
   await page.setViewportSize({ width: 360, height: 800 });
