@@ -285,12 +285,14 @@ function leggiTesto(file) {
   try { return readFileSync(file, 'utf8'); } catch (_) { return ''; }
 }
 
+function righeJson(testo) {
+  return testo.split('\n').filter(Boolean).flatMap((l) => {
+    try { return [JSON.parse(l)]; } catch (_) { return []; }
+  });
+}
+
 function leggiRighe(file) {
-  try {
-    return readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((l) => {
-      try { return [JSON.parse(l)]; } catch (_) { return []; }
-    });
-  } catch (_) { return []; }
+  try { return righeJson(readFileSync(file, 'utf8')); } catch (_) { return []; }
 }
 
 // Il codice provato scrive nella temporanea anche senza chiederla ai test (#717): ogni corsa gliene dà una sua, che se ne
