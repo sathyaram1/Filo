@@ -73,6 +73,21 @@ await prova('create anonima col biglietto locale: rifiutata', () =>
 await prova('update admin del biglietto locale: rifiutato', () =>
   assertFails(updateDoc(doc(admin, 'feedback/big1'), { bigliettoLocale: 'b'.repeat(64) })));
 
+// #1075: authUid è il mittente su cui il server conta il tetto; vale solo se è di chi scrive.
+const anonFirebase = env.authenticatedContext('uid-anonimo', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+await prova('create senza accesso con authUid: rifiutata', () =>
+  assertFails(setDoc(doc(anon, 'feedback/au1'), { ...FEEDBACK, authUid: 'uid-anonimo' })));
+await prova('create con authUid di un altro: rifiutata', () =>
+  assertFails(setDoc(doc(anonFirebase, 'feedback/au2'), { ...FEEDBACK, authUid: 'chiunque' })));
+await prova('create di un account anonimo col proprio authUid: accettata', () =>
+  assertSucceeds(setDoc(doc(anonFirebase, 'feedback/au3'), { ...FEEDBACK, authUid: 'uid-anonimo' })));
+await prova('create di un account anonimo senza authUid: accettata', () =>
+  assertSucceeds(setDoc(doc(anonFirebase, 'feedback/au4'), FEEDBACK)));
+await prova('authUid non numerico né vuoto al posto dell’uid: rifiutato', () =>
+  assertFails(setDoc(doc(anonFirebase, 'feedback/au5'), { ...FEEDBACK, authUid: '' })));
+await prova('un loggato non cambia authUid a un documento', () =>
+  assertFails(updateDoc(doc(anonFirebase, 'feedback/au3'), { authUid: 'altro' })));
+
 await prova('config/redteam: lo legge chiunque', () =>
   assertSucceeds(getDoc(doc(anon, 'config/redteam'))));
 await prova('config/redteam: un loggato qualunque non lo scrive', () =>
