@@ -61,7 +61,7 @@ test('la create anonima ammette authUid solo se è l’uid di chi scrive', () =>
     anonima.cond.includes("(!('authUid' in request.resource.data) || (request.auth != null && request.resource.data.authUid == request.auth.uid))"),
     'authUid senza il vincolo «uguale a request.auth.uid»: chiunque si attribuirebbe l’uid di un altro',
   );
-  for (const s of scritture()) {
+  for (const s of tutte) {
     if (s === anonima || /^isAdmin\(\)/.test(s.cond)) continue;
     assert.ok(!liste(s.cond).flat().includes('authUid'), `ramo non-admin che riscrive authUid: ${s.cond.slice(0, 120)}`);
   }
