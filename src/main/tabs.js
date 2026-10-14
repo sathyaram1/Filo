@@ -18,6 +18,7 @@ const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
+const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
@@ -262,8 +263,17 @@ function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
   try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {}
   return true;
 }
+// Un indirizzo fermato non resta muto (#482): il silenzio sembra un'app rotta. Solo testo, niente «Apri comunque».
+function avvisaIndirizzoFermato(rawUrl, win) {
+  const a = avvisoIndirizzoFermato(rawUrl);
+  if (!a || !win || win.isDestroyed?.()) return;
+  try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave } }); } catch (_) {}
+}
+// Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
-  if (!invitoFermato(rawUrl, ctx)) openExternalScheme(rawUrl);
+  if (invitoFermato(rawUrl, ctx) || openExternalScheme(rawUrl)) return true;
+  avvisaIndirizzoFermato(rawUrl, ctx && ctx.win);
+  return false;
 }
 // La pagina intera passa da will-navigate; qui solo i riquadri, e solo l'invito.
 function fermaInvitoNelRiquadro(event, ctx) {
@@ -3108,7 +3118,13 @@ class TabManager {
   // `navigazione`: la navigazione è già partita, e il gesto che la porta Permessi l'ha messo da parte.
   _esternoDallaPagina(wc, tabId, url, referrer, { navigazione = false } = {}) {
     const invito = Boolean(globalThis.SN_WALLET?.isInviteDeepLink?.(url));
-    if (!invito && !isOsDelegatedScheme(url)) return;
+    if (!invito && !isOsDelegatedScheme(url)) {
+      // Il clic dell'utente su un indirizzo fermato (zoommtg:, ms-teams:…) lo dice (#482); la pagina da sola resta muta.
+      const dalClic = Permessi.perUnaFinestra(wc, url, referrer)
+        || (navigazione && (Permessi.gestoPerLaNavigazione(wc) || Permessi.navigazioneDaGesto(wc)));
+      if (dalClic) avvisaIndirizzoFermato(url, this.win);
+      return;
+    }
     // Per l'invito il clic che ha fatto partire la navigazione lo conta `invitoFermato`, che lo spegne all'arrivo (#664).
     const gesto = Permessi.perUnaFinestra(wc, url, referrer) || (!invito && navigazione && Permessi.gestoPerLaNavigazione(wc));
     // L'invito scelto dall'utente (anche dal menu di Filo, che alla pagina non dà il gesto) lo porta dentro Filo.
@@ -3118,6 +3134,13 @@ class TabManager {
       return;
     }
     openExternalScheme(url);
+  }
+
+  // Il collegamento file: che Chromium ha rifiutato a una pagina (page-preload.js): vale solo dopo un input vero, che
+  // la pagina non può fingere.
+  indirizzoRifiutatoDallaPagina(wc, url) {
+    if (!/^file:/i.test(String(url || '')) || !Permessi.gestoRecente(wc)) return;
+    avvisaIndirizzoFermato(url, this.win);
   }
 
   // Il lasciapassare che «Apri» dà alla finestra di accesso che la pagina richiede su suo ordine: una volta, subito.
@@ -3242,7 +3265,7 @@ class TabManager {
   // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
   // siti in blacklist fermati come un clic, il resto in una scheda nuova.
   apriDaCollegamento(url, { sfondo = false } = {}) {
-    if (isWebUnsafeNav(url)) return invitoFermato(url, { win: this.win }) || openExternalScheme(url);
+    if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
     this.openTab(url, { activate: !sfondo, openedByLink: true });
     return true;
