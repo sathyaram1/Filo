@@ -1,4 +1,5 @@
-// Verifica #1115 giro 1: le strade che lo spec del lavoro non percorre (contenteditable, input, token, menu doppio).
+// Verifica #1115 giro 1: le strade che lo spec del lavoro non percorre (contenteditable, input, markup, token, menu
+// doppio, casella svuotata dal sito). Tutte verdi al giro 1: si ri-provano ai giri dopo.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -128,14 +129,13 @@ test('stessa parola blu e ocra: il tasto destro mostra tutte e due le cose', asy
   await page.screenshot({ path: 'tests/.shots/v1115-doppio-menu.png' }).catch(() => {});
 });
 
-test('Preferenze: i due token ocra compaiono e si cambiano', async ({ app, openTab }) => {
+test('il sito svuota la casella dopo l\'invio: i segni ocra spariscono', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
-  const pref = await openTab('filo://preferences/preferences.html');
-  await pref.waitForTimeout(1500);
-  const testo = await pref.locator('body').innerText();
-  expect(testo).toContain('Colore della sottolineatura ocra del correttore');
-  expect(testo).toContain('Stile della sottolineatura ocra del correttore');
-  const riga = pref.locator('text=Stile della sottolineatura ocra del correttore').first();
-  await riga.scrollIntoViewIfNeeded();
-  await pref.screenshot({ path: 'tests/.shots/v1115-pref-token.png' }).catch(() => {});
+  const page = await apri(app, openTab, testServer, contraddizione(),
+    CHAT('<textarea id="ta" style="width:700px;height:100px;font:22px monospace"></textarea>'));
+  await page.locator('#ta').click();
+  await page.keyboard.type('sì ci vediamo mercoledì, e giovedì 9 ottobre 2026');
+  await expect(ocra(page)).toHaveCount(2, { timeout: 12_000 });
+  await page.evaluate(() => { const t = document.getElementById('ta'); t.value = ''; t.dispatchEvent(new Event('input', { bubbles: true })); });
+  await expect(ocra(page)).toHaveCount(0, { timeout: 4000 });
 });
