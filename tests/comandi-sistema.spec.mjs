@@ -431,6 +431,7 @@ test('Esc premuto appena aperto chiude il riquadro, e mentre legge l\'elenco il 
   const b = await riquadro(page).boundingBox();
   const v = await voce(page, 'bluetooth').boundingBox();
   expect(b.y + b.height <= v.y || b.y >= v.y + v.height).toBe(true);
+  await page.screenshot({ path: 'tests/.shots/1219-riquadro-bluetooth-in-lettura.png' }).catch(() => {});
   // E la voce si riapre al primo clic, senza aspettare la fine della lettura.
   await page.keyboard.press('Escape');
   await expect(riquadro(page)).toHaveCount(0);
