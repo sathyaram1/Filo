@@ -725,10 +725,12 @@ export function mittenteConsegna(e) {
  * dell'orchestratore dopo la fine del worker di prima (o dopo un suo rilascio
  * di un biglietto morto, già contato lì) fino a adesso, cioè fino al rilascio
  * del worker che sta lavorando. Un worker lanciato in sottofondo (il default di
- * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
- * col suo tool-use-id, non quel risultato. PURA.
+ * Claude Code) riceve subito «Async agent launched»: la sua fine è la sua
+ * consegna, o una notifica che lo nomina, non quel risultato. `corrente`
+ * ({ agentId, toolUseId }) è il worker che sta rilasciando: è vivo, nessuna
+ * notifica lo chiude. PURA.
  */
-export function finestraOrchestratore(linee) {
+export function finestraOrchestratore(linee, { corrente = null } = {}) {
   const voci = [];
   for (const l of linee) {
     let e;
@@ -748,30 +750,63 @@ export function finestraOrchestratore(linee) {
       if (msg.usage && !/^<[^>]*>$/.test(String(msg.model || ''))) turni.push(ms);
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
-        if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
+        if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN, agentId: '' });
         if (b.input && eRilascio(b.input.command)) rilasci.push(ms);
       }
     } else if (e.type === 'user') {
-      for (const b of blocchi) {
-        if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
+      const risultati = blocchi.filter((b) => b && b.type === 'tool_result');
+      // L'esito grezzo dello strumento: resta anche quando un gancio cambia il testo che vede il modello.
+      const grezzo = risultati.length === 1 && e.toolUseResult && typeof e.toolUseResult === 'object' ? e.toolUseResult : {};
+      for (const b of risultati) {
+        if (!chiamate.has(b.tool_use_id)) continue;
         const testo = testoDi(b.content);
         const c = chiamate.get(b.tool_use_id);
-        if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || ''; continue; }
+        if (/^\s*Async agent launched/i.test(testo) || grezzo.status === 'async_launched' || grezzo.isAsync === true) {
+          c.agentId = (typeof grezzo.agentId === 'string' && grezzo.agentId.trim()) || (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || '';
+          continue;
+        }
+        // Un lancio rifiutato (dal gancio, o un tipo di agente che non c'è) non ha fatto lavorare nessuno:
+        // non è la fine di un worker, e il lancio riprovato dopo resta nella stessa finestra.
+        if (b.is_error === true) { c.fallita = true; continue; }
         c.fine = ms;
       }
     }
   }
-  // Un worker in sottofondo finisce solo con la prima notifica dopo il lancio che lo NOMINA (tool-use-id della
-  // chiamata o task-id = agentId del lancio): un Monitor, un comando, un artefatto o un testo che ne parla non lo chiudono.
-  const aperta = (c, ms) => c.inizio <= ms && !(c.fine <= ms);
+  const eCorrente = (id, c) => !!corrente && ((!!corrente.toolUseId && id === corrente.toolUseId) || (!!corrente.agentId && c.agentId === corrente.agentId));
+  // Le consegne e le notifiche, ognuna al suo primo apparire: coda, allegato e messaggio portano lo stesso testo.
+  const notifiche = [];
+  const consegne = [];
+  const viste = new Set();
   for (const { e, ms } of voci) {
-    const testa = Number.isFinite(ms) ? testaNotifica(e) : '';
-    if (!testa) continue;
-    const ids = [...testa.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)].map((m) => m[1].trim());
-    const task = [...testa.matchAll(/<task-id>([^<]+)<\/task-id>/g)].map((m) => m[1].trim());
-    for (const [id, c] of chiamate) {
-      if (aperta(c, ms) && (ids.includes(id) || (c.agentId && task.includes(c.agentId)))) c.fine = ms;
-    }
+    if (!Number.isFinite(ms)) continue;
+    const da = mittenteConsegna(e);
+    if (da) { consegne.push({ ms, da }); continue; }
+    const intera = notificaIntera(e);
+    if (!intera || viste.has(intera)) continue;
+    viste.add(intera);
+    // Solo la testa: il rapporto riportato in <result> può citare altri id.
+    const testa = intera.split(/<summary>|<result>/)[0];
+    notifiche.push({
+      ms,
+      ids: [...testa.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)].map((m) => m[1].trim()),
+      task: [...testa.matchAll(/<task-id>([^<]+)<\/task-id>/g)].map((m) => m[1].trim()),
+    });
+  }
+  const lanci = [...chiamate.values()].filter((c) => !c.fallita).map((c) => c.inizio);
+  for (const [id, c] of chiamate) {
+    if (c.fallita || eCorrente(id, c)) { c.fine = NaN; continue; }
+    // La consegna è la fine vera: la notifica può arrivare dopo (figli del worker ancora vivi), o prima e provvisoria.
+    const consegna = c.agentId ? consegne.find((x) => x.da === c.agentId && x.ms >= c.inizio) : null;
+    if (consegna) { c.fine = Number.isFinite(c.fine) ? Math.min(c.fine, consegna.ms) : consegna.ms; continue; }
+    if (Number.isFinite(c.fine)) continue;
+    // Senza consegna: una notifica che lo NOMINA (tool-use-id della chiamata o task-id = agentId del lancio). Se ne
+    // arrivano più d'una (la provvisoria di chi aspetta un suo comando, poi la finale), conta l'ultima prima del
+    // lancio dopo: è lì che l'orchestratore ha smesso di aspettarlo.
+    const sue = notifiche.filter((n) => n.ms >= c.inizio && (n.ids.includes(id) || (c.agentId && n.task.includes(c.agentId))));
+    if (!sue.length) continue;
+    const dopo = Math.min(...lanci.filter((t) => t > c.inizio));
+    const prima = sue.filter((n) => n.ms < dopo);
+    c.fine = prima.length ? prima[prima.length - 1].ms : sue[0].ms;
   }
   // La finestra arriva fino a adesso: in primo piano dopo la chiamata aperta
   // non c'è niente, in sottofondo i turni d'attesa dopo il lancio sono suoi.
