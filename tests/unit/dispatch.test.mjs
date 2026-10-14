@@ -851,13 +851,28 @@ test('secaudit: sul fail la ricetta non chiede una consegna di design, che il se
   assert.ok(!/accoda|deliver status/.test(fail[0]), `sul fail niente consegne a mano: «${fail[0]}»`);
 });
 
-test('secaudit: la richiesta di fusione fa girare gli unit sulla fusione per minuti, e la ricetta la manda in sottofondo (#929)', () => {
-  // Una chiamata da due minuti la taglia a metà: nessuna richiesta parte e resta la cartella di prova.
-  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
-  const i = t.indexOf('merge-gate.mjs');
-  assert.ok(i > -1);
-  assert.match(t.slice(i, i + 1200), /sottofondo/);
-  assert.ok(!/Qui non gira nessun git/.test(t), 'qui adesso girano git e gli unit');
+test('secaudit: il prompt consegnato fa registrare il verdetto e rilasciare, la fusione non la chiede (#1207)', () => {
+  // Gli unit sulla fusione li fa girare un'azione avviata dal server: un L4 che chiede ancora la fusione aspetta minuti
+  // per niente, e la spiegazione di un blocco L5 la compone il server.
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try {
+    emit(bucket, serverCtx(bucket, null, { diff: 'diff --git a/x b/x\n+riga\n', base: { ref: 'origin/main', sha: 'a'.repeat(40) }, head: 'b'.repeat(40) }));
+  } finally { process.stdout.write = real; }
+  const t = JSON.parse(out).instructions.replace(/\s+/g, ' ');
+  assert.match(t, /--record-secaudit <id> <pass\|fail> --nota/, 'il verdetto si registra con la nota');
+  assert.match(t, /Su \*\*pass\*\* il resto lo fa il server[^]*?resta solo il rilascio del biglietto/);
+  for (const vietato of [/merge-gate/, /routineMerge/, /--status done/, /--reason l5/, /--clear-state/, /exit del gate/]) {
+    assert.doesNotMatch(t, vietato, `il prompt di L4 non deve più chiedere né chiudere la fusione: ${vietato}`);
+  }
 });
 
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────
