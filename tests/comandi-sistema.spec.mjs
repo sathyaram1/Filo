@@ -366,7 +366,7 @@ test('con tante reti conosciute il riquadro scorre, con la rotella e con le frec
 });
 
 test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'elenco dei dispositivi, e le letture non si accodano', async ({ app }) => {
-  // Letture ferme, non lunghe: con un tempo fisso la suite carica arrivava alla terza apertura a lettura già finita (#1223).
+  // Letture ferme, non a tempo: «in volo» non deve dipendere dalla velocità della macchina della suite (#1223).
   await computerFinto(app, { lettureFerme: true, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
   const letture = async () => (await chiamate(app)).filter((c) => c[0] === 'btElenco').length;
   const page = await home(app);
