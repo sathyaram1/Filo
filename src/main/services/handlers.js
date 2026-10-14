@@ -2262,8 +2262,10 @@ async function eseguiAzioneFilo(action, {
         // NAVIGA è livello 1 (nessuna conferma), quindi il filtro è qui. Un URL
         // "nudo" (es. "example.com") non parsa e prosegue: openTab → normalizeUrl
         // gli antepone https://.
+        // Si giudica quello che diventerà caricandolo: un percorso del computer scritto com'è è un file (#482 giro 2).
+        const caricato = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : (globalThis.SN_URL_NAV?.normalizeUrl?.(url) || url);
         try {
-          const proto = new URL(url).protocol.toLowerCase();
+          const proto = new URL(caricato).protocol.toLowerCase();
           if (!['http:', 'https:', 'filo:'].includes(proto)) {
             return { executed: false, kept: true, output: { blocked: 'scheme' } };
           }
