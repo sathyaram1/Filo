@@ -2045,7 +2045,7 @@ export function emit(bucket, ctx) {
   try {
     // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
     payload = scaricaPayload(pieno, {
-      root: ROOT, sempre: ['diff'], max: STAMPA_MAX,
+      root: ROOT, sempre: ['diff', 'diffServer'], max: STAMPA_MAX,
       misura: (p) => JSON.stringify(stampaCon(p), null, 2).length + 1,
     });
   } catch (e) {
