@@ -294,8 +294,12 @@
   // «Rifiuta e abbonati» porta alla pagina dell'abbonamento: non è un rifiuto, è l'altra metà di un banner da nascondere.
   const NOT_A_REJECT = /(abbona|abbonati|subscri|abonn|suscri|assin|premium|paga|pay|acquista|compra|buy|accedi|login|log in|sign in|registr)/i;
 
+  // I due controlli in testa scartano senza normalizzare i link che avvolgono un intero blocco (un post, una scheda).
   function isRejectText(el) {
-    const txt = (el.textContent || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (el.childElementCount > 3) return false;
+    const raw = el.textContent || '';
+    if (raw.length > 120) return false;
+    const txt = raw.trim().toLowerCase().replace(/\s+/g, ' ');
     if (!txt || txt.length > 40) return false;
     if (!REJECT_PHRASES.some((p) => txt === p || txt.startsWith(p))) return false;
     return !NOT_A_REJECT.test(txt);
