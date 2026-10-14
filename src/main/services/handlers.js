@@ -828,7 +828,7 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     });
   }
 
-  if (!skipCache) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
+  if (!skipCache) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
   return {
     text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
