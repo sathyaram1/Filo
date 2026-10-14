@@ -594,6 +594,8 @@
     if (ora === state.testoIssues) return;
     const prima = state.testoIssues;
     state.testoIssues = ora;
+    // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora».
+    if (!ora.trim()) state.ocraIgnorate.clear();
     if (!state.issues.length && !state.ocra.length) return;
     const blu = riallineaIssues(state.issues, prima, ora);
     const ocra = riallineaIssues(state.ocra, prima, ora);
