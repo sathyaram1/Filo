@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import zlib from 'node:zlib';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
+import { letturaIsolata } from '../helpers/letturaIsolata.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/provenienzaImmagine.js');
