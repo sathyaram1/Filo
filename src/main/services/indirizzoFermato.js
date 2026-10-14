@@ -26,7 +26,8 @@ function avvisoIndirizzoFermato(rawUrl) {
   let testo;
   if (schema === 'file:') {
     // file:///C:/x arriva come «/C:/x»: la barra davanti alla lettera del disco non è del percorso.
-    const percorso = decodificato(u.pathname).replace(/^\/(?=[a-z]:)/i, '') || '/';
+    // Così anche «~/x», che arriva come «/~/x».
+    const percorso = decodificato(u.pathname).replace(/^\/(?=[a-z]:|~(?:\/|$))/i, '') || '/';
     if (u.hostname) testo = `Percorso di rete bloccato per sicurezza: ${accorciato(`//${u.hostname}${percorso}`)}`;
     else if (/\/$/.test(percorso)) testo = `Cartella del computer bloccata per sicurezza: ${accorciato(percorso)}`;
     else testo = `File del computer bloccato per sicurezza: ${accorciato(percorso)}`;
