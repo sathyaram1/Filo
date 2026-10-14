@@ -717,7 +717,7 @@ function createAnswerStreamer(onText) {
 // Gli strumenti si passano all'istante e i tempi si MISURANO (idee «Latenza
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
-async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false }) {
+async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
   const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
@@ -800,6 +800,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
       })()
     : await Gate.complete({ action, settings, attempts, messages, tools, toolChoice, signal });
   timing.totalMs = Date.now() - t0;
+  // Quanto il turno ha aspettato prima di chiamare il modello (stato del computer, saldo, contesto): `preparazioneMs`.
+  if (tempiPrima && typeof tempiPrima === 'object') Object.assign(timing, tempiPrima);
   const toolCalls = Array.isArray(result.toolCalls) ? result.toolCalls : [];
   const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
   const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
@@ -4322,6 +4324,7 @@ async function handleFiloChat(richiesta) {
 }
 
 async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }, volo) {
+  const inizioTurno = Date.now();
   await FiloMem.touchSession();
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
   // perché la parola di stop deve funzionare anche quando il resto non
@@ -4437,7 +4440,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble({ creditiFreschi: true });
+  const { stateText, attese: attesePrimaDelModello } = await FiloState.assemble({ creditiFreschi: true });
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
@@ -4673,6 +4676,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
   let fermato = false;
+  // Il primo giro che risponde porta nella cronologia anche l'attesa prima del modello: chi aspetta la vive (#1097.1).
+  let tempiPrima = { preparazioneMs: Date.now() - inizioTurno, ...(attesePrimaDelModello || {}) };
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       if (turno.fermato) { fermato = true; break; }
@@ -4681,7 +4686,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         action: ACTIONS.FILO_CHAT,
         payload: { ...payloadBase, threadMessages },
         origin: 'filo:chat',
-        onReasoning, onText, onToolCall, tools, signal: turno.ctrl.signal,
+        onReasoning, onText, onToolCall, tools, signal: turno.ctrl.signal, tempiPrima,
       });
       const KW = global.SN_WALLET_MAIN;
       try {
@@ -4692,6 +4697,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         if (await stringiDopoRifiuto(e)) { round--; continue; }
         throw e;
       }
+      tempiPrima = null;
       if (finestraDaRicordare != null) { finestreDeiModelli.set(modelloChat, finestraDaRicordare); finestraDaRicordare = null; }
       if (r && r.keyFallback) keyFallback = r.keyFallback;
       costEur += Number(r.costEur) || 0;

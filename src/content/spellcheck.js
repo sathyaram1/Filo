@@ -551,6 +551,18 @@
     renderOverlayContent(state);
   }
 
+  // I segni di una risposta dello scan su `inviato`, portati sul testo di `adesso`.
+  function segniDellaRisposta(risposta, inviato, adesso) {
+    return riallineaIssues(buildIssues(parseIssues(risposta), inviato), inviato, adesso);
+  }
+
+  // Le stesse parole a meno di spazi e punteggiatura: lo scan rifarebbe la stessa domanda (#1097.5). Due parole fuse
+  // o separate invece cambiano le parole.
+  const ossatura = (t) => String(t ?? '').replace(/[\s\p{P}]+/gu, ' ').trim();
+  function soloSpaziOPunteggiatura(prima, dopo) {
+    return typeof prima === 'string' && !!prima && prima !== dopo && ossatura(prima) === ossatura(dopo);
+  }
+
   // Prima del cambio resta, dopo scorre; chi tocca il cambio, o la cui parola il cambio allunga o fonde con un'altra
   // (un bordo che passa da separatore a lettera), si perde.
   function riallineaIssues(issues, vecchio, nuovo) {
@@ -617,16 +629,21 @@
       state.issues = [];
       state.testoIssues = text;
       state.lastScannedText = text;
+      // Una risposta ancora in viaggio parlava del testo di prima: non riporta i segni.
+      state.scanMostrato = state.scanInviati || 0;
       renderOverlayContent(state);
       return;
     }
     if (text === state.lastScannedText) return;
+    if (soloSpaziOPunteggiatura(state.lastScannedText, text)) return;
     if (text.length > MAX_TEXT_LENGTH) {
       // Niente scan continuo su testi enormi: lasciamo invariati gli issue precedenti.
       return;
     }
 
     const context = extractContext(state.el);
+    const numero = (state.scanInviati || 0) + 1;
+    state.scanInviati = numero;
     let res;
     try {
       res = await chrome.runtime.sendMessage({
@@ -639,11 +656,6 @@
       return;
     }
 
-    // Se nel frattempo l'utente ha modificato il testo, scarta la risposta:
-    // sarebbe disallineata. Il prossimo input rilancerà lo scan.
-    const currentText = getEditableText(state.el);
-    if (currentText !== text) return;
-
     if (!res?.ok) {
       console.error('[SN] scan blu — provider error:', res?.code, res?.error);
       return;
@@ -652,10 +664,17 @@
       console.warn('[SN] scan blu — risposta senza text:', res);
       return;
     }
-    const allIssues = buildIssues(parseIssues(res.text), text);
-    state.issues = allIssues;
-    state.testoIssues = text;
-    state.lastScannedText = text;
+    // Una risposta più vecchia di quella già in vista non la sovrascrive.
+    if (numero < (state.scanMostrato || 0)) return;
+    const currentText = getEditableText(state.el);
+    if (!currentText || currentText.length < MIN_TEXT_LENGTH) return;
+    state.scanMostrato = numero;
+    // Arrivata mentre l'utente scriveva, la risposta pagata non si butta (#1097.5): i segni passano sul testo di adesso
+    // come quelli già in vista; quelli che il cambio tocca li rifà lo scan che segue.
+    const { issues, perse } = segniDellaRisposta(res.text, text, currentText);
+    state.issues = issues;
+    state.testoIssues = currentText;
+    state.lastScannedText = perse ? '' : text;
     renderOverlayContent(state);
     // Prefetch delle correzioni a singola parola: per ogni issue blu su 1 parola
     // chiediamo subito allo stesso modello la verifica ortografica e mettiamo in
@@ -666,7 +685,7 @@
     // italiane reali ma usate male). Il blu resta stabile; per evitare la
     // sovrapposizione con il rosso nativo lo zigzag blu è leggermente offsettato
     // verticalmente in CSS.
-    prefetchSingleWordSuggestions(state, text).catch((e) => {
+    prefetchSingleWordSuggestions(state, currentText).catch((e) => {
       console.warn('[SN] prefetch single-word failed:', e);
     });
   }
@@ -1466,6 +1485,8 @@
     applyFix,
     sostituisciComeBattuta,
     riallineaIssues,
+    soloSpaziOPunteggiatura,
+    segniDellaRisposta,
     addToDictionary,
     isInDictionary,
     setAutocorrect,

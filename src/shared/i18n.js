@@ -807,6 +807,8 @@
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',
     history_timing_title: 'Dalla partenza della richiesta: primo pezzo di ragionamento, prima parola (o prima azione), fine della risposta.',
+    history_timing_prep: 'prepara %s · ',
+    history_timing_prep_title: 'Prima della richiesta il turno ha aspettato %s, di cui stato del computer %s e saldo %s.',
     history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',
     history_empty: 'Nessuna interazione AI registrata.',
     history_no_results: 'Nessun risultato per la ricerca.',

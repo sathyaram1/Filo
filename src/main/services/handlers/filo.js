@@ -183,8 +183,9 @@ module.exports = function register(on, ctx) {
     const davanti = !(schede && sender.tab) || schede.inVista(sender.tab.id);
     const segue = !(msg && msg.segue === false);
     // Chi sta scrivendo in chat sveglia il lettore per il turno che arriva, senza diventare una pagina che lo segue.
+    // Una volta anche dopo una pausa lunga: il turno lo chiederebbe comunque, e lo aspetterebbe (#1097.1).
     if (msg && msg.perChat === true) {
-      if (davanti) Sistema.richiedi();
+      if (davanti) Sistema.richiedi({ unaVolta: true });
       return { ok: true, stato: Sistema.stato() };
     }
     Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
