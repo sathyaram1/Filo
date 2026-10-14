@@ -417,6 +417,13 @@ export function testoFermo(inCorso, fermoMs, root = REPO_ROOT) {
   return righe.join('\n');
 }
 
+/** I file chiusi dal tetto per file, uno per riga; la corsa intanto è andata avanti. PURA. */
+export function testoFileChiusi(chiusi, fermoMs, root = REPO_ROOT) {
+  const minuti = Math.round(fermoMs / 60000);
+  const tempo = minuti >= 1 ? `${minuti} minut${minuti === 1 ? 'o' : 'i'}` : `${Math.round(fermoMs / 1000)} secondi`;
+  return chiusi.map((f) => `[test:unit] ROSSO: ${perLaRiga(f, root)} non è andato avanti per ${tempo} ed è stato chiuso; gli altri file sono andati avanti.`).join('\n');
+}
+
 function chiudiAlbero(c) {
   // Chiuso da solo, il genitore di node --test lascerebbe vivi i figli appesi: va tolto l'albero intero.
   if (process.platform === 'win32') {
