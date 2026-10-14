@@ -140,6 +140,8 @@ test('i segni delle date vincono su quelli del modello che li toccano, e «Ignor
   const m = [{ start: 0, end: 9, fonte: 'modello', tipo: 'contraddizione', segment: 'mercoledì', citazione: 'martedì' }];
   assert.deepEqual(C.unisci(d, m).map((s) => s.fonte), ['data']);
   assert.equal(C.chiaveIgnora(d[0]), C.chiaveIgnora({ ...d[0], start: 40, end: 59 }));
+  assert.equal(C.chiaveIgnora(m[0]), C.chiaveIgnora({ ...m[0], citazione: 'un\'altra riga della chat' }));
+  assert.notEqual(C.chiaveIgnora(m[0]), C.chiaveIgnora({ ...m[0], segment: 'giovedì' }));
 });
 
 // ── il prompt ────────────────────────────────────────────────────────────────

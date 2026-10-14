@@ -121,7 +121,6 @@
 
   function giorniNelMese(anno, mese) { return new Date(anno, mese + 1, 0).getDate(); }
   function mezzanotte(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-  const GIORNO_MS = 24 * 60 * 60 * 1000;
 
   // Senza anno vale l'anno che mette la data più vicina a oggi: «venerdì 2 gennaio» scritto a fine dicembre è il 2 gennaio
   // che arriva, non quello passato.
@@ -386,8 +385,9 @@
     return senzaSovrapposti([...date, ...(modello || []).filter(libero)]);
   }
 
-  // «Ignora» vale per quel segno su quel testo: stessa porzione, stesso motivo.
-  const chiaveIgnora = (it) => [it.fonte, it.tipo, normalizza(it.segment), normalizza(it.citazione)].join('\u0001');
+  // «Ignora» vale per quel segno su quel testo: stessa porzione, stesso tipo. Non la citazione, che il modello al giro
+  // dopo può prendere da un'altra riga della stessa conversazione.
+  const chiaveIgnora = (it) => [it.fonte, it.tipo, normalizza(it.segment)].join('\u0001');
 
   // FNV-1a: l'impronta del contesto nella chiave della cache, non una difesa.
   function impronta(s) {

@@ -123,6 +123,9 @@ test('data e giorno che non tornano si segnano senza modello; «Ignora» li togl
   await menu.locator('.sn-menu-item', { hasText: 'Ignora' }).click();
   await expect(ocra(page)).toHaveCount(0);
 
+  // Il fuoco esce e rientra: per quel testo il segno ignorato resta via.
+  await page.mouse.click(700, 500);
+  await page.waitForTimeout(400);
   await page.locator('#ta').click();
   await page.keyboard.press('End');
   await page.keyboard.type(', va bene?');
@@ -158,7 +161,69 @@ test('i due interruttori stanno in Opzioni → Altro e ognuno spegne il suo segn
   await expect(ocra(page)).toHaveCount(0);
   expect(await chiamate(app)).toBe(0);
 
-  // Riacceso dalla chat, la pagina Altro lo rimostra acceso senza ricaricarla.
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ featureFlags: { spellcheckContext: true } }));
+  // Riacceso chiedendolo a Filo, la pagina Altro lo rimostra acceso senza ricaricarla, e il segno torna.
+  const r = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), { type: 'IMPOSTA_PREFERENZA', chiave: 'coerenza', valore: 'on' });
+  expect(r.executed).toBe(true);
   await expect(giallo).toBeChecked({ timeout: 4000 });
+  await page.bringToFront();
+  await page.locator('#ta').click();
+  await page.keyboard.type('!');
+  await expect(ocra(page)).toHaveText(['mercoledì 9 ottobre 2026'], { timeout: 5000 });
+});
+
+test('aspetto: ocra accanto al blu, anche sulla stessa parola, in tema chiaro e scuro', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer, JSON.stringify({ issues: [
+    { tipo: 'contraddizione', testo: 'mercoledì', citazione: 'ci vediamo martedì?', spiegazione: 'Prima si era detto martedì.', correzione: 'martedì' },
+    { tipo: 'poco_chiara', testo: 'lui gli', citazione: '', spiegazione: 'Non si capisce chi porta cosa.', correzione: '' },
+  ] }));
+  // Il blu, finto anche lui: «sonno» al posto di «sono», e «mercoledì» per vedere i due segni sulla stessa parola.
+  await app.evaluate(() => {
+    const prima = globalThis.SN_PROVIDERS.completeWithFallback;
+    const finto = async (req) => {
+      if (JSON.stringify(req.messages).includes('Analizza il testo qui sotto')) {
+        return { text: JSON.stringify({ annotated: 'ieri **sonno** stato da Marco, ciaoo, ci vediamo **mercoledì** e lui gli porta', issues: [
+          { type: 'semantic', explanation: 'sono', correction: 'sono' }, { type: 'grammar', explanation: 'x', correction: 'martedì' },
+        ] }), model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+      }
+      return prima(req);
+    };
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type('ieri sonno stato da Marco, ciaoo, ci vediamo mercoledì e lui gli porta');
+  await expect(ocra(page)).toHaveText(['mercoledì', 'lui gli'], { timeout: 12_000 });
+  await expect(page.locator('.sn-spell-overlay .sn-semantic-error')).toHaveText(['sonno', 'mercoledì'], { timeout: 6000 });
+  const insieme = page.locator('.sn-spell-overlay .sn-semantic-error.sn-coerenza');
+  await expect(insieme).toHaveText('mercoledì');
+  const segni = () => insieme.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { zigzag: cs.backgroundImage !== 'none', puntini: cs.textDecorationStyle, colore: cs.textDecorationColor };
+  });
+  expect(await segni()).toEqual({ zigzag: true, puntini: 'dotted', colore: 'rgb(176, 122, 20)' });
+  await page.locator('#ta').evaluate((el) => el.blur());
+  await page.locator('#ta').focus();
+  await page.screenshot({ path: 'tests/.shots/1115-ocra-chiaro.png', clip: { x: 0, y: 0, width: 820, height: 320 } }).catch(() => {});
+
+  // Il tema cambiato a overlay aperto arriva ai segni senza dover battere un tasto.
+  await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), { type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' });
+  await page.evaluate(() => { document.body.style.background = '#1e1d1b'; document.body.style.color = '#e5e3dc'; });
+  await expect.poll(segni, { timeout: 5000 }).toEqual({ zigzag: true, puntini: 'dotted', colore: 'rgb(226, 173, 77)' });
+  await page.screenshot({ path: 'tests/.shots/1115-ocra-scuro.png', clip: { x: 0, y: 0, width: 820, height: 320 } }).catch(() => {});
+});
+
+test('su una pagina delicata il testo della pagina non parte: niente contraddizioni, le date restano', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ security: { pagineDelicate: { enabled: true, siti: ['sito-pubblico.test'] } } }));
+  const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'));
+  await page.locator('#ta').click();
+  await page.keyboard.type('sì ci vediamo mercoledì e poi giovedì 9 ottobre 2026');
+  await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBe(1);
+  const [prompt] = await app.evaluate(() => globalThis.__ocra);
+  expect(prompt).not.toContain('porto io i biglietti');
+  expect(prompt).toContain('sì ci vediamo mercoledì e poi giovedì 9 ottobre 2026');
+  await page.waitForTimeout(800);
+  // La citazione sarebbe nella pagina, ma il modello la pagina non l'ha vista: la contraddizione non vale.
+  await expect(ocra(page)).toHaveText(['giovedì 9 ottobre 2026']);
 });

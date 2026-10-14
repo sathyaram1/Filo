@@ -47,6 +47,10 @@
 .sn-spell-overlay[data-sn-theme="dark"] .sn-coerenza {
   text-decoration-color: var(--sn-spell-ocra, #e2ad4d);
 }
+/* Sulla stessa parola i puntini scendono sotto lo zigzag, che altrimenti coprirebbero. */
+.sn-spell-overlay .sn-semantic-error.sn-coerenza {
+  text-underline-offset: 9px;
+}
 
 /* Popup di correzione: sostituisce il menu nativo del tasto destro sugli errori. */
 

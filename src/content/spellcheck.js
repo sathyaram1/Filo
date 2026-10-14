@@ -50,6 +50,8 @@
   // tenere riferimenti che impediscano GC se il sito rimuove l'elemento.
   const monitored = new WeakMap();
   const ascoltate = new WeakSet(); // caselle con gli ascoltatori già messi
+  // «Ignora» dell'ocra, per casella: sopravvive al fuoco che esce e rientra, si svuota quando la casella si svuota.
+  const ignoratePerCampo = new WeakMap();
   let activeEl = null;
   let personalDict = new Set();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
@@ -131,7 +133,8 @@
       state.ocra = [];
       state.ocraUltimo = '';
     }
-    renderOverlayContent(state);
+    // Anche il tema può essere cambiato: i colori dei segni lo leggono dall'overlay.
+    syncOverlay(state);
   }
 
   function isEnabled() {
@@ -433,9 +436,9 @@
         ocraUltimo: '',
         timerOcra: null,
         timerDate: null,
-        // «Ignora» vale per quel testo: si svuota quando il campo si svuota (il messaggio è partito).
-        ocraIgnorate: new Set(),
+        ocraIgnorate: ignoratePerCampo.get(el) || new Set(),
       };
+      ignoratePerCampo.set(el, state.ocraIgnorate);
       monitored.set(el, state);
       // Un ascoltatore per casella, che guarda lo stato vivo: chi esce e rientra non lascia indietro uno stato morto
       // che si prende il gesto, e una casella lasciata non lavora più (#1070).
@@ -789,7 +792,7 @@
         state.ocraUltimo = testo;
         return;
       }
-      modello = C.leggiRisposta(res.text, testo, contesto);
+      modello = C.leggiRisposta(res.text, testo, res.senzaContesto ? {} : contesto);
       ricordaOcra(chiave, modello);
     }
     seguiIlTesto(state);
