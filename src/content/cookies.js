@@ -322,20 +322,19 @@
   // sta in un contenitore di consenso. Conservativo per costruzione.
   // `seen.hidden` dice se c'era un rifiuto ancora invisibile (un banner che sta entrando in dissolvenza).
   function findRejectText(root, inConsentBox, seen) {
-    let nodes = [];
-    try {
-      nodes = [...root.querySelectorAll(CLICKABLE)];
-      if (root.nodeType === 1 && root.matches(CLICKABLE)) nodes.unshift(root);
-    } catch (_) {}
-    for (const el of nodes) {
-      if (el.__filoCookieClicked) continue;
+    const fits = (el) => {
+      if (el.__filoCookieClicked) return false;
       const probe = el.tagName === 'INPUT' ? { textContent: el.value } : el;
-      if (!isRejectText(probe)) continue;
-      if (el.tagName === 'A' && leavesPage(el)) continue;
-      if (!inConsentBox && !looksLikeConsent(el)) continue;
-      if (!isVisible(el)) { if (seen) seen.hidden = true; continue; }
-      return el;
-    }
+      if (!isRejectText(probe)) return false;
+      if (el.tagName === 'A' && leavesPage(el)) return false;
+      if (!inConsentBox && !looksLikeConsent(el)) return false;
+      if (!isVisible(el)) { if (seen) seen.hidden = true; return false; }
+      return true;
+    };
+    try { if (root.nodeType === 1 && root.matches(CLICKABLE) && fits(root)) return root; } catch (_) {}
+    let nodes = [];
+    try { nodes = root.querySelectorAll(CLICKABLE); } catch (_) {}
+    for (const el of nodes) if (fits(el)) return el;
     return null;
   }
 
