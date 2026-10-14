@@ -243,10 +243,11 @@
           out.push(verifica({ ...base, mese: Number(secondo) - 1 }));
           continue;
         }
-        // In inglese «10/9» è il 9 ottobre o il 10 settembre: si segna solo se nessuna delle due letture torna.
-        const comeUsa = verifica({ ...base, numero: [secondo, -1, ''], mese: Number(primo) - 1 });
-        const comeUk = verifica({ ...base, mese: Number(secondo) - 1 });
-        if (comeUsa && comeUk) out.push({ ...comeUsa, correzioni: [] });
+        // In inglese «10/9» è il 9 ottobre o il 10 settembre: si segna solo se nessuna delle letture possibili torna.
+        const letture = [[secondo, primo], [primo, secondo]]
+          .filter(([g, m]) => Number(g) >= 1 && Number(g) <= 31 && Number(m) >= 1 && Number(m) <= 12)
+          .map(([g, m]) => verifica({ ...base, numero: [g, 0, ''], mese: Number(m) - 1 }));
+        if (letture.length && letture.every(Boolean)) out.push({ ...letture[0], correzioni: [] });
       }
       if (motore.relativa) {
         for (const m of testo.matchAll(motore.relativa)) {
