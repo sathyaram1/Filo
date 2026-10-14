@@ -83,3 +83,25 @@ irraggiungibili.
   Lato **pagina visitata** (content script): `mountToast`/`unmountToast` +
   `.sn-toasts` in `src/content/popup.js` e `src/styles/popup.css` — ci passano
   toast, `.sn-dictate-pill` e `.sn-save-confirm`. Test `tests/toast-stack.spec.mjs`.
+
+## Una domanda a passi resta nella stessa carta
+
+Quando una risposta apre un'altra domanda sulla stessa cosa (il box dei titoli
+sospetti, #927: «è un tentativo di dare ordini a Filo?», poi «ce lo mandi?»), il
+secondo passo riscrive la carta che l'utente ha davanti. Una carta che si chiude
+e una nuova che compare sembrano due avvisi diversi, e il secondo arriva sotto
+il puntatore come se fosse nato da solo.
+
+- L'azione si dichiara con `resta: true` (`NOTIFS` in `src/renderer/shell.js`):
+  il clic non chiude la carta, e finché la risposta non torna gli altri clic
+  della carta non partono.
+- Chi risponde (il main) dice il passo dopo; la shell lo posa con la stessa
+  `unica`, che riscrive testo e azioni della carta viva. Senza passo dopo, la
+  carta si chiude con `dismissUnica`.
+- La vista sopra la pagina vede azioni nuove e le riarma: il «Sì» del secondo
+  passo non prende il clic che era partito per il primo
+  ([una conferma non è un avviso sopra un fatto già compiuto](una-conferma-non-e-un-avviso-sopra-un-fatto-gia-compiuto.md)).
+- Le risposte arrivano al main solo dalla cornice della finestra (`isShell`):
+  se la domanda riguarda una pagina, la pagina non risponde per l'utente.
+
+Prove: `tests/titoli-schede.spec.mjs` (stessa carta, `data-nid` invariato).

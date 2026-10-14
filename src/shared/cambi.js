@@ -81,6 +81,8 @@
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
+    'titoliSchede.controlla': { nome: 'controllo dei titoli delle schede', valore: ATTIVO, livello: 1 },
+    'titoliSchede.chiediCondivisione': { nome: 'domanda se mandare i titoli segnalati', valore: ATTIVA, livello: 1 },
     'notifications.durationSec': { nome: 'durata delle notifiche', valore: (v) => (Number(v) ? `${numero(v)} s` : 'finché non la chiudi'), livello: 1 },
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },

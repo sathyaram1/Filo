@@ -124,6 +124,15 @@
       dove: ['src/shared/paths.js'],
     },
     {
+      id: 'titoli-condivisi', nome: 'Il server di Filo, per i titoli delle schede segnalati',
+      base: [FUNZIONI],
+      quando: 'funzione',
+      occasione: 'solo se nel riquadro di un titolo sospetto accetti di mandarcelo, e solo quando il server è pronto a riceverli',
+      riceve: 'il titolo, il nome del sito, la tua risposta, la lingua e la versione della regola, con l’identità anonima dell’installazione',
+      frase: 'I titoli delle schede si controllano sul tuo computer.',
+      dove: ['src/main/services/controlloTitoli.js'],
+    },
+    {
       id: 'red-team', nome: 'Il server di Filo, per il red team',
       base: [FUNZIONI],
       quando: 'funzione',

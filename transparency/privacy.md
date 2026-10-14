@@ -113,6 +113,8 @@ Lo stesso vale per i percorsi dell'Aiuto: Filo sa già ripulire e condividere i 
 
 Leggerli invece sì. Quando apri l'Aiuto su una pagina, o gli fai una domanda, Filo chiede al server i percorsi già noti per quel sito, e la richiesta porta il nome del sito, per esempio posta.esempio.it, senza il resto dell'indirizzo e senza il tuo account. Gli indirizzi numerici e le pagine della rete di casa restano fuori. La richiesta legge e basta: nel database non resta niente.
 
+I titoli delle schede si controllano sul tuo computer. Quando un titolo sembra dare ordini a Filo, il riquadro che te lo chiede può domandarti anche se mandarcelo, per migliorare il controllo: solo se rispondi Sì partono il titolo, il nome del sito, la tua risposta, la lingua e la versione della regola, con l'identità anonima dell'installazione e senza il resto dell'indirizzo. La domanda compare solo quando il server è pronto a riceverli, e non per le schede in incognito.
+
 ## Il red team
 
 Chi vuole può attaccare i giudici di Filo dall'app, con ricompense in crediti. Servono il login e un codice. Il testo dell'attacco arriva al server in chiaro e ci resta: è materiale scritto per ingannare un modello, e serve proprio a farlo leggere. Con il tuo account restano il nome in classifica, che scegli tu, i punteggi e i tentativi. Chi non partecipa non ha niente in questa parte. Per ora il red team è in pausa, e torna dopo il rilascio pubblico.

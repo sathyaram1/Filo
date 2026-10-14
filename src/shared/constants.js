@@ -133,6 +133,8 @@
     // I siti (dominio registrabile) dove Filo ha visto un campo password o carta: restano delicati anche dopo un
     // riavvio, quando la scheda riaperta è già dentro l'area riservata e il campo non c'è più (#1004).
     SITI_CON_CAMPI: 'filo_siti_con_campi',
+    // { "sito\nchiave del titolo": 'si'|'no' }: le risposte al box dei titoli sospetti (#927), che non si riapre più.
+    TITOLI_SCHEDE_RISPOSTE: 'filo_titoli_schede_risposte',
     // { versione } su cui l'utente ha premuto «Installa» da spento (#786): vale anche dopo un riavvio a metà scaricamento.
     AGGIORNAMENTO_CHIESTO: 'filo_aggiornamento_chiesto',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
@@ -2719,6 +2721,9 @@
     // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nella Cronologia per significato. Spento, di una
     // scheda che si chiude non parte niente verso i modelli: la si ritrova per parole.
     riassuntoSchede: { enabled: true },
+    // #927 — i titoli delle schede passano dalla regola locale prima del riepilogo della chat. Spento: solo il nome
+    // del sito. `chiediCondivisione` spento è il «Non chiedermelo più» del box.
+    titoliSchede: { controlla: true, chiediCondivisione: true },
     // Suoneria del timer: suono riprodotto alla scadenza finché l'utente non
     // preme "Ferma". Generato via WebAudio API (nessun file audio esterno).
     // Valori: 'default' | 'gentle' | 'urgent' | 'chime'

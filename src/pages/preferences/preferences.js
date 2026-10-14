@@ -854,6 +854,8 @@
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
+      case 'titoliSchede.controlla': return $('titoliControlla').checked;
+      case 'titoliSchede.chiediCondivisione': return $('titoliChiedi').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
@@ -904,6 +906,8 @@
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
+      case 'titoliSchede.controlla': return !(s.titoliSchede && s.titoliSchede.controlla === false);
+      case 'titoliSchede.chiediCondivisione': return !(s.titoliSchede && s.titoliSchede.chiediCondivisione === false);
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
@@ -944,9 +948,13 @@
     }
   }
   // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
+  // La domanda «ci mandi questo titolo?» esiste solo se il server ha il canale (#927): senza, la sua spunta non si mostra.
+  let titoliCanale = false;
   async function segnapostiContesto() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
+      titoliCanale = !!(r && r.titoliCondivisi);
+      $('titoliChiediRiga').hidden = !titoliCanale || !$('titoliControlla').checked;
       const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
       if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
       if (d.token != null) $('contestoToken').placeholder = String(d.token);
@@ -1046,6 +1054,10 @@
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
+    const titoli = settings.titoliSchede || {};
+    if (vuole('titoliSchede.controlla')) $('titoliControlla').checked = titoli.controlla !== false;
+    if (vuole('titoliSchede.chiediCondivisione')) $('titoliChiedi').checked = titoli.chiediCondivisione !== false;
+    $('titoliChiediRiga').hidden = !titoliCanale || titoli.controlla === false;
     if (vuole('aggiornamenti.installa')) {
       $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
     }
@@ -1201,6 +1213,50 @@
     if (hint) hint.textContent = r && r.ok && r.tolta ? 'Dimenticato' : 'Non c\'era più: ecco com\'è adesso';
     flashSaved('memoriaHint');
     caricaMemoria();
+  }
+
+  // ── Titoli delle schede (#927): le risposte date al box, che qui si tolgono ──
+  async function caricaTitoli() {
+    const box = $('titoliRisposte');
+    if (!box) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.TITOLI_SCHEDE_ELENCO }); } catch (_) {}
+    const voci = r && r.ok && Array.isArray(r.voci) ? r.voci : [];
+    box.textContent = '';
+    box.hidden = !voci.length;
+    if (!voci.length) return;
+    const h = document.createElement('h3');
+    h.className = 'mem-gruppo';
+    h.textContent = 'Titoli a cui hai risposto';
+    box.appendChild(h);
+    for (const v of voci) box.appendChild(rigaTitolo(v));
+  }
+
+  function rigaTitolo(v) {
+    const row = document.createElement('div');
+    row.className = 'mem-riga';
+    const t = document.createElement('span');
+    t.className = 'mem-testo';
+    t.textContent = v.titolo || '(senza titolo)';
+    const dove = document.createElement('span');
+    dove.className = 'doc-dove';
+    dove.textContent = [v.sito || 'pagina senza sito', v.risposta === 'no' ? 'Filo lo legge' : 'resta fuori', v.incognito ? 'in incognito, fino alla chiusura di Filo' : '']
+      .filter(Boolean).join(' · ');
+    t.appendChild(dove);
+    row.appendChild(t);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'mem-via';
+    b.textContent = '×';
+    b.title = 'Togli la risposta: se il titolo torna, Filo lo richiede';
+    b.setAttribute('aria-label', `Togli la risposta per ${String(v.titolo || '').slice(0, 80)}`);
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await chrome.runtime.sendMessage({ type: MSG.TITOLO_SCHEDA_DIMENTICA, voce: v.voce }); } catch (_) {}
+      caricaTitoli();
+    });
+    row.appendChild(b);
+    return row;
   }
 
   // ── Ricerca nei documenti (#947) ─────────────────────────────────────────
@@ -1538,8 +1594,11 @@
     } catch (_) {}
     load();
     caricaMemoria();
+    caricaTitoli();
     $('documentiAggiungi').addEventListener('click', aggiungiCartella);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) caricaStatoDocumenti(); });
+    // Una risposta data al box mentre questa pagina era dietro si vede tornando qui.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) caricaTitoli(); });
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
@@ -1572,6 +1631,8 @@
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('aggiornamentiAutomatici').addEventListener('change', persist);
+    $('titoliControlla').addEventListener('change', () => { $('titoliChiediRiga').hidden = !titoliCanale || !$('titoliControlla').checked; persist(); });
+    $('titoliChiedi').addEventListener('change', persist);
     for (const id of ['contestoGiorni', 'contestoToken']) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));

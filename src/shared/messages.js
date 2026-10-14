@@ -400,6 +400,10 @@
     QUIT_APP: 'quit_app',
     // #1039 — «Riavvia e aggiorna»: chiude Filo e lancia l'installatore, quindi solo dalle superfici di Filo (soloFilo).
     AGGIORNAMENTO_INSTALLA: 'aggiornamento_installa', // → { ok } | { ok:false, frase }
+    // #927 — la risposta al box dei titoli sospetti, solo dalla cornice della finestra: { id, passo, valore } → { passo? | chiudi }
+    TITOLO_SCHEDA_RISPOSTA: 'titolo_scheda_risposta',
+    TITOLI_SCHEDE_ELENCO: 'titoli_schede_elenco',        // → { ok, voci: [{ voce, titolo, sito, risposta, incognito }] } (solo pagine di Filo)
+    TITOLO_SCHEDA_DIMENTICA: 'titolo_scheda_dimentica',  // { voce } → { ok, tolta } (solo pagine di Filo)
     NAV_BACK: 'nav_back',
     NAV_FORWARD: 'nav_forward',
     NAV_RELOAD: 'nav_reload',

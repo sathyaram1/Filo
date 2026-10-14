@@ -2634,6 +2634,17 @@ class TabManager {
     wc.on('page-title-updated', (_e, title) => {
       update({ title: title || tab.title });
       this.visite.titolo(wc, title);
+      // Un titolo che parla a Filo apre il box subito, anche da una scheda dietro (#927).
+      try {
+        globalThis.SN_TITOLI_MAIN?.titoloCambiato({ titolo: title, url: wc.getURL(), incognito: this.incognito, finestra: this.win?.id })?.catch(() => {});
+      } catch (_) {}
+    });
+    // Ricaricata con lo stesso titolo la pagina non lo «cambia»: il box chiuso senza risposta deve poter tornare.
+    wc.on('did-finish-load', () => {
+      try {
+        const titolo = wc.getTitle();
+        if (titolo && titolo !== wc.getURL()) globalThis.SN_TITOLI_MAIN?.titoloCambiato({ titolo, url: wc.getURL(), incognito: this.incognito, finestra: this.win?.id })?.catch(() => {});
+      } catch (_) {}
     });
     wc.on('page-favicon-updated', (_e, favicons) => this._aggiornaIcona(tab, wc, favicons));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
@@ -2643,6 +2654,7 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      try { globalThis.SN_TITOLI_MAIN?.paginaCaricata(url); } catch (_) {}
       // L'icona in volo era del documento di prima; quella mostrata vale ancora solo sullo stesso sito.
       tab._giroIcona = (tab._giroIcona || 0) + 1;
       if (origineDi(url) !== tab._origineIcona) tab.favicon = '';

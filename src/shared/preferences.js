@@ -1374,6 +1374,34 @@
         return { partial: { riassuntoSchede: { enabled: b } }, label: `Riassunto delle schede chiuse → ${b ? 'attivo' : 'spento'}` };
       },
     },
+    // #927 — i titoli delle schede nel riepilogo della chat: acceso li fa entrare dopo la regola locale, spento solo il sito.
+    {
+      scrive: ['titoliSchede.controlla'],
+      aiuto: 'true | false (i titoli delle schede passano da una regola locale prima che Filo li legga, e uno che sembra dargli ordini resta fuori e apre un box; spento, Filo legge solo il nome del sito)',
+      costo: 1,
+      keys: ['controlla_titoli_schede', 'controlla i titoli delle schede', 'controllo dei titoli delle schede', 'titoli delle schede',
+        'titoli schede', 'leggi i titoli delle schede', 'titolischede'],
+      allenta: (r) => r.partial.titoliSchede.controlla === true,
+      risk: 'Acceso, Filo legge i titoli delle schede che passano la regola locale: un titolo scritto per dargli ordini '
+        + 'che la regola non riconosce entra nel riepilogo di ogni messaggio. Spento, legge solo il nome del sito.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { titoliSchede: { controlla: b } }, label: `Controlla i titoli delle schede → ${b ? 'acceso' : 'spento'}` };
+      },
+    },
+    {
+      scrive: ['titoliSchede.chiediCondivisione'],
+      aiuto: 'true | false (dopo la risposta al box di un titolo sospetto, chiede se mandare titolo, nome del sito e risposta per migliorare il filtro; spento è «Non chiedermelo più»)',
+      costo: 1,
+      keys: ['chiedi_condivisione_titoli', 'chiedimi se mandare i titoli', 'condivisione dei titoli segnalati', 'mandare i titoli segnalati',
+        'non chiedermelo più dei titoli'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { titoliSchede: { chiediCondivisione: b } }, label: `Chiedimi se mandare i titoli segnalati → ${b ? 'acceso' : 'spento'}` };
+      },
+    },
     {
       scrive: ['security.riquadriRotti.modello'],
       aiuto: 'true | false (un contenuto incorporato di un altro sito rimasto vuoto, che Filo non riconosce da solo, va in foto a un modello per capire se sono i cookie rifiutati; spento, nessuna foto parte e quel riquadro si riattiva col tasto destro)',

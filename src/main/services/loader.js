@@ -88,6 +88,7 @@ require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
 require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
 require(path.join(SHARED, 'urlExfil.js'));
+require(path.join(SHARED, 'titoliSchede.js')); // #927 — la regola fissa sui titoli delle schede (logica pura)
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
 require(path.join(SHARED, 'codaAdattiva.js'));  // #1118 — lavori in parallelo che rallentano ai 429: prima del cancello dei modelli
@@ -171,6 +172,7 @@ require(path.join(SVC, 'statoSistema.js')); // batteria, rete, Bluetooth del com
 require(path.join(SVC, 'comandiSistema.js')); // #874 volume, Bluetooth e Wi-Fi a comando: SN_COMANDI_SISTEMA
 require(path.join(SVC, 'safebrowse', 'index.js'));
 require(path.join(SVC, 'pagineDelicate.js')); // #1004 — i siti che hanno mostrato un campo password o carta, per la sessione
+require(path.join(SVC, 'controlloTitoli.js')); // #927 — quali titoli delle schede entrano nel riepilogo, e il box dei sospetti
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));
 require(path.join(SVC, 'geoBlockRules.js'));

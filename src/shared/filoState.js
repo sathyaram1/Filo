@@ -32,6 +32,10 @@
       // Una pagina delicata entra nel contesto della chat solo col nome del sito (#1004): la regola la tiene il main.
       let fuori = () => null;
       try { if (global.SN_DELICATE) fuori = await global.SN_DELICATE.filtro(); } catch (_) {}
+      // Il titolo lo sceglie il sito: entra solo se passa la regola locale e il livello lo tiene pulito (#927).
+      // Senza il controllo (una pagina, un errore) passa solo il nome del sito.
+      let soloSito = () => 'sito';
+      try { if (global.SN_TITOLI_MAIN) soloSito = await global.SN_TITOLI_MAIN.filtro(); } catch (_) {}
       return sorted.map((t) => ({
         url: t.url || '',
         title: t.title || '',
@@ -39,6 +43,7 @@
         lastAccessed: t.lastAccessed || null,
         zoomPercent: typeof t.zoomPercent === 'number' ? t.zoomPercent : null,
         delicata: fuori(t.url || '') || null,
+        soloSito: soloSito({ title: t.title || '', url: t.url || '' }) || null,
       }));
     } catch (_) {
       return [];
@@ -328,6 +333,12 @@
           let sito = '';
           try { sito = new URL(t.url).hostname.replace(/^www\./, ''); } catch (_) {}
           righe.push(`${i + 1}. ${focus}[pagina delicata] ${E.neutralizza(sito || 'sito', { unaRiga: true })}${rel}`);
+          return;
+        }
+        if (t.soloSito) {
+          let sito = '';
+          try { sito = new URL(t.url).hostname.replace(/^www\./, ''); } catch (_) {}
+          righe.push(`${i + 1}. ${focus}[titolo non letto] ${E.neutralizza(sito || 'pagina senza indirizzo web', { unaRiga: true })}${rel}`);
           return;
         }
         const grezzo = (t.title || '').slice(0, 80) || '(senza titolo)';

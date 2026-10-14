@@ -459,6 +459,7 @@ const REGOLE_IMPORT = {
   FILO_TERMINAL_CWD: 'stato',
   FILO_TERMINALE_SPIEGATO: 'stato',
   SITI_CON_CAMPI: 'contenuto',
+  TITOLI_SCHEDE_RISPOSTE: 'contenuto',
   AGGIORNAMENTO_CHIESTO: 'stato',
   LAST_SEEN_VERSION: 'stato',
   LAST_SEEN_NOTES: 'stato',

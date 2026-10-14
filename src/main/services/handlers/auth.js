@@ -607,6 +607,7 @@ module.exports = function register(on, ctx) {
       return {
         ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
         contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
+        titoliCondivisi: Boolean(Defaults.canaleTitoli()),
       };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };

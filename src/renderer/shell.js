@@ -1528,8 +1528,15 @@
       for (let i = 0; i < over; i++) {
         const c = live[i]; // le più vecchie sono in cima (append in coda)
         if (c._tempo) c._tempo.annulla();
+        chiusa(c);
         try { c.remove(); } catch (_) {}
       }
+    }
+    // `allaChiusura`: chi ha aperto una domanda sa che la carta è sparita, comunque sia sparita.
+    function chiusa(card) {
+      const f = card._allaChiusura;
+      card._allaChiusura = null;
+      if (typeof f === 'function') { try { f(); } catch (_) {} }
     }
     function avviaTempo(card, ms) {
       if (card._tempo) card._tempo.annulla();
@@ -1538,6 +1545,7 @@
     function dismiss(card) {
       if (!card || card.dataset.closing === '1') return;
       card.dataset.closing = '1';
+      chiusa(card);
       if (card._tempo) card._tempo.annulla();
       card._tempo = null;
       card.classList.remove('show');
@@ -1563,6 +1571,15 @@
           // Il bottone resta sotto il puntatore mentre la notifica sparisce: un doppio clic
           // ripeterebbe l'azione (due schede da «Apri comunque»).
           if (card.dataset.closing === '1') return;
+          // `resta`: la carta è una domanda a passi, e il passo dopo la riscrive (o la chiude) chi risponde.
+          if (a.resta) {
+            if (card.dataset.attesa === '1') return;
+            card.dataset.attesa = '1';
+            let p = null;
+            try { p = a.onClick && a.onClick(); } catch (_) {}
+            Promise.resolve(p).catch(() => {}).finally(() => { delete card.dataset.attesa; });
+            return;
+          }
           try { a.onClick && a.onClick(); } catch (_) {}
           dismiss(card);
         });
@@ -1597,6 +1614,7 @@
       card.dataset.nid = String(++seq);
       if (opts.key) card.dataset.key = String(opts.key);
       if (chiave) card.dataset.unica = chiave;
+      if (typeof opts.allaChiusura === 'function') card._allaChiusura = opts.allaChiusura;
 
       const msg = document.createElement('div');
       msg.className = 'shell-notif-msg';
@@ -1642,7 +1660,12 @@
         if (c.dataset.key === String(key)) dismiss(c);
       }
     }
-    return { show, dismiss, dismissKey, rispecchia };
+    function dismissUnica(chiave) {
+      for (const c of hostEl().querySelectorAll('.shell-notif')) {
+        if (c.dataset.unica === String(chiave)) dismiss(c);
+      }
+    }
+    return { show, dismiss, dismissKey, dismissUnica, rispecchia };
   })();
 
   // Compat: il vecchio toast informativo (es. "Tab riordinate e salvate") ora
@@ -1686,16 +1709,40 @@
   // programma?», dove la pagina non la copre.
   let chiediApertura = null;
 
+  // #927 — il box dei titoli sospetti: la risposta va al main, che dice se c'è un secondo passo nella stessa carta.
+  function azioneTitoloScheda(a, unica) {
+    const d = a.titoloScheda || {};
+    return {
+      label: a.label,
+      resta: true,
+      onClick: () => api.message({ type: 'titolo_scheda_risposta', id: d.id, passo: d.passo, valore: d.valore }).then((r) => {
+        if (r && r.passo && unica) {
+          NOTIFS.show(r.passo.testo, { durationSec: 0, unica, actions: (r.passo.azioni || []).map((x) => azioneTitoloScheda(x, unica)) });
+          return;
+        }
+        if (unica) NOTIFS.dismissUnica(unica);
+        if (r && r.frase) NOTIFS.show(r.frase);
+      }).catch(() => { if (unica) NOTIFS.dismissUnica(unica); }),
+    };
+  }
+
   if (api.onToast) api.onToast((info) => {
     if (!info || !info.text) return;
     // Le azioni che arrivano dal main non possono trasportare funzioni: le
     // codifichiamo in modo dichiarativo e le traduciamo qui in onClick.
     // - openUrl → apri quel sito; con apriComunque scavalca la lista dei siti bloccati (#170.3).
     let opts = info.opts;
+    // Il box di un titolo sospetto che sparisce senza risposta lo dice al main, che non zittisce il sito.
+    const domandaTitolo = opts && Array.isArray(opts.actions) && opts.actions.find((a) => a && a.titoloScheda);
+    if (domandaTitolo) {
+      const id = domandaTitolo.titoloScheda.id;
+      opts = { ...opts, allaChiusura: () => api.message({ type: 'titolo_scheda_risposta', id, passo: 'chiuso' }).catch(() => {}) };
+    }
     if (opts && Array.isArray(opts.actions)) {
       opts = {
         ...opts,
         actions: opts.actions.map((a) => {
+          if (a && a.titoloScheda && !a.onClick) return azioneTitoloScheda(a, opts.unica);
           if (a && a.openUrl && !a.onClick) {
             return { label: a.label, onClick: () => api.tabs.openBlockedPopup(a.openUrl, a.apriComunque === true) };
           }

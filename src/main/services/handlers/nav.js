@@ -115,6 +115,15 @@ module.exports = function register(on, ctx) {
     return msg && msg.avvisa === true ? U.riavviaDallaHome() : U.riavviaEAggiorna();
   }));
 
+  // #927 — il box lo vede l'utente nella cornice: una pagina non può rispondere per lui sul proprio titolo.
+  on(MSG.TITOLO_SCHEDA_RISPOSTA, async (msg, sender) => {
+    if (!sender?.isShell) return { ok: false, error: 'forbidden' };
+    return require('../controlloTitoli').rispondi(msg || {});
+  });
+  // Le risposte date al box si rivedono e si tolgono in Preferenze.
+  on(MSG.TITOLI_SCHEDE_ELENCO, soloFilo(async () => ({ ok: true, voci: await require('../controlloTitoli').elenco() })));
+  on(MSG.TITOLO_SCHEDA_DIMENTICA, soloFilo(async (msg) => ({ ok: true, tolta: await require('../controlloTitoli').dimentica(msg && msg.voce) })));
+
   on(MSG.NAV_BACK, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
