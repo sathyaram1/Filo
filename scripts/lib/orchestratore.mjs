@@ -633,9 +633,17 @@ export function creaMotore(dep, opzioni = {}) {
         salva(p);
       }
       if (serveDeploy(p, p.fileApp) && !p.fusa.deploy) {
-        dep.log(`#${p.num} server:pubblica`);
-        const r = await conRitenta(p, () => dep.pubblica(), 'server:pubblica');
-        if (r.code !== 0) return ferma(p, `fuso, ma il deploy del server non è andato:\n${coda(r.out)}`);
+        // Con deploy.yml su main la spinta del server l'ha già pubblicata GitHub: un deploy dal PC correrebbe insieme al
+        // suo. Resta al PC solo un'app che cambia file incorporati, che nessuna spinta sul server ripubblica.
+        const incorpora = (p.fileApp || []).some((f) => INCORPORATI_DAL_SERVER.includes(f));
+        if (p.fusa.server && !incorpora && dep.pubblicaGitHub && await dep.pubblicaGitHub()) {
+          dep.log(`#${p.num} il server lo pubblica GitHub (deploy.yml): niente server:pubblica dal PC`);
+          p.avvisi.push('server: lo pubblica GitHub (deploy.yml su main di filo-security); se la corsa è rossa, npm run server:pubblica da filo-security/functions');
+        } else {
+          dep.log(`#${p.num} server:pubblica`);
+          const r = await conRitenta(p, () => dep.pubblica(), 'server:pubblica');
+          if (r.code !== 0) return ferma(p, `fuso, ma il deploy del server non è andato:\n${coda(r.out)}`);
+        }
         p.fusa.deploy = true;
         salva(p);
       }
