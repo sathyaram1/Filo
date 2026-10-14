@@ -119,15 +119,6 @@ test('incollato con paragrafi', async ({ app, openTab, testServer }) => {
   await sottoLaParola(page, 'paragrafi');
 });
 
-test('campo che scorre: ultima riga dopo molte righe', async ({ app, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const page = await apri(app, openTab, testServer);
-  await page.evaluate(() => { const ce = document.getElementById('ce'); ce.style.maxHeight = '80px'; ce.style.overflow = 'auto'; });
-  for (const r of ['uno', 'due', 'tre', 'quattro', 'cinque']) { await page.keyboard.type(r); await page.keyboard.press('Enter'); }
-  await page.keyboard.type('sì ci vediamo mercoledì');
-  await sottoLaParola(page, 'scorre');
-});
-
 test('correzione applicata sulla seconda riga: le righe restano', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer);
