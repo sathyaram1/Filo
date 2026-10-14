@@ -420,9 +420,8 @@ export function ambientePerITest(base, temp = '') {
 }
 
 /**
- * `node --test` con `args`. Con `avanzamento` (il file del suo reporter) un lancio che non va avanti per `tetto` si
- * chiude, e `fermo` dice chi era fermo. Anche una prova che fa girare altri file passa da qui (#1214). `raccogli`: l'uscita
- * torna in `stdout`/`stderr` invece di andare al terminale.
+ * Con `avanzamento` (il file del suo reporter) un lancio fermo per `tetto` si chiude, e `fermo` dice chi era fermo. Ci
+ * passa anche una prova che fa girare altri file (#1214). `raccogli`: l'uscita torna nell'esito invece che al terminale.
  */
 export const lanciaSorvegliato = (args, { env, avanzamento = null, tetto = TETTO_FERMO_MS, raccogli = false } = {}) => new Promise((ok) => {
   // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
