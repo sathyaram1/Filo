@@ -407,9 +407,14 @@ export function orologioMacchina({ misura = misuraLavoro, ora = () => performanc
 }
 
 /** PURA. */
+function durataDetta(ms) {
+  const minuti = Math.round(ms / 60000);
+  return minuti >= 1 ? `${minuti} minut${minuti === 1 ? 'o' : 'i'}` : `${Math.round(ms / 1000)} secondi`;
+}
+
+/** PURA. */
 export function testoFermo(inCorso, fermoMs, root = REPO_ROOT) {
-  const minuti = Math.round(fermoMs / 60000);
-  const tempo = minuti >= 1 ? `${minuti} minut${minuti === 1 ? 'o' : 'i'}` : `${Math.round(fermoMs / 1000)} secondi`;
+  const tempo = durataDetta(fermoMs);
   if (!inCorso.length) return `[test:unit] ROSSO: per ${tempo} non è andato avanti niente, e la corsa è stata chiusa.`;
   const [fermo, ...altri] = inCorso.map((f) => perLaRiga(f, root));
   const righe = [`[test:unit] ROSSO: ${fermo} non è andato avanti per ${tempo}, e la corsa è stata chiusa.`];
