@@ -53,6 +53,10 @@ test('exitCodeFor: il contratto CLI su cui il ruolo secaudit decide le chiusure'
   assert.equal(exitCodeFor({ ok: true, result: 'merged', sha: 'abc' }), 0);
   assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' }), 10);
   assert.equal(exitCodeFor({ ok: true, result: 'conflict' }), 20);
+  // Lavoro server (#1159 fase 2): la parte del server la segue il server, e chi chiede non fa niente.
+  assert.equal(exitCodeFor({ ok: true, result: 'server', esito: 'attesa_deploy' }), 30);
+  assert.match(testoEsitoServer('attesa_suite'), /aspetta la suite di filo-security.*rilascia il biglietto/);
+  assert.match(testoEsitoServer('boh'), /esito «boh»/);
   // Un RIFIUTO del server (verdetti non registrati, ramo che non combacia,
   // biglietto morto) è 1, non 10: non è un blocco di sicurezza da spiegare
   // all'owner, è una richiesta fuori perimetro già registrata dal server.
