@@ -642,6 +642,7 @@ async function main() {
       await scrivi(`\n[test:unit] gruppo ${i + 1} di ${gruppi.length} (${gruppo.length} file)`);
       const l = flagsDi(i);
       const r = await lancia(['--test', ...l.flags, ...gruppo], temp, l.avanzamento);
+      if (r.chiusi.length) await scrivi(`\n${testoFileChiusi(r.chiusi, TETTO_FERMO_MS)}`);
       // Un file fermo è un rosso del suo gruppo, non un'interruzione: i gruppi dopo partono.
       if (r.fermo) { await scrivi(testoFermo(r.fermo, TETTO_FERMO_MS)); esiti.push(1); continue; }
       if (r.error) {
