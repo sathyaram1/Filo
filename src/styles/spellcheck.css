@@ -19,8 +19,8 @@
   box-sizing: border-box;
 }
 
-/* Lo specchio di un campo modificabile usa i tag della pagina (div, p, li…): le sue regole di colore e cornice non
-   devono arrivarci, o il testo e i bordi trasparenti diventerebbero un doppione visibile. */
+/* Lo specchio di un campo modificabile usa i tag della pagina (div, p, li…): i colori che la pagina dà a quei tag non
+   devono renderlo visibile. */
 .sn-spell-overlay *,
 .sn-spell-overlay *::before,
 .sn-spell-overlay *::after,
