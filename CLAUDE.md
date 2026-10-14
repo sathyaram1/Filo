@@ -148,7 +148,9 @@ I feedback arrivano spesso poco specificati. Il tuo lavoro è ricostruire
 - **Miglioramenti SENZA trade-off** (non costano servizi a pagamento, non
   complicano l'uso, non chiudono strade future): nel dubbio si fanno.
 - **Trade-off VERO** (velocità vs costo, semplicità vs potenza, dati
-  dell'utente, scelte di gusto): NON decidere tu, segnala all'owner.
+  dell'utente, scelte di gusto): NON decidere tu, segnala all'owner. Prima
+  cerca nel registro delle decisioni (`node scripts/domanda.mjs cerca
+  <parole>`): un principio che risponde si applica e si cita (D-n).
 
 Nel report: **elenca cosa hai aggiunto oltre il chiesto**, e **se hai fatto una
 cosa DIVERSA da quella chiesta dillo per primo, col perché** (anche per le
