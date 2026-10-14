@@ -29,6 +29,10 @@
     testoTurno: 10000,
     conversazioneByte: 300 * 1024,
     aperteBiglietto: 20,
+    principio: 1000,
+    cerca: 300,
+    risultatiRegistro: 30,
+    assorbite: 20,
   });
 
   // Le chiavi che un'azione `automazione` può scrivere: solo booleani già in Automazioni. `spegne`: il vero spegne.
