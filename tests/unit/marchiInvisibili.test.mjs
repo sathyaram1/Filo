@@ -180,10 +180,7 @@ test('la frase e la nota per il modello presentano il marchio come dichiarazione
 
 process.env.NODE_ENV = 'test';
 const F = require('../../src/main/services/firmatariC2pa.js');
-const isolata = require('../../src/main/services/provenienzaIsolata.js');
-// Il thread di lettura non tiene vivo il processo: senza un intervallo vero la prova finirebbe prima della risposta.
-const vivo = setInterval(() => {}, 60_000);
-test.after(() => clearInterval(vivo));
+const isolata = letturaIsolata();
 
 test('nel thread recintato il marchio si legge, anche dentro un JPEG', async () => {
   assert.equal((await isolata.cercaMarchi(fixture('marchio-flux.jpg'))).marchio, 'flux');
