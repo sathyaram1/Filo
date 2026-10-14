@@ -366,8 +366,9 @@ test('con tante reti conosciute il riquadro scorre, con la rotella e con le frec
 });
 
 test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'elenco dei dispositivi, e le letture non si accodano', async ({ app }) => {
-  // Una lettura lunga: sulla macchina carica della suite tre aperture con Esc arrivavano a superare quattro secondi.
-  await computerFinto(app, { letturaMs: 12_000, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  // Letture ferme, non lunghe: con un tempo fisso la suite carica arrivava alla terza apertura a lettura già finita (#1223).
+  await computerFinto(app, { lettureFerme: true, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  const letture = async () => (await chiamate(app)).filter((c) => c[0] === 'btElenco').length;
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
   // Aperto e richiuso due volte cercando la voce giusta, poi il gesto.
@@ -376,14 +377,18 @@ test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'e
     await page.keyboard.press('Escape');
   }
   await voce(page, 'bluetooth').click();
-  // Tre aperture con la lettura ancora in volo sono una lettura sola.
-  expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(1);
+  await expect.poll(letture).toBe(1);
+  // La lettura non finisce mai da sola: se il tasto la aspettasse, il Bluetooth resterebbe acceso.
   await opzione(page, 'Spegni il Bluetooth').click();
-  await expect.poll(async () => (await computer(app)).bluetooth.acceso, { timeout: 2_000 }).toBe(false);
-  await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 2_000 });
-  // Spento il Bluetooth l'elenco si rilegge una volta, e arriva nel riquadro aperto.
-  await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 25_000 });
-  expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(2);
+  await expect.poll(async () => (await computer(app)).bluetooth.acceso, { timeout: 10_000 }).toBe(false);
+  await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 10_000 });
+  await expect(riquadro(page).locator('.dash-sis-attesa')).toBeVisible();
+  // Spento il Bluetooth l'elenco si rilegge una volta, e arriva nel riquadro aperto. Le tre aperture di prima, arrivate
+  // al main prima del comando, sono una lettura sola: con letture accodate qui sarebbero quattro.
+  await expect.poll(letture).toBe(2);
+  await liberaLetture(app);
+  await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 10_000 });
+  expect(await letture()).toBe(2);
 });
 
 test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuori da Filo', async ({ app, shell }) => {
