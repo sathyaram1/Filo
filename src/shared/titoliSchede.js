@@ -190,13 +190,18 @@
   // I caratteri «tag» (U+E0020–E007E) scrivono testo invisibile: si rileggono come lettere normali.
   const TAG = /[\u{E0020}-\u{E007E}]+/gu;
 
+  // Il taglio si fa sui caratteri del titolo, mai sul testo normalizzato: un carattere che si allarga (\uFDFA \u2192 diciotto
+  // lettere) spingerebbe l'ordine che lo segue oltre la lettura. Uno che si allarga oltre ALLARGATO conta come spazio.
+  const ALLARGATO = 4;
+  const NON_ASCII = /[^\x00-\x7F]/gu;
   function base(testo) {
-    let t = String(testo || '').slice(0, TETTO * 2);
+    let t = Array.from(String(testo || '')).slice(0, TETTO).join('');
     t = t.replace(TAG, (run) => ` ${Array.from(run, (c) => String.fromCharCode(c.codePointAt(0) - 0xE0000)).join('')} `);
+    t = t.replace(NON_ASCII, (c) => (c.normalize('NFKC').length > ALLARGATO ? ' ' : c));
     t = t.normalize('NFKC').replace(INVISIBILI, '').toLowerCase();
     let out = '';
     for (const ch of t.normalize('NFD').replace(/[\u0300-\u036F]/g, '')) out += CONFONDIBILI.get(ch) || ch;
-    return out.slice(0, TETTO);
+    return out;
   }
 
   // Lettere spaziate o puntate («i g n o r a», «N.O.T.A»): una sola lettera fra separatori singoli, quattro o più di fila.
