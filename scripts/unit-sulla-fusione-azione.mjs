@@ -1,6 +1,6 @@
-// Gli unit sul risultato della fusione, nell'azione di GitHub che il server avvia dopo i pass (#1207). Prova la coppia
-// di sha ricevuta, mai il main di adesso; non fonde né spinge. Il verde per il server è la corsa riuscita: l'annotazione
-// `prova-unit` dice solo che rosso è. Gira da una copia di main, sul ramo in --root. Sentinella: tests/unit/unitSullaFusione.test.mjs.
+// Gli unit sulla fusione nell'azione di GitHub avviata dal server (#1207): gira da una copia di main sul ramo in --root,
+// prova la coppia di sha ricevuta e mai il main di adesso, non fonde né spinge. Il verde è la corsa riuscita; l'annotazione
+// `prova-unit` dice solo che rosso è. Sentinella: tests/unit/unitSullaFusione.test.mjs.
 
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
