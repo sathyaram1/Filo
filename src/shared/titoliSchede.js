@@ -55,10 +55,15 @@
     SEGNO: R`\s*(?:[:,;!.\-–—|)\]>=~*]+|$)`,
     QUI: R`(?:questa|questo|this|esta|este|cette|ce|diese|dieser|dieses)\s+(?:pagina|page|sito|site|website|testo|text|titolo|title|documento|document|scheda|tab|pestana|onglet|seite|webseite|texte|titre|post|articolo|article)`,
     LEGGE: R`(?:leggono|leggete|legge|leggi|leggera|leggeranno|stanno leggendo|sta leggendo|read|reads|are reading|is reading|will read|lee|leen|lea|lean|leyendo|estan leyendo|lit|lisent|lisez|lirez|lesen|liest|lest|visitano|visit|visits|visiting|scan|scansiona|scansionano|analizzano|analizza|analyze|analyse|analyzing|crawl|crawls|crawling|process|processes|riassumono|riassume|summarize|summarizes|summarizing)`,
-    ISTRUZIONI: R`(?:consignes|instructions?|istruzion[ei]|instrucciones|anweisungen|directives?|direttive|prompts?|system prompt|prompt di sistema|guidelines|linee guida|vorgaben)`,
+    ISTRUZIONI: R`(?:consignes|directions|indicazioni|instructions?|istruzion[ei]|instrucciones|anweisungen|directives?|direttive|prompts?|system prompt|prompt di sistema|guidelines|linee guida|vorgaben)`,
     REGOLE: R`(?:rules|regole|reglas|regles|regeln|commands?|comandi|orders|ordini|ordres)`,
     PRIMA: R`(?:ogni|every|qualsiasi|qualunque|any|cualquier|toute|jede|every|cada|chaque|all|tutt[ei]|todas?|toutes?|tous|alle|{{PRIMA_FORTE}})`,
     PRIMA_FORTE: R`(?:your|tue|tus|tes|deine|vos|vostre|previous|prior|above|earlier|preceding|precedenti|anteriores|precedentes|vorherigen|bisherigen|obigen|di prima|ricevute|original[ei]|originales?)`,
+    // Qualcosa che finisce un ordine, non un titolo che prosegue («ignore previous estimates», «le regole precedenti del fantacalcio»).
+    FINE_FRASE: R`(?=\s*(?:$|[.!,;:|\-–—)\]]|(?:and|e|y|et|und)\b|(?:this|questa|questo|esta|este|cette|ce|diese[rs]?)\s+(?:line|riga|linea|message|messaggio|sentence|frase|point|punto|text|testo|mensaje|ligne|zeile)\b))`,
+    PRECEDENTI: R`(?:precedenti|di prima|anteriores|precedentes|previous|above|earlier|vorherigen|ricevute|originali|originales|bisherigen)`,
+    // Senza un indirizzo a cui mandarli, «i file dell'utente» sono una guida per chi amministra: qui solo i segreti.
+    SEGRETI_VERI: R`(?:password|passwords|credenziali|credentials|credenciales|identifiants|zugangsdaten|codici|codes|codigos|cookies?|token|tokens|chiavi|keys|api keys?|pin|iban)`,
     SEGRETI: R`(?:password|passwords|credenziali|credentials|credenciales|identifiants|zugangsdaten|codici|codes|codigos|cookies?|token|tokens|chiavi|keys|api keys?|e-?mails?|mail|messaggi|messages|mensajes|nachrichten|contatti|contacts|contactos|kontakte|documenti|documents|files?)`,
   });
 
@@ -98,11 +103,11 @@
     { famiglia: 'memoria', re: R`{{PERSONA}}\s+(?:\w+\s+){0,2}?{{GUSTO}}\s+(?:\w+\s+){0,3}?(?:che|that|you|tu|te|ti|filo|l'assistente|the assistant|risposte|answers|responses|replies|respuestas|reponses|antworten|sempre|always|siempre|toujours|immer|solo|only|ricevere|receive|recibir|recevoir|erhalten|di\s+(?:rispondere|ricevere|usare|parlare|scrivere)|to\s+(?:receive|get|have|use|buy|see)|que\s+(?:le|les|tu|vous|respondas)|dass\s+du|in\s+{{LINGUA}}|en\s+{{LINGUA}}|auf\s+{{LINGUA}})\b` },
     { famiglia: 'memoria', re: R`\b(?:salva|aggiungi|scrivi|memorizza|registra|save|add|write|store|guarda|agrega|anade|escribe|enregistre|ajoute|ecris|speichere|fuge|schreibe)\s+(?:questo|questa|cio|quanto segue|this|that|it|the following|esto|eso|lo siguiente|ceci|cela|das|dies|folgendes)\s+(?:\w+\s+){0,2}?{{MEMORIA_TUA}}` },
     { famiglia: 'memoria', re: R`\b(?:salva|aggiungi|scrivi|memorizza|registra|save|add|write|store|guarda|agrega|anade|escribe|enregistre|ajoute|ecris|speichere|fuge|schreibe)\s+(?:\w+\s+){0,2}?{{MEMORIA_TUA}}\s*[:,]?\s*(?:che|that|que|qu'|dass)?\s*{{PERSONA}}` },
-    { famiglia: 'memoria', re: R`\b(?:salva|save|guarda|enregistre|speichere|impara|learn|memorizza|memorize|ricorda|remember)\s+(?:questa|this|esta|cette|diese)\s+(?:lezione|lesson|leccion|lecon|lektion|preferenza|preference|preferencia|praferenz|regola|rule|regla|regle|regel)` },
+    { famiglia: 'memoria', re: R`\b(?:salva|save|guarda|enregistre|speichere|impara|learn|memorizza|memorize|ricorda|remember)\s+(?:questa|this|esta|cette|diese)\s+(?:lezione|lesson|leccion|lecon|lektion|preferenza|preference|preferencia|praferenz|regola|rule|regla|regle|regel)\s*[:,\-–—]\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}(?:{{ORDINE}}|{{CONDOTTA}}|{{PERSONA}})` },
     { famiglia: 'memoria', re: R`\b(?:ricorda(?:ti|te)?|remember|recuerda|souviens-toi|rappelle-toi|merk dir|merke dir|memorizza|memori[sz]e|memoriza|retiens)(?:\s+(?:forever|always|per sempre|sempre|bene|well|siempre|toujours|immer|pour toujours|para siempre))?\s*[,:]?\s*(?:(?:che|that|que|qu'|dass)\s+{{PERSONA}}\s+(?:\w+\s+){0,2}?(?:{{GUSTO}}|is|e|es|est|ist|has|ha|tiene|a|hat|lives|vive|habite|wohnt|works|lavora|trabaja|travaille|arbeitet)|{{PERSONA}}\s+(?:\w+\s+){0,2}?{{GUSTO}})\b` },
     // Richieste di azione che portano fuori i dati, anche senza nominare un assistente.
-    { famiglia: 'azione', re: R`\b(?:invia|manda|inoltra|send|forward|e-?mail|envia|reenvia|envoie|transfere|sende|schicke|leite)\s+(?:\w+\s+){0,3}?{{SEGRETI}}\b.{0,60}?(?:\bto|\ba|\bal|\ball'|\bpara|\ban|\bzu|\bvers|\bsu|\bon)\s+(?:\S*@\S+|(?:https?:\/\/|www\.)\S+)` },
-    { famiglia: 'azione', re: R`\b(?:invia|manda|inoltra|send|forward|envia|envoie|sende|schicke|inserisci|scrivi|incolla|enter|type|paste|introduce|pega|saisis|colle|gib|copia|copy|copie|kopiere|condividi|share|comparte|partage|teile|pubblica|publish|post)\s+(?:\w+\s+){0,2}?(?:dell'utente|user'?s|of the user|del usuario|de l'utilisateur|des nutzers)\s*{{SEGRETI}}|(?:invia|manda|inoltra|send|forward|envia|envoie|sende|schicke|inserisci|scrivi|incolla|enter|type|paste|introduce|pega|saisis|colle|gib|copia|copy|copie|kopiere|condividi|share|comparte|partage|teile|pubblica|publish|post)\s+(?:\w+\s+){0,2}?{{SEGRETI}}\s+(?:dell'utente|of the user|del usuario|de l'utilisateur|des nutzers)` },
+    { famiglia: 'azione', re: R`\b(?:invia|manda|inoltra|send|forward|e-?mail|envia|reenvia|envoie|transfere|sende|schicke|leite)\s+(?:[\w']+\s+){0,3}?{{SEGRETI}}\b.{0,60}?(?:\bto|\ba|\bal|\ball'|\bpara|\ban|\bzu|\bvers|\bsu|\bon)\s+(?:\S*@\S+|(?:https?:\/\/|www\.)\S+)` },
+    { famiglia: 'azione', re: R`\b(?:invia|manda|inoltra|send|forward|envia|envoie|sende|schicke|inserisci|scrivi|incolla|enter|type|paste|introduce|pega|saisis|colle|gib|copia|copy|copie|kopiere|condividi|share|comparte|partage|teile|pubblica|publish|post)\s+(?:\w+\s+){0,2}?(?:dell'utente|user'?s|of the user|del usuario|de l'utilisateur|des nutzers)\s*{{SEGRETI_VERI}}|(?:invia|manda|inoltra|send|forward|envia|envoie|sende|schicke|inserisci|scrivi|incolla|enter|type|paste|introduce|pega|saisis|colle|gib|copia|copy|copie|kopiere|condividi|share|comparte|partage|teile|pubblica|publish|post)\s+(?:\w+\s+){0,2}?{{SEGRETI_VERI}}\s+(?:dell'utente|of the user|del usuario|de l'utilisateur|des nutzers)` },
     { famiglia: 'azione', re: R`\b(?:cambia|modifica|disattiva|disabilita|change|modify|disable|turn off|cambia|desactiva|change|modifie|desactive|andere|deaktiviere)\s+(?:le |the |la |las |les |die )?(?:impostazioni|settings|preferenze|preferences|configuracion|ajustes|parametres|reglages|einstellungen)\s+(?:di |della |dell'|of |del |de |des |von )?(?:{{PERSONA}}|user'?s)` },
     { famiglia: 'azione', re: R`\b(?:cambia|modifica|disattiva|disabilita|change|modify|disable|turn off|desactiva|modifie|desactive|andere|deaktiviere)\s+(?:the |le |la |las |les |die )?(?:user'?s|dell'utente|del usuario|de l'utilisateur|des nutzers)\s+(?:\w+\s+){0,2}?(?:impostazioni|settings|preferenze|preferences|configuracion|ajustes|parametres|reglages|einstellungen|protezioni|protections|security|sicurezza)` },
     { famiglia: 'azione', re: R`(?:user'?s|dell'utente|del usuario|de l'utilisateur|des nutzers)\s+{{SEGRETI}}\b.{0,60}?\b(?:send|invia|forward|inoltra|manda|envia|envoie|sende|schicke|post|upload|carica)\b.{0,40}?(?:\bto|\ba|\bal|\bpara|\ban|\bzu|\bvers|\bsu|\bon)\s+(?:\S*@\S+|(?:https?:\/\/|www\.)\S+)` },
@@ -110,9 +115,9 @@
     // Cambi di comportamento senza un destinatario esplicito.
     { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*|override|bypass|salta|ometti)\s+(?=(?:(?:the|le|i|gli|las|los|les|die|der|den)\s+){0,2}{{PRIMA}}\s)(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){1,5}{{ISTRUZIONI}}\b` },
     { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*|override|bypass)\s+(?=(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){0,3}{{PRIMA_FORTE}}\s)(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){1,5}{{REGOLE}}\b` },
-    { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*)\s+(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){0,4}(?:{{ISTRUZIONI}}|{{REGOLE}})\s+(?:precedenti|di prima|anteriores|precedentes|previous|above|earlier|vorherigen|ricevute|originali|originales|bisherigen)\b` },
+    { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*)\s+(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){0,4}(?:{{ISTRUZIONI}}\s+{{PRECEDENTI}}\b|{{REGOLE}}\s+{{PRECEDENTI}}\b{{FINE_FRASE}})` },
     { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*|override|bypass)\s+(?:the |il |lo |la |le |i |gli |el |los |les |die |den )?(?:system prompt|prompt di sistema|prompt de sistema|system instructions|istruzioni di sistema|safety (?:rules|guidelines|filters)|guardrails|(?:your|il tuo|tu|ton|dein) (?:training|addestramento|entrenamiento|entrainement|training))\b` },
-    { famiglia: 'comportamento', re: R`\b(?:forget|ignore|disregard|dimentica|ignora|olvida|oublie|vergiss|ignoriere)\s+(?:(?:everything|anything|all|tutto|todo|tout|alles|the|quanto|cio|lo|ce qui est|das)\s+)?(?:above|before|previous|prior|you(?:'ve| have| were)? (?:been )?told|sopra|prima|precedente|detto prima|que te dijeron|anterior|ci-dessus|precedent|davor|bisher|oben)\b` },
+    { famiglia: 'comportamento', re: R`\b(?:forget|ignore|disregard|dimentica|ignora|olvida|oublie|vergiss|ignoriere)\s+(?:(?:everything|anything|all|tutto|todo|tout|alles|the|quanto|cio|lo|ce qui est|das)\s+){0,2}(?:above|before|previous|prior|you(?:'ve| have| were)? (?:been )?told|sopra|prima|precedente|detto prima|que te dijeron|anterior|ci-dessus|precedent|davor|bisher|oben)\b{{FINE_FRASE}}` },
     { famiglia: 'comportamento', re: R`\b(?:d'ora in (?:poi|avanti)|da (?:ora|adesso|oggi) in (?:poi|avanti)|from now on|henceforth|going forward|a partir de ahora|de ahora en adelante|desde ahora|desormais|dorenavant|a partir de maintenant|ab jetzt|ab sofort|von nun an|fortan)\s*,?\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}(?:{{GUARDIA}}{{PARLA}}|you will|you must|you should|you are|devi|dovrai|debes|tu dois|du musst)\b` },
     { famiglia: 'comportamento', re: R`\b(?:rispondi|rispondimi|rispondete|scrivi|parla|answer|respond|reply|write|speak|responde|contesta|escribe|habla|reponds|repondez|ecris|parle|antworte|schreib\w*|sprich)\s+(?:(?:sempre|solo|soltanto|unicamente|esclusivamente|always|only|exclusively|siempre|solamente|toujours|seulement|uniquement|immer|nur|ausschliesslich)\s+){1,2}(?:in|en|auf)\s+{{LINGUA}}` },
     { famiglia: 'comportamento', re: R`\b(?:always|only|sempre|soltanto|siempre|toujours|immer|nur)\s+(?:respond|answer|reply|write|speak|rispondi|scrivi|parla|responde|escribe|reponds|ecris|antworte|schreib\w*)\s+(?:in|en|auf)\s+{{LINGUA}}` },
@@ -216,6 +221,7 @@
 
   // I caratteri «tag» (U+E0020–E007E) scrivono testo invisibile: si rileggono come lettere normali.
   const TAG = /[\u{E0020}-\u{E007E}]+/gu;
+  const CON_TAG = /[\u{E0020}-\u{E007E}]/u;
 
   // Il taglio si fa sui caratteri del titolo, mai sul testo normalizzato: un carattere che si allarga (\uFDFA \u2192 diciotto
   // lettere) spingerebbe l'ordine che lo segue oltre la lettura. Uno che si allarga oltre ALLARGATO conta come VUOTO.
@@ -273,7 +279,8 @@
 
   // Tutte le letture del titolo su cui si cercano le espressioni: com'è, e coi travestimenti sciolti.
   function scheletri(titolo) {
-    const grezzo = base(chiave(titolo));
+    const k = chiave(titolo);
+    const grezzo = base(k);
     const b = grezzo.replace(VUOTO_RE, ' ');
     const { unito, pezzi } = ricomponi(b);
     // «NOTA_PER_FILO», «nota*per*filo»: i segni usati al posto dello spazio tornano spazi.
@@ -281,6 +288,12 @@
     const spaziato = coppie.replace(/[_*~^+=]+/g, ' ');
     const letture = new Set([pulisci(b), pulisci(unito), pulisci(spaziato), pulisci(sciogliLeet(spaziato, 'i')), pulisci(sciogliLeet(spaziato, 'l')),
       pulisci(separatoriComeSpazi(spaziato)), pulisci(grezzo.replace(DENTRO_PAROLA, '').replace(VUOTO_RE, ' '))]);
+    // I tag si leggono come testo, ma il riepilogo li toglie: dentro una parola, per il modello non ci sono.
+    if (CON_TAG.test(k)) {
+      const senzaTag = base(k.replace(TAG, ''));
+      letture.add(pulisci(senzaTag.replace(VUOTO_RE, ' ')));
+      letture.add(pulisci(senzaTag.replace(DENTRO_PAROLA, '').replace(VUOTO_RE, ' ')));
+    }
     const attaccate = new Set();
     for (const p of pezzi) {
       attaccate.add(sciogliLeet(p, 'i').replace(/[^a-z]/g, ''));
