@@ -637,6 +637,7 @@
     const wait = Math.max((seenHidden() ? 0 : FRAME_REPORT_MS) - (now - frameSeenAt), ACTION_GRACE_MS - (now - lastActionAt));
     if (wait > 0) { scheduleScanIn(wait + 20); return; }
     reported.add('frame');
+    settle();
     send({ type: T_FRAME });
   }
 
