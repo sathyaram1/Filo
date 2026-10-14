@@ -7,6 +7,7 @@
 //   3. Una pratica passata in cloud che aspetta il PC lo dice sulla scheda («Pronto: aspetta il PC»); rimessa in coda no.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const FEEDBACK = 'filo://feedback/feedback.html';
@@ -44,7 +45,7 @@ async function stubAutomazioni(page, { lavoriServer, rompi = false } = {}) {
 async function apriAutomazioni(page, opts) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await stubAutomazioni(page, opts);
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
@@ -102,7 +103,7 @@ test('Automazioni: chi non è owner vede l’interruttore ma non lo muove', asyn
   const page = await openTab(MANAGE);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
-  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await apriScheda(page, 'automation');
   await page.evaluate(() => window.__mgTest.setAdmin(false));
   await expect(page.locator('#mgLavoriServer')).toBeDisabled();
 });
