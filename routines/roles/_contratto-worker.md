@@ -38,6 +38,8 @@ REGISTRATO con gli script, mentre lavori:
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
 conta niente. Se non l'hai registrato, non esiste.
 
+<!-- includi: _registro-decisioni.md -->
+
 ## I pezzi lunghi del payload stanno in un file
 
 Un campo del payload troppo lungo per la stampa arriva in un file fuori dal
