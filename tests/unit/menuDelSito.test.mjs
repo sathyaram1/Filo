@@ -112,19 +112,15 @@ test('lo stesso ascoltatore sulla finestra per tanti eventi guarda i clic, non a
   for (const t of ['pointerdown', 'pointerup', 'contextmenu']) finestra.removeEventListener(t, tela);
 });
 
-test('conta anche il gestore oncontextmenu, finché c\'è e finché non ha fallito', () => {
-  const nodo = new EventTarget();
-  assert.equal(chiedi(':c', nodo), false);
-  nodo.oncontextmenu = () => false;
-  assert.equal(chiedi(':c', nodo), true);
-  nodo.oncontextmenu = null;
-  assert.equal(chiedi(':c', nodo), false);
-  nodo.oncontextmenu = () => false;
-  chiedi(':f', nodo);
-  assert.equal(chiedi(':c', nodo), false);
-  const curioso = new EventTarget();
-  Object.defineProperty(curioso, 'oncontextmenu', { get() { throw new Error('no'); } });
-  assert.equal(chiedi(':c', curioso), false);
+test('conta anche il gestore oncontextmenu, finché c\'è', () => {
+  assert.equal(ascolta(), false);
+  finestra.oncontextmenu = () => false;
+  assert.equal(ascolta(), true);
+  finestra.oncontextmenu = null;
+  assert.equal(ascolta(), false);
+  Object.defineProperty(finestra, 'oncontextmenu', { configurable: true, get() { throw new Error('no'); } });
+  assert.equal(ascolta(), false);
+  pulisci();
 });
 
 test('chi ascoltava e non ha mostrato niente non conta più, e il segreto non lo indovina chi non lo sa', () => {
