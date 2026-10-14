@@ -837,8 +837,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     });
   }
 
-  // Una risposta fermata dal tetto non si rilegge dalla cache: chi riprova deve poterla avere intera (#1097.3).
-  if (!skipCache && result.finishReason !== 'length') AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
+  // Una risposta tagliata (tetto o errore a metà flusso) non si rilegge dalla cache: chi riprova deve poterla avere intera (#1097.3).
+  if (!skipCache && !globalThis.SN_CHAT_ERRORS.troncata(result.finishReason)) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
   return {
     text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
@@ -893,7 +893,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
   });
 
-  if (result.finishReason !== 'length') AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
+  if (!globalThis.SN_CHAT_ERRORS.troncata(result.finishReason)) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
   return {
     costEur, usage: result.usage, provider: usedProvider, model: concreteModel, keyFallback: ripiegoDaDire(result.keyFallback),
     finishReason: result.finishReason || null,
@@ -4744,7 +4744,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
         exhausted = false;
-        interrotta = r.finishReason === 'length';
+        interrotta = globalThis.SN_CHAT_ERRORS.troncata(r.finishReason) ? r.finishReason : false;
         break;
       }
       if (turno.fermato) { fermato = true; break; }
@@ -4901,7 +4901,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   }
   if (interrotta && !senzaRisposta) {
     senzaRisposta = { passi, interrotta: true };
-    textReply = unisciTesti([textReply, globalThis.SN_CHAT_ERRORS.rispostaInterrotta('length')]);
+    textReply = unisciTesti([textReply, globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di

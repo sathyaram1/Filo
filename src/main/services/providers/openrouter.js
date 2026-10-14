@@ -466,6 +466,13 @@
         }
       }
     }
+    // Fermato da un errore prima di scrivere qualcosa: è un guasto del servizio, che si riprova o passa al ripiego.
+    if (finishReason === 'error' && !fullText && !calls.list().length) {
+      const err = new Error('OpenRouter 502: il fornitore si è fermato a metà flusso');
+      err.status = 502;
+      err.provider = 'openrouter';
+      throw err;
+    }
     return {
       text: fullText, toolCalls: calls.list(), reasoningDetails: details.list(), finishReason, servedBy,
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
