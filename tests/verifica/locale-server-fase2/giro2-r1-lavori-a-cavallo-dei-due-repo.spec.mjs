@@ -3,7 +3,7 @@
 // routine. Le corse di GitHub si simulano dai workflow veri; non apre Filo.
 
 import { test, expect } from '@playwright/test';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
