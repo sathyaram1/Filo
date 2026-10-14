@@ -30,6 +30,15 @@ Il diff può essere GROSSO: la taglia non è una scusa per campionare. Leggilo
 tutto; se il contesto non basta, usa sotto-agenti sequenziali per sezioni del
 diff e tieni tu il giudizio d'insieme.
 
+**Lavoro server.** Se il payload porta anche `diffServerFile` (con
+`diffServerHead` e `diffServerBase`), il lavoro tocca il codice del server
+(filo-security, privato): è il diff del suo ramo contro il main del server, e lo
+scarica il server, perché qui il clone non c'è. Leggilo intero come quello
+dell'app e giudica i due insieme. In più, lì, sono sensibili: il cancello di
+fusione e i suoi token, le chiavi e i segreti, le automazioni di GitHub e gli
+strumenti di pubblicazione, la decifratura dei feedback. Il tuo verdetto copre
+anche quel commit del server: lo sa il server, non devi passarlo.
+
 ## Passi
 
 1. Leggi il diff riga per riga (è intero nel file `diffFile` del payload).
