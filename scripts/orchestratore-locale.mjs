@@ -392,7 +392,8 @@ function depVere(P, opz, log) {
       return { ...verifyLocal.verdictForCurrentBranch(wt), dirty: verifyLocal.isDirty(wt) };
     },
     pubblica: () => pubblicaDavvero(P),
-    pubblicaGitHub: () => deployDaGitHub(P),
+    pubblicaGitHub: () => automazioneSuMain(P, 'deploy.yml'),
+    regoleGitHub: () => automazioneSuMain(P, 'regole.yml'),
     carico,
     dormi: (ms) => new Promise((ok) => setTimeout(ok, ms)),
     log,
