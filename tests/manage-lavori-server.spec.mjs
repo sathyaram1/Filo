@@ -140,9 +140,10 @@ test('#1222: la scheda dice quando il server aspetta la suite; un segno di attes
   const s = page.locator('.mg-item[data-id="srv-3"] .mg-attesa-server');
   await expect(s).toHaveText('Aspetta le prove del server');
   await expect(s).toHaveAttribute('title', /suite di GitHub è verde su quel commit/);
-  const d = page.locator('.mg-item[data-id="srv-4"] .mg-attesa-server');
-  await expect(d).toHaveText('Server fuso: aspetta la pubblicazione');
-  await expect(d).toHaveAttribute('title', /Quella dell’app si fonde quando la pubblicazione da GitHub è verde/);
+  await expect(s).toHaveAttribute('title', /prima la parte dell’app|la parte dell’app e poi il ramo di filo-security/);
+  // L'app si fonde prima del server (#1222): l'attesa della pubblicazione non c'è più, e un segno rimasto non si mostra.
+  await expect(page.locator('.mg-item[data-id="srv-4"]')).toBeVisible();
+  await expect(page.locator('.mg-item[data-id="srv-4"] .mg-attesa-server')).toHaveCount(0);
   await expect(page.locator('.mg-item[data-id="srv-5"]')).toBeVisible();
   await expect(page.locator('.mg-item[data-id="srv-5"] .mg-attesa-server')).toHaveCount(0);
 });
