@@ -227,12 +227,14 @@ spedisci_ramo() {
     # protection sui segreti): «! [remote rejected]». Non e' storia divergente
     # e un rebase non lo cura: si dice per quello che e', col motivo del
     # remoto, e non si ritenta col lease (verifica del giro 4).
-    *"[remote rejected]"*"refusing to allow"*workflow*)
-      cosa_fare_automazione
-      segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin: GitHub l'ha RIFIUTATO perche' porta un cambiamento a un'automazione (.github/workflows), anche solo arrivato da main, e $AUTOMAZIONI_MARCA (#1140). $REPLY Il motivo di GitHub: $(motivo_git "$esito")"
-      return 1 ;;
     *"[remote rejected]"*)
-      segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"
+      case "$esito" in
+        *"refusing to allow"*workflow*)
+          cosa_fare_automazione
+          segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin: GitHub l'ha RIFIUTATO perche' porta un cambiamento a un'automazione (.github/workflows), anche solo arrivato da main, e $AUTOMAZIONI_MARCA (#1140). $REPLY Il motivo di GitHub: $(motivo_git "$esito")" ;;
+        *)
+          segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")" ;;
+      esac
       return 1 ;;
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
       # --force-if-includes: il lease da solo si fida del ref remoto che questa
