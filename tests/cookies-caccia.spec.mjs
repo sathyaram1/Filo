@@ -122,3 +122,31 @@ test('senza banner, a finestra chiusa la pagina e il riquadro vivi non si ripass
     await page.waitForFunction((x) => (document.getElementById(x).src || '').includes('youtube-nocookie.com'), id, { timeout: 8_000 });
   }
 });
+
+test('a caccia chiusa si rifiuta il banner con la scritta arrivata dopo e quello già in pagina mostrato più tardi', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  // Pagina ferma: il banner nascosto dal caricamento non può contare su un nodo nuovo qualsiasi per farsi vedere.
+  const page = await testServer.openReady(openTab, `<title>COMPARSA_TARDIVA</title>${LINK(300)}
+    ${SENZA_CMP('dopo', 'display:none')}`);
+  await expect.poll(async () => (await stato(app, page)).hunting, { timeout: 35_000, intervals: [1_000] }).toBe(false);
+
+  await page.evaluate(() => { document.getElementById('dopo').style.display = 'block'; });
+  await page.waitForFunction(() => !document.getElementById('dopo'), null, { timeout: 8_000 });
+  expect(await page.evaluate(() => [window.__rifiuti, window.__accettati])).toEqual([1, undefined]);
+
+  // Pulsanti vuoti, scritte un attimo dopo: come i banner che caricano le traduzioni. Poi una scritta cambiata sul posto.
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML('beforeend', `<div id="vuoto" class="cookie-consent" style="position:fixed;top:0;left:0;right:0;height:90px;background:#fff;z-index:10">
+      <p>Usiamo i cookie.</p><button id="acc" onclick="window.__accettati=1;this.parentNode.remove()"></button>
+      <button id="rif" onclick="window.__rifiuti=(window.__rifiuti||0)+1;this.parentNode.remove()"></button></div>`);
+    setTimeout(() => { document.getElementById('acc').textContent = 'Accetta'; document.getElementById('rif').textContent = 'Rifiuta'; }, 300);
+  });
+  await page.waitForFunction(() => !document.getElementById('vuoto'), null, { timeout: 8_000 });
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML('beforeend', `<div id="chiave" class="cookie-consent" style="position:fixed;top:0;left:0;right:0;height:90px;background:#fff;z-index:10">
+      <p>Usiamo i cookie.</p><button onclick="window.__rifiuti=(window.__rifiuti||0)+1;this.parentNode.remove()">caricamento</button></div>`);
+    setTimeout(() => { document.querySelector('#chiave button').firstChild.data = 'Rifiuta tutto'; }, 300);
+  });
+  await page.waitForFunction(() => !document.getElementById('chiave'), null, { timeout: 8_000 });
+  expect(await page.evaluate(() => [window.__rifiuti, window.__accettati])).toEqual([3, undefined]);
+});
