@@ -534,20 +534,71 @@ test('la guardia conta il tempo fermo dal primo evento: un file lento che avanza
   assert.equal(appeso(10, 1000), true);
 });
 
-test('senza il tetto di node, un file appeso dopo le sue prove diventa un rosso col suo nome e la corsa finisce', () => {
+// #1231: chiusa la corsa intera, i file dopo quello appeso non giravano e una chiusura restava ferma più di un'ora.
+test('un file appeso si chiude da solo, col suo nome e il tetto nel rosso, e gli altri file girano e dicono il loro esito', () => {
   const dir = cartellaTemporanea('filo-fermo-');
   try {
-    writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
-    // Un tetto corto qui non fa rossi finti: qualunque cosa sia ferma, l'unico file in corso è quello appeso.
+    writeFileSync(join(dir, 'a-appeso-dopo.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
+    writeFileSync(join(dir, 'b-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano dopo il primo appeso', () => {});\n");
+    writeFileSync(join(dir, 'c-appeso-subito.test.mjs'), "setInterval(() => {}, 1000);\nawait new Promise(() => {});\n");
+    writeFileSync(join(dir, 'd-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano in fondo', () => {});\n");
+    // Un tetto corto qui non fa rossi finti: i file sani finiscono in millisecondi.
     const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
-    assert.match(r.stdout, /ROSSO: .*appeso\.test\.mjs non è andato avanti/);
+    assert.match(r.stdout, /^ok \d+ - sano dopo il primo appeso$/m);
+    assert.match(r.stdout, /^ok \d+ - sano in fondo$/m);
+    assert.match(r.stdout, /ROSSO: \S*a-appeso-dopo\.test\.mjs non è andato avanti per 3 secondi ed è stato chiuso; gli altri file sono andati avanti/);
+    assert.match(r.stdout, /ROSSO: \S*c-appeso-subito\.test\.mjs non è andato avanti per 3 secondi ed è stato chiuso/);
+    assert.match(r.stdout, /^not ok \d+ - \S*c-appeso-subito\.test\.mjs$/m, 'node lo dà rosso');
+    assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/);
+    assert.doesNotMatch(r.stdout, /sano.*non è andato avanti/);
     assert.equal(r.status, 1);
   } finally {
     togliCartella(dir);
   }
+});
+
+test('il tetto per file conta solo l\'avanzamento del primo file in corso: gli altri che partono e finiscono non lo fanno ripartire', () => {
+  const g = guardiaPerFile(1000);
+  assert.equal(g([{ via: 'a' }, {}], 0), null);
+  assert.equal(g([{}], 900), null);
+  assert.equal(g([], 1800), null, 'l\'ultimo passo di a è a 900');
+  assert.equal(g([{ via: 'b' }, { fine: 'b' }, { via: 'c' }], 1899), null);
+  assert.equal(g([], 1900), 'a', 'b e c partiti o finiti non sono avanzamento di a');
+  assert.equal(g([], 2500), null, 'detto una volta, il suo tempo riparte');
+  assert.equal(g([], 2900), 'a', 'ridetto: chiuderlo non è servito');
+  assert.equal(g([{ fine: 'a' }], 3000), null, 'chiuso a, il primo diventa c e il suo tempo parte adesso');
+  assert.equal(g([], 3999), null);
+  assert.equal(g([], 4000), 'c');
+  assert.equal(g([{ fine: 'c' }], 4100), null);
+  assert.equal(g([], 99_999), null, 'nessun file in corso: niente da chiudere');
+  assert.match(testoFileChiusi([join(ROOT, 'tests', 'unit', 'x.test.mjs')], 20 * 60 * 1000, ROOT),
+    /^\[test:unit\] ROSSO: tests\/unit\/x\.test\.mjs non è andato avanti per 20 minuti ed è stato chiuso; gli altri file sono andati avanti\.$/);
+});
+
+test('il processo del file da chiudere si trova dalla riga di comando, coi suoi figli, e solo sotto il node --test', () => {
+  const lista = leggiProcessi([
+    '  100     1 /usr/bin/node /home/u/Filo/scripts/run-unit-tests.mjs',
+    '  200   100 /usr/bin/node --test --test-reporter=tap tests/unit/a.test.mjs tests/unit/xa.test.mjs',
+    '  201   200 /usr/bin/node tests/unit/xa.test.mjs',
+    '  202   200 /usr/bin/node /home/u/Filo/tests/unit/a.test.mjs',
+    '  203   202 /usr/bin/node figlio.mjs',
+    '  204   203 sleep 100',
+    '  300     1 /usr/bin/node tests/unit/a.test.mjs',
+    'riga che non è un processo',
+  ].join('\n'));
+  assert.equal(lista.length, 7);
+  assert.deepEqual(processiDelFile(lista, 200, '/home/u/Filo/tests/unit/a.test.mjs', { root: '/home/u/Filo', p: posix }), [202, 203, 204]);
+  assert.deepEqual(processiDelFile(lista, 200, '/home/u/Filo/tests/unit/xa.test.mjs', { root: '/home/u/Filo', p: posix }), [201]);
+  assert.deepEqual(processiDelFile(lista, 200, '/home/u/Filo/tests/unit/b.test.mjs', { root: '/home/u/Filo', p: posix }), []);
+
+  const win = leggiProcessi('512 64 "C:\\Program Files\\nodejs\\node.exe" "C:\\Users\\agenti AI\\Filo\\Tests\\unit\\a.test.mjs"\r\n'
+    + '513 64 "C:\\Program Files\\nodejs\\node.exe" tests\\unit\\b.test.mjs\r\n514 64 \r\n');
+  const comeWin = { root: 'C:\\Users\\agenti AI\\Filo', p: win32 };
+  assert.deepEqual(processiDelFile(win, 64, 'C:\\Users\\agenti AI\\Filo\\tests\\unit\\a.test.mjs', comeWin), [512]);
+  assert.deepEqual(processiDelFile(win, 64, 'C:\\Users\\agenti AI\\Filo\\tests\\unit\\b.test.mjs', comeWin), [513]);
 });
 
 test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
