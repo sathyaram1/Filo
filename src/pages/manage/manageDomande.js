@@ -102,7 +102,7 @@
         let domande = delta ? fondi(stato.domande, r.domande) : r.domande.slice();
         if (aperte) domande = fondi(domande, aperte.domande);
         Object.assign(stato, {
-          lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '',
+          lette: true, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', aggiornamento: '',
           domande,
           riferimenti: Object.assign({}, delta ? stato.riferimenti : {}, aperte ? aperte.riferimenti : {}, r.riferimenti || {}),
           adesso: Number(r.adesso) || stato.adesso,
@@ -110,10 +110,17 @@
         });
       } else {
         const errore = String(guasto.error || 'nessuna risposta');
-        Object.assign(stato, {
-          lette: false, fallita: true, nonDisponibile: nonPubblicata(errore), soloOwner: guasto.code === 'not_admin',
-          errore, domande: [], riferimenti: {}, adesso: 0, altre: false,
-        });
+        const soloOwner = guasto.code === 'not_admin';
+        const nonDisponibile = nonPubblicata(errore);
+        // Chi non è più owner, o un server che non le pubblica più, le toglie; un guasto qualunque no, e la lettura
+        // dopo riparte dallo stesso `adesso`.
+        if (stato.lette && !soloOwner && !nonDisponibile) stato.aggiornamento = errore;
+        else {
+          Object.assign(stato, {
+            lette: false, fallita: true, nonDisponibile, soloOwner,
+            errore, aggiornamento: '', domande: [], riferimenti: {}, adesso: 0, altre: false,
+          });
+        }
       }
       cambia();
       return stato;
