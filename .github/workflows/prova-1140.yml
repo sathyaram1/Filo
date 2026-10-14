@@ -1,8 +1,0 @@
-name: prova 1140 (non gira mai)
-on: workflow_dispatch
-jobs:
-  niente:
-    if: false
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo niente
