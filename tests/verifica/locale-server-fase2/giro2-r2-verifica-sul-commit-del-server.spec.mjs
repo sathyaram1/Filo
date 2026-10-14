@@ -24,6 +24,6 @@ test('r2 un commit spinto sul ramo del server dopo il pass della verifica non va
   });
   const doc = { _id: 'fb-r2', localOnly: { by: 'owner', at: 1 }, fiducia: 'fidato', branch: RAMO, status: 'revision_security' };
   await cancelloServer({ feedbackId: 'fb-r2', doc, ramo: RAMO, deps });
-  const fusioni = github.chiamate.filter((c) => c[0] === 'avanzaMain' && c[3] === 'server');
+  const fusioni = github.chiamate.filter((c) => c[0] === 'avanzaMain' && c[2] === 'server');
   expect(fusioni, 'main di filo-security avanza su un commit che nessuna verifica ha provato').toEqual([]);
 });
