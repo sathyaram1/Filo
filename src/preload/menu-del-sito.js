@@ -105,12 +105,18 @@ function sorgenteSonda(nome) {
     }
     return false;
   }
+  // L'altra porta standard: il gestore oncontextmenu, assegnato da script o scritto come attributo nell'HTML.
+  function gestore(nodo) {
+    try { return typeof nodo.oncontextmenu === 'function'; } catch (e) { return false; }
+  }
   function chiAscolta(cammino) {
     var react = null;
     for (var i = 0; i < cammino.length; i++) {
       var nodo = cammino[i];
+      if (!nodo || falliti.has(nodo)) continue;
+      if (gestore(nodo)) return nodo;
       var m = ascolti.get(nodo);
-      if (!m || !m.size || falliti.has(nodo)) continue;
+      if (!m || !m.size) continue;
       if (nodo === window || nodo === DOC) {
         var proprio = false;
         m.forEach(function (_b, f) { if (!generico(f)) proprio = true; });
