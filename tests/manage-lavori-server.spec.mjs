@@ -126,7 +126,7 @@ test('una pratica passata che aspetta il PC lo dice sulla scheda; rimessa in cod
   await expect(page.locator('.mg-item[data-id="srv-2"] .mg-attesa-server')).toHaveCount(0);
 });
 
-test('#1222: la scheda dice quando il server aspetta la suite e quando l’app aspetta la pubblicazione', async ({ openTab }) => {
+test('#1222: la scheda dice quando il server aspetta la suite; un segno di attesa che non esiste non si mostra', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
