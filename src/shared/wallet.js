@@ -456,6 +456,8 @@
     { chiave: 'invitesMaxUses', etichetta: 'Persone per invito', min: 1, max: 1000, aiuto: 'Quante persone possono entrare con lo stesso codice. Vale anche per i link già in giro.' },
     { chiave: 'maxGrantCredits', etichetta: 'Tetto dei crediti elargibili', min: 0, max: 1000000000, aiuto: 'Il massimo che Filo può regalare, sommando tutte le persone.' },
     { chiave: 'rewardFeedbackSent', etichetta: 'Premio per un feedback inviato', min: 0, max: 1000000, aiuto: 'Arriva quando la segnalazione passa i controlli.' },
+    // #1077: il premio d'invio si paga al più tante volte al giorno per pseudonimo; lo applica il server.
+    { chiave: 'rewardFeedbackSentPerDay', etichetta: 'Feedback inviati premiati al giorno', min: 0, max: 1000000, aiuto: 'Quante segnalazioni al giorno di una stessa persona ricevono il premio d’invio. Oltre, l’invio non paga; il premio per le risolte resta.' },
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
