@@ -278,9 +278,10 @@ describe('pushRamoCorrente', () => {
     assert.equal(r.ok, false);
     assert.match(r.reason, /\.github\/workflows\/nuova\.yml/);
     assert.match(r.reason, /--reason locale/);
-    assert.equal(remoteSha(origin, 'worker/wf'), '', 'il ramo con l\'automazione non deve arrivare su origin');
+    assert.equal(g(origin, ['for-each-ref', '--format=%(objectname)', 'refs/heads/worker/wf']), '', 'il ramo con l\'automazione non deve arrivare su origin');
 
     g(work, ['checkout', '-q', 'main']);
+    mkdirSync(resolve(work, '.github', 'workflows'), { recursive: true });
     commitFile(work, '.github/workflows/dell-owner.yml');
     g(work, ['push', '-q', 'origin', 'main']);
     g(work, ['checkout', '-q', '-b', 'worker/riallineato', 'main~1']);
