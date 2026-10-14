@@ -140,11 +140,12 @@ server un verdetto raccontato non lo legge).
      **Non fare niente**: il server ha già instradato il giro di
      riallineamento (la pratica torna a chi risolve con la critica che spiega
      il rebase). Niente `design`, niente nota: la sovrascriveresti.
-   - `30` → lavoro server: la parte del server la segue il server. O è già
-     su main e la parte dell'app aspetta la pubblicazione da GitHub, o aspetta
+   - `30` → lavoro server: la parte del server la segue il server. O aspetta
      la suite di filo-security, o è tornata alle routine, o aspetta il PC
      dell'owner. **Non fare niente**: niente stato, niente nota. Rilascia il
-     biglietto.
+     biglietto. Un lavoro server con le due parti su main esce `0`; se la
+     parte dell'app si ferma (blocco, conflitto) esce come per l'app, e il
+     server resta fuori da main.
    - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
      nell'output e il tentativo è già a registro). Con `secaudit_stale` o
      `stale` il server ha trovato il tuo verdetto su un commit diverso dalla
