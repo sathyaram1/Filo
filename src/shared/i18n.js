@@ -473,6 +473,13 @@
       'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
     admin_defaults_contesto_giorni: 'Giorni',
     admin_defaults_contesto_token: 'Tetto in token',
+    // Quanto può essere lunga una risposta dei modelli (#1097.3)
+    admin_defaults_lunghezza: 'Quanto può essere lunga una risposta',
+    admin_defaults_lunghezza_desc:
+      'Il tetto in token di ogni risposta, per famiglia di funzioni: ferma il modello che si incarta, e una risposta che lo tocca si vede interrotta. Un fornitore che non regge il tetto viene scartato. Vale per chi non l\'ha cambiato in Preferenze; un campo vuoto segue il codice.',
+    admin_defaults_lunghezza_conversazioni: 'Chat e conversazioni',
+    admin_defaults_lunghezza_testi: 'Traduzioni, riscritture, riassunti',
+    admin_defaults_lunghezza_brevi: 'Risposte brevi',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
@@ -807,6 +814,8 @@
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',
     history_timing_title: 'Dalla partenza della richiesta: primo pezzo di ragionamento, prima parola (o prima azione), fine della risposta.',
+    history_timing_prep: 'prepara %s · ',
+    history_timing_prep_title: 'Prima della richiesta il turno ha aspettato %s, di cui stato del computer %s e saldo %s.',
     history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',
     history_empty: 'Nessuna interazione AI registrata.',
     history_no_results: 'Nessun risultato per la ricerca.',

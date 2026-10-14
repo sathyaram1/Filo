@@ -72,6 +72,15 @@
       valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
       livello: 2,
     },
+    ...Object.fromEntries([
+      ['conversazioni', 'della chat e delle conversazioni'],
+      ['testi', 'di traduzioni, riscritture e riassunti'],
+      ['brevi', 'brevi (spiegazioni, titoli, correttore)'],
+    ].map(([f, di]) => [`lunghezzaRisposte.${f}`, {
+      nome: `lunghezza massima delle risposte ${di}`,
+      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT', { useGrouping: true })} token`),
+      livello: 2,
+    }])),
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
     'autoArchive.onIdle': { nome: 'archiviazione quando Filo è inattivo', valore: ATTIVA, livello: 1 },
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },

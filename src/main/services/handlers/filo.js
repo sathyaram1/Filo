@@ -63,7 +63,10 @@ module.exports = function register(on, ctx) {
       // per la pagina Crediti solo quando è lì che si sistema.
       const W = globalThis.SN_WALLET;
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
+      // Il tetto e il taglio decidono se accanto alla frase ci va il tasto per le Preferenze (#1097.3).
+      const tetto = Number(e && e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {};
+      const taglio = e && e.code === 'RISPOSTA_TAGLIATA' ? { finishReason: e.finishReason || null } : {};
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...taglio };
     } finally {
       fineLavoro();
     }
@@ -183,8 +186,9 @@ module.exports = function register(on, ctx) {
     const davanti = !(schede && sender.tab) || schede.inVista(sender.tab.id);
     const segue = !(msg && msg.segue === false);
     // Chi sta scrivendo in chat sveglia il lettore per il turno che arriva, senza diventare una pagina che lo segue.
+    // Una volta anche dopo una pausa lunga: il turno lo chiederebbe comunque, e lo aspetterebbe (#1097.1).
     if (msg && msg.perChat === true) {
-      if (davanti) Sistema.richiedi();
+      if (davanti) Sistema.richiedi({ unaVolta: true });
       return { ok: true, stato: Sistema.stato() };
     }
     Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });

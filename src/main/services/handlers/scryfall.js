@@ -283,6 +283,9 @@ module.exports = function register(on, ctx) {
       // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
+      // Fermata al tetto di lunghezza (#1097.3): lo dice la risposta stessa.
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(r.finishReason);
+      if (interrotta) reply = [reply, interrotta].filter(Boolean).join('\n');
       let deckOut = null;
       // La frase che il modello dà alla lista (#788); quella della query corretta al secondo tentativo, se c'è.
       let title = parsed.title;

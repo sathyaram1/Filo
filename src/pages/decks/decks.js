@@ -1054,7 +1054,16 @@
     if (m.stopped) return `<div class="dk-msg dk-msg-bot dk-msg-stopped" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta fermata.</div>${retry}</div>`;
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${retry}</div>`;
     const parts = [cotHtml(m)];
-    if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
+    // Risposta fermata a metà: la riga lo dice da nota, non da risposta, e l'ultima bolla offre «Continua».
+    const CE = window.SN_CHAT_ERRORS;
+    const righe = String(m.reply || '').split('\n');
+    const interrotta = righe.length > 1 && !!CE?.eFraseInterrotta?.(righe[righe.length - 1]);
+    const testo = interrotta ? righe.slice(0, -1).join('\n') : m.reply;
+    if (testo) parts.push(`<p class="dk-msg-text">${proseHtml(testo)}</p>`);
+    if (interrotta) {
+      parts.push(`<div class="dk-msg-pending">${esc(righe[righe.length - 1])}</div>`);
+      if (isLast) parts.push('<button class="dk-retry" data-continua="1" title="Continua la risposta da dove si è interrotta">Continua</button>');
+    }
     // Sopra la lista: con decine di righe, sotto non lo vedrebbe nessuno.
     if (m.retryable) parts.push(retry);
     if (m.clearChat) {
@@ -2352,6 +2361,7 @@
     log.addEventListener('click', (e) => {
       if (toggleCot(e.target)) return;
       if (e.target.closest('[data-retry]')) { retryLastTurn(); return; }
+      if (e.target.closest('[data-continua]')) { sendChat(window.SN_CHAT_ERRORS.CHIEDI_SEGUITO); return; }
       if (e.target.closest('[data-clear-chat]')) { clearChat(); return; }
       const impAll = e.target.closest('[data-import-all]');
       if (impAll) { importAllFromBubble(impAll.closest('[data-msg-i]')); return; }

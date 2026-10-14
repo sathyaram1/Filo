@@ -1897,6 +1897,8 @@ html, body {
   color: var(--dash-ink-mute);
   padding: 0 12px;
 }
+/* La riga che dice una risposta interrotta: stessa voce delle note, dentro la bolla. */
+.dash-bubble-interrotta { font-size: 12px; font-style: italic; color: var(--dash-ink-mute); }
 
 /* Le conversazioni delle altre app (#974): un nodo nel filo, al centro perché non le ha dette né l'utente né la
    chat di qui. Ripiegate sono una riga sola; aperte, lo scambio in piccolo sotto. */

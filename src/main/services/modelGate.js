@@ -176,8 +176,11 @@
       return settleChain(s, action, chain, rest);
     }
 
+    // Chi chiede solo il testo lo legge come dati (un'etichetta, un giudizio, un JSON): un pezzo tagliato è un errore.
     async function text(opts) {
       const r = await complete(opts);
+      const CE = globalThis.SN_CHAT_ERRORS;
+      if (r && CE && CE.troncata(r.finishReason)) throw CE.erroreTagliata(r.finishReason);
       return (r && r.text) || '';
     }
 

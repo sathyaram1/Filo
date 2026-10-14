@@ -33,6 +33,9 @@
   // Dopo un turno finito senza risposta (#557) i passi fatti bastano spesso già: rifarli rimetterebbe Filo nello stesso giro.
   const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
     + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
+  // Una risposta fermata dal tetto di lunghezza (#1097.3) riprende dalla parola dove si è interrotta.
+  const CONTINUA_RISPOSTA = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
+    + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
   const dashDir = $('dashDir');
 
   // ===== Stato locale =====
@@ -155,7 +158,7 @@
   // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
   const inChatAperta = (chat) => !chat || chat === chatId;
 
-  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS });
+  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS, bozza: () => !!($('input')?.value || '').trim() });
   Term.init({
     dashDir,
     inputEl,
@@ -675,6 +678,9 @@
     if (markdown && text && self.SN_MARKDOWN) {
       el.innerHTML = self.SN_MARKDOWN.render(text);
       el.classList.add('dash-bubble-md');
+      // La riga «interrotta» la scrive il main dentro la risposta: si legge come nota, non come parole del modello.
+      const ultimo = el.lastElementChild;
+      if (ultimo && self.SN_CHAT_ERRORS?.eFraseInterrotta?.(ultimo.textContent)) ultimo.classList.add('dash-bubble-interrotta');
     } else {
       el.textContent = text || '';
     }
@@ -969,15 +975,13 @@
       // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
       const CE = window.SN_CHAT_ERRORS;
-      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused }) : null;
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason }) : null;
       if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';
         via.className = 'dash-action-btn';
         via.textContent = pagina.label;
-        via.title = pagina.dove === 'opzioni'
-          ? 'Scegli il modello per questa funzione'
-          : (r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter');
+        via.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : pagina.title;
         via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
         row.appendChild(via);
       }
@@ -1132,7 +1136,9 @@
     sending = false;
     // Riprendere ha senso solo nella conversazione che è ancora a schermo.
     if (r?.ok && r.stopped && activity.el.isConnected) ripresa = { nota: r._notaFermato || null, blocco: activity.el };
-    else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) offriContinua(r._bubble, activity.el);
+    else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) {
+      offriContinua(r._bubble, activity.el, { interrotta: r.senzaRisposta.interrotta === true });
+    }
     aggiornaTasto();
     inputEl.focus();
 
@@ -1223,7 +1229,7 @@
   }
   // Un turno finito senza risposta (#557): la frase la scrive il main, qui il «Continua» sotto e lo stesso «riprendi»
   // di un turno fermato sul tasto d'invio e nel tasto destro del blocco.
-  function offriContinua(bolla, blocco) {
+  function offriContinua(bolla, blocco, { interrotta = false } = {}) {
     let riga = bolla.querySelector('.dash-bubble-actions');
     if (!riga) {
       riga = document.createElement('div');
@@ -1234,10 +1240,10 @@
     tasto.type = 'button';
     tasto.className = 'dash-action-btn dash-action-btn-primary dash-continua';
     tasto.textContent = 'Continua';
-    tasto.title = 'Riprendi da dove si era fermato';
+    tasto.title = interrotta ? 'Continua la risposta da dove si è interrotta' : 'Riprendi da dove si era fermato';
     tasto.addEventListener('click', () => { riprendi(); inputEl.focus(); });
     riga.appendChild(tasto);
-    ripresa = { nota: null, blocco, tasto, messaggio: CONTINUA };
+    ripresa = { nota: null, blocco, tasto, messaggio: interrotta ? CONTINUA_RISPOSTA : CONTINUA };
   }
   // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
   // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
@@ -1540,6 +1546,8 @@
     inputEl.style.height = 'auto';
     inputEl.style.height = `${inputEl.scrollHeight}px`;
   }
+
+  inputEl.addEventListener('focus', () => Sistema.scrive({ entra: true }));
 
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).

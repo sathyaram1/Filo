@@ -24,6 +24,7 @@
   <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
   <script src="filo://shared/filoContesto.js"></script>
+  <script src="filo://shared/lunghezzaRisposte.js"></script>
   <style>
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -403,6 +404,24 @@
           <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di quello che Filo ha davanti. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
             <span>Tetto in token</span>
             <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+          </label>
+        </div>
+      </section>
+
+      <section id="sec-lunghezza">
+        <h2>Quanto può essere lunga una risposta</h2>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;">
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di una risposta della chat (anche quella delle app e dell'Aiuto). Oltre si ferma e te lo dice, con «Continua». Vuoto: il valore predefinito.">
+            <span>Chat</span>
+            <input type="number" id="lunghezzaConversazioni" min="1024" max="262144" step="1024" style="width:140px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di traduzioni, riscritture e riassunti. Vuoto: il valore predefinito.">
+            <span>Traduzioni e riassunti</span>
+            <input type="number" id="lunghezzaTesti" min="1024" max="262144" step="1024" style="width:140px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token delle risposte brevi: spiegazioni, titoli, correttore. Vuoto: il valore predefinito.">
+            <span>Risposte brevi</span>
+            <input type="number" id="lunghezzaBrevi" min="1024" max="262144" step="1024" style="width:140px;" />
           </label>
         </div>
       </section>

@@ -238,8 +238,9 @@
         };
       } catch (_) { /* prova il prossimo candidato */ }
     }
-    // Nessun JSON: il testo grezzo diventa la reply (degradazione garbata).
-    return { ...none, reply: raw };
+    // Nessun JSON: il testo grezzo diventa la reply (degradazione garbata); di un involucro tagliato a metà, il suo testo.
+    const salvato = raw.includes('{') ? global.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(raw, ['reply']) : null;
+    return { ...none, reply: salvato ?? raw };
   }
 
   // Prosa con nomi carta marcati [[Nome Carta]] (§3.5) → segmenti tipizzati:

@@ -244,6 +244,13 @@ function registerIpcHandlers() {
     try { return Boolean(globalThis.SN_WALLET?.keyRefusalOf?.(err)); } catch (_) { return false; }
   };
 
+  // Tetto, finestra e taglio viaggiano con l'errore: la frase e il tasto per le Preferenze si ricompongono da qui (#1097.3).
+  const dettagliDelTetto = (err) => (err ? {
+    ...(err.maxTokens ? { maxTokens: err.maxTokens } : {}),
+    ...(err.finestra ? { finestra: err.finestra } : {}),
+    ...(err.code === 'RISPOSTA_TAGLIATA' ? { finishReason: err.finishReason || null, vuota: !!err.vuota } : {}),
+  } : {});
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
@@ -256,7 +263,7 @@ function registerIpcHandlers() {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
       console.error('[Filo IPC] handler error', msg?.type, err);
-      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN', keyRefused: rifiutoDellaChiave(err) };
+      return { ok: false, error: err.message || String(err), code: err.code || 'UNKNOWN', keyRefused: rifiutoDellaChiave(err), ...dettagliDelTetto(err) };
     }
   });
 
@@ -307,6 +314,7 @@ function registerIpcHandlers() {
           provider: (err && err.provider) || '',
           userMessage: (err && typeof err.userMessage === 'string') ? err.userMessage : '',
           keyRefused: rifiutoDellaChiave(err),
+          ...dettagliDelTetto(err),
         });
       } finally {
         inFlightStreams.delete(requestId);

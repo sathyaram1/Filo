@@ -2535,6 +2535,9 @@
     // #868 — quanto filo la chat ha davanti: gli ultimi giorni, fino a un tetto in token (vince il minore). Vuoto vale
     // come nei Modelli predefiniti dell'owner; valori del codice e limiti in src/shared/filoContesto.js.
     contestoFilo: { giorni: null, token: null },
+    // #1097.3 — il tetto in token di una risposta, per famiglia di funzioni. Vuoto vale come nei Modelli predefiniti;
+    // famiglie, valori del codice e limiti in src/shared/lunghezzaRisposte.js.
+    lunghezzaRisposte: { conversazioni: null, testi: null, brevi: null },
     // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
     // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.
     // - durationSec: secondi prima dell'auto-dismiss. 0 = infinita: la notifica
@@ -2912,7 +2915,8 @@
   // della conversazione, così anche una chat lunghissima resta riconoscibile
   // (vedi SN_CHAT_ARCHIVE.transcriptForTriage).
   const FILO_CHAT_TRIAGE_CHARS = 4000;
-  const AI_CACHE_MAX_ENTRIES = 200;
+  // Risposte tenute in cache per OGNI funzione (#1097.4), non per tutte insieme.
+  const AI_CACHE_MAX_PER_FUNZIONE = 200;
   const CLIPBOARD_HISTORY_MAX = 50;
 
   const PAGES_WITHOUT_MENU_PREFIXES = [
@@ -3004,7 +3008,7 @@
     FILO_CHAT_TRIAGE_CHARS,
     SAVED_PAGES_LIMIT,
     EMBED_DIM,
-    AI_CACHE_MAX_ENTRIES,
+    AI_CACHE_MAX_PER_FUNZIONE,
     CLIPBOARD_HISTORY_MAX,
     PAGES_WITHOUT_MENU_PREFIXES,
   };

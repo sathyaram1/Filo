@@ -25,6 +25,9 @@
   // `null` = non ancora caricato; lista = caricato.
   const providerModelCache = { openrouter: null };
 
+  // Il tetto delle risposte per famiglia di funzioni (#1097.3): famiglia → campo.
+  const CAMPI_LUNGHEZZA = [['conversazioni', 'lunghezzaConversazioni'], ['testi', 'lunghezzaTesti'], ['brevi', 'lunghezzaBrevi']];
+
   function $(id) { return document.getElementById(id); }
 
   // Id della datalist (combobox) associata a un provider.
@@ -110,6 +113,9 @@
     $('contesto-desc').textContent = I18n.t('admin_defaults_contesto_desc');
     $('l-contesto-giorni').textContent = I18n.t('admin_defaults_contesto_giorni');
     $('l-contesto-token').textContent = I18n.t('admin_defaults_contesto_token');
+    $('h-lunghezza').textContent = I18n.t('admin_defaults_lunghezza');
+    $('lunghezza-desc').textContent = I18n.t('admin_defaults_lunghezza_desc');
+    for (const [f] of CAMPI_LUNGHEZZA) $(`l-lunghezza-${f}`).textContent = I18n.t(`admin_defaults_lunghezza_${f}`);
   }
 
   function keyStateText(present) {
@@ -618,6 +624,25 @@
     return JSON.stringify(ora) === JSON.stringify(contestoCaricato) ? null : ora;
   }
 
+  // ── Quanto può essere lunga una risposta (#1097.3) ─────────────────────────
+  let lunghezzaCaricata = {};
+  function renderLunghezza(salvato, diSerie) {
+    lunghezzaCaricata = salvato || {};
+    for (const [f, id] of CAMPI_LUNGHEZZA) {
+      $(id).value = lunghezzaCaricata[f] != null ? String(lunghezzaCaricata[f]) : '';
+      $(id).placeholder = diSerie && diSerie[f] != null ? String(diSerie[f]) : '';
+    }
+  }
+  // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
+  function collectLunghezza() {
+    const ora = {};
+    for (const [f, id] of CAMPI_LUNGHEZZA) {
+      const v = $(id).value.trim();
+      if (v !== '' && Number.isFinite(Number(v))) ora[f] = Number(v);
+    }
+    return JSON.stringify(ora) === JSON.stringify(lunghezzaCaricata) ? null : ora;
+  }
+
   // ── Load / Save ─────────────────────────────────────────────────────────────
   function applyConfig(cfg) {
     const present = cfg.apiKeysPresent || {};
@@ -631,6 +656,7 @@
     renderExcluded(cfg.excludedProviders || [], cfg.excludedProviderReasons || []);
     renderDelicate(cfg.sitiDelicati, cfg.sitiDelicatiDiSerie);
     renderContesto(cfg.contestoFilo, cfg.contestoFiloDiSerie);
+    renderLunghezza(cfg.lunghezzaRisposte, cfg.lunghezzaRisposteDiSerie);
     ensureProviderCatalog();
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
@@ -697,6 +723,8 @@
     if (delicate) config.sitiDelicati = delicate;
     const contesto = collectContesto();
     if (contesto) config.contestoFilo = contesto;
+    const lunghezza = collectLunghezza();
+    if (lunghezza) config.lunghezzaRisposte = lunghezza;
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();

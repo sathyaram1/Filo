@@ -921,6 +921,13 @@
       : { classe: 5, campo: 'web', chiave: 'filo:da-fuori', motivo: 'ho letto un testo arrivato da fuori' };
   }
 
+  // Sola lettura: non cambiano niente e nessuna aspetta l'esito di un'altra, quindi il giro della chat le lancia insieme
+  // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
+  const LETTURE = Object.freeze([
+    'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+  ]);
+  const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
+
   function fonteDi(action) {
     const entry = voce(action);
     const out = action && action._output;
@@ -971,5 +978,5 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, costoFor, campoFor, fonteDi, ingressi, describe, describeDone, spiegazioneComando, stileDellAccoglienza };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeDone, spiegazioneComando, stileDellAccoglienza };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
