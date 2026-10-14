@@ -31,8 +31,9 @@
   const TASTO_MANDA = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+Invio') : '';
   const TITOLO_FIDATA = 'Scritta da una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
 
-  // `lette` falso dopo un errore: un numero vecchio accanto a un guasto direbbe più di quanto si sa.
-  const stato = { lette: false, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', domande: [], riferimenti: {}, adesso: 0, altre: false };
+  // `lette` falso finché nessuna lettura è riuscita: un numero senza dati direbbe più di quanto si sa. Dopo, una
+  // rilettura che salta tiene le domande a schermo e lo dice in `aggiornamento`: l'owner può star rispondendo.
+  const stato = { lette: false, fallita: false, nonDisponibile: false, soloOwner: false, errore: '', aggiornamento: '', domande: [], riferimenti: {}, adesso: 0, altre: false };
   let finte = false;
   let inVolo = null;
   let scheda = 'domande';
