@@ -5709,9 +5709,22 @@
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(modelWrap, modelIn, {
         readOptions: () => readSmModelOptions(modelIn),
-        onPick: () => populateSmNicknames(),
+        onPick: () => { populateSmNicknames(); checkJudgeProducer(); },
       });
     }
+
+    // Il produttore di un modello a pesi aperti va fra i fornitori esclusi (#1059). I giudici girano
+    // sul server, la cui lista è la copia di quella del codice: il confronto è con quella.
+    const msg = document.createElement('div');
+    msg.className = 'sn-model-row-msg';
+    const checkJudgeProducer = () => {
+      const C = window.SN_CONST || {};
+      const producer = typeof C.uncoveredModelProducer === 'function'
+        ? C.uncoveredModelProducer(modelIn.value, C.DEFAULT_EXCLUDED_PROVIDERS || []) : '';
+      msg.textContent = producer ? window.SN_I18N.t('model_producer_not_excluded', producer) : '';
+    };
+    modelIn.addEventListener('input', checkJudgeProducer);
+    checkJudgeProducer();
 
     const del = document.createElement('button');
     del.type = 'button';
