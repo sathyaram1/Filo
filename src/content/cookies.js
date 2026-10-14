@@ -519,6 +519,7 @@
   // ─── esiti: il main li mostra nel menu della scheda ─────────────────────────
 
   function noteRejected(via) {
+    settle();
     if (reported.has('rejected')) return;
     reported.add('rejected');
     const go = () => send({ type: T_OUTCOME, outcome: 'rejected', via: String(via || '').slice(0, 60) });
@@ -527,10 +528,12 @@
       if (ok !== false) { go(); return; }
       reported.delete('rejected');
       send({ type: T_OUTCOME, outcome: 'unconfirmed' });
+      wake();
     });
   }
 
   function noteHidden() {
+    settle();
     if (reported.has('hidden')) return;
     reported.add('hidden');
     send({ type: T_OUTCOME, outcome: 'hidden' });
