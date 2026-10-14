@@ -497,7 +497,7 @@ test('un produttore che su OpenRouter non serve nessuno si esclude senza segnala
   const riga = page.locator('#excludedList .sn-excluded-row').last();
   await expect(riga.locator('.sn-excluded-name')).toHaveValue('hexgrad');
   const msg = riga.locator('.sn-model-row-msg');
-  await expect(msg).toContainText('vale da quando hexgrad comincerà a servire i suoi modelli');
+  await expect(msg).toContainText('scatta se hexgrad comincia a servire i suoi modelli');
   await expect(msg).toHaveClass(/sn-msg-info/);
   await expect(riga).not.toHaveClass(/sn-row-invalid/);
   await expect(avviso).toBeEmpty();
