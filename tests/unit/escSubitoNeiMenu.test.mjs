@@ -30,7 +30,7 @@ function corpoDelTimer(testo, da) {
   return testo.slice(da, da + 600);
 }
 
-export function tastiRimandati(testo) {
+function tastiRimandati(testo) {
   const trovati = [];
   const re = /setTimeout\s*\(/g;
   let m;
