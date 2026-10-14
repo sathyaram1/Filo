@@ -116,7 +116,6 @@
   let dirty = false;
   let settingsMode = false;
   let commenting = false;
-  let saveTimer = null;
   // Snapshot manuali: `manualBaseline` è lo stato di riferimento (contenuto
   // serializzato) da cui misurare quanto l'utente ha scritto/cancellato a mano
   // prima di decidere se salvare un punto di ripristino. `manualSnapTimer` è la
@@ -393,7 +392,12 @@
     collection.activeId = doc.id;
   }
 
+  // Il documento parte dopo la pausa e prima che la scheda, la finestra o Filo si chiudano: la regola delle caselle.
+  const documentoAlSicuro = window.SN_CASELLE.crea();
+  documentoAlSicuro.registra('doc', () => save(false));
+
   function save(flash) {
+    documentoAlSicuro.spedita('doc');
     try {
       syncActiveIntoCollection();
       writeCollection();
@@ -414,8 +418,7 @@
     dirty = true;
     saveStateEl.textContent = 'Non salvato';
     saveStateEl.classList.add('dirty');
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => save(false), 1200);
+    documentoAlSicuro.cambiato('doc', null, { pausa: 1200 });
     // Snapshot manuale "a pausa": dopo che l'utente smette di scrivere, valuta
     // se la deriva è abbastanza grande da meritare un punto di ripristino.
     clearTimeout(manualSnapTimer);

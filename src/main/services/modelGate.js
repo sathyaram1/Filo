@@ -291,7 +291,7 @@
           try {
             r = (await P.decisions({
               apiKey: a.apiKey, model: a.model, state: req.state, questions: req.questions,
-              providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s), signal,
+              providerRouting: a.providerRouting !== undefined ? a.providerRouting : routing(s, a), signal,
             })) || {};
           } finally { inVolo--; }
           risposte++;

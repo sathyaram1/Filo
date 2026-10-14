@@ -204,3 +204,79 @@ test('Correttore: la correzione riscritta resta anche chiudendo la scheda', asyn
 
   await expect.poll(() => regole().then((r) => r.perke || ''), { timeout: 8000 }).toBe('perché sì');
 });
+
+// ── Gestione e pagina dei feedback: la frase per chi ha segnalato e le note ──
+// Il main rifiuta feedback_update senza un admin vero: la pagina lo spedisce a una spia che lo scrive nello
+// storage, così si vede dal main se è partito prima che la scheda sparisse.
+const spia = (app) => app.evaluate(async () => globalThis.SN_STORAGE.getRaw('spia_feedback_update', null));
+async function spiaFeedbackUpdate(page) {
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') {
+        chrome.storage.local.set({ spia_feedback_update: { userNote: msg.userNote, notes: msg.notes } });
+        return { ok: true };
+      }
+      if (msg && msg.type === 'auth_status') return { ok: true, isAdmin: true, profile: { email: 'owner@example.com' } };
+      return orig(msg);
+    };
+  });
+}
+
+test('Gestione: la frase per chi ha segnalato parte anche chiudendo la scheda subito dopo averla scritta', async ({ app, shell, openTab }) => {
+  const page = await openTab('filo://manage/manage.html');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await spiaFeedbackUpdate(page);
+  await page.evaluate(() => {
+    const f = {
+      _id: 'uscita-frase-1', text: 'Il modello non si toglie', name: 'Togliere un modello', seq: 901, subSeq: 0,
+      clientId: 'tester@example.com', createdAt: '2026-10-01T10:00:00Z', images: [], status: 'done', statusPublic: 'closed', notes: '',
+    };
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([f]);
+    window.__mgTest.setTab('resolved');
+    window.__mgTest.openDetail(f._id);
+  });
+  if (await page.locator('#mgUserNote').isHidden()) await page.locator('#mgUserNoteToggle').click();
+  await page.locator('#mgUserNoteText').click();
+  await page.keyboard.type('Ora il modello si toglie dalle Opzioni.');
+
+  await chiudiScheda(shell, 'manage');
+  await expect.poll(() => spia(app).then((s) => (s && s.userNote) || ''), { timeout: 8000, message: 'la frase non è partita' })
+    .toBe('Ora il modello si toglie dalle Opzioni.');
+});
+
+test('Pagina dei feedback: la nota appena scritta parte anche chiudendo la scheda', async ({ app, shell, openTab }) => {
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForFunction(() => window.SN_FEEDBACK && window.filo);
+  await spiaFeedbackUpdate(page);
+  await page.evaluate(() => {
+    window.SN_FEEDBACK.list = async () => ([{
+      _id: 'uscita-nota-1', status: 'todo', text: 'Feedback per la nota che parte uscendo.',
+      url: 'filo://newtab/', notes: '', createdAt: new Date().toISOString(),
+    }]);
+  });
+  await page.waitForFunction(() => {
+    const e = document.querySelector('.fb-empty');
+    return !e || !/Caricamento/.test(e.textContent || '');
+  }, null, { timeout: 10_000 });
+  await app.evaluate(async ({ webContents }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let url = '';
+      try { url = wc.getURL(); } catch (_) {}
+      if (url.includes('feedback')) {
+        wc.send('filo:broadcast', { type: 'auth_changed', signedIn: true, isAdmin: true, profile: { email: 'owner@example.com' } });
+      }
+    }
+  });
+  await page.locator('#refresh').click();
+  await page.locator('[data-tab="queue"]').click();
+  const nota = page.locator('.fb-notes');
+  await expect(nota).toHaveCount(1);
+  await nota.click();
+  await page.keyboard.type('nota scritta e scheda chiusa subito');
+
+  await chiudiScheda(shell, 'feedback');
+  await expect.poll(() => spia(app).then((s) => (s && s.notes) || ''), { timeout: 8000, message: 'la nota non è partita' })
+    .toContain('nota scritta e scheda chiusa subito');
+});

@@ -8,6 +8,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
 
 const RADICE = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -77,8 +78,7 @@ async function scriviESpegni(pagina, scrivi, campo) {
     },
   });
   try {
-    const shell = await app.firstWindow();
-    await shell.waitForLoadState('domcontentloaded');
+    const shell = await primaFinestra(app);
     await shell.evaluate((u) => window.filoShell.tabs.open(u), pagina);
     const nome = new URL(pagina).hostname;
     const scadenza = Date.now() + 15_000;

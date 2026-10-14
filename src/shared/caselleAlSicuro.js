@@ -40,13 +40,16 @@
   }
 
   // Il main sa se nella pagina c'è qualcosa da spedire: chiudendola la avvisa e aspetta il «niente più» (#666). Lo stato
-  // è della pagina, non della singola istanza: due istanze (Opzioni e Altro) non si smentiscono a vicenda. Chi spedisce
-  // manda il suo messaggio senza await davanti, così sullo stesso canale arriva prima di questo.
+  // è della pagina, non della singola istanza: due istanze (Opzioni e Altro) non si smentiscono a vicenda. Il «niente
+  // più» parte a fine giro: chi spedisce manda il suo messaggio senza await davanti, così sullo stesso canale arriva prima.
   const inSospeso = new Set();
   let segnalato = false;
-  function segnala() {
-    let ora = false;
-    for (const chi of inSospeso) { if (chi()) { ora = true; break; } }
+  let rimandato = false;
+  function statoPagina() {
+    for (const chi of inSospeso) { if (chi()) return true; }
+    return false;
+  }
+  function manda(ora) {
     const MSG = global.SN_MSG && global.SN_MSG.MSG;
     if (ora === segnalato || !MSG || !MSG.CASELLE_IN_SOSPESO) return;
     segnalato = ora;
@@ -54,6 +57,12 @@
       const p = global.chrome.runtime.sendMessage({ type: MSG.CASELLE_IN_SOSPESO, inSospeso: ora });
       if (p && typeof p.catch === 'function') p.catch(() => {});
     } catch (_) {}
+  }
+  function segnala() {
+    if (statoPagina()) { manda(true); return; }
+    if (rimandato) return;
+    rimandato = true;
+    Promise.resolve().then(() => { rimandato = false; manda(statoPagina()); });
   }
 
   // `uscita` gira all'uscita vera (scheda in secondo piano, ricarica, chiusura): lì si accendono gli avvisi in attesa.

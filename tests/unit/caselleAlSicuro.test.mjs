@@ -30,7 +30,7 @@ function finestra() {
   new Function('window', 'globalThis', codice)(w, w);
   const sospeso = () => alMain.filter((m) => m.type === 'caselle_in_sospeso').map((m) => m.inSospeso);
   const avvisoDelMain = (m) => { for (const fn of dalMain) fn(m); };
-  return { C: w.SN_CASELLE, scatta, sospeso, avvisoDelMain };
+  return { C: w.SN_CASELLE, scatta, sospeso, avvisoDelMain, alMain, w };
 }
 
 const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -102,7 +102,9 @@ test('un campo al volo non parte al Ctrl né alla perdita del fuoco, ma all\'usc
 });
 
 // Il main aspetta a chiudere solo una pagina che ha detto di avere qualcosa da spedire (#666): lo stato è della pagina.
-test('due istanze nella stessa pagina non si smentiscono: il main sente «niente più» solo quando non resta niente', () => {
+const fineGiro = async () => { for (let i = 0; i < 3; i++) await Promise.resolve(); };
+
+test('due istanze nella stessa pagina non si smentiscono: il main sente «niente più» solo quando non resta niente', async () => {
   const { C, sospeso } = finestra();
   const opzioni = C.crea();
   const altro = C.crea();
@@ -111,12 +113,14 @@ test('due istanze nella stessa pagina non si smentiscono: il main sente «niente
   opzioni.cambiato('pagina', { inputType: 'insertText' }, { pausa: 60000 });
   altro.cambiato('blocklist', { inputType: 'insertText' }, { pausa: 60000 });
   altro.spedita('blocklist');
+  await fineGiro();
   assert.deepEqual(sospeso(), [true]);
   opzioni.spedita('pagina');
+  await fineGiro();
   assert.deepEqual(sospeso(), [true, false]);
 });
 
-test('un campo al volo dice al main di aspettare, e l\'avviso di chiusura lo conferma', () => {
+test('un campo al volo dice al main di aspettare, e l\'avviso di chiusura lo conferma', async () => {
   const { C, sospeso, avvisoDelMain } = finestra();
   const fatti = [];
   const campo = C.alVolo();
@@ -124,18 +128,18 @@ test('un campo al volo dice al main di aspettare, e l\'avviso di chiusura lo con
   assert.deepEqual(sospeso(), [true]);
   avvisoDelMain({ type: 'tab_in_vista', inVista: false });
   assert.deepEqual(fatti, ['confermato']);
+  await fineGiro();
   assert.deepEqual(sospeso(), [true, false]);
 });
 
-test('l\'avviso di chiusura del main fa partire le caselle in sospeso prima del «niente più»', () => {
-  const { C, sospeso, avvisoDelMain } = finestra();
-  const ordine = [];
+test('l\'avviso di chiusura del main fa partire le caselle in sospeso, e il loro messaggio arriva prima del «niente più»', async () => {
+  const { C, avvisoDelMain, alMain, w } = finestra();
   const c = C.crea();
-  c.registra('pref', () => { c.spedita('pref'); ordine.push('spedito'); });
+  c.registra('pref', () => { c.spedita('pref'); w.chrome.runtime.sendMessage({ type: 'update_settings' }); });
   c.cambiato('pref', { inputType: 'insertText' }, { pausa: 60000 });
   avvisoDelMain({ type: 'tab_in_vista', inVista: false });
-  assert.deepEqual(ordine, ['spedito']);
-  assert.deepEqual(sospeso(), [true, false]);
+  await fineGiro();
+  assert.deepEqual(alMain.map((m) => (m.type === 'caselle_in_sospeso' ? m.inSospeso : m.type)), [true, 'update_settings', false]);
 });
 
 // Una pagina che salva da sé non si riscrive le uscite in casa: le chiede a SN_CASELLE, o al giro dopo una diverge.
