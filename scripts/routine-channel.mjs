@@ -585,6 +585,8 @@ export async function rispostaChiusura(cred, answer, opts, report = null) {
   if (!conRapporto || r.esito !== 'rifiutato' || r.reason === 'answer_too_big') return r;
   const motivo = `${r.reason}${r.detail ? `: ${r.detail}` : ''}${r.bytes !== undefined ? ` (${r.bytes} byte, massimo ${r.max ?? '?'})` : ''}`;
   const senza = await tenta(null);
+  // Rifiutata anche senza: il rapporto non c'entrava, e il rifiuto da mostrare è quello.
+  if (senza.esito !== 'ok') return senza;
   return { ...senza, avviso: `il server non ha preso il rapporto della chiusura (${motivo}): risposta mandata SENZA rapporto.` };
 }
 
