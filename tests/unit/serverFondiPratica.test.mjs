@@ -413,3 +413,48 @@ test('leggiArgomenti: i rami delle routine (worker/…) valgono come i claude/�
   assert.equal(leggiArgomenti(['worker/f1-20261012T090000Z', '--feedback', '9']).ramo, 'worker/f1-20261012T090000Z');
   for (const no of ['worker/', 'worker/../main', 'lavoro/x']) assert.match(leggiArgomenti([no]).errore, /solo rami claude/, no);
 });
+
+// ── Dopo il passo 10 (#1159 fase 2): su main di filo-security scrive solo il cancello ──
+
+test('GitHub rifiuta la spinta su main: la stessa fusione la chiede il cancello, e la pratica si chiude come sempre', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
+  const r = await giro({
+    docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato,
+    codiceServer: USCITA_SPINTA_RIFIUTATA, cancello: () => ({ outcome: 'merged', sha: 'c'.repeat(40) }),
+  });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.alCancello, [{ branch: 'claude/x', sha: 'c'.repeat(40), feedbackId: 'p' }], 'lo sha registrato, non la punta del momento');
+  assert.match(r.testo, /lo scrive solo il cancello: gli chiedo di portarci cccccccc/);
+  assert.match(r.testo, /Il cancello ha portato claude\/x su main di filo-security/);
+  assert.match(r.testo, /Pratica #910 chiusa/);
+});
+
+test('il cancello non fonde (suite non verde): la pratica resta in lavorazione, col motivo', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
+  const r = await giro({
+    docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato,
+    codiceServer: USCITA_SPINTA_RIFIUTATA, cancello: () => ({ outcome: 'aspetta_suite', sha: 'c'.repeat(40), url: 'https://x/r/1' }),
+  });
+  assert.equal(r.k, 1, r.testo);
+  assert.match(r.testo, /suite di filo-security su ccccccccc non è ancora verde \(https:\/\/x\/r\/1\): rilancia/);
+  assert.match(r.testo, /resta in lavorazione/);
+  assert.ok(!r.scritture.some((u) => u.includes('resolvedInVersion')), 'non si chiude');
+  // Senza uno sha da chiedere non si chiede niente.
+  const senza = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], codiceServer: USCITA_SPINTA_RIFIUTATA, puntaRamo: () => 'c'.repeat(40), lavoroDelRamo: async () => ({ ok: true, registro: false }) });
+  assert.equal(senza.alCancello.length, 1, 'senza registro vale la punta letta su origin');
+});
+
+test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il ramo del server', () => {
+  const ok = (result, extra = {}) => classifyServerMerge(200, { result: { ok: true, result, ...extra } });
+  assert.deepEqual(ok('merged', { sha: 'a'.repeat(40) }), { outcome: 'merged', sha: 'a'.repeat(40) });
+  assert.deepEqual(ok('suite_rossa', { sha: 'b', url: 'u' }), { outcome: 'suite_rossa', sha: 'b', url: 'u' });
+  assert.equal(ok('strano').outcome, 'fault');
+  assert.equal(classifyServerMerge(200, { result: { ok: false, reason: 'github_503' } }).outcome, 'unreachable');
+  assert.equal(classifyServerMerge(404, {}).outcome, 'not_deployed');
+  assert.equal(classifyServerMerge(400, { error: { message: 'ramo_non_fidato' } }).reason, 'ramo_non_fidato');
+  assert.equal(classifyServerMerge(403, {}).outcome, 'denied');
+  assert.equal(classifyServerMerge(0, {}).outcome, 'unreachable');
+  assert.match(messageForServerMerge({ outcome: 'non_rapido' }, 'claude/x'), /claude\/x non contiene main di filo-security/);
+  assert.match(messageForServerMerge({ outcome: 'rifiutata', detail: '422' }), /bypass della regola di main/);
+  assert.match(messageForServerMerge({ outcome: 'not_deployed' }), /server della fase 2/);
+});

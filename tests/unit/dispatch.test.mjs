@@ -1110,6 +1110,37 @@ test('#507: il ramo lo dice il biglietto, e le fini di giro sigillano', () => {
     'consegna e rilascio devono sigillare il punto fermo');
 });
 
+test('emit secaudit di un lavoro server: anche il diff del server, intero in un file fuori dal repo, e niente del feedback (#1159 fase 2)', () => {
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const diffServer = `diff --git a/functions/index.js b/functions/index.js\n${'+una riga del server\n'.repeat(3000)}`;
+  const busta = { payload: { role: 'secaudit', branch: 'worker/s', diffServer: { diff: diffServer, base: { ref: 'main di filo-security', sha: '1'.repeat(40) }, head: 'a'.repeat(40) }, feedback: { text: 'SEGRETO' } } };
+  const bucket = { role: 'secaudit', id: 's', num: '#3', branch: 'worker/s' };
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit(bucket, serverCtx(bucket, busta, { diff: 'diff --git a/x b/x\n+app', base: { ref: 'origin/main', sha: '2'.repeat(40) }, head: 'b'.repeat(40) })); } finally { process.stdout.write = real; }
+  const j = JSON.parse(out);
+  assert.match(j.instructions, /diffServerFile/, 'il testo del ruolo dice del diff del server');
+  assert.equal(j.payload.diffServer, undefined);
+  assert.ok(isAbsolute(j.payload.diffServerFile));
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  assert.ok(fuoriDa(repo, j.payload.diffServerFile), 'il file sta fuori dal repo');
+  assert.equal(readFileSync(j.payload.diffServerFile, 'utf8'), diffServer, 'il file contiene tutto il diff del server');
+  assert.equal(j.payload.diffServerHead, 'a'.repeat(40));
+  assert.deepEqual(j.payload.diffServerBase, { ref: 'main di filo-security', sha: '1'.repeat(40) });
+  assert.ok(j.payload.diffFile, 'il diff dell’app resta');
+  assert.ok(!out.includes('SEGRETO'), 'del feedback niente');
+  // Un lavoro dell'app non porta niente del server.
+  const app = buildPayload(bucket, serverCtx(bucket, { payload: {} }, 'DIFF'));
+  assert.equal(app.diffServer, undefined);
+  assert.equal(app.diffServerHead, undefined);
+});
+
 test('cleanup STATE_DIR temporanea', () => {
   togliCartella(TMP);
   assert.ok(!existsSync(TMP));

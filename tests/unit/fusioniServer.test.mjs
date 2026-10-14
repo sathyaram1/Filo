@@ -143,3 +143,42 @@ test('orchestra -- fusioni-server: un comando suo, con --dry-run e nient’altro
   assert.equal(leggiArgomenti('fusioni-server', ['--dry-run']).opz.dryRun, true);
   assert.throws(() => leggiArgomenti('fusioni-server', ['--paralleli', '2']));
 });
+
+// ── Fase 2 (#1222): il deploy lo fa GitHub ──────────────────────────────────
+
+test('deploy da GitHub affidabile: niente server:pubblica dal PC, l’app aspetta il deploy verde che contiene main di adesso', async () => {
+  const { dep, fatti } = finte({ pratiche: [], commitApp: { 'worker/f2-20261012T091500Z': 2 } });
+  const viste = [];
+  dep.attese = async () => ({ pratiche: [SOLO, CON_APP], deployDaActions: { verdiDiFila: 2, affidabile: true } });
+  dep.puntaServer = async () => 'd'.repeat(40);
+  dep.fineAttesa = async (id, opz) => { viste.push([id, opz]); };
+  const r = await fusioniServer(dep);
+  assert.equal(r.daGitHub, true);
+  assert.equal(r.pubblicato, false);
+  assert.deepEqual(r.ferme, []);
+  assert.ok(!fatti.includes('server:pubblica'), fatti.join('\n'));
+  assert.deepEqual(viste, [['f2', { attendiDeploy: true, sha: 'd'.repeat(40) }]], 'solo la pratica con la parte dell’app');
+  assert.ok(fatti.some((f) => /la pubblicazione la fa GitHub \(deploy\.yml\) su dddddddd/.test(f)), fatti.join('\n'));
+});
+
+test('deploy da GitHub non ancora affidabile, o stato assente: pubblica il PC come prima', async () => {
+  for (const deployDaActions of [{ verdiDiFila: 1, affidabile: false }, null]) {
+    const { dep, fatti } = finte({ pratiche: [], commitApp: { 'worker/f2-20261012T091500Z': 2 } });
+    dep.attese = async () => ({ pratiche: [CON_APP], deployDaActions });
+    const r = await fusioniServer(dep);
+    assert.equal(r.daGitHub, false);
+    assert.equal(r.pubblicato, true);
+    assert.ok(fatti.includes('server:pubblica'));
+    assert.ok(fatti.includes('fineAttesa f2'));
+  }
+});
+
+test('deploy da GitHub ma main del server illeggibile: la pratica non si sblocca e si dice', async () => {
+  const { dep, fatti } = finte({ pratiche: [], commitApp: { 'worker/f2-20261012T091500Z': 1 } });
+  dep.attese = async () => ({ pratiche: [CON_APP], deployDaActions: { affidabile: true } });
+  dep.puntaServer = async () => '';
+  const r = await fusioniServer(dep);
+  assert.equal(r.ferme.length, 1);
+  assert.match(r.ferme[0].motivo, /non aspetta la pubblicazione da GitHub: main di filo-security non si legge/);
+  assert.ok(!fatti.some((f) => f.startsWith('fineAttesa')));
+});
