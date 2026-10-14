@@ -2496,7 +2496,8 @@
     };
     const d = DOMANDE ? DOMANDE.stato() : null;
     const nd = d && d.lette ? MR.contaDomande(d.domande) : null;
-    const bd = scrivi('domande', nd ? `(${nd.domande})` : '', nd ? `${nd.domande} da rispondere` : '');
+    const bd = scrivi('domande', nd ? `(${nd.domande})` : '',
+      nd ? `${nd.domande} da rispondere${d.aggiornamento ? ' · l’ultimo aggiornamento non è riuscito' : ''}` : '');
     if (bd) bd.classList.toggle('mg-sezione--urgente', !!(nd && MR.bloccanteAperta(d.domande)));
     for (const tab of DOMANDE_TABS) {
       const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
