@@ -799,9 +799,8 @@ export function finestraOrchestratore(linee, { corrente = null } = {}) {
     const consegna = c.agentId ? consegne.find((x) => x.da === c.agentId && x.ms >= c.inizio) : null;
     if (consegna) { c.fine = Number.isFinite(c.fine) ? Math.min(c.fine, consegna.ms) : consegna.ms; continue; }
     if (Number.isFinite(c.fine)) continue;
-    // Senza consegna: una notifica che lo NOMINA (tool-use-id della chiamata o task-id = agentId del lancio). Se ne
-    // arrivano più d'una (la provvisoria di chi aspetta un suo comando, poi la finale), conta l'ultima prima del
-    // lancio dopo: è lì che l'orchestratore ha smesso di aspettarlo.
+    // Senza consegna: una notifica che lo NOMINA (tool-use-id o task-id = agentId). Dopo una provvisoria ne arriva
+    // un'altra: conta l'ultima prima del lancio dopo, dove l'orchestratore ha smesso di aspettarlo.
     const sue = notifiche.filter((n) => n.ms >= c.inizio && (n.ids.includes(id) || (c.agentId && n.task.includes(c.agentId))));
     if (!sue.length) continue;
     const dopo = Math.min(...lanci.filter((t) => t > c.inizio));
