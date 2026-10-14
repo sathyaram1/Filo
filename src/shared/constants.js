@@ -2960,6 +2960,7 @@
     isProviderExcluded,
     PRODUCER_ONLY_MODELS,
     producerOnlyRule,
+    requiresZeroRetention,
     servedPolicyViolation,
     hostPolicyViolation,
     DICTATION_LIMITS,
