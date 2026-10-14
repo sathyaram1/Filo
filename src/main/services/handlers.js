@@ -4640,7 +4640,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let finestraDaRicordare = null;
   const stringiDopoRifiuto = async (e) => {
     const FC = globalThis.SN_FILO_CONTESTO;
-    const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 ? FC.troppoLungo(e) : null;
+    // Un rifiuto dato dal tetto della risposta non si cura stringendo la conversazione.
+    const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 && e?.code !== 'TETTO_RISPOSTA' ? FC.troppoLungo(e) : null;
     if (!rifiuto) return false;
     let inviati = [];
     try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
