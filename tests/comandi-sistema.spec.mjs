@@ -16,15 +16,17 @@ const PARTENZA = {
 };
 
 // L'esecutore finto cambia la stessa lettura che il lettore finto restituisce: come un computer vero.
-async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [], negato = null, letturaMs = 0 } = {}) {
+// `lettureFerme`: gli elenchi restano in volo finché la prova non chiama liberaLetture, a qualunque velocità della macchina.
+async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [], negato = null, lettureFerme = false } = {}) {
   await app.evaluate(async (_, a) => {
     globalThis.__pc = JSON.parse(JSON.stringify(a.stato));
     globalThis.__pcChiamate = [];
+    globalThis.__pcLetture = [];
     const pc = globalThis.__pc;
     const disp = a.dispositivi;
     const reti = a.reti;
     const traccia = (nome, p) => globalThis.__pcChiamate.push([nome, p || {}]);
-    const lettura = () => new Promise((r) => setTimeout(r, a.letturaMs));
+    const lettura = () => (a.lettureFerme ? new Promise((r) => globalThis.__pcLetture.push(r)) : Promise.resolve());
     globalThis.SN_COMANDI_SISTEMA._perProve.usaComputer({
       async volume(p) {
         traccia('volume', p);
