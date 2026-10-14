@@ -410,15 +410,23 @@ export async function attesePcConStato(deps = {}) {
 
 /**
  * La parte del server è su main e pubblicata, o (`soloApp`) sul server il ramo non c'è: la pratica torna alle routine per
- * la parte dell'app. `riallinea`: il ramo del server va in conflitto con main, e torna alle routine per riallinearlo.
- * `attendiDeploy` + `sha` (main di filo-security dopo la fusione): la pubblica GitHub, e il server libera l'app al deploy
- * verde che lo contiene. Lancia.
+ * la parte dell'app. `riallinea`: il ramo del server va in conflitto con main, e torna alle routine per riallinearlo. Lancia.
  */
-export async function fineAttesa(feedbackId, { soloApp = false, riallinea = false, attendiDeploy = false, sha = '', ...deps } = {}) {
-  const data = riallinea === true ? { feedbackId, riallinea: true }
-    : attendiDeploy === true ? { feedbackId, attendiDeploy: true, sha: String(sha || '') }
-      : soloApp === true ? { feedbackId, soloApp: true } : { feedbackId };
+export async function fineAttesa(feedbackId, { soloApp = false, riallinea = false, ...deps } = {}) {
+  const data = riallinea === true ? { feedbackId, riallinea: true } : soloApp === true ? { feedbackId, soloApp: true } : { feedbackId };
   return chiama('fineAttesa', data, deps);
+}
+
+// La fusione dell'app passa da GitHub e da L5 sul server: ben oltre il tetto delle op brevi, dentro il suo (120 s).
+export const TEMPO_FONDI_APP_MS = 110_000;
+
+/**
+ * La parte dell'app di una pratica che aspetta il PC, col cancello di sempre, prima di server:fondi (#1222).
+ * → { result: 'merged'|'blocked'|'conflict'|'rifiutata'|'guasto'…, sha?, reason?, detail? }. Lancia, anche con
+ * «op_sconosciuta» da un server che non la conosce ancora.
+ */
+export async function fondiApp(feedbackId, deps = {}) {
+  return chiama('fondiApp', { feedbackId }, Object.assign({ tempoMs: TEMPO_FONDI_APP_MS }, deps));
 }
 
 /** Chiude i biglietti di questa sessione e ne toglie i file. */
