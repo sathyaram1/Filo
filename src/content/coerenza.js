@@ -89,6 +89,11 @@
   };
 
   const PRIMA = '(?<![\\p{L}\\p{N}])';
+  // «mercoledì 9 ottobre del 2024», «October 9th of 2024», «9 de octubre de 2024»: l'anno dopo la preposizione è l'anno.
+  const ANNO_DOPO = '(?:(?:de|del|nel|of|do|von)\\s+)?';
+  // «lunedì 2/3 ore», «sabato 3/4 persone»: senza anno, una barra seguita da una parola è una quantità, non una data.
+  // Restano date «venerdì 9/10», «venerdì 9/10, alle 18», «venerdì 9/10 ore 18».
+  const DOPO_NUMERICA = /^(?:\s*$|\s*[^\s\p{L}]|\s+(?:alle|all'|dalle|dalla|verso|e|ed|o|oppure|a|at|and|or|from|to|by|et|ou|à|y|und|oder|um)(?!\p{L})|\s+(?:ore|h)\s*\d)/iu;
   const DOPO = '(?![\\p{L}\\p{N}])';
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const alternative = (liste) => liste.flat(2).filter(Boolean).sort((a, b) => b.length - a.length).map(esc).join('|');
@@ -108,9 +113,9 @@
     const M = alternative(L.mesi);
     const giornoMese = new RegExp(
       `${PRIMA}(${G})${DOPO}\\.?,?\\s+(?:the\\s+)?(\\d{1,2})(st|nd|rd|th|°|º|\\.)?\\s+(?:(?:de|of)\\s+)?(${M})${DOPO}\\.?`
-      + `(?:,?\\s+(?:de\\s+)?(\\d{4})(?!\\p{N}))?`, 'giu');
+      + `(?:,?\\s+${ANNO_DOPO}(\\d{4})(?!\\p{N}))?`, 'giu');
     const meseGiorno = lingua === 'en' ? new RegExp(
-      `${PRIMA}(${G})${DOPO}\\.?,?\\s+(${M})${DOPO}\\.?\\s+(\\d{1,2})(st|nd|rd|th)?${DOPO}(?:,?\\s+(\\d{4})(?!\\p{N}))?`, 'giu') : null;
+      `${PRIMA}(${G})${DOPO}\\.?,?\\s+(${M})${DOPO}\\.?\\s+(\\d{1,2})(st|nd|rd|th)?${DOPO}(?:,?\\s+${ANNO_DOPO}(\\d{4})(?!\\p{N}))?`, 'giu') : null;
     // «9.10» e «9-10» senza anno sono anche orari e intervalli («mercoledì 9-10 sono libero»): solo con l'anno.
     const numerica = new RegExp(
       `${PRIMA}(${G})${DOPO}\\.?,?\\s+(\\d{1,2})(?:/(\\d{1,2})(?:/(\\d{2}|\\d{4}))?|([.\\-])(\\d{1,2})\\5(\\d{2}|\\d{4}))(?![\\p{N}/.\\-]\\p{N}|\\p{N})`, 'giu');
@@ -122,18 +127,21 @@
   function giorniNelMese(anno, mese) { return new Date(anno, mese + 1, 0).getDate(); }
   function mezzanotte(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 
-  // Senza anno vale l'anno che mette la data più vicina a oggi: «venerdì 2 gennaio» scritto a fine dicembre è il 2 gennaio
-  // che arriva, non quello passato.
-  function annoPiuVicino(giorno, mese, oggi) {
+  // Senza anno una data ha due letture, quella passata e quella che arriva, e vale la più vicina a oggi: «venerdì 2
+  // gennaio» scritto a fine dicembre è il 2 gennaio che arriva. Oltre VICINA_GIORNI le due letture si equivalgono
+  // («lunedì 2 marzo» detto a ottobre): si segna solo se non torna nessuna.
+  const VICINA_GIORNI = 120;
+  const GIORNO_MS = 86400000;
+  function lettureSenzaAnno(giorno, mese, oggi) {
     const y = oggi.getFullYear();
     const base = mezzanotte(oggi).getTime();
-    let meglio = null;
+    const out = [];
     for (const a of [y - 1, y, y + 1]) {
       if (giorno > giorniNelMese(a, mese)) continue;
       const dist = Math.abs(new Date(a, mese, giorno).getTime() - base);
-      if (!meglio || dist < meglio.dist) meglio = { a, dist };
+      if (dist <= 366 * GIORNO_MS) out.push({ a, dist });
     }
-    return meglio ? meglio.a : null;
+    return out.sort((p, q) => p.dist - q.dist);
   }
 
   function annoScritto(s) {
@@ -190,8 +198,13 @@
       segno.spiegazione = t('spell_ocra_inesistente', ilGiorno(n, mese), nomeMese(mese), giorniNelMese(scrittoAnno || 2023, mese));
       return segno;
     }
-    const anno = scrittoAnno || annoPiuVicino(n, mese, oggi);
-    if (anno === null) return null; // il 29 febbraio senza anno, lontano da un bisestile: non si sa quale
+    let anno = scrittoAnno;
+    if (!anno) {
+      const letture = lettureSenzaAnno(n, mese, oggi);
+      if (!letture.length) return null; // il 29 febbraio senza anno, lontano da un bisestile: non si sa quale
+      anno = letture[0].a;
+      if (letture[0].dist > VICINA_GIORNI * GIORNO_MS && letture.some((l) => new Date(l.a, mese, n).getDay() === g.indice)) return null;
+    }
     const data = new Date(anno, mese, n);
     if (data.getDay() === g.indice) return null;
     segno.spiegazione = t('spell_ocra_data', dataDetta(data), nomeGiorno(data.getDay()));
@@ -238,6 +251,7 @@
         const [tutto, giorno, primo, secondoBarra, annoBarra, , secondoAltro, annoAltro] = m;
         const secondo = secondoBarra || secondoAltro;
         const anno = annoBarra || annoAltro;
+        if (!anno && !DOPO_NUMERICA.test(testo.slice(m.index + tutto.length))) continue;
         const pn = posizione(tutto, primo, giorno.length);
         const base = { motore, testo: tutto, inizio: m.index, oggi, giorno: [giorno, 0], numero: [primo, pn, ''], anno };
         if (motore.lingua !== 'en') {
@@ -389,6 +403,20 @@
   // dopo può prendere da un'altra riga della stessa conversazione.
   const chiaveIgnora = (it) => [it.fonte, it.tipo, normalizza(it.segment)].join('\u0001');
 
+  // Un segno ignorato copre anche quelli dello stesso tipo che toccano il suo pezzo nel testo di adesso: al giro dopo
+  // il modello può segnare qualche parola in più o in meno della stessa frase. `ignorate`: [{ fonte, tipo, segment }].
+  function ignorato(it, ignorate, testo) {
+    const basso = String(testo || '').toLowerCase();
+    for (const ig of ignorate || []) {
+      if (!ig || ig.fonte !== it.fonte || ig.tipo !== it.tipo || !ig.segment) continue;
+      const pezzo = ig.segment.toLowerCase();
+      for (let i = basso.indexOf(pezzo); i >= 0; i = basso.indexOf(pezzo, i + 1)) {
+        if (i < it.end && i + pezzo.length > it.start) return true;
+      }
+    }
+    return false;
+  }
+
   // FNV-1a: l'impronta del contesto nella chiave della cache, non una difesa.
   function impronta(s) {
     let h = 0x811c9dc5;
@@ -401,6 +429,6 @@
   }
 
   global.SN_COERENZA = {
-    dateDi, leggiRisposta, citazioneNelContesto, normalizza, unisci, chiaveIgnora, impronta, contestoComeTesto,
+    dateDi, leggiRisposta, citazioneNelContesto, normalizza, unisci, chiaveIgnora, ignorato, impronta, contestoComeTesto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

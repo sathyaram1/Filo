@@ -436,7 +436,7 @@
         ocraUltimo: '',
         timerOcra: null,
         timerDate: null,
-        ocraIgnorate: ignoratePerCampo.get(el) || new Set(),
+        ocraIgnorate: ignoratePerCampo.get(el) || new Map(),
       };
       ignoratePerCampo.set(el, state.ocraIgnorate);
       monitored.set(el, state);
@@ -572,19 +572,82 @@
     // Blu e ocra possono coprire la stessa parola: il testo si taglia a ogni bordo e ogni pezzo porta le classi dei
     // segni che lo coprono (lo zigzag è uno sfondo, i puntini una sottolineatura: convivono).
     const bordi = [...new Set([0, text.length, ...segni.flatMap((s) => [s.start, s.end])])].sort((a, b) => a - b);
+    let pos = 0;
+    const scrivi = (pezzo, dove) => {
+      const fine = pos + pezzo.length;
+      let a = pos;
+      for (const b of [...bordi.filter((x) => x > pos && x < fine), fine]) {
+        if (b <= a) continue;
+        const classi = [...new Set(segni.filter((s) => s.start <= a && s.end >= b).map((s) => s.classe))];
+        const t = pezzo.slice(a - pos, b - pos);
+        if (!classi.length) dove.appendChild(document.createTextNode(t));
+        else {
+          const span = document.createElement('span');
+          span.className = classi.join(' ');
+          span.textContent = t;
+          dove.appendChild(span);
+        }
+        a = b;
+      }
+      pos = fine;
+    };
     const frag = document.createDocumentFragment();
-    for (let k = 0; k < bordi.length - 1; k++) {
-      const a = bordi[k];
-      const b = bordi[k + 1];
-      const classi = [...new Set(segni.filter((s) => s.start <= a && s.end >= b).map((s) => s.classe))];
-      if (!classi.length) { frag.appendChild(document.createTextNode(text.slice(a, b))); continue; }
-      const span = document.createElement('span');
-      span.className = classi.join(' ');
-      span.textContent = text.slice(a, b);
-      frag.appendChild(span);
-    }
+    if (state.el.tagName === 'TEXTAREA' || state.el.tagName === 'INPUT') scrivi(text, frag);
+    else specchio(state.el, frag, scrivi);
     o.innerHTML = '';
     o.appendChild(frag);
+  }
+
+  // Un campo modificabile va a capo ai suoi blocchi e ai suoi <br>: lo specchio ne ricalca la struttura con tag innocui e
+  // le sole misure dello stile in linea (mai classi, colori, attributi); i testi, in ordine di textContent, tengono gli offset.
+  const SPECCHIO_STESSO_TAG = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'DL', 'DT', 'DD', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+    'BLOCKQUOTE', 'PRE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'ADDRESS', 'FIGURE', 'FIGCAPTION', 'TABLE', 'CAPTION',
+    'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'DEL', 'INS', 'CODE',
+    'KBD', 'SAMP', 'TT', 'SMALL', 'BIG', 'SUB', 'SUP', 'CITE', 'DFN', 'VAR', 'ABBR', 'Q', 'SPAN']);
+  const SPECCHIO_NASCOSTI = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'HEAD', 'TITLE']);
+  const SPECCHIO_RIQUADRI = new Set(['IMG', 'PICTURE', 'VIDEO', 'AUDIO', 'CANVAS', 'IFRAME', 'OBJECT', 'EMBED', 'SVG',
+    'INPUT', 'BUTTON', 'SELECT', 'TEXTAREA', 'HR', 'METER', 'PROGRESS']);
+  const SPECCHIO_MISURE = ['font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing',
+    'word-spacing', 'text-indent', 'text-align', 'white-space', 'margin-top', 'margin-right', 'margin-bottom',
+    'margin-left', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left'];
+
+  function specchio(radice, dove, scrivi) {
+    for (const c of radice.childNodes) {
+      if (c.nodeType === 3) { scrivi(c.nodeValue, dove); continue; }
+      if (c.nodeType !== 1) continue;
+      const tag = c.tagName.toUpperCase();
+      if (tag === 'BR') { dove.appendChild(document.createElement('br')); continue; }
+      let figlio;
+      let dentro;
+      if (SPECCHIO_NASCOSTI.has(tag)) {
+        figlio = document.createElement('span');
+        figlio.style.display = 'none';
+      } else if (SPECCHIO_RIQUADRI.has(tag)) {
+        const r = c.getBoundingClientRect();
+        figlio = document.createElement('span');
+        figlio.style.cssText = `display:inline-block;width:${r.width}px;height:${r.height}px;overflow:hidden`;
+        dentro = document.createElement('span');
+        dentro.style.display = 'none';
+        figlio.appendChild(dentro);
+      } else {
+        let nome = SPECCHIO_STESSO_TAG.has(tag) ? tag : 'SPAN';
+        if (nome === 'SPAN' && tag !== 'SPAN') {
+          const d = getComputedStyle(c).display;
+          if (d === 'none') nome = 'NASCOSTO';
+          else if (!d.startsWith('inline') && d !== 'contents') nome = 'DIV';
+        }
+        figlio = document.createElement(nome === 'NASCOSTO' ? 'span' : nome);
+        if (nome === 'NASCOSTO') figlio.style.display = 'none';
+        for (const p of SPECCHIO_MISURE) {
+          const v = c.style && c.style.getPropertyValue(p);
+          if (v) figlio.style.setProperty(p, v);
+        }
+        const dir = c.getAttribute('dir');
+        if (dir) figlio.setAttribute('dir', dir);
+      }
+      dove.appendChild(figlio);
+      specchio(c, dentro || figlio, scrivi);
+    }
   }
 
   // Chi corregge una parola perde il segno di quella: gli altri restano dov'erano finché lo scan dopo non li rinnova
@@ -745,9 +808,10 @@
   }
 
   function fissaOcra(state, date, modello) {
-    if (!getEditableText(state.el).trim()) state.ocraIgnorate.clear();
-    const ignorate = state.ocraIgnorate;
-    state.ocra = Coerenza().unisci(date, modello).filter((i) => !ignorate.has(Coerenza().chiaveIgnora(i)));
+    const testo = getEditableText(state.el);
+    if (!testo.trim()) state.ocraIgnorate.clear();
+    const ignorate = [...state.ocraIgnorate.values()];
+    state.ocra = Coerenza().unisci(date, modello).filter((i) => !Coerenza().ignorato(i, ignorate, testo));
     renderOverlayContent(state);
   }
 
@@ -906,8 +970,10 @@
   function ignoraCoerenza(el, issue) {
     const state = monitored.get(el);
     if (!state || !issue) return;
-    state.ocraIgnorate.add(Coerenza().chiaveIgnora(issue));
-    state.ocra = state.ocra.filter((i) => !(i.start === issue.start && i.end === issue.end));
+    state.ocraIgnorate.set(Coerenza().chiaveIgnora(issue), { fonte: issue.fonte, tipo: issue.tipo, segment: issue.segment });
+    const ignorate = [...state.ocraIgnorate.values()];
+    const testo = getEditableText(el);
+    state.ocra = state.ocra.filter((i) => !(i.start === issue.start && i.end === issue.end) && !Coerenza().ignorato(i, ignorate, testo));
     renderOverlayContent(state);
   }
 

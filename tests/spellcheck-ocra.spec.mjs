@@ -18,7 +18,7 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 </body>`;
 
 // `__ocraRisposta` è quello che il modello finto risponde al controllo di coerenza; il blu non trova mai niente.
-async function apri(app, openTab, testServer, risposta) {
+async function apri(app, openTab, testServer, risposta, html = PAGINA) {
   await app.evaluate(async (_e, risposta) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
@@ -47,7 +47,7 @@ async function apri(app, openTab, testServer, risposta) {
     globalThis.SN_PROVIDERS.completeWithFallback = finto;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
   }, risposta);
-  const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
+  const page = await testServer.openReady(openTab, html, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   return page;
 }
@@ -226,4 +226,81 @@ test('su una pagina delicata il testo della pagina non parte: niente contraddizi
   await page.waitForTimeout(800);
   // La citazione sarebbe nella pagina, ma il modello la pagina non l'ha vista: la contraddizione non vale.
   await expect(ocra(page)).toHaveText(['giovedì 9 ottobre 2026']);
+});
+
+// Invio in un campo modificabile apre un <div>, Maiusc+Invio mette un <br>: i segni devono stare sulla riga della parola,
+// e le regole della pagina sui suoi tag (colore, bordi) non devono rendere visibile la copia trasparente del testo.
+test('campo modificabile su più righe: i puntini stanno sotto la parola, sulla sua riga', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const html = PAGINA
+    .replace('<textarea id="ta" spellcheck="true" lang="it" style="display:block;width:760px;height:140px;font:22px monospace"></textarea>',
+      '<div id="ce" contenteditable="true" style="width:760px;min-height:140px;border:1px solid #999;font:22px sans-serif"></div>')
+    .replace('<main>', '<style>div div { color: #c00; border: 1px solid #c00; }</style><main>');
+  const page = await apri(app, openTab, testServer, JSON.stringify({ issues: [
+    { tipo: 'contraddizione', testo: 'mercoledì', citazione: 'ci vediamo martedì?', spiegazione: 'Prima si era detto martedì.', correzione: 'martedì' },
+    { tipo: 'poco_chiara', testo: 'lui gli', citazione: '', spiegazione: 'Non si capisce chi porta cosa.', correzione: '' },
+  ] }), html);
+  await page.locator('#ce').click();
+  await page.keyboard.type('ok!');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('sì ci vediamo mercoledì');
+  await page.keyboard.press('Shift+Enter');
+  await page.keyboard.type('e lui gli porta');
+  await expect(ocra(page)).toHaveText(['mercoledì', 'lui gli'], { timeout: 12_000 });
+  const dove = (parola) => page.evaluate((parola) => {
+    const w = document.createTreeWalker(document.getElementById('ce'), NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const i = n.nodeValue.indexOf(parola);
+      if (i < 0) continue;
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + parola.length);
+      const q = r.getBoundingClientRect();
+      return { x: Math.round(q.x), y: Math.round(q.y) };
+    }
+    return null;
+  }, parola);
+  for (const [k, parola] of [[0, 'mercoledì'], [1, 'lui gli']]) {
+    const b = await ocra(page).nth(k).boundingBox();
+    const v = await dove(parola);
+    expect({ parola, dx: Math.abs(b.x - v.x) < 3, dy: Math.abs(b.y - v.y) < 3 }).toEqual({ parola, dx: true, dy: true });
+  }
+  const copia = await page.locator('.sn-spell-overlay div').first().evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { colore: cs.color, bordo: cs.borderTopColor };
+  });
+  expect(copia).toEqual({ colore: 'rgba(0, 0, 0, 0)', bordo: 'rgba(0, 0, 0, 0)' });
+  await page.screenshot({ path: 'tests/.shots/1115-ocra-righe.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
+});
+
+// Il modello al controllo dopo può segnare qualche parola in più o in meno della stessa frase: l'«Ignora» tiene.
+test('«Ignora» tiene anche se il modello al giro dopo segna un pezzo un po\' diverso della stessa frase', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'));
+  await page.locator('#ta').click();
+  await page.keyboard.type('sì ci vediamo mercoledì');
+  await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
+  const menu = await tastoDestroSu(page, ocra(page).first());
+  await menu.locator('.sn-menu-item', { hasText: 'Ignora' }).click();
+  await expect(ocra(page)).toHaveCount(0);
+  await app.evaluate(() => {
+    globalThis.__ocraRisposta = JSON.stringify({ issues: [{
+      tipo: 'contraddizione', testo: 'vediamo mercoledì', citazione: 'ci vediamo martedì?', spiegazione: 'Prima si era detto martedì.', correzione: '',
+    }] });
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' alle 18');
+  await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBe(2);
+  await page.waitForTimeout(800);
+  await expect(ocra(page)).toHaveCount(0);
+  // Un'altra contraddizione, su un altro pezzo, si segna.
+  await app.evaluate(() => {
+    globalThis.__ocraRisposta = JSON.stringify({ issues: [{
+      tipo: 'contraddizione', testo: 'alle 19', citazione: 'sì, alle 18 davanti al cinema', spiegazione: 'Prima si era detto alle 18.', correzione: 'alle 18',
+    }] });
+  });
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type('9');
+  await expect(ocra(page)).toHaveText(['alle 19'], { timeout: 12_000 });
 });

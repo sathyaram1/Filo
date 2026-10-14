@@ -94,6 +94,35 @@ test('quello che sembra una data e non lo è non si segna', () => {
   assert.deepEqual(date('Wed 10/9').map((s) => s.correzioni), [[]]);
 });
 
+test('una data che si può leggere in un altro modo non si segna: nel dubbio si tace', () => {
+  for (const t of [
+    'lunedì 2/3 ore di lavoro', // una quantità, non il 2 marzo
+    'sabato 3/4 persone',
+    'era mercoledì 9 ottobre del 2024', // l'anno dopo «del»
+    'Wednesday, October 9th of 2024',
+    'ci siamo visti lunedì 2 marzo', // il 2 marzo passato era lunedì; quello che arriva, più vicino di poco, no
+  ]) assert.deepEqual(date(t), [], t);
+  // Una barra seguita da un orario o da una congiunzione resta una data; il lapsus vicino a oggi resta segnato.
+  assert.deepEqual(date('mercoledì 9/10 alle 18').map((s) => s.pezzo), ['mercoledì 9/10']);
+  assert.deepEqual(date('mercoledì 9/10 ore 18').map((s) => s.pezzo), ['mercoledì 9/10']);
+  assert.deepEqual(date('mercoledì 9/10, va bene?').map((s) => s.pezzo), ['mercoledì 9/10']);
+  assert.deepEqual(date('mercoledì 9 ottobre del 2026').map((s) => s.pezzo), ['mercoledì 9 ottobre del 2026']);
+  assert.deepEqual(date('ci vediamo martedì 2 marzo').map((s) => s.pezzo), [], 'il 2 marzo 2026 era lunedì, il 2 marzo 2027 è martedì');
+  assert.deepEqual(date('ci vediamo domenica 2 marzo').map((s) => s.pezzo), ['domenica 2 marzo'], 'nessuna delle due letture torna');
+});
+
+test('«Ignora» copre i segni dello stesso tipo che toccano il pezzo ignorato, anche se il modello lo allarga', () => {
+  const ig = [{ fonte: 'modello', tipo: 'contraddizione', segment: 'mercoledì' }];
+  const testo = 'sì ci vediamo mercoledì alle 18';
+  const it = (start, end, tipo = 'contraddizione', fonte = 'modello') => ({ start, end, tipo, fonte });
+  assert.equal(C.ignorato(it(14, 23), ig, testo), true, 'lo stesso pezzo');
+  assert.equal(C.ignorato(it(6, 23), ig, testo), true, '«vediamo mercoledì»');
+  assert.equal(C.ignorato(it(14, 31), ig, testo), true, '«mercoledì alle 18»');
+  assert.equal(C.ignorato(it(24, 31), ig, testo), false, '«alle 18» è un altro pezzo');
+  assert.equal(C.ignorato(it(14, 23, 'poco_chiara'), ig, testo), false, 'un altro tipo di segno');
+  assert.equal(C.ignorato(it(14, 23), ig, 'sì ci vediamo giovedì'), false, 'il pezzo ignorato non c\'è più');
+});
+
 // ── la risposta del modello ──────────────────────────────────────────────────
 
 const CONTESTO = { prima: 'Anna: ci vediamo martedì?\nTu: sì, alle 18\nAnna: perfetto, porto io le chiavi', dopo: '' };

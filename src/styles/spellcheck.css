@@ -19,6 +19,20 @@
   box-sizing: border-box;
 }
 
+/* Lo specchio di un campo modificabile usa i tag della pagina (div, p, li…): le sue regole di colore e cornice non
+   devono arrivarci, o il testo e i bordi trasparenti diventerebbero un doppione visibile. */
+.sn-spell-overlay *,
+.sn-spell-overlay *::before,
+.sn-spell-overlay *::after,
+.sn-spell-overlay *::marker {
+  color: transparent !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
 /* Lo zigzag sta un filo più in basso del rosso nativo del browser: se una parola è marcata sia rossa
    sia blu i due tratti convivono affiancati invece di sovrapporsi. */
 .sn-spell-overlay .sn-semantic-error {
