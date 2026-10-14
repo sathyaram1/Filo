@@ -222,3 +222,75 @@ test('il motivo dello sporco: pochi id e mai oltre il tetto del server', () => {
   assert.match(m, /^testo di 400 domande non fidate \(D-1, .*D-10, …\)$/);
   assert.ok(`elenco delle domande: ${m}`.length <= 300);
 });
+
+test('cerca (#1154): col biglietto delle routine passa dal canale, da una sessione va a ownerDomande e si sporca sui non fidati', async () => {
+  assert.deepEqual(leggiArgomenti(['cerca', 'crediti', 'client']), { cmd: 'cerca', testo: 'crediti client' });
+  assert.deepEqual(leggiArgomenti(['cerca']), { cmd: 'cerca', testo: '' });
+  assert.match(leggiArgomenti(['cerca', 'x'.repeat(400)]).errore, /400 caratteri, il massimo è 300/);
+
+  const voci = [
+    { id: 'D-3', titolo: 'Crediti', gruppo: 'crediti', principio: 'Zero fiducia nei crediti dichiarati dal client.', fiducia: 'fidato', daRivedere: false },
+    { id: 'D-8', titolo: 'Altro', gruppo: '', principio: 'Riga\u001b[2Jcon controllo', fiducia: 'non_fidato', daRivedere: true },
+  ];
+  const routine = finto({ biglietto: 'biglietto-routine' });
+  const canale = [];
+  routine.io.cercaCanale = async (t, testo) => { canale.push({ t, testo }); return { outcome: 'ok', reply: { voci, totale: 2, altre: 0 } }; };
+  assert.equal(await esegui(['cerca', 'crediti'], routine.io), 0);
+  assert.deepEqual(canale, [{ t: 'biglietto-routine', testo: 'crediti' }]);
+  assert.equal(routine.chiamate.length, 0, 'le routine non hanno le credenziali del proprietario');
+  const stampa = routine.out.join('\n');
+  assert.match(stampa, /D-3 {2}«Zero fiducia nei crediti dichiarati dal client\.»/);
+  assert.match(stampa, /DA RIVEDERE/);
+  assert.ok(!stampa.includes('\u001b'), 'i caratteri di controllo escono visibili');
+  assert.match(stampa, /si cita col suo numero/);
+
+  const rifiuto = finto({ biglietto: 'b' });
+  rifiuto.io.cercaCanale = async () => ({ outcome: 'refused', reason: 'intento_sconosciuto' });
+  assert.equal(await esegui(['cerca', 'crediti'], rifiuto.io), 1);
+  assert.match(rifiuto.err.join('\n'), /RIFIUTATO dal server: intento_sconosciuto/);
+  const giu = finto({ biglietto: 'b' });
+  giu.io.cercaCanale = async () => ({ outcome: 'fault', reason: 'http_503' });
+  assert.equal(await esegui(['cerca', 'crediti'], giu.io), 3);
+
+  const sessione = finto({ cerca: { ok: true, voci, totale: 2, altre: 0 } });
+  assert.equal(await esegui(['cerca', 'crediti'], sessione.io), 0);
+  assert.deepEqual(sessione.chiamate[0], { op: 'cerca', testo: 'crediti' });
+  assert.equal(sessione.sporcate.length, 1);
+  assert.match(sessione.sporcate[0].motivi[0], /D-8/);
+  assert.deepEqual(sessione.ordine, ['sporca', 'scrivi'], 'si sporca prima di stampare');
+
+  const vuoto = finto({ cerca: { ok: true, voci: [], totale: 0, altre: 0 } });
+  await esegui(['cerca', 'zebra'], vuoto.io);
+  assert.match(vuoto.out.join('\n'), /Nessun principio risponde a «zebra»/);
+  assert.equal(vuoto.sporcate.length, 0);
+  const tutto = finto({ cerca: { ok: true, voci: [], totale: 0, altre: 0 } });
+  await esegui(['cerca'], tutto.io);
+  assert.match(tutto.out.join('\n'), /Il registro è vuoto/);
+  const oltre = finto({ cerca: { ok: true, voci: [voci[0]], totale: 41, altre: 40 } });
+  await esegui(['cerca', 'crediti'], oltre.io);
+  assert.match(oltre.out.join('\n'), /Ce ne sono altri 40 meno pertinenti/);
+});
+
+test('mostra ed elenco (#1154): principio, riapertura, superata e assorbite si leggono', () => {
+  const s = formattaDomanda({
+    id: 'D-21', stato: 'aperta', priorita: 'importante', fiducia: 'fidato', titolo: 'T',
+    riaperta: { il: 5000, esitoPrima: { tipo: 'principio', principio: 'D-3', automatica: true } },
+    assorbite: ['D-31', 'D-32'],
+  }, {}, { quando: () => 'ieri' });
+  assert.match(s, /Riaperta dall'owner il ieri: la risposta automatica col principio di D-3 non andava/);
+  assert.match(s, /Assorbe: D-31, D-32/);
+  const c = formattaDomanda({
+    id: 'D-3', stato: 'chiusa', priorita: 'importante', fiducia: 'fidato', titolo: 'T',
+    principio: { testo: 'Zero fiducia nel client.', fiducia: 'fidato', daRivedere: { il: 1, da: 'D-21' } },
+  }, {}, { quando: () => 'ieri' });
+  assert.match(c, /Principio \(fidata · da rivedere: l'owner ha riaperto D-21\)\n {2}Zero fiducia nel client\./);
+  const a = formattaDomanda({
+    id: 'D-20', stato: 'chiusa', priorita: 'importante', titolo: 'T',
+    esito: { ok: true, automatica: true, tipo: 'principio', principio: 'D-3', testoPrincipio: 'Zero fiducia.', scelta: 0, azione: { tipo: 'compito' } },
+  }, {}, { quando: () => 'ieri' });
+  assert.match(a, /risposta automatica col principio di D-3: «Zero fiducia\.»/);
+  const sup = formattaDomanda({ id: 'D-31', stato: 'superata', assorbitaDa: 'D-30', titolo: 'T' }, {}, { quando: () => 'ieri' });
+  assert.match(sup, /Superata: è un caso di D-30/);
+  const e = formattaElenco([{ id: 'D-31', titolo: 'x', priorita: 'importante', stato: 'superata', assorbitaDa: 'D-30', fiducia: 'fidato' }]);
+  assert.match(e, /\[superata → D-30 · fidata\]/);
+});

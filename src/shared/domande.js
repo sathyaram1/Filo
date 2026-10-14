@@ -440,8 +440,9 @@
    * @returns {{ ok:true, madre:object, figlie:object[] } | { ok:false, errore, dettaglio }}
    */
   function assorbi(madre, figlie, { ora } = {}) {
-    if (!isOggetto(madre) || !['aperta', 'in_lavorazione'].includes(madre.stato) || !idValido(madre.id)) {
-      return no('madre_non_aperta', 'si assorbe solo in una domanda aperta o in lavorazione');
+    // Una madre già in lavorazione ha una risposta in mano a un agente, che non vedrebbe i casi arrivati dopo.
+    if (!isOggetto(madre) || madre.stato !== 'aperta' || !idValido(madre.id)) {
+      return no('madre_non_aperta', 'si assorbe solo in una domanda aperta');
     }
     const lista = Array.isArray(figlie) ? figlie : [];
     if (!lista.length) return no('niente_da_assorbire', 'nessuna domanda da assorbire');

@@ -799,6 +799,19 @@ test('readRoleInstructions: ai ruoli lavoranti viene ACCODATO il contratto comun
   assert.equal(readRoleInstructions('off'), '');
 });
 
+test('i ruoli lavoranti, prima di chiedere, cercano nel registro delle decisioni (#1154)', () => {
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  for (const [ruolo, opz] of [['new-work', {}], ['fixer', { caso: 'ripresa' }], ['verifier', {}], ['secaudit', {}], ['prober', {}]]) {
+    const t = readRoleInstructions(ruolo, opz);
+    assert.match(t, /Prima di chiedere, il registro delle decisioni/, ruolo);
+    assert.match(t, /domanda\.mjs"? cerca <parole chiave>/, ruolo);
+    assert.ok(!/<!--\s*includi:/.test(t), `${ruolo}: niente richiami rimasti`);
+  }
+});
+
 test('emit halt: il testo consegnato chiede la domanda di fine sessione PRIMA del rilascio col guasto (#1205)', () => {
   // Le sessioni andate storte sono quelle che all'owner interessano di più: halt
   // non riceve il contratto (non lavora), ma la sua parte sulla domanda sì.
