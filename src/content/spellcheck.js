@@ -569,6 +569,11 @@
   }
 
   function renderOverlayContent(state) {
+    disegnaSpecchio(state);
+    allineaScorrimento(state);
+  }
+
+  function disegnaSpecchio(state) {
     const o = state.overlay;
     if (!o) return;
     const text = getEditableText(state.el);
