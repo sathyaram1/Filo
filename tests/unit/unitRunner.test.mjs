@@ -560,6 +560,23 @@ test('un file appeso si chiude da solo, col suo nome e il tetto nel rosso, e gli
   }
 });
 
+test('quattro file appesi insieme si chiudono tutti, ciascuno col suo nome, e la corsa finisce', () => {
+  const dir = cartellaTemporanea('filo-appesi-insieme-');
+  try {
+    const nomi = ['a', 'b', 'c', 'd'].map((n) => `${n}-appeso.test.mjs`);
+    for (const n of nomi) writeFileSync(join(dir, n), "import { test } from 'node:test';\ntest('appeso', async () => { setInterval(() => {}, 1000); await new Promise(() => {}); });\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '6000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE, '--test-concurrency=4'], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    for (const n of nomi) assert.match(r.stdout, new RegExp(`ROSSO: .*${n.replace('.', '\\.')} non è andato avanti per 6 secondi ed è stato chiuso`));
+    assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/);
+    assert.equal(r.status, 1);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
 test('il tetto per file conta solo l\'avanzamento del primo file in corso: gli altri che partono e finiscono non lo fanno ripartire', () => {
   const g = guardiaPerFile(1000);
   assert.equal(g([{ via: 'a' }, {}], 0), null);
