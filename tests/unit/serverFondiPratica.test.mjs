@@ -155,6 +155,17 @@ test('davvero, con --solo-server: presa in carico, server con la pratica, a fusi
   assert.match(r.testo, /Pratica #910 chiusa/);
 });
 
+test('con deploy.yml su main del server il consiglio non è un secondo deploy insieme a quello di GitHub', async () => {
+  const gh = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], daGitHub: true });
+  assert.equal(gh.k, 0, gh.testo);
+  assert.match(gh.testo, /Il deploy lo fa GitHub \(deploy\.yml\) per questa spinta: niente server:pubblica adesso/);
+  assert.doesNotMatch(gh.testo, /Per il deploy: npm run server:pubblica/);
+  assert.match(notaFine('claude/x', 'a'.repeat(40), true), /In produzione lo porta GitHub/);
+  const pc = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
+  assert.match(pc.testo, /Per il deploy: npm run server:pubblica/);
+  assert.match(notaFine('claude/x', ''), /npm run server:pubblica/);
+});
+
 test('senza --solo-server e senza un ramo dell’app in vista la pratica resta aperta, e si dice come chiuderla', async () => {
   const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
   assert.equal(r.k, 0, r.testo);
