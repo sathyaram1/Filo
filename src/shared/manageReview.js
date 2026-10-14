@@ -88,10 +88,15 @@
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
   }
-  // Un lavoro server passato dal verificatore aspetta il PC dell'owner (server:fondi, #1159): gemello di
-  // select.inAttesaFusioneServer nel server; fuori dalla revisione il segno vecchio non conta.
+  // Le attese di un lavoro server passato (#1159): il PC dell'owner, la suite di filo-security, la pubblicazione da
+  // GitHub. Gemello di select.ATTESA nel server; fuori dalla revisione il segno vecchio non conta.
+  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite', deploy_server: 'deploy' });
+  function attesaServer(fb) {
+    if (!fb || normalizeStatus(fb).status !== 'revision_security') return '';
+    return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
+  }
   function inAttesaFusioneServer(fb) {
-    return !!fb && fb.attesa === 'fusione_server' && normalizeStatus(fb).status === 'revision_security';
+    return attesaServer(fb) === 'pc';
   }
   function isProvenLocalSender(fb) {
     return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
