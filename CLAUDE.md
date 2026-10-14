@@ -248,8 +248,10 @@ Prima di consegnare un testo destinato a un umano applica
 - **`src/shared/feedbackTransitions.js`**: le tabelle della macchina a stati
   come DATI (i numeri dei bilanci no: li scrive l'owner in Gestione →
   Automazioni, e chi ne ha bisogno li legge dal server o si ferma). Il server
-  di filo-security le incorpora al deploy insieme a **`filo_filosofia.txt`**: se tocchi transizioni o filosofia, **rideploya le
-  functions**.
+  di filo-security le incorpora al deploy insieme agli altri file di
+  `INCORPORATI_DAL_SERVER` (`scripts/lib/orchestratore.mjs`), fra cui
+  **`filo_filosofia.txt`**: se ne tocchi uno, **le functions vanno
+  ripubblicate**. Una routine non può farlo: lo scrive nel report.
 
 ## Run / test
 
