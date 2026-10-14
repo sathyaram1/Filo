@@ -652,7 +652,7 @@ async function main() {
       }
       // Ucciso da un segnale (Ctrl+C, timeout): non è un successo, e i gruppi dopo non partono.
       if (r.status === null) { esiti.push(1); interrotto = i + 1 < gruppi.length; break; }
-      esiti.push(r.status);
+      esiti.push(r.status || (r.chiusi.length ? 1 : 0));
     }
     // Relative alla root come per node, che gira lì.
     const rapportiPersi = [];
