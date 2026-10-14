@@ -641,6 +641,34 @@
     return PRODUCER_ONLY_MODELS.find((r) => id.startsWith(r.prefix)) || null;
   }
 
+  // I «modelli stretti» che la politica ammette comprati dal produttore, elencati per nome in
+  // transparency/models.md («Ammessi oggi»): come Anthropic, il loro produttore non va escluso.
+  const NARROW_MODELS = [
+    { prefix: 'typesafe/', producer: 'TypeSafe' },
+  ];
+
+  // Prefissi OpenRouter che non si scrivono come la voce della lista di esclusione.
+  const PRODUCER_PREFIX_NAMES = { 'meta-llama': 'Meta', mistralai: 'Mistral' };
+  const compactProviderName = (s) => normalizeProviderName(s).replace(/[^a-z0-9]/g, '');
+
+  // Regola dell'owner (06/10/2026): chi produce un modello a pesi aperti è escluso come fornitore.
+  // Il produttore è il prefisso dell'id OpenRouter. Ritorna il suo nome se `excluded` non lo copre,
+  // '' se lo copre, se è Anthropic o un modello stretto, o se l'id non ha prefisso. PURA.
+  function uncoveredModelProducer(modelId, excluded) {
+    const id = String(modelId == null ? '' : modelId).trim().toLowerCase().replace(/^~/, '');
+    const slash = id.indexOf('/');
+    if (slash <= 0) return '';
+    if (producerOnlyRule(id) || NARROW_MODELS.some((m) => id.startsWith(m.prefix))) return '';
+    const slug = id.slice(0, slash);
+    const name = PRODUCER_PREFIX_NAMES[slug]
+      || DEFAULT_EXCLUDED_PROVIDERS.find((n) => compactProviderName(n) === compactProviderName(slug))
+      || slug;
+    const list = Array.isArray(excluded) ? excluded : [];
+    if (isProviderExcluded(name, list)) return '';
+    if (list.some((n) => compactProviderName(n) && compactProviderName(n) === compactProviderName(name))) return '';
+    return name;
+  }
+
   // Perché chi ha servito viola la politica: 'excluded' (è nella lista di
   // esclusione), 'not-producer' (il modello si compra solo dal produttore e
   // l'host non è dei suoi), '' se non la viola o se chi ha servito non si sa. PURA.
