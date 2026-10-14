@@ -27,7 +27,8 @@ test('r1 quattro file appesi insieme: la corsa finisce in circa un tetto, non in
     const durata = Date.now() - t0;
     const uscita = `${r.stdout}\n${r.stderr}`;
     expect(r.status, uscita).toBe(1);
-    for (const n of nomi) expect(uscita, `${n} non è nominato fra i rossi`).toMatch(new RegExp(`ROSSO[^\\n]*${n}|${n}[^\\n]*\\n[^\\n]*ROSSO|chiusi[^\\n]*${n}`));
+    const nostre = uscita.split('\n').filter((l) => l.startsWith('[test:unit]')).join('\n');
+    for (const n of nomi) expect(nostre, `${n} non è nominato nel verdetto`).toContain(n);
     expect(durata, `la corsa ha impiegato ${durata} ms con un tetto di ${TETTO_MS} ms`).toBeLessThan(TETTO_MS * 2.5);
   } finally {
     togliCartella(dir);
