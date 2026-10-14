@@ -557,8 +557,9 @@
   }
 
   // Le stesse parole a meno di spazi e punteggiatura: lo scan rifarebbe la stessa domanda (#1097.5). Due parole fuse
-  // o separate invece cambiano le parole.
-  const ossatura = (t) => String(t ?? '').replace(/[\s\p{P}]+/gu, ' ').trim();
+  // o separate invece cambiano le parole, e così apostrofo e trattino («un amico» / «un'amico», «e-mail»).
+  const ossatura = (t) => String(t ?? '').replace(/\u2019/g, "'").replace(/\u2010/g, '-')
+    .replace(/(?:(?!['-])[\s\p{P}])+/gu, ' ').trim();
   function soloSpaziOPunteggiatura(prima, dopo) {
     return typeof prima === 'string' && !!prima && prima !== dopo && ossatura(prima) === ossatura(dopo);
   }
@@ -603,6 +604,17 @@
     return G.prendi('correttore', undefined, oppure ? (l) => qui(l) || oppure(l) : qui);
   }
 
+  // Gli esiti già pagati, per testo e contesto (#1097.5): fuori dalla cache del main, un campo lasciato e ripreso, o un
+  // annulla che torna a un testo controllato, non ripagano la stessa domanda. Pochi e per pagina.
+  const ESITI_MAX = 30;
+  const esitiRecenti = new Map();
+  const chiaveEsito = (text, context) => `${JSON.stringify(context ?? null)}\u0000${text}`;
+  function ricordaEsito(chiave, risposta) {
+    esitiRecenti.delete(chiave);
+    esitiRecenti.set(chiave, risposta);
+    while (esitiRecenti.size > ESITI_MAX) esitiRecenti.delete(esitiRecenti.keys().next().value);
+  }
+
   function scheduleScan(state) {
     if (!isEnabled()) return;
     if (state.timer) clearTimeout(state.timer);
@@ -644,16 +656,20 @@
     const context = extractContext(state.el);
     const numero = (state.scanInviati || 0) + 1;
     state.scanInviati = numero;
+    const chiave = chiaveEsito(text, context);
     let res;
-    try {
-      res = await chrome.runtime.sendMessage({
-        type: MSG.AI_REQUEST,
-        action: ACTIONS.SPELLCHECK_SEMANTIC,
-        payload: { text, context },
-      });
-    } catch (err) {
-      console.error('[SN] scan blu — sendMessage fallito:', err);
-      return;
+    if (esitiRecenti.has(chiave)) res = { ok: true, text: esitiRecenti.get(chiave) };
+    else {
+      try {
+        res = await chrome.runtime.sendMessage({
+          type: MSG.AI_REQUEST,
+          action: ACTIONS.SPELLCHECK_SEMANTIC,
+          payload: { text, context },
+        });
+      } catch (err) {
+        console.error('[SN] scan blu — sendMessage fallito:', err);
+        return;
+      }
     }
 
     if (!res?.ok) {
@@ -664,6 +680,8 @@
       console.warn('[SN] scan blu — risposta senza text:', res);
       return;
     }
+    // Ricordata prima di guardare la casella: arrivata a campo lasciato, serve a chi ci rientra.
+    ricordaEsito(chiave, res.text);
     // Una risposta più vecchia di quella già in vista non la sovrascrive.
     if (numero < (state.scanMostrato || 0)) return;
     const currentText = getEditableText(state.el);

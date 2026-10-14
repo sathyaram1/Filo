@@ -1662,9 +1662,12 @@
       const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
       const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
       assistantEl = appendChatMessage('assistant', displayText, { nelFilo: !!parsed.display });
-      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice.
+      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice, e «Continua» chiede il seguito come nelle altre chat.
       const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
       if (interrotta) appendActionLog(interrotta);
+      if (interrotta && !(parsed.choices && parsed.choices.length)) {
+        parsed.choices = [{ label: 'Continua', prompt: globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO }];
+      }
 
       // Aggiorna la storia AI
       if (userAction && !userMessage) {

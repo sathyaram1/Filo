@@ -724,7 +724,13 @@ function createAnswerStreamer(onText) {
 // Gli strumenti si passano all'istante e i tempi si MISURANO (idee «Latenza
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
-async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
+// `intera`: chi legge la risposta come dati (JSON, memoria, etichette) non riceve mai un pezzo tagliato, ma un errore.
+async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null, intera = false }) {
+  if (intera) {
+    const r = await handleAIRequest({ action, payload, origin, onReasoning, onText, onToolCall, tools, toolChoice, signal, noCache, tempiPrima });
+    if (r && globalThis.SN_CHAT_ERRORS.troncata(r.finishReason)) throw globalThis.SN_CHAT_ERRORS.erroreTagliata(r.finishReason);
+    return r;
+  }
   const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
@@ -946,6 +952,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
       action: ACTIONS.FILO_LESSON,
       payload: { profilo, preferenze, lezioni: lezioniText, interazione, stato: stateText },
       origin: 'filo:lesson',
+      intera: true,
     });
     const text = (r?.text || '').trim();
     if (!text || /^NULLA DA IMPARARE/i.test(text)) return;
@@ -985,6 +992,7 @@ async function maybeRunCompactor() {
       action: ACTIONS.FILO_COMPACT,
       payload: { moduli: moduliText, lezioni: lezioniText },
       origin: 'filo:compact',
+      intera: true,
     });
     const text = (r?.text || '').trim();
     if (!text || /^NESSUNA MODIFICA/i.test(text)) {
@@ -5291,6 +5299,7 @@ async function generateDashboardFromInputs(inputs) {
     action: ACTIONS.FILO_DASHBOARD,
     payload: { ...inputs.payload, ultimoMessaggio: cached?.message || '' },
     origin: 'filo:dashboard',
+    intera: true,
   });
   const parsed = extractJson(r.text);
   let message = '';
@@ -5405,7 +5414,7 @@ async function maybeCategorizeAsync(savedEntry, pageInput) {
   if (!settings.featureFlags?.categorize) return;
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) return;
   if (!SN_CONST.canServeAction(settings, ACTIONS.CATEGORIZE)) return;
-  const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '' });
+  const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '', intera: true });
   const result = await Categorizer.categorize({
     invokeAI,
     page: {
@@ -5640,6 +5649,7 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   ];
 
   const result = await Gate.complete({ action: ACTIONS.FILO_TAB_TRIAGE, messages });
+  if (globalThis.SN_CHAT_ERRORS.troncata(result.finishReason)) throw globalThis.SN_CHAT_ERRORS.erroreTagliata(result.finishReason);
   const { provider: usedProvider, model: concreteModel } = result;
 
   const parsed = extractJson(result.text) || {};

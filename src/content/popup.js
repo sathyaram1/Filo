@@ -1258,7 +1258,7 @@
   }
 
   // «Continua» sotto una risposta interrotta è una domanda come le altre, già scritta.
-  const CONTINUA_RISPOSTA = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  const CONTINUA_RISPOSTA = global.SN_CHAT_ERRORS?.CHIEDI_SEGUITO || 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
   function continuaRisposta(popup) {
     if (!popup || popup.activePort) return;
     chiedi(popup, CONTINUA_RISPOSTA);

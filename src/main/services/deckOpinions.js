@@ -158,6 +158,7 @@
         action: ACTIONS.DECKS_OPINION,
         payload: { messages: [{ role: 'user', content: sys }] },
         origin: 'filo://decks',
+        intera: true,
       });
       const parsed = P.parseOpinionBatch(r.text);
       sintesi = parsed.sintesi;
@@ -207,6 +208,7 @@
         action: ACTIONS.DECKS_AUTOTAG,
         payload: { messages: [{ role: 'user', content: sys }] },
         origin: 'filo://decks',
+        intera: true,
       });
       const raw = P.parseTagBatch(r.text);
       // Solo id davvero richiesti e solo tag davvero richiesti.
@@ -325,6 +327,7 @@
           action: ACTIONS.DECKS_SEARCH_FILTER,
           payload: { messages: [{ role: 'user', content: sys }] },
           origin: 'filo://decks',
+          intera: true,
         });
         const keep = P.parseSearchKeep(r && r.text, ids);
         if (keep) return { keep };

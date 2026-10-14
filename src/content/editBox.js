@@ -125,7 +125,8 @@
         $nota = Popup.notaRipiego($prop.parentNode, res.keyFallback);
         $interrotta = Popup.notaInterrotta($prop.parentNode, res.finishReason);
         $copy.disabled = false;
-        $replace.disabled = false;
+        // Una riscrittura tagliata al posto del testo intero ne perderebbe la coda: si copia, non si sostituisce.
+        $replace.disabled = !!global.SN_CHAT_ERRORS?.troncata?.(res.finishReason);
       } catch (e) {
         $prop.textContent = Popup.frasePerLUtente({ message: e?.message });
       } finally {

@@ -109,6 +109,7 @@
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
     LIMIT_REACHED: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
+    RISPOSTA_TAGLIATA: 'preferenze',
   };
   // Accetta il codice da solo o la risposta intera. Con la risposta si sa anche
   // se il servizio ha rifiutato la CHIAVE (credito finito compreso): lì la
@@ -117,6 +118,7 @@
     if (x && typeof x === 'object') {
       if (x.keyRefused) return 'crediti';
       if (x.code === 'NO_TOOL_HOST' && Number(x.maxTokens) > 0) return 'preferenze';
+      if (x.code === 'RISPOSTA_TAGLIATA' && x.finishReason === 'error') return '';
       return RIMEDIO[String(x.code || '')] || '';
     }
     return RIMEDIO[String(x || '')] || '';
@@ -157,6 +159,7 @@
     const raw = String((e && e.message) || (typeof e === 'string' ? e : ''));
     if (e && CODICI_GIA_SCRITTI.includes(e.code)) return raw;
 
+    if (e && e.code === 'RISPOSTA_TAGLIATA') return fraseTagliata(e.finishReason);
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {
@@ -289,10 +292,25 @@
   function rispostaInterrotta(finishReason) {
     return troncata(finishReason) ? FRASI_INTERROTTA[finishReason] : '';
   }
+  // Il messaggio con cui ogni chat chiede il seguito di una risposta interrotta.
+  const CHIEDI_SEGUITO = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
   const eFraseInterrotta = (s) => Object.values(FRASI_INTERROTTA).includes(String(s || '').trim());
+  // Per chi legge la risposta come dati (JSON, memoria riscritta, un nome): un pezzo non si usa, si dice.
+  function fraseTagliata(finishReason) {
+    return finishReason === 'error'
+      ? 'il servizio AI si è fermato a metà della risposta, e un pezzo non basta a questa funzione. Riprova.'
+      : 'la risposta del modello ha raggiunto la lunghezza massima prima di finire, e un pezzo non basta a questa funzione: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.';
+  }
+  function erroreTagliata(finishReason) {
+    const f = fraseTagliata(finishReason);
+    const e = new Error(f.charAt(0).toUpperCase() + f.slice(1));
+    e.code = 'RISPOSTA_TAGLIATA';
+    e.finishReason = finishReason;
+    return e;
+  }
 
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

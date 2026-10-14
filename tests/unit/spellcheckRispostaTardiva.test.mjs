@@ -57,6 +57,10 @@ test('solo spazi o punteggiatura cambiati: niente scan nuovo; una parola cambiat
   assert.equal(soloSpaziOPunteggiatura(INVIATO, INVIATO.replace('mare', 'mari')), false);
   assert.equal(soloSpaziOPunteggiatura(INVIATO, INVIATO.replace('al mare', 'almare')), false);
   assert.equal(soloSpaziOPunteggiatura(INVIATO, INVIATO), false);
+  // Apostrofo e trattino cambiano la parola (#1097 giro 1): «un'amico» è l'errore da trovare.
+  assert.equal(soloSpaziOPunteggiatura('ho visto un amico ieri', "ho visto un'amico ieri"), false);
+  assert.equal(soloSpaziOPunteggiatura("dammene un po' di più", 'dammene un po di più'), false);
+  assert.equal(soloSpaziOPunteggiatura('e-mail inviata ieri', 'e mail inviata ieri'), false);
   // Mai controllato (o un segno perso che chiede di rifarlo): lo scan parte.
   assert.equal(soloSpaziOPunteggiatura('', INVIATO), false);
 });

@@ -365,6 +365,11 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-msg.assistant { align-self: flex-start; background: var(--sn-bg); border: 1px solid var(--sn-border); }
 /* Risposta pagata coi crediti di Filo (chiave dell'utente rifiutata): non è un errore, è una nota. */
 .ed-chat-note { align-self: flex-start; font-size: 11px; font-style: italic; color: var(--sn-muted); padding: 0 9px; }
+.ed-chat-continua {
+  align-self: flex-start; margin-left: 9px; padding: 3px 10px; border-radius: 999px; font: inherit; font-size: 12px;
+  border: 1px solid var(--sn-border); background: transparent; color: inherit; cursor: pointer; transition: background 120ms ease;
+}
+.ed-chat-continua:hover { background: var(--sn-hover); }
 .ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
 .ed-chat-input .sn-voce-btn { margin-bottom: 2px; }
 /* Cresce col testo (anche il suggerimento, a capo col microfono accanto) fino allo spazio del modulo meno

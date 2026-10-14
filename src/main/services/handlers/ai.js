@@ -867,7 +867,7 @@ module.exports = function register(on, ctx) {
         // giro), e un token preso adesso a quel punto è scaduto. Chi manda se
         // lo fa dare al momento dell'invio, da `ottieniIdToken` (vedi l'init
         // della coda in handlers/misc.js).
-        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
+        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin, intera: true });
         const r = await PathsCollector.collectAndSave({ session: msg.payload?.session, invokeAI });
         if (r?.saved) console.info('[Filo] percorso in coda:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }

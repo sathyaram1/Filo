@@ -1890,6 +1890,8 @@ html, body {
 
 /* Riga discreta sotto una risposta: la chiave OpenRouter dell'utente è stata rifiutata e ha risposto
    la chiave personale. Non è un errore — la risposta c'è — quindi sta in tono col blocco di attività. */
+/* La riga che dice una risposta interrotta: stessa voce delle note, dentro la bolla. */
+.dash-bubble-interrotta { font-size: 12px; font-style: italic; color: var(--dash-ink-mute); }
 .dash-bubble-note {
   align-self: flex-start;
   font-size: 12px;
