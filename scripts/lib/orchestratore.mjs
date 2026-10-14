@@ -369,6 +369,7 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
  *   esegui(cmd, args, { cwd, input, timeoutMs }) → { code, stdout, out },   // out = stdout + stderr
  *   claude({ ruolo, prompt, cwd, addDirs, nome, dalServer }) → { ok, testo, costo, errore },
  *   verifica(wtApp) → { ok, entry, dirty }, pubblica() → { code, out },
+ *   pubblicaGitHub() / regoleGitHub() → deploy.yml / regole.yml su main di filo-security (in dubbio false),
  *   carico() → { cpu, liberaGB }, dormi(ms), log(riga), ora() → ISO,
  *   percorsi: { radice, wt(slug), serverRadice ('' se manca), wtServer(slug), note, regole },
  *   fs: { esiste(p), collega(verso, link), scollega(link) }, annota(feedbackId, testo), richiestaDi(num),
