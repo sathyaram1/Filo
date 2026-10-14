@@ -60,12 +60,12 @@ test('documento letto un giro prima + ricerca che ne porta fuori un pezzo nella 
 });
 
 test('due ricerche dello stesso giro vanno insieme: il giro dura quanto la più lunga, non la somma', async () => {
-  const { diario, avvia } = finto({ durate: { a: 80, b: 80 } });
+  const { diario, avvia } = finto({ durate: { a: 250, b: 250 } });
   const t0 = Date.now();
   await eseguiGiro([{ id: 'a', type: 'CERCA_WEB', query: 'treni Milano' }, { id: 'b', type: 'CERCA_WEB', query: 'meteo Roma' }],
     opzioni({ contesto: [], avvia, dopo: () => {} }));
   assert.deepEqual(diario.slice(0, 2), ['parte a', 'parte b']);
-  assert.ok(Date.now() - t0 < 150, `durata ${Date.now() - t0} ms`);
+  assert.ok(Date.now() - t0 < 450, `durata ${Date.now() - t0} ms`);
 });
 
 test('una lettura dopo un\'azione che cambia qualcosa aspetta il suo esito', async () => {

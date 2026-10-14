@@ -340,11 +340,17 @@
     }));
   }
 
-  async function complete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, signal }) {
+  // Il tetto della risposta (#1097.3): un modello che si incarta si ferma lì, e `finish_reason: 'length'` lo dice.
+  function maxTokensField(maxTokens) {
+    const n = Math.round(Number(maxTokens));
+    return Number.isFinite(n) && n > 0 ? { max_tokens: n } : {};
+  }
+
+  async function complete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
     // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
     // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
     // personale (#598). Senza, il costo si stima dal listino.
-    const body = { model, messages, stream: false, usage: { include: true }, ...toolsFields(tools, toolChoice) };
+    const body = { model, messages, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
     const pb = providerBlock(providerRouting, model, { tools: !!body.tools });
@@ -352,7 +358,7 @@
     const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-    if (!res.ok) throw await httpError(res, { tools: !!body.tools });
+    if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens });
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
@@ -379,8 +385,8 @@
   // onReasoning(chunk) per il ragionamento, onToolCall({ id, name }) appena si
   // conosce il nome di una chiamata a uno strumento. Ritorna
   // { text, toolCalls, reasoningDetails, finishReason, servedBy, usage }.
-  async function streamComplete({ apiKey, model, messages, reasoning, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
-    const reqBody = { model, messages, stream: true, usage: { include: true }, ...toolsFields(tools, toolChoice) };
+  async function streamComplete({ apiKey, model, messages, reasoning, maxTokens, providerRouting, tools, toolChoice, onDelta, onReasoning, onToolCall, signal }) {
+    const reqBody = { model, messages, stream: true, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     // Reasoning: unisce il livello scelto dall'owner (#369) e la richiesta del
     // caller di STREAMARE i token di ragionamento (onReasoning). I modelli che
     // non ragionano semplicemente non ne emettono — best-effort.
@@ -391,7 +397,7 @@
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
     const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal);
-    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools });
+    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens });
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -471,15 +477,34 @@
   // personale c'è stato e ha fallito (fetchWithKey li lascia sulla risposta):
   // un 402 «la tua chiave» e un 402 «anche i crediti di Filo» sono due frasi
   // diverse per l'utente.
-  async function httpError(res, { tools = false } = {}) {
+  // Quanto chiede di aspettare un 429 o un 5xx: Retry-After in secondi o come data, o l'istante in cui il tetto riparte.
+  function attesaChiesta(res, ora = Date.now()) {
+    const h = (n) => { try { return res && res.headers && typeof res.headers.get === 'function' ? res.headers.get(n) : null; } catch (_) { return null; } };
+    const ra = String(h('retry-after') || '').trim();
+    if (/^\d+(\.\d+)?$/.test(ra)) return Math.round(Number(ra) * 1000);
+    if (ra) { const t = Date.parse(ra); if (Number.isFinite(t)) return Math.max(0, t - ora); }
+    const reset = Number(h('x-ratelimit-reset'));
+    if (Number.isFinite(reset) && reset > 0) return Math.max(0, (reset < 1e12 ? reset * 1000 : reset) - ora);
+    return null;
+  }
+
+  // Un rifiuto per il tetto della risposta: nessun host ammesso regge quel `max_tokens`. Si dice, col numero (#1097.3).
+  const RIFIUTO_TETTO = /max[_ ]?tokens|max(?:imum)?[_ ](?:output|completion)[_ ]tokens|output token limit/i;
+
+  async function httpError(res, { tools = false, maxTokens = null } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
     err.provider = 'openrouter';
+    const attesa = attesaChiesta(res);
+    if (attesa != null) err.retryAfterMs = attesa;
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
-    if (refusal === 'PARAMS') { if (tools) err.code = 'NO_TOOL_HOST'; } else if (refusal) err.code = refusal;
+    if (maxTokens && (res.status === 400 || res.status === 404) && RIFIUTO_TETTO.test(errText)) {
+      err.code = 'TETTO_RISPOSTA';
+      err.maxTokens = maxTokens;
+    } else if (refusal === 'PARAMS') { if (tools) err.code = 'NO_TOOL_HOST'; } else if (refusal) err.code = refusal;
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
@@ -808,7 +833,7 @@
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
     modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals,
-    createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
+    createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields, maxTokensField, attesaChiesta, httpError,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,
     GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };
