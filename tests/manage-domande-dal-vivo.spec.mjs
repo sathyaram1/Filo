@@ -1,6 +1,7 @@
 // LE DOMANDE DAL VIVO E L'APERTURA DELLA GESTIONE (#1150, verifica locale giro 1).
 //   1. Una domanda nata con la pagina aperta entra nel contatore delle Domande al giro dopo, senza aprire la sezione.
 //   2. L'apertura va su Domande con una bloccante, ma non porta via l'owner da una pratica o da una ricerca cominciate.
+//   3. Una rilettura che fallisce tiene a schermo le domande già lette, la risposta a metà e l'esito appena dato (giro 2).
 import { test, expect } from './fixtures/electron.mjs';
 import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, rilasciaDomande, aspettaAvvio } from './helpers/gestioneMainFinto.mjs';
 
