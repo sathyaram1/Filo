@@ -267,6 +267,42 @@ describe('pushRamoCorrente', () => {
     assert.equal(r.branch, 'worker/9');
     assert.match(r.reason, /non-esiste|does not appear|repository/i);
   });
+
+  // Le automazioni le spinge solo l'owner (#1140): il rilascio è l'altra porta da cui un ramo di routine parte.
+  test('un commit che cambia un\'automazione non parte; riallinearsi a main che ne porta una sì', () => {
+    const { origin, work } = scena();
+    g(work, ['checkout', '-q', '-b', 'worker/wf']);
+    mkdirSync(resolve(work, '.github', 'workflows'), { recursive: true });
+    commitFile(work, '.github/workflows/nuova.yml');
+    const r = pushRamoCorrente(work, { env: { FILO_ROUTINE: '1' } });
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /\.github\/workflows\/nuova\.yml/);
+    assert.match(r.reason, /--reason locale/);
+    assert.equal(remoteSha(origin, 'worker/wf'), '', 'il ramo con l\'automazione non deve arrivare su origin');
+
+    g(work, ['checkout', '-q', 'main']);
+    commitFile(work, '.github/workflows/dell-owner.yml');
+    g(work, ['push', '-q', 'origin', 'main']);
+    g(work, ['checkout', '-q', '-b', 'worker/riallineato', 'main~1']);
+    commitFile(work, 'a.js');
+    g(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'merge', '-q', '--no-edit', 'main']);
+    const fuso = pushRamoCorrente(work, { env: { FILO_ROUTINE: '1' } });
+    assert.equal(fuso.ok, true, fuso.reason);
+    assert.equal(remoteSha(origin, 'worker/riallineato'), g(work, ['rev-parse', 'HEAD']));
+  });
+
+  test('GitHub che rifiuta per un\'automazione: il motivo dice cosa fare', () => {
+    const { origin, work } = scena();
+    g(work, ['checkout', '-q', '-b', 'worker/rifiutato']);
+    commitFile(work, 'a.js');
+    const pre = resolve(origin, 'hooks', 'pre-receive');
+    writeFileSync(pre, "#!/bin/sh\necho 'refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml` without `workflows` permission' >&2\nexit 1\n");
+    chmodSync(pre, 0o755);
+    const r = pushRamoCorrente(work, { env: { FILO_ROUTINE: '1' } });
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /GitHub ha rifiutato il push: porta un cambiamento a un'automazione/);
+    assert.match(r.reason, /--reason locale/);
+  });
 });
 
 // ─── La riga di comando, tutta insieme ───────────────────────────────────────

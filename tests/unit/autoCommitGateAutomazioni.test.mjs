@@ -113,7 +113,7 @@ describe('riallinearsi a main non ferma il ramo', () => {
   test('se GitHub la rifiuta lo stesso, la sessione legge il perché e cosa fare', () => {
     const { origin, work } = ramoRiallineatoAMain('worker/rifiutato');
     const pre = resolve(origin, 'hooks', 'pre-receive');
-    writeFileSync(pre, '#!/bin/sh\necho "refusing to allow an OAuth App to create or update workflow `.github/workflows/ci.yml` without `workflow` scope" >&2\nexit 1\n');
+    writeFileSync(pre, "#!/bin/sh\necho 'refusing to allow an OAuth App to create or update workflow `.github/workflows/ci.yml` without `workflow` scope' >&2\nexit 1\n");
     chmodSync(pre, 0o755);
     writeFileSync(resolve(work, 'b.js'), 'dopo la fusione\n', 'utf8');
 
