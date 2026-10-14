@@ -108,6 +108,22 @@ test('il tetto della risposta arriva nel corpo della richiesta; Retry-After e il
   assert.equal(e.code, 'TETTO_RISPOSTA');
   assert.match(CE.sentence(e), /262\.144 token.*Preferenze/);
   assert.equal(CE.rimedioPagina({ code: 'TETTO_RISPOSTA' }).url, 'filo://preferences/preferences.html#sec-lunghezza');
+  // Le due forme in cui il router rifiuta davvero un tetto (#1097 giro 1): la finestra sforata dal solo tetto, e il
+  // «nessun host regge i parametri», dove con gli strumenti il tetto è una delle due cause dette.
+  const finestra = '{"error":{"message":"This endpoint\'s maximum context length is 163840 tokens. However, you requested about 300000 tokens (37616 of text input, 262144 in the output).","code":400}}';
+  const eFin = await OR.httpError(new Response(finestra, { status: 400 }), { maxTokens: 262144, tools: true });
+  assert.equal(eFin.code, 'TETTO_RISPOSTA');
+  assert.match(CE.sentence(eFin), /tetto di 262\.144 token/);
+  const eStretta = await OR.httpError(new Response(finestra, { status: 400 }), { maxTokens: 16384, tools: true });
+  assert.equal(eStretta.code, undefined, 'col tetto piccolo è la conversazione a sforare, e la chat la stringe da sé');
+  const nessunHost = '{"error":{"message":"No endpoints found that can handle the requested parameters.","code":404}}';
+  const eChat = await OR.httpError(new Response(nessunHost, { status: 404 }), { maxTokens: 16384, tools: true });
+  assert.equal(eChat.code, 'NO_TOOL_HOST');
+  assert.match(CE.sentence(eChat), /strumenti.*tetto di 16\.384 token.*Preferenze/);
+  assert.equal(CE.rimedio({ code: 'NO_TOOL_HOST', maxTokens: 16384 }), 'preferenze');
+  const eTesto = await OR.httpError(new Response(nessunHost, { status: 404 }), { maxTokens: 16384 });
+  assert.equal(eTesto.code, 'TETTO_RISPOSTA');
+  assert.equal(CE.fromResponse({ error: 'x', code: 'NO_TOOL_HOST', maxTokens: 16384 }).maxTokens, 16384);
   const e429 = await OR.httpError(new Response('busy', { status: 429, headers: { 'retry-after': '2' } }));
   assert.equal(e429.retryAfterMs, 2000);
   assert.equal(e429.code, undefined);
