@@ -703,6 +703,7 @@
           }
           body.innerHTML = Popup.renderMarkdown(daMostrare);
           Popup.notaRipiego(body, res.keyFallback);
+          Popup.notaInterrotta(body, res.finishReason);
         });
         return () => { cancelled = true; };
       },
@@ -815,6 +816,7 @@
             }
             testoChiuso(body, res.text);
             Popup.notaRipiego(el, res.keyFallback);
+            Popup.notaInterrotta(el, res.finishReason);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -885,6 +887,7 @@
               body.textContent = '';
             } else if (m.type === 'done') {
               Popup.notaRipiego(el, m.keyFallback);
+              Popup.notaInterrotta(el, m.finishReason);
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
@@ -1717,7 +1720,9 @@
         ta.remove();
       }
       try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
-      Popup.showToast(I18n.t('toast_transcribed'));
+      // Copiato, ma non intero: fermato al tetto di lunghezza (#1097.3).
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
     } catch (_) {
       Popup.showToast(I18n.t('err_provider_failed'));
     }

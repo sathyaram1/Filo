@@ -115,6 +115,32 @@
     return global.SN_FILO_CONTESTO;
   }
 
+  function lunghezzaRisposte() {
+    if (!global.SN_LUNGHEZZA_RISPOSTE && typeof require === 'function') require('./lunghezzaRisposte.js');
+    return global.SN_LUNGHEZZA_RISPOSTE;
+  }
+
+  // Il tetto delle risposte di una famiglia di funzioni (#1097.3): «16 mila», «32k», «predefinito».
+  function setterLunghezza(famiglia, nome, keys) {
+    return {
+      scrive: [`lunghezzaRisposte.${famiglia}`],
+      aiuto: `token 1.024-262.144, o "predefinito" (quanto può essere lunga una risposta per ${nome}; oltre si ferma e lo dice)`,
+      keys,
+      costo: 2,
+      risk: 'Un tetto più alto lascia finire le risposte lunghe, ma un modello che si incarta costa di più prima di fermarsi, e qualche fornitore che non regge il tetto viene scartato; uno più basso costa meno e interrompe prima le risposte lunghe.',
+      build(v) {
+        const nomeTetto = `Lunghezza massima delle risposte per ${nome}`;
+        if (predefinito(v)) return { partial: { lunghezzaRisposte: { [famiglia]: null } }, label: `${nomeTetto} → come i predefiniti` };
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        let n = parseItalianNumber(s);
+        if (!Number.isFinite(n)) return null;
+        if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
+        const token = lunghezzaRisposte().numeroIn(n);
+        return { partial: { lunghezzaRisposte: { [famiglia]: token } }, label: `${nomeTetto} → ${token.toLocaleString('it-IT', { useGrouping: true })} token` };
+      },
+    };
+  }
+
   // «predefinito», «di serie», «come prima»: torna al valore dei Modelli predefiniti.
   function predefinito(v) {
     if (v === null) return true;
@@ -1361,6 +1387,13 @@
         return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
       },
     },
+    // ── #1097.3: quanto può essere lunga una risposta, per famiglia di funzioni ──
+    setterLunghezza('conversazioni', 'la chat e le conversazioni', ['lunghezza_risposte_chat', 'lunghezza delle risposte della chat',
+      'risposte della chat', 'tetto delle risposte della chat', 'lunghezzarisposte.conversazioni']),
+    setterLunghezza('testi', 'traduzioni, riscritture e riassunti', ['lunghezza_risposte_testi', 'lunghezza delle traduzioni',
+      'lunghezza dei riassunti', 'tetto delle traduzioni', 'lunghezzarisposte.testi']),
+    setterLunghezza('brevi', 'le risposte brevi (spiegazioni, titoli, correttore)', ['lunghezza_risposte_brevi', 'lunghezza delle spiegazioni',
+      'tetto delle risposte brevi', 'lunghezzarisposte.brevi']),
     // ── #1004: cosa delle pagine va ai modelli senza che l'utente lo chieda ──
     {
       scrive: ['riassuntoSchede.enabled'],

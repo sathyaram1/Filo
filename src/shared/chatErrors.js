@@ -34,7 +34,7 @@
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
 //
-//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | ''
+//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | ''
 //     La pagina dove l'utente può togliere l'ostacolo, per chi affianca un
 //     collegamento al «Riprova» (che su questi codici non porta da nessuna
 //     parte finché non si cambia qualcosa).
@@ -108,6 +108,7 @@
     NO_MODEL_FOR_ACTION: 'opzioni',
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
     LIMIT_REACHED: 'opzioni',
+    TETTO_RISPOSTA: 'preferenze',
   };
   // Accetta il codice da solo o la risposta intera. Con la risposta si sa anche
   // se il servizio ha rifiutato la CHIAVE (credito finito compreso): lì la
@@ -126,6 +127,7 @@
   const RIMEDIO_PAGINE = {
     crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti' },
     opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni' },
+    preferenze: { url: 'filo://preferences/preferences.html#sec-lunghezza', label: 'Apri Preferenze' },
   };
   function rimedioPagina(x) {
     const dove = rimedio(x);
@@ -179,6 +181,12 @@
         return e.keySource === 'own'
           ? 'nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello in Modelli predefiniti.'
           : 'nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello in Modelli predefiniti.';
+      }
+      // #1097.3: fra gli host ammessi nessuno regge il tetto di lunghezza della risposta di questa funzione.
+      if (e && e.code === 'TETTO_RISPOSTA') {
+        const n = Number(e.maxTokens);
+        const tetto = Number.isFinite(n) && n > 0 ? ` di ${n.toLocaleString('it-IT', { useGrouping: true })} token` : '';
+        return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello in Modelli predefiniti.`;
       }
       if (e && e.code === 'MODEL_UNAVAILABLE') {
         return 'il modello scelto non è più disponibile sul servizio AI: scegli un altro modello in Modelli predefiniti.';
@@ -264,8 +272,15 @@
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
   }
 
+  // Una risposta che il modello ha dovuto fermare al tetto di lunghezza (finish_reason 'length', #1097.3): non è un
+  // errore, ma chi la legge deve sapere che non è intera. La stessa frase su ogni superficie; '' se la risposta è intera.
+  const FRASE_INTERROTTA = 'La risposta si è interrotta qui: era più lunga del tetto che ha questa funzione.';
+  function rispostaInterrotta(finishReason) {
+    return finishReason === 'length' ? FRASE_INTERROTTA : '';
+  }
+
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, CODICI_GIA_SCRITTI,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

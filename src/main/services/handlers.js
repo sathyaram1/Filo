@@ -522,6 +522,12 @@ function buildAttemptChain(settings, modelRef, action) {
       if (a.provider === 'openrouter') a.providerRouting = routing;
     }
   }
+  // Il tetto della risposta per la famiglia della funzione (#1097.3): Preferenze, poi Modelli predefiniti, poi il codice.
+  const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
+  let owner = null;
+  try { owner = Defaults.get().lunghezzaRisposte; } catch (_) {}
+  const tetto = LR ? LR.perAzione(action, settings.lunghezzaRisposte, owner) : null;
+  if (tetto) for (const a of out) a.maxTokens = tetto;
   return out;
 }
 
@@ -831,7 +837,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     });
   }
 
-  if (!skipCache) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
+  // Una risposta fermata dal tetto non si rilegge dalla cache: chi riprova deve poterla avere intera (#1097.3).
+  if (!skipCache && result.finishReason !== 'length') AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
   return {
     text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
@@ -886,8 +893,11 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
   });
 
-  AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
-  return { costEur, usage: result.usage, provider: usedProvider, model: concreteModel, keyFallback: ripiegoDaDire(result.keyFallback) };
+  if (result.finishReason !== 'length') AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
+  return {
+    costEur, usage: result.usage, provider: usedProvider, model: concreteModel, keyFallback: ripiegoDaDire(result.keyFallback),
+    finishReason: result.finishReason || null,
+  };
 }
 
 // ─── Filo agents ────────────────────────────────────────────────────────────
@@ -4674,6 +4684,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
   let fermato = false;
+  // La risposta si è fermata al tetto di lunghezza (#1097.3): lo si dice, e «Continua» la riprende.
+  let interrotta = false;
   // Il primo giro che risponde porta nella cronologia anche l'attesa prima del modello: chi aspetta la vive (#1097.1).
   let tempiPrima = { preparazioneMs: Date.now() - inizioTurno, ...(attesePrimaDelModello || {}) };
   try {
@@ -4731,6 +4743,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
         exhausted = false;
+        interrotta = r.finishReason === 'length';
         break;
       }
       if (turno.fermato) { fermato = true; break; }
@@ -4884,6 +4897,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (mutoDopoLetture) {
     senzaRisposta = { passi };
     textReply = unisciTesti([textReply, fraseSenzaRisposta(passi)]);
+  }
+  if (interrotta && !senzaRisposta) {
+    senzaRisposta = { passi, interrotta: true };
+    textReply = unisciTesti([textReply, `_${globalThis.SN_CHAT_ERRORS.rispostaInterrotta('length')}_`]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di

@@ -95,11 +95,13 @@
     let currentResult = '';
     let inFlight = false;
     let $nota = null; // la riga del ripiego sui crediti di Filo, della proposta in vista
+    let $interrotta = null; // la riga della proposta fermata dal tetto di lunghezza (#1097.3)
     async function runEdit() {
       const instruction = $instr.value.trim();
       if (!instruction || inFlight) return;
       inFlight = true;
       if ($nota) { $nota.remove(); $nota = null; }
+      if ($interrotta) { $interrotta.remove(); $interrotta = null; }
       $prop.classList.add('sn-editbox-empty');
       $prop.textContent = I18n.t('edit_box_loading');
       $copy.disabled = true;
@@ -121,6 +123,7 @@
         $prop.classList.remove('sn-editbox-empty');
         renderDiff($prop, originalText, currentResult);
         $nota = Popup.notaRipiego($prop.parentNode, res.keyFallback);
+        $interrotta = Popup.notaInterrotta($prop.parentNode, res.finishReason);
         $copy.disabled = false;
         $replace.disabled = false;
       } catch (e) {

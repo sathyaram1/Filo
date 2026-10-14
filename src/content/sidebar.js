@@ -1662,6 +1662,9 @@
       const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
       const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
       assistantEl = appendChatMessage('assistant', displayText, { nelFilo: !!parsed.display });
+      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice.
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      if (interrotta) appendActionLog(interrotta);
 
       // Aggiorna la storia AI
       if (userAction && !userMessage) {

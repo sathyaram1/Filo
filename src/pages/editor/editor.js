@@ -3866,6 +3866,9 @@
           } else {
             thinking.content = raw;
           }
+          // Fermata al tetto di lunghezza (#1097.3): lo si legge sotto, e il modello lo vede al giro dopo.
+          const interrotta = window.SN_CHAT_ERRORS?.rispostaInterrotta?.(r.finishReason);
+          if (interrotta) thinking.content = `${thinking.content}\n\n_${interrotta}_`;
           annotaNelFilo(conv, 'filo', thinking.content);
         }
       } catch (e) {
