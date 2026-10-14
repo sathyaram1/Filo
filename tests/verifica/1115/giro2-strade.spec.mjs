@@ -145,5 +145,4 @@ test('il contesto sta prima del testo da controllare', async ({ app, openTab, te
   const iTesto = tutto.lastIndexOf('sì ci vediamo mercoledì');
   expect(iCtx).toBeGreaterThan(-1);
   expect(iCtx).toBeLessThan(iTesto);
-  console.log(tutto.slice(0, 3000));
 });
