@@ -320,7 +320,6 @@ test('casella che scorre: i segni seguono lo scorrimento e restano visibili sott
   await righe(page, '#ce');
   expect(await misure(page, '#ce')).toEqual({ scorre: true, visibile: true, parola: { dx: true, dy: true } });
   await page.screenshot({ path: 'tests/.shots/1115-ocra-scorre-ce.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
-  await page.close();
 
   const ta = PAGINA.replace('height:140px', 'height:90px').replace('width:760px', 'width:400px');
   page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), ta);
