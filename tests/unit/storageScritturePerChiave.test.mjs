@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { rapportoFraCosti } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
