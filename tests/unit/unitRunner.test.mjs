@@ -566,14 +566,36 @@ test('il tetto per file conta solo l\'avanzamento del primo file in corso: gli a
   assert.equal(g([{}], 900), null);
   assert.equal(g([], 1800), null, 'l\'ultimo passo di a è a 900');
   assert.equal(g([{ via: 'b' }, { fine: 'b' }, { via: 'c' }], 1899), null);
-  assert.equal(g([], 1900), 'a', 'b e c partiti o finiti non sono avanzamento di a');
+  assert.deepEqual(g([], 1900), { file: ['a'] }, 'b e c partiti o finiti non sono avanzamento di a; c è partito da poco');
   assert.equal(g([], 2500), null, 'detto una volta, il suo tempo riparte');
-  assert.equal(g([], 2900), 'a', 'ridetto: chiuderlo non è servito');
-  assert.equal(g([{ fine: 'a' }], 3000), null, 'chiuso a, il primo diventa c e il suo tempo parte adesso');
-  assert.equal(g([], 3999), null);
-  assert.equal(g([], 4000), 'c');
-  assert.equal(g([{ fine: 'c' }], 4100), null);
-  assert.equal(g([], 99_999), null, 'nessun file in corso: niente da chiudere');
+  assert.deepEqual(g([], 2900), { tutto: true }, 'ridetto senza che sia finito niente: chiuderlo non è servito');
+
+  const h = guardiaPerFile(1000);
+  assert.equal(h([{ via: 'a' }, {}, { via: 'b' }, { via: 'z' }], 0), null);
+  assert.equal(h([{ fine: 'z' }], 500), null);
+  assert.deepEqual(h([], 1000), { file: ['a'] }, 'z è finito da poco: la corsa va avanti, si chiude solo il primo');
+  assert.equal(h([{ fine: 'a' }, { via: 'c' }, { fine: 'c' }], 1100), null, 'chiuso a, il primo diventa b e il suo tempo parte adesso');
+  assert.equal(h([], 2099), null);
+  assert.deepEqual(h([], 2100), { file: ['b'] });
+  assert.equal(h([{ fine: 'b' }], 2200), null);
+  assert.equal(h([], 99_999), null, 'nessun file in corso: niente da chiudere');
+});
+
+// #1231: in fila dietro il primo, quattro file appesi insieme costavano quattro tetti; col disco pieno (#717), centinaia.
+test('più file appesi insieme si chiudono insieme, e se dopo non finisce più niente si chiude la corsa', () => {
+  const g = guardiaPerFile(1000);
+  assert.equal(g([{ via: 'a' }, { via: 'b' }, { via: 'c' }, {}, {}], 0), null);
+  assert.equal(g([{ via: 'd' }], 400), null);
+  assert.deepEqual(g([], 1000), { file: ['a', 'b', 'c'] }, 'nessun file finito in un tetto: con a i partiti da un tetto; d è appena partito');
+  assert.equal(g([{ fine: 'a' }, { fine: 'b' }, { fine: 'c' }, { via: 'e' }], 1100), null, 'le fini dei chiusi non sono avanzamento');
+  assert.equal(g([], 2099), null);
+  assert.deepEqual(g([], 2100), { tutto: true }, 'dopo una chiusura non è finito niente per un tetto: la corsa è ferma');
+
+  const sani = guardiaPerFile(1000);
+  sani([{ via: 'a' }, { via: 'b' }, {}], 0);
+  assert.deepEqual(sani([], 1000), { file: ['a', 'b'] });
+  assert.equal(sani([{ fine: 'a' }, { fine: 'b' }, { via: 'c' }, { via: 'd' }, { fine: 'd' }], 1500), null);
+  assert.deepEqual(sani([], 2500), { file: ['c'] }, 'd è finito da sé: la corsa va avanti, e si continua a chiudere file');
   assert.match(testoFileChiusi([join(ROOT, 'tests', 'unit', 'x.test.mjs')], 20 * 60 * 1000, ROOT),
     /^\[test:unit\] ROSSO: tests\/unit\/x\.test\.mjs non è andato avanti per 20 minuti ed è stato chiuso; gli altri file sono andati avanti\.$/);
 });
