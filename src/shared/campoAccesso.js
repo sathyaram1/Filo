@@ -48,6 +48,7 @@
     const nomi = [...parole(c.name), ...parole(c.id)];
     if (nomi.some((p) => PAROLE_NO.has(p))) return false;
     if (nomi.some((p) => PAROLE_NOME.has(p))) return true;
+    if (nomi.includes('user') && !nomi.some((p) => USER_NO.has(p))) return true;
     const leggibile = [testo(c.placeholder), testo(c.ariaLabel), testo(c.label)].join(' · ');
     return TESTO_SI.test(leggibile) && !TESTO_NO.test(leggibile);
   }
