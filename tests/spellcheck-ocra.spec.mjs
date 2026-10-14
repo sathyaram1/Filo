@@ -311,19 +311,25 @@ const scorre = {
       visibile: s.top >= fr.top && s.top < fr.bottom && s.bottom + 4 <= or.bottom,
       parola,
     };
-  }, sel);
+  }, sel),
+};
 
+test('campo modificabile che scorre, con margine interno: i puntini seguono lo scorrimento, sotto la parola', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
   const ce = PAGINA.replace('<textarea id="ta" spellcheck="true" lang="it" style="display:block;width:760px;height:140px;font:22px monospace"></textarea>',
     '<div id="ce" contenteditable="true" style="width:400px;max-height:110px;overflow:auto;padding:14px;border:1px solid #999;font:22px sans-serif"></div>');
-  let page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), ce);
-  await righe(page, '#ce');
-  expect(await misure(page, '#ce')).toEqual({ scorre: true, visibile: true, parola: { dx: true, dy: true } });
+  const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), ce);
+  await scorre.righe(page, '#ce');
+  expect(await scorre.misure(page, '#ce')).toEqual({ scorre: true, visibile: true, parola: { dx: true, dy: true } });
   await page.screenshot({ path: 'tests/.shots/1115-ocra-scorre-ce.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
+});
 
+test('casella di testo che scorre: i puntini seguono lo scorrimento e non sono tagliati sotto l\'ultima riga', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
   const ta = PAGINA.replace('height:140px', 'height:90px').replace('width:760px', 'width:400px');
-  page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), ta);
-  await righe(page, '#ta');
-  expect(await misure(page, '#ta')).toEqual({ scorre: true, visibile: true, parola: null });
+  const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), ta);
+  await scorre.righe(page, '#ta');
+  expect(await scorre.misure(page, '#ta')).toEqual({ scorre: true, visibile: true, parola: null });
   await page.screenshot({ path: 'tests/.shots/1115-ocra-scorre-ta.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
 });
 
