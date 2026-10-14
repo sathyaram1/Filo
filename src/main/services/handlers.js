@@ -4315,15 +4315,15 @@ function ricordoComeAzione(ricordi) {
 }
 
 async function handleFiloChat(richiesta) {
-  const turno = { inVolo: false };
+  const volo = { accoglienza: false };
   try {
-    return await turnoFiloChat(richiesta, turno);
+    return await turnoFiloChat(richiesta, volo);
   } finally {
-    if (turno.inVolo) onbTurniInVolo -= 1;
+    if (volo.accoglienza) onbTurniInVolo -= 1;
   }
 }
 
-async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }, turno) {
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }, volo) {
   await FiloMem.touchSession();
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
   // perché la parola di stop deve funzionare anche quando il resto non
@@ -4333,7 +4333,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // L'intervista comincia col benvenuto di Filo: un messaggio scritto prima (senza crediti) non ne è una risposta, e
   // metterlo nella conversazione la faceva ripartire da lì, senza che Filo si presentasse mai.
   const onbActive = !!(Onboarding && !onbBefore.done && onbBefore.thread.length > 0);
-  if (onbActive) { turno.inVolo = true; onbTurniInVolo += 1; }
+  if (onbActive) { volo.accoglienza = true; onbTurniInVolo += 1; }
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
 
   // #525 — la chat si scrive su disco ADESSO, non alla chiusura: se l'app
