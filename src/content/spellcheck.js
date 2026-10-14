@@ -585,7 +585,10 @@
       ...(state.ocra || []).filter(valido).map((i) => ({ start: i.start, end: i.end, classe: 'sn-coerenza' })),
     ];
 
-    if (!segni.length) { o.textContent = text; return; }
+    // Un a capo in fondo è una riga nella casella ma non nello specchio: senza, lo specchio è più basso e lo scorrimento
+    // si ferma una riga prima.
+    const coda = /\n$/.test(text) && (state.el.tagName === 'TEXTAREA') ? '​' : '';
+    if (!segni.length) { o.textContent = text + coda; return; }
 
     // Blu e ocra possono coprire la stessa parola: il testo si taglia a ogni bordo e ogni pezzo porta le classi dei
     // segni che lo coprono (lo zigzag è uno sfondo, i puntini una sottolineatura: convivono).
