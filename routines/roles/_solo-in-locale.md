@@ -7,6 +7,11 @@ piedi, non aggirarla e non aprire un feedback per una sessione locale (le
 routine non ne aprono): rimandalo nei Ricevuti. Lì l'owner lo approva come
 lavoro locale, e lo prende una sessione sulla sua macchina.
 
+Vale anche per un'automazione da cambiare (`.github/workflows`): le automazioni
+le spinge solo l'owner, a mano. Non toccarle: fermati prima, e scrivi nelle note
+cosa cambiare. Un ramo che le cambia non parte, né col salvataggio né col
+rilascio (`patterns/le-automazioni-le-spinge-solo-l-owner-a-mano.md`).
+
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason locale \
   --notes "[cosa va fatto in locale e perché; cosa hai già fatto sul ramo]"
