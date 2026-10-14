@@ -490,6 +490,13 @@
 
   // Un rifiuto per il tetto della risposta: nessun host ammesso regge quel `max_tokens`. Si dice, col numero (#1097.3).
   const RIFIUTO_TETTO = /max[_ ]?tokens|max(?:imum)?[_ ](?:output|completion)[_ ]tokens|output token limit/i;
+  // Finestra sforata: se il tetto da solo ne prende più di metà, stringere la conversazione non basta e la causa
+  // da dire è il tetto; sotto, resta un rifiuto di contesto che la chat sa stringere da sé.
+  function finestraPresaDalTetto(errText, maxTokens) {
+    const m = /maximum context (?:length|window) (?:is|of) ([\d.,]+)/i.exec(String(errText || ''));
+    const finestra = m ? Number(m[1].replace(/[.,]/g, '')) : NaN;
+    return Number.isFinite(finestra) && finestra > 0 && maxTokens > finestra / 2;
+  }
 
   async function httpError(res, { tools = false, maxTokens = null } = {}) {
     const errText = await res.text().catch(() => '');
