@@ -19,6 +19,7 @@ const QUESTO = basename(fileURLToPath(import.meta.url));
 const NOTI = ['dispatch', 'domandaChiusura', 'esitoPerCommit', 'routineChannelRilascio', 'routineRole', 'routineTicket', 'sessionReport']
   .map((n) => `${n}.test.mjs`);
 const IMPORTA = /^import '\.\.\/helpers\/senzaSessione\.mjs';$/m;
+let corse = 0;
 
 /**
  * Trenta file sotto carico durano quanto vuole la macchina: il tetto conta il tempo in cui niente va avanti, come nel
