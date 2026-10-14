@@ -2975,6 +2975,7 @@
     substituteFitsAction,
     openWeightsBlockKind,
     effectiveExcludedProviders,
+    effectiveApiKeys,
     applyOpenWeightsPolicy,
     openWeightsImpact,
     DEPRECATED_MODELS,
