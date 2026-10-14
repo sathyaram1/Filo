@@ -278,6 +278,14 @@
   ];
 
   const HAND_HIDE = CMPS.flatMap((c) => c.hide || []);
+  // Un CMP scritto a mano che monta il suo banner. Non «Impostazioni cookie» né l'involucro: restano in pagina dopo la risposta.
+  const HAND_SIGN = CMPS.flatMap((c) => [
+    ...c.reject, ...(c.rejectInSettings || []), ...(c.showing || []), ...(c.shadowHosts || []).map((id) => '#' + id),
+  ]).join(',');
+
+  function carriesCmp(root) {
+    try { return !!pick(root, HAND_SIGN); } catch (_) { return false; }
+  }
   // Container che hanno l'aria di un consenso cookie (per limitare il fallback).
   const CONSENT_HINT = /(cookie|consent|gdpr|cmp|privacy|consenso|cmpwrapper|didomi|onetrust|cybot|qc-cmp|sp_message|usercentrics|iubenda|truste)/i;
 
