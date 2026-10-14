@@ -189,9 +189,10 @@ osservato. Minimi per tipo di modifica:
 - **la suite completa non la lancia nessuno**, da nessuna parte: gira in GitHub
   a ogni fusione su main (`suite.yml`), e un rosso nuovo diventa un feedback;
   ogni sei ore si pubblica il commit più nuovo con la suite verde. Al suo
-  posto chi verifica lancia `npm run finish:check` (unit più gli spec delle
-  aree toccate). Le regressioni restano di chi le introduce: se ne temi una
-  precisa, lancia quello spec.
+  posto le routine lanciano `npm run finish:check` (unit più gli spec delle
+  aree toccate): chi lavora prima di consegnare, chi verifica nel suo giro.
+  Le regressioni restano di chi le introduce: se ne temi una precisa, lancia
+  quello spec.
 
 **Prima di consegnare, la verifica te la fai tu**, con gli stessi criteri che
 userà chi ti verifica: **`routines/roles/_criteri-verifica.md`** (nelle routine
