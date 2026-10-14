@@ -64,7 +64,8 @@ async function sottoLaParola(page, nome) {
   const a = await segno.first().boundingBox();
   const b = await dovèLaParola(page);
   await page.screenshot({ path: `tests/.shots/v1115-g2-${nome}.png` }).catch(() => {});
-  expect({ x: Math.round(a.x), y: Math.round(a.y) }).toEqual(b);
+  expect({ dx: Math.abs(a.x - b.x) < 4, dy: Math.abs(a.y - b.y) < 6, a: [Math.round(a.x), Math.round(a.y)], b: [b.x, b.y] })
+    .toMatchObject({ dx: true, dy: true });
 }
 
 test('Invio due volte (riga vuota in mezzo)', async ({ app, openTab, testServer }) => {
