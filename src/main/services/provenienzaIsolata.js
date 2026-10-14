@@ -51,7 +51,7 @@ function codiceThread() {
   if (!codice) {
     const condiviso = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'shared', nome), 'utf8');
     // jpeg-js (JS puro) entra come testo anche lui, chiuso in una funzione che gli fa da modulo.
-    const jpeg = fs.readFileSync(require.resolve('jpeg-js/lib/decoder.js'), 'utf8');
+    const jpeg = fs.readFileSync(DECODIFICA_JPEG, 'utf8');
     codice = [
       condiviso('provenienzaImmagine.js'),
       condiviso('marchiInvisibili.js'),
