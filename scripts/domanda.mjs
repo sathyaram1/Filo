@@ -316,6 +316,22 @@ export async function esegui(argv, io = {}) {
       scrivi(formattaDomanda(r.domanda, r.riferimenti));
       return 0;
     }
+    // Le routine non hanno le credenziali del proprietario: il registro lo leggono dal canale, col biglietto del giro.
+    if (a.cmd === 'cerca') {
+      const t = await biglietto();
+      if (t) {
+        const r = await cercaCanale(t, a.testo);
+        if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
+        if (r.outcome !== 'ok') { errore(`guasto del canale delle routine (${visibile(r.reason)}): il registro non si è letto.`); return 3; }
+        scrivi(formattaRegistro(r.reply || {}, a.testo));
+        return 0;
+      }
+      const r = await chiama({ op: 'cerca', testo: a.testo });
+      const nf = (Array.isArray(r.voci) ? r.voci : []).filter((v) => v && v.fiducia !== 'fidato').map((v) => String(v.id || '?'));
+      if (nf.length) errore(await sporca('registro delle decisioni', [motivoNonFidate(nf)]));
+      scrivi(formattaRegistro(r, a.testo));
+      return 0;
+    }
     if (a.cmd === 'elenco') {
       const r = await chiama(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
       const nf = nonFidate(r.domande);
