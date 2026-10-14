@@ -267,7 +267,7 @@ automazioni_da_spedire() {
 }
 cosa_fare_automazione() {
   if is_routine_session; then
-    REPLY="Un lavoro di routine che deve cambiare un'automazione si ferma e va ai lavori locali (consegna con --reason locale); se il cambiamento non serve, toglilo dalla storia del ramo e il salvataggio riparte."
+    REPLY="Da una routine non parte: togli quel cambiamento dalla storia del ramo e, se il lavoro ne ha bisogno, consegnalo ai lavori locali (--reason locale) scrivendo nelle note cosa cambiare."
   else
     REPLY="La spinge l'owner a mano, con la credenziale per le automazioni (patterns/le-automazioni-le-spinge-solo-l-owner-a-mano.md); dopo, il salvataggio riparte da solo."
   fi

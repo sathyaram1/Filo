@@ -29,10 +29,16 @@ export function rifiutoPerAutomazioni(testo) {
   return /refusing to allow[\s\S]*workflow/i.test(String(testo || ''));
 }
 
-export function avvisoAutomazioni(file, { routine = true } = {}) {
-  const quali = file.length ? ` (${file.join(', ')})` : '';
-  const cosa = routine
-    ? 'Un lavoro di routine che deve cambiare un\'automazione si ferma e va ai lavori locali (consegna con --reason locale); se il cambiamento non serve, toglilo dalla storia del ramo e rispedisci.'
+export function cosaFareConUnAutomazione({ routine = true } = {}) {
+  return routine
+    ? 'Da una routine non parte: togli quel cambiamento dalla storia del ramo e, se il lavoro ne ha bisogno, consegnalo ai lavori locali (--reason locale) scrivendo nelle note cosa cambiare.'
     : 'La spinge l\'owner a mano, con la credenziale per le automazioni (patterns/le-automazioni-le-spinge-solo-l-owner-a-mano.md).';
-  return `i commit da spedire cambiano un'automazione${quali}, e le automazioni le spinge solo l'owner (#1140). ${cosa}`;
+}
+
+export function avvisoAutomazioni(file, { routine = true } = {}) {
+  return `i commit da spedire cambiano un'automazione (${file.join(', ')}), e le automazioni le spinge solo l'owner (#1140). ${cosaFareConUnAutomazione({ routine })}`;
+}
+
+export function avvisoRifiutoAutomazioni(motivo, { routine = true } = {}) {
+  return `GitHub ha rifiutato il push: porta un cambiamento a un'automazione, anche solo arrivato da main, e le automazioni le spinge solo l'owner (#1140). ${cosaFareConUnAutomazione({ routine })} Il motivo di GitHub: ${motivo}`;
 }

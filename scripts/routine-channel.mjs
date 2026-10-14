@@ -127,6 +127,7 @@ import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
+import { automazioniDaSpedire, rifiutoPerAutomazioni, avvisoAutomazioni, avvisoRifiutoAutomazioni } from './lib/automazioni.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
@@ -637,6 +638,9 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
     copie = spedibileSenzaCopie(root, routine ? { nome: 'claude-routine', email: 'claude@routine' } : {});
   } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
   if (copie.stato === 'fermo') return { ok: false, skipped: false, branch: ramo, reason: copie.avviso };
+  // Come l'hook: un'automazione nei commit da spedire ferma il ramo (#1140).
+  const automazioni = automazioniDaSpedire(root, 'HEAD', { exec });
+  if (automazioni.length) return { ok: false, skipped: false, branch: ramo, reason: avvisoAutomazioni(automazioni, { routine }) };
   try { installaControlloSpedizione(root); } catch (_) { /* il controllo qui sopra c'è già stato */ }
   const avviso = copie.avviso ? { avviso: copie.avviso } : {};
   const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
@@ -645,6 +649,9 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
   // regola del repo, il push protection): non è storia divergente, un rebase
   // non lo cura e il lease non si tenta (verifica del giro 4, stessa regola
   // dell'hook di salvataggio).
+  if (/\[remote rejected\]/i.test(push.out) && rifiutoPerAutomazioni(push.out)) {
+    return { ok: false, skipped: false, branch: ramo, reason: avvisoRifiutoAutomazioni(pulisciGit(push.out), { routine }) };
+  }
   if (/\[remote rejected\]/i.test(push.out)) {
     return { ok: false, skipped: false, branch: ramo, reason: `il server remoto ha rifiutato il push (una regola del repo, un pre-receive, il push protection?): ${pulisciGit(push.out)}` };
   }
