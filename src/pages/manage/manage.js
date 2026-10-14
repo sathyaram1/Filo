@@ -2573,8 +2573,12 @@
     if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
-  // Passato dalla verifica, aspetta il PC per la fusione e il deploy del server (#1159): lo prende `npm run orchestra -- fusioni-server`.
-  const TITOLO_ATTESA_SERVER = 'La verifica è passata, aspetta il tuo PC. Lo porta su main di filo-security e lo pubblica npm run orchestra -- fusioni-server, che parte anche con avvia.';
+  // Un lavoro server passato e le sue attese (#1159): il cancello, la suite di filo-security, la pubblicazione da GitHub, il PC.
+  const ATTESE_SERVER = Object.freeze({
+    pc: ['Pronto: aspetta il PC', 'Verifica e controllo di sicurezza sono passati, ma il cancello non può portare il ramo su main di filo-security. Lo porta il tuo PC con npm run orchestra -- fusioni-server, che parte anche con avvia.'],
+    suite: ['Aspetta le prove del server', 'Il cancello porta il ramo su main di filo-security quando la suite di GitHub è verde su quel commit. Riprova da solo ogni dieci minuti.'],
+    deploy: ['Server fuso: aspetta la pubblicazione', 'La parte del server è su main di filo-security. Quella dell’app si fonde quando la pubblicazione da GitHub è verde.'],
+  });
   function localSignText(fb) {
     const m = fb && fb.localOnly;
     if (!m) return '';
