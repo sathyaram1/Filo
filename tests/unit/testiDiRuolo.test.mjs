@@ -190,3 +190,17 @@ test('come si nomina una prova del giro lo spiega un testo solo, e le risposte d
     assert.match(t, /- r2 \[1i\] il bordo è freddo/);
   }
 });
+
+// Un file in .github/workflows gira appena il ramo arriva su GitHub (#1140): chi lavora in routine deve sapere che quel
+// lavoro va in locale prima di toccarlo, perché il salvataggio lo committerebbe nel ramo al primo Edit.
+test('un lavoro che cambia un\'automazione va in locale: lo dicono i testi di chi scrive codice e il documento comune', () => {
+  const testi = [['new-work'], ['fixer'], ['fixer', { caso: 'ripresa' }]];
+  for (const [ruolo, opts] of testi) {
+    const t = readRoleInstructions(ruolo, opts).replace(/\s+/g, ' ');
+    const locale = t.slice(t.indexOf('## Se il lavoro si fa solo in locale'));
+    assert.ok(locale.length < t.length, `${ruolo} ${opts?.caso || ''}: manca la sezione sul lavoro solo in locale`);
+    assert.match(locale.slice(0, 900), /un'automazione in `\.github\/workflows` \(il file non si tocca/, `${ruolo} ${opts?.caso || ''}`);
+  }
+  const comune = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8').replace(/\s+/g, ' ');
+  assert.match(comune, /Le automazioni \(`\.github\/workflows`\) passano dall'owner\.[^-]*_solo-in-locale\.md/);
+});
