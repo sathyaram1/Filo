@@ -19,6 +19,8 @@ process.env.FILO_USER_DATA = DATI;
 const require = createRequire(import.meta.url);
 require('../../src/shared/provenienzaImmagine.js');
 const F = require('../../src/main/services/firmatariC2pa.js');
+// Qui e non alla prima lettura: un pacchetto che manca fa cadere il file subito, col suo nome (#1231).
+const isolata = letturaIsolata();
 const P = globalThis.SN_PROVENIENZA;
 
 const RADICE = certificato({ organizzazione: 'Autorità di prova', nomeComune: 'Radice', ca: true });
