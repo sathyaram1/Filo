@@ -82,6 +82,23 @@ test('nessuno unit test dà a un processo vero un tempo massimo scritto a mano',
   assert.deepEqual(fuori, [], 'usa TETTO_ATTESA_MS da tests/helpers/attese.mjs: sotto carico un tetto stretto è un rosso finto');
 });
 
+// Un intervallo vero acceso per tutto il file tiene vivo il processo anche dietro una promessa rimasta a metà: il file
+// si appendeva invece di cadere rosso (#1231). Si accende solo mentre l'attesa vera è in viaggio.
+const VIVO_PER_TUTTO_IL_FILE = /^(?:(?:const|let|var)\s+\w+\s*=\s*)?setInterval\s*\(/m;
+
+test('nessuno unit test tiene vivo il processo per tutto il file con un intervallo', () => {
+  assert.ok(VIVO_PER_TUTTO_IL_FILE.test("import x from 'y';\nconst vivo = setInterval(() => {}, 60_000);\n"));
+  assert.ok(VIVO_PER_TUTTO_IL_FILE.test('setInterval(() => {}, 1000);\n'));
+  assert.ok(!VIVO_PER_TUTTO_IL_FILE.test("test('x', async () => {\n  const vivo = setInterval(() => {}, 1000);\n});\n"));
+  assert.ok(!VIVO_PER_TUTTO_IL_FILE.test('writeFileSync(f, "test(\'a\', () => {});\\nsetInterval(() => {}, 1000);\\n");\n'));
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    if (VIVO_PER_TUTTO_IL_FILE.test(readFileSync(file, 'utf8'))) fuori.push(relative(ROOT, file).split(sep).join('/'));
+  }
+  assert.deepEqual(fuori, [], 'tieni vivo il processo solo mentre aspetti (per le letture delle immagini: tests/helpers/letturaIsolata.mjs)');
+});
+
 // Il pid di un processo morto non si prende lanciandone uno (#1063): sotto carico il figlio non parte e non scrive
 // niente, o il suo pid torna in uso, e la prova crede viva una cosa morta.
 const PID_DI_UN_FIGLIO = [/\bspawnSync\s*\([^;]*?\)\s*\.pid\b/, /['"`]-e['"`]\s*,\s*['"`][^'"`]*console\.log\(process\.pid\)/];
