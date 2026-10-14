@@ -276,9 +276,208 @@
   function schedaDi(domanda) {
     const s = isOggetto(domanda) ? domanda.stato : '';
     if (s === 'in_lavorazione') return 'in_lavorazione';
-    if (s === 'chiusa' && isOggetto(domanda.esito) && domanda.esito.automatica === true) return 'risposte_automatiche';
+    if (s === 'chiusa' && isOggetto(domanda.esito) && (domanda.esito.automatica === true || domanda.esito.tipo === 'principio')) return 'risposte_automatiche';
     if (s === 'chiusa' || s === 'superata') return 'archivio';
     return 'da_rispondere';
+  }
+
+  // ─── Registro delle decisioni (§3.6): le domande chiuse col loro principio, nessun archivio a parte ───
+
+  /** Il principio che una risposta stabilisce: una regola generale in una frase. Oltre il tetto si rifiuta col numero. */
+  function validaPrincipio(testo) {
+    const t = typeof testo === 'string' ? testo.trim() : '';
+    if (!t) return no('principio_vuoto', 'il principio è la regola generale che la risposta stabilisce: una frase, non vuota');
+    return lunghezzaOk(t, 'principio', TETTI.principio) || { ok: true, principio: t };
+  }
+
+  function principioDi(d) {
+    const p = isOggetto(d) && isOggetto(d.principio) ? d.principio : null;
+    return p && typeof p.testo === 'string' && p.testo.trim() ? p : null;
+  }
+  const idValido = (v) => (typeof v === 'string' && numeroDi(v) !== null ? v.trim() : '');
+
+  /**
+   * La voce del registro di una domanda, o null: conta solo una chiusa col suo principio non ancora sostituito.
+   * Senza `fiducia` scritta dal server il principio vale non fidato: un principio piantato non risponde da solo.
+   */
+  function voceRegistro(d) {
+    const p = principioDi(d);
+    if (!p || d.stato !== 'chiusa' || idValido(p.sostituitoDa)) return null;
+    return {
+      id: String(d.id || ''),
+      titolo: typeof d.titolo === 'string' ? d.titolo : '',
+      gruppo: typeof d.gruppo === 'string' ? d.gruppo.trim() : '',
+      principio: p.testo.trim(),
+      fiducia: p.fiducia === 'fidato' ? 'fidato' : 'non_fidato',
+      daRivedere: isOggetto(p.daRivedere),
+      il: Number(p.scrittoIl) || Number(d.modificataIl) || 0,
+    };
+  }
+
+  const PAROLE_VUOTE = new Set(('che chi con per non una uno gli del dei delle della dello degli alla alle allo agli dal dai '
+    + 'dalla nel nei nella nelle sul sui sulla come piu anche sono essere fare questo questa quello quella quando dove '
+    + 'cosa ogni tutto tutti tra fra senza').split(' '));
+  // Una radice grezza basta a far incontrare «credito» e «crediti»: la ricerca la fa un agente, che riprova con altre parole.
+  function radici(testo) {
+    const s = String(testo == null ? '' : testo).toLocaleLowerCase('it').normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const out = new Set();
+    for (const w of s.split(/[^a-z0-9]+/)) {
+      if (w.length < 3 || PAROLE_VUOTE.has(w)) continue;
+      out.add(w.length > 5 ? w.slice(0, Math.max(5, w.length - 2)) : w);
+    }
+    return out;
+  }
+  function incontra(q, parole) {
+    for (const p of parole) {
+      if (p === q) return true;
+      const corta = p.length < q.length ? p : q;
+      if (corta.length >= 4 && (p.startsWith(q) || q.startsWith(p))) return true;
+    }
+    return false;
+  }
+  const PESI_REGISTRO = Object.freeze({ principio: 3, titolo: 2, gruppo: 2 });
+  const piuUtile = (a, b) => (Number(a.daRivedere) - Number(b.daRivedere))
+    || (Number(b.fiducia === 'fidato') - Number(a.fiducia === 'fidato')) || (b.il - a.il);
+
+  /**
+   * Cerca nel registro. Senza parole lo dà tutto (per gruppo, poi dal più recente), così chi chiede può leggerlo intero;
+   * con le parole, i primi `limite` per pertinenza e quante ne restano fuori. Mai un taglio muto.
+   * @returns {{ ok:true, voci:object[], totale:number, altre:number } | { ok:false, errore, dettaglio }}
+   */
+  function cercaNelRegistro(domande, testo, { limite = TETTI.risultatiRegistro } = {}) {
+    const q = typeof testo === 'string' ? testo.trim() : '';
+    if (q.length > TETTI.cerca) {
+      return no('campo_troppo_lungo', `la ricerca è lunga ${q.length} caratteri, il massimo è ${TETTI.cerca}: bastano le parole chiave`,
+        { campo: 'cerca', lunghezza: q.length, massimo: TETTI.cerca });
+    }
+    const voci = (Array.isArray(domande) ? domande : []).map(voceRegistro).filter(Boolean);
+    if (!q) {
+      const perGruppo = (a, b) => (!a.gruppo - !b.gruppo) || a.gruppo.localeCompare(b.gruppo, 'it') || piuUtile(a, b);
+      return { ok: true, voci: voci.sort(perGruppo), totale: voci.length, altre: 0 };
+    }
+    const cercate = [...radici(q)];
+    if (!cercate.length) return no('ricerca_vuota', 'nessuna parola utile da cercare: servono parole di almeno tre lettere');
+    const trovate = [];
+    for (const v of voci) {
+      const campi = { principio: radici(v.principio), titolo: radici(v.titolo), gruppo: radici(v.gruppo) };
+      let punteggio = 0;
+      for (const c of cercate) {
+        let peso = 0;
+        for (const [campo, parole] of Object.entries(campi)) if (PESI_REGISTRO[campo] > peso && incontra(c, parole)) peso = PESI_REGISTRO[campo];
+        punteggio += peso;
+      }
+      if (punteggio > 0) trovate.push(Object.assign({ punteggio }, v));
+    }
+    trovate.sort((a, b) => (b.punteggio - a.punteggio) || piuUtile(a, b));
+    const n = Number.isInteger(limite) && limite > 0 ? limite : TETTI.risultatiRegistro;
+    return { ok: true, voci: trovate.slice(0, n), totale: trovate.length, altre: Math.max(0, trovate.length - n) };
+  }
+
+  /**
+   * Un principio chiude da solo una domanda solo se è fidato e non da rivedere, e solo con un'azione che l'owner
+   * applicherebbe anche in blocco senza un suo gesto: nessuna risposta automatica fa ciò che chiede il consenso.
+   */
+  function principioApplicabile(voce, azione) {
+    if (!isOggetto(voce) || voce.fiducia !== 'fidato' || voce.daRivedere === true) return false;
+    const v = validaAzione(azione);
+    return v.ok && TIPI[v.azione.tipo].bulk === true && TIPI[v.azione.tipo].consenso !== true;
+  }
+
+  /**
+   * La risposta automatica di una domanda aperta con un principio del registro: sceglie l'opzione `scelta`.
+   * Il server applica l'azione come per una scelta dell'owner, poi scrive l'esito con ok/errore e la chiude.
+   * @returns {{ ok:true, esito:object } | { ok:false, errore, dettaglio }}
+   */
+  function rispostaDaPrincipio(domanda, voce, scelta) {
+    if (!isOggetto(domanda) || domanda.stato !== 'aperta') return no('domanda_non_aperta', 'un principio risponde solo a una domanda aperta');
+    if (!isOggetto(voce) || !idValido(voce.id)) return no('principio_sconosciuto', 'il principio va indicato con la domanda che lo porta (D-n)');
+    if (voce.id === domanda.id) return no('principio_di_se_stessa', 'una domanda non si risponde col proprio principio');
+    const opzioni = Array.isArray(domanda.opzioni) ? domanda.opzioni : [];
+    if (!Number.isInteger(scelta) || scelta < 0 || scelta >= opzioni.length) {
+      return no('scelta_non_valida', opzioni.length ? `l'opzione va scelta fra 1 e ${opzioni.length}` : 'la domanda non ha opzioni da scegliere: resta all\'owner');
+    }
+    const azione = isOggetto(opzioni[scelta]) ? opzioni[scelta].azione : null;
+    if (!principioApplicabile(voce, azione)) {
+      const perche = voce.fiducia !== 'fidato' ? 'il principio non è fidato'
+        : voce.daRivedere === true ? 'il principio è da rivedere: l\'owner l\'ha smentito con una riapertura'
+          : 'l\'azione di quell\'opzione la decide solo l\'owner';
+      return no('principio_non_applicabile', `${perche}: la domanda resta all'owner`);
+    }
+    return {
+      ok: true,
+      esito: { automatica: true, tipo: 'principio', principio: voce.id, testoPrincipio: voce.principio, scelta, azione: validaAzione(azione).azione },
+    };
+  }
+
+  /**
+   * La riapertura dell'owner di una risposta automatica: la domanda torna aperta con l'esito di prima da parte, e il
+   * principio che l'aveva chiusa diventa da rivedere finché la nuova risposta non lo corregge o lo conferma.
+   */
+  function riapriAutomatica(domanda, { ora } = {}) {
+    const e = isOggetto(domanda) ? domanda.esito : null;
+    if (!isOggetto(domanda) || domanda.stato !== 'chiusa' || !isOggetto(e) || (e.automatica !== true && e.tipo !== 'principio')) {
+      return no('non_automatica', 'così si riapre solo una risposta automatica chiusa');
+    }
+    const sorgente = idValido(e.principio);
+    return {
+      ok: true,
+      domanda: { stato: 'aperta', esito: null, riaperta: { il: ora, esitoPrima: e }, modificataIl: ora },
+      principio: sorgente ? { id: sorgente, daRivedere: { il: ora, da: String(domanda.id || '') } } : null,
+    };
+  }
+
+  /** Chiusa col suo principio dopo una riapertura: il principio smentito che va segnato `sostituitoDa`, o ''. */
+  function principioDaSostituire(domanda) {
+    if (!isOggetto(domanda) || domanda.stato !== 'chiusa' || !principioDi(domanda)) return '';
+    const prima = isOggetto(domanda.riaperta) && isOggetto(domanda.riaperta.esitoPrima) ? domanda.riaperta.esitoPrima : null;
+    const id = prima ? idValido(prima.principio) : '';
+    return id && id !== domanda.id ? id : '';
+  }
+
+  /**
+   * Assorbe in `madre` le domande aperte che sono casi dello stesso problema: le figlie diventano superate e restano
+   * leggibili dentro la madre, che prende i loro legami ai feedback e la priorità più urgente (assorbire non abbassa mai).
+   * @returns {{ ok:true, madre:object, figlie:object[] } | { ok:false, errore, dettaglio }}
+   */
+  function assorbi(madre, figlie, { ora } = {}) {
+    if (!isOggetto(madre) || !['aperta', 'in_lavorazione'].includes(madre.stato) || !idValido(madre.id)) {
+      return no('madre_non_aperta', 'si assorbe solo in una domanda aperta o in lavorazione');
+    }
+    const lista = Array.isArray(figlie) ? figlie : [];
+    if (!lista.length) return no('niente_da_assorbire', 'nessuna domanda da assorbire');
+    if (lista.length > TETTI.assorbite) {
+      return no('troppe_assorbite', `${lista.length} domande da assorbire, il massimo è ${TETTI.assorbite} per volta`, { lunghezza: lista.length, massimo: TETTI.assorbite });
+    }
+    const ids = [];
+    for (const f of lista) {
+      const id = isOggetto(f) ? idValido(f.id) : '';
+      if (!id) return no('domanda_non_valida', 'ogni domanda da assorbire va data con il suo id (D-n)');
+      if (id === madre.id) return no('assorbe_se_stessa', `${id} non può assorbire se stessa`);
+      if (ids.includes(id)) return no('assorbita_due_volte', `${id} compare due volte`);
+      if (f.stato !== 'aperta') return no('assorbita_non_aperta', `${id} è ${String(f.stato || '?').slice(0, 20)}: si assorbono solo le domande aperte`);
+      ids.push(id);
+    }
+    const gia = Array.isArray(madre.collegamenti) ? madre.collegamenti.filter(isOggetto) : [];
+    const chiave = (c) => `${c.tipo}|${c.id}`;
+    const visti = new Set(gia.map(chiave));
+    const collegamenti = gia.slice();
+    const aggiungi = (c) => { if (c && !visti.has(chiave(c))) { visti.add(chiave(c)); collegamenti.push(c); } };
+    for (const f of lista) {
+      aggiungi({ tipo: 'domanda', id: f.id });
+      if (isOggetto(f.origine) && f.origine.tipo === 'feedback' && f.origine.id) aggiungi({ tipo: 'feedback', id: f.origine.id });
+      for (const c of Array.isArray(f.collegamenti) ? f.collegamenti : []) if (isOggetto(c) && c.tipo === 'feedback' && c.id) aggiungi({ tipo: 'feedback', id: c.id });
+    }
+    if (collegamenti.length > TETTI.collegamenti) {
+      return no('troppi_collegamenti', `la domanda che assorbe arriverebbe a ${collegamenti.length} collegamenti, il massimo è ${TETTI.collegamenti}: assorbine meno per volta`,
+        { lunghezza: collegamenti.length, massimo: TETTI.collegamenti });
+    }
+    const prima = Array.isArray(madre.assorbite) ? madre.assorbite.filter((x) => idValido(x)) : [];
+    const rango = Math.min(rangoPriorita(madre.priorita), ...lista.map((f) => rangoPriorita(f.priorita)));
+    return {
+      ok: true,
+      madre: { collegamenti, assorbite: [...new Set([...prima, ...ids])], priorita: PRIORITA[rango] || madre.priorita, modificataIl: ora },
+      figlie: ids.map((id) => ({ id, stato: 'superata', assorbitaDa: madre.id, modificataIl: ora })),
+    };
   }
 
   const ID_RE = /^D-([1-9]\d{0,8})$/;
