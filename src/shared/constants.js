@@ -583,6 +583,8 @@
     'Meta',         // produttore di Llama
     'Z.AI',         // Zhipu / GLM
     'Xiaomi',       // MiMo
+    'NVIDIA',       // Nemotron
+    'hexgrad',      // Kokoro
     // Non è un produttore: è un host che nel banco di prova del 30/08 ha
     // risposto ad alcune richieste con la risposta di un'ALTRA richiesta in
     // corso (media 0.42 contro 0.84-0.91 degli altri host). Escluso per tutti i
