@@ -125,3 +125,24 @@ test('una pratica passata che aspetta il PC lo dice sulla scheda; rimessa in cod
   await expect(page.locator('.mg-item[data-id="srv-2"]')).toBeVisible();
   await expect(page.locator('.mg-item[data-id="srv-2"] .mg-attesa-server')).toHaveCount(0);
 });
+
+test('fase 2: la scheda dice quando il server aspetta la suite e quando l’app aspetta la pubblicazione', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await stubAutomazioni(page);
+  const suite = fb({ _id: 'srv-3', seq: 1202, status: 'revision_security', attesa: 'suite_server', branch: 'worker/srv-3-20261014T090000Z' });
+  const deploy = fb({ _id: 'srv-4', seq: 1203, status: 'revision_security', attesa: 'deploy_server', branch: 'worker/srv-4-20261014T090000Z' });
+  const altro = fb({ _id: 'srv-5', seq: 1204, status: 'revision_security', attesa: 'boh', branch: 'worker/srv-5-20261014T090000Z' });
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [suite, deploy, altro]);
+  await page.evaluate(() => window.__mgTest.setTab('local'));
+  const s = page.locator('.mg-item[data-id="srv-3"] .mg-attesa-server');
+  await expect(s).toHaveText('Aspetta le prove del server');
+  await expect(s).toHaveAttribute('title', /suite di GitHub è verde su quel commit/);
+  const d = page.locator('.mg-item[data-id="srv-4"] .mg-attesa-server');
+  await expect(d).toHaveText('Server fuso: aspetta la pubblicazione');
+  await expect(d).toHaveAttribute('title', /Quella dell’app si fonde quando la pubblicazione da GitHub è verde/);
+  await expect(page.locator('.mg-item[data-id="srv-5"]')).toBeVisible();
+  await expect(page.locator('.mg-item[data-id="srv-5"] .mg-attesa-server')).toHaveCount(0);
+});
