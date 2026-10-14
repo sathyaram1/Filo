@@ -166,7 +166,7 @@
   const TETTO_CHIAVE = 2000;
   function chiave(titolo) {
     let t = typeof titolo === 'string' ? titolo.slice(0, TETTO_CHIAVE) : '';
-    t = t.normalize('NFC').replace(INVISIBILI, '');
+    t = senzaInvisibili(t.normalize('NFC').replace(VUOTI, ' '));
     // Gli spazi doppi restano: separano le parole di un titolo scritto a lettere spaziate.
     t = t.replace(/\s/g, ' ').replace(CONTATORE, '').replace(SEGNI_NON_LETTO, '').replace(NUMERO, '#');
     return t.trim();
