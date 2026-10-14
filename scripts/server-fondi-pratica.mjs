@@ -56,7 +56,13 @@ export function ramoCanonico(r) {
 }
 
 export const notaInizio = (ramo) => `Lavoro sul server: porto ${ramo} su main di filo-security (npm run server:fondi).`;
-export const notaFine = (ramo, sha) => `Fuso su main di filo-security: ${ramo}${sha ? ` a ${sha.slice(0, 9)}` : ''}. In produzione va col deploy, npm run server:pubblica.`;
+export const notaFine = (ramo, sha, daGitHub = false) => `Fuso su main di filo-security: ${ramo}${sha ? ` a ${sha.slice(0, 9)}` : ''}. ${daGitHub
+  ? 'In produzione lo porta GitHub (deploy.yml).'
+  : 'In produzione va col deploy, npm run server:pubblica.'}`;
+// Con deploy.yml su main la spinta appena fatta la pubblica GitHub: un server:pubblica adesso correrebbe insieme al suo.
+export const perIlDeploy = (daGitHub) => (daGitHub
+  ? 'Il deploy lo fa GitHub (deploy.yml) per questa spinta: niente server:pubblica adesso. Se la corsa è rossa, rilanciala, o npm run server:pubblica a corsa finita.'
+  : 'Per il deploy: npm run server:pubblica, da filo-security/functions.');
 
 /**
  * I rami dell'app legati alla pratica (verify-local start --feedback, in ogni worktree del repo), ancora esistenti e non ancora su
