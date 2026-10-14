@@ -88,6 +88,19 @@ export function coda(testo, righe = 12) {
   return String(testo || '').trim().split('\n').slice(-righe).join('\n');
 }
 
+/**
+ * Un istante (ISO o ms) com'è sull'orologio della macchina: «19:14», o «2026-10-14 19:14:31» con `conData`; '' se non si legge.
+ * Le ore che legge l'owner passano da qui: tagliare l'ISO dà l'ora UTC (#1064). PURA a fuso dato.
+ */
+export function oraLocale(istante, { conData = false, timeZone } = {}) {
+  const d = new Date(typeof istante === 'number' ? istante : String(istante || ''));
+  if (Number.isNaN(d.getTime())) return '';
+  const giorno = conData ? { year: 'numeric', month: '2-digit', day: '2-digit', second: '2-digit' } : {};
+  const fmt = new Intl.DateTimeFormat('en-GB', { ...giorno, hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone });
+  const p = Object.fromEntries(fmt.formatToParts(d).map((x) => [x.type, x.value]));
+  return conData ? `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}` : `${p.hour}:${p.minute}`;
+}
+
 export function slugDi(num) { return `lavoro-${num}`; }
 export function ramoDi(p) { return `claude/${p.slug}`; }
 // verify-local start prende per opzione o percorso un testo che comincia con un trattino o una barra.
