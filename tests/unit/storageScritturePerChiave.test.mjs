@@ -63,18 +63,14 @@ function grandeStorage() {
 // principale. Il disco qui non scrive, così la misura non paga 4 MB di I/O a campione.
 let nelFlush = 0;
 async function flushSenzaDisco() {
+  const vero = Disco.scrivi;
   const t0 = performance.now();
-  await new Promise((resolve) => {
-    const vero = Disco.scrivi;
-    Disco.scrivi = function (p, ...r) {
-      if (p !== FILE) return vero.call(this, p, ...r);
-      nelFlush += performance.now() - t0;
-      Disco.scrivi = vero;
-      resolve();
-      return Promise.resolve(true);
-    };
-    Storage.flushNow();
-  });
+  Disco.scrivi = function (p, ...r) {
+    if (p !== FILE) return vero.call(this, p, ...r);
+    nelFlush += performance.now() - t0;
+    return Promise.resolve(true);
+  };
+  try { await Storage.flushNow(); } finally { Disco.scrivi = vero; }
 }
 
 test('4 MB di storage: una scritta su una chiave piccola non riserializza il resto e il flush costa una frazione di uno pieno', async () => {
