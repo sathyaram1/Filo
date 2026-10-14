@@ -868,6 +868,8 @@
     const signed = roots.filter(carriesCmp);
     const hit = handReject(signed);
     if (hit) { if (hit.rejected) noteRejected(hit.name); else wake(); return; }
+    const shown = shownWatched();
+    if (shown && clickEl(shown)) { noteRejected('testo'); return; }
     const seen = { hidden: false };
     for (const r of roots) {
       const fb = findRejectText(r, false, seen);
