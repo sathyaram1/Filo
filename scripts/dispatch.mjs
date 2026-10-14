@@ -765,6 +765,11 @@ export function buildPayload(bucket, ctx = {}) {
           diffBase: ctx.diffBase,
           ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: `git diff ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
         } : {}),
+        ...(ctx.diffServer && typeof ctx.diffServer === 'object' ? {
+          diffServer: String(ctx.diffServer.diff || ''),
+          diffServerBase: ctx.diffServer.base || null,
+          diffServerHead: String(ctx.diffServer.head || ''),
+        } : {}),
       };
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
