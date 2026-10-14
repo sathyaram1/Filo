@@ -549,9 +549,9 @@ test('un file appeso si chiude da solo, col suo nome e il tetto nel rosso, e gli
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
     assert.match(r.stdout, /^ok \d+ - sano dopo il primo appeso$/m);
     assert.match(r.stdout, /^ok \d+ - sano in fondo$/m);
-    assert.match(r.stdout, /ROSSO: \S*a-appeso-dopo\.test\.mjs non è andato avanti per 3 secondi ed è stato chiuso; gli altri file sono andati avanti/);
-    assert.match(r.stdout, /ROSSO: \S*c-appeso-subito\.test\.mjs non è andato avanti per 3 secondi ed è stato chiuso/);
-    assert.match(r.stdout, /^not ok \d+ - \S*c-appeso-subito\.test\.mjs$/m, 'node lo dà rosso');
+    assert.match(r.stdout, /ROSSO: .*a-appeso-dopo\.test\.mjs non è andato avanti per 3 secondi ed è stato chiuso; gli altri file sono andati avanti/);
+    assert.match(r.stdout, /ROSSO: .*c-appeso-subito\.test\.mjs non è andato avanti per 3 secondi ed è stato chiuso/);
+    assert.match(r.stdout, /^not ok \d+ - .*c-appeso-subito\.test\.mjs$/m, 'node lo dà rosso');
     assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/);
     assert.doesNotMatch(r.stdout, /sano.*non è andato avanti/);
     assert.equal(r.status, 1);

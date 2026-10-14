@@ -8,6 +8,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Worker } = require('node:worker_threads');
 
+// Cercato al caricamento: se il pacchetto manca, chi importa il modulo cade subito e col motivo (#1231).
+const DECODIFICA_JPEG = require.resolve('jpeg-js/lib/decoder.js');
+
 // Un'immagine vera da 64 MB si legge in qualche centinaio di millisecondi.
 const TEMPO_MAX_MS = 10_000;
 const MEMORIA_MB = 512;
