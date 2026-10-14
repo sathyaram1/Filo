@@ -106,13 +106,8 @@ test('senza banner, a finestra chiusa la pagina e il riquadro vivi non si ripass
   }, SENZA_CMP('tardivo', 'display:none'));
   await page.waitForFunction(() => !document.getElementById('tardivo'), null, { timeout: 8_000 });
   expect(await page.evaluate(() => [window.__rifiuti, window.__accettati])).toEqual([1, undefined]);
-});
 
-test('a caccia chiusa i video di YouTube incorporati passano a youtube-nocookie, anche quelli caricati dopo', async ({ app, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const page = await testServer.openReady(openTab, `<title>VIVA_YT</title>${LINK(200)}${VIVO}`);
-  // «Mostra il banner» qui: la caccia non parte nemmeno, i video si riscrivono lo stesso.
-  await nelMondoDiFilo(app, page, () => globalThis.SN_COOKIES_CS._state().active);
+  // I video di YouTube incorporati passano a youtube-nocookie anche a caccia chiusa, pure quelli che ricevono l'indirizzo dopo.
   await page.evaluate(() => {
     const subito = document.createElement('iframe');
     subito.id = 'yt-subito';
