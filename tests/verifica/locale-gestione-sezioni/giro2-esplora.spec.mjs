@@ -134,5 +134,5 @@ test('una lettura periodica delle domande andata male non porta via la domanda a
   // Dal punto di vista dell'owner: la domanda e il testo restano, al più con un avviso.
   await expect(art).toBeVisible();
   await expect(art.locator('.mg-dq-testo')).toHaveValue('Sto scrivendo la risposta alla terza');
-  await expect(page.locator('#mgDomandeLista .mg-domanda[data-id="D-3"]')).toBeVisible();
+  await expect(page.locator('#mgDomandeLista .mg-domanda[data-id="D-3"]')).toHaveClass(/mg-domanda--aperta/);
 });
