@@ -27,7 +27,7 @@ const IMPORTA = /^import '\.\.\/helpers\/senzaSessione\.mjs';$/m;
 async function daSoli(file, sessione, { casa, tetto = TETTO_ATTESA_MS }) {
   // Con NODE_TEST_CONTEXT il figlio si crederebbe una sotto-prova di questa e non correrebbe niente.
   const { NODE_TEST_CONTEXT: _figlio, ...ambiente } = process.env;
-  const avanzamento = join(casa, 'avanzamento.jsonl');
+  const avanzamento = join(mkdtempSync(join(casa, 'corsa-')), 'avanzamento.jsonl');
   const r = await lanciaSorvegliato(['--test', ...flagsConAvanzamento(['--test-reporter=tap'], avanzamento), ...fileArgs(file, ROOT)], {
     env: { ...ambiente, ...sessione }, avanzamento, tetto, raccogli: true,
   });
