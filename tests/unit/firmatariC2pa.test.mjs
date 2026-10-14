@@ -106,8 +106,8 @@ test('alla prima immagine firmata, un elenco in arrivo si aspetta invece di dire
   assert.ok(togliCartella(join(DATI, 'firmatari-c2pa')));
   let apri;
   risposte.set('/lento.pem', { corpo: elencoPem(RADICE), cancello: new Promise((r) => { apri = r; }) });
-  // L'elenco arriva solo dopo che la prima lettura dell'immagine lo ha trovato ancora in viaggio. Anche se la lettura
-  // fallisce: chiuso, l'aggiornamento resterebbe in corso e le prove dopo lo aspetterebbero per sempre (#1231).
+  // L'elenco arriva solo dopo che la prima lettura dell'immagine lo ha trovato ancora in viaggio. Si apre anche se la
+  // lettura fallisce: rimasto chiuso, l'aggiornamento resterebbe in corso e le prove dopo lo aspetterebbero per sempre.
   const vera = isolata.analizza;
   isolata.analizza = (...a) => vera(...a).finally(() => setImmediate(apri));
   const giro = F.aggiorna({ forza: true, url: `${base}/lento.pem` });
