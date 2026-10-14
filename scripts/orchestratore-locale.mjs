@@ -11,7 +11,7 @@ import { cpus, freemem, homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
+  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, oraLocale, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { ENV_FILE as ENV_BIGLIETTO, attesePc, fineAttesa, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
