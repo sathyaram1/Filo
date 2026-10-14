@@ -1,4 +1,4 @@
-// Domande all'owner (SPEC-DOMANDE.md §3): tipi d'azione come dati, validazione coi tetti, etichette e ordine.
+// Domande all'owner (SPEC-DOMANDE.md §3): tipi d'azione come dati, validazione coi tetti, etichette, ordine e registro.
 // PURO e unico: lo incorpora il server (bake-shared), lo usano la Gestione e scripts/domanda.mjs.
 // Un'etichetta nasce solo da tipo, parametri e riferimenti del server, mai dal testo di chi chiede (§3.3).
 
