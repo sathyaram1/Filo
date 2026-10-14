@@ -223,6 +223,9 @@
     const status = document.createElement('div');
     status.className = 'sn-model-row-status';
 
+    const msg = document.createElement('div');
+    msg.className = 'sn-model-row-msg';
+
     row.appendChild(nickIn);
     row.appendChild(provSel);
     row.appendChild(idWrap);
@@ -230,7 +233,36 @@
     row.appendChild(del);
     row.appendChild(test);
     row.appendChild(status);
+    row.appendChild(msg);
     return row;
+  }
+
+  // Il produttore di un modello a pesi aperti va fra i fornitori esclusi (regola dell'owner, #1059):
+  // si confronta con la lista che si sta modificando qui sotto, e un clic ce lo aggiunge.
+  function checkProducer(row) {
+    const C = window.SN_CONST || {};
+    const msg = row.querySelector('.sn-model-row-msg');
+    if (!msg) return;
+    msg.textContent = '';
+    if (typeof C.uncoveredModelProducer !== 'function') return;
+    if (row.querySelector('.sn-model-provider').value !== 'openrouter') return;
+    const producer = C.uncoveredModelProducer(row.querySelector('.sn-model-id').value, collectExcluded());
+    if (!producer) return;
+    const text = document.createElement('span');
+    text.textContent = I18n.t('model_producer_not_excluded', producer);
+    const fix = document.createElement('button');
+    fix.type = 'button';
+    fix.className = 'sn-excluded-guess';
+    fix.textContent = I18n.t('model_producer_exclude', producer);
+    fix.addEventListener('click', () => {
+      $('excludedList').appendChild(makeExcludedRow(producer, { kind: 'producer' }));
+      renderExcludedDrift();
+    });
+    msg.append(text, fix);
+  }
+
+  function checkProducers() {
+    for (const row of $('modelRegistryList').querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) checkProducer(row);
   }
 
   async function runRowTest(nickIn, provSel, idIn, row, btn) {
