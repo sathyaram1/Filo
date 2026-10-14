@@ -204,7 +204,7 @@
     const m = new Map();
     const righe = {
       'ΑΒΕΖΗΙΚΜΝΟΡΤΥΧ': 'abezhikmnoptyx',
-      'ᎪᏴᏟᎠᎬᏀᎻᎥᎫᏦᏞᎷᎾᏢᎡᏒᏚᏕᎢᏙᏉᎳᏔᏃᎽ': 'abcdeghijklmoprrssttvwwzy',
+      'ᎪᏴᏟᎠᎬᏀᎻᎥᎫᏦᏞᎷᎾᏢᎡᏒᏚᏕᎢᏙᎳᏔᏃᎽ': 'abcdeghijklmoprrsstvwwzy',
       'ꓮꓐꓚꓓꓰꓝꓖꓧꓲꓙꓗꓡꓟꓠꓳꓑꓣꓢꓔꓴꓦꓪꓫꓬꓜ': 'abcdefghijklmnoprstuvwxyz',
     };
     for (const [da, a] of Object.entries(righe)) {
@@ -273,13 +273,14 @@
 
   // Tutte le letture del titolo su cui si cercano le espressioni: com'è, e coi travestimenti sciolti.
   function scheletri(titolo) {
-    const b = base(chiave(titolo));
+    const grezzo = base(chiave(titolo));
+    const b = grezzo.replace(VUOTO_RE, ' ');
     const { unito, pezzi } = ricomponi(b);
     // «NOTA_PER_FILO», «nota*per*filo»: i segni usati al posto dello spazio tornano spazi.
     const coppie = pezzi.length ? unito.replace(/(?<![\p{L}\p{N}])([\p{L}\p{N}]) ([\p{L}\p{N}])(?![\p{L}\p{N}])/gu, '$1$2') : unito;
     const spaziato = coppie.replace(/[_*~^+=]+/g, ' ');
     const letture = new Set([pulisci(b), pulisci(unito), pulisci(spaziato), pulisci(sciogliLeet(spaziato, 'i')), pulisci(sciogliLeet(spaziato, 'l')),
-      pulisci(separatoriComeSpazi(spaziato)), pulisci(spaziato.replace(DENTRO_PAROLA, ''))]);
+      pulisci(separatoriComeSpazi(spaziato)), pulisci(grezzo.replace(DENTRO_PAROLA, '').replace(VUOTO_RE, ' '))]);
     const attaccate = new Set();
     for (const p of pezzi) {
       attaccate.add(sciogliLeet(p, 'i').replace(/[^a-z]/g, ''));
