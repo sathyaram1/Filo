@@ -237,9 +237,13 @@
   let sezioneAttiva = 'feedback';
   const schedaPerSezione = {};
   for (const s of MR.SEZIONI) schedaPerSezione[s.id] = s.schede[0];
-  // Dopo un clic dell'utente la sezione d'apertura non scatta più: niente cambi di sezione sotto la mano.
+  // Dopo un gesto vero dell'owner la sezione d'apertura non scatta più: una pratica aperta, un filtro o una ricerca
+  // cominciati mentre le domande arrivano non si portano via. Vale ogni gesto, non le sole schede.
   let utenteHaScelto = false;
   let aperturaFatta = false;
+  for (const ev of ['pointerdown', 'keydown', 'wheel']) {
+    document.addEventListener(ev, (e) => { if (e.isTrusted) utenteHaScelto = true; }, { capture: true, passive: true });
+  }
   // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
   let livelliScelti = [];
   const DOMANDE_TABS = (MR.SEZIONI.find((s) => s.id === 'domande') || { schede: [] }).schede;
