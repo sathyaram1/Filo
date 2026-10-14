@@ -253,7 +253,7 @@
   }
 
   // ── Le manopole ────────────────────────────────────────────────────────────
-  // Sette campi identici: nome, limiti e spiegazione stanno nella tabella di
+  // Campi identici: nome, limiti e spiegazione stanno nella tabella di
   // src/shared/wallet.js, il comportamento in src/shared/campoNumero.js. Qui
   // resta solo il cucito.
   const campi = new Map();
