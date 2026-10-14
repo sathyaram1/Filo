@@ -400,10 +400,17 @@
     const name = input.value.trim();
     if (!name || !providerCatalog || !C || typeof C.providerCoversCatalog !== 'function') return;
     if (C.providerCoversCatalog(name, providerCatalog)) return;
-    row.classList.add('sn-row-invalid');
-    input.classList.add('sn-input-invalid');
+    // Un produttore che oggi su OpenRouter non serve nessuno si esclude lo stesso: vale da quando comincia.
+    const producer = row.querySelector('.sn-excluded-kind').value === 'producer';
+    msg.classList.toggle('sn-msg-info', producer);
+    if (!producer) {
+      row.classList.add('sn-row-invalid');
+      input.classList.add('sn-input-invalid');
+    }
     const text = document.createElement('span');
-    text.textContent = I18n.t('admin_defaults_excluded_unknown');
+    text.textContent = producer
+      ? I18n.t('admin_defaults_excluded_producer_absent', name)
+      : I18n.t('admin_defaults_excluded_unknown');
     msg.appendChild(text);
     const guess = C.closestCatalogProvider(name, providerCatalog);
     if (guess) {
