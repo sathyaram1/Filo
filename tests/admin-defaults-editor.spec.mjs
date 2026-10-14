@@ -442,7 +442,7 @@ test('un modello il cui produttore non è escluso lo dice sulla riga, e «Esclud
   await expect(avviso).toContainText('Xiaomi produce questo modello ma non è fra i fornitori esclusi');
   await expect(righe.nth(1).locator('.sn-model-row-msg')).toBeEmpty();
   await expect(righe.nth(2).locator('.sn-model-row-msg')).toBeEmpty();
-  await page.locator('#sec-model-registry, #modelRegistryList').first().screenshot({ path: 'tests/.shots/admin-defaults-produttore.png' }).catch(() => {});
+  await page.locator('#sec-model-registry').screenshot({ path: 'tests/.shots/admin-defaults-produttore.png' }).catch(() => {});
 
   await avviso.getByRole('button', { name: 'Escludi Xiaomi' }).click();
   await expect(avviso).toBeEmpty();
