@@ -61,7 +61,7 @@ node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
 
 ### Dopo la verifica
 
-Un lavoro server passato va al controllo di sicurezza, che legge anche il diff del server. Poi il cancello porta il
-ramo del server su main di filo-security, ma solo con la suite di GitHub verde sullo sha esatto della punta registrata:
-l'ultima spinta, con la sua riga `ramo-server`, è quella che conta. La pubblicazione la fa GitHub, e la parte dell'app
-si fonde dopo. Non chiedere la fusione del server da qui.
+Un lavoro server passato va al controllo di sicurezza, che legge anche il diff del server. Poi il cancello, solo con la
+suite di GitHub verde sullo sha esatto della punta registrata (l'ultima spinta, con la sua riga `ramo-server`), porta
+prima la parte dell'app su main di Filo, coi controlli di sempre, e poi il ramo del server su main di filo-security. La
+pubblicazione la fa GitHub, e incorpora main di Filo che ha già la parte dell'app. Non chiedere la fusione del server da qui.
