@@ -411,34 +411,6 @@ test('il riquadro di Bluetooth e rete: Esc appena aperto lo chiude, e mentre leg
   }
 });
 
-test('Esc premuto appena aperto chiude il riquadro, e mentre legge l\'elenco il riquadro non copre la sua voce', async ({ app }) => {
-  await computerFinto(app, { letturaMs: 8_000, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
-  const page = await home(app);
-  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
-
-  // Clic ed Esc nello stesso giro: un Esc ascoltato solo dopo un timer andava perso e il riquadro restava aperto.
-  const restaAperto = await page.evaluate(() => {
-    document.querySelector('#sistema .dash-sis-voce[data-voce="bluetooth"]').click();
-    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-    return !!document.querySelector('.dash-sis-box');
-  });
-  expect(restaAperto).toBe(false);
-  await expect(riquadro(page)).toHaveCount(0);
-
-  // La riga «Leggo i dispositivi abbinati…» allunga il riquadro: resta accanto alla voce, non sopra di lei.
-  await voce(page, 'bluetooth').click();
-  await expect(riquadro(page).locator('.dash-sis-attesa')).toBeVisible();
-  const b = await riquadro(page).boundingBox();
-  const v = await voce(page, 'bluetooth').boundingBox();
-  expect(b.y + b.height <= v.y || b.y >= v.y + v.height).toBe(true);
-  await page.screenshot({ path: 'tests/.shots/1219-riquadro-bluetooth-in-lettura.png' }).catch(() => {});
-  // E la voce si riapre al primo clic, senza aspettare la fine della lettura.
-  await page.keyboard.press('Escape');
-  await expect(riquadro(page)).toHaveCount(0);
-  await voce(page, 'bluetooth').click({ timeout: 2_000 });
-  await expect(riquadro(page)).toBeVisible();
-});
-
 test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuori da Filo', async ({ app, shell }) => {
   await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   void shell;
