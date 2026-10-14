@@ -2912,7 +2912,8 @@
   // della conversazione, così anche una chat lunghissima resta riconoscibile
   // (vedi SN_CHAT_ARCHIVE.transcriptForTriage).
   const FILO_CHAT_TRIAGE_CHARS = 4000;
-  const AI_CACHE_MAX_ENTRIES = 200;
+  // Risposte tenute in cache per OGNI funzione (#1097.4), non per tutte insieme.
+  const AI_CACHE_MAX_PER_FUNZIONE = 200;
   const CLIPBOARD_HISTORY_MAX = 50;
 
   const PAGES_WITHOUT_MENU_PREFIXES = [
@@ -3004,7 +3005,7 @@
     FILO_CHAT_TRIAGE_CHARS,
     SAVED_PAGES_LIMIT,
     EMBED_DIM,
-    AI_CACHE_MAX_ENTRIES,
+    AI_CACHE_MAX_PER_FUNZIONE,
     CLIPBOARD_HISTORY_MAX,
     PAGES_WITHOUT_MENU_PREFIXES,
   };

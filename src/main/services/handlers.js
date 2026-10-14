@@ -750,10 +750,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   // Con gli strumenti in richiesta la cache si salta: conserva solo il testo, e
   // una risposta fatta di chiamate rientrerebbe come una risposta muta.
   const hasTools = Array.isArray(tools) && tools.length > 0;
-  // Il giudice delle carte ha la sua cache per carta e criterio: qui le sue venti risposte a ricerca butterebbero
-  // fuori quelle del resto di Filo, che ha un tetto di voci (#382).
-  const skipCache = hasTools || action === ACTIONS.DECKS_SEARCH_FILTER;
-  const cached = (noCache || skipCache) ? null : await AICache.get({ provider: settings.provider, model, messages });
+  const skipCache = hasTools || AICache.esclusa(action);
+  const cached = (noCache || skipCache) ? null : await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
