@@ -62,9 +62,8 @@ export function bakeIn(publicRepo, outDir) {
 
 /** Lo stato del giro come lo lascia il server dopo il pass della verifica (che ha provato `server`) e della sicurezza. */
 export function statoPassato({ app, server, sicurezzaServer = server, ramo }) {
-  void server;
   return {
-    verifierVerdict: 'pass', verifiedSha: app, lastVerdict: { ticket: 'verificatore', sha: app }, lavoroServer: true,
+    verifierVerdict: 'pass', verifiedSha: app, verifiedShaServer: server, lastVerdict: { ticket: 'verificatore', sha: app }, lavoroServer: true,
     secauditDone: true, secauditVerdict: 'pass', secauditSha: app, secauditShaServer: sicurezzaServer, branch: ramo,
   };
 }
