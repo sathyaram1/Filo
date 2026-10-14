@@ -239,6 +239,11 @@ async function consegnaDomanda(biglietto, domanda) {
   return deliver(biglietto, 'domanda', { domanda });
 }
 
+async function cercaDalCanale(biglietto, testo) {
+  const { deliver } = await import('./routine-channel.mjs');
+  return deliver(biglietto, 'cerca_registro', { testo });
+}
+
 /** Il segreto del biglietto della sessione (il più sporco se più d'uno), '' senza: il server allora la fa non fidata. */
 async function segretoLocale() {
   const { trovaBiglietto } = await import('./lib/biglietto-locale.mjs');
