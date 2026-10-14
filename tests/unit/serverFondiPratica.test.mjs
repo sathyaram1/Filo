@@ -83,7 +83,7 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, 
       punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA, verdetto: () => verdetto, fissa,
       lavoroDelRamo: async (x) => { chiesti.push(x); return lavoroDelRamo(x); }, puntaRamo,
       chiediAlCancello: async (x) => { alCancello.push(x); return cancello ? cancello(x) : { outcome: 'fault', reason: 'nessun cancello nella prova' }; },
-      allinea: () => {},
+      allinea: () => {}, deployDaGitHub: () => daGitHub,
     });
     return { k, lanci, scritture, chiesti, alCancello, testo: righe.join('\n') };
   });
