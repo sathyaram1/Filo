@@ -104,6 +104,26 @@ test('«Menu di <sito>» in cima apre il menu della pagina nello stesso punto, e
 
 const vociDelSito = (page) => page.locator('.sn-menu .sn-menu-split-main', { hasText: /^Menu di/ });
 
+// L'altra porta standard per ascoltare il tasto destro: il gestore oncontextmenu, da script o come attributo.
+const COL_GESTORE = (registra, attributo) => MENU_SUO
+  .replace("document.addEventListener('contextmenu', function (e) {", 'window.mostra = function (e) {')
+  .replace("    window.aperture++;\n  });", `    window.aperture++;\n    return false;\n  };\n  ${registra}`)
+  .replace('<div id="area"', `<div id="area" ${attributo}`);
+
+for (const [nome, registra, attributo] of [
+  ['assegnato da script', 'document.oncontextmenu = function (e) { return mostra(e); };', ''],
+  ['scritto come attributo', '', 'oncontextmenu="return mostra(event)"'],
+]) {
+  test(`un menu col gestore oncontextmenu ${nome}: la voce c'è e apre il menu della pagina`, async ({ openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, COL_GESTORE(registra, attributo));
+    await page.locator('#area').click({ button: 'right', position: { x: 60, y: 50 } });
+    await expect(vociDelSito(page)).toHaveText(['Menu di Sito di prova']);
+    expect(await page.evaluate(() => window.aperture)).toBe(0);
+    await vociDelSito(page).click();
+    await expect(page.locator('#menu-suo')).toBeVisible();
+  });
+}
+
 // Anche gli strumenti di Playwright ascoltano il tasto destro sulla finestra della pagina, con un ascoltatore solo per
 // dodici eventi: come un registratore di sessione, non sono un menu, e queste prove lo verificano di passaggio.
 test('una pagina senza menu suo, o un\'app React senza onContextMenu, non ha la voce; con onContextMenu sì', async ({ openTab, testServer }) => {
