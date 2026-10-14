@@ -5712,7 +5712,7 @@
     },
     // Le soglie dell'orologio, accorciate: un giro vero ogni minuto farebbe
     // aspettare minuti a ogni spec.
-    setLiveTiming(t) { live.tempi(t); },
+    setLiveTiming(t) { live.tempi(t); if (t && t.pollMs) domandePollMs = t.pollMs; },
     liveArrivate() { return Array.from(arrivate); },
     // Caricamento FALLITO, su richiesta. Lo spec che verifica "niente numeri
     // inventati quando i dati non sono arrivati" si affidava al fatto che nel
