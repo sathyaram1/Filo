@@ -275,9 +275,8 @@ test('campo modificabile su più righe: i puntini stanno sotto la parola, sulla 
 
 // Testo più alto della casella: lo specchio dei segni scorre con lei, va a capo come lei (margine interno e barra di
 // scorrimento compresi) e non taglia i segni dell'ultima riga, che stanno qualche pixel sotto il testo.
-test('casella che scorre: i segni seguono lo scorrimento e restano visibili sotto l\'ultima riga', async ({ app, openTab, testServer }) => {
-  test.setTimeout(90_000);
-  const righe = async (page, sel) => {
+const scorre = {
+  righe: async (page, sel) => {
     await page.locator(sel).click();
     for (const r of ['uno', 'due', 'tre', 'quattro', 'cinque']) {
       await page.keyboard.type(r);
