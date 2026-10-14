@@ -70,7 +70,7 @@ const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${s
 // Il registro dei rami (#1159): per difetto il ramo non ne ha uno, come i lavori locali di prima.
 const SENZA_REGISTRO = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: 'il ramo non ha un registro' });
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null }) {
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null, daGitHub = false }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
