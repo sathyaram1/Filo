@@ -260,10 +260,9 @@
           const data = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate() + offset);
           if (data.getDay() === g.indice) continue;
           const gPos = tutto.length - giorno.length;
-          const detta = parola[0].toUpperCase() + parola.slice(1).toLowerCase();
           out.push({
             start: m.index, end: m.index + tutto.length, segment: tutto, fonte: 'data', tipo: 'falso', citazione: '',
-            spiegazione: t('spell_ocra_relativa', motore.lingua === 'it' ? detta : nomeRelativo(offset), `${nomeGiorno(data.getDay())} ${data.getDate()} ${nomeMese(data.getMonth())}`),
+            spiegazione: t('spell_ocra_relativa', nomeRelativo(offset), `${nomeGiorno(data.getDay())} ${data.getDate()} ${nomeMese(data.getMonth())}`),
             correzioni: [tutto.slice(0, gPos) + giornoNellaForma(motore, giorno, g, data.getDay())],
           });
         }
