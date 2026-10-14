@@ -745,8 +745,12 @@
     }
     scegliSeServe();
     const n = inOrdine(scheda).length;
-    el0.textContent = n ? '' : (VUOTO[scheda] || '');
-    el0.hidden = !!n;
+    const vuoto = n ? '' : (VUOTO[scheda] || '');
+    if (stato.aggiornamento) {
+      el0.textContent = `Non riesco ad aggiornare le domande: ${stato.aggiornamento}. Restano quelle dell’ultima lettura.${vuoto ? ` ${vuoto}` : ''}`;
+      if (riprova) riprova.hidden = false;
+    } else el0.textContent = vuoto;
+    el0.hidden = !el0.textContent;
     lista.hidden = !n;
     disegnaLista();
     if (altre && stato.altre && scheda === 'domande-archivio') {
