@@ -149,7 +149,15 @@
 
   // ── Il titolo come chiave: i contatori di notifica e i numeri che cambiano non lo rendono un titolo nuovo ──
 
-  const INVISIBILI = /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0]/g;
+  // Tutta la classe, non un elenco: un invisibile che la regola non conosce spezza le parole per lei, e il riepilogo
+  // lo toglie prima del modello (#927 giro 6). I caratteri \u00ABtag\u00BB restano: base() li rilegge come lettere.
+  const INVISIBILI = /[\p{Default_Ignorable_Code_Point}\p{Cf}]/gu;
+  const senzaInvisibili = (t) => t.replace(INVISIBILI, (c) => {
+    const n = c.codePointAt(0);
+    return n >= 0xE0020 && n <= 0xE007E ? c : '';
+  });
+  // Bianchi che a schermo sono uno spazio: tolti attaccherebbero le parole che separano.
+  const VUOTI = /[\u115F\u1160\u2800\u3164\uFFA0]/g;
   const SEGNI_NON_LETTO = /^[\s●•⚫⬤○⭕\u{1F534}\u{1F7E0}\u{1F7E1}\u{1F7E2}\u{1F535}\u{1F7E3}\u{1F514}\u{1F4AC}*]+/u;
   const CONTATORE = /\s*[([{]\s*\d{1,3}(?:[., ]\d{3})*\+?\s*[)\]}]/g;
   const NUMERO = /(?<![\p{L}\p{N}])\d[\d.,:/]*(?![\p{L}\p{N}])/gu;
