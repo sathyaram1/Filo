@@ -569,6 +569,10 @@
   // Aggiungere un nome qui non basta a farlo valere dove l'owner ha già scritto
   // la sua lista: va aggiunto anche là. La pagina «Modelli predefiniti» segnala
   // da sola le voci di questa lista che quella remota non copre.
+  //
+  // Il produttore di ogni modello di serie del repo deve stare qui (regola dell'owner del
+  // 06/10/2026): lo controlla tests/unit/produttoriEsclusi.test.mjs. Copia sul server:
+  // filo-security/functions/src/modelPolicy.js.
   const DEFAULT_EXCLUDED_PROVIDERS = [
     'Google',       // produttore di Gemini (copre Google AI Studio / Vertex)
     'OpenAI',
