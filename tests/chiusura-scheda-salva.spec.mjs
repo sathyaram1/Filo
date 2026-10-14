@@ -132,3 +132,46 @@ test('Opzioni: quello che scrivi resta anche se spegni subito Filo', async () =>
   }, 'monthlyLimitEur');
   expect(salvato, 'spegnendo Filo l\'ultima modifica si perde').toBe('31');
 });
+
+// L'Editor tiene il documento nel suo archivio, non nelle impostazioni: si guarda riaprendo Filo sulla stessa cartella.
+test('Editor: quello che scrivi nel documento resta anche se spegni subito Filo', async () => {
+  test.setTimeout(180_000);
+  const atteso = 'scritto e poi spengo Filo';
+  const userData = cartellaTemporanea('filo-test-editor-uscita-');
+  const avvia = () => electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: RADICE,
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
+  });
+  const apriEditor = async (app) => {
+    const shell = await primaFinestra(app);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), 'filo://editor/editor.html');
+    let page = null;
+    await expect.poll(() => { page = app.windows().find((w) => w.url().includes('editor')) || null; return Boolean(page); },
+      { timeout: 20_000, message: 'la scheda dell\'editor non si è aperta' }).toBe(true);
+    await page.waitForSelector('#doc', { timeout: 20_000 });
+    return page;
+  };
+
+  let app = await avvia();
+  try {
+    const page = await apriEditor(app);
+    await page.click('#doc');
+    await page.keyboard.type(atteso);
+    await expect.poll(() => page.locator('#doc').innerText(), { timeout: 5000 }).toContain(atteso);
+  } finally {
+    await chiudiApp(app);
+  }
+
+  app = await avvia();
+  let ritrovato = '';
+  try {
+    const page = await apriEditor(app);
+    await expect.poll(() => page.locator('#doc').innerText(), { timeout: 8000 }).toContain(atteso);
+    ritrovato = await page.locator('#doc').innerText();
+  } finally {
+    await chiudiApp(app);
+  }
+  try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  expect(ritrovato, 'spegnendo Filo subito dopo aver scritto, l\'ultima frase del documento sparisce').toContain(atteso);
+});
