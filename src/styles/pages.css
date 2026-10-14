@@ -620,6 +620,8 @@ section:has(#dictList) .sn-spell-add-row {
   color: var(--sn-error);
 }
 .sn-model-row-msg:empty { display: none; }
+/* Un'informazione sulla riga, non un errore: niente rosso. */
+.sn-model-row-msg.sn-msg-info { color: var(--sn-muted); }
 /* Quando una riga è stata scartata l'indicatore prende il colore d'allerta: un "Salvato" verde
    affermerebbe un salvataggio totale che non c'è stato. */
 .sn-page .sn-saved-indicator.sn-hint-warn { color: var(--sn-error); }
