@@ -1,7 +1,6 @@
-// Gli unit test sul RISULTATO della fusione del ramo con origin/main, prima di chiederla al server (#929).
-// Non fonde e non spinge niente: lavora in cartelle temporanee e le toglie senza mai attraversare il collegamento
-// a node_modules. La usano merge-gate, finish-local e l'azione di GitHub (scripts/unit-sulla-fusione-azione.mjs);
-// sentinella: tests/unit/unitSullaFusione.test.mjs.
+// Gli unit test sul RISULTATO della fusione del ramo con main, prima di chiederla al server (#929). Non fonde e non spinge:
+// cartelle temporanee, tolte senza mai attraversare il collegamento a node_modules. La usano merge-gate, finish-local e
+// l'azione di GitHub (scripts/unit-sulla-fusione-azione.mjs); sentinella: tests/unit/unitSullaFusione.test.mjs.
 
 import { spawnSync, execFileSync } from 'node:child_process';
 import {
