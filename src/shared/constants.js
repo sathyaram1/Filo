@@ -640,6 +640,12 @@
     return PRODUCER_ONLY_MODELS.find((r) => id.startsWith(r.prefix)) || null;
   }
 
+  // Quando paga Filo (ogni chiave che non è quella propria dell'utente) il router usa solo host a ritenzione
+  // zero (#831, decisione owner 4/09). Con la chiave propria decide l'utente; Anthropic ha la sua regola (#904). PURA.
+  function requiresZeroRetention(keySource, modelId) {
+    return keySource !== 'own' && !producerOnlyRule(modelId);
+  }
+
   // Perché chi ha servito viola la politica: 'excluded' (è nella lista di
   // esclusione), 'not-producer' (il modello si compra solo dal produttore e
   // l'host non è dei suoi), '' se non la viola o se chi ha servito non si sa. PURA.
