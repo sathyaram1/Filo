@@ -508,10 +508,17 @@
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
-    if (maxTokens && (res.status === 400 || res.status === 404) && RIFIUTO_TETTO.test(errText)) {
+    const perTetto = maxTokens && (res.status === 400 || res.status === 404 || res.status === 413)
+      && (RIFIUTO_TETTO.test(errText) || finestraPresaDalTetto(errText, maxTokens));
+    if (perTetto) {
       err.code = 'TETTO_RISPOSTA';
       err.maxTokens = maxTokens;
-    } else if (refusal === 'PARAMS') { if (tools) err.code = 'NO_TOOL_HOST'; } else if (refusal) err.code = refusal;
+    } else if (refusal === 'PARAMS') {
+      // Il tetto è uno dei parametri che il router fa reggere agli host: il suo «nessun host» può venire da lì.
+      if (tools) err.code = 'NO_TOOL_HOST';
+      else if (maxTokens) err.code = 'TETTO_RISPOSTA';
+      if (maxTokens) err.maxTokens = maxTokens;
+    } else if (refusal) err.code = refusal;
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
