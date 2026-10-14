@@ -392,6 +392,26 @@ test('regole toccate: avviso per la pubblicazione a Filo chiuso, il lavoro si ch
   assert.equal(p.fase, 'fuso');
   assert.match(p.avvisi.join('\n'), /regole:pubblica/);
   assert.equal(toccaRegole(['src/x.js']), false);
+  // Con regole.yml su main di filo-security le pubblica GitHub: l'avviso lo dice, il comando resta per averle subito.
+  const cloud = banco({ server: false, risposte: [[/diff --name-only/, { code: 0, out: 'firestore.rules' }]] });
+  cloud.dep.regoleGitHub = async () => true;
+  const q = (await cloud.motore.avvia()).pratiche[7];
+  assert.equal(q.fase, 'fuso');
+  const avviso = q.avvisi.find((a) => a.startsWith('regole'));
+  assert.match(avviso, /le pubblica GitHub entro un’ora/);
+  assert.match(avviso, /se la corsa è rossa, npm run regole:pubblica/);
+});
+
+test('il PC conosce tutte le fonti che il server incorpora: con una sola mancante pubblicherebbe GitHub col main di Filo di prima', () => {
+  const guardia = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'filo-security', 'functions', 'tools', 'guardia-deploy.js');
+  const attese = ['src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt'];
+  assert.deepEqual([...INCORPORATI_DAL_SERVER].sort(), [...attese].sort());
+  // Accanto al checkout principale c'è il server: il suo elenco deve essere lo stesso.
+  if (existsSync(guardia)) {
+    const m = /const FONTI_BAKE = \[([^\]]*)\]/.exec(readFileSync(guardia, 'utf8'));
+    assert.ok(m, 'FONTI_BAKE non trovato nella guardia del server');
+    assert.deepEqual([...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort(), [...INCORPORATI_DAL_SERVER].sort());
+  }
 });
 
 test('il collegamento a node_modules che non si toglie lascia il worktree al suo posto', async () => {
