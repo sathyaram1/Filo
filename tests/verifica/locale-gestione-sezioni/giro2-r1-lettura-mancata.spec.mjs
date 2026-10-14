@@ -46,13 +46,13 @@ async function mainFinto(app, cfg) {
       if (t === 'domande_elenco') {
         globalThis.__v2Letture++;
         if (s.guasti > 0) { s.guasti--; return { ok: false, error: 'deadline-exceeded' }; }
-        return { ok: true, domande: JSON.parse(JSON.stringify(s.domande || [])), riferimenti: {}, adesso: Date.now(), altre: false };
+        return { ok: true, domande: JSON.parse(JSON.stringify(s.domande || [])), riferimenti: { 'fb-903': { num: '#903', priorita: 1 } }, adesso: Date.now(), altre: false };
       }
       if (t === 'domanda_rispondi') {
         const d = (s.domande || []).find((x) => x.id === msg.id);
         if (!d) return { ok: false, error: 'domanda sconosciuta' };
         Object.assign(d, { stato: 'in_lavorazione', modificataIl: Date.now() });
-        return { ok: true, domanda: JSON.parse(JSON.stringify(d)) };
+        return { ok: true, domanda: JSON.parse(JSON.stringify(d)), riferimenti: { 'fb-903': { num: '#903', priorita: 1 } } };
       }
       return orig(event, msg);
     });
