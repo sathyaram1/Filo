@@ -232,8 +232,8 @@
     row.appendChild(reasonSel);
     row.appendChild(del);
     row.appendChild(test);
-    row.appendChild(status);
     row.appendChild(msg);
+    row.appendChild(status);
     return row;
   }
 

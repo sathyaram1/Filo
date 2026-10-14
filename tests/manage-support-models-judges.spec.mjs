@@ -96,3 +96,40 @@ test('il registro raccoglie le righe (anche quelle aggiunte) come voci OpenRoute
   // La chiave digitata è nel campo (verrà inviata dal save).
   await expect(page.locator('#mgSmKeyOpenrouter')).toHaveValue('sk-or-v1-nuova');
 });
+
+// #1059: i giudici girano sul server, la cui lista di esclusione è la copia di quella del codice.
+// Un nickname che punta a un modello il cui produttore non è in lista lo dice accanto alla riga.
+test('registro dei giudici: un produttore non escluso si vede accanto alla riga', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.renderSupportModelsEditor);
+  await page.evaluate(() => window.__mgTest.setTab('automation'));
+  await page.evaluate((m) => window.__mgTest.renderSupportModelsEditor(m), {
+    ...FAKE_MODELS,
+    judgeRegistry: {
+      mimo: { provider: 'openrouter', model: 'xiaomi/mimo-v2.6-flash' },
+      sonnet: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
+      nuovo: { provider: 'openrouter', model: 'acme/giudice-2' },
+    },
+  });
+  const righe = page.locator('#mgSmRegistryList .sn-model-row:not(.sn-model-row-head)');
+  await expect(righe).toHaveCount(3);
+  // Xiaomi è nella lista: il giudice MiMo non fa scattare niente, come Anthropic.
+  await expect(righe.nth(0).locator('.sn-model-row-msg')).toBeEmpty();
+  await expect(righe.nth(1).locator('.sn-model-row-msg')).toBeEmpty();
+  await expect(righe.nth(2).locator('.sn-model-row-msg'))
+    .toHaveText('acme produce questo modello ma non è fra i fornitori esclusi, quindi può servire lui le richieste.');
+
+  // Mentre l'owner lo imposta: scrivendo l'id l'avviso compare e se ne va.
+  await page.click('#mgSmRegistryAdd');
+  const nuova = righe.last();
+  await nuova.locator('.sn-model-id').fill('nousresearch/hermes-5');
+  await expect(nuova.locator('.sn-model-row-msg')).toContainText('nousresearch produce questo modello');
+  await nuova.locator('.sn-model-id').fill('deepseek/deepseek-v4-pro');
+  await expect(nuova.locator('.sn-model-row-msg')).toBeEmpty();
+
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((t) => window.SN_PAGE_BOOTSTRAP && window.SN_PAGE_BOOTSTRAP.applyTheme(t), theme);
+    await page.locator('#mgSmRegistry').screenshot({ path: `tests/.shots/giudici-produttore-${theme}.png` }).catch(() => {});
+  }
+});
