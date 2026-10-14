@@ -906,6 +906,18 @@
     return base;
   }
 
+  // Chiavi dei fornitori con «usa modelli predefiniti» acceso. PURA. Per ogni servizio vince la
+  // chiave scritta da chi usa Filo (#598, #1107): è il suo conto; quella di fabbrica è il ripiego.
+  function effectiveApiKeys(utente, personale, fabbrica) {
+    const k = (v) => (typeof v === 'string' ? v.trim() : '');
+    const u = utente || {};
+    const f = fabbrica || {};
+    return {
+      openrouter: k(u.openrouter) || k(personale) || k(f.openrouter),
+      tavily: k(u.tavily) || k(f.tavily),
+    };
+  }
+
   // Cosa sanno masticare i sostituti, per nickname. Sta qui accanto alla tabella
   // delle sostituzioni perché è la stessa curatela: il registry personale di chi
   // usa Filo NON dichiara le capacità (le righe delle Opzioni hanno solo
