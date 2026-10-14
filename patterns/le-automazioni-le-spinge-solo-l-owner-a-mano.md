@@ -28,8 +28,10 @@ token a grana fine). Il resto è una rete che spiega:
   permesso c'è (l'App chiede «Workflows: read and write», e GitHub non lascia accettare solo una parte dei permessi di
   un'App): il 14/10 una spinta di prova con un file in `.github/workflows` è passata. Le regole di push per percorso
   (push ruleset, «Restrict file paths») esistono solo per i repo privati, e Filo è pubblico. La strada è collegare
-  claude.ai con `/web-setup`, che manda il token di `gh` della macchina da cui lo lanci: se quel token non ha il
-  permesso sulle automazioni, `/web-setup` avvisa e GitHub rifiuta quelle spinte.
+  claude.ai con `/web-setup`, che manda il token stampato da `gh auth token` sulla macchina da cui lo lanci e prende il
+  posto della connessione dal browser: se quel token non ha il permesso sulle automazioni, `/web-setup` avvisa e GitHub
+  rifiuta quelle spinte. Il token giusto è uno a grana fine solo per Filo, senza Workflows: quello di `gh` ha lo scope
+  `repo` su tutti i repo dell'owner, `filo-security` compreso.
 - **Salvataggio automatico locale.** Spinge con la credenziale di git della macchina dell'owner (`gh` come aiutante
   di credenziali, `gh auth setup-git`). Senza lo scope: `gh auth refresh -h github.com --remove-scopes workflow`.
 - **L'owner.** Per le automazioni usa una credenziale a parte che non sta sul disco (un token a grana fine solo per

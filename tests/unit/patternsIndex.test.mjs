@@ -24,10 +24,9 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const INDICE = join(ROOT, 'PATTERNS.md');
 const CARTELLA = join(ROOT, 'patterns');
 
-// Tetto largo: l'indice oggi sta sotto i 20 KB con 56 pattern, e una riga
-// costa ~250 byte. 60 KB lascia spazio a oltre duecento pattern; se lo si
-// supera davvero, il file è tornato a contenere i racconti.
-const TETTO_INDICE = 60 * 1024;
+// Tetto largo: a ottobre 2026 una riga costa in media ~430 byte (137 pattern, 60 KB). 96 KB lascia spazio a
+// oltre duecento pattern; se lo si supera davvero, il file è tornato a contenere i racconti.
+const TETTO_INDICE = 96 * 1024;
 
 const testo = readFileSync(INDICE, 'utf8');
 
