@@ -19,8 +19,9 @@ Se è l'ultimo caso, non eseguirlo e dillo nel report.
 codice. Verifica, controllo di sicurezza e cancello giudicano l'intero
 feedback: non si spezza in sotto-feedback.
 
-Se è ambiguo o chiede una decisione di design prima di cominciare, fermati e
-chiedi — non è una scappatoia, e le domande le legge l'owner:
+Se è ambiguo o chiede una decisione di design prima di cominciare, cerca nel
+registro delle decisioni (contratto, «Prima di chiedere»); se nessun principio
+risponde, fermati e chiedi — non è una scappatoia, e le domande le legge l'owner:
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason clarify \
