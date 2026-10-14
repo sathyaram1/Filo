@@ -13,9 +13,11 @@ test('r1 cambiando «Host dei modelli» mentre il «Prova» gira, la misura pres
       if (u.includes('/chat/completions')) {
         let corpo = null;
         try { corpo = JSON.parse((init && init.body) || 'null'); } catch (_) { corpo = null; }
-        globalThis.__sortProve.push(corpo && corpo.provider ? corpo.provider.sort || '' : '');
-        // Un modello vero ci mette qualche secondo: il tempo di cambiare idea sulla tendina.
-        await new Promise((ok) => setTimeout(ok, 2500));
+        if (JSON.stringify((corpo && corpo.messages) || []).includes('Conta da 1 a 20')) {
+          globalThis.__sortProve.push(corpo.provider ? corpo.provider.sort || '' : '');
+          // Un modello vero ci mette qualche secondo: il tempo di cambiare idea sulla tendina.
+          await new Promise((ok) => setTimeout(ok, 2500));
+        }
         const sse = 'data: {"choices":[{"delta":{"content":"1, 2, 3"}}]}\n\n'
           + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":9}}\n\n'
           + 'data: [DONE]\n\n';
