@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { pngFirmato, certificato, elencoPem, USO_MARCA } from '../helpers/immagineFirmata.mjs';
+import { letturaIsolata } from '../helpers/letturaIsolata.mjs';
 
 process.env.NODE_ENV = 'test';
 const DATI = cartellaTemporanea('filo-firmatari-');
