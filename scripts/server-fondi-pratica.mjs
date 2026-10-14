@@ -381,30 +381,31 @@ export async function esegui(argv, deps = {}) {
     }
     const parte = await of.registraParte(r.id, 'server', { bearer, solo, ramo: a.ramo });
     if (!parte.ok) err(`La pratica ${chi} non ha registrato che la parte del server è su main (${parte.motivo}): una parte dell'app che arrivasse a pratica chiusa non la troverebbe.`);
+    const daGitHub = (deps.deployDaGitHub || deployDaGitHub)(cartella);
     if (tardiva) {
-      const nota = `${notaFine(a.ramo, sha)} Era l'ultima parte: la pratica l'aveva chiusa la fusione della parte ${NOME_PARTE.app} dello stesso lavoro (${quando}), e resta chiusa.`;
+      const nota = `${notaFine(a.ramo, sha, daGitHub)} Era l'ultima parte: la pratica l'aveva chiusa la fusione della parte ${NOME_PARTE.app} dello stesso lavoro (${quando}), e resta chiusa.`;
       const annotata = await of.scrivi(r.id, 'done', nota, { bearer, attore: 'routine' });
       if (!annotata.ok) err(`${a.ramo} è su main del server, ma la pratica ${chi} non l'ha annotato (${annotata.motivo}).`);
-      log(`${a.ramo} è su main del server. La pratica ${chi} resta chiusa, con la nota di quest'ultima parte. Per il deploy: npm run server:pubblica, da filo-security/functions.`);
+      log(`${a.ramo} è su main del server. La pratica ${chi} resta chiusa, con la nota di quest'ultima parte. ${perIlDeploy(daGitHub)}`);
       return annotata.ok ? 0 : 1;
     }
     if (!chiude) {
-      const nota = `${notaFine(a.ramo, sha)} La pratica resta aperta: manca la parte ${NOME_PARTE.app}, non ancora su main, e ${chiudeApp}.${ramiApp.length ? '' : ` Se il lavoro stava solo sul server: ${soloComando}.`}`;
+      const nota = `${notaFine(a.ramo, sha, daGitHub)} La pratica resta aperta: manca la parte ${NOME_PARTE.app}, non ancora su main, e ${chiudeApp}.${ramiApp.length ? '' : ` Se il lavoro stava solo sul server: ${soloComando}.`}`;
       const annotata = await of.annotaPratica(r.id, nota, { bearer });
       if (!annotata.ok) err(`${a.ramo} è su main del server, ma la pratica ${chi} non l'ha registrato (${annotata.motivo}).`);
       log(`${a.ramo} è su main del server. La pratica ${chi} resta aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}.`);
       // Con un ramo dell'app legato --solo-server si rifiuta: consigliarlo manderebbe in un vicolo.
       if (!ramiApp.length) log(`Se il lavoro stava solo sul server, chiudila con: ${soloComando}`);
-      log('Per il deploy: npm run server:pubblica, da filo-security/functions.');
+      log(perIlDeploy(daGitHub));
       return annotata.ok ? 0 : 1;
     }
-    const notaChiusura = solo ? `${notaFine(a.ramo, sha)} Il lavoro stava solo sul server (--solo-server).` : notaFine(a.ramo, sha);
+    const notaChiusura = solo ? `${notaFine(a.ramo, sha, daGitHub)} Il lavoro stava solo sul server (--solo-server).` : notaFine(a.ramo, sha, daGitHub);
     const chiusa = await of.scrivi(r.id, 'done', notaChiusura, { bearer, attore: 'routine' });
     if (!chiusa.ok) {
       err(`${a.ramo} è su main del server, ma la pratica ${chi} non si è chiusa (${chiusa.motivo}). Chiudila a mano:\n  npm run feedback -- ${r.id} done "${notaChiusura}" --come-routine`);
       return 1;
     }
-    log(`Pratica ${chi} chiusa: ${a.ramo} è su main del server. Per il deploy: npm run server:pubblica, da filo-security/functions.`);
+    log(`Pratica ${chi} chiusa: ${a.ramo} è su main del server. ${perIlDeploy(daGitHub)}`);
     const frase = await of.fraseDaScrivere(r.id, chi, { bearer });
     if (frase) log(frase);
     return 0;
