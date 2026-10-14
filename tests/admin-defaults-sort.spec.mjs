@@ -280,3 +280,33 @@ test('cambiato l’ordinamento della riga, la misura di prima non resta', async 
   await prima().locator('.sn-model-sort').selectOption('latency');
   await expect(prima().locator('.sn-model-row-status')).toHaveText(/Non ancora testato/, { timeout: 5_000 });
 });
+
+// Le due scelte si devono leggere in tutti e due i temi: la tendina della riga non si stringe sotto le sue voci né
+// copre il ragionamento accanto, e la scelta generale ha scritta, spiegazione e aria sotto il pulsante sopra.
+test('la scelta della riga e quella generale si leggono nel tema chiaro e nello scuro', async ({ app, openTab }) => {
+  for (const tema of ['light', 'dark']) {
+    await app.evaluate(async (_e, t) => { await globalThis.SN_STORAGE.updateSettings({ theme: t }); }, tema);
+    const page = await openEditor(openTab);
+    const prima = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+    const sort = await prima.locator('.sn-model-sort').boundingBox();
+    const reason = await prima.locator('.sn-model-reason').boundingBox();
+    expect(sort && sort.width, `${tema}: la scelta dell'ordinamento è troppo stretta per le sue voci`).toBeGreaterThan(60);
+    expect(sort.x, `${tema}: la scelta dell'ordinamento copre il ragionamento`).toBeGreaterThanOrEqual(reason.x + reason.width - 1);
+
+    const generale = await page.evaluate(() => {
+      const l = document.getElementById('providerSortLabel').getBoundingClientRect();
+      const b = document.querySelector('#sec-model-registry .sn-row').getBoundingClientRect();
+      return {
+        etichetta: document.getElementById('providerSortLabel').textContent.trim(),
+        descrizione: document.getElementById('providerSortDesc').textContent.trim(),
+        altezza: document.getElementById('providerSort').getBoundingClientRect().height,
+        distanza: Math.round(l.top - b.bottom),
+      };
+    });
+    expect(generale.etichetta, `${tema}: la scelta generale è senza scritta`).not.toBe('');
+    expect(generale.descrizione, `${tema}: la scelta generale è senza spiegazione`).not.toBe('');
+    expect(generale.altezza, `${tema}: la scelta generale non si vede`).toBeGreaterThan(10);
+    expect(generale.distanza, `${tema}: la scritta della scelta generale tocca il pulsante sopra`).toBeGreaterThanOrEqual(8);
+    await page.screenshot({ path: `tests/.shots/1121-modelli-predefiniti-${tema}.png`, fullPage: false }).catch(() => {});
+  }
+});

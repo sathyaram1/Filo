@@ -280,3 +280,46 @@ test('Pagina dei feedback: la nota appena scritta parte anche chiudendo la sched
   await expect.poll(() => spia(app).then((s) => (s && s.notes) || ''), { timeout: 8000, message: 'la nota non è partita' })
     .toContain('nota scritta e scheda chiusa subito');
 });
+
+// ── Le altre uscite: ricaricare, e portare la stessa scheda su un'altra pagina ──
+async function portaAltrove(shell, frammento) {
+  const id = await shell.evaluate(async (f) => {
+    const s = await window.filoShell.tabs.snapshot();
+    const lista = Array.isArray(s) ? s : (s && s.tabs) || [];
+    const t = lista.find((x) => (x.url || '').includes(f));
+    return t ? t.id : null;
+  }, frammento);
+  expect(id, `la scheda ${frammento} non compare fra quelle aperte`).toBeTruthy();
+  await shell.evaluate((i) => window.filoShell.tabs.navigate(i, 'filo://history/history.html'), id);
+}
+
+test('Preferenze: portando la stessa scheda altrove subito dopo aver scritto, lo stile non si perde', async ({ app, shell, openTab }) => {
+  const page = await openTab(PREFERENZE);
+  await page.waitForSelector('#agentStyleText', { timeout: 15_000 });
+  const atteso = 'stile scritto e poi vado altrove nella stessa scheda';
+  await page.evaluate((t) => {
+    const el = document.getElementById('agentStyleText');
+    el.value = t;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, atteso);
+  await portaAltrove(shell, 'preferences');
+  await expect.poll(() => impostazioni(app).then((s) => s.agentStyle || ''), { timeout: 6000 }).toBe(atteso);
+});
+
+test('Opzioni: portando la stessa scheda altrove o ricaricando subito dopo, il limite di spesa non si perde', async ({ app, shell, openTab }) => {
+  const scriviLimite = (page, v) => page.evaluate((x) => {
+    const el = document.getElementById('monthlyLimit');
+    el.value = String(x);
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, v);
+  const page = await openTab(OPZIONI);
+  await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
+  await scriviLimite(page, 13);
+  await page.reload();
+  await page.waitForSelector('#monthlyLimit', { timeout: 15_000 });
+  await expect.poll(() => impostazioni(app).then((s) => s.monthlyLimitEur), { timeout: 6000 }).toBe(13);
+
+  await scriviLimite(page, 23);
+  await portaAltrove(shell, 'options/options.html');
+  await expect.poll(() => impostazioni(app).then((s) => s.monthlyLimitEur), { timeout: 6000 }).toBe(23);
+});

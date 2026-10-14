@@ -80,6 +80,47 @@ test('Opzioni: la misura del «Prova» di un modello predefinito resta dopo il r
     .toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
 });
 
+// Una riga dei modelli propri con ordinamento e ragionamento suoi: la misura è presa con quelli, e con quelli deve
+// ancora valere dopo il ricaricamento.
+test('Opzioni: la misura del «Prova» di un modello proprio con ordinamento e ragionamento resta dopo il ricaricamento', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    const vero = global.fetch;
+    global.fetch = async (url, init) => {
+      const u = String(url && url.url ? url.url : url);
+      if (!u.includes('openrouter.ai/')) return vero(url, init);
+      if (u.includes('/chat/completions')) {
+        const sse = 'data: {"choices":[{"delta":{"content":"1, 2, 3"}}]}\n\n'
+          + 'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":9}}\n\n'
+          + 'data: [DONE]\n\n';
+        return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+      }
+      return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      openWeightsOnly: false,
+      apiKeys: { openrouter: 'sk-or-finta' },
+      modelRegistry: { mio: { provider: 'openrouter', model: 'finto/mio', sort: 'throughput', reasoning: 'high' } },
+    });
+  });
+
+  const riga = async (page) => {
+    const sel = '#modelRegistryList .sn-model-row:not(.sn-model-row-head)';
+    await page.waitForSelector(sel, { timeout: 15_000 });
+    const i = await page.evaluate((q) => Array.from(document.querySelectorAll(q))
+      .findIndex((r) => (r.querySelector('.sn-model-nick') || {}).value === 'mio'), sel);
+    expect(i, 'la riga «mio» non c\'è').toBeGreaterThanOrEqual(0);
+    return page.locator(sel).nth(i);
+  };
+  const page = await openTab(OPTIONS_URL);
+  await (await riga(page)).locator('.sn-model-test').click();
+  await expect((await riga(page)).locator('.sn-model-row-status')).toHaveText(/TTFT\s+\d/, { timeout: 20_000 });
+
+  await page.reload();
+  await expect((await riga(page)).locator('.sn-model-row-status'), 'la misura è sparita col ricaricamento')
+    .toHaveText(/TTFT\s+\d/, { timeout: 10_000 });
+});
+
 test('Opzioni: riattivare lo switch ri-nasconde la config', async ({ openTab }) => {
   const page = await openTab(OPTIONS_URL);
   await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
