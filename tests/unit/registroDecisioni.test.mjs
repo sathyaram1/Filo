@@ -155,7 +155,9 @@ test('l’assorbimento lascia le superate collegate, coi loro feedback, e non ab
   assert.equal(r.madre.priorita, 'bloccante');
   for (const f of r.figlie) assert.equal(D.schedaDi(Object.assign({}, f)), 'archivio');
 
-  assert.equal(D.assorbi(Object.assign({}, madre, { stato: 'chiusa' }), figlie, { ora: 1 }).errore, 'madre_non_aperta');
+  for (const stato of ['chiusa', 'in_lavorazione', 'superata']) {
+    assert.equal(D.assorbi(Object.assign({}, madre, { stato }), figlie, { ora: 1 }).errore, 'madre_non_aperta', stato);
+  }
   assert.equal(D.assorbi(madre, [], { ora: 1 }).errore, 'niente_da_assorbire');
   assert.equal(D.assorbi(madre, [{ id: 'D-30', stato: 'aperta' }], { ora: 1 }).errore, 'assorbe_se_stessa');
   assert.equal(D.assorbi(madre, [figlie[0], figlie[0]], { ora: 1 }).errore, 'assorbita_due_volte');
