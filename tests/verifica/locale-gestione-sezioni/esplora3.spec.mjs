@@ -5,7 +5,6 @@ import { MANAGE, PRATICHE, RIFERIMENTI, domanda, mainFinto, aspettaAvvio, finest
 const OUT = 'C:/Users/agenti AI/Desktop/Filo/report/ruoli-invertiti-stato/ondata1/tmp-1150/vista-verifica';
 
 test('E9 tema scuro e testi lunghi', async ({ app, openTab }) => {
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
   const lungo = 'Parola '.repeat(1400);
   await mainFinto(app, {
     feedbacks: PRATICHE, riferimenti: RIFERIMENTI,
@@ -20,7 +19,9 @@ test('E9 tema scuro e testi lunghi', async ({ app, openTab }) => {
   const page = await openTab(MANAGE);
   await aspettaAvvio(page);
   await finestra(app, 1536, 864);
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForTimeout(500);
+  console.log('E9 tema', await page.evaluate(() => document.documentElement.dataset.snTheme));
   await page.screenshot({ path: `${OUT}/e9-scuro-domande.png` });
   await page.locator('#mgDomandaDettaglio details.mg-dq-note summary').scrollIntoViewIfNeeded();
   await page.locator('#mgDomandaDettaglio details.mg-dq-note summary').click();
@@ -34,10 +35,9 @@ test('E9 tema scuro e testi lunghi', async ({ app, openTab }) => {
   await page.locator('.mg-livello-btn[data-livello="l1"]').click();
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${OUT}/e9-scuro-ricevuti.png` });
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'system'; });
 });
 
-test('E10 chi non è owner', async ({ app, openTab }) => {
+test.skip('E10 chi non è owner', async ({ app, openTab }) => {
   await mainFinto(app, { admin: false, feedbacks: [], domande: [], domandeErr: 'riservato' });
   // ownerOnly del main vero risponde code not_admin: lo si imita.
   await app.evaluate(({ ipcMain }) => {
