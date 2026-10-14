@@ -305,7 +305,7 @@ async function temporaneaDellaCorsa() {
 // Un file appeso (col disco pieno, #717) non deve tenere ferma la corsa per sempre: è un rosso col suo nome. Il tetto
 // conta il tempo senza che niente vada avanti, non la durata del file: sotto carico un file sano è lento ma avanza (#1063).
 export const TETTO_FERMO_MS = Number(process.env.FILO_UNIT_TETTO_FERMO_MS) || 20 * 60 * 1000;
-const CONTROLLO_MS = Math.min(5000, Math.max(100, Math.floor(TETTO_FERMO_MS / 20)));
+const controlloPer = (tetto) => Math.min(5000, Math.max(100, Math.floor(tetto / 20)));
 
 /** Il tetto di node, che conta la durata del file: solo dove il lanciatore non può guardare l'avanzamento. PURA. */
 export function conTettoDiTempo(opzioni) {
