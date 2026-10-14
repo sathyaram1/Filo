@@ -30,7 +30,8 @@ export function domanda(numero, over = {}) {
   }, over);
 }
 
-// cfg: { feedbacks, domande, riferimenti, trattieni }. Con `trattieni` le letture delle domande aspettano `rilasciaDomande`.
+// cfg: { feedbacks, domande, riferimenti, trattieni, guasti }. Con `trattieni` le letture delle domande aspettano
+// `rilasciaDomande`; `guasti` è quante letture dell'elenco, dalla prossima, falliscono. Una risposta passa in lavorazione.
 export async function mainFinto(app, cfg) {
   await app.evaluate(({ ipcMain }, c) => {
     globalThis.__mgFinto = c;
