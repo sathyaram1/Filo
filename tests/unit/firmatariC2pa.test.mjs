@@ -39,12 +39,9 @@ globalThis.fetch = async (url) => {
   return new Response(r.corpo, { status: r.stato || 200, headers: { 'Content-Type': 'text/plain', 'Content-Length': String(Buffer.byteLength(r.corpo)) } });
 };
 // I tempi limite del modulo (lo scaricamento, il thread di lettura, l'attesa della prima volta) non scadono da soli.
-// Il thread di lettura non tiene vivo il processo e i timer finti nemmeno: lo tiene vivo un intervallo vero.
-const vivo = setInterval(() => {}, 60_000);
 beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
 afterEach(() => mock.timers.reset());
 after(() => {
-  clearInterval(vivo);
   globalThis.fetch = fetchVero;
   togliCartella(DATI);
 });
