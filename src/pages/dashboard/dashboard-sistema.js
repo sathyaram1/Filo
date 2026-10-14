@@ -363,7 +363,6 @@
       : (cosa === 'wifi' ? 'Il computer non conosce nessuna rete Wi-Fi' : 'Nessun dispositivo abbinato');
     lista.appendChild(titolo);
     for (const v of voci) lista.appendChild(voceElenco(questo, cosa, v));
-    posiziona(questo.el, questo.ancora, questo.punto);
   }
 
   function voceElenco(questo, cosa, v) {
