@@ -686,18 +686,38 @@ export function eRilascio(comando) {
  * rapporto di un worker riportato dentro può citare altri id. '' se la riga non è una notifica. PURA.
  */
 export function testaNotifica(e) {
+  const s = notificaIntera(e);
+  return s ? s.split(/<summary>|<result>/)[0] : '';
+}
+
+/** Il testo che Claude Code consegna al thread (coda, allegato, messaggio di testo); '' altrimenti. PURA. */
+function testoConsegnato(e) {
   if (!e || typeof e !== 'object') return '';
   const msg = e.message && typeof e.message === 'object' ? e.message : null;
   let s = '';
-  if (e.type === 'queue-operation' && typeof e.content === 'string') s = e.content;
+  // L'uscita dalla coda ripete il testo dell'entrata: il momento è quello dell'entrata.
+  if (e.type === 'queue-operation' && typeof e.content === 'string' && e.operation !== 'remove') s = e.content;
   else if (e.type === 'attachment' && e.attachment && typeof e.attachment.prompt === 'string') s = e.attachment.prompt;
   else if (e.type === 'user' && msg) {
     s = typeof msg.content === 'string' ? msg.content
       : Array.isArray(msg.content) ? msg.content.filter((b) => b && b.type === 'text').map((b) => String(b.text || '')).join('\n') : '';
   }
-  s = s.trimStart();
-  if (!s.startsWith('<task-notification>')) return '';
-  return s.split(/<summary>|<result>/)[0];
+  return s.trim();
+}
+
+/** La notifica intera (coda, allegato e messaggio portano lo stesso testo: è la sua identità); '' se non lo è. PURA. */
+function notificaIntera(e) {
+  const s = testoConsegnato(e);
+  return s.startsWith('<task-notification>') ? s : '';
+}
+
+/**
+ * Chi consegna il suo rapporto finale (SubagentHandback) in questa riga: l'agentId, o ''. Solo in testa, dove lo
+ * mette Claude Code (in un messaggio dopo una sua riga di presentazione): il rapporto riportato dentro non conta. PURA.
+ */
+export function mittenteConsegna(e) {
+  const m = testoConsegnato(e).match(/^(?:[^<\n]{0,80}:\s*)?<agent-message from="([^"]+)">\s*\[Subagent hand-back\]/);
+  return m ? m[1].trim() : '';
 }
 
 /**
