@@ -355,6 +355,31 @@ export function guardiaFermo(tetto = TETTO_FERMO_MS) {
   };
 }
 
+/**
+ * Il tetto per file. Node lascia passare in diretta solo i passi del primo file partito e non finito (degli altri dice
+ * solo quando partono e finiscono): l'avanzamento che si vede è il suo, e un file fermo dietro di lui diventa il primo
+ * appena quelli prima finiscono. Riceve le righe nuove del reporter dell'avanzamento e dice il file da chiudere; detto
+ * una volta, il suo tempo riparte: se lo ridice, chiuderlo non è servito. PURA.
+ */
+export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
+  const partiti = [];
+  const finiti = new Set();
+  let primo = null;
+  let dal = null;
+  return (righe, ora) => {
+    for (const r of righe) {
+      if (r.via) partiti.push(r.via);
+      else if (r.fine) finiti.add(r.fine);
+      else dal = ora;
+    }
+    const adesso = partiti.find((f) => !finiti.has(f)) ?? null;
+    if (adesso !== primo) { primo = adesso; dal = ora; }
+    if (primo === null || ora - dal < tetto) return null;
+    dal = ora;
+    return primo;
+  };
+}
+
 /** Un lavoro fisso per il processore: quanto ci mette dice quanto la macchina è carica adesso. */
 export function misuraLavoro() {
   const t = performance.now();
