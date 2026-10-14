@@ -95,7 +95,7 @@
         'Se mandi una segnalazione mentre quella di prima sta ancora partendo, parte anche lei. Prima restava ferma finché non ne mandavi un\'altra o non riaprivi Filo.',
         'Se Filo fa molti passi senza arrivare a una risposta, adesso lo scrive in chat e ti dà il tasto «Continua», che lo fa ripartire da dove era arrivato senza rifare le ricerche già fatte. Prima la conversazione poteva finire con «Ha cercato sul web 9 volte» e nient\'altro.',
         'Nella Cronologia AI il filtro per tipo elenca ogni nome una volta sola, e scegliendo «Aiuto» vedi tutte le richieste fatte all\'Aiuto. Prima lo stesso nome poteva comparire due o tre volte, e ognuno mostrava solo una parte delle righe.',
-        'Se scrivi nelle Preferenze la tua chiave Tavily, le ricerche sul web di Filo usano quella. Prima restava ferma: Filo cercava con la sua, e quando la finiva passava a risultati peggiori anche se la tua avrebbe funzionato.',
+        'Se scrivi nelle Preferenze la tua chiave Tavily, le ricerche sul web di Filo usano quella. Prima Filo cercava sempre con la sua, e quando la esauriva passava a risultati peggiori anche se la tua avrebbe funzionato.',
       ],
     },
     {
