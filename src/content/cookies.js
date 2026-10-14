@@ -770,21 +770,85 @@
     scanLater = setTimeout(() => { scanLater = null; scheduleScan(); }, Math.max(16, ms | 0));
   }
 
+  // ─── la caccia ──────────────────────────────────────────────────────────────
+  //
+  // Il documento intero si ripassa solo mentre si cerca un banner: COM_WINDOW_MS dall'avvio o da un segno di CMP,
+  // finché non arriva l'esito, e finché una regola lavora su un CMP visto. Fuori, solo i sottoalberi nuovi (#1106).
+
+  let huntId = 0;
+  let settledHunt = 0;
+  let huntUntil = 0;
+  let fullScans = 0;
+
+  function wake() {
+    huntId++;
+    huntUntil = Date.now() + COM_WINDOW_MS;
+    hunt();
+    scheduleScan();
+  }
+
+  function settle() { settledHunt = huntId; }
+
+  function hunting(now) {
+    if (settledHunt === huntId) return false;
+    if (now < huntUntil || com.busy) return true;
+    for (const name of com.firstSeen.keys()) if (!com.tried.has(name)) return true;
+    return false;
+  }
+
+  // In una scheda in sottofondo i fotogrammi si fermano e i nodi si accumulano: oltre il tetto si ripassa tutto una volta.
+  const ADDED_MAX = 2000;
+  let addedRoots = [];
+  let addedLost = false;
+
+  function takeAdded() {
+    const out = { roots: addedRoots, lost: addedLost };
+    addedRoots = [];
+    addedLost = false;
+    return out;
+  }
+
+  function huntDocument() {
+    fullScans++;
+    const hit = handReject(null);
+    if (hit) { if (hit.rejected) noteRejected(hit.name); else wake(); return; }
+    const hand = handPresent();
+    const comWorking = comTick(hand.skip);
+    if (comWorking) return;
+    const fb = findRejectText(document, false);
+    if (fb && clickEl(fb)) { noteRejected('testo'); return; }
+    if (IS_TOP) { bannerTick(hand.any || com.firstSeen.size > 0); comHideTick(); }
+    else frameTick(hand.any);
+  }
+
+  // Le stesse regole sui soli nodi nuovi. Un CMP che entra senza un rifiuto già premibile riapre la caccia.
+  function scanAdded(roots) {
+    const signed = roots.filter(carriesCmp);
+    const hit = handReject(signed);
+    if (hit) { if (hit.rejected) noteRejected(hit.name); else wake(); return; }
+    const seen = { hidden: false };
+    for (const r of roots) {
+      const fb = findRejectText(r, false, seen);
+      if (fb && clickEl(fb)) { noteRejected('testo'); return; }
+    }
+    if (signed.length || seen.hidden) { wake(); return; }
+    if (IS_TOP) { bannerTick(com.firstSeen.size > 0); comHideTick(); }
+    else frameTick(true);
+  }
+
   function scan() {
     if (!active) return;
-    try { rewriteYouTube(document); } catch (_) {}
+    const { roots: all, lost } = takeAdded();
+    const roots = all.filter((n) => n.isConnected);
+    try {
+      if (lost) rewriteYouTube(document);
+      else for (const r of roots) rewriteYouTube(r);
+    } catch (_) {}
     if (!banners) return;
     try {
       if (com.busy) return;
-      const hit = handReject();
-      if (hit) { if (hit.rejected) noteRejected(hit.name); return; }
-      const hand = handPresent();
-      const comWorking = comTick(hand.skip);
-      if (comWorking) return;
-      const fb = findRejectText(document, false);
-      if (fb && clickEl(fb)) { noteRejected('testo'); return; }
-      if (IS_TOP) { bannerTick(hand.any || com.firstSeen.size > 0); comHideTick(); }
-      else frameTick(hand.any);
+      if (lost || hunting(Date.now())) huntDocument();
+      else scanAdded(roots);
     } catch (_) {}
   }
 
@@ -798,23 +862,41 @@
       if (r.type === 'attributes') { if (surveying) B.survey(r.target, false); continue; }
       if (!r.addedNodes.length) continue;
       added = true;
-      if (surveying) for (const n of r.addedNodes) if (n.nodeType === 1) B.survey(n, true);
+      for (const n of r.addedNodes) {
+        if (n.nodeType !== 1) continue;
+        if (addedRoots.length < ADDED_MAX) addedRoots.push(n); else addedLost = true;
+        if (surveying) B.survey(n, true);
+      }
     }
     if (added) scheduleScan();
   }
 
+  // Gli attributi servono solo alla lista dei banner: senza, ogni classe che cambia sarebbe un record da buttare.
+  let observedAttrs = false;
   function startObserver() {
-    if (observer) return;
+    const B = global.SN_COOKIE_BANNERS;
+    const attrs = !!(B && B.isRunning());
+    if (observer && observedAttrs === attrs) return;
     try {
-      observer = new MutationObserver(onMutations);
-      observer.observe(document.documentElement || document, {
-        childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'id'],
-      });
+      if (observer) {
+        const left = observer.takeRecords();
+        observer.disconnect();
+        if (left.length) onMutations(left);
+      } else {
+        observer = new MutationObserver(onMutations);
+      }
+      observedAttrs = attrs;
+      observer.observe(document.documentElement || document, attrs
+        ? { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'id'] }
+        : { childList: true, subtree: true });
     } catch (_) {}
   }
 
   function stopObserver() {
     if (observer) { try { observer.disconnect(); } catch (_) {} observer = null; }
+    if (srcObserver) { try { srcObserver.disconnect(); } catch (_) {} srcObserver = null; }
+    srcWatched = new WeakSet();
+    takeAdded();
   }
 
   // Alcuni CMP montano il banner con ritardo: si ripassa per qualche secondo anche senza mutazioni utili.
@@ -837,7 +919,8 @@
       complex: [...(Array.isArray(cfg.cosmetic.complex) ? cfg.cosmetic.complex : []), ...HAND_HIDE],
       specific: cfg.cosmetic.specific,
       ask: (ids, classes) => ask({ type: T_TOKENS, ids, classes }).then((r) => (r && r.ok && Array.isArray(r.selectors) ? r.selectors : [])),
-      onFound: scheduleScan,
+      // Un banner della lista è un segno di CMP: fuori dalla caccia la riapre.
+      onFound: () => { if (hunting(Date.now())) scheduleScan(); else wake(); },
     });
   }
 
@@ -860,14 +943,15 @@
       if (huntTimer) { clearInterval(huntTimer); huntTimer = null; }
       return;
     }
+    const wasActive = active;
     const wasBanners = banners;
     active = true;
     banners = nextBanners;
-    startObserver();
     if (banners && !wasBanners) startBanners();
     if (!banners && wasBanners) stopBanners();
-    scheduleScan();
-    hunt();
+    startObserver();
+    if (!wasActive) { try { rewriteYouTube(document); } catch (_) {} }
+    wake();
     for (const m of pendingFrames.splice(0)) hideFrame(m);
   }
 
@@ -899,5 +983,5 @@
     load();
   }
 
-  global.SN_COOKIES_CS = { applyMode, tryReject, rewriteYouTube, nocookieUrl, _state: () => ({ mode, active, banners }) };
+  global.SN_COOKIES_CS = { applyMode, tryReject, rewriteYouTube, nocookieUrl, _state: () => ({ mode, active, banners, fullScans, hunting: banners && hunting(Date.now()) }) };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
