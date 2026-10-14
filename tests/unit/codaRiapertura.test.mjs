@@ -112,7 +112,9 @@ test('una pagina che non finisce mai di caricarsi libera il posto al tetto, e la
   const fine = coda.finita();
   await pausa(10);
   assert.deepEqual(partite, ['a']);
-  await fine;
+  // I timer del tetto non tengono vivo il processo (in Filo non devono tenerlo aperto): qui lo tiene la prova.
+  const vivo = setInterval(() => {}, 1000);
+  try { await fine; } finally { clearInterval(vivo); }
   assert.deepEqual(partite, ['a', 'b', 'c', 'd']);
   assert.equal(coda.volo.size, 0);
 });

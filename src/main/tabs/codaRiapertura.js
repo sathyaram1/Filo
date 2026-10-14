@@ -33,6 +33,7 @@ class CodaRiapertura {
 
   // Non fa partire niente: la prima la carica chi la mette davanti (activate → subito), poi avanti().
   accoda(schede) {
+    if (this.spenta) return;
     for (const t of schede || []) if (t && !this.attesa.includes(t) && !this.volo.has(t)) this.attesa.push(t);
   }
 
