@@ -9,10 +9,13 @@
   // Un campo che dice di volere una password, un codice o una carta non è quello dell'accesso, anche se si chiama «login».
   const AC_NO = /\b(current-password|new-password|one-time-code|cc-[a-z-]+|tel(-[a-z-]+)?|off-email)\b/;
   const AC_SI = /\b(username|email)\b/;
-  const PAROLE_NOME = new Set(['email', 'mail', 'username', 'user', 'login', 'userid', 'loginid', 'utente', 'nomeutente',
+  const PAROLE_NOME = new Set(['email', 'mail', 'username', 'login', 'userid', 'loginid', 'utente', 'nomeutente',
     'identifier', 'loginfmt', 'usuario', 'benutzername', 'identifiant', 'courriel']);
   const PAROLE_NO = new Set(['password', 'passwd', 'pass', 'pwd', 'otp', 'code', 'codice', 'pin', 'search', 'cerca',
     'query', 'coupon', 'promo', 'captcha', 'card', 'carta', 'iban', 'cvv', 'cvc']);
+  // «user» da solo dice poco: «user_name» è il nome utente, «user[first_name]» il nome di battesimo.
+  const USER_NO = new Set(['first', 'last', 'given', 'family', 'surname', 'cognome', 'full', 'display', 'nick', 'phone',
+    'telefono', 'mobile', 'address', 'city', 'birth', 'age', 'comment', 'message', 'bio']);
   // Nel testo che legge l'utente (etichetta, segnaposto): parole intere, in più lingue.
   const TESTO_SI = /(^|[^\p{L}])(e-?mail|username|user name|user id|nome utente|login|utente|usuario|courriel|benutzername)([^\p{L}]|$)/iu;
   const TESTO_NO = /(^|[^\p{L}])(password|codice|code|cerca|search|coupon)([^\p{L}]|$)/iu;
