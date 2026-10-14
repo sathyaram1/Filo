@@ -15,8 +15,8 @@ corregge e si riprova; se la domanda non parte per altro, la scrivi intera nel
 file di `--segnala` se c'è, se no nel report.
 
 Se la domanda non deve fermare il lavoro, consegni come sempre. **Se deve
-fermarlo** (priorità `bloccante`), la consegna porta anche `--segnala
-<file.md>`, un file scritto **fuori dal repo** (per esempio
+fermarlo** (priorità `bloccante`), la consegna porta anche
+`--segnala <file.md>`, un file scritto **fuori dal repo** (per esempio
 `../segnala-<numero>.md`) che l'owner apre dal rombo nella scheda. Lo legge chi
 non conosce il codice: il numero della domanda, la strada che hai preso per
 consegnare e cosa cambia se l'owner sceglie l'altra.
