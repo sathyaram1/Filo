@@ -2575,7 +2575,7 @@
   }
   // Un lavoro server passato e le sue attese (#1159): il cancello, la suite di filo-security, la pubblicazione da GitHub, il PC.
   const ATTESE_SERVER = Object.freeze({
-    pc: ['Pronto: aspetta il PC', 'Verifica e controllo di sicurezza sono passati, ma il cancello non può portare il ramo su main di filo-security. Lo porta il tuo PC con npm run orchestra -- fusioni-server, che parte anche con avvia.'],
+    pc: ['Pronto: aspetta il PC', 'Il cancello non può portare il ramo su main di filo-security: il lavoro aspetta il tuo PC. Lo porta su main npm run orchestra -- fusioni-server, che parte anche con avvia.'],
     suite: ['Aspetta le prove del server', 'Il cancello porta il ramo su main di filo-security quando la suite di GitHub è verde su quel commit. Riprova da solo ogni dieci minuti.'],
     deploy: ['Server fuso: aspetta la pubblicazione', 'La parte del server è su main di filo-security. Quella dell’app si fonde quando la pubblicazione da GitHub è verde.'],
   });
