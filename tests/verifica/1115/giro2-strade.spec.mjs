@@ -1,5 +1,6 @@
-// Verifica #1115 giro 2: esplorazione delle righe nei campi modificabili (Invio doppio, Maiusc+Invio, terza riga,
-// riga che va a capo da sola, incolla con paragrafi) e della correzione applicata su una riga che non è la prima.
+// Verifica #1115 giro 2: le altre forme di riga nei campi modificabili (Invio doppio, Maiusc+Invio, terza riga, riga
+// che va a capo da sola, paragrafi incollati), la correzione su una riga che non è la prima, il contesto prima del
+// testo. Tutte verdi al giro 2: si ri-provano ai giri dopo.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
