@@ -6,9 +6,13 @@ ruolo che ti viene consegnato.
 
 ## Switch di ruolo
 
-- **Sessione locale** (owner + Claude in chat) → leggi anche **`../LOCAL.md`**
-  (nella cartella SOPRA il repo: è voluto, non sono informazioni che devono
-  stare nel repo pubblico).
+- **Sessione locale** (owner + Claude in chat, sul suo PC) → **discute e apre
+  feedback**: non scrive codice e non lancia prove. Il lavoro lo fanno le
+  routine in cloud: il PC è lento, si spegne, e un giro locale ripaga il
+  contesto a cache fredda. Uniche eccezioni: i segreti e le automazioni di
+  GitHub del server, che la chiave delle routine non tocca. Leggi anche
+  **`../LOCAL.md`** (nella cartella SOPRA il repo: è voluto, non sono
+  informazioni che devono stare nel repo pubblico).
 - **Routine cloud** → le istruzioni del tuo ruolo le ricevi automaticamente
   (l'orchestratore dal preflight, i worker da dispatch). Non cercare file di
   istruzioni da leggere per conto tuo.
