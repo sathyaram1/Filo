@@ -9,9 +9,8 @@
 //   diverse alla prima correzione: è il motivo per cui i pezzi condivisi
 //   esistono.
 //   I criteri con cui si giudica un lavoro stanno in un file solo e valgono
-//   per chi lo fa e per chi lo verifica: il documento comune del progetto, che
-//   guida i giri locali, deve rimandare lì invece di tenerne una copia più
-//   corta.
+//   per chi lo fa e per chi lo verifica: il documento comune del progetto deve
+//   rimandare lì invece di tenerne una copia più corta.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
