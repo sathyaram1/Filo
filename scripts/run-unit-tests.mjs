@@ -547,15 +547,20 @@ const lancia = (args, temp, avanzamento = null) => new Promise((ok) => {
     const nuove = intere > letti ? righeJson(testo.slice(letti, intere)) : [];
     letti = Math.max(letti, intere);
     const ora = tempo();
-    const file = fileFermo(nuove, ora);
+    const giudizio = fileFermo(nuove, ora);
     const tutto = eFermo(testo.length, ora);
-    if (file && !chiusi.includes(file) && chiudiFile(c, file)) {
-      chiusi.push(file);
-      // Node scrive l'esito del file chiuso fra un attimo: fino ad allora la corsa non è ferma.
-      eFermo = guardiaFermo();
-      return;
+    const daChiudere = giudizio?.file?.filter((f) => !chiusi.includes(f)) || [];
+    if (daChiudere.length) {
+      // Tutti provati, anche dopo un no: chi è chiuso è un rosso col suo nome comunque vada.
+      const riusciti = daChiudere.filter((f) => chiudiFile(c, f));
+      chiusi.push(...riusciti);
+      if (riusciti.length === daChiudere.length) {
+        // Node scrive l'esito dei file chiusi fra un attimo: fino ad allora la corsa non è ferma.
+        eFermo = guardiaFermo();
+        return;
+      }
     }
-    if (!file && !tutto) return;
+    if (!giudizio && !tutto) return;
     clearInterval(guardia);
     fermo = fileInCorso(leggiRighe(avanzamento));
     chiudiAlbero(c);
