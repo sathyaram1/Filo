@@ -302,8 +302,9 @@ async function temporaneaDellaCorsa() {
   return existsSync(modulo) ? (await import(pathToFileURL(modulo).href)).temporaneaDellaCorsa() : null;
 }
 
-// Un file appeso (col disco pieno, #717) non deve tenere ferma la corsa per sempre: è un rosso col suo nome. Il tetto
-// conta il tempo senza che niente vada avanti, non la durata del file: sotto carico un file sano è lento ma avanza (#1063).
+// Un file appeso (col disco pieno, #717; un pacchetto mancante, #1231) è un rosso col suo nome: si chiude lui e la corsa
+// va avanti. Il tetto conta il tempo in cui il file non va avanti, non la sua durata: sotto carico un file sano è lento
+// ma avanza (#1063).
 export const TETTO_FERMO_MS = Number(process.env.FILO_UNIT_TETTO_FERMO_MS) || 20 * 60 * 1000;
 const controlloPer = (tetto) => Math.min(5000, Math.max(100, Math.floor(tetto / 20)));
 
