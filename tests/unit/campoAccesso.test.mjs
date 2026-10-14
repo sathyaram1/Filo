@@ -70,3 +70,16 @@ test('si propone a campo vuoto o con l\'inizio scritto dall\'utente, mai con un 
   assert.equal(A.daProporre('c'.repeat(A.VALORE_MAX + 1), e, true), false);
   assert.equal(A.daProporre(undefined, e, true), false);
 });
+
+test('dalla chat la proposta si spegne e si riaccende, anche per l\'incognito; di serie accesa, in incognito no', () => {
+  globalThis.self = globalThis;
+  for (const m of ['tabColor', 'constants', 'contenutoEsterno', 'preferences']) require(`../../src/shared/${m}.js`);
+  const P = globalThis.SN_PREF;
+  for (const chiave of ['proposta_email', 'suggerisci email', 'email nei siti']) {
+    const r = P.buildPreferencePartial(chiave, 'no');
+    assert.deepEqual(r.partial, { propostaEmail: { attiva: false } }, chiave);
+    assert.equal(r.costo, 1);
+  }
+  assert.deepEqual(P.buildPreferencePartial('proposta_email_incognito', 'sì').partial, { propostaEmail: { incognito: true } });
+  assert.deepEqual(globalThis.SN_CONST.DEFAULT_SETTINGS.propostaEmail, { attiva: true, incognito: false });
+});

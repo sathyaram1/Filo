@@ -421,7 +421,7 @@ class TabManager {
       window.once('closed', () => { this.anteprime.chiudi(); this.riserva.spegni(); this.codaRiapertura.chiudi(); });
     }
     this.avvisi = new AvvisiSopraPagina(window, {
-      dopoInCima: () => (this.propostaEmail ? this.propostaEmail.inCima() : this.conferme.inCima()),
+      dopoInCima: () => { if (this.propostaEmail) this.propostaEmail.inCima(); this.conferme.inCima(); },
       alto: () => this._altezzaCornice(),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       schedaAttiva: () => {
@@ -441,7 +441,8 @@ class TabManager {
         return b.width > 0 && b.height > 0 ? b : null;
       },
       restituisci: () => this._tastieraAllaSchedaAttiva(),
-      dopoInCima: () => this.conferme.inCima(),
+      sotto: () => [...this.tabs.map((t) => t.view), this.avvisoSito.vista, this.avvisi.vista].filter(Boolean),
+      dopoInCima: () => { this.conferme.inCima(); this.barra._inCima(); },
     });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,

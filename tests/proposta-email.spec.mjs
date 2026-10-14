@@ -2,6 +2,7 @@
 // (clic o freccia giù e Invio) lo riempie con un `input` vero, e prima della scelta la pagina non la trova da nessuna parte.
 // Niente campo password nelle pagine: su http l'avviso del sito sospetto coprirebbe la scheda, e la proposta con lei.
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
+import { menuAperto, vociDelMenu, scegliNelMenu } from './helpers/barra.mjs';
 
 const EMAIL = 'chi-usa-filo@example.com';
 
@@ -42,7 +43,8 @@ async function impostazioni(app, parziale) {
   }, parziale);
 }
 
-// La proposta vista dal main: a schermo, dove, se è la vista in cima, e i bordi della scheda davanti.
+// La proposta vista dal main: a schermo, dove, se sta sopra la scheda e gli avvisi (sopra di lei solo la barra
+// laterale e la conferma), e i bordi della scheda davanti.
 function stato(app) {
   return app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
@@ -53,7 +55,7 @@ function stato(app) {
     return {
       mostrata: !!p.mostrata,
       bounds: p.vista ? p.vista.getBounds() : null,
-      inCima: !!p.vista && figli[figli.length - 1] === p.vista,
+      inCima: !!p.vista && figli.slice(figli.indexOf(p.vista) + 1).every((v) => v === tm.barra.vista || v === tm.conferme.vista),
       scheda: t ? t.view.getBounds() : null,
       zoom: t ? t.view.webContents.getZoomFactor() : 1,
     };
@@ -227,10 +229,78 @@ test('in incognito si propone solo se l\'utente l\'ha chiesto, e mai sulle pagin
       spenta: P.ammessa(mittente({}), { propostaEmail: { attiva: false } }),
       incognito: P.ammessa(mittente({ isIncognito: true }), {}),
       incognitoChiesta: P.ammessa(mittente({ isIncognito: true }), { propostaEmail: { incognito: true } }),
-      popupIncognito: P.ammessa(mittente({ wc: { session: { isPersistent: () => false } } }), {}),
+      // In Privacy ogni sito non fidato ha una sessione effimera sua: non è incognito.
+      sessioneDelSito: P.ammessa(mittente({ wc: { session: { isPersistent: () => false } } }), {}),
       paginaDiFilo: P.ammessa(mittente({ url: 'filo://home/home.html', frame: { url: 'filo://home/home.html' } }), {}),
       file: P.ammessa(mittente({ frame: { url: 'file:///tmp/a.html' } }), {}),
     };
   });
-  expect(esiti).toEqual({ normale: true, spenta: false, incognito: false, incognitoChiesta: true, popupIncognito: false, paginaDiFilo: false, file: false });
+  expect(esiti).toEqual({ normale: true, spenta: false, incognito: false, incognitoChiesta: true, sessioneDelSito: true, paginaDiFilo: false, file: false });
+});
+
+test('nella finestra in incognito niente proposta, finché l\'utente non la chiede anche lì', async ({ app, shell, testServer }) => {
+  await accountFinto(app);
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  const inIncognito = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    return w && w._filoTabs ? { schede: w._filoTabs.tabs.length, mostrata: !!w._filoTabs.propostaEmail.mostrata } : { schede: 0, mostrata: false };
+  });
+  await expect.poll(async () => (await inIncognito()).schede, { timeout: 15_000 }).toBe(1);
+  const url = testServer.html(PAGINA);
+  await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().find((x) => x._filoIncognito)._filoTabs.openTab(u), url);
+  let page = null;
+  await expect.poll(async () => {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
+    return page ? page.evaluate(() => document.documentElement.dataset.filoReady === '1').catch(() => false) : false;
+  }, { timeout: 10_000 }).toBe(true);
+
+  await page.click('#e');
+  await page.waitForTimeout(800);
+  expect((await inIncognito()).mostrata).toBe(false);
+
+  await impostazioni(app, { propostaEmail: { incognito: true } });
+  await page.click('#altro');
+  await page.click('#e');
+  await expect.poll(async () => (await inIncognito()).mostrata, { timeout: 8000 }).toBe(true);
+});
+
+const leggiOpzioni = (app) => app.evaluate(async () => ((await globalThis.SN_STORAGE.getSettings()) || {}).propostaEmail || null);
+
+test('col tasto destro sulla proposta si inserisce l\'email o la si spegne', async ({ app, openTab, testServer }) => {
+  await accountFinto(app);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.click('#e');
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  const vista = await vistaProposta(app);
+
+  await vista.click('#voce', { button: 'right' });
+  let menu = await menuAperto(app);
+  expect(menu).not.toBeNull();
+  expect(await vociDelMenu(menu)).toEqual(['Inserisci l\'email', 'Non propormela più']);
+  await scegliNelMenu(menu, 'Inserisci');
+  await expect.poll(() => page.inputValue('#e')).toBe(EMAIL);
+
+  await page.fill('#e', '');
+  await page.click('#altro');
+  await page.click('#e');
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  await vista.click('#voce', { button: 'right' });
+  menu = await menuAperto(app);
+  await scegliNelMenu(menu, 'Non propormela');
+  await expect.poll(() => leggiOpzioni(app)).toMatchObject({ attiva: false });
+  await expect.poll(() => mostrata(app)).toBe(false);
+});
+
+test('in Preferenze, nelle impostazioni avanzate, la proposta si spegne e si riaccende', async ({ app, openTab }) => {
+  const pref = await openTab('filo://preferences/preferences.html');
+  const attiva = pref.locator('#sec-advanced #sec-proposta-email #propostaEmailAttiva');
+  const incognito = pref.locator('#sec-advanced #sec-proposta-email #propostaEmailIncognito');
+  await expect(attiva).toBeChecked();
+  await expect(incognito).not.toBeChecked();
+  await attiva.uncheck();
+  await expect.poll(() => leggiOpzioni(app)).toMatchObject({ attiva: false });
+  await expect(incognito).toBeDisabled();
+  await attiva.check();
+  await incognito.check();
+  await expect.poll(() => leggiOpzioni(app)).toMatchObject({ attiva: true, incognito: true });
 });

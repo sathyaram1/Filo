@@ -56,11 +56,13 @@ const istanze = new Set();
 
 class PropostaEmail {
   // area(wc): dove sta nella finestra la pagina di `wc` se è quella che l'utente vede, se no null.
-  // restituisci(wc): la tastiera torna alla pagina. dopoInCima: chi deve restarle sopra (la conferma) ci risale.
-  constructor(win, { area = () => null, restituisci = () => {}, dopoInCima = () => {} } = {}) {
+  // restituisci(wc): la tastiera torna alla pagina. sotto(): le viste che devono starle sotto (schede, avvisi);
+  // dopoInCima: chi deve restarle sopra (la conferma, la barra laterale) ci risale.
+  constructor(win, { area = () => null, restituisci = () => {}, sotto = () => [], dopoInCima = () => {} } = {}) {
     this.win = win;
     this.area = area;
     this.restituisci = restituisci;
+    this.sotto = sotto;
     this.dopoInCima = dopoInCima;
     this.vista = null;
     this.pronta = false;
@@ -104,6 +106,8 @@ class PropostaEmail {
     const c = this.c;
     // Rientrare nel campo dopo Esc la ripropone, come rientrarci da un'altra parte.
     if (d.motivo === 'focus' && !this._toccata()) c.chiusa = false;
+    // Chi scrive dopo aver evidenziato con la freccia vuole il suo testo: il prossimo Invio è della pagina.
+    if (d.motivo === 'input') c.evidenziata = false;
     Object.assign(c, { x: d.x, y: d.y, w: d.w, h: d.h, valore: d.valore, digitato: d.digitato, email, lasciato: false });
     this.tema = tema;
     this.posa();
@@ -135,7 +139,6 @@ class PropostaEmail {
 
   inCima() {
     if (this.mostrata) this._inCima();
-    else { try { this.dopoInCima(); } catch (_) {} }
   }
 
   // Chiamata a ogni misura del campo e dal layout delle schede (scheda cambiata, finestra ridimensionata).
@@ -161,7 +164,7 @@ class PropostaEmail {
     if (fy + fh <= a.y || fy >= a.y + a.height || fx + fw <= a.x || fx >= a.x + a.width) return null;
     const spazio = a.width - 2 * MARGINE;
     if (spazio < 80) return null;
-    const width = Math.round(Math.min(Math.max(fw, this.taglia.w, LARGHEZZA_MIN), LARGHEZZA_MAX, spazio));
+    const width = Math.round(Math.min(Math.max(fw, Math.min(this.taglia.w, LARGHEZZA_MAX), LARGHEZZA_MIN), spazio));
     const height = Math.max(1, this.taglia.h || 44);
     const x = Math.round(Math.min(Math.max(fx, a.x + MARGINE), a.x + a.width - MARGINE - width));
     let y = Math.round(fy + fh + STACCO);
@@ -227,10 +230,12 @@ class PropostaEmail {
     if (input.type !== 'keyDown' || !this.mostrata || !this.c || this.c.wc !== wc) return false;
     if (k === 'Tab') { this.c.chiusa = true; this.posa(); return false; }
     if (input.control || input.alt || input.meta || input.shift) return false;
-    let mio = false;
-    if (k === 'ArrowDown') { this._evidenzia(true); mio = true; } else if (k === 'ArrowUp' && this.c.evidenziata) { this._evidenzia(false); mio = true; } else if (k === 'Enter' && this.c.evidenziata) { this._scegli('tastiera'); mio = true; } else if (k === 'Escape') { this.c.chiusa = true; this.posa(); mio = true; }
-    if (mio) this.ingoiati.add(k);
-    return mio;
+    if (k === 'ArrowDown') this._evidenzia(true);
+    else if (k === 'ArrowUp' && this.c.evidenziata) this._evidenzia(false);
+    else if (k === 'Enter' && this.c.evidenziata) this._scegli('tastiera');
+    else if (k === 'Escape') { this.c.chiusa = true; this.posa(); } else return false;
+    this.ingoiati.add(k);
+    return true;
   }
 
   _scegli(come, giro) {
@@ -269,10 +274,15 @@ class PropostaEmail {
     });
   }
 
+  // Sale solo se qualcosa che le sta sotto le è passato sopra: a ogni misura del campo non rimescola le viste.
   _inCima() {
     const cv = this.win.contentView;
     const figli = cv.children || [];
-    if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    const mia = figli.indexOf(this.vista);
+    let sotto = [];
+    try { sotto = this.sotto() || []; } catch (_) { sotto = []; }
+    if (mia >= 0 && !figli.slice(mia + 1).some((v) => sotto.includes(v))) return;
+    cv.addChildView(this.vista);
     try { this.dopoInCima(); } catch (_) {}
   }
 
@@ -405,9 +415,19 @@ function ammessa(sender, s) {
   let url = '';
   try { url = String(sender.frame.url || ''); } catch (_) { url = ''; }
   if (!/^https?:\/\//i.test(url) || String(sender.url || '').startsWith('filo:')) return false;
-  let incognito = !!sender.isIncognito;
-  try { incognito = incognito || !sender.wc.session.isPersistent(); } catch (_) {}
-  return !incognito || o.incognito;
+  return !inIncognito(sender) || o.incognito;
+}
+
+// Una scheda in incognito sta in una finestra in incognito; un popup di accesso aperto da lei, nella sua sessione.
+// Non basta una sessione effimera: in Privacy ogni sito non fidato ne ha una sua.
+function inIncognito(sender) {
+  if (sender.isIncognito) return true;
+  try {
+    const { session } = require('electron');
+    const ses = sender.wc && sender.wc.session;
+    return !!ses && BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs && w._filoTabs.partition
+      && session.fromPartition(w._filoTabs.partition) === ses);
+  } catch (_) { return false; }
 }
 
 function pulisci(msg) {
