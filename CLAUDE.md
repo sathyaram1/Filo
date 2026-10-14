@@ -58,11 +58,8 @@ Le riletture della cache sono la voce più grossa del costo di una sessione.
   il TUO ramo. È il trasporto del lavoro verso verifica e server, oltre che il
   paracadute.
 - **Su `main` scrive SOLO il server** (regola di protezione su GitHub: un push
-  su `main` viene respinto). Le due strade, il cancello di merge (routine) e
-  `npm run finish` (locale), CHIEDONO al server di fondere.
-- **Su `main` il tuo lavoro non viene salvato**: gli automatismi locali non
-  committano su un ramo protetto, lo scrivono nei log e proseguono. Spostati su
-  un ramo: `git worktree add .claude/worktrees/<nome> -b claude/<nome>`.
+  su `main` viene respinto): a fine giro il cancello di merge delle routine gli
+  CHIEDE di fondere.
 - **Mai committare artefatti dei test** (`tests/.shots/`, `tests/.smoke/`,
   `tests/agent/.out/`…). Se un PNG risulta tracciato: `git rm --cached <file>`.
 - **Fine riga: LF ovunque.** `.gitattributes` (`* text=auto eol=lf`) vince su
