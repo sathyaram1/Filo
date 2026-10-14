@@ -625,7 +625,7 @@ export function creaMotore(dep, opzioni = {}) {
         // L'app va su main solo se il server la può seguire: un ramo che non contiene main del server server:fondi lo rifiuta.
         if (serverDaFondere && /^claude\//.test(ramoDi(p))
           && (await git(P.serverRadice, 'merge-base', '--is-ancestor', 'refs/remotes/origin/main', `refs/heads/${ramoDi(p)}`)).code !== 0) {
-          return riallinea(p, 'il ramo del server non contiene main di filo-security: va riallineato prima che l’app vada su main');
+          return ferma(p, `il ramo ${ramoDi(p)} del server non contiene main di filo-security, e server:fondi non lo fonderebbe: l’app non è andata su main. Nel worktree del server git merge origin/main, prove, push; poi npm run orchestra -- riprendi ${p.num}`);
         }
         dep.log(`#${p.num} finish`);
         const e = await fondiApp(p, wt);
