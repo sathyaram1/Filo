@@ -613,7 +613,8 @@
     }
     wrap.appendChild(main);
 
-    if (!props.loading) {
+    // `senzaFreccia`: una riga che non ha niente da approfondire non apre un riquadro vuoto.
+    if (!props.loading && !props.senzaFreccia) {
       const arrow = document.createElement('button');
       arrow.type = 'button';
       arrow.className = 'sn-menu-correction-arrow';
