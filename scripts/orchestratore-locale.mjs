@@ -577,10 +577,10 @@ async function main(argv) {
     return 0;
   }
 
-  // I lavori server passati in cloud aspettano il PC (#1159): fusione, deploy, e la parte dell'app torna alle routine.
+  // I lavori server passati in cloud aspettano il PC (#1159): prima la parte dell'app, poi il server, poi il deploy.
   const depFusioni = (log) => ({
     attese: () => attesePcConStato(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P),
-    puntaServer: () => puntaDelServer(P), log, radice: P.radice,
+    fondiApp: (id) => fondiApp(id), filoDiMain: () => filoDiMain(P), log, radice: P.radice,
   });
   const righeFerme = (esito) => esito.ferme.map((f) => `#${f.num} fermo: ${f.motivo}`);
 
