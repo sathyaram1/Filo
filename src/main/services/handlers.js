@@ -883,7 +883,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
   });
 
-  AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
+  AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
   return { costEur, usage: result.usage, provider: usedProvider, model: concreteModel, keyFallback: ripiegoDaDire(result.keyFallback) };
 }
 
