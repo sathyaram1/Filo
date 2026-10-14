@@ -1,5 +1,6 @@
 // I lavori server passati in cloud e fermi per il PC dell'owner (#1159, mappa §2.1): server:fondi per ognuno, un
-// server:pubblica per tutti, poi la parte dell'app torna alle routine (mai prima del deploy). Niente qui decide la
+// server:pubblica per tutti, poi la parte dell'app torna alle routine (mai prima del deploy). Coi deploy da GitHub
+// affidabili (fase 2) il PC non pubblica: la parte dell'app la libera il server al deploy verde. Niente qui decide la
 // fiducia: la controlla server-fondi-pratica. Regole: tests/unit/fusioniServer.test.mjs.
 
 import { USCITA_CONFLITTO_MAIN, USCITA_SOLO_APP } from '../server-fondi-pratica.mjs';
@@ -10,19 +11,23 @@ const numeroDi = (p) => (Number(p.subSeq) > 0 ? `${p.seq}.${p.subSeq}` : String(
 const coda = (t, n = 8) => String(t || '').trim().split('\n').slice(-n).join('\n');
 
 /**
- * dep: { attese() → [{ feedbackId, seq, subSeq, branch, parti }], esegui(cmd, args, { cwd, timeoutMs }),
- *        pubblica() → { code, out }, fineAttesa(feedbackId, { soloApp, riallinea }), log(riga), radice }.
- * → { fuse: [{ num, id, app }], soloApp: [{ num, id, app }], riallineate: [{ num, id }], ferme: [{ num, motivo }], pubblicato }
+ * dep: { attese() → [{ feedbackId, seq, subSeq, branch, parti }] o { pratiche, deployDaActions }, esegui(cmd, args,
+ *        { cwd, timeoutMs }), pubblica() → { code, out }, puntaServer() → sha di main di filo-security,
+ *        fineAttesa(feedbackId, { soloApp, riallinea, attendiDeploy, sha }), log(riga), radice }.
+ * → { fuse: [{ num, id, app }], soloApp: [{ num, id, app }], riallineate: [{ num, id }], ferme: [{ num, motivo }], pubblicato, daGitHub }
  */
 export async function fusioniServer(dep, { prova = false } = {}) {
-  const pratiche = await dep.attese();
+  const lette = await dep.attese();
+  const pratiche = Array.isArray(lette) ? lette : (lette && Array.isArray(lette.pratiche) ? lette.pratiche : []);
+  // Due deploy verdi di fila da GitHub (il server li conta): da lì pubblica deploy.yml a ogni spinta su main.
+  const daGitHub = !Array.isArray(lette) && !!(lette && lette.deployDaActions && lette.deployDaActions.affidabile === true);
   const fuse = [];
   const soloApp = [];
   const riallineate = [];
   const ferme = [];
   if (!pratiche.length) {
     dep.log('Nessun lavoro server aspetta il PC.');
-    return { fuse, soloApp, riallineate, ferme, pubblicato: false };
+    return { fuse, soloApp, riallineate, ferme, pubblicato: false, daGitHub };
   }
   const git = (args) => dep.esegui('git', args, { cwd: dep.radice });
   await git(['fetch', '--quiet', 'origin', 'main']);
@@ -67,7 +72,7 @@ export async function fusioniServer(dep, { prova = false } = {}) {
     }
     fuse.push({ num, id: p.feedbackId, app });
   }
-  if (prova) return { fuse, soloApp, riallineate, ferme, pubblicato: false };
+  if (prova) return { fuse, soloApp, riallineate, ferme, pubblicato: false, daGitHub };
   for (const s of riallineate) {
     try {
       await dep.fineAttesa(s.id, { riallinea: true });
@@ -82,7 +87,23 @@ export async function fusioniServer(dep, { prova = false } = {}) {
       ferme.push({ num: s.num, motivo: `sul server non c’era niente da fondere, ma la pratica non è tornata alle routine: ${String((e && e.message) || e).slice(0, 200)}` });
     }
   }
-  if (!fuse.length) return { fuse, soloApp, riallineate, ferme, pubblicato: false };
+  if (!fuse.length) return { fuse, soloApp, riallineate, ferme, pubblicato: false, daGitHub };
+
+  if (daGitHub) {
+    // Il deploy lo fa GitHub: le parti dell'app aspettano quello verde che contiene main di adesso.
+    const sha = String((await dep.puntaServer()) || '').trim();
+    dep.log(`la pubblicazione la fa GitHub (deploy.yml)${sha ? ` su ${sha.slice(0, 9)}` : ''}: niente server:pubblica dal PC`);
+    for (const f of fuse.filter((x) => x.app > 0)) {
+      try {
+        if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('main di filo-security non si legge');
+        await dep.fineAttesa(f.id, { attendiDeploy: true, sha });
+        dep.log(`#${f.num}: la parte dell’app torna alle routine quando la pubblicazione da GitHub è verde`);
+      } catch (e) {
+        ferme.push({ num: f.num, motivo: `fuso, ma la pratica non aspetta la pubblicazione da GitHub: ${String((e && e.message) || e).slice(0, 200)}` });
+      }
+    }
+    return { fuse, soloApp, riallineate, ferme, pubblicato: false, daGitHub };
+  }
 
   // Un deploy solo, dopo tutte le fusioni: incorpora il main del server appena mosso.
   dep.log('server:pubblica');
@@ -90,7 +111,7 @@ export async function fusioniServer(dep, { prova = false } = {}) {
   if (d.code !== 0) {
     // Le parti dell'app restano ferme: senza il server in produzione romperebbero chi le usa (mappa §3.3, rischio 7).
     ferme.push({ num: fuse.map((f) => f.num).join(', '), motivo: `fuso, ma il deploy del server non è andato:\n${coda(d.out)}` });
-    return { fuse, soloApp, riallineate, ferme, pubblicato: false };
+    return { fuse, soloApp, riallineate, ferme, pubblicato: false, daGitHub };
   }
   for (const f of fuse.filter((x) => x.app > 0)) {
     try {
@@ -100,5 +121,5 @@ export async function fusioniServer(dep, { prova = false } = {}) {
       ferme.push({ num: f.num, motivo: `server in produzione, ma la pratica non è tornata alle routine: ${String((e && e.message) || e).slice(0, 200)}` });
     }
   }
-  return { fuse, soloApp, riallineate, ferme, pubblicato: true };
+  return { fuse, soloApp, riallineate, ferme, pubblicato: true, daGitHub };
 }

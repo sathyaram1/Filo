@@ -14,7 +14,7 @@ import {
   OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
-import { ENV_FILE as ENV_BIGLIETTO, attesePc, fineAttesa, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
+import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
 import { fusioniServer } from './lib/fusioni-server.mjs';
 import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
 
@@ -347,6 +347,14 @@ function pubblicaDavvero(P) {
   return esegui('npm', ['run', 'server:pubblica'], { cwd, timeoutMs: 60 * 60_000 });
 }
 
+/** main di filo-security su origin, appena letto: lo sha che la pubblicazione da GitHub deve contenere. */
+async function puntaDelServer(P) {
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.serverRadice });
+  if (f.code !== 0) return '';
+  const r = await esegui('git', ['rev-parse', 'refs/remotes/origin/main'], { cwd: P.serverRadice });
+  return r.code === 0 ? String(r.out || '').trim() : '';
+}
+
 function depVere(P, opz, log) {
   const bin = trovaClaude();
   if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
@@ -553,7 +561,8 @@ async function main(argv) {
 
   // I lavori server passati in cloud aspettano il PC (#1159): fusione, deploy, e la parte dell'app torna alle routine.
   const depFusioni = (log) => ({
-    attese: () => attesePc(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P), log, radice: P.radice,
+    attese: () => attesePcConStato(), fineAttesa: (id, opz) => fineAttesa(id, opz), esegui, pubblica: () => pubblicaDavvero(P),
+    puntaServer: () => puntaDelServer(P), log, radice: P.radice,
   });
   const righeFerme = (esito) => esito.ferme.map((f) => `#${f.num} fermo: ${f.motivo}`);
 

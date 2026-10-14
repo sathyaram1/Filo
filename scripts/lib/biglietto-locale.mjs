@@ -396,16 +396,28 @@ export async function lavoroDelRamo({ repo, ramo, sha, feedbackId }, deps = {}) 
 
 /** Le pratiche passate che aspettano il PC: [{ feedbackId, seq, subSeq, branch, parti }]; lancia. */
 export async function attesePc(deps = {}) {
+  return (await attesePcConStato(deps)).pratiche;
+}
+
+/** Le stesse, col conto dei deploy da GitHub che il server tiene (#1159 fase 2): { pratiche, deployDaActions }; lancia. */
+export async function attesePcConStato(deps = {}) {
   const r = await chiama('attese', {}, deps);
-  return Array.isArray(r.pratiche) ? r.pratiche : [];
+  return {
+    pratiche: Array.isArray(r.pratiche) ? r.pratiche : [],
+    deployDaActions: r.deployDaActions && typeof r.deployDaActions === 'object' ? r.deployDaActions : null,
+  };
 }
 
 /**
  * La parte del server è su main e pubblicata, o (`soloApp`) sul server il ramo non c'è: la pratica torna alle routine per
- * la parte dell'app. `riallinea`: il ramo del server va in conflitto con main, e torna alle routine per riallinearlo. Lancia.
+ * la parte dell'app. `riallinea`: il ramo del server va in conflitto con main, e torna alle routine per riallinearlo.
+ * `attendiDeploy` + `sha` (main di filo-security dopo la fusione): la pubblica GitHub, e il server libera l'app al deploy
+ * verde che lo contiene. Lancia.
  */
-export async function fineAttesa(feedbackId, { soloApp = false, riallinea = false, ...deps } = {}) {
-  const data = riallinea === true ? { feedbackId, riallinea: true } : soloApp === true ? { feedbackId, soloApp: true } : { feedbackId };
+export async function fineAttesa(feedbackId, { soloApp = false, riallinea = false, attendiDeploy = false, sha = '', ...deps } = {}) {
+  const data = riallinea === true ? { feedbackId, riallinea: true }
+    : attendiDeploy === true ? { feedbackId, attendiDeploy: true, sha: String(sha || '') }
+      : soloApp === true ? { feedbackId, soloApp: true } : { feedbackId };
   return chiama('fineAttesa', data, deps);
 }
 

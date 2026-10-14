@@ -168,6 +168,43 @@ function puntaRamoServer(cartella, ramo) {
 export const USCITA_SOLO_APP = 5;
 // La stessa dello strumento del server: un ramo worker/* va in conflitto con main del server, lo riallineano le routine.
 export const USCITA_CONFLITTO_MAIN = 6;
+// La stessa dello strumento del server: GitHub rifiuta la spinta su main, che dopo il passo 10 scrive solo il cancello.
+export const USCITA_SPINTA_RIFIUTATA = 7;
+
+/**
+ * La fusione che la spinta dal PC non può più fare la chiede al cancello (#1159 fase 2), sullo stesso sha. A fusione
+ * fatta origin/main del server si rilegge e il checkout di main, se c'è, avanza. → codice d'uscita (0 = fuso).
+ */
+export async function fusioneDalCancello({ cartella, ramo, sha, feedbackId }, { chiedi, allinea = allineaMainServer, log, err }) {
+  if (!/^[0-9a-f]{40}$/.test(String(sha || ''))) {
+    err(`server:fondi: GitHub rifiuta la spinta su main e non so quale commit di ${ramo} chiedere al cancello. Non ho toccato niente.`);
+    return 1;
+  }
+  log(`main di filo-security lo scrive solo il cancello: gli chiedo di portarci ${String(sha).slice(0, 9)} di ${ramo}.`);
+  const { askServerMergeServer, messageForServerMerge } = await import('./lib/owner-merge.mjs');
+  const risposta = await (chiedi || askServerMergeServer)({ branch: ramo, sha, feedbackId });
+  const riga = messageForServerMerge(risposta, ramo);
+  if (risposta.outcome !== 'merged') {
+    err(`server:fondi: ${riga}`);
+    return risposta.outcome === 'unreachable' ? 4 : 1;
+  }
+  log(riga);
+  allinea(cartella, log);
+  return 0;
+}
+
+/** origin/main del server riletto, e il checkout di main portato lì solo in avanti; un passo che non riesce si dice e basta. */
+function allineaMainServer(cartella, log) {
+  const radice = dirname(cartella);
+  if (!gitEsito(radice, ['fetch', '--quiet', 'origin']).ok) { log('  ! git fetch del server non riuscito: rileggi origin/main quando puoi'); return; }
+  const elenco = gitEsito(radice, ['worktree', 'list', '--porcelain']);
+  const blocchi = elenco.ok ? String(elenco.out).split(/\r?\n\r?\n/) : [];
+  const main = blocchi.find((b) => /^branch refs\/heads\/main\r?$/m.test(b));
+  const dove = main ? ((main.match(/^worktree (.+?)\r?$/m) || [])[1] || '') : '';
+  if (!dove) return;
+  const ff = gitEsito(dove, ['merge', '--ff-only', '--quiet', 'refs/remotes/origin/main']);
+  if (!ff.ok) log(`  ! il checkout di main del server (${dove}) non avanza da solo: git merge --ff-only origin/main`);
+}
 
 /**
  * Il ramo del server è un lavoro fidato secondo il registro dei rami (#1159, mappa §1.6)? Vale anche per un ramo con
@@ -312,7 +349,11 @@ export async function esegui(argv, deps = {}) {
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
     }
-    const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
+    let k = lanciaFissato(cartella, a.ramo, daFondere, figlio, fissate);
+    if (k === USCITA_SPINTA_RIFIUTATA) {
+      const shaCancello = (daFondere && daFondere.server && daFondere.server.sha) || (deps.puntaRamo || puntaRamoServer)(cartella, a.ramo) || '';
+      k = await fusioneDalCancello({ cartella, ramo: a.ramo, sha: shaCancello, feedbackId: r.id }, { chiedi: deps.chiediAlCancello, allinea: deps.allinea, log, err });
+    }
     if (k === USCITA_CONFLITTO_MAIN && !tardiva) {
       err(`main del server non si è mosso. La pratica ${chi} torna alle routine per il riallineamento al giro del PC (npm run orchestra -- fusioni-server).`);
       return k;
