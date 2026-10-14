@@ -84,8 +84,8 @@ test('4 MB di storage: una scritta su una chiave piccola non riserializza il res
     const caratteri = await caratteriSerializzati(async () => {
       await Storage.set({ piccola: i });
       const vero = Disco.scrivi;
-      Disco.scrivi = function (p, txt, ...r) { if (p === FILE) { testo = txt; Disco.scrivi = vero; } return vero.call(this, p, txt, ...r); };
-      await Storage.flushNow();
+      Disco.scrivi = function (p, txt, ...r) { if (p === FILE) testo = txt; return vero.call(this, p, txt, ...r); };
+      try { await Storage.flushNow(); } finally { Disco.scrivi = vero; }
     });
     assert.ok(testo.length > 4 * 1024 * 1024, 'il flush deve passare al disco il file intero');
     assert.ok(caratteri < 1000, `una chiave piccola ha fatto riserializzare ${caratteri} caratteri`);
