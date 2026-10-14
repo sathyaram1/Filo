@@ -287,6 +287,11 @@ function fermaInvitoNelRiquadro(event, ctx) {
 // né verso la pagina «Sito bloccato» né fuori. La seguono quando la lista sta ferma per questo tempo, o quando l'utente le guarda.
 const LISTA_FERMA_MS = 3000;
 
+// Il riordino della riapertura parte non prima di questo dall'apertura, e un attimo dopo che la coda ha caricato
+// tutto: i siti a pagina unica riempiono il testo dopo la fine del caricamento.
+const TRIAGE_RIAPERTURA_MS = 4000;
+const TRIAGE_DOPO_CODA_MS = 1500;
+
 // webContents → sito di un «Apri comunque»: il sì vale anche per il blocco delle richieste.
 const permessiApriComunque = new Map();
 Cookies.permettiRichieste((d) => {
