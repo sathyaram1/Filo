@@ -425,3 +425,92 @@ test('salvare i modelli predefiniti tiene la catena delle funzioni spostate in G
   const upd2 = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
   expect(upd2.config.models.manage_search).toBe('esistente');
 });
+
+// #1059: il produttore di un modello a pesi aperti va fra i fornitori esclusi. La riga del modello
+// lo dice mentre lo si imposta, contro la lista che si sta modificando, e un clic lo aggiunge.
+test('un modello il cui produttore non è escluso lo dice sulla riga, e «Escludi» lo aggiunge', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    excludedProviders: ['Google', 'Novita'],
+    modelRegistry: {
+      mimo: { provider: 'openrouter', model: 'xiaomi/mimo-v2.6-flash' },
+      claude: { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' },
+      gemma: { provider: 'openrouter', model: 'google/gemma-4-31b-it' },
+    },
+  });
+  const righe = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)');
+  const avviso = righe.nth(0).locator('.sn-model-row-msg');
+  await expect(avviso).toContainText('Xiaomi produce questo modello ma non è fra i fornitori esclusi');
+  await expect(righe.nth(1).locator('.sn-model-row-msg')).toBeEmpty();
+  await expect(righe.nth(2).locator('.sn-model-row-msg')).toBeEmpty();
+  await page.locator('#sec-model-registry, #modelRegistryList').first().screenshot({ path: 'tests/.shots/admin-defaults-produttore.png' }).catch(() => {});
+
+  await avviso.getByRole('button', { name: 'Escludi Xiaomi' }).click();
+  await expect(avviso).toBeEmpty();
+  const nuova = page.locator('#excludedList .sn-excluded-row').last();
+  await expect(nuova.locator('.sn-excluded-name')).toHaveValue('Xiaomi');
+  await expect(nuova.locator('.sn-excluded-kind')).toHaveValue('producer');
+
+  // Tolta di nuovo dalla lista, l'avviso torna.
+  await nuova.getByRole('button', { name: 'Rimuovi' }).click();
+  await expect(avviso).toContainText('Xiaomi');
+  await avviso.getByRole('button', { name: 'Escludi Xiaomi' }).click();
+
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(true);
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd.config.excludedProviders).toEqual(['Google', 'Novita', 'Xiaomi']);
+  expect(upd.config.excludedProviderReasons).toContainEqual({ name: 'Xiaomi', kind: 'producer', note: '' });
+});
+
+test('l\'avviso del produttore segue quello che si scrive nella riga del modello', async ({ openTab }) => {
+  // Lista del codice: Xiaomi c'è, quindi il giudice MiMo non fa scattare niente.
+  const page = await openStubbedEditor(openTab, {
+    modelRegistry: { mimo: { provider: 'openrouter', model: 'xiaomi/mimo-v2.6-flash' } },
+  });
+  const riga = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await expect(riga.locator('.sn-model-row-msg')).toBeEmpty();
+
+  await page.click('#addModelRow');
+  const nuova = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').last();
+  const id = nuova.locator('.sn-model-id');
+  await id.fill('acme/modello-1');
+  await expect(nuova.locator('.sn-model-row-msg')).toContainText('acme produce questo modello');
+  await id.fill('~anthropic/claude-sonnet-latest');
+  await expect(nuova.locator('.sn-model-row-msg')).toBeEmpty();
+  await id.fill('typesafe/jev-1.13');
+  await expect(nuova.locator('.sn-model-row-msg')).toBeEmpty();
+  for (const strano of ['   ', '<b>x</b>/1', 'senza-produttore']) {
+    await id.fill(strano);
+    await expect(nuova.locator('.sn-model-row-msg')).toHaveText(strano.includes('/') ? /produce questo modello/ : '');
+  }
+  // Il nome arriva come testo, mai come markup.
+  expect(await nuova.locator('.sn-model-row-msg b').count()).toBe(0);
+});
+
+test('un produttore che su OpenRouter non serve nessuno si esclude senza segnalarlo come refuso', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    excludedProviders: ['Google'],
+    modelRegistry: { kokoro: { provider: 'openrouter', model: 'hexgrad/kokoro-82m' } },
+  });
+  const avviso = page.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head) .sn-model-row-msg').first();
+  await avviso.getByRole('button', { name: 'Escludi hexgrad' }).click();
+  const riga = page.locator('#excludedList .sn-excluded-row').last();
+  await expect(riga.locator('.sn-excluded-name')).toHaveValue('hexgrad');
+  const msg = riga.locator('.sn-model-row-msg');
+  await expect(msg).toContainText('vale da quando hexgrad comincerà a servire i suoi modelli');
+  await expect(msg).toHaveClass(/sn-msg-info/);
+  await expect(riga).not.toHaveClass(/sn-row-invalid/);
+  await expect(avviso).toBeEmpty();
+
+  // Lo stesso nome senza il motivo «Produce i modelli» resta un nome che non esclude nessuno.
+  await riga.locator('.sn-excluded-kind').selectOption('');
+  await expect(msg).toContainText('non esclude nessuno');
+  await expect(riga).toHaveClass(/sn-row-invalid/);
+
+  await riga.locator('.sn-excluded-kind').selectOption('producer');
+  await expect(riga).not.toHaveClass(/sn-row-invalid/);
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((t) => window.SN_PAGE_BOOTSTRAP.applyTheme(t), theme);
+    await page.screenshot({ path: `tests/.shots/admin-defaults-produttore-${theme}.png`, fullPage: true }).catch(() => {});
+  }
+});
