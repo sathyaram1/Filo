@@ -12,6 +12,7 @@
       version: '0.2.241', date: '2026-10-15',
       features: [
         'Chiedi all\'Aiuto di una scheda «quando l\'ho aperta?» e ti dice giorno, ora e quanto tempo è passato, per la scheda e per la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo.',
+        'Quando un sito ti chiede l\'email o il nome utente, per esempio la pagina di accesso di Google, sotto il campo compare l\'email del tuo account Filo: un clic, oppure freccia giù e Invio, e la trovi scritta. Il sito la vede solo dopo che l\'hai scelta. Se non la vuoi, la spegni col tasto destro sulla proposta o in Preferenze, nelle impostazioni avanzate.',
       ],
       fixes: [],
     },
