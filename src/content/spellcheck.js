@@ -530,12 +530,25 @@
     for (const p of COPIED_STYLE_PROPS) {
       o.style.setProperty(p, cs.getPropertyValue(p));
     }
+    // Lo specchio deve andare a capo come la casella: larghezza e altezza qui sopra sono del bordo esterno, e la barra
+    // di scorrimento della casella toglie spazio al testo che lo specchio (senza barra) avrebbe in più.
+    o.style.boxSizing = 'border-box';
+    const px = (p) => parseFloat(cs.getPropertyValue(p)) || 0;
+    const barraV = Math.max(0, el.offsetWidth - el.clientWidth - px('border-left-width') - px('border-right-width'));
+    const barraO = Math.max(0, el.offsetHeight - el.clientHeight - px('border-top-width') - px('border-bottom-width'));
+    const latoBarra = cs.direction === 'rtl' ? 'padding-left' : 'padding-right';
+    if (barraV) o.style.setProperty(latoBarra, `${px(latoBarra) + barraV}px`);
+    if (barraO) o.style.setProperty('padding-bottom', `${px('padding-bottom') + barraO}px`);
 
     renderOverlayContent(state);
+  }
 
-    // Allinea lo scroll dell'overlay con quello dell'editabile.
-    o.scrollTop = el.scrollTop;
-    o.scrollLeft = el.scrollLeft;
+  // Svuotare e riempire lo specchio lo riporta in cima: ogni disegno riprende lo scorrimento della casella.
+  function allineaScorrimento(state) {
+    const o = state.overlay;
+    if (!o || !state.el) return;
+    o.scrollTop = state.el.scrollTop;
+    o.scrollLeft = state.el.scrollLeft;
   }
 
   // Sincronizzazione differita per scroll/resize globali (evita ridisegni inutili).
