@@ -1,4 +1,4 @@
-// La pagina «Inviti e utenti» dell'owner (#652): le sette manopole dei crediti
+// La pagina «Inviti e utenti» dell'owner (#652): le manopole dei crediti
 // si cambiano da qui, i numeri che il server calcola si guardano e basta, e
 // ogni riga della tabella apre la scheda della persona.
 //
@@ -61,6 +61,9 @@ function fsRead(fields) {
   return out;
 }
 
+// Quante righe disegna la pagina: una per voce di OWNER_KNOBS (src/shared/wallet.js).
+const MANOPOLE = 8;
+
 function configDiPartenza() {
   return {
     eurPerCredit: 0.0007,
@@ -70,6 +73,7 @@ function configDiPartenza() {
     invitesMaxUses: 3,
     maxGrantCredits: 70000,
     rewardFeedbackSent: 10,
+    rewardFeedbackSentPerDay: 5,
     rewardFeedbackClosed: 50,
     invitesRemaining: 9,
     eurUsd: 1.17,
@@ -238,16 +242,17 @@ async function apriOwner(app) {
   return page;
 }
 
-test('le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
+test('le manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
 
-  // Ci sono tutte e sette, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(7, { timeout: 15_000 });
+  // Ci sono tutte, col valore che ha il server adesso.
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(MANOPOLE, { timeout: 15_000 });
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
+  await expect(page.locator('#knob-rewardFeedbackSentPerDay')).toHaveValue('5');
 
   const msg = page.locator('#knob-dailyCredits-msg');
 
@@ -311,6 +316,17 @@ test('le sette manopole si salvano davvero, un numero storto non arriva al serve
   await page.click('#knob-invitesMaxUses-salva');
   await expect(msgUsi).toHaveText('Persone per invito: almeno 1.');
   expect(patch.length).toBe(2);
+
+  // #1077: il tetto giornaliero del premio d'invio arriva a config/credits col
+  // nome che legge il server; zero vale «nessun invio premiato», non un errore.
+  const msgTetto = page.locator('#knob-rewardFeedbackSentPerDay-msg');
+  await page.fill('#knob-rewardFeedbackSentPerDay', '0');
+  await page.click('#knob-rewardFeedbackSentPerDay-salva');
+  await expect(msgTetto).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(patch.length).toBe(3);
+  expect(patch[2].mask).toEqual(['rewardFeedbackSentPerDay']);
+  expect(patch[2].valori).toEqual({ rewardFeedbackSentPerDay: 0 });
+  expect(configDoc.rewardFeedbackSentPerDay).toBe(0);
 });
 
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {
@@ -405,7 +421,7 @@ test('un numero lasciato a metà parte da solo, si vede finché non è partito, 
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+  await page.waitForFunction((n) => document.querySelectorAll('#ownerKnobs .sn-manopola').length === n, MANOPOLE, { timeout: 15_000 });
 
   const scatola = page.locator('.sn-manopola[data-chiave="dailyCredits"]');
   const msg = page.locator('#knob-dailyCredits-msg');
@@ -449,7 +465,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+  await page.waitForFunction((n) => document.querySelectorAll('#ownerKnobs .sn-manopola').length === n, MANOPOLE, { timeout: 15_000 });
 
   await page.fill('#knob-dailyCredits', '500');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
@@ -528,10 +544,10 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
       await globalThis.__filoStorage.set({ settings: { ...s, theme: t } });
     }, tema);
     await page.reload();
-    await page.waitForFunction(() => {
+    await page.waitForFunction((n) => {
       const s = document.getElementById('ownerSection');
-      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7;
-    }, null, { timeout: 15_000 });
+      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === n;
+    }, MANOPOLE, { timeout: 15_000 });
     // La pagina prende davvero il tema chiesto.
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);
     // Nello scatto ci deve stare anche quello che compare solo quando si usa

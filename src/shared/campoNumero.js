@@ -1,7 +1,6 @@
 // Una manopola numerica: il campo, il controllo sul numero, il salvataggio e
-// il «rimetti com'era». Nato per le sette manopole dei crediti nella pagina
-// dell'owner (#652), dove riscriverle sette volte sarebbe stato sette volte lo
-// stesso bug.
+// il «rimetti com'era». Nato per le manopole dei crediti nella pagina
+// dell'owner (#652), dove riscriverle una per una avrebbe ripetuto lo stesso bug.
 //
 // Due metà, separate apposta:
 //   - `leggi` e `frase` sono logica pura (nessun DOM): dicono se un numero va
