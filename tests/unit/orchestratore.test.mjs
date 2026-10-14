@@ -179,11 +179,16 @@ test('deploy.yml su main di filo-security: la spinta del server la pubblica GitH
   assert.deepEqual(p.fusa, { app: true, server: true, deploy: true });
   assert.equal(indice(b.righe(), /server:pubblica/), -1, b.righe().join('\n'));
   assert.match(p.avvisi.join('\n'), /lo pubblica GitHub/);
-  // Un'app che cambia un file incorporato non la ripubblica nessuna spinta sul server: il deploy resta al PC.
+  // Un file incorporato cambiato dall'app: la spinta del server arriva dopo l'app, e GitHub incorpora anche lui (#1222).
   const inc = banco();
   inc.dep.pubblicaGitHub = async () => true;
   await inc.motore.avvia();
-  assert.ok(indice(inc.righe(), /server:pubblica/) >= 0);
+  assert.equal(indice(inc.righe(), /server:pubblica/), -1, inc.righe().join('\n'));
+  // Senza una spinta del server dopo l'app (lavoro solo dell'app, o server fuso prima), il deploy resta al PC.
+  const soloApp = banco({ server: false });
+  soloApp.dep.pubblicaGitHub = async () => true;
+  await soloApp.motore.avvia();
+  assert.ok(indice(soloApp.righe(), /server:pubblica/) >= 0);
   // Senza deploy.yml su main, come prima.
   const senza = banco({ risposte: [soloScript] });
   senza.dep.pubblicaGitHub = async () => false;
