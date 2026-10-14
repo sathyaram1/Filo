@@ -19,6 +19,7 @@
   // I classificatori (Jev) non passano dalla chat: hanno un endpoint loro, ancora in alfa sul router.
   const DECISIONS_ENDPOINT = 'https://openrouter.ai/api/alpha/decisions';
   const GENERATION_ENDPOINT = 'https://openrouter.ai/api/v1/generation';
+  const ZDR_ENDPOINTS_ENDPOINT = 'https://openrouter.ai/api/v1/endpoints/zdr';
   const AUTH_KEY_ENDPOINT = 'https://openrouter.ai/api/v1/auth/key';
   const CREDITS_ENDPOINT = 'https://openrouter.ai/api/v1/credits';
 
