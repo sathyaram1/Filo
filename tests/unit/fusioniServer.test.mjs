@@ -161,10 +161,25 @@ test('deploy da GitHub affidabile: niente server:pubblica dal PC, l’app aspett
   assert.ok(fatti.some((f) => /la pubblicazione la fa GitHub \(deploy\.yml\) su dddddddd/.test(f)), fatti.join('\n'));
 });
 
-test('deploy da GitHub non ancora affidabile, o stato assente: pubblica il PC come prima', async () => {
-  for (const deployDaActions of [{ verdiDiFila: 1, affidabile: false }, null]) {
+test('deploy.yml su main ma ancora nessun verde, o rosso: la spinta la pubblica GitHub, il PC non ne lancia un secondo insieme', async () => {
+  for (const deployDaActions of [{ verdiDiFila: 0, affidabile: false, ultimoVerde: '' }, { verdiDiFila: 0, affidabile: false, ultimoVerde: 'a'.repeat(40) }]) {
     const { dep, fatti } = finte({ pratiche: [], commitApp: { 'worker/f2-20261012T091500Z': 2 } });
+    const viste = [];
     dep.attese = async () => ({ pratiche: [CON_APP], deployDaActions });
+    dep.puntaServer = async () => 'd'.repeat(40);
+    dep.fineAttesa = async (id, opz) => { viste.push([id, opz]); };
+    const r = await fusioniServer(dep);
+    assert.equal(r.daGitHub, true);
+    assert.equal(r.pubblicato, false);
+    assert.ok(!fatti.includes('server:pubblica'), fatti.join('\n'));
+    assert.deepEqual(viste, [['f2', { attendiDeploy: true, sha: 'd'.repeat(40) }]]);
+  }
+});
+
+test('stato delle corse assente (server di prima, o deploy.yml non su main): pubblica il PC come prima', async () => {
+  for (const lette of [{ pratiche: [CON_APP], deployDaActions: null }, [CON_APP]]) {
+    const { dep, fatti } = finte({ pratiche: [], commitApp: { 'worker/f2-20261012T091500Z': 2 } });
+    dep.attese = async () => lette;
     const r = await fusioniServer(dep);
     assert.equal(r.daGitHub, false);
     assert.equal(r.pubblicato, true);
