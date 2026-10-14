@@ -56,6 +56,7 @@ test('CLAUDE.md: la sessione locale discute, il lavoro e le prove sono delle rou
   assert.doesNotMatch(CLAUDE, /`npm run finish` \(locale\)/);
   assert.doesNotMatch(CLAUDE, /git worktree add/, 'creare un ramo a mano è lavoro locale');
   assert.doesNotMatch(CLAUDE, /rideploya/i, 'una routine non pubblica il server');
+  assert.doesNotMatch(CLAUDE, /PowerShell/, 'prove e commit col PowerShell del PC non li fa più nessuno');
   assert.match(CLAUDE, /`INCORPORATI_DAL_SERVER` \(`scripts\/lib\/orchestratore\.mjs`\)/);
   assert.match(readFileSync(join(ROOT, 'scripts', 'lib', 'orchestratore.mjs'), 'utf8'), /export const INCORPORATI_DAL_SERVER\b/);
 });
