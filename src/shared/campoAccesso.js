@@ -7,7 +7,7 @@
 
   const TIPI = new Set(['', 'text', 'email']);
   // Un campo che dice di volere una password, un codice o una carta non è quello dell'accesso, anche se si chiama «login».
-  const AC_NO = /\b(current-password|new-password|one-time-code|cc-[a-z-]+|tel(-[a-z-]+)?|off-email)\b/;
+  const AC_NO = /\b(current-password|new-password|one-time-code|cc-[a-z-]+|tel(-[a-z-]+)?)\b/;
   const AC_SI = /\b(username|email)\b/;
   const PAROLE_NOME = new Set(['email', 'mail', 'username', 'login', 'userid', 'loginid', 'utente', 'nomeutente',
     'identifier', 'loginfmt', 'usuario', 'benutzername', 'identifiant', 'courriel']);
