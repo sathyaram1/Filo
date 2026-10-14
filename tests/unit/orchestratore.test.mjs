@@ -385,17 +385,37 @@ test('finish: conflitto → riallineamento e nuova verifica; rosso transitorio �
   assert.equal(classificaFinish({ code: 30, out: '' }), 'superato');
 });
 
-test('fuso a metà (server sì, app no) e ripreso: non rifonde il server', async () => {
-  const b = banco({ risposte: [[/finish-local/, { code: 1, out: 'unit rosso' }]] });
+test('fuso a metà (app sì, server no) e ripreso: non rifonde l’app, e il fermo dice che l’app è già su main', async () => {
+  let volte = 0;
+  const b = banco({ risposte: [[/server-fondi-pratica/, () => (volte++ === 0 ? { code: 1, out: 'test rossi' } : null)]] });
   let p = (await b.motore.avvia()).pratiche[7];
   assert.equal(p.fase, 'fermo');
-  assert.equal(p.fusa.server, true);
+  assert.deepEqual([p.fusa.app, !!p.fusa.server], [true, false]);
+  assert.match(p.fermo.motivo, /la parte dell’app è già su main di Filo, il server no: server:fondi non ha fuso/);
   const q = riprendi(p, '');
   assert.equal(q.fase, 'chiusura');
   b.stato.pratiche[7] = q;
-  const prima = b.righe().filter((x) => /server-fondi/.test(x)).length;
+  const prima = b.righe().filter((x) => /finish-local/.test(x)).length;
   p = (await b.motore.avvia()).pratiche[7];
-  assert.equal(b.righe().filter((x) => /server-fondi/.test(x)).length, prima);
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.equal(b.righe().filter((x) => /finish-local/.test(x)).length, prima);
+});
+
+test('app ferma al finish: il server non va su main', async () => {
+  const b = banco({ risposte: [[/finish-local/, { code: 1, out: 'unit rosso' }]] });
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fermo');
+  assert.equal(!!p.fusa.server, false);
+  assert.equal(indice(b.righe(), /server-fondi/), -1);
+});
+
+test('ramo del server che non contiene main di filo-security: ci si ferma prima che l’app vada su main', async () => {
+  const b = banco({ risposte: [[/merge-base --is-ancestor refs\/remotes\/origin\/main refs\/heads\/claude\/sette/, { code: 1, out: '' }]] });
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fermo');
+  assert.match(p.fermo.motivo, /non contiene main di filo-security.*l’app non è andata su main.*riprendi 7/);
+  assert.equal(indice(b.righe(), /finish-local/), -1);
+  assert.equal(indice(b.righe(), /server-fondi/), -1);
 });
 
 test('regole toccate: avviso per la pubblicazione a Filo chiuso, il lavoro si chiude lo stesso', async () => {
