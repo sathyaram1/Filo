@@ -261,9 +261,10 @@
     pop.style.left = `${Math.min(x, window.innerWidth - r.width - 8)}px`;
     pop.style.top = `${Math.min(y, window.innerHeight - r.height - 8)}px`;
     ctxEl = pop;
+    document.addEventListener('keydown', ctxKey, true);
     setTimeout(() => {
+      if (ctxEl !== pop) return;
       document.addEventListener('click', closeCtx, true);
-      document.addEventListener('keydown', ctxKey, true);
     }, 0);
   }
 
@@ -2223,9 +2224,10 @@
 
     $('deckHead').appendChild(pop);
     switcherEl = pop;
+    document.addEventListener('keydown', switcherKey, true);
     setTimeout(() => {
+      if (switcherEl !== pop) return;
       document.addEventListener('click', closeSwitcher, true);
-      document.addEventListener('keydown', switcherKey, true);
     }, 0);
   }
 

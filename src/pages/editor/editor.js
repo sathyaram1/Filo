@@ -1433,9 +1433,10 @@
     menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
     titleMenuEl = menu;
+    document.addEventListener('keydown', onTitleMenuKeydown, true);
     setTimeout(() => {
+      if (titleMenuEl !== menu) return;
       document.addEventListener('mousedown', onTitleMenuOutside, true);
-      document.addEventListener('keydown', onTitleMenuKeydown, true);
       window.addEventListener('scroll', closeTitleMenu, true);
       window.addEventListener('resize', closeTitleMenu);
     }, 0);
