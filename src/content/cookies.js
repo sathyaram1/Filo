@@ -896,23 +896,29 @@
     } catch (_) {}
   }
 
-  // Le classi che cambiano servono solo a chiedere le regole della lista; a far ripassare le regole
-  // bastano i nodi nuovi (un banner che compare per classe lo segnala il motore di stile, da cookieBanners.js).
+  // Le classi che cambiano servono solo a chiedere le regole della lista; a far ripassare le regole bastano i nodi
+  // nuovi e le scritte nei pulsanti (un banner che compare per classe lo segnalano il motore di stile e i «rifiuta» sorvegliati).
   function onMutations(records) {
     const B = IS_TOP && banners ? global.SN_COOKIE_BANNERS : null;
     const surveying = !!(B && B.isRunning());
     let added = false;
+    const push = (n) => { added = true; if (addedRoots.length < ADDED_MAX) addedRoots.push(n); else addedLost = true; };
     for (const r of records) {
       if (r.type === 'attributes') { if (surveying) B.survey(r.target, false); continue; }
-      if (!r.addedNodes.length) continue;
-      added = true;
+      if (r.type === 'characterData') { const c = labelled(r.target); if (c) push(c); continue; }
       for (const n of r.addedNodes) {
-        if (n.nodeType !== 1) continue;
-        if (addedRoots.length < ADDED_MAX) addedRoots.push(n); else addedLost = true;
+        if (n.nodeType !== 1) { const c = n.nodeType === 3 && labelled(r.target); if (c) push(c); continue; }
+        push(n);
         if (surveying) B.survey(n, true);
       }
     }
     if (added) scheduleScan();
+  }
+
+  // Una scritta che entra o cambia è una novità del pulsante che la porta: le etichette arrivano anche dopo il pulsante.
+  function labelled(t) {
+    const el = t && (t.nodeType === 1 ? t : t.parentElement);
+    try { return el ? el.closest(CLICKABLE) : null; } catch (_) { return null; }
   }
 
   // Gli attributi servono solo alla lista dei banner: senza, ogni classe che cambia sarebbe un record da buttare.
@@ -931,8 +937,8 @@
       }
       observedAttrs = attrs;
       observer.observe(document.documentElement || document, attrs
-        ? { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'id'] }
-        : { childList: true, subtree: true });
+        ? { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'id'] }
+        : { childList: true, subtree: true, characterData: true });
     } catch (_) {}
   }
 
@@ -940,6 +946,7 @@
     if (observer) { try { observer.disconnect(); } catch (_) {} observer = null; }
     if (srcObserver) { try { srcObserver.disconnect(); } catch (_) {} srcObserver = null; }
     srcWatched = new WeakSet();
+    stopWatching();
     takeAdded();
   }
 
