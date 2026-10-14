@@ -503,6 +503,8 @@
     state.overlay = o;
   }
 
+  const SPORGENZA_SEGNI = 8;
+
   function syncOverlay(state) {
     const o = state.overlay;
     const el = state.el;
