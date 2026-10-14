@@ -4656,8 +4656,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let finestraDaRicordare = null;
   const stringiDopoRifiuto = async (e) => {
     const FC = globalThis.SN_FILO_CONTESTO;
-    // Un rifiuto dato dal tetto della risposta non si cura stringendo la conversazione.
-    // Se anche il testo da solo ci sta (`stringibile`), accorciare il tratto basta e non chiede niente all'utente.
+    // Un rifiuto dato dal tetto della risposta non si cura stringendo la conversazione, salvo `stringibile`: lì
+    // accorciare il tratto basta e non chiede niente all'utente.
     const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 && (e?.code !== 'TETTO_RISPOSTA' || e?.stringibile) ? FC.troppoLungo(e) : null;
     if (!rifiuto) return false;
     let inviati = [];

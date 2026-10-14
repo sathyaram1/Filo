@@ -115,7 +115,7 @@ test('il tetto della risposta arriva nel corpo della richiesta; Retry-After e il
   assert.equal(eFin.code, 'TETTO_RISPOSTA');
   assert.match(CE.sentence(eFin), /tetto di 262\.144 token/);
   const eStretta = await OR.httpError(new Response(finestra, { status: 400 }), { maxTokens: 16384, tools: true });
-  assert.equal(eStretta.code, undefined, 'col tetto piccolo è la conversazione a sforare, e la chat la stringe da sé');
+  assert.ok(eStretta.code === undefined || eStretta.stringibile, 'col tetto piccolo la chat può ancora stringere la conversazione da sé');
   const nessunHost = '{"error":{"message":"No endpoints found that can handle the requested parameters.","code":404}}';
   const eChat = await OR.httpError(new Response(nessunHost, { status: 404 }), { maxTokens: 16384, tools: true });
   assert.equal(eChat.code, 'NO_TOOL_HOST');

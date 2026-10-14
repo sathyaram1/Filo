@@ -189,7 +189,7 @@ test('C — entrare nel campo della chat dopo una pausa sveglia il lettore del c
   });
 });
 
-test('C2 — senza toccare il campo: muovere il mouse nella home sveglia il lettore, e una bozza lo tiene sveglio', async ({ app, shell }) => {
+test('C2 — senza toccare il campo: muovere il mouse nella home sveglia il lettore', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);

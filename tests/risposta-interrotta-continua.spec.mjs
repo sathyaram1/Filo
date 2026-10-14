@@ -33,11 +33,12 @@ async function prepara(app) {
       if (/CARTE CANDIDATE/.test(ultimo)) return fatto('{"keep":[]}');
       if (sistema.includes('# Protocollo di risposta')) {
         return seguito ? fatto(JSON.stringify({ text: 'poi premi Invia.', status: 'done' }))
-          : fatto(JSON.stringify({ text: 'Per iscriverti apri il modulo e', status: 'done' }), 'length');
+          // Tagliata dal tetto a metà dell'involucro, come arriva davvero: senza la chiusura.
+          : fatto('{"text": "Per iscriverti apri il modulo e', 'length');
       }
       if (sistema.includes('deck builder per Magic')) {
         return seguito ? fatto(JSON.stringify({ reply: 'e qualche rampa in più.' }))
-          : fatto(JSON.stringify({ reply: 'Per questo mazzo servono più pescate' }), 'length');
+          : fatto('{"reply": "Per questo mazzo servono più pescate', 'length');
       }
       if (sistema.includes('assistente di scrittura dentro un editor')) {
         return seguito ? fatto('e il resto resta com\'è.') : fatto('Il capitolo sui licheni va accorciato', 'length');
@@ -103,6 +104,7 @@ test('Aiuto: la risposta interrotta offre «Continua», che chiede il seguito', 
   await sito.fill('.sn-sidebar-input textarea', 'come mi iscrivo?');
   await sito.press('.sn-sidebar-input textarea', 'Enter');
   await expect(sito.locator('.sn-sidebar-msg-assistant').last()).toContainText('apri il modulo e', { timeout: 10_000 });
+  await expect(sito.locator('.sn-sidebar-msg-assistant').last()).not.toContainText('{');
   const continua = sito.locator('.sn-sidebar-choice', { hasText: 'Continua' });
   await expect(continua).toBeVisible();
   await continua.click();
@@ -135,4 +137,45 @@ test('Home: la riga «interrotta» dentro la bolla ha l\'aspetto di una nota, in
   await expect(casa.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
   await casa.waitForTimeout(400);
   await casa.locator('.dash-bubble-filo').last().screenshot({ path: `${SHOTS}/1097-home-interrotta-scuro.png` });
+});
+
+// Una risposta di casa che il tetto ferma: dentro un blocco di codice, o a metà degli argomenti di un'azione.
+async function casaFermata(app, risposta) {
+  await app.evaluate(async (_e, r) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__giri = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      globalThis.__giri += 1;
+      try { if (r.text) onDelta && onDelta(r.text); } catch (_) {}
+      return { text: r.text, finishReason: 'length', model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: r.toolCalls || [], reasoningDetails: [] };
+    };
+  }, risposta);
+  return home(app);
+}
+
+test('Home: interrotta dentro un blocco di codice, la riga resta una nota fuori dal codice', async ({ app }) => {
+  test.setTimeout(60_000);
+  const casa = await casaFermata(app, { text: 'Ecco lo script:\n\n```python\nfor i in range(10):\n    print(i' });
+  await casa.locator('#input').fill('scrivimi uno script');
+  await casa.locator('#sendBtn').click();
+  const nota = casa.locator('.dash-bubble-filo .dash-bubble-interrotta');
+  await expect(nota).toHaveText('La risposta si è interrotta qui: ha raggiunto la lunghezza massima.', { timeout: 15_000 });
+  await expect(casa.locator('.dash-bubble-filo pre').last()).not.toContainText('interrotta');
+});
+
+test('Home: il tetto che taglia gli argomenti di un\'azione ferma il turno con «Continua», senza rifarla', async ({ app }) => {
+  test.setTimeout(60_000);
+  const casa = await casaFermata(app, {
+    text: 'Cerco.',
+    toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: '{"query": "meteo di domani a Bolo' }],
+  });
+  await casa.locator('#input').fill('che tempo fa domani?');
+  await casa.locator('#sendBtn').click();
+  await expect(casa.locator('.dash-bubble-filo .dash-bubble-interrotta')).toBeVisible({ timeout: 15_000 });
+  await expect(casa.getByRole('button', { name: 'Continua' }).last()).toBeVisible();
+  expect(await app.evaluate(() => globalThis.__giri)).toBe(1);
 });
