@@ -15,6 +15,8 @@ function correttore() {
     const n = { tagName: tag, nodeType: 1, children: [], style: new Proxy({ setProperty() {} }, {}), dataset: {}, isConnected: true, className: '', textContent: '',
       setAttribute() {}, appendChild(c) { if (c.isFrag) n.children.push(...c.children); else n.children.push(c); return c; }, remove() { n.isConnected = false; } };
     Object.defineProperty(n, 'innerHTML', { set() { n.children = []; }, get() { return ''; } });
+    let testo = '';
+    Object.defineProperty(n, 'textContent', { set(v) { testo = String(v); n.children = []; }, get() { return testo; } });
     return n;
   }
   const docListeners = {};
@@ -63,7 +65,9 @@ function correttore() {
     entra: (el) => docListeners.focusin.forEach((f) => f({ target: el })),
     esce: (el) => docListeners.focusout.forEach((f) => f({ target: el })),
     scrive: (el, v) => { el.value = v; el.fire('input'); },
-    risponde: (i, annotated) => pending[i].r({ ok: true, text: JSON.stringify({ annotated, issues: [] }) }),
+    risponde: (i, annotated, issues = []) => pending[i].r({ ok: true, text: JSON.stringify({ annotated, issues }) }),
+    // Le parole segnate in vista, lette dagli strati sopra i campi.
+    segni: () => sb.document.body.children.flatMap((o) => o.children || []).filter((x) => x.className === 'sn-semantic-error').map((x) => x.textContent),
   };
 }
 
@@ -92,4 +96,62 @@ test('un apostrofo aggiunto dopo uno scan rifà il controllo', async () => {
   c.scrive(el, "ho visto un'amico ieri sera");
   await c.fireAll();
   assert.equal(c.chiamate.n, 2);
+});
+
+const ERRORE = [{ type: 'grammar', explanation: 'soggetto plurale', correction: 'sono andati' }];
+
+test('un annulla mentre il controllo del testo abbandonato è in viaggio lascia i segni giusti', async () => {
+  const c = correttore();
+  const el = c.campo();
+  const giusto = 'Marco e Luca è andato al mare ieri';
+  c.entra(el);
+  c.scrive(el, giusto);
+  await c.fireAll();
+  c.risponde(0, 'Marco e Luca **è andato** al mare ieri', ERRORE);
+  await c.tick();
+  assert.deepEqual(c.segni(), ['è andato']);
+  c.scrive(el, 'Marco è andato al mare ieri');
+  await c.fireAll();
+  assert.equal(c.chiamate.n, 2);
+  c.scrive(el, giusto);
+  await c.fireAll();
+  c.risponde(1, 'Marco è andato al mare ieri');
+  await c.tick(); await c.fireAll();
+  assert.deepEqual(c.segni(), ['è andato']);
+});
+
+test('un punto aggiunto mentre il controllo è in viaggio non lo ripaga', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'ieri sono andato al mare con gli amici');
+  await c.fireAll();
+  c.scrive(el, 'ieri sono andato al mare con gli amici.');
+  await c.fireAll();
+  assert.equal(c.chiamate.n, 1);
+  c.risponde(0, 'ieri sono andato al mare con gli amici');
+  await c.tick(); await c.fireAll();
+  assert.equal(c.chiamate.n, 1);
+});
+
+test('uscire e rientrare nel campo mentre il controllo è in viaggio non lo ripaga', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'ieri sono andato al mare con gli amici');
+  await c.fireAll();
+  c.esce(el); await c.fireAll();
+  c.entra(el); await c.fireAll();
+  assert.equal(c.chiamate.n, 1);
+});
+
+test('un testo cortissimo che arriva alla lunghezza minima con un segno si controlla', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'tu sono');
+  await c.fireAll();
+  c.scrive(el, 'tu sono.');
+  await c.fireAll();
+  assert.equal(c.chiamate.n, 1);
 });

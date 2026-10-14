@@ -338,6 +338,7 @@
     btn.type = 'button';
     btn.className = 'sn-sidebar-choice';
     btn.textContent = pagina.label;
+    if (pagina.title) btn.title = pagina.title;
     btn.addEventListener('click', (e) => {
       if (!gestoVero(e)) return;
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
@@ -660,7 +661,9 @@
   // ---------- Parsing risposta AI ----------
 
   function parseAssistantOutput(text) {
-    const fallback = { display: (text || '').trim(), highlight: null, choices: [], status: 'done', collapse: false };
+    // Un involucro tagliato a metà (tetto, guasto) si mostra per quello che il modello aveva scritto, non come codice.
+    const salvato = String(text || '').includes('{') ? globalThis.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(text, ['text']) : null;
+    const fallback = { display: (salvato ?? (text || '')).trim(), highlight: null, choices: [], status: 'done', collapse: false };
     if (!text) return fallback;
     const trimmed = text.trim();
     const start = trimmed.indexOf('{');

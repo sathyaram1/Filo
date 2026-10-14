@@ -189,7 +189,39 @@ test('C — entrare nel campo della chat dopo una pausa sveglia il lettore del c
   });
 });
 
-test('D — riquadro della risposta fermato dal tetto: la riga lo dice, «Continua» chiede il seguito, e non resta in cache', async ({ app }) => {
+test('C2 — senza toccare il campo: muovere il mouse nella home sveglia il lettore, e una bozza lo tiene sveglio', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await page.evaluate(() => document.getElementById('input').blur());
+  await app.evaluate(async () => {
+    globalThis.__letture = 0;
+    await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => {
+      globalThis.__letture += 1;
+      return { batteria: { livello: 64, inCarica: false, collegata: false }, rete: { online: true, tipo: 'wifi', nome: 'Casa' }, bluetooth: { acceso: false, dispositivi: [] } };
+    });
+    globalThis.SN_SISTEMA_MAIN._perProve.veglia(2_000);
+    globalThis.SN_SISTEMA_MAIN._perProve.inattivita('idle');
+  });
+  const attivo = () => app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.attivo());
+  const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
+  await expect.poll(attivo, { timeout: giro * 2 + 4_000 }).toBe(false);
+  await new Promise((r) => setTimeout(r, giro * 2 + 500));
+
+  // Un suggerimento o «Continua» si raggiungono col mouse: il lettore parte prima del clic.
+  const prima = await app.evaluate(() => globalThis.__letture);
+  await page.mouse.move(200, 300);
+  await page.mouse.move(260, 320);
+  await expect.poll(() => app.evaluate(() => globalThis.__letture), { timeout: 2_000 }).toBeGreaterThan(prima);
+
+  await app.evaluate(() => {
+    globalThis.SN_SISTEMA_MAIN._perProve.inattivita();
+    globalThis.SN_SISTEMA_MAIN._perProve.veglia(0);
+  });
+});
+
+test('D —riquadro della risposta fermato dal tetto: la riga lo dice, «Continua» chiede il seguito, e non resta in cache', async ({ app }) => {
   test.setTimeout(60_000);
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;

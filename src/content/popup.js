@@ -34,6 +34,7 @@
     btn.type = 'button';
     btn.className = 'sn-msg-rimedio';
     btn.textContent = pagina.label;
+    if (pagina.title) btn.title = pagina.title;
     btn.addEventListener('click', () => {
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
     });

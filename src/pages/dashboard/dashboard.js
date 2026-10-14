@@ -158,7 +158,7 @@
   // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
   const inChatAperta = (chat) => !chat || chat === chatId;
 
-  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS });
+  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS, bozza: () => !!($('input')?.value || '').trim() });
   Term.init({
     dashDir,
     inputEl,
@@ -975,15 +975,13 @@
       // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
       const CE = window.SN_CHAT_ERRORS;
-      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused }) : null;
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason }) : null;
       if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';
         via.className = 'dash-action-btn';
         via.textContent = pagina.label;
-        via.title = pagina.dove === 'opzioni'
-          ? 'Scegli il modello per questa funzione'
-          : (r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter');
+        via.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : pagina.title;
         via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
         row.appendChild(via);
       }

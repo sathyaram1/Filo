@@ -63,7 +63,10 @@ module.exports = function register(on, ctx) {
       // per la pagina Crediti solo quando è lì che si sistema.
       const W = globalThis.SN_WALLET;
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
+      // Il tetto e il taglio decidono se accanto alla frase ci va il tasto per le Preferenze (#1097.3).
+      const tetto = Number(e && e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {};
+      const taglio = e && e.code === 'RISPOSTA_TAGLIATA' ? { finishReason: e.finishReason || null } : {};
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...taglio };
     } finally {
       fineLavoro();
     }

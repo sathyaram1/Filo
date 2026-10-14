@@ -614,6 +614,22 @@
     esitiRecenti.set(chiave, risposta);
     while (esitiRecenti.size > ESITI_MAX) esitiRecenti.delete(esitiRecenti.keys().next().value);
   }
+  // Le domande ancora in viaggio, per la stessa chiave: rientrare nel campo mentre il controllo corre non lo ripaga.
+  const inViaggio = new Map();
+  function chiediScan(chiave, text, context) {
+    let p = inViaggio.get(chiave);
+    if (!p) {
+      p = Promise.resolve(chrome.runtime.sendMessage({
+        type: MSG.AI_REQUEST,
+        action: ACTIONS.SPELLCHECK_SEMANTIC,
+        payload: { text, context },
+      }));
+      inViaggio.set(chiave, p);
+      const via = () => { if (inViaggio.get(chiave) === p) inViaggio.delete(chiave); };
+      p.then(via, via);
+    }
+    return p;
+  }
 
   function scheduleScan(state) {
     if (!isEnabled()) return;
@@ -640,7 +656,8 @@
     if (!text || text.length < MIN_TEXT_LENGTH) {
       state.issues = [];
       state.testoIssues = text;
-      state.lastScannedText = text;
+      // Mai controllato: un segno che lo porta alla lunghezza minima deve far partire lo scan, non saltarlo.
+      state.lastScannedText = '';
       // Una risposta ancora in viaggio parlava del testo di prima: non riporta i segni.
       state.scanMostrato = state.scanInviati || 0;
       renderOverlayContent(state);
@@ -648,6 +665,8 @@
     }
     if (text === state.lastScannedText) return;
     if (soloSpaziOPunteggiatura(state.lastScannedText, text)) return;
+    // Lo stesso testo, o solo un segno in più, è già in viaggio: la sua risposta arriva su quello di adesso.
+    if (state.testoInViaggio && (text === state.testoInViaggio || soloSpaziOPunteggiatura(state.testoInViaggio, text))) return;
     if (text.length > MAX_TEXT_LENGTH) {
       // Niente scan continuo su testi enormi: lasciamo invariati gli issue precedenti.
       return;
@@ -660,15 +679,14 @@
     let res;
     if (esitiRecenti.has(chiave)) res = { ok: true, text: esitiRecenti.get(chiave) };
     else {
+      state.testoInViaggio = text;
       try {
-        res = await chrome.runtime.sendMessage({
-          type: MSG.AI_REQUEST,
-          action: ACTIONS.SPELLCHECK_SEMANTIC,
-          payload: { text, context },
-        });
+        res = await chiediScan(chiave, text, context);
       } catch (err) {
         console.error('[SN] scan blu — sendMessage fallito:', err);
         return;
+      } finally {
+        if (state.testoInViaggio === text) state.testoInViaggio = '';
       }
     }
 
@@ -686,6 +704,8 @@
     if (numero < (state.scanMostrato || 0)) return;
     const currentText = getEditableText(state.el);
     if (!currentText || currentText.length < MIN_TEXT_LENGTH) return;
+    // Il testo è tornato a uno già controllato (un annulla): i suoi segni sono quelli giusti, non quelli dell'abbandonato.
+    if (currentText !== text && currentText === state.lastScannedText) return;
     state.scanMostrato = numero;
     // Arrivata mentre l'utente scriveva, la risposta pagata non si butta (#1097.5): i segni passano sul testo di adesso
     // come quelli già in vista; quelli che il cambio tocca li rifà lo scan che segue.

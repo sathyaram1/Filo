@@ -51,6 +51,10 @@
     window.addEventListener('offline', () => chiedi({ subito: true }));
     programmaRichiamo();
     programmaOra();
+    // Chi usa la home sta per mandare un turno anche senza scrivere (un suggerimento, «Riprova», «Continua»), e una
+    // bozza lasciata lì parte con un Invio anche dopo una pausa lunga: finché è così il lettore resta sveglio (#1097.1).
+    for (const t of ['pointermove', 'pointerdown', 'keydown', 'wheel']) document.addEventListener(t, () => scrive(), { passive: true, capture: true });
+    setInterval(() => { if (deps.bozza && deps.bozza() && document.hasFocus()) scrive(); }, 60 * 1000);
   }
 
   async function chiedi({ subito = false } = {}) {
