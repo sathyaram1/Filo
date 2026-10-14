@@ -105,8 +105,12 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
 
 const indice = (righe, re) => righe.findIndex((r) => re.test(r));
 
-test('giro intero: lavoratore, due verifiche, server su main, app, deploy, rilievi aperti come feedback, worktree tolti', async () => {
-  const b = banco({ verdetti: ['fixed', 'pass'], derived: [{ level: 1, sede: 'e', text: 'altro lavoro Z' }] });
+test('giro intero: lavoratore, due verifiche, app su main, poi server, deploy, rilievi aperti come feedback, worktree tolti', async () => {
+  let filo = null;
+  const b = banco({
+    verdetti: ['fixed', 'pass'], derived: [{ level: 1, sede: 'e', text: 'altro lavoro Z' }],
+    risposte: [[/server-fondi-pratica/, (riga, o) => { filo = o.env && o.env.FILO_PUBLIC_REPO; }]],
+  });
   const fine = await b.motore.avvia();
   const p = fine.pratiche[7];
   assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
@@ -114,8 +118,11 @@ test('giro intero: lavoratore, due verifiche, server su main, app, deploy, rilie
   assert.deepEqual(p.fusa, { app: true, server: true, deploy: true });
   assert.deepEqual(p.derivatiAperti.map((d) => d.num), [1001]);
   assert.equal(p.costo, 1.5);
+  // Le prove di server:fondi leggono il ramo del lavoro, con la parte dell'app, come la suite di GitHub (#1222).
+  assert.equal(filo, '/r/.claude/worktrees/sette');
   const r = b.righe();
-  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /finish-local\.mjs --feedback 7/, /server:pubblica/, /scollega/, /worktree remove/];
+  // Prima l'app, poi il server, come dal cancello: la pubblicazione incorpora main di Filo con la parte dell'app (#1222).
+  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /finish-local\.mjs --feedback 7/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /server:pubblica/, /scollega/, /worktree remove/];
   let prima = -1;
   for (const re of ordine) {
     const i = r.findIndex((x, k) => k > prima && re.test(x));
