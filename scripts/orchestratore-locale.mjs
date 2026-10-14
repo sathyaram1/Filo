@@ -347,6 +347,14 @@ function pubblicaDavvero(P) {
   return esegui('npm', ['run', 'server:pubblica'], { cwd, timeoutMs: 60 * 60_000 });
 }
 
+/** deploy.yml è su main di filo-security: ogni spinta su main la pubblica GitHub (#1159 fase 2). In dubbio no. */
+async function deployDaGitHub(P) {
+  if (!P.serverRadice) return false;
+  const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.serverRadice });
+  if (f.code !== 0) return false;
+  return (await esegui('git', ['cat-file', '-e', 'refs/remotes/origin/main:.github/workflows/deploy.yml'], { cwd: P.serverRadice })).code === 0;
+}
+
 /** main di filo-security su origin, appena letto: lo sha che la pubblicazione da GitHub deve contenere. */
 async function puntaDelServer(P) {
   const f = await esegui('git', ['fetch', '--quiet', 'origin', '+refs/heads/main:refs/remotes/origin/main'], { cwd: P.serverRadice });
