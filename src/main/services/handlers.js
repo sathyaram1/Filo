@@ -3188,7 +3188,11 @@ async function saveOnboarding(state) {
 // processo muore, la prenotazione muore con lui, che è esattamente giusto.
 const ONB_RESUME_CLAIM_MS = 120000;
 let onbResumeClaimedAt = 0;
+// Un turno dell'intervista già in volo tiene la ripresa anche se nessuna scheda l'ha prenotata: una scheda nuova
+// aperta mentre Filo risponde rimandava lo stesso messaggio, e la risposta arrivava due volte (#1219).
+let onbTurniInVolo = 0;
 function claimOnboardingResume() {
+  if (onbTurniInVolo > 0) return false;
   const now = Date.now();
   if (onbResumeClaimedAt && now - onbResumeClaimedAt < ONB_RESUME_CLAIM_MS) return false;
   onbResumeClaimedAt = now;
@@ -4310,7 +4314,16 @@ function ricordoComeAzione(ricordi) {
   };
 }
 
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }) {
+async function handleFiloChat(richiesta) {
+  const volo = { accoglienza: false };
+  try {
+    return await turnoFiloChat(richiesta, volo);
+  } finally {
+    if (volo.accoglienza) onbTurniInVolo -= 1;
+  }
+}
+
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }, volo) {
   await FiloMem.touchSession();
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
   // perché la parola di stop deve funzionare anche quando il resto non
@@ -4320,6 +4333,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // L'intervista comincia col benvenuto di Filo: un messaggio scritto prima (senza crediti) non ne è una risposta, e
   // metterlo nella conversazione la faceva ripartire da lì, senza che Filo si presentasse mai.
   const onbActive = !!(Onboarding && !onbBefore.done && onbBefore.thread.length > 0);
+  if (onbActive) { volo.accoglienza = true; onbTurniInVolo += 1; }
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
 
   // #525 — la chat si scrive su disco ADESSO, non alla chiusura: se l'app

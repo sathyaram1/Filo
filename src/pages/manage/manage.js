@@ -2131,9 +2131,10 @@
     menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
     sortMenu = menu;
+    document.addEventListener('keydown', onSortKeydown, true);
     setTimeout(() => {
+      if (sortMenu !== menu) return;
       document.addEventListener('mousedown', onSortOutside, true);
-      document.addEventListener('keydown', onSortKeydown, true);
       window.addEventListener('scroll', onSortScroll, true);
       window.addEventListener('resize', closeSortMenu);
     }, 0);
@@ -6978,9 +6979,10 @@
     menu.style.left = `${Math.max(4, Math.min(x, vw - menu.offsetWidth - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - menu.offsetHeight - 4))}px`;
     fsMenu = menu;
+    document.addEventListener('keydown', fsEscMenu, true);
     setTimeout(() => {
+      if (fsMenu !== menu) return;
       document.addEventListener('mousedown', fsFuoriMenu, true);
-      document.addEventListener('keydown', fsEscMenu, true);
       window.addEventListener('resize', fsChiudiMenu);
     }, 0);
   }

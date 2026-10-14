@@ -11,7 +11,7 @@ import { cpus, freemem, homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
+  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, oraLocale, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, fondiApp, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
@@ -597,7 +597,7 @@ async function main(argv) {
   if (cmd === 'avvia') {
     const opz = opzioniDa(rest);
     const log = (riga) => {
-      const r = `${ora().slice(0, 19)} ${riga}`;
+      const r = `${oraLocale(ora(), { conData: true })} ${riga}`;
       console.log(r);
       if (!opz.dryRun) try { mkdirSync(P.note, { recursive: true }); writeFileSync(join(P.note, 'orchestratore.log'), `${r}\n`, { flag: 'a' }); } catch (_) { /* il log non ferma il giro */ }
     };
