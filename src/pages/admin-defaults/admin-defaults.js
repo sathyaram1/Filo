@@ -459,6 +459,7 @@
       kind.appendChild(opt);
     }
     kind.value = r.kind || '';
+    kind.addEventListener('change', () => checkExcludedName(row));
 
     const note = document.createElement('input');
     note.type = 'text';
