@@ -617,6 +617,7 @@ async function main() {
       // Un gruppo solo: l'uscita è quella di un `node --test` qualunque, riepilogo compreso.
       const l = lancioDi(0, date);
       const r = await lancia(['--test', ...l.flags, ...gruppi[0]], temp, l.avanzamento);
+      if (r.chiusi.length) await scrivi(`\n${testoFileChiusi(r.chiusi, TETTO_FERMO_MS)}`);
       if (r.fermo) {
         await scrivi(testoFermo(r.fermo, TETTO_FERMO_MS));
         process.exitCode = 1;
@@ -624,7 +625,7 @@ async function main() {
       }
       if (r.error) console.error(`[test:unit] non sono riuscito a lanciare node: ${r.error.message}`);
       // Ucciso da un segnale: non è un successo, e `status` in quel caso è null.
-      process.exitCode = r.error || r.status === null ? 1 : r.status;
+      process.exitCode = r.error || r.status === null ? 1 : r.status || (r.chiusi.length ? 1 : 0);
       return;
     }
 
