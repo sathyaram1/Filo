@@ -19,7 +19,6 @@
   // I classificatori (Jev) non passano dalla chat: hanno un endpoint loro, ancora in alfa sul router.
   const DECISIONS_ENDPOINT = 'https://openrouter.ai/api/alpha/decisions';
   const GENERATION_ENDPOINT = 'https://openrouter.ai/api/v1/generation';
-  const ZDR_ENDPOINTS_ENDPOINT = 'https://openrouter.ai/api/v1/endpoints/zdr';
   const AUTH_KEY_ENDPOINT = 'https://openrouter.ai/api/v1/auth/key';
   const CREDITS_ENDPOINT = 'https://openrouter.ai/api/v1/credits';
 
@@ -52,17 +51,8 @@
   // personale un 402 sono i crediti finiti), e il rifiuto della chiave
   // propria resta comunque registrato: la pagina Crediti lo mostra.
   // La prova di una chiave non ripiega (SN_WALLET_MAIN.senzaRipiego).
-  // `makeInit(key, keySource)` compone la richiesta per QUELLA chiave (anche async): chi paga decide i
-  // vincoli sugli host (#831), e il ripiego dalla propria ai crediti di Filo li deve portare.
-  async function sourceOfKey(key) {
-    const K = global.SN_WALLET_MAIN;
-    if (!K || typeof K.keySourceOf !== 'function') return '';
-    try { return (await K.keySourceOf(key)) || ''; } catch (_) { return ''; }
-  }
-
   async function fetchWithKey(url, apiKey, makeInit) {
-    let keySource = await sourceOfKey(apiKey);
-    let res = await fetch(url, await makeInit(apiKey, keySource));
+    let res = await fetch(url, makeInit(apiKey));
     let keyUsed = apiKey;
     let keyFallback = null;
     const W = global.SN_WALLET;
@@ -81,19 +71,21 @@
         const refused = { status: res.status, detail };
         // Il rifiuto si annota DOPO il ripiego: Crediti dice che Filo ha
         // usato i crediti solo se la personale ha risposto davvero.
-        const altSource = (await sourceOfKey(alt.key)) || alt.source || 'personal';
         try {
-          res = await fetch(url, await makeInit(alt.key, altSource));
+          res = await fetch(url, makeInit(alt.key));
         } catch (e) {
           try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
           throw e;
         }
         try { await K.noteOwnKeyRefusal({ ...refused, served: res.ok }); } catch (_) {}
         keyUsed = alt.key;
-        keySource = altSource;
         keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
         if (!res.ok) keyFallback.failed = res.status;
       }
+    }
+    let keySource = '';
+    if (K && typeof K.keySourceOf === 'function') {
+      try { keySource = await K.keySourceOf(keyUsed); } catch (_) { keySource = ''; }
     }
     // La chiave propria ha appena servito una chiamata: il rifiuto ricordato
     // in Crediti (se c'era) non vale più, e spesa e residuo sono cambiati.
