@@ -63,13 +63,17 @@
     return ok;
   }
 
-  // querySelector che entra anche negli shadow root aperti dei root indicati.
-  // Alcuni CMP (Usercentrics) montano l'UI dentro uno shadow DOM, irraggiungibile
-  // con un querySelector classico.
+  // `root` è il documento, uno shadow root o un sottoalbero appena entrato in pagina, che può essere lui il pulsante.
+  // Alcuni CMP (Usercentrics) montano l'UI dentro uno shadow DOM, irraggiungibile con un querySelector classico.
+  function pick(root, sel) {
+    if (root.nodeType === 1 && root.matches(sel)) return root;
+    return root.querySelector(sel);
+  }
+
   function queryIn(root, selectors) {
     for (const sel of selectors) {
       let el = null;
-      try { el = root.querySelector(sel); } catch (_) {}
+      try { el = pick(root, sel); } catch (_) {}
       if (el && isVisible(el)) return el;
     }
     return null;
@@ -77,7 +81,7 @@
 
   function existsIn(root, selectors) {
     for (const sel of selectors) {
-      try { if (root.querySelector(sel)) return true; } catch (_) {}
+      try { if (pick(root, sel)) return true; } catch (_) {}
     }
     return false;
   }
