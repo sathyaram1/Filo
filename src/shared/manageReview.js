@@ -88,9 +88,9 @@
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
   }
-  // Le attese di un lavoro server passato (#1159): il PC dell'owner, la suite di filo-security, la pubblicazione da
-  // GitHub. Gemello di select.ATTESA nel server; fuori dalla revisione il segno vecchio non conta.
-  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite', deploy_server: 'deploy' });
+  // Le attese di un lavoro server passato (#1159): il PC dell'owner, la suite di filo-security. Gemello di select.ATTESA
+  // nel server; fuori dalla revisione il segno vecchio non conta.
+  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite' });
   function attesaServer(fb) {
     if (!fb || normalizeStatus(fb).status !== 'revision_security') return '';
     return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
