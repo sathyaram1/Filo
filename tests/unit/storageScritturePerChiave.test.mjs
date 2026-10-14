@@ -104,7 +104,7 @@ test('4 MB di storage: una scritta su una chiave piccola non riserializza il res
   const suDisco = JSON.parse(leggiFile());
   assert.equal(suDisco.piccola, 'fine');
   assert.equal(suDisco.cronologiaGrande.length, grande.length);
-  assert.equal(suDisco.cronologiaGrande[0].quando, giro - 1);
+  assert.equal(suDisco.cronologiaGrande[0].quando, grande[0].quando);
   await Storage.remove('cronologiaGrande');
   await Storage.whenSettled();
 });
