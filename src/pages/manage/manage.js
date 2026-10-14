@@ -5740,6 +5740,7 @@
     row.appendChild(nickIn);
     row.appendChild(modelWrap);
     row.appendChild(del);
+    row.appendChild(msg);
     return row;
   }
 
