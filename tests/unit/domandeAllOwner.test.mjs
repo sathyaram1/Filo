@@ -48,6 +48,9 @@ test("i ruoli che chiedono all'owner aprono una domanda e rimandano a CLAUDE.md"
   const resolver = piatto(readRoleInstructions('new-work'));
   assert.match(resolver, /domanda `bloccante`[^]*--reason clarify/, 'chi si ferma prima di cominciare apre la domanda');
   assert.doesNotMatch(resolver, /--notes "\[le tue domande\]"/, 'le domande non viaggiano più solo nelle note');
+  const verifier = piatto(readRoleInstructions('verifier'));
+  assert.doesNotMatch(verifier, /stanno nel file/, 'le scelte stanno nella domanda, il file di --segnala ne porta il numero');
+  assert.match(verifier, /le scelte e i loro costi stanno nella domanda/);
 });
 
 test('CLAUDE.md: la sessione locale discute, il lavoro e le prove sono delle routine', () => {
