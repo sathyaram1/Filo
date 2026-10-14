@@ -59,6 +59,11 @@ export function leggiArgomenti(argv) {
     if (out.scelta === undefined && out.testo === undefined) return { errore: `rispondi vuole --scelta N, --testo "…" o tutti e due.\n${USO}` };
     return out;
   }
+  if (cmd === 'cerca') {
+    const testo = a.slice(1).join(' ').trim();
+    if (testo.length > D.TETTI.cerca) return { errore: `la ricerca è lunga ${testo.length} caratteri, il massimo è ${D.TETTI.cerca}: bastano le parole chiave.` };
+    return { cmd, testo };
+  }
   if (cmd === 'consiglio') {
     const ids = a.slice(1);
     if (!ids.length) return { errore: `consiglio vuole almeno una domanda.\n${USO}` };
