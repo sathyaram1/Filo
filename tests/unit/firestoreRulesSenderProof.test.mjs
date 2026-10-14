@@ -52,6 +52,20 @@ test('nessun ramo non-admin può scrivere senderProof, e ognuno ha la sua hasOnl
   }
 });
 
+// #1075: il server conta il tetto per mittente su authUid; un uid altrui farebbe pagare un altro.
+test('la create anonima ammette authUid solo se è l’uid di chi scrive', () => {
+  const [anonima] = scritture().filter((s) => s.verbi.includes('create') && !/^isAdmin\(\)/.test(s.cond));
+  assert.ok(liste(anonima.cond)[0].includes('authUid'), 'authUid non ammesso: il mittente torna il clientId scelto da chi scrive');
+  assert.ok(
+    anonima.cond.includes("(!('authUid' in request.resource.data) || (request.auth != null && request.resource.data.authUid == request.auth.uid))"),
+    'authUid senza il vincolo «uguale a request.auth.uid»: chiunque si attribuirebbe l’uid di un altro',
+  );
+  for (const s of scritture()) {
+    if (s === anonima || /^isAdmin\(\)/.test(s.cond)) continue;
+    assert.ok(!liste(s.cond).flat().includes('authUid'), `ramo non-admin che riscrive authUid: ${s.cond.slice(0, 120)}`);
+  }
+});
+
 test('il ramo update admin ammette senderProof solo con i valori admin e server', () => {
   const admin = scritture().filter((s) => s.verbi.includes('update') && /^isAdmin\(\)/.test(s.cond));
   assert.equal(admin.length, 1, 'atteso un solo ramo update admin');
