@@ -52,8 +52,17 @@
   // personale un 402 sono i crediti finiti), e il rifiuto della chiave
   // propria resta comunque registrato: la pagina Crediti lo mostra.
   // La prova di una chiave non ripiega (SN_WALLET_MAIN.senzaRipiego).
+  // `makeInit(key, keySource)` compone la richiesta per QUELLA chiave (anche async): chi paga decide i
+  // vincoli sugli host (#831), e il ripiego dalla propria ai crediti di Filo li deve portare.
+  async function sourceOfKey(key) {
+    const K = global.SN_WALLET_MAIN;
+    if (!K || typeof K.keySourceOf !== 'function') return '';
+    try { return (await K.keySourceOf(key)) || ''; } catch (_) { return ''; }
+  }
+
   async function fetchWithKey(url, apiKey, makeInit) {
-    let res = await fetch(url, makeInit(apiKey));
+    let keySource = await sourceOfKey(apiKey);
+    let res = await fetch(url, await makeInit(apiKey, keySource));
     let keyUsed = apiKey;
     let keyFallback = null;
     const W = global.SN_WALLET;
