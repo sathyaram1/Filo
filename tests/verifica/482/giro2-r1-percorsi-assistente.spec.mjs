@@ -25,7 +25,7 @@ for (const [nome, percorso] of [
     const home = await dallaHome(app, shell);
     const r = await home.evaluate((u) => chrome.runtime.sendMessage({ type: 'filo_run_action', action: { type: 'NAVIGA', url: u } }), percorso);
     await home.waitForTimeout(1500);
-    const cercato = (await schede(app)).filter((u) => /google\.[a-z]+\/search/.test(u));
+    const cercato = (await schede(app)).filter((u) => /google\.[a-z]+\/search/.test(decodeURIComponent(u)));
     expect(cercato, `l'assistente ha aperto una ricerca Google del percorso (${JSON.stringify(r)})`).toEqual([]);
     const avviso = await shell.evaluate(() => [...document.querySelectorAll('#shell-notifs > .shell-notif')]
       .some((c) => /bloccat/.test(c.textContent)));
