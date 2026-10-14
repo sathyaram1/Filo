@@ -77,87 +77,36 @@ server un verdetto raccontato non lo legge).
    controllato. Se ti ferma: guarda cosa sono quei file, portali a un commit,
    e se cambiano il codice rileggi il diff prima di registrare lo stesso
    verdetto.
-2. Su **fail** hai finito: non fondere e non consegnare nessuno stato. Il
-   server, ricevuto il fail del passo 1, porta già da solo il feedback in
+2. Registrato il verdetto, hai finito: non chiedi la fusione e non consegni
+   nessuno stato. Su **fail** il server porta già da solo il feedback in
    `design` con la tua nota, e decide l'owner; una consegna di `design` in più
    verrebbe respinta. Resta solo il rilascio del biglietto.
-   Su **pass**, chiedi la fusione:
-   ```bash
-   node scripts/merge-gate.mjs <branch>
-   ```
-   **Dura minuti, non secondi**: prima di chiedere fa girare gli unit sul
-   risultato della fusione del ramo con origin/main, in una cartella
-   temporanea (dai cinque ai venti minuti, di più se main si muove e la prova
-   si rifà). Lancialo in sottofondo e aspettalo a pezzi, come dice il
-   contratto: una chiamata tagliata a metà non chiede niente. Se gli unit sono
-   rossi solo sulla fusione il server non fonde e rimanda il lavoro al
-   riallineamento con l'elenco (exit 20): non è un tuo fail.
-   Anche la richiesta di fusione parla del commit, non del ramo: dichiara la
-   punta della directory, e prima di partire rifà i due controlli del passo 1.
-   Se il ramo si è mosso dopo il TUO verdetto, il rifiuto ti scrive cosa
-   rileggere e come registrare di nuovo il verdetto sul contenuto nuovo:
-   fallo, poi rilancia. Se si è mosso dopo quello della verifica non tocca a
-   te, e il gate lo dice in una nota: dopo un pass il verificatore toglie le
-   prove dei rilievi usciti in feedback loro, ed è previsto. Decide il server:
-   se lì si è solo tolto fonde, altrimenti azzera la verifica e la rimette in
-   giro da sé, e a te arriva un rifiuto `not_approved`. In quel caso rilascia
-   il biglietto e basta: non c'è altro da registrare.
-   Il `<branch>` che nomini dev'essere quello su cui sei posizionato: il gate
-   legge tutto dalla directory, e con due rami diversi controllerebbe uno e
-   chiederebbe l'altro. Guarda anche cosa ti dice su dov'è il ramo su origin,
-   da dove il server lo prende: se là manca il contenuto che hai controllato,
-   spediscilo e rilancia; se là il ramo è più avanti, NON spedire e non
-   riportarlo indietro (sovrascriveresti lavoro che qui non c'è): porta la
-   directory lì col comando che il rifiuto ti scrive e rilancia.
-   Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
-   verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
-   sul diff che scarica da GitHub, e fonde con la sua identità. Qui girano
-   solo la prova degli unit e la richiesta, e non si passa nessun verdetto: se
-   il tuo `pass` non è stato registrato al passo 1, la fusione viene rifiutata.
-3. Chiudi in base all'exit del gate:
-   - `0` → fuso → `node scripts/routine-channel.mjs deliver status --status done --notes "<riga>"` +
-     `node scripts/dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 sul diff) → `node scripts/routine-channel.mjs deliver status --status design
-     --notes "<spiegazione>" --branch <branch> --reason l5`.
-     Il motivo è `l5`, non `secaudit`: il tuo controllo è passato, a fermare è
-     stato il cancello del server, e in dashboard sono due forme diverse (il
-     pentagono verde, il quadrato rosso). Il ramo NON è perduto: il server apre una richiesta in attesa che l'owner
-     trova in cima ai Ricevuti della dashboard di gestione, e da lì può dare il via libera
-     dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
-     legge per decidere: scrivila per lui, non per il registro.
-   - `20` → conflitto: main è andato avanti e il ramo non si fonde più da
-     solo; oppure gli unit, che il gate fa girare sul risultato della fusione
-     con main prima di chiederla, lì sono rossi e su main da solo no.
-     **Non fare niente**: il server ha già instradato il giro di
-     riallineamento (la pratica torna a chi risolve con la critica che spiega
-     il rebase). Niente `design`, niente nota: la sovrascriveresti.
-   - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
-     nell'output e il tentativo è già a registro). Con `secaudit_stale` o
-     `stale` il server ha trovato il tuo verdetto su un commit diverso dalla
-     punta che fonderebbe: l'ha azzerato e rimanda da sé un nuovo controllo di
-     sicurezza sulla punta. Rilascia il biglietto e basta.
+   Su **pass** il resto lo fa il server, senza di te: fa girare gli unit sul
+   risultato della fusione del ramo col main di quel momento in un'azione di
+   GitHub, poi L5 sul diff che scarica da sé, e fonde con la sua identità. Un
+   conflitto o unit rossi sulla fusione li manda lui al riallineamento, un
+   blocco di L5 lo spiega lui all'owner. Anche qui resta solo il rilascio del
+   biglietto.
 
 **Quanto scrivere — dipende dall'esito:**
 
 - **pass** → la nota di `--nota`: poche righe su cosa hai controllato e cosa
   hai trovato. Il report del lavoro l'ha già scritto chi l'ha fatto: non
-  riscriverlo, non riassumerlo. La riga di chiusura dopo la fusione
-  (`--status done`) resta una riga.
-- **blocco (fail L4, o L5 dal cancello)** → una **spiegazione esaustiva**: un
-  blocco è un evento raro e l'owner deve poter capire da solo se è un attacco
-  vero o un fraintendimento. Scrivi: COSA hai trovato e DOVE nel diff; PERCHÉ è
-  pericoloso, con lo scenario concreto ("questo codice permetterebbe a X di
-  fare Y"); e cosa andrebbe verificato se fosse un falso positivo (cosa ti ha
-  insospettito e quale informazione lo smentirebbe). Su fail va nella nota di
-  `--nota`; su L5 nelle `--notes` della consegna. In tutti e due i casi il
-  server la CIFRA: non deve mai finire in chiaro, perché è anche la
-  descrizione esatta di come l'attacco è stato scoperto. Letto il tuo fail,
-  l'owner può decidere di andare avanti lo stesso («Salta il controllo», in
-  dashboard): il tuo esito resta scritto, con accanto il suo salto, e il
-  cancello del server gira comunque.
+  riscriverlo, non riassumerlo.
+- **fail** → una **spiegazione esaustiva**: un blocco è un evento raro e
+  l'owner deve poter capire da solo se è un attacco vero o un fraintendimento.
+  Scrivi: COSA hai trovato e DOVE nel diff; PERCHÉ è pericoloso, con lo
+  scenario concreto ("questo codice permetterebbe a X di fare Y"); e cosa
+  andrebbe verificato se fosse un falso positivo (cosa ti ha insospettito e
+  quale informazione lo smentirebbe). Va nella nota di `--nota`, e il server
+  la CIFRA: non deve mai finire in chiaro, perché è anche la descrizione
+  esatta di come l'attacco è stato scoperto. Letto il tuo fail, l'owner può
+  decidere di andare avanti lo stesso («Salta il controllo», in dashboard): il
+  tuo esito resta scritto, con accanto il suo salto, e il cancello del server
+  gira comunque.
 
 **Nota:** L5 (blocco deterministico sui file sensibili) gira **sul server**,
-dentro il gate, sul diff che il server scarica da sé. Tu sei solo L4 (il
+dopo il tuo pass, sul diff che il server scarica da sé. Tu sei solo L4 (il
 giudizio LLM). I due livelli si completano — e nessuno dei due si può
 raccontare: il tuo si registra con una consegna validata, l'altro lo calcola
 il server.

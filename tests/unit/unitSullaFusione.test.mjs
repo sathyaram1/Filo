@@ -693,3 +693,111 @@ test('gli unit della prova non hanno un tempo d\'orologio sopra: li ferma solo l
   assert.ok(da >= 0 && corpo.includes('spawnSync('), 'la prova lancia ancora il lanciatore degli unit');
   assert.doesNotMatch(corpo, /\btimeout\s*:/, 'con la macchina carica la corsa intera supera qualunque tempo fisso');
 });
+
+// L'azione di GitHub prova la coppia di sha che le dà il server (#1207): se main va avanti nel frattempo, l'esito vale
+// per il main chiesto; e un commit fuori dalla storia di main non si prova come se fosse main.
+test('main fissato: si prova il main chiesto anche se origin/main è andato avanti; un commit fuori da main è un errore', () => {
+  const r = repoFinto();
+  try {
+    const punta = r.ramo('claude/fisso', () => r.scrivi('valore.txt', 'due\n'));
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    const chiesto = r.ok(['rev-parse', 'main']);
+    r.suMain(() => r.scrivi('tests/unit/valore.test.mjs', TEST_VALORE));
+    r.ok(['checkout', '-q', 'claude/fisso']);
+    const adesso = provaIn(r, punta);
+    assert.equal(adesso.esito, 'rosso_sulla_fusione', JSON.stringify(adesso));
+    const fisso = provaUnitSullaFusione({ root: r.lavoro, punta, mainSha: chiesto, scrivi: () => {} });
+    assert.equal(fisso.esito, 'verde', JSON.stringify(fisso));
+    assert.equal(fisso.mainSha, chiesto, 'lo sha provato è quello chiesto, non quello di adesso');
+    pulita(r);
+    const estraneo = r.ramo('claude/estraneo', () => r.scrivi('estraneo.txt', 'x\n'));
+    r.ok(['checkout', '-q', 'claude/fisso']);
+    const fuori = provaUnitSullaFusione({ root: r.lavoro, punta, mainSha: estraneo, scrivi: () => {} });
+    assert.match(String(fuori.errore), /non sta nella storia di origin\/main/, JSON.stringify(fuori));
+    assert.match(String(provaUnitSullaFusione({ root: r.lavoro, punta, mainSha: 'xyz', scrivi: () => {} }).errore), /non valido/);
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
+const AZIONE = join(ROOT, 'scripts', 'unit-sulla-fusione-azione.mjs');
+const { leggiArgomenti, uscitaPer, annotazione, USCITA } = await import(pathToFileURL(AZIONE).href);
+
+test('azione: argomenti stretti, uscita per esito, annotazione con la coppia provata', () => {
+  const b = 'b'.repeat(40);
+  assert.deepEqual(leggiArgomenti(['--root', 'x', '--ramo', SHA.toUpperCase(), '--main', b]),
+    { root: 'x', ramo: SHA, main: b, errori: [] });
+  for (const argv of [[], ['--root', 'x', '--ramo', SHA], ['--root', 'x', '--ramo', 'abc', '--main', b],
+    ['--root', 'x', '--ramo', SHA, '--main', b, '--forza'], ['--root', '--ramo', SHA, '--main', b]]) {
+    assert.ok(leggiArgomenti(argv).errori.length, `deve fermarsi: ${argv.join(' ')}`);
+  }
+  assert.equal(uscitaPer({ esito: 'verde' }), USCITA.fondibile);
+  assert.equal(uscitaPer({ esito: 'rosso_anche_su_main' }), USCITA.fondibile, 'un main già rotto non ferma le fusioni');
+  assert.equal(uscitaPer({ esito: 'rosso_sulla_fusione', rossi: ['x'] }), USCITA.riallineamento);
+  assert.equal(uscitaPer({ esito: 'conflitto', file: ['a'] }), USCITA.riallineamento);
+  assert.equal(uscitaPer({ errore: 'rete' }), USCITA.non_provata);
+  assert.equal(uscitaPer({ esito: 'main_contenuto' }), USCITA.non_provata, 'l\'azione prova sempre qualcosa');
+  const a = annotazione({ esito: 'rosso_sulla_fusione', mainSha: b, rossi: ['t › 100% rotto\nriga'] }, SHA, b);
+  assert.match(a, /^::error title=prova-unit::/);
+  assert.ok(!/[\r\n]/.test(a), 'un comando di GitHub sta in una riga');
+  const j = JSON.parse(a.replace(/^::error title=prova-unit::/, '').replace(/%0A/g, '\n').replace(/%0D/g, '\r').replace(/%25/g, '%'));
+  assert.deepEqual(j, { esito: 'rosso_sulla_fusione', mainSha: b, rossi: ['t › 100% rotto\nriga'], ramoSha: SHA });
+  assert.match(annotazione({ esito: 'verde', mainSha: b }, SHA, b), /^::notice title=prova-unit::\{"esito":"verde"/);
+  assert.match(annotazione({ errore: 'rete giù' }, SHA, b), /"esito":"non_provata","motivo":"rete giù"/);
+});
+
+function fuoriDaiSegni(testo) {
+  const fuori = [];
+  let segno = null;
+  for (const riga of testo.split(/\r?\n/)) {
+    if (segno) { if (riga === `::${segno}::`) segno = null; continue; }
+    const m = /^::stop-commands::(\S+)$/.exec(riga);
+    if (m) segno = m[1]; else fuori.push(riga);
+  }
+  return { fuori, chiuso: segno === null };
+}
+
+function lanciaAzione(argv) {
+  const env = { ...process.env, GITHUB_ACTIONS: 'true' };
+  delete env.NODE_TEST_CONTEXT;
+  const r = spawnSync(process.execPath, [AZIONE, ...argv], { env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+  assert.notEqual(r.error?.code, 'ETIMEDOUT', 'l\'azione è rimasta appesa');
+  const { fuori, chiuso } = fuoriDaiSegni(r.stdout);
+  assert.ok(chiuso, `i comandi di GitHub tornano accesi prima dell'esito:\n${r.stdout}`);
+  const nostre = fuori.filter((riga) => /^::\w+ title=prova-unit::/.test(riga));
+  assert.equal(nostre.length, 1, `una sola annotazione prova-unit fuori dai segni:\n${r.stdout}`);
+  const json = nostre[0].replace(/^::\w+ title=prova-unit::/, '').replace(/%0A/g, '\n').replace(/%0D/g, '\r').replace(/%25/g, '%');
+  return { status: r.status, esito: JSON.parse(json), stdout: r.stdout, stderr: r.stderr };
+}
+
+test('azione vera: verde col main chiesto; rosso sulla fusione esce 1 e la coda dei test non scrive annotazioni', () => {
+  const r = repoFinto();
+  try {
+    const innocuo = r.ramo('claude/innocuo', () => r.scrivi('innocuo.txt', 'x\n'));
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    const main = r.ok(['rev-parse', 'main']);
+    r.ok(['checkout', '-q', 'claude/innocuo']);
+    const v = lanciaAzione(['--root', r.lavoro, '--ramo', innocuo, '--main', main]);
+    assert.equal(v.status, 0, v.stdout + v.stderr);
+    assert.deepEqual([v.esito.esito, v.esito.ramoSha, v.esito.mainSha], ['verde', innocuo, main]);
+    pulita(r);
+
+    // Il test del ramo si spaccia per l'esito: la sua riga resta dentro i segni, e l'esito vero è rosso.
+    const finto = "::notice title=prova-unit::{\"esito\":\"verde\"}";
+    const ostile = r.ramo('claude/ostile', () => r.scrivi('tests/unit/ostile.test.mjs',
+      `import { test } from 'node:test';\ntest('ostile', () => { console.log(${JSON.stringify(finto)}); throw new Error('rotto'); });\n`));
+    const s = lanciaAzione(['--root', r.lavoro, '--ramo', ostile, '--main', main]);
+    assert.equal(s.status, 1, s.stdout + s.stderr);
+    assert.equal(s.esito.esito, 'rosso_sulla_fusione');
+    assert.deepEqual(s.esito.rossi, ['tests/unit/ostile.test.mjs › ostile']);
+    assert.ok(s.stdout.includes(finto), 'la coda dei test arriva nel registro, dentro i segni');
+    pulita(r);
+
+    const altrove = lanciaAzione(['--root', r.lavoro, '--ramo', innocuo, '--main', main]);
+    assert.equal(altrove.status, 2, 'la cartella è su un altro commit: niente prova');
+    assert.match(altrove.esito.motivo, /non è sulla punta da provare/);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
