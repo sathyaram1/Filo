@@ -53,7 +53,14 @@ export async function mainFinto(app, cfg) {
       if (t === 'merge_approvals_get') return { ok: true, pending: [], failed: [], recent: [], preapproved: [], ttlMs: 7 * 864e5 };
       if (t === 'domande_elenco') {
         if (s.trattieni) await new Promise((r) => globalThis.__mgFintoAttese.push(r));
+        if (s.guasti > 0) { s.guasti--; return { ok: false, error: 'deadline-exceeded' }; }
         return { ok: true, domande: JSON.parse(JSON.stringify(s.domande || [])), riferimenti: s.riferimenti || {}, adesso: Date.now(), altre: false };
+      }
+      if (t === 'domanda_rispondi') {
+        const d = (s.domande || []).find((x) => x.id === msg.id);
+        if (!d) return { ok: false, error: 'domanda sconosciuta' };
+        Object.assign(d, { stato: 'in_lavorazione', modificataIl: Date.now() });
+        return { ok: true, domanda: JSON.parse(JSON.stringify(d)) };
       }
       return orig(event, msg);
     });
