@@ -294,12 +294,14 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
 /**
  * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda?, contenuto? } | { saltata, motivo } | { errore, mainSha? }.
  * `ancheContenuto`: con main già dentro il ramo si prova il ramo stesso invece di rispondere `main_contenuto`
- * (serve a giudicare un unit rosso sul ramo, #1009). `lancia` è iniettabile solo per i test.
+ * (serve a giudicare un unit rosso sul ramo, #1009). `mainSha`: si prova quel main e non quello di adesso, perché
+ * l'esito vale per una coppia di sha (l'azione di GitHub, #1207). `lancia` è iniettabile solo per i test.
  */
 export function provaUnitSullaFusione({
   root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s),
-  ancheContenuto = false,
+  ancheContenuto = false, mainSha: fissato = '',
 } = {}) {
+  if (fissato && !/^[0-9a-f]{40}$/i.test(String(fissato))) return { errore: 'sha di main da provare non valido' };
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
   // I resti delle prove interrotte si tolgono a ogni richiesta, anche quando la prova poi non serve.
