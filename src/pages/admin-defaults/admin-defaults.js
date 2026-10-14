@@ -182,12 +182,15 @@
     if (window.SN_COMBOBOX) {
       window.SN_COMBOBOX.attach(idWrap, idIn, {
         readOptions: () => readProviderOptions(provSel.value),
+        onPick: () => checkProducer(row),
       });
     }
+    idIn.addEventListener('input', () => checkProducer(row));
 
     // Cambiando provider, il combobox legge l'altra lista (e la carica).
     provSel.addEventListener('change', () => {
       ensureProviderModels(provSel.value);
+      checkProducer(row);
     });
 
     // Livello di reasoning per QUESTO modello (#369): l'owner può forzarlo quando
