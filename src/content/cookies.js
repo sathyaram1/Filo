@@ -883,7 +883,7 @@
   function scan() {
     if (!active) return;
     const { roots: all, lost } = takeAdded();
-    const roots = all.filter((n) => n.isConnected);
+    const roots = [...new Set(all)].filter((n) => n.isConnected);
     try {
       if (lost) rewriteYouTube(document);
       else for (const r of roots) rewriteYouTube(r);
