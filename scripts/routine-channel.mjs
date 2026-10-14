@@ -512,13 +512,15 @@ export async function releaseConRapporto(t, fault, report, opts) {
 // ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
 
 /** Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA. */
-export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '' } = {}) {
+export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '', report = null } = {}) {
   if (!passphrase === !ticket) throw new Error('serve esattamente una fra parola d\'ordine e biglietto');
   const corpo = passphrase ? { passphrase: String(passphrase), op } : { ticket: String(ticket), op };
   if (op === 'question' && passphrase && requestId) corpo.requestId = String(requestId);
   if (op === 'answer') {
     if (passphrase) corpo.id = String(id || '');
     corpo.answer = String(answer ?? '');
+    // Solo l'orchestratore: i turni di un worker li porta il suo rilascio.
+    if (passphrase && report && typeof report === 'object') corpo.report = report;
   }
   return corpo;
 }
