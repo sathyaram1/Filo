@@ -6,8 +6,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { join, resolve } from 'node:path';
 import {
-  cartellaDelServer, leggiArgomenti, esegui, ramiApertiDellaPratica, PRATICA_ENV, USCITA_SOLO_APP,
+  cartellaDelServer, leggiArgomenti, esegui, ramiApertiDellaPratica, PRATICA_ENV, USCITA_SOLO_APP, USCITA_SPINTA_RIFIUTATA,
 } from '../../scripts/server-fondi-pratica.mjs';
+import { classifyServerMerge, messageForServerMerge } from '../../scripts/lib/owner-merge.mjs';
 import { FIRESTORE_BASE } from '../../scripts/lib/firestore-auth.mjs';
 
 test('cartellaDelServer: il checkout del server accanto al repo, dal checkout principale e da una sua worktree', () => {
