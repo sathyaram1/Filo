@@ -119,6 +119,11 @@ export function depsCancello({ github, stato, reg, nowMs = 10_000 }) {
     scritto,
     deps: {
       github, nowMs, gates: () => ({ passed: true }),
+      // La parte dell'app la fonde il cancello di sempre (#1222: prima del server); qui risponde fusa, e la chiamata
+      // resta fra quelle di GitHub per l'ordine. Il cancello ha già visto riuscire un suo avanzamento (passo 10 fatto).
+      fondiApp: async () => { github.chiamate.push(['fondiApp']); return { ok: true, result: 'merged', sha: sha('5') }; },
+      leggiPubblica: async () => ({ cancelloAvanza: { at: 1, via: 'pc' } }),
+      scriviPubblica: async () => {},
       readState: async () => stato,
       writeState: async (id, patch) => { scritto.stato.push(patch); },
       scriviFeedback: async (id, campi) => { scritto.feedback.push(campi); },
