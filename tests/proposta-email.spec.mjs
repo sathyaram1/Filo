@@ -1,5 +1,6 @@
 // L'email dell'account proposta sotto i campi di accesso dei siti (#1124): compare entrando nel campo, la scelta
 // (clic o freccia giù e Invio) lo riempie con un `input` vero, e prima della scelta la pagina non la trova da nessuna parte.
+// Niente campo password nelle pagine: su http l'avviso del sito sospetto coprirebbe la scheda, e la proposta con lei.
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 
 const EMAIL = 'chi-usa-filo@example.com';
@@ -7,7 +8,7 @@ const EMAIL = 'chi-usa-filo@example.com';
 const PAGINA = `<!doctype html><html><head><title>Accedi</title></head>
 <body style="margin:0;padding:40px;font-family:sans-serif">
   <form onsubmit="return false"><input type="email" id="e" name="email" style="width:320px;height:32px;box-sizing:border-box"></form>
-  <p><input type="password" id="pw"></p>
+  <p><input type="search" id="cerca" placeholder="Cerca"></p>
   <p><input type="text" id="altro" name="citta"></p>
   <script>
     window.eventi = [];
@@ -17,7 +18,9 @@ const PAGINA = `<!doctype html><html><head><title>Accedi</title></head>
     e.addEventListener('input', (ev) => window.eventi.push({ tipo: 'input', vero: ev.isTrusted, valore: e.value }));
     e.addEventListener('change', () => window.eventi.push({ tipo: 'change', valore: e.value }));
     document.addEventListener('keydown', (ev) => window.tasti.push(ev.key), true);
-    new MutationObserver(() => { if (document.documentElement.outerHTML.includes('@example.com')) window.vistoNelDom = true; })
+    // L'ago si compone qui: scritto per intero starebbe nel testo di questo script, e l'outerHTML lo troverebbe sempre.
+    const ago = String.fromCharCode(64) + 'example' + '.com';
+    new MutationObserver(() => { if (document.documentElement.outerHTML.includes(ago)) window.vistoNelDom = true; })
       .observe(document, { subtree: true, childList: true, characterData: true, attributes: true });
   </script>
 </body></html>`;
@@ -161,9 +164,9 @@ test('l\'inizio scritto dall\'utente la tiene, un altro testo o un valore messo 
   await expect.poll(() => mostrata(app)).toBe(true);
   await page.click('#altro');
   await expect.poll(() => mostrata(app)).toBe(false);
-  await page.click('#pw');
+  await page.click('#cerca');
   await page.waitForTimeout(500);
-  expect(await mostrata(app), 'una password non è un campo di accesso da riempire con l\'email').toBe(false);
+  expect(await mostrata(app), 'una casella di ricerca non chiede l\'email').toBe(false);
   expect(await nonLaTrova(page)).toMatchObject({ html: false, find: false, osservata: false });
 });
 

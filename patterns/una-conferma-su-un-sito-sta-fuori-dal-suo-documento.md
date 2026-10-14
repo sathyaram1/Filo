@@ -117,3 +117,33 @@ La strada che regge:
   «leggo i documenti nuovi» con «Ferma».
 - Prove: `tests/aiuto-cerca-documenti.spec.mjs`,
   `tests/unit/aiutoDocumenti.test.mjs`.
+
+## Quando Filo propone un dato dell'utente a un sito: l'email nei campi di accesso (#1124)
+
+La regola: un dato dell'utente da inserire in un sito (l'email dell'account oggi, password e indirizzi domani) lo
+propone il main in una vista sopra la scheda, e arriva al frame del campo solo quando l'utente l'ha scelto. Prima di
+quel momento nessun pezzo di Filo nel documento lo conosce.
+
+Filo non ha l'autocompilazione di Chrome (Electron non la include), e sulla pagina di accesso di Google l'owner non
+trovava la sua email. La porta che dice chi è entrato (`MSG.AUTH_STATUS`) è chiusa ai siti di proposito, e quello che
+un content script scrive nel documento il sito lo legge, anche da uno shadow root chiuso (`window.find`, la
+selezione).
+
+- **Il content script porta solo il campo**: dov'è (px CSS della scheda, risalendo i riquadri della stessa origine),
+  cosa contiene e se quel valore l'ha scritto l'utente. La risposta dice solo «seguilo» o no.
+- **Il main decide e disegna**: interruttore, account, incognito, pagina di Filo. La vista è grande quanto il
+  riquadro e non tiene la tastiera (un clic gliela dà, torna al campo al giro dopo); frecce, Invio ed Esc li prende
+  dal `before-input-event` della scheda, prima del documento e della modalità a schermo intero.
+- **Il dato parte alla scelta e solo verso quel frame**, ricontrollati frame vivo, origine e account; il content
+  script lo scrive con `execCommand('insertText')`, così la pagina riceve un `input` vero, poi `change`.
+- **Un valore messo dalla pagina non conta**: si propone a campo vuoto o con l'inizio scritto dall'utente. Se no la
+  pagina proverebbe un prefisso alla volta, e dai tasti che non le arrivano saprebbe quando c'è una proposta.
+- **Un clic vale dopo mezzo secondo di proposta ferma sotto il campo**: la pagina può farla comparire sotto il
+  cursore, come la conferma.
+- **Sotto l'avviso del sito sospetto non compare**: la scheda coperta non è quella che l'utente vede.
+
+Dove vive: `src/main/propostaEmail.js` (vista, tasti, scelta), `src/content/propostaEmail.js` (il campo),
+`src/shared/campoAccesso.js` (quali campi, quando proporre), `src/renderer/proposta-email.*`. Prove:
+`tests/proposta-email.spec.mjs` (prima della scelta la pagina non trova l'email, dopo la riceve con un `input` vero),
+`tests/unit/campoAccesso.test.mjs`. Limite: un campo dentro un riquadro di un'altra origine non ha proposta, perché
+quel frame non sa dove sta il suo riquadro nella pagina.

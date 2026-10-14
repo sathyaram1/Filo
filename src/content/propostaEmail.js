@@ -1,6 +1,6 @@
 // L'email dell'account proposta nei campi di accesso dei siti (#1124): qui solo il campo, le sue misure e il riempimento.
 // Se e dove proporla lo decide il main, che la disegna sopra la scheda: l'email arriva qui solo dopo la scelta.
-// Regole: patterns/un-dato-dell-utente-proposto-a-un-sito-arriva-con-la-scelta.md
+// Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
 
 (function (global) {
   'use strict';

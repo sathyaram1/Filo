@@ -1,6 +1,6 @@
 // L'email dell'account Filo proposta sotto un campo di accesso di un sito (#1124), in una vista sopra la scheda: la
 // pagina non la legge e non la preme. L'email va al frame del campo solo alla scelta (clic, Invio, tasto destro).
-// Regole: patterns/un-dato-dell-utente-proposto-a-un-sito-arriva-con-la-scelta.md
+// Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
 
 const path = require('node:path');
 const { BrowserWindow, webContents: WebContents } = require('electron');

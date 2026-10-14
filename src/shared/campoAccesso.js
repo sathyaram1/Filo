@@ -1,6 +1,6 @@
 // Quali campi di un sito chiedono un'email o un nome utente, e quando proporci l'email dell'account (#1124). PURO:
 // il content script ci passa il campo, il main il valore. L'email non passa mai di qui verso la pagina.
-// Regole: patterns/un-dato-dell-utente-proposto-a-un-sito-arriva-con-la-scelta.md
+// Regole: patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md
 
 (function (global) {
   'use strict';
