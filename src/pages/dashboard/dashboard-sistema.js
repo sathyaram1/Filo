@@ -178,6 +178,7 @@
 
   function chiudiBox() {
     if (!box) return;
+    if (box.misura) box.misura.disconnect();
     box.el.remove();
     box = null;
     document.removeEventListener('mousedown', fuori, true);
@@ -362,7 +363,6 @@
       : (cosa === 'wifi' ? 'Il computer non conosce nessuna rete Wi-Fi' : 'Nessun dispositivo abbinato');
     lista.appendChild(titolo);
     for (const v of voci) lista.appendChild(voceElenco(questo, cosa, v));
-    posiziona(questo.el, questo.ancora, questo.punto);
   }
 
   function voceElenco(questo, cosa, v) {
@@ -498,9 +498,15 @@
     aggiornaComandi(x);
     posiziona(el, ancora, punto);
     if (questo.elenco && elencoDaLeggere(v, x)) caricaElenco(questo);
+    // L'attesa, l'elenco, un errore cambiano l'altezza: il riquadro resta ancorato e non copre la voce (un clic lì
+    // finiva su «Nascondi»).
+    questo.misura = new ResizeObserver(() => { if (box === questo) posiziona(el, ancora, punto); });
+    questo.misura.observe(el);
+    // Esc e il clic fuori valgono dal primo istante: rimandati, un Esc subito dopo l'apertura andava perso (#1223).
+    document.addEventListener('mousedown', fuori, true);
+    document.addEventListener('keydown', tasto, true);
     setTimeout(() => {
-      document.addEventListener('mousedown', fuori, true);
-      document.addEventListener('keydown', tasto, true);
+      if (box !== questo) return;
       window.addEventListener('scroll', scorre, true);
       window.addEventListener('resize', chiudiBox);
     }, 0);
