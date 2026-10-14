@@ -60,3 +60,46 @@ test('una ricerca scritta mentre le domande arrivano non si chiude', async ({ ap
   await expect(page.locator('#mgSearchBar')).toBeVisible();
   await expect(page.locator('#mgSearchInput')).toHaveValue('il tasto destro');
 });
+
+async function apriSuDomande(app, openTab, cfg) {
+  await mainFinto(app, cfg);
+  const page = await openTab(MANAGE);
+  await aspettaAvvio(page);
+  await expect(sezioneAccesa(page)).toHaveAttribute('data-sezione', 'domande');
+  return page;
+}
+
+test('una rilettura che fallisce tiene a schermo la domanda aperta e la risposta a metà, e lo dice', async ({ app, openTab }) => {
+  const cfg = { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [domanda(12, { priorita: 'bloccante' }), domanda(13), domanda(14)] };
+  const page = await apriSuDomande(app, openTab, cfg);
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-14"] .mg-domanda-titolo').click();
+  const art = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-14"]');
+  await art.locator('.mg-dq-testo').fill('Risposta a metà');
+  await mainFinto(app, { ...cfg, guasti: 1000 });
+  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 1000, clockMs: 200 }));
+  const avviso = page.locator('#mgDomandeStato');
+  await expect(avviso).toContainText('Non riesco ad aggiornare le domande', { timeout: 15000 });
+  await expect(art.locator('.mg-dq-testo')).toHaveValue('Risposta a metà');
+  await expect(page.locator('#mgDomandeLista .mg-domanda[data-id="D-14"]')).toHaveClass(/mg-domanda--aperta/);
+  await expect(page.locator('.mg-sezione[data-sezione="domande"] .mg-sezione-count')).toHaveText('(3)');
+  await expect(page.locator('#mgDomandeRiprova')).toBeVisible();
+  // La lettura dopo riesce: l'avviso se ne va e tutto resta dov'era.
+  await mainFinto(app, cfg);
+  await expect(avviso).toBeHidden({ timeout: 15000 });
+  await expect(art.locator('.mg-dq-testo')).toHaveValue('Risposta a metà');
+});
+
+test('una risposta partita resta col suo esito anche se le riletture dopo falliscono, cambiando scheda compreso', async ({ app, openTab }) => {
+  const cfg = { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [domanda(12, { priorita: 'bloccante' }), domanda(13)] };
+  const page = await apriSuDomande(app, openTab, cfg);
+  const art = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-12"]');
+  await expect(art).toBeVisible();
+  await mainFinto(app, { ...cfg, guasti: 1000 });
+  await art.locator('button[data-scelta="0"]').click();
+  await expect(art.locator('.mg-dq-msg')).toHaveText(/Mandata/);
+  await expect(page.locator('#mgDomandeStato')).toContainText('Non riesco ad aggiornare le domande');
+  await expect(art.locator('.mg-dq-msg')).toHaveText(/Mandata/);
+  await page.locator('.mg-tab[data-tab="domande-lavoro"]').click();
+  await expect(page.locator('#mgDomandeLista .mg-domanda[data-id="D-12"]')).toBeVisible();
+  await expect(page.locator('#mgDomandeStato')).toContainText('Non riesco ad aggiornare le domande');
+});
