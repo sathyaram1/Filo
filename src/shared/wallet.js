@@ -30,15 +30,20 @@
     return /^OpenRouter(?:\s+\S+)?\s+402\b/.test(raw) || /insufficient credits|key limit exceeded/i.test(raw);
   }
 
-  // Quanti crediti vale una spesa in dollari, coi parametri del server
-  // (euro per credito, cambio). Per eccesso al decimo: ciò che si scala al
-  // saldo mostrato non deve essere meno di ciò che OpenRouter conta.
-  function creditsForUsd(costUsd, { eurPerCredit, eurUsd } = {}) {
-    const usd = Number(costUsd);
-    if (!Number.isFinite(usd) || usd <= 0) return 0;
+  // Quanti crediti vale un dollaro, coi parametri del server (euro per
+  // credito, cambio): la stessa tariffa scala il saldo e fa le stime (#819).
+  function creditsPerUsd({ eurPerCredit, eurUsd } = {}) {
     const e = Number(eurPerCredit) || 0.0007;
     const fx = Number(eurUsd) || 1.1;
-    return Math.ceil((usd / (e * fx)) * 10 - 1e-6) / 10;
+    return 1 / (e * fx);
+  }
+
+  // Quanti crediti vale una spesa in dollari. Per eccesso al decimo: ciò che
+  // si scala al saldo mostrato non deve essere meno di ciò che OpenRouter conta.
+  function creditsForUsd(costUsd, params = {}) {
+    const usd = Number(costUsd);
+    if (!Number.isFinite(usd) || usd <= 0) return 0;
+    return Math.ceil(usd * creditsPerUsd(params) * 10 - 1e-6) / 10;
   }
 
   // Costruisce la riga, scartando tutto ciò che non è nel contratto. `at` è
