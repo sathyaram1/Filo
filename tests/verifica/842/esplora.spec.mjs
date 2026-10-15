@@ -140,3 +140,30 @@ test('etichette su mac e manifesto', async ({ app, openTab }) => {
   console.log(await altro.locator('#shortcutsList').innerText());
   await altro.locator('#shortcutsList').screenshot({ path: join(SHOTS, 'v842-altro.png') });
 });
+
+test('passare da una riga all altra mentre registra', async ({ app, openTab }) => {
+  const page = await openTab(PREFERENZE);
+  await expect(page.locator('#scorciatoieFilo .sc-riga')).toHaveCount(4);
+  await tastiDellaRiga(page, 'translate-selection').click();
+  await expect(page.locator('#scorciatoieFilo .sc-riga[data-azione="translate-selection"]')).toHaveClass(/sc-registra/);
+  await tastiDellaRiga(page, 'explain-selection').click();
+  await page.waitForTimeout(300);
+  console.log('classe spiega dopo un clic:', await page.locator('#scorciatoieFilo .sc-riga[data-azione="explain-selection"]').getAttribute('class'));
+  console.log('classe traduci:', await page.locator('#scorciatoieFilo .sc-riga[data-azione="translate-selection"]').getAttribute('class'));
+  await premi(app, 'U', ['control', 'shift']);
+  await page.waitForTimeout(400);
+  console.log('dopo Ctrl+Shift+U', JSON.stringify(await scelte(app)));
+  // ripristina mentre registra
+  await tastiDellaRiga(page, 'save-for-later').click();
+  await page.locator('#scorciatoieRipristina').click();
+  await page.waitForTimeout(400);
+  console.log('dopo ripristina a registrazione aperta', JSON.stringify(await scelte(app)), await page.locator('#scorciatoieFilo').innerText());
+  // cambio dalla chat mentre registra
+  await tastiDellaRiga(page, 'save-for-later').click();
+  await chiedi(app, 'Aiuto: Alt+Shift+H');
+  await page.waitForTimeout(400);
+  console.log('aiuto dalla chat mentre si registra salva', await tastiDellaRiga(page, 'open-help-sidebar').innerText());
+  await premi(app, 'Escape');
+  await page.waitForTimeout(300);
+  console.log('dopo esc aiuto', await tastiDellaRiga(page, 'open-help-sidebar').innerText());
+});
