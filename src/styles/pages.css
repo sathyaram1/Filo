@@ -756,6 +756,10 @@ section:has(#dictList) .sn-spell-add-row {
 /* L'avviso del costo informa e non ferma niente: col colore di Filo, non con quello d'errore. */
 .sn-chain-costo { color: var(--sn-accent); font-size: 12px; line-height: 1.4; margin-top: 4px; }
 .sn-chain-costo p { margin: 2px 0 0; }
+/* Cosa trova sotto la griglia chi accende «Solo modelli a pesi aperti» (#833): le funzioni ferme col colore d'errore. */
+.sn-page .sn-ow-impact { margin-top: 14px; }
+.sn-page .sn-ow-impact p { margin: 2px 0 0; }
+.sn-page .sn-ow-impact .sn-ow-stop { color: var(--sn-error); font-weight: 600; }
 
 .sn-page .sn-cookie-modes {
   display: flex;
