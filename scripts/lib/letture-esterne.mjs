@@ -10,11 +10,22 @@ import { fileURLToPath } from 'node:url';
 import * as B from './biglietto-locale.mjs';
 import { cartellaDelServer } from './ramo-server.mjs';
 
-// Sempre esterni: la rete, le risorse dei server MCP lette senza passare da un mcp__, i commenti e i dati che gli altri
-// scrivono negli artefatti.
-export const STRUMENTI_ESTERNI = Object.freeze(['WebFetch', 'WebSearch', 'ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool', 'ArtifactComments', 'ArtifactData']);
-// Artifact pubblica, e legge solo con queste azioni: una pagina, anche propria, la possono aver scritta altri.
-const ARTIFACT_LETTURE = Object.freeze(['read', 'list']);
+// Gli strumenti di Claude Code che non portano dentro niente da fuori. Elenco chiuso: uno che non c'è, anche nuovo o
+// sconosciuto, sporca (#1211.2). Read, Artifact, Agent e ToolSearch li decide motivoLettura dai parametri.
+export const STRUMENTI_SENZA_LETTURA = Object.freeze([
+  // La shell: quello che scarica lo dichiara la sessione (SPEC-DOMANDE.md §1.2).
+  'Bash', 'PowerShell', 'BashOutput', 'KillShell', 'Monitor',
+  'Grep', 'Glob', 'LS',
+  'Edit', 'MultiEdit', 'Write', 'NotebookEdit',
+  'TodoWrite', 'TaskCreate', 'TaskGet', 'TaskList', 'TaskUpdate', 'TaskStop', 'CronCreate', 'CronDelete', 'CronList',
+  'EnterPlanMode', 'ExitPlanMode', 'EnterWorktree', 'ExitWorktree', 'AskUserQuestion',
+  // Le abilità le installa l'owner, e stanno dove Read non sporca: il progetto e la cartella di Claude.
+  'Skill', 'SlashCommand',
+  'PushNotification', 'SendUserFile', 'SubagentHandback',
+]);
+// Artifact non porta dentro niente solo con queste azioni. Pubblicare sì: un rifiuto restituisce la pagina con le
+// modifiche di chi l'ha aperta, e la sessione resta in ascolto dei commenti.
+const ARTIFACT_SENZA_LETTURA = Object.freeze(['open', 'pin', 'unpin', 'delete']);
 // Gli strumenti MCP che agiscono e rispondono con un esito, mai con testo scritto da altri. Elenco chiuso: un mcp__ che
 // non c'è sporca.
 export const MCP_SENZA_LETTURA = Object.freeze([
