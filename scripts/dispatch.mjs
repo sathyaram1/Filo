@@ -423,9 +423,9 @@ export function stripFileArg(list, nome) {
  * Il payload della consegna «corretto», con la segnalazione se c'è. `sha`: la punta della cartella, che il registro del
  * ramo confronta con quella che troverà dopo (#1148; senza, il server segna il buco). PURA.
  */
-export function fixedPayload({ report, frase, branch, segnalazione, ferma, sha } = {}) {
+export function fixedPayload({ report, frase, branch, segnalazione, campiSegnalazione, ferma, sha } = {}) {
   const p = { report: String(report || ''), userNote: String(frase || ''), branch: String(branch || '') };
-  if (String(segnalazione || '').trim()) p.segnalazione = String(segnalazione).trim();
+  if (String(segnalazione || '').trim()) Object.assign(p, { segnalazione: String(segnalazione).trim() }, campiSegnalazione || {});
   if (ferma === true) p.stop = true;
   if (/^[0-9a-f]{40}$/.test(String(sha || ''))) p.sha = String(sha);
   return p;
