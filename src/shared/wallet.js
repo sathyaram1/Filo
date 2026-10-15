@@ -218,8 +218,25 @@
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
   });
 
-  function redeemMessage(status) {
+  // `dettagli` è la risposta del server: per 'network_cap' porta `reopensAt`, l'ora in cui la rete torna libera.
+  function redeemMessage(status, dettagli = {}) {
+    if (status === 'network_cap') return networkCapMessage(dettagli && dettagli.reopensAt);
     return REDEEM_MESSAGES[status] || REDEEM_MESSAGES.internal;
+  }
+
+  // Il quarto della stessa rete (#1120) deve sapere QUANDO riprovare: «più tardi» lo rimanda a tentativi a vuoto.
+  function networkCapMessage(reopensAt, now = Date.now()) {
+    const t = Date.parse(String(reopensAt || ''));
+    if (!Number.isFinite(t) || t <= Number(now)) return REDEEM_MESSAGES.network_cap;
+    const d = new Date(t);
+    const ora = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const giorno = (x) => new Date(x).toLocaleDateString('it-IT');
+    const domani = new Date(Number(now));
+    domani.setDate(domani.getDate() + 1);
+    const quando = giorno(t) === giorno(now) ? `dopo le ${ora}`
+      : giorno(t) === giorno(domani) ? `domani dopo le ${ora}`
+        : `dal ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} alle ${ora}`;
+    return `Da questa rete sono già entrate troppe persone con un invito: riprova ${quando}. Il codice resta valido.`;
   }
 
   function fmtInt(n) {
