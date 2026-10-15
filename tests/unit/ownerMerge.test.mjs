@@ -146,6 +146,22 @@ describe('cosa legge l’owner', () => {
     assert.ok(msg.includes('https://filo-8b9cb.web.app'), msg);
   });
 
+  test('il posto che il messaggio nomina è quello dove Gestione disegna la richiesta del lavoro locale (#761)', () => {
+    // La richiesta come la apre il server per `npm run finish`: senza numero né id della pratica, anche con --feedback.
+    const req = { id: 'ab12cd34ef56ab12cd34ef56', branch: 'claude/x', sha: 'f'.repeat(40), who: 'owner', trips: [], origin: 'locale' };
+    const pratica = { _id: 'pratica908', seq: 908, subSeq: 0, status: 'working', localOnly: true };
+    assert.deepEqual(MR.fusioniSenzaFeedback([req], [pratica]), [req], 'senza pratica non ha una scheda nei Ricevuti');
+    const html = readFileSync(join(RADICE, 'src', 'pages', 'manage', 'manage.html'), 'utf8');
+    const inizio = html.indexOf('data-panel="automation"');
+    assert.ok(inizio > 0, 'la scheda Automazioni non c’è più');
+    const pannello = html.slice(inizio, html.indexOf('data-panel=', inizio + 1) >>> 0 || html.length);
+    const orfane = pannello.indexOf('id="mgMergeApprovalsOrphans"');
+    assert.ok(orfane > 0, 'le richieste senza pratica non stanno più in Automazioni: va cambiato DOVE_SI_APPROVA');
+    assert.ok(orfane < pannello.indexOf('mg-auto-main'), 'non sono più in cima alla scheda');
+    assert.match(html, /data-tab="automation"[^>]*>Automazioni</);
+    assert.equal(DOVE_SI_APPROVA, 'Gestione → Automazioni');
+  });
+
   test('bloccato SENZA richiesta: non promette un avviso che non comparirà mai', () => {
     const msg = messageForOwnerMerge({ outcome: 'blocked', reason: 'x' }, 'claude/x');
     assert.doesNotMatch(msg, /approvala da Filo/i);
