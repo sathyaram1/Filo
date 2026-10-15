@@ -121,6 +121,8 @@ durata, nessun "margine per l'ultimo worker".
 
 ## 8. Documenti: nuova struttura
 
+*Fatto (§14, passo 2).*
+
 Principio: i file sono per chi li mantiene; le istanze ricevono testo già
 composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
 
