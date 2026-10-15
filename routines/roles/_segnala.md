@@ -3,7 +3,10 @@
 Velocità contro costo, semplicità contro potenza, dati dell'utente, una scelta
 di gusto: decide l'owner. Scrivi un file markdown **fuori dal repo** (per
 esempio `../segnala-<numero>.md`) e passalo alla consegna con
-`--segnala <file.md>`: l'owner lo apre dal rombo nella scheda. Lo legge chi non
+`--segnala <file.md> --livello <0-3>`, più `--difficile` se la scelta è
+difficile da disfare (dati degli utenti, sicurezza, formati salvati su disco):
+l'owner lo apre dal rombo nella scheda. Il livello è quello del problema, col
+metro dei rilievi. Lo legge chi non
 conosce il codice di questo progetto: breve, niente nomi di file o funzioni,
 tre parti.
 
