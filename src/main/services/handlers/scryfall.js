@@ -597,8 +597,8 @@ module.exports = function register(on, ctx) {
           const library = Stats.buildLibrary(base, known);
           const cond = { game: p.game, mulligans: p.mulligans, keep: p.keep, extraDraws: p.extraDraws };
           let hits = 0; let iters = 0;
-          for (let seed = 1; iters < CHAT_PROB_HANDS && !signal.aborted; seed++) {
-            const r2 = Stats.simulate({ library, want: p.needs, turn: p.turn, ...cond, iterations: CHAT_PROB_BATCH, seed });
+          for (let seed = 1; seed <= CHAT_PROB_BATCHES && !signal.aborted; seed++) {
+            const r2 = Stats.simulate({ library, want: p.needs, turn: p.turn, ...cond, iterations: Stats.PROB_BATCH, seed });
             hits += r2.hits; iters += r2.iterations;
             if (hits === 0 || hits === iters) break; // caso certo o impossibile
             await new Promise((res) => setImmediate(res));
