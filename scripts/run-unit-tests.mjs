@@ -364,8 +364,10 @@ export function guardiaFermo(tetto = TETTO_FERMO_MS) {
  * - Il primo si chiude dopo un tetto senza un suo passo.
  * - Se nello stesso tetto non è finito nessun file, con lui si chiudono i partiti da almeno un tetto: in fila dietro
  *   di lui costerebbero un tetto ciascuno (#1231).
- * - Se dopo una chiusura non finisce più nessun file per un altro tetto, è ferma la corsa (il disco pieno, #717), o
- *   chiudere non è servito.
+ * - Se dopo la chiusura dei partiti da un tetto non finisce più nessun file per un altro tetto, è ferma la corsa (il
+ *   disco pieno, #717); così anche se un file chiuso resta in corso: chiudere non è servito.
+ * - Chiuso il primo da solo, il turno dopo senza fini è muto e chiude i fermi, non la corsa: chiudere il primo da solo
+ *   o insieme agli altri dipendeva solo da quando arrivava la fine di un file sano, e la corsa chiusa ne perdeva l'esito (#1235).
  */
 export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   const partenza = new Map();
@@ -374,13 +376,13 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   let primo = null;
   let dal = null;
   let ultimaFine = null;
-  let chiusiSenzaFine = false;
+  let fermiChiusiSenzaFine = false;
   return (righe, ora) => {
     for (const r of righe) {
       if (r.via) { if (!partenza.has(r.via)) partenza.set(r.via, ora); }
       else if (r.fine) {
         finiti.add(r.fine);
-        if (!chiusi.has(r.fine)) { ultimaFine = ora; chiusiSenzaFine = false; }
+        if (!chiusi.has(r.fine)) { ultimaFine = ora; fermiChiusiSenzaFine = false; }
       } else dal = ora;
     }
     const inCorso = [...partenza.keys()].filter((f) => !finiti.has(f));
@@ -388,11 +390,11 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
     if (adesso !== primo) { primo = adesso; dal = ora; }
     if (primo === null || ora - dal < tetto) return null;
     dal = ora;
-    if (chiusiSenzaFine) return { tutto: true };
+    if (fermiChiusiSenzaFine || chiusi.has(primo)) return { tutto: true };
     const muta = ultimaFine === null || ora - ultimaFine >= tetto;
     const file = muta ? inCorso.filter((f) => f === primo || ora - partenza.get(f) >= tetto) : [primo];
     for (const f of file) chiusi.add(f);
-    chiusiSenzaFine = true;
+    fermiChiusiSenzaFine = muta;
     return { file };
   };
 }
