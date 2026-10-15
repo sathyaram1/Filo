@@ -98,7 +98,23 @@
       auditDelaysMs = AUDIT_DELAYS_MS,
       segreti = async () => [],
       ricordaEsterni = () => {},
+      funzioneDi = () => '',
+      rimedioDi = () => '',
     } = deps;
+
+    // Il «nessun host ammesso» del router (#828) lo legge chi usa una funzione: la frase dice quale, e dove si sceglie
+    // un altro modello. Voce, dettatura e classificatori hanno la loro frase, scritta prima di chiamare.
+    function conLaFunzione(err, s, action) {
+      const CE = global.SN_CHAT_ERRORS;
+      if (!err || err.code !== 'NO_ALLOWED_HOST' || !CE || typeof CE.fraseNessunHost !== 'function') return err;
+      let funzione = '';
+      let rimedio = '';
+      try { funzione = funzioneDi(action) || ''; } catch (_) {}
+      try { rimedio = rimedioDi(s, action) || ''; } catch (_) {}
+      err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: CE.motivoHostEsclusi(err.hosts), rimedio });
+      return err;
+    }
+    const DAL_ROUTER = new Set(['complete', 'streamComplete', 'embed']);
 
     // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
     // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
