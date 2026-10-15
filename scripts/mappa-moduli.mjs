@@ -17,7 +17,7 @@ const USE_STRICT = /^(['"])use strict\1;?$/;
 
 // Le righe di testo del primo commento in cima (la riga vuota fra paragrafi resta ''), o null se in cima c'è codice.
 export function intestazione(testo) {
-  const righe = String(testo).replace(/^﻿/, '').split(/\r?\n/);
+  const righe = String(testo).replace(/^\uFEFF/, '').split(/\r?\n/);
   let i = 0;
   if (righe[0]?.startsWith('#!')) i = 1;
   while (i < righe.length) {
@@ -29,15 +29,15 @@ export function intestazione(testo) {
       while (i < righe.length && righe[i].trim().startsWith('//')) blocco.push(righe[i++].trim().replace(/^\/\/+\s?/, ''));
     } else if (t.startsWith('/*')) {
       blocco = [];
-      for (let r = t.replace(/^\/\*+!?/, ''); ; r = righe[i].trim()) {
+      for (let r = t.slice(2).replace(/^!/, ''); ; r = righe[i].trim()) {
         const chiude = r.indexOf('*/');
-        blocco.push((chiude === -1 ? r : r.slice(0, chiude)).trim().replace(/^\*+\s?/, '').trim());
+        blocco.push((chiude === -1 ? r : r.slice(0, chiude)).replace(/^\*+\s?/, '').trim());
         i++;
         if (chiude !== -1 || i >= righe.length) break;
       }
     } else return null;
-    const pieno = blocco.map((r) => r.trim()).filter(Boolean);
-    if (pieno.length && !DIRETTIVA.test(pieno[0])) return blocco.map((r) => r.trimEnd());
+    const pieno = blocco.filter((r) => r.trim());
+    if (pieno.length && !DIRETTIVA.test(pieno[0].trim())) return blocco;
   }
   return null;
 }
