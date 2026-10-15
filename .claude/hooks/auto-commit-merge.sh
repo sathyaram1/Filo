@@ -253,6 +253,29 @@ else
   COMMIT_AS_EMAIL="claude@local"
 fi
 
+# ─── LE AUTOMAZIONI NON PARTONO DA QUI (#1140) ───────────────────────────────
+#
+# Un file di .github/workflows gira appena il suo ramo arriva su GitHub, senza fusione, e le automazioni le cambia
+# solo l'owner: questo salvataggio non le committa e non spedisce un ramo che ne cambia una, in nessuna sessione.
+AUTOMAZIONI='.github/workflows'
+in_una_riga() { sed '/^$/d' | sort -u | awk 'NR>1{printf ", "}{printf "%s",$0}'; }
+if is_routine_session; then
+  RIMEDIO_AUTOMAZIONI="da una routine un'automazione non si cambia: riporta il file com'era (o toglilo, se e' nuovo) e, se il lavoro ne ha bisogno, rimandalo in locale (--reason locale) con nelle note la modifica che serve"
+else
+  RIMEDIO_AUTOMAZIONI="la committa e la spinge l'owner, a mano, con la sua credenziale per le automazioni"
+fi
+togli_automazioni() {
+  local elenco
+  elenco=$(git diff --cached --name-only --no-renames -- "$AUTOMAZIONI" 2>/dev/null | in_una_riga)
+  [ -n "$elenco" ] || return 0
+  git reset -q -- "$AUTOMAZIONI" >/dev/null 2>&1 || git rm -r -q --cached --ignore-unmatch -- "$AUTOMAZIONI" >/dev/null 2>&1
+  segnala_avviso "$1" "NON committo $elenco: un'automazione gira appena il ramo arriva su GitHub. Il file resta com'e' nella cartella; $RIMEDIO_AUTOMAZIONI."
+}
+# Anche un commit fatto a mano: il salvataggio non e' la strada di un'automazione, chiunque l'abbia committata.
+automazioni_da_spedire() {
+  git log --format= --name-only --no-renames "refs/heads/$1" --not --remotes=origin -- "$AUTOMAZIONI" 2>/dev/null | in_una_riga
+}
+
 # ─── UNA COPIA DEI DATI DEL SERVER NON PARTE (#1108) ─────────────────────────
 #
 # Il repo e' pubblico: un file spedito resta nella storia anche se tolto subito, quindi la forma si
