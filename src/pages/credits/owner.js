@@ -50,7 +50,7 @@
     const cfg = o.config || {};
     const tot = o.totals || {};
     const uso = W.usoPersone(o.users || []);
-    ultimoUso = uso;
+    usoLetto = uso;
     renderNumeri(cfg, tot, o.ownerInvites || [], uso);
     renderConto(o);
     const quando = formatDate(cfg.eurUsdAt);
@@ -315,7 +315,7 @@
     return li;
   }
 
-  let ultimoUso = { attivi7: [], attivi30: [] };
+  let usoLetto = { attivi7: [], attivi30: [] };
 
   function filtraAttivi(giorni) {
     filtro = { giorni };
@@ -332,7 +332,7 @@
   }
 
   function applicaFiltro() {
-    const chi = filtro ? new Set(filtro.giorni === 7 ? ultimoUso.attivi7 : ultimoUso.attivi30) : null;
+    const chi = filtro ? new Set(filtro.giorni === 7 ? usoLetto.attivi7 : usoLetto.attivi30) : null;
     // Se il conto nuovo è vuoto non c'è più niente da mostrare: il filtro si toglie da sé.
     if (chi && !chi.size) { filtro = null; return applicaFiltro(); }
     for (const tr of $('ownerUsers').querySelectorAll('tbody tr[data-pseudonym]')) {
