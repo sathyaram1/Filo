@@ -12,7 +12,7 @@
       version: '0.2.239', date: '2026-10-14',
       features: [
         'Quando riapri Filo la scheda che stavi guardando arriva per prima. Le altre si caricano dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se ne apri una che non è ancora pronta, si carica subito.',
-        'L\'Aiuto di una scheda comincia a rispondere prima a ogni passo: la foto della pagina che manda al modello adesso pesa molto meno, soprattutto sugli schermi con la scala al 125% o più.',
+        'L\'Aiuto di una scheda comincia a rispondere prima a ogni passo, perché la foto della pagina che manda al modello adesso pesa molto meno. Si sente di più sugli schermi con la scala al 125% o più.',
       ],
       fixes: [],
     },
