@@ -225,6 +225,19 @@ test('Mac senza permesso: le altre app non si elencano, e chiederne una apre il 
   await Schermo.crea({ sistema: nuovo }).prepara({ type: 'VEDI_SCHERMO', finestra: 'Word' }, { settings: ACCESA, chiave: 't' });
   assert.equal(nuovo.conti.domanda, 1, 'la prima volta chiede macOS, che mette Filo nell\'elenco');
   assert.equal(nuovo.conti.pannello, 0);
+  const daElenco = sistemaFinto({ piattaforma: 'darwin', permesso: 'not-determined' });
+  const r2 = await Schermo.crea({ sistema: daElenco }).prepara({ type: 'VEDI_SCHERMO' }, { settings: ACCESA, chiave: 't' });
+  assert.equal(daElenco.conti.domanda, 1, 'anche chiedendo l\'elenco');
+  assert.equal(r2.esito.output.permesso, 'mac');
+});
+
+test('l\'elenco segna in primo piano la prima finestra esterna che dà il sistema: è «questa finestra»', async () => {
+  const S = Schermo.crea({ sistema: sistemaFinto() });
+  const r = await S.prepara({ type: 'VEDI_SCHERMO' }, { settings: ACCESA, chiave: 't' });
+  const davanti = r.esito.output.elenco.filter((v) => v.davanti);
+  assert.deepEqual(davanti.map((v) => v.nome), ['Documento1 - Word']);
+  const wl = await Schermo.crea({ sistema: sistemaFinto({ wayland: true }) }).prepara({ type: 'VEDI_SCHERMO' }, { settings: ACCESA, chiave: 't' });
+  assert.equal(wl.esito.output.elenco.some((v) => v.davanti), false, 'col selettore di Wayland non c\'è un ordine da dire');
 });
 
 test('un\'immagine nera o vuota non va al modello', async () => {
