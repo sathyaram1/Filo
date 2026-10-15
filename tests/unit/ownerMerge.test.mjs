@@ -128,13 +128,11 @@ describe('cosa legge l’owner', () => {
       'claude/x'
     );
     assert.match(msg, /in attesa/i);
-    // Il posto è UNO (scelta owner 2026-08-26): la dashboard di gestione, in
-    // cima ai Ricevuti. Il vecchio messaggio mandava sulla prima schermata,
-    // che l'avviso non lo mostra più: un'indicazione sbagliata è peggio di
-    // nessuna indicazione.
-    assert.match(msg, /dashboard di gestione/i);
-    assert.match(msg, /Ricevuti/);
-    assert.doesNotMatch(msg, /prima schermata|in cima alla home/i);
+    // Un'indicazione sbagliata è peggio di nessuna: l'avviso in cima ai Ricevuti
+    // non c'è più dal 2026-09-13, e l'owner lo ha cercato lì per niente (#761).
+    // Che la richiesta stia davvero in Automazioni lo prova il test qui sotto.
+    assert.match(msg, /in Gestione → Automazioni/);
+    assert.doesNotMatch(msg, /Ricevuti|avviso|prima schermata|in cima alla home/i);
     // Quanto dura si dice QUI: è l'unico posto dove l'owner sta guardando nel
     // momento in cui la richiesta nasce, e sapere se deve correre o no cambia
     // cosa fa dopo. Una settimana (decisione owner 2026-08-28): l'approvazione
