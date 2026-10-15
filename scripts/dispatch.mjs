@@ -183,7 +183,7 @@ export const VERIFIER_ROUND = (() => {
  *   Documento mai scritto (404) NON è un dubbio: è "l'owner non ha mai toccato
  *   niente" ⇒ comportamento storico (routine accese, coi default).
  *
- * @returns {Promise<{enabled?:boolean, proberWhenIdle?:boolean}>}
+ * @returns {Promise<{enabled?:boolean}>}
  * @throws {Error} con `faultKind` se il documento non è leggibile.
  */
 async function fetchRoutineConfig() {
