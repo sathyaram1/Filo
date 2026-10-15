@@ -36,7 +36,7 @@
 //     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff): il feedback va
 //          messo in stato `design`, decide l'utente. Nessuna fusione — ma il
 //          ramo non è perduto: il server apre una richiesta di approvazione
-//          che l'owner apre dal quadrato rosso della pratica, in cima ai Ricevuti.
+//          che l'owner trova nel quadrato rosso della pratica, in cima ai Ricevuti.
 //     20 → conflitto di merge, o unit rossi sul risultato della fusione con main
 //          (#929): il server ha già instradato il riallineamento. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
