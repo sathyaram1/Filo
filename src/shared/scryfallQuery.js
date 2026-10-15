@@ -148,27 +148,45 @@
   //   hasBudget/budget  → l'utente ha chiesto di impostare (numero ≥ 0) o
   //                       rimuovere (null) il tetto di budget (§9.2)
   //   prob              → richiesta al calcolatore di probabilità (§9.3):
-  //                       { turn: int ≥ 1, needs: [{ tag, n }] } oppure null
-  function normalizeProb(p) {
-    if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
-    const turn = Math.floor(Number(p.turn));
-    if (!Number.isFinite(turn) || turn < 1) return null;
-    const rawNeeds = p.needs;
+  //                       { turn: int ≥ 1, needs: [{ tag, n }], game, mulligans,
+  //                       keep: [{ tag, n }], extraDraws } oppure null. `game`
+  //                       resta grezzo: lo valida SN_DECK_STATS.gameOf.
+  function normalizeNeeds(raw) {
     const needs = [];
-    if (Array.isArray(rawNeeds)) {
-      for (const it of rawNeeds) {
+    if (Array.isArray(raw)) {
+      for (const it of raw) {
         const tag = String((it && it.tag) || '').trim().toLowerCase();
         const n = Math.floor(Number(it && it.n));
         if (tag && Number.isFinite(n) && n > 0) needs.push({ tag, n });
       }
-    } else if (rawNeeds && typeof rawNeeds === 'object') {
-      for (const [tag, v] of Object.entries(rawNeeds)) {
+    } else if (raw && typeof raw === 'object') {
+      for (const [tag, v] of Object.entries(raw)) {
         const t = String(tag).trim().toLowerCase();
         const n = Math.floor(Number(v));
         if (t && Number.isFinite(n) && n > 0) needs.push({ tag: t, n });
       }
     }
-    return needs.length ? { turn, needs } : null;
+    return needs;
+  }
+
+  function normalizeProb(p) {
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return null;
+    const turn = Math.floor(Number(p.turn));
+    if (!Number.isFinite(turn) || turn < 1) return null;
+    const needs = normalizeNeeds(p.needs);
+    if (!needs.length) return null;
+    const count = (v) => {
+      const n = Math.floor(Number(v));
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    return {
+      turn,
+      needs,
+      game: typeof p.game === 'string' ? p.game.trim().toLowerCase() : '',
+      mulligans: count(p.mulligans),
+      keep: normalizeNeeds(p.keep),
+      extraDraws: count(p.extraDraws),
+    };
   }
 
   function parseAgentReply(text) {
