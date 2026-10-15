@@ -1148,6 +1148,28 @@ html, body {
   border: 1px solid var(--dash-line);
   flex-shrink: 0;
 }
+.sn-refine-sample-ombra { background: var(--dash-card); border-radius: 8px; }
+/* Il pallino va avanti e indietro alla durata vera: si vede quanto sono lente le animazioni. */
+.sn-refine-sample-track {
+  position: relative;
+  flex: 1;
+  min-width: 80px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--dash-line);
+}
+.sn-refine-sample-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sn-accent, var(--dash-accent));
+  animation: sn-refine-va calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite alternate;
+}
+@keyframes sn-refine-va { to { left: calc(100% - 10px); } }
+@media (prefers-reduced-motion: reduce) { .sn-refine-sample-dot { animation: none; } }
 .sn-refine-control { display: flex; }
 .sn-refine-input { width: 100%; font-family: inherit; }
 .sn-refine-color { height: 42px; padding: 2px; cursor: pointer; }
