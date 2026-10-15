@@ -757,8 +757,10 @@
     $('probCard').dataset.mull = m > 0 ? '1' : '0';
     const keeps = [...$('probNeeds').querySelectorAll('input[data-keep]')];
     if (m > 0 && probMullBefore === 0 && keeps.every((inp) => !(Number(inp.value) > 0))) {
-      const lands = keeps.find((inp) => inp.dataset.keep === Stats.LAND_TAG);
-      if (lands) lands.value = '2';
+      for (const w of Stats.DEFAULT_KEEP) {
+        const inp = keeps.find((x) => x.dataset.keep === w.tag);
+        if (inp) inp.value = String(w.n);
+      }
     }
     probMullBefore = m;
   }
