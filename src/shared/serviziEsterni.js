@@ -347,6 +347,13 @@
       dove: ['src/pages/options/options.html'],
     },
     {
+      id: 'ricarica-openrouter', nome: 'La pagina dei crediti di OpenRouter',
+      base: ['https://openrouter.ai/settings/credits'],
+      occasione: 'solo per il proprietario di Filo, quando dalla sua pagina «Inviti e utenti» apre la ricarica del conto',
+      riceve: 'la visita, come ogni sito',
+      dove: ['src/pages/credits/owner.js'],
+    },
+    {
       id: 'sito-filo', nome: 'Il sito di Filo',
       base: ['https://filo.red'],
       occasione: 'quando apri la pagina per scaricare Filo, o qualcuno apre un tuo link d’invito',
