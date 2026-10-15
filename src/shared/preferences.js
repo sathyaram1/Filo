@@ -676,7 +676,7 @@
       // difesa: anche accesa, la prima occhiata a ogni finestra di un'altra app chiede.
       chiede: (r) => r.partial.schermo.guarda === true,
       risk: 'Da accesa, quando glielo chiedi in chat Filo cattura l\'immagine di una finestra o dello schermo e la fa leggere '
-        + 'a un modello che vede le immagini, insieme alla tua domanda: quello che si vede in quella finestra arriva al modello. '
+        + 'a un modello che vede le immagini, insieme alla tua domanda. Quello che si vede in quella finestra arriva quindi al modello. '
         + 'La prima volta che guarda una finestra di un\'altra app, a ogni tua richiesta, ti chiede l\'OK dicendoti quale. '
         + 'Filo guarda soltanto: non clicca, non scrive e non salva l\'immagine. Da spenta, non guarda niente fuori dalla chat.',
       build(v) {

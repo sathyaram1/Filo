@@ -451,7 +451,7 @@
         const nota = document.createElement('div');
         nota.className = 'dash-bubble-note';
         nota.dataset.replay = '1';
-        nota.textContent = `Ho guardato la finestra «${nome}»: l'immagine non è conservata`;
+        nota.textContent = `Ho guardato «${nome}»: l'immagine non è conservata`;
         bubblesEl.appendChild(nota);
       }
       // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.

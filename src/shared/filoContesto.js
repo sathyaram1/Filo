@@ -192,7 +192,7 @@
     if (!oss && Array.isArray(m.guardate) && m.guardate.length) {
       const E = global.SN_ESTERNO;
       const nomi = m.guardate.map((n) => `«${E ? E.perCanaleSistema(n) : String(n)}»`).join(', ');
-      parti.push(`(qui avevo guardato ${m.guardate.length > 1 ? 'le finestre' : 'la finestra'} ${nomi}: quello che c'era non è conservato)`);
+      parti.push(`(qui avevo guardato ${nomi}: quello che c'era non è conservato)`);
     }
     const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
     // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda: tolto solo all'ultima cambierebbe a

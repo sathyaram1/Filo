@@ -3829,7 +3829,7 @@ function vediSchermoForPrompt(actions) {
     if (!out || typeof out !== 'object') continue;
     const nome = E.perCanaleSistema(String(out.finestra || ''));
     if (out.nonConservata) {
-      blocks.push(`[Avevo guardato la finestra «${nome}»: quello che c'era non è conservato. Se serve di nuovo, guardala un'altra volta.]`);
+      blocks.push(`[Avevo guardato «${nome}»: quello che c'era non è conservato. Se serve di nuovo, guardala un'altra volta.]`);
       continue;
     }
     if (!String(out.testo || '').trim()) continue;

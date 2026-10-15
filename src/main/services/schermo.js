@@ -11,8 +11,8 @@ const SELETTORE = 'selettore';
 const PANNELLO_MAC = 'mac-registrazione-schermo';
 const MAX_CHIAVI = 64;
 
-const FRASE_MAC = 'macOS fa vedere a Filo le finestre delle altre app solo col permesso «Registrazione schermo»: '
-  + 'concedilo in Impostazioni di sistema → Privacy e sicurezza → Registrazione schermo, poi riapri Filo';
+const FRASE_MAC = 'macOS fa vedere a Filo le finestre delle altre app solo col permesso «Registrazione schermo». '
+  + 'Concedilo in Impostazioni di sistema → Privacy e sicurezza → Registrazione schermo, poi riapri Filo';
 
 function normalizza(s) {
   return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')

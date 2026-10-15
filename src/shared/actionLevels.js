@@ -462,7 +462,7 @@
       campo: null,
       perimetro: (a) => {
         const f = a && a._finestra;
-        if (!f) return true;
+        if (!f) return false;
         return (f.filo === true && !f.delicata) || a._approvata === true;
       },
       perchePerimetro: (a) => (a && a._finestra && a._finestra.delicata
@@ -481,17 +481,18 @@
         const f = (a && a._finestra) || {};
         const nome = String(f.nome || (a && a.finestra) || '').trim();
         let quale = nome ? `la finestra «${nome}»` : 'una finestra';
-        if (f.tipo === 'schermo') quale = `lo schermo («${nome}»)`;
+        if (f.tipo === 'schermo') quale = nome ? `«${nome}»` : 'lo schermo';
         else if (f.tipo === 'selettore') quale = 'una finestra o lo schermo, che scegli tu nel selettore del sistema';
         else if (f.filo) quale = `la finestra di Filo «${nome}»`;
         return `Filo vuole guardare ${quale}.\n\nNe cattura l'immagine e la fa leggere al modello che descrive le immagini, `
-          + 'insieme alla tua domanda. Non clicca e non scrive niente, e l\'immagine non viene salvata.';
+          + 'insieme alla tua domanda. Non clicca, non scrive e non salva l\'immagine.';
       },
       describeDone: (a) => {
         const o = (a && a._output) || {};
         const nome = String(o.finestra || (a && a._finestra && a._finestra.nome) || '').trim();
         if (Array.isArray(o.elenco) && !o.testo) return 'Ho guardato quali finestre sono aperte';
-        return nome ? `Ho guardato la finestra «${nome}»` : 'Ho guardato lo schermo';
+        if (!nome) return 'Ho guardato lo schermo';
+        return o.tipo === 'schermo' ? `Ho guardato «${nome}»` : `Ho guardato la finestra «${nome}»`;
       },
     },
     CERCA_DOCUMENTI: {
