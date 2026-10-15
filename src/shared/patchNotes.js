@@ -16,6 +16,7 @@
       ],
       fixes: [
         'Nel terminale della home un comando valido non diventa più rosso quando il computer è lento a controllarlo. Il rosso compare solo se Filo ha verificato che il comando non esiste.',
+        'Una password o un\'immagine tolta dalla cronologia appunti resta tolta anche se è ancora negli appunti e la incolli di nuovo, pure dopo aver chiuso e riaperto Filo.',
       ],
     },
     {
