@@ -62,78 +62,11 @@
     renderOwnerCodes(o.ownerInvites || []);
 
     const table = $('ownerUsers');
-    const tbody = table.querySelector('tbody');
-    // Le righe si rifanno: un menu aperto su una riga che non esiste più
-    // resterebbe appeso sopra la pagina.
-    chiudiMenuPersona();
-    tbody.innerHTML = '';
-    // Le righe si rifanno da zero: le schede già chieste vanno richieste.
-    schedeChieste.clear();
     const users = (o.users || []).slice().sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
     table.hidden = users.length === 0;
     ricevuti.clear();
     for (const u of users) ricevuti.set(u.pseudonym, ricevutiIn(u));
-    for (const u of users) {
-      const tr = document.createElement('tr');
-      const b = u.balance || {};
-      const rec = u.reconcile;
-      const regTxt = !rec ? '—' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'ok');
-      const cells = [
-        u.pseudonym, formatCredits(b.credits), formatInt(b.creditsGranted), fmtUsd(b.usageUsd), regTxt,
-        u.invitedBy === 'owner' ? 'te' : (u.invitedBy || '—'), formatDate(u.createdAt),
-      ];
-      cells.forEach((c, i) => {
-        const td = document.createElement('td');
-        td.textContent = c;
-        if (i === 0) { td.className = 'sn-wallet-pseudonym'; td.title = 'Copia'; td.addEventListener('click', (ev) => { ev.stopPropagation(); try { navigator.clipboard.writeText(u.pseudonym); } catch (_) {} $('ownerGrantPseudonym').value = u.pseudonym; }); }
-        if (i === 4 && rec && rec.flagged) td.className = 'is-flagged';
-        tr.appendChild(td);
-      });
-      if (u.disabled) tr.className = 'is-used';
-      tr.classList.add('sn-wallet-user');
-      tr.title = 'Apri la scheda di questa persona';
-      tr.tabIndex = 0;
-      tr.setAttribute('role', 'button');
-      tr.setAttribute('aria-expanded', 'false');
-      tbody.appendChild(tr);
-
-      // La scheda della persona sta in una riga sotto, che si apre al clic
-      // sulla riga. Il contenuto è una chiamata a parte (movimenti, inviti,
-      // ultime chiamate): si chiede alla prima apertura, non prima.
-      const detail = document.createElement('tr');
-      detail.className = 'sn-wallet-user-detail';
-      detail.hidden = true;
-      const td = document.createElement('td');
-      td.colSpan = cells.length;
-      // Finché la scheda non arriva si mostra quello che la vista generale sa
-      // già (per azione, per giorno): qualcosa da leggere c'è subito.
-      td.appendChild(usageDetail(u.usage));
-      detail.appendChild(td);
-      tbody.appendChild(detail);
-
-      const apriChiudi = () => {
-        detail.hidden = !detail.hidden;
-        tr.classList.toggle('is-open', !detail.hidden);
-        tr.setAttribute('aria-expanded', detail.hidden ? 'false' : 'true');
-        if (!detail.hidden) caricaScheda(u, td).catch(() => {});
-      };
-      tr.addEventListener('click', apriChiudi);
-      // Il tasto destro su una persona: quello che si vorrebbe fare proprio a
-      // lei. Senza, si apriva il menu generale della pagina, che di questa
-      // riga non sa niente. Vale anche dal tasto menu della tastiera, che
-      // manda lo stesso evento sulla riga col fuoco.
-      tr.addEventListener('contextmenu', (ev) => {
-        ev.preventDefault();
-        apriMenuPersona(u, detail, apriChiudi, ev.clientX, ev.clientY);
-      });
-      // Stessa strada da tastiera: una riga che si apre solo col mouse è una
-      // riga che per metà delle persone non si apre.
-      tr.addEventListener('keydown', (ev) => {
-        if (ev.key !== 'Enter' && ev.key !== ' ') return;
-        ev.preventDefault();
-        apriChiudi();
-      });
-    }
+    aggiornaRighe(table.querySelector('tbody'), users);
     const runs = [];
     if (o.daily && o.daily.lastRunAt) runs.push(`giornaliera ${formatDateTime(o.daily.lastRunAt)}${summ(o.daily.summary)}`);
     if (o.reconcile && o.reconcile.lastRunAt) runs.push(`riconciliazione ${formatDateTime(o.reconcile.lastRunAt)}${summ(o.reconcile.summary)}`);
