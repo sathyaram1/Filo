@@ -87,7 +87,7 @@ export function fraseRinvio(motivo) {
  * riassunto, e `rossa` se è un guasto che deve lasciare la corsa rossa. Il verde può essere lo stesso commit dell'ultima
  * patch: la minor porta sullo stabile quello che il veloce ha già. PURA.
  */
-export function decidiMinor({ tipo, finestra, permesso, verde, tag, verdeOk } = {}) {
+export function decidiMinor({ tipo, finestra, permesso, verde, tag, verdeOk, erroreApi = '' } = {}) {
   const righe = ['## La minor del lunedì (canale stabile)', ''];
   const esito = (sha, riga, rossa = false) => ({ sha, rossa, righe: [...righe, `- ${riga}`] });
   if (tipo === 'minor-programmata' && !finestra) return esito('', 'Fuori dalla finestra del lunedì (00:00–06:00 a Roma): questa corsa non pubblica niente.');
@@ -96,7 +96,8 @@ export function decidiMinor({ tipo, finestra, permesso, verde, tag, verdeOk } = 
   if (p.outcome !== 'permessa') {
     return esito('', `Il permesso del server non è arrivato (${p.outcome || 'nessuna risposta'}${p.reason ? `: ${p.reason}` : ''}): la minor di questa settimana non esce.`, true);
   }
-  // Senza verdi da 48 ore il fermo lo segnala già la corsa delle sei ore.
+  // Senza verdi da 48 ore il fermo lo segnala già la corsa delle sei ore; corse illeggibili sono invece un guasto di questa.
+  if (!verde && erroreApi) return esito('', `Niente minor: le corse della suite non si sono lette (${erroreApi}).`, true);
   if (!verde) return esito('', 'Niente minor: nessun commit di main ha la suite verde fra le ultime corse riuscite.');
   if (!verdeOk) return esito('', `Niente minor: il commit verde \`${verde}\` è più vecchio di ${tag}.`, true);
   return esito(verde, `Si pubblica come minor \`${verde}\`, il commit più nuovo di main con la suite verde${tag ? ` (l'ultima versione è ${tag})` : ''}.`);

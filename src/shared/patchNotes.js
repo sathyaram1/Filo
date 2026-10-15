@@ -8,9 +8,11 @@
   const NOTES = [
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
+    // Il lunedì la versione dopo può essere la minor (x.y.0) al posto di quel numero: il recap mostra lo stesso le sue righe.
     {
       version: '0.2.239', date: '2026-10-14',
       features: [
+        'In Preferenze, Impostazioni avanzate, scegli il canale degli aggiornamenti: veloce, con ogni versione nuova appena esce, o stabile, con una versione a settimana, il lunedì, uscita solo se non restano problemi di sicurezza aperti. Puoi chiederlo anche a Filo: «passa al canale stabile».',
         'Quando riapri Filo la scheda che stavi guardando arriva per prima. Le altre si caricano dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se ne apri una che non è ancora pronta, si carica subito.',
       ],
       fixes: [],

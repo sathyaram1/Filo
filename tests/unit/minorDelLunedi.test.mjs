@@ -7,8 +7,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFile, spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -89,7 +89,8 @@ describe('il permesso e il numero', () => {
     assert.equal(rinvio.rossa, false, 'una minor rinviata non è un guasto: niente corsa rossa e niente domande');
     assert.match(rinvio.righe.join('\n'), /monitoraggio/);
     assert.deepEqual([M.decidiMinor({ ...base, permesso: { outcome: 'not_deployed' } }).rossa, M.decidiMinor({ ...base, permesso: null }).rossa], [true, true]);
-    assert.equal(M.decidiMinor({ ...base, verde: '' }).sha, '');
+    assert.deepEqual([M.decidiMinor({ ...base, verde: '' }).sha, M.decidiMinor({ ...base, verde: '' }).rossa], ['', false]);
+    assert.equal(M.decidiMinor({ ...base, verde: '', erroreApi: 'gh assente' }).rossa, true, 'corse illeggibili: la minor salta in silenzio');
     assert.equal(M.decidiMinor({ ...base, verdeOk: false }).rossa, true);
   });
 });
@@ -170,8 +171,21 @@ describe('release-bump.mjs --minor', () => {
 describe('ultima-suite-verde.mjs nella corsa della minor', () => {
   const SCRIPT = join(ROOT, 'scripts', 'ultima-suite-verde.mjs');
 
-  // Un main finto senza `gh` raggiungibile: nessun verde letto. Conta cosa chiede al server e cosa scrive.
-  async function corsa({ env, risposta }) {
+  // Il `gh` finto: una corsa verde della suite (con gli unit su Windows) sul commit in FAKE_GH_VERDE.
+  const CORPO_GH = `
+const p = process.argv.find((a) => a.startsWith('repos/')) || '';
+if (process.env.FAKE_GH_GUASTO) { process.stderr.write('gh: non autenticato'); process.exit(1); }
+if (p.includes('/actions/workflows/suite.yml/runs')) {
+  process.stdout.write(JSON.stringify({ workflow_runs: [{ id: 7, head_sha: process.env.FAKE_GH_VERDE, conclusion: 'success',
+    status: 'completed', event: 'push', head_branch: 'main', created_at: '2026-10-11T20:00:00Z', html_url: 'https://x/7' }] }));
+} else if (/actions[/]runs[/]7[/]jobs/.test(p)) {
+  process.stdout.write(JSON.stringify({ jobs: [{ name: 'unit-windows', conclusion: 'success' }] }));
+} else if (p.includes('/releases/tags/')) process.stdout.write(JSON.stringify({ published_at: '2026-10-11T22:00:00Z' }));
+else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
+`;
+
+  // Un main finto; senza `conGh` il `gh` finto non risponde e nessun verde si legge. Conta cosa chiede al server e cosa scrive.
+  async function corsa({ env, risposta, conGh = false }) {
     const tmp = cartellaTemporanea('filo-minor-');
     const repo = join(tmp, 'main');
     const { srv, richieste, port } = await fintoServer(() => risposta);
@@ -179,13 +193,26 @@ describe('ultima-suite-verde.mjs nella corsa della minor', () => {
       mkdirSync(repo, { recursive: true });
       const git = (args) => new Promise((ok, ko) => execFile('git', args, { cwd: repo }, (e, o) => (e ? ko(e) : ok(o))));
       await git(['init', '-q', '-b', 'main']);
-      await git(['-c', 'user.email=p@f', '-c', 'user.name=p', 'commit', '-q', '--allow-empty', '-m', 'primo']);
+      await git(['-c', 'user.email=p@f', '-c', 'user.name=p', 'commit', '-q', '--allow-empty', '-m', 'merge-gate: #1 via server']);
+      // L'ultima patch è uscita proprio dal commit verde più nuovo.
+      await git(['tag', 'v0.2.240']);
+      const testa = (await git(['rev-parse', 'HEAD'])).trim();
+      const bin = join(tmp, 'bin');
+      mkdirSync(bin);
+      if (process.platform === 'win32') {
+        copyFileSync(process.execPath, join(bin, 'gh.exe'));
+        writeFileSync(join(repo, 'api'), CORPO_GH);
+      } else {
+        writeFileSync(join(bin, 'gh'), `#!${process.execPath}\n${CORPO_GH}`);
+        chmodSync(join(bin, 'gh'), 0o755);
+      }
       writeFileSync(join(tmp, 'output.txt'), '');
       const r = await lancia(SCRIPT, [], {
         GITHUB_REPOSITORY: 'o/r', GITHUB_OUTPUT: join(tmp, 'output.txt'), GITHUB_STEP_SUMMARY: join(tmp, 'riassunto.md'),
-        FILO_BUILD_PASSPHRASE: 'prova', FILO_ROUTINE_API: `http://127.0.0.1:${port}`, PATH: join(tmp, 'vuoto'), ...env,
+        FILO_BUILD_PASSPHRASE: 'prova', FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FAKE_GH_VERDE: testa,
+        PATH: `${bin}${delimiter}${process.env.PATH}`, ...(conGh ? {} : { FAKE_GH_GUASTO: '1' }), ...env,
       }, repo);
-      return { ...r, richieste, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), riassunto: readFileSync(join(tmp, 'riassunto.md'), 'utf8') };
+      return { ...r, testa, richieste, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), riassunto: readFileSync(join(tmp, 'riassunto.md'), 'utf8') };
     } finally {
       srv.close();
       togliCartella(tmp, { tentativi: 10 });
@@ -203,6 +230,19 @@ describe('ultima-suite-verde.mjs nella corsa della minor', () => {
     assert.match(r.riassunto, /settimana prossima/);
   });
 
+  test('permessa: la minor esce col commit verde più nuovo, anche se è lo stesso dell\'ultima patch', async () => {
+    const r = await corsa({ env: { GITHUB_EVENT_NAME: 'workflow_dispatch', FILO_MINOR_A_MANO: 'true' }, risposta: [200, { ok: true, permessa: true }], conGh: true });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(r.output, `sha=${r.testa}\ntipo=minor\n`);
+    assert.match(r.riassunto, /Si pubblica come minor/);
+  });
+
+  test('la stessa situazione nella corsa delle sei ore: niente di nuovo, niente patch', async () => {
+    const r = await corsa({ env: { GITHUB_EVENT_NAME: 'schedule', FILO_CRON: '0 */6 * * *' }, risposta: [200, { ok: true }], conGh: true });
+    assert.equal(r.output, 'sha=\n');
+    assert.equal(r.richieste.length, 0);
+  });
+
   test('una corsa programmata fuori dal lunedì non chiede niente a nessuno', async () => {
     const fuori = M.nellaFinestra() === false;
     const r = await corsa({ env: { GITHUB_EVENT_NAME: 'schedule', FILO_CRON: '0 22 * * 0' }, risposta: [200, { ok: true, permessa: true }] });
@@ -212,6 +252,13 @@ describe('ultima-suite-verde.mjs nella corsa della minor', () => {
       assert.equal(r.status, 0);
     }
     assert.match(r.output, /^sha=\n/);
+  });
+
+  test('permessa ma le corse della suite non si leggono: corsa rossa, niente pubblicato', async () => {
+    const r = await corsa({ env: { GITHUB_EVENT_NAME: 'workflow_dispatch', FILO_MINOR_A_MANO: 'true' }, risposta: [200, { ok: true, permessa: true }] });
+    assert.equal(r.status, 1);
+    assert.equal(r.output, 'sha=\ntipo=\n');
+    assert.match(r.riassunto, /non si sono lette/);
   });
 
   test('server senza la minor (non ancora pubblicata la funzione): corsa rossa, niente pubblicato', async () => {

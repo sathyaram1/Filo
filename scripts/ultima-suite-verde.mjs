@@ -212,8 +212,7 @@ async function main() {
     const finestra = nellaFinestra();
     const permesso = tipo === 'minor-programmata' && !finestra ? null : await chiediMinor({ passphrase: parolaDellaCostruzione(), controllo: true });
     const verdeOk = Boolean(verde) && (verde === tagSha || verdePiuNuovoDelTag(verde, tagSha, eAntenato));
-    const d = decidiMinor({ tipo, finestra, permesso, verde, tag, verdeOk });
-    if (erroreApi) d.righe.push(`- Le corse della suite non si sono lette: ${erroreApi}.`);
+    const d = decidiMinor({ tipo, finestra, permesso, verde, tag, verdeOk, erroreApi });
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `sha=${d.sha}\ntipo=${d.sha ? 'minor' : ''}\n`);
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${d.righe.join('\n')}\n`);
     console.log(d.righe.join('\n'));

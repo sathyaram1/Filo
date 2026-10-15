@@ -140,6 +140,18 @@ test('chi ha la 0.2.228 vede al prossimo aggiornamento le righe scritte dopo la 
     'il blocco 0.2.228 non esisteva quando la 0.2.228 è uscita: una riga lì non la vede nessuno che aggiorna');
 });
 
+// #1160: sul canale stabile si passa da una minor all'altra, e la minor del lunedì prende il posto della patch che il
+// blocco aperto aspettava. Le righe di tutte le patch in mezzo, e quelle del blocco aperto, arrivano sotto la minor.
+test('canale stabile: da una minor alla successiva il recap porta le righe di tutte le patch in mezzo e del blocco aperto', () => {
+  const [maj, min] = pkg.version.split('.').map(Number);
+  const minor = `${maj}.${min + 1}.0`;
+  const da = PN.NOTES[Math.min(6, PN.NOTES.length - 1)].version;
+  const attese = righeDi(PN.NOTES.filter((n) => PN.cmpVersion(n.version, da) > 0 && PN.cmpVersion(n.version, minor) <= 0));
+  assert.ok(attese.length > 0);
+  assert.ok(PN.cmpVersion(PN.NOTES[0].version, minor) <= 0, 'il blocco aperto cade sotto la minor che può prenderne il posto');
+  assert.deepEqual(righeDi(PN.recap(da, minor, null)).sort(), attese.sort());
+});
+
 test('una riga non arriva a chi ha una versione che non la contiene', () => {
   const inArrivo = PN.NOTES.filter((n) => PN.cmpVersion(n.version, pkg.version) > 0);
   const recap = righeDi(PN.recap('0.2.225', pkg.version, null));
