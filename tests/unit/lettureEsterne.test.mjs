@@ -20,22 +20,53 @@ const FP = '7'.repeat(64);
 const ctxPosix = { cwd: '/casa/Filo', win: false, cartelle: ['/casa/Filo', '/casa/filo-security', '/home/o/.claude'], file: ['/casa/LOCAL.md'] };
 const leggi = (file_path, ctx = ctxPosix) => L.motivoLettura({ tool_name: 'Read', tool_input: { file_path } }, ctx);
 
-test('classificatore: la rete, le risorse MCP e ogni mcp__ fuori dall’elenco chiuso sporcano; shell, ricerche nel disco e scritture no', () => {
+test('classificatore: sporca ogni strumento tranne un elenco chiuso (shell, ricerche nel disco, scritture, sotto-agenti locali, compiti), anche uno nuovo (#1211.2)', () => {
   assert.equal(L.motivoLettura({ tool_name: 'WebFetch', tool_input: { url: 'https://esempio.it/a?chiave=segreta' } }), 'WebFetch (esempio.it)');
   assert.equal(L.motivoLettura({ tool_name: 'WebFetch', tool_input: { url: 'non un indirizzo' } }), 'WebFetch');
-  assert.equal(L.motivoLettura({ tool_name: 'WebSearch', tool_input: { query: 'x' } }), 'WebSearch');
-  for (const n of ['ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool', 'ArtifactComments', 'ArtifactData']) assert.equal(L.motivoLettura({ tool_name: n }), n);
-  assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action: 'read', url: 'https://claude.ai/artifact/x' } }), 'Artifact (read)');
-  assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action: 'list', scope: 'shared' } }), 'Artifact (list)');
-  for (const action of [undefined, 'publish', 'open', 'pin', 'delete']) assert.equal(L.motivoLettura({ tool_name: 'Artifact', tool_input: { action, file_path: '/tmp/p.html' } }), '', String(action));
+  // I cataloghi di estensioni, i messaggi fra sessioni, le uscite di un compito che può essere remoto, uno strumento
+  // che oggi non esiste: nessuno li ha messi fra i puliti, quindi sporcano.
+  for (const n of ['WebSearch', 'ListMcpResourcesTool', 'ReadMcpResourceTool', 'ReadMcpResourceDirTool', 'ArtifactComments', 'ArtifactData',
+    'SearchPlugins', 'ListPlugins', 'SearchSkills', 'ListSkills', 'SearchMcpRegistry', 'ListConnectors', 'SuggestConnectors', 'SuggestSkills',
+    'SuggestPluginInstall', 'DesignSync', 'ListAgents', 'SendMessage', 'TaskOutput', 'LSP', 'NotebookRead', 'StrumentoDiDomani']) {
+    assert.equal(L.motivoLettura({ tool_name: n, tool_input: { query: 'x' } }), n);
+  }
+  assert.equal(L.motivoLettura({ tool_name: 'Nuovo\ncon\u0000a capo' }), 'Nuovo con a capo');
   for (const n of ['mcp__github__get_file_contents', 'mcp__claude-in-chrome__get_page_text', 'mcp__plugin_posta_gmail__search', 'mcp__computer-use__screenshot']) {
     assert.equal(L.motivoLettura({ tool_name: n, tool_input: {} }), n);
   }
   for (const n of L.MCP_SENZA_LETTURA) assert.equal(L.motivoLettura({ tool_name: n }), '', n);
-  for (const n of ['Bash', 'PowerShell', 'Grep', 'Glob', 'Edit', 'Write', 'NotebookEdit', 'Agent', 'TodoWrite', '', undefined]) {
+  for (const n of [...L.STRUMENTI_SENZA_LETTURA, '', undefined]) {
     assert.equal(L.motivoLettura({ tool_name: n, tool_input: { file_path: '/etc/passwd', path: '/etc', url: 'https://x.it' } }, ctxPosix), '', String(n));
   }
+  for (const n of ['Bash', 'PowerShell', 'Grep', 'Glob', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'Skill']) assert.ok(L.STRUMENTI_SENZA_LETTURA.includes(n), n);
   assert.equal(L.motivoLettura(null), '');
+});
+
+test('classificatore: un artefatto sporca anche quando si pubblica; solo aprirlo, appuntarlo e cancellarlo no (#1211.2)', () => {
+  const artefatto = (action, altro = {}) => L.motivoLettura({ tool_name: 'Artifact', tool_input: { action, ...altro } });
+  assert.equal(artefatto('read', { url: 'https://claude.ai/artifact/x' }), 'Artifact (read)');
+  assert.equal(artefatto('list', { scope: 'shared' }), 'Artifact (list)');
+  // Su una pagina modificata da altri il rifiuto restituisce la versione attuale; e chi pubblica riceve i commenti.
+  assert.equal(artefatto(undefined, { file_path: '/tmp/p.html', url: 'https://claude.ai/artifact/x' }), 'Artifact (publish)');
+  assert.equal(artefatto('publish', { file_path: '/tmp/p.html' }), 'Artifact (publish)');
+  assert.equal(artefatto('quickstart', { intent: 'slides' }), 'Artifact (quickstart)');
+  assert.equal(artefatto('azione-nuova'), 'Artifact (azione-nuova)');
+  for (const action of ['open', 'pin', 'unpin', 'delete']) assert.equal(artefatto(action, { url: 'https://claude.ai/artifact/x' }), '', action);
+});
+
+test('classificatore: un sotto-agente sporca solo se gira fuori dal computer; ToolSearch solo se può portare descrizioni MCP (#1211.2)', () => {
+  const agente = (tool_input, tool_name = 'Agent') => L.motivoLettura({ tool_name, tool_input });
+  assert.equal(agente({ prompt: 'leggi https://x.it', description: 'web', isolation: 'remote' }), 'Agent (remote)');
+  assert.equal(agente({ prompt: 'x', isolation: 'remote' }, 'Task'), 'Task (remote)');
+  assert.equal(agente({ prompt: 'x', isolation: 'cloud-di-domani' }), 'Agent (cloud-di-domani)');
+  assert.equal(agente({ prompt: 'x', isolation: { dove: 'remote' } }), 'Agent ([object Object])');
+  for (const isolation of [undefined, '', 'worktree']) assert.equal(agente({ prompt: 'x', subagent_type: 'Explore', isolation }), '', String(isolation));
+  assert.equal(agente({ prompt: 'x' }, 'Task'), '');
+  const cerca = (query) => L.motivoLettura({ tool_name: 'ToolSearch', tool_input: { query, max_results: 5 } });
+  for (const q of ['select:Monitor', 'select:TaskCreate, TaskUpdate,EnterWorktree', ' select:WebFetch']) assert.equal(cerca(q), '', q);
+  for (const q of ['select:mcp__github__get_me', 'select:Monitor,mcp__x__y', 'select:MCP__x', 'select:*', 'select:', 'select:Monitor,', 'notebook jupyter', '+slack send', '', undefined]) {
+    assert.equal(cerca(q), 'ToolSearch', String(q));
+  }
 });
 
 test('classificatore: Read sporca solo fuori dal repo, dal checkout del server accanto e dalla cartella di Claude; LOCAL.md sopra il repo no', () => {
