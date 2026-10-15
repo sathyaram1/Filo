@@ -324,8 +324,9 @@ test('nel riassunto l\'etichetta breve col separatore («Porta [2]: chiusa») re
 
 test('#561 giro 7: il segno prima della cifra («[?2]») o un segno diverso dopo («[2!]») è un livello messo male, non riassunto', () => {
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[?2] rotto'), ['[?2] rotto']);
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2!] rotto'), ['[2!] rotto']);
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n- [2?!] rotto'), ['- [2?!] rotto']);
+  // Dal #1202 il «!» è un segno: senza la sede la riga si respinge con la spiegazione della sede.
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2!] rotto'), [`[2!] rotto (${R.SPIEGAZIONE_SEDE})`]);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n- [2?!] rotto'), [`- [2?!] rotto (${R.SPIEGAZIONE_SEDE})`]);
   // Il formato giusto resta un rilievo; in mezzo a una frase, dal 2026-09-07,
   // le quadre col livello dentro sono comunque un rilievo scritto male.
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[2i?] decidi tu'), []);
