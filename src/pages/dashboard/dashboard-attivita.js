@@ -1572,6 +1572,8 @@
           : window.confirm(opts.text); // fallback se il modulo non è caricato
         if (!ok) return;
         btn.disabled = true;
+        // Catturare e far leggere una finestra prende qualche secondo: il bottone dice che Filo ci sta lavorando.
+        if (type === 'VEDI_SCHERMO') btn.textContent = 'Guardo la finestra…';
         const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: paroleUtente() });
         // Nemmeno l'OK fa uscire un segreto (#810): la riga dice cosa è stato fermato.
         if (r && r.output && r.output.blocked === 'segreto') {
