@@ -439,7 +439,7 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
   }
   const parsed = ROUND.parseFindings(critique);
   const decision = ROUND.decideRound({ findings: parsed.findings, caps, counts: prev.counts || {} });
-  for (const k of ['fix', 'derived', 'external']) decision[k] = numeraRilievi(parsed.findings, decision[k]);
+  for (const k of ['fix', 'derived', 'external', 'domande']) decision[k] = numeraRilievi(parsed.findings, decision[k] || []);
   const outcome = decision.stop ? 'stop' : decision.fix.length ? 'fix' : 'pass';
   const when = at || new Date().toISOString();
   const entry = {
