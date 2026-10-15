@@ -3,6 +3,7 @@
 // Senza il lavoro il modello non riceveva nessuna data e la risposta finta resta senza ora.
 
 import { test, expect } from './helpers/reteFinta.mjs';
+import { nelMondoDiFilo } from './helpers/riquadri.mjs';
 
 const PAGINA_A = '<title>Pagina A</title><body style="padding:40px;font:16px sans-serif"><h1>Articolo A</h1></body>';
 const PAGINA_B = '<title>Pagina B sorella</title><body style="padding:40px;font:16px sans-serif"><h1>Articolo B</h1></body>';
