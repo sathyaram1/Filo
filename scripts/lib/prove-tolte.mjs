@@ -506,8 +506,9 @@ export function rilanciaProveTolte(prove, shaPrima, root, opzioni = {}) {
 }
 
 // Ogni prova nella sua cartella com'era a `sha`, col codice di adesso: `{ esiti: Map<prova, { rossa, casi }>, motivo }`.
-// Con `perCaso` anche l'esito di ogni caso (casiDalReport), null se Playwright non l'ha scritto.
-function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, prepara = preparaLancioElectron, titolo = '', perCaso = false, etichetta = `${process.pid}`, fuori = [] } = {}) {
+// Con `perCaso` anche l'esito di ogni caso (casiDalReport), null se Playwright non l'ha scritto. `versioni`: le prove
+// da prendere a un altro commit (quelle a cui una pulizia dopo le correzioni ha tolto un caso).
+function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, prepara = preparaLancioElectron, titolo = '', perCaso = false, etichetta = `${process.pid}`, fuori = [], versioni = {} } = {}) {
   const esiti = new Map();
   const schermo = prepara('npx', []);
   if (!schermo.ok) return { esiti, motivo: schermo.motivo };
