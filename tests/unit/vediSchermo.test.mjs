@@ -305,10 +305,9 @@ test('l\'archivio della chat tiene il nome della finestra guardata, mai l\'immag
   // Una conferma data dopo il turno arriva col solo nome.
   assert.deepEqual(CA.toStoredMessage({ role: 'filo', text: '', actions: [{ type: 'VEDI_SCHERMO' }], guardate: ['Schermo intero'] }).guardate, ['Schermo intero']);
   // Riaperta, il modello sa che l'aveva guardata e che il contenuto non c'è più.
-  const nota = FCx.rendi
-    ? FCx.rendi({ ...m, ts: new Date().toISOString(), chat: 'c1' }, null, { tetto: 4000 }).content
-    : '';
-  if (FCx.rendi) assert.match(nota, /Errore di Word.*non è conservato/);
+  const ora = Date.parse('2026-10-15T12:00:00.000Z');
+  const f = FCx.finestra([{ ...m, ts: new Date(ora - 60_000).toISOString(), chat: 'c1' }], { ora, giorni: 3, token: 100000 });
+  assert.match(f.messaggi[0].content, /Errore di Word.*non è conservato/);
 });
 
 test('ogni azione di sola lettura del registro ha uno strumento, e VEDI_SCHERMO è fra le letture', () => {
