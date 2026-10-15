@@ -2323,5 +2323,6 @@
     getCwd: Term.getCwd,
     refreshAccountControl,
     ricompenseAvvio: () => ricompenseAvvio,
+    allarmeOwnerChiesto: () => allarmeOwnerChiesto,
   };
 })();
