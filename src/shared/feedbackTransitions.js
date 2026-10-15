@@ -182,13 +182,16 @@
   //         Filo inutilizzabile). A bilancio finito un 3 ferma la pratica e
   //         chiama l'owner (statusReason `loop`): è l'unico che ferma.
   //   cap2: giri per i rilievi di livello 2 (la cosa chiesta non si ottiene nel
-  //         caso normale). A bilancio finito un 2 NON ferma: diventa un
-  //         feedback a parte a priorità 2, e il lavoro passa (2026-09-23).
+  //         caso normale). A bilancio finito un 2 NON ferma: sale su una
+  //         correzione che parte comunque (#744), altrimenti diventa un
+  //         feedback a parte a priorità 2 e il lavoro passa (2026-09-23).
   //   cap1: giri per i rilievi di livello 1 (di rado, cosmetica evidente). A
-  //         bilancio finito un 1 va nel feedback derivato.
+  //         bilancio finito un 1 sale su una correzione che parte comunque,
+  //         altrimenti va nel feedback derivato.
   //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da
   //         soli non si correggono mai: solo insieme ad altro.
-  // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
+  // Ogni giro consuma UN giro dal bilancio del livello più alto fra quelli
+  // che lo fanno partire; chi ci sale col bilancio finito non paga.
   const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {
