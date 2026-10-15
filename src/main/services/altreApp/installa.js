@@ -18,7 +18,7 @@ const FRASI = {
   http: (p) => `Non riesco a scaricare il componente: GitHub risponde ${p.stato}.`,
   impronta: () => 'Il file scaricato non è quello atteso: la sua impronta non combacia, quindi non l\'ho installato. '
     + 'Può essere un download rovinato o un file alterato lungo la strada.',
-  misura: (p) => `Il file scaricato non è quello atteso (${p.ricevuti} byte invece di ${p.attesi}): non l'ho installato.`,
+  misura: (p) => `Il file scaricato non è quello atteso (${p.ricevuti} byte, ne aspettavo ${p.attesi}): non l'ho installato.`,
   spazio: () => 'Non c\'è abbastanza spazio sul disco per installare il componente.',
   disco: () => 'Non riesco a scrivere il componente nella cartella dei dati di Filo.',
   archivio: () => 'Il pacchetto scaricato non si apre: non l\'ho installato.',
@@ -114,7 +114,10 @@ function creaInstallatore({ cartella, pacchetto, sistema = () => `${process.plat
     if (!res || !res.ok) throw new ErroreInstalla('http', { stato: res ? res.status : '?' });
     const dichiarati = Number(res.headers && res.headers.get && res.headers.get('content-length')) || 0;
     const totali = p.byte || dichiarati || 0;
-    if (dichiarati && p.byte && dichiarati !== p.byte) throw new ErroreInstalla('misura', { ricevuti: dichiarati, attesi: p.byte });
+    if (dichiarati && p.byte && dichiarati !== p.byte) {
+      try { await res.body.cancel(); } catch (_) {}
+      throw new ErroreInstalla('misura', { ricevuti: dichiarati, attesi: p.byte });
+    }
     const hash = crypto.createHash('sha256');
     let ricevuti = 0;
     let out;
@@ -122,8 +125,9 @@ function creaInstallatore({ cartella, pacchetto, sistema = () => `${process.plat
     let erroreScrittura = null;
     out.on('error', (e) => { erroreScrittura = e; });
     annuncia({ fase: 'scarica', ricevuti: 0, totali });
+    let lettore = null;
     try {
-      const lettore = res.body.getReader();
+      lettore = res.body.getReader();
       for (;;) {
         const { done, value } = await lettore.read();
         if (done) break;
@@ -133,11 +137,13 @@ function creaInstallatore({ cartella, pacchetto, sistema = () => `${process.plat
         // Più byte di quelli fissati non è il file atteso: ci si ferma senza scaricare il resto.
         if (p.byte && ricevuti > p.byte) throw new ErroreInstalla('misura', { ricevuti: `più di ${p.byte}`, attesi: p.byte });
         hash.update(pezzo);
-        if (!out.write(pezzo)) await new Promise((r) => out.once('drain', r));
+        // Un disco che si riempie mentre si aspetta non deve lasciare l'attesa appesa: anche l'errore la scioglie.
+        if (!out.write(pezzo)) await new Promise((r) => { out.once('drain', r); out.once('error', r); });
         annuncia({ fase: 'scarica', ricevuti, totali }, { subito: false });
       }
     } catch (e) {
       try { out.destroy(); } catch (_) {}
+      if (lettore) lettore.cancel().catch(() => {});
       if (signal.aborted) throw new ErroreInstalla('fermato');
       if (e instanceof ErroreInstalla) throw e;
       if (e && e.code && /^E[A-Z]+$/.test(e.code) && e.syscall) throw daDisco(e);

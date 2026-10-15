@@ -283,3 +283,15 @@ test('un driver che non parte più a metà lavoro lo segnala una volta a chi tie
   assert.equal((await fai('tempo')).codice, 'tempo');
   assert.deepEqual(segnalati, ['avvio', 'uscito']);
 });
+
+test('Cua: fermato mentre parte, la connessione che arriva dopo si chiude e non resta un driver acceso', async () => {
+  const { m, chiudi } = motoreCua();
+  try {
+    const p = m.finestre();
+    m.ferma();
+    await assert.rejects(p, (e) => e.codice === 'chiuso');
+    assert.equal(m.attivo(), false);
+    // E la richiesta dopo riparte da capo.
+    assert.equal((await pronto(m).windows()).ok, true);
+  } finally { chiudi(); }
+});

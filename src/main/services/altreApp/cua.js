@@ -87,6 +87,8 @@ function creaMotoreCua({ eseguibile, avvia = Mcp.avvia, ambienteBase = process.e
   let connessione = null;
   let inArrivo = null;
   let timer = null;
+  // Fermato mentre partiva: la connessione che arriva dopo si chiude subito, o terrebbe occupati i file del driver.
+  let generazione = 0;
 
   function riarma() {
     clearTimeout(timer);
@@ -100,6 +102,7 @@ function creaMotoreCua({ eseguibile, avvia = Mcp.avvia, ambienteBase = process.e
     const exe = eseguibile();
     if (!exe) throw new Mcp.ErroreMcp('avvio', 'driver non installato');
     const path = require('path');
+    const mia = generazione;
     inArrivo = avvia({
       comando: exe,
       argomenti: ['mcp', '--direct'],
@@ -107,6 +110,7 @@ function creaMotoreCua({ eseguibile, avvia = Mcp.avvia, ambienteBase = process.e
       env: ambiente(ambienteBase, idApp),
       cliente: { name: 'Filo', version: String(versioneFilo) },
     }).then((c) => {
+      if (mia !== generazione) { c.chiudi(); throw new Mcp.ErroreMcp('chiuso', 'fermato mentre partiva'); }
       connessione = c;
       c.suUscita((e) => {
         if (connessione === c) connessione = null;
@@ -130,6 +134,7 @@ function creaMotoreCua({ eseguibile, avvia = Mcp.avvia, ambienteBase = process.e
   }
 
   function ferma() {
+    generazione += 1;
     clearTimeout(timer);
     const c = connessione;
     connessione = null;
@@ -235,12 +240,12 @@ function creaMotoreCua({ eseguibile, avvia = Mcp.avvia, ambienteBase = process.e
     },
 
     async gesto(b, g) {
+      const c = await collega();
       const base = { pid: b.finestra.pid, window_id: b.finestra.idFinestra, element_token: b.elemento || undefined };
       const xy = b.punto ? { x: b.punto.x, y: b.punto.y } : {};
-      const sfondo = (nome) => (connessione && haCampo(connessione.strumenti.get(nome), 'delivery_mode') ? { delivery_mode: 'background' } : {});
+      const sfondo = (nome) => (haCampo(c.strumenti.get(nome), 'delivery_mode') ? { delivery_mode: 'background' } : {});
       let r;
       if (g.tipo === 'clic') {
-        const c = await collega();
         const schema = c.strumenti.get('click');
         if (g.tasto === 'left' && g.volte === 1) r = await chiama('click', { ...base, ...xy, ...sfondo('click') });
         else if (haCampo(schema, 'button') || haCampo(schema, 'count')) {
@@ -255,7 +260,6 @@ function creaMotoreCua({ eseguibile, avvia = Mcp.avvia, ambienteBase = process.e
       } else if (g.tipo === 'scorri') {
         r = await chiama('scroll', { ...base, ...xy, direction: g.direzione, amount: g.quanto, by: 'line', ...sfondo('scroll') });
       } else if (g.tipo === 'tasto') {
-        const c = await collega();
         if (!g.modificatori.length || haCampo(c.strumenti.get('press_key'), 'modifiers')) {
           r = await chiama('press_key', { ...base, ...xy, key: g.tasto, modifiers: g.modificatori.length ? g.modificatori : undefined, ...sfondo('press_key') });
         } else {
