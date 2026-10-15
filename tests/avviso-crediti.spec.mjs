@@ -137,6 +137,15 @@ const valuta = (app) => app.evaluate(async () => {
   const r = await globalThis.SN_AVVISO_CREDITI_MAIN.valutaOra();
   return r && r.esito;
 });
+// Il tempo del main va avanti di un minuto: la chat torna a chiedere il saldo al server.
+function passaUnMinuto(app) {
+  return app.evaluate(() => {
+    const vero = globalThis.__dateNowVero || Date.now;
+    globalThis.__dateNowVero = vero;
+    globalThis.__spostamento = (globalThis.__spostamento || 0) + 61_000;
+    Date.now = () => vero() + globalThis.__spostamento;
+  });
+}
 const rileggi = (app) => app.evaluate(async () => { await globalThis.SN_WALLET_MAIN.readState(); });
 
 async function newtab(app) {
@@ -159,8 +168,12 @@ test('(A) con una conversazione aperta l\'avviso arriva in chat, una volta; il m
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const home = await newtab(app);
   await redirectHosts(app);
-  await riscatta(app);
   await treGiorniA300(app);
+  // Al riscatto il saldo è alto; poi scende sul server, e il turno di chat lo rilegge come fa sempre dopo un minuto.
+  saldo = 4000;
+  await riscatta(app);
+  saldo = 400;
+  await passaUnMinuto(app);
 
   await scrivi(home, 'ciao');
   await expect(home.locator('.dash-bubble-filo', { hasText: 'Ecco fatto' }).first()).toBeVisible({ timeout: 30_000 });
@@ -175,7 +188,7 @@ test('(A) con una conversazione aperta l\'avviso arriva in chat, una volta; il m
   await expect(modello.locator('.sn-crediti-rimedio-cifra')).toHaveText(/^circa \d+ crediti in meno al giorno$/);
   await expect(modello).toContainText('Gemma 4 31B invece di DeepSeek V4 Pro');
   const automatiche = avviso.locator('.sn-crediti-rimedio[data-rimedio="automatiche"]');
-  await expect(automatiche).toContainText('la spiegazione anticipata');
+  await expect(automatiche).toContainText('la spiegazione preparata quando selezioni un testo');
   await expect(automatiche).toContainText('il riassunto delle schede');
   await expect(automatiche.locator('.sn-crediti-rimedio-cifra')).toHaveText('circa 60 crediti in meno al giorno');
   await expect(avviso.locator('.sn-crediti-rimedio[data-rimedio="chiave"]')).toContainText('chiave OpenRouter');
@@ -214,10 +227,9 @@ test('(B) senza conversazione è una notifica che apre Crediti; lì i rimedi si 
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await newtab(app);
   await redirectHosts(app);
-  await riscatta(app);
   await treGiorniA300(app);
-
-  expect(await valuta(app)).toBe('avvisato');
+  // Il saldo letto al riscatto basta: la valutazione che segue ogni lettura avvisa, e nessuna home ha una conversazione.
+  await riscatta(app);
   const vista = await avvisi();
   const notifica = vista.locator('.shell-notif', { hasText: 'al ritmo di oggi finiscono dopodomani' });
   await expect(notifica).toBeVisible({ timeout: 10_000 });
@@ -248,13 +260,21 @@ test('(B) senza conversazione è una notifica che apre Crediti; lì i rimedi si 
   await expect(auto.locator('.sn-crediti-rimedio-esito')).toHaveText('Rimesso com\'era.');
   expect(await imp()).toEqual({ riassunto: true, anticipata: true });
 
+  await crediti.evaluate(async () => { await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }); });
+  await new Promise((r) => setTimeout(r, 800));
+  await crediti.screenshot({ path: `${SHOTS}/crediti-scuro.png`, fullPage: true });
+
   // «Metti la chiave» porta al campo della chiave.
   await sez.locator('.sn-crediti-rimedio[data-rimedio="chiave"] button').click();
   await expect(crediti.locator('#ownKeyInput')).toBeFocused();
 
   // Lo stesso calo non avvisa due volte; il saldo risale (un regalo) e riscende: avvisa di nuovo.
   expect(await valuta(app)).toBe('gia-detto');
+  // Risale di poco (la quota della notte) e riscende: è lo stesso calo.
   saldo = 450;
+  await rileggi(app);
+  expect(await valuta(app)).toBe('sopra');
+  saldo = 380;
   await rileggi(app);
   expect(await valuta(app)).toBe('gia-detto');
   saldo = 1500;
@@ -272,10 +292,9 @@ test('(C) sopra le soglie, con la chiave propria o senza portafoglio non c\'è a
   await redirectHosts(app);
   expect(await valuta(app)).toBe('senza-portafoglio');
 
-  await riscatta(app);
   await treGiorniA300(app);
   saldo = 4000;
-  await rileggi(app);
+  await riscatta(app);
   expect(await valuta(app)).toBe('sopra');
 
   saldo = 400;

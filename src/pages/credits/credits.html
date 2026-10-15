@@ -51,12 +51,6 @@
     </section>
 
     <p class="sn-muted" id="refillHint">Ricevi +100 crediti ogni giorno a mezzanotte.</p>
-    <!-- #818 — l'avviso prima che i crediti finiscano, coi rimedi: ci porta la notifica, e qui restano i «com'era». -->
-    <section class="sn-wallet-section sn-crediti-avviso" id="avviso" hidden>
-      <h2>Per farli durare di più</h2>
-      <p class="sn-crediti-avviso-testo" id="avvisoTesto" role="status"></p>
-      <div id="avvisoRimedi"></div>
-    </section>
     <!-- Il nome con cui la persona si fa riconoscere da chi le regala crediti, senza dare l'email (#895). -->
     <p class="sn-wallet-me" id="pseudonymRow" hidden>
       <span class="sn-muted">Il tuo pseudonimo</span>
@@ -65,6 +59,12 @@
     <p class="sn-muted" id="offlineHint" hidden>
       Accedi col tuo account per sincronizzare i crediti su tutti i dispositivi.
     </p>
+    <!-- #818 — l'avviso prima che i crediti finiscano, coi rimedi: ci porta la notifica, e qui restano i «com'era». -->
+    <section class="sn-wallet-section sn-crediti-avviso" id="avviso" hidden>
+      <h2>Per farli durare di più</h2>
+      <p class="sn-crediti-avviso-testo" id="avvisoTesto" role="status"></p>
+      <div id="avvisoRimedi"></div>
+    </section>
 
     <!-- Stesso campo delle Impostazioni (settings.apiKeys.openrouter), gestito da qui perché è qui che si decide
        con cosa si paga: con la chiave si vedono spesa, residuo e ultimo rifiuto; senza, solo il campo. -->

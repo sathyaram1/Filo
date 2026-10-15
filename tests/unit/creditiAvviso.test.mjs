@@ -170,8 +170,8 @@ test('i rimedi: modelli più economici per le funzioni che consumano, automatich
   assert.match(per.modello.frase, /^circa \d+ crediti in meno al giorno$/);
   // Il correttore è spento: non si propone di spegnerlo, e non conta nel risparmio.
   assert.deepEqual(per.automatiche.cambi.map((c) => c.percorso), ['spiegaAnticipata.enabled', 'riassuntoSchede.enabled']);
-  // Media sui giorni dal primo registrato, oggi compreso: 70 crediti in due giorni.
-  assert.equal(Math.round(per.automatiche.risparmio), 35);
+  // Media sui giorni interi: ieri, 70 crediti.
+  assert.equal(Math.round(per.automatiche.risparmio), 70);
   assert.equal(per.chiave.frase, 'circa 300 crediti di Filo in meno al giorno');
   assert.equal(per.attesa.testo, 'Aspetta la quota del giorno: stanotte verso le 2:00 arrivano 100 crediti');
   // Con la chiave propria non c'è il rimedio della chiave; senza quota, niente attesa.
@@ -183,4 +183,15 @@ test('pezzoPer costruisce il pezzo da salvare, leggiPercorso lo rilegge', () => 
   assert.deepEqual(CA.pezzoPer('riassuntoSchede.enabled', false), { riassuntoSchede: { enabled: false } });
   assert.equal(CA.leggiPercorso({ a: { b: true } }, 'a.b'), true);
   assert.equal(CA.leggiPercorso({}, 'a.b'), undefined);
+});
+
+test('i consumi per funzione: media dei giorni interi, e il primo giorno quello di oggi', () => {
+  const soloOggi = diarioCon({ [OGGI]: [{ azione: A.FILO_CHAT, crediti: 40 }] });
+  assert.equal(CA.consumoPerAzione(soloOggi, { oggi: OGGI })[A.FILO_CHAT].c, 40);
+  const tre = diarioCon({
+    '2026-10-12': [{ azione: A.FILO_CHAT, crediti: 30 }],
+    '2026-10-14': [{ azione: A.FILO_CHAT, crediti: 60 }],
+    [OGGI]: [{ azione: A.FILO_CHAT, crediti: 500 }],
+  });
+  assert.equal(CA.consumoPerAzione(tre, { oggi: OGGI })[A.FILO_CHAT].c, 30, 'tre giorni interi, uno a zero; oggi non conta');
 });

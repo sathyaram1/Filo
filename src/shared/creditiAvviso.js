@@ -216,7 +216,7 @@
   function automatiche() {
     const a = A();
     return [
-      { id: 'spiegaAnticipata', percorso: 'spiegaAnticipata.enabled', chiavi: [chiaveAzione(a.EXPLAIN || 'explain', ANTICIPATA)], nome: 'la spiegazione anticipata del testo che selezioni' },
+      { id: 'spiegaAnticipata', percorso: 'spiegaAnticipata.enabled', chiavi: [chiaveAzione(a.EXPLAIN || 'explain', ANTICIPATA)], nome: 'la spiegazione preparata quando selezioni un testo' },
       { id: 'riassuntoSchede', percorso: 'riassuntoSchede.enabled', chiavi: [a.FILO_TAB_SUMMARY || 'filo_tab_summary'], nome: 'il riassunto delle schede che chiudi' },
       { id: 'riordinoSchede', percorso: 'autoArchive.enabled', chiavi: [a.FILO_TAB_TRIAGE || 'filo_tab_triage'], nome: 'il riordino automatico delle schede' },
       { id: 'correttore', percorso: 'featureFlags.spellcheck', chiavi: [a.SPELLCHECK_SEMANTIC || 'spellcheck_semantic', a.SPELLCHECK_WORD || 'spellcheck_word'], nome: 'il correttore ortografico' },
@@ -245,14 +245,16 @@
     return out;
   }
 
-  // Consumo medio al giorno per chiave del diario, sugli ultimi sette giorni (meno se il diario è più giovane).
+  // Consumo medio al giorno per chiave del diario, sui giorni interi degli ultimi sette (come il ritmo: oggi non è
+  // finito e abbasserebbe la media). Il primo giorno vale quello di oggi.
   function consumoPerAzione(diario, { oggi = chiaveGiorno() } = {}) {
     const d = diario || {};
     const primo = primoGiorno(d);
     const out = {};
     if (!primo) return out;
+    const soloOggi = primo >= oggi;
     let giorni = 0;
-    for (let i = 0; i < GIORNI_PER_FUNZIONE; i++) {
+    for (let i = soloOggi ? 0 : 1; i <= (soloOggi ? 0 : GIORNI_PER_FUNZIONE); i++) {
       const g = spostaGiorno(oggi, -i);
       if (g < primo) break;
       giorni++;
