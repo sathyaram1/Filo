@@ -109,6 +109,67 @@ test('gli 1 e gli 0 come prima: con un 2 corretto entrano; senza un giro che par
   assert.deepEqual(conEsterno.external.map((x) => x.priority), [2, 3]);
 });
 
+// #744: un 2 a bilancio finito non fa partire un giro, ma se il giro parte lo
+// stesso (lo paga un 1 o uno 0) ci sale come ci salgono gli 1 sul giro di un 2.
+test('un 2 a bilancio dei 2 finito sale sulla correzione che un 1 fa partire, e il giro lo paga cap1', () => {
+  const d = decide([f(2, 'i', 'non salva'), f(1, 'i', 'bordo storto')], { count2: 4 });
+  assert.equal(d.stop, false);
+  assert.deepEqual(livelli(d.fix), ['2i', '1i'], 'si correggono tutti e due, nell\'ordine della critica');
+  assert.deepEqual(d.derived, [], 'nessun feedback a parte per il 2');
+  assert.equal(d.consume, 'cap1', 'il giro lo paga chi lo fa partire');
+  assert.equal(d.counts.count1, 1);
+  assert.equal(d.counts.count2, 4, 'il 2 non paga: cap2 non va oltre il suo tetto');
+  assert.equal(d.budgets.cap2.used, 4);
+  assert.equal(d.budgets.cap2.left, 0);
+  assert.equal(d.budgets.cap1.left, 0);
+
+  // Il giro dopo, con cap1 finito anche lui e niente che lo faccia partire,
+  // il 2 esce nel feedback dei rimasti come prima.
+  const dopo = decide([f(2, 'i', 'non salva ancora'), f(1, 'i', 'bordo')], d.counts);
+  assert.deepEqual(dopo.fix, []);
+  assert.deepEqual(dopo.derived.map((x) => [x.level, x.priority]), [[2, 2], [1, 1]]);
+  assert.equal(dopo.consume, null);
+});
+
+test('un vicino o uno 0 che fanno partire il giro con cap0 si portano dietro i 2 e gli 1 a bilancio finito', () => {
+  const caps = { ...CAPS, cap0: 1 };
+  const d = decide([f(2, 'i', 'non salva'), f(1, 'i', 'bordo'), f(3, 'v', 'nel file accanto')], { count2: 4, count1: 1 }, caps);
+  assert.deepEqual(livelli(d.fix), ['2i', '1i', '3v']);
+  assert.equal(d.consume, 'cap0');
+  assert.deepEqual([d.counts.count2, d.counts.count1, d.counts.count0], [4, 1, 1]);
+  // A cap0 = 0 nessuno lo fa partire: escono tutti, il lavoro passa.
+  const senza = decide([f(2, 'i', 'non salva'), f(1, 'i', 'bordo'), f(3, 'v', 'nel file accanto')], { count2: 4, count1: 1 });
+  assert.deepEqual(senza.fix, []);
+  assert.equal(senza.stop, false);
+  assert.deepEqual(livelli(senza.derived), ['2i', '1i', '3v']);
+});
+
+test('chi sale non cambia chi paga né chi ferma: un 3 a bilancio finito ferma anche accanto a un 1 col bilancio, un ? resta fuori', () => {
+  const fermo = decide([f(3, 'i', 'perde i dati'), f(1, 'i', 'bordo')], { count3: 5 });
+  assert.equal(fermo.stop, true);
+  assert.deepEqual(livelli(fermo.blocking), ['3i']);
+  const domanda = decide([f(2, 'i', 'non salva'), f(1, 'i', 'bordo'), f(1, 'i', 'A o B?', true)], { count2: 4 });
+  assert.deepEqual(livelli(domanda.fix), ['2i', '1i']);
+  assert.deepEqual(domanda.derived.map((x) => [x.level, x.decision]), [[1, true]]);
+  // Col bilancio dei 2 ancora aperto il giro resta del 2, come prima.
+  assert.equal(decide([f(2, 'i', 'a'), f(1, 'i', 'b')]).consume, 'cap2');
+});
+
+test('la nota del giro dice che il 2 sale e chi paga, e non parla di 2 messi da parte', () => {
+  const list = [f(2, 'i', 'Non salva.'), f(1, 'i', 'Bordo storto.')];
+  const d = decide(list, { count2: 4 });
+  const nota = R.roundNote({ summary: 'provato', findings: list, decision: d });
+  assert.match(nota, /La correzione riguarda tutti i rilievi; poi un'altra verifica ricontrolla\./);
+  assert.match(nota, /Il giro lo paga il bilancio del livello 1: un rilievo di livello più alto, col suo bilancio finito, sale sulla correzione che parte comunque\./);
+  assert.doesNotMatch(nota, /feedback dei rimasti|non corretti in questo giro/);
+  const due = [f(2, 'i', 'a'), f(2, 'i', 'b'), f(0, 'v', 'c')];
+  assert.match(R.roundNote({ findings: due, decision: decide(due, { count2: 4 }, { ...CAPS, cap0: 1 }) }), /Il giro lo paga il bilancio del livello 0: 2 rilievi di livello più alto, col loro bilancio finito, salgono/);
+  // Gli 1 sul giro di un 2, o i vicini: nessuno sta sopra chi paga, la riga non c'è.
+  assert.doesNotMatch(R.roundNote({ findings: list, decision: decide(list) }), /Il giro lo paga/);
+  const vicino = [f(1, 'i', 'qui'), f(3, 'v', 'accanto')];
+  assert.doesNotMatch(R.roundNote({ findings: vicino, decision: decide(vicino) }), /Il giro lo paga/);
+});
+
 test('senza uno dei quattro bilanci si ferma e dice quale manca: nessun default', () => {
   assert.throws(() => R.decideRound({ findings: [f(2, 'i', 'x')], caps: { cap2: 4, cap1: 1, cap0: 0 } }), /bilanci del verificatore mancanti: cap3/);
   assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap3, cap2, cap1, cap0/);
