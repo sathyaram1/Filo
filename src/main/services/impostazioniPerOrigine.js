@@ -17,7 +17,8 @@ const CAMPI_WEB = Object.freeze({
   blocklist: true,
   // I siti dove il tasto destro apre il loro menu (#975): come i siti esclusi, arriva solo la voce del frame che chiede.
   menuDelSito: Object.freeze({ siti: true }),
-  featureFlags: Object.freeze({ spellcheck: true }),
+  // L'Aiuto spento (#841) toglie la sua voce dal tasto destro anche sui siti.
+  featureFlags: Object.freeze({ spellcheck: true, help: true }),
   // La spiegazione che parte da sola alla selezione (#818): spenta, la pagina aspetta il tasto destro.
   spiegaAnticipata: true,
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),

@@ -185,7 +185,7 @@
       id: 'spellcheck', title: 'Correttore mentre scrivi', category: 'writing',
       desc: 'Mentre scrivi in un campo di testo, segnala gli errori: zigzag rosso per l’ortografia (suggerimenti del sistema) e zigzag blu per gli errori di contesto rilevati dall’AI.',
       invoke: 'Automatico quando scrivi in un’area di testo; clic destro su una parola segnalata per i suggerimenti.',
-      doesNot: 'Il correttore contestuale (blu) lavora su testi né troppo corti né enormi e può essere disattivato. Parte solo da quello che scrivi tu: il testo che un sito inserisce da solo si controlla al tuo prossimo tasto in quella casella, e a scheda nascosta il controllo aspetta che torni. Da una scheda partono al massimo 300 controlli al minuto: oltre, Filo li ferma e te lo dice.',
+      doesNot: 'Il correttore contestuale (blu) lavora su testi né troppo corti né enormi; si spegne in Preferenze → Impostazioni avanzate → «Funzioni» o chiedendolo a Filo. Parte solo da quello che scrivi tu: il testo che un sito inserisce da solo si controlla al tuo prossimo tasto in quella casella, e a scheda nascosta il controllo aspetta che torni. Da una scheda partono al massimo 300 controlli al minuto: oltre, Filo li ferma e te lo dice.',
     },
     {
       id: 'spellcheck-manage', title: 'Gestisci correttore e dizionario', category: 'writing',
@@ -317,7 +317,7 @@
     },
     {
       id: 'open-for-later', title: 'Aperti per dopo', category: 'save',
-      desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire.',
+      desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire. Con le categorie automatiche ogni pagina salvata prende una categoria scelta da un modello e la lista si raggruppa per categoria: sono spente di serie, e si accendono in Preferenze → Impostazioni avanzate → «Funzioni» o chiedendolo a Filo.',
       invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Anche cliccando la conferma che appare dopo «Salva per dopo». Clicca una scheda per riaprirla.',
       doesNot: 'Non è la home: l’icona Home della barra laterale porta alla nuova scheda, non a questa lista.',
     },
@@ -379,7 +379,7 @@
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
       desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Sa quando hai aperto la scheda e quando ci è arrivata la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo. I passi che fai con lui, per ora, non escono dal tuo computer. Ogni conversazione resta sul tuo computer come una riga nel filo della home, e Filo la ritrova quando gliene chiedi.',
-      invoke: 'Alt+H (Ctrl+Alt+H su Mac), oppure tasto destro sulla scheda › Aiuto, o tasto destro sulla pagina › Aiuto.',
+      invoke: 'Alt+H (Ctrl+Alt+H su Mac), oppure la voce «Aiuto» del tasto destro sulla pagina o sulla linguetta della scheda (su Mac anche dalla barra dei menu, Aiuto → Assistente laterale). È acceso di serie. Lo spegni e lo riaccendi in Preferenze → Impostazioni avanzate → «Funzioni», o chiedendolo a Filo («spegni l’Aiuto»). Da spento la voce sparisce dai menu, un pannello già aperto si chiude, e la scorciatoia dice che è spento invece di aprirlo.',
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Per ora non ti chiede se ha funzionato e non condivide con nessuno i passi delle tue sessioni.',
     },
     {

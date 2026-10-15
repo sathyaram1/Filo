@@ -876,9 +876,19 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
       case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'featureFlags.help': return $('aiutoAcceso').checked;
+      case 'featureFlags.spellcheck': return $('correttoreAcceso').checked;
+      case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
       default: return undefined;
     }
   }
+
+  // Gli interruttori di funzione con il loro valore di serie: acceso finché non è `false`, o spento finché non è `true`.
+  const INTERRUTTORI = [['help', 'aiutoAcceso', true], ['spellcheck', 'correttoreAcceso', true], ['categorize', 'categorieAutomatiche', false]];
+  const interruttore = (s, nome, diSerie) => {
+    const v = s.featureFlags && s.featureFlags[nome];
+    return diSerie ? v !== false : v === true;
+  };
 
   // Lo stesso valore letto dalla memoria, con le stesse regole di riempi().
   function valoreSalvato(s, k) {
@@ -933,6 +943,12 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'featureFlags.help':
+      case 'featureFlags.spellcheck':
+      case 'featureFlags.categorize': {
+        const [nome, , diSerie] = INTERRUTTORI.find(([n]) => k === `featureFlags.${n}`);
+        return interruttore(s, nome, diSerie);
+      }
       default: return undefined;
     }
   }
@@ -1117,6 +1133,9 @@
       if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
     }
     if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
+    for (const [nome, id, diSerie] of INTERRUTTORI) {
+      if (vuole(`featureFlags.${nome}`)) $(id).checked = interruttore(settings, nome, diSerie);
+    }
 
     if (vuole('timerRingtone')) {
       const ringtone = settings.timerRingtone || 'default';
@@ -1619,6 +1638,7 @@
     }
     $('avvisoCreditiAttivo').addEventListener('change', persist);
     $('spiegaAnticipata').addEventListener('change', persist);
+    for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
     for (const [, id] of CAMPI_CREDITI) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));

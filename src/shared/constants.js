@@ -2511,11 +2511,10 @@
     blocklist: [],
     // Siti dove il tasto destro apre il menu del sito e quello di Filo sta a Shift (#975).
     menuDelSito: { siti: [] },
-    // Feature flags
-    // - help, categorize: Fase 2, default off
-    // - spellcheck: correttore AI (zigzag blu sopra il rosso nativo del browser), default on
+    // Interruttori di funzione: Preferenze → Avanzate e IMPOSTA_PREFERENZA. Il vecchio `help: false` di serie dei file
+    // di dati lo riaccende src/main/services/interruttoreAiuto.js (#841). categorize: spenta di serie.
     featureFlags: {
-      help: false,
+      help: true,
       categorize: false,
       spellcheck: true,
     },

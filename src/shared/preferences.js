@@ -836,13 +836,13 @@
     },
     {
       scrive: ['featureFlags.help'],
-      aiuto: 'true | false (barra laterale dell\'Aiuto)',
+      aiuto: 'true | false (l\'Aiuto nelle pagine: la sua voce nel tasto destro e la sua scorciatoia)',
       costo: 1,
-      keys: ['sidebar_aiuto', 'sidebar aiuto', 'pannello aiuto', 'aiuto', 'help', 'assistente aiuto'],
+      keys: ['sidebar_aiuto', 'sidebar aiuto', 'pannello aiuto', 'aiuto', 'help', 'assistente aiuto', 'aiuto nelle pagine', 'assistente di pagina', 'assistente della pagina'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { featureFlags: { help: b } }, label: `Sidebar Aiuto → ${b ? 'attiva' : 'disattivata'}` };
+        return { partial: { featureFlags: { help: b } }, label: `Aiuto nelle pagine → ${b ? 'acceso' : 'spento'}` };
       },
     },
     {

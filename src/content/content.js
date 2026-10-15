@@ -1803,9 +1803,9 @@
     // src/content/menuIcons.js (SN_MENU_ICONS), caricato prima di questo file.
     items.push(MenuIcons.buildGlobalIconRow(navState));
 
-    // 2. Aiuto — voce sempre presente, etichettata.
-    items.push({ type: 'separator' });
-    items.push(buildHelpItem());
+    // 2. Aiuto, se è acceso, e le voci di stato qui sotto: il separatore c'è solo se la sezione ha qualcosa.
+    const sezioneAiuto = [];
+    if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
 
     // 2b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
     // vocale è in riproduzione, anche senza selezione/contesto, così la
@@ -1813,7 +1813,7 @@
     // è true anche se a leggere è un'ALTRA scheda: lo stop chiede al main di
     // inoltrare l'arresto alla scheda che legge davvero.
     if (TTS.isAnyReading()) {
-      items.push(TTS.buildStopReadingItem());
+      sezioneAiuto.push(TTS.buildStopReadingItem());
     }
 
     // 2c. Mostra originale — solo quando alla traduzione di pagina manca ancora
@@ -1826,7 +1826,7 @@
       && TranslatePage.showsRestore();
     if (TranslatePage && typeof TranslatePage.canContinue === 'function'
         && TranslatePage.canContinue() && !iconIsRestore) {
-      items.push(TranslatePage.buildRestoreOriginalItem());
+      sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
     }
 
     // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
@@ -1835,7 +1835,8 @@
     // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
     // con un evento, la risposta arriva nel dataset nello stesso dispatch.
     const zoomItem = buildZoomItem();
-    if (zoomItem) items.push(zoomItem);
+    if (zoomItem) sezioneAiuto.push(zoomItem);
+    if (sezioneAiuto.length) items.push({ type: 'separator' }, ...sezioneAiuto);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
     // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
@@ -2221,7 +2222,13 @@
   // ------------------------------------------------------------
   // Sidebar Aiuto (Fase 2)
   // ------------------------------------------------------------
+  // L'interruttore dell'Aiuto (#841): spento, nessuna strada apre il pannello e il tasto dice perché.
+  function aiutoAcceso() {
+    return !(settings && settings.featureFlags && settings.featureFlags.help === false);
+  }
+
   function openHelpSidebar(context) {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
 
@@ -2326,6 +2333,8 @@
       // SpellCheck.init registra listener globali; per non duplicarli su update
       // usiamo updateSettings (definito apposta da spellcheck.js).
       SpellCheck.updateSettings(isBlocked() ? { featureFlags: { spellcheck: false } } : settings);
+      // Spento l'Aiuto, il pannello già aperto se ne va come la sua voce (#841.r1).
+      if (!aiutoAcceso() && Sidebar.isOpen()) Sidebar.close();
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
