@@ -76,7 +76,7 @@ I tre testi (report, frase, changelog) li scrivi tu.
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status revision_capability \
-  --notes "[il tuo report]" --frase "[la frase]" --branch <il-tuo-branch> [--segnala <file.md>]
+  --notes "[il tuo report]" --frase "[la frase]" --branch <il-tuo-branch> [--segnala <file.md> --livello <0-3> [--difficile]]
 ```
 
 Infine rilascia il biglietto:
