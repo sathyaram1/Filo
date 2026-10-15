@@ -222,8 +222,12 @@ Le forme che cadevano, e cosa le ha sostituite:
   test quando Windows la tiene ancora; `rmSync` ricorsivo nudo nei test lo ferma una
   sentinella (`tests/unit/cartelleTemporanee.test.mjs`). Gli script che i test lanciano
   ritentano anche loro (`maxRetries`).
-- **Il tetto del lanciatore** (20 minuti in cui niente va avanti, non la durata del file: un
-  file sano sotto carico è lento ma avanza): una prova sola che ci si avvicina si divide, e una
+- **Il tetto del lanciatore** (20 minuti in cui un file non va avanti, non la sua durata: un
+  file sano sotto carico è lento ma avanza): il file fermo si chiude da solo, rosso col suo
+  nome, e gli altri girano (#1231). Node mostra in diretta solo i passi del primo file in
+  corso: se in un tetto non finisce nessun file, con lui si chiudono i file partiti da più
+  di un tetto (in fila costerebbero un tetto ciascuno), e se dopo non finisce più niente si
+  chiude la corsa (il disco pieno). Una prova sola che ci si avvicina si divide, e una
   scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
   (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
   risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
@@ -231,6 +235,11 @@ Le forme che cadevano, e cosa le ha sostituite:
   prova con un ambiente suo (le prove da sole in sessione, #1214) usa la stessa guardia,
   `lanciaSorvegliato`, col tetto delle attese: cinque minuti sulla durata della corsa
   cadevano con due corse insieme su un portatile lento.
+- **Un file non si appende sul primo errore.** Un intervallo vero che tiene vivo il processo
+  per tutto il file tiene vivo anche una promessa rimasta a metà: si accende solo finché
+  l'attesa vera è in viaggio (`tests/helpers/letturaIsolata.mjs`). Un pacchetto che il
+  codice provato usa si cerca al caricamento del modulo, così se manca il file cade subito
+  col nome del pacchetto.
 
 ## Il verso opposto (#937)
 

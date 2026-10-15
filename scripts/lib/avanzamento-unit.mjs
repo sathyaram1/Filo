@@ -13,6 +13,7 @@ export default async function* avanzamentoUnit(source) {
     const delFile = d.nesting === 0 && d.file && typeof d.name === 'string' && resolve(d.name) === resolve(d.file);
     if (delFile && ev.type === 'test:dequeue') yield `${JSON.stringify({ via: d.file })}\n`;
     else if (delFile && ev.type === 'test:complete') yield `${JSON.stringify({ fine: d.file })}\n`;
-    else if (PASSI.has(ev.type)) yield '{}\n';
+    // Gli altri passi di un file arrivano anche mentre il primo è fermo: contati, il suo tetto ripartirebbe (#1231).
+    else if (!delFile && PASSI.has(ev.type)) yield '{}\n';
   }
 }
