@@ -73,9 +73,7 @@ function parteFingerprint(seed) {
   function family(CanvasCtor, CtxCtor, make) {
     var cp = CanvasCtor && CanvasCtor.prototype, xp = CtxCtor && CtxCtor.prototype;
     if (!cp || !xp || !xp.getImageData) return null;
-    var F = { put: xp.putImageData, draw: xp.drawImage, make: make };
-    F.getCtx = track(cp);
-    F.get = patchGet(xp);
+    var F = { __proto__: null, put: xp.putImageData, draw: xp.drawImage, make: make, getCtx: track(cp), get: patchGet(xp) };
     return F.getCtx ? F : null;
   }
 
@@ -209,8 +207,8 @@ const PROPAGAZIONE = `
   var EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute, qsa = EP.querySelectorAll;
   var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(Node.prototype, 'nodeType').get;
   var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, taglia = SP.slice;
-  var MO = MutationObserver, moObserve = MO.prototype.observe, lunghezza = gOPD(window, 'length').get;
-  var GETTER = {};
+  var MO = MutationObserver, moObserve = MO.prototype.observe;
+  var GETTER = { __proto__: null };
   for (var k = 0; k < CORNICI.length; k++) {
     var CC = window[CORNICI[k]], dcw = CC && gOPD(CC.prototype, 'contentWindow');
     if (dcw && dcw.get) GETTER[k === 0 ? 'IFRAME' : k === 1 ? 'FRAME' : 'OBJECT'] = dcw.get;
@@ -291,22 +289,20 @@ const PROPAGAZIONE = `
     try { osserva(w); } catch (e) {}
   }
 
-  // Il primo preambolo della stessa origine nella scheda, cercato dalla cima: un canvas annotato da uno si legge con
-  // le funzioni dell'altro, e ognuno riconosce come native le funzioni dell'altro. Si legge solo il segno, che la
-  // pagina non può aver messo prima del preambolo della sua finestra.
+  // Il primo preambolo della stessa origine fra i frame che lo contengono: un canvas annotato da uno si legge con le
+  // funzioni dell'altro, e ognuno riconosce come native le funzioni dell'altro. Solo i contenitori, già caricati: un
+  // riquadro ancora vuoto toccato da qui perderebbe il preload. Si leggono solo il segno e il genitore coi getter
+  // nativi di questa finestra: la pagina non può far girare il suo codice prima che questa finestra sia protetta.
   function unisci() {
-    var coda = [window.top], visti = 0;
-    while (coda.length && visti++ < 500) {
-      var w = coda.shift();
-      if (w !== window) {
-        try {
-          var d = gOPD(w, '__filoFpGuard');
-          if (d && !d.configurable && typeof d.get === 'function') { R(d.get, window, []); return; }
-        } catch (e) {}
-      }
-      var n = 0;
-      try { n = R(lunghezza, w, []) | 0; } catch (e) {}
-      for (var i = 0; i < n; i++) { try { coda.push(w[i]); } catch (e) {} }
+    var genitore = gOPD(window, 'parent').get, w = window;
+    for (var i = 0; i < 1000; i++) {
+      var p = R(genitore, w, []);
+      if (!p || p === w) return;
+      w = p;
+      try {
+        var d = gOPD(w, '__filoFpGuard'), g = d && gOPD(d, 'get');
+        if (g && !d.configurable && typeof g.value === 'function') { R(g.value, window, []); return; }
+      } catch (e) {}
     }
   }
   if (window.top !== window) { try { unisci(); } catch (e) {} }

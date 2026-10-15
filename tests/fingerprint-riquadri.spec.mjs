@@ -123,13 +123,15 @@ test('i riquadri della pagina leggono canvas, WebGL e audio col suo rumore; un a
   await new Promise((r) => gemello.listen(0, '127.0.0.1', r));
   const sitoGemello = `http://127.0.0.1:${gemello.address().port}/`;
   try {
+    // Off si legge sulla stessa scheda: openTab sceglie la vista per host, e due schede su 127.0.0.1 si confonderebbero.
+    const page = await openTab(paginaDiProva(testServer, sitoGemello));
     const leggi = async () => {
-      const page = await openTab(paginaDiProva(testServer, sitoGemello));
       await page.waitForFunction(() => document.readyState === 'complete' && window.__l, null, { timeout: 10_000 });
       return page.evaluate(letture);
     };
     const on = await leggi();
     await setFpMode(openTab, 'off');
+    await page.goto(paginaDiProva(testServer, sitoGemello));
     const off = await leggi();
 
     expect(on.pagina).not.toBe(off.pagina);
@@ -167,26 +169,33 @@ test('un riquadro creato dopo che la pagina ha riscritto Object, call, apply e O
   const r = await page.evaluate(() => {
     const { c } = scena(document);
     const pagina = fnv(c.toDataURL());
+    const salva = {
+      dp: Object.defineProperty, gopd: Object.getOwnPropertyDescriptor, sp: Object.setPrototypeOf, ra: Reflect.apply,
+      call: Function.prototype.call, apply: Function.prototype.apply,
+    };
     const rubate = [];
     const spia = function () { rubate.push(this); throw new Error('rubato'); };
-    Object.defineProperty = spia; Object.getOwnPropertyDescriptor = spia; Object.setPrototypeOf = spia;
-    Reflect.apply = spia;
-    Object.prototype.__defineGetter__.call(Object.prototype, 'get', function () { rubate.push('get'); return undefined; });
-    Object.prototype.__defineGetter__.call(Object.prototype, 'value', function () { rubate.push('value'); return undefined; });
-    const call = Function.prototype.call, apply = Function.prototype.apply;
-    Function.prototype.call = function (...a) { rubate.push(this); return Reflect.construct.length ? call.bind(this)(...a) : 0; };
-    Function.prototype.apply = function (t, a) { rubate.push(this); return call.bind(this)(t, ...(a || [])); };
-    const f = document.createElement('iframe');
-    document.body.appendChild(f);
-    const dalRiquadro = fnv(call.bind(f.contentWindow.HTMLCanvasElement.prototype.toDataURL)(c));
-    Function.prototype.call = call; Function.prototype.apply = apply;
-    delete Object.prototype.get; delete Object.prototype.value;
-    const nativeRubate = rubate.filter((x) => typeof x === 'function' && /\[native code\]/.test(call.bind(Function.prototype.toString)(x))
-      && /toDataURL|getImageData|getContext/.test(x.name)).length;
-    return { pagina, dalRiquadro, nativeRubate };
+    let dalRiquadro = null;
+    try {
+      Object.defineProperty(Object.prototype, 'get', { get() { rubate.push('get'); return undefined; }, configurable: true });
+      Object.defineProperty(Object.prototype, 'value', { get() { rubate.push('value'); return undefined; }, configurable: true });
+      Object.defineProperty = spia; Object.getOwnPropertyDescriptor = spia; Object.setPrototypeOf = spia; Reflect.apply = spia;
+      Function.prototype.call = spia; Function.prototype.apply = spia;
+      const f = document.createElement('iframe');
+      document.body.appendChild(f);
+      c.leggi = f.contentWindow.HTMLCanvasElement.prototype.toDataURL;
+      dalRiquadro = c.leggi();
+    } catch (e) {
+      dalRiquadro = 'errore: ' + e.message;
+    } finally {
+      Function.prototype.call = salva.call; Function.prototype.apply = salva.apply;
+      Object.defineProperty = salva.dp; Object.getOwnPropertyDescriptor = salva.gopd; Object.setPrototypeOf = salva.sp; Reflect.apply = salva.ra;
+      delete Object.prototype.get; delete Object.prototype.value;
+    }
+    return { pagina, dalRiquadro: /^data:/.test(dalRiquadro) ? fnv(dalRiquadro) : dalRiquadro, toccate: rubate.length };
   });
   expect(r.dalRiquadro).toBe(r.pagina);
-  expect(r.nativeRubate).toBe(0);
+  expect(r.toccate, 'la guardia non passa dalle funzioni riscritte dalla pagina').toBe(0);
 });
 
 // Le funzioni del riquadro, e i getter che lo raggiungono, rispondono come in Off a chi le ispeziona da una finestra
