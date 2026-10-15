@@ -36,6 +36,7 @@ nati da quei vincoli invece di adattarli.
 - La macchina a stati vive in due copie (dashboard + server filo-security):
   lo smontaggio va fatto su entrambe, con rideploy (v. §7 per la soluzione
   definitiva alle due copie).
+  - **Superato** (le due copie): vedi `CLAUDE.md`, «Fonti di verità singole».
 - L'owner può sempre "spezzare" da sé aprendo più feedback distinti: non serve
   nessun meccanismo.
 
