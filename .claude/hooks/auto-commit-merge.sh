@@ -260,16 +260,19 @@ fi
 AUTOMAZIONI='.github/workflows'
 in_una_riga() { sed '/^$/d' | sort -u | awk 'NR>1{printf ", "}{printf "%s",$0}'; }
 if is_routine_session; then
-  RIMEDIO_AUTOMAZIONI="da una routine un'automazione non si cambia: riporta il file com'era (o toglilo, se e' nuovo) e, se il lavoro ne ha bisogno, rimandalo in locale (--reason locale) con nelle note la modifica che serve"
+  IN_LOCALE="da una routine un'automazione non si cambia: se il lavoro ne ha bisogno, rimandalo in locale (--reason locale) con nelle note la modifica che serve"
+  RIMEDIO_FILE="riportalo com'era (git checkout HEAD -- <file>, o toglilo se e' nuovo); $IN_LOCALE"
+  RIMEDIO_RAMO="togli quei commit dalla parte non spedita tenendo il lavoro nella cartella (git reset --soft origin/<ramo>, o sulla base del ramo se non e' mai partito), poi riporta i file delle automazioni com'erano; $IN_LOCALE"
 else
-  RIMEDIO_AUTOMAZIONI="la committa e la spinge l'owner, a mano, con la sua credenziale per le automazioni"
+  RIMEDIO_FILE="la committa e la spinge l'owner, a mano, con la sua credenziale per le automazioni"
+  RIMEDIO_RAMO="il ramo lo spinge l'owner, a mano, con la sua credenziale per le automazioni; dopo, il salvataggio riparte da solo"
 fi
 togli_automazioni() {
   local elenco
   elenco=$(git diff --cached --name-only --no-renames -- "$AUTOMAZIONI" 2>/dev/null | in_una_riga)
   [ -n "$elenco" ] || return 0
   git reset -q -- "$AUTOMAZIONI" >/dev/null 2>&1 || git rm -r -q --cached --ignore-unmatch -- "$AUTOMAZIONI" >/dev/null 2>&1
-  segnala_avviso "$1" "NON committo $elenco: un'automazione gira appena il ramo arriva su GitHub. Il file resta com'e' nella cartella; $RIMEDIO_AUTOMAZIONI."
+  segnala_avviso "$1" "NON committo $elenco: un'automazione gira appena il ramo arriva su GitHub. Il file resta com'e' nella cartella: $RIMEDIO_FILE."
 }
 # Anche un commit fatto a mano: il salvataggio non e' la strada di un'automazione, chiunque l'abbia committata.
 automazioni_da_spedire() {
