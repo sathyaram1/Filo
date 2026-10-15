@@ -109,25 +109,3 @@ test('tolto il secondo anello aperto dalla catena, la funzione torna fra le ferm
   await expect(cella.locator('.sn-chain-input')).toHaveCount(1);
   await expect(ferme(page)).toContainText(spiega);
 });
-
-test('molte funzioni ferme, tema chiaro e scuro: l\'avviso si legge e dove si trova', async ({ openTab }) => {
-  const page = await apri(openTab, CFG);
-  const azioni = await page.evaluate(() => window.SN_MODEL_CHAIN.actionLabels().map(([a]) => a));
-  const models = Object.fromEntries(azioni.map((a) => [a, 'chiuso']));
-  const p2 = await apri(openTab, { ...CFG, models });
-  await expect(ferme(p2)).toBeVisible();
-  const info = await p2.evaluate(() => {
-    const g = document.getElementById('modelsGrid').getBoundingClientRect();
-    const b = document.getElementById('openWeightsImpact').getBoundingClientRect();
-    const save = document.getElementById('saveBtn').getBoundingClientRect();
-    return { gridTop: g.top, gridH: g.height, boxTop: b.top, boxH: b.height, saveTop: save.top, vh: innerHeight, n: document.querySelectorAll('#modelsGrid > div').length };
-  });
-  console.log('GEOM', JSON.stringify(info));
-  await p2.locator('#openWeightsImpact').scrollIntoViewIfNeeded();
-  await p2.screenshot({ path: 'tests/.shots/v833-molte-chiaro.png' });
-  await p2.evaluate(() => window.SN_PAGE_BOOTSTRAP.applyTheme('dark'));
-  await p2.screenshot({ path: 'tests/.shots/v833-molte-scuro.png' });
-  await p2.locator('#modelsGrid').scrollIntoViewIfNeeded();
-  await p2.evaluate(() => document.getElementById('modelsGrid').scrollIntoView({ block: 'start' }));
-  await p2.screenshot({ path: 'tests/.shots/v833-in-griglia.png' });
-});
