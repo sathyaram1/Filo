@@ -138,6 +138,46 @@
     return dove ? { dove, ...RIMEDIO_PAGINE[dove] } : null;
   }
 
+  // «Nessun host ammesso per questo modello» (#828): la frase la compone solo fraseNessunHost, e chi ha un altro
+  // motivo o un altro posto dove si rimedia li passa. Senza «riprova»: finché il modello resta quello, non cambia niente.
+  const NESSUN_HOST_MOTIVO = 'nessun fornitore ammesso lo ospita';
+  const RIMEDI_NESSUN_HOST = {
+    opzioni: 'Scegline un altro in Opzioni → Modelli per azione.',
+    predefiniti: 'Usi i modelli predefiniti: per sceglierne un altro togli «Usa modelli predefiniti» in Opzioni e impostalo in Modelli per azione.',
+    gestione: 'Scegline un altro in Gestione → Automazioni, fra i Modelli di supporto.',
+  };
+  const NOMI_MOSTRATI = 5;
+  const breve = (s, max = 120) => {
+    const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    return t.length > max ? `${t.slice(0, max)}…` : t;
+  };
+  function elencoNomi(nomi) {
+    const visti = [];
+    for (const n of Array.isArray(nomi) ? nomi : []) {
+      const b = breve(n, 60);
+      if (b && !visti.some((v) => v.toLowerCase() === b.toLowerCase())) visti.push(b);
+    }
+    const mostrati = visti.slice(0, NOMI_MOSTRATI);
+    const altri = visti.length - mostrati.length;
+    if (altri > 0) mostrati.push(altri === 1 ? 'un altro' : `altri ${altri}`);
+    if (mostrati.length < 2) return { testo: mostrati.join(''), quanti: visti.length };
+    return { testo: `${mostrati.slice(0, -1).join(', ')} e ${mostrati[mostrati.length - 1]}`, quanti: visti.length };
+  }
+  function motivoHostEsclusi(hosts) {
+    const { testo, quanti } = elencoNomi(hosts);
+    if (!quanti) return NESSUN_HOST_MOTIVO;
+    return `${NESSUN_HOST_MOTIVO} (${quanti > 1 ? 'lo servono' : 'lo serve'} solo ${testo}, che Filo esclude)`;
+  }
+  function fraseNessunHost({ modello, funzione, motivo, rimedio: dove } = {}) {
+    const m = breve(modello);
+    const f = breve(funzione);
+    const chi = f ? `La funzione «${f}»` : 'Filo';
+    const perche = String(motivo == null ? '' : motivo).trim().replace(/[.\s]+$/, '') || NESSUN_HOST_MOTIVO;
+    let cosaFare = String(dove == null ? '' : dove).trim() || RIMEDI_NESSUN_HOST.opzioni;
+    if (!/[.!?]$/.test(cosaFare)) cosaFare += '.';
+    return `${chi} non può usare ${m ? `«${m}»` : 'il modello scelto'}: ${perche}. ${cosaFare}`;
+  }
+
   // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
   // a mano perde il codice, e la frase già scritta torna generica (#663).
   function fromResponse(res, fallbackMessage) {
