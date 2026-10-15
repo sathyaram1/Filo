@@ -830,45 +830,58 @@ function tryGit(args) {
   catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
 }
 
-// Ritorna anche su quale base e su quale punta il diff è stato calcolato: chi lo ricalcola deve usare
-// quelle, non il `main` locale (nel clone delle routine è indietro e gonfia il diff).
-export function diffForBranch(branch, root = ROOT) {
+/**
+ * Il diff del ramo contro il main di GitHub, con la base e la punta su cui è calcolato: chi lo ricalcola usa
+ * quelle. Un diff che git non sa calcolare esce con `ok: false` e il motivo, mai come diff vuoto (#740); uno vuoto
+ * esce solo se il contenuto del ramo è davvero quello della base comune, e lo dichiara in `vuoto`.
+ * @returns {{ok:true, diff:string, base:{ref:string, sha:string}, head:string, vuoto?:{commitPropri:number}}
+ *   | {ok:false, motivo:string, diff:'', base:object|null, head:string}}
+ */
+export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi } = {}) {
   // Il diff non si ripulisce: gli spazi in fondo all'ultima riga fanno parte del ramo.
-  const tryGit = (args, { grezzo = false } = {}) => {
+  const git = (args, { grezzo = false } = {}) => {
     try {
-      const out = execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 30 });
+      const out = execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 30, timeout: TETTO_STORIA_MS });
       return { ok: true, out: grezzo ? out : out.trim() };
-    } catch (e) { return { ok: false, out: '' }; }
+    } catch (e) {
+      return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || String(e.message || e) };
+    }
   };
-  if (!branch) return { diff: '', base: null, head: '' };
-  // La base del confronto DEVE essere lo stato REMOTO di main. In cloud il clone
-  // è shallow e il ref locale `main` non viene mai aggiornato (l'orchestratore fa
-  // `pull --rebase origin main` sul branch driver `claude/*`, non fa avanzare il
-  // ref `main`), quindi un `git diff main...branch` userebbe un main vecchio di
-  // decine di versioni: il diff si gonfia con modifiche GIÀ in main e fa scattare
-  // falsi positivi L5/secaudit (file sensibili "toccati" che in realtà erano già
-  // su main). Il cancello di fusione (sul server) confronta con il main VERO di
-  // GitHub per lo stesso motivo; qui allineiamo la stessa logica per il diff
-  // che alimenta il secaudit.
-  tryGit(['fetch', 'origin', MAIN_BRANCH]);
-  const base = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok
-    ? `origin/${MAIN_BRANCH}`
-    : MAIN_BRANCH;
-  // Il branch può esistere solo su origin (worker/* pushato ma non in locale).
-  const ref = tryGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).ok
-    ? branch
-    : (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]).ok
-        ? `origin/${branch}`
-        : branch);
-  const baseSha = tryGit(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
-  const headSha = tryGit(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+  const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
+  const guasto = (motivo, base = null, head = '') => ({ ok: false, motivo, diff: '', base, head });
+  if (!branch) return guasto('nessun ramo di cui calcolare il diff');
+  // La base è il main REMOTO: quello locale, nel clone delle routine, è indietro di decine di versioni e gonfia il
+  // diff di modifiche già fuse. Il refspec è esplicito perché in un clone a ramo singolo `fetch origin main` non
+  // crea origin/main; e niente ripiego sul main locale, che è proprio la base sbagliata.
+  const f = git(['fetch', '--quiet', 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
+  const baseSha = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`]);
+  if (!baseSha.ok) {
+    return guasto(`non ho origin/${main} da usare come base${f.ok ? '' : `, e scaricarlo non riesce (${primaRiga(f.out)})`}`);
+  }
+  // Senza download riuscito si usa l'ultimo origin/main scaricato: più vecchio, il diff può solo crescere.
+  if (!f.ok) process.stderr.write(`[dispatch] origin/${main} non si aggiorna (${primaRiga(f.out)}): diff calcolato sull'ultima copia scaricata\n`);
+  const base = { ref: `origin/${main}`, sha: baseSha.out };
+  // Il ramo può esistere solo su origin (worker/* pushato ma non in locale).
+  const ref = [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]
+    .find((r) => git(['rev-parse', '--verify', '--quiet', r]).ok);
+  const headSha = ref ? git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]) : { ok: false };
+  if (!headSha.ok) return guasto(`il ramo ${branch} non c'è, né qui né fra quelli scaricati da origin`, base);
+  const head = headSha.out;
+  // Un clone poco profondo non ha la base comune: si scarica la storia che manca, come per la fusione di prova.
+  const storia = assicuraStoria({ git, mainSha: base.sha, punta: head, main, ...(passi ? { passi } : {}) });
+  if (storia.errore) return guasto(storia.errore, base, head);
+  const comune = git(['merge-base', base.sha, head]);
+  if (!comune.ok) return guasto(`ramo e origin/${main} non hanno una base comune`, base, head);
   // Fra gli sha, non fra i nomi: il diff è esattamente quello del comando che il payload dichiara.
-  const r = baseSha.ok && headSha.ok ? tryGit(['diff', `${baseSha.out}...${headSha.out}`], { grezzo: true }) : { ok: false, out: '' };
-  return {
-    diff: r.ok ? r.out : '',
-    base: baseSha.ok ? { ref: base, sha: baseSha.out } : null,
-    head: headSha.ok ? headSha.out : '',
-  };
+  const r = git(['diff', `${base.sha}...${head}`], { grezzo: true });
+  if (!r.ok) return guasto(`git diff non riesce (${primaRiga(r.out)})`, base, head);
+  if (r.out) return { ok: true, diff: r.out, base, head };
+  // Vuoto vale solo se l'albero del ramo è quello della base comune: è la prova che non passa dal testo del diff.
+  const albero = (sha) => git(['rev-parse', '--verify', '--quiet', `${sha}^{tree}`]);
+  const [a, b] = [albero(comune.out.split('\n')[0]), albero(head)];
+  if (!a.ok || !b.ok || a.out !== b.out) return guasto('il diff è uscito vuoto ma il ramo cambia dei file rispetto alla base comune con main', base, head);
+  const propri = git(['rev-list', '--count', `${base.sha}..${head}`]);
+  return { ok: true, diff: '', base, head, vuoto: { commitPropri: propri.ok ? Number(propri.out) || 0 : 0 } };
 }
 
 // ─── Retry (esportato, testato in tests/unit/dispatch.test.mjs) ───────────────
