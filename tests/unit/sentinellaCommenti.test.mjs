@@ -111,6 +111,23 @@ test('un racconto attaccato in coda a una riga di codice non sfugge alla misura'
     `tre righe attaccate in coda a un tag passano:\n${inPagina}`);
 });
 
+test('un .js senza intestazione in cima fa rossa la sentinella, col nome del file', () => {
+  const pulito = corsa({
+    'strict.js': "'use strict';\n// Il perché del modulo.\nconst a = 1;\n",
+    'eseguibile.js': '#!/usr/bin/env node\n/** Il perché del comando. */\n',
+  });
+  assert.doesNotMatch(pulito, /not ok \d+ -/, `#! o 'use strict' prima dell'intestazione la fanno rossa:\n${pulito}`);
+
+  const uscita = corsa({
+    'buono.js': '// Il perché del modulo.\nconst a = 1;\n',
+    'nudo.js': 'const a = 1;\n// un commento dopo il codice non è un’intestazione\n',
+    'sotto/vuoto.js': '',
+  });
+  assert.ok(rosso(uscita, 'ogni .js ha un commento d’intestazione in cima'), `un .js senza intestazione passa:\n${uscita}`);
+  assert.ok(uscita.includes('nudo.js') && uscita.includes('sotto/vuoto.js'), `la sentinella non nomina i file:\n${uscita}`);
+  assert.ok(!uscita.includes('buono.js'), `un .js in regola finisce fra i colpevoli:\n${uscita}`);
+});
+
 // La sentinella legge i commenti col lexer di TypeScript: se il progetto non lo
 // dichiara fra le sue dipendenze, un giorno sparisce e con lui TUTTI i controlli
 // veloci, con un errore che parla di un modulo mancante e non di commenti.
