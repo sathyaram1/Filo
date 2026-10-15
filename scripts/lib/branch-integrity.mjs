@@ -32,6 +32,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
+import { ensureCommentChar } from './carattere-commento.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
