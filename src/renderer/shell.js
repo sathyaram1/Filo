@@ -110,11 +110,6 @@
     };
     if (!anteprimaSchede.enabled) try { ANTEPRIMA.nascondi(); } catch (_) {}
   }
-  // L'Aiuto spento (#841) non ha la sua voce nel menu della linguetta.
-  let aiutoAcceso = true;
-  function applyFeatureFlags(ff) {
-    aiutoAcceso = !(ff && ff.help === false);
-  }
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
@@ -122,7 +117,6 @@
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
       applyTabPreview(r?.settings?.tabPreview);
-      applyFeatureFlags(r?.settings?.featureFlags);
       applyRingTone(r?.settings?.timerRingtone, r?.settings?.timerRingtoneVolume);
       refreshRinging();
       try { render({ forza: true }); } catch (_) {}
@@ -137,7 +131,6 @@
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
         applyTabPreview(m.settings?.tabPreview);
-        applyFeatureFlags(m.settings?.featureFlags);
         applyRingTone(m.settings?.timerRingtone, m.settings?.timerRingtoneVolume);
         // Il volume cambiato mentre suona deve sentirsi subito: senza questo si
         // sentirebbe solo alla scadenza dopo.
@@ -934,10 +927,11 @@
     const mio = ++ctxGiro;
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
-    // Le due domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
-    const [proxy, permessi] = await Promise.all([
+    // Le domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
+    const [proxy, permessi, impostazioni] = await Promise.all([
       senzaErrore(() => api.tabs.proxyStatus()),
       senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
+      senzaErrore(() => api.message({ type: 'get_settings' })),
     ]);
     // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
     if (mio !== ctxGiro) return;
@@ -948,7 +942,9 @@
         ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
         : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
     ];
-    if (aiutoAcceso) entries.push({ label: 'Aiuto', icon: 'help', action: 'tab-help' });
+    // L'Aiuto spento (#841) non ha la sua voce.
+    const ff = impostazioni && impostazioni.settings && impostazioni.settings.featureFlags;
+    if (!(ff && ff.help === false)) entries.push({ label: 'Aiuto', icon: 'help', action: 'tab-help' });
     // "Apri da un altro paese" (proxy per-tab): solo se un endpoint è
     // configurato — una voce che non può funzionare non deve comparire.
     // Il click diretto usa il default (ultima location usata, altrimenti USA);
