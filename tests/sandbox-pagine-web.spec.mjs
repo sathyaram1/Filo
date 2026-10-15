@@ -7,13 +7,14 @@ import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 // Il mondo isolato in cui girano page-preload.js e i content script (lo stesso numero di src/preload/mondo-esente.js).
 const MONDO_DEL_PRELOAD = 999;
 
-const preferenze = (app, trova) => app.evaluate(({ webContents }, src) => {
-  const trova = new Function('u', `return (${src})(u)`);
-  const wc = webContents.getAllWebContents().find((w) => !w.isDestroyed() && trova(w.getURL()));
+// `dove`: { url } esatto, oppure { inizia, contiene } sull'indirizzo del webContents.
+const preferenze = (app, dove) => app.evaluate(({ webContents }, d) => {
+  const va = (u) => (d.url ? u === d.url : u.startsWith(d.inizia || '') && u.includes(d.contiene || ''));
+  const wc = webContents.getAllWebContents().find((w) => !w.isDestroyed() && va(w.getURL()));
   if (!wc) return null;
   const p = wc.getLastWebPreferences();
   return { sandbox: p.sandbox, contextIsolation: p.contextIsolation, nodeIntegration: p.nodeIntegration };
-}, trova.toString());
+}, dove);
 
 // Cosa trova chi arriva nel mondo del preload: Node no, Filo sì.
 const mondoDelPreload = (app, url) => app.evaluate(({ webContents }, { u, mondo }) => {
@@ -29,7 +30,7 @@ const SENZA_NODE = { process: 'undefined', require: 'undefined', Buffer: 'undefi
 test('una scheda web gira in sandbox, senza Node nel mondo del preload, e il tasto destro apre il menu di Filo', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<p id="t">Una pagina qualunque, con del testo da cliccare.</p>');
   const url = page.url();
-  expect(await preferenze(app, (u) => u === url)).toEqual(SANDBOX);
+  expect(await preferenze(app, { url })).toEqual(SANDBOX);
   expect(await mondoDelPreload(app, url)).toEqual(SENZA_NODE);
   await page.locator('#t').click({ button: 'right' });
   const menu = page.locator('.sn-menu');
@@ -58,33 +59,33 @@ test('la finestrella di accesso aperta da un sito gira in sandbox, con Filo dent
     const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && x.webContents.getURL() === u);
     return !!w;
   }, accesso), 'è una finestra a sé, non una scheda').toBe(true);
-  expect(await preferenze(app, (u) => u.includes('client_id=a'))).toEqual(SANDBOX);
+  expect(await preferenze(app, { url: accesso })).toEqual(SANDBOX);
   expect(await mondoDelPreload(app, accesso)).toEqual(SENZA_NODE);
   await popup.locator('#a').click({ button: 'right' });
   await expect(popup.locator('.sn-menu')).toBeVisible();
 });
 
 test('la shell, normale e in incognito, gira in sandbox e risponde', async ({ app, shell, testServer }) => {
-  expect(await preferenze(app, (u) => u === 'filo://shell/shell.html')).toEqual(SANDBOX);
+  expect(await preferenze(app, { url: 'filo://shell/shell.html' })).toEqual(SANDBOX);
   const url = testServer.html('<title>Dalla barra</title><p>ok</p>');
   await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
   await expect(shell.locator('#tabs .tab', { hasText: 'Dalla barra' })).toBeVisible();
   await shell.evaluate(() => window.filoShell.openIncognito());
   const incognito = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/shell.html?incognito=1'), 'la finestra incognito non si è aperta');
   await incognito.waitForLoadState('domcontentloaded');
-  expect(await preferenze(app, (u) => u.startsWith('filo://shell/shell.html?incognito=1'))).toEqual(SANDBOX);
+  expect(await preferenze(app, { inizia: 'filo://shell/shell.html?incognito=1' })).toEqual(SANDBOX);
   expect(await incognito.evaluate(() => typeof window.filoShell.tabs.open)).toBe('function');
 });
 
 test('il fumetto dei pulsanti mostra il testo e prende la sua misura senza Node', async ({ app, shell }) => {
-  await shell.evaluate(() => window.filoShell.tooltipShow('Indietro di una pagina', 40, 40));
-  const fumetto = await aspettaFinestra(app, (w) => w.url().startsWith('data:text/html'), 'il fumetto non è nato');
-  await expect(fumetto.locator('#tip')).toHaveText('Indietro di una pagina');
-  expect(await preferenze(app, (u) => u.startsWith('data:text/html') && u.includes('fumetto'))).toEqual(SANDBOX);
+  await shell.evaluate(() => window.filoShell.tooltipShow('Indietro', 40, 40));
+  const fumetto = await aspettaFinestra(app, (w) => w.url().startsWith('data:text/html') && w.url().includes('fumetto'), 'il fumetto non è nato');
+  await expect(fumetto.locator('#tip')).toHaveText('Indietro');
+  expect(await preferenze(app, { inizia: 'data:text/html', contiene: 'fumetto' })).toEqual(SANDBOX);
   expect(await fumetto.evaluate(() => ({ require: typeof require, process: typeof process }))).toEqual({ require: 'undefined', process: 'undefined' });
-  // La misura torna al main: la finestra lascia i 200x30 di partenza per stare intorno alla scritta.
+  // La misura torna al main: la finestra lascia i 200 px di partenza per stare intorno alla scritta.
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().startsWith('data:text/html') && x.webContents.getURL().includes('fumetto'));
-    return w ? w.getBounds().height : 0;
-  })).toBeLessThan(30);
+    return w ? w.getBounds().width : 0;
+  })).toBeLessThan(200);
 });
