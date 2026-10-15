@@ -135,9 +135,8 @@ test('sessione: l’hook di avvio imposta il carattere, e una worktree nata dopo
   assert.equal(gancio(fuori).status, 0, 'fuori da un repo l’hook esce 0');
 });
 
-test('le altre nascite: il clone del worker e l’orchestratore locale passano dalla stessa funzione', () => {
-  const clone = readFileSync(join(ROOT, 'scripts', 'lib', 'clone-worker.mjs'), 'utf8');
-  assert.match(clone, /ensureCommentChar\(dir\);[\s\S]*pinWorkerTools\(dir/, 'preparaClone, prima di consegnare il clone');
+// Il clone del worker lo prova tests/unit/cloneWorker.test.mjs, sul clone vero.
+test('orchestratore locale: avvia passa dalla stessa funzione prima che nascano le worktree', () => {
   const orch = readFileSync(join(ROOT, 'scripts', 'orchestratore-locale.mjs'), 'utf8');
   assert.match(orch, /ensureCommentChar\(P\.radice\);\s*\n\s*const fine = await creaMotore\(depVere/, 'avvia, prima che nascano le worktree');
 });
