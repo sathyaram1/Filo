@@ -136,12 +136,14 @@ test('sotto l\'avviso del sito, da spento Alt+H e la linguetta dicono perché ne
     const tab = tm.tabs.find((t) => t.id === tm.activeId);
     tm.avvisoSito.coperta = () => tab;
   });
-  const avviso = shell.getByText('L\'Aiuto è spento', { exact: false });
+  // Le carte della cornice si disegnano in un riquadro sopra le pagine: la cornice ne tiene l'elenco.
+  const avvisi = () => shell.evaluate(() => [...document.querySelectorAll('#shell-notifs > .shell-notif')].filter((c) => c.textContent.includes('L\'Aiuto è spento')).length);
   await premiAltH(app);
-  await expect(avviso.first()).toBeVisible({ timeout: 8000 });
+  await expect.poll(avvisi, { timeout: 8000 }).toBe(1);
+  await shell.evaluate(() => document.querySelectorAll('#shell-notifs > .shell-notif').forEach((c) => c.remove()));
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
-  await expect(avviso.first()).toBeVisible();
+  await expect.poll(avvisi, { timeout: 8000 }).toBe(1);
 });
 
 test('in Preferenze ci sono i tre interruttori: cambiano le stesse impostazioni della chat e seguono la chat', async ({ app, openTab }) => {

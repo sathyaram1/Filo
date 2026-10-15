@@ -379,7 +379,7 @@
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
       desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Sa quando hai aperto la scheda e quando ci è arrivata la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo. I passi che fai con lui, per ora, non escono dal tuo computer. Ogni conversazione resta sul tuo computer come una riga nel filo della home, e Filo la ritrova quando gliene chiedi.',
-      invoke: 'Alt+H (Ctrl+Alt+H su Mac), oppure la voce «Aiuto» del tasto destro sulla pagina o sulla linguetta della scheda (su Mac anche dalla barra dei menu, Aiuto → Assistente laterale). È acceso di serie. Lo spegni e lo riaccendi in Preferenze → Impostazioni avanzate → «Funzioni», o chiedendolo a Filo («spegni l’Aiuto»). Da spento la voce sparisce dai menu, e la scorciatoia dice che è spento invece di aprirlo.',
+      invoke: 'Alt+H (Ctrl+Alt+H su Mac), oppure la voce «Aiuto» del tasto destro sulla pagina o sulla linguetta della scheda (su Mac anche dalla barra dei menu, Aiuto → Assistente laterale). È acceso di serie. Lo spegni e lo riaccendi in Preferenze → Impostazioni avanzate → «Funzioni», o chiedendolo a Filo («spegni l’Aiuto»). Da spento la voce sparisce dai menu, un pannello già aperto si chiude, e la scorciatoia dice che è spento invece di aprirlo.',
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Per ora non ti chiede se ha funzionato e non condivide con nessuno i passi delle tue sessioni.',
     },
     {
