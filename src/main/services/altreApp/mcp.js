@@ -88,6 +88,8 @@ async function avvia({ comando, argomenti = [], env, cwd, spawn = spawnVero, cli
     }
     if (da < pezzo.length) { pezzi.push(pezzo.slice(da)); lunghezza += pezzo.length - da; }
     if (lunghezza > TETTO_RIGA) {
+      pezzi = [];
+      lunghezza = 0;
       termina(new ErroreMcp('protocollo', `una risposta supera ${Math.round(TETTO_RIGA / 1048576)} MB`));
       try { figlio.kill(); } catch (_) {}
     }
