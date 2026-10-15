@@ -480,6 +480,7 @@ const REGOLE_ALTRE_CHIAVI = {
   walletUsageQueue: 'stato',
   'filo.editor.notesMigrated': 'stato',
   sn_qr_in_primary_migrated: 'stato',
+  sn_aiuto_di_serie_migrated: 'stato',
 };
 
 let regolePerChiave = null;
