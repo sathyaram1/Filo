@@ -2296,6 +2296,7 @@
         if (!shown) await maybeShowFeedbackRewards();
       } catch (_) {}
     });
+    inCodaPopup(chiediAllarmeOwner);
   })();
 
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
