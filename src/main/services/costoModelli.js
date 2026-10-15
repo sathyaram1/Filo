@@ -106,10 +106,4 @@ async function contesto({ Defaults, forzaListino = false } = {}) {
   };
 }
 
-// Solo per i test: il listino si rilegge alla prossima domanda.
-function dimenticaListino() {
-  ultimo = null;
-  fallitoAt = 0;
-}
-
-module.exports = { contesto, listino, dimenticaListino };
+module.exports = { contesto, listino };
