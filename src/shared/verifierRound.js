@@ -409,7 +409,11 @@
     return s === 'e' || s === 'v' ? s : 'i';
   }
 
-  /** Il livello con cui un rilievo conta nel giro: un vicino vale 0, qualunque livello porti scritto. PURA. */
+  /**
+   * Il livello con cui un rilievo può fermare il lavoro o pagare un giro: un
+   * vicino non fa né l'uno né l'altro, qualunque livello porti scritto, e qui
+   * dà 0 perché un confronto «>= 2» lo lasci fuori. PURA.
+   */
   function effectiveLevel(f) {
     return f && sedeDi(f.sede) === 'v' ? 0 : Number(f && f.level);
   }
@@ -419,7 +423,9 @@
    * alla forma canonica. Scarta quello che non è un rilievo: livello fuori
    * scala, testo vuoto. Un rilievo STRUTTURATO senza sede vale interno: è
    * la forma dei client non aggiornati e dello stato già scritto, dove la
-   * sede non esisteva; l'obbligo vale sul testo della critica. PURA.
+   * sede non esisteva; l'obbligo vale sul testo della critica. Un
+   * `difficile` senza `decision` porta con sé la domanda: è il verso che
+   * ferma, e nel testo quella forma si respinge. PURA.
    */
   function normalizeFindings(list) {
     if (!Array.isArray(list)) return [];
