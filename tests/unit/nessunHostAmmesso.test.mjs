@@ -95,7 +95,7 @@ for (const via of ['complete', 'stream']) {
       assert.equal(err.code, 'NO_ALLOWED_HOST', testo);
       assert.equal(err.status, 404);
       const frase = frasePerLUtente(err);
-      assert.equal(frase, 'La funzione «Spiega (inline)» non può usare «google/gemini-2.5-flash»: nessun fornitore ammesso lo ospita (lo servono solo Google AI Studio e Google Vertex, che Filo esclude). Scegline un altro in Opzioni → Modelli per azione.');
+      assert.equal(frase, 'La funzione «Spiega (inline)» non può usare «google/gemini-2.5-flash» perché nessun fornitore ammesso lo ospita. Lo servono solo Google AI Studio e Google Vertex, che Filo esclude. Scegline un altro in Opzioni → Modelli per azione.');
       assert.doesNotMatch(frase, /riprov/i);
       assert.equal(CE.rimedio({ code: err.code }), 'opzioni', 'accanto alla frase va il tasto per le Opzioni');
     }
@@ -105,12 +105,12 @@ for (const via of ['complete', 'stream']) {
 test('un host solo: la frase lo nomina al singolare', async () => {
   const err = await conRouter({}, () => fallita(cancello().complete({ action: 'translate_sel', attempts: [tentativo(GROK)], messages: MESSAGGI })));
   assert.equal(err.code, 'NO_ALLOWED_HOST');
-  assert.match(CE.sentence(err), /^La funzione «Traduci selezione» non può usare «x-ai\/grok-4»: nessun fornitore ammesso lo ospita \(lo serve solo xAI, che Filo esclude\)\./);
+  assert.match(CE.sentence(err), /^La funzione «Traduci selezione» non può usare «x-ai\/grok-4» perché nessun fornitore ammesso lo ospita\. Lo serve solo xAI, che Filo esclude\./);
 });
 
 test('con i modelli predefiniti la frase dice di toglierli per sceglierne un altro', async () => {
   const err = await conRouter({}, () => fallita(cancello({ useDefaultModels: true }).complete({ action: 'explain', attempts: [tentativo(GEMINI)], messages: MESSAGGI })));
-  assert.match(CE.sentence(err), /Usi i modelli predefiniti: per sceglierne un altro togli «Usa modelli predefiniti» in Opzioni/);
+  assert.match(CE.sentence(err), /Per sceglierne un altro togli «Usa modelli predefiniti» in Opzioni e impostalo in Modelli per azione\.$/);
 });
 
 test('la catena passa al modello dopo come prima: la frase arriva solo quando falliscono tutti', async () => {
@@ -169,7 +169,7 @@ test('la prova di una riga delle Opzioni mostra la stessa spiegazione', async ()
     action: C.ACTIONS.PROVIDER_TEST, attempt: tentativo(GEMINI), method: 'streamComplete', args: { messages: MESSAGGI, onDelta: () => {} },
   })));
   assert.equal(prova.code, 'NO_ALLOWED_HOST');
-  assert.equal(prova.message, 'Filo non può usare «google/gemini-2.5-flash»: nessun fornitore ammesso lo ospita (lo servono solo Google AI Studio e Google Vertex, che Filo esclude). Scegline un altro in Opzioni → Modelli per azione.');
+  assert.equal(prova.message, 'Filo non può usare «google/gemini-2.5-flash» perché nessun fornitore ammesso lo ospita. Lo servono solo Google AI Studio e Google Vertex, che Filo esclude. Scegline un altro in Opzioni → Modelli per azione.');
   const spiegazione = (s) => s.slice(s.indexOf('«google/'));
   assert.equal(spiegazione(prova.message), spiegazione(chat.message));
 });
@@ -179,7 +179,7 @@ test('l\'indicizzazione passa dallo stesso router e dice la stessa cosa', async 
     action: 'archive_embed', attempt: tentativo(GEMINI), method: 'embed', args: { texts: ['ciao'] },
   })));
   assert.equal(err.code, 'NO_ALLOWED_HOST');
-  assert.match(err.message, /^La funzione «Indicizzazione dell'archivio» non può usare «google\/gemini-2\.5-flash»: nessun fornitore ammesso/);
+  assert.match(err.message, /^La funzione «Indicizzazione dell'archivio» non può usare «google\/gemini-2\.5-flash» perché nessun fornitore ammesso/);
 });
 
 test('voce e dettatura tengono la loro frase, scritta prima di chiamare', async () => {
@@ -193,7 +193,7 @@ test('voce e dettatura tengono la loro frase, scritta prima di chiamare', async 
 test('fraseNessunHost: un altro motivo e un altro rimedio cambiano solo quelle parti', () => {
   const base = { modello: GEMINI, funzione: 'Spiega (inline)' };
   const oggi = CE.fraseNessunHost(base);
-  assert.equal(oggi, 'La funzione «Spiega (inline)» non può usare «google/gemini-2.5-flash»: nessun fornitore ammesso lo ospita. Scegline un altro in Opzioni → Modelli per azione.');
+  assert.equal(oggi, 'La funzione «Spiega (inline)» non può usare «google/gemini-2.5-flash» perché nessun fornitore ammesso lo ospita. Scegline un altro in Opzioni → Modelli per azione.');
   const altra = CE.fraseNessunHost({ ...base, motivo: 'MOTIVO FINTO', rimedio: 'Rimedio finto.' });
   assert.equal(altra, oggi.replace(CE.NESSUN_HOST_MOTIVO, 'MOTIVO FINTO').replace(CE.RIMEDI_NESSUN_HOST.opzioni, 'Rimedio finto.'));
   assert.equal(CE.fraseNessunHost({ ...base, motivo: 'MOTIVO FINTO' }), oggi.replace(CE.NESSUN_HOST_MOTIVO, 'MOTIVO FINTO'));
@@ -201,13 +201,13 @@ test('fraseNessunHost: un altro motivo e un altro rimedio cambiano solo quelle p
 });
 
 test('fraseNessunHost regge dati strani: vuoti, lunghissimi, tanti host', () => {
-  assert.equal(CE.fraseNessunHost(), 'Filo non può usare il modello scelto: nessun fornitore ammesso lo ospita. Scegline un altro in Opzioni → Modelli per azione.');
+  assert.equal(CE.fraseNessunHost(), 'Filo non può usare il modello scelto perché nessun fornitore ammesso lo ospita. Scegline un altro in Opzioni → Modelli per azione.');
   assert.equal(CE.fraseNessunHost({ modello: '   ', funzione: '  ', motivo: '  ', rimedio: ' ' }), CE.fraseNessunHost());
   const lungo = CE.fraseNessunHost({ modello: `a/${'x'.repeat(5000)}`, funzione: 'y'.repeat(5000) });
   assert.ok(lungo.length < 600, 'nomi lunghissimi si accorciano, con i puntini');
   assert.match(lungo, /…»/);
   const tanti = CE.motivoHostEsclusi(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'a', '', null]);
-  assert.equal(tanti, 'nessun fornitore ammesso lo ospita (lo servono solo A, B, C, D, E e altri 2, che Filo esclude)');
+  assert.equal(tanti, 'nessun fornitore ammesso lo ospita. Lo servono solo A, B, C, D, E e altri 2, che Filo esclude');
   assert.equal(CE.motivoHostEsclusi([]), CE.NESSUN_HOST_MOTIVO);
-  assert.equal(CE.motivoHostEsclusi(['Solo']), 'nessun fornitore ammesso lo ospita (lo serve solo Solo, che Filo esclude)');
+  assert.equal(CE.motivoHostEsclusi(['Solo']), 'nessun fornitore ammesso lo ospita. Lo serve solo Solo, che Filo esclude');
 });

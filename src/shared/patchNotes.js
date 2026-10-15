@@ -19,6 +19,7 @@
         'Quando Filo riordina le schede per colore, i siti bianchi come Wikipedia vanno in testa e quelli neri come GitHub dopo l\'ultimo colore. Prima finivano in coda, mescolati alle schede senza icona. Ogni giorno della Cronologia segue lo stesso ordine.',
         'Nel Deck builder MTG il calcolatore di probabilità conta la pescata del primo turno, come in una partita Commander vera, e il mulligan mette le carte in fondo al mazzo come vuole la regola attuale. Prima le probabilità uscivano più basse del vero.',
         'Chiedi a Filo «mi protegge dai siti truffa?» o «come tolgo questo avviso?» e ti risponde con quello che fa davvero: cosa controlla, i due livelli di avviso, cosa esce dal computer e dove si spegne. Le descrizioni nella pagina Sicurezza adesso dicono la stessa cosa.',
+        'Se il modello scelto per una funzione lo servono solo fornitori che Filo esclude, la chat, la funzione e il tasto «Prova» delle Opzioni ti dicono quale modello è e dove sceglierne un altro. Prima un messaggio generico ti invitava a riprovare, e riprovare non serviva.',
       ],
     },
     {

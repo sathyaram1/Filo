@@ -5,7 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 
 const GEMINI = 'google/gemini-2.5-flash';
-const SPIEGAZIONE = 'non può usare «google/gemini-2.5-flash»: nessun fornitore ammesso lo ospita (lo servono solo Google AI Studio e Google Vertex, che Filo esclude). Scegline un altro in Opzioni → Modelli per azione.';
+const SPIEGAZIONE = 'non può usare «google/gemini-2.5-flash» perché nessun fornitore ammesso lo ospita. Lo servono solo Google AI Studio e Google Vertex, che Filo esclude. Scegline un altro in Opzioni → Modelli per azione.';
 
 // Il router finto nel main: il catalogo dice che Gemini lo servono solo host di Google, e la richiesta, che li esclude,
 // riceve il 404 del router; ogni altro modello risponde.
