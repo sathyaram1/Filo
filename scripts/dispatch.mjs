@@ -1381,14 +1381,20 @@ async function recordPulizia(id) {
   if (stato.lines.length) return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'pulizia') };
   const st = { ...(guard.state || defaultState(id, '')), id };
   const avvio = st.messiDaParteGiro && st.messiDaParteGiro.sha === st.verifierSha ? st.messiDaParteGiro.avvio : '';
-  const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT, avvio }) : null);
+  const controllo = st.verifierSha ? controllaPulizia({
+    shaCritica: st.verifierSha, root: ROOT, avvio, base: baseDelConfronto(st.verifierSha, st.puliziaSha, ROOT), pulizieDopo: st.pulizieDopo,
+  }) : null;
+  const r = applyPulizia(st, controllo);
   if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
   const numeri = Array.isArray(st.messiDaParteGiro?.numeri) ? st.messiDaParteGiro.numeri : undefined;
-  const casi = controllaCasiDellaPulizia({ shaCritica: st.verifierSha, sha: r.state.puliziaSha, root: ROOT, messi: numeri, log: (m) => process.stderr.write(`${m}\n`) });
+  const casi = controllaCasiDellaPulizia({
+    shaCritica: controllo.prima || st.verifierSha, sha: controllo.sha, root: ROOT, messi: numeri, dopo: !!controllo.dopo,
+    log: (m) => process.stderr.write(`${m}\n`),
+  });
   if (casi.ferma) return { rejected: true, formatRejected: true, message: casi.testo };
   // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
   sealTransition(r.state, 'pulizia');
-  return { ...r.state, files: r.files };
+  return { ...r.state, files: r.files, sha: controllo.sha, dopo: !!controllo.dopo };
 }
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
