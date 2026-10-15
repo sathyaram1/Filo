@@ -237,12 +237,19 @@ export async function esegui({ argv, gh, attendi, riassunto = () => {}, log = ()
   riassunto(testoRiassunto({ piattaforma: a.piattaforma, versione: a.versione, righe }));
 
   const leggi = () => {
-    const dati = JSON.parse(gh(['release', 'view', a.versione, '--repo', a.repo, '--json', 'body,isDraft']));
-    return { corpo: String(dati.body ?? ''), bozza: !!dati.isDraft };
+    const dati = JSON.parse(gh(['release', 'view', a.versione, '--repo', a.repo, '--json', 'body,isDraft,assets']));
+    return { corpo: String(dati.body ?? ''), bozza: !!dati.isDraft, allegati: dati.assets };
   };
   const dir = mkdtempSync(join(tmpdir(), 'filo-impronte-'));
   let bozza = null;
   try {
+    const primo = await conRiprova(leggi, { attendi, log, cosa: `la lettura di ${a.versione}` });
+    bozza = primo.bozza;
+    const { problemi, senzaImpronta } = confrontaAllegati(primo.allegati, righe);
+    for (const n of senzaImpronta) log(`::warning::${a.versione}: GitHub non dichiara l'impronta di ${n}, non la posso confrontare con quella del file costruito qui`);
+    if (problemi.length) {
+      throw new Error(`il file che GitHub fa scaricare non è quello costruito qui (${problemi.join('; ')}): non scrivo un'impronta che chi scarica non ritroverebbe`);
+    }
     for (let giro = 1; giro <= GIRI; giro++) {
       await conRiprova(() => {
         const letto = leggi();
