@@ -78,7 +78,7 @@ test('Opzioni: ogni modello ha il suo costo in crediti, e un modello grande per 
     .filter((seg) => seg.querySelector('.sn-chain-input').value.trim())
     .map((seg) => { const t = seg.querySelector('.sn-chain-cost'); return `${seg.querySelector('.sn-chain-input').value} ${t && !t.hidden ? t.textContent : '(niente)'}`; }));
   expect(righe.length).toBeGreaterThan(30);
-  for (const r of righe) expect(r).toMatch(/ (≈ [\d,.]+ credit[oi]|meno di 0,1 crediti|prezzo non noto|costo dopo il primo uso)$/);
+  for (const r of righe) expect(r).toMatch(/ (≈ [\d,.]+ credit[oi]|meno di 0,1 crediti|prezzo non noto|costo da misurare)$/);
 
   // Nella tendina ogni modello ha la cifra per questa funzione.
   const input = chat.locator('.sn-chain-input').first();
