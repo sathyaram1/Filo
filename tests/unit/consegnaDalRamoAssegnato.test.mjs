@@ -239,6 +239,11 @@ test('il testo del rifiuto: con l\'assegnato dice il comando giusto, senza non n
   const senza = testoConsegnaFuoriRamo('consegna non registrata', { motivo: 'principale', current: 'main', assigned: '' });
   assert.match(senza, /<il ramo del tuo lavoro>/);
   assert.doesNotMatch(senza, /Rifiuto/);
+  // Il rebase di un ALTRO ramo è una deriva: prima si chiude quello, poi si torna.
+  const altro = testoConsegnaFuoriRamo('consegna non registrata', { motivo: 'staccata', current: '', assigned: 'worker/y', rebaseDi: 'worker/altro', count: 2 });
+  assert.match(altro, /a metà del rebase di "worker\/altro", ma il ramo assegnato/);
+  assert.match(altro, /Chiudi quel rebase .* `git checkout worker\/y`/);
+  assert.match(altro, /Rifiuto 2 di 3/);
 });
 
 test('guardiaConsegna non tocca il contatore quando non conosce il lavoro', () => {
