@@ -108,6 +108,8 @@ durata, nessun "margine per l'ultimo worker".
 
 ## 7. Fonti di verità singole (fine delle copie a mano)
 
+*Fatto (§14, passo 3); oggi in `CLAUDE.md`, «Fonti di verità singole».*
+
 - Filosofia per i giudici L2: incorporata nel prompt AL DEPLOY delle functions,
   leggendo filo_filosofia.txt dal repo pubblico (checkout locale o raw GitHub).
   La copia manuale nel file dei principi cessa di esistere come file da
