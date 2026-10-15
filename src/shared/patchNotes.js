@@ -14,7 +14,9 @@
         'Chiedi all\'Aiuto di una scheda «quando l\'ho aperta?» e ti dice giorno, ora e quanto tempo è passato, per la scheda e per la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo.',
         'Puoi cambiare anche il font dei link, la durata delle animazioni e l\'intensità delle ombre, dalle Preferenze o chiedendolo a Filo. «Togli le animazioni» le spegne in tutta l\'app, «animazioni più lente» le rallenta.',
       ],
-      fixes: [],
+      fixes: [
+        'Se chiedi a Filo di spegnere l\'Aiuto, adesso si spegne davvero. La voce «Aiuto» sparisce dal tasto destro sulla pagina e sulla linguetta, e la scorciatoia non lo apre più. Prima Filo diceva «fatto» e l\'Aiuto restava. Lo riaccendi chiedendolo, o con l\'interruttore in Preferenze, nelle Impostazioni avanzate, dove trovi anche quelli del correttore ortografico e delle categorie automatiche di «Aperti per dopo».',
+      ],
     },
     {
       version: '0.2.240', date: '2026-10-15',
@@ -26,7 +28,6 @@
         'Quando i crediti di Filo stanno per finire, Filo te lo dice prima, una volta: quanti ne restano, quando finiscono al ritmo di oggi e come farli durare, con quanto risparmi al giorno. Puoi passare a modelli più economici le funzioni che consumano di più, spegnere quelle automatiche, mettere una tua chiave o aspettare la quota della notte. Un clic applica, lo stesso pulsante rimette com\'era, e lo puoi chiedere anche a parole («sì, usa i modelli più economici»). Soglie e avviso li cambi in Preferenze o chiedendolo a Filo. Lì puoi anche spegnere la spiegazione che Filo prepara appena selezioni un testo: partirà solo dal tasto destro, e spendi meno.',
       ],
       fixes: [
-        'Se chiedi a Filo di spegnere l\'Aiuto, adesso si spegne davvero. La voce «Aiuto» sparisce dal tasto destro sulla pagina e sulla linguetta, e la scorciatoia non lo apre più. Prima Filo diceva «fatto» e l\'Aiuto restava. Lo riaccendi chiedendolo, o con l\'interruttore in Preferenze, nelle Impostazioni avanzate, dove trovi anche quelli del correttore ortografico e delle categorie automatiche di «Aperti per dopo».',
         'Quando Filo riordina le schede per colore, i siti bianchi come Wikipedia vanno in testa e quelli neri come GitHub dopo l\'ultimo colore. Prima finivano in coda, mescolati alle schede senza icona. Ogni giorno della Cronologia segue lo stesso ordine.',
         'Nel Deck builder MTG il calcolatore di probabilità conta la pescata del primo turno, come in una partita Commander vera, e il mulligan mette le carte in fondo al mazzo come vuole la regola attuale. Prima le probabilità uscivano più basse del vero.',
         'Chiedi a Filo «mi protegge dai siti truffa?» o «come tolgo questo avviso?» e ti risponde con quello che fa davvero: cosa controlla, i due livelli di avviso, cosa esce dal computer e dove si spegne. Le descrizioni nella pagina Sicurezza adesso dicono la stessa cosa.',
