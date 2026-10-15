@@ -3,7 +3,9 @@
 :root {
   --sn-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --sn-radius: 6px;
-  --sn-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  --sn-shadow: 0 4px 16px rgba(0, 0, 0, var(--sn-shadow-opacity, 0.18));
+  /* Le ombre scritte a mano moltiplicano il loro alfa per questo rapporto: seguono il token `shadow`. */
+  --sn-ombra: calc(var(--sn-shadow-opacity, 0.18) / 0.18);
   /* Token specifici (registro in src/shared/themeTokens.js): ereditano dalla categoria via var(), così
      un override di categoria si propaga da solo; quello del token specifico esce più specifico e vince. */
   --sn-btn-bg: var(--sn-fg);
