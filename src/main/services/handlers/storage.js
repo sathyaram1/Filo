@@ -30,6 +30,7 @@ module.exports = function register(on, ctx) {
     chiaviStoragePerOrigine, scritturaStorageAmmessa, scritturaImpostazioniAmmessa,
   } = require('../impostazioniPerOrigine');
   const vietato = { ok: false, code: 'forbidden', error: 'forbidden' };
+  const { soloFilo } = require('./origine');
   const AppuntiDaiSiti = require('../appuntiDaiSiti');
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
