@@ -1,8 +1,11 @@
 # Ridisegno delle routine per il piano Max — decisioni prese (2026-08-18)
 
-Decisioni concordate owner + Claude nella sessione del 2026-08-18. Questa spec
-è la fonte per l'implementazione. **Cantiere aperto il 2026-08-18** (questa
-copia è entrata nel repo con il trasloco documenti, passo 2 del §14).
+**Stato: chiuso il 2026-09-21**, con l'ultimo passo del §14. Qui resta il
+racconto delle decisioni; dove una è cambiata dopo, una riga **Superato** dice
+in quale file vive la regola di oggi.
+
+Decisioni concordate owner + Claude nella sessione del 2026-08-18 (questa copia
+è entrata nel repo con il trasloco documenti, passo 2 del §14).
 
 ## 0. Contesto
 
