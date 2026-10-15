@@ -142,8 +142,8 @@ test('simulate ≈ ipergeometrica: 3+ terre al turno 4 con 40 terre su 99', () =
     ...Array.from({ length: 40 }, () => ['terre']),
     ...Array.from({ length: 59 }, () => []),
   ];
-  // Turno 4 "on the play": 7 + 3 = 10 carte viste.
-  const r = S.simulate({ library, want: [{ tag: 'terre', n: 3 }], turn: 4, iterations: 20000, seed: 42 });
+  // Turno 4 a due, iniziando: 7 + 3 = 10 carte viste.
+  const r = S.simulate({ library, want: [{ tag: 'terre', n: 3 }], turn: 4, game: 'play', iterations: 20000, seed: 42 });
   assert.equal(r.seen, 10);
   const oracle = hyperAtLeast(99, 40, 10, 3);
   assert.ok(Math.abs(r.probability - oracle) < 0.02,
