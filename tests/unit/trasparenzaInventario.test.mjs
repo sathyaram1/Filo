@@ -51,6 +51,7 @@ const CARTELLA_DATI = {
   adblock: { frase: 'le liste per bloccare la pubblicità' },
   'firmatari-c2pa': { frase: 'l\'elenco dei firmatari riconosciuti delle credenziali sulle immagini' },
   Dictionaries: { frase: 'i dizionari del correttore ortografico' },
+  componenti: { frase: 'il componente che legge le finestre del computer' },
 };
 
 test('ogni file nella cartella dei dati è nel documento sulla privacy', () => {
