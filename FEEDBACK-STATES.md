@@ -122,7 +122,8 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
   (feedback #561, dal 2026-09-05); —rilievo di livello 3 non correggibile (bilancio
   dei 3 esaurito)→ `design` (`statusReason: loop`); un 2 a bilancio dei 2 esaurito NON
-  ferma: entra nel feedback derivato dei rimasti e il lavoro passa se non c'è altro
+  ferma: sale sulla correzione se un altro rilievo la fa partire col suo bilancio (#744),
+  altrimenti entra nel feedback derivato dei rimasti e il lavoro passa se non c'è altro
   (dal 2026-09-23, bilanci separati per livello); —rilievo di livello 3/2 che chiede una
   decisione→ `design` (`statusReason: decisione`); —QUALUNQUE consegna con una
   segnalazione per l'owner (`--segnala`: di chi risolve, di chi corregge, e la critica
