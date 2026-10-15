@@ -10,7 +10,7 @@
   background: rgba(0, 0, 0, 0.18);
   font-family: var(--sn-font);
   color: var(--sn-fg);
-  animation: sn-fade-in 100ms ease-out;
+  animation: sn-fade-in calc(100ms * var(--sn-motion, 1)) ease-out;
 }
 
 .sn-rt-modal {

@@ -662,6 +662,12 @@
       invoke: 'Preferenze → Tema.',
     },
     {
+      id: 'aspetto-su-misura', title: 'Aspetto su misura: colori, font, animazioni, ombre', category: 'settings',
+      desc: 'Ogni dettaglio dell’aspetto di Filo si cambia: i colori (accento, sfondo, testo, bottoni, link, selezione…), il font dell’interfaccia e quello dei link, il raggio degli angoli, la durata di tutte le animazioni e l’intensità delle ombre. Il font dei link segue quello dell’interfaccia finché non lo tocchi. La durata è un moltiplicatore: 0 toglie le animazioni (anche lo scorrimento morbido), 1 è quella di serie, 2 le rende due volte più lente. Chiedendolo a Filo («togli le animazioni», «ombre più leggere», «metti i link con un font con grazie») il cambio si applica subito e sotto la risposta compare un controllo per regolarlo; un valore che non ha senso viene rifiutato dicendo quale formato serve.',
+      invoke: 'Preferenze → Impostazioni avanzate → «Aspetto: token estetici», oppure chiedendolo a Filo in chat.',
+      doesNot: 'Non cambia l’aspetto dei siti che visiti: il font dei link vale per le pagine di Filo, e per i siti c’è lo stile della pagina. Sui siti con regole di sicurezza molto strette i menu di Filo possono restare con l’aspetto di serie. Le animazioni che misurano un tempo vero, come l’anello per annullare un messaggio dettato, non cambiano durata.',
+    },
+    {
       id: 'onboarding', title: 'Intervista di benvenuto', category: 'settings',
       desc: 'La prima volta che apri Filo, invece di una schermata di configurazione parte una chiacchierata. Ti chiede chi sei e come vuoi che ti parli. Ti chiede anche quanto vuoi che faccia da solo, e il livello lo scegli tu con un clic. Applica quello che gli dici mentre parlate, e ti racconta in poche righe l’aspetto, la privacy, come sceglie i modelli AI e come funzionano i crediti. Dì "basta così" e la chiude, in qualsiasi momento. Quella frase la riconosce l’app da sé, quindi funziona anche se l’AI non risponde; sotto la conversazione c’è anche il pulsante "Salta l’accoglienza". Rispondere "no grazie" a una proposta invece rifiuta solo quella: si va avanti col resto. Se chiudi la finestra a metà la ritrovi dov’era. Alla fine Filo ti prepara la tua prima home, costruita su quello che ha appena imparato.',
       invoke: 'Parte da sola al primo avvio. Per rifarla in qualsiasi momento, Preferenze → "Rifai l’intervista di benvenuto". Nella stessa sezione trovi le interviste che hai già fatto, da rileggere. Se si è chiusa prima della fine, la home stessa ti propone di riprenderla.',

@@ -182,8 +182,12 @@
     wrap.appendChild(piano);
 
     const calmo = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
+    // Token `motion`: ogni tempo del filo si moltiplica; a 0 il filo sta fermo come col movimento ridotto.
+    const motion = () => (global.SN_THEME_TOKENS ? global.SN_THEME_TOKENS.motionFactor(document) : 1);
     const durata = (nome, base) => {
-      try { return ms(getComputedStyle(wrap).getPropertyValue(nome), base); } catch (_) { return base; }
+      let v = base;
+      try { v = ms(getComputedStyle(wrap).getPropertyValue(nome), base); } catch (_) {}
+      return Math.round(v * motion());
     };
 
     const nodi = [];
@@ -247,15 +251,17 @@
       if (!finito) return false;
       if (avv.m !== avv.a) return false;
       if (Math.abs(onda.amp) > 0.02) return false;
-      return nodi.every((nd) => nd.stretta >= 1 || (nd.riaperto && Date.now() - nd.riaperto > 400)) && nodi.every((nd) => !nd.strappo);
+      const k = motion();
+      return nodi.every((nd) => nd.stretta >= 1 || (nd.riaperto && Date.now() - nd.riaperto > 400 * k)) && nodi.every((nd) => !nd.strappo);
     }
 
     function disegna() {
       if (!vivo || !wrap.isConnected) { corre = false; return; }
       const ora = Date.now();
-      onda.amp += (onda.ampA - onda.amp) * (calmo ? 1 : 0.06);
+      const k = motion();
+      onda.amp += (onda.ampA - onda.amp) * (calmo || !k ? 1 : 0.06);
       onda.vel += (onda.velA - onda.vel) * 0.08;
-      if (!calmo) onda.fase += onda.vel;
+      if (!calmo && k) onda.fase += onda.vel / k;
 
       if (avv.m !== avv.a) {
         const t = avv.durata > 0 && !calmo ? Math.min(1, (ora - avv.t0) / avv.durata) : 1;
@@ -273,7 +279,7 @@
         if (avv.m === 0) nd.y = nd.seg.offsetTop + RIGA;
         if (nd.riaperto) {
           // Un passo fallito: il cappio si stringe e poi si riapre, e il nodo non si forma mai.
-          const p = calmo ? 1 : Math.min(1, (ora - nd.riaperto) / 340);
+          const p = calmo || !k ? 1 : Math.min(1, (ora - nd.riaperto) / (340 * k));
           nd.stretta = 1 - 0.62 * facile(p);
         } else if (nd.stretta < 1) {
           nd.stretta = calmo || nd.durata <= 0 ? 1 : Math.min(1, (ora - nd.nato) / nd.durata);
@@ -291,7 +297,7 @@
         if (nd.riaperto) q = 0;
         let r = R_NODO * Math.min(1, q);
         if (nd.strappo) {
-          const p = Math.min(1, (ora - nd.strappo) / 180);
+          const p = k ? Math.min(1, (ora - nd.strappo) / (180 * k)) : 1;
           r *= 1 + Math.sin(Math.PI * p) / 3;
           if (p >= 1) nd.strappo = 0;
         }
@@ -334,8 +340,8 @@
       el: piano,
       sveglia,
       // Mentre il modello ragiona il filo ondeggia pieno; mentre uno strumento lavora si tende, il lavoro è altrove.
-      pensa() { onda.ampA = calmo ? 0 : 3.2; onda.velA = 0.065; sveglia(); },
-      agisce() { onda.ampA = calmo ? 0 : 0.3; onda.velA = 0.014; sveglia(); },
+      pensa() { onda.ampA = calmo || !motion() ? 0 : 3.2; onda.velA = 0.065; sveglia(); },
+      agisce() { onda.ampA = calmo || !motion() ? 0 : 0.3; onda.velA = 0.014; sveglia(); },
       // Fermato dall'utente: il filo si taglia e la punta si affloscia di lato.
       taglia() { onda.tagliato = true; onda.ampA = 0; onda.coda = 2; finito = true; sveglia(); },
       // Lavoro chiuso: quello che è già successo sta fermo.

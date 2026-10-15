@@ -37,6 +37,9 @@
     if (reg) reg.applyToDocument(document, tokens || {});
   }
 
+  // Il segno delle pagine di Filo: gli override dei token girano anche sui siti, e il font dei link vale solo qui.
+  document.documentElement.dataset.snPagina = '';
+
   // Tema/scala iniziali "best effort" prima che le impostazioni siano caricate.
   applyTheme('system');
 

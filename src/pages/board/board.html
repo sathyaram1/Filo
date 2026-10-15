@@ -48,10 +48,10 @@
     .bd-spinner {
       width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%;
       border: 2px solid var(--sn-border); border-top-color: var(--sn-accent);
-      animation: bdSpin 0.8s linear infinite;
+      animation: bdSpin calc(0.8s * var(--sn-motion, 1)) linear infinite;
     }
     @keyframes bdSpin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) { .bd-spinner { animation-duration: 2s; } }
+    @media (prefers-reduced-motion: reduce) { .bd-spinner { animation-duration: calc(2s * var(--sn-motion, 1)); } }
 
     /* Se il caricamento fallisce la bacheca lo DICE e offre un modo per riprovare, invece di fingere che non
        ci sia nulla da votare. */
@@ -161,7 +161,7 @@
     .bd-mia {
       display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
       border: 1px solid var(--sn-border); border-radius: 10px; background: var(--sn-card);
-      padding: 4px 6px 4px 4px; transition: border-color .15s;
+      padding: 4px 6px 4px 4px; transition: border-color calc(.15s * var(--sn-motion, 1));
     }
     .bd-mia:hover, .bd-mia.bd-mia-aperta { border-color: color-mix(in srgb, var(--sn-accent) 45%, var(--sn-border)); }
     .bd-mia-testa {

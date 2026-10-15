@@ -21,7 +21,7 @@
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
   box-shadow: var(--sn-shadow);
-  animation: sn-fade-in 100ms ease-out;
+  animation: sn-fade-in calc(100ms * var(--sn-motion, 1)) ease-out;
   backdrop-filter: blur(4px);
 }
 
@@ -122,7 +122,7 @@
   border-radius: 999px;
   color: var(--sn-fg);
   font-size: 12px;
-  transition: background 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-msg-rimedio:hover { background: var(--sn-hover); }
 /* Sotto una risposta fermata dal tetto di lunghezza la riga è in corsivo, il tasto no. */
@@ -293,7 +293,7 @@
   box-shadow: var(--sn-shadow);
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease, background 150ms ease;
+  transition: opacity calc(200ms * var(--sn-motion, 1)) ease, transform calc(200ms * var(--sn-motion, 1)) ease, background calc(150ms * var(--sn-motion, 1)) ease;
   pointer-events: none;
 }
 
@@ -333,7 +333,7 @@
   height: 8px;
   border-radius: 50%;
   background: #e02b2b;
-  animation: sn-dictate-pulse 1.2s ease-in-out infinite;
+  animation: sn-dictate-pulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 .sn-dictate-pill:hover { border-color: var(--sn-accent); }
 .sn-dictate-pill-live {
@@ -373,7 +373,7 @@
   gap: 10px;
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease, border-color 120ms ease;
+  transition: opacity calc(200ms * var(--sn-motion, 1)) ease, transform calc(200ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-save-confirm.sn-save-confirm-visible { opacity: 1; transform: translateY(0); }
 .sn-save-confirm:hover,

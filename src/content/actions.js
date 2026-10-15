@@ -1045,7 +1045,7 @@
       if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
-      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
+      setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, self.SN_THEME_TOKENS?.motionMs(220) ?? 220);
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
@@ -1895,7 +1895,7 @@
       b.textContent = label;
       const base = [
         'flex:1', 'padding:9px 12px', 'border-radius:8px', 'font-size:13px',
-        'font-family:inherit', 'cursor:pointer', 'transition:background .12s,border-color .12s',
+        'font-family:inherit', 'cursor:pointer', 'transition:background calc(.12s * var(--sn-motion, 1)),border-color calc(.12s * var(--sn-motion, 1))',
       ];
       if (primary) {
         base.push('border:1px solid var(--sn-accent,#c45a3b)', 'background:var(--sn-accent,#c45a3b)', 'color:#fff');

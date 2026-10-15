@@ -80,12 +80,12 @@
       position: relative; width: 40px; height: 22px; border-radius: 999px;
       /* A riposo un grigio theme-aware: `--sn-border` sul tema chiaro è quasi bianco e non si leggeva come switch.
          `--sn-muted` si vede su entrambi i temi; da acceso passa a `--sn-accent`. */
-      background: var(--sn-muted); transition: background 0.15s; flex: 0 0 auto;
+      background: var(--sn-muted); transition: background calc(0.15s * var(--sn-motion, 1)); flex: 0 0 auto;
     }
     .mg-switch-thumb {
       position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
-      border-radius: 50%; background: #fff; transition: transform 0.15s;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      border-radius: 50%; background: #fff; transition: transform calc(0.15s * var(--sn-motion, 1));
+      box-shadow: 0 1px 2px rgba(0, 0, 0, calc(0.3 * var(--sn-ombra, 1)));
     }
     .mg-switch input:checked + .mg-switch-track { background: var(--sn-accent); }
     .mg-switch input:checked + .mg-switch-track .mg-switch-thumb { transform: translateX(18px); }
@@ -101,8 +101,8 @@
     #mgRtRoot label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
       box-shadow: 0 0 0 4px color-mix(in srgb, var(--sn-accent) 22%, transparent);
     }
-    #mgRtRoot .mg-switch-track { transition: background 0.15s, box-shadow 0.15s; }
-    #mgRtRoot label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa 0.9s ease-in-out infinite; }
+    #mgRtRoot .mg-switch-track { transition: background calc(0.15s * var(--sn-motion, 1)), box-shadow calc(0.15s * var(--sn-motion, 1)); }
+    #mgRtRoot label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa calc(0.9s * var(--sn-motion, 1)) ease-in-out infinite; }
     @keyframes mg-rt-pulsa { 50% { opacity: 0.55; } }
     .mg-rt-stato:empty { display: none; }
     .mg-rt-stato.mg-err { color: #c0392b; }
@@ -140,7 +140,7 @@
       padding: 7px 14px; border-radius: 999px;
       border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
       font-size: 13px; font-weight: 600; color: var(--sn-muted);
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      transition: background calc(0.15s * var(--sn-motion, 1)), color calc(0.15s * var(--sn-motion, 1)), border-color calc(0.15s * var(--sn-motion, 1));
     }
     .mg-auto-choice-item:hover .mg-auto-choice-text { background: var(--sn-hover); color: var(--sn-fg); }
     .mg-auto-choice-item input:checked + .mg-auto-choice-text {
@@ -226,7 +226,7 @@
       display: inline-flex; align-items: center; justify-content: center;
       width: 30px; height: 30px; border-radius: 6px;
       color: var(--sn-muted);
-      transition: background 0.1s, color 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1)), color calc(0.1s * var(--sn-motion, 1));
     }
     .mg-search-toggle:hover { background: var(--sn-hover); color: var(--sn-fg); }
     .mg-search-toggle:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
@@ -253,7 +253,7 @@
     .mg-search-progress[hidden] { display: none; }
     .mg-search-progress-fill {
       display: block; height: 100%; width: 0;
-      background: var(--sn-accent); transition: width 0.2s ease-out;
+      background: var(--sn-accent); transition: width calc(0.2s * var(--sn-motion, 1)) ease-out;
     }
     .mg-search-ico { display: inline-flex; color: var(--sn-muted); flex: 0 0 auto; }
     .mg-search-ico svg { display: block; }
@@ -350,7 +350,7 @@
       padding: 7px 12px; border-radius: 999px;
       border: 1px solid var(--sn-border);
       background: transparent; color: var(--sn-muted);
-      cursor: pointer; transition: background 0.14s, color 0.14s, border-color 0.14s;
+      cursor: pointer; transition: background calc(0.14s * var(--sn-motion, 1)), color calc(0.14s * var(--sn-motion, 1)), border-color calc(0.14s * var(--sn-motion, 1));
       display: inline-flex; align-items: center; gap: 6px;
     }
     .mg-chip:hover { background: var(--sn-hover); color: var(--sn-fg); }
@@ -401,7 +401,7 @@
       padding: 14px 16px; text-align: left;
       font: inherit; color: var(--sn-fg);
       display: flex; flex-direction: column; gap: 2px;
-      transition: border-color 0.14s, background 0.14s;
+      transition: border-color calc(0.14s * var(--sn-motion, 1)), background calc(0.14s * var(--sn-motion, 1));
     }
     .mg-tile--click { cursor: pointer; appearance: none; -webkit-appearance: none; }
     .mg-tile--click:hover { border-color: var(--sn-accent); background: var(--sn-hover); }
@@ -430,7 +430,7 @@
       font-size: 11px; color: var(--sn-muted); margin-top: 6px;
       display: inline-flex; align-items: center; gap: 4px;
     }
-    .mg-tile-caret { transition: transform 0.16s; display: inline-block; }
+    .mg-tile-caret { transition: transform calc(0.16s * var(--sn-motion, 1)); display: inline-block; }
     .mg-tile--open .mg-tile-caret { transform: rotate(90deg); }
     .mg-tile--open { border-color: var(--sn-accent); }
 
@@ -592,7 +592,7 @@
       cursor: col-resize;
       background: transparent;
       border-radius: 2px;
-      transition: background 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1));
     }
     .mg-divider:hover, .mg-divider.mg-divider--dragging {
       background: var(--sn-accent);
@@ -618,7 +618,7 @@
       border: none; background: transparent; cursor: pointer;
       color: var(--sn-muted); font-size: 14px; line-height: 1;
       padding: 2px 4px; border-radius: 4px;
-      transition: background 0.1s, color 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1)), color calc(0.1s * var(--sn-motion, 1));
     }
     .mg-sort-btn:hover { background: var(--sn-hover); color: var(--sn-fg); }
     /* Ordinamento non predefinito: il glifo si tinge d'accento, così è chiaro che la lista è riordinata. */
@@ -637,7 +637,7 @@
       border: 1px solid var(--sn-border);
       border-left-width: 3px;
       background: transparent;
-      transition: background 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1));
     }
     /* Le etichette vanno a capo invece di uscire dalla scheda: «fusione ferma» e «locale»
        insieme non ci stanno, e tagliate a metà parola non dicono più niente. */
@@ -675,7 +675,7 @@
        votando». Solo sulla card di turno, non sulle altre. */
     .mg-item--evaluating {
       border-left-color: var(--sn-accent);
-      animation: mg-eval-pulse 1.2s ease-in-out infinite;
+      animation: mg-eval-pulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes mg-eval-pulse {
       0%, 100% { box-shadow: inset 4px 0 0 -1px var(--sn-accent); }
@@ -686,10 +686,10 @@
     .mg-eval-dots i {
       width: 5px; height: 5px; border-radius: 50%;
       background: var(--sn-accent);
-      animation: mg-eval-bounce 1s ease-in-out infinite;
+      animation: mg-eval-bounce calc(1s * var(--sn-motion, 1)) ease-in-out infinite;
     }
-    .mg-eval-dots i:nth-child(2) { animation-delay: 0.15s; }
-    .mg-eval-dots i:nth-child(3) { animation-delay: 0.3s; }
+    .mg-eval-dots i:nth-child(2) { animation-delay: calc(0.15s * var(--sn-motion, 1)); }
+    .mg-eval-dots i:nth-child(3) { animation-delay: calc(0.3s * var(--sn-motion, 1)); }
     @keyframes mg-eval-bounce {
       0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
       40%           { opacity: 1;   transform: scale(1); }
@@ -707,7 +707,7 @@
     .mg-segno-fermata {
       flex: 0 0 auto; align-self: center; display: inline-flex;
       width: var(--mg-segno-size, 11px); height: var(--mg-segno-size, 11px); color: var(--sn-muted);
-      cursor: help; transition: transform 0.1s;
+      cursor: help; transition: transform calc(0.1s * var(--sn-motion, 1));
     }
     .mg-segno-fermata:hover { transform: scale(1.25); }
     .mg-segno-fermata svg { width: 100%; height: 100%; display: block; overflow: visible; }
@@ -740,7 +740,7 @@
       width: 12px; height: 12px; padding: 0; border-radius: 50%;
       border: 1px solid var(--sn-muted); background: transparent;
       cursor: pointer; box-sizing: border-box;
-      transition: background 0.1s, border-color 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
     }
     .mg-priority .mg-dot:hover { border-color: var(--sn-accent); }
     .mg-priority .mg-dot--on { background: var(--sn-accent); border-color: var(--sn-accent); }
@@ -768,7 +768,7 @@
     }
     .mg-work-live i {
       width: 7px; height: 7px; border-radius: 50%; background: var(--sn-accent);
-      animation: mg-eval-bounce 1s ease-in-out infinite;
+      animation: mg-eval-bounce calc(1s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     .mg-work-idle { flex-basis: 100%; font-style: italic; }
     @media (prefers-reduced-motion: reduce) {
@@ -834,7 +834,7 @@
       width: 14px; height: 14px; flex: 0 0 auto;
       display: inline-flex; align-items: center; justify-content: center;
       cursor: pointer; color: var(--sn-muted);
-      transition: transform 0.1s;
+      transition: transform calc(0.1s * var(--sn-motion, 1));
     }
     .mg-forma:hover, .mg-forma:focus-visible { transform: scale(1.2); }
     .mg-forma svg { width: 14px; height: 14px; display: block; overflow: visible; }
@@ -860,7 +860,7 @@
       border: 2px solid var(--sn-border);
       background: transparent; display: inline-block;
       flex: 0 0 auto;
-      transition: transform 0.1s;
+      transition: transform calc(0.1s * var(--sn-motion, 1));
     }
     .mg-dot--clickable {
       cursor: pointer;
@@ -912,7 +912,7 @@
       background: var(--sn-surface-2, rgba(127,127,127,.08));
       cursor: default;
     }
-    .mg-bubble-imgs img.mg-img-loading { animation: mgImgPulse 1.2s ease-in-out infinite; }
+    .mg-bubble-imgs img.mg-img-loading { animation: mgImgPulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite; }
     .mg-bubble-imgs img.mg-img-failed {
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 11px; color: var(--sn-text-dim, #999);
@@ -1020,7 +1020,7 @@
       line-height: 1.45; color: var(--sn-fg); opacity: 0; transform: translateY(8px);
       /* Più esiti in un avviso solo: ognuno sulla sua riga. */
       white-space: pre-line;
-      transition: opacity 0.18s ease, transform 0.18s ease;
+      transition: opacity calc(0.18s * var(--sn-motion, 1)) ease, transform calc(0.18s * var(--sn-motion, 1)) ease;
       pointer-events: none; z-index: 2147483001;
     }
     /* Visibile prende il puntatore (sopra, il tempo aspetta; un clic lo chiude); nascosto torna trasparente. */
@@ -1080,7 +1080,7 @@
     .mg-usernote-toggle::after {
       content: '▾'; display: inline-block; margin-left: 6px;
       font-size: 11px; color: var(--sn-muted);
-      transition: transform 0.12s;
+      transition: transform calc(0.12s * var(--sn-motion, 1));
     }
     .mg-usernote-toggle[aria-expanded="true"]::after { transform: rotate(180deg); }
     .mg-usernote-toggle.mg-usernote-piena {
@@ -1107,7 +1107,7 @@
       padding: 7px 12px; border-radius: 8px;
       border: 1px solid var(--sn-border); background: var(--sn-bg, transparent);
       color: var(--sn-fg); font-size: 13px; font-weight: 600;
-      transition: background 0.1s, border-color 0.1s;
+      transition: background calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
     }
     .mg-star-btn:hover { background: var(--sn-hover); }
     .mg-star-btn[aria-pressed="true"] {
@@ -1165,7 +1165,7 @@
     .mg-segno--tolto, .mg-segno--errore { color: var(--sn-muted); }
     .mg-segno-riprova {
       all: unset; cursor: pointer; margin-left: 8px; color: var(--sn-accent);
-      font-size: 12px; transition: opacity 0.1s;
+      font-size: 12px; transition: opacity calc(0.1s * var(--sn-motion, 1));
     }
     .mg-segno-riprova:hover, .mg-segno-riprova:focus-visible { text-decoration: underline; }
     .mg-segno-riprova:disabled { opacity: 0.5; cursor: default; }

@@ -48,6 +48,9 @@
     hover: 'voci di menu, righe e bottoni secondari',
     overlay: 'anche la barra laterale',
     'button.bg': 'è questo per "rendi i bottoni di un colore"',
+    'link.font': 'solo i link; finché non lo tocchi seguono `font`',
+    motion: 'un moltiplicatore di TUTTE le animazioni: "togli le animazioni" = "0", "rimetti le animazioni" = "predefinito", "più lente" = "2", "più veloci" = "0.5"',
+    shadow: 'l\'alfa dell\'ombra di menu e popup, le altre ombre seguono: "ombre più leggere" = più basso di 0.18, "togli le ombre" = "0"',
   };
   // Nel main i moduli sono già caricati dal loader; negli unit test che caricano solo questo, li porta require.
   function modulo(nome, file) {
@@ -390,7 +393,7 @@
         + 'Con valore "predefinito" il token torna al suo valore di serie. Token disponibili:\n' + righeToken(),
       properties: {
         token: S('Il token, dall\'elenco.'),
-        valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per una durata i millisecondi ("450ms"); per il font una lista di famiglie ("Georgia, serif").'),
+        valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per una durata i millisecondi ("450ms"); per la durata delle animazioni un moltiplicatore 0-3 ("0" le toglie, "1" normali, "2" due volte più lente); per il font una lista di famiglie ("Georgia, serif").'),
       },
       required: ['token', 'valore'],
     },

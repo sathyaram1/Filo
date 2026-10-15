@@ -1078,6 +1078,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   if (ownKeyBefore !== null && ownKeyBefore !== String(merged?.apiKeys?.openrouter || '').trim()) {
     try { await globalThis.SN_WALLET_MAIN?.ownKeyChanged?.(); } catch (_) {}
   }
+  try { require('../movimento').segui(merged); } catch (_) {}
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   avvisaSeLaProntezzaCambia().catch(() => {});
   try {
@@ -2570,10 +2571,12 @@ async function eseguiAzioneFilo(action, {
           await applySettingsUpdate({ themeTokens: restanti });
           return { executed: true, kept: true };
         }
-        if (!T || !T.validate(token, valore)) return { executed: false, kept: false };
+        if (!T || !T.validate(token, valore)) {
+          return { executed: false, kept: false, ...(T ? { output: { error: T.errorMessage(token) } } : {}) };
+        }
         const settings = await Storage.getSettings();
         const overrides = { ...(settings.themeTokens || {}) };
-        overrides[token] = String(valore).trim();
+        overrides[token] = T.normalize(token, valore);
         await applySettingsUpdate({ themeTokens: overrides });
         // kept:true → il client renderizza il bottone di raffinamento (GUI).
         return { executed: true, kept: true };

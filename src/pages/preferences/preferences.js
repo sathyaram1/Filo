@@ -69,17 +69,8 @@
     return !!t && t.type === 'color';
   }
 
-  // Messaggio d'errore puntuale per tipo di token.
   function tokenErrorMsg(name) {
-    const t = Tokens && Tokens.get(name);
-    switch (t && t.type) {
-      case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
-      case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
-      case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
-      case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
-      case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
-      default: return 'Valore non valido.';
-    }
+    return Tokens ? Tokens.errorMessage(name) : 'Valore non valido.';
   }
 
   // (Ri)disegna una singola riga dal modello: valore effettivo, stato
@@ -203,7 +194,7 @@
     for (const name of tokenInCorso) {
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
-      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = v;
+      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = Tokens.normalize(name, v);
     }
     chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
     flashSaved('tokenSavedHint');
@@ -248,11 +239,12 @@
     row.classList.remove('sn-token-invalid');
     if (v !== '' && !Tokens.validate(name, v)) return;
 
-    if (v === '' || v === Tokens.defaultValue(name, resolvedTheme())) {
+    const canonico = v === '' ? '' : Tokens.normalize(name, v);
+    if (canonico === '' || canonico === Tokens.defaultValue(name, resolvedTheme())) {
       // Vuoto o uguale al predefinito del tema corrente: nessun override.
       delete currentOverrides[name];
     } else {
-      currentOverrides[name] = v;
+      currentOverrides[name] = canonico;
     }
     row.classList.toggle('sn-token-modified', !!Tokens.validate(name, currentOverrides[name]));
     if (isColorToken(name)) {
