@@ -572,8 +572,8 @@
     options_security_safebrowse_network: 'Controlli di rete (età del dominio e del certificato)',
     options_security_safebrowse_network_desc:
       'Quando un sito ha già un indizio sospetto, Filo chiede a due registri pubblici (rdap.org e crt.sh) ' +
-      'da quanto esistono il dominio e il suo certificato, mandando solo il nome del sito: un sito "di un ' +
-      'marchio noto" nato pochi giorni fa è un forte segnale di truffa. Non richiede alcuna chiave. ' +
+      'da quanto esistono il dominio e il suo certificato. Manda solo il nome del sito. Un sito "di un ' +
+      'marchio noto" nato pochi giorni fa è un forte segnale di truffa. Non serve nessuna chiave. ' +
       'Disattivalo se non vuoi che Filo faccia queste richieste.',
     options_security_safebrowse_llm: 'Giudizio AI sui casi sospetti',
     options_security_safebrowse_llm_desc:
