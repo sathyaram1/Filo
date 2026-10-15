@@ -71,10 +71,53 @@ test('il messaggio di crediti finiti distingue chiave di Filo e chiave propria',
 });
 
 test('ogni esito del server ha una frase; uno sconosciuto cade su quella generica', () => {
-  for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable']) {
+  for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'inviter_not_linked', 'network_cap', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable']) {
     assert.ok(W.redeemMessage(s).length > 10, s);
+    assert.notEqual(s === 'internal' ? '' : W.redeemMessage(s), W.REDEEM_MESSAGES.internal, `${s}: non è la frase generica`);
   }
   assert.equal(W.redeemMessage('boh'), W.REDEEM_MESSAGES.internal);
+});
+
+// #1120 — un invito di chi non ha collegato Google: chi lo riceve sa cosa chiedere, e che un altro invito funziona.
+test('l\'invito di chi non ha Google collegato dice cosa manca e a chi chiederlo', () => {
+  const frase = W.redeemMessage('inviter_not_linked');
+  assert.match(frase, /collegare Google/);
+  assert.match(frase, /un altro invito/);
+});
+
+// #1120 — il quarto dalla stessa rete sa QUANDO riprovare, nell'ora del suo computer, e che il codice non è bruciato.
+test('il tetto per rete dice l\'ora in cui riprovare: oggi, domani o in un altro giorno', () => {
+  const now = new Date(2026, 9, 15, 10, 0).getTime();
+  const ora = (d) => d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const oggi = new Date(2026, 9, 15, 14, 30);
+  assert.equal(W.networkCapMessage(oggi.toISOString(), now),
+    `Da questa rete sono già entrate troppe persone con un invito: riprova dopo le ${ora(oggi)}. Il codice resta valido.`);
+  const domani = new Date(2026, 9, 16, 9, 5);
+  assert.match(W.networkCapMessage(domani.toISOString(), now), new RegExp(`riprova domani dopo le ${ora(domani)}\\.`));
+  const fra3 = new Date(2026, 9, 18, 9, 5);
+  assert.match(W.networkCapMessage(fra3.toISOString(), now), new RegExp(`riprova dal 18 ottobre alle ${ora(fra3)}\\.`));
+  // Senza un'ora valida, o con un'ora già passata, resta la frase senza promesse.
+  for (const x of [undefined, '', 'boh', new Date(now - 1000).toISOString()]) {
+    assert.equal(W.networkCapMessage(x, now), W.REDEEM_MESSAGES.network_cap, String(x));
+  }
+  // La risposta del server arriva intera a redeemMessage: l'ora la porta `reopensAt`.
+  assert.match(W.redeemMessage('network_cap', { reopensAt: new Date(Date.now() + 3 * 3600e3).toISOString() }), /riprova (domani )?dopo le \d\d:\d\d\./);
+  assert.match(W.redeemMessage('network_cap', null), /riprova più tardi/);
+});
+
+// #1120 — i codici di un portafoglio senza Google non fanno entrare nessuno: al loro posto la strada per sbloccarli.
+test('gli inviti chiusi finché manca Google: la riga giusta per chi non è entrato e per chi è entrato altrove', () => {
+  assert.equal(W.invitesLock({}), null);
+  assert.equal(W.invitesLock({ server: { hasWallet: true, invites: [{ code: 'AAAA2222' }] } }), null, 'un server di prima non chiude niente');
+  assert.equal(W.invitesLock({ server: { hasWallet: true, canInvite: true, invitesLocked: null } }), null);
+  const chiuso = { hasWallet: true, canInvite: false, invitesLocked: 'need_google' };
+  for (const google of [undefined, null, { signedIn: false, linkedHere: null }, { signedIn: true, linkedHere: null }, { signedIn: true, linkedHere: true }]) {
+    assert.deepEqual(W.invitesLock({ server: chiuso, google }), { testo: '', bottone: 'Collega Google per dare i tuoi inviti' }, JSON.stringify(google));
+  }
+  // Già dentro con un account legato a un'altra identità: rifare lo stesso accesso non sblocca niente, e si dice.
+  const altrove = W.invitesLock({ server: chiuso, google: { signedIn: true, linkedHere: false } });
+  assert.match(altrove.testo, /già legato a un’altra copia di Filo/);
+  assert.match(altrove.bottone, /altro account Google/);
 });
 
 // Un invito vale per più persone: un rifiuto per posti finiti non si racconta
