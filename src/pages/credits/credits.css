@@ -163,6 +163,7 @@
   margin: 4px 0 14px; padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--sn-error);
   background: color-mix(in srgb, var(--sn-error) 9%, transparent); color: var(--sn-error); font-weight: 600;
 }
+.sn-wallet-allarme-ricarica { display: block; margin-top: 8px; font-weight: 600; }
 .sn-wallet-conto-nota { margin: 6px 0 0; }
 .sn-wallet-filtro { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
 .sn-wallet-table tr.is-fuori { display: none; }
