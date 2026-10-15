@@ -169,8 +169,8 @@ test('i permessi che mancano (su Mac) si leggono uno per uno, ognuno col pulsant
   await pref.evaluate(() => window.SN_PREF_ALTRE_APP.disegna({
     attiva: true, fase: 'pronto', versione: '0.35.4', byte: 96341278,
     permessi: [
-      { id: 'accessibilita', nome: 'Accessibilità', frase: 'Su Mac serve il permesso «Accessibilità» per Filo, per leggere e toccare le finestre.', apribile: true },
-      { id: 'schermo', nome: 'Registrazione schermo', frase: 'Su Mac serve il permesso «Registrazione schermo» per Filo, per vedere le finestre.', apribile: true },
+      { id: 'accessibilita', nome: 'Accessibilità', frase: 'Manca il permesso «Accessibilità» per Filo: serve per leggere e toccare le finestre.', apribile: true },
+      { id: 'schermo', nome: 'Registrazione schermo', frase: 'Manca il permesso «Registrazione schermo» per Filo: serve per vedere le finestre.', apribile: true },
     ],
   }));
   await expect(pref.locator('#altreAppFrase')).toContainText('non gli dà ancora tutto quello che serve');

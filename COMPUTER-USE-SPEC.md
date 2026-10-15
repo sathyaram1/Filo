@@ -472,7 +472,8 @@ attuazione. Utile da solo.
 
 **CU3 — Il driver.** Interfaccia `ComputerDriver`, integrazione del Cua Driver
 via MCP, installazione su richiesta, degrado pulito se manca. Nessuna azione
-esposta ancora al modello.
+esposta ancora al modello. *(Fatto, #779: `src/main/services/altreApp/`; il
+ComputerDriver si prende da `require('./altreApp').computerDriver`.)*
 
 **CU4 — Il classificatore del bersaglio.** `src/shared/targetClassify.js` con
 gli unit test. Puramente logica: nessuna UI, nessun Electron. Va scritto e

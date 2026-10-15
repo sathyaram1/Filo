@@ -105,3 +105,40 @@ test('un pacchetto con l\'impronta sbagliata non si installa e lo stato lo dice 
   assert.equal(w.codice, 'impronta');
   await A.seguiImpostazioni({ altreApp: { enabled: false } });
 });
+
+test('su Linux, senza l\'accessibilità del desktop, lo stato dice cosa manca e il ComputerDriver non parte a vuoto', { skip: process.platform !== 'linux' && 'la prova del driver chiede i permessi solo su Linux' }, async () => {
+  scriviElenco(createHash('sha256').update(file).digest('hex'));
+  process.env.FINTO_ATSPI = '0';
+  try {
+    await A.seguiImpostazioni({ altreApp: { enabled: true } });
+    const s = await A.statoPerPagina({ verifica: true });
+    assert.equal(s.fase, 'pronto');
+    assert.deepEqual(s.permessi.map((p) => p.id), ['atspi']);
+    const w = await A.computerDriver.windows();
+    assert.equal(w.codice, 'permessi');
+    assert.match(w.motivo, /Accessibilità del desktop/);
+  } finally {
+    delete process.env.FINTO_ATSPI;
+    await A.seguiImpostazioni({ altreApp: { enabled: false } });
+  }
+});
+
+test('un driver sparito dal disco: l\'operazione dice «non parte», lo stato offre di reinstallarlo, e reinstallato risponde', { skip: SALTA }, async () => {
+  const { rmSync } = await import('node:fs');
+  scriviElenco(createHash('sha256').update(file).digest('hex'));
+  await A.seguiImpostazioni({ altreApp: { enabled: true } });
+  assert.equal((await A.statoPerPagina({ verifica: true })).fase, 'pronto');
+  A.allUscita();
+  rmSync(join(base(), 'cua-driver', '0.0.1-prova', 'cua-driver'));
+  const w = await A.computerDriver.windows();
+  assert.deepEqual({ ok: w.ok, disponibile: w.disponibile, codice: w.codice }, { ok: false, disponibile: false, codice: 'non-parte' });
+  const s = await A.statoPerPagina();
+  assert.equal(s.fase, 'errore');
+  assert.equal(s.errore.codice, 'non-parte');
+  assert.match(s.errore.frase, /non parte/);
+  const r = await A.reinstalla();
+  assert.equal(r.ok, true);
+  assert.equal(r.stato.fase, 'pronto');
+  assert.equal((await A.computerDriver.windows()).ok, true);
+  await A.seguiImpostazioni({ altreApp: { enabled: false } });
+});

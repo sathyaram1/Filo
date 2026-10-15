@@ -176,7 +176,7 @@ function bersaglioValido(b, gesto) {
  * `disponibile()` → { ok:true, motore } | { ok:false, codice, motivo }: dice se il driver c'è, è acceso e può partire.
  * Il motore fa il lavoro grezzo (finestre, albero, immagine, gesto); qui si valida l'ingresso e si pulisce l'uscita.
  */
-function creaComputerDriver({ disponibile, log = () => {} } = {}) {
+function creaComputerDriver({ disponibile, log = () => {}, nonParte = () => {} } = {}) {
   async function conMotore(fn) {
     let d;
     try { d = await disponibile(); } catch (e) { d = { ok: false, codice: 'guasto', motivo: 'il driver non risponde' }; log(e); }
@@ -187,13 +187,14 @@ function creaComputerDriver({ disponibile, log = () => {} } = {}) {
       return await fn(d.motore);
     } catch (e) {
       log(e);
-      const giu = e && (e.codice === 'avvio' || e.codice === 'uscito' || e.codice === 'chiuso');
-      return {
-        ok: false,
-        disponibile: !giu,
-        codice: giu ? 'non-parte' : (e && e.codice === 'tempo' ? 'tempo' : 'guasto'),
-        motivo: giu ? 'il driver non parte' : (e && e.codice === 'tempo' ? 'il driver non ha risposto in tempo' : 'il driver ha risposto in un modo che Filo non capisce'),
-      };
+      const giu = e && (e.codice === 'avvio' || e.codice === 'uscito');
+      if (giu) { try { nonParte(e); } catch (_) {} }
+      const [codice, motivo] = giu ? ['non-parte', 'il driver non parte']
+        : e && e.codice === 'tempo' ? ['tempo', 'il driver non ha risposto in tempo']
+          // Chiuso da Filo a metà (spento, permessi cambiati): l'operazione si rifà, il driver non è rotto.
+          : e && e.codice === 'chiuso' ? ['interrotto', 'il driver è stato fermato a metà dell\'operazione']
+            : ['guasto', 'il driver ha risposto in un modo che Filo non capisce'];
+      return { ok: false, disponibile: !giu, codice, motivo };
     }
   }
 

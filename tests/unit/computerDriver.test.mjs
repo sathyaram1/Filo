@@ -269,3 +269,17 @@ test('l\'ambiente del driver tiene il sistema e toglie chiavi e segreti', () => 
   for (const k of ['GITHUB_TOKEN', 'ANTHROPIC_API_KEY', 'FILO_USER_DATA', 'NODE_OPTIONS']) assert.equal(env[k], undefined, k);
   assert.equal(env.DO_NOT_TRACK, '1');
 });
+
+test('un driver che non parte più a metà lavoro lo segnala una volta a chi tiene lo stato; fermato da Filo no', async () => {
+  const segnalati = [];
+  const fai = (codice) => creaComputerDriver({
+    disponibile: async () => ({ ok: true, motore: motoreFinto({ finestre: async () => { throw new Mcp.ErroreMcp(codice, codice); } }) }),
+    nonParte: (e) => segnalati.push(e.codice),
+  }).windows();
+  assert.equal((await fai('avvio')).codice, 'non-parte');
+  assert.equal((await fai('uscito')).codice, 'non-parte');
+  const interrotto = await fai('chiuso');
+  assert.deepEqual({ codice: interrotto.codice, disponibile: interrotto.disponibile }, { codice: 'interrotto', disponibile: true });
+  assert.equal((await fai('tempo')).codice, 'tempo');
+  assert.deepEqual(segnalati, ['avvio', 'uscito']);
+});

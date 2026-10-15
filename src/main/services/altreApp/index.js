@@ -164,9 +164,9 @@ async function allineaByte() {
   }
 }
 
-/** Per la pagina: lo stato, e la prima volta in una sessione prova anche che il driver parta davvero. */
+/** Per la pagina: lo stato; la prima volta in una sessione (o finché manca qualcosa) prova anche che il driver parta. */
 async function statoPerPagina({ verifica = false } = {}) {
-  if (verifica && voluto && installatore.stato().fase === 'pronto' && !provato && !installatore.inCorso()) {
+  if (verifica && voluto && installatore.stato().fase === 'pronto' && (!provato || mancantiLinux.length) && !installatore.inCorso()) {
     provato = true;
     const r = await provaDriver();
     if (!r.ok) installatore.imposta({ fase: 'errore', errore: { codice: 'non-parte', frase: frase('non-parte') } });
@@ -189,11 +189,18 @@ async function disponibile() {
   if (s.fase === 'errore') return { ok: false, codice: (s.errore && s.errore.codice) || 'guasto', motivo: (s.errore && s.errore.frase) || 'il componente non funziona' };
   if (s.fase !== 'pronto' || !eseguibileInstallato) return { ok: false, codice: 'assente', motivo: 'il componente non è installato' };
   const mancano = Permessi.mancanti({ daLinux: mancantiLinux });
-  if (mancano.length) return { ok: false, codice: 'permessi', motivo: `manca ${mancano.map((m) => `«${m.nome}»`).join(' e ')}` };
+  if (mancano.length) return { ok: false, codice: 'permessi', motivo: `${mancano.length > 1 ? 'mancano' : 'manca'} ${mancano.map((m) => `«${m.nome}»`).join(' e ')}` };
   return { ok: true, motore };
 }
 
-const computerDriver = creaComputerDriver({ disponibile, log });
+// Un driver che a metà lavoro non parte più (cancellato, rotto) diventa l'errore che in Preferenze offre «Reinstalla».
+const computerDriver = creaComputerDriver({
+  disponibile,
+  log,
+  nonParte: () => {
+    if (voluto && !installatore.inCorso()) installatore.imposta({ fase: 'errore', errore: { codice: 'non-parte', frase: frase('non-parte') } });
+  },
+});
 
 module.exports = {
   computerDriver,

@@ -9,8 +9,8 @@ const PANNELLI_MAC = {
 };
 
 const NOMI = {
-  accessibilita: { nome: 'Accessibilità', frase: 'Su Mac serve il permesso «Accessibilità» per Filo, per leggere e toccare le finestre.' },
-  schermo: { nome: 'Registrazione schermo', frase: 'Su Mac serve il permesso «Registrazione schermo» per Filo, per vedere le finestre.' },
+  accessibilita: { nome: 'Accessibilità', frase: 'Manca il permesso «Accessibilità» per Filo: serve per leggere e toccare le finestre.' },
+  schermo: { nome: 'Registrazione schermo', frase: 'Manca il permesso «Registrazione schermo» per Filo: serve per vedere le finestre.' },
   atspi: { nome: 'Accessibilità del desktop', frase: 'L\'accessibilità del desktop è spenta, e senza Filo non legge le finestre: si accende dalle impostazioni di accessibilità del sistema.' },
   display: { nome: 'Sessione X11', frase: 'Il componente vede le finestre in una sessione X11: in questa sessione non le raggiunge.' },
 };
