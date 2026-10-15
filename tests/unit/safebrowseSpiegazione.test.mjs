@@ -98,5 +98,5 @@ test('le descrizioni della pagina Sicurezza non promettono quello che il codice 
   assert.ok(giudizio.includes(`«${T('options_action_safebrowse_judge')}»`), 'nomina la voce di Modelli dove si sceglie');
   assert.match(giudizio, /mai il contenuto della pagina/);
 
-  assert.match(T('options_security_safebrowse_network_desc'), /solo il nome del sito/);
+  assert.match(T('options_security_safebrowse_network_desc'), /Manda solo il nome del sito/);
 });
