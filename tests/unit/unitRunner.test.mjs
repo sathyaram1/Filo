@@ -638,7 +638,7 @@ test('chiuso il primo da solo, il fermo dietro di lui si chiude come lui, e la c
 
   const nonServe = guardiaPerFile(1000);
   nonServe([{ via: 'a' }, {}, { via: 'b' }, { fine: 'b' }], 0);
-  assert.deepEqual(nonServe([{ via: 'c' }, { fine: 'c' }], 999), null);
+  assert.equal(nonServe([{ via: 'c' }, { fine: 'c' }], 999), null);
   assert.deepEqual(nonServe([], 1000), { file: ['a'] });
   assert.equal(nonServe([{ via: 'z' }, { fine: 'z' }], 1500), null, 'z finisce da sé, ma a chiuso non esce');
   assert.deepEqual(nonServe([], 2000), { tutto: true }, 'il primo chiuso è ancora in corso: chiudere non è servito');
