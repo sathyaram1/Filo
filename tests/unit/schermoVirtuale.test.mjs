@@ -136,8 +136,10 @@ const LINUX_CON_XVFB = process.platform === 'linux' && xvfbDisponibile();
 const senzaLinuxXvfb = LINUX_CON_XVFB ? false : 'serve Linux con xvfb-run';
 const numero = (display) => display.slice(1);
 const spento = (display) => aspettaChe(() => !existsSync(`/tmp/.X${numero(display)}-lock`), { cosa: `Xvfb ${display} spento` });
-const ambienteSenzaSchermo = () => {
-  const env = { ...process.env };
+// Al figlio una temporanea sua: con quella della corsa degli unit test ereditata, il suo teardown la toglierebbe
+// sotto ai file di prova che girano insieme (centotrenta rossi finti).
+const ambienteSenzaSchermo = (temp) => {
+  const env = { ...process.env, TMPDIR: temp, TEMP: temp, TMP: temp };
   for (const k of ['DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'ELECTRON_DISABLE_SANDBOX']) delete env[k];
   return env;
 };
@@ -205,29 +207,40 @@ test('accendiSchermo accende un Xvfb vero, lo dà all\'ambiente e allo spegnimen
   }
 });
 
-test('chi accende lo schermo ed esce senza spegnerlo non lascia Xvfb acceso', { skip: senzaLinuxXvfb }, () => {
+test('chi accende lo schermo ed esce senza spegnerlo non lascia Xvfb acceso', { skip: senzaLinuxXvfb }, async () => {
   // Come il runner che esce di colpo: la temporanea della corsa (col cookie dentro) se ne va all'uscita.
   const codice = `import(${JSON.stringify(pathToFileURL(resolve(ROOT, 'tests', 'helpers', 'percorsi.mjs')).href)})`
     + `.then(() => import(${JSON.stringify(pathToFileURL(resolve(ROOT, 'scripts', 'lib', 'schermo-virtuale.mjs')).href)}))`
     + '.then(async (m) => { const s = await m.accendiSchermo(); console.log(s.display); process.exit(0); })';
-  const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(), timeout: TETTO_ATTESA_MS });
-  assert.equal(r.status, 0, r.stderr);
-  const display = r.stdout.trim();
-  assert.match(display, /^:\d+$/);
-  return spento(display);
+  const temp = cartellaTemporanea('schermo-uscita-');
+  try {
+    const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(temp), timeout: TETTO_ATTESA_MS });
+    assert.equal(r.status, 0, r.stderr);
+    const display = r.stdout.trim();
+    assert.match(display, /^:\d+$/);
+    await spento(display);
+    assert.deepEqual(readdirSync(temp), [], 'la corsa del figlio, cookie compreso, se n\'è andata');
+  } finally {
+    togliCartella(temp);
+  }
 });
 
-test('il globalSetup vero, senza schermo, dà display e sandbox spenta ai lavoratori e alla fine li ritira', { skip: senzaLinuxXvfb }, () => {
+test('il globalSetup vero, senza schermo, dà display e sandbox spenta ai lavoratori e alla fine li ritira', { skip: senzaLinuxXvfb }, async () => {
   const codice = `import(${JSON.stringify(pathToFileURL(resolve(ROOT, 'tests', 'fixtures', 'prima-della-corsa.mjs')).href)})`
     + `.then(async (m) => { const fine = await m.default({ configFile: ${JSON.stringify(resolve(ROOT, 'playwright.config.js'))} });`
     + ' const e = () => ({ DISPLAY: process.env.DISPLAY, ELECTRON_DISABLE_SANDBOX: process.env.ELECTRON_DISABLE_SANDBOX });'
     + ' const durante = e(); await fine(); console.log(JSON.stringify({ durante, dopo: e() })); })';
-  const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(), timeout: TETTO_ATTESA_MS });
-  assert.equal(r.status, 0, r.stderr);
-  const { durante, dopo } = JSON.parse(r.stdout.trim().split('\n').pop());
-  assert.match(durante.DISPLAY, /^:\d+$/);
-  assert.equal(durante.ELECTRON_DISABLE_SANDBOX, '1');
-  assert.match(r.stderr, /schermo virtuale :\d+/, 'chi lancia vede una riga su cosa è successo');
-  assert.deepEqual(dopo, {});
-  return spento(durante.DISPLAY);
+  const temp = cartellaTemporanea('schermo-globalsetup-');
+  try {
+    const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(temp), timeout: TETTO_ATTESA_MS });
+    assert.equal(r.status, 0, r.stderr);
+    const { durante, dopo } = JSON.parse(r.stdout.trim().split('\n').pop());
+    assert.match(durante.DISPLAY, /^:\d+$/);
+    assert.equal(durante.ELECTRON_DISABLE_SANDBOX, '1');
+    assert.match(r.stderr, /schermo virtuale :\d+/, 'chi lancia vede una riga su cosa è successo');
+    assert.deepEqual(dopo, {});
+    await spento(durante.DISPLAY);
+  } finally {
+    togliCartella(temp);
+  }
 });
