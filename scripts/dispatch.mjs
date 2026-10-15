@@ -2215,7 +2215,10 @@ if (isMainModule) {
       }
       const s = await recordPulizia(id);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com'era è ancora rossa, la ferma.`);
+      const quante = s.files.length === 1 ? '1 prova toccata' : `${s.files.length} prove toccate`;
+      console.log(s.dopo
+        ? `stato ${id}: pulizia dopo le correzioni registrata su ${String(s.sha).slice(0, 8)} (${quante}). La consegna non le rilancia più com'erano: di quelle a cui ha tolto un caso rilancia quello che resta, e ogni altra prova del giro tolta o cambiata dalla pulizia di prima, se com'era è ancora rossa, la ferma.`
+        : `stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com'era è ancora rossa, la ferma.`);
       console.log(s.files.map((f) => `  · ${f}`).join('\n'));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
