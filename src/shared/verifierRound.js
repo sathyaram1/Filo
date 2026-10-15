@@ -701,9 +701,10 @@
     return groups;
   }
 
-  /** «[2i]», «[1v?]»: livello e sede di un rilievo, senza testo. PURA. */
+  /** «[2i]», «[1v?]», «[2i?!]»: livello, sede e segni di un rilievo, senza testo. PURA. */
   function findingTag(f) {
-    return `[${Number(f && f.level) || 0}${sedeDi(f && f.sede)}${f && f.decision ? '?' : ''}]`;
+    const domanda = !!f && (f.decision === true || f.difficile === true);
+    return `[${Number(f && f.level) || 0}${sedeDi(f && f.sede)}${domanda ? '?' : ''}${domanda && f.difficile === true ? '!' : ''}]`;
   }
 
   /**
