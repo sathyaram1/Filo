@@ -339,7 +339,7 @@ describe('una richiesta già decisa non si annuncia in attesa (#486)', () => {
       assert.match(msg, /In Filo non c'è niente da approvare/);
       assert.match(msg, /git commit --allow-empty -m "riproposta"/);
       assert.match(msg, /npm run finish/);
-      assert.doesNotMatch(msg, /approvala da Filo|IN ATTESA|aspetta il tuo sì|compare da solo/, `"${requestState}" promette un avviso che non arriverà`);
+      assert.doesNotMatch(msg, /approvala da Filo|IN ATTESA|aspetta il tuo sì|compare da sol/, `"${requestState}" promette un avviso che non arriverà`);
       assert.equal(richiestaForseInAttesa(reply), false, `"${requestState}" non deve suonare il campanello`);
       assert.equal(exitCodeForOwnerMerge(reply), 10);
     }
