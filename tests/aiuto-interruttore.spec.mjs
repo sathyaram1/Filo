@@ -53,28 +53,27 @@ async function vociPagina(page) {
   return voci;
 }
 
-// Le voci del menu della linguetta: lo apre il tasto destro vero sulla scheda attiva, e si legge nel suo riquadro.
-async function vociLinguetta(app, shell) {
-  let testo = null;
-  await expect.poll(async () => {
-    await shell.evaluate(() => {
-      const el = document.querySelector('.tab.active');
-      const r = el.getBoundingClientRect();
-      el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
-    });
-    await new Promise((r) => setTimeout(r, 200));
-    for (const w of app.windows()) {
-      try {
-        const t = await w.evaluate(() => (document.body && document.body.innerText.includes('Duplica') ? document.body.innerText : null));
-        if (t) { testo = t; return true; }
-      } catch (_) {}
-    }
-    return false;
-  }, { timeout: 15_000 }).toBe(true);
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) if (!w._filoTabs && w.isVisible()) w.hide();
+// Il menu della linguetta aperto col tasto destro sulla scheda attiva: c'è la voce Aiuto? null finché il riquadro
+// del menu non si legge. Il riquadro si riusa, quindi chi aspetta un cambio ripete finché la lettura lo mostra.
+async function linguettaHaAiuto(app, shell) {
+  await shell.evaluate(() => {
+    const el = document.querySelector('.tab.active');
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
   });
-  return testo.split('\n').map((s) => s.trim()).filter(Boolean);
+  await new Promise((r) => setTimeout(r, 250));
+  for (const w of app.windows()) {
+    try {
+      const voci = await w.evaluate(() => {
+        if (!document.body || !document.body.innerText.includes('Duplica')) return null;
+        const v = [...document.querySelectorAll('button.item')].map((b) => b.textContent.trim());
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        return v;
+      });
+      if (voci) return voci.includes('Aiuto');
+    } catch (_) {}
+  }
+  return null;
 }
 
 function premiAltH(app) {
