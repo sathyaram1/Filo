@@ -13,6 +13,23 @@ function configura(settings) {
   globalThis.SN_TASTI.usaScorciatoieFilo(settings && settings.scorciatoie);
 }
 
+// Le combinazioni dei moduli dell'Editor stanno nei suoi documenti: la chat e il salvataggio le confrontano con le
+// quattro, quindi il main le segue da quando parte a ogni salvataggio dell'Editor.
+const COLLEZIONE_EDITOR = 'filo.editor.collection';
+let moduliSeguiti = false;
+async function seguiModuliEditor() {
+  if (moduliSeguiti) return;
+  moduliSeguiti = true;
+  const Storage = require('./shim/storage');
+  Storage.onChanged((cambi) => {
+    if (cambi && cambi[COLLEZIONE_EDITOR]) globalThis.SN_TASTI.usaScorciatoieModuli(cambi[COLLEZIONE_EDITOR].newValue);
+  });
+  try {
+    const r = await Storage.get(COLLEZIONE_EDITOR);
+    globalThis.SN_TASTI.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+  } catch (_) {}
+}
+
 function comandoDaTasto(input, piattaforma = process.platform) {
   if (!input || input.type !== 'keyDown') return null;
   return globalThis.SN_TASTI.azioneFiloDaTasto(input, piattaforma);
