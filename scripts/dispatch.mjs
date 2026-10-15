@@ -330,6 +330,7 @@ export function applyFixed(state) {
   s.verifierCritique = '';
   s.verifierSha = '';
   s.puliziaSha = '';
+  s.pulizieDopo = [];
   s.secauditDone = false;
   s.secauditVerdict = null;
   // Gli sha degli esiti se ne vanno con gli esiti: una correzione è contenuto
