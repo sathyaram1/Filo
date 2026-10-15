@@ -1997,6 +1997,9 @@
       obs.observe(document.body, { childList: true, subtree: true });
     });
   }
+  // Si scioglie quando questa home ha avuto risposta sull'allarme del conto: gli spec la aspettano prima di cambiare chi è owner.
+  let fineAllarmeOwner = () => {};
+  const allarmeOwnerChiesto = new Promise((ok) => { fineAllarmeOwner = ok; });
   async function chiediAllarmeOwner() {
     await quandoVisibile();
     // Recap e ringraziamento non tengono la coda fino alla chiusura: si aspetta che se ne vadano, mai sopra di loro.
