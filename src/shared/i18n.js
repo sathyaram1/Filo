@@ -486,6 +486,11 @@
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
+    admin_defaults_open_weights_title: 'Per chi accende «Solo modelli a pesi aperti»',
+    admin_defaults_open_weights_to: 'Passano a %s: %s',
+    admin_defaults_open_weights_none_stop: 'Nessuna funzione si ferma.',
+    admin_defaults_open_weights_all_open:
+      'Con «Solo modelli a pesi aperti» acceso non cambia niente: tutte le funzioni partono già da modelli a pesi aperti.',
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
