@@ -45,9 +45,8 @@ async function scriviVoce(dest, nome, dati, modo, stato) {
   conta(stato, dati.length);
   await fs.promises.mkdir(path.dirname(p), { recursive: true });
   await fs.promises.writeFile(p, dati);
-  // Su Windows i permessi Unix non esistono; altrove l'eseguibile deve restare eseguibile.
+  // Su Windows i permessi Unix non esistono (chmod lì tocca solo la sola lettura); altrove l'eseguibile resta eseguibile.
   if (process.platform !== 'win32') await fs.promises.chmod(p, (modo & 0o111) ? 0o755 : 0o644);
-  else await Promise.resolve();
 }
 
 async function creaCartella(dest, nome, stato) {
@@ -142,7 +141,8 @@ async function estraiTar(buf, dest, stato) {
     const tipo = String.fromCharCode(h[156] || 48);
     const misura = ottale(h, 124, 12);
     const modo = ottale(h, 100, 8);
-    const prefisso = testo(h, 257, 6).startsWith('ustar') ? testo(h, 345, 155) : '';
+    // Solo il formato POSIX ha il prefisso del nome a 345: nel GNU lì ci sono le date.
+    const prefisso = h.slice(257, 263).toString('latin1') === 'ustar\u0000' ? testo(h, 345, 155) : '';
     let nome = (prefisso ? `${prefisso}/` : '') + testo(h, 0, 100);
     const dati = buf.slice(p + 512, p + 512 + misura);
     if (dati.length !== misura) throw new ErroreArchivio('voce del tar tagliata');
