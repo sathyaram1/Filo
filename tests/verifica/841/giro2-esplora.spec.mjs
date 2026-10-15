@@ -178,3 +178,25 @@ test('spento, una scheda aperta dopo e un riquadro incorporato non hanno l\'Aiut
   expect(testi.length).toBeGreaterThan(0);
   for (const t of testi) expect(t).not.toMatch(/\bAiuto\b/);
 });
+
+test('spento nella finestra normale: anche l\'incognito non ha l\'Aiuto, né nel menu né con Alt+H', async ({ app, shell, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => { await globalThis.__filoHandlers.executeFiloAction({ type: 'IMPOSTA_PREFERENZA', chiave: 'aiuto', valore: 'spento' }); });
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoIncognito && w._filoTabs)), { timeout: 10_000 }).toBe(true);
+  const url = testServer.html(HTML.replace('Pagina prova', 'Pagina segreta'));
+  await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().find((w) => w._filoIncognito)._filoTabs.openTab(u), url);
+  let page = null;
+  await expect.poll(() => { page = app.windows().find((w) => w.url() === url); return !!page; }, { timeout: 10_000 }).toBe(true);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  expect(await vociMenuPagina(page)).not.toMatch(/\bAiuto\b/);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    t.view.webContents.focus();
+    t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'H', modifiers: ['alt'] });
+    t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'H', modifiers: ['alt'] });
+  });
+  await pausa(1500);
+  await expect(page.locator('.sn-sidebar')).toHaveCount(0);
+});
