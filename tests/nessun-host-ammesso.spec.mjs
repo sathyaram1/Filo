@@ -117,7 +117,12 @@ test('il «Prova» di una riga delle Opzioni su quel modello mostra la stessa sp
   await preparaRouter(app, 'gemini-x');
   const page = await openTab('filo://options/options.html');
   await page.waitForSelector('#sec-model-registry:not([hidden])', { timeout: 8_000 });
-  const riga = page.locator('#modelRegistryList .sn-model-row').filter({ has: page.locator('.sn-model-id[value="google/gemini-2.5-flash"]') });
+  await page.waitForFunction((id) => [...document.querySelectorAll('#modelRegistryList .sn-model-id')].some((i) => i.value === id), GEMINI, { timeout: 8_000 });
+  await page.evaluate((id) => {
+    const input = [...document.querySelectorAll('#modelRegistryList .sn-model-id')].find((i) => i.value === id);
+    input.closest('.sn-model-row').dataset.provaGemini = '1';
+  }, GEMINI);
+  const riga = page.locator('#modelRegistryList .sn-model-row[data-prova-gemini="1"]');
   await expect(riga).toHaveCount(1);
   await riga.locator('.sn-model-test').click();
   const stato = riga.locator('.sn-model-row-status');
