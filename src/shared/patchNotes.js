@@ -17,6 +17,7 @@
       ],
       fixes: [
         'Se chiedi a Filo di spegnere l\'Aiuto, adesso si spegne davvero. La voce «Aiuto» sparisce dal tasto destro sulla pagina e sulla linguetta, e la scorciatoia non lo apre più. Prima Filo diceva «fatto» e l\'Aiuto restava. Lo riaccendi chiedendolo, o con l\'interruttore in Preferenze, nelle Impostazioni avanzate, dove trovi anche quelli del correttore ortografico e delle categorie automatiche di «Aperti per dopo».',
+        'La protezione dal fingerprinting copre anche l\'impronta audio calcolata come fa la maggior parte degli script di tracciamento. Prima quegli script leggevano il suono della tua macchina prima che Filo ci aggiungesse il rumore, e potevano riconoscerti da un sito all\'altro.',
       ],
     },
     {

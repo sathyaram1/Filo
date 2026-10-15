@@ -454,6 +454,7 @@ async function profiloFunzioni() {
     readPixels: WebGLRenderingContext.prototype.readPixels,
     readPixels2: WebGL2RenderingContext.prototype.readPixels,
     startRendering: OfflineAudioContext.prototype.startRendering,
+    renderedBuffer: Object.getOwnPropertyDescriptor(OfflineAudioCompletionEvent.prototype, 'renderedBuffer').get,
     fnToString: Function.prototype.toString,
   };
   const out = {};
@@ -466,10 +467,79 @@ async function profiloFunzioni() {
     };
   }
   out.fnTsSuSeStesso = fnTs.call(fnTs);
+  const rb = Object.getOwnPropertyDescriptor(OfflineAudioCompletionEvent.prototype, 'renderedBuffer');
+  out.renderedBufferDescrittore = {
+    enumerable: rb.enumerable, configurable: rb.configurable, set: typeof rb.set,
+    ordine: Object.getOwnPropertyNames(OfflineAudioCompletionEvent.prototype).join(','),
+  };
+  try { rb.get.call({}); out.renderedBufferSuAltro = 'ok'; } catch (e) { out.renderedBufferSuAltro = e.constructor.name; }
   return out;
 }
 
 test('le funzioni sostituite dalla guardia sono indistinguibili dalle native', async ({ openTab, testServer }) => {
   const { on, off } = await protettaPoiOff(openTab, testServer, profiloFunzioni);
   expect(on).toEqual(off);
+});
+
+// ---- Audio: l'impronta di OfflineAudioContext come la calcola fingerprintjs2 (#797) ----
+// Lo script sta inline nel <head>: prova anche che la guardia arriva prima degli script della pagina.
+// Chromium consegna lo stesso buffer al gestore dell'evento complete, che gira prima di ogni .then.
+const PAGINA_AUDIO = `<!doctype html><html><head><title>FP_AUDIO</title><script>
+(function () {
+  function scena() {
+    var ctx = new OfflineAudioContext(1, 44100, 44100);
+    var osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(10000, ctx.currentTime);
+    var comp = ctx.createDynamicsCompressor();
+    [['threshold', -50], ['knee', 40], ['ratio', 12], ['attack', 0], ['release', 0.25]].forEach(function (p) {
+      comp[p[0]].setValueAtTime(p[1], ctx.currentTime);
+    });
+    osc.connect(comp); comp.connect(ctx.destination); osc.start(0);
+    return ctx;
+  }
+  function somma(buf) { var d = buf.getChannelData(0), s = 0; for (var i = 4500; i < 5000; i++) s += Math.abs(d[i]); return s; }
+  var out = {}, mancano = 4;
+  function fatto(k, v) { out[k] = v; if (--mancano === 0) window.__fpAudio = out; }
+  var a = scena(); a.startRendering(); a.oncomplete = function (e) { fatto('evento', somma(e.renderedBuffer)); };
+  var b = scena(); b.addEventListener('complete', function (e) { fatto('ascolto', somma(e.renderedBuffer)); }); b.startRendering();
+  var c = scena(); c.startRendering().then(function (buf) { fatto('promessa', somma(buf)); });
+  var d = scena(), dd = {};
+  d.oncomplete = function (e) { dd.evento = somma(e.renderedBuffer); dd.buffer = e.renderedBuffer; };
+  d.startRendering().then(function (buf) {
+    fatto('entrambi', { evento: dd.evento, promessa: somma(buf), riletto: somma(dd.buffer), stessoBuffer: dd.buffer === buf });
+  });
+  // Un evento costruito dalla pagina col suo buffer: i campioni restano quelli che ha scritto lei.
+  var mio = new AudioBuffer({ length: 6000, sampleRate: 44100 }), m = mio.getChannelData(0);
+  for (var i = 0; i < m.length; i++) m[i] = Math.sin(i / 7) * 0.5;
+  out.sintetico = somma(new OfflineAudioCompletionEvent('complete', { renderedBuffer: mio }).renderedBuffer);
+})();
+</script></head><body><p>audio</p></body></html>`;
+
+async function impronteAudio(page) {
+  await page.waitForFunction(() => !!window.__fpAudio, null, { timeout: 15_000 });
+  return page.evaluate(() => ({ ...window.__fpAudio, guardia: !!window.__filoFpGuard }));
+}
+
+test('audio: l\'impronta letta nel gestore complete esce col rumore, uguale a quella della promessa, una volta sola', async ({ openTab, testServer }) => {
+  const page = await openTab(testServer.html(PAGINA_AUDIO));
+  const on = await impronteAudio(page);
+  await page.reload();
+  const on2 = await impronteAudio(page);
+  await setFpMode(openTab, 'off');
+  await page.reload();
+  const off = await impronteAudio(page);
+  expect(on.guardia).toBe(true);
+  expect(off.guardia).toBe(false);
+  // Senza protezione le quattro strade leggono lo stesso numero: è l'impronta vera della macchina.
+  expect([off.ascolto, off.promessa, off.entrambi.evento, off.entrambi.promessa]).toEqual(Array(4).fill(off.evento));
+  expect(off.entrambi.stessoBuffer).toBe(true);
+  expect(on.evento).not.toBe(off.evento);
+  expect(Math.abs(on.evento - off.evento)).toBeLessThan(1e-4);
+  expect(on2.evento).toBe(on.evento);
+  expect(on.ascolto).toBe(on.evento);
+  expect(on.promessa).toBe(on.evento);
+  expect(on.entrambi).toEqual({ evento: on.evento, promessa: on.evento, riletto: on.evento, stessoBuffer: true });
+  expect(on.sintetico).toBe(off.sintetico);
+  expect(on2).toEqual(on);
 });

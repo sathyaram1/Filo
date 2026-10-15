@@ -189,6 +189,22 @@ function buildGuardSource(seed, level) {
   } catch (e) {}
 
   // ---- AudioContext (OfflineAudioContext.startRendering) ----
+  // Lo stesso buffer arriva dall'evento complete, i cui gestori girano prima di ogni .then della
+  // promessa: il rumore lo mette chi lo tocca per primo, una volta sola (sommato due volte, evento
+  // e promessa darebbero impronte diverse). Solo da un evento vero: un buffer della pagina non si tocca.
+  var rumoreAudio = new WeakSet();
+  function noiseAudio(buf) {
+    if (!buf || rumoreAudio.has(buf)) return;
+    rumoreAudio.add(buf);
+    try {
+      for (var ch = 0; ch < buf.numberOfChannels; ch++) {
+        var d = buf.getChannelData(ch);
+        for (var i = 0; i < d.length; i++) {
+          d[i] += ((ph(i, ch) / 4294967295) - 0.5) * 1e-7;
+        }
+      }
+    } catch (e) {}
+  }
   try {
     var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     if (OAC && OAC.prototype && OAC.prototype.startRendering) {
@@ -196,21 +212,26 @@ function buildGuardSource(seed, level) {
       var nf2 = function startRendering() {
         var p = oStart.apply(this, arguments);
         if (p && typeof p.then === 'function') {
-          return p.then(function (buf) {
-            try {
-              for (var ch = 0; ch < buf.numberOfChannels; ch++) {
-                var d = buf.getChannelData(ch);
-                for (var i = 0; i < d.length; i++) {
-                  d[i] += ((ph(i, ch) / 4294967295) - 0.5) * 1e-7;
-                }
-              }
-            } catch (e) {}
-            return buf;
-          });
+          return p.then(function (buf) { noiseAudio(buf); return buf; });
         }
         return p;
       };
       OAC.prototype.startRendering = mask(nf2, oStart, 'startRendering');
+    }
+  } catch (e) {}
+  try {
+    var OACE = window.OfflineAudioCompletionEvent && window.OfflineAudioCompletionEvent.prototype;
+    var dRB = OACE && Object.getOwnPropertyDescriptor(OACE, 'renderedBuffer');
+    if (dRB && dRB.get && dRB.configurable) {
+      var oRB = dRB.get;
+      Object.defineProperty(OACE, 'renderedBuffer', {
+        get: mask(function () {
+          var buf = oRB.call(this);
+          if (this.isTrusted === true) noiseAudio(buf);
+          return buf;
+        }, oRB, 'get renderedBuffer'),
+        set: dRB.set, enumerable: dRB.enumerable, configurable: true,
+      });
     }
   } catch (e) {}
 })();`;
