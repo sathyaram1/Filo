@@ -90,6 +90,10 @@
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
+    'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
+    'avvisoCrediti.attivo': { nome: 'avviso prima che i crediti finiscano', valore: ATTIVO, livello: 1 },
+    'avvisoCrediti.giorni': { nome: 'giorni dell\'avviso dei crediti', valore: numero, livello: 1 },
+    'avvisoCrediti.percento': { nome: 'percentuale dell\'avviso dei crediti', valore: (v) => `${numero(v)}%`, livello: 1 },
     'notifications.durationSec': { nome: 'durata delle notifiche', valore: (v) => (Number(v) ? `${numero(v)} s` : 'finché non la chiudi'), livello: 1 },
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
@@ -105,6 +109,7 @@
     openWeightsOnly: { nome: 'solo modelli a pesi aperti', valore: sino('sì', 'no'), livello: 2 },
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
+    'modelliScelti.*': { nome: (k) => `modello scelto da te per «${etichettaFunzione(k)}»`, valore: (v) => v || 'quello predefinito', livello: 2 },
     'modelRegistry.*': { nome: (k) => `modello «${k}»`, valore: (v) => (v && v.model ? v.model : 'non c\'è'), livello: 2 },
     monthlyLimitEur: {
       nome: 'limite di spesa mensile',

@@ -5543,6 +5543,7 @@ require('./handlers/filo')(on, handlerCtx);
 require('./handlers/auth')(on, handlerCtx);
 require('./handlers/credits')(on, handlerCtx);
 require('./handlers/wallet')(on, handlerCtx);   // #598 — chiave personale, inviti, registro d'uso
+require('./handlers/avvisoCrediti')(on, handlerCtx); // #818 — l'avviso prima che i crediti finiscano, coi rimedi
 require('./handlers/board')(on, handlerCtx);
 require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);

@@ -62,6 +62,7 @@
   }
   // Il verso opposto, per i numeri interi che l'utente legge: 1.500 ms, 1.200 caratteri.
   const cifre = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
+  const conVirgola = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 2 });
   const decimali = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: 1, maximumFractionDigits: 2 });
 
   // I toni della suoneria e degli avvisi: gli id sono quelli di SN_SOUNDS (sounds.js).
@@ -433,6 +434,25 @@
       : parseInt(s.replace('%', ''), 10);
     if (!Number.isFinite(n)) return null;
     return Math.min(100, Math.max(0, n));
+  }
+
+  // Una soglia dell'avviso dei crediti (#818): fuori dai limiti è un rifiuto col numero, mai un taglio.
+  function setterSogliaCrediti(k, aiuto, keys, etichetta) {
+    return {
+      scrive: [`avvisoCrediti.${k}`], aiuto, keys, costo: 1,
+      build(v) {
+        const C = global.SN_CONST;
+        if (predefinito(v)) {
+          const d = C.DEFAULT_SETTINGS.avvisoCrediti[k];
+          return { partial: { avvisoCrediti: { [k]: d } }, label: etichetta(d) };
+        }
+        const n = parseItalianNumber(String(v == null ? '' : v).replace(/[^0-9.,-]/g, ''));
+        if (!Number.isFinite(n)) return null;
+        const [min, max] = C.AVVISO_CREDITI_LIMITI[k];
+        if (n < min || n > max) return { rifiuto: `${conVirgola(n)} è fuori dai limiti: da ${conVirgola(min)} a ${conVirgola(max)}` };
+        return { partial: { avvisoCrediti: { [k]: n } }, label: etichetta(n) };
+      },
+    };
   }
 
   // Un tempo della barra laterale in millisecondi ("300", "300 ms", "0,5 secondi"); fuori dai limiti è un
@@ -1507,6 +1527,37 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { riassuntoSchede: { enabled: b } }, label: `Riassunto delle schede chiuse → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    // ── #818: l'avviso prima che i crediti finiscano, e il pre-calcolo della spiegazione ──
+    {
+      scrive: ['avvisoCrediti.attivo'],
+      aiuto: 'true | false (Filo avvisa, una volta per calo, quando i crediti stanno per finire e propone come farli durare)',
+      costo: 1,
+      keys: ['avviso_crediti', 'avviso crediti', 'avviso dei crediti', 'avviso prima che i crediti finiscano',
+        'avvisami quando i crediti stanno per finire', 'avvisocrediti.attivo'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { avvisoCrediti: { attivo: b } }, label: `Avviso prima che i crediti finiscano → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    setterSogliaCrediti('giorni', 'giorni 0-30, o "predefinito" (avvisa quando, al ritmo di questi giorni e con la quota di ogni notte, i crediti durano al più tanto; 0 spegne questa condizione)',
+      ['soglia_giorni_crediti', 'giorni dell\'avviso dei crediti', 'avvisa quando i crediti durano', 'soglia in giorni dei crediti', 'avvisocrediti.giorni'],
+      (n) => `Avviso dei crediti quando durano al più → ${conVirgola(n)} ${n === 1 ? 'giorno' : 'giorni'}`),
+    setterSogliaCrediti('percento', 'percentuale 0-100, o "predefinito" (avvisa quando il saldo scende sotto questa parte dei crediti d\'ingresso; 0 spegne questa condizione)',
+      ['soglia_percento_crediti', 'percentuale dell\'avviso dei crediti', 'soglia in percentuale dei crediti', 'avvisocrediti.percento'],
+      (n) => `Avviso dei crediti sotto il → ${conVirgola(n)}% di quelli d'ingresso`),
+    {
+      scrive: ['spiegaAnticipata.enabled'],
+      aiuto: 'true | false (prepara la spiegazione appena si seleziona un testo, così al tasto destro è già pronta; spenta, parte solo dal tasto destro e consuma meno crediti)',
+      costo: 1,
+      keys: ['spiegazione_anticipata', 'spiegazione anticipata', 'spiega in anticipo', 'prepara la spiegazione',
+        'spiegazione alla selezione', 'pre-calcolo delle spiegazioni', 'spieganticipata', 'spiegaanticipata.enabled'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { spiegaAnticipata: { enabled: b } }, label: `Spiegazione preparata alla selezione → ${b ? 'attiva' : 'spenta'}` };
       },
     },
     {

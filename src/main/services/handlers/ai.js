@@ -125,7 +125,12 @@ module.exports = function register(on, ctx) {
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
     // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).
-    const chiedi = () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    // La spiegazione partita da sola alla selezione si conta a parte nel diario dei crediti (#818).
+    const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
+    const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
+    const chiedi = daSola
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin }))
+      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
     const K = globalThis.SN_WALLET_MAIN;
     const r = await (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     if (lettura) await lettura;

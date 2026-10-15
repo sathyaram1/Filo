@@ -2789,6 +2789,8 @@
   // Le regolazioni della barra laterale come le usa chi le legge: un valore fuori dai limiti torna
   // dentro, uno mancante o illeggibile prende il predefinito. Preferenze e chat rifiutano prima.
   const BARRA_LATERALE_LIMITI = Object.freeze({ attesaMs: [100, 3000], uscitaMs: [100, 5000] });
+  // Le soglie dell'avviso dei crediti (#818): 0 spegne quella condizione. Le usano la pagina, la chat e la proiezione.
+  const AVVISO_CREDITI_LIMITI = Object.freeze({ giorni: Object.freeze([0, 30]), percento: Object.freeze([0, 100]) });
   function opzioniBarraLaterale(v) {
     const d = DEFAULT_SETTINGS.barraLaterale;
     const o = v && typeof v === 'object' ? v : {};
@@ -3017,6 +3019,7 @@
     AGENT_STYLE_MAX,
     agentStyleLength,
     BARRA_LATERALE_LIMITI,
+    AVVISO_CREDITI_LIMITI,
     opzioniBarraLaterale,
     testoLeggibile,
     LESSON_MAX,

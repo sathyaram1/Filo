@@ -599,6 +599,8 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // Spenta dalle Preferenze, o per far durare i crediti (#818): la spiegazione parte al tasto destro.
+    if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) return;
     // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
     if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;

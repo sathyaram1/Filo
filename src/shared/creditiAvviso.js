@@ -5,7 +5,8 @@
 (function (global) {
   'use strict';
 
-  const PREDEFINITI = Object.freeze({ attivo: true, giorni: 2, percento: 10 });
+  const C0 = global.SN_CONST || {};
+  const PREDEFINITI = Object.freeze({ attivo: true, giorni: 2, percento: 10, ...((C0.DEFAULT_SETTINGS && C0.DEFAULT_SETTINGS.avvisoCrediti) || {}) });
   // Il diario serve al ritmo (tre giorni) e ai consumi per funzione (sette): due settimane bastano con margine.
   const GIORNI_DIARIO = 14;
   const GIORNI_RITMO = 3;
@@ -35,6 +36,22 @@
   }
 
   const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+  // Le soglie che si cambiano dalle Preferenze e dalla chat. 0 spegne quella condizione.
+  const L0 = C0.AVVISO_CREDITI_LIMITI || { giorni: [0, 30], percento: [0, 100] };
+  const LIMITI = Object.freeze({
+    giorni: Object.freeze({ min: L0.giorni[0], max: L0.giorni[1] }),
+    percento: Object.freeze({ min: L0.percento[0], max: L0.percento[1] }),
+  });
+  // Vuoto o non numerico = il predefinito; fuori scala torna dentro (la chat invece rifiuta col numero).
+  function numeroSoglia(k, v) {
+    const l = LIMITI[k];
+    if (!l) return null;
+    if (v === '' || v == null) return PREDEFINITI[k];
+    const n = Number(String(v).trim().replace(',', '.'));
+    if (!Number.isFinite(n)) return PREDEFINITI[k];
+    return Math.min(l.max, Math.max(l.min, n));
+  }
 
   function soglieDa(s) {
     const x = s && typeof s === 'object' ? s : {};
@@ -413,7 +430,7 @@
   }
 
   global.SN_CREDITI_AVVISO = {
-    PREDEFINITI, GIORNI_DIARIO, GIORNI_RITMO, GIORNI_PER_FUNZIONE, ANTICIPATA,
+    PREDEFINITI, LIMITI, numeroSoglia, GIORNI_DIARIO, GIORNI_RITMO, GIORNI_PER_FUNZIONE, ANTICIPATA,
     chiaveGiorno, giorniFra, soglieDa, chiaveAzione, azioneDi,
     aggiungi, ritmo, proiezione, valuta, sogliaRiarmo, riarmato,
     quando, frase, prossimaQuota,

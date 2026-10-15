@@ -255,8 +255,11 @@ module.exports = function register(on, ctx) {
     inAttesa.timer = null;
     try {
       const { BrowserWindow } = require('electron');
-      const valida = (w) => w && !w.isDestroyed?.() && w._filoTabs && w.webContents && !w.webContents.isDestroyed?.();
-      const win = [BrowserWindow.getFocusedWindow(), ...BrowserWindow.getAllWindows()].find(valida);
+      // Una finestra sola, quella davanti: la cornice, non le pagine.
+      const win = [BrowserWindow.getFocusedWindow(), ...BrowserWindow.getAllWindows()]
+        .filter(Boolean)
+        .filter((w) => w._filoTabs)
+        .find((w) => !w.isDestroyed?.() && w.webContents && !w.webContents.isDestroyed?.());
       if (!win) return;
       win.webContents.send('shell:toast', {
         text: avviso.testo,
