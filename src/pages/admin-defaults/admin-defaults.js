@@ -587,6 +587,46 @@
     return { ...hiddenModels, ...ModelChain.collect(modelChains) };
   }
 
+  // Cosa trova chi accende «Solo modelli a pesi aperti» con la config com'è sulla pagina, non salvata: lo stesso calcolo
+  // delle Opzioni sulle sole funzioni della griglia (#465). È un avviso, il salvataggio resta libero (#833).
+  function renderOpenWeightsImpact() {
+    const host = $('openWeightsImpact');
+    const C = window.SN_CONST;
+    if (!host) return;
+    const models = ModelChain.collect(modelChains);
+    if (!C || typeof C.openWeightsImpact !== 'function' || !Object.keys(models).length) { host.hidden = true; return; }
+    const impact = C.openWeightsImpact(models, collectModelRegistry());
+    const riga = (testo, cls) => {
+      const p = document.createElement('p');
+      p.textContent = testo;
+      if (cls) p.className = cls;
+      return p;
+    };
+    host.replaceChildren();
+    if (!impact.unavailable.length && !impact.substituted.length) {
+      host.className = 'sn-muted sn-ow-impact';
+      host.appendChild(riga(I18n.t('admin_defaults_open_weights_all_open')));
+      host.hidden = false;
+      return;
+    }
+    host.className = 'sn-info-box sn-ow-impact';
+    const titolo = riga(I18n.t('admin_defaults_open_weights_title'));
+    titolo.className = 'sn-info-box-title';
+    host.appendChild(titolo);
+    if (impact.unavailable.length) {
+      const nomi = impact.unavailable.map((u) => ModelChain.etichetta(u.action));
+      host.appendChild(riga(I18n.t('options_open_weights_unavailable', nomi.join(', ')), 'sn-ow-stop'));
+    }
+    const perModello = new Map();
+    for (const s of impact.substituted) {
+      if (!perModello.has(s.to)) perModello.set(s.to, []);
+      perModello.get(s.to).push(ModelChain.etichetta(s.action));
+    }
+    for (const [to, nomi] of perModello) host.appendChild(riga(I18n.t('admin_defaults_open_weights_to', to, nomi.join(', '))));
+    if (!impact.unavailable.length) host.appendChild(riga(I18n.t('admin_defaults_open_weights_none_stop')));
+    host.hidden = false;
+  }
+
   // ── Pagine delicate (#1004) ─────────────────────────────────────────────────
   let delicateCaricate = {};
   let delicateDiSerie = {};
