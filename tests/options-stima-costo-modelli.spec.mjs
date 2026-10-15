@@ -25,21 +25,22 @@ const OPUS = { label: 'Claude Opus 4.5', provider: 'openrouter', model: 'anthrop
 const CREDITI_PER_DOLLARO = 0.92 / 0.0008;
 const OPUS_MSG = (16000 * 0.000005 + 900 * 0.000025) * CREDITI_PER_DOLLARO; // 117,875
 
-async function listino(app, { rotto = false } = {}) {
-  await app.evaluate((_e, { catalogo, rotto: giu }) => {
+async function listino(app, { rotto = false, lento = 0 } = {}) {
+  await app.evaluate((_e, { catalogo, rotto: giu, lento: ms }) => {
     const vero = globalThis.fetch;
     globalThis.__listinoChiesto = 0;
     globalThis.fetch = async (input, init) => {
       const url = String((input && input.url) || input);
       if (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(url)) {
         globalThis.__listinoChiesto += 1;
+        if (ms) await new Promise((r) => setTimeout(r, ms));
         if (giu) return new Response('giù', { status: 503 });
         const data = url.includes('output_modalities') ? [] : catalogo;
         return new Response(JSON.stringify({ data }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
       return vero(input, init);
     };
-  }, { catalogo: CATALOGO, rotto });
+  }, { catalogo: CATALOGO, rotto, lento });
 }
 
 async function configura(app, extra = {}) {
@@ -143,6 +144,23 @@ test('Opzioni senza listino: nessuna cifra inventata, la riga dice che il listin
   await expect(page.locator('#modelsGrid .sn-chain-cost', { hasText: /\d/ })).toHaveCount(0);
 });
 
+test('Opzioni: la cifra accanto ai modelli non manda a capo una catena che senza ci stava su una riga', async ({ app, openTab }) => {
+  await listino(app);
+  await configura(app);
+  const page = await openTab(OPTIONS_URL);
+  await expect(cellaDi(page, CHAT).locator('.sn-chain-cost').first()).toHaveText('≈ 8,2 crediti', { timeout: 8_000 });
+  const righe = () => page.evaluate(() => [...document.querySelectorAll('#modelsGrid > div')].map((cell) => {
+    const segs = [...cell.querySelectorAll('.sn-chain-seg')];
+    return { nome: (cell.querySelector('label') || {}).textContent, segs: segs.length, righe: new Set(segs.map((s) => Math.round(s.getBoundingClientRect().top))).size };
+  }).filter((x) => x.segs > 1));
+  const con = await righe();
+  await page.addStyleTag({ content: '.sn-chain-cost{display:none!important}' });
+  await expect.poll(async () => (await righe()).map((r) => r.righe).join()).toBeTruthy();
+  const senza = await righe();
+  expect(con.length).toBeGreaterThan(10);
+  expect(con.filter((c, k) => c.righe > senza[k].righe).map((c) => c.nome)).toEqual([]);
+});
+
 // ── In chat ───────────────────────────────────────────────────────────────────
 
 async function homeDi(app) {
@@ -227,4 +245,21 @@ test('Chat coi modelli predefiniti: il cambio non parte e Filo sa perché, senza
   const esito = (await app.evaluate(() => globalThis.__costo_tool)).join('\n');
   expect(esito).toContain('NON applicata: stai usando i modelli predefiniti');
   expect((await impostazioni(app)).models.filo_chat).toBe(prima);
+});
+
+test('Chat col listino lento: il cambio parte e la risposta dice che il costo non è arrivato, non tace', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await listino(app, { lento: 6000 });
+  await configura(app, { chiave: 'k-test', models: { filo_chat: 'deepseek-flash' } });
+  await app.evaluate(() => { globalThis.SN_WALLET_MAIN.keySource = async () => 'factory'; });
+
+  await modelloFinto(app, [cambia('Chat con Filo: opus'), { text: 'Fatto.' }]);
+  await scrivi(chat, 'usa opus per la chat');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 15_000 });
+  await expect.poll(async () => (await impostazioni(app)).models.filo_chat, { timeout: 5_000 }).toBe('opus');
+  const ritardo = /listino di OpenRouter non è arrivato in tempo/;
+  expect((await app.evaluate(() => globalThis.__costo_tool)).join('\n')).toMatch(ritardo);
+  await expect(chat.locator('.dash-activity', { hasText: ritardo }).first()).toBeAttached({ timeout: 5_000 });
 });
