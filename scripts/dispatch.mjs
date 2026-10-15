@@ -843,7 +843,8 @@ export function buildPayload(bucket, ctx = {}) {
         };
       }
       // Riallineamento del ramo: il lavoro era già verificato, quindi niente serie. Il perché lo scrive il server
-      // (conflitto, o unit rossi sulla fusione con l'elenco dei test, #929): senza, chi riallinea non sa cosa far tornare verde.
+      // (conflitto, o unit rossi sulla fusione con l'elenco dei test, #929): senza, chi riallinea non sa perché la fusione
+      // si è fermata. Quei test non li corregge lui (#1204).
       return {
         case: 'riallineamento',
         branch: bucket.branch,
