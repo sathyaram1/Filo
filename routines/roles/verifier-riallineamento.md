@@ -28,7 +28,13 @@ di questo giro». Guardi quattro cose.
    `git diff <commit verificato>..HEAD` per trovare le zone: in questo giro
    il diff si guarda, ed è l'unica eccezione. Dentro ci sono anche le
    modifiche arrivate da `main`: ti interessano solo dove toccano il lavoro.
-2. **Le prove dei giri**, se la cartella c'è:
+2. **Gli unit**, che lanci con i controlli automatici. Chi rifà la base non li
+   tocca, anche quando la fusione si era fermata proprio per loro: ogni test
+   rosso che su `main` da solo passa è un rilievo **interno**, anche se il
+   lavoro da solo era verde, perché a romperlo è l'incontro dei due. Il
+   livello è quello di ogni altro rosso dei controlli automatici; un rosso che
+   c'è anche su `main` da solo segue la loro regola.
+3. **Le prove dei giri**, se la cartella c'è:
    `npx playwright test tests/verifica/<numero>` (numero del feedback senza
    cancelletto, percorso relativo alla radice del repo, barre normali). Una
    prova che prima era verde e ora è rossa è un rilievo di livello 2,
