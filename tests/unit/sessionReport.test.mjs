@@ -884,3 +884,130 @@ test('il marcatore di un altro biglietto non dà il momento del rilascio', async
     assert.equal(readTicketSince(base), since);
   } finally { togliCartella(base); }
 });
+
+// #1170: la fine di un worker in sottofondo, nelle forme viste sulla macchina dell'owner il 10/10.
+const lanciatoCome = (id, agentId, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: `Async agent launched successfully.\nagentId: ${agentId}` }] }] } });
+const notificaDi = (id, agentId, nota = '') => `<task-notification>\n<task-id>${agentId}</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n<summary>Agent "w" finished</summary>\n${nota ? `<note>${nota}</note>\n` : ''}<result>fatto</result>\n</task-notification>`;
+const inCoda = (testo, ts) => JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp: ts, content: testo });
+const comeMessaggio = (testo, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'text', text: testo }] } });
+const consegnaFinale = (agentId, corpo = 'FATTO') => `Another Claude session sent a message: <agent-message from="${agentId}">\n[Subagent hand-back] The text below is the final report of a subagent this session delegated to.\n${corpo}\n</agent-message>`;
+const PROVVISORIA = 'This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.';
+const agente = (id) => ({ type: 'tool_use', id, name: 'Agent', input: {} });
+const turniDi = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
+const PRIMO_WORKER = [
+  orch('k1', H('12:00:00'), { cw: 30000 }),
+  orch('k2', H('12:01:00'), { cr: 30000, tool: agente('ag1') }),
+  lanciatoCome('ag1', 'a1', H('12:01:01')),
+  orch('k3', H('12:01:02'), { cr: 30000 }),
+];
+const lancioDue = (ts1, ts2, ts3) => [orch('k7', ts1, { cr: 200000, tool: agente('ag2') }), lanciatoCome('ag2', 'a2', ts2), orch('k8', ts3, { cr: 200000 })];
+
+test('la consegna del worker arriva prima della notifica: i turni di mezzo (la cache riscritta) sono del biglietto dopo', () => {
+  const righe = PRIMO_WORKER.concat(
+    comeMessaggio(consegnaFinale('a1'), H('13:30:00')),
+    orch('k4', H('13:30:12'), { cw: 200000 }),
+    inCoda(notificaDi('ag1', 'a1'), H('13:30:24')),
+    comeMessaggio(notificaDi('ag1', 'a1'), H('13:30:25')),
+    orch('k5', H('13:31:00'), { cr: 200000 }),
+    ...lancioDue(H('13:32:00'), H('13:32:01'), H('13:32:02')),
+  );
+  const f = finestraOrchestratore(righe);
+  assert.deepEqual(turniDi(f), ['k4', 'k5', 'k7', 'k8']);
+  assert.equal(f.attesaPrimaS, 5350, 'da k3 alle 12:01:02 a k4 alle 13:30:12');
+  assert.equal(consegnaDi(JSON.parse(righe[4])), 'a1');
+});
+
+test('non è una consegna: un messaggio a metà lavoro, la consegna di un altro agente, una consegna citata', () => {
+  const dopo = [orch('k4', H('12:40:00'), { cr: 30000 })];
+  for (const [nome, riga] of [
+    ['messaggio a metà', comeMessaggio('Another Claude session sent a message: <agent-message from="a1">\nsto ancora lavorando\n</agent-message>', H('12:30:00'))],
+    ['altro agente', comeMessaggio(consegnaFinale('a9'), H('12:30:00'))],
+    ['citata in un risultato', JSON.stringify({ type: 'user', timestamp: H('12:30:00'), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_read', content: consegnaFinale('a1') }] } })],
+    ['dentro il rapporto di una notifica', inCoda(`<task-notification>\n<task-id>z</task-id>\n<summary>altro</summary>\n<result>${consegnaFinale('a1')}</result>\n</task-notification>`, H('12:30:00'))],
+    ['in un testo con qualcosa davanti', comeMessaggio(`<system-reminder>x</system-reminder>\n${consegnaFinale('a1')}`, H('12:30:00'))],
+  ]) {
+    assert.deepEqual(turniDi(finestraOrchestratore(PRIMO_WORKER.concat(riga, dopo))), ['k1', 'k2', 'k3', 'k4'], nome);
+  }
+});
+
+test('un lancio rifiutato e riprovato non sposta l\'inizio della finestra; un worker partito e caduto sì', () => {
+  const rifiutato = (id, ts, content, isError) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, ...(isError ? { is_error: true } : {}), content }] } });
+  const righe = PRIMO_WORKER.concat(
+    inCoda(notificaDi('ag1', 'a1'), H('13:30:00')),
+    orch('k4', H('13:30:12'), { cw: 200000 }),
+    orch('k5', H('13:31:00'), { cr: 200000, tool: agente('agX') }),
+    rifiutato('agX', H('13:31:01'), "Agent type 'routine-worker' not found. Available agents: general-purpose", true),
+    orch('k6', H('13:31:30'), { cr: 200000, tool: agente('agY') }),
+    rifiutato('agY', H('13:31:31'), '<tool_use_error>Hook PreToolUse:Agent denied this tool call: manca --ticket</tool_use_error>', false),
+    ...lancioDue(H('13:32:00'), H('13:32:01'), H('13:32:02')),
+  );
+  const f = finestraOrchestratore(righe);
+  assert.deepEqual(turniDi(f), ['k4', 'k5', 'k6', 'k7', 'k8']);
+  assert.equal(f.attesaPrimaS, 5350);
+  // Un errore che nomina l'agente viene da un worker che è partito: la sua fine resta un confine.
+  const caduto = righe.map((l) => l.replace("Agent type 'routine-worker' not found. Available agents: general-purpose", 'API Error\\nagentId: a7'));
+  assert.deepEqual(turniDi(finestraOrchestratore(caduto)), ['k6', 'k7', 'k8']);
+});
+
+test('la notifica provvisoria di un worker che aspetta un suo comando non è la sua fine', () => {
+  const fino = PRIMO_WORKER.concat(
+    inCoda(notificaDi('ag1', 'a1', PROVVISORIA), H('12:40:00')),
+    comeMessaggio(notificaDi('ag1', 'a1', PROVVISORIA), H('12:40:01')),
+    orch('k4', H('12:40:05'), { cr: 30000 }),
+  );
+  assert.equal(notificaProvvisoria(JSON.parse(fino[4])), true);
+  // Il worker uno rilascia mentre aspetta: la sua finestra è tutta la sessione, compreso il turno della notifica.
+  assert.deepEqual(turniDi(finestraOrchestratore(fino)), ['k1', 'k2', 'k3', 'k4']);
+  // Il worker due parte dalla fine vera del worker uno e non riconta k4.
+  const dopo = fino.concat(
+    inCoda(notificaDi('ag1', 'a1'), H('13:00:00')),
+    orch('k5', H('13:00:10'), { cr: 30000 }),
+    ...lancioDue(H('13:01:00'), H('13:01:01'), H('13:01:02')),
+  );
+  const f = finestraOrchestratore(dopo);
+  assert.deepEqual(turniDi(f), ['k5', 'k7', 'k8']);
+  assert.equal(f.attesaPrimaS, 1205, 'da k4 alle 12:40:05 a k5 alle 13:00:10');
+  // La nota conta solo nella busta di Claude Code: nel riassunto (testo dell'orchestratore) o nel risultato del worker no.
+  const nelRiassunto = `<task-notification>\n<task-id>a1</task-id>\n<summary>Agent "<note>${PROVVISORIA}</note>" finished</summary>\n<result>fatto</result>\n</task-notification>`;
+  const nelRisultato = `<task-notification>\n<task-id>a1</task-id>\n<summary>finished</summary>\n<result><note>${PROVVISORIA}</note></result>\n</task-notification>`;
+  for (const n of [nelRiassunto, nelRisultato, notificaDi('ag1', 'a1')]) assert.equal(notificaProvvisoria(JSON.parse(inCoda(n, H('12:40:00')))), false, n);
+});
+
+test('chiusura: il rapporto della risposta dell\'orchestratore porta i suoi turni dopo l\'ultimo biglietto, una volta sola', async () => {
+  const base = cartellaTemporanea('filo-rapporto-chiusura-');
+  try {
+    const file = join(base, 'orch.jsonl');
+    const comando = (id, command) => ({ type: 'tool_use', id, name: 'Bash', input: { command } });
+    writeFileSync(file, SOTTOFONDO.concat(
+      JSON.stringify({ type: 'user', timestamp: H('13:10:00'), message: { role: 'user', content: notifica('bg2') } }),
+      orch('c1', H('13:10:05'), { cw: 34000 }),
+      orch('c2', H('13:10:30'), { cr: 34000, tool: comando('tk', 'node scripts/routine-channel.mjs ticket "p" --json') }),
+      orch('c3', H('13:11:00'), { cr: 34500, tool: comando('rs', 'node scripts/routine-channel.mjs risposta "p" c9') }),
+    ).join('\n') + '\n');
+    const r = await rapportoChiusura({ transcript: file });
+    assert.equal(r.role, 'orchestrator');
+    assert.equal(r.closing, true);
+    assert.equal(r.turns, 3, 'c1, c2, c3: i turni dei worker di prima stanno nei loro rilasci');
+    assert.equal(r.rewarmTurns, 1, 'c1 riscrive la cache dopo un\'ora e mezza');
+    assert.equal(r.attesaPrimaS, 5885, 'da s7 alle 11:32 a c1 alle 13:10:05');
+    assert.equal(r.costUsd, Math.round(((34000 * 5 + 68500 * 0.2 + 30 * 20) / 1e6) * 10000) / 10000);
+    // Chiamato da un sotto-agente (il più recente nella cartella) si legge il thread principale.
+    mkdirSync(join(base, 'orch', 'subagents'), { recursive: true });
+    writeFileSync(join(base, 'orch', 'subagents', 'agent-w.jsonl'), orch('w1', H('13:11:30'), { cw: 1000 }) + '\n');
+    assert.equal((await rapportoChiusura({ transcript: join(base, 'orch', 'subagents', 'agent-w.jsonl') })).turns, 3);
+    // Dopo un rilascio dell'orchestratore per un worker morto: quel turno è già nel suo rapporto.
+    writeFileSync(file, PRINCIPALE.slice(0, 8).concat(orch('z1', H('11:05:00'), { cr: 34000 })).join('\n') + '\n');
+    assert.equal((await rapportoChiusura({ transcript: file })).turns, 1);
+    // Un'accensione senza worker: tutta la sessione è chiusura.
+    writeFileSync(file, [orch('p1', H('09:00:00'), { cw: 30000 }), orch('p2', H('09:00:20'), { cr: 30000 })].join('\n') + '\n');
+    const vuota = await rapportoChiusura({ transcript: file });
+    assert.equal(vuota.turns, 2);
+    assert.equal(vuota.attesaPrimaS, 0);
+    assert.equal(vuota.rewarmTurns, 0);
+    // Senza transcript: la nota, mai un errore.
+    const nessuno = await rapportoChiusura({ transcript: join(base, 'non-c-e.jsonl') });
+    assert.equal(nessuno.closing, true);
+    assert.equal(nessuno.turns, undefined);
+    assert.match(nessuno.notes[0], /assente/);
+  } finally { togliCartella(base); }
+});
