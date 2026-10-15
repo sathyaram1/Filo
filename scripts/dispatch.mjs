@@ -1231,6 +1231,7 @@ export function verifierReplyText(reply, id = '<id>', conSegnalazione = false) {
   if (r.outcome === 'fix' && r.phase2) {
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
+      nonFermata,
       'Rilievi interni da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
       fmt(r.phase2.findings),
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
