@@ -77,6 +77,17 @@ function configDiPartenza() {
   };
 }
 
+// Le persone che la vista elenca: una prova le cambia per vedere cosa fa la pagina quando la vista si rilegge.
+let persone = [];
+function personeDiPartenza() {
+  return [{
+    pseudonym: PSEUDONIMO,
+    balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
+    invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z',
+    reconcile: { flagged: false }, usage: { rows: 2, byAction: { chat: 0.2 }, byDay: { '2026-09-17': 0.2 } },
+  }];
+}
+
 test.beforeAll(async () => {
   server = createServer((req, res) => {
     let raw = '';
