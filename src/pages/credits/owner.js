@@ -108,6 +108,7 @@
       // ultime chiamate): si chiede alla prima apertura, non prima.
       const detail = document.createElement('tr');
       detail.className = 'sn-wallet-user-detail';
+      detail.dataset.pseudonym = u.pseudonym;
       detail.hidden = true;
       const td = document.createElement('td');
       td.colSpan = cells.length;
