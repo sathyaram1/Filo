@@ -561,9 +561,12 @@
       // Qui si decidono anche i fornitori esclusi: l'avviso li legge dalla pagina, non da quelli in vigore.
       avvisoDi: (action, ref) => ModelChain.avvisoHostAudio(action, ref, collectModelRegistry()[ref], collectExcluded()),
       costoDi: costoModello,
+      // Mentre si scrive il segmento è a metà: l'avviso segue solo i valori confermati.
+      onChange: (scrivendo) => { if (!scrivendo) renderOpenWeightsImpact(); },
     });
     hiddenModels = Object.fromEntries(Object.entries(models || {})
       .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
+    renderOpenWeightsImpact();
   }
 
   // Il costo di un uso accanto a ogni modello (#819), come nelle Opzioni. Senza avviso: qui si decide il predefinito,
