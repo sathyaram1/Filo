@@ -381,6 +381,7 @@
     $('apiKeyTavily').value = settings.apiKeys?.tavily || '';
     $('monthlyLimit').value = settings.monthlyLimitEur ?? 5;
     $('costWarnRatio').value = String(window.SN_STIMA_COSTO.soglia(settings));
+    chiaveDelleStime = settings.apiKeys?.openrouter || '';
     caricaStime();
 
     // Registry modelli PRIMA dell'editor a segmenti: le righe del registry sono
@@ -599,11 +600,12 @@
     return ModelChain.avvisoHostAudio(action, ref, collectModelRegistry().registry[ref]);
   }
 
-  // ── Il costo accanto a ogni modello (#819) ─────────────────────────────────
+  // ── Il costo accanto a ogni modello e nella tendina (#819) ─────────────────
   // Listino, saldo, tariffa e token medi li dà il main; la stima è quella di SN_STIMA_COSTO, la stessa della chat.
   // Registro e soglia si leggono dalla pagina, così una riga appena scritta ha già il suo costo.
   let stimaCtx = null;
   let stimaGiro = 0;
+  let chiaveDelleStime = null;
   async function caricaStime(opts) {
     const mio = ++stimaGiro;
     if (!stimaCtx && modelChains) ModelChain.aggiornaCosti(modelChains);
@@ -889,6 +891,8 @@
     }
 
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
+    // La chiave messa o tolta qui decide crediti o dollari accanto ai modelli.
+    if (apiKey !== chiaveDelleStime) { chiaveDelleStime = apiKey; caricaStime(); }
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);

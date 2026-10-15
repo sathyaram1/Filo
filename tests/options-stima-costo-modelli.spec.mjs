@@ -4,7 +4,8 @@
 // conferma e l'esito dicono le stesse cifre. Senza il fix accanto ai modelli non c'è niente.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmText, fillConfirmInput, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, confirmText, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const OPTIONS_URL = 'filo://options/options.html';
 const CHAT = 'Home — chat con Filo';
@@ -73,17 +74,16 @@ test('Opzioni: ogni modello ha il suo costo in crediti, e un modello grande per 
   await expect(chat.locator('.sn-chain-costo')).toBeHidden();
 
   // Ogni modello di ogni funzione ha la sua riga: una cifra, o perché non c'è.
-  const segmenti = page.locator('#modelsGrid .sn-chain-seg').filter({ has: page.locator('.sn-chain-input:not([value=""])') });
-  const quanti = await segmenti.count();
-  expect(quanti).toBeGreaterThan(30);
-  for (let i = 0; i < quanti; i++) {
-    await expect(segmenti.nth(i).locator('.sn-chain-cost')).toHaveText(/crediti|prezzo non noto|costo dopo il primo uso/);
-  }
+  const righe = await page.evaluate(() => [...document.querySelectorAll('#modelsGrid .sn-chain-seg')]
+    .filter((seg) => seg.querySelector('.sn-chain-input').value.trim())
+    .map((seg) => { const t = seg.querySelector('.sn-chain-cost'); return `${seg.querySelector('.sn-chain-input').value} ${t && !t.hidden ? t.textContent : '(niente)'}`; }));
+  expect(righe.length).toBeGreaterThan(30);
+  for (const r of righe) expect(r).toMatch(/ (≈ [\d,.]+ credit[oi]|meno di 0,1 crediti|prezzo non noto|costo dopo il primo uso)$/);
 
   // Nella tendina ogni modello ha la cifra per questa funzione.
   const input = chat.locator('.sn-chain-input').first();
   await input.focus();
-  const pop = chat.locator('.sn-chain-pop');
+  const pop = chat.locator('.sn-chain-seg').first().locator('.sn-chain-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
   const opzione = pop.locator('.sn-select-option').filter({ has: page.locator('.sn-chain-opt-nick', { hasText: /^opus$/ }) });
   await expect(opzione.locator('.sn-chain-opt-cost')).toHaveText('≈ 118 crediti');
@@ -184,6 +184,7 @@ async function scrivi(page, testo) {
 
 test('Chat: «usa opus per la chat» chiede l\'OK con il costo e l\'avviso, salva, e l\'esito porta le stesse cifre', async ({ app, shell }) => {
   test.setTimeout(90_000);
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);
   await listino(app);
@@ -200,10 +201,10 @@ test('Chat: «usa opus per la chat» chiede l\'OK con il costo e l\'avviso, salv
   expect((await impostazioni(app)).models.filo_chat).toBe('deepseek-flash');
   await chat.screenshot({ path: 'tests/.shots/stima-costo-chat-conferma.png' });
 
-  await expect(chat.locator(CONFIRM_HOST)).toBeVisible();
-  await fillConfirmInput(chat, 'conferma');
+  // Cambiare modello non abbassa una difesa: basta l'OK, senza scrivere «conferma».
+  expect((await confirmText(chat))).not.toMatch(/abbassa una difesa/);
   await scrollConfirmToEnd(chat);
-  await clickConfirm(chat, 'danger');
+  await clickConfirm(chat, 'ok');
   await expect.poll(async () => (await impostazioni(app)).models.filo_chat, { timeout: 5_000 }).toBe('opus');
   // Al modello torna la riga da ripetere, e la traccia in chat la porta comunque.
   await expect.poll(async () => (await app.evaluate(() => globalThis.__costo_tool)).join('\n'), { timeout: 10_000 }).toContain(riga);

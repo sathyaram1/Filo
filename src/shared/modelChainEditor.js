@@ -241,7 +241,8 @@
       if (!costoDi) return;
       for (const seg of el.querySelectorAll('.sn-chain-seg')) {
         const tag = seg.querySelector('.sn-chain-cost');
-        if (tag) mostraCosto(tag, costoSicuro(confermati[Number(seg.dataset.i)]));
+        const inp = seg.querySelector('.sn-chain-input');
+        if (tag) mostraCosto(tag, costoSicuro(inp ? inp.value : confermati[Number(seg.dataset.i)]));
       }
       const scelti = [...new Set(confermati.map((r) => String(r || '').trim()).filter(Boolean))];
       const righe = [...new Set(scelti.map((r) => (costoSicuro(r) || {}).avviso).filter((x) => typeof x === 'string' && x))];
@@ -335,13 +336,21 @@
           showSegMsg(seg, reason);
           inp.value = confermati[i]; fit(inp);
           refs[i] = confermati[i]; emit();
+          const tag = seg.querySelector('.sn-chain-cost');
+          if (tag) mostraCosto(tag, costoSicuro(inp.value));
         };
         const confermaSegmento = () => {
           const val = inp.value.trim();
           const v = validate ? validate(val) : { ok: true };
           if (v.ok) accept(val); else reject(v.reason);
         };
-        inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(true); });
+        // Il costo segue quello che si scrive, come la larghezza del campo: cambiarlo all'uscita sposterebbe «+» e «×»
+        // fra la pressione e il rilascio del clic, e il clic andrebbe perso.
+        inp.addEventListener('input', () => {
+          refs[i] = inp.value; fit(inp); emit(true);
+          const tag = seg.querySelector('.sn-chain-cost');
+          if (tag) mostraCosto(tag, costoSicuro(inp.value));
+        });
         inp.addEventListener('change', confermaSegmento);
         conferme.push(() => { if (inp.value.trim() !== String(confermati[i] || '').trim()) confermaSegmento(); });
         seg.appendChild(inp);

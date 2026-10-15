@@ -334,7 +334,7 @@
     options_theme_dark: 'Scuro',
     options_monthly_limit: 'Limite mensile (€)',
     options_current_spent: 'Speso questo mese',
-    options_cost_warn_ratio: 'Avvisa quando un modello costa più di tante volte il predefinito (0 = mai)',
+    options_cost_warn_ratio: 'Avviso sui modelli costosi: oltre quante volte il costo del predefinito (0 = mai)',
     options_action_explain: 'Spiega (inline)',
     options_action_explain_deep: 'Approfondisci',
     options_action_translate_sel: 'Traduci selezione',

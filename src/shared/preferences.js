@@ -991,8 +991,8 @@
       aiuto: '"<funzione>: <modello>[, <ripiego>…]", la funzione col nome che ha in Opzioni → Modelli, il modello col nome del registro dei modelli o un id di OpenRouter (es. "Chat con Filo: claude")',
       keys: ['modello_funzione', 'modello di una funzione', 'modello della funzione', 'modello per la funzione',
         'modello per una funzione', 'cambia modello', 'modello per'],
+      // I fornitori esclusi restano esclusi con qualunque modello: cambiarlo cambia costo e qualità, non abbassa difese.
       costo: 2,
-      allenta: () => true,
       risk: 'Cambia il modello che elabora le richieste di questa funzione: qualità, velocità e costo cambiano, '
         + 'e i dati vanno al fornitore di quel modello.',
       build(v) {
