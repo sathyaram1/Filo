@@ -226,7 +226,7 @@
     return li;
   }
 
-  function renderNumeri(cfg, tot, ownerInvites) {
+  function renderNumeri(cfg, tot, ownerInvites, uso) {
     const lista = $('ownerNumeri');
     lista.innerHTML = '';
     const nUsers = Number(tot.users) || 0;
@@ -234,19 +234,33 @@
     const dati = Number(tot.grantedCredits);
     const restano = Number.isFinite(tetto) && Number.isFinite(dati) ? Math.max(0, tetto - dati) : null;
     const vivi = tot.liveCredits;
+    const inEuro = (crediti) => fmtEur(W.euroDaCrediti(crediti, cfg));
 
     lista.appendChild(riquadro(formatInt(nUsers), nUsers === 1 ? 'utente' : 'utenti',
       'Quante persone hanno un portafoglio su questo server.'));
+    for (const giorni of [7, 30]) {
+      const chi = giorni === 7 ? uso.attivi7 : uso.attivi30;
+      lista.appendChild(riquadroAttivi(giorni, chi));
+    }
     lista.appendChild(riquadro(
       Number.isFinite(dati) ? formatInt(dati) : '—',
       Number.isFinite(tetto) ? `crediti elargiti su ${formatInt(tetto)}` : 'crediti elargiti',
       'Quanto hai dato finora, contro il tetto che hai messo.',
-      { barra: Number.isFinite(tetto) && tetto > 0 && Number.isFinite(dati) ? dati / tetto : null },
+      { barra: Number.isFinite(tetto) && tetto > 0 && Number.isFinite(dati) ? dati / tetto : null, nota: Number.isFinite(dati) ? inEuro(dati) : '' },
     ));
     lista.appendChild(riquadro(restano == null ? '—' : formatInt(restano), 'ancora elargibili',
       'Quanto puoi ancora dare prima di sbattere sul tetto. A zero si fermano ingressi, quote e premi.'));
     lista.appendChild(riquadro(vivi == null ? '—' : formatCredits(vivi), 'crediti vivi',
-      'La somma dei saldi di tutti: quello che le persone hanno ancora da spendere.'));
+      'La somma dei saldi di tutti: quello che le persone hanno ancora da spendere.',
+      { nota: vivi == null ? '' : inEuro(vivi) }));
+    const spesiCrediti = uso.spesoUsd == null ? null : W.creditiDaUsd(uso.spesoUsd, cfg);
+    const spesiNota = uso.spesoUsd == null ? '' : [fmtUsd(uso.spesoUsd), fmtEur(W.euroDaUsd(uso.spesoUsd, cfg))]
+      .filter((t) => t !== '—').join(' · ');
+    lista.appendChild(riquadro(spesiCrediti == null ? '—' : formatCredits(spesiCrediti), 'crediti spesi',
+      `Quello che hanno speso tutti: la somma della colonna «Speso», al cambio del giorno.${uso.spesoIgnoti
+        ? ` ${uso.spesoIgnoti === 1 ? 'Una persona non ha' : `${formatInt(uso.spesoIgnoti)} persone non hanno`} la spesa letta e non ${uso.spesoIgnoti === 1 ? 'è contata' : 'sono contate'}.`
+        : ''}`,
+      { nota: spesiNota }));
 
     // «In circolazione» sono i codici che questa pagina ha generato e che
     // hanno ancora un posto libero: sono gli unici che il server manda qui.
