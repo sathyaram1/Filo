@@ -240,4 +240,5 @@ module.exports = {
   isIdentityProviderHref,
   isGoogleAppSurface,
   configForHref,
+  configForFrames,
 };
