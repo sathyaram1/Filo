@@ -191,11 +191,11 @@ module.exports = function register(on, ctx) {
   }
 
   async function componi(sit) {
+    const testo = CA.frase({ saldo: sit.saldo, giorni: sit.v.giorni, motivi: sit.v.motivi, percento: sit.soglie.percento });
+    const rimedi = await rimediDaMostrare(sit);
     return {
       id: `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-      testo: CA.frase({ saldo: sit.saldo, giorni: sit.v.giorni, motivi: sit.v.motivi, percento: sit.soglie.percento }),
-      saldo: sit.saldo,
-      rimedi: await rimediDaMostrare(sit),
+      testo, saldo: sit.saldo, rimedi, perFilo: CA.perFilo(testo, rimedi),
     };
   }
 
