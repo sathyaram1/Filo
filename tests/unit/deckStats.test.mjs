@@ -322,10 +322,10 @@ test('simulate: hits è esatto e accumulare batch converge (feedback #354)', () 
 
   // Un singolo batch da 15k vs 40 batch accumulati (600k mani): l'accumulato
   // dev'essere almeno buono quanto il singolo, e molto vicino all'oracolo.
-  const small = S.simulate({ library, want, turn: 4, iterations: 15000, seed: 1 });
+  const small = S.simulate({ library, want, turn: 4, game: 'play', iterations: 15000, seed: 1 });
   let hits = 0; let iters = 0;
   for (let s = 1; s <= 40; s++) {
-    const r = S.simulate({ library, want, turn: 4, iterations: 15000, seed: s });
+    const r = S.simulate({ library, want, turn: 4, game: 'play', iterations: 15000, seed: s });
     hits += r.hits; iters += r.iterations;
   }
   const converged = hits / iters;
