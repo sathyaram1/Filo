@@ -565,7 +565,7 @@
     options_security_safebrowse_desc:
       'Ti avvisa quando un sito imita un marchio noto, è nella lista nera di Google per phishing o malware, ' +
       'ha un certificato che non torna o ti chiede la password su una connessione non protetta. L\'avviso ' +
-      'copre la pagina finché non scegli: su un sito sospetto premi «Continua», su uno pericoloso scrivi ' +
+      'copre la pagina finché non scegli. Su un sito sospetto premi «Continua», su uno pericoloso scrivi ' +
       '«confermo». La scelta vale per quel sito in quella scheda, finché resta aperta. Spento, Filo non ' +
       'chiede più niente fuori dal computer, ma ti avvisa ancora sui sosia e sulle password chieste senza ' +
       'connessione protetta, che riconosce da solo.',
