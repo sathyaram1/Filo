@@ -233,7 +233,7 @@ module.exports = function register(on, ctx) {
 
   // ── Stato per la pagina Crediti ───────────────────────────────────────────
   // { ok, identity:{ ok, error? }, hasPersonalKey, pseudonym, usingOwnKey,
-  //   server: <walletState> | null, error? }
+  //   server: <walletState> | null, google?: { signedIn, linkedHere }, error? }
   // L'ultima lettura resta a chi deve DIRE il saldo fuori da quella pagina
   // (la chat, #816): lo stesso numero, senza un giro dal server a ogni turno.
   let ultimaLettura = null; // { at, state }
