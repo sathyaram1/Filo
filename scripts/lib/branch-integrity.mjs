@@ -652,7 +652,7 @@ export function guardTransition(root, id, { escalate, persist, clear, assigned: 
   const assigned = prev?.branch || String(ripiego || '');
   const v = checkDelivery(root, assigned);
   if (v.ok) return { ok: true, state: prev };
-  const dove = { current: v.current, assigned: v.assigned };
+  const dove = { current: v.current, assigned: v.assigned, ...(v.cartella ? { cartella: v.cartella, radice: v.radice } : {}) };
   // Il rebase del ramo assegnato si finisce e poi si registra: non conta verso la sospensione per deriva.
   if (v.rebase) return { ok: false, rebase: true, escalated: false, count: 0, ...dove, message: `registrazione rifiutata su ${id}: ${v.reason}` };
 
