@@ -288,7 +288,24 @@ function lasciaFuoriCanale() {
     stato.percentuale = null;
     if (['pronto', 'scarica'].includes(stato.fase)) stato.fase = 'aggiornato';
   }
-  togliCarte((n) => fuori(n.action.versione), { tipi: [TIPO_DISPONIBILE, PRONTO.tipo] });
+  dimenticaCarte((n) => fuori(n.action.versione), [TIPO_DISPONIBILE, PRONTO.tipo]);
+}
+
+// Le carte le ha messe Filo e Filo le toglie del tutto, così tornando al canale di prima ricompaiono. Quelle che
+// l'utente ha chiuso restano chiuse.
+function dimenticaCarte(via, tipi) {
+  return inFila(async () => {
+    const FiloMem = globalThis.SN_FILO_MEMORY;
+    if (!FiloMem?.listNotifications) return;
+    let tolte = 0;
+    for (const n of await FiloMem.listNotifications()) {
+      if (!tipi.includes(n.action?.tipo) || !via(n)) continue;
+      if (FiloMem.forgetNotification) await FiloMem.forgetNotification(n.id);
+      else await FiloMem.dismissNotification(n.id);
+      tolte += 1;
+    }
+    if (tolte) stato.annuncia();
+  });
 }
 
 function ricontrolla() {

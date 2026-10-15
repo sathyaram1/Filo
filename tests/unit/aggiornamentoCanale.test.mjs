@@ -97,6 +97,7 @@ function memoriaFinta() {
     listNotifications: async ({ includeDismissed = false } = {}) => carte.filter((n) => includeDismissed || !n.dismissed),
     addNotification: async (n) => { const e = { ...n, id: `n${++id}`, dismissed: false }; carte.unshift(e); return e; },
     dismissNotification: async (nid) => { const n = carte.find((x) => x.id === nid); if (n) n.dismissed = true; return carte; },
+    forgetNotification: async (nid) => { carte = carte.filter((x) => x.id !== nid); return carte; },
   };
 }
 const calma = async (giri = 6) => { for (let i = 0; i < giri; i++) await new Promise((r) => setImmediate(r)); };
@@ -138,7 +139,7 @@ test('la scelta stabile: la minor più nuova di quella in uso, mai una patch', (
   assert.deepEqual(s('0.3.9'), { tag: 'v0.4.0', finito: true });
   assert.deepEqual(s('0.3.0'), { tag: 'v0.4.0', finito: true }, 'chi è rimasto indietro di più settimane prende l\'ultima, non la prima');
   // Niente di più nuovo sullo stabile: la prima release non più nuova di quella in uso, e electron-updater dice «aggiornato».
-  assert.deepEqual(s('0.4.0'), { tag: 'v0.3.9', finito: true });
+  assert.deepEqual(s('0.4.0'), { tag: 'v0.4.0', finito: true });
   assert.deepEqual(s('0.4.1'), { tag: 'v0.4.1', finito: true }, 'chi era sul veloce non torna indietro alla minor');
   // Bozze, pre-release, etichette che non sono una versione e minor senza il file di questo sistema non contano.
   const sporche = [rilascio('v0.6.0', { draft: true }), rilascio('v0.5.0', { prerelease: true }), rilascio('prova-0.5.0'), rilascio('v0.5.0-rc.1'),
@@ -171,7 +172,7 @@ for (const piattaforma of ['win32', 'linux']) {
   test(`stabile: arriva la minor del lunedì, non le patch delle sei ore (${piattaforma})`, async () => {
     const { u, stato } = await avvia({ piattaforma, inUso: '0.3.9', canale: 'stabile' });
     assert.deepEqual(u.scaricate, ['/sathyaram1/Filo/releases/download/v0.4.0/Filo-Setup.exe']);
-    assert.equal(ricordo()?.versione, piattaforma === 'win32' ? '0.4.0' : ricordo()?.versione);
+    assert.equal(ricordo()?.versione, '0.4.0');
     assert.deepEqual(stato.api, [1], 'controllo e cancello chiedono l\'elenco una volta sola');
   });
 
@@ -200,6 +201,26 @@ test('stabile, spento: la carta «Installa» è della minor, e «Installa» scar
   assert.deepEqual(u.scaricate, ['/sathyaram1/Filo/releases/download/v0.4.0/Filo-Setup.exe']);
 });
 
+test('spento: la carta «Installa» della patch sparisce passando allo stabile e torna tornando al veloce; quella chiusa resta chiusa', async () => {
+  const { u } = await avvia({ inUso: '0.4.0', canale: 'veloce', automatici: false });
+  assert.deepEqual(carteAperte(), ['aggiornamento-disponibile:0.4.3']);
+  U.seguiImpostazioni(impostazioni('stabile', false));
+  await calma(12);
+  assert.deepEqual(carteAperte(), []);
+  assert.equal((await U.installaAggiornamento()).stato, 'aggiornato', '«Installa» sullo stabile ha scaricato la patch');
+  assert.deepEqual(u.scaricate, []);
+  U.seguiImpostazioni(impostazioni('veloce', false));
+  await calma(12);
+  assert.deepEqual(carteAperte(), ['aggiornamento-disponibile:0.4.3']);
+  // Chiusa dall'utente, un altro andata e ritorno non la riporta.
+  await globalThis.SN_FILO_MEMORY.dismissNotification(carte.find((n) => !n.dismissed).id);
+  U.seguiImpostazioni(impostazioni('stabile', false));
+  await calma(12);
+  U.seguiImpostazioni(impostazioni('veloce', false));
+  await calma(12);
+  assert.deepEqual(carteAperte(), []);
+});
+
 test('stabile: una minor senza i file di questo sistema non si propone, si prende quella prima', async () => {
   const release = [rilascio('v0.5.1'), rilascio('v0.5.0', { assets: [{ name: 'latest.yml' }] }), ...PUBBLICATE];
   const linux = await avvia({ piattaforma: 'linux', inUso: '0.3.9', canale: 'stabile', release });
@@ -216,11 +237,13 @@ test('stabile: la minor sta oltre le prime cento release, e si trova lo stesso',
   assert.deepEqual(u.scaricate, ['/sathyaram1/Filo/releases/download/v0.5.0/Filo-Setup.exe']);
 });
 
-test('dal veloce allo stabile con una patch già scaricata: non si installa, né alla chiusura né all\'avvio, e la carta se ne va', async () => {
-  const { u, registro } = await avvia({ inUso: '0.4.0', canale: 'veloce' });
+for (const piattaforma of ['win32', 'linux']) test(`dal veloce allo stabile con una patch già scaricata: non si installa, né alla chiusura né all'avvio, e la carta se ne va (${piattaforma})`, async () => {
+  const { u, registro } = await avvia({ piattaforma, inUso: '0.4.0', canale: 'veloce' });
+  if (piattaforma === 'linux') assert.equal(u.autoInstallOnAppQuit, true, 'su Linux il veloce la installa alla chiusura');
   assert.deepEqual(u.scaricate, ['/sathyaram1/Filo/releases/download/v0.4.3/Filo-Setup.exe']);
   assert.equal(ricordo()?.versione, '0.4.3');
-  assert.deepEqual(carteAperte(), ['aggiornamento-pronto:0.4.3']);
+  // Su Linux senza un AppImage da riscrivere la carta «Riavvia e aggiorna» non c'è nemmeno sul veloce.
+  if (piattaforma === 'win32') assert.deepEqual(carteAperte(), ['aggiornamento-pronto:0.4.3']);
 
   U.seguiImpostazioni(impostazioni('stabile'));
   await calma();
@@ -251,7 +274,6 @@ test('andata e ritorno: la patch torna a installarsi sul veloce, e una minor nuo
   assert.deepEqual(u.scaricate.map((p) => p.split('/')[5]), ['v0.4.3', 'v0.4.0']);
   assert.equal(ricordo()?.versione, '0.4.0');
   assert.deepEqual(carteAperte(), ['aggiornamento-pronto:0.4.0']);
-  assert.equal(u.autoInstallOnAppQuit, false, 'Windows installa all\'apertura, non alla chiusura');
   U.seguiImpostazioni(impostazioni('veloce'));
   await calma(12);
   assert.deepEqual(u.scaricate.map((p) => p.split('/')[5]), ['v0.4.3', 'v0.4.0', 'v0.4.3']);

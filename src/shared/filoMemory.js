@@ -777,6 +777,14 @@
     return true;
   }
 
+  // Una carta che Filo toglie perché non vale più, non perché l'utente l'ha chiusa: se torna vera, si riscrive.
+  async function forgetNotification(id) {
+    const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
+    const resto = list.filter((n) => n.id !== id);
+    if (resto.length !== list.length) await setRaw(KEYS.FILO_NOTIFICATIONS, resto);
+    return resto;
+  }
+
   async function dismissNotification(id, { acted = false } = {}) {
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     const idx = list.findIndex((n) => n.id === id);
@@ -895,7 +903,7 @@
     normalizeRepeat, parseClock, nextRecurrence, nextAlarmOccurrence, formatRepeat, isRecurring,
     resolveTimerRefs, removeTimersByRef, updateTimersByRef,
     // notifications
-    listNotifications, addNotification, dismissNotification, setNotificationText,
+    listNotifications, addNotification, dismissNotification, forgetNotification, setNotificationText,
     // dashboard cache
     getDashboardCache, setDashboardCache,
     // proxy: regole persistenti per dominio (#152)
