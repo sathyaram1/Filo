@@ -498,10 +498,10 @@ function soloTagDiRilascio(au) {
   au.getUpdateInfoAndProvider = cancello;
 }
 
-function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = () => {}, modo = R.MODO_PREDEFINITO } = {}) {
+function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = () => {}, modo = R.MODO_PREDEFINITO, canale = R.CANALE_PREDEFINITO } = {}) {
   updater = au;
   soloTagDiRilascio(au);
-  Object.assign(stato, nuovoStato(), { attivo: true, automatici, chiesta, annuncia, modo });
+  Object.assign(stato, nuovoStato(), { attivo: true, automatici, chiesta, annuncia, modo, canale: R.CANALI.includes(canale) ? canale : R.CANALE_PREDEFINITO });
   regola();
   au.on('checking-for-update', () => { if (stato.fase !== 'pronto') stato.fase = 'controllo'; });
   au.on('update-available', (info) => {
@@ -600,7 +600,7 @@ function initAutoUpdater(impostazioni) {
     await togliAvvisiSuperati(versioneInUso());
     const chiesta = await richiestaValida(versioneInUso());
     await avviaAggiornatore(autoUpdater, {
-      automatici: automaticiDa(settings), chiesta, annuncia: annunciaHome, modo: R.modoScelto(settings),
+      automatici: automaticiDa(settings), chiesta, annuncia: annunciaHome, modo: R.modoScelto(settings), canale: R.canaleScelto(settings),
     });
   })().catch((e) => console.error('[updater] avvio fallito:', e?.message || e));
 }
@@ -830,7 +830,8 @@ function esitoScarica(versione, { gia = false } = {}) {
 // com'è. `riavvio`: l'utente ha confermato il riavvio; una versione arrivata dopo la conferma non riavvia senza chiedere.
 async function aggiornaDaChat({ riavvio = true } = {}) {
   const inUso = versioneInUso() || '?';
-  const aggiornato = { eseguito: true, esito: 'aggiornato', frase: `Filo è aggiornato: la ${inUso} è l'ultima versione.` };
+  const ultima = stato.canale === 'stabile' ? 'l\'ultima versione del canale stabile' : 'l\'ultima versione';
+  const aggiornato = { eseguito: true, esito: 'aggiornato', frase: `Filo è aggiornato: la ${inUso} è ${ultima}.` };
   const senzaRete = { eseguito: false, esito: 'errore', frase: `Non sono riuscito a controllare se c'è una versione nuova (ora hai la ${inUso}): forse manca la rete. Riprova fra poco.` };
   const rifiutata = { eseguito: false, esito: 'rifiutata', frase: `${FRASE_RIFIUTATA} Resti sulla ${inUso}.` };
   if (!stato.attivo) {
@@ -877,6 +878,7 @@ async function statoAggiornamento() {
     versioneInUso: versioneInUso(),
     piattaforma: dip.piattaforma(),
     modo: stato.modo,
+    canale: stato.canale,
     automatici: stato.automatici,
     riavvio: !!p && puoInstallare(),
   };
