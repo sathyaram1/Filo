@@ -56,3 +56,17 @@ export const OVUNQUE = [
   /chi l[ioae] ha (?:scritt|trovat|registrat)\w*(?:(?! chi )[^.\n]){0,30}corregg/i,
   /stess[oa] (?:agente|worker|sessione)(?:(?! chi )[^.\n]){0,40}(?:critic|verific)/i,
 ];
+
+// Frasi che tengono ferme le formule: le prime le prendono, le seconde no.
+export const ESEMPI = {
+  vietati: [
+    'il verificatore ha da correggere i suoi rilievi',
+    'Se poi il server ti manda a correggere, una segnalazione ferma il lavoro',
+    'i rilievi di una verifica: li corregge chi li ha scritti',
+    'Con esito fix corregge lo stesso agente che ha scritto la critica',
+  ],
+  legittimi: [
+    'critica del verificatore senza rilievi INTERNI da correggere',
+    'chi verifica e chi corregge sono due ruoli',
+  ],
+};

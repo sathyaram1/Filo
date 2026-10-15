@@ -78,6 +78,12 @@ test('nessun testo di verifica anticipa il seguito del giro', () => {
 
 // Vale anche per ciò che si incontra senza cercarlo fuori dal ruolo (documenti nominati da CLAUDE.md, compito
 // locale, aiuto, intestazioni degli strumenti), letto unito perché una frase va a capo dove capita.
+test('le formule vietate prendono le frasi che lo dicono e lasciano stare quelle legittime', async () => {
+  const { OVUNQUE, ESEMPI } = await import('../helpers/formule-vietate.mjs');
+  for (const f of ESEMPI.vietati) assert.ok(OVUNQUE.some((r) => r.test(f)), `non presa: «${f}»`);
+  for (const f of ESEMPI.legittimi) assert.ok(!OVUNQUE.some((r) => r.test(f)), `presa per sbaglio: «${f}»`);
+});
+
 test('i documenti e le intestazioni che si leggono senza cercarli non anticipano il seguito del giro', async () => {
   const { OVUNQUE } = await import('../helpers/formule-vietate.mjs');
   const { testoLavoroServer, usageText } = await import('../../scripts/dispatch.mjs');
