@@ -739,6 +739,23 @@
       campo: 'web',
       describe: (a) => `Togliere la regola "apri sempre da un altro paese" per ${proxyDomain(a) || 'questo sito'}`,
     },
+    // «Tieni sempre aperto X» (#823): la pulizia delle schede non lo archivia più. Si vede e si toglie in
+    // Preferenze → Memoria. `_voce`/`_voci` le risolve il main prima del gate, mai l'LLM.
+    TIENI_APERTA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => `Tenere sempre aperto ${(a && (a._voce || a._detto)) || proxyDomain(a || {}) || 'questo sito'}`,
+      describeDone: (a) => `Da ora la pulizia delle schede non archivia ${(a && a._voce) || 'questo sito'}`,
+    },
+    NON_TENERE_APERTA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => {
+        const voci = Array.isArray(a && a._voci) ? a._voci : [];
+        return `Non tenere più sempre aperto ${voci.length ? voci.join(', ') : ((a && a._detto) || proxyDomain(a || {}) || 'questo sito')}`;
+      },
+      describeDone: (a) => `La pulizia delle schede può di nuovo archiviare ${(Array.isArray(a && a._voci) && a._voci.join(', ')) || 'questo sito'}`,
+    },
     // ── comandi della finestra / barra di Filo via chat (#419) ────────────────
     // L'agente della home aziona i controlli del browser stesso (schermo intero,
     // riduci a icona, menu Impostazioni/App/Account, home) — la stessa cosa che
