@@ -298,6 +298,14 @@ module.exports = function register(on, ctx) {
     return out;
   }
 
+  // Gli inviti si sbloccano col portafoglio legato a Google (#1120). Se l'accesso Google è su un altro uid (account già
+  // legato a un'altra copia di Filo), rifarlo non lega niente: la pagina Crediti lo deve dire invece di riproporlo.
+  async function statoGoogle() {
+    if (!auth.isSignedIn()) return { signedIn: false, linkedHere: null };
+    const [g, mio] = await Promise.all([auth.getUid().catch(() => null), identity.getUid().catch(() => null)]);
+    return { signedIn: true, linkedHere: g && mio ? g === mio : null };
+  }
+
   // Questa installazione ha un portafoglio (#816): i crediti veri li tiene il
   // server, e il conteggio locale non riceve premi né si racconta in chat.
   function haPortafoglio() {
