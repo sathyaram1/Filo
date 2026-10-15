@@ -773,6 +773,8 @@
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
+      // Un accesso fatto altrove (menu dell'account) può sbloccare gli inviti (#1120).
+      if (msg && msg.type === MSG.AUTH_CHANGED) { load().catch(() => {}); return; }
       if (!msg || msg.type !== MSG.CREDITS_CHANGED) return;
       load().catch(() => {});
       // Una chiamata pagata con la chiave propria (o il suo rifiuto superato):
