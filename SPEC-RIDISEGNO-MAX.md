@@ -361,9 +361,9 @@ resto.
   quando la ricerca larga è già stata fatta: `chiusura` (dopo una correzione,
   se l'owner ha acceso «Giro stretto dopo una correzione») e `riallineamento`
   (dopo un conflitto di fusione risolto a mano su un lavoro già verificato).
-  Cambia il perimetro, non il metro; un difetto fuori perimetro vale al massimo
-  livello 1, salvo danno concreto all'utente. L'ambito lo decide il server e
-  viaggia nel payload.
+  Cambia il perimetro, non il metro: livello e sede si danno come nel giro
+  pieno, anche a un difetto fuori perimetro (decisione dell'owner del
+  2026-09-22). L'ambito lo decide il server e viaggia nel payload.
 - **Un solo modello per la verifica**, quello forte: nel laboratorio (§9) i
   modelli economici non hanno prodotto un rilievo di completezza in 15 corse.
 
