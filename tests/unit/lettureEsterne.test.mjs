@@ -267,18 +267,24 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
   }
 });
 
-test('cablaggio: il gancio sta dopo uno strumento riuscito e dopo uno fallito, su tutti e soli gli strumenti che possono leggere fuori', () => {
+test('cablaggio: il gancio sta dopo uno strumento riuscito e dopo uno fallito, su ogni strumento fuori dall’elenco dei puliti', () => {
   const s = JSON.parse(readFileSync(join(ROOT, '.claude', 'settings.local.json'), 'utf8'));
-  const possibili = ['Read', 'Artifact', ...L.STRUMENTI_ESTERNI, 'mcp__github__get_file_contents', 'mcp__plugin_posta_gmail__search', 'mcp__claude-in-chrome__navigate'];
+  const possibili = ['Read', 'Artifact', 'Agent', 'Task', 'ToolSearch', 'WebFetch', 'WebSearch', 'ArtifactComments', 'SearchPlugins', 'SendMessage', 'StrumentoDiDomani',
+    'BashX', 'XBash', 'Bash|Grep', 'mcp__github__get_file_contents', 'mcp__plugin_posta_gmail__search', 'mcp__claude-in-chrome__navigate', ...L.MCP_SENZA_LETTURA];
   for (const evento of ['PostToolUse', 'PostToolUseFailure']) {
     const voci = (s.hooks[evento] || []).filter((g) => (g.hooks || []).some((h) => /\.claude\/hooks\/letture-esterne\.sh/.test(h.command)));
     assert.equal(voci.length, 1, evento);
-    // Come Claude Code: con un carattere da espressione regolare il matcher è una RegExp non ancorata.
-    const re = new RegExp(voci[0].matcher);
-    for (const n of possibili) assert.ok(re.test(n), `${evento}: ${n} non fa partire il gancio`);
-    for (const n of possibili) assert.ok(L.puoLeggereFuori(n), n);
-    for (const n of ['Bash', 'Grep', 'Glob', 'Edit', 'Write', 'Agent']) assert.equal(re.test(n), false, `${evento}: ${n} lo farebbe partire per niente`);
+    assert.equal(voci[0].matcher, L.matcherDelGancio(), `${evento}: il matcher si rigenera da STRUMENTI_SENZA_LETTURA`);
+    // Come Claude Code: con un carattere da espressione regolare il matcher è una RegExp non ancorata. Si prova anche
+    // ancorata ai due capi, perché un'altra lettura del matcher non apra un buco.
+    for (const re of [new RegExp(voci[0].matcher), new RegExp(`^(?:${voci[0].matcher})$`)]) {
+      for (const n of possibili) assert.ok(re.test(n), `${evento}: ${n} non fa partire il gancio`);
+      for (const n of L.STRUMENTI_SENZA_LETTURA) assert.equal(re.test(n), false, `${evento}: ${n} lo farebbe partire per niente`);
+    }
   }
+  for (const n of possibili) assert.ok(L.puoLeggereFuori(n), n);
+  for (const n of [...L.STRUMENTI_SENZA_LETTURA, '', undefined]) assert.equal(L.puoLeggereFuori(n), false, String(n));
+  for (const n of L.STRUMENTI_SENZA_LETTURA) assert.match(n, /^[A-Za-z]+$/, 'un nome nel matcher non deve portare caratteri da espressione regolare');
   const src = readFileSync(GANCIO, 'utf8');
   assert.doesNotMatch(src, /\r\n/, 'fine riga LF');
   assert.match(src, /\[ -n "\$FILO_ROUTINE" \] && exit 0/);
