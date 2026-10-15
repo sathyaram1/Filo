@@ -655,28 +655,6 @@ async function setRoutinesEnabled(on, idToken) {
   return Boolean(on);
 }
 
-// Esplorazione automatica a coda vuota (campo `proberWhenIdle`): quando non c'è
-// più niente da lavorare, le routine vanno a cercare problemi che nessuno ha
-// segnalato. Campo assente ⇒ true (il comportamento che c'è sempre stato): solo
-// un `false` scritto apposta ferma l'esplorazione.
-async function getAutomationProberIdle(idToken) {
-  // SOLO config/routines: è il documento che il server legge davvero. Il
-  // ripiego sul documento vecchio (config/automation) mostrava all'owner un
-  // valore che il server ignorava — la manopola girava, le ruote no. È già
-  // successo: la migrazione ha seminato i default nel documento nuovo e le
-  // scelte fatte prima (esplorazione spenta, tetto a 5) sono rimaste in
-  // ombra nel vecchio, mai più lette da nessuno.
-  const doc = await fetchDoc(ROUTINES_DOC, idToken);
-  if (doc && typeof doc.proberWhenIdle === 'boolean') return doc.proberWhenIdle;
-  return true;
-}
-
-async function setAutomationProberIdle(on, idToken) {
-  if (!idToken) throw new Error('Serve un ID token admin per cambiare l\'esplorazione automatica.');
-  await patchDoc(ROUTINES_DOC, { proberWhenIdle: toFsValue(Boolean(on)) }, ['proberWhenIdle'], idToken);
-  return Boolean(on);
-}
-
 // I lavori server alle routine (#1159): solo un `true` scritto apposta li accende, come legge il server.
 async function getLavoriServer(idToken) {
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
