@@ -422,11 +422,17 @@
       || (/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
   }
 
-  // Cache "il comando shell esiste?" (token → bool), per non rifare lo spawn
-  // di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
+  // Cache "il comando shell esiste?" (shell + token → bool), per non rifare lo
+  // spawn di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
   // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
+  // Tiene solo risposte certe: un controllo scaduto (macchina carica) va in
+  // `shellCmdIncerti` e si ritenta dopo RIPROVA_INCERTO_MS, alla prossima occasione (#1176).
   const shellCmdCache = new Map();
+  const shellCmdIncerti = new Map(); // chiave → quando è scaduto
+  const shellCmdInVolo = new Set();
+  const RIPROVA_INCERTO_MS = 20000;
   let whichTimer = null;
+  const chiaveShell = (cmd) => `${getShell() || ''}\u0000${cmd}`;
 
   // Cache "il dominio /sito.tld esiste?" (host → bool). Evita di rifare il
   // lookup DNS a ogni tasto; popolata sia dalla verifica live sia da quella
