@@ -425,10 +425,10 @@
   // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
   // incolla, non da una copia scelta: una voce appena tolta non rientra così.
   function pushClipboardEntry(entry, via) {
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry, via }).catch(() => {});
-    // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
+    const spinta = chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry, via }).catch(() => null);
+    // Un'immagine che l'utente ha tolto dalla cronologia non torna a un modello per farsi descrivere.
     if (entry?.type === 'image' && entry.dataUrl) {
-      requestImageDescription(entry.dataUrl).catch(() => {});
+      spinta.then((r) => { if (r?.tenuta !== false) requestImageDescription(entry.dataUrl).catch(() => {}); });
     }
   }
 
