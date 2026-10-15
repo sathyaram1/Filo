@@ -1627,11 +1627,11 @@ class TabManager {
   // Se l'LLM manca o fallisce, i duplicati vengono comunque collassati.
   async runAutoTriage({ trigger = 'idle' } = {}) {
     if (this.incognito || this._triageRunning) return { archived: 0 };
-    await this._caricaSempreAperte();
-    const cands = this._triageCandidates();
-    if (!cands.length) return { archived: 0 };
     this._triageRunning = true;
     try {
+      await this._caricaSempreAperte();
+      const cands = this._triageCandidates();
+      if (!cands.length) return { archived: 0 };
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
       let dupIdx = new Set();
