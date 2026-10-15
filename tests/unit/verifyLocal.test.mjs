@@ -147,6 +147,14 @@ test('un 3 a bilancio esaurito, o un 2 col segno ?: esito stop; un 2 a bilancio 
   const p = withCritique(due, 'r', { critique: 'P.\n[2i] ancora rotto', sha: SHA });
   assert.equal(p.outcome, 'pass');
   assert.deepEqual(p.state.r.derived.map((x) => [x.level, x.priority]), [[2, 2]]);
+  // Se un 1 fa partire la correzione col suo bilancio, il 2 ci sale (#744).
+  let sale = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  sale.r.counts = { count2: 5 };
+  const q = withCritique(sale, 'r', { critique: 'P.\n[2i] ancora rotto\n[1i] bordo storto', sha: SHA });
+  assert.equal(q.outcome, 'fix');
+  assert.deepEqual(q.state.r.rounds.at(-1).fixed, [2, 1]);
+  assert.equal(q.state.r.rounds.at(-1).consumed, 'cap1');
+  assert.deepEqual([q.state.r.counts.count2, q.state.r.counts.count1], [5, 1]);
 });
 
 test('i rilievi fuori dal giro restano in `derived` per il report', () => {
