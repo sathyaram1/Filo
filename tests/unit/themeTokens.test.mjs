@@ -243,3 +243,65 @@ test('illegibleAfter NON segnala i cambi estetici sensati', () => {
   // Cambiare il raggio degli angoli non c'entra con la leggibilità.
   assert.equal(TT.illegibleAfter('radius', '12px', {}, 'light'), false);
 });
+
+// ── #837: font dei link, durata delle animazioni, intensità delle ombre ─────
+
+test('link.font eredita dal font della UI finché non lo si tocca', () => {
+  const ui = TT.defaultValue('font', 'light');
+  assert.equal(TT.effectiveValue('link.font', {}, 'light'), ui);
+  assert.equal(TT.effectiveValue('link.font', { font: 'Georgia, serif' }, 'dark'), 'Georgia, serif');
+  assert.equal(TT.effectiveValue('link.font', { font: 'Georgia, serif', 'link.font': 'Verdana, sans-serif' }, 'light'), 'Verdana, sans-serif');
+  assert.equal(TT.effectiveValue('font', { 'link.font': 'Verdana, sans-serif' }, 'light'), ui);
+  assert.match(TT.pageCss({ 'link.font': 'Georgia, serif' }), /--sn-link-font: Georgia, serif;/);
+  assert.ok(!TT.validate('link.font', 'Georgia; color: red'));
+});
+
+test('motion: un moltiplicatore da 0 a 3, validato come gli altri tipi', () => {
+  assert.equal(TT.get('motion').type, 'factor');
+  assert.equal(TT.defaultValue('motion', 'light'), '1');
+  for (const ok of ['0', '1', '2', '3', '0.5', '1.25', '.5', '2.125', ' 2 ']) assert.ok(TT.validate('motion', ok), ok);
+  for (const no of ['4', '3.5', '-1', '1,5', '2x', '×2', '1e1', '0.12345', 'calc(2)', '1;}', '', ' ', 'NaN', 'Infinity']) {
+    assert.ok(!TT.validate('motion', no), no);
+  }
+  assert.ok(!TT.validate('motion', 2), 'un numero non stringa non passa');
+});
+
+test('motion arriva a pagine e shell con la stessa variabile', () => {
+  assert.match(TT.pageCss({ motion: '0' }), /--sn-motion: 0;/);
+  assert.match(TT.shellCss({ motion: '2' }), /--sn-motion: 2;/);
+  assert.equal(TT.pageCss({ motion: '9' }), '');
+});
+
+test('shadow: intensità di tipo opacità, sulle pagine e nella shell', () => {
+  assert.equal(TT.get('shadow').type, 'opacity');
+  assert.equal(TT.effectiveValue('shadow', {}, 'dark'), '0.18');
+  assert.match(TT.pageCss({ shadow: '0.05' }), /--sn-shadow-opacity: 0.05;/);
+  assert.match(TT.shellCss({ shadow: '0' }), /--sn-shadow-opacity: 0;/);
+  assert.ok(!TT.validate('shadow', '0 4px 16px black'), 'niente testo CSS libero');
+});
+
+test('errorMessage dice il formato giusto per ogni tipo', () => {
+  assert.match(TT.errorMessage('motion'), /fra 0 e 3/);
+  assert.match(TT.errorMessage('shadow'), /fra 0 e 1/);
+  assert.match(TT.errorMessage('link.font'), /famiglie/);
+  assert.match(TT.errorMessage('accent'), /#rrggbb/);
+  for (const n of TT.names()) assert.notEqual(TT.errorMessage(n), 'Valore non valido.', `${n} senza messaggio per il suo tipo`);
+});
+
+test('motionFactor legge --sn-motion dal documento, con 1 se manca e un tetto', () => {
+  const doc = (v) => ({ documentElement: { v } });
+  const prima = globalThis.getComputedStyle;
+  globalThis.getComputedStyle = (el) => ({ getPropertyValue: () => el.v });
+  try {
+    assert.equal(TT.motionFactor(doc('')), 1);
+    assert.equal(TT.motionFactor(doc(' 0')), 0);
+    assert.equal(TT.motionFactor(doc('2')), 2);
+    assert.equal(TT.motionFactor(doc('7')), 3);
+    assert.equal(TT.motionFactor(doc('boh')), 1);
+    assert.equal(TT.motionMs(200, doc('1.5')), 300);
+    assert.equal(TT.motionMs(200, doc('0')), 0);
+  } finally {
+    globalThis.getComputedStyle = prima;
+  }
+  assert.equal(TT.motionFactor(null), 1);
+});

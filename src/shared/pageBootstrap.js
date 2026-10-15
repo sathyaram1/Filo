@@ -37,6 +37,9 @@
     if (reg) reg.applyToDocument(document, tokens || {});
   }
 
+  // theme.css gira anche sui siti (menu, popup): le regole che valgono solo per le pagine di Filo, come il font dei link, si appoggiano a questo segno.
+  document.documentElement.dataset.snPagina = '';
+
   // Tema/scala iniziali "best effort" prima che le impostazioni siano caricate.
   applyTheme('system');
 
