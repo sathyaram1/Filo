@@ -201,9 +201,13 @@ test('all\'OK vale la finestra che il popup ha mostrato; se si è chiusa lo dice
 test('Mac senza permesso: le altre app non si elencano, e chiederne una apre il pannello invece di dare un\'immagine nera', async () => {
   const sis = sistemaFinto({ piattaforma: 'darwin', permesso: 'denied' });
   const S = Schermo.crea({ sistema: sis });
+  // L'elenco è il primo passo del modello: porta già al permesso, col tasto del pannello.
   const elenco = await S.prepara({ type: 'VEDI_SCHERMO' }, { settings: ACCESA, chiave: 't' });
   assert.deepEqual(elenco.esito.output.elenco.map((v) => v.nome), ['Filo: Ricette']);
-  assert.match(elenco.esito.output.nota, /Registrazione schermo/);
+  assert.equal(elenco.esito.executed, false);
+  assert.equal(elenco.esito.output.permesso, 'mac');
+  assert.equal(elenco.esito.output.apri, Schermo.PANNELLO_MAC);
+  assert.equal(sis.conti.pannello, 1);
   const r = await S.prepara({ type: 'VEDI_SCHERMO', finestra: 'Word' }, { settings: ACCESA, chiave: 't' });
   assert.equal(r.esito.executed, false);
   assert.equal(r.esito.output.permesso, 'mac');
