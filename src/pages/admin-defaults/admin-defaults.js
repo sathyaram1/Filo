@@ -558,9 +558,29 @@
       getRegistry: () => collectModelRegistry(),
       // Qui si decidono anche i fornitori esclusi: l'avviso li legge dalla pagina, non da quelli in vigore.
       avvisoDi: (action, ref) => ModelChain.avvisoHostAudio(action, ref, collectModelRegistry()[ref], collectExcluded()),
+      costoDi: costoModello,
     });
     hiddenModels = Object.fromEntries(Object.entries(models || {})
       .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
+  }
+
+  // Il costo di un uso accanto a ogni modello (#819), come nelle Opzioni. Senza avviso: qui si decide il predefinito,
+  // che è proprio il metro dell'avviso.
+  let stimaCtx = null;
+  async function caricaStime() {
+    let ctx = null;
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.STIMA_COSTO_MODELLI });
+      if (r && r.ok && r.contesto) ctx = r.contesto;
+    } catch (_) { ctx = null; }
+    stimaCtx = { ...(ctx || { modo: 'crediti', listino: null, registro: {} }), predefiniti: {} };
+    if (modelChains) ModelChain.aggiornaCosti(modelChains);
+  }
+  function costoModello(action, ref) {
+    const S = window.SN_STIMA_COSTO;
+    if (!S || !ref) return null;
+    if (!stimaCtx) return { breve: '…', testo: 'Sto leggendo il listino di OpenRouter.' };
+    return S.valuta(action, ref, collectModelRegistry(), stimaCtx);
   }
 
   function collectModels() {
@@ -651,6 +671,7 @@
     $('apiKeySafebrowse-state').textContent = `(${keyStateText(cfg.safeBrowsingKeyPresent)})`;
     renderModelRegistry(cfg.modelRegistry || {});
     renderModelsGrid(cfg.models || {});
+    caricaStime();
     // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed
     // è quella che il salvataggio riscrive per intero.
     renderExcluded(cfg.excludedProviders || [], cfg.excludedProviderReasons || []);

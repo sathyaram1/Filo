@@ -93,6 +93,7 @@ require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete 
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
 require(path.join(SHARED, 'codaAdattiva.js'));  // #1118 — lavori in parallelo che rallentano ai 429: prima del cancello dei modelli
 require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: righe del registro, 402, messaggi
+require(path.join(SHARED, 'stimaCosto.js'));  // #819 — quanto costa un uso tipico di una funzione con un modello
 // #652 — una manopola numerica: controllo del numero e frase di rifiuto. La
 // parte pura serve anche al main, che rifiuta gli stessi valori della pagina.
 require(path.join(SHARED, 'campoNumero.js'));

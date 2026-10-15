@@ -141,6 +141,64 @@
     };
   }
 
+  // Le funzioni che hanno un modello scelto da chi usa Filo, coi nomi con cui si possono dire: quello delle Opzioni,
+  // quello del censimento, l'id. «chat» da sola è la chat con Filo: è quella che si intende quasi sempre.
+  function funzioniConModello() {
+    if (!global.SN_MODEL_USAGE && typeof require === 'function') require('./modelUsage.js');
+    const U = global.SN_MODEL_USAGE;
+    if (!U || typeof U.list !== 'function') return [];
+    const MC = global.SN_MODEL_CHAIN;
+    const I18n = global.SN_I18N;
+    const opzioni = new Map(MC && typeof MC.actionLabels === 'function' ? MC.actionLabels() : []);
+    return U.list().filter((e) => e.from === 'user' && e.ref).map((e) => {
+      const chiave = opzioni.get(e.ref);
+      const tradotta = chiave && I18n ? I18n.t(chiave) : '';
+      const nome = tradotta && tradotta !== chiave ? tradotta : e.label;
+      return { action: e.ref, nome, nomi: [nome, e.label, e.id, e.ref].filter(Boolean) };
+    });
+  }
+  const FUNZIONE_DETTA = { chat: 'filo_chat', 'chat con filo': 'filo_chat', 'chat di filo': 'filo_chat', 'chat della home': 'filo_chat' };
+  function funzioneDetta(raw) {
+    const pk = pianoChiave(raw);
+    if (!pk) return { nessuna: true };
+    const tutte = funzioniConModello();
+    const alias = FUNZIONE_DETTA[pk];
+    if (alias) { const f = tutte.find((x) => x.action === alias); if (f) return { f }; }
+    const esatte = tutte.filter((x) => x.nomi.some((n) => pianoChiave(n) === pk));
+    if (esatte.length === 1) return { f: esatte[0] };
+    const dentro = tutte.filter((x) => x.nomi.some((n) => pianoChiave(n).includes(pk)));
+    if (dentro.length === 1) return { f: dentro[0] };
+    if (dentro.length > 1) return { ambigue: dentro };
+    return { nessuna: true };
+  }
+  // «Chat con Filo: claude, deepseek» → { action, nome, refs }, { rifiuto } o null. Il separatore è il primo «→», «=»
+  // o «:» che ha a sinistra una funzione: gli id di OpenRouter possono contenere i due punti.
+  function modelloDiFunzione(v) {
+    const testo = String(v == null ? '' : v).trim();
+    if (!testo) return null;
+    let ambigue = null;
+    for (const sep of ['→', '=>', '=', ':']) {
+      let idx = testo.indexOf(sep);
+      while (idx > 0) {
+        const f = funzioneDetta(testo.slice(0, idx));
+        if (f.f) {
+          const refs = testo.slice(idx + sep.length).split(',').map((x) => x.trim()).filter(Boolean);
+          if (!refs.length) return null;
+          if (refs.some((x) => x.length > 200)) return null;
+          return { action: f.f.action, nome: f.f.nome, refs };
+        }
+        if (f.ambigue && !ambigue) ambigue = f.ambigue;
+        idx = testo.indexOf(sep, idx + sep.length);
+      }
+    }
+    const elenco = `Le funzioni sono: ${funzioniConModello().map((x) => `«${x.nome}»`).join(', ')}. Riprova col nome di quella che l'utente intende, o chiediglielo.`;
+    if (ambigue) {
+      return { rifiuto: `la funzione detta può essere più d'una: ${ambigue.map((x) => `«${x.nome}»`).join(', ')}`, perModello: elenco };
+    }
+    if (/[→=:]/.test(testo)) return { rifiuto: 'non trovo la funzione di cui cambiare il modello', perModello: elenco };
+    return null;
+  }
+
   // «predefinito», «di serie», «come prima»: torna al valore dei Modelli predefiniti.
   function predefinito(v) {
     if (v === null) return true;
@@ -927,6 +985,28 @@
       },
     },
     {
+      // Il modello di una funzione (#819), come la griglia di Opzioni → Modelli. Che esista, che sia adatto e quanto
+      // costa lo controlla il main prima della conferma: qui c'è solo la lettura della frase.
+      scrive: ['models.*'],
+      aiuto: '"<funzione>: <modello>[, <ripiego>…]", la funzione col nome che ha in Opzioni → Modelli, il modello col nome del registro dei modelli o un id di OpenRouter (es. "Chat con Filo: claude")',
+      keys: ['modello_funzione', 'modello di una funzione', 'modello della funzione', 'modello per la funzione',
+        'modello per una funzione', 'cambia modello', 'modello per'],
+      // I fornitori esclusi restano esclusi con qualunque modello: cambiarlo cambia costo e qualità, non abbassa difese.
+      costo: 2,
+      risk: 'Cambia il modello che elabora le richieste di questa funzione: qualità, velocità e costo cambiano, '
+        + 'e i dati vanno al fornitore di quel modello.',
+      build(v) {
+        const r = modelloDiFunzione(v);
+        if (!r) return null;
+        if (r.rifiuto) return r;
+        return {
+          partial: { models: { [r.action]: r.refs.join(', ') } },
+          label: `Modello per «${r.nome}» → ${r.refs.join(', ')}`,
+          modelloFunzione: { action: r.action, refs: r.refs, nome: r.nome },
+        };
+      },
+    },
+    {
       scrive: ['openWeightsOnly'],
       aiuto: 'true | false (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)',
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
@@ -1009,6 +1089,26 @@
         n = Math.min(10000, n);
         const eur = n.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
         return { partial: { monthlyLimitEur: n }, label: `Limite di spesa mensile → ${eur} €` };
+      },
+    },
+    {
+      scrive: ['costoModelli.soglia'],
+      aiuto: 'numero di volte (0-1000): avvisa quando il modello scelto per una funzione costa almeno tante volte il predefinito; 0 o "mai" per non avvisare',
+      keys: ['avviso_modelli_costosi', 'avviso modelli costosi', 'avviso sui modelli costosi', 'soglia avviso costo modelli',
+        'avviso costo modello', 'avviso costo modelli', 'modelli costosi', 'soglia modelli costosi'],
+      costo: 1,
+      risk: 'Decide quando Filo ti avvisa che il modello scelto per una funzione consuma molti più crediti del predefinito.',
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        let n = ['mai', 'spento', 'spenta', 'off', 'no', 'nessuno', 'disattiva', 'disattivato'].includes(s) ? 0 : parseItalianNumber(s);
+        if (predefinito(v)) n = 5;
+        if (!Number.isFinite(n) || n < 0) return null;
+        n = Math.min(1000, n);
+        const volte = n.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 1 });
+        return {
+          partial: { costoModelli: { soglia: n } },
+          label: n > 0 ? `Avviso sui modelli costosi → oltre ${volte} volte il predefinito` : 'Avviso sui modelli costosi → mai',
+        };
       },
     },
 
@@ -1568,7 +1668,7 @@
     }
     const setter = r.setter;
     const b = setter.build(rawVal);
-    if (b && b.rifiuto) return { rifiuto: b.rifiuto };
+    if (b && b.rifiuto) return b.perModello ? { rifiuto: b.rifiuto, perModello: b.perModello } : { rifiuto: b.rifiuto };
     if (!b) return null;
     let allenta = false;
     try { allenta = typeof setter.allenta === 'function' ? !!setter.allenta(b, attuali) : false; } catch (_) { allenta = true; }

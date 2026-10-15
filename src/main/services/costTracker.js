@@ -42,6 +42,45 @@
     return state.months[month] || { totalEur: 0, byAction: {}, byProvider: {} };
   }
 
+  // Il registro d'uso delle stime di costo (#819): token medi per funzione, un campione per uso. Un uso fatto di più
+  // chiamate (i giri di strumenti di un messaggio in chat) gira dentro `unUso` e diventa un campione solo.
+  let usoCorrente = null;
+  try { usoCorrente = new (require('async_hooks').AsyncLocalStorage)(); } catch (_) { usoCorrente = null; }
+
+  function campioneDi(model, usage) {
+    const u = usage || {};
+    return {
+      model: String(model || ''),
+      prompt: Number(u.promptTokens) || 0,
+      completion: Number(u.completionTokens) || 0,
+      cached: Number(u.cachedPromptTokens) || 0,
+      usd: Number(u.costUsd) || 0,
+    };
+  }
+
+  async function aggiungiAlRegistro(action, campione) {
+    const S = global.SN_STIMA_COSTO;
+    if (!S || !action) return;
+    const state = await getState();
+    state.tokens = S.aggiungiCampione(state.tokens || {}, action, campione);
+    await setState(state);
+  }
+
+  async function unUso(action, fn) {
+    if (!usoCorrente) return fn();
+    const uso = { action, campione: null };
+    try {
+      return await usoCorrente.run(uso, fn);
+    } finally {
+      if (uso.campione) { try { await aggiungiAlRegistro(action, uso.campione); } catch (_) {} }
+    }
+  }
+
+  async function registroToken() {
+    const state = await getState();
+    return state.tokens || {};
+  }
+
   async function record({ action, provider, model, usage, pricing, usdToEur }) {
     const eur = estimateCostEur({ usage, pricing, usdToEur });
     const state = await getState();
@@ -49,6 +88,15 @@
     m.totalEur += eur;
     m.byAction[action] = (m.byAction[action] || 0) + eur;
     m.byProvider[provider] = (m.byProvider[provider] || 0) + eur;
+    const campione = campioneDi(model, usage);
+    const uso = usoCorrente && usoCorrente.getStore();
+    if (uso && uso.action === action) {
+      const c = uso.campione || { model: campione.model, prompt: 0, completion: 0, cached: 0, usd: 0 };
+      for (const k of ['prompt', 'completion', 'cached', 'usd']) c[k] += campione[k];
+      uso.campione = c;
+    } else if (global.SN_STIMA_COSTO) {
+      state.tokens = global.SN_STIMA_COSTO.aggiungiCampione(state.tokens || {}, action, campione);
+    }
     await setState(state);
     // Conteggio crediti (gamification): 1 credito = 0,08 centesimi. Il costo €
     // resta qui dietro le quinte; il motore crediti converte e scala il saldo.
@@ -84,5 +132,5 @@
     return m.totalEur >= monthlyLimitEur;
   }
 
-  global.SN_COSTS = { record, getMonthly, isOverLimit, estimateCostEur, monthKey, getState };
+  global.SN_COSTS = { record, getMonthly, isOverLimit, estimateCostEur, monthKey, getState, unUso, registroToken };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
