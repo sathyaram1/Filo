@@ -1,5 +1,5 @@
 // Verifica #823 giro 1, rilievo 1: «tienimi sempre aperta questa scheda» su un sito locale (localhost) non si salva,
-// mentre la pulizia quella scheda la archivia.
+// mentre la pulizia quella scheda la può archiviare.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi } from '../../helpers/chatFinta.mjs';
