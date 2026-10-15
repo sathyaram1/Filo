@@ -3,6 +3,9 @@
 // spenta; senza xvfb uno stop che dice cosa manca. Windows e Mac: invariato. Unit test: tests/unit/schermoVirtuale.test.mjs.
 
 import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { datiWorker, displayDelWorker } from './dati-worker.mjs';
 
 const vuota = (v) => !String(v ?? '').trim();
@@ -59,7 +62,7 @@ export function preparaLancioElectron(cmd, args = [], opzioni = {}) {
 }
 
 // Il figlio di xvfb-run dice dove sta lo schermo e aspetta la fine del suo stdin: quando chi l'ha acceso si chiude,
-// anche ucciso, il figlio esce e xvfb-run spegne Xvfb e toglie l'autorizzazione.
+// anche ucciso, il figlio esce e xvfb-run spegne Xvfb.
 const TIENI_SCHERMO = 'printf "%s\\n%s\\n" "$DISPLAY" "$XAUTHORITY"; exec cat >/dev/null';
 
 /**
@@ -72,8 +75,14 @@ export async function accendiSchermo({ env = process.env, attesaMs = 30_000, lan
   if (!p.serve) return { display: '', nota: '', spegni: async () => {} };
   if (!p.ok) throw new Error(p.motivo);
 
+  // L'autorizzazione la tiene chi accende: quella che xvfb-run crea da sé, se sparisce prima di lui (la temporanea della
+  // corsa se ne va all'uscita), gli fa saltare lo spegnimento di Xvfb.
+  const cartellaAuth = mkdtempSync(join(tmpdir(), 'filo-schermo-'));
+  const auth = join(cartellaAuth, 'Xauthority');
+  writeFileSync(auth, '', { mode: 0o600 });
+  const togliAuth = () => { try { rmSync(cartellaAuth, { recursive: true, force: true }); } catch (_) {} };
   // Gruppo suo: il Ctrl+C del terminale non spegne lo schermo sotto agli spec che chiudono.
-  const figlio = lancia('xvfb-run', [...p.xvfb, 'sh', '-c', TIENI_SCHERMO], { env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+  const figlio = lancia('xvfb-run', [...p.xvfb, '-f', auth, 'sh', '-c', TIENI_SCHERMO], { env, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
   const uccidi = () => { try { process.kill(-figlio.pid, 'SIGTERM'); } catch (_) { try { figlio.kill('SIGTERM'); } catch (_) {} } };
   let fuori = '';
   let errori = '';
@@ -92,6 +101,7 @@ export async function accendiSchermo({ env = process.env, attesaMs = 30_000, lan
   if (!esito.errore && !/^:\d+$/.test(esito.display)) esito.errore = `xvfb-run ha dato un display che non si capisce: ${JSON.stringify(esito.display)}`;
   if (esito.errore) {
     uccidi();
+    togliAuth();
     const dettaglio = (errori || fuori).trim();
     throw new Error(`Linux senza schermo: ${esito.errore}, e senza Electron ogni spec uscirebbe rosso subito.`
       + `${dettaglio ? ` xvfb-run dice: ${dettaglio}` : ''}`);
@@ -108,10 +118,11 @@ export async function accendiSchermo({ env = process.env, attesaMs = 30_000, lan
   let spento = null;
   const spegni = () => spento || (spento = new Promise((risolvi) => {
     for (const k of VARIABILI) { if (prima[k] === undefined) delete env[k]; else env[k] = prima[k]; }
-    if (figlio.exitCode !== null || figlio.signalCode !== null) return risolvi();
+    const fatto = () => { togliAuth(); risolvi(); };
+    if (figlio.exitCode !== null || figlio.signalCode !== null) return fatto();
     figlio.ref();
-    const tetto = setTimeout(() => { uccidi(); risolvi(); }, 5_000);
-    figlio.once('exit', () => { clearTimeout(tetto); risolvi(); });
+    const tetto = setTimeout(() => { uccidi(); fatto(); }, 5_000);
+    figlio.once('exit', () => { clearTimeout(tetto); fatto(); });
     figlio.stdin.end();
   }));
   return {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Un comando che apre Electron, lanciato a mano come lo lancia finish:check: su Linux senza schermo con xvfb-run -a, la
-// base di display del worker (#1157) e la sandbox spenta; altrove invariato. Regole in scripts/lib/schermo-virtuale.mjs.
-//   node scripts/lancia-electron.mjs npx playwright test <percorso>
+// Un comando che apre Electron fuori da Playwright (npx playwright test lo schermo se lo accende da sé, #739), lanciato
+// come lo lancia finish:check: su Linux senza schermo con xvfb-run -a, la base di display del worker (#1157) e la sandbox
+// spenta; altrove invariato. Regole in scripts/lib/schermo-virtuale.mjs.   node scripts/lancia-electron.mjs npm run test:shoot
 
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
