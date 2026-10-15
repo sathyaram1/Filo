@@ -98,7 +98,23 @@
       auditDelaysMs = AUDIT_DELAYS_MS,
       segreti = async () => [],
       ricordaEsterni = () => {},
+      funzioneDi = () => '',
+      rimedioDi = () => '',
     } = deps;
+
+    // Il «nessun host ammesso» del router (#828) lo legge chi usa una funzione: la frase dice quale, e dove si sceglie
+    // un altro modello. Voce, dettatura e classificatori hanno la loro frase, scritta prima di chiamare.
+    function conLaFunzione(err, s, action) {
+      const CE = global.SN_CHAT_ERRORS;
+      if (!err || err.code !== 'NO_ALLOWED_HOST' || !CE || typeof CE.fraseNessunHost !== 'function') return err;
+      let funzione = '';
+      let rimedio = '';
+      try { funzione = funzioneDi(action) || ''; } catch (_) {}
+      try { rimedio = rimedioDi(s, action) || ''; } catch (_) {}
+      err.message = CE.fraseNessunHost({ modello: err.model, funzione, motivo: CE.motivoHostEsclusi(err.hosts), rimedio });
+      return err;
+    }
+    const DAL_ROUTER = new Set(['complete', 'streamComplete', 'embed']);
 
     // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
     // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
@@ -149,7 +165,12 @@
 
     async function complete({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}) {
       const { s, chain } = await chainFor({ action, settings, attempts });
-      const r = await providers().completeWithFallback({ attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onFallback });
+      let r;
+      try {
+        r = await providers().completeWithFallback({ attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onFallback });
+      } catch (e) {
+        throw conLaFunzione(e, s, action);
+      }
       return settleChain(s, action, chain, r);
     }
 
@@ -169,7 +190,7 @@
         });
       } catch (e) {
         auditBroken(s, action, e && e.brokenAttempts);
-        throw e;
+        throw conLaFunzione(e, s, action);
       }
       const { brokenAttempts, ...rest } = r || {};
       auditBroken(s, action, brokenAttempts);
@@ -234,7 +255,12 @@
       // Il testo passa dal router, che per complete e streamComplete ha già il suo smistamento per nome.
       const router = providers();
       const viaRouter = (method === 'complete' || method === 'streamComplete') && typeof router[method] === 'function';
-      const r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
+      let r;
+      try {
+        r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
+      } catch (e) {
+        throw DAL_ROUTER.has(method) ? conLaFunzione(e, s, action) : e;
+      }
       const usage = r.usage;
       const { servedBy, violation } = noteServed(s, action, { ...r, model: r.model || a.model });
       const later = !servedBy && Boolean(r.generationId);

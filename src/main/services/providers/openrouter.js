@@ -552,6 +552,9 @@
     err.provider = 'openrouter';
     const attesa = attesaChiesta(res);
     if (attesa != null) err.retryAfterMs = attesa;
+    if (res.keySource) err.keySource = res.keySource;
+    if (res.keyFallback) err.keyFallback = res.keyFallback;
+    if (res.status === 404 && model && await nessunHostAmmesso(err, { apiKey, model, providerRouting })) return err;
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
@@ -568,9 +571,24 @@
       else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
       if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
     } else if (refusal) err.code = refusal;
-    if (res.keySource) err.keySource = res.keySource;
-    if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
+  }
+
+  // Un 404 del router su un modello che servono solo host esclusi (#828). Lo dicono gli host dichiarati, non il testo
+  // dell'errore, che il router può cambiare; e vince sugli altri motivi del 404, perché strumenti e tetto non contano più.
+  async function nessunHostAmmesso(err, { apiKey, model, providerRouting }) {
+    let v = null;
+    try { v = await hostVerdict({ apiKey, model, providerRouting }); } catch (_) { v = null; }
+    if (!v || v.ok || v.reason !== 'excluded') return false;
+    console.warn(`[Filo policy] "${model}" lo servono solo host esclusi (${v.excluded.join(', ')}): ${err.message}`);
+    const CE = global.SN_CHAT_ERRORS;
+    err.dettaglio = err.message;
+    err.message = CE ? CE.fraseNessunHost({ modello: model, motivo: CE.motivoHostEsclusi(v.excluded) }) : `NO_ALLOWED_HOST ${model}`;
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'excluded';
+    err.model = model;
+    err.hosts = v.excluded;
+    return true;
   }
 
   // ─── Chi può servire un modello, prima di chiamarlo ───────────────────────
@@ -781,7 +799,7 @@
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key) => ({
       method: 'POST', headers: buildHeaders(key), body: payload, signal,
     }));
-    if (!res.ok) throw await httpError(res);
+    if (!res.ok) throw await httpError(res, { apiKey, model, providerRouting });
     const data = await res.json();
     const rows = Array.isArray(data.data) ? data.data.slice() : [];
     rows.sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
