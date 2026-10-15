@@ -144,6 +144,28 @@
   background: var(--sn-hover, rgba(0,0,0,.08)); overflow: hidden;
 }
 .sn-wallet-numero-barra > span { display: block; height: 100%; background: var(--sn-accent); }
+.sn-wallet-numero-nota { font-size: 12px; color: var(--sn-muted); }
+.sn-wallet-numero.is-allarme .sn-wallet-numero-valore,
+.sn-wallet-numero.is-allarme .sn-wallet-numero-nome { color: var(--sn-error); }
+/* Un numero che apre le persone contate (#820): si capisce dal puntatore e dal fondo al passaggio, e resta acceso
+   finché la tabella mostra solo loro. */
+.sn-wallet-numero.is-apribile {
+  cursor: pointer; border-radius: 8px; padding: 2px 8px; margin: -2px -8px;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.sn-wallet-numero.is-apribile:hover { background: rgba(var(--sn-accent-rgb), 0.12); }
+.sn-wallet-numero.is-apribile:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--sn-accent); }
+.sn-wallet-numero.is-apribile:active { transform: scale(.98); }
+.sn-wallet-numero.is-attivo { background: rgba(var(--sn-accent-rgb), 0.18); }
+.sn-wallet-numero.is-attivo .sn-wallet-numero-valore { color: var(--sn-accent); }
+/* Il conto che non regge: la prima cosa della pagina, nel colore degli errori che l'utente può cambiare. */
+.sn-wallet-allarme {
+  margin: 4px 0 14px; padding: 10px 14px; border-radius: 8px; border-left: 3px solid var(--sn-error);
+  background: color-mix(in srgb, var(--sn-error) 9%, transparent); color: var(--sn-error); font-weight: 600;
+}
+.sn-wallet-conto-nota { margin: 6px 0 0; }
+.sn-wallet-filtro { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
+.sn-wallet-table tr.is-fuori { display: none; }
 
 /* Le manopole vanno in griglia, tante per riga quante ce ne stanno: in colonna lasciavano vuoti due terzi
    di finestra e spingevano la tabella degli utenti sotto la piega. */
