@@ -350,14 +350,13 @@ resto.
   numeri li scrive l'owner in Gestione → Automazioni e non hanno un default nel
   codice. Un'istanza catturata non può promuoversi da sola: i conti non li fa
   lei.
-- **Fase 2.** Con esito `fix` corregge lo stesso agente che ha scritto la
-  critica, sui soli rilievi che il server gli rimanda, e consegna con
-  `--record-fixed`. Se correggere non si può senza una decisione, consegna con
-  `--ferma` e una segnalazione: il lavoro aspetta l'owner. Ogni correzione
-  porta a un'altra verifica, fatta da un'altra istanza.
-- **I rilievi non corretti non spariscono**: il server li raccoglie in un
-  feedback derivato per lavoro, figlio `#N.k`, categoria `routine:residuo`. Il
-  verificatore non apre feedback.
+- **Con esito `fix` si corregge** sui soli rilievi che il server rimanda, e si
+  consegna con `--record-fixed`. Se correggere non si può senza una decisione,
+  la consegna porta `--ferma` e una segnalazione: il lavoro aspetta l'owner.
+  Ogni correzione porta a un'altra verifica, fatta da un'altra istanza.
+- **I rilievi non corretti non spariscono**: diventano feedback derivati,
+  figli `#N.k`, aperti dal server; quanti e con quale priorità lo dice
+  `FEEDBACK-STATES.md` §3. Il verificatore non apre feedback.
 - **Ambiti.** La verifica è piena di serie. Due giri stretti la sostituiscono
   quando la ricerca larga è già stata fatta: `chiusura` (dopo una correzione,
   se l'owner ha acceso «Giro stretto dopo una correzione») e `riallineamento`
