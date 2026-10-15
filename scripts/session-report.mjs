@@ -770,8 +770,8 @@ export function finestraOrchestratore(linee) {
     }
   }
   // Un worker in sottofondo finisce col primo segno dopo il lancio che lo NOMINA: la sua consegna (from = agentId del
-  // lancio) o una notifica non provvisoria (tool-use-id della chiamata o task-id = agentId). Un Monitor, un comando,
-  // un artefatto o un testo che ne parla non lo chiudono; e se la consegna arriva prima, i turni di mezzo sono già dopo.
+  // lancio), che può precedere la notifica di secondi, o una notifica non provvisoria (tool-use-id o task-id = agentId).
+  // Un Monitor, un comando, un artefatto o un testo che ne parla non lo chiudono.
   const aperta = (c, ms) => c.inizio <= ms && !(c.fine <= ms);
   for (const { e, ms } of voci) {
     if (!Number.isFinite(ms)) continue;
