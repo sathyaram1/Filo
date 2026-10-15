@@ -42,6 +42,7 @@ const CARTELLA_DATI = {
   'wallet-stato.bin': { frase: 'l\'ultimo stato del tuo portafoglio letto dal server' },
   'auth.bin': { frase: 'la chiave dei crediti e il tuo accesso Google' },
   'segreti-letti.bin': { frase: 'E per un mese i segreti letti' },
+  'appunti-tolti.json': { frase: 'un\'impronta da cui non si ricava né il testo né l\'immagine' },
   'archivio-schede': { frase: 'le schede aperte e quelle archiviate' },
   'segnalazioni-mie': { frase: 'una copia delle segnalazioni che hai mandato' },
   'cronologia-ai': { frase: 'l\'elenco delle richieste fatte ai modelli con domanda e risposta' },
