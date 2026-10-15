@@ -259,9 +259,9 @@
           coverage(cards, want, false).covered,
           cards.reduce((s, c) => s + c.filter((t) => wantTags.has(t)).length, 0),
         ];
-        const better = !bestScore || score[0] !== bestScore[0] ? !bestScore || score[0] > bestScore[0]
-          : score[1] !== bestScore[1] ? score[1] > bestScore[1] : score[2] > bestScore[2];
-        if (better) { best = pick.slice(); bestScore = score; }
+        if (!bestScore || (score[0] - bestScore[0] || score[1] - bestScore[1] || score[2] - bestScore[2]) > 0) {
+          best = pick.slice(); bestScore = score;
+        }
         return;
       }
       for (let k = start; k <= useful.length - (size - pick.length); k++) {
