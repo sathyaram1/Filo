@@ -4146,6 +4146,7 @@
       return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1…${conNome ? ` (es. ${conNome})` : ''}.`;
     }
     if (r.tipo === 'sistema') return `${r.nome} se la prende il sistema operativo e non arriverebbe mai a questo modulo: scegline un'altra${perEsempio}.`;
+    if (r.tipo === 'altgr') return `${r.nome} su Windows è anche AltGr, che scrive caratteri come € e @: scegline un'altra${perEsempio}.`;
     if (r.tipo === 'simbolo') {
       return r.modificatore === 'Shift'
         ? `Con Shift il simbolo cambia, quindi ${r.nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift): scegline un'altra${perEsempio}.`
