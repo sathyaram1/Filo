@@ -192,6 +192,8 @@ function configureSpellchecker() {
 
 app.whenReady().then(async () => {
   // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
+  // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
+  try { await require('./services/interruttoreAiuto').migra(); } catch (e) { console.warn('[Filo] interruttore dell\'Aiuto:', e?.message || e); }
   let impostazioniAvvio = {};
   try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
   try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
