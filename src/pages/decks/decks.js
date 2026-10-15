@@ -2287,7 +2287,17 @@
     // condizione (feedback #354). Delego l'ascolto a #stateStats perché le righe
     // categoria (#probNeeds) sono ricostruite a ogni rerender delle statistiche.
     $('stateStats').addEventListener('input', (e) => {
-      if (e.target && e.target.matches('#probTurn, #probNeeds input')) scheduleProb();
+      if (!e.target || !e.target.matches('#probTurn, #probNeeds input, #probMull, #probExtra')) return;
+      if (e.target.id === 'probMull') onProbMull();
+      scheduleProb();
+    });
+    $('probGame').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = $('probGame').getBoundingClientRect();
+      openCtx(r.left, r.bottom + 2, PROB_GAMES.map((g) => ({
+        label: `Partita ${g.label}`,
+        run: () => { setProbGame(g.id); scheduleProb(); },
+      })));
     });
 
     $('carouselPrev').addEventListener('click', () => carouselNav(-1));
