@@ -166,9 +166,9 @@ export const VERIFIER_ROUND = (() => {
  *   Stavano in `config/automation`, leggibile solo con un bearer admin, e la
  *   lettura era best-effort: senza credenziale si ricadeva sui default **senza
  *   dirlo**. Ma nelle macchine delle routine quella credenziale non c'è mai
- *   (è la causa del registro worker sempre vuoto, feedback #451): quindi né
- *   l'esplorazione a coda vuota né i tentativi del loop hanno MAI raggiunto una
- *   routine cloud. In dashboard sembravano attivi, nei fatti non lo erano.
+ *   (è la causa del registro worker sempre vuoto, feedback #451): quindi le
+ *   impostazioni delle routine non hanno MAI raggiunto una routine cloud. In
+ *   dashboard sembravano attive, nei fatti non lo erano.
  *
  *   Ora vivono in `config/routines`, che le regole rendono leggibile da chiunque
  *   e scrivibile solo dall'owner (dentro c'è solo come devono comportarsi le
