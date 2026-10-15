@@ -178,6 +178,8 @@ test('accesa: la finestra di un\'altra app si guarda dopo un solo OK, e la rispo
   // L'elenco era arrivato al modello come titoli scritti da altri.
   expect(chat[1]).toContain('<<<FINESTRE_APERTE>>>');
   expect(chat[1]).toContain(ESTERNA);
+  // La prima che dà il sistema è quella appena lasciata: il modello sa che è «questa finestra».
+  expect(chat[1]).toContain(`${ESTERNA} (in primo piano`);
 
   // Dopo il turno: l'immagine non c'è in nessun file di Filo, e l'archivio della chat tiene il nome della finestra.
   const dati = await app.evaluate(({ app: a }) => a.getPath('userData'));
