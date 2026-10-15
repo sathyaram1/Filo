@@ -142,8 +142,10 @@ async function verificaCambio({ action, refs } = {}, { Defaults } = {}) {
     contesto({ Defaults }).catch(() => null),
     new Promise((res) => { const t = setTimeout(() => res(null), ATTESA_CHAT_MS); if (t.unref) t.unref(); }),
   ]);
-  return { costo: ctx ? fraseCosto(action, lista, registry, ctx) : '' };
+  // Il listino in ritardo non è un costo zero: si dice, come la riga delle Opzioni, e lo scaricamento resta in volo.
+  return { costo: ctx ? fraseCosto(action, lista, registry, ctx) : LISTINO_IN_RITARDO };
 }
+const LISTINO_IN_RITARDO = 'Il listino di OpenRouter non è arrivato in tempo: Filo non stima il costo senza. Lo trovi in Opzioni, accanto al modello.';
 
 // «Circa 133 crediti per messaggio. Con opus i tuoi 4.300 crediti bastano per circa 32 messaggi.»
 function fraseCosto(action, refs, registry, ctx) {
