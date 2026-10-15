@@ -21,7 +21,8 @@ function albero() {
   const file = {
     'src/zeta.js': pesa('// Ultimo per nome. Seconda frase che non si vede.\nconst z = 1;\n', 2048),
     'src/alfa.js': "'use strict';\n// Dopo use strict, la prima frase.\nconst a = 1;\n",
-    'src/main/crlf.js': '// Fine riga di Windows.\r\n// Seconda riga.\r\nconst c = 1;\r\n',
+    'src/main/crlf.js': '﻿// Fine riga di Windows.\r\n// Seconda riga.\r\nconst c = 1;\r\n',
+    'src/main/vuoto.js': '/**/\n/*\n *\n */\n// Dopo due commenti vuoti.\n',
     'src/main/elenco.js': '// Pagina "Aperti per dopo".\n// - voce uno\n// - voce due\n',
     'src/main/nudo.js': 'const x = 1; // il commento dopo il codice non è un\'intestazione\n',
     'src/main/servizi/blocco.js': pesa('#!/usr/bin/env node\n/**\n * Blocco in cima, es. con un punto in mezzo. Poi altro.\n */\n', 1024),
