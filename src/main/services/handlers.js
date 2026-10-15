@@ -3071,6 +3071,20 @@ async function eseguiAzioneFilo(action, {
           output: r && r.ok ? { proxyRule: 'set', domain: r.domain, country: r.country } : { proxyRule: 'failed', error: r && r.error },
         };
       }
+      case 'TIENI_APERTA': {
+        if (!action._voce) {
+          return { executed: false, kept: false, output: { sempreAperta: 'non_salvata', error: 'nessun sito riconosciuto: serve il dominio (es. web.whatsapp.com) o una scheda web davanti' } };
+        }
+        await SempreAperte.aggiungi(action._voce);
+        return { executed: true, kept: false, output: { sempreAperta: 'salvata', sito: action._voce } };
+      }
+      case 'NON_TENERE_APERTA': {
+        const tolte = await FiloMem.removeKeepOpen(action._voci || []);
+        if (!tolte.length) {
+          return { executed: false, kept: false, output: { sempreAperta: 'nessuna', error: 'nessun sito da tenere aperto corrisponde', salvati: await SempreAperte.voci() } };
+        }
+        return { executed: true, kept: false, output: { sempreAperta: 'tolta', siti: tolte } };
+      }
       case 'RIMUOVI_REGOLA_PROXY': {
         const { tm, tab } = targetWebTab(sender);
         if (!tm) return { executed: false, kept: false };
