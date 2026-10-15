@@ -108,7 +108,7 @@ test('i documenti e le intestazioni che si leggono senza cercarli non anticipano
   const colpevoli = [];
   for (const [nome, testo] of superfici) {
     const unito = testo.replace(/\s+/g, ' ');
-    for (const formula of OVUNQUE) {
+    for (const formula of [...OVUNQUE, PULIZIA_E_CORREZIONI]) {
       const m = unito.match(formula);
       if (m) colpevoli.push(`${nome}: «${unito.slice(Math.max(0, m.index - 30), m.index + m[0].length + 10)}»`);
     }
