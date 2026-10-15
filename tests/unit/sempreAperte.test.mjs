@@ -64,6 +64,25 @@ test('«non tenerla più aperta» toglie la voce che copre il sito e quelle sott
   assert.deepEqual(T.vociDaTogliere('', voci), []);
 });
 
+test('una macchina senza punto si tiene aperta se è detta come indirizzo (#823 giro 1)', () => {
+  assert.equal(T.hostTenuto('localhost'), 'localhost');
+  assert.equal(T.hostTenuto('localhost:3000'), 'localhost');
+  assert.equal(T.hostTenuto('http://localhost:5173/app'), 'localhost');
+  assert.equal(T.hostTenuto('http://nas:5000/'), 'nas');
+  assert.equal(T.hostTenuto('intranet:8080'), 'intranet');
+  assert.equal(T.hostTenuto('http://intranet/'), 'intranet');
+  assert.equal(T.hostTenuto('http://[::1]:3000/'), '[::1]');
+  assert.equal(T.hostTenuto('whatsapp'), '');
+  assert.equal(SempreAperte.voceDa('http://localhost:3000/'), 'localhost');
+  assert.equal(SempreAperte.voceDa('http://nas:5000/'), 'nas');
+  assert.equal(SempreAperte.voceDa('http://[::1]:3000/'), '[::1]');
+  assert.equal(SempreAperte.voceDa('127.0.0.1:8080'), '127.0.0.1');
+  assert.equal(T.voceTenuta('http://localhost:3000/x', ['localhost']), 'localhost');
+  assert.equal(T.voceTenuta('http://nas:5000/', ['nas']), 'nas');
+  assert.equal(T.voceTenuta('https://nas.example.org/', ['nas']), null);
+  assert.deepEqual(T.vociDaTogliere('http://localhost:3000/', ['localhost', 'example.org']), ['localhost']);
+});
+
 test('un suffisso pubblico non si salva: terrebbe aperto mezzo web', () => {
   assert.equal(SempreAperte.voceDa('example.org'), 'example.org');
   assert.equal(SempreAperte.voceDa('https://web.whatsapp.com/'), 'web.whatsapp.com');
