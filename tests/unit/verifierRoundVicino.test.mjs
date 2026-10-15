@@ -87,7 +87,7 @@ test('un 3 vicino a cap3 finito non ferma; un v col ? non ferma e va da parte', 
 });
 
 test('allo stop i vicini restano fra i sospesi, come gli interni', () => {
-  const r = decide([f(2, 'i', 'da decidere', true), f(1, 'v', 'vicino'), f(1, 'e', 'altrove')]);
+  const r = decide([f(3, 'i', 'da decidere', true), f(1, 'v', 'vicino'), f(1, 'e', 'altrove')]);
   assert.equal(r.stop, true);
   assert.deepEqual(tag(r.sospesi), ['1v']);
   assert.deepEqual(tag(r.external), ['1e']);
