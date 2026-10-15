@@ -404,9 +404,59 @@ function rifiutoDelCancello(messaggio, info) {
   return Object.assign(new Error(messaggio), { rifiutata: String((info && info.version) || '?') });
 }
 
+// ── Il canale stabile ──
+
+// electron-updater chiede a GitHub quale release è «latest»: sul canale stabile la risposta è l'ultima minor, e il
+// resto (il suo latest.yml, i suoi file, il cancello qui sotto) resta quello di sempre. Senza questo punto lo stabile
+// prenderebbe ogni patch: false, e il cancello ferma gli aggiornamenti stabili.
+function agganciaCanale() {
+  let GitHubProvider;
+  try { ({ GitHubProvider } = require('electron-updater/out/providers/GitHubProvider')); } catch (_) { return false; }
+  const proto = GitHubProvider && GitHubProvider.prototype;
+  if (!proto || typeof proto.getLatestTagName !== 'function') return false;
+  if (proto.getLatestTagName.filoCanale) return true;
+  const originale = proto.getLatestTagName;
+  const scelta = function (token) {
+    return this.updater && this.updater.filoCanale === 'stabile' ? ultimaStabile(this, token) : originale.call(this, token);
+  };
+  scelta.filoCanale = true;
+  proto.getLatestTagName = scelta;
+  return true;
+}
+
+// Un minuto: il controllo e il cancello chiedono due volte, e una minor uscita in mezzo li farebbe divergere.
+const VALIDITA_STABILE_MS = 60 * 1000;
+
+// L'elenco delle release dall'API di GitHub, dalla più nuova, finché la regola non ha la risposta.
+async function ultimaStabile(provider, token) {
+  if (typeof provider.computeGithubBasePath !== 'function' || !provider.baseApiUrl || typeof provider.httpRequest !== 'function') {
+    throw new Error('aggiornamenti stabili fermi: il provider GitHub di electron-updater non ha più l\'indirizzo delle API');
+  }
+  const { owner, repo } = provider.options || {};
+  const inUso = String((provider.updater && provider.updater.currentVersion) || versioneInUso() || '');
+  const fileCanale = `${provider.channel}.yml`;
+  const chiave = `${owner}/${repo} ${inUso} ${fileCanale}`;
+  const memo = provider.filoStabile;
+  if (memo && memo.chiave === chiave && Date.now() - memo.quando < VALIDITA_STABILE_MS) return memo.tag;
+  const base = provider.computeGithubBasePath(`/repos/${owner}/${repo}/releases`);
+  for (let pagina = 1; pagina <= R.PAGINE_STABILE; pagina++) {
+    const testo = await provider.httpRequest(new URL(`${base}?per_page=100&page=${pagina}`, provider.baseApiUrl),
+      { Accept: 'application/vnd.github+json' }, token);
+    const elenco = JSON.parse(testo || '[]');
+    const s = R.sceltaStabile(elenco, { inUso, fileCanale });
+    if (s.finito) {
+      provider.filoStabile = { chiave, quando: Date.now(), tag: s.tag };
+      return s.tag;
+    }
+    if (!Array.isArray(elenco) || elenco.length < 100) break;
+  }
+  throw new Error(`nessuna versione stabile con ${fileCanale} fra le ultime ${R.PAGINE_STABILE * 100} pubblicazioni`);
+}
+
 function soloTagDiRilascio(au) {
   if (au.getUpdateInfoAndProvider && au.getUpdateInfoAndProvider.filoTag) return;
   if (!dalMotore(au)) return;
+  const canaleAgganciato = agganciaCanale();
   // Un electron-updater che ha rinominato quel punto lascerebbe passare tutto: senza cancello niente aggiornamenti.
   if (typeof au.getUpdateInfoAndProvider !== 'function') {
     const fermo = async () => { throw new Error('aggiornamenti fermi: electron-updater non ha getUpdateInfoAndProvider'); };
