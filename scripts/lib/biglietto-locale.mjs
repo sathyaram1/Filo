@@ -240,7 +240,12 @@ export async function chiama(op, data = {}, deps = {}) {
   });
   let body = {};
   try { body = await res.json(); } catch (_) { body = {}; }
-  if (!res.ok || (body.result && body.result.ok === false)) throw new Error(messaggioErrore(res.status, body));
+  if (!res.ok || (body.result && body.result.ok === false)) {
+    const e = new Error(messaggioErrore(res.status, body));
+    // Il server ha risposto no (biglietto sconosciuto, già chiuso): riprovare non cambia niente, a differenza di un guasto.
+    if (res.ok) e.rifiuto = true;
+    throw e;
+  }
   return body.result || {};
 }
 
