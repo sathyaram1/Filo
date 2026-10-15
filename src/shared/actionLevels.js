@@ -583,7 +583,9 @@
         // prima riga resta corta perché fa anche da bottone.
         const base = `Filo vuole impostare: ${built.label}.`;
         const testo = built.testo ? `\n\nTesto esatto:\n«${built.testo}»` : '';
-        return built.risk ? `${base}${testo}\n\n${built.risk}` : `${base}${testo}`;
+        // Il costo del modello scelto per una funzione (#819): lo calcola il main prima della conferma.
+        const costo = a && typeof a._costoModello === 'string' && a._costoModello ? `\n\n${a._costoModello}` : '';
+        return built.risk ? `${base}${testo}${costo}\n\n${built.risk}` : `${base}${testo}${costo}`;
       },
       // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
       describeDone: (a) => {

@@ -851,8 +851,16 @@ module.exports = function register(on, ctx) {
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
+  // La tariffa dei crediti dell'ultimo stato letto (euro per credito, cambio): le stime di costo (#819) scalano con
+  // la stessa del registro d'uso. Mai letta: valgono i valori di ripiego di SN_WALLET.creditsPerUsd.
+  function tariffaCrediti() {
+    let b = lastServer && lastServer.balance;
+    if (!b) { try { const disco = walletStore.lastServer(); b = disco && disco.balance; } catch (_) { b = null; } }
+    return { eurPerCredit: b && b.eurPerCredit, eurUsd: b && b.eurUsd };
+  }
+
   globalThis.SN_WALLET_MAIN = {
-    recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    recordUsage, outOfCreditsNotice, flush, readState, keySource, tariffaCrediti,
     // Le cifre dette fuori dalla pagina Crediti (#816): chat, premi delle
     // segnalazioni. `redeemedAt`: da quando le segnalazioni portano lo pseudonimo.
     haPortafoglio, saldoPerChat,

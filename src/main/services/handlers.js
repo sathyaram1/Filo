@@ -1993,6 +1993,8 @@ async function eseguiAzioneFilo(action, {
   // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
   if (type === 'IMPOSTA_PREFERENZA') {
     delete action._invariato;
+    // Il costo del modello scelto per una funzione (#819): lo scrive solo il main, qui sotto.
+    delete action._costoModello;
     // Mai dal modello né da una conferma: lo scrive solo un turno dell'intervista di benvenuto (#592.2).
     delete action._accoglienza;
     try {
@@ -2021,6 +2023,12 @@ async function eseguiAzioneFilo(action, {
         action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,
         action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
       );
+      // Il modello di una funzione: si controlla prima della conferma, che non chieda un OK a un cambio che non parte.
+      if (built && built.modelloFunzione) {
+        const v = await require('./costoModelli').verificaCambio(built.modelloFunzione, { Defaults });
+        if (v.rifiuto) return { executed: false, kept: false, output: { error: v.rifiuto, rifiuto: true, ...(v.perModello ? { perModello: v.perModello } : {}) } };
+        if (v.costo) action._costoModello = v.costo;
+      }
       if (built && built.elenco) {
         const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
         if (r.invariato) action._invariato = r.invariato;
@@ -2531,7 +2539,8 @@ async function eseguiAzioneFilo(action, {
         await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
         const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
-        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}) } };
+        const costo = typeof action._costoModello === 'string' && action._costoModello ? { costoModello: action._costoModello } : {};
+        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
@@ -4079,8 +4088,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
     done = String(done || describe()).replace(/\.+\s*$/, '');
     // #949 — un cambio fatto da Filo dice cosa ha cambiato e come si torna indietro.
     if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
+      const costo = res.output && typeof res.output.costoModello === 'string' && res.output.costoModello
+        ? ` Nella stessa risposta riporta il costo, con le stesse cifre: «${res.output.costoModello}»` : '';
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
-        + 'sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+        + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}`;
     }
     return `Eseguita: ${done}.`;
   }
@@ -4342,7 +4353,10 @@ function ricordoComeAzione(ricordi) {
 async function handleFiloChat(richiesta) {
   const volo = { accoglienza: false };
   try {
-    return await turnoFiloChat(richiesta, volo);
+    // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
+    const Costi = global.SN_COSTS;
+    const turno = () => turnoFiloChat(richiesta, volo);
+    return await (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno());
   } finally {
     if (volo.accoglienza) onbTurniInVolo -= 1;
   }

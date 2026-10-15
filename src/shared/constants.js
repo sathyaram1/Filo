@@ -2450,6 +2450,8 @@
     },
     // Limite hard mensile in EUR
     monthlyLimitEur: 5,
+    // L'avviso accanto a un modello che costa più di `soglia` volte il predefinito della funzione (#819); 0 = mai.
+    costoModelli: { soglia: 5 },
     // Tasso di conversione USD->EUR usato per la stima costi (i prezzi provider sono in USD)
     usdToEur: 0.92,
     blocklist: [],

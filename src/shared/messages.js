@@ -110,6 +110,8 @@
     SCRYFALL_SYMBOLS: 'scryfall_symbols', // {} → mappa '{U}' → svg_uri
     SCRYFALL_PRINTS: 'scryfall_prints',   // { name } → { ok, prints } (n. stampe, cache permanente)
     GET_COSTS: 'get_costs',
+    // Le stime di costo dei modelli (#819): {} → { ok, contesto } (listino, saldo, tariffa, token medi, predefiniti).
+    STIMA_COSTO_MODELLI: 'stima_costo_modelli',
     // Crediti (gamification): saldo + consumo aggregato per tipo d'uso, per la
     // pagina Crediti del profilo. NON espone mai il costo in €. Vedi creditStore.
     GET_CREDITS: 'get_credits',

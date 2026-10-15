@@ -798,6 +798,16 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Le stime di costo accanto ai modelli (#819): la pagina le calcola col contesto che solo il main ha.
+  on(MSG.STIMA_COSTO_MODELLI, soloFilo(async (msg) => {
+    try {
+      const contesto = await require('../costoModelli').contesto({ Defaults, forzaListino: Boolean(msg && msg.forzaListino) });
+      return { ok: true, contesto };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
   // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
   on(MSG.DEFAULT_PROVIDERS_LIST, soloFilo(async () => {
