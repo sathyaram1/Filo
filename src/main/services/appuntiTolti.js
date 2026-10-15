@@ -185,7 +185,7 @@ function perFilo() {
   diFilo = crea({
     file: path.join(app.getPath('userData'), 'appunti-tolti.json'),
     decodifica: decodificaElectron,
-    appunti: { testo: () => clipboard.readText(), immagine: immagineElectron },
+    appunti: { testo: async () => await clipboard.readText(), immagine: immagineElectron },
   });
   return diFilo;
 }
