@@ -452,8 +452,6 @@ async function main() {
     process.exit(1);
   }
   if (pubblicazione.stato === 'piu_avanti') {
-    // Il rimedio con gli attrezzi del GIRO, come l'altro rifiuto che nomina un
-    // comando: `scripts/…` qui dentro è la copia del ramo.
     console.error(testoPiuAvanti(punta, pubblicazione.suOrigin, source));
     process.exit(1);
   }
