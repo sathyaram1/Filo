@@ -757,7 +757,7 @@ function conImmagini(ctx) {
 }
 
 // Perché un diff vuoto è vuoto davvero: senza questa riga il controllo non lo distingue da un calcolo fallito (#740).
-export function testoDiffVuoto({ commitPropri = null } = {}) {
+function testoDiffVuoto({ commitPropri = null } = {}) {
   if (commitPropri === 0) return 'Il diff è vuoto davvero: il ramo non ha commit propri rispetto a main, quindi non porta nessuna modifica.';
   const quanti = commitPropri > 0 ? `ha ${commitPropri} commit propri, ma ` : '';
   return `Il diff è vuoto davvero: il ramo ${quanti}ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda).`;
