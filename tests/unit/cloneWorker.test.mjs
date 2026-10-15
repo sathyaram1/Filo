@@ -15,6 +15,7 @@ import {
 } from '../../scripts/lib/clone-worker.mjs';
 import { PINNED_PATHS, pinnedDirWorker, pinnedRepoRoot } from '../../scripts/lib/tools-pin.mjs';
 import { SESSION_MARKERS } from '../../scripts/lib/branch-integrity.mjs';
+import { carattereSicuro } from '../../scripts/lib/carattere-commento.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
