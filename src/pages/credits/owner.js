@@ -81,9 +81,11 @@
       const b = u.balance || {};
       const rec = u.reconcile;
       const regTxt = !rec ? '—' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'ok');
+      const fine = uso.ultimo[u.pseudonym];
       const cells = [
         u.pseudonym, formatCredits(b.credits), formatInt(b.creditsGranted), fmtUsd(b.usageUsd), regTxt,
         u.invitedBy === 'owner' ? 'te' : (u.invitedBy || '—'), formatDate(u.createdAt),
+        fine ? giornoBreve(fine) : (u.usage && u.usage.rows ? '—' : 'mai'),
       ];
       cells.forEach((c, i) => {
         const td = document.createElement('td');
