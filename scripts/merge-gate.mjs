@@ -493,7 +493,7 @@ async function main() {
     // Il blocco non è più un vicolo cieco: il server apre una richiesta che
     // l'owner trova sulla scheda della pratica in Gestione. Dirlo qui evita che
     // chi legge il registro creda che il ramo sia perduto.
-    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
+    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica');
   }
   else if (code === 20 && reply.result === 'unit_rossi') {
     console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
