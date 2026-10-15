@@ -63,6 +63,8 @@ perché col nuovo impianto i tagli a metà diventano rari per costruzione
 
 ## 4. Niente finestre d'ore
 
+*Fatto (§14, passo 4); oggi in `routines/roles/orchestrator.md`, «Loop».*
+
 Un giro finisce quando: il server dice basta, la coda è vuota, o il contesto
 dell'orchestratore è quasi pieno. Nessun tetto d'orologio, nessuna stima di
 durata, nessun "margine per l'ultimo worker".
