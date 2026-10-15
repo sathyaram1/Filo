@@ -723,10 +723,11 @@ export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console
     titolo: `E com'erano ${dopoLeCorrezioni ? 'prima della pulizia' : 'alla critica'}, per vedere quali casi erano rossi:`,
   });
   if (prima.motivo) return { ferma: true, testo: `pulizia non registrata: ${prima.motivo}` };
-  const testo = testoCasiSpenti(confronta.map((f) => ({
-    f, ...casiSpenti(prima.esiti.get(f), dopo.esiti.get(f)),
-    tolti: casiToltiNonMessi(f, prima.esiti.get(f), dopo.esiti.get(f), messi, dopoLeCorrezioni),
-  })), toccate.via, shaCritica, { dopo: dopoLeCorrezioni });
+  const testo = testoCasiSpenti(confronta.map((f) => {
+    const s = casiSpenti(prima.esiti.get(f), dopo.esiti.get(f));
+    // Dopo le correzioni quello che resta può essere già verde: lo rilancia la consegna, com'è dopo la pulizia.
+    return { f, ...s, vuota: s.vuota && !dopoLeCorrezioni, tolti: casiToltiNonMessi(f, prima.esiti.get(f), dopo.esiti.get(f), messi, dopoLeCorrezioni) };
+  }), toccate.via, shaCritica, { dopo: dopoLeCorrezioni });
   return { ferma: !!testo, testo };
 }
 
