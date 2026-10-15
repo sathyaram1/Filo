@@ -140,6 +140,31 @@ service cloud.firestore {
             && d.localApproval.get('at', 0) > 0);
     }
 
+    // Un allegato di un feedback anonimo è un oggetto del deposito di Filo nella forma che scrive
+    // l'app, e nient'altro (#597): il server lo scarica, e un URL qualunque era una sua fetch verso
+    // dove voleva chi segnala. Sentinella: tests/unit/firestoreRulesAllegati.test.mjs.
+    function allegatoDelDeposito(u) {
+      return u is string
+        && u.matches('^https://firebasestorage[.]googleapis[.]com/v0/b/filo-8b9cb[.]firebasestorage[.]app/o/feedback%2F([a-z]{1,16}_)?[0-9]{10,17}_[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}[.][A-Za-z0-9]{1,12}[?]alt=media&token=[A-Za-z0-9,-]{1,400}$');
+    }
+    // Le regole non hanno cicli: un controllo per posto, tanti quanti il tetto.
+    function immaginiDelDeposito(l) {
+      return l is list && l.size() <= 5
+        && (l.size() < 1 || allegatoDelDeposito(l[0]))
+        && (l.size() < 2 || allegatoDelDeposito(l[1]))
+        && (l.size() < 3 || allegatoDelDeposito(l[2]))
+        && (l.size() < 4 || allegatoDelDeposito(l[3]))
+        && (l.size() < 5 || allegatoDelDeposito(l[4]));
+    }
+    function fileDelDeposito(l) {
+      return l is list && l.size() <= 5
+        && (l.size() < 1 || (l[0] is map && allegatoDelDeposito(l[0].get('url', ''))))
+        && (l.size() < 2 || (l[1] is map && allegatoDelDeposito(l[1].get('url', ''))))
+        && (l.size() < 3 || (l[2] is map && allegatoDelDeposito(l[2].get('url', ''))))
+        && (l.size() < 4 || (l[3] is map && allegatoDelDeposito(l[3].get('url', ''))))
+        && (l.size() < 5 || (l[4] is map && allegatoDelDeposito(l[4].get('url', ''))));
+    }
+
     // Allowlist amministratori. Gestita SOLO da console Firebase.
     match /admins/{email} {
       allow read: if isAdmin();
