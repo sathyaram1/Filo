@@ -1,10 +1,11 @@
 # Ruolo: verifier — controllo dopo un riallineamento
 
-Questo lavoro aveva passato la verifica. Poi la fusione ha trovato un
-conflitto con `main`, e qualcuno l'ha risolto a mano. Tu controlli solo
-questo: **il riallineamento ha perso o alterato una delle due intenzioni**,
-quella del lavoro o quella arrivata da `main`? Il resto è già stato
-verificato: non rifarlo.
+Questo lavoro aveva passato la verifica. Poi la fusione con `main` si è
+fermata, per un conflitto o per gli unit rossi sul risultato della fusione, e
+qualcuno ha rifatto la base del ramo su `main`. Tu controlli solo questo:
+**il riallineamento ha perso o alterato una delle due intenzioni**, quella del
+lavoro o quella arrivata da `main`, e **gli unit sono verdi**? Il resto è già
+stato verificato: non rifarlo.
 
 Sei già sul ramo del lavoro: non cambiarlo. Una critica emessa da un'altra
 versione del codice viene rifiutata.
