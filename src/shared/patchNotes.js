@@ -13,6 +13,7 @@
       features: [
         'Chiedi all\'Aiuto di una scheda «quando l\'ho aperta?» e ti dice giorno, ora e quanto tempo è passato, per la scheda e per la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo.',
         'Puoi cambiare anche il font dei link, la durata delle animazioni e l\'intensità delle ombre, dalle Preferenze o chiedendolo a Filo. «Togli le animazioni» le spegne in tutta l\'app, «animazioni più lente» le rallenta.',
+        'Filo può guardare una finestra aperta sul computer, o lo schermo intero, e dirti cosa c\'è scritto: chiedi in chat «cosa mi sta chiedendo questa finestra?» o «leggimi l\'errore di Word». Si accende in Preferenze, alla voce «Guardare lo schermo», e la prima volta che guarda la finestra di un\'altra app ti chiede l\'OK. Guarda soltanto, non clicca e non salva l\'immagine.',
       ],
       fixes: [],
     },
