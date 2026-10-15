@@ -188,12 +188,15 @@
   function coverage(drawn, want, stopAtMiss) {
     const units = [];
     for (const w of want) for (let k = 0; k < w.n; k++) units.push(w.tag);
-    const ownerOf = new Array(drawn.length).fill(-1); // carta → unità che copre
-    const tryAssign = (u, visited) => {
-      for (let c = 0; c < drawn.length; c++) {
-        if (visited[c] || !drawn[c].includes(units[u])) continue;
-        visited[c] = true;
-        if (ownerOf[c] < 0 || tryAssign(ownerOf[c], visited)) {
+    const m = drawn.length;
+    const ownerOf = new Int32Array(m).fill(-1); // carta → unità che copre
+    const visitedIn = new Int32Array(m).fill(-1); // carta → giro che l'ha già provata
+    let round = 0;
+    const tryAssign = (u) => {
+      for (let c = 0; c < m; c++) {
+        if (visitedIn[c] === round || !drawn[c].includes(units[u])) continue;
+        visitedIn[c] = round;
+        if (ownerOf[c] < 0 || tryAssign(ownerOf[c])) {
           ownerOf[c] = u;
           return true;
         }
@@ -202,7 +205,8 @@
     };
     let covered = 0;
     for (let u = 0; u < units.length; u++) {
-      if (tryAssign(u, new Array(drawn.length).fill(false))) covered++;
+      round = u;
+      if (tryAssign(u)) covered++;
       else if (stopAtMiss) break;
     }
     return { covered, units: units.length };
