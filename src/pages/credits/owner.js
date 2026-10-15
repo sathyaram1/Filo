@@ -96,6 +96,7 @@
       });
       if (u.disabled) tr.className = 'is-used';
       tr.classList.add('sn-wallet-user');
+      tr.dataset.pseudonym = u.pseudonym;
       tr.title = 'Apri la scheda di questa persona';
       tr.tabIndex = 0;
       tr.setAttribute('role', 'button');
