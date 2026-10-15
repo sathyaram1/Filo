@@ -1095,6 +1095,18 @@
       },
     },
     {
+      scrive: ['scorciatoie.explain-selection', 'scorciatoie.translate-selection', 'scorciatoie.save-for-later', 'scorciatoie.open-help-sidebar'],
+      aiuto: () => {
+        const T = global.SN_TASTI;
+        const esempio = T ? T.etichettaFilo('Ctrl+Shift+Y') : '';
+        return `"<azione>: <combinazione>", azione fra Spiega, Traduci, Salva per dopo e Aiuto (es. "Traduci: ${esempio}"); "<azione>: di serie" la rimette com'era, "tutte di serie" tutte e quattro`;
+      },
+      keys: ['scorciatoia', 'scorciatoie', 'scorciatoia da tastiera', 'scorciatoie da tastiera', 'tasto di scelta rapida',
+        'scorciatoia di spiega', 'scorciatoia di traduci', 'scorciatoia di salva per dopo', 'scorciatoia di aiuto'],
+      costo: 1,
+      build: scorciatoiaFiloDetta,
+    },
+    {
       scrive: ['openWeightsOnly'],
       aiuto: 'true | false (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)',
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
