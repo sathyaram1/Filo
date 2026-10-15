@@ -770,12 +770,12 @@
   // valore, poi si ferma. Niente più bottone "Calcola" né oscillazione del
   // risultato tra un ricalcolo e l'altro.
   //
-  //   PROB_BATCH  simulazioni per giro (~15k = pochi ms, non blocca la UI)
+  //   PROB_BATCH  simulazioni per giro (SN_DECK_STATS, condiviso con la chat)
   //   PROB_CAP    tetto totale = 100× le 10.000 di prima. A 1.000.000 di mani
   //               l'errore statistico è ~0,05 punti percentuali (ben sotto
   //               l'oscillazione di ~1 punto segnalata): salire oltre non
   //               cambierebbe la cifra mostrata, costerebbe solo CPU.
-  const PROB_BATCH = 15000;
+  const PROB_BATCH = Stats.PROB_BATCH;
   const PROB_CAP = 1000000;
   let probRunId = 0;         // invalida i batch di run precedenti
   let probDebounce = null;
