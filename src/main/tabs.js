@@ -2812,6 +2812,7 @@ class TabManager {
       update({ url: userUrl(url), canBack: this.puoTornare(tab, 'indietro', wc), canFwd: this.puoTornare(tab, 'avanti', wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
       if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
+      if (isMainFrame === true) segnaPagina(tab, url);
     });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
