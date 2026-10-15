@@ -599,7 +599,9 @@
     const C = window.SN_CONST;
     if (!host) return;
     const models = ModelChain.collect(modelChains);
-    if (!C || typeof C.openWeightsImpact !== 'function' || !Object.keys(models).length) { host.hidden = true; return; }
+    // Senza nessun modello scelto non c'è niente da dire: «partono già da modelli aperti» sarebbe falso.
+    const conModello = Object.values(models).some((v) => String(v || '').trim());
+    if (!C || typeof C.openWeightsImpact !== 'function' || !conModello) { host.hidden = true; return; }
     const impact = C.openWeightsImpact(models, collectModelRegistry());
     const riga = (testo, cls) => {
       const p = document.createElement('p');
