@@ -597,6 +597,9 @@ module.exports = function register(on, ctx) {
     if (out && out.ok) {
       await markPending({ done: true });
       await setNotice('entry', W.entryNoticeText({ credits: out.credits }));
+    } else if (out && out.status === 'network_cap') {
+      // Il quarto della stessa rete (#1120) arriva quasi sempre da qui, al primo avvio: deve sapere quando riprovare.
+      await setNotice('failed', out.message);
     }
     return out;
   }
