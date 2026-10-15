@@ -262,8 +262,6 @@ function rifiuta(info) {
     + `l'etichetta della release ${dato(info && info.tag)}`);
 }
 
-// Una preferenza cambiata a sessione aperta vale subito: chi spegne dopo lo scaricamento dell'avvio non se lo
-// ritrova installato, chi riaccende scarica come all'avvio, e la carta pronta segue la scelta di quando installare.
 // Quello che il canale di prima aveva trovato, chiesto o scaricato e che in questo non c'è: via la carta, la richiesta
 // e il ricordo dell'installatore (Windows lo installerebbe al prossimo avvio). Il file resta nella cache di electron-updater.
 function lasciaFuoriCanale() {
@@ -315,8 +313,9 @@ function ricontrolla() {
   });
 }
 
-// Un canale cambiato vale come un avvio nuovo: quello trovato o scaricato sull'altro canale, se qui non c'è, non si
-// installa e non si annuncia, e si ricontrolla subito.
+// Una preferenza cambiata a sessione aperta vale subito: chi spegne dopo lo scaricamento dell'avvio non se lo
+// ritrova installato, chi riaccende scarica come all'avvio, e la carta pronta segue la scelta di quando installare.
+// Un canale cambiato vale come un avvio nuovo: quello che l'altro aveva promesso se ne va, e si ricontrolla subito.
 function seguiImpostazioni(settings) {
   const automatici = automaticiDa(settings);
   const modo = R.modoScelto(settings);
@@ -331,7 +330,6 @@ function seguiImpostazioni(settings) {
   regola();
   riscriviCartaPronto();
   if (updater && cambiaCanale) {
-    if (automatici && stato.pronto) segnalaPronto();
     ricontrolla();
     stato.annuncia();
     return;

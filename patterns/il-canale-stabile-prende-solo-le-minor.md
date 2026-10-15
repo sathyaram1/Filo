@@ -59,6 +59,19 @@ tornando al canale di prima ricompaiono. Quelle chiuse dall'utente restano chius
   minor ferma la costruzione.
 - Una corsa programmata che GitHub non fa partire si recupera da Actions → Run workflow con `minor`.
 
+## Il contratto col server
+
+`releaseMinor`, con la parola d'ordine della costruzione come `releaseBump`:
+
+- `{ passphrase, controllo: true }` non scrive niente e risponde `{ ok: true, permessa: true }` oppure
+  `{ ok: true, permessa: false, motivo }`, con `motivo` `settimana` (già uscita) o un altro, che la corsa
+  scrive come rinvio generico.
+- `{ passphrase }` rifà gli stessi controlli, scrive su main il numero x.y+1.0 e risponde come
+  `releaseBump` (`{ ok, version, previous, sha }`); se nel frattempo la minor non è più permessa risponde
+  409. Il freno anti-raffica è quello di `releaseBump`.
+
+Un server che non conosce `releaseMinor` risponde 404: la corsa del lunedì è rossa e non pubblica niente.
+
 ## Il changelog
 
 Le righe si scrivono come sempre nel blocco in cima (`package.json` + 1 patch). Il lunedì la minor prende il

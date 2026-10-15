@@ -651,7 +651,7 @@
     },
     {
       scrive: ['aggiornamenti.canale'],
-      aiuto: '"veloce" | "stabile", o true per "stabile" (veloce: ogni versione nuova appena esce, più volte al giorno; stabile: una versione a settimana, il lunedì)',
+      aiuto: '"veloce" | "stabile", o true per "stabile" (il veloce riceve ogni versione nuova appena esce, più volte al giorno, lo stabile una versione a settimana, il lunedì)',
       keys: ['canale_aggiornamenti', 'canale aggiornamenti', 'canale degli aggiornamenti', 'canale di aggiornamento',
         'canale', 'versione stabile', 'aggiornamenti stabili', 'aggiornamenti veloci', 'aggiornamenti settimanali'],
       costo: 1,

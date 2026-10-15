@@ -23,7 +23,8 @@ const VIETATI = [
   // Sul cancello gli stessi nomi sono ammessi: Gate.complete, modelGate.keyInfo…
   { re: /(?<![Gg]ate)\.(?:complete|streamComplete|synthesizeSpeech|transcribe|embed|decisions|lookupServedBy|keyInfo)\s*\(/, cosa: 'un metodo di un fornitore' },
   { re: /openrouter\.ai\/api\/(?:v1\/(?:chat\/completions|completions|audio\/|embeddings|generation)|alpha\/decisions)/, cosa: 'un endpoint che fa lavorare un modello' },
-  { re: /require\([^)]*['"/]providers\b/, cosa: 'un modulo fornitore caricato a mano', tranne: LOADER },
+  // I «providers» di electron-updater sono le fonti degli aggiornamenti, non fornitori di modelli.
+  { re: /require\((?!\s*['"]electron-updater\/)[^)]*['"/]providers\b/, cosa: 'un modulo fornitore caricato a mano', tranne: LOADER },
 ];
 
 function senzaCommenti(riga) {
@@ -78,6 +79,8 @@ test('la sentinella riconosce le chiamate dirette che c\'erano prima del cancell
     "await fetch('https://openrouter.ai/api/alpha/decisions', init);",
   ];
   for (const riga of vecchie) assert.equal(violazioni(riga, 'src/x.js').length > 0, true, riga);
+  assert.deepEqual(violazioni("({ GitHubProvider } = require('electron-updater/out/providers/GitHubProvider'));", 'src/x.js'), []);
+  assert.equal(violazioni("const P = require('./services/providers/openrouter');", 'src/x.js').length, 1);
   for (const riga of [
     'const r = await Gate.complete({ action, messages });',
     "const info = await Gate.keyInfo({ provider: 'openrouter', apiKey: key });",
