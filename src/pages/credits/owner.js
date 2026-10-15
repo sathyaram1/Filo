@@ -522,35 +522,45 @@
   // Tutto quello che si può sapere di chi usa Filo con un portafoglio, senza
   // mai un nome: saldo, quanto ha ricevuto e quanto ha speso, dove sono andati
   // i crediti, i movimenti, chi l'ha invitata, i suoi inviti e le ultime
-  // chiamate che ha fatto. Si chiede alla prima apertura della riga.
-  const schedeChieste = new Set();
-
-  async function caricaScheda(u, td) {
-    if (schedeChieste.has(u.pseudonym)) return;
-    schedeChieste.add(u.pseudonym);
-    const attesa = document.createElement('p');
-    attesa.className = 'sn-muted sn-wallet-scheda-attesa';
-    attesa.textContent = 'Apro la scheda…';
-    td.appendChild(attesa);
-    const r = await chrome.runtime
-      .sendMessage({ type: MSG.WALLET_OWNER_USER_DETAIL, pseudonym: u.pseudonym })
+  // chiamate che ha fatto. Si chiede alla prima apertura della riga, e di nuovo
+  // quando la vista dice che i suoi numeri sono cambiati (`cambiaRiga`).
+  async function caricaScheda(r) {
+    if (r.scheda) return;
+    r.scheda = 'chiesta';
+    const td = r.td;
+    for (const n of td.querySelectorAll('.sn-wallet-scheda-esito')) n.remove();
+    let attesa = null;
+    if (!td.querySelector('.sn-wallet-scheda')) {
+      attesa = document.createElement('p');
+      attesa.className = 'sn-muted sn-wallet-scheda-attesa';
+      attesa.textContent = 'Apro la scheda…';
+      td.appendChild(attesa);
+    }
+    const res = await chrome.runtime
+      .sendMessage({ type: MSG.WALLET_OWNER_USER_DETAIL, pseudonym: r.u.pseudonym })
       .catch(() => null);
-    attesa.remove();
-    const d = r && r.ok && r.detail;
+    if (attesa) attesa.remove();
+    const d = res && res.ok && res.detail;
     if (!d || d.found === false) {
       // Riprovabile: la prossima apertura la richiede.
-      schedeChieste.delete(u.pseudonym);
+      r.scheda = null;
       const err = document.createElement('p');
-      err.className = 'sn-wallet-msg is-error';
-      if (r && r.error) console.warn('[credits/owner] scheda non arrivata:', r.error);
+      err.className = 'sn-wallet-msg is-error sn-wallet-scheda-esito';
+      if (res && res.error) console.warn('[credits/owner] scheda non arrivata:', res.error);
       err.textContent = d && d.found === false
         ? 'Questa persona non risulta più al server.'
-        : `Scheda non arrivata: ${fraseGuasto(r && r.error)}. Richiudi e riapri per riprovare.`;
+        : `Scheda non arrivata: ${fraseGuasto(res && res.error)}. Richiudi e riapri per riprovare.`;
       td.appendChild(err);
-      return;
+    } else {
+      r.scheda = 'arrivata';
+      td.replaceChildren(schedaPersona(r.u, d));
     }
-    td.innerHTML = '';
-    td.appendChild(schedaPersona(u, d));
+    // La vista è cambiata mentre questa era in viaggio: quella appena scritta è già vecchia.
+    if (r.rileggi) {
+      r.rileggi = false;
+      r.scheda = null;
+      if (!r.detail.hidden) await caricaScheda(r);
+    }
   }
 
   function bloccoScheda(titolo, corpo) {
