@@ -197,7 +197,7 @@
     const { unita } = funzione(action);
     const model = entry && entry.model ? String(entry.model) : '';
     const provider = entry && entry.provider ? String(entry.provider) : 'openrouter';
-    const BREVI = { listino: 'listino non disponibile', consumo: 'costo dopo il primo uso' };
+    const BREVI = { listino: 'listino non disponibile', consumo: 'costo da misurare' };
     const nonNota = (motivo, testo) => ({ ok: false, motivo, unita, breve: BREVI[motivo] || 'prezzo non noto', testo });
     if (!model) return null;
     if (provider !== 'openrouter') return nonNota('fornitore', 'Questo fornitore non pubblica un listino: Filo non stima il costo.');
