@@ -1900,11 +1900,6 @@ async function finalizeBucket(bucket, fromServer) {
   // Il ruolo `idle` non esiste più (SPEC-RIDISEGNO-MAX.md §12): coda vuota o
   // interruttore spento sono un exit 2 alla richiesta di biglietto, PRIMA che
   // un worker venga spawnato. Qui arrivano solo buste con un lavoro dentro.
-  if (bucket.role === 'prober') {
-    prepareForProber();
-    emit(bucket, {});
-    return { exit: 0 };
-  }
 
   // Un lavoro server clona filo-security: dentro il checkout di Filo l'hook di salvataggio lo pubblicherebbe (#1159).
   if (fromServer && fromServer.payload && fromServer.payload.lavoroServer && cloneDentroIlRepo(cartellaCloneServer(), ROOT)) {
