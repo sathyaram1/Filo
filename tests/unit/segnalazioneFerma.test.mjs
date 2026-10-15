@@ -54,6 +54,26 @@ test('la nota per la chat e la risposta stampata dicono che i sospesi restano da
   assert.match(perSegnalazione, /\[2i\] x/);
 });
 
+test('fermo per un 3 a bilancio esaurito con una segnalazione allegata: la risposta stampata dice tutte e due le cause (#706)', () => {
+  const decision = decide('[3i] perde i dati\n[1i] b', { count3: 10 });
+  const reply = { outcome: 'stop', motivo: 'loop', blocking: decision.blocking, sospesi: decision.sospesi, derived: [] };
+  const stampa = verifierReplyText(reply, 'X', true);
+  assert.match(stampa, /segnalazione è consegnata all'owner/);
+  assert.match(stampa, /un 3 a bilancio esaurito[\s\S]*insieme alla segnalazione[\s\S]*\[3i\] perde i dati/);
+  assert.match(stampa, /restano davanti a chi riprende[\s\S]*\[1i\] b/);
+  // Un server che nomina la segnalazione come motivo non nasconde il rilievo che ferma anche lui.
+  assert.match(verifierReplyText({ ...reply, motivo: 'segnalazione' }, 'X'), /consegnata all'owner[\s\S]*\[3i\] perde i dati/);
+  // Senza segnalazione la stampa resta quella del bilancio.
+  assert.doesNotMatch(verifierReplyText(reply, 'X'), /segnalazione/);
+});
+
+test('una critica con segnalazione che il server non ferma: la stampa lo dice, in ogni esito che non ferma', () => {
+  for (const reply of [{ outcome: 'pass', derived: [] }, { outcome: 'fix', phase2: { findings: F('[2i] x'), derived: [], instructions: 'FASE 2' } }]) {
+    assert.match(verifierReplyText(reply, 'X', true), /ATTENZIONE: la critica portava una segnalazione, ma il server non ha fermato il lavoro/, reply.outcome);
+    assert.doesNotMatch(verifierReplyText(reply, 'X'), /ATTENZIONE/, reply.outcome);
+  }
+});
+
 test('il compito della verifica locale insegna il formato che il lettore accetta', () => {
   const brief = buildVerifierBrief({ request: 'Prova.', branch: 'claude/prova', recipe: '', history: [], scope: 'pieno', perimetro: [] });
   const esempi = brief.split('\n').filter((l) => /^\s*\[\d/.test(l));
