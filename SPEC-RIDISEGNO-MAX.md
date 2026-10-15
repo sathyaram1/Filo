@@ -299,6 +299,8 @@ Collegato (18/08, revisione del ruolo secaudit con l'owner):
   riga; su blocco spiegazione esaustiva (cosa, dove, perché, scenario, cosa
   verificare se falso positivo) — e MAI in chiaro: è la descrizione esatta di
   come l'attacco è stato scoperto.
+  - **Superato** (la nota del pass): vedi `routines/roles/secaudit.md`, «Quanto
+    scrivere».
 
 ## 11. Suite completa: in GitHub, non dentro il giro
 
