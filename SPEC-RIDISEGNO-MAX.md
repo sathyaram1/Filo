@@ -279,9 +279,10 @@ l'unico che può.
   contenuto, né il ramo: accettarli sarebbe un push diretto travestito.
 - **Freno anti-raffica** con lo stato sul server: al massimo un aumento ogni 20
   minuti e 12 al giorno (il cron pubblica ogni sei ore: non intralcia).
-- Il lavoro di pubblicazione **chiede** il numero, poi rilegge `main` e
-  costruisce. Non fa più nessun `git push`, e una sentinella negli unit test
-  diventa rossa se ci torna.
+- Il lavoro di pubblicazione **chiede** il numero e non fa più nessun
+  `git push`: una sentinella negli unit test diventa rossa se ci torna.
+  - **Superato** (#641, quale commit si costruisce): vedi `ROUTINE-AUTH-SPEC.md`
+    §12.
 
 Dettaglio in `ROUTINE-AUTH-SPEC.md` §12.
 
