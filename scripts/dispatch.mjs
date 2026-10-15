@@ -2249,9 +2249,9 @@ if (isMainModule) {
       }
       const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
-      const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
+      const s = await recordFixed(id, report, frase, segnalazione.testo, ferma, livSeg.campi);
       if (s.rejected) esciRespinto(s);
-      console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim()));
+      console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim(), ferma || livSeg.ferma));
       process.exit(0);
     } else if (flag === '--record-pulizia') {
       const [, id, ...avanzo] = conBiglietto(argv);
