@@ -264,15 +264,27 @@ function rifiuta(info) {
 
 // Una preferenza cambiata a sessione aperta vale subito: chi spegne dopo lo scaricamento dell'avvio non se lo
 // ritrova installato, chi riaccende scarica come all'avvio, e la carta pronta segue la scelta di quando installare.
+// Un canale cambiato vale come un avvio nuovo: quello trovato o scaricato sull'altro canale, se qui non c'è, non si
+// installa e non si annuncia, e si ricontrolla subito.
 function seguiImpostazioni(settings) {
   const automatici = automaticiDa(settings);
   const modo = R.modoScelto(settings);
-  if (automatici === stato.automatici && modo === stato.modo) return;
+  const canale = R.canaleScelto(settings);
+  if (automatici === stato.automatici && modo === stato.modo && canale === stato.canale) return;
   const cambiaAutomatici = automatici !== stato.automatici;
+  const cambiaCanale = canale !== stato.canale;
   stato.automatici = automatici;
   stato.modo = modo;
+  stato.canale = canale;
+  if (cambiaCanale) lasciaFuoriCanale();
   regola();
   riscriviCartaPronto();
+  if (updater && cambiaCanale) {
+    if (automatici && stato.pronto) segnalaPronto();
+    ricontrolla();
+    stato.annuncia();
+    return;
+  }
   if (!updater || !cambiaAutomatici) return;
   if (stato.versioneTrovata) {
     if (automatici) scarica();
