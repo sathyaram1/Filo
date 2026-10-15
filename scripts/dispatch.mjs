@@ -777,6 +777,11 @@ export function buildPayload(bucket, ctx = {}) {
           diffBase: ctx.diffBase,
           ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: `git diff ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
         } : {}),
+        ...(ctx.diffServer && typeof ctx.diffServer === 'object' ? {
+          diffServer: String(ctx.diffServer.diff || ''),
+          diffServerBase: ctx.diffServer.base || null,
+          diffServerHead: String(ctx.diffServer.head || ''),
+        } : {}),
         ...(ctx.diffVuoto ? { diffVuoto: testoDiffVuoto(ctx.diffVuoto) } : {}),
       };
     case 'verifier':
@@ -1927,10 +1932,12 @@ export function serverCtx(bucket, fromServer, diff = '') {
   // non chiede nessuna chiave. Del feedback non riceve niente, e non è più una
   // consegna da rispettare — senza chiave, il testo cifrato per lui è un blob.
   if (role === 'secaudit') {
+    // Un lavoro server porta anche il diff del server: lo scarica il server, perché qui il clone non c'è (#1159 fase 2).
+    const server = payload && payload.diffServer && typeof payload.diffServer === 'object' ? { diffServer: payload.diffServer } : {};
     if (diff && typeof diff === 'object') {
-      return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '', ...(diff.vuoto ? { diffVuoto: diff.vuoto } : {}) };
+      return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '', ...(diff.vuoto ? { diffVuoto: diff.vuoto } : {}), ...server };
     }
-    return { diff };
+    return { diff, ...server };
   }
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
     // Il feedback arriva GIÀ DECIFRATO dal server. Non c'è nessun ripiego che
@@ -2083,7 +2090,7 @@ export function emit(bucket, ctx) {
   try {
     // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
     payload = scaricaPayload(pieno, {
-      root: ROOT, sempre: ['diff'], max: STAMPA_MAX,
+      root: ROOT, sempre: ['diff', 'diffServer'], max: STAMPA_MAX,
       misura: (p) => JSON.stringify(stampaCon(p), null, 2).length + 1,
     });
   } catch (e) {

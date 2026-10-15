@@ -922,6 +922,7 @@ export async function merge(t, branch, opts) {
       sha: String(body.sha || ''),
       approval: String(body.approval || ''),
       ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
+      ...(body.esito ? { esito: String(body.esito) } : {}),
     };
   }
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
