@@ -1,5 +1,6 @@
 // Il testo di un livello (L3 la segnalazione, L4 la nota del controllo di
-// sicurezza) letto da file, per le consegne. Sta qui perché lo usano due
+// sicurezza) letto da file, per le consegne, e il livello che accompagna la
+// segnalazione (`--livello`, `--difficile`). Sta qui perché lo usano due
 // strumenti — dispatch (--record-*) e il canale (deliver status --segnala) —
 // e dispatch importa il canale: una copia sola, senza cicli.
 //
