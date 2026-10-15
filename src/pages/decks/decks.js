@@ -764,8 +764,8 @@
   }
 
   // Calcolatore di probabilità (§9.3): la stima si raffina DA SOLA (feedback
-  // #354). Appena cambiano le condizioni (turno, categorie richieste, o il mazzo
-  // stesso) riparte una simulazione progressiva: un primo batch dà subito una
+  // #354). Appena cambiano le condizioni (turno, categorie, partita, mulligan,
+  // pescate extra o il mazzo) riparte una simulazione progressiva: un primo batch dà subito una
   // stima, i batch successivi si accumulano e la fanno convergere verso il vero
   // valore, poi si ferma. Niente più bottone "Calcola" né oscillazione del
   // risultato tra un ricalcolo e l'altro.
