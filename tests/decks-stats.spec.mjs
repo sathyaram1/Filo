@@ -444,6 +444,11 @@ test('chat e riquadro danno lo stesso numero alle stesse condizioni (#791)', asy
   await expect(page.locator('#probNeeds input[data-keep="terre"]')).toHaveValue('2');
   const riquadro = await settledPct(page);
   expect(Math.abs(chat - riquadro)).toBeLessThan(0.6);
+
+  // Una mano da tenere con una categoria che il mazzo non ha non diventa un numero inventato.
+  await page.fill('#chatInput', 'e se tengo solo mani con un ramp?');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-bot').last()).toContainText('Nel mazzo non c\'è la categoria «ramp»: puoi chiedere terre.');
 });
 
 test('il riquadro resta compatto: senza mulligan nessuna colonna in più, con il mulligan le categorie restano leggibili (#791)', async ({ app, openTab }) => {
