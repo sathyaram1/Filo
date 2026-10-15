@@ -1,6 +1,6 @@
-// Mappa dei .js di src ricavata dalle intestazioni: una riga per file (percorso, KB, prima frase) o, senza argomenti, per cartella.
-// Non scrive niente su disco: la mappa si rifà a ogni lancio e non invecchia. Prove: tests/unit/mappaModuli.test.mjs;
-// che ogni .js abbia l'intestazione lo tiene tests/unit/commentiRegola.test.mjs.
+// Mappa dei .js di src dalle intestazioni: una riga per file (percorso, KB, prima frase), o per cartella senza argomenti.
+// Non scrive niente su disco: si rifà a ogni lancio e non invecchia. Prove: tests/unit/mappaModuli.test.mjs; che ogni
+// .js abbia l'intestazione lo tiene tests/unit/commentiRegola.test.mjs.
 
 import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import path, { dirname, join, resolve } from 'node:path';
