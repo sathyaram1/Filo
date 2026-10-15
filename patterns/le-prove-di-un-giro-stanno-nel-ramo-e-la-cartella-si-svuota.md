@@ -34,9 +34,9 @@ la cartella.
   rossa la respinge (#679, una prova rossa cancellata insieme alla correzione; togliere il
   solo caso rosso e tenere il file è la stessa porta). Dopo un riallineamento contano solo
   le prove che ha toccato il ramo: quelle che main ha cambiato nel frattempo sono di altri
-  lavori e non si rilanciano. Le prove dei rilievi messi da parte escono PRIMA di ogni
-  correzione, in un commit che toglie solo quelle registrato da chi ha scritto la critica
-  (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
+  lavori e non si rilanciano. Le prove dei rilievi messi da parte escono appena la risposta
+  alla critica li elenca, in un commit che toglie solo quelle registrato da chi ha scritto la
+  critica (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
   e una prova tolta ancora rossa ferma la consegna sempre (`scripts/lib/prove-tolte.mjs`).
   Dopo un «pass» la pulizia non si registra: la sigilla il rilascio di chi ha verificato (il punto fermo
   porta il ruolo), e un riallineamento confronta da quel punto fermo se dalla critica ha solo tolto prove
