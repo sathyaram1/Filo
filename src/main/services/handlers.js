@@ -1112,6 +1112,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     for (const w of BrowserWindow.getAllWindows()) w._filoTabs?.riapplicaListaBloccati?.({ mentreScrive });
   } catch (_) {}
   try { require('./downloads').configureFromSettings(merged); } catch (_) {}
+  try { require('./altreApp').seguiImpostazioni(merged); } catch (_) {}
   return merged;
 }
 
