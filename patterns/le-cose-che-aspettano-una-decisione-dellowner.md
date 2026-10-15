@@ -7,7 +7,7 @@ prima schermata del browser e la pagina di gestione — con l'idea che "così
 l'owner le trova senza cercarle". La scelta dell'owner (2026-08-26) è stata
 l'opposta: la home di tutti i giorni non è il posto delle sue pratiche, e le
 cose che aspettano una sua decisione hanno GIÀ una casa — la scheda Ricevuti
-della dashboard di gestione, dove stanno i feedback da decidere.
+di Gestione, dove stanno i feedback da decidere.
 
 - **Regola:** una cosa da decidere si mette dove l'owner decide le altre, in
   cima se è più urgente — non su una superficie in più "per visibilità". Due
