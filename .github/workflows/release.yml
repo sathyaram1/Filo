@@ -398,6 +398,21 @@ jobs:
             }
           done
 
+      # Le impronte entrano nella bozza prima che diventi pubblica: nessuna versione esce senza «Verifica».
+      # Lo strumento e' quello di questa corsa: il commit provato puo' essere piu' vecchio di lui.
+      - name: Impronte dei file nella sezione Verifica
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -e
+          git show "${GITHUB_SHA}:scripts/release-impronte.mjs" > "${RUNNER_TEMP}/release-impronte.mjs"
+          node "${RUNNER_TEMP}/release-impronte.mjs" --piattaforma Windows --cartella dist \
+            --versione "${{ steps.bump.outputs.version }}" --repo "${{ github.repository }}" \
+            --commit "${{ steps.applica.outputs.sha }}" \
+            --corsa "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       - name: Pubblica la release (da bozza a pubblicata)
         # electron-builder crea la release come DRAFT. La rendiamo pubblica solo
         # ORA, a build+upload finiti, cosi' l'auto-update non vede mai una

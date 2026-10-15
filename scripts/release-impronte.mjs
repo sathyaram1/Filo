@@ -186,13 +186,16 @@ export const GH_TETTO_MS = 20_000;
 export const ATTESE_RIPROVA_S = [15, 30];
 export const GIRI = 4;
 
+// Di un gh fallito conta quello che ha detto lui, non la riga «Command failed» che Node gli mette davanti.
+const primaRiga = (e) => String(e?.stderr || '').trim().split('\n')[0] || String(e?.message ?? e).split('\n')[0];
+
 async function conRiprova(fare, { attendi, log, cosa }) {
   for (let t = 0; ; t++) {
     try {
       return await fare();
     } catch (e) {
-      if (t >= ATTESE_RIPROVA_S.length) throw new Error(`${cosa}: ${e.message}`);
-      log(`${cosa} non riuscita (${String(e.message).split('\n')[0]}): riprovo fra ${ATTESE_RIPROVA_S[t]} s`);
+      if (t >= ATTESE_RIPROVA_S.length) throw new Error(`${cosa}: ${primaRiga(e)}`);
+      log(`${cosa} non riuscita (${primaRiga(e)}): riprovo fra ${ATTESE_RIPROVA_S[t]} s`);
       await attendi(ATTESE_RIPROVA_S[t] * 1000);
     }
   }
@@ -265,12 +268,12 @@ async function main() {
       log: (t) => console.log(t),
     });
   } catch (e) {
-    const motivo = e.stderr ? `${e.message}\n${e.stderr}` : e.message;
-    console.error(`::error::sezione «Verifica» non scritta: ${String(motivo).split('\n')[0]}`);
+    const motivo = primaRiga(e);
+    console.error(`::error::sezione «Verifica» non scritta: ${motivo}`);
     riassunto([
       '### La sezione «Verifica» non è stata scritta',
       '',
-      `Motivo: ${String(motivo).split('\n')[0]}`,
+      `Motivo: ${motivo}`,
       ...(e.bozza ? ['', 'La versione è ancora una bozza e resta non pubblicata.'] : []),
       '',
     ].join('\n'));
