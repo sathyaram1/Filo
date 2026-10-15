@@ -243,8 +243,9 @@ test('CLI: la risposta dell\'orchestratore porta da sola il costo dei suoi turni
     writeFileSync(file, [turno('p1', '2026-10-15T09:00:00.000Z', { cache_creation_input_tokens: 30000 }), turno('p2', '2026-10-15T09:00:20.000Z', { cache_read_input_tokens: 30000 })].join('\n') + '\n');
     const r = await cli(port, ['risposta', 'parola', 'c7'], 'niente\n', { FILO_TRANSCRIPT: file });
     assert.equal(r.status, 0, r.stderr);
-    const { report, ...resto } = richieste[0].body;
-    assert.deepEqual(resto, { passphrase: 'parola', op: 'answer', id: 'c7', answer: 'niente' });
+    const { report, passphrase, op, id, answer } = richieste[0].body;
+    assert.deepEqual({ passphrase, op, id, answer }, { passphrase: 'parola', op: 'answer', id: 'c7', answer: 'niente' });
+    assert.equal(richieste.length, 1);
     assert.equal(report.closing, true);
     assert.equal(report.role, 'orchestrator');
     assert.equal(report.turns, 2, 'un\'accensione senza worker: tutta la sessione');
