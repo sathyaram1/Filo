@@ -221,7 +221,9 @@ export function derivatiDaAprire(p, derived) {
       ? `Rilievi rimasti del lavoro locale #${p.num}`
       : (prima.length > 90 ? `${prima.slice(0, 89)}…` : prima);
     const testo = [
-      `Rilievo messo da parte nella verifica del lavoro locale #${p.num} (ramo ${ramoDi(p)}): ${ROUND.groupLabel(g)}.`,
+      g.inCorrezione
+        ? `Domanda della verifica del lavoro locale #${p.num} (ramo ${ramoDi(p)}): il lavoro la corregge con l'opzione consigliata qui sotto. Se scegli diversamente, questo feedback cambia il codice già fuso.`
+        : `Rilievo messo da parte nella verifica del lavoro locale #${p.num} (ramo ${ramoDi(p)}): ${ROUND.groupLabel(g)}.`,
       '',
       ROUND.formatFindings(g.findings),
     ].join('\n');
