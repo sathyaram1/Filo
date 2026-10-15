@@ -603,7 +603,7 @@ module.exports = function register(on, ctx) {
             if (hits === 0 || hits === iters) break; // caso certo o impossibile
             await new Promise((res) => setImmediate(res));
           }
-          const pct = (hits / iters * 100).toFixed(1).replace('.', ',');
+          const pct = (hits / Math.max(1, iters) * 100).toFixed(1).replace('.', ',');
           const wantsTxt = p.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
           probTxt = `Probabilità di avere ${wantsTxt} al turno ${p.turn} (${Stats.describeConditions(cond)}): ≈ ${pct}% (${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate).`;
         }
