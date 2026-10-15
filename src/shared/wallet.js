@@ -471,7 +471,7 @@
     if (!server || server.invitesLocked !== 'need_google') return null;
     if (google && google.signedIn && google.linkedHere === false) {
       return {
-        testo: 'Il tuo account Google è già collegato a un altro portafoglio di Filo, per esempio su un altro computer: i tuoi inviti li dai da lì. Per darli anche da qui serve un altro account Google.',
+        testo: 'Il tuo account Google è già legato a un’altra copia di Filo, per esempio su un altro computer. Per dare inviti da qui serve un altro account Google.',
         bottone: 'Collega un altro account Google',
       };
     }
