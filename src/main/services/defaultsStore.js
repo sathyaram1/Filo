@@ -702,9 +702,9 @@ function clampCap(n) {
 }
 
 async function getRoutineCaps(idToken) {
-  // SOLO config/routines: è il documento che il server legge davvero, e
-  // mostrare un valore pescato altrove significa mostrare una regola che
-  // nessuno applica (vedi il commento in getAutomationProberIdle).
+  // SOLO config/routines: è il documento che il server legge davvero. Il
+  // ripiego sul vecchio config/automation mostrava all'owner valori che il
+  // server ignorava: la manopola girava, le ruote no.
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   // `null` = non ho potuto leggere: dirlo, o «spento» e «non impostato» sembrano parole del server.
   if (doc === null) throw new Error('Impostazioni del giro di verifica non raggiungibili.');
