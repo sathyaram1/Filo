@@ -4040,6 +4040,8 @@
       if (rawShortcut && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
       const r = rifiuto(rawShortcut, m);
       if (r) { mostraRifiuto(r); cfgShortcut.focus(); return; }
+      // Le scorciatoie di Filo la confrontano con quelle dei moduli salvati: un attimo dopo sarebbe già tardi (#842).
+      const nuovaScorciatoia = (m.data.shortcut || '') !== rawShortcut;
       m.data.shortcut = rawShortcut;
       if (m.type === 'word-count') m.data.count = $('cfgCount').value;
       if (m.type === 'switch') {
