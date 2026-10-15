@@ -947,8 +947,8 @@
       t.muted
         ? { label: 'Riattiva audio', icon: 'mute', action: 'tab-mute' }
         : { label: 'Muta', icon: 'sound', action: 'tab-mute' },
-      { label: 'Aiuto', icon: 'help', action: 'tab-help' },
     ];
+    if (aiutoAcceso) entries.push({ label: 'Aiuto', icon: 'help', action: 'tab-help' });
     // "Apri da un altro paese" (proxy per-tab): solo se un endpoint è
     // configurato — una voce che non può funzionare non deve comparire.
     // Il click diretto usa il default (ultima location usata, altrimenti USA);
