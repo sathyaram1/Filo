@@ -2576,7 +2576,7 @@ async function eseguiAzioneFilo(action, {
         }
         const settings = await Storage.getSettings();
         const overrides = { ...(settings.themeTokens || {}) };
-        overrides[token] = String(valore).trim();
+        overrides[token] = T.normalize(token, valore);
         await applySettingsUpdate({ themeTokens: overrides });
         // kept:true → il client renderizza il bottone di raffinamento (GUI).
         return { executed: true, kept: true };
