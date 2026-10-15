@@ -528,10 +528,15 @@ async function daContenuto(msg, sender) {
   return { ok: true, segui: true };
 }
 
-// Interruttore spento (Preferenze, chat, tasto destro sulla proposta): via quella a schermo, ovunque.
+// Una proposta a schermo segue le impostazioni di adesso, da dovunque cambino: spenta (anche solo in incognito) va
+// via, col tema nuovo si ridisegna.
 function impostazioni(merged) {
-  if (opzioni(merged).attiva) return;
-  for (const p of istanze) p.fine();
+  const o = opzioni(merged);
+  for (const p of istanze) {
+    if (!o.attiva || (p.c && p.c.incognito && !o.incognito)) { p.fine(); continue; }
+    p.tema = temaDi(merged);
+    if (p.c) p.posa();
+  }
 }
 
 module.exports = { PropostaEmail, daContenuto, impostazioni, _test: { opzioni, ammessa, pulisci, ARMA_MS } };
