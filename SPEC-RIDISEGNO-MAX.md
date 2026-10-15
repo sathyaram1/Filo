@@ -294,6 +294,7 @@ Collegato (18/08, revisione del ruolo secaudit con l'owner):
   attacco è passato. Cifratura retroattiva o rimozione; valutare quanto della
   superficie pubblica (titoli compresi) si può chiudere. I testi vecchi sono
   "sicuri" (unico utente: l'owner) ma lasciarli lì non è pulito né coerente.
+  - *Fuori dai passi del §14: come è finita non risulta dal repo.*
 - **la nota di un blocco di sicurezza è cifrata e dettagliata**: su pass una
   riga; su blocco spiegazione esaustiva (cosa, dove, perché, scenario, cosa
   verificare se falso positivo) — e MAI in chiaro: è la descrizione esatta di
