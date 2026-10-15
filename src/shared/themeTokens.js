@@ -193,6 +193,13 @@
       css: '--sn-link',
       category: 'accent',
     },
+    // Senza override la variabile non esiste e i link ereditano il font di chi li contiene (theme.css).
+    'link.font': {
+      label: 'Font dei link',
+      type: 'font',
+      css: '--sn-link-font',
+      category: 'font',
+    },
     'selection.color': {
       label: 'Colore della selezione',
       type: 'color',
