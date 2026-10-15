@@ -192,6 +192,7 @@ test.afterAll(async () => {
 
 test.beforeEach(() => {
   configDoc = configDiPartenza();
+  persone = personeDiPartenza();
   patch.length = 0;
   rifiutaPatch = false;
   detailChiesti.length = 0;
