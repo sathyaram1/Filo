@@ -1141,7 +1141,7 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'cosa chiesta non si ottiene o cammino principale · 1 cosmetica/attrito fuori cammino ·',
     '0 situazione rara; `i` tocca a questo lavoro, `e` è un altro lavoro, `v` è un altro lavoro',
     'ma sta in un file che questo ramo modifica già; `[1i?]` = chiede una decisione',
-    'dell’owner). Una riga col solo livello viene respinta. Le righe prima del',
+    'dell’owner, `[2i?!]` = una decisione difficile da disfare). Una riga col solo livello viene respinta. Le righe prima del',
     'primo rilievo sono il riassunto di cosa funziona. Nessun rilievo = verifica superata.',
     'LE QUADRE COL LIVELLO DENTRO SONO SEMPRE UN RILIEVO, dovunque stiano nella riga:',
     'nel riassunto E NEI PASSI un livello si cita a parole («il livello 2»), mai',
