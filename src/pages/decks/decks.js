@@ -797,17 +797,19 @@
       return;
     }
     const turn = Math.max(1, Number($('probTurn').value) || 1);
+    const cond = probConditions();
     const library = Stats.buildLibrary(current, cardsById);
     let hits = 0; let iters = 0; let batchSeed = 1; let seen = 0;
     out.classList.add('dk-prob-refining');
 
     const step = () => {
       if (runId !== probRunId) return; // le condizioni sono cambiate: molla
-      const r = Stats.simulate({ library, want, turn, iterations: PROB_BATCH, seed: batchSeed++ });
+      const r = Stats.simulate({ library, want, turn, ...cond, iterations: PROB_BATCH, seed: batchSeed++ });
       hits += r.hits; iters += r.iterations; seen = r.seen;
       const p = hits / iters;
       out.textContent = `≈ ${(p * 100).toFixed(1).replace('.', ',')}%`;
-      out.title = `${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate, ${seen} carte viste`;
+      out.title = `${iters.toLocaleString('it-IT', { useGrouping: true })} mani simulate, ${seen} carte viste`
+        + (cond.keep.length ? ' tenendo la prima mano' : '');
       // Converge finché non tocca il tetto; un risultato esattamente 0 o 100%
       // è deterministico (caso certo/impossibile) → inutile insistere.
       if (iters < PROB_CAP && hits > 0 && hits < iters) {
