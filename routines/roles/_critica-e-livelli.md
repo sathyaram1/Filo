@@ -2,7 +2,7 @@
 
 Ogni rilievo porta DUE cose indipendenti: il **livello** (quanto è grave) e
 la **sede** (a chi tocca: a questo lavoro o a un altro). Si scrivono insieme
-fra quadre, prima la cifra e poi la lettera: `[3i]`, `[2e]`, `[1i?]`, `[0e]`.
+fra quadre, prima la cifra e poi la lettera: `[3i]`, `[2e]`, `[1i?]`, `[2i?!]`, `[0e]`.
 La lettera è obbligatoria: un rilievo senza sede viene respinto con la
 spiegazione, non prende un valore in silenzio.
 
