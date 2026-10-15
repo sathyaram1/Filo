@@ -231,15 +231,24 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
     // frase giusta, prima di qualunque altra cosa.
     const segAssente = lancia(['--record-fixed', 'ID1',
       'Corretto il salvataggio col titolo vuoto: ora il file compare nella lista e resta dopo la riapertura.',
-      '--segnala', 'seg-manca.md']);
+      '--segnala', 'seg-manca.md', '--livello', '2']);
     assert.equal(segAssente.status, 1);
     assert.match(String(segAssente.stderr), /seg-manca\.md non esiste/);
     nienteScritto('segnalazione assente');
 
+    // #1202: la segnalazione senza il suo livello si ferma prima, col perché.
+    const senzaLivello = lancia(['--record-fixed', 'ID1',
+      'Corretto il salvataggio col titolo vuoto: ora il file compare nella lista e resta dopo la riapertura.',
+      '--segnala', 'seg-manca.md']);
+    assert.equal(senzaLivello.status, 1);
+    assert.match(String(senzaLivello.stderr), /--segnala vuole anche --livello <0-3>/);
+    assert.match(String(senzaLivello.stderr), /Con 3, o con --difficile/);
+    nienteScritto('segnalazione senza livello');
+
     // E anche dalla critica.
     const segVer = lancia(['--record-verifier', 'ID1',
       'Provato ad aprire la pagina e a salvare con il titolo vuoto: funziona tutto, non ho trovato niente da segnalare.',
-      '--segnala', 'seg-manca.md']);
+      '--segnala', 'seg-manca.md', '--livello=3', '--difficile']);
     assert.equal(segVer.status, 1);
     assert.match(String(segVer.stderr), /seg-manca\.md non esiste/);
   } finally {
@@ -287,7 +296,7 @@ test('canale: deliver status --segnala manda `segnalazione` intera; file assente
     // `working` e non `revision_capability`: qui si prova il campo, non il
     // controllo sui file fuori dai commit (che vale sulla directory vera).
     const ok = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
-      '--notes', 'Preso in carico: ho trovato un trade-off vero e lo segnalo.', '--segnala', seg]);
+      '--notes', 'Preso in carico: ho trovato un trade-off vero e lo segnalo.', '--segnala', seg, '--livello', '2']);
     assert.equal(ok.status, 0, `la consegna doveva partire (stderr: ${ok.stderr})`);
     const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
     assert.ok(consegna, 'la consegna deve arrivare al server');
@@ -295,6 +304,37 @@ test('canale: deliver status --segnala manda `segnalazione` intera; file assente
     assert.equal(d.segnalazione, '## Problema\nDue strade.\n\n## Scelte\n- A: costa.\n- B: lenta.',
       'il testo arriva intero, col nome che il server legge');
     assert.equal(d.segnala, undefined, 'il nome dell\'opzione non viaggia: il server non lo conosce');
+    // #1202: il livello viaggia accanto al testo, e il server decide da lì se fermare.
+    assert.equal(d.segnalazioneLivello, 2);
+    assert.equal(d.segnalazioneDifficile, undefined);
+    assert.equal(d.livello, undefined);
+    assert.match(ok.stdout, /La segnalazione non ferma il lavoro/);
+
+    const difficile = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
+      '--notes', 'Preso in carico: scelta sul formato dei dati salvati.', '--difficile', '--segnala', seg, '--livello', '1']);
+    assert.equal(difficile.status, 0, `la consegna doveva partire (stderr: ${difficile.stderr})`);
+    const dd = ricevuti.filter((x) => x.url.includes('routineDeliver')).pop().body.data || {};
+    assert.equal(dd.segnalazioneLivello, 1);
+    assert.equal(dd.segnalazioneDifficile, true);
+    assert.equal(dd.difficile, undefined);
+    assert.match(difficile.stdout, /ATTENZIONE: la segnalazione era di livello 3 o difficile da disfare, ma il server non ha fermato/,
+      'il finto server non ferma: chi consegna deve saperlo');
+
+    // Senza --livello la segnalazione non parte: il livello lo sceglie chi segnala, non un default.
+    const contati = ricevuti.length;
+    const senzaLivello = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
+      '--notes', 'Preso in carico.', '--segnala', seg]);
+    assert.equal(senzaLivello.status, 1);
+    assert.match(senzaLivello.stderr, /--segnala vuole anche --livello <0-3>/);
+    const fuoriScala = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
+      '--notes', 'Preso in carico.', '--segnala', seg, '--livello', '4']);
+    assert.equal(fuoriScala.status, 1);
+    assert.match(fuoriScala.stderr, /letto: «4»/);
+    const livelloDaSolo = await lancia(['deliver', 'biglietto-di-prova', 'status', '--status', 'working',
+      '--notes', 'Preso in carico.', '--livello', '2']);
+    assert.equal(livelloDaSolo.status, 1);
+    assert.match(livelloDaSolo.stderr, /accompagnano --segnala/);
+    assert.equal(ricevuti.length, contati, 'niente deve partire');
 
     // File assente: si ferma prima del server, con la frase giusta.
     const prima = ricevuti.length;
@@ -312,7 +352,7 @@ test('canale: deliver status --segnala manda `segnalazione` intera; file assente
     assert.match(String(monco.stderr), /--segnala vuole il percorso di un file/);
 
     // Su un intento che il server non legge (note) non si consegna a vuoto.
-    const altrove = await lancia(['deliver', 'biglietto-di-prova', 'note', '--notes', 'Una riga.', '--segnala', seg]);
+    const altrove = await lancia(['deliver', 'biglietto-di-prova', 'note', '--notes', 'Una riga.', '--segnala', seg, '--livello', '2']);
     assert.equal(altrove.status, 1);
     assert.match(String(altrove.stderr), /vale solo su deliver status, fixed e verdict/);
     assert.equal(ricevuti.length, prima, 'niente deve partire');
