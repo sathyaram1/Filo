@@ -188,13 +188,20 @@ test('la prova a secco si paga una volta: l\'applicazione che la segue non risca
   const copie = join(BASE, 'copie-riuso');
   mkdirSync(copie, { recursive: true });
   const secco = lancia('backfill-feedback-numbers.mjs', ['--dry-run'], { copie });
-  console.log('SECCO', secco.stat.lette, secco.pulito);
+  expect(secco.stat.lette).toBe(7);
 
   const applica = lancia('backfill-feedback-numbers.mjs', [], { copie });
-  console.log('APPLICA', applica.stat.lette, applica.pulito);
+  expect(applica.stat.lette, 'l\'applicazione ha ripagato la scansione della prova a secco').toBe(0);
+  expect(applica.pulito).toMatch(/Riuso la lettura della prova a secco/);
+  // Restano i conteggi e il contatore, che guardano il server di adesso: la scansione no.
+  expect(applica.pulito).toMatch(/Documenti letti dal server in questo giro: \d+ \((?![^)]*segnalazioni)/);
+  // Stessa decisione della prova a secco, scritta invece che stampata.
+  expect(applica.pulito).toMatch(/✓ #6 → f-bloccato/);
+  expect(applica.pulito).toMatch(/✓ #7 → e-senza-numero/);
 
+  // Applicato: la copia non descrive più il server e va buttata.
   const ancora = lancia('backfill-feedback-numbers.mjs', [], { copie });
-  console.log('ANCORA', ancora.stat.lette, ancora.pulito);
+  expect(ancora.stat.lette, 'dopo un\'applicazione la copia doveva essere buttata').toBe(7);
 });
 
 test('il riuso si può rifiutare: con --rileggi si torna al server', () => {
