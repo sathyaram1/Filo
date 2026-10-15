@@ -1113,7 +1113,7 @@ async function recordVerifier(id, critiqueText, segnalazione = '') {
   const next = applyVerifierVerdict(base, outcome, critiqueText, shaProvato);
   next.id = id;
   // I rilievi messi da parte su QUESTO commit, col loro posto nella critica: la pulizia toglie solo le loro prove.
-  const daParte = derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived);
+  const { daParte } = separaDomandeInCorrezione(derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived), reply.phase2 && reply.phase2.findings);
   next.messiDaParteGiro = outcome === 'fix'
     ? { sha: shaProvato, n: daParte.reduce((k, d) => k + d.rilievi.length, 0), numeri: daParte.flatMap((d) => d.rilievi.map((f) => f.n)).filter(Number.isInteger), avvio: avvio || '' }
     : null;
