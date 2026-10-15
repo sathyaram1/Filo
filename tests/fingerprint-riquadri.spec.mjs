@@ -1,0 +1,238 @@
+// #798 — Una pagina non aggira la protezione anti-fingerprint leggendo canvas, WebGL e audio con le funzioni di un
+// riquadro: vuoto creato da lei, scritto nell'HTML, srcdoc, data:, o dello stesso sito. Ogni lettura coincide con
+// quella della pagina ed è diversa da Off; un riquadro di un altro sito resta com'è. Senza la correzione le letture
+// dai riquadri coincidono con Off.
+
+import { test, expect } from './fixtures/electron.mjs';
+import { createServer } from 'node:http';
+
+async function setFpMode(openTab, mode) {
+  const sec = await openTab('filo://security/');
+  await sec.waitForSelector('input[name="fp-mode"]', { timeout: 8_000 });
+  await sec.locator(`input[name="fp-mode"][value="${mode}"]`).check();
+  await expect(sec.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+}
+
+// Lo script di un'impronta, uguale in ogni documento: una scena fissa, letta con le funzioni della sua finestra.
+const IMPRONTA = `
+  function fnv(s) {
+    var a = 2166136261, b = 33554467;
+    for (var i = 0; i < s.length; i++) { a = Math.imul(a ^ s.charCodeAt(i), 16777619) >>> 0; b = Math.imul(b ^ s.charCodeAt(i), 16777619) >>> 0; }
+    return a.toString(16) + b.toString(16);
+  }
+  function scena(doc) {
+    var c = doc.createElement('canvas'); c.width = 80; c.height = 40;
+    var x = c.getContext('2d');
+    x.fillStyle = '#1e90ff'; x.fillRect(0, 0, 80, 40);
+    x.fillStyle = '#000'; x.font = '16px sans-serif'; x.fillText('filo', 4, 24);
+    return { c: c, x: x };
+  }
+  function impronta() { return fnv(scena(document).c.toDataURL()); }
+  function manda(chi) { parent.postMessage({ lettura: chi, valore: impronta() }, '*'); }
+`;
+
+function documento(chi) {
+  return `<!doctype html><meta charset="utf-8"><body><script>${IMPRONTA}manda(${JSON.stringify(chi)});</script></body>`;
+}
+const attr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+// Tutte le strade insieme, nella pagina: hash di ogni lettura.
+async function letture() {
+  /* global fnv, scena */
+  const attendi = (cond) => new Promise((res) => { const t = () => (cond() ? res() : setTimeout(t, 25)); t(); });
+  const hashPx = (a) => fnv(Array.prototype.join.call(a, ','));
+  const { c, x } = scena(document);
+  const out = { pagina: fnv(c.toDataURL()), paginaPx: hashPx(x.getImageData(0, 0, 80, 40).data) };
+
+  const f = document.createElement('iframe');
+  document.body.appendChild(f);
+  const W = f.contentWindow;
+  out.vuotoToDataURL = fnv(W.HTMLCanvasElement.prototype.toDataURL.call(c));
+  out.vuotoScena = fnv(W.HTMLCanvasElement.prototype.toDataURL.call(scena(W.document).c));
+  out.vuotoPx = hashPx(W.CanvasRenderingContext2D.prototype.getImageData.call(x, 0, 0, 80, 40).data);
+  out.vuotoBlob = await new Promise((res) => W.HTMLCanvasElement.prototype.toBlob.call(c, (b) => {
+    const fr = new FileReader(); fr.onload = () => res(fnv(fr.result)); fr.readAsDataURL(b);
+  }));
+  const g = document.createElement('iframe');
+  document.body.appendChild(g);
+  out.daDocumento = fnv(g.contentDocument.defaultView.HTMLCanvasElement.prototype.toDataURL.call(c));
+  const annidato = W.document.createElement('iframe');
+  W.document.body.appendChild(annidato);
+  out.annidato = fnv(annidato.contentWindow.HTMLCanvasElement.prototype.toDataURL.call(c));
+  out.perIndice = fnv(frames[0].HTMLCanvasElement.prototype.toDataURL.call(c));
+  out.perNome = fnv(window.nellHtml.HTMLCanvasElement.prototype.toDataURL.call(c));
+
+  const gc = document.createElement('canvas'); gc.width = 32; gc.height = 16;
+  const gl = gc.getContext('webgl', { preserveDrawingBuffer: true });
+  if (gl) {
+    gl.clearColor(0.2, 0.4, 0.6, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    const leggi = (fn, Arr) => { const px = new Arr(32 * 16 * 4); fn.call(gl, 0, 0, 32, 16, gl.RGBA, gl.UNSIGNED_BYTE, px); return hashPx(px); };
+    out.paginaGL = leggi(WebGLRenderingContext.prototype.readPixels, Uint8Array);
+    out.vuotoGL = leggi(W.WebGLRenderingContext.prototype.readPixels, Uint8Array);
+    out.vuotoGLBufferSuo = leggi(W.WebGLRenderingContext.prototype.readPixels, W.Uint8Array);
+  }
+
+  const suono = async (Ctor) => {
+    const ctx = new Ctor(1, 4410, 44100);
+    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = 1000;
+    const comp = ctx.createDynamicsCompressor();
+    o.connect(comp); comp.connect(ctx.destination); o.start(0);
+    const buf = await ctx.startRendering();
+    return hashPx(new Uint8Array(buf.getChannelData(0).buffer));
+  };
+  out.paginaAudio = await suono(OfflineAudioContext);
+  out.vuotoAudio = await suono(W.OfflineAudioContext);
+
+  // I riquadri con un documento loro, già carichi: si leggono anche da qui, con le loro funzioni.
+  await attendi(() => document.getElementById('so').contentDocument?.readyState === 'complete');
+  const so = document.getElementById('so').contentWindow;
+  out.stessaOrigineDaQui = fnv(so.HTMLCanvasElement.prototype.toDataURL.call(c));
+  const cs = scena(so.document).c;
+  out.canvasDelRiquadroLettoQui = fnv(HTMLCanvasElement.prototype.toDataURL.call(cs));
+  await attendi(() => document.getElementById('sd').contentDocument?.readyState === 'complete');
+  out.srcdocDaQui = fnv(document.getElementById('sd').contentWindow.HTMLCanvasElement.prototype.toDataURL.call(c));
+
+  await attendi(() => ['srcdoc', 'sandbox', 'data', 'stessaOrigine', 'stessoSito', 'altroSito'].every((k) => k in window.__l));
+  return { ...out, ...window.__l };
+}
+
+function paginaDiProva(testServer, sitoGemello) {
+  const stessaOrigine = testServer.html(documento('stessaOrigine'));
+  const altroSito = testServer.html(documento('altroSito'), { pubblico: true });
+  return testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}
+    window.__l = {};
+    addEventListener('message', function (e) { if (e.data && e.data.lettura) window.__l[e.data.lettura] = e.data.valore; });
+  </script></head><body>
+  <iframe name="nellHtml"></iframe>
+  <iframe id="sd" srcdoc="${attr(documento('srcdoc'))}"></iframe>
+  <iframe sandbox="allow-scripts" srcdoc="${attr(documento('sandbox'))}"></iframe>
+  <iframe src="data:text/html;charset=utf-8,${encodeURIComponent(documento('data'))}"></iframe>
+  <iframe id="so" src="${stessaOrigine}"></iframe>
+  <iframe src="${sitoGemello}"></iframe>
+  <iframe src="${altroSito}"></iframe>
+  </body></html>`);
+}
+
+test('i riquadri della pagina leggono canvas, WebGL e audio col suo rumore; un altro sito resta com\'è', async ({ openTab, testServer }) => {
+  test.setTimeout(90_000);
+  // Stesso sito, altra origine: lo stesso indirizzo IP su un'altra porta.
+  const gemello = createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(documento('stessoSito'));
+  });
+  await new Promise((r) => gemello.listen(0, '127.0.0.1', r));
+  const sitoGemello = `http://127.0.0.1:${gemello.address().port}/`;
+  try {
+    const leggi = async () => {
+      const page = await openTab(paginaDiProva(testServer, sitoGemello));
+      await page.waitForFunction(() => document.readyState === 'complete' && window.__l, null, { timeout: 10_000 });
+      return page.evaluate(letture);
+    };
+    const on = await leggi();
+    await setFpMode(openTab, 'off');
+    const off = await leggi();
+
+    expect(on.pagina).not.toBe(off.pagina);
+    expect(on.paginaPx).not.toBe(off.paginaPx);
+    const comeLaPagina = ['vuotoToDataURL', 'vuotoScena', 'vuotoBlob', 'daDocumento', 'annidato', 'perIndice', 'perNome',
+      'stessaOrigineDaQui', 'canvasDelRiquadroLettoQui', 'srcdocDaQui', 'srcdoc', 'sandbox', 'data', 'stessaOrigine', 'stessoSito'];
+    for (const k of comeLaPagina) {
+      expect.soft(on[k], `${k}: come la pagina, col rumore`).toBe(on.pagina);
+      expect.soft(off[k], `${k}: in Off come la pagina, senza rumore`).toBe(off.pagina);
+    }
+    expect(on.vuotoBlob).not.toBe(off.vuotoBlob);
+    expect(on.vuotoPx).toBe(on.paginaPx);
+    expect(off.vuotoPx).toBe(off.paginaPx);
+    expect(on.paginaGL, 'WebGL disponibile').toBeTruthy();
+    expect(on.paginaGL).not.toBe(off.paginaGL);
+    expect(on.vuotoGL).toBe(on.paginaGL);
+    expect(on.vuotoGLBufferSuo).toBe(on.paginaGL);
+    expect(off.vuotoGL).toBe(off.paginaGL);
+    expect(on.paginaAudio).not.toBe(off.paginaAudio);
+    expect(on.vuotoAudio).toBe(on.paginaAudio);
+    expect(off.vuotoAudio).toBe(off.paginaAudio);
+    // Il widget di un altro sito non cambia.
+    expect(on.altroSito).toBe(off.altroSito);
+    expect(on.altroSito).not.toBe(on.pagina);
+  } finally {
+    gemello.closeAllConnections?.();
+    await new Promise((r) => gemello.close(r));
+  }
+});
+
+// La pagina ha riscritto prima ciò che la guardia usa per prepararsi: il riquadro creato dopo ha lo stesso rumore.
+test('un riquadro creato dopo che la pagina ha riscritto Object, call, apply e Object.prototype ha lo stesso rumore', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><title>avvelenata</title><script>${IMPRONTA}</script><p>ok</p>`);
+  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  const r = await page.evaluate(() => {
+    const { c } = scena(document);
+    const pagina = fnv(c.toDataURL());
+    const rubate = [];
+    const spia = function () { rubate.push(this); throw new Error('rubato'); };
+    Object.defineProperty = spia; Object.getOwnPropertyDescriptor = spia; Object.setPrototypeOf = spia;
+    Reflect.apply = spia;
+    Object.prototype.__defineGetter__.call(Object.prototype, 'get', function () { rubate.push('get'); return undefined; });
+    Object.prototype.__defineGetter__.call(Object.prototype, 'value', function () { rubate.push('value'); return undefined; });
+    const call = Function.prototype.call, apply = Function.prototype.apply;
+    Function.prototype.call = function (...a) { rubate.push(this); return Reflect.construct.length ? call.bind(this)(...a) : 0; };
+    Function.prototype.apply = function (t, a) { rubate.push(this); return call.bind(this)(t, ...(a || [])); };
+    const f = document.createElement('iframe');
+    document.body.appendChild(f);
+    const dalRiquadro = fnv(call.bind(f.contentWindow.HTMLCanvasElement.prototype.toDataURL)(c));
+    Function.prototype.call = call; Function.prototype.apply = apply;
+    delete Object.prototype.get; delete Object.prototype.value;
+    const nativeRubate = rubate.filter((x) => typeof x === 'function' && /\[native code\]/.test(call.bind(Function.prototype.toString)(x))
+      && /toDataURL|getImageData|getContext/.test(x.name)).length;
+    return { pagina, dalRiquadro, nativeRubate };
+  });
+  expect(r.dalRiquadro).toBe(r.pagina);
+  expect(r.nativeRubate).toBe(0);
+});
+
+// Le funzioni del riquadro, e i getter che lo raggiungono, rispondono come in Off a chi le ispeziona da una finestra
+// o dall'altra (#799).
+async function profiloRiquadro() {
+  const f = document.createElement('iframe');
+  document.body.appendChild(f);
+  const W = f.contentWindow;
+  const fnTs = Function.prototype.toString, wTs = W.Function.prototype.toString;
+  const desc = (P, k) => Object.getOwnPropertyDescriptor(P, k).get;
+  const voci = {
+    toDataURL: W.HTMLCanvasElement.prototype.toDataURL,
+    getImageData: W.CanvasRenderingContext2D.prototype.getImageData,
+    getContext: W.HTMLCanvasElement.prototype.getContext,
+    readPixels: W.WebGLRenderingContext.prototype.readPixels,
+    startRendering: W.OfflineAudioContext.prototype.startRendering,
+    toStringRiquadro: wTs,
+    toDataURLPagina: HTMLCanvasElement.prototype.toDataURL,
+    contentWindow: desc(HTMLIFrameElement.prototype, 'contentWindow'),
+    contentDocument: desc(HTMLIFrameElement.prototype, 'contentDocument'),
+    frameContentWindow: desc(HTMLFrameElement.prototype, 'contentWindow'),
+    objectContentDocument: desc(HTMLObjectElement.prototype, 'contentDocument'),
+    contentWindowRiquadro: desc(W.HTMLIFrameElement.prototype, 'contentWindow'),
+  };
+  const out = {};
+  for (const [k, fn] of Object.entries(voci)) {
+    let nuovo;
+    try { new fn(); nuovo = 'ok'; } catch (e) { nuovo = e.constructor.name; }
+    out[k] = {
+      testo: fnTs.call(fn), testoDalRiquadro: wTs.call(fn), nome: fn.name, lunghezza: fn.length,
+      proprie: Object.getOwnPropertyNames(fn).sort().join(','), prototype: 'prototype' in fn, nuovo,
+      funzioneDellaPagina: fn instanceof Function, funzioneDelRiquadro: fn instanceof W.Function,
+    };
+  }
+  out.illegale = (() => { try { W.HTMLCanvasElement.prototype.toDataURL.call({}); return 'nessun errore'; } catch (e) { return [e instanceof W.TypeError, e instanceof TypeError, e.message]; } })();
+  return out;
+}
+
+test('le funzioni del riquadro e i getter dei riquadri sono indistinguibili dalle native', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<title>FP_ON</title><p>ok</p>');
+  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  const on = await page.evaluate(profiloRiquadro);
+  await setFpMode(openTab, 'off');
+  await page.goto(testServer.html('<title>FP_OFF</title><p>ok</p>'));
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+  expect(await page.evaluate(() => !!window.__filoFpGuard)).toBe(false);
+  const off = await page.evaluate(profiloRiquadro);
+  expect(on).toEqual(off);
+});
