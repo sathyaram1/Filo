@@ -314,4 +314,4 @@ function percorsoDelPreload() {
   return scelto;
 }
 
-module.exports = { componi, scrivi, percorsoDelPreload, NEL_PACCHETTO, INGRESSO };
+module.exports = { componi, scrivi, percorsoDelPreload, runtime, NEL_PACCHETTO, INGRESSO };
