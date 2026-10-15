@@ -321,6 +321,9 @@ più scemo, che è la direzione giusta).
 
 ## 12. Ritorno dei worker: niente canale di testo
 
+*Fatto (§14, passi 2 e 4); oggi in `ROUTINE-AUTH-SPEC.md` §10 e
+`routines/roles/_contratto-worker.md`.*
+
 Deciso con l'owner il 18/08 (terza passata): il "contratto della riga finale"
 è ABOLITO. Il testo con cui un worker chiude non viene letto da nessuna
 macchina — l'orchestratore decide il passo successivo SOLO interrogando il
