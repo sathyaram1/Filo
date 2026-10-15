@@ -273,7 +273,9 @@ module.exports = function register(on, ctx) {
       return out;
     }
     try {
-      out.server = await callable('walletState');
+      const [server, google] = await Promise.all([callable('walletState'), statoGoogle()]);
+      out.server = server;
+      out.google = google;
       if (out.server && out.server.hasWallet) {
         lastServer = out.server;
         if (!out.pseudonym && out.server.pseudonym && out.hasPersonalKey) {
