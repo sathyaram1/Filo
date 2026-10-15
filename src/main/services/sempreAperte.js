@@ -8,13 +8,13 @@ const { getDomainInfo } = require('./safebrowse/psl');
 const T = () => globalThis.SN_TAB_TRIAGE;
 const FM = () => globalThis.SN_FILO_MEMORY;
 
-// La voce per `input` (dominio o indirizzo), o '' se non è un sito. Un suffisso pubblico («com», «github.io»)
-// terrebbe aperto mezzo web.
+// La voce per `input` (dominio o indirizzo), o '' se non è un sito. Un suffisso pubblico («co.uk», «github.io»)
+// terrebbe aperto mezzo web: lo è se un nome subito sotto di lui è già un sito a sé.
 function voceDa(input) {
   const host = T().hostTenuto(input);
   if (!host) return '';
-  const info = getDomainInfo(host, { soloPsl: true });
-  return info && info.suffixOnly ? '' : host;
+  const sotto = getDomainInfo(`a.${host}`, { soloPsl: true });
+  return sotto && sotto.registrable === `a.${host}` ? '' : host;
 }
 
 async function voci() {
