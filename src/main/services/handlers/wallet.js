@@ -273,7 +273,7 @@ module.exports = function register(on, ctx) {
       return out;
     }
     try {
-      const [server, google] = await Promise.all([callable('walletState'), statoGoogle()]);
+      const [server, google] = await Promise.all([callable('walletState'), statoGoogle().catch(() => null)]);
       out.server = server;
       out.google = google;
       if (out.server && out.server.hasWallet) {
