@@ -722,6 +722,25 @@
     return `rimasti del giro: ${n} ${n === 1 ? 'rilievo' : 'rilievi'} (${findings.map(findingTag).join(', ')})`;
   }
 
+  // ── Le segnalazioni ───────────────────────────────────────────────────────
+
+  /**
+   * Se una segnalazione (`--segnala`) ferma il lavoro: per un problema di
+   * livello 3 o per una scelta difficile da disfare, come i rilievi col `?`.
+   * Negli altri casi chi segnala ha già applicato la scelta che consiglia, e
+   * la segnalazione esce in un feedback derivato con la domanda (decisione
+   * dell'owner del 2026-10-12). Senza un livello leggibile ferma: è la
+   * consegna di uno strumento di prima, che fermava sempre. PURA.
+   * @param {{ level?: number|string, difficile?: boolean }} s
+   */
+  function segnalazioneFerma(s) {
+    const o = s && typeof s === 'object' ? s : {};
+    if (o.difficile === true) return true;
+    const raw = o.level;
+    const n = raw === '' || raw == null || typeof raw === 'boolean' ? NaN : Number(raw);
+    return !LEVELS.includes(n) || n >= 3;
+  }
+
   // ── Testi ─────────────────────────────────────────────────────────────────
 
   /** Un rilievo come riga di elenco: «- [2i] testo», «- [1v] testo», «- [1e?] testo». PURA. */
