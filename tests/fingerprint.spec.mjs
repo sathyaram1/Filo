@@ -454,6 +454,7 @@ async function profiloFunzioni() {
     readPixels: WebGLRenderingContext.prototype.readPixels,
     readPixels2: WebGL2RenderingContext.prototype.readPixels,
     startRendering: OfflineAudioContext.prototype.startRendering,
+    renderedBuffer: Object.getOwnPropertyDescriptor(OfflineAudioCompletionEvent.prototype, 'renderedBuffer').get,
     fnToString: Function.prototype.toString,
   };
   const out = {};
