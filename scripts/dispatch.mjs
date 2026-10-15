@@ -884,8 +884,8 @@ export function diffForBranch(branch, root = ROOT) {
  *                  da scrivere = nessuna logica di retry da sbagliare);
  *   - 'permanent'  il branch nello stato non esiste più → riprovare ogni 6h è
  *                  inutile: il feedback esce dal giro automatico (`design`).
- * Prima esisteva solo il fallback su prober, che traveste un guasto da
- * "giornata tranquilla" — ed è già costato un'ondata di lavoro fantasma.
+ * Mai un ripiego su un altro lavoro: traveste un guasto da "giornata
+ * tranquilla", ed è già costato un'ondata di lavoro fantasma.
  */
 export function routineFault(kind, message) {
   const e = new Error(message);
