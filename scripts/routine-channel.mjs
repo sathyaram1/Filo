@@ -1132,7 +1132,8 @@ if (isMain) {
         // volte. Stessa frase di dispatch --record-*.
         console.error(key === 'segnala'
           ? '--segnala vuole il percorso di un file subito dopo di sé (un .md scritto prima): non ho consegnato niente.'
-          : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
+          : key === 'livello' ? `--livello vuole una cifra da 0 a 3 dopo di sé. ${SPIEGAZIONE_LIVELLO_SEGNALAZIONE} Non ho consegnato niente.`
+            : `--${key} vuole un testo dopo di sé — non ho consegnato niente.`);
         process.exit(1);
       }
       data[key] = true;
