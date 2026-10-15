@@ -396,6 +396,8 @@ Regole collegate:
   specifico del ruolo. E **non spiegano ciò che non compete al ruolo** ("cosa
   succede dopo non ti riguarda", soglie altrui, meccaniche a valle):
   informazione inutile è superficie in più.
+  - **Superato** (le meccaniche a valle, per chi deve sceglierne livello e
+    sede): vedi `routines/roles/_critica-e-livelli.md`.
 
 ## 13. La verifica: critica a livelli, esito del server
 
