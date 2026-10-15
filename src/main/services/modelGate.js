@@ -187,7 +187,7 @@
         });
       } catch (e) {
         auditBroken(s, action, e && e.brokenAttempts);
-        throw e;
+        throw conLaFunzione(e, s, action);
       }
       const { brokenAttempts, ...rest } = r || {};
       auditBroken(s, action, brokenAttempts);
