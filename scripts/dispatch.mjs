@@ -1724,24 +1724,6 @@ export async function run() {
   return finalizeBucket(bucket, w);
 }
 
-// Raccoglie il payload (diff/feedback) della busta del server e stampa il JSON.
-// Ritorna { exit }.
-// Il prober non lavora su un branch: la directory torna alla LINEA PRINCIPALE
-// e l'identità attesa viene rilasciata. Senza, resteremmo sul branch del
-// compito precedente e le modifiche del prober finirebbero là dentro, dove
-// diventerebbero modifiche di QUEL lavoro nel diff che va al gate.
-function prepareForProber() {
-  clearExpectation(ROOT);
-  const g = (args) => tryGit(args);
-  g(['fetch', 'origin', MAIN_BRANCH]);
-  if (currentBranch(ROOT) === MAIN_BRANCH) return;
-  if (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok) {
-    g(['checkout', '-B', MAIN_BRANCH, `origin/${MAIN_BRANCH}`]);
-  } else {
-    g(['checkout', MAIN_BRANCH]);
-  }
-}
-
 // Fra un worker e l'altro la cartella torna sulla linea principale: la sessione legge gli agenti (e il loro
 // sforzo) dalla cartella, e il ramo vecchio lasciato dal worker prima li riporterebbe indietro (sforzo per ruolo).
 // Scarta le modifiche non salvate (il lavoro di un worker morto si butta): per questo solo nelle routine.
