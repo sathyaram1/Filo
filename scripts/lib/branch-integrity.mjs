@@ -712,10 +712,14 @@ export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
       : checkDelivery(root, assigned);
     if (!g.ok) {
       const cur = g.current || '';
-      const motivo = g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur, principale) ? 'principale' : 'deriva';
-      return { ok: false, motivo, current: cur, assigned: g.assigned || assigned, rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated };
+      const motivo = g.cartella ? 'cartella' : g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur, principale) ? 'principale' : 'deriva';
+      const dove = g.cartella ? { cartella: g.cartella, radice: g.radice } : {};
+      return { ok: false, motivo, current: cur, assigned: g.assigned || assigned, rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated, ...dove };
     }
     if (g.state && g.state.branch) assigned = g.state.branch;
+  } else {
+    const altra = altraCartellaDelDeposito(root);
+    if (altra) return { ok: false, motivo: 'cartella', current: altra.ramo, assigned, cartella: altra.cartella, radice: altra.radice };
   }
   const current = currentBranch(root);
   if (!current) {
