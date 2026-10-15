@@ -1,29 +1,30 @@
 ## Lavoro server: anche filo-security
 
 Questo lavoro tocca il server, il repo privato `sathyaram1/filo-security`. Il tuo biglietto porta l'ambito
-`server`: finché resta pulito, il server ti dà un token da un'ora, solo per quel repo, e git lo chiede da solo
-all'aiutante di credenziali. Qui il codice del server lo tocchi: il resto di «Se il lavoro si fa solo in locale»
-(deploy, segreti, credenziali dell'owner) vale ancora.
+`server`: finché resta pulito, il server ti dà un token da un'ora, solo per quel repo. Qui il codice del server lo
+tocchi: il resto di «Se il lavoro si fa solo in locale» (deploy, segreti, credenziali dell'owner) vale ancora.
 
 Il clone sta **fuori** dal checkout di Filo, in `<CLONE>`. L'hook di salvataggio pubblica tutto quello che sta
 dentro Filo: un file del server copiato lì finisce sul repo pubblico. Non copiare mai niente del server dentro Filo.
 
-### Il clone, una volta sola
+### Git verso filo-security: solo `git-server`
 
-La configurazione dell'aiutante va nel clone, mai globale: la configurazione globale è quella del proxy.
+Ogni comando di git che parla con GitHub (clone, ls-remote, fetch, push) passa da qui, e solo da qui. Chiede il token
+al server e lo dà a quella sola chiamata di git: non resta nel clone, non si stampa, e aiutanti e askpass del proxy
+della sessione per quella chiamata non valgono. Il resto (checkout, commit, merge, diff) è git normale nel clone.
 
 ```bash
-git -c credential.helper= -c 'credential.helper=!node "<CANALE>" git-credenziali' -c credential.useHttpPath=true \
-  clone https://github.com/sathyaram1/filo-security.git "<CLONE>"
-git -C "<CLONE>" config --local credential.helper ""
-git -C "<CLONE>" config --local --add credential.helper '!node "<CANALE>" git-credenziali'
-git -C "<CLONE>" config --local credential.useHttpPath true
-git -C "<CLONE>" ls-remote origin HEAD
+node "<CANALE>" git-server clone "<CLONE>"
+node "<CANALE>" git-server ls-remote "<CLONE>"
+node "<CANALE>" git-server fetch "<CLONE>" <ramo>
+node "<CANALE>" git-server push "<CLONE>" <ramo>
 ```
 
-Se `ls-remote` non si autentica, ripeti il comando con le tre `-c` davanti. Se continua, il token non esce: il motivo
-l'ha stampato l'aiutante (biglietto sporco, feedback non fidato, ramo del server scritto fuori registro, GitHub che non
-risponde). Non aggirarlo: niente token scritti nell'URL, niente altre credenziali. La parte del server da qui non si fa:
+Uscita 4: il server non ha dato il token, e il motivo è stampato (biglietto sporco o chiuso, feedback non fidato, ramo
+del server scritto fuori registro, GitHub che non risponde). Uscita 1 dopo «git è uscito con»: l'errore di git sta
+sopra; se parla di autenticazione o di repository non trovato, il token c'era e GitHub l'ha respinto. Se è il
+controllo dei permessi della sessione a bloccare il comando, copia nelle note il suo messaggio esatto. Non aggirare nessuno di questi no: niente token scritti nell'URL, niente aiutanti di credenziali, niente altre
+credenziali. La parte del server da qui non si fa:
 
 - se fai il primo lavoro o correggi, rimanda la pratica in locale con la consegna che trovi più su, nella
   sezione «Se il lavoro si fa solo in locale», e scrivi nelle note il motivo;
@@ -36,19 +37,21 @@ risponde). Non aggirarlo: niente token scritti nell'URL, niente altre credenzial
 Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --abbrev-ref HEAD` nel checkout di Filo).
 
 - Lavoro nuovo: `git -C "<CLONE>" checkout -b <ramo> origin/main`.
-- Verifica o correzione: `git -C "<CLONE>" fetch origin <ramo>` e `git -C "<CLONE>" checkout -B <ramo> origin/<ramo>`.
-  Se sul server il ramo non c'è, il lavoro sta tutto nell'app.
-- Riallineamento del server (lo dice la critica): `git -C "<CLONE>" merge origin/main`, conflitti risolti tenendo main
-  per ciò che altri ci hanno già portato, poi prove e spinta come sotto.
+- Verifica o correzione: `node "<CANALE>" git-server fetch "<CLONE>" <ramo>` e
+  `git -C "<CLONE>" checkout -B <ramo> origin/<ramo>`. Se sul server il ramo non c'è (git: «couldn't find remote
+  ref»), il lavoro sta tutto nell'app.
+- Riallineamento del server (lo dice la critica): `node "<CANALE>" git-server fetch "<CLONE>" main`, poi
+  `git -C "<CLONE>" merge origin/main`, conflitti risolti tenendo main per ciò che altri ci hanno già portato, poi prove
+  e spinta come sotto.
 
 ### Prove, spinta, registro
 
 - Le prove del server: `npm ci` la prima volta, poi `npm test` in `<CLONE>/functions`, con `FILO_PUBLIC_REPO` uguale
   al checkout di Filo. Se il lavoro tocca anche l'app, le prove dell'app come sempre.
 - Le prove del giro che riguardano il server vanno in `functions/test/` del clone, sul ramo.
-- Spingi solo il tuo ramo: `git -C "<CLONE>" push origin <ramo>`, dopo quello dell'app. La suite di GitHub del server
-  prova il ramo di Filo con lo stesso nome com'è al momento della spinta del server (main di Filo se non c'è). Subito
-  dopo, a ogni spinta e prima di consegnare:
+- Spingi solo il tuo ramo: `node "<CANALE>" git-server push "<CLONE>" <ramo>`, dopo quello dell'app. La suite di
+  GitHub del server prova il ramo di Filo con lo stesso nome com'è al momento della spinta del server (main di Filo se
+  non c'è). Subito dopo, a ogni spinta e prima di consegnare:
 
 ```bash
 node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"

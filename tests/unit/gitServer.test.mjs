@@ -4,7 +4,7 @@ import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -40,7 +40,9 @@ test('l’ambiente del git figlio: niente askpass né aiutanti del proxy, il tok
     GIT_CONFIG_KEY_9: 'avanzo', GIT_CONFIG_VALUE_9: 'oltre il conto',
   };
   const { env, tolte } = ambienteGitServer(base, TOKEN);
-  for (const k of ['GIT_ASKPASS', 'SSH_ASKPASS', 'GIT_CONFIG_PARAMETERS', 'GIT_TRACE_REDACT', 'GIT_CONFIG_KEY_9']) assert.ok(!(k in env), k);
+  for (const k of ['GIT_ASKPASS', 'SSH_ASKPASS', 'GIT_CONFIG_PARAMETERS', 'GIT_TRACE_REDACT']) assert.ok(!(k in env), k);
+  assert.ok(!Object.values(env).includes('avanzo') && !Object.values(env).includes('oltre il conto'), 'le voci fuori dal conto spariscono');
+  assert.ok(!(`GIT_CONFIG_KEY_${Number(env.GIT_CONFIG_COUNT)}` in env));
   assert.equal(env.PATH, '/bin');
   assert.equal(env.HTTPS_PROXY, 'http://proxy:1', 'il proxy di rete serve ancora');
   assert.equal(env.GIT_TERMINAL_PROMPT, '0');
@@ -215,23 +217,29 @@ test('git vero: con l’ambiente del proxy il clone fallisce, con quello di git-
   const macchina = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(GIT_|SSH_ASKPASS$|https?_proxy$|all_proxy$|no_proxy$)/i.test(k)));
   Object.assign(macchina, { GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: globale, NO_PROXY: '*', no_proxy: '*', GIT_TERMINAL_PROMPT: '0' });
   writeFileSync(globale, '');
-  const git = (args, env = macchina, cwd = casa) => execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  // Asincrono: il server git sta in questo processo, e una chiamata sincrona lo fermerebbe.
+  const git = (args, env = macchina, cwd = casa) => new Promise((ok, ko) => {
+    execFile('git', args, { cwd, env, encoding: 'utf8', timeout: 60_000 }, (e, so, se) => (e ? ko(Object.assign(e, { se })) : ok(so)));
+  });
   const { srv, visti, port } = await servitoreGit(radice, BASIC(TOKEN));
   const url = `http://127.0.0.1:${port}/filo-security.git`;
+  const segno = join(casa, 'aiutante-del-proxy-chiamato');
   try {
     mkdirSync(radice, { recursive: true });
-    git(['init', '-q', '--bare', '-b', 'main', join(radice, 'filo-security.git')]);
+    await git(['init', '-q', '--bare', '-b', 'main', join(radice, 'filo-security.git')]);
     const semina = join(casa, 'semina');
-    git(['init', '-q', '-b', 'main', semina]);
+    await git(['init', '-q', '-b', 'main', semina]);
     writeFileSync(join(semina, 'README.md'), 'filo-security\n');
-    git(['-c', 'user.name=prova', '-c', 'user.email=prova@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'primo'], macchina, semina);
-    git(['push', '-q', join(radice, 'filo-security.git'), 'main'], macchina, semina);
+    await git(['add', 'README.md'], macchina, semina);
+    await git(['-c', 'user.name=prova', '-c', 'user.email=prova@example.invalid', 'commit', '-q', '-m', 'primo'], macchina, semina);
+    await git(['push', '-q', join(radice, 'filo-security.git'), 'main'], macchina, semina);
 
-    // Il proxy: aiutante con credenziali sbagliate e intestazione sbagliata nel file globale; nell'ambiente askpass, un
-    // altro aiutante, un'altra intestazione e una riscrittura del repo verso una porta morta.
+    // Il proxy, nel file globale e nell'ambiente: askpass, aiutanti con credenziali sbagliate, intestazioni sbagliate e
+    // riscritture del repo verso una porta morta. Quelle del file non si tolgono: devono perdere contro le voci nostre.
     writeFileSync(globale, [
-      '[credential]', '\thelper = "!f() { echo username=proxy; echo password=sbagliata; }; f"',
-      `[http "http://127.0.0.1:${port}/"]`, '\textraHeader = AUTHORIZATION: basic globale-sbagliata', '',
+      '[credential]', `\thelper = "!f() { echo chiamato >> '${segno.split('\\').join('/')}'; echo username=proxy; echo password=sbagliata; }; f"`,
+      `[http "http://127.0.0.1:${port}/"]`, '\textraHeader = AUTHORIZATION: basic globale-sbagliata',
+      '[url "http://127.0.0.1:1/morto-globale/"]', `\tinsteadOf = http://127.0.0.1:${port}/`, '',
     ].join('\n'));
     const proxy = {
       ...macchina, GIT_ASKPASS: join(casa, 'askpass-che-non-esiste'),
@@ -242,28 +250,33 @@ test('git vero: con l’ambiente del proxy il clone fallisce, con quello di git-
     };
 
     // Senza la cura il clone non passa: è il guasto della segnalazione.
-    assert.throws(() => git(['clone', '-q', url, join(casa, 'col-proxy')], proxy));
+    await assert.rejects(git(['clone', '-q', url, join(casa, 'col-proxy')], proxy));
+    togliCartella(segno);
 
     const { env } = ambienteGitServer(proxy, TOKEN, url);
     const clone = join(casa, 'filo-security');
     visti.length = 0;
-    git(['clone', '-q', url, clone], env);
+    await git(['clone', '-q', url, clone], env);
     assert.ok(visti.length > 0 && visti.every((v) => v.auth.length === 1 && v.auth[0] === BASIC(TOKEN)), JSON.stringify(visti.map((v) => v.auth)));
     assert.equal(readFileSync(join(clone, 'README.md'), 'utf8'), 'filo-security\n');
     const configClone = readFileSync(join(clone, '.git', 'config'), 'utf8');
     assert.ok(!configClone.includes(TOKEN) && !configClone.includes(BASIC(TOKEN).split(' ')[1]), 'il token non resta nel clone');
     assert.match(configClone, new RegExp(`url = ${url.replace(/[.]/g, '\\.')}`));
 
-    git(['checkout', '-q', '-b', 'worker/f1-prova'], macchina, clone);
+    await git(['checkout', '-q', '-b', 'worker/f1-prova'], macchina, clone);
     writeFileSync(join(clone, 'README.md'), 'filo-security\nuna riga\n');
-    git(['-c', 'user.name=prova', '-c', 'user.email=prova@example.invalid', 'commit', '-q', '-am', 'una riga'], macchina, clone);
-    git(['-C', clone, 'push', '-q', 'origin', 'worker/f1-prova'], env);
-    assert.match(git(['-C', clone, 'ls-remote', 'origin', 'worker/f1-prova'], env), /refs\/heads\/worker\/f1-prova/);
+    await git(['-c', 'user.name=prova', '-c', 'user.email=prova@example.invalid', 'commit', '-q', '-am', 'una riga'], macchina, clone);
+    await git(['-C', clone, 'push', '-q', 'origin', 'worker/f1-prova'], env);
+    assert.match(await git(['-C', clone, 'ls-remote', 'origin', 'worker/f1-prova'], env), /refs\/heads\/worker\/f1-prova/);
 
-    // Con un token diverso il server dice di no, e git non ripiega su altre credenziali.
+    // Con un token diverso il server dice di no, e git non ripiega sulle credenziali del proxy.
     const { env: altro } = ambienteGitServer(proxy, 'ghs_scaduto', url);
-    assert.throws(() => git(['-C', clone, 'ls-remote', 'origin'], altro));
+    visti.length = 0;
+    await assert.rejects(git(['-C', clone, 'ls-remote', 'origin'], altro));
+    assert.ok(visti.length > 0 && visti.every((v) => v.auth.length === 1 && v.auth[0] === BASIC('ghs_scaduto')), JSON.stringify(visti.map((v) => v.auth)));
+    assert.equal(existsSync(segno), false, 'l’aiutante del proxy non è stato chiamato');
   } finally {
+    srv.closeAllConnections();
     srv.close();
     togliCartella(casa);
   }
