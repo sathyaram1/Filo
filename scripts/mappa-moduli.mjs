@@ -53,7 +53,9 @@ export function primaFrase(righe) {
     if (i > dall && VOCE_DI_ELENCO.test(righe[i].trim())) break;
     paragrafo.push(righe[i].trim());
   }
-  const testo = paragrafo.join(' ').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  // I caratteri di controllo e di direzione non arrivano al terminale: un commento non deve poter riscrivere le altre righe.
+  const testo = paragrafo.join(' ').replace(/[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
   const fine = /[.!?]["'»)\]]*(?=\s+[\p{Lu}\p{N}«"'(`[])/u.exec(testo);
   return taglia(fine ? testo.slice(0, fine.index + fine[0].length) : testo) || SENZA_INTESTAZIONE;
 }
