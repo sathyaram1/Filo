@@ -213,6 +213,8 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
 
 ## 10. Chiusura del buco del push diretto su `main` (sicurezza)
 
+*Fatto (§14, passo 5); oggi in `ROUTINE-AUTH-SPEC.md` §11 e §12.*
+
 Individuato dall'owner il 18/08: oggi NIENTE impedisce fisicamente a
 un'istanza catturata da una prompt injection di pushare dritta su `main`,
 saltando verifier, secaudit e L5 — i controlli girano solo sul cammino onesto.
