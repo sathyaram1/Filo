@@ -96,7 +96,7 @@ import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
-import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
+import { MAX_LIVELLO_CHARS, leggiTestoLivello, segnalazioneNonPresaText } from './lib/livelli.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 
