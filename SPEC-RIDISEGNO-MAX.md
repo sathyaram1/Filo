@@ -173,6 +173,8 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
 - Anche modelli open economici via OpenRouter come possibile setaccio
   AGGIUNTIVO (mai sostitutivo), nel rispetto della politica modelli: pesi
   aperti, mai dai server del produttore.
+  - **Superato** (verifica con un modello solo, dagli esiti qui sotto): vedi
+    `.claude/agents/routine-worker.md` e `routines/roles/orchestrator.md`, «Loop».
 - **Varianti di prompt già in lista** (18/08): la lente "immagina di essere un
   utente che si vuole lamentare" — proposta dall'owner, sospesa perché rischia
   solo rumore ("si trova sempre di che lamentarsi"): entra nel prompt SOLO se
