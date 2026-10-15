@@ -64,7 +64,7 @@
   }
   async function setRaw(key, value) {
     await chrome.storage.local.set({ [key]: value });
-    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER) && onMemoriaCambiata) {
+    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER || key === KEYS.FILO_KEEP_OPEN) && onMemoriaCambiata) {
       try { onMemoriaCambiata(); } catch (_) {}
     }
   }
