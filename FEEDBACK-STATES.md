@@ -513,7 +513,10 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   `workingSince`. Deploy manuale (`npm run regole:pubblica`).
 
 ### 8. Migrazione legacy → nuovi stati (confermata dall'owner ed eseguita il 2026-07-03, F5)
-Script one-shot, più la normalizzazione in lettura per lo storico:
+Script una tantum, più la normalizzazione in lettura per lo storico (che resta). Lo
+script è stato tolto il 2026-10-15 (#1134), con quello dell'imbottitura dello `status`
+cifrato: una prova a vuoto su tutte le segnalazioni in produzione non trovava più
+niente da cambiare. La storia di git li conserva.
 - `new` → derivare dal pipeline con la STESSA logica di oggi (classifyBlock/isAligned):
   nessun pipeline o parziale → `unlabeled`; attacco → `attack`; spam → `spam`; design →
   `design`; aligned+`candidate_change` → `todo`; aligned senza → `aligned`.
