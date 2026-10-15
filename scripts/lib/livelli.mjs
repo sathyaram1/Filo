@@ -7,7 +7,9 @@
 // col numero, e chi scrive accorcia lui (CLAUDE.md § Limiti).
 
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Tetto sul testo di un livello, lo stesso del server. Oltre: rifiuto con il
 // numero, qui, prima di chiamare il server.
