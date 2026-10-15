@@ -74,8 +74,8 @@
   }
 
   // ── Le righe delle persone ─────────────────────────────────────────────────
-  // La vista si rilegge a ogni movimento di crediti, anche di un'altra scheda: le righe restano quelle e cambiano solo i
-  // numeri, così la scheda aperta, il menu e il fuoco restano dove l'owner li ha lasciati (#1087.4).
+  // La vista si rilegge a ogni movimento di crediti, anche di un'altra scheda: le righe si ritrovano per pseudonimo invece
+  // di rifarsi (patterns/una-lista-che-si-rilegge-da-sola-aggiorna-le-righe-al-loro-posto.md, #1087.4).
   const righe = new Map();
 
   function celleDi(u) {
