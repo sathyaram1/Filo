@@ -735,23 +735,34 @@ export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console
 /**
  * Tutto il controllo, per chi consegna: `{ ferma, testo }`. `shaPrima` è la base (baseDelConfronto).
  * Senza non si sa cosa è stato tolto: lo si dice e non si ferma (la verifica dopo rilancia la cartella).
- * Con `shaCritica` si rilanciano anche le prove che la pulizia ha toccato, com'erano dopo di lei.
+ * Con `shaCritica` si rilanciano anche le prove che la pulizia ha toccato, com'erano dopo di lei. `numeri` (i posti
+ * dei rilievi messi da parte) e `avvio` dicono quali rosse sono di un rilievo messo da parte; `pulizieDopo` sono le
+ * pulizie registrate dopo le correzioni; `comando` registra la pulizia.
  */
-export function controllaProveTolte({ shaPrima, root, log = console.log, lancia, prepara, conPulizia = true, messi = 0, shaCritica = '' } = {}) {
+export function controllaProveTolte({
+  shaPrima, root, log = console.log, lancia, prepara, conPulizia = true, messi = 0, shaCritica = '',
+  numeri, avvio = '', pulizieDopo = [], comando = '',
+} = {}) {
   if (!SHA.test(String(shaPrima || ''))) {
     return { ferma: false, testo: 'Non so da che commit è partita la correzione: le prove del giro cancellate o cambiate non le rilancio.' };
   }
   const dal = proveTolteDal(shaPrima, root);
   if (dal === null) return { ferma: false, testo: 'Git non mi dice quali prove del giro sono state cancellate o cambiate: non le rilancio.' };
-  const { prove } = dal;
+  // Tolta per intero da una pulizia dopo le correzioni è uscita lì; a cui ne ha tolto un caso si rilancia com'era dopo di lei.
+  const { esenti, versioni } = effettiPulizieDopo(shaPrima, pulizieDopo, root);
+  const prove = dal.prove.filter((f) => !esenti.has(f) || oggetto('HEAD', f, root));
   // Chi corregge può non toccarle mai: senza rilanciarle, un caso da correggere uscito al posto di uno messo da parte non si vedrebbe.
   const pulite = conPulizia ? toccateDallaPulizia(shaCritica, shaPrima, root) : null;
-  const accorciate = pulite ? pulite.prove.filter((f) => !prove.includes(f)) : [];
+  const accorciate = pulite ? pulite.prove.filter((f) => !prove.includes(f) && !esenti.has(f)) : [];
   if (!prove.length && !accorciate.length) return { ferma: false, testo: '' };
-  const r = rilanciaProveTolte([...prove, ...accorciate], shaPrima, root, { log, fuori: dal.fuori || [], ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) });
+  const r = rilanciaProveTolte([...prove, ...accorciate], shaPrima, root, {
+    log, fuori: dal.fuori || [], versioni, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}),
+  });
   if (r.motivo) return { ferma: true, testo: `Consegna respinta: ${r.motivo}` };
+  const vecchie = Array.isArray(numeri) && r.rosse.length ? proveVecchie(r.rosse, avvio, String(shaCritica || shaPrima), root) : null;
   return esitoProveTolte({
     rosse: r.rosse.filter((f) => prove.includes(f)), dallaPulizia: r.rosse.filter((f) => accorciate.includes(f)),
     shaPrima, conPulizia, messi, via: { ...(pulite ? pulite.via : {}), ...dal.via },
+    numeri, casi: r.casi, vecchie: vecchie || [], comando,
   });
 }
