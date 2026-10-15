@@ -641,5 +641,7 @@
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
     formatCredits, PREMIO_ATTESA_MS, resolutionReward,
+    // Chi usa Filo e se il conto OpenRouter regge (#820)
+    creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
