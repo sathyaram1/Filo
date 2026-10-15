@@ -119,6 +119,10 @@ module.exports = function register(on, ctx) {
       const d = esterno.documenti ? require('../aiutoDocumenti').perIlModello(sender && sender.wc) : null;
       if (d) esterno.documenti = d; else delete esterno.documenti;
     }
+    // Quando è stata aperta la scheda lo sa il main (#826): il valore che manda la pagina non conta.
+    if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
+      msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
+    }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
