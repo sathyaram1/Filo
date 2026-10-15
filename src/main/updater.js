@@ -221,7 +221,10 @@ function regola() {
     // Lo scaricamento lo chiede sempre Filo, dopo il confronto fra numero ed etichetta (#1119): da solo
     // electron-updater partirebbe prima che Filo veda la versione.
     u.autoDownload = false;
-    u.autoInstallOnAppQuit = siInstalla() && R.piano(dip.piattaforma(), stato.modo).allaChiusura;
+    // Il canale lo legge la scelta della release (agganciaCanale), su questo aggiornatore.
+    u.filoCanale = stato.canale;
+    const fuori = stato.scaricataFuori != null && !R.nelCanale(stato.scaricataFuori, stato.canale);
+    u.autoInstallOnAppQuit = siInstalla() && R.piano(dip.piattaforma(), stato.modo).allaChiusura && !fuori;
     // electron-updater aggancia l'installazione alla chiusura solo a scaricamento finito: una versione già pronta
     // quando l'installazione si riaccende va riagganciata. Richiedere lo scaricamento di una versione già scaricata
     // la ritrova in cache e rifà l'aggancio, senza rete.
