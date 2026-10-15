@@ -1,4 +1,4 @@
-// L'avviso prima che i crediti finiscano (#818): ritmo, quota, soglie, riarmo e rimedi, dalla logica pura.
+// L'avviso prima che i crediti finiscano (#818): ritmo, quota, soglie, riarmo, rimedi e scelte sopra i predefiniti.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -194,4 +194,30 @@ test('i consumi per funzione: media dei giorni interi, e il primo giorno quello 
     [OGGI]: [{ azione: A.FILO_CHAT, crediti: 500 }],
   });
   assert.equal(CA.consumoPerAzione(tre, { oggi: OGGI })[A.FILO_CHAT].c, 30, 'tre giorni interi, uno a zero; oggi non conta');
+});
+
+test('spegnere la spiegazione preparata fa risparmiare solo quelle che nessuno ha aperto', () => {
+  let d = {};
+  for (let i = 0; i < 4; i++) d = CA.aggiungi(d, { giorno: '2026-10-14', azione: A.EXPLAIN, tag: CA.ANTICIPATA, crediti: 10, prompt: 100, completion: 10 });
+  for (let i = 0; i < 3; i++) d = CA.aggiungiUso(d, { giorno: '2026-10-14', azione: A.EXPLAIN });
+  const imp = { spiegaAnticipata: { enabled: true } };
+  const r = CA.rimedi({ diario: d, oggi: OGGI, perGiorno: 40, quota: 0, chiavePropria: true, config: config(), impostazioni: imp });
+  const auto = r.find((x) => x.id === 'automatiche');
+  assert.equal(Math.round(auto.risparmio), 10, 'quattro preparate, tre aperte: si risparmia la quarta');
+});
+
+test('il sostituto legge quello che il modello di adesso legge: l\'Aiuto su un modello che vede non passa a uno che non vede', () => {
+  const models = { ...TM.models, [A.HELP]: 'claude' };
+  const m = CA.modelloPiuEconomico(A.HELP, { p: 5000, o: 500 }, config(models));
+  assert.ok(m, 'un modello più economico che vede c\'è');
+  const ins = globalThis.SN_CONST.entryModalities(TM.registry[m.nick], m.nick).input_modalities;
+  assert.ok(ins.includes('image'), `${m.nick} non legge le immagini`);
+});
+
+test('la scelta di una funzione vale sopra i predefiniti solo coi modelli che esistono (anche un id grezzo)', () => {
+  const C = globalThis.SN_CONST;
+  const reg = { a: {}, b: {} };
+  assert.deepEqual(C.effectiveModels({ x: 'a', y: 'b' }, { x: 'b, a', y: 'sparito' }, reg), { x: 'b, a', y: 'b' });
+  assert.deepEqual(C.effectiveModels({ x: 'a' }, { x: 'b, google/gemma-x' }, reg), { x: 'b, google/gemma-x' });
+  assert.deepEqual(C.effectiveModels({ x: 'a' }, { x: '' }, reg), { x: 'a' }, 'vuoto = nessuna scelta');
 });

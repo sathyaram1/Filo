@@ -920,13 +920,13 @@
 
   // I modelli per funzione con «usa modelli predefiniti» acceso, più le scelte di chi usa Filo per una funzione sola
   // (#818: il modello più economico proposto quando i crediti stanno per finire). PURA. Una scelta vale solo se ogni
-  // nickname esiste nel registro predefinito: un modello tolto dall'owner non resta acceso da una scelta vecchia.
+  // nickname esiste nel registro predefinito (o è un id grezzo): un modello tolto dall'owner non resta acceso da una scelta vecchia.
   function effectiveModels(predefiniti, scelti, registry) {
     const out = { ...(predefiniti || {}) };
     const reg = registry || {};
     for (const [azione, catena] of Object.entries(scelti && typeof scelti === 'object' ? scelti : {})) {
       const refs = parseModelRefs(catena);
-      if (refs.length && refs.every((r) => Object.prototype.hasOwnProperty.call(reg, r))) out[azione] = refs.join(', ');
+      if (refs.length && refs.every((r) => Object.prototype.hasOwnProperty.call(reg, r) || isRawModelId(r))) out[azione] = refs.join(', ');
     }
     return out;
   }

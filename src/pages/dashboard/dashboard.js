@@ -1588,7 +1588,8 @@
   // #818 — l'avviso prima che i crediti finiscano lo prende la home con una conversazione aperta, e arriva in fondo
   // alla conversazione, dopo la risposta che sta arrivando. Senza conversazione lo lascia alla notifica della finestra.
   async function avvisoCrediti(id) {
-    if (body.dataset.state !== 'thread' || inRiserva === true || Accoglienza.isActive()) return;
+    // Una home in una scheda che non si vede non lo prende: lo direbbe a nessuno, e la notifica non partirebbe più.
+    if (body.dataset.state !== 'thread' || inRiserva === true || Accoglienza.isActive() || document.visibilityState === 'hidden') return;
     let r = null;
     try { r = await send({ type: MSG.CREDITS_WARNING_CLAIM, id }); } catch (_) { r = null; }
     if (!r || !r.ok || !r.avviso) return;

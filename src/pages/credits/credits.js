@@ -39,14 +39,13 @@
       $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
     }
 
-    // Le letture non dipendono l'una dall'altra: partono insieme.
-    const [r, w, a] = await Promise.all([
+    // Le due letture non dipendono l'una dall'altra: partono insieme. L'avviso viene dopo, dal saldo appena letto.
+    const [r, w] = await Promise.all([
       chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }),
       chrome.runtime.sendMessage({ type: MSG.WALLET_STATE }).catch(() => null),
-      chrome.runtime.sendMessage({ type: MSG.CREDITS_WARNING_STATE }).catch(() => null),
     ]);
     render(r || {}, w || null);
-    renderAvviso(a);
+    renderAvviso(await chrome.runtime.sendMessage({ type: MSG.CREDITS_WARNING_STATE }).catch(() => null));
     seguiAncora();
   }
 

@@ -227,6 +227,9 @@
     //   sé: dalla pagina arriva solo l'id. { id: 'modello'|'automatiche' } → { ok, frase, avviso }
     CREDITS_REMEDY_APPLY: 'credits_remedy_apply',
     CREDITS_REMEDY_UNDO: 'credits_remedy_undo',
+    // SPIEGAZIONE_ANTICIPATA_USATA: la spiegazione preparata alla selezione è stata aperta col tasto destro. Anche dai
+    //   siti (content script): serve solo a non contarla fra quelle che spegnere farebbe risparmiare. { } → { ok }
+    SPIEGAZIONE_ANTICIPATA_USATA: 'spiegazione_anticipata_usata',
     // WALLET_NOTICE_SEEN (#651): l'avviso di benvenuto («Sei entrato con un
     //   invito: hai N crediti») è stato mostrato da una superficie. Lo dicono
     //   la home e la pagina Crediti, ognuna per sé: chi l'ha già visto in

@@ -90,6 +90,18 @@
     return d;
   }
 
+  // Una spiegazione preparata alla selezione che poi l'utente ha aperto: spegnerla non avrebbe risparmiato niente.
+  function aggiungiUso(diario, { giorno = chiaveGiorno(), azione, tag = ANTICIPATA } = {}) {
+    const d = aggiungi(diario, { giorno });
+    const k = chiaveAzione(azione, tag);
+    if (!k) return d;
+    const oggi = d[giorno] || {};
+    const r = { c: 0, p: 0, o: 0, n: 0, u: 0, ...(oggi[k] || {}) };
+    r.u = (Number(r.u) || 0) + 1;
+    d[giorno] = { ...oggi, [k]: r };
+    return d;
+  }
+
   function totaleDelGiorno(g) {
     let t = 0;
     for (const v of Object.values(g || {})) t += Math.max(0, num(v && v.c));
@@ -259,16 +271,17 @@
       if (g < primo) break;
       giorni++;
       for (const [k, v] of Object.entries(d[g] || {})) {
-        const r = out[k] || { c: 0, p: 0, o: 0, n: 0 };
+        const r = out[k] || { c: 0, p: 0, o: 0, n: 0, u: 0 };
         r.c += Math.max(0, num(v && v.c));
         r.p += Math.max(0, num(v && v.p));
         r.o += Math.max(0, num(v && v.o));
         r.n += Math.max(0, num(v && v.n));
+        r.u += Math.max(0, num(v && v.u));
         out[k] = r;
       }
     }
     const div = Math.max(1, giorni);
-    for (const r of Object.values(out)) { r.c /= div; r.p /= div; r.o /= div; r.n /= div; }
+    for (const r of Object.values(out)) { r.c /= div; r.p /= div; r.o /= div; r.n /= div; r.u /= div; }
     return out;
   }
 
@@ -285,7 +298,7 @@
 
   // Regge la funzione? Uscita e ingressi dichiarati; per gli strumenti vale solo un modello che la configurazione
   // mette già nella catena di quella funzione, l'unico segno certo che li sa usare.
-  function reggeLaFunzione(nick, entry, azione, catena) {
+  function reggeLaFunzione(nick, entry, azione, catena, cfgRegistry) {
     const Caps = global.SN_MODEL_CAPS;
     const C = global.SN_CONST || {};
     if (!Caps || !entry || !entry.model) return false;
@@ -299,6 +312,15 @@
       for (const i of req.inputs || []) if (!caps.inputs.includes(i)) return false;
     }
     if (req.tools && !catena.includes(nick)) return false;
+    // Quello che il modello di adesso dichiara di leggere lo deve leggere anche il sostituto: l'Aiuto manda la foto
+    // della pagina a ogni turno anche se la funzione, sulla carta, chiede solo testo.
+    const testa = catena[0] && cfgRegistry && cfgRegistry[catena[0]];
+    if (testa && testa !== entry) {
+      const mt = C.entryModalities ? C.entryModalities(testa, catena[0]) : null;
+      const ct = Caps.capabilitiesFor(testa.provider || 'openrouter', testa.model, mt);
+      const extra = ct.uncertain ? [] : ct.inputs.filter((i) => i !== 'text');
+      for (const i of extra) if (caps.uncertain || !caps.inputs.includes(i)) return false;
+    }
     return true;
   }
 
@@ -332,7 +354,7 @@
       const c = costo(p);
       // Meno del 10% di risparmio non vale una funzione che risponde peggio.
       if (!(c < c0 * 0.9)) continue;
-      if (!reggeLaFunzione(nick, entry, azione, catena)) continue;
+      if (!reggeLaFunzione(nick, entry, azione, catena, registry)) continue;
       candidati.push({ nick, entry, c, inCatena: catena.includes(nick) });
     }
     if (!candidati.length) return null;
@@ -401,9 +423,16 @@
       });
     }
 
+    // Di una chiamata preparata in anticipo si risparmia solo la parte che nessuno ha poi aperto.
+    const inutile = (k) => {
+      const v = perAzione[k];
+      if (!v) return 0;
+      if (!/#/.test(k) || !(num(v.n) > 0)) return num(v.c);
+      return num(v.c) * (1 - Math.min(num(v.u), num(v.n)) / num(v.n));
+    };
     const consumano = automatiche()
       .filter((f) => leggiPercorso(x.impostazioni || {}, f.percorso) === true)
-      .map((f) => ({ ...f, c: f.chiavi.reduce((s, k) => s + num(perAzione[k] && perAzione[k].c), 0) }))
+      .map((f) => ({ ...f, c: f.chiavi.reduce((s, k) => s + inutile(k), 0) }))
       .filter((f) => f.c > 0 && f.c >= totale * 0.01)
       .sort((p, q) => q.c - p.c);
     if (consumano.length) {
@@ -434,7 +463,7 @@
   global.SN_CREDITI_AVVISO = {
     PREDEFINITI, LIMITI, numeroSoglia, GIORNI_DIARIO, GIORNI_RITMO, GIORNI_PER_FUNZIONE, ANTICIPATA,
     chiaveGiorno, giorniFra, soglieDa, chiaveAzione, azioneDi,
-    aggiungi, ritmo, proiezione, valuta, sogliaRiarmo, riarmato,
+    aggiungi, aggiungiUso, ritmo, proiezione, valuta, sogliaRiarmo, riarmato,
     quando, frase, prossimaQuota,
     automatiche, leggiPercorso, pezzoPer, consumoPerAzione, modelloPiuEconomico, rimedi, risparmioFrase,
   };

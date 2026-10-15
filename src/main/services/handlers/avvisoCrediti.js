@@ -17,6 +17,9 @@ module.exports = function register(on, ctx) {
   const INGRESSO_KEY = 'walletIngresso';
   // Prima di dire «finiscono dopodomani» il saldo si rilegge, se l'ultima lettura ha più di un minuto.
   const LETTURA_VALIDA_MS = 60 * 1000;
+  // Dopo un avviso il saldo si rilegge ogni tanto anche senza nessuno che lo chieda: solo così si vede che è risalito
+  // (la quota della notte, un regalo) con Filo aperto per giorni.
+  const RILETTURA_DOPO_AVVISO_MS = 30 * 60 * 1000;
   // Quanto la home con una conversazione aperta ha per prenderlo, prima che diventi una notifica.
   const ATTESA_CHAT_MS = 3000;
   const ATTESA_VALUTAZIONE_MS = 4000;
@@ -220,6 +223,10 @@ module.exports = function register(on, ctx) {
       return { esito: 'niente' };
     }
     let stato = await leggiStato();
+    if (stato.armato === false && rileggi && Date.now() - sit.letturaAt > RILETTURA_DOPO_AVVISO_MS) {
+      await W.readState().catch(() => null);
+      return valuta({ rileggi: false });
+    }
     if (stato.armato === false && CA.riarmato(stato, sit.saldo)) {
       stato = { armato: true };
       await scriviStato(stato);
@@ -317,8 +324,14 @@ module.exports = function register(on, ctx) {
       for (const c of cambi) deepAssign(pezzo, CA.pezzoPer(c.percorso, c.dopo));
       rec = { at: new Date().toISOString(), testo: r.testo, fatto: r.fatto, cambi };
     }
-    await ctx.applySettingsUpdate(pezzo);
-    await scriviApplicati({ ...applicati, [id]: rec });
+    // Prima il «com'era», poi il cambio: un cambio senza il suo «com'era» non si potrebbe più annullare.
+    await S().setRaw(RIMEDI_KEY, { ...applicati, [id]: rec });
+    try {
+      await ctx.applySettingsUpdate(pezzo);
+    } catch (e) {
+      await scriviApplicati(applicati);
+      throw e;
+    }
     return { ok: true, frase: id === 'modello' ? 'Fatto: le funzioni usano i modelli più economici.' : 'Fatto: spente.' };
   }
 
@@ -363,20 +376,30 @@ module.exports = function register(on, ctx) {
   }
 
   const RIMEDI_CON_CLIC = new Set(['modello', 'automatiche']);
+  const NON_RIUSCITO = { ok: false, frase: 'Non ci sono riuscito: riprova.' };
   on(MSG.CREDITS_REMEDY_APPLY, filoOnly(async (msg) => {
     const id = String((msg && msg.id) || '');
     if (!RIMEDI_CON_CLIC.has(id)) return { ok: false, error: 'bad_id' };
-    const r = await inFila(() => applica(id));
+    const r = await inFila(() => applica(id)).catch(() => NON_RIUSCITO);
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, avvisoCrediti: true }); } catch (_) {}
     return { ...r, avviso: (await perLaPagina()).avviso };
   }));
   on(MSG.CREDITS_REMEDY_UNDO, filoOnly(async (msg) => {
     const id = String((msg && msg.id) || '');
     if (!RIMEDI_CON_CLIC.has(id)) return { ok: false, error: 'bad_id' };
-    const r = await inFila(() => annulla(id));
+    const r = await inFila(() => annulla(id)).catch(() => NON_RIUSCITO);
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, avvisoCrediti: true }); } catch (_) {}
     return { ...r, avviso: (await perLaPagina()).avviso };
   }));
+
+  // Una spiegazione preparata alla selezione e poi aperta col tasto destro. Arriva anche dai siti, dal content script:
+  // il peggio che un mittente può fare è abbassare la cifra di risparmio di un rimedio.
+  on(MSG.SPIEGAZIONE_ANTICIPATA_USATA, async () => {
+    await carica();
+    diario = CA.aggiungiUso(diario, { azione: C.ACTIONS.EXPLAIN });
+    salvaPresto();
+    return { ok: true };
+  });
 
   globalThis.SN_AVVISO_CREDITI_MAIN = {
     registraConsumo, ricordaIngresso, dopoLettura, comeAnticipata, valutaOra,
