@@ -75,7 +75,11 @@
   //   [2e] Preferenze aperta in due schede cancella le modifiche (c'era già su main)
   //
   // Il `?` dopo la sede segna «chiede una decisione dell'owner» (un
-  // trade-off vero, una scelta di prodotto). La sede è OBBLIGATORIA: un
+  // trade-off vero, una scelta di prodotto); il `!` accanto al `?` («[2i?!]»)
+  // dice che la scelta è difficile da disfare (dati degli utenti, sicurezza,
+  // formati salvati su disco), e da solo non vale: un «!» senza «?» viene
+  // respinto, perché è il segno, non il testo, che ferma un 2 (decisione
+  // dell'owner del 2026-10-12). La sede è OBBLIGATORIA: un
   // «[2]» senza lettera non prende un default in silenzio, viene respinto con
   // la spiegazione (unparsedLevelLines, e `rifiutati` di parseFindings). Le
   // righe che seguono un rilievo senza un livello davanti sono la sua
