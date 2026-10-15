@@ -262,7 +262,7 @@ in_una_riga() { sed '/^$/d' | sort -u | awk 'NR>1{printf ", "}{printf "%s",$0}';
 if is_routine_session; then
   IN_LOCALE="da una routine un'automazione non si cambia: se il lavoro ne ha bisogno, rimandalo in locale (--reason locale) con nelle note la modifica che serve"
   RIMEDIO_FILE="riportalo com'era (git checkout HEAD -- <file>, o toglilo se e' nuovo); $IN_LOCALE"
-  RIMEDIO_RAMO="togli quei commit dalla parte non spedita tenendo il lavoro nella cartella (git reset --soft origin/<ramo>, o sulla base del ramo se non e' mai partito), poi riporta i file delle automazioni com'erano; $IN_LOCALE"
+  RIMEDIO_RAMO="se la modifica l'hai fatta tu e il lavoro puo' farne a meno, togli quei commit dalla parte non spedita tenendo il lavoro nella cartella (git reset --soft origin/<ramo>, o sulla base del ramo se non e' mai partito) e riporta i file delle automazioni com'erano; se no (serve, o era gia' nel ramo e un rebase l'ha riscritta) non toccarla e rimanda il lavoro in locale (--reason locale), con nelle note cosa serve"
 else
   RIMEDIO_FILE="la committa e la spinge l'owner, a mano, con la sua credenziale per le automazioni"
   RIMEDIO_RAMO="il ramo lo spinge l'owner, a mano, con la sua credenziale per le automazioni; dopo, il salvataggio riparte da solo"
