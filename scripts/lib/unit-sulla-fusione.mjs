@@ -337,7 +337,7 @@ export function assicuraStoria({ git, mainSha, punta, passi = PASSI_STORIA, main
   const storia = { superficiale: true, approfondito: 0, intera: false };
   if (base()) return { storia };
   // --deepen sposta TUTTI i confini del clone, anche quello del ramo, che è il lato tagliato.
-  const prendi = (extra) => git(['fetch', '--quiet', ...extra, 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  const prendi = (extra) => git(['fetch', '--quiet', ...extra, 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
   for (const n of passi) {
     const f = prendi([`--deepen=${n}`]);
     if (!f.ok) return { errore: `non riesco a scaricare la storia che manca (${primaRiga(f.out)})`, storia };
