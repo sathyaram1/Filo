@@ -71,7 +71,9 @@ async function mockProvider(app) {
       const last = String(messages[messages.length - 1].content || '');
       let text;
       if (/budget/i.test(last)) text = JSON.stringify({ reply: '', budget: 40 });
-      else if (/mulligan/i.test(last)) {
+      else if (/\bramp\b/i.test(last)) {
+        text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, mulligans: 1, keep: { ramp: 1 } } });
+      } else if (/mulligan/i.test(last)) {
         // #791: «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre».
         text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, game: 'draw', mulligans: 1, keep: { terre: 2 } } });
       } else if (/probabilit/i.test(last)) {
