@@ -238,7 +238,7 @@
       lines.push(I18n.t('options_open_weights_switched', String(impact.substituted.length), modelli.join(', ')));
     }
     if (impact.unavailable.length) {
-      const names = impact.unavailable.map((u) => actionLabelFor(u.action));
+      const names = impact.unavailable.map((u) => ModelChain.etichetta(u.action));
       lines.push(I18n.t('options_open_weights_unavailable', names.join(', ')));
     }
     if (!lines.length) { host.hidden = true; return; }
