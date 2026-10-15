@@ -249,7 +249,7 @@ da decidere all'implementazione sono decise così:
   (il PAT resta come ripiego): non è l'account di nessuno e il token con cui
   parla dura un'ora;
 - **anche il finish locale passa dal server** (`ownerMerge`): niente più
-  fusione né push da questa macchina. Non pretende i verdetti registrati — quelli
+  fusione né push su `main` da questa macchina. Non pretende i verdetti registrati — quelli
   sono il vocabolario delle routine — ma **L5 gira lo stesso**, e lo `sha`
   dichiarato deve combaciare con la punta vera del ramo.
   - **Superato** (L5 sui lavori fidati): vedi `ROUTINE-AUTH-SPEC.md` §11.
