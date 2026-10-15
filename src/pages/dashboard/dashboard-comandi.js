@@ -501,13 +501,19 @@
     clearTimeout(whichTimer);
     whichTimer = setTimeout(async () => {
       const cmd = programmaDi(value.trim());
-      if (!cmd || shellCmdCache.has(cmd)) { updateInputClass(); return; }
-      let exists = false;
+      if (!cmd) { updateInputClass(); return; }
+      const chiave = chiaveShell(cmd);
+      // Lo stesso comando già in controllo non ne lancia un secondo: sotto carico ogni spawn in più allunga gli altri.
+      if (shellCmdCache.has(chiave) || shellCmdInVolo.has(chiave)) { updateInputClass(); return; }
+      shellCmdInVolo.add(chiave);
+      let exists = null;
       try {
         const r = await window.filo?.shellWhich?.({ command: cmd, shell: getShell(), cwd: getCwd() });
-        exists = !!(r && r.exists);
-      } catch (_) { exists = false; }
-      shellCmdCache.set(cmd, exists);
+        if (r && typeof r.exists === 'boolean') exists = r.exists;
+      } catch (_) { exists = null; }
+      shellCmdInVolo.delete(chiave);
+      if (exists === null) shellCmdIncerti.set(chiave, Date.now());
+      else { shellCmdCache.set(chiave, exists); shellCmdIncerti.delete(chiave); }
       updateInputClass(); // ricolora sullo stato attuale dell'input
     }, 250);
   }
