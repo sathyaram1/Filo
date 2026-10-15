@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { accendiSchermo, preparaLancioElectron, senzaSchermo, xvfbDisponibile } from '../../scripts/lib/schermo-virtuale.mjs';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
+import { aspettaChe, TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { shaDelRiallineamento, cambiatiPerLaScelta } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -134,11 +135,7 @@ test('il lanciatore a mano, dove lo schermo c\'è, esegue il comando com\'è e n
 const LINUX_CON_XVFB = process.platform === 'linux' && xvfbDisponibile();
 const senzaLinuxXvfb = LINUX_CON_XVFB ? false : 'serve Linux con xvfb-run';
 const numero = (display) => display.slice(1);
-const entro = async (cond, ms = 5_000) => {
-  const fine = Date.now() + ms;
-  while (!cond() && Date.now() < fine) await new Promise((r) => setTimeout(r, 50));
-  return cond();
-};
+const spento = (display) => aspettaChe(() => !existsSync(`/tmp/.X${numero(display)}-lock`), { cosa: `Xvfb ${display} spento` });
 const ambienteSenzaSchermo = () => {
   const env = { ...process.env };
   for (const k of ['DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'ELECTRON_DISABLE_SANDBOX']) delete env[k];
@@ -150,6 +147,7 @@ test('il globalSetup di Playwright è quello che accende lo schermo', () => {
   assert.match(config, /globalSetup:\s*'\.\/tests\/fixtures\/prima-della-corsa\.mjs'/);
   const setup = readFileSync(resolve(ROOT, 'tests', 'fixtures', 'prima-della-corsa.mjs'), 'utf8');
   assert.match(setup, /await accendiSchermo\(/);
+  assert.ok(setup.indexOf('assicuraMotore(') < setup.indexOf('await accendiSchermo('), 'sul motore sbagliato ci si ferma prima di accendere');
 });
 
 test('accendiSchermo su Windows, Mac e Linux con schermo non lancia niente e non tocca l\'ambiente', async () => {
@@ -177,12 +175,12 @@ test('accendiSchermo: uno xvfb-run che esce o risponde storto si dice, col suo m
     /è uscito \(3\) prima di accendere lo schermo.*xauth command not found/s,
   );
   await assert.rejects(
-    accendiSchermo({ platform: 'linux', env, haXvfb: () => true, worker: null, lancia: finto('process.stdout.write("boh\\n\\n"); setTimeout(() => {}, 5000)') }),
+    accendiSchermo({ platform: 'linux', env, haXvfb: () => true, worker: null, lancia: finto('process.stdout.write("boh\\n\\n"); process.stdin.resume()') }),
     /display che non si capisce: "boh"/,
   );
   await assert.rejects(
-    accendiSchermo({ platform: 'linux', env, haXvfb: () => true, worker: null, attesaMs: 300, lancia: finto('setTimeout(() => {}, 5000)') }),
-    /non si è acceso in 0 s/,
+    accendiSchermo({ platform: 'linux', env, haXvfb: () => true, worker: null, attesaMs: 300, lancia: finto('process.stdin.resume()') }),
+    /non si è acceso in 0\.3 s/,
   );
   assert.deepEqual(env, { PATH: process.env.PATH });
 });
@@ -202,7 +200,7 @@ test('accendiSchermo accende un Xvfb vero, lo dà all\'ambiente e allo spegnimen
     const { DISPLAY: display, XAUTHORITY: auth } = env;
     await s.spegni();
     assert.deepEqual(env, { PATH: process.env.PATH }, 'l\'ambiente torna quello di prima');
-    assert.ok(await entro(() => !existsSync(`/tmp/.X${numero(display)}-lock`)), 'Xvfb spento');
+    await spento(display);
     assert.ok(!existsSync(auth), 'il cookie se ne va');
   }
 });
@@ -212,11 +210,11 @@ test('chi accende lo schermo ed esce senza spegnerlo non lascia Xvfb acceso', { 
   const codice = `import(${JSON.stringify(pathToFileURL(resolve(ROOT, 'tests', 'helpers', 'percorsi.mjs')).href)})`
     + `.then(() => import(${JSON.stringify(pathToFileURL(resolve(ROOT, 'scripts', 'lib', 'schermo-virtuale.mjs')).href)}))`
     + '.then(async (m) => { const s = await m.accendiSchermo(); console.log(s.display); process.exit(0); })';
-  const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(), timeout: 30_000 });
+  const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(), timeout: TETTO_ATTESA_MS });
   assert.equal(r.status, 0, r.stderr);
   const display = r.stdout.trim();
   assert.match(display, /^:\d+$/);
-  return entro(() => !existsSync(`/tmp/.X${numero(display)}-lock`)).then((spento) => assert.ok(spento, `Xvfb ${display} rimasto acceso`));
+  return spento(display);
 });
 
 test('il globalSetup vero, senza schermo, dà display e sandbox spenta ai lavoratori e alla fine li ritira', { skip: senzaLinuxXvfb }, () => {
@@ -224,12 +222,12 @@ test('il globalSetup vero, senza schermo, dà display e sandbox spenta ai lavora
     + `.then(async (m) => { const fine = await m.default({ configFile: ${JSON.stringify(resolve(ROOT, 'playwright.config.js'))} });`
     + ' const e = () => ({ DISPLAY: process.env.DISPLAY, ELECTRON_DISABLE_SANDBOX: process.env.ELECTRON_DISABLE_SANDBOX });'
     + ' const durante = e(); await fine(); console.log(JSON.stringify({ durante, dopo: e() })); })';
-  const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(), timeout: 60_000 });
+  const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(), timeout: TETTO_ATTESA_MS });
   assert.equal(r.status, 0, r.stderr);
   const { durante, dopo } = JSON.parse(r.stdout.trim().split('\n').pop());
   assert.match(durante.DISPLAY, /^:\d+$/);
   assert.equal(durante.ELECTRON_DISABLE_SANDBOX, '1');
   assert.match(r.stderr, /schermo virtuale :\d+/, 'chi lancia vede una riga su cosa è successo');
   assert.deepEqual(dopo, {});
-  return entro(() => !existsSync(`/tmp/.X${numero(durante.DISPLAY)}-lock`)).then((spento) => assert.ok(spento, 'Xvfb spento col teardown'));
+  return spento(durante.DISPLAY);
 });
