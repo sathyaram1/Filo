@@ -73,15 +73,20 @@ async function avvia({ comando, argomenti = [], env, cwd, spawn = spawnVero, cli
   };
 
   figlio.stdout.setEncoding('utf8');
+  // Il ritorno a capo si cerca solo nel pezzo nuovo: una schermata in base64 arriva in centinaia di pezzi.
   figlio.stdout.on('data', (pezzo) => {
-    buffer += pezzo;
+    let da = 0;
     let i;
-    while ((i = buffer.indexOf('\n')) >= 0) {
-      const r = buffer.slice(0, i);
-      buffer = buffer.slice(i + 1);
+    while ((i = pezzo.indexOf('\n', da)) >= 0) {
+      pezzi.push(pezzo.slice(da, i));
+      const r = pezzi.join('');
+      pezzi = [];
+      lunghezza = 0;
+      da = i + 1;
       riga(r);
     }
-    if (buffer.length > TETTO_RIGA) {
+    if (da < pezzo.length) { pezzi.push(pezzo.slice(da)); lunghezza += pezzo.length - da; }
+    if (lunghezza > TETTO_RIGA) {
       termina(new ErroreMcp('protocollo', `una risposta supera ${Math.round(TETTO_RIGA / 1048576)} MB`));
       try { figlio.kill(); } catch (_) {}
     }
