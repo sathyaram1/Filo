@@ -91,10 +91,10 @@
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
 //         repo). Da lì ciò che scrivi nasce non fidato. Exit 0 = registrato, 4 = rifiutato, 3 = guasto.
 //
-//   node scripts/routine-channel.mjs git-credenziali <get|store|erase>
-//       → aiutante di credenziali di git per il clone di filo-security di un lavoro server (#1159): lo configura
-//         routines/roles/_lavoro-server.md nel clone, mai globale. Risponde solo a https://github.com/sathyaram1/filo-security
-//         col token da un'ora del biglietto; un no è uno stdout vuoto (exit 0), il motivo su stderr.
+//   node scripts/routine-channel.mjs git-server <clone|ls-remote|fetch|push> <cartella-del-clone> [<ramo>]
+//       → l'unica strada di git verso filo-security in un lavoro server (#1159, #1233): chiede il token del biglietto e
+//         lo dà a quella sola chiamata di git (lib/git-server.mjs). Exit 0 = fatto, 1 = uso o git fallito, 4 = token
+//         rifiutato, 3 = guasto.
 //
 //   node scripts/routine-channel.mjs ramo-server <ramo> [<sha>]
 //       → dopo il push su filo-security: il server legge la punta e la registra (registro dei rami). Exit come sporca.
