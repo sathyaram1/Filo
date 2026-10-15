@@ -877,6 +877,24 @@ async function inizioFinestraPrima(principale, since) {
 }
 
 /**
+ * I turni dell'orchestratore dopo l'ultimo biglietto (la chiusura, o un'accensione senza worker): nessun rilascio li
+ * porta, viaggiano con la sua risposta alla domanda di fine sessione. Non lancia mai: senza numeri, la nota.
+ */
+export async function rapportoChiusura({ transcript = '', cwd = process.cwd(), env = process.env, configDir = '' } = {}) {
+  const base = { v: 3, role: 'orchestrator', closing: true, notes: [] };
+  const trovato = trovaTranscript({ explicit: transcript, env, cwd, configDir });
+  if (!trovato.file) return { ...base, notes: [trovato.note || 'transcript non trovato'] };
+  const principale = eSottoAgente(trovato.file) ? `${dirname(dirname(trovato.file))}.jsonl` : trovato.file;
+  try {
+    const r = await rapportoOrchestratore(principale);
+    if (!r) return { ...base, notes: [`thread principale assente: ${principale}`] };
+    return { ...base, sessionId: basename(principale, '.jsonl'), ...r };
+  } catch (e) {
+    return { ...base, notes: [`thread principale illeggibile: ${String((e && e.message) || e)}`] };
+  }
+}
+
+/**
  * Il rapporto di questa sessione, sotto-agenti compresi. Non lancia mai per
  * un transcript assente o illeggibile: torna il rapporto minimo con la nota.
  * (Un errore di programmazione qui dentro sì: lo prende chi chiama.)
