@@ -188,8 +188,8 @@ function fintoServer(status, risposta) {
 }
 
 // spawn ASINCRONO: il server finto vive in questo processo.
-function cli(port, args, stdin = '') {
-  const env = { ...senzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}` };
+function cli(port, args, stdin = '', altroEnv = {}) {
+  const env = { ...senzaSessione(), FILO_ROUTINE_API: `http://127.0.0.1:${port}`, ...altroEnv };
   return new Promise((risolvi) => {
     const p = spawn(process.execPath, [CANALE, ...args], { env });
     let stdout = ''; let stderr = '';
