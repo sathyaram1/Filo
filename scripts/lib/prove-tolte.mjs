@@ -700,8 +700,9 @@ function toccateDallaPulizia(shaCritica, shaPulizia, root) {
 /**
  * Prima di registrare la pulizia: ogni caso rosso di una prova che ha toccato resta rosso, perché il codice è ancora
  * quello della critica. Si rilancia com'è dopo; com'era alla critica solo dove dopo c'è un verde da spiegare.
+ * `dopo`: la pulizia dopo le correzioni, confrontata col commit prima di lei (`shaCritica`) sul codice di adesso.
  */
-export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console.log, lancia, prepara, messi } = {}) {
+export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console.log, lancia, prepara, messi, dopo: dopoLeCorrezioni = false } = {}) {
   const toccate = toccateDallaPulizia(shaCritica, sha, root);
   if (!toccate) return { ferma: true, testo: 'pulizia non registrata: git non mi dice quali prove del giro ha toccato.' };
   const n = toccate.prove.length;
@@ -709,7 +710,7 @@ export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console
   const opz = { log, perCaso: true, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) };
   const dopo = corriCome(toccate.prove, sha, root, {
     ...opz, etichetta: `${process.pid}-dopo`,
-    titolo: `Rilancio ${n === 1 ? 'la prova toccata' : `le ${n} prove toccate`} dalla pulizia, sul codice della critica: ogni caso rosso deve restare rosso.`,
+    titolo: `Rilancio ${n === 1 ? 'la prova toccata' : `le ${n} prove toccate`} dalla pulizia, sul codice ${dopoLeCorrezioni ? 'di adesso' : 'della critica'}: ogni caso rosso deve restare rosso.`,
   });
   if (dopo.motivo) return { ferma: true, testo: `pulizia non registrata: ${dopo.motivo}` };
   const conUnVerde = toccate.prove.filter((p) => {
@@ -720,12 +721,14 @@ export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console
   const confronta = [...new Set([...conUnVerde, ...(Array.isArray(messi) ? toccate.dirette : [])])];
   if (!confronta.length) return { ferma: false, testo: '' };
   const prima = corriCome(confronta, shaCritica, root, {
-    ...opz, etichetta: `${process.pid}-prima`, titolo: 'E com\'erano alla critica, per vedere quali casi erano rossi:',
+    ...opz, etichetta: `${process.pid}-prima`,
+    titolo: `E com'erano ${dopoLeCorrezioni ? 'prima della pulizia' : 'alla critica'}, per vedere quali casi erano rossi:`,
   });
   if (prima.motivo) return { ferma: true, testo: `pulizia non registrata: ${prima.motivo}` };
   const testo = testoCasiSpenti(confronta.map((f) => ({
-    f, ...casiSpenti(prima.esiti.get(f), dopo.esiti.get(f)), tolti: casiToltiNonMessi(f, prima.esiti.get(f), dopo.esiti.get(f), messi),
-  })), toccate.via, shaCritica);
+    f, ...casiSpenti(prima.esiti.get(f), dopo.esiti.get(f)),
+    tolti: casiToltiNonMessi(f, prima.esiti.get(f), dopo.esiti.get(f), messi, dopoLeCorrezioni),
+  })), toccate.via, shaCritica, { dopo: dopoLeCorrezioni });
   return { ferma: !!testo, testo };
 }
 
