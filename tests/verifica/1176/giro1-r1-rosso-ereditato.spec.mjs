@@ -27,8 +27,9 @@ async function whichAComando(page) {
 }
 const chiamate = (page, c) => page.evaluate((c) => window.__which.chiamate.filter((x) => x.command === c).length, c);
 const rispondi = (page, c, exists) => page.evaluate(({ c, exists }) => {
-  window.__which.chiamate.find((x) => x.command === c && !x.fatta).fatta = true;
-  window.__which.chiamate.filter((x) => x.command === c).at(-1).rispondi({ ok: true, exists });
+  const chiamata = window.__which.chiamate.find((x) => x.command === c && !x.fatta);
+  chiamata.fatta = true;
+  chiamata.rispondi({ ok: true, exists });
 }, { c, exists });
 const scrivi = (page, v) => page.evaluate((v) => {
   const i = document.getElementById('input');
