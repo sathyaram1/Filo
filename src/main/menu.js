@@ -299,7 +299,7 @@ function template(piattaforma) {
     label: 'Aiuto',
     role: 'help',
     submenu: [
-      { label: 'Assistente laterale', click: assistenteLaterale },
+      { id: 'assistente-laterale', label: 'Assistente laterale', click: assistenteLaterale },
     ],
   };
 
