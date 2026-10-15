@@ -387,6 +387,7 @@ salva_cartella() {
     return 0
   }
   togli_copie_di_dati "$wt"
+  togli_automazioni "$wt"
   if git diff --cached --quiet 2>/dev/null; then
     return 0
   fi
