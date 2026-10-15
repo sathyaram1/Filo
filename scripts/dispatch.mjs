@@ -314,6 +314,7 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   if (String(sha || '')) s.verifierSha = String(sha);
   // Una critica nuova apre un giro nuovo: la pulizia di quello prima non ne è la base.
   s.puliziaSha = '';
+  s.pulizieDopo = [];
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'stop';
@@ -330,6 +331,7 @@ export function applyFixed(state) {
   s.verifierCritique = '';
   s.verifierSha = '';
   s.puliziaSha = '';
+  s.pulizieDopo = [];
   s.secauditDone = false;
   s.secauditVerdict = null;
   // Gli sha degli esiti se ne vanno con gli esiti: una correzione è contenuto
@@ -341,7 +343,8 @@ export function applyFixed(state) {
 
 /**
  * La pulizia dopo la critica: le prove dei rilievi messi da parte tolte PRIMA di correggere. PURA.
- * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed.
+ * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed. Una pulizia dopo
+ * le correzioni non sposta la base: va in `pulizieDopo`, e la consegna non rilancia ciò che ha tolto.
  */
 export function applyPulizia(state, controllo) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
@@ -358,7 +361,8 @@ export function applyPulizia(state, controllo) {
   if (!controllo || !controllo.ok) return { ok: false, message: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
   const fuori = testoPuliziaFuoriNumero(controllo, md.numeri);
   if (fuori) return { ok: false, message: fuori };
-  s.puliziaSha = controllo.sha;
+  if (controllo.dopo) s.pulizieDopo = [...(Array.isArray(s.pulizieDopo) ? s.pulizieDopo : []).filter((x) => x !== controllo.sha), controllo.sha];
+  else s.puliziaSha = controllo.sha;
   return { ok: true, state: s, files: controllo.files };
 }
 
@@ -1348,12 +1352,17 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
     process.stderr.write(`Dopo la verifica superata le prove del giro tolte in ${puliziaPass.slice(0, 8)} sono la pulizia: il confronto parte da lì.\n`);
   }
   if (baseTolte && baseTolte !== headSha(ROOT)) {
-    const md = guard.state?.messiDaParteGiro;
+    const md = guard.state?.messiDaParteGiro && guard.state.messiDaParteGiro.sha === shaCritica ? guard.state.messiDaParteGiro : null;
     const tolte = controllaProveTolte({
       shaPrima: baseTolte, root: ROOT,
       conPulizia: baseTolte !== shaCritica,
-      messi: md && md.sha === shaCritica ? Number(md.n) || 0 : 0,
+      messi: md ? Number(md.n) || 0 : 0,
       shaCritica,
+      // Il numero nel nome dice quali rosse sono di un rilievo messo da parte: quelle escono con la pulizia (#747).
+      numeri: md && Array.isArray(md.numeri) ? md.numeri : undefined,
+      avvio: md ? md.avvio || '' : '',
+      pulizieDopo: guard.state?.pulizieDopo,
+      comando: `node scripts/dispatch.mjs --record-pulizia ${id}`,
       log: (m) => process.stderr.write(`${m}\n`),
     });
     if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
@@ -1394,14 +1403,20 @@ async function recordPulizia(id) {
   if (stato.lines.length) return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'pulizia') };
   const st = { ...(guard.state || defaultState(id, '')), id };
   const avvio = st.messiDaParteGiro && st.messiDaParteGiro.sha === st.verifierSha ? st.messiDaParteGiro.avvio : '';
-  const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT, avvio }) : null);
+  const controllo = st.verifierSha ? controllaPulizia({
+    shaCritica: st.verifierSha, root: ROOT, avvio, base: baseDelConfronto(st.verifierSha, st.puliziaSha, ROOT), pulizieDopo: st.pulizieDopo,
+  }) : null;
+  const r = applyPulizia(st, controllo);
   if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
   const numeri = Array.isArray(st.messiDaParteGiro?.numeri) ? st.messiDaParteGiro.numeri : undefined;
-  const casi = controllaCasiDellaPulizia({ shaCritica: st.verifierSha, sha: r.state.puliziaSha, root: ROOT, messi: numeri, log: (m) => process.stderr.write(`${m}\n`) });
+  const casi = controllaCasiDellaPulizia({
+    shaCritica: controllo.prima || st.verifierSha, sha: controllo.sha, root: ROOT, messi: numeri, dopo: !!controllo.dopo,
+    log: (m) => process.stderr.write(`${m}\n`),
+  });
   if (casi.ferma) return { rejected: true, formatRejected: true, message: casi.testo };
   // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
   sealTransition(r.state, 'pulizia');
-  return { ...r.state, files: r.files };
+  return { ...r.state, files: r.files, sha: controllo.sha, dopo: !!controllo.dopo };
 }
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
@@ -1643,7 +1658,8 @@ export function usageText() {
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
     '  --record-pulizia  <id> [--ticket <b>]   dopo una critica che manda a correggere e mette rilievi',
     '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
-    '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso)',
+    '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
+    '                         più tardi, per una prova dimenticata, il commit è l\'ultimo e da solo',
     '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
@@ -2229,7 +2245,10 @@ if (isMainModule) {
       }
       const s = await recordPulizia(id);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com'era è ancora rossa, la ferma.`);
+      const quante = s.files.length === 1 ? '1 prova toccata' : `${s.files.length} prove toccate`;
+      console.log(s.dopo
+        ? `stato ${id}: pulizia dopo le correzioni registrata su ${String(s.sha).slice(0, 8)} (${quante}). La consegna non le rilancia più com'erano: di quelle a cui ha tolto un caso rilancia quello che resta, e ogni altra prova del giro tolta o cambiata dalla pulizia di prima, se com'era è ancora rossa, la ferma.`
+        : `stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com'era è ancora rossa, la ferma.`);
       console.log(s.files.map((f) => `  · ${f}`).join('\n'));
       process.exit(0);
     } else if (flag === '--record-secaudit') {
