@@ -101,16 +101,27 @@
   // underscore: guardando solo gli asterischi, «__tre] …» passava muta e la
   // bocciatura finiva nel riassunto (feedback #565).
   const GRASSETTO = '(?:\\*{1,3}|_{1,3})?';
-  // Il segno «?» si accetta anche PRIMA della lettera («[1?i]»): il significato
-  // è lo stesso e respingerlo costerebbe un giro per un ordine di due caratteri.
-  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(?:(\\?)\\s*)?([ievIEV])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
+  // I segni «?» e «!» si accettano anche PRIMA della lettera («[1?i]») e in
+  // qualunque ordine fra loro: il significato è lo stesso e respingerlo
+  // costerebbe un giro per un ordine di due caratteri.
+  const SEGNI = '[?!]{0,3}';
+  const FINDING_LINE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(${SEGNI})\\s*([ievIEV])\\s*(${SEGNI})\\s*\\]${GRASSETTO}\\s*(.*)$`);
   // La forma VECCHIA, col solo livello: si riconosce per respingerla con la
   // spiegazione giusta, non per leggerla.
-  const FINDING_LINE_SENZA_SEDE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(\\?)?\\s*\\]${GRASSETTO}\\s*(.*)$`);
+  const FINDING_LINE_SENZA_SEDE = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}\\[\\s*([0-3])\\s*(${SEGNI})\\s*\\]${GRASSETTO}\\s*(.*)$`);
+  const SPIEGAZIONE_DIFFICILE = 'il «!» segna una scelta difficile da disfare e va insieme al «?» che chiede la decisione (per esempio [2i?!]); un difetto non porta né l\'uno né l\'altro';
 
-  /** I gruppi di FINDING_LINE come rilievo: livello, sede minuscola, segno «?», testo. PURA. */
+  /** I gruppi di FINDING_LINE come rilievo: livello, sede minuscola, segni «?» e «!», testo. PURA. */
   function rilievoDa(m) {
-    return { level: Number(m[1]), sede: String(m[3]).toLowerCase(), text: m[5].trim(), decision: m[2] === '?' || m[4] === '?' };
+    const segni = `${m[2]}${m[4]}`;
+    const decision = segni.includes('?');
+    return { level: Number(m[1]), sede: String(m[3]).toLowerCase(), text: m[5].trim(), decision, difficile: decision && segni.includes('!') };
+  }
+
+  /** Una riga letta da FINDING_LINE col «!» ma senza il «?». PURA. */
+  function difficileSenzaDomanda(m) {
+    const segni = `${m[2]}${m[4]}`;
+    return segni.includes('!') && !segni.includes('?');
   }
   // Qualunque cosa fra parentesi quadre che sembri un livello — anche fuori
   // scala («[4]») o scritto come intervallo («[2-3]», «[2/3]»). Una riga che
