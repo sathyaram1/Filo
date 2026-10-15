@@ -99,6 +99,7 @@ import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
+import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -755,6 +756,13 @@ function conImmagini(ctx) {
   return Array.isArray(ctx && ctx.immagini) && ctx.immagini.length ? { immagini: ctx.immagini } : {};
 }
 
+// Perché un diff vuoto è vuoto davvero: senza questa riga il controllo non lo distingue da un calcolo fallito (#740).
+export function testoDiffVuoto({ commitPropri = null } = {}) {
+  if (commitPropri === 0) return 'Il diff è vuoto davvero: il ramo non ha commit propri rispetto a main, quindi non porta nessuna modifica.';
+  const quanti = commitPropri > 0 ? `ha ${commitPropri} commit propri, ma ` : '';
+  return `Il diff è vuoto davvero: il ramo ${quanti}ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda).`;
+}
+
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {
     case 'secaudit':
@@ -765,6 +773,7 @@ export function buildPayload(bucket, ctx = {}) {
           diffBase: ctx.diffBase,
           ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: `git diff ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
         } : {}),
+        ...(ctx.diffVuoto ? { diffVuoto: testoDiffVuoto(ctx.diffVuoto) } : {}),
       };
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
@@ -881,7 +890,7 @@ export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi }
   const [a, b] = [albero(comune.out.split('\n')[0]), albero(head)];
   if (!a.ok || !b.ok || a.out !== b.out) return guasto('il diff è uscito vuoto ma il ramo cambia dei file rispetto alla base comune con main', base, head);
   const propri = git(['rev-list', '--count', `${base.sha}..${head}`]);
-  return { ok: true, diff: '', base, head, vuoto: { commitPropri: propri.ok ? Number(propri.out) || 0 : 0 } };
+  return { ok: true, diff: '', base, head, vuoto: { commitPropri: propri.ok ? Number(propri.out) : null } };
 }
 
 // ─── Retry (esportato, testato in tests/unit/dispatch.test.mjs) ───────────────
@@ -1902,7 +1911,9 @@ export function serverCtx(bucket, fromServer, diff = '') {
   // non chiede nessuna chiave. Del feedback non riceve niente, e non è più una
   // consegna da rispettare — senza chiave, il testo cifrato per lui è un blob.
   if (role === 'secaudit') {
-    if (diff && typeof diff === 'object') return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '' };
+    if (diff && typeof diff === 'object') {
+      return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '', ...(diff.vuoto ? { diffVuoto: diff.vuoto } : {}) };
+    }
     return { diff };
   }
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
@@ -2005,8 +2016,13 @@ async function finalizeBucket(bucket, fromServer) {
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
-  const ctx = serverCtx(bucket, fromServer,
-    bucket.role === 'secaudit' ? diffForBranch(bucket.branch) : '');
+  let diff = '';
+  if (bucket.role === 'secaudit') {
+    diff = diffForBranch(bucket.branch);
+    // Un diff che non si calcola non arriva al controllo come se fosse vuoto: darebbe il via libera su niente (#740).
+    if (!diff.ok) return emitHalt('transient', `il diff del ramo ${bucket.branch} non si calcola: ${diff.motivo}`);
+  }
+  const ctx = serverCtx(bucket, fromServer, diff);
 
   emit(bucket, ctx);
   return { exit: 0 };

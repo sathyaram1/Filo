@@ -757,6 +757,121 @@ test('diffForBranch: dichiara la base remota su cui è calcolato, anche col main
   assert.match(g('diff', 'main...worker/x'), /gia-fuso\.txt/, 'premessa: col main locale il diff si gonfia');
 });
 
+// I cloni delle routine sono poco profondi, a volte del solo ramo: lì il diff usciva vuoto senza avviso, e il
+// controllo di sicurezza dava il via libera su niente (#740).
+function origineConRamo(nome) {
+  const dir = resolve(TMP, nome);
+  const lavoro = resolve(dir, 'lavoro');
+  const nudo = resolve(dir, 'origine.git');
+  mkdirSync(lavoro, { recursive: true });
+  const g = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const scrivi = (f, t) => { writeFileSync(resolve(lavoro, f), t); g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-q', '-m', f); };
+  g(lavoro, 'init', '-q', '--initial-branch=main');
+  scrivi('base.txt', 'base\n');
+  g(lavoro, 'checkout', '-q', '-b', 'worker/x');
+  scrivi('del-ramo.txt', 'lavoro\n');
+  scrivi('del-ramo-2.txt', 'ancora\n');
+  g(lavoro, 'checkout', '-q', 'main');
+  for (const i of [1, 2, 3]) scrivi(`gia-fuso-${i}.txt`, `già su main ${i}\n`);
+  g(dir, 'clone', '-q', '--bare', lavoro, nudo);
+  const clona = (dove, ...opz) => {
+    g(dir, 'clone', '-q', ...opz, pathToFileURL(nudo).href, dove);
+    return resolve(dir, dove);
+  };
+  return { g, clona, mainSha: g(lavoro, 'rev-parse', 'main'), puntaSha: g(lavoro, 'rev-parse', 'worker/x') };
+}
+
+function diffGiusto(r, o, clone) {
+  assert.equal(r.ok, true, `diff calcolato (${r.motivo || ''})`);
+  assert.deepEqual(r.base, { ref: 'origin/main', sha: o.mainSha });
+  assert.equal(r.head, o.puntaSha);
+  assert.match(r.diff, /del-ramo\.txt/);
+  assert.match(r.diff, /del-ramo-2\.txt/);
+  assert.doesNotMatch(r.diff, /gia-fuso/, 'le modifiche già su main non entrano nel diff');
+  assert.equal(r.diff, execFileSync('git', ['diff', `${r.base.sha}...${r.head}`], { cwd: clone, encoding: 'utf8' }));
+}
+
+test('diffForBranch: in un clone del solo ramo scarica main, invece di consegnare un diff vuoto (#740)', () => {
+  const o = origineConRamo('diff-ramo-singolo');
+  const clone = o.clona('clone', '--depth', '1', '--single-branch', '--branch', 'worker/x');
+  assert.throws(() => o.g(clone, 'rev-parse', '--verify', 'refs/remotes/origin/main'), 'premessa: origin/main non c\'è');
+  diffGiusto(diffForBranch('worker/x', clone), o, clone);
+});
+
+test('diffForBranch: in un clone poco profondo scarica la storia fino alla base comune (#740)', () => {
+  const o = origineConRamo('diff-poco-profondo');
+  const clone = o.clona('clone', '--depth', '1', '--no-single-branch');
+  o.g(clone, 'checkout', '-q', 'worker/x');
+  assert.throws(() => o.g(clone, 'merge-base', 'origin/main', 'worker/x'), 'premessa: la base comune non è nel clone');
+  diffGiusto(diffForBranch('worker/x', clone, { passi: [1] }), o, clone);
+});
+
+test('diffForBranch: se la base non si scarica si ferma col motivo, mai con un diff vuoto (#740)', () => {
+  const o = origineConRamo('diff-senza-base');
+  const clone = o.clona('clone', '--depth', '1', '--single-branch', '--branch', 'worker/x');
+  o.g(clone, 'remote', 'set-url', 'origin', pathToFileURL(resolve(TMP, 'diff-senza-base', 'non-esiste.git')).href);
+  const r = diffForBranch('worker/x', clone);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /origin\/main/);
+  assert.equal(r.diff, '');
+  // Con main scaricato ma la storia irraggiungibile: la base comune manca, e lo dice.
+  const o2 = origineConRamo('diff-senza-storia');
+  const c2 = o2.clona('clone', '--depth', '1', '--no-single-branch');
+  o2.g(c2, 'checkout', '-q', 'worker/x');
+  o2.g(c2, 'remote', 'set-url', 'origin', pathToFileURL(resolve(TMP, 'diff-senza-storia', 'non-esiste.git')).href);
+  const r2 = diffForBranch('worker/x', c2);
+  assert.equal(r2.ok, false);
+  assert.match(r2.motivo, /storia/);
+  assert.equal(r2.head, o2.puntaSha, 'dice su quale punta si è fermato');
+  assert.equal(diffForBranch('worker/non-esiste', c2).ok, false, 'un ramo che non c\'è non è un diff vuoto');
+});
+
+test('diffForBranch: un diff vuoto passa solo se il contenuto del ramo è davvero quello della base, e lo dichiara', () => {
+  const repo = resolve(TMP, 'repo-diff-vuoto');
+  mkdirSync(repo, { recursive: true });
+  const g = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const scrivi = (f, t) => { writeFileSync(resolve(repo, f), t); g('add', '-A'); g('commit', '-q', '-m', f); };
+  g('init', '-q', '--initial-branch=main');
+  scrivi('base.txt', 'base\n');
+  g('update-ref', 'refs/remotes/origin/main', g('rev-parse', 'HEAD'));
+  g('branch', 'worker/fermo');
+  g('checkout', '-q', '-b', 'worker/annullato');
+  scrivi('base.txt', 'cambiato\n');
+  scrivi('base.txt', 'base\n');
+  g('checkout', '-q', '-b', 'worker/vero');
+  scrivi('nuovo.txt', 'x\n');
+
+  const fermo = diffForBranch('worker/fermo', repo);
+  assert.deepEqual([fermo.ok, fermo.diff, fermo.vuoto], [true, '', { commitPropri: 0 }]);
+  const annullato = diffForBranch('worker/annullato', repo);
+  assert.deepEqual([annullato.ok, annullato.diff, annullato.vuoto], [true, '', { commitPropri: 2 }]);
+  // Un git che stampa niente (qui un diff esterno muto) su un ramo che cambia dei file: guasto, non via libera.
+  g('config', 'diff.external', 'true');
+  const muto = diffForBranch('worker/vero', repo);
+  assert.equal(muto.ok, false);
+  assert.match(muto.motivo, /vuoto ma il ramo cambia/);
+  g('config', '--unset', 'diff.external');
+  assert.equal(diffForBranch('worker/vero', repo).vuoto, undefined);
+
+  // Al controllo il vuoto arriva col suo perché, mai muto.
+  const vere = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  const dir = resolve(TMP, 'routines', 'roles');
+  mkdirSync(dir, { recursive: true });
+  for (const f of readdirSync(vere)) {
+    if (f === 'secaudit.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+  }
+  const bucket = { role: 'secaudit', id: 's', num: '#740', branch: 'worker/annullato' };
+  let out = '';
+  const real = process.stdout.write;
+  process.stdout.write = (s) => { out += s; return true; };
+  try { emit(bucket, serverCtx(bucket, null, annullato)); } finally { process.stdout.write = real; }
+  const j = JSON.parse(out);
+  assert.match(j.payload.diffVuoto, /vuoto davvero[^]*2 commit propri/);
+  assert.equal(j.payload.diffCaratteri, 0);
+  assert.match(j.instructions, /diffVuoto/, 'il testo del ruolo dice cosa farne');
+  assert.equal(buildPayload(bucket, serverCtx(bucket, null, diffForBranch('worker/vero', repo))).diffVuoto, undefined);
+});
+
 // ─── teardown ─────────────────────────────────────────────────────────────────
 
 // ─── Ruolo unico resolver + contratto comune (SPEC-RIDISEGNO-MAX.md §12) ──────
