@@ -61,15 +61,18 @@
     $('avvisoTesto').textContent = avviso.testo || '';
     $('avvisoTesto').hidden = !avviso.testo;
     const host = $('avvisoRimedi');
-    host.textContent = '';
-    host.appendChild(window.SN_CREDITI_AVVISO_UI.elenco({
+    const opz = {
       avviso,
       invia: (m) => chrome.runtime.sendMessage(m),
       classeBottone: 'sn-btn sn-btn-secondary',
       apriChiave: apriCampoChiave,
       esito: esitoAvviso,
       onEsito: (id, frase) => { esitoAvviso = frase ? { id, frase } : null; },
-    }));
+    };
+    // La pagina si ridisegna a ogni saldo cambiato: l'elenco si aggiorna sul posto, così un clic non va a vuoto.
+    const ul = host.querySelector(':scope > .sn-crediti-rimedi');
+    if (ul) window.SN_CREDITI_AVVISO_UI.aggiorna(ul, opz);
+    else host.appendChild(window.SN_CREDITI_AVVISO_UI.elenco(opz));
   }
 
   // «Metti la chiave»: il campo della chiave propria, qui sotto.
