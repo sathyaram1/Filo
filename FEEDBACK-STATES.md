@@ -125,7 +125,8 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
   figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
   server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità uguale al livello; UNO solo per tutti gli altri (interni messi da parte
+  priorità uguale al livello (quello col `?` aspetta la risposta nei Ricevuti: sopra,
+  Pipeline); UNO solo per tutti gli altri (interni messi da parte
   dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
   fra loro); —critica con rilievi
   interni da correggere→ resta
