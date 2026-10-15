@@ -460,11 +460,27 @@
     return out.filter((r) => r.soloTesto || r.id === 'chiave' || num(r.risparmio) >= 0.5);
   }
 
+  // L'avviso come lo legge il modello della chat: la frase e i rimedi coi loro id, così a una risposta a parole
+  // («sì, usa i più economici») sa cosa ha proposto e come farlo. `lista`: le righe come le mostra la UI.
+  function perFilo(testo, lista) {
+    const righe = [];
+    for (const r of Array.isArray(lista) ? lista : []) {
+      if (!r || !r.testo) continue;
+      const stato = r.applicato ? ' [applicato: si rimette con RIMEDIO_CREDITI annulla]' : (r.azione === 'applica' ? ' [si applica con RIMEDIO_CREDITI applica]' : '');
+      const id = r.azione === 'applica' || r.azione === 'annulla' ? `${r.id}: ` : '';
+      righe.push(`- ${id}${r.testo}${r.frase ? ` (${r.frase})` : ''}${stato}`);
+      for (const d of r.dettagli || []) righe.push(`    ${d}`);
+    }
+    const t = String(testo || '').trim();
+    if (!righe.length) return t;
+    return `${t}${t ? '\n' : ''}Per farli durare di più:\n${righe.join('\n')}`;
+  }
+
   global.SN_CREDITI_AVVISO = {
     PREDEFINITI, LIMITI, numeroSoglia, GIORNI_DIARIO, GIORNI_RITMO, GIORNI_PER_FUNZIONE, ANTICIPATA,
     chiaveGiorno, giorniFra, soglieDa, chiaveAzione, azioneDi,
     aggiungi, aggiungiUso, ritmo, proiezione, valuta, sogliaRiarmo, riarmato,
     quando, frase, prossimaQuota,
-    automatiche, leggiPercorso, pezzoPer, consumoPerAzione, modelloPiuEconomico, rimedi, risparmioFrase,
+    automatiche, leggiPercorso, pezzoPer, consumoPerAzione, modelloPiuEconomico, rimedi, risparmioFrase, perFilo,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
