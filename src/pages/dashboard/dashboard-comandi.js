@@ -445,6 +445,7 @@
   //   'shell'   → comando shell esistente (modalità terminale) → azzurro
   //   'unknown' → inizia con "/" ma non è un comando riconosciuto → rosso
   //   'pending' → modalità terminale, esistenza del comando ancora da verificare
+  //   'incerto' → modalità terminale, il controllo non ha saputo rispondere → neutro
   //   'none'    → testo normale (va all'LLM)
   function classifyInput(value) {
     const t = value.trim();
