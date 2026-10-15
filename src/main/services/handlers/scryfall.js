@@ -16,9 +16,8 @@ module.exports = function register(on, ctx) {
   // economico. Una rete più larga di così la chat la dichiara col numero e chiede un vincolo in più.
   const JUDGE_MAX_CARDS = 1050;
   const SORT_WORDS = { cmc: 'costo di mana', name: 'nome', price: 'prezzo' };
-  // Dieci lotti: l'errore resta sotto i tre decimi di punto, e la risposta non aspetta più di mezzo secondo.
-  const CHAT_PROB_BATCH = globalThis.SN_DECK_STATS.PROB_BATCH;
-  const CHAT_PROB_HANDS = CHAT_PROB_BATCH * 10;
+  // Lotti della probabilità in chat: dieci tengono l'errore sotto i tre decimi di punto e la risposta sotto il mezzo secondo.
+  const CHAT_PROB_BATCHES = 10;
 
   // Identity del mazzo per il filtro automatico (§4): dai colori del
   // commander. Senza commander nessun vincolo (si cerca in tutto Scryfall).
