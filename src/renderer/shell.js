@@ -122,6 +122,7 @@
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
       applyTabPreview(r?.settings?.tabPreview);
+      applyFeatureFlags(r?.settings?.featureFlags);
       applyRingTone(r?.settings?.timerRingtone, r?.settings?.timerRingtoneVolume);
       refreshRinging();
       try { render({ forza: true }); } catch (_) {}
