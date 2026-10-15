@@ -407,7 +407,7 @@
       ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
     ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
     if (!senzaFilo) {
-      for (const a of AZIONI_FILO) lista.push([etichetta(scorciatoiaFilo(a.id), esplicita), `è «${a.nome}» di Filo`]);
+      for (const a of AZIONI_FILO) lista.push([etichettaFilo(scorciatoiaFilo(a.id), esplicita), `«${a.nome}»`]);
     }
     return lista;
   }
@@ -752,7 +752,7 @@
       case 'senzaModificatore': return `Tieni premuto anche ${ctrl} o Alt, così il tasto non scatta mentre scrivi.`;
       case 'tasto': return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un tasto come Spazio, Invio, F1.`;
       case 'sistema': return `${r.nome} se la prende il sistema operativo: ${altra}.`;
-      case 'presa': return `${r.nome} ${r.cosa}: ${altra}.`;
+      case 'presa': return `${r.nome} è già in uso (${r.cosa}): ${altra}.`;
       case 'simbolo': return r.modificatore === 'Shift'
         ? `Con Shift quel simbolo diventa un altro, quindi ${r.nome} non partirebbe mai: ${altra}.`
         : `Con ${r.modificatore === 'Alt' ? 'Opzione' : etichetta(r.modificatore, esplicita)} quel simbolo diventa un altro, quindi ${r.nome} non partirebbe mai: ${altra}.`;

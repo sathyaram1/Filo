@@ -4057,18 +4057,13 @@
   }
 
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
-  // Nome scritto e tasto premuto si leggono SOLO con SN_TASTI: ogni lettura fatta
-  // qui in casa divergeva («Ctrl+Minus», «Ctrl++») e salvava tasti morti (#545).
+  // Nome scritto, tasto premuto e controlli comuni (tasti di Filo e del sistema, nomi sconosciuti, simboli che
+  // cambiano) stanno in SN_TASTI, la stessa regola delle scorciatoie di Filo: qui solo l'Editor e i suoi moduli (#545, #842).
   // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
     const p = TASTI.pressioneScritta(sc);
     return !!p && (p.ctrlKey || p.metaKey || p.altKey);
-  }
-  // Valida: un modificatore reale e un tasto finale, così non coincide con la
-  // digitazione di una lettera.
-  function isValidShortcut(sc) {
-    return shortcutHasRealModifier(sc) && !TASTI.tipoModificatore(TASTI.pressioneScritta(sc).key);
   }
   function isEditableTarget(t) {
     if (!t) return false;
@@ -4115,17 +4110,10 @@
     const e = TASTI.pressioneScritta(sc);
     return (e && TASTI_EDITOR.find((t) => prendeIlTasto(t, e))) || null;
   }
-  // Perché una scorciatoia non partirebbe mai su questo modulo ('' = va bene).
+  // Perché una scorciatoia non partirebbe mai su questo modulo per i tasti dell'Editor o di un altro modulo ('' = va bene).
   function motivoScorciatoiaPresa(sc, m) {
     if (!sc) return '';
-    const nome = TASTI ? TASTI.etichettaScritta(sc) : sc;
-    if (TASTI && TASTI.riservato(sc)) {
-      return `${nome} è già di Filo (schede, zoom, annulla…) e non arriverebbe mai a questo modulo`;
-    }
-    // Prima dei tasti dell'Editor: la pressione che descrive non è quella vera.
-    const cambia = TASTI.modificatoreCheCambiaSimbolo(sc);
-    if (cambia === 'Shift') return `Con Shift il simbolo cambia, quindi ${nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift)`;
-    if (cambia) return `Con ${tasto(cambia)} il simbolo cambia, quindi ${nome} non partirebbe mai`;
+    const nome = TASTI.etichettaScritta(sc);
     const t = tastoEditorDi(sc);
     if (t && t.suo !== m.type) return `${nome} nell'Editor ${t.cosa}, quindi questo modulo non partirebbe mai`;
     const e = TASTI.pressioneScritta(sc);
@@ -4141,14 +4129,8 @@
   // esempi degli avvisi: un esempio che poi si rifiuta non esce (#545).
   function rifiuto(sc, m) {
     if (!sc) return null;
-    const ignoto = TASTI.pezzoSconosciuto(sc);
-    if (ignoto && ignoto.modificatore) return { tipo: 'modificatore', nome: ignoto.nome };
-    const conReale = sc.split(/[+\s-]+/).some((p) => ['ctrl', 'alt'].includes(TASTI.tipoModificatore(p)));
-    if (conReale && TASTI.soloModificatori(sc)) return { tipo: 'senzaTasto', nome: TASTI.etichettaScritta(sc.replace(/[+\s-]+$/, '')) };
-    // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive.
-    if (!isValidShortcut(sc)) return { tipo: 'senzaModificatore' };
-    if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
-    if (TASTI.delSistema(sc)) return { tipo: 'sistema', nome: TASTI.etichettaScritta(sc) };
+    const comune = TASTI.rifiutoScritta(sc, TASTI.piattaforma());
+    if (comune) return comune;
     const motivo = motivoScorciatoiaPresa(sc, m);
     return motivo ? { tipo: 'presa', motivo } : null;
   }
@@ -4164,7 +4146,13 @@
       return `Non riconosco il tasto «${r.nome}»: usa una lettera, una cifra o un nome come Spazio, Invio, Esc, Tab, Su, Giù, F1…${conNome ? ` (es. ${conNome})` : ''}.`;
     }
     if (r.tipo === 'sistema') return `${r.nome} se la prende il sistema operativo e non arriverebbe mai a questo modulo: scegline un'altra${perEsempio}.`;
-    return `${r.motivo}: scegline un'altra${perEsempio}.`;
+    if (r.tipo === 'simbolo') {
+      return r.modificatore === 'Shift'
+        ? `Con Shift il simbolo cambia, quindi ${r.nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift): scegline un'altra${perEsempio}.`
+        : `Con ${tasto(r.modificatore)} il simbolo cambia, quindi ${r.nome} non partirebbe mai: scegline un'altra${perEsempio}.`;
+    }
+    const motivo = r.cosa ? `${r.nome} è già di Filo (${r.cosa}) e non arriverebbe mai a questo modulo` : r.motivo;
+    return `${motivo}: scegline un'altra${perEsempio}.`;
   }
   // Gli esempi escono coi nomi dei tasti di chi legge; '' se sono tutti presi.
   const ESEMPI_LIBERI = ['Ctrl+Shift', 'Ctrl+Alt+Shift'].flatMap((mods) => [...'123456789'].map((d) => tasto(`${mods}+${d}`)));
