@@ -6,6 +6,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const RADICE = path.join(__dirname, '..', '..');
 const INGRESSO = 'src/preload/page-preload.js';
@@ -77,7 +78,7 @@ function testiLetti(src, cartella, radice) {
 /**
  * Compone il preload impacchettato. `codice` è il file; `moduli` e `testi` cosa porta; `assenti` i moduli di Node che
  * qualcuno chiede e la sandbox non ha (a chiamata la sandbox li rifiuta, come farebbe senza pacchetto); `dinamici` le
- * require() che non si leggono da ferme. PURA a parte la lettura dei sorgenti.
+ * require() che non si leggono da ferme; `rotti` i file con un errore di sintassi. PURA a parte la lettura dei sorgenti.
  */
 function componi({ radice = RADICE, ingresso = INGRESSO } = {}) {
   const moduli = new Map();
@@ -124,12 +125,20 @@ function componi({ radice = RADICE, ingresso = INGRESSO } = {}) {
     '(function (richiestaDellaSandbox) {',
     'const MODULI = {',
   ];
+  const rotti = [];
   for (const [chiave, src] of moduli) {
     parti.push(`// ── ${chiave.slice(1)}`);
-    if (chiave.endsWith('.json')) {
-      parti.push(`${JSON.stringify(chiave)}: function (exports, require, module) { module.exports = ${src.trim()}; },`);
-    } else {
-      parti.push(`${JSON.stringify(chiave)}: function (exports, require, module, __filename, __dirname) {\n${src}\n},`);
+    const corpo = chiave.endsWith('.json') ? `module.exports = ${src.trim()};` : `\n${src}\n`;
+    const testa = 'function (exports, require, module, __filename, __dirname) {';
+    // Come da disco: un file che non si legge cade da solo, al suo require, invece di spegnere tutto il pacchetto.
+    try {
+      new vm.Script(`void ${testa}${corpo}}`, { filename: chiave.slice(1) });
+      parti.push(`${JSON.stringify(chiave)}: ${testa}${corpo}},`);
+    } catch (e) {
+      const motivo = `${chiave.slice(1)}: ${e.message}`;
+      rotti.push(motivo);
+      console.error('[preload impacchettato] non si legge, resta fuori:', motivo);
+      parti.push(`${JSON.stringify(chiave)}: function () { throw new SyntaxError(${JSON.stringify(motivo)}); },`);
     }
   }
   parti.push('};');
@@ -144,6 +153,7 @@ function componi({ radice = RADICE, ingresso = INGRESSO } = {}) {
     testi: fogli.map(([k]) => k.slice(1)),
     assenti: [...assenti].sort(),
     dinamici,
+    rotti,
   };
 }
 

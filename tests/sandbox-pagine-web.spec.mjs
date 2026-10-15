@@ -1,6 +1,7 @@
 // #834 — Le pagine web girano nella sandbox di Chromium: un buco fra la pagina e il preload troverebbe un processo chiuso,
 // non Node. Qui la sandbox c'è (scheda, riquadro, finestrella di accesso, shell, fumetto) e Filo dentro lavora ancora:
-// il menu del tasto destro nella pagina, in un riquadro di un altro sito e nella finestrella. Regole: src/main/preloadPacchetto.js.
+// il menu del tasto destro nella pagina, in un riquadro di un altro sito e nella finestrella.
+// Regole: patterns/il-preload-delle-pagine-web-gira-in-sandbox.md.
 
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 

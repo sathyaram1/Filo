@@ -46,6 +46,8 @@ on:
       # La ricetta del pacchetto sta qui dentro (build.linux). Il commit che
       # alza il numero di versione porta `[skip ci]` e non fa scattare niente.
       - 'package.json'
+      # Il preload delle pagine web che il pacchetto si porta dentro, e chi lo scrive.
+      - 'src/main/preloadPacchetto.js'
 
 permissions:
   contents: read
@@ -100,6 +102,30 @@ jobs:
             exit 1
           }
           cat dist/latest-linux.yml
+
+      # Le pagine web girano in sandbox col preload impacchettato (src/main/preloadPacchetto.js, scritto da
+      # build.beforePack): senza quel file nell'asar, o con uno vecchio, ogni sito resterebbe senza Filo o con il
+      # Filo di ieri.
+      - name: Il pacchetto porta il preload delle pagine web
+        shell: bash
+        run: |
+          set -e
+          PUNTO=$(mktemp -d)
+          cp dist/Filo-Linux.AppImage "$PUNTO/Filo.AppImage"
+          chmod +x "$PUNTO/Filo.AppImage"
+          (cd "$PUNTO" && ./Filo.AppImage --appimage-extract 'resources/app.asar' >/dev/null)
+          ARCHIVIO="$PUNTO/squashfs-root/resources/app.asar"
+          test -f "$ARCHIVIO" || { echo "::error::nell'AppImage non c'e' resources/app.asar"; exit 1; }
+          node -e "
+            const asar = require('@electron/asar');
+            const { componi } = require('./src/main/preloadPacchetto.js');
+            let dentro = '';
+            try { dentro = asar.extractFile(process.argv[1], 'generato/page-preload.js').toString('utf8'); } catch (_) {
+              console.log('::error::nel pacchetto manca generato/page-preload.js: le pagine web resterebbero senza Filo'); process.exit(1);
+            }
+            if (dentro !== componi().codice) { console.log('::error::il preload nel pacchetto non è quello dei sorgenti'); process.exit(1); }
+            console.log('preload delle pagine web nel pacchetto:', dentro.length, 'byte');
+          " "$ARCHIVIO"
 
       # Dentro l'AppImage c'e' la voce di menu (.desktop) che il sistema legge
       # quando l'utente integra il file: e' li' che vivono il nome, l'icona, la

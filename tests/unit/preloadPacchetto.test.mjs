@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import vm from 'node:vm';
 import nodeUrl from 'node:url';
@@ -28,6 +28,28 @@ test('il pacchetto si compone, è JavaScript valido ed è sempre lo stesso a par
   assert.doesNotThrow(() => new vm.Script(pacchetto.codice, { filename: 'page-preload.js' }));
   assert.equal(componi().codice, pacchetto.codice, 'due composizioni diverse: il Mac universale fonde due copie che devono coincidere');
   assert.ok(pacchetto.moduli.length >= 40, `solo ${pacchetto.moduli.length} moduli: la lettura delle dipendenze è rotta`);
+});
+
+test('un file con un errore di sintassi cade da solo, al suo require, non spegne il pacchetto', () => {
+  assert.deepEqual(pacchetto.rotti, [], 'un modulo del pacchetto non si legge');
+  const radice = cartellaTemporanea('filo-pacchetto-rotto-');
+  try {
+    mkdirSync(join(radice, 'src', 'preload'), { recursive: true });
+    writeFileSync(join(radice, 'src', 'preload', 'page-preload.js'),
+      "let e = null; try { require('./rotto.js'); } catch (x) { e = x.name; } globalThis.esito = { buono: require('./buono.js'), e };\n");
+    writeFileSync(join(radice, 'src', 'preload', 'rotto.js'), 'const = 1;\n');
+    writeFileSync(join(radice, 'src', 'preload', 'buono.js'), 'module.exports = 42;\n');
+    const prima = console.error;
+    console.error = () => {};
+    let r;
+    try { r = componi({ radice, ingresso: 'src/preload/page-preload.js' }); } finally { console.error = prima; }
+    assert.equal(r.rotti.length, 1);
+    assert.match(r.rotti[0], /^src\/preload\/rotto\.js: /);
+    // Gira come nel preload: il file rotto lo dice al suo require, gli altri lavorano.
+    const mondo = { require: () => { throw new Error('niente'); }, console };
+    vm.runInNewContext(r.codice, mondo);
+    assert.deepEqual({ ...mondo.esito }, { buono: 42, e: 'SyntaxError' });
+  } finally { togliCartella(radice); }
 });
 
 test('ogni require dei moduli impacchettati si legge da fermo', () => {
