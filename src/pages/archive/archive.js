@@ -401,8 +401,8 @@
 
     for (const k of orderedDays) {
       const items = groups.get(k);
-      // Ordine cromatico dentro il giorno (arcobaleno); i senza colore in fondo.
-      items.sort((a, b) => hueOf(a.identityColor) - hueOf(b.identityColor));
+      // Dentro il giorno lo stesso ordine arcobaleno della barra.
+      if (TabColor) items.sort((a, b) => TabColor.compareRainbow(a.identityColor, b.identityColor));
 
       const day = document.createElement('div');
       day.className = 'arc-day';
