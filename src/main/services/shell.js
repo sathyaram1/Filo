@@ -507,7 +507,8 @@ function existenceProbes({ shell, cmd }) {
 // attesa: con la macchina carica anche `where.exe` supera i dieci secondi (#1063).
 const ATTESA_PROBE_MS = 10000;
 
-// Esegue UN probe e risolve true se il processo esce con codice 0.
+// Un probe risponde 'si' (uscito 0), 'no' (uscito con un altro codice) o 'incerto': scaduto, non partito, ucciso
+// da un segnale. Un incerto non è un «non esiste»: con la macchina carica colorava di rosso comandi validi (#1176).
 function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS) {
   return new Promise((resolve) => {
     let done = false;
@@ -518,13 +519,29 @@ function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS
       // sulla riga di comando di PowerShell), così non può essere eseguito.
       const env = probeEnv ? { ...process.env, ...probeEnv } : undefined;
       proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
-    } catch (_) { resolve(false); return; }
-    const timer = setTimeout(() => finish(false), attesaMs);
-    proc.on('error', () => { clearTimeout(timer); finish(false); });
-    proc.on('exit', (code) => { clearTimeout(timer); finish(code === 0); });
+    } catch (_) { resolve('incerto'); return; }
+    const timer = setTimeout(() => finish('incerto'), attesaMs);
+    proc.on('error', () => { clearTimeout(timer); finish('incerto'); });
+    proc.on('exit', (code) => {
+      clearTimeout(timer);
+      finish(code === 0 ? 'si' : (typeof code === 'number' ? 'no' : 'incerto'));
+    });
   });
 }
 
+// true se un probe conferma, false solo se TUTTI dicono no, null altrimenti: dopo un `where.exe` scaduto il «no» di
+// Get-Command non basta, perché sbaglia proprio sugli shim npm che `where` avrebbe visto.
+async function esitoDeiProbe(probes, cwd, attesaMs = ATTESA_PROBE_MS) {
+  let incerto = false;
+  for (const probe of probes) {
+    const esito = await runProbe(probe, cwd, attesaMs);
+    if (esito === 'si') return true;
+    if (esito === 'incerto') incerto = true;
+  }
+  return incerto ? null : false;
+}
+
+// true esiste, false non esiste di certo, null non si è potuto sapere (la dashboard lo lascia senza colore).
 async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS } = {}) {
   const cmd = String(command == null ? '' : command).trim();
   // Niente da controllare, o token chiaramente non un nome di comando
