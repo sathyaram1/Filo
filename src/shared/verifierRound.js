@@ -529,9 +529,8 @@
     const blocking = [];
     const derived = [];
     const candidati = [];
-    // Chi sale su un giro e chi lo fa partire sono due domande diverse: decise
-    // insieme dall'alto in basso, un 2 a bilancio finito restava fuori da un
-    // giro pagato da un 1 (#744).
+    // Chi fa partire il giro e chi ci sale sono due domande separate: un 2 a
+    // bilancio finito sale anche su un giro pagato da un 1 o da uno 0 (#744).
     let pagaLivello = null;
     for (const f of findings) {
       const level = effectiveLevel(f);
