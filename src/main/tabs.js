@@ -1684,7 +1684,8 @@ class TabManager {
     cands.forEach((tab, i) => {
       const d = byIndex.get(i);
       if (!d || d.action !== 'archive') return;
-      if (tab.id === this.activeId || tab.audible) return; // salvaguardia dura
+      // Salvaguardia dura. Durante la decisione la scheda può essere andata su un sito da tenere aperto.
+      if (tab.id === this.activeId || tab.audible || this._sempreAperta(tab)) return;
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
