@@ -16,9 +16,13 @@ nati da quei vincoli invece di adattarli.
 
 ## 1. Sotto-feedback: aboliti
 
+*Fatto (§14, passo 3).*
+
 - Un feedback non si spezza più: il worker lo lavora INTERO e, se serve, usa
   sotto-agenti propri (SEMPRE sequenziali, mai in parallelo: l'hook di
   salvataggio si pesta sui lock, e il ritmo di consumo resta contenuto).
+  - **Superato** (sotto-agenti in parallelo): vedi `CLAUDE.md`, «Il contesto si
+    paga a ogni turno».
 - Verifica, secaudit e cancello di merge operano sull'INTERO feedback. La
   verifica avversariale torna a confrontarsi con le parole originali
   dell'owner, non con spec di seconda mano scritte da chi spezzava.
