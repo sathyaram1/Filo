@@ -2,7 +2,7 @@
 // e la riga «come controllare» deve funzionare anche sui Linux senza shasum.
 import { test, expect } from '@playwright/test';
 import { createHash } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
 import * as M from '../../../scripts/release-impronte.mjs';
@@ -20,7 +20,7 @@ function releaseFinta(digest) {
       const tutto = { body: stato.corpo, isDraft: false, assets: Object.entries(digest).map(([name, d]) => ({ name, digest: `sha256:${d}` })) };
       return JSON.stringify(Object.fromEntries(campi.map((c) => [c, tutto[c]])));
     }
-    if (args[1] === 'edit') { stato.corpo = require('node:fs').readFileSync(args[args.indexOf('--notes-file') + 1], 'utf8'); return ''; }
+    if (args[1] === 'edit') { stato.corpo = readFileSync(args[args.indexOf('--notes-file') + 1], 'utf8'); return ''; }
     throw new Error('comando inatteso');
   };
   return { gh, stato };
@@ -34,7 +34,6 @@ test('r1 se GitHub serve un file con un\'altra impronta, la pagina non riporta q
   try {
     writeFileSync(join(dir, 'Filo-Linux.AppImage'), 'il file costruito qui');
     const { gh, stato } = releaseFinta({ 'Filo-Linux.AppImage': sha('un file diverso, quello caricato davvero') });
-    globalThis.require = (await import('node:module')).createRequire(import.meta.url);
     let fallito = false;
     try { await M.esegui({ argv: argv(dir), gh, attendi: async () => {} }); } catch { fallito = true; }
     expect(fallito, 'il passo deve fermarsi: chi scarica confronterebbe un\'impronta che il suo file non ha').toBe(true);
