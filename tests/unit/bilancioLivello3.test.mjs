@@ -73,11 +73,16 @@ test('un 2 interno paga il bilancio dei 2; a bilancio finito NON ferma: va da pa
   assert.match(uno, /Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità 2: \[2i\] non salva/);
 });
 
-test('un 2 interno col segno ? ferma ancora: la decisione dell\'owner non dipende dal bilancio', () => {
+test('un 2 interno col segno ? a bilancio dei 2 finito non ferma: non si corregge ed esce da solo con la domanda', () => {
   const d = decide([f(2, 'i', 'A o B?', true)], { count2: 4 });
-  assert.equal(d.stop, true);
-  assert.deepEqual(livelli(d.blocking), ['2i']);
-  assert.match(R.roundNote({ summary: '', findings: [f(2, 'i', 'A o B?', true)], decision: d }), /livello 3 o 2 che chiede una tua decisione/);
+  assert.equal(d.stop, false);
+  assert.deepEqual(d.fix, []);
+  assert.deepEqual(d.domande, []);
+  assert.deepEqual(livelli(d.derived), ['2i']);
+  assert.deepEqual(R.derivedGroups(d).map((g) => [g.tipo, g.priority, !!g.inCorrezione]), [['decisione', 2, false]]);
+  const nota = R.roundNote({ summary: '', findings: [f(2, 'i', 'A o B?', true)], decision: d });
+  assert.match(nota, /Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte/);
+  assert.doesNotMatch(nota, /Il bilancio delle correzioni di livello 2 è finito/, 'la domanda non entra nel feedback dei rimasti');
 });
 
 test('3 e 2 insieme: il giro si paga dal 3, e il 2 entra anche a bilancio dei 2 finito; a cap3 finito il 3 ferma e il 2 resta sospeso', () => {
