@@ -386,10 +386,14 @@ export function testoPuliziaFuoriNumero(controllo, numeri) {
   }
   if (!fuori.length) return '';
   const elenco = messi.size ? r([...messi].sort((a, b) => a - b)) : 'nessuno porta un numero';
+  // Dopo le correzioni la pulizia è l'ultimo commit da solo: rimettere a mano aggiungerebbe righe a lui.
+  const rimedio = c.dopo
+    ? ['Annulla il commit (`git revert --no-edit HEAD`), rifallo togliendo solo quelle, `git add -A && git commit`, e rilancia la']
+    : ['Rimettile com\'erano (git checkout <commit della critica> -- <file>), `git add -A && git commit`, e rilancia la'];
   return [
     `pulizia non registrata: qui esce solo la prova di un rilievo messo da parte, riconosciuta dal numero nel nome (messi da parte: ${elenco}).`,
     ...fuori,
-    'Rimettile com\'erano (git checkout <commit della critica> -- <file>), `git add -A && git commit`, e rilancia la',
+    ...rimedio,
     'pulizia. Le prove dei rilievi da correggere restano finché non sono verdi.',
   ].join('\n');
 }
