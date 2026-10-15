@@ -233,6 +233,8 @@
     draw: { firstDraw: true, freeMulligan: false, text: 'partita a due, inizia l\'altro' },
   };
   const DEFAULT_GAME = 'multi';
+  // La mano da tenere quando si chiede un mulligan senza dire quale: riquadro e chat partono da qui.
+  const DEFAULT_KEEP = Object.freeze([Object.freeze({ tag: LAND_TAG, n: 2 })]);
   function gameOf(g) {
     const k = String(g || '').trim().toLowerCase();
     return Object.prototype.hasOwnProperty.call(GAMES, k) ? k : DEFAULT_GAME;
