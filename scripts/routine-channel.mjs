@@ -1537,7 +1537,6 @@ if (isMain) {
       // contenuto mai esaminato (verifica del giro 1 su questo lavoro).
       // Anche correzione e revisione (#1148): il registro del ramo confronta questa punta con quella che troverà chi
       // viene dopo, e una consegna senza impronta il server la segna come buco.
-      const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato' : 'consegna non registrata';
       const punta = headSha(ROOT);
       if (!punta) {
         console.error(`${quale}: non riesco a farmi dire su quale commit è la directory, e un esito vale per il contenuto esaminato, non per il nome del ramo.`);
