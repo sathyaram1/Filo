@@ -18,8 +18,9 @@ versione del codice viene rifiutata.
 
 ## Il perimetro
 
-Dove c'erano i conflitti, e il commit che aveva passato la verifica, stanno in
-fondo a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
+Dove c'erano i conflitti, quali unit erano rossi dopo il rebase e il commit
+che aveva passato la verifica stanno in fondo a questo testo, sotto «Perimetro
+di questo giro». Guardi quattro cose.
 
 1. **Le zone in conflitto.** Per ognuna prova, usando Filo, che la cosa
    chiesta dal feedback si ottenga ancora e che quello che `main` aveva
