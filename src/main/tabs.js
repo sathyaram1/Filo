@@ -995,6 +995,9 @@ class TabManager {
       isInternal,
       // Quando la tab è stata aperta — metadato dell'archivio (§3.1).
       openedAt: new Date().toISOString(),
+      // Da quando c'è la pagina in vista: dopo un collegamento seguito nella stessa scheda non è più l'apertura (#826).
+      paginaDal: null,
+      _paginaUrl: senzaAncora(url),
       // §2.1 segnali per la decisione di auto-archiviazione (popolati a runtime).
       lastActiveAt: activate ? Date.now() : null,
       lastInteractionAt: activate ? Date.now() : null,
