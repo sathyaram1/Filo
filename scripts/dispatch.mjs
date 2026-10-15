@@ -1250,6 +1250,7 @@ export function verifierReplyText(reply, id = '<id>') {
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
       'Rilievi interni da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
       fmt(r.phase2.findings),
+      conDomanda.length ? `${conDomanda.length === 1 ? 'Il rilievo col «?» qui sopra chiede' : `I ${conDomanda.length} rilievi col «?» qui sopra chiedono`} una decisione dell'owner che non ferma il lavoro: applica l'opzione che chi verifica consiglia nel rilievo, e scrivi nel report quale. La domanda arriva all'owner in un feedback derivato${domandeInCorso.length ? ` (${domandeInCorso.map((d) => d.num || '(numero non comunicato)').join(', ')})` : ''}: se sceglie diversamente, cambierà quello il codice già fuso. Le prove di questi rilievi restano: li stai correggendo.` : null,
       'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
       derivatiRighe(derivati),
       derivati.length ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle dei rilievi esterni sono già uscite col commit della critica: se non ci sono più, vai avanti). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi, e il suo caso resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).' : null,
