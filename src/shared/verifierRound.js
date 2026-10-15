@@ -814,10 +814,10 @@
   }
 
   global.SN_VERIFIER_ROUND = {
-    LEVELS, SEDI, SPIEGAZIONE_SEDE, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
+    LEVELS, SEDI, SPIEGAZIONE_SEDE, SPIEGAZIONE_DIFFICILE, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel, primaFrase,
     sedeDi, effectiveLevel, missingCaps, normalizeCaps, normalizeCounts, decideRound, derivedGroups, groupLabel,
-    findingTag, formatFinding, formatFindings, hasDecision, roundNote,
+    findingTag, formatFinding, formatFindings, hasDecision, roundNote, segnalazioneFerma,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
