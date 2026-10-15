@@ -527,48 +527,24 @@
     const findings = tutti.filter((f) => f.sede !== 'e');
     const external = tutti.filter((f) => f.sede === 'e').map(conPriorita);
     const blocking = [];
-    const fixable = [];
     const derived = [];
-    const twos = [];
-    const ones = [];
-    const zeros = [];
+    const candidati = [];
+    // Chi sale su un giro e chi lo fa partire sono due domande diverse: decise
+    // insieme dall'alto in basso, un 2 a bilancio finito restava fuori da un
+    // giro pagato da un 1 (#744).
+    let pagaLivello = null;
     for (const f of findings) {
       const level = effectiveLevel(f);
-      if (level >= 3) {
-        if (f.decision || left('cap3') <= 0) blocking.push(f);
-        else fixable.push(f);
-      } else if (level === 2) {
-        if (f.decision) blocking.push(f);
-        else twos.push(f);
-      } else if (level === 1) {
-        ones.push(f);
-      } else {
-        zeros.push(f);
+      if (level >= 2 && f.decision) blocking.push(f);
+      else if (level >= 3 && left('cap3') <= 0) blocking.push(f);
+      else if (f.decision) derived.push(f);
+      else {
+        candidati.push(f);
+        if (left(capKeyOf(level)) > 0 && (pagaLivello === null || level > pagaLivello)) pagaLivello = level;
       }
     }
-    // I 2: con un 3 da correggere nello stesso giro si correggono pure loro
-    // (il giro lo paga il 3); da soli seguono il loro bilancio, e a bilancio
-    // finito non fermano: vanno da parte, ciascuno un feedback a priorità 2.
-    const withThree = fixable.length > 0;
-    for (const f of twos) {
-      if (withThree || left('cap2') > 0) fixable.push(f);
-      else derived.push(f);
-    }
-    // Gli 1: con un 3/2 da correggere nello stesso giro si correggono pure
-    // loro (il giro lo paga il 3/2); da soli seguono il loro bilancio.
-    const withHigher = fixable.length > 0;
-    for (const f of ones) {
-      if (f.decision) derived.push(f);
-      else if (withHigher || left('cap1') > 0) fixable.push(f);
-      else derived.push(f);
-    }
-    // Gli 0: con qualcos'altro da correggere si correggono pure loro; da soli
-    // solo se il loro bilancio lo permette (z = 0 per default).
-    for (const f of zeros) {
-      if (f.decision) derived.push(f);
-      else if (fixable.length || left('cap0') > 0) fixable.push(f);
-      else derived.push(f);
-    }
+    const fixable = pagaLivello === null ? [] : candidati;
+    if (pagaLivello === null) derived.push(...candidati);
 
     const budgets = {};
     for (const k of CAP_KEYS) budgets[k] = { cap: caps[k], used: counts[k.replace('cap', 'count')], left: Math.max(0, left(k)) };
