@@ -3817,6 +3817,73 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #778 — quello che Filo ha visto in una finestra lo legge un modello dall'immagine, ma lo SCRIVE chi ha fatto la
+// finestra (un'app, un sito, una mail): torna imbustato, e il nome della finestra passa dal canale di sistema.
+function vediSchermoForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'VEDI_SCHERMO') continue;
+    const out = a._output;
+    if (!out || typeof out !== 'object') continue;
+    const nome = E.perCanaleSistema(String(out.finestra || ''));
+    if (out.nonConservata) {
+      blocks.push(`[Avevo guardato la finestra «${nome}»: quello che c'era non è conservato. Se serve di nuovo, guardala un'altra volta.]`);
+      continue;
+    }
+    if (!String(out.testo || '').trim()) continue;
+    const quale = out.tipo === 'schermo' ? 'lo schermo' : (out.filo ? 'la finestra di Filo' : 'la finestra');
+    blocks.push(`[Ho guardato ${quale} «${nome}»: ecco cosa c'è, letto dall'immagine da un modello che vede]\n`
+      + E.imbusta({ tipo: 'SCHERMO', testo: String(out.testo), conIntestazione: true }));
+  }
+  return blocks.join('\n\n').trim();
+}
+
+// Gli esiti di VEDI_SCHERMO che non sono una lettura: spenta, in attesa dell'OK, permesso, elenco, errore (#778).
+function vediSchermoPerModello(action, res) {
+  const E = globalThis.SN_ESTERNO;
+  const o = (res && res.output) || {};
+  const finestre = (l) => E.imbusta({
+    tipo: 'FINESTRE_APERTE',
+    testo: (Array.isArray(l) ? l : []).map((v) => `- ${E.neutralizza(v && v.nome, { unaRiga: true })}`
+      + (v && v.filo ? ' (di Filo)' : (v && v.tipo === 'schermo' ? ' (schermo)' : ''))).join('\n') || '(nessuna)',
+    conIntestazione: true,
+  });
+  const nota = o.nota ? `\n${E.perCanaleSistema(o.nota)}` : '';
+  const nome = E.perCanaleSistema(String(o.finestra || (action && action._finestra && action._finestra.nome) || action.finestra || ''));
+  if (o.spenta) {
+    return 'Non ho guardato niente: l\'impostazione «Filo può guardare lo schermo» è spenta, e da spenta Filo non cattura nessuna finestra. '
+      + 'Proponi all\'utente di accenderla chiamando adesso IMPOSTA_PREFERENZA con chiave guarda_schermo e valore true: il sistema gli mostra '
+      + 'il popup e gli basta un clic. Non riprovare a guardare finché non è accesa.';
+  }
+  if (res && res.needsConfirm) {
+    return `In attesa dell'OK dell'utente per guardare «${nome}»: il popup è davanti a lui. Quando lo dà, la finestra si guarda e la `
+      + 'conversazione riprende da sola con quello che c\'è. NON richiamare questa azione e non immaginare cosa c\'è scritto: '
+      + 'scrivi solo, in una riga, che aspetti il suo OK.';
+  }
+  if (o.permesso === 'mac') {
+    return `Non ho guardato: ${E.perCanaleSistema(o.frase)}. Sotto la tua risposta c'è «Apri le impostazioni». Dillo all'utente in una riga `
+      + 'e non riprovare finché non ha dato il permesso e riaperto Filo.'
+      + (Array.isArray(o.elenco) && o.elenco.length ? `\nIntanto si vedono solo queste:\n${finestre(o.elenco)}` : '');
+  }
+  if (Array.isArray(o.ambigue)) {
+    return `Più finestre corrispondono a «${E.perCanaleSistema(o.richiesta)}»:\n${finestre(o.ambigue)}\n`
+      + 'Chiedi all\'utente quale intende, elencandogliele: non sceglierne una a caso.';
+  }
+  if (o.nessuna) {
+    return `Nessuna finestra aperta si chiama «${E.perCanaleSistema(o.richiesta)}». Queste sono quelle che si possono guardare:\n${finestre(o.elenco)}${nota}\n`
+      + 'Se una è chiaramente quella che intende l\'utente, richiama VEDI_SCHERMO col suo nome esatto; se non si capisce, chiediglielo.';
+  }
+  if (Array.isArray(o.elenco)) {
+    return `Finestre che si possono guardare adesso:\n${finestre(o.elenco)}${nota}\n`
+      + 'Richiama VEDI_SCHERMO con in «finestra» il nome esatto di quella che intende l\'utente. Se dalla richiesta non si capisce quale, '
+      + 'chiediglielo elencando le candidate.';
+  }
+  if (o.errore) return `Non ho potuto guardare «${nome}»: ${E.perCanaleSistema(o.errore)}. Dillo all'utente in una riga, senza inventare cosa c'era.`;
+  return '';
+}
+
 // #947 — re-immissione di quello che CERCA_DOCUMENTI ha trovato: la compone PROMPTS.documentiTrovati, la stessa
 // dell'Aiuto di una scheda.
 function documentSearchesForPrompt(actions) {
@@ -3838,7 +3905,8 @@ function documentSearchesForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), transparencyDocsForPrompt(actions),
+    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), vediSchermoForPrompt(actions),
+    transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions), testiDiFuoriForPrompt(actions),
@@ -4052,6 +4120,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return n > 0
       ? `Schede riordinate: ${n} archiviate, riapribili da «Tab archiviate». Dillo all'utente in una riga.`
       : 'Schede riordinate: nessuna da archiviare. Dillo all\'utente in una riga.';
+  }
+  if (type === 'VEDI_SCHERMO') {
+    const t = vediSchermoPerModello(action, res);
+    if (t) return t;
   }
   if (res.output && res.output.blocked === 'disabled') {
     return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
