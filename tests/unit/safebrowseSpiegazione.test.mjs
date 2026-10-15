@@ -30,7 +30,7 @@ test('la chat che riceve «Filo mi protegge dal phishing?» ha la voce nell\'ind
 
   const d = CAP.renderDetailForPrompt(['dangerous-sites']);
   for (const [cosa, re] of [
-    ['i due livelli', /«Pericoloso»[\s\S]*«Sospetto»/],
+    ['i due livelli', /È «pericoloso»[\s\S]*È «sospetto»/],
     ['la lista nera di Google', /lista nera di Google/],
     ['l\'età del dominio', /da quanti giorni esiste/],
     ['i campi password o carta', /password o i dati della carta/],
