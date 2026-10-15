@@ -1048,7 +1048,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda',
+    'segnala', 'livello', 'difficile', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket', 'domanda',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
