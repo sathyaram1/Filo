@@ -5538,6 +5538,7 @@ require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un si
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
+require('./handlers/altreApp')(on, handlerCtx);   // #779 — il componente che fa agire Filo sulle altre applicazioni
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
