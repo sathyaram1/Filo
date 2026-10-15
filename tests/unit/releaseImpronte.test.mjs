@@ -342,7 +342,7 @@ test('la copia dello script, da sola e dietro un collegamento, scrive pagina e r
     const bin = join(base, 'bin');
     mkdirSync(bin);
     const statoFile = join(base, 'release.json');
-    writeFileSync(statoFile, JSON.stringify({ body: 'Note.', isDraft: true }));
+    writeFileSync(statoFile, JSON.stringify({ body: 'Note.', isDraft: true, assets: allegatiDi({ 'Filo-Linux.AppImage': 'appimage' }) }));
     writeFileSync(join(bin, 'gh'), `#!/usr/bin/env node
 const fs = require('fs');
 const a = process.argv.slice(2);
