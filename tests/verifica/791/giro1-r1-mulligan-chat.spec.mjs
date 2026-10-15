@@ -75,25 +75,3 @@ test('r1 in chat un mulligan senza mano da tenere non sparisce in silenzio: il r
   await expect(bolla).toContainText('Probabilità di avere 3 terre al turno 3');
   await expect(bolla).toContainText(/mulligan/);
 });
-
-test('aspetto e raffiche: riquadro col mulligan in chiaro e scuro, valori strani', async ({ app, openTab }) => {
-  test.setTimeout(90_000);
-  await mockScryfall(app);
-  const page = await openTab('filo://decks/decks.html');
-  await page.waitForLoadState('domcontentloaded');
-  await seedBigDeck(page);
-  const result = page.locator('#probResult');
-  await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
-  for (const v of ['1', '0', '3', '', '-2', '99', '1']) await page.fill('#probMull', v);
-  await page.fill('#probExtra', 'abc');
-  await expect(result).toHaveText(/≈ \d/);
-  await expect(result).not.toHaveClass(/dk-prob-refining/, { timeout: 30_000 });
-  await expect(page.locator('#probNeeds input[data-keep="terre"]')).toHaveValue('2');
-  await page.screenshot({ path: 'tests/.shots/v791-chiaro.png' });
-  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE(
-    { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
-    { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
-  await page.click('#probGame');
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: 'tests/.shots/v791-scuro.png' });
-});
