@@ -756,10 +756,11 @@
       parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con priorità uguale al livello.`);
     }
     // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza
-    // dei 3 non fermano il lavoro. Un vicino di livello scritto 2 non è il caso.
-    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i').length : 0;
+    // dei 3 non fermano il lavoro. Un vicino, o un 2 con la domanda (esce da
+    // solo), non è il caso.
+    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i' && !f.decision).length : 0;
     if (d.stop) {
-      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (bilancio esaurito), o un rilievo interno di livello 3 o 2 che chiede una tua decisione.');
+      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (bilancio esaurito) o che chiede una tua decisione, o un rilievo interno di livello 2 che chiede una scelta difficile da disfare.');
       const sospesi = Array.isArray(d.sospesi) ? d.sospesi.length : 0;
       if (sospesi) parts.push(`${sospesi === 1 ? 'Un altro rilievo interno resta' : `Altri ${sospesi} rilievi interni restano`} davanti a chi riprende dopo la tua risposta.`);
     } else if (Array.isArray(d.fix) && d.fix.length) {
