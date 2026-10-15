@@ -189,6 +189,73 @@
     const res = await send({ type: MSG.DECKS_LIST });
     decks = Decks.sortForLibrary((res && res.decks) || []);
     renderLibrary();
+    loadLibraryPrices();
+  }
+
+  // Prezzo totale sulla scheda (§10): stesso conto e formato del pannello statistiche (budgetInfo, fmtEur).
+  // Prima la cache, poi i prezzi freschi dietro, senza far aspettare la griglia (#380).
+  const PRICE_CHUNK = 25;
+  let libPricesRead = false; // prima della cache la scheda tace: «n.d.» direbbe che il prezzo manca, non che arriva
+  let libPriceToken = 0;
+
+  function deckCardIds(deck) {
+    const ids = deck.carte.map((c) => c.scryfall_id);
+    if (deck.commander) ids.push(deck.commander);
+    return ids;
+  }
+
+  function paintPrice(slot, deck) {
+    if (!libPricesRead) return;
+    const b = Stats.budgetInfo(deck, cardsById);
+    const carte = (n) => `${n} cart${n === 1 ? 'a' : 'e'}`;
+    if (b.missing && !b.total) {
+      slot.textContent = 'prezzo n.d.';
+      slot.title = `Prezzo non noto per ${carte(b.missing)}`;
+    } else if (b.missing) {
+      slot.textContent = `≥ ${fmtEur(b.total)}`;
+      slot.title = `Totale parziale: ${carte(b.missing)} senza prezzo noto`;
+    } else {
+      slot.textContent = fmtEur(b.total);
+      slot.title = 'Prezzo totale del mazzo';
+    }
+    slot.dataset.missing = String(b.missing);
+  }
+
+  function paintLibraryPrices() {
+    for (const el of $('deckGrid').querySelectorAll('[data-deck-id]')) {
+      const deck = decks.find((d) => d.id === el.dataset.deckId);
+      const slot = el.querySelector('.dk-price');
+      if (deck && slot) paintPrice(slot, deck);
+    }
+  }
+
+  // I freschi vanno mazzo per mazzo nell'ordine della griglia e a pezzi: lasciata la libreria il giro si ferma al
+  // pezzo dopo, invece di occupare Scryfall con mazzi che nessuno sta guardando.
+  async function loadLibraryPrices() {
+    const token = ++libPriceToken;
+    const live = () => token === libPriceToken;
+    const all = [...new Set(decks.flatMap(deckCardIds))];
+    if (all.length) {
+      const r = await send({ type: MSG.SCRYFALL_CARDS, ids: all, cacheOnly: true }).catch(() => null);
+      if (!live()) return;
+      Object.assign(cardsById, (r && r.ok && r.cards) || {});
+    }
+    libPricesRead = true;
+    paintLibraryPrices();
+    const seen = new Set();
+    for (const deck of decks) {
+      const ids = deckCardIds(deck).filter((id) => !seen.has(id));
+      ids.forEach((id) => seen.add(id));
+      for (let i = 0; i < ids.length; i += PRICE_CHUNK) {
+        if (!live()) return;
+        const r = await send({ type: MSG.SCRYFALL_CARDS, ids: ids.slice(i, i + PRICE_CHUNK), freshPrices: true }).catch(() => null);
+        if (!live()) return;
+        if (r && r.ok && r.cards) {
+          Object.assign(cardsById, r.cards);
+          paintLibraryPrices();
+        }
+      }
+    }
   }
 
   function pipsHtml(deck) {
