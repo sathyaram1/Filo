@@ -736,17 +736,29 @@
     if (r) return { ...r, nome: etichettaFilo(accel, esplicita) };
     const f = forma(accel);
     const nome = etichettaFilo(accel, esplicita);
-    const mods = f.slice(0, f.indexOf('|'));
-    // AltGr su Windows è Ctrl+Alt: con la E scrive €, con la Q @ su molte tastiere.
-    if (piattaforma(esplicita) === 'win32' && mods.includes('c') && mods.includes('a') && [...f.slice(f.indexOf('|') + 1)].length === 1) {
-      return { tipo: 'altgr', nome };
-    }
     const di = (x) => (altre && typeof altre[x] === 'string' ? altre[x] : scorciatoiaFilo(x));
     const altra = AZIONI_FILO.find((a) => a.id !== id && forma(di(a.id)) === f);
     if (altra) return { tipo: 'filo', nome, azione: altra.nome };
-    const usata = USATI_NELLE_PAGINE.find(([x]) => forma(x) === f);
+    const usata = [...USATI_NELLE_PAGINE, ...moduliPresi].find(([x]) => forma(x) === f);
     if (usata) return { tipo: 'presa', nome, cosa: usata[1] };
     return null;
+  }
+
+  // Le combinazioni date ai moduli dell'Editor, in tutti i documenti: le quattro le prenderebbero prima del modulo.
+  // Chi controlla una delle quattro passa qui la collezione dell'Editor (filo.editor.collection) e i suoi cambi.
+  let moduliPresi = [];
+  function usaScorciatoieModuli(collezione) {
+    const lista = [];
+    const files = collezione && Array.isArray(collezione.files) ? collezione.files : [];
+    for (const file of files) {
+      for (const m of (file && Array.isArray(file.modules) ? file.modules : [])) {
+        const sc = m && m.data && typeof m.data.shortcut === 'string' ? m.data.shortcut.trim() : '';
+        if (!sc || sc.length > 80 || !forma(sc)) continue;
+        const titolo = String((file.meta && file.meta.title) || 'Documento senza titolo').slice(0, 60);
+        lista.push([sc, `la usa un modulo dell'Editor nel documento «${titolo}»`]);
+      }
+    }
+    moduliPresi = lista;
   }
 
   // La frase che l'utente legge per un rifiuto di `rifiutoScorciatoiaFilo` o di `scorciatoiaDa*`.
