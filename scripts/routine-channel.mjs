@@ -993,6 +993,11 @@ export function testoImprontaDiversa(quale, dichiarato, punta, motivo = 'altro_c
 export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
   const x = g || {};
   const nulla = 'Niente è stato consegnato.';
+  const sospeso = (testa) => {
+    const nonArrivata = sospesa && !sospesa.ok ? ` (ma la sospensione non è arrivata al server: ${sospesa.motivo || 'motivo ignoto'})` : '';
+    return `${testa}Rifiuto ${x.count} di fila: la lavorazione automatica di questo feedback è sospesa e passa all'owner${nonArrivata}. Non rilanciare: rilascia il biglietto.`;
+  };
+  const conta = () => (x.count ? ` Rifiuto ${x.count} di ${IDENTITY_REJECT_LIMIT}: al ${IDENTITY_REJECT_LIMIT}° di fila il lavoro passa all'owner.` : '');
   if (x.motivo === 'rebase') {
     const di = x.rebaseDi && x.rebaseDi !== '?' ? ` del ramo "${x.rebaseDi}"` : '';
     return `${quale}: c'è un rebase in corso${di}. ${nulla}\n`
@@ -1002,12 +1007,8 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
     const ramo = x.current ? ` (ramo "${x.current}")` : '';
     const sul = x.assigned ? `, sul ramo assegnato "${x.assigned}"` : '';
     const testa = `${quale}: la consegna parte dalla cartella "${x.cartella}"${ramo}, ma il lavoro si consegna dalla cartella in cui è stato posizionato, "${x.radice}"${sul}. ${nulla}\n`;
-    if (x.escalated) {
-      const nonArrivata = sospesa && !sospesa.ok ? ` (ma la sospensione non è arrivata al server: ${sospesa.motivo || 'motivo ignoto'})` : '';
-      return `${testa}Rifiuto ${x.count} di fila: la lavorazione automatica di questo feedback è sospesa e passa all'owner${nonArrivata}. Non rilanciare: rilascia il biglietto.`;
-    }
-    const conta = x.count ? ` Rifiuto ${x.count} di ${IDENTITY_REJECT_LIMIT}: al ${IDENTITY_REJECT_LIMIT}° di fila il lavoro passa all'owner.` : '';
-    return `${testa}Porta lì i commit del lavoro (\`git -C "${x.radice}" cherry-pick <i tuoi commit>\`), poi rilancia lo stesso comando da "${x.radice}".${conta}`;
+    if (x.escalated) return sospeso(testa);
+    return `${testa}Porta lì i commit del lavoro (\`git -C "${x.radice}" cherry-pick <i tuoi commit>\`), poi rilancia lo stesso comando da "${x.radice}".${conta()}`;
   }
   if (x.motivo === 'dichiarato') {
     return `${quale}: hai dichiarato il ramo "${x.declared}", ma la cartella è sul ramo "${x.current}". ${nulla} Il ramo lo legge lo strumento dalla cartella: uno dichiarato può solo confermarlo.\n`
@@ -1019,15 +1020,11 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
     : x.rebaseDi ? (x.rebaseDi === '?' ? 'a metà di un rebase' : `a metà del rebase di "${x.rebaseDi}"`) : 'staccata, su nessun ramo';
   const atteso = x.assigned ? `il ramo assegnato a questo lavoro è "${x.assigned}"` : 'una consegna che va in verifica parte dal ramo del lavoro';
   const testa = `${quale}: la cartella è ${dove}, ma ${atteso}. ${nulla}\n`;
-  if (x.escalated) {
-    const nonArrivata = sospesa && !sospesa.ok ? ` (ma la sospensione non è arrivata al server: ${sospesa.motivo || 'motivo ignoto'})` : '';
-    return `${testa}Rifiuto ${x.count} di fila: la lavorazione automatica di questo feedback è sospesa e passa all'owner${nonArrivata}. Non rilanciare: rilascia il biglietto.`;
-  }
+  if (x.escalated) return sospeso(testa);
   const prima = !x.current && x.rebaseDi ? 'Chiudi quel rebase (`git rebase --continue` o `git rebase --abort`), poi torna' : 'Torna';
   const comando = `git checkout ${x.assigned || '<il ramo del tuo lavoro>'}`;
   const lavoro = x.current ? ` su "${x.current}"` : '';
-  const conta = x.count ? ` Rifiuto ${x.count} di ${IDENTITY_REJECT_LIMIT}: al ${IDENTITY_REJECT_LIMIT}° di fila il lavoro passa all'owner.` : '';
-  return `${testa}${prima} sul ramo ${x.assigned ? 'assegnato' : 'del lavoro'} con \`${comando}\`; se hai committato il lavoro${lavoro}, portalo lì (\`git cherry-pick\` dei tuoi commit) e rilancia lo stesso comando.${conta}`;
+  return `${testa}${prima} sul ramo ${x.assigned ? 'assegnato' : 'del lavoro'} con \`${comando}\`; se hai committato il lavoro${lavoro}, portalo lì (\`git cherry-pick\` dei tuoi commit) e rilancia lo stesso comando.${conta()}`;
 }
 
 /** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */

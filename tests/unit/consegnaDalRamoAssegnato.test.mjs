@@ -14,7 +14,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const {
   writeBranchState, withCheckpoint, writeExpectation, readBranchState, ensureSessionExcludes,
-  IDENTITY_REJECT_LIMIT, escalationNote, guardiaConsegna,
+  IDENTITY_REJECT_LIMIT, escalationNote, guardiaConsegna, checkDelivery,
 } = await import('../../scripts/lib/branch-integrity.mjs');
 const { testoConsegnaFuoriRamo } = await import('../../scripts/routine-channel.mjs');
 
@@ -71,13 +71,13 @@ function deposito({ attesa = true } = {}) {
   return { base, work, g, committa };
 }
 
-function lanciatore(work, port) {
+function lanciatore(work, port, cwd = work) {
   const env = {
     ...process.env, FILO_REPO_ROOT: work, FILO_TOOLS_ROOT: work, FILO_NO_BEAT: '1',
     FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
   };
   delete env.FILO_DISPATCH_STATE_DIR;
-  return (args) => new Promise((r) => execFile(process.execPath, [CANALE, 'deliver', 'biglietto-finto', ...args], { env, cwd: work },
+  return (args) => new Promise((r) => execFile(process.execPath, [CANALE, 'deliver', 'biglietto-finto', ...args], { env, cwd },
     (err, so, se) => r({ code: err ? (err.code ?? 1) : 0, so: String(so || ''), se: String(se || '') })));
 }
 
@@ -158,6 +158,38 @@ test('dalla linea principale o da una cartella staccata si rifiuta, anche senza 
       const chiusura = await lancia(['status', '--status', 'done', '--notes', REPORT]);
       assert.equal(chiusura.code, 0, chiusura.se);
       assert.equal(consegne(ricevuti).length, 1);
+    } finally { srv.close(); togliCartella(base); }
+  }
+});
+
+test('da un worktree dello stesso deposito non si consegna: ramo e commit lì non sono quelli della cartella posizionata', async () => {
+  for (const attesa of [true, false]) {
+    const { srv, ricevuti, port } = await fintoServer();
+    const { base, work, g } = deposito({ attesa });
+    try {
+      // La cartella posizionata resta pulita sul ramo assegnato; il lavoro nasce in un worktree su un ramo suo.
+      writeFileSync(resolve(work, '.git', 'info', 'exclude'), '.claude/worktrees/\n', { flag: 'a' });
+      const wt = resolve(work, '.claude', 'worktrees', 'altro');
+      g(['worktree', 'add', '-q', wt, '-b', 'claude/altro']);
+      writeFileSync(resolve(wt, 'lavoro.txt'), 'fatto\n', 'utf8');
+      g(['add', '-A'], wt); g(['commit', '-qm', 'lavoro'], wt);
+      const lancia = lanciatore(work, port, wt);
+      for (const [nome, args] of Object.entries(CONSEGNE)) {
+        if (attesa) azzera(work);
+        const r = await lancia(args);
+        assert.equal(r.code, 1, `attesa=${attesa} ${nome}: ${r.se}`);
+        assert.match(r.se, /la consegna parte dalla cartella ".*altro" \(ramo "claude\/altro"\)/, `${nome}: dice da dove parte`);
+        assert.match(r.se, /si consegna dalla cartella in cui è stato posizionato/, `${nome}: e qual è la cartella del lavoro`);
+        assert.match(r.se, /cherry-pick/, `${nome}: e come portarci il lavoro`);
+      }
+      assert.equal(ricevuti.length, 0, `attesa=${attesa}: al server non parte niente`);
+      // Lo stesso controllo vale per le registrazioni di dispatch, che passano da checkDelivery.
+      assert.equal(checkDelivery(work, ASSEGNATO, { da: wt }).ok, false);
+      assert.equal(checkDelivery(work, ASSEGNATO, { da: work }).ok, true);
+      // Da una sottocartella della cartella posizionata si consegna.
+      const sotto = resolve(work, 'sotto'); mkdirSync(sotto);
+      const r = await lanciatore(work, port, sotto)(CONSEGNE.critica);
+      assert.equal(r.code, 0, r.se);
     } finally { srv.close(); togliCartella(base); }
   }
 });
