@@ -28,15 +28,13 @@ export function intestazione(testo) {
       blocco = [];
       while (i < righe.length && righe[i].trim().startsWith('//')) blocco.push(righe[i++].trim().replace(/^\/\/+\s?/, ''));
     } else if (t.startsWith('/*')) {
-      const fine = righe.findIndex((r, j) => j >= i && r.indexOf('*/', j === i ? righe[i].indexOf('/*') + 2 : 0) !== -1);
-      const ultima = fine === -1 ? righe.length - 1 : fine;
-      blocco = righe.slice(i, ultima + 1).map((r, j) => {
-        let s = r.trim();
-        if (j === 0) s = s.replace(/^\/\*+!?/, '');
-        if (j === ultima - i) s = s.slice(0, s.indexOf('*/') === -1 ? s.length : s.indexOf('*/'));
-        return s.replace(/^\*+(?!\/)\s?/, '').trim();
-      });
-      i = ultima + 1;
+      blocco = [];
+      for (let r = t.replace(/^\/\*+!?/, ''); ; r = righe[i].trim()) {
+        const chiude = r.indexOf('*/');
+        blocco.push((chiude === -1 ? r : r.slice(0, chiude)).trim().replace(/^\*+\s?/, '').trim());
+        i++;
+        if (chiude !== -1 || i >= righe.length) break;
+      }
     } else return null;
     const pieno = blocco.map((r) => r.trim()).filter(Boolean);
     if (pieno.length && !DIRETTIVA.test(pieno[0])) return blocco.map((r) => r.trimEnd());
