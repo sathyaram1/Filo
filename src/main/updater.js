@@ -186,6 +186,7 @@ async function installaAllAvvioSeServe(impostazioni, { forza = false } = {}) {
     piattaforma: dip.piattaforma(),
     versioneInUso: versioneInUso(),
     modo: R.modoScelto(impostazioni),
+    canale: R.canaleScelto(impostazioni),
     automatici: automaticiDa(impostazioni),
     chiesta: await richiestaValida(versioneInUso()),
     pronto: leggiRicordo(),
