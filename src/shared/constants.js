@@ -2433,6 +2433,9 @@
     // impostare nulla. Le altre impostazioni modelli/chiavi restano nascoste
     // finché l'utente non disattiva questo switch dalle Opzioni.
     useDefaultModels: true,
+    // #818 — il modello scelto da chi usa Filo per una funzione sola, sopra i predefiniti: { [azione]: 'nick, nick' }.
+    // Vale solo coi predefiniti accesi e coi nickname del loro registro; '' toglie la scelta.
+    modelliScelti: {},
     // "Solo modelli a pesi aperti": quando true, Filo rifiuta OGNI modello
     // proprietario — Anthropic compresa — e lavora solo con modelli a pesi
     // aperti serviti da fornitori indipendenti. Vale anche con "usa modelli
@@ -2737,6 +2740,12 @@
     // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nella Cronologia per significato. Spento, di una
     // scheda che si chiude non parte niente verso i modelli: la si ritrova per parole.
     riassuntoSchede: { enabled: true },
+    // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
+    // solo dal tasto destro: si aspetta un po' e si spende meno.
+    spiegaAnticipata: { enabled: true },
+    // #818 — l'avviso prima che i crediti finiscano: quando la proiezione dice che durano al più `giorni`, o il saldo
+    // scende sotto `percento` dei crediti d'ingresso. Le soglie sono ipotesi della spec: si cambiano da qui.
+    avvisoCrediti: { attivo: true, giorni: 2, percento: 10 },
     // Suoneria del timer: suono riprodotto alla scadenza finché l'utente non
     // preme "Ferma". Generato via WebAudio API (nessun file audio esterno).
     // Valori: 'default' | 'gentle' | 'urgent' | 'chime'
