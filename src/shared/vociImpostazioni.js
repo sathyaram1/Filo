@@ -47,6 +47,7 @@
         terminalEnabled: 'terminal.enabled',
         terminalShell: 'terminal.shell',
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
+        altreAppEnabled: 'altreApp.enabled',
         barraSpinta: 'barraLaterale.spinta',
         barraStriscia: 'barraLaterale.striscia',
         barraAttesa: 'barraLaterale.attesaMs',
