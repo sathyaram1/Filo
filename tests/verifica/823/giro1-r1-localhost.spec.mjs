@@ -6,7 +6,7 @@ import { home, modelloFinto, ripristina, chiedi } from '../../helpers/chatFinta.
 
 const pagina = (titolo) => `<!doctype html><html><head><title>${titolo}</title></head><body><p>${titolo}</p></body></html>`;
 
-test('r1 la scheda su localhost detta «tienimi sempre aperta questa scheda» resta aperta dopo la pulizia', async ({ app, shell, openTab, testServer }) => {
+test('r1 «tienimi sempre aperta questa scheda» davanti a una scheda su localhost salva la regola',async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const locale = testServer.html(pagina('Locale')).replace('127.0.0.1', 'localhost');
   await openTab(locale);
