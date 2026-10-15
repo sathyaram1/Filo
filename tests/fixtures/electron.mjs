@@ -97,10 +97,12 @@ function registraUsciteApp(app) {
 
 // Chi apre Filo in una prova è già stato accolto (FILO_TEST_ACCOLTO, da playwright.config.js). Una prova
 // dell'accoglienza parte dal profilo nuovo con `test.use({ accoglienzaFatta: false })`.
+// `argomentiInPiu` vanno dopo la manopola della scala: una prova che fissa il suo fattore lo tiene anche con FILO_TEST_SCALE.
 export const test = base.extend({
   accoglienzaFatta: [true, { option: true }],
+  argomentiInPiu: [[], { option: true }],
 
-  app: async ({ accoglienzaFatta }, use, testInfo) => {
+  app: async ({ accoglienzaFatta, argomentiInPiu }, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
@@ -124,6 +126,7 @@ export const test = base.extend({
       //    la pagina con un nome da internet (testServer.html(…, { pubblico: true })).
       args: [
         ...argomentiScala,
+        ...argomentiInPiu,
         '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1',
         '.',
       ],

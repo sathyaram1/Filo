@@ -1365,7 +1365,7 @@
 
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
+      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, leggera: true });
       if (r?.ok && r.dataUrl) return r.dataUrl;
     } catch (_) {}
     return null;
