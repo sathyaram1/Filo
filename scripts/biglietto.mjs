@@ -1,6 +1,6 @@
 // biglietto.mjs — il biglietto della sessione locale (SPEC-DOMANDE.md §1.2). Lo prende l'hook di avvio; da qui ci si
 // dichiara sporchi, si legge lo stato, si chiude. Nessuna strada per tornare puliti né per «segna fidato» (§1.4).
-// Le op e il file stanno in scripts/lib/biglietto-locale.mjs; `gancio` e `consegna` sono del gancio delle letture esterne.
+// Le op stanno in scripts/lib/biglietto-locale.mjs; `gancio`/`consegna`, `fine`/`chiusura` e `scadenze` sono dei ganci.
 
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
