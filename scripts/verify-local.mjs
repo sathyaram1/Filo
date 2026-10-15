@@ -712,7 +712,7 @@ export function bilanciResiduiText(budgets) {
 
 /** La riga che dice dei 2 interni messi da parte (bilancio dei 2 finito), o vuota. PURA. */
 export function dueDaParteText(list) {
-  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && ROUND.sedeDi(f.sede) === 'i').length;
+  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && ROUND.sedeDi(f.sede) === 'i' && !f.decision).length;
   if (!n) return '';
   return `Bilancio delle correzioni di livello 2 finito: ${n === 1 ? 'il rilievo interno di livello 2 rimasto entra' : `i ${n} rilievi interni di livello 2 rimasti entrano`} nel feedback dei rimasti. Il lavoro non si ferma.`;
 }
