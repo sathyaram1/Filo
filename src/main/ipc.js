@@ -132,10 +132,10 @@ function registerIpcHandlers() {
     try {
       const F = require('./services/fingerprint');
       const ambito = ambitoIncognitoDi(senderInfo(event));
-      const riquadro = !!(opts && opts.riquadro);
-      if (!riquadro) { event.returnValue = F.configForHref(href, ambito); return; }
+      const fr = event.senderFrame;
+      if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = F.configForHref(href, ambito); return; }
       const catena = [];
-      for (let f = event.senderFrame; f; f = f.parent) catena.push(String(f.url || ''));
+      for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
       event.returnValue = catena.length > 1 ? F.configForFrames(catena, ambito) : { level: 0, seed: 0 };
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };

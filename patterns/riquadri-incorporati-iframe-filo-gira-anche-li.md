@@ -78,7 +78,7 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   la guardia anti-fingerprint; #753, GPC, passa dallo stesso preambolo). Ogni
   riquadro della stessa origine è un'altra finestra con le sue copie native di
   canvas, WebGL e audio: una pagina che crea un `iframe` vuoto e ne usa le
-  funzioni legge senza la guardia. Cinque cose misurate, non supposte:
+  funzioni legge senza la guardia. Le regole, provate negli spec:
   il preload entra in `srcdoc`, `data:`, `blob:` e negli indirizzi veri, non in
   `about:blank`; il riquadro vuoto lo prepara la finestra che lo contiene,
   dall'elemento (`contentWindow`, `contentDocument`) e, per indice o per nome,
@@ -101,5 +101,5 @@ diventa scorrevole invece di essere tagliato.
 
 **Dove:** `_makeView` in `src/main/tabs.js`, `src/preload/page-preload.js`,
 `IS_SUBFRAME` in `src/content/content.js` e `src/content/menuIcons.js`, ponte in
-`src/main/services/handlers/nav.js`. Test: `tests/iframe-context-menu.spec.mjs`,
-`tests/translate-page.spec.mjs`.
+`src/main/services/handlers/nav.js`, preambolo in `src/preload/fingerprint-guard.js`. Test:
+`tests/iframe-context-menu.spec.mjs`, `tests/translate-page.spec.mjs`, `tests/fingerprint-riquadri.spec.mjs`.
