@@ -2112,6 +2112,18 @@ async function eseguiAzioneFilo(action, {
     action._righe = righeDaDimenticare.map((r) => r.testo);
   }
 
+  // «Tieni sempre aperto X» (#823): il sito lo risolve il main (detto, o la scheda web davanti), così il popup e
+  // l'esito dicono quello che si salva o si toglie davvero.
+  if (type === 'TIENI_APERTA' || type === 'NON_TENERE_APERTA') {
+    const detto = String(action.dominio ?? action.domain ?? action.sito ?? '').trim();
+    const davanti = detto ? '' : ((targetWebTab(sender).tab || {}).url || '');
+    try {
+      if (type === 'TIENI_APERTA') action._voce = SempreAperte.voceDa(detto || davanti);
+      else action._voci = await SempreAperte.daTogliere(detto || davanti);
+    } catch (_) {}
+    action._detto = detto || davanti;
+  }
+
   // CANCELLA_PAGINE (#866): periodo e numero di pagine li calcola il main, così il popup dice il conto vero.
   if (type === 'CANCELLA_PAGINE') {
     const sito = globalThis.SN_FILO_EVENTI.normaSito(action.sito ?? action.dominio ?? action.site ?? '');
