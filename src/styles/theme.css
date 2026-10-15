@@ -269,8 +269,8 @@
   height: 0;
 }
 
-/* theme.css è iniettato anche nelle pagine esterne, dove l'<html> del sito non ha [data-sn-theme]: qui il
-   prefisso sono i contenitori Filo. Riafferma le icone outline contro un `svg { fill: currentColor }` del sito. */
+/* theme.css è iniettato anche nelle pagine esterne, e content.js mette [data-sn-theme] sull'<html> del sito: qui
+   il prefisso sono i contenitori Filo, perché le regole non tocchino il sito. Riafferma le icone outline contro un `svg { fill: currentColor }` del sito. */
 .sn-menu svg,
 .sn-popup svg,
 .sn-sidebar svg,
