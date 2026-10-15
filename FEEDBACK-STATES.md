@@ -84,8 +84,8 @@ functions. Qui sotto il perché dei passaggi, per attore.
   #775). Il derivato nato da un rilievo col `?` porta il segno `chiedeDecisione` (in chiaro,
   lo scrive solo il server alla nascita) e la domanda come turno di Filo nella conversazione.
   Ogni esito che lo metterebbe in coda o ad aspettare l'origine (sicuro dei giudici, salto dei
-  fidati, origine fusa, chiusa, sparita o non ancora fusa) diventa `design` (`statusReason:
-  decisione`): nei Ricevuti, col rombo e la casella. Attacco, spam, origine bloccata e
+  fidati, origine fusa, chiusa, sparita o non ancora fusa), e anche il verdetto `design` dei
+  giudici, diventa `design` (`statusReason: decisione`): nei Ricevuti, col rombo e la casella. Attacco, spam, origine bloccata e
   giudizio incompleto vincono come per gli altri; con l'origine si blocca e si sblocca, ma la
   sua fusione non lo mette in coda. Dopo la risposta va in coda come un feedback normale (non
   ha un ramo da riprendere) e chi lo prende trova domanda e risposta (`decisioni`). Un
