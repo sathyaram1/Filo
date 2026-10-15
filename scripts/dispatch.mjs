@@ -2148,6 +2148,8 @@ if (isMainModule) {
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
       console.log(verifierReplyText(s.reply, id));
+      const persa = segnalazioneNonPresaText(!!segnalazione.testo.trim(), s.reply);
+      if (persa) console.log(`\n${persa}`);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
