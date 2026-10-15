@@ -1658,7 +1658,7 @@
     return box.querySelector('.dk-io-body');
   }
 
-  function openExportDialog() {
+  function openExportDialog(deckId) {
     const body = buildIoOverlay('Esporta mazzo');
     body.innerHTML = `
       <textarea class="dk-io-textarea" readonly rows="14">(generazione…)</textarea>
