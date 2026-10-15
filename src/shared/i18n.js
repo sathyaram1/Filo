@@ -586,8 +586,8 @@
       'La finestra nascosta e senza i tuoi dati in cui Filo proverebbe un link sospetto prima che tu lo ' +
       'apra. Oggi nessuna funzione la usa, e una pagina che hai già aperto non ci torna mai.',
     options_security_safebrowse_key_managed:
-      'Per la lista nera di Google (phishing e malware) Filo usa una chiave che arriva col programma: ' +
-      'funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
+      'Per la lista nera di Google (phishing e malware) Filo usa una chiave che arriva col programma. ' +
+      'Funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
       'arriva solo un pezzo dell\'impronta degli indirizzi che apri, mai gli indirizzi.',
     // #1004 — pagine delicate
     options_security_delicate: 'Non mandare ai modelli le pagine delicate',
