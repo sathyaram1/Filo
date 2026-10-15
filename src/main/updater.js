@@ -452,16 +452,17 @@ function collega(au, { automatici = true, chiesta = stato.chiesta, annuncia = ()
   regola();
   au.on('checking-for-update', () => { if (stato.fase !== 'pronto') stato.fase = 'controllo'; });
   au.on('update-available', (info) => {
-    // Un controllo partito sul canale di prima: per questo canale la versione non c'è.
-    if (!R.nelCanale(info && info.version, stato.canale)) {
-      if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
-      return;
-    }
     stato.info = info || null;
     // Per chi usa Filo la versione non c'è: niente carta, niente scaricamento.
     if (!R.releaseCoerente(info)) {
       rifiuta(info);
       stato.rifiutata = String((info && info.version) || '?');
+      if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
+      return;
+    }
+    // Un controllo partito sul canale di prima: in questo la versione non c'è.
+    if (!R.nelCanale(info.version, stato.canale)) {
+      stato.info = null;
       if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
       return;
     }
