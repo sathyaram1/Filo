@@ -138,7 +138,8 @@ test('sessione: l’hook di avvio imposta il carattere, e una worktree nata dopo
 // Il clone del worker lo prova tests/unit/cloneWorker.test.mjs, sul clone vero.
 test('orchestratore locale: avvia passa dalla stessa funzione prima che nascano le worktree', () => {
   const orch = readFileSync(join(ROOT, 'scripts', 'orchestratore-locale.mjs'), 'utf8');
-  assert.match(orch, /ensureCommentChar\(P\.radice\);\s*\n\s*const fine = await creaMotore\(depVere/, 'avvia, prima che nascano le worktree');
+  assert.match(orch, /\[P\.radice, P\.serverRadice\]\.filter\(Boolean\)\) ensureCommentChar\(radice\);\s*\n\s*const fine = await creaMotore\(depVere/,
+    'avvia, per l’app e per il server, prima che nascano le worktree');
 });
 
 test('nessuna ricetta imposta il carattere per conto suo: la regola vive solo dove nasce la copia', () => {
