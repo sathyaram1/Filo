@@ -76,6 +76,9 @@
         TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',
         OPEN_URL: 'apre una pagina collegata: non salva niente',
+        ALTRE_APP_STATO: 'legge a che punto è il componente delle altre applicazioni per mostrarlo: non salva niente',
+        ALTRE_APP_REINSTALLA: 'pulsante che fa un’azione (reinstalla il componente): dalla chat lo stesso si ottiene spegnendo e riaccendendo altre_applicazioni',
+        ALTRE_APP_PERMESSO: 'apre il pannello del sistema dove si concede un permesso a Filo: è il sistema che lo chiede, non un valore da cambiare',
       },
     },
     security: {
