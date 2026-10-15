@@ -6,6 +6,7 @@
 
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const { impronta } = require('./improntaPixel');
 
 // Lo pubblica chi gestisce lo standard (programma di conformità del C2PA).
 const FONTE = 'https://raw.githubusercontent.com/c2pa-org/conformance-public/main/trust-list/C2PA-TRUST-LIST.pem';
@@ -212,41 +213,6 @@ async function analizzaImmagine(byte) {
 // l'esito letto sull'originale si ricorda per i pixel della copia, e la chat lo ritrova.
 const MAX_COPIE = 500;
 const copie = new Map();
-
-// L'impronta decodifica i pixel nel processo principale: un PNG di pochi MB può dichiararne miliardi (#946).
-const MAX_PIXEL_IMPRONTA = 100_000_000;
-
-// Larghezza per altezza dichiarate nell'intestazione di un PNG o di un JPEG, senza decodificare.
-function pixelDichiarati(b) {
-  if (b.length >= 24 && b[0] === 0x89 && b.toString('latin1', 12, 16) === 'IHDR') return b.readUInt32BE(16) * b.readUInt32BE(20);
-  if (b[0] === 0xff && b[1] === 0xd8) {
-    let i = 2;
-    while (i + 9 < b.length) {
-      if (b[i] !== 0xff) { i++; continue; }
-      const m = b[i + 1];
-      if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7) || m === 0xff) { i += m === 0xff ? 1 : 2; continue; }
-      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return b.readUInt16BE(i + 5) * b.readUInt16BE(i + 7);
-      if (m === 0xd9 || m === 0xda) break;
-      i += 2 + b.readUInt16BE(i + 2);
-    }
-  }
-  return 0;
-}
-
-function immagine(x) {
-  if (!x) return null;
-  if (typeof x.toBitmap === 'function') return x;
-  const b = Buffer.from(x);
-  if (pixelDichiarati(b) > MAX_PIXEL_IMPRONTA) return null;
-  try { return require('electron').nativeImage.createFromBuffer(b); } catch (_) { return null; }
-}
-function impronta(x) {
-  const img = immagine(x);
-  if (!img || img.isEmpty()) return '';
-  const { width, height } = img.getSize();
-  if (width * height > MAX_PIXEL_IMPRONTA) return '';
-  return require('node:crypto').createHash('sha256').update(`${width}x${height}:`).update(img.toBitmap()).digest('hex');
-}
 
 async function ricordaCopia(originale, copiate) {
   const res = await analizzaImmagine(originale);
