@@ -369,7 +369,7 @@ function withDefaults(settings) {
   return {
     ...settings,
     provider: d.provider,
-    models: d.models,
+    models: SN_CONST.effectiveModels(d.models, settings.modelliScelti, d.modelRegistry),
     modelRegistry: d.modelRegistry,
     openWeightsOnly,
     excludedProviders,

@@ -130,8 +130,11 @@ test('modello più economico: la chat (strumenti) prende solo una riserva della 
   // Senza riserve più economiche nella catena, la chat non cambia: deepseek-flash non ha mai fatto da chat.
   assert.equal(CA.modelloPiuEconomico(A.FILO_CHAT, { p: 5000, o: 500 }, config({ ...TM.models, [A.FILO_CHAT]: 'deepseek' })), null);
   // Descrivere un'immagine: solo un modello che le legge, dichiarato.
-  const img = CA.modelloPiuEconomico(A.DESCRIBE_IMAGE, { p: 3000, o: 200 }, config({ ...TM.models, [A.DESCRIBE_IMAGE]: 'claude, gemma' }));
-  assert.equal(img.nick, 'glm', 'gemma non dichiara le immagini, glm sì');
+  const img = CA.modelloPiuEconomico(A.DESCRIBE_IMAGE, { p: 3000, o: 200 }, config({ ...TM.models, [A.DESCRIBE_IMAGE]: 'claude' }));
+  assert.equal(img.nick, 'gemma-lite', 'il più economico fra quelli che leggono le immagini; DeepSeek Flash costa meno ma non le legge');
+  const ignoto = { ...TM.registry, misterioso: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash', label: 'Senza capacità dichiarate' } };
+  const soloIgnoto = CA.modelloPiuEconomico(A.DESCRIBE_IMAGE, { p: 3000, o: 200 }, { ...config({ [A.DESCRIBE_IMAGE]: 'claude', [A.EXPLAIN]: 'misterioso' }), registry: ignoto });
+  assert.equal(soloIgnoto, null, 'chi non dichiara di leggere le immagini non si propone per le immagini');
   // Testo semplice: il più economico fra quelli in uso, prima la riserva della catena.
   const sp = CA.modelloPiuEconomico(A.EXPLAIN, { p: 800, o: 200 }, config());
   assert.equal(sp.nick, 'gemma-lite');
@@ -167,7 +170,8 @@ test('i rimedi: modelli più economici per le funzioni che consumano, automatich
   assert.match(per.modello.frase, /^circa \d+ crediti in meno al giorno$/);
   // Il correttore è spento: non si propone di spegnerlo, e non conta nel risparmio.
   assert.deepEqual(per.automatiche.cambi.map((c) => c.percorso), ['spiegaAnticipata.enabled', 'riassuntoSchede.enabled']);
-  assert.equal(Math.round(per.automatiche.risparmio), 70);
+  // Media sui giorni dal primo registrato, oggi compreso: 70 crediti in due giorni.
+  assert.equal(Math.round(per.automatiche.risparmio), 35);
   assert.equal(per.chiave.frase, 'circa 300 crediti di Filo in meno al giorno');
   assert.equal(per.attesa.testo, 'Aspetta la quota del giorno: stanotte verso le 2:00 arrivano 100 crediti');
   // Con la chiave propria non c'è il rimedio della chiave; senza quota, niente attesa.

@@ -918,6 +918,19 @@
     };
   }
 
+  // I modelli per funzione con «usa modelli predefiniti» acceso, più le scelte di chi usa Filo per una funzione sola
+  // (#818: il modello più economico proposto quando i crediti stanno per finire). PURA. Una scelta vale solo se ogni
+  // nickname esiste nel registro predefinito: un modello tolto dall'owner non resta acceso da una scelta vecchia.
+  function effectiveModels(predefiniti, scelti, registry) {
+    const out = { ...(predefiniti || {}) };
+    const reg = registry || {};
+    for (const [azione, catena] of Object.entries(scelti && typeof scelti === 'object' ? scelti : {})) {
+      const refs = parseModelRefs(catena);
+      if (refs.length && refs.every((r) => Object.prototype.hasOwnProperty.call(reg, r))) out[azione] = refs.join(', ');
+    }
+    return out;
+  }
+
   // Cosa sanno masticare i sostituti, per nickname. Sta qui accanto alla tabella
   // delle sostituzioni perché è la stessa curatela: il registry personale di chi
   // usa Filo NON dichiara le capacità (le righe delle Opzioni hanno solo
@@ -2982,6 +2995,7 @@
     openWeightsBlockKind,
     effectiveExcludedProviders,
     effectiveApiKeys,
+    effectiveModels,
     applyOpenWeightsPolicy,
     openWeightsImpact,
     DEPRECATED_MODELS,
