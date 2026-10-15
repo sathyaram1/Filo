@@ -12,7 +12,7 @@ import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 
 const [cmd, ...args] = process.argv.slice(2);
 if (!cmd) {
-  console.error('Uso: node scripts/lancia-electron.mjs <comando> [argomenti…]   es. npx playwright test tests/x.spec.mjs');
+  console.error('Uso: node scripts/lancia-electron.mjs <comando> [argomenti…]   es. npm run test:shoot');
   process.exit(2);
 }
 // Il marcatore sta nel clone del worker: dagli strumenti fissati o da questo file, non da dove si è lanciato.
