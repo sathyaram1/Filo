@@ -264,12 +264,15 @@
         note.hidden = false;
         reissue.hidden = false;
       }
-      renderInvites(server.invites || []);
+      const blocco = W.invitesLock({ server, google: w.google });
+      renderInvitesLocked(blocco);
+      renderInvites(blocco ? [] : (server.invites || []), { bloccati: Boolean(blocco) });
       return;
     }
 
     // Nessun portafoglio: si entra con un invito.
     $('invitesSection').hidden = true;
+    renderInvitesLocked(null);
     const form = $('redeemForm');
     form.hidden = false;
     if (w.identity && !w.identity.ok && (w.identity.lost || w.identity.unreadable)) {
