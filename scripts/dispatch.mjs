@@ -1276,7 +1276,7 @@ export function verifierReplyText(reply, id = '<id>') {
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
       perSegnalazione
         ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
-        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
+        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito o che chiede una decisione, o un 2 che chiede una scelta difficile da disfare): decide l\'owner.',
       perSegnalazione ? null : fmt(r.blocking),
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
