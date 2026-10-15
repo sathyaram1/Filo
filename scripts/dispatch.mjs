@@ -100,6 +100,7 @@ import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
+import { cloneDentroIlRepo } from './lib/git-server.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
