@@ -1343,16 +1343,17 @@ export function verifierReplyText(reply, id = '<id>') {
 /**
  * Cosa si stampa a consegna accettata: il lavoro si è fermato, o torna in
  * verifica. `conSegnalazione` = la consegna portava una segnalazione (o il
- * vecchio --ferma), quindi DOVEVA fermarsi. PURA.
+ * vecchio --ferma); `doveva` = per il suo livello DOVEVA fermarsi (#1202). PURA.
  */
-export function fixedReplyText(id, reply, conSegnalazione = false) {
+export function fixedReplyText(id, reply, conSegnalazione = false, doveva = true) {
   const fermato = reply && reply.outcome === 'stop';
   if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
   // Un server vecchio, che non ferma su una segnalazione, rimette in coda: dirlo, o chi ha segnalato crede di essersi fermato.
-  if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
+  if (conSegnalazione && doveva) return `stato ${id}: ATTENZIONE, la segnalazione era di livello 3 o difficile da disfare ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
+  if (conSegnalazione) return `stato ${id}: consegnato, torna in coda per la verifica con la scelta che hai fatto nel frattempo; la segnalazione arriva all'owner in un feedback derivato, con la domanda`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
-async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
+async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false, campiSegnalazione = {}) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
   // La consegna vale per un commit, come la critica (stessa regola, stessa
