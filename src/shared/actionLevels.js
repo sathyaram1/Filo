@@ -614,6 +614,13 @@
         return !!(built && !built.rifiuto && built.allenta);
       },
       dove: (a) => { const built = prefBuilt(a); return (built && built.dove) || ''; },
+      // Un setter che vuole sempre l'OK (`chiede` in preferences.js) sta fuori dal perimetro: un clic, a ogni livello.
+      perimetro: (a) => {
+        if (a && a._invariato) return true;
+        const built = prefBuilt(a);
+        return !(built && !built.rifiuto && built.chiede);
+      },
+      perchePerimetro: 'Te lo chiedo sempre prima di accenderla.',
       describe: (a) => {
         const built = prefBuilt(a);
         if (!built || built.rifiuto) return 'Modificare una preferenza';
@@ -982,6 +989,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+    'VEDI_SCHERMO',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
@@ -1015,7 +1023,10 @@
     try { dove = String(valore(entry.dove, action, ctx) || ''); } catch (_) { dove = ''; }
     let dentroPerimetro = true;
     try { dentroPerimetro = typeof entry.perimetro === 'function' ? !!entry.perimetro(action, ctx) : true; } catch (_) { dentroPerimetro = false; }
-    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro };
+    // La frase del popup quando chiede perché l'azione sta fuori dal perimetro: la dice chi conosce l'azione.
+    let perchePerimetro = '';
+    try { perchePerimetro = dentroPerimetro ? '' : String(valore(entry.perchePerimetro, action, ctx) || ''); } catch (_) { perchePerimetro = ''; }
+    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro, perchePerimetro };
   }
 
   // Spiegazione in chiaro di cosa Filo sta tentando, per il popup di conferma.
