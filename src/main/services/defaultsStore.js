@@ -929,8 +929,6 @@ module.exports = {
   setAutomationGate,
   getAutomationAutoApprove,
   setAutomationAutoApprove,
-  getAutomationProberIdle,
-  setAutomationProberIdle,
   getLavoriServer,
   setLavoriServer,
   getRoutinesEnabled,
