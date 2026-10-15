@@ -463,7 +463,7 @@
   }
 
   // ── Le manopole dei crediti (#652) ─────────────────────────────────────────
-  // Le sette impostazioni che l'owner può cambiare in `config/credits`: come si
+  // Le impostazioni che l'owner può cambiare in `config/credits`: come si
   // chiamano nella pagina e quanto possono valere. Stanno qui perché le usano
   // in due — la pagina per disegnare i campi, il main per rifiutare un numero
   // storto prima di scriverlo sul server. I tetti sono larghi di proposito: il
