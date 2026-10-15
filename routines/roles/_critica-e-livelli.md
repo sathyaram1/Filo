@@ -189,14 +189,17 @@ node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 <!-- includi: _segnala.md -->
 
 Qui il file accompagna un rilievo col `?`: la riga nella critica resta una
-riga, le scelte e i loro costi stanno nel file. Un difetto non va lì: è un
+riga, le scelte e i loro costi stanno nel file, col livello e il `!` del
+rilievo anche su `--livello` e `--difficile`. Un difetto non va lì: è un
 rilievo col suo livello. Sulla critica fermano il lavoro un rilievo interno
-di livello 2 o 3 col `?` e la segnalazione allegata, anche senza rilievi: con
-`--segnala` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
-restano davanti a chi riprende dopo la sua risposta. Un 1 col `?`, o un
-esterno di qualunque livello, va avanti in un feedback derivato che l'owner
+di livello 3 col `?`, uno di livello 2 col `?!`, e una segnalazione di livello
+3 o con `--difficile`, anche senza rilievi: allora il lavoro aspetta l'owner
+in ogni esito, e i rilievi da correggere restano davanti a chi riprende dopo
+la sua risposta. Un `[2i?]` va avanti nella correzione con la strada che
+consigli, e la domanda esce in un feedback derivato; un 1 o uno 0 col `?`, o
+un esterno di qualunque livello, va avanti in un feedback derivato che l'owner
 decide a parte. Se poi il server ti manda a correggere, una segnalazione a
-QUELLA consegna ferma il lavoro come per chi risolve.
+QUELLA consegna segue la stessa regola che vale per chi risolve.
 
 La critica registrata non si modifica più.
 
