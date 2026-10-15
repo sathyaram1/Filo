@@ -349,7 +349,8 @@ describe('una richiesta già decisa non si annuncia in attesa (#486)', () => {
     const reply = { outcome: 'blocked', reason: 'x', requestId: ID, requestState: '', requestCheck: 'elenco delle richieste: http_500' };
     const msg = messageForOwnerMerge(reply, 'claude/x');
     assert.match(msg, /non sono riuscito a\s+controllarlo \(elenco delle richieste: http_500\)/);
-    assert.match(msg, /Se in cima ai Ricevuti della dashboard di gestione non c'è l'avviso/);
+    assert.match(msg, /Se in Gestione → Automazioni la richiesta non c'è/);
+    assert.doesNotMatch(msg, /Ricevuti/);
     assert.match(msg, /git commit --allow-empty/);
     assert.doesNotMatch(msg, /L'ho messa IN ATTESA/);
     assert.equal(richiestaForseInAttesa(reply), true);
