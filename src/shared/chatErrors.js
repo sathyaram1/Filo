@@ -107,6 +107,7 @@
     NO_API_KEY: 'crediti',
     NO_MODEL_FOR_ACTION: 'opzioni',
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
+    NO_ALLOWED_HOST: 'opzioni',
     LIMIT_REACHED: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
     RISPOSTA_TAGLIATA: 'preferenze',
