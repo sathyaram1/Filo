@@ -61,15 +61,22 @@ aggiunto oltre il chiesto (l'aggiunta resta, il suo difetto va in un feedback
 suo: non si disfa il lavoro fatto).
 
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
-resta un 3. Il giro continua per i rilievi interni; un vicino può essere
-corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
-lavoro; ogni esterno esce subito in un feedback suo, con la priorità uguale al
-livello, e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
-suo feedback.
+resta un 3. Solo i rilievi interni decidono se il giro continua o si ferma; un
+vicino viene corretto insieme a loro se il giro continua comunque, perché il
+suo file è già aperto, altrimenti esce in un feedback suo col livello che
+scrivi, e non ferma mai questo lavoro; ogni esterno esce subito in un feedback
+suo, con la priorità uguale al livello, e non ferma questo lavoro — nemmeno
+col `?`: la domanda viaggia nel suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
 rilievo chiede una decisione dell'owner: un trade-off vero, una scelta di
-prodotto o di gusto. Un difetto non chiede decisioni.
+prodotto o di gusto. Un difetto non chiede decisioni. Nel rilievo col `?`
+scrivi le strade e **quella che consigli**: un `[2i?]` non ferma il lavoro,
+chi corregge applica la tua, e la domanda arriva all'owner in un feedback
+derivato. **Il segno `!`** accanto al `?` (`[2i?!]`) dice che la scelta è
+difficile da disfare — dati degli utenti, sicurezza, formati salvati su disco
+— e allora anche un 2 ferma il lavoro finché l'owner non risponde. Il `!` da
+solo, senza `?`, viene respinto.
 
 | segnalazione e rilievo | livello e sede |
 |---|---|
