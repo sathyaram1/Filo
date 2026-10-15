@@ -385,10 +385,8 @@ service cloud.firestore {
         // S1.F2.2: clientIdHash — hash SHA-256 troncato in chiaro (32 char hex) per match C5.
         && request.resource.data.get('clientIdHash', '') is string
         && request.resource.data.get('clientIdHash', '').size() <= 64
-        && request.resource.data.get('images', []) is list
-        && request.resource.data.get('images', []).size() <= 5
-        && request.resource.data.get('files', []) is list
-        && request.resource.data.get('files', []).size() <= 5
+        && immaginiDelDeposito(request.resource.data.get('images', []))
+        && fileDelDeposito(request.resource.data.get('files', []))
         && request.resource.data.get('seq', 0) is int
         && request.resource.data.get('seq', 0) >= 0
         && request.resource.data.get('seq', 0) <= 1000000
