@@ -75,7 +75,10 @@ test('la riga di comando: prendi, sporca col motivo, stato, chiudi; niente per t
   assert.deepEqual(leggiArgomenti(['sporca', 'letto', 'una', 'pagina']), { cmd: 'sporca', motivo: 'letto una pagina' });
   assert.deepEqual(leggiArgomenti(['stato']), { cmd: 'stato' });
   assert.deepEqual(leggiArgomenti(['chiudi']), { cmd: 'chiudi' });
-  for (const a of [[], ['sporca'], ['sporca', '  '], ['prendi', '--sporco'], ['prendi', '--pulito'], ['pulisci'], ['segna-fidato', 'x'], ['stato', 'x']]) {
+  assert.deepEqual(leggiArgomenti(['fine']), { cmd: 'fine' });
+  assert.deepEqual(leggiArgomenti(['scadenze']), { cmd: 'scadenze' });
+  assert.deepEqual(leggiArgomenti(['chiusura', 'sess-1']), { cmd: 'chiusura', sessione: 'sess-1' });
+  for (const a of [[], ['sporca'], ['sporca', '  '], ['prendi', '--sporco'], ['prendi', '--pulito'], ['pulisci'], ['segna-fidato', 'x'], ['stato', 'x'], ['chiusura'], ['chiusura', ' '], ['fine', 'x']]) {
     assert.ok(leggiArgomenti(a).errore, JSON.stringify(a));
   }
 });
