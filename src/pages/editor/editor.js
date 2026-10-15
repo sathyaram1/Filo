@@ -4049,6 +4049,7 @@
         overlayBox.querySelectorAll('[data-picon]').forEach((sel) => { m.data.pages[Number(sel.dataset.picon)].icon = sel.value; });
       }
       closeOverlay(); renderGrid(); markDirty();
+      if (nuovaScorciatoia) save(false);
     });
     // Invio in un campo conferma come «Salva», come Esc annulla (#545).
     overlayBox.querySelectorAll('input[type="text"]').forEach((inp) => inp.addEventListener('keydown', (e) => {
