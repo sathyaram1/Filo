@@ -1180,6 +1180,25 @@ function frase(f) {
   return VERIFIER_ROUND.primaFrase ? VERIFIER_ROUND.primaFrase(f && f.text) : String((f && f.text) || '').split('\n')[0];
 }
 
+/**
+ * I derivati divisi fra messi da parte e domande che il giro corregge comunque con l'opzione consigliata (un
+ * `[2i?]`, #1202): queste ultime hanno un feedback loro, ma la prova resta, perché il rilievo si sta correggendo.
+ * Si riconoscono dal segno del server o dal numero in `daCorreggere`. PURA.
+ */
+export function separaDomandeInCorrezione(derivati, daCorreggere) {
+  const numeri = new Set((Array.isArray(daCorreggere) ? daCorreggere : []).map((f) => f && f.n).filter(Number.isInteger));
+  const inCorso = (f) => !!f && (f.inCorrezione === true || (Number.isInteger(f.n) && numeri.has(f.n)));
+  const daParte = [];
+  const domande = [];
+  for (const d of Array.isArray(derivati) ? derivati : []) {
+    const si = d.rilievi.filter(inCorso);
+    const no = d.rilievi.filter((f) => !inCorso(f));
+    if (no.length) daParte.push(si.length ? { ...d, rilievi: no } : d);
+    if (si.length) domande.push(no.length ? { ...d, rilievi: si } : d);
+  }
+  return { daParte, domande };
+}
+
 function derivatiRighe(list) {
   if (!list.length) return '  (nessuno)';
   return list.map((d) => {
