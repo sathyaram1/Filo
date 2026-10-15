@@ -209,6 +209,13 @@
   }
 
   function handSatisfies(drawn, want) {
+    // Il conteggio per tag è una condizione necessaria e costa poco: quasi
+    // sempre basta a dire di no, e il matching resta per i sì.
+    for (const w of want) {
+      let c = 0;
+      for (let i = 0; i < drawn.length && c < w.n; i++) if (drawn[i].includes(w.tag)) c++;
+      if (c < w.n) return false;
+    }
     const c = coverage(drawn, want, true);
     return c.covered === c.units;
   }
