@@ -127,9 +127,16 @@ function registerIpcHandlers() {
   // può aspettare una Promise. Ritorna { level, seed }: il seed è derivato in
   // main dal master secret (che NON attraversa mai questo confine). Vedi
   // services/fingerprint.js e preload/fingerprint-guard.js.
-  ipcMain.on('filo:fp-config', (event, href) => {
+  // Per un riquadro conta la catena dei frame vista dal main, non l'indirizzo che il riquadro dichiara (#798).
+  ipcMain.on('filo:fp-config', (event, href, opts) => {
     try {
-      event.returnValue = require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
+      const F = require('./services/fingerprint');
+      const ambito = ambitoIncognitoDi(senderInfo(event));
+      const riquadro = !!(opts && opts.riquadro);
+      if (!riquadro) { event.returnValue = F.configForHref(href, ambito); return; }
+      const catena = [];
+      for (let f = event.senderFrame; f && catena.length < 64; f = f.parent) catena.push(String(f.url || ''));
+      event.returnValue = catena.length > 1 ? F.configForFrames(catena, ambito) : { level: 0, seed: 0 };
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
