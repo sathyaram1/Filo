@@ -432,7 +432,7 @@
     const msg = $('linkGoogleMsg');
     btn.disabled = true;
     msg.classList.remove('is-error');
-    msg.textContent = 'Completa l’accesso a Google: poi i tuoi inviti compaiono qui.';
+    msg.textContent = 'Completa l’accesso a Google, poi i tuoi inviti compaiono qui.';
     msg.hidden = false;
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) { r = null; }
@@ -443,7 +443,7 @@
       await load();
       return;
     }
-    msg.textContent = (r && r.error) || 'L’accesso a Google non è riuscito: riprova.';
+    msg.textContent = (r && r.error) || 'L’accesso a Google non è riuscito. Riprova.';
     msg.classList.add('is-error');
   }
 

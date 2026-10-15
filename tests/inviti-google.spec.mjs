@@ -118,7 +118,7 @@ test('un portafoglio senza Google vede «Collega Google» al posto dei codici; f
   await dirottaAccesso(page);
   await bottone.click();
   await expect.poll(() => page.evaluate(() => window.__accessi.length)).toBe(1);
-  await expect(page.locator('#linkGoogleMsg')).toHaveText('Completa l’accesso a Google: poi i tuoi inviti compaiono qui.');
+  await expect(page.locator('#linkGoogleMsg')).toHaveText('Completa l’accesso a Google, poi i tuoi inviti compaiono qui.');
   await expect(bottone).toBeDisabled();
   // Un secondo clic mentre l'accesso è aperto non ne apre un altro.
   await bottone.click({ force: true });
@@ -183,14 +183,14 @@ test('i due rifiuti nuovi del riscatto si spiegano: invito di chi non ha Google,
   riscatto = { status: 'inviter_not_linked' };
   await page.fill('#inviteCode', 'ABCD-EFGH');
   await page.click('#redeemBtn');
-  await expect(msg).toHaveText('Questo invito non vale ancora: chi te l’ha dato deve prima collegare Google a Filo, dalla sua pagina Crediti. Chiediglielo, o fatti mandare un altro invito.');
+  await expect(msg).toHaveText('Questo invito non vale ancora. Chi te l’ha dato deve prima collegare Google a Filo dalla sua pagina Crediti. Chiediglielo, o fatti mandare un altro invito.');
   await expect(msg).toHaveClass(/is-error/);
 
   const riapre = RIAPRE();
   riscatto = { status: 'network_cap', reopensAt: riapre };
   await page.click('#redeemBtn');
   const ora = await page.evaluate((iso) => new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }), riapre);
-  await expect(msg).toHaveText(new RegExp(`^Da questa rete sono già entrate troppe persone con un invito: riprova (domani )?dopo le ${ora}\\. Il codice resta valido\\.$`));
+  await expect(msg).toHaveText(new RegExp(`^Da questa rete sono già entrate troppe persone con un invito\\. Il codice resta valido, riprova (domani )?dopo le ${ora}\\.$`));
   expect(seen.redeems).toEqual(['ABCDEFGH', 'ABCDEFGH']);
   // Il campo resta lì col codice: chi riprova più tardi non lo deve ricopiare.
   await expect(page.locator('#inviteCode')).toHaveValue('ABCD-EFGH');
@@ -199,7 +199,7 @@ test('i due rifiuti nuovi del riscatto si spiegano: invito di chi non ha Google,
 test(T_PRIMO_AVVIO, async ({ openTab }) => {
   await expect.poll(() => seen.redeems, { timeout: 40_000 }).toEqual(['ABCDEFGH']);
   const page = await openTab('filo://credits/credits.html');
-  await expect(page.locator('#walletNote')).toContainText('Da questa rete sono già entrate troppe persone con un invito: riprova', { timeout: 15_000 });
-  await expect(page.locator('#walletNote')).toContainText('Il codice resta valido.');
+  await expect(page.locator('#walletNote')).toContainText('Da questa rete sono già entrate troppe persone con un invito. Il codice resta valido, riprova', { timeout: 15_000 });
+  await expect(page.locator('#walletNote')).toContainText(/riprova (domani )?dopo le \d\d:\d\d\./);
   await expect(page.locator('#redeemForm')).toBeVisible();
 });

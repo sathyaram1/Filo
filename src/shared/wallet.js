@@ -207,9 +207,9 @@
     own_code: 'È un tuo codice: dallo a qualcun altro.',
     already_in: 'Hai già i tuoi crediti su questa installazione.',
     invites_exhausted: 'Per ora i posti sono finiti: riprova fra qualche giorno.',
-    // #1120: un invito vale solo se chi l'ha dato ha collegato Google; il controllo è al riscatto, anche per i codici vecchi.
-    inviter_not_linked: 'Questo invito non vale ancora: chi te l’ha dato deve prima collegare Google a Filo, dalla sua pagina Crediti. Chiediglielo, o fatti mandare un altro invito.',
-    network_cap: 'Da questa rete sono già entrate troppe persone con un invito: riprova più tardi. Il codice resta valido.',
+    // #1120: un invito vale solo se chi l'ha dato ha collegato Google. Il server lo guarda al riscatto, quindi vale anche per i codici già in giro.
+    inviter_not_linked: 'Questo invito non vale ancora. Chi te l’ha dato deve prima collegare Google a Filo dalla sua pagina Crediti. Chiediglielo, o fatti mandare un altro invito.',
+    network_cap: 'Da questa rete sono già entrate troppe persone con un invito. Il codice resta valido, riprova più tardi.',
     global_cap: 'Per ora non possiamo dare altri crediti: riprova fra qualche giorno.',
     missing_exchange_rate: 'Il server non è ancora pronto (manca il cambio del giorno): riprova fra qualche minuto.',
     not_configured: 'Il server non è ancora configurato per i crediti.',
@@ -236,7 +236,7 @@
     const quando = giorno(t) === giorno(now) ? `dopo le ${ora}`
       : giorno(t) === giorno(domani) ? `domani dopo le ${ora}`
         : `dal ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} alle ${ora}`;
-    return `Da questa rete sono già entrate troppe persone con un invito: riprova ${quando}. Il codice resta valido.`;
+    return `Da questa rete sono già entrate troppe persone con un invito. Il codice resta valido, riprova ${quando}.`;
   }
 
   function fmtInt(n) {

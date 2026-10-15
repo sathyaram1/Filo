@@ -91,7 +91,7 @@ test('il tetto per rete dice l\'ora in cui riprovare: oggi, domani o in un altro
   const ora = (d) => d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
   const oggi = new Date(2026, 9, 15, 14, 30);
   assert.equal(W.networkCapMessage(oggi.toISOString(), now),
-    `Da questa rete sono già entrate troppe persone con un invito: riprova dopo le ${ora(oggi)}. Il codice resta valido.`);
+    `Da questa rete sono già entrate troppe persone con un invito. Il codice resta valido, riprova dopo le ${ora(oggi)}.`);
   const domani = new Date(2026, 9, 16, 9, 5);
   assert.match(W.networkCapMessage(domani.toISOString(), now), new RegExp(`riprova domani dopo le ${ora(domani)}\\.`));
   const fra3 = new Date(2026, 9, 18, 9, 5);
