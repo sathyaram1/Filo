@@ -7,6 +7,7 @@ import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { menuAperto, barraPage } from './helpers/barra.mjs';
+import { home as homeChat, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 
