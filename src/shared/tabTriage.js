@@ -80,18 +80,24 @@
 
   // «Tieni sempre aperto X» (#823): la voce è un host, e copre anche i suoi sottodomini. Il sito registrabile
   // sarebbe troppo largo: «tieni aperto Google Docs» non deve tenere aperte anche le ricerche su google.com.
+  // Un nome senza punto è una macchina (localhost, il NAS dell'ufficio) solo detto come indirizzo, con schema o
+  // porta: «whatsapp» da solo è un nome di servizio, e salvarlo non terrebbe aperto niente.
   function hostTenuto(v) {
     let s = String(v == null ? '' : v).trim().toLowerCase();
     if (!s) return '';
-    if (!/^[a-z][a-z0-9+.-]*:\/\//.test(s)) s = `https://${s}`;
+    const conSchema = /^[a-z][a-z0-9+.-]*:\/\//.test(s);
+    if (!conSchema) s = `https://${s}`;
     let host;
+    let porta;
     try {
       const u = new URL(s);
       if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
       host = u.hostname;
+      porta = u.port;
     } catch (_) { return ''; }
     host = host.replace(/\.$/, '').replace(/^www\./, '');
-    return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : '';
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) || /^\[[0-9a-f:.]+\]$/.test(host)) return host;
+    return /^[a-z0-9-]+$/.test(host) && (host === 'localhost' || conSchema || porta) ? host : '';
   }
 
   function copreHost(voce, host) {
