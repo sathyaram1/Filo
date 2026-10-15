@@ -219,8 +219,8 @@ export async function esegui({ argv, gh, attendi, riassunto = () => {}, log = ()
     return { corpo: String(dati.body ?? ''), bozza: !!dati.isDraft };
   };
   const dir = mkdtempSync(join(tmpdir(), 'filo-impronte-'));
+  let bozza = null;
   try {
-    let bozza = false;
     for (let giro = 1; giro <= GIRI; giro++) {
       await conRiprova(() => {
         const letto = leggi();
