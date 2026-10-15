@@ -233,3 +233,39 @@ test('la scorciatoia scelta resta dopo aver chiuso e riaperto Filo', async ({ te
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 });
+
+// Verifica #842: la combinazione di un modulo dell'Editor non va a una delle quattro, che la prenderebbero prima del
+// modulo; e i moduli rifiutano il microfono delle chat come le quattro.
+test('una combinazione già data a un modulo dell\'Editor si rifiuta per Traduci, a parole e in Preferenze', async ({ app, openTab }) => {
+  const editor = await openTab('filo://editor/editor.html');
+  await expect(editor.locator('#doc')).toBeVisible();
+  await editor.locator('.ed-module[data-type="settings"]').click();
+  await editor.locator('.ed-module[data-type="word-count"]').click();
+  await editor.fill('#cfgShortcut', 'Ctrl+Shift+Spazio');
+  await editor.click('#cfgSave');
+  await expect(editor.locator('#cfgShortcutTaken')).toContainText('microfono');
+  await editor.fill('#cfgShortcut', 'Ctrl+Shift+Y');
+  await editor.click('#cfgSave');
+  await expect(editor.locator('#overlay')).toBeHidden();
+  await editor.locator('.ed-module[data-type="settings"]').click();
+  await expect(editor.locator('#settingsView')).toBeHidden();
+
+  // L'Editor salva da sé dopo un attimo: da lì il main la conosce.
+  await expect.poll(() => app.evaluate(() => !!globalThis.SN_TASTI.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y')),
+    { timeout: 10_000 }).toBe(true);
+  const r = await chiedi(app, 'Traduci: Ctrl+Shift+Y');
+  expect(r.executed).toBe(false);
+  expect(r.output.error).toContain('modulo dell\'Editor');
+
+  await editor.click('#doc');
+  await premi(app, 'Y', ['control', 'shift']);
+  await expect(editor.locator('#overlay')).toBeVisible();
+  await editor.keyboard.press('Escape');
+
+  const pref = await openTab(PREFERENZE);
+  await tastiDellaRiga(pref, 'translate-selection').click();
+  await premi(app, 'Y', ['control', 'shift']);
+  const errore = pref.locator('#scorciatoieFilo .sc-riga[data-azione="translate-selection"] .sc-errore');
+  await expect(errore).toContainText('modulo dell\'Editor');
+  expect((await scelte(app))['translate-selection'] || '').toBe('');
+});
