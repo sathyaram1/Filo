@@ -596,7 +596,8 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
 /**
  * Registra il commit della pulizia: le prove dei rilievi messi da parte tolte PRIMA di correggere.
  * Da lì parte il confronto della consegna, e ogni prova tolta dopo che è ancora rossa la ferma. PURA:
- * `controllo` è l'esito di controllaPulizia (lib/prove-tolte.mjs).
+ * `controllo` è l'esito di controllaPulizia (lib/prove-tolte.mjs). Una pulizia dopo le correzioni non
+ * sposta la base: va in `pulizieDopo`, e la consegna non rilancia ciò che ha tolto.
  */
 export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
@@ -610,11 +611,22 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   }
   if (Array.isArray(dirtyFiles) && dirtyFiles.length) return { ok: false, reason: dirtyTreeText(dirtyFiles, 'pulizia') };
   if (!controllo || !controllo.ok) return { ok: false, reason: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
-  const numeri = numeraRilievi(ROUND.parseFindings(prev.critique || '').findings, parte).map((f) => f.n);
+  const numeri = numeriMessiDaParte(prev);
   const fuori = testoPuliziaFuoriNumero(controllo, numeri);
   if (fuori) return { ok: false, reason: fuori };
-  s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
+  const dopo = Array.isArray(prev.pending.pulizieDopo) ? prev.pending.pulizieDopo.filter((x) => x !== controllo.sha) : [];
+  const pending = controllo.dopo
+    ? { ...prev.pending, pulizieDopo: [...dopo, controllo.sha] }
+    : { ...prev.pending, shaPulizia: controllo.sha };
+  s[branch] = { ...prev, pending };
   return { ok: true, state: s, files: controllo.files, numeri };
+}
+
+/** I posti nella critica dei rilievi che il giro ha messo da parte: le loro prove escono con la pulizia. PURA. */
+export function numeriMessiDaParte(prev) {
+  const p = (prev && prev.pending) || {};
+  const parte = [p.derived, p.external].flatMap((l) => (Array.isArray(l) ? l : []));
+  return numeraRilievi(ROUND.parseFindings((prev && prev.critique) || '').findings, parte).map((f) => f.n);
 }
 
 /**
