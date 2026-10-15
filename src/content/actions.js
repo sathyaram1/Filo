@@ -600,6 +600,8 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // Spenta dalle Preferenze, o per far durare i crediti (#818): la spiegazione parte al tasto destro.
+    if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) return;
     // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
     if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
@@ -616,6 +618,7 @@
     // seleziona altrove (#1070).
     if (!Gesto.prendi('spiega', Gesto.SELEZIONA, Gesto.sullaSelezione)) return;
     prefetchedExplain = startExplainRequest(sel);
+    prefetchedExplain.anticipata = true;
   }
 
   // `suRichiesta`: l'ha chiesta l'utente col tasto destro, e il tetto del main sulle automatiche non la ferma.
@@ -652,6 +655,11 @@
     };
     const pre = prefetchedExplain;
     if (pre && pre.key === key && !pre.fermata) {
+      // Preparata e aperta: per i crediti non è una chiamata sprecata (#818).
+      if (pre.anticipata && !pre.usata) {
+        pre.usata = true;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
+      }
       return pre.promise.then((res) => (pre.fermata ? chiedi() : res));
     }
     return chiedi();

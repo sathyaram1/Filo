@@ -918,6 +918,19 @@
     };
   }
 
+  // I modelli per funzione con «usa modelli predefiniti» acceso, più le scelte di chi usa Filo per una funzione sola
+  // (#818: il modello più economico proposto quando i crediti stanno per finire). PURA. Una scelta vale solo se ogni
+  // nickname esiste nel registro predefinito (o è un id grezzo): un modello tolto dall'owner non resta acceso da una scelta vecchia.
+  function effectiveModels(predefiniti, scelti, registry) {
+    const out = { ...(predefiniti || {}) };
+    const reg = registry || {};
+    for (const [azione, catena] of Object.entries(scelti && typeof scelti === 'object' ? scelti : {})) {
+      const refs = parseModelRefs(catena);
+      if (refs.length && refs.every((r) => Object.prototype.hasOwnProperty.call(reg, r) || isRawModelId(r))) out[azione] = refs.join(', ');
+    }
+    return out;
+  }
+
   // Cosa sanno masticare i sostituti, per nickname. Sta qui accanto alla tabella
   // delle sostituzioni perché è la stessa curatela: il registry personale di chi
   // usa Filo NON dichiara le capacità (le righe delle Opzioni hanno solo
@@ -2136,6 +2149,7 @@
       `CARTE DELLA HOME ("togli la carta dei mazzi", "rimetti l'editor", "metti i suggerimenti in cima", "togli l'avviso del backup dalla home", "metti il timer della pasta in cima") → emetti CARTA_HOME. Vale per le due colonne: a destra le carte che l'utente tiene, a sinistra quello che sta succedendo (timer, sveglie, scaricamenti, avvisi, lavori in corso). Solo un timer o una sveglia da cancellare del tutto passano da CANCELLA_SVEGLIA.\n` +
       `COMANDO DELLA FINESTRA ("metti a schermo intero", "togli lo schermo intero", "riduci a icona", "vai alla home", "apri le impostazioni", "apri le app", "apri l'account", "apri la barra laterale") → emetti l'azione COMANDO_FINESTRA con {comando}. Aziona i controlli del browser Filo stesso, non il sito. "schermo intero" toglie le barre (schede + indirizzo) e fa occupare alla pagina ATTIVA tutta la finestra — è l'immersione, la stessa della barra laterale → Schermo intero; NON preme il pulsante del lettore video DENTRO il sito (quello Filo non sa farlo: se l'utente vuole proprio il fullscreen del player, trattala come una cosa che Filo non sa fare, vedi "QUANDO AMMETTI UNA MANCANZA"). NON esiste un comando per CHIUDERE la finestra o le schede: è escluso di proposito, non proporlo. Esegui subito, conferma in una frase breve.\n` +
       `ICONE FRA BARRA LATERALE E TASTO DESTRO ("metti Screenshot nella barra laterale", "togli Chiudi scheda dalla barra", "rimetti Indietro nel tasto destro", "porta il QR nella riga del menu") → emetti l'azione SPOSTA_ICONA con {icona, dove}. È lo stesso trascinamento che l'utente fa col mouse e resta dopo un riavvio. Togliere dalla barra senza dire dove = dove "altro". Esegui subito, conferma in una frase breve.\n` +
+      `CREDITI CHE STANNO PER FINIRE ("sì, usa i modelli più economici", "spegni quelle automatiche", "rimetti i modelli di prima", "come faccio a farli durare?", "cosa consuma di più?") → emetti RIMEDIO_CREDITI: applica o annulla un rimedio (modello, automatiche), come i pulsanti sotto l'avviso; elenca dice la situazione e i rimedi con le cifre. Esegui subito: si rimette con un'altra RIMEDIO_CREDITI.\n` +
       `AGGIORNARE FILO ("aggiornati", "aggiorna Filo", "installa l'aggiornamento", "c'è una versione nuova di Filo?") → emetti INSTALLA_AGGIORNAMENTO. Se una versione nuova è già scaricata Filo si riavvia per installarla (la conferma la chiede il sistema); altrimenti controlla e, se c'è, la scarica: l'esito ti dice com'è: riferiscilo, non inventare numeri di versione. "Aggiorna la pagina" non è questo: è ricaricare la pagina.\n` +
       `RIMETTERE COME PRIMA ("rimetti come prima", "annulla", "torna com'era", "no, era meglio prima", "rimetti il tema di prima") → emetti l'azione ANNULLA_CAMBIO con {id} del cambio, preso dai CAMBI RECENTI dello STATO. Lì ci sono i cambi di stato chiunque li abbia fatti: quelli chiesti in chat e quelli fatti dall'utente nelle Preferenze o nelle altre pagine. Scegli quello a cui l'utente si riferisce (di solito l'ultimo che tocca la cosa di cui parla); se due sono ugualmente probabili, chiedi quale. Non rifarlo a mano con IMPOSTA_PREFERENZA: l'annullo lascia il segno giusto e rimette anche più impostazioni insieme. Esegui subito, conferma in una frase breve.\n` +
       `ORIGINE DI UN'IMMAGINE ("è fatta con l'AI?", "è una foto vera?", "è generata?") → non giudicarlo mai dall'aspetto, né dalla descrizione che ne hai dato: riporta solo l'esito delle etichette di origine che Filo ha letto nel file, che trovi nel turno dell'immagine o, per le immagini allegate in un messaggio precedente, in una nota di sistema del turno di adesso. Se per quell'immagine l'esito non c'è, di' che Filo non ne ha letto le etichette e che l'aspetto non prova niente.\n` +
@@ -2420,6 +2434,9 @@
     // impostare nulla. Le altre impostazioni modelli/chiavi restano nascoste
     // finché l'utente non disattiva questo switch dalle Opzioni.
     useDefaultModels: true,
+    // #818 — il modello scelto da chi usa Filo per una funzione sola, sopra i predefiniti: { [azione]: 'nick, nick' }.
+    // Vale solo coi predefiniti accesi e coi nickname del loro registro; '' toglie la scelta.
+    modelliScelti: {},
     // "Solo modelli a pesi aperti": quando true, Filo rifiuta OGNI modello
     // proprietario — Anthropic compresa — e lavora solo con modelli a pesi
     // aperti serviti da fornitori indipendenti. Vale anche con "usa modelli
@@ -2724,6 +2741,12 @@
     // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nella Cronologia per significato. Spento, di una
     // scheda che si chiude non parte niente verso i modelli: la si ritrova per parole.
     riassuntoSchede: { enabled: true },
+    // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
+    // solo dal tasto destro: si aspetta un po' e si spende meno.
+    spiegaAnticipata: { enabled: true },
+    // #818 — l'avviso prima che i crediti finiscano: quando la proiezione dice che durano al più `giorni`, o il saldo
+    // scende sotto `percento` dei crediti d'ingresso. Le soglie sono ipotesi della spec: si cambiano da qui.
+    avvisoCrediti: { attivo: true, giorni: 2, percento: 10 },
     // Suoneria del timer: suono riprodotto alla scadenza finché l'utente non
     // preme "Ferma". Generato via WebAudio API (nessun file audio esterno).
     // Valori: 'default' | 'gentle' | 'urgent' | 'chime'
@@ -2767,6 +2790,8 @@
   // Le regolazioni della barra laterale come le usa chi le legge: un valore fuori dai limiti torna
   // dentro, uno mancante o illeggibile prende il predefinito. Preferenze e chat rifiutano prima.
   const BARRA_LATERALE_LIMITI = Object.freeze({ attesaMs: [100, 3000], uscitaMs: [100, 5000] });
+  // Le soglie dell'avviso dei crediti (#818): 0 spegne quella condizione. Le usano la pagina, la chat e la proiezione.
+  const AVVISO_CREDITI_LIMITI = Object.freeze({ giorni: Object.freeze([0, 30]), percento: Object.freeze([0, 100]) });
   function opzioniBarraLaterale(v) {
     const d = DEFAULT_SETTINGS.barraLaterale;
     const o = v && typeof v === 'object' ? v : {};
@@ -2982,6 +3007,7 @@
     openWeightsBlockKind,
     effectiveExcludedProviders,
     effectiveApiKeys,
+    effectiveModels,
     applyOpenWeightsPolicy,
     openWeightsImpact,
     DEPRECATED_MODELS,
@@ -2994,6 +3020,7 @@
     AGENT_STYLE_MAX,
     agentStyleLength,
     BARRA_LATERALE_LIMITI,
+    AVVISO_CREDITI_LIMITI,
     opzioniBarraLaterale,
     testoLeggibile,
     LESSON_MAX,

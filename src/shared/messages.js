@@ -213,6 +213,23 @@
     //   la chiave resta nel main). { } → { ok, limit|null, usage,
     //   limit_remaining|null, line } oppure { ok:false, status, message }
     WALLET_OWN_KEY_INFO: 'wallet_own_key_info',
+    // === L'avviso prima che i crediti finiscano (#818) =======================
+    // ORIGINE: solo pagine filo:// e la shell (come i WALLET_*).
+    // CREDITS_WARNING: spinta del main alle pagine filo:// quando scatta l'avviso. { id }
+    //   La home con una conversazione aperta lo prende con CREDITS_WARNING_CLAIM; se nessuna lo prende, diventa una
+    //   notifica nella cornice che apre la pagina Crediti.
+    CREDITS_WARNING: 'credits_warning',
+    // CREDITS_WARNING_CLAIM: { id } → { ok, avviso:{ id, testo, rimedi:[…] } } solo alla prima che lo chiede.
+    CREDITS_WARNING_CLAIM: 'credits_warning_claim',
+    // CREDITS_WARNING_STATE: l'avviso com'è adesso, per la pagina Crediti. { } → { ok, mostra, avviso|null }
+    CREDITS_WARNING_STATE: 'credits_warning_state',
+    // CREDITS_REMEDY_APPLY / _UNDO: un rimedio con un clic, e com'era con un altro. Il main ricalcola il rimedio da
+    //   sé: dalla pagina arriva solo l'id. { id: 'modello'|'automatiche' } → { ok, frase, avviso }
+    CREDITS_REMEDY_APPLY: 'credits_remedy_apply',
+    CREDITS_REMEDY_UNDO: 'credits_remedy_undo',
+    // SPIEGAZIONE_ANTICIPATA_USATA: la spiegazione preparata alla selezione è stata aperta col tasto destro. Anche dai
+    //   siti (content script): serve solo a non contarla fra quelle che spegnere farebbe risparmiare. { } → { ok }
+    SPIEGAZIONE_ANTICIPATA_USATA: 'spiegazione_anticipata_usata',
     // WALLET_NOTICE_SEEN (#651): l'avviso di benvenuto («Sei entrato con un
     //   invito: hai N crediti») è stato mostrato da una superficie. Lo dicono
     //   la home e la pagina Crediti, ognuna per sé: chi l'ha già visto in

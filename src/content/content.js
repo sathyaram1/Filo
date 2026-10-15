@@ -31,6 +31,7 @@
     isBlocked: () => isBlocked(),
     isIncognito: () => inIncognito,
     getLastMouseEvent: () => lastMouseEvent,
+    spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
   MenuIcons.init({
     isContentFullscreen: () => contentFullscreen,

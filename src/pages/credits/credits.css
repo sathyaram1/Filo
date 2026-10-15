@@ -258,3 +258,22 @@
 .sn-ownkey-refusal { color: var(--sn-danger, #c45a3b); }
 .sn-ownkey-rule { margin: 6px 0 0; font-size: 13px; }
 .sn-ownkey-actions { margin-top: 10px; }
+
+/* #818 — l'avviso prima che i crediti finiscano: la frase, poi un rimedio per riga col pulsante a destra. */
+.sn-crediti-avviso-testo { margin: 4px 0 8px; font-size: 15px; color: var(--sn-fg); }
+.sn-crediti-rimedi { list-style: none; padding: 0; margin: 0; max-width: 640px; }
+.sn-crediti-rimedio {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--sn-border);
+}
+.sn-crediti-rimedio:last-child { border-bottom: none; }
+.sn-crediti-rimedio-corpo { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 14px; }
+.sn-crediti-rimedio-cifra { color: var(--sn-accent); font-size: 13px; }
+.sn-crediti-rimedio-dettaglio { color: var(--sn-muted); font-size: 12.5px; }
+.sn-crediti-rimedio-esito { color: var(--sn-muted); font-size: 12.5px; font-style: italic; }
+.sn-crediti-rimedio-btn { flex: 0 0 auto; }
+.sn-crediti-rimedio[data-applicato="1"] .sn-crediti-rimedio-testo { color: var(--sn-muted); }

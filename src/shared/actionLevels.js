@@ -873,6 +873,20 @@
           + 'Filo si riapre da solo con le schede di adesso. Le finestre in incognito si chiudono.'
         : 'Cercare la versione nuova di Filo e scaricarla'),
     },
+    // #818 — un rimedio dell'avviso dei crediti: lo stesso clic dei pulsanti, che si rimette com'era con un altro.
+    RIMEDIO_CREDITI: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const op = String((a && a.operazione) || '').trim().toLowerCase();
+        const r = String((a && a.rimedio) || '').trim().toLowerCase();
+        if (op === 'applica' && r === 'modello') return 'Usare modelli più economici per le funzioni che consumano di più';
+        if (op === 'applica' && r === 'automatiche') return 'Spegnere le funzioni automatiche che consumano crediti';
+        if (op === 'annulla' && r === 'modello') return 'Rimettere i modelli di prima';
+        if (op === 'annulla' && r === 'automatiche') return 'Riaccendere le funzioni automatiche';
+        return 'Guardare come far durare i crediti';
+      },
+    },
     ZOOM_PAGINA: {
       costo: 1,
       campo: null,
