@@ -729,8 +729,9 @@ export function consegnaDi(e) {
  * dell'orchestratore dopo la fine del worker di prima (o dopo un suo rilascio
  * di un biglietto morto, già contato lì) fino a adesso, cioè fino al rilascio
  * del worker che sta lavorando. Un worker lanciato in sottofondo (il default di
- * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
- * col suo tool-use-id, non quel risultato. PURA.
+ * Claude Code) riceve subito «Async agent launched»: la sua fine è la prima fra
+ * la sua consegna e la notifica definitiva che lo nomina, non quel risultato.
+ * Un lancio rifiutato non ha fatto partire nessun worker: non è un confine. PURA.
  */
 export function finestraOrchestratore(linee) {
   const voci = [];
