@@ -522,8 +522,22 @@ test('fixedReplyText: il fermo lo conferma il server; una segnalazione non ferma
   assert.match(fixedReplyText('A', { outcome: 'stop' }, true), /FERMATO/);
   assert.match(fixedReplyText('A', { outcome: 'stop' }, false), /FERMATO/, 'il server ha fermato: si dice anche se qui non lo si aspettava');
   assert.match(fixedReplyText('A', {}, true), /ATTENZIONE/);
-  assert.match(fixedReplyText('A', {}, true), /segnalazione/);
+  assert.match(fixedReplyText('A', {}, true), /segnalazione NON è arrivata/);
+  assert.doesNotMatch(fixedReplyText('A', {}, true), /consegnata lo stesso/, '#705: non fermata vuol dire non presa');
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
+  assert.doesNotMatch(fixedReplyText('A', {}, false), /ATTENZIONE/);
+});
+
+test('#705: una segnalazione è arrivata solo se il server ha fermato; con ogni altro esito si dice, col rimedio', async () => {
+  const { segnalazioneNonPresaText } = await import('../../scripts/lib/livelli.mjs');
+  for (const reply of [{ outcome: 'pass' }, { outcome: 'fix' }, {}, null, undefined]) {
+    const t = segnalazioneNonPresaText(true, reply);
+    assert.match(t, /NON è arrivata all'owner/, `esito ${JSON.stringify(reply)}`);
+    assert.match(t, /già registrata su questo commit/);
+    assert.match(t, /--guasto/);
+  }
+  assert.equal(segnalazioneNonPresaText(true, { outcome: 'stop' }), '');
+  assert.equal(segnalazioneNonPresaText(false, { outcome: 'pass' }), '');
 });
 
 test('la nota che lo strumento stampa dopo la critica dice che la segnalazione ferma, senza --ferma', () => {
