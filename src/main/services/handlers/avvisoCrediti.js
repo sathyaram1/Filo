@@ -431,7 +431,7 @@ module.exports = function register(on, ctx) {
   });
 
   globalThis.SN_AVVISO_CREDITI_MAIN = {
-    registraConsumo, ricordaIngresso, dopoLettura, comeAnticipata, valutaOra,
+    registraConsumo, ricordaIngresso, dopoLettura, comeAnticipata, valutaOra, rimedioDaChat,
     // Solo per i test (NODE_ENV=test): il diario di giorni passati, e la valutazione senza aspettare.
     impostaDiarioPerTest: async (d) => {
       if (process.env.NODE_ENV !== 'test') return;
