@@ -98,3 +98,6 @@ filo-security/
 # Diario locale delle interruzioni di sessione e dump di bash su Windows: macchina, non repo.
 .claude/cap-observations.jsonl
 *.stackdump
+# Il preload delle pagine web impacchettato per la sandbox (src/main/preloadPacchetto.js): lo rigenera
+# electron-builder a ogni pacchetto (build.beforePack), e senza pacchetto Filo lo compone da sé nella cartella dati.
+generato/

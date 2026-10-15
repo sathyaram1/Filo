@@ -38,6 +38,7 @@ function confronta(trovati, inventario, cosa) {
 const CARTELLA_DATI = {
   'storage.json': { frase: 'Tutto quello che Filo sa di te vive nella sua cartella dei dati' },
   'identity.bin': { frase: 'un account anonimo che Filo crea da solo' },
+  'preload-pacchetto': { perche: 'il codice di Filo per le pagine web, ricomposto all\'avvio fuori dal pacchetto (npm start, i test): niente di chi usa l\'app' },
   'wallet.bin': { frase: 'la chiave dei crediti e il tuo accesso Google' },
   'wallet-stato.bin': { frase: 'l\'ultimo stato del tuo portafoglio letto dal server' },
   'auth.bin': { frase: 'la chiave dei crediti e il tuo accesso Google' },

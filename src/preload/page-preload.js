@@ -5,8 +5,8 @@
 //     spellcheck, feedback)
 //   - espone chrome.* dentro il mondo isolato del preload (NON in main world:
 //     la pagina è codice non fidato; i content script girano qui)
-//   - carica i moduli SN_* (shared) via require()
-//   - carica i content script via require()
+//   - carica i moduli SN_* (shared) e i content script via require(): gira in
+//     sandbox, impacchettato con tutto ciò che richiede (src/main/preloadPacchetto.js)
 //
 // contextIsolation è TRUE per queste pagine, quindi globalThis qui è isolato
 // dal main world della pagina. Le scritture su globalThis NON sono visibili

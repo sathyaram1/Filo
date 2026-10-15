@@ -387,9 +387,10 @@ app.whenReady().then(async () => {
           const captureWin = new BrowserWindow({
             width: 1280, height: 800, show: true,
             webPreferences: {
-              preload: path.join(__dirname, '..', 'preload', preloadName),
+              // Come le schede: la pagina web col preload impacchettato, in sandbox; quella interna col suo.
+              preload: preloadName === 'page-preload.js' ? require('./preloadPacchetto').percorsoDelPreload() : path.join(__dirname, '..', 'preload', preloadName),
               contextIsolation: preloadName !== 'internal-preload.js',
-              sandbox: false, nodeIntegration: false,
+              sandbox: preloadName !== 'internal-preload.js', nodeIntegration: false,
             },
           });
           captureWin.loadURL(url);
