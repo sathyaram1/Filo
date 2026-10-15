@@ -56,6 +56,7 @@ const COMPOSTI = [
   { file: 'src/pages/security/security.js', testo: "new URL('http://' + s).hostname", perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/eseguibili.js', testo: 's : `https://${s}`', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/preferences.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
+  { file: 'src/shared/tabTriage.js', testo: 's = `https://${s}`', perche: 'ne estrae il nome del sito da tenere sempre aperto' },
   { file: 'src/shared/urlExfil.js', testo: "new URL('https://' + url)", perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
   { file: 'src/shared/urlExfil.js', testo: 'new URL(`https://${url}`)', perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
   { file: 'src/shared/urlExfil.js', testo: 'l : `https://${l}`', perche: 'la chiave di confronto di un link scritto in chat' },

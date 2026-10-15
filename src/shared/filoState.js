@@ -353,7 +353,7 @@
       lines.push(E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n') }));
     }
     lines.push('');
-    if (state.sempreAperte.length) {
+    if (Array.isArray(state.sempreAperte) && state.sempreAperte.length) {
       lines.push('SITI SEMPRE APERTI (la pulizia delle schede non li archivia; si tolgono con NON_TENERE_APERTA)');
       lines.push(state.sempreAperte.join(', '));
       lines.push('');

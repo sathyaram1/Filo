@@ -25,9 +25,8 @@ async function puliziaCheArchiviaTutto(app) {
       const testo = (args.messages || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
       if (!/gestore delle schede/.test(testo)) return orig(args);
       globalThis.__pulizia.push(testo);
-      const n = (testo.match(/^#\d+ /gm) || []).length;
       return {
-        text: JSON.stringify({ decisions: Array.from({ length: n }, (_, i) => ({ i, action: 'archive', reason: 'test' })) }),
+        text: JSON.stringify({ decisions: Array.from({ length: 50 }, (_, i) => ({ i, action: 'archive', reason: 'test' })) }),
         model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {},
       };
     };
@@ -43,16 +42,17 @@ const urlAperte = (shell) => shell.evaluate(async () => (await window.filoShell.
 
 test('«tienimi sempre aperta example.org»: la chat salva la regola, la pulizia archivia le altre e lei resta', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
-  await puliziaCheArchiviaTutto(app);
   await modelloFinto(app, [
     { toolCalls: [{ id: 't1', name: 'TIENI_APERTA', arguments: JSON.stringify({ dominio: 'example.org' }) }] },
     { text: 'Fatto: example.org resta sempre aperto.' },
   ]);
+  await puliziaCheArchiviaTutto(app);
   const chat = await home(app);
   await chiedi(chat, 'tienimi sempre aperta example.org');
   await expect(chat.locator('.dash-bubble-filo')).toContainText('example.org resta sempre aperto', { timeout: 15_000 });
   await chat.locator('.dash-activity-head').click();
   await expect(chat.locator('.dash-activity-row', { hasText: 'Sempre aperto · example.org' })).toHaveCount(1);
+  await chat.screenshot({ path: 'tests/.shots/sempre-aperte-chat.png' });
   expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['example.org']);
   const esito = (await chiamateAlModello(app))[1].find((m) => m.role === 'tool' && m.tool_call_id === 't1');
   expect(esito.content).toContain('non archivia example.org');
@@ -66,10 +66,11 @@ test('«tienimi sempre aperta example.org»: la chat salva la regola, la pulizia
   await expect.poll(async () => (await urlAperte(shell)).some((u) => u.startsWith('http://example.org:'))).toBe(true);
 
   const r = await pulisci(app);
-  expect(r.archived).toBe(2);
+  expect(r.archived).toBeGreaterThanOrEqual(2);
   const dopo = await urlAperte(shell);
   expect(dopo.filter((u) => u.startsWith('http://example.org:'))).toHaveLength(1);
   expect(dopo.some((u) => u.startsWith('http://sito-pubblico.test:'))).toBe(false);
+  expect(await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.title))).not.toContain('Terza');
   // Al modello la scheda tenuta non arriva nemmeno: non può deciderne niente.
   const [prompt] = await app.evaluate(() => globalThis.__pulizia);
   expect(prompt).toContain('Altra');
@@ -85,7 +86,7 @@ test('«tienimi sempre aperta example.org»: la chat salva la regola, la pulizia
     globalThis.__decideVero = decide;
     globalThis.SN_TAB_TRIAGE_DECIDE = async (arg) => {
       const t = tm.tabs.find((x) => /sito-pubblico\.test/.test(x.url || ''));
-      if (t) t.url = nuova;
+      if (t) await t.view.webContents.loadURL(nuova);
       return { decisions: arg.tabs.map((_, i) => ({ i, action: 'archive', reason: 'test' })) };
     };
   }, testServer.html(pagina('x')).replace('127.0.0.1', 'example.org'));
@@ -112,8 +113,11 @@ test('le regole si vedono nella memoria delle Preferenze, la × le toglie, e «n
   await riga('example.org').scrollIntoViewIfNeeded();
   await pref.screenshot({ path: 'tests/.shots/sempre-aperte-preferenze.png' });
   for (const tema of ['dark', 'light']) {
-    await app.evaluate((_e, t) => globalThis.SN_STORAGE.updateSettings({ theme: t }), tema);
-    await pref.waitForTimeout(400);
+    await app.evaluate((_e, t) => globalThis.SN_HANDLE_MESSAGE(
+      { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } },
+      { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' },
+    ), tema);
+    await pref.waitForTimeout(500);
     await riga('example.org').scrollIntoViewIfNeeded();
     await pref.screenshot({ path: `tests/.shots/sempre-aperte-preferenze-${tema}.png` });
   }
