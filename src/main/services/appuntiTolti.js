@@ -108,8 +108,8 @@ function crea({ file, decodifica, appunti }) {
     /** Una voce tolta: se è ancora negli appunti, il prossimo «Incolla» non la rimette. */
     async voceTolta(voce) {
       const tipo = tipoDi(voce);
-      const mat = tipo ? materiale(voce) : '';
-      if (mat && mat === await negliAppunti(tipo)) await sospendi(tipo, mat);
+      const nel = tipo ? await negliAppunti(tipo) : '';
+      if (nel && materiale(voce) === nel) await sospendi(tipo, nel);
     },
 
     /** Svuotata: vale per ciò che, fra le voci di prima, sta ancora negli appunti. */
