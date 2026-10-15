@@ -521,7 +521,6 @@ const ROLE_FILE = {
   fixer: 'resolver-rebase.md',
   'new-work': 'resolver.md',
   resolver: 'resolver.md',
-  prober: 'prober.md',
   halt: 'halt.md',
 };
 // Il correttore ha due casi (payload.case), e la ripresa dopo la risposta
