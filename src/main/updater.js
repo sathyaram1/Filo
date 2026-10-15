@@ -745,7 +745,8 @@ function controllaAdesso(tettoMs = 20000) {
       resolve(esito);
     };
     const ascolti = [
-      ['update-available', (info) => fine(R.releaseCoerente(info) ? { esito: 'nuova', versione: info.version } : { esito: 'rifiutata' })],
+      ['update-available', (info) => fine(!R.releaseCoerente(info) ? { esito: 'rifiutata' }
+        : R.nelCanale(info.version, stato.canale) ? { esito: 'nuova', versione: info.version } : { esito: 'nessuna' })],
       ['update-not-available', () => fine({ esito: 'nessuna' })],
       ['error', (e) => fine(e && e.rifiutata ? { esito: 'rifiutata' } : { esito: 'errore', messaggio: e?.message || String(e || '') })],
     ];
