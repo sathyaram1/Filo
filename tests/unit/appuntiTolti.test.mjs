@@ -1,6 +1,6 @@
 // Cronologia appunti (#256.2): una voce tolta mentre è ancora negli appunti non rientra dal primo «Incolla», anche
 // dopo una riapertura e anche se è un'immagine (riconosciuta dai pixel, non dal PNG); su disco niente di leggibile.
-// Appunti e decodifica sono finti, il disco è vero.
+// Appunti e impronta dei pixel sono finti, il disco è vero.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,9 +14,9 @@ const { crea } = require('../../src/main/services/appuntiTolti.js');
 
 // Un «PNG» finto: `data:<codifica>;px=<pixel>`. Due codifiche dello stesso disegno hanno gli stessi pixel.
 const png = (px, codifica = 'a') => `data:image/png;${codifica};px=${px}`;
-const decodifica = (s) => {
+const pixel = (s) => {
   const m = /;px=(.*)$/.exec(Buffer.isBuffer(s) ? s.toString('utf8') : String(s));
-  return m && m[1] ? { larghezza: 2, altezza: 1, pixel: Buffer.from(m[1]) } : null;
+  return m && m[1] ? `impronta-di-${m[1]}` : '';
 };
 
 function ambiente() {
@@ -24,7 +24,7 @@ function ambiente() {
   const appunti = { t: '', i: null };
   const apri = () => crea({
     file,
-    decodifica,
+    pixel,
     appunti: { testo: async () => appunti.t, immagine: async () => (appunti.i ? Buffer.from(appunti.i) : null) },
   });
   return { file, appunti, apri };
@@ -133,7 +133,7 @@ test('appunti che non rispondono o immagini che non si decodificano: nessun erro
   const a = ambiente();
   const t = crea({
     file: a.file,
-    decodifica: () => { throw new Error('rotta'); },
+    pixel: () => { throw new Error('rotta'); },
     appunti: { testo: async () => { throw new Error('giù'); }, immagine: async () => { throw new Error('giù'); } },
   });
   await t.voceTolta(testo('password'));

@@ -17,17 +17,13 @@ const ESADECIMALE = /^[0-9a-f]{32}$/;
 const TIPI = ['t', 'i'];
 
 const tipoDi = (voce) => (voce && voce.type === 'text' ? 't' : voce && voce.type === 'image' ? 'i' : '');
-const sha = (...parti) => {
-  const h = crypto.createHash('sha256');
-  for (const p of parti) h.update(p);
-  return h.digest('hex');
-};
+const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
 /**
- * `decodifica(dataUrl | Buffer)` → { larghezza, altezza, pixel } | null; `appunti` → { testo(), immagine() } coi
- * byte dell'immagine. L'immagine si riconosce dai pixel: la stessa schermata torna dagli appunti in PNG diversi.
+ * `pixel(dataUrl | Buffer)` → impronta dei pixel, '' se non si decodifica: la stessa schermata torna dagli appunti in
+ * PNG diversi. `appunti` → { testo(), immagine() }, coi byte dell'immagine.
  */
-function crea({ file, decodifica, appunti }) {
+function crea({ file, pixel, appunti }) {
   let stato = null;
   let scrivibile = true;
   let coda = Promise.resolve();
@@ -70,10 +66,9 @@ function crea({ file, decodifica, appunti }) {
   }
 
   function materialeImmagine(sorgente) {
-    let img = null;
-    try { img = sorgente ? decodifica(sorgente) : null; } catch (_) { img = null; }
-    if (!img || !img.larghezza || !img.altezza || !img.pixel || !img.pixel.length) return '';
-    return 'i:' + sha(`${img.larghezza}x${img.altezza}:`, img.pixel);
+    let p = '';
+    try { p = sorgente ? pixel(sorgente) : ''; } catch (_) { p = ''; }
+    return p ? 'i:' + p : '';
   }
 
   function materiale(voce) {
@@ -154,16 +149,6 @@ function crea({ file, decodifica, appunti }) {
   };
 }
 
-function decodificaElectron(sorgente) {
-  const { nativeImage } = require('electron');
-  const img = Buffer.isBuffer(sorgente)
-    ? nativeImage.createFromBuffer(sorgente)
-    : nativeImage.createFromDataURL(String(sorgente));
-  if (!img || img.isEmpty()) return null;
-  const { width, height } = img.getSize();
-  return { larghezza: width, altezza: height, pixel: img.toBitmap() };
-}
-
 // I byte dell'immagine negli appunti di sistema, PNG prima di tutto; null se non ce n'è.
 async function immagineElectron() {
   const voci = await require('electron').clipboard.read();
@@ -184,7 +169,7 @@ function perFilo() {
   const { app, clipboard } = require('electron');
   diFilo = crea({
     file: path.join(app.getPath('userData'), 'appunti-tolti.json'),
-    decodifica: decodificaElectron,
+    pixel: require('./improntaPixel').impronta,
     appunti: { testo: async () => await clipboard.readText(), immagine: immagineElectron },
   });
   return diFilo;
