@@ -97,7 +97,7 @@ async function avvia(items) {
     },
     async chiudi() {
       server.close();
-      try { await app.close(); } catch (_) {}
+      try { await ctx.app.close(); } catch (_) {}
       rmSync(userData, { recursive: true, force: true });
     },
   };
