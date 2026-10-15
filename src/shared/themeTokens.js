@@ -329,7 +329,7 @@
     const clean = {};
     const rejected = [];
     for (const [name, value] of Object.entries(overrides || {})) {
-      if (validate(name, value)) clean[name] = String(value).trim();
+      if (validate(name, value)) clean[name] = normalize(name, value);
       else rejected.push(name);
     }
     return { clean, rejected };
