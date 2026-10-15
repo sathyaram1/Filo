@@ -96,8 +96,11 @@ export function soloDiMessiDaParte(prova, messi, rossi = null, vecchie = []) {
 }
 
 /**
- * `numeri`: i posti dei rilievi messi da parte nella critica (assente se non si sanno); `casi`: per prova rossa i titoli
- * dei casi rossi (null senza rapporto); `comando`: come si registra la pulizia. PURA.
+ * Cosa fare dopo il rilancio. PURA. Una rossa riproduce un rilievo da chiudere, salvo quella che porta solo numeri di
+ * rilievi messi da parte: la pulizia l'ha lasciata indietro, e con lei esce. `via`: le prove rilanciate perché è
+ * cambiato un file di supporto che usano, con quei file; `numeri`: i posti dei rilievi messi da parte nella critica
+ * (assente se non si sanno); `casi`: per prova rossa i titoli dei casi rossi (null senza rapporto); `comando`: come
+ * si registra la pulizia.
  */
 export function esitoProveTolte({
   rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0, via = {}, numeri, casi = {}, vecchie = [], comando = '',
