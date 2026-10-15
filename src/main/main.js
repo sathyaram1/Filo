@@ -192,6 +192,8 @@ function configureSpellchecker() {
 
 app.whenReady().then(async () => {
   // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
+  // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
+  try { await require('./services/interruttoreAiuto').migra(); } catch (e) { console.warn('[Filo] interruttore dell\'Aiuto:', e?.message || e); }
   let impostazioniAvvio = {};
   try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
   try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
@@ -207,6 +209,7 @@ app.whenReady().then(async () => {
   try {
     const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
+    try { require('./movimento').segui(s); } catch (_) {}
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);
@@ -386,9 +389,10 @@ app.whenReady().then(async () => {
           const captureWin = new BrowserWindow({
             width: 1280, height: 800, show: true,
             webPreferences: {
-              preload: path.join(__dirname, '..', 'preload', preloadName),
+              // Come le schede: la pagina web col preload impacchettato, in sandbox; quella interna col suo.
+              preload: preloadName === 'page-preload.js' ? require('./preloadPacchetto').percorsoDelPreload() : path.join(__dirname, '..', 'preload', preloadName),
               contextIsolation: preloadName !== 'internal-preload.js',
-              sandbox: false, nodeIntegration: false,
+              sandbox: preloadName !== 'internal-preload.js', nodeIntegration: false,
             },
           });
           captureWin.loadURL(url);

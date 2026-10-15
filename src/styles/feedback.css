@@ -12,7 +12,7 @@
   cursor: crosshair;
   font-family: var(--sn-font);
   color: var(--sn-fg);
-  animation: sn-fade-in 100ms ease-out;
+  animation: sn-fade-in calc(100ms * var(--sn-motion, 1)) ease-out;
 }
 
 /* Tela di disegno a mano libera: copre tutta la pagina sotto al box. */
@@ -32,14 +32,14 @@
   justify-content: center;
   cursor: zoom-out;
   z-index: 2;
-  animation: sn-fade-in 100ms ease-out;
+  animation: sn-fade-in calc(100ms * var(--sn-motion, 1)) ease-out;
 }
 .sn-fb-lightbox img {
   max-width: 94%;
   max-height: 94%;
   object-fit: contain;
   border-radius: 6px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, calc(0.5 * var(--sn-ombra, 1)));
 }
 .sn-fb-thumb img { cursor: zoom-in; }
 

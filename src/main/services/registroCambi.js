@@ -62,6 +62,7 @@ function raccogli(ctx, evento) {
 function registra({ tipo, cambi }, { incognito = Disco.inIncognito(), vuoto = false } = {}) {
   if (!Array.isArray(cambi) || (!cambi.length && !vuoto)) return null;
   const ctx = corrente();
+  if (ctx && ctx.via === 'migrazione') return null; // ESCLUSIONI.migrazione
   const p = ctx || { via: 'filo' };
   const evento = {
     id: nuovoId(),

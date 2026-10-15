@@ -211,6 +211,7 @@
     err_limit_reached: 'Limite di spesa mensile raggiunto. Alza il limite nelle opzioni o aspetta il prossimo mese.',
     err_blocked_domain: 'Estensione disabilitata su questo dominio.',
     err_no_selection: 'Nessuna selezione di testo.',
+    help_disabled: 'L\'Aiuto è spento. Lo riaccendi in Preferenze, o chiedendolo a Filo.',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.

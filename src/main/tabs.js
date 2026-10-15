@@ -164,7 +164,8 @@ function filoSingletonKey(url) {
   return u.hostname + u.pathname;
 }
 
-const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
+// Le pagine web girano nella sandbox di Chromium: il loro preload è page-preload.js impacchettato in un file (#834).
+const { percorsoDelPreload } = require('./preloadPacchetto');
 // Esito di una scheda aperta da NAVIGA (#590): quanto si aspetta, dopo l'arrivo della prima pagina,
 // che la pagina si sposti da sé su un sito della lista. Tetto e margine dopo il caricamento.
 const ASSESTAMENTO_MS = 1500;
@@ -875,13 +876,15 @@ class TabManager {
   _preferenzeWeb(url, partition, opts = {}) {
     const isInternal = url.startsWith('filo://');
     const webPreferences = {
-      preload: isInternal ? INTERNAL_PRELOAD : PAGE_PRELOAD,
+      preload: isInternal ? INTERNAL_PRELOAD : percorsoDelPreload(),
       // Per le pagine interne (filo://) usiamo contextIsolation:false così
       // possiamo overwritare window.chrome direttamente — i file portati
       // dall'estensione si aspettano chrome.* in scope globale. Le pagine
       // web esterne mantengono l'isolation (codice non fidato).
       contextIsolation: !isInternal,
-      sandbox: false,
+      // Un buco nell'isolamento di una pagina web troverebbe un processo chiuso, non Node (#834). Le pagine interne
+      // si decidono a parte: il loro preload richiede ancora i moduli da disco.
+      sandbox: !isInternal,
       nodeIntegration: false,
       webSecurity: true,
       // #405 — i riquadri incorporati (video, mappe, commenti, moduli) sono
@@ -891,8 +894,9 @@ class TabManager {
       // destro non produceva nulla. Con nodeIntegrationInSubFrames il preload
       // parte in ogni sottoframe; `nodeIntegration` resta false e
       // contextIsolation true, quindi il codice della pagina (incluso quello
-      // di terze parti dentro l'iframe) NON guadagna alcun accesso a Node né
-      // allo shim chrome.*, che vivono solo nel mondo isolato del preload.
+      // di terze parti dentro l'iframe) NON guadagna alcun accesso allo shim
+      // chrome.*, che vive solo nel mondo isolato del preload; e con la
+      // sandbox nemmeno quel mondo ha Node.
       // Il costo si paga solo dove serve: nei sottoframe page-preload.js
       // carica i content script alla PRIMA interazione, non al caricamento.
       ...(isInternal ? {} : { nodeIntegrationInSubFrames: true }),
@@ -1822,7 +1826,10 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     if (this.activeId !== id) this.activate(id);
-    if (this.avvisoSito.coperta() === tab) { this._sbScelta(tab, 'chiedi'); return; }
+    if (this.avvisoSito.coperta() === tab) {
+      require('./services/interruttoreAiuto').seAcceso(this.win, () => this._sbScelta(tab, 'chiedi'));
+      return;
+    }
     try {
       tab.view.webContents.send('shortcut:triggered', {
         command: 'open-help-sidebar',
@@ -3074,9 +3081,9 @@ class TabManager {
         frame: true,
         titleBarStyle: 'default',
         webPreferences: {
-          preload: PAGE_PRELOAD,
+          preload: percorsoDelPreload(),
           contextIsolation: true,
-          sandbox: false,
+          sandbox: true,
           nodeIntegration: false,
           webSecurity: true,
           // #405 — stesse regole di una scheda esterna: anche dentro il popup

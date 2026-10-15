@@ -114,7 +114,7 @@
   background: transparent;
   color: var(--sn-fg);
   cursor: pointer;
-  transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
+  transition: background-color calc(.15s * var(--sn-motion, 1)) ease, border-color calc(.15s * var(--sn-motion, 1)) ease, transform calc(.15s * var(--sn-motion, 1)) ease;
 }
 .sn-wallet-invite-link { font-size: 14px; letter-spacing: 0; border-style: solid; }
 .sn-wallet-code:hover:not(:disabled),
@@ -151,7 +151,7 @@
    finché la tabella mostra solo loro. */
 .sn-wallet-numero.is-apribile {
   cursor: pointer; border-radius: 8px; padding: 2px 8px; margin: -2px -8px;
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  transition: background-color calc(120ms * var(--sn-motion, 1)) ease, box-shadow calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-wallet-numero.is-apribile:hover { background: rgba(var(--sn-accent-rgb), 0.12); }
 .sn-wallet-numero.is-apribile:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--sn-accent); }
@@ -193,7 +193,7 @@
 /* Il menu del tasto destro su una persona riusa il popup di Filo (.sn-select-pop in theme.css), che però
    nasce ancorato al suo campo: qui si posa dove ha cliccato il cursore. */
 .sn-wallet-ctx { position: fixed; left: 0; top: 0; right: auto; min-width: 190px; }
-.sn-wallet-ctx .sn-select-option { transition: background-color 120ms ease; }
+.sn-wallet-ctx .sn-select-option { transition: background-color calc(120ms * var(--sn-motion, 1)) ease; }
 .sn-wallet-ctx .sn-select-option:hover,
 .sn-wallet-ctx .sn-select-option:focus-visible {
   background-color: rgba(var(--sn-accent-rgb), 0.18);

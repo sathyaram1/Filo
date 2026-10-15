@@ -299,7 +299,7 @@ function template(piattaforma) {
     label: 'Aiuto',
     role: 'help',
     submenu: [
-      { label: 'Assistente laterale', click: assistenteLaterale },
+      { id: 'assistente-laterale', label: 'Assistente laterale', click: assistenteLaterale },
     ],
   };
 
@@ -317,6 +317,15 @@ function installaMenuApplicazione() {
   } catch (e) {
     console.warn('[Filo] barra dei menu non installata', e && e.message);
   }
+  // L'Aiuto spento (#841) non resta nel menu: la voce segue l'interruttore.
+  try {
+    const segui = (s) => {
+      const voce = Menu.getApplicationMenu()?.getMenuItemById('assistente-laterale');
+      if (voce) voce.visible = require('./services/interruttoreAiuto').acceso(s);
+    };
+    globalThis.SN_STORAGE.getSettings().then(segui, () => {});
+    require('./shim/storage').onChanged((changes) => { if (changes && changes.settings) segui(changes.settings.newValue); });
+  } catch (_) {}
 }
 
 module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo };

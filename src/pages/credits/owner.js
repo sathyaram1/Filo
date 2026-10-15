@@ -613,7 +613,7 @@
         $('ownerGrantPseudonym').value = u.pseudonym;
         const quanti = $('ownerGrantCredits');
         quanti.focus();
-        quanti.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        quanti.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
       }],
     ], x, y);
   }

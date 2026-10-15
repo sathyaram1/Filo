@@ -10,7 +10,8 @@
   --bordo-campo: #d1d5db;
   --accento: #b91c1c;
   --su-accento: #fff;
-  --ombra: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --sn-ombra: calc(var(--sn-shadow-opacity, 0.18) / 0.18);
+  --ombra: 0 24px 60px rgba(0, 0, 0, calc(0.45 * var(--sn-ombra, 1)));
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --fondo: rgba(40, 6, 6, 0.94);
 }
@@ -25,7 +26,7 @@
     --campo: #2e2622;
     --bordo-campo: #54473f;
     --accento: #ef5350;
-    --ombra: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --ombra: 0 24px 60px rgba(0, 0, 0, calc(0.6 * var(--sn-ombra, 1))), 0 0 0 1px rgba(255, 255, 255, 0.08);
   }
   :root[data-livello="sospetto"] { --accento: #f0853c; }
 }
@@ -59,7 +60,7 @@ body {
   box-shadow: var(--ombra);
   text-align: center;
   outline: none;
-  animation: entra 0.16s ease-out;
+  animation: entra calc(0.16s * var(--sn-motion, 1)) ease-out;
 }
 #carta[hidden], #conferma[hidden] { display: none; }
 @keyframes entra { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
@@ -81,7 +82,7 @@ h1 { font: 700 22px/1.25 var(--font); color: var(--accento); margin: 0 0 10px; o
   box-sizing: border-box;
   color: var(--testo);
   background: var(--campo);
-  transition: border-color 0.15s ease;
+  transition: border-color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 #parola:hover, #parola:focus { border-color: var(--accento); }
 
@@ -92,7 +93,7 @@ button {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, transform calc(0.15s * var(--sn-motion, 1)) ease, filter calc(0.15s * var(--sn-motion, 1)) ease;
 }
 button:hover { transform: translateY(-1px); filter: brightness(1.08); }
 button:active { transform: translateY(0); }

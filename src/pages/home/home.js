@@ -204,7 +204,7 @@
       card.dataset.highlighted = '1';
       card.classList.add('sn-card-highlight');
       requestAnimationFrame(() => {
-        try { card.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+        try { card.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' }); } catch (_) {}
       });
       card.addEventListener('animationend', () => card.classList.remove('sn-card-highlight'), { once: true });
     }

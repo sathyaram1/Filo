@@ -371,6 +371,28 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"   # app non firmata: salta la ricerca certificati
         run: npm run release
 
+      # Le pagine web girano in sandbox col preload impacchettato (src/main/preloadPacchetto.js, scritto da
+      # build.beforePack): senza quel file nell'asar, o con uno vecchio, ogni sito resterebbe senza Filo. La bozza
+      # allora non si pubblica. Un commit di prima della sandbox non ha il file da confrontare, e passa.
+      - name: Il pacchetto per Windows porta il preload delle pagine web?
+        if: steps.check.outputs.should_release == 'true'
+        shell: bash
+        run: |
+          set -e
+          if [ ! -f src/main/preloadPacchetto.js ]; then echo "versione senza preload impacchettato: niente da controllare"; exit 0; fi
+          ARCHIVIO=$(find dist -path '*win-unpacked/resources/app.asar' -print -quit)
+          test -n "$ARCHIVIO" || { echo "::error::nel pacchetto per Windows non trovo app.asar: non pubblico la bozza"; exit 1; }
+          node -e "
+            const asar = require('@electron/asar');
+            const { componi } = require('./src/main/preloadPacchetto.js');
+            let dentro = '';
+            try { dentro = asar.extractFile(process.argv[1], 'generato/page-preload.js').toString('utf8'); } catch (_) {
+              console.log('::error::nel pacchetto manca generato/page-preload.js: le pagine web resterebbero senza Filo'); process.exit(1);
+            }
+            if (dentro !== componi().codice) { console.log('::error::il preload nel pacchetto non è quello dei sorgenti'); process.exit(1); }
+            console.log('preload delle pagine web nel pacchetto:', dentro.length, 'byte');
+          " "$ARCHIVIO"
+
       # Il passo sopra puo' finire verde senza aver caricato niente (lo
       # strumento, quando decide di non pubblicare, si limita a un avviso).
       # Si guarda la bozza VERA prima di renderla pubblica: senza l'installer

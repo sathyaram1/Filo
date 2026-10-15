@@ -3221,7 +3221,7 @@
       // portano da nessuna parte. La sezione si riapre da sé, poi la vista ci
       // arriva sopra (feedback #385).
       revealCollapsedFor(node, { temporary: true });
-      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      node.scrollIntoView({ block: 'center', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
     };
     if (opts && opts.immediate) go();
     else findRevealTimer = setTimeout(go, FIND_REVEAL_DELAY_MS);
@@ -4256,6 +4256,7 @@
   // si crederebbe in overflow e resterebbe con la barra di scorrimento addosso
   // per sempre (due soli avvisi mostravano la scrollbar).
   let edToastOverflowTimer = null;
+  const motionMs = (ms) => (window.SN_THEME_TOKENS ? window.SN_THEME_TOKENS.motionMs(ms) : ms);
   function syncEdToastOverflow() {
     clearTimeout(edToastOverflowTimer);
     edToastOverflowTimer = setTimeout(() => {
@@ -4263,7 +4264,7 @@
       const scrollable = host.scrollHeight - host.clientHeight > 2;
       host.classList.toggle('scrolling', scrollable);
       if (scrollable) host.scrollTop = host.scrollHeight;
-    }, 260); // > della transizione di entrata/uscita (0.18s / 0.22s)
+    }, motionMs(260)); // > della transizione di entrata/uscita (0.18s / 0.22s)
   }
   function removeEdToast(el, immediate) {
     if (!el || el.dataset.closing === '1') return;
@@ -4275,7 +4276,7 @@
     el.classList.remove('show');
     const via = () => { try { el.remove(); } catch (_) {} edToastTempi.lascia(el); syncEdToastOverflow(); };
     if (immediate) { via(); return; }
-    setTimeout(via, 220);
+    setTimeout(via, motionMs(220));
   }
   // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
   // toast (es. "Annulla" dopo una modifica automatica di Filo).

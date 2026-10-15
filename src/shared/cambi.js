@@ -11,6 +11,7 @@
   const sino = (si, no) => (v) => (v ? si : no);
   const ATTIVO = sino('attivo', 'spento');
   const ATTIVA = sino('attiva', 'spenta');
+  const ATTIVE = sino('attive', 'spente');
   // I decimali restano quelli che il valore ha davvero; la parte intera prende il punto delle migliaia (1.500 ms).
   const intero = (n) => n.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 0 });
   const numero = (v) => {
@@ -99,8 +100,8 @@
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'notifications.soundVolume': { nome: 'volume del suono delle notifiche', valore: (v) => `${numero(v)}%`, livello: 1 },
     'featureFlags.spellcheck': { nome: 'correttore ortografico', valore: ATTIVO, livello: 1 },
-    'featureFlags.help': { nome: 'barra dell\'Aiuto', valore: ATTIVA, livello: 1 },
-    'featureFlags.categorize': { nome: 'categorizzazione automatica', valore: ATTIVA, livello: 1 },
+    'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
+    'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
     blocklist: { nome: 'domini dove Filo non interviene', elenco: true, livello: 2 },
     'menuDelSito.siti': { nome: 'siti dove il tasto destro apre il menu del sito', elenco: true, livello: 1 },
     'documenti.cartelle': { nome: 'cartelle dove Filo cerca i documenti', elenco: true, livello: 2 },
@@ -163,6 +164,7 @@
     'pricing.*': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
     usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
     azzeramento: 'cancellare tutti i dati non lascia traccia: è proprio quello che si è chiesto',
+    migrazione: 'un valore di serie che cambia con un aggiornamento non l\'ha scelto nessuno: un file di dati vecchio lo riceve come chi installa adesso',
     'timer:suona': 'un timer o una sveglia che arriva all\'ora e suona è il tempo che passa, non un cambio di qualcuno',
     'timer:ferma': 'fermare la suoneria chiude il giro del timer: rimetterlo non avrebbe più niente da far suonare',
     'timer:pausa': 'pausa e ripresa di un timer sono il suo pulsante play: si riprende da lì',

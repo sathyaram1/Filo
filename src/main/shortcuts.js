@@ -96,7 +96,7 @@ function dispatch(command, window) {
   // Sotto l'avviso del sito pericoloso un pannello della pagina non si vedrebbe: l'Aiuto lì è la domanda a Filo (#813.5).
   const tm = win._filoTabs;
   if (tm.avvisoSito && tm.avvisoSito.coperta() === active) {
-    if (command === 'open-help-sidebar') tm._sbScelta(active, 'chiedi');
+    if (command === 'open-help-sidebar') require('./services/interruttoreAiuto').seAcceso(win, () => tm._sbScelta(active, 'chiedi'));
     return;
   }
   const wc = active.view.webContents;

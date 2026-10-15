@@ -152,7 +152,7 @@ html, body {
   font-size: 12px;
   margin-left: 8px;
   opacity: 0;
-  transition: opacity 200ms;
+  transition: opacity calc(200ms * var(--sn-motion, 1));
 }
 .sn-page .sn-saved-indicator.sn-show { opacity: 1; }
 
@@ -245,7 +245,7 @@ html, body {
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  transition: transform 100ms ease, box-shadow 100ms ease;
+  transition: transform calc(100ms * var(--sn-motion, 1)) ease, box-shadow calc(100ms * var(--sn-motion, 1)) ease;
 }
 .sn-card:hover {
   transform: translateY(-1px);
@@ -253,7 +253,7 @@ html, body {
 }
 /* La scheda appena salvata pulsa una volta e sfuma: dice "è finita qui" senza restare invadente. */
 .sn-card-highlight {
-  animation: sn-card-highlight 2.4s ease-out 1;
+  animation: sn-card-highlight calc(2.4s * var(--sn-motion, 1)) ease-out 1;
 }
 @keyframes sn-card-highlight {
   0%   { box-shadow: 0 0 0 3px rgba(var(--sn-accent-rgb), 0.55); border-color: var(--sn-accent); }
@@ -393,7 +393,7 @@ html, body {
   padding: 2px 6px;
   border-radius: var(--sn-radius);
   opacity: 0;
-  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+  transition: opacity calc(0.12s * var(--sn-motion, 1)) ease, color calc(0.12s * var(--sn-motion, 1)) ease, background calc(0.12s * var(--sn-motion, 1)) ease;
 }
 
 .sn-history-item:hover .sn-history-remove,
@@ -442,7 +442,7 @@ html, body {
   background: var(--sn-bg);
   display: flex;
   flex-direction: column;
-  transition: transform 100ms ease, box-shadow 100ms ease;
+  transition: transform calc(100ms * var(--sn-motion, 1)) ease, box-shadow calc(100ms * var(--sn-motion, 1)) ease;
 }
 .sn-cat-tile:hover {
   transform: translateY(-1px);
@@ -845,7 +845,7 @@ section:has(#dictList) .sn-spell-add-row {
   align-items: center;
   gap: 10px;
   padding: 7px 10px;
-  transition: background 0.12s ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .sn-page .sn-clip-item + .sn-clip-item { border-top: 1px solid var(--sn-border); }
 /* La zona cliccabile rimette la voce negli appunti: una riga che si illumina
@@ -893,7 +893,7 @@ section:has(#dictList) .sn-spell-add-row {
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease, color calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .sn-page .sn-clip-remove:hover:not(:disabled) {
   color: var(--sn-fg);

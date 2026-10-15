@@ -69,17 +69,8 @@
     return !!t && t.type === 'color';
   }
 
-  // Messaggio d'errore puntuale per tipo di token.
   function tokenErrorMsg(name) {
-    const t = Tokens && Tokens.get(name);
-    switch (t && t.type) {
-      case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
-      case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
-      case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
-      case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
-      case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
-      default: return 'Valore non valido.';
-    }
+    return Tokens ? Tokens.errorMessage(name) : 'Valore non valido.';
   }
 
   // (Ri)disegna una singola riga dal modello: valore effettivo, stato
@@ -203,7 +194,7 @@
     for (const name of tokenInCorso) {
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
-      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = v;
+      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = Tokens.normalize(name, v);
     }
     chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
     flashSaved('tokenSavedHint');
@@ -248,11 +239,12 @@
     row.classList.remove('sn-token-invalid');
     if (v !== '' && !Tokens.validate(name, v)) return;
 
-    if (v === '' || v === Tokens.defaultValue(name, resolvedTheme())) {
+    const canonico = v === '' ? '' : Tokens.normalize(name, v);
+    if (canonico === '' || canonico === Tokens.defaultValue(name, resolvedTheme())) {
       // Vuoto o uguale al predefinito del tema corrente: nessun override.
       delete currentOverrides[name];
     } else {
-      currentOverrides[name] = v;
+      currentOverrides[name] = canonico;
     }
     row.classList.toggle('sn-token-modified', !!Tokens.validate(name, currentOverrides[name]));
     if (isColorToken(name)) {
@@ -884,9 +876,19 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
       case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'featureFlags.help': return $('aiutoAcceso').checked;
+      case 'featureFlags.spellcheck': return $('correttoreAcceso').checked;
+      case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
       default: return undefined;
     }
   }
+
+  // Gli interruttori di funzione con il loro valore di serie: acceso finché non è `false`, o spento finché non è `true`.
+  const INTERRUTTORI = [['help', 'aiutoAcceso', true], ['spellcheck', 'correttoreAcceso', true], ['categorize', 'categorieAutomatiche', false]];
+  const interruttore = (s, nome, diSerie) => {
+    const v = s.featureFlags && s.featureFlags[nome];
+    return diSerie ? v !== false : v === true;
+  };
 
   // Lo stesso valore letto dalla memoria, con le stesse regole di riempi().
   function valoreSalvato(s, k) {
@@ -941,6 +943,12 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'featureFlags.help':
+      case 'featureFlags.spellcheck':
+      case 'featureFlags.categorize': {
+        const [nome, , diSerie] = INTERRUTTORI.find(([n]) => k === `featureFlags.${n}`);
+        return interruttore(s, nome, diSerie);
+      }
       default: return undefined;
     }
   }
@@ -1125,6 +1133,9 @@
       if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
     }
     if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
+    for (const [nome, id, diSerie] of INTERRUTTORI) {
+      if (vuole(`featureFlags.${nome}`)) $(id).checked = interruttore(settings, nome, diSerie);
+    }
 
     if (vuole('timerRingtone')) {
       const ringtone = settings.timerRingtone || 'default';
@@ -1627,6 +1638,7 @@
     }
     $('avvisoCreditiAttivo').addEventListener('change', persist);
     $('spiegaAnticipata').addEventListener('change', persist);
+    for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
     for (const [, id] of CAMPI_CREDITI) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));

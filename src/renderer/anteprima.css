@@ -33,7 +33,7 @@ html, body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   /* Ombra corta e calda, verso il basso: un foglio appoggiato sotto la scheda. */
-  box-shadow: 0 6px 14px -4px rgba(42, 34, 26, 0.28);
+  box-shadow: 0 6px 14px -4px rgba(42, 34, 26, calc(0.28 * var(--sn-ombra, 1)));
   overflow: hidden;
 }
 #carta[hidden] { display: none; }
