@@ -103,9 +103,14 @@ test('«togli le animazioni»: menu del tasto destro, schede e pagine di Filo no
   expect(await menu.evaluate(() => getComputedStyle(document.querySelector('.menu')).animationDuration)).toBe('0s');
   await menu.keyboard.press('Escape').catch(() => {});
 
+  // La barra laterale vive in una vista sua: la durata le arriva dalla shell.
+  const barra = await barraPage(app);
+  await expect.poll(() => stile(barra, '.pannello', 'transitionDuration')).toBe('0s, 0s');
+
   // Due volte più lente.
   await azione(app, { token: 'motion', valore: '2' });
   await expect.poll(() => stile(shell, '.tab', 'transitionDuration')).toBe('0.2s');
+  await expect.poll(() => stile(barra, '.pannello', 'transitionDuration')).toBe('0.4s, 0.4s');
   await expect.poll(() => stile(home, '.dash-carta', 'transitionDuration')).toMatch(/^0\.36s/);
 
   // «Rimetti le animazioni»: il token torna al predefinito e le durate a quelle di sempre.
