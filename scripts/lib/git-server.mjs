@@ -41,11 +41,14 @@ export function ramoAccettabile(ramo) {
     && !r.endsWith('.lock') && !r.includes('..') && !r.includes('//');
 }
 
-/** Le voci di git che fanno passare il token, e solo lui, verso filo-security. Senza token: solo gli azzeramenti. PURA. */
-export function vociGitServer(token) {
+/**
+ * Le voci di git che fanno passare il token, e solo lui, verso filo-security. Senza token: solo gli azzeramenti.
+ * `url` cambia solo nelle prove: il comando non lo espone. PURA.
+ */
+export function vociGitServer(token, url = URL_SERVER) {
   const voci = [['credential.helper', ''], ['core.askPass', '']];
   const auth = token ? `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}` : '';
-  for (const u of [URL_SERVER, URL_NUDO]) {
+  for (const u of [url, url.replace(/\.git$/, '')]) {
     // Il riscrittore più lungo vince: l'identità sull'URL intero batte quelli del proxy su github.com.
     voci.push([`url.${u}.insteadOf`, u], [`url.${u}.pushInsteadOf`, u]);
     // Un valore vuoto azzera le intestazioni raccolte; sull'URL esatto nessuna voce dei file può valere di più.
@@ -60,7 +63,7 @@ export function vociGitServer(token) {
  * (certificati, proxy di rete), in coda le nostre, che le variabili d'ambiente fanno valere dopo ogni file. PURA.
  * → { env, tolte: [nomi] }: i nomi servono alla diagnosi, i valori non si mostrano mai.
  */
-export function ambienteGitServer(base, token) {
+export function ambienteGitServer(base, token, url = URL_SERVER) {
   const env = { ...(base || {}) };
   const tolte = [];
   for (const k of ['GIT_ASKPASS', 'SSH_ASKPASS', 'GIT_CONFIG_PARAMETERS', 'GIT_TRACE_REDACT']) {
@@ -75,7 +78,7 @@ export function ambienteGitServer(base, token) {
     else tenute.push([k, env[`GIT_CONFIG_VALUE_${i}`] ?? '']);
   }
   for (const k of Object.keys(env)) if (/^GIT_CONFIG_(COUNT|KEY_\d+|VALUE_\d+)$/.test(k)) delete env[k];
-  const voci = [...tenute, ...vociGitServer(token)];
+  const voci = [...tenute, ...vociGitServer(token, url)];
   env.GIT_CONFIG_COUNT = String(voci.length);
   voci.forEach(([k, v], i) => { env[`GIT_CONFIG_KEY_${i}`] = k; env[`GIT_CONFIG_VALUE_${i}`] = v; });
   env.GIT_TERMINAL_PROMPT = '0';
