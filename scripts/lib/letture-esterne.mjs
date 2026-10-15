@@ -78,10 +78,19 @@ export function motivoLettura(input, ctx = {}) {
     try { host = new URL(String(dati.url || '')).hostname; } catch (_) { /* resta senza */ }
     return host ? `WebFetch (${pulisci(host, 120)})` : 'WebFetch';
   }
-  if (STRUMENTI_ESTERNI.includes(nome)) return nome;
-  if (nome === 'Artifact') return ARTIFACT_LETTURE.includes(String(dati.action || '')) ? `Artifact (${dati.action})` : '';
+  if (nome === 'Artifact') {
+    const azione = String(dati.action || 'publish');
+    return ARTIFACT_SENZA_LETTURA.includes(azione) ? '' : `Artifact (${pulisci(azione, 40)})`;
+  }
+  // Un sotto-agente locale passa da questo gancio con le sue chiamate. Uno che gira altrove no, e il suo rapporto
+  // arriva senza strumento: sporca alla partenza.
+  if (nome === 'Agent' || nome === 'Task') {
+    const dove = String(dati.isolation || '');
+    return dove === '' || dove === 'worktree' ? '' : `${nome} (${pulisci(dove, 40)})`;
+  }
+  if (nome === 'ToolSearch') return cercaSoloStrumentiDiClaude(dati.query) ? '' : 'ToolSearch';
   if (nome.startsWith('mcp__')) return MCP_SENZA_LETTURA.includes(nome) ? '' : pulisci(nome, 160);
-  if (nome !== 'Read') return '';
+  if (nome !== 'Read') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
   const grezzo = String(dati.file_path || '').trim();
   if (!grezzo) return '';
   const win = !!ctx.win;
