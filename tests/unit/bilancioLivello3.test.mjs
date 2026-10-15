@@ -186,7 +186,7 @@ test('le stampe del giro locale e delle routine dicono i quattro bilanci e i 2 m
   assert.match(pass, /Bilancio delle correzioni di livello 2 finito: il rilievo interno di livello 2 rimasto è entrato nel feedback dei rimasti/);
   assert.match(pass, /Bilanci: cap3: 5 giri residui su 5 · cap2: 0 giri residui su 4 · cap1: 1 giri residui su 1 · cap0: 0 giri residui su 0/);
   const stop = verifierReplyText({ outcome: 'stop', motivo: 'loop', blocking: [f(3, 'i', 'perde i dati')], sospesi: [], derived: [], budgets: decide([f(3, 'i', 'x')], { count3: 5 }).budgets });
-  assert.match(stop, /un 3 a bilancio esaurito, o un 3\/2 che chiede una decisione/);
+  assert.match(stop, /un 3 a bilancio esaurito o che chiede una decisione, o un 2 che chiede una scelta difficile da disfare/);
   assert.match(stop, /Bilanci: cap3: 0 giri residui su 5/);
   const fase2 = verifierReplyText({ outcome: 'fix', phase2: { findings: [f(1, 'i', 'bordo')], derived: [{ level: 2, sede: 'i', text: 'a', priority: 2, num: '#7.2' }], budgets: finito.budgets, instructions: 'FASE 2' } });
   assert.match(fase2, /Bilancio delle correzioni di livello 2 finito/);
