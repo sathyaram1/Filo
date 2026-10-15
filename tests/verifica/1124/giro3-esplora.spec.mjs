@@ -65,7 +65,7 @@ test('Google vero: il campo identificativo riceve la proposta e la scelta lo rie
   const page = await openTab('https://accounts.google.com/signin/v2/identifier?hl=it');
   await page.waitForSelector('#identifierId', { timeout: 30_000 });
   await page.waitForTimeout(1500);
-  console.log('google, subito:', await mostrata(app));
+  console.log('google, subito:', await mostrata(app), JSON.stringify(await page.evaluate(() => ({ a: document.activeElement && document.activeElement.id, f: document.hasFocus() }))));
   await clicVero(app, page, '#identifierId');
   await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
   await foto(app, 'giro3-google');
@@ -99,8 +99,9 @@ test('popup di accesso aperto da window.open: la proposta compare anche lì', as
   await pop.waitForLoadState('domcontentloaded');
   await pop.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 }).catch(() => {});
   await pop.click('#e');
-  const esito = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => ({ tabs: !!w._filoTabs, url: w.webContents.getURL(), figli: w.contentView.children.length })));
+  const esito = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => ({ tabs: !!w._filoTabs, url: w.webContents.getURL().slice(0, 40), figli: w.contentView.children.length })));
   await page.waitForTimeout(1500);
+  console.log('popup mostrata (finestra principale):', await mostrata(app));
   console.log('finestre:', JSON.stringify(await esito()));
   const vis = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((w) => !w._filoTabs).map((w) => w.contentView.children.map((v) => ({ url: v.webContents.getURL(), vis: v.getVisible ? v.getVisible() : null, b: v.getBounds() }))));
   console.log('popup viste:', JSON.stringify(vis));
@@ -114,10 +115,21 @@ test('tema scuro e email lunga: foto', async ({ app, openTab, testServer }) => {
   await page.click('#e');
   await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
   await page.waitForTimeout(400);
-  await foto(app, 'giro3-scuro-lunga');
+  const v = await vista(app);
+  await v.screenshot({ path: 'tests/.shots/giro3-scuro-lunga.png' });
+  await page.screenshot({ path: 'tests/.shots/giro3-scuro-pagina.png' });
+  console.log('bounds scuro', JSON.stringify(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.propostaEmail.vista.getBounds())));
   await impostazioni(app, { theme: 'light' });
   await page.waitForTimeout(600);
-  await foto(app, 'giro3-chiaro-lunga');
+  await v.screenshot({ path: 'tests/.shots/giro3-chiaro-lunga.png' });
+  await page.evaluate(() => document.getElementById('e').blur());
+  await page.click('#e');
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  await page.waitForTimeout(400);
+  await v.screenshot({ path: 'tests/.shots/giro3-chiaro-rientro.png' });
+  await v.hover('#voce');
+  await page.waitForTimeout(200);
+  await v.screenshot({ path: 'tests/.shots/giro3-chiaro-hover.png' });
 });
 
 test('passo di una SPA: il campo sostituito o la pagina che cambia portano via la proposta', async ({ app, openTab, testServer }) => {
@@ -125,7 +137,7 @@ test('passo di una SPA: il campo sostituito o la pagina che cambia portano via l
   const page = await testServer.openReady(openTab, '<!doctype html><body style="padding:40px"><div id="c"><input type="email" id="e" style="width:300px;height:30px"></div></body>');
   await page.click('#e');
   await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
-  await page.evaluate(() => { document.getElementById('c').innerHTML = '<input type="password" id="p">'; document.getElementById('p').focus(); });
+  await page.evaluate(() => { document.getElementById('c').innerHTML = '<input type="text" id="p" name="codice">'; document.getElementById('p').focus(); });
   await expect.poll(() => mostrata(app), { timeout: 3000 }).toBe(false);
   await page.evaluate(() => { document.getElementById('c').innerHTML = '<input type="email" id="e2" style="width:300px;height:30px">'; });
   await page.click('#e2');
