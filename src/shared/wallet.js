@@ -479,7 +479,7 @@
     { chiave: 'rewardFeedbackClosed', etichetta: 'Premio per un feedback risolto', min: 0, max: 1000000, aiuto: 'Arriva solo se la segnalazione viene risolta.' },
     // #1120. La finestra non supera i 30 giorni perché la Privacy promette che l'impronta della rete non resta di più.
     { chiave: 'redeemsPerNetwork', etichetta: 'Ingressi dalla stessa rete', min: 1, max: 1000, aiuto: 'Quante persone possono entrare con un invito dalla stessa connessione dentro la finestra qui sotto. Vale anche per i tuoi codici.' },
-    { chiave: 'redeemsPerNetworkHours', etichetta: 'Finestra per rete, in ore', min: 1, max: 720, aiuto: 'Dopo quante ore dal primo ingresso la stessa connessione può far entrare di nuovo.' },
+    { chiave: 'redeemsPerNetworkHours', etichetta: 'Finestra per rete, in ore', min: 1, max: 720, aiuto: 'Su quante ore si contano gli ingressi dalla stessa connessione.' },
   ]);
   const OWNER_KNOB_KEYS = Object.freeze(OWNER_KNOBS.map((k) => k.chiave));
   function knobOf(chiave) { return OWNER_KNOBS.find((k) => k.chiave === chiave) || null; }
