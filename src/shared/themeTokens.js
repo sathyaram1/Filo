@@ -433,7 +433,7 @@
   // sfondo chiaro sia "rendi lo sfondo nero" con testo già scuro.
   function illegibleAfter(name, value, overrides, theme) {
     const next = { ...(overrides || {}) };
-    if (validate(name, value)) next[name] = String(value).trim();
+    if (validate(name, value)) next[name] = normalize(name, value);
     else if (name in next) delete next[name];
     for (const [fg, bg] of LEGIBILITY_PAIRS) {
       const r = contrastRatio(
