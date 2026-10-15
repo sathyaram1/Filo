@@ -26,7 +26,7 @@ test('una rossa che porta solo numeri di rilievi messi da parte manda alla puliz
   assert.match(e.testo, /giro2-r3-dimenticata\.spec\.mjs \(r3\)/);
   assert.match(e.testo, /non si correggono qui/);
   assert.match(e.testo, /git checkout abcdef123456 -- <file>/);
-  assert.match(e.testo.replace(/\s+/g, ' '), /registra la pulizia subito, finché è l'ultimo commit: node scripts\/dispatch\.mjs --record-pulizia fid-747/);
+  assert.match(e.testo.replace(/\s+/g, ' '), /Registra la pulizia finché il suo è l'ultimo commit \(node scripts\/dispatch\.mjs --record-pulizia fid-747\)/);
   assert.match(e.testo, /si registra anche dopo le correzioni/);
   assert.doesNotMatch(e.testo, /correggi finché|riproduce un rilievo da chiudere/i);
 });
