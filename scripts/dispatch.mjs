@@ -1810,7 +1810,7 @@ function positionOnBranch(bucket) {
  */
 // I ruoli che questa macchina sa eseguire. Un ruolo fuori da qui non è un
 // lavoro: è una busta che non sappiamo aprire.
-const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work', 'prober'];
+const RUOLI_LAVORABILI = ['secaudit', 'verifier', 'fixer', 'new-work'];
 // Chi lavora su un ramo esistente: senza, non c'è niente su cui posizionarsi.
 const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
 
