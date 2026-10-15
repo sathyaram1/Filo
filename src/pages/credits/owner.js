@@ -508,6 +508,7 @@
     menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
     menuAperto = menu;
+    menuDi = r;
     document.addEventListener('keydown', tastoSulMenu, true);
     setTimeout(() => {
       if (menuAperto !== menu) return;
