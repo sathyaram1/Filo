@@ -335,6 +335,9 @@ macchina — l'orchestratore decide il passo successivo SOLO interrogando il
 canale (chiede un biglietto nuovo: exit 0 = spawna, 2 = chiudi, 3 = guasto,
 chiudi senza rispawnare) più il controllo del proprio contesto (~70%).
 
+> **Superato** (i passi fra un worker e l'altro): vedi
+> `routines/roles/orchestrator.md`, «Loop».
+
 Perché: il testo di ritorno entra comunque nel contesto dell'orchestratore
 (non si può impedire), quindi la difesa non è chiedere una riga corta ma
 togliere al testo OGNI peso decisionale — un worker catturato non ha più
