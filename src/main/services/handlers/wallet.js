@@ -673,7 +673,10 @@ module.exports = function register(on, ctx) {
       const esito = W.allarmiDaDire(detti, conto);
       try { await globalThis.SN_STORAGE.setRaw(ALLARMI_DETTI_KEY, esito.detti); } catch (_) {}
       if (!esito.dire.length) return null;
-      return { title: 'Il conto OpenRouter non regge', text: esito.dire.map((a) => a.testo).join('\n\n') };
+      const title = esito.dire.some((a) => a.kind === 'vivi_oltre_conto')
+        ? 'Il conto OpenRouter non regge'
+        : 'Il tetto dei regali supera il conto OpenRouter';
+      return { title, text: esito.dire.map((a) => a.testo).join('\n\n') };
     });
     filaAllarmi = turno.catch(() => {});
     return { ok: true, alarm: await turno };
