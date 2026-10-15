@@ -703,6 +703,17 @@ fila delle forme della scheda):
   ruolo, at, testo }`. Il ruolo lo dice il biglietto, mai il messaggio. È un
   trade-off vero che decide l'owner; il server la appende anche alle note,
   per la storia della chat. Sulla riga di comando: `--segnala <file.md>`.
+- Dal #1202 accanto a `segnalazione` (su `status`, `fixed` e `verdict`)
+  viaggiano `segnalazioneLivello` (0-3, il livello del problema col metro dei
+  rilievi; sulla riga di comando `--livello`, obbligatorio con `--segnala`) e
+  `segnalazioneDifficile: true` (`--difficile`: una scelta difficile da
+  disfare, cioè dati degli utenti, sicurezza, formati salvati su disco). Il
+  server ferma il lavoro solo se `SN_VERIFIER_ROUND.segnalazioneFerma` dice sì
+  (un 3, o difficile; senza livello ferma, come gli strumenti di prima); negli
+  altri casi la consegna segue il suo esito normale e la segnalazione apre un
+  feedback derivato con la domanda, perché chi l'ha scritta ha già applicato la
+  scelta che consiglia. I due campi non vanno in `livelli.l3`, le cui chiavi
+  le regole di Firestore contano.
 - `fixed` accetta `stop: true`, solo insieme a `segnalazione`: chi corregge
   dichiara che non può andare avanti senza una decisione. Il server risponde
   `{ outcome: 'stop' }` e porta il feedback in attesa dell'owner invece che a

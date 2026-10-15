@@ -109,11 +109,13 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
 - `revision_capability` —routine, critica del verificatore senza rilievi INTERNI da
   correggere→ `revision_security` (dal 2026-09-23 ogni rilievo porta livello e sede,
-  `[2i]`/`[2e]`: contano gli interni; dal 2026-09-27 anche `[1v]`, il vicino, un
-  difetto di un altro lavoro in un file che il ramo modifica già, che conta come
-  livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
+  `[2i]`/`[2e]`: contano gli interni; dal 2026-09-27 c'è anche `[1v]`, il vicino, un
+  difetto di un altro lavoro in un file che il ramo modifica già: dal 2026-10-12 non
+  decide mai se il giro parte, entra nella correzione solo se il giro parte comunque
+  per gli interni e non consuma nessun bilancio. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
   figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
-  server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
+  server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?` (anche
+  per un `[2i?]` che si corregge con l'opzione consigliata: la sua domanda resta all'owner), a
   priorità uguale al livello; UNO solo per tutti gli altri (interni messi da parte
   dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
   fra loro); —critica con rilievi
@@ -123,11 +125,17 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   (feedback #561, dal 2026-09-05); —rilievo di livello 3 non correggibile (bilancio
   dei 3 esaurito)→ `design` (`statusReason: loop`); un 2 a bilancio dei 2 esaurito NON
   ferma: entra nel feedback derivato dei rimasti e il lavoro passa se non c'è altro
-  (dal 2026-09-23, bilanci separati per livello); —rilievo di livello 3/2 che chiede una
-  decisione→ `design` (`statusReason: decisione`); —QUALUNQUE consegna con una
-  segnalazione per l'owner (`--segnala`: di chi risolve, di chi corregge, e la critica
-  di chi verifica in ogni esito)→ `design` (`statusReason: decisione`), senza bisogno
-  di `--ferma`: un feedback che aspetta una scelta dell'owner non gira altri giri. Le
+  (dal 2026-09-23, bilanci separati per livello); —rilievo interno di livello 3 che chiede
+  una decisione, o di livello 2 su una scelta difficile da disfare (`[2i?!]`)→ `design`
+  (`statusReason: decisione`); un `[2i?]` NON ferma (dal 2026-10-12): si corregge con
+  l'opzione consigliata dal verificatore ed esce anche come feedback derivato con la
+  domanda; —consegna con una segnalazione per l'owner (`--segnala`, di chi risolve, di
+  chi corregge, e la critica di chi verifica in ogni esito) di livello 3 o con
+  `--difficile`→ `design` (`statusReason: decisione`), senza bisogno di `--ferma`: un
+  feedback che aspetta una scelta dell'owner non gira altri giri. Una segnalazione di
+  livello 2, 1 o 0 non ferma: chi l'ha scritta ha già applicato la scelta che consiglia,
+  e la segnalazione esce come feedback derivato con la domanda (`segnalazioneFerma` in
+  `src/shared/verifierRound.js`; senza livello, da uno strumento di prima, ferma). Le
   consegne che non possono fermare (nota, controllo di sicurezza, apertura di un
   feedback) la RESPINGONO, mai ignorata in silenzio. Il segnalibro di ripresa porta,
   con quello che ha fermato, anche gli altri rilievi interni della stessa critica
@@ -351,9 +359,10 @@ Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
 giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
 alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
 3 che non si può più correggere da soli — bilancio delle correzioni dei 3 esaurito
-(`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3/2 che chiede una
-decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corregge ha
-consegnato con una segnalazione per l'owner (stesso `statusReason: decisione`); in
+(`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3 che chiede una
+decisione dell'owner, o un 2 su una scelta difficile da disfare (`statusReason: decisione`),
+oppure chi risolve o chi corregge ha consegnato con una segnalazione per l'owner di livello 3
+o difficile da disfare (stesso `statusReason: decisione`); in
 tutti questi casi bilanci e verdetti del giro si azzerano — la storia delle critiche
 resta — e il server lascia un **segnalibro di ripresa** nello stato del giro (chi si
 è fermato, perché, i rilievi rimasti aperti). Nei casi `clarify` e `decisione` la
