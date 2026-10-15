@@ -9,9 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.240', date: '2026-10-15',
+      version: '0.2.241', date: '2026-10-15',
       features: [
         'Chiedi all\'Aiuto di una scheda «quando l\'ho aperta?» e ti dice giorno, ora e quanto tempo è passato, per la scheda e per la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo.',
+      ],
+      fixes: [],
+    },
+    {
+      version: '0.2.240', date: '2026-10-15',
+      features: [
         'Ogni versione di Filo su GitHub ha una sezione «Verifica» con l\'impronta di ogni file da scaricare e il link alla costruzione pubblica che l\'ha prodotto. Se il file che hai scaricato ha la stessa impronta, è quello costruito dal codice pubblico.',
         'Nella schermata Mazzi ogni mazzo mostra quanto costa in tutto, senza doverlo aprire. Se di qualche carta il prezzo non è noto, davanti al totale c\'è «≥». Col tasto destro su un mazzo lo puoi anche esportare come lista o rinominare, oltre a duplicarlo ed eliminarlo.',
         'Nelle Opzioni, accanto a ogni modello di ogni funzione, vedi quanto costa usarla, per esempio «≈ 3 crediti» per un messaggio in chat. Se scegli un modello che costa molto più di quello predefinito, sotto compare per quanti messaggi ti bastano i crediti che hai. Se usi i tuoi modelli puoi cambiarli anche chiedendolo a Filo, e la conferma ti dice le stesse cifre. Con una tua chiave OpenRouter il costo è in dollari.',
