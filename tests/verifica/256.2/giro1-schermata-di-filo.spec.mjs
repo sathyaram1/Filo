@@ -41,7 +41,7 @@ test('schermata di Filo: tolta dalla Sicurezza, non rientra al primo «Incolla»
     await web.locator('#p').click({ button: 'right' });
     await web.locator('.sn-menu [data-sn-icon-id="screenshot"]').first().click();
     await expect.poll(disco, { timeout: 30000 }).toEqual(['[img]']);
-    expect(await app.evaluate(({ clipboard }) => clipboard.readImage().isEmpty())).toBe(false);
+    await expect.poll(() => app.evaluate(async ({ clipboard }) => (await clipboard.read()).some((v) => v.types.some((t) => t.startsWith('image/'))))).toBe(true);
 
     await shell.evaluate((u) => window.filoShell.tabs.open(u), 'filo://security/security.html');
     const sec = await trova(app, 'security');
