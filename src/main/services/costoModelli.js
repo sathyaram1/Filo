@@ -108,7 +108,7 @@ async function contesto({ Defaults, forzaListino = false } = {}) {
 
 // Un cambio di modello chiesto in chat (#819), prima della conferma: deve poter partire come dalla griglia delle
 // Opzioni (configurazione personale, nomi che esistono, modello adatto alla funzione), e dice quanto costerà.
-// → { rifiuto, perModello } oppure { costo } (la frase del costo e dell'avviso, '' se il contesto non arriva in tempo).
+// → { rifiuto, perModello } oppure { costo } (la frase del costo e dell'avviso, o perché manca).
 const ATTESA_CHAT_MS = 4000;
 async function verificaCambio({ action, refs } = {}, { Defaults } = {}) {
   const S = globalThis.SN_STIMA_COSTO;
