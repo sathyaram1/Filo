@@ -287,7 +287,7 @@
 
   function riquadroAttivi(giorni, chi) {
     const n = chi.length;
-    const li = riquadro(formatInt(n), `${n === 1 ? 'attiva' : 'attive'} negli ultimi ${giorni} giorni`,
+    const li = riquadro(formatInt(n), `${n === 1 ? 'attivo' : 'attivi'} negli ultimi ${giorni} giorni`,
       `Le persone col portafoglio che negli ultimi ${giorni} giorni hanno almeno una riga nel registro d’uso.`);
     li.dataset.giorni = String(giorni);
     if (!n) return li;
