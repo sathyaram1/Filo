@@ -35,18 +35,20 @@ function crea({ file, decodifica, appunti }) {
   function carica() {
     if (stato) return stato;
     stato = { sale: '', t: '', i: '' };
+    let raw = null;
     try {
       Disco.togliTemporaneiUnaVolta(file);
-      const raw = Disco.leggiSync(file);
-      const j = raw ? JSON.parse(Disco.togliBom(raw.toString('utf8'))) : null;
-      if (j && ESADECIMALE.test(String(j.sale))) {
-        stato.sale = j.sale;
-        for (const k of TIPI) if (ESADECIMALE.test(String(j[k]))) stato[k] = j[k];
-      }
+      raw = Disco.leggiSync(file);
     } catch (e) {
-      // Un file che non si legge non si sovrascrive: questa sessione ricorda in memoria.
+      // Un file che il disco non dà non si sovrascrive: questa sessione ricorda in memoria.
       scrivibile = false;
       console.warn('[appunti] sospensioni non lette:', e?.message || e);
+    }
+    let j = null;
+    try { j = raw ? JSON.parse(Disco.togliBom(raw.toString('utf8'))) : null; } catch (_) { j = null; }
+    if (j && ESADECIMALE.test(String(j.sale))) {
+      stato.sale = j.sale;
+      for (const k of TIPI) if (ESADECIMALE.test(String(j[k]))) stato[k] = j[k];
     }
     return stato;
   }
