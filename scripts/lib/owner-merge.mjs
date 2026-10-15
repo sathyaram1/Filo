@@ -196,9 +196,9 @@ function righeDellaRichiesta(r) {
   const giaDecisa = (perche) => `  NON l'ho messa in attesa: ${perche}\n  In Filo non c'è niente da approvare.\n${RIPROPONI}`;
   switch (r.requestState) {
     case 'pending':
-      return '  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
-        + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
-        + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
+      return `  L'ho messa IN ATTESA: approvala da Filo, in ${DOVE_SI_APPROVA}\n`
+        + '  (in cima alla scheda). Da lì puoi anche scartarla.\n'
+        + '  Se la pagina è già aperta la richiesta compare da sola, non serve riaprirla.\n'
         + `  Se Filo non si apre: ${PAGINA_APPROVAZIONI} da un browser qualunque,\n`
         + '  con l\'account del proprietario.\n'
         + '  Vale per il commit appena controllato e per 7 giorni: se scade, o se il\n'
