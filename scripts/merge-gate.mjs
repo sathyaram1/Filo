@@ -357,6 +357,13 @@ export function testoEsitoServer(esito) {
   return `${testi[esito] || `esito «${String(esito || '?')}»`}. Niente da fare qui: rilascia il biglietto.`;
 }
 
+/** Il fermo per unit rossi sulla fusione. Chi riallinea non li corregge: li giudica la verifica (#1204). PURA. */
+export function testoUnitRossi() {
+  return '[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con '
+    + 'l\'elenco dei test rotti: chi riallinea rifà solo la base, e quei test li giudica come rilievi la verifica che '
+    + 'segue. Da qui non c\'è altro da fare.';
+}
+
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 const USO = [
