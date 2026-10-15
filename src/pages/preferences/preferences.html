@@ -27,6 +27,60 @@
   <script src="filo://shared/lunghezzaRisposte.js"></script>
   <script src="filo://shared/creditiAvviso.js"></script>
   <style>
+    /* Le scorciatoie di Filo (#842): i tasti hanno la forma di tasti veri, e la riga in ascolto si accende. */
+    .sc-lista { display: flex; flex-direction: column; gap: 2px; max-width: 620px; }
+    .sc-riga {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr) 28px;
+      align-items: center;
+      column-gap: 10px;
+      padding: 4px 0;
+    }
+    .sc-nome { color: var(--sn-fg); }
+    .sc-riga.sc-cambiata .sc-nome { color: var(--sn-accent); font-weight: 600; }
+    .sc-tasti {
+      justify-self: start;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 30px;
+      padding: 3px 8px;
+      border: 1px solid var(--sn-border);
+      border-radius: var(--sn-radius);
+      background: var(--sn-bg);
+      color: var(--sn-fg);
+      font: inherit;
+      cursor: pointer;
+      transition: border-color 120ms, background 120ms, box-shadow 120ms;
+    }
+    .sc-tasti:hover, .sc-tasti:focus-visible { border-color: var(--sn-accent); background: var(--sn-hover); outline: none; }
+    .sc-kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      padding: 1px 7px;
+      border: 1px solid var(--sn-border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--sn-hover);
+    }
+    .sc-piu { color: var(--sn-muted); font-size: 11px; }
+    .sc-riga.sc-registra .sc-tasti {
+      border-color: var(--sn-accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--sn-accent) 22%, transparent);
+    }
+    .sc-attesa { color: var(--sn-muted); font-style: italic; }
+    .sc-ripristina {
+      background: transparent;
+      border: none;
+      color: var(--sn-muted);
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      padding: 3px 5px;
+      border-radius: 4px;
+    }
+    .sc-ripristina:hover { color: var(--sn-fg); background: var(--sn-hover); }
+    .sc-errore { grid-column: 2 / -1; color: var(--sn-error); font-size: 12px; margin-top: 2px; }
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
     .onb-conv > summary {
