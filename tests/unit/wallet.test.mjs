@@ -73,7 +73,7 @@ test('il messaggio di crediti finiti distingue chiave di Filo e chiave propria',
 test('ogni esito del server ha una frase; uno sconosciuto cade su quella generica', () => {
   for (const s of ['ok', 'invalid_code', 'code_used', 'own_code', 'already_in', 'invites_exhausted', 'inviter_not_linked', 'network_cap', 'global_cap', 'missing_exchange_rate', 'not_configured', 'provider_error', 'internal', 'not_reachable']) {
     assert.ok(W.redeemMessage(s).length > 10, s);
-    assert.notEqual(s === 'internal' ? '' : W.redeemMessage(s), W.REDEEM_MESSAGES.internal, `${s}: non è la frase generica`);
+    if (s !== 'internal') assert.notEqual(W.redeemMessage(s), W.REDEEM_MESSAGES.internal, `${s}: non è la frase generica`);
   }
   assert.equal(W.redeemMessage('boh'), W.REDEEM_MESSAGES.internal);
 });
