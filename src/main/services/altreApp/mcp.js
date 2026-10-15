@@ -31,7 +31,8 @@ async function avvia({ comando, argomenti = [], env, cwd, spawn = spawnVero, cli
     throw new ErroreMcp('avvio', `il programma non si avvia (${e.code || e.message})`);
   }
   let prossimo = 1;
-  let buffer = '';
+  let pezzi = [];
+  let lunghezza = 0;
   let coda = '';
   let uscito = null;
   const attese = new Map();
