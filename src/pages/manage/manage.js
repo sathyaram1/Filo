@@ -39,9 +39,7 @@
   const mgRoutinesToggle = document.getElementById('mgRoutinesToggle');
   const mgRoutinesState  = document.getElementById('mgRoutinesState');
   const mgRoutinesMsg    = document.getElementById('mgRoutinesMsg');
-  const mgProberIdle      = document.getElementById('mgProberIdle');
-  const mgProberIdleMsg   = document.getElementById('mgProberIdleMsg');
-  const mgLavoriServer       = document.getElementById('mgLavoriServer');
+  const mgLavoriServer      = document.getElementById('mgLavoriServer');
   const mgLavoriServerSwitch = document.getElementById('mgLavoriServerSwitch');
   const mgLavoriServerMsg    = document.getElementById('mgLavoriServerMsg');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
