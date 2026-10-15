@@ -767,6 +767,8 @@
       parts.push(`La correzione riguarda ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un'altra verifica ricontrolla.`);
       const vicini = d.fix.filter((f) => f && sedeDi(f.sede) === 'v').length;
       if (vicini) parts.push(`${vicini === 1 ? 'Un rilievo è vicino (di un altro lavoro, ma in un file che il ramo modifica già): si corregge' : `${vicini} rilievi sono vicini (di un altro lavoro, ma in file che il ramo modifica già): si correggono`} insieme al resto.`);
+      const inCorrezione = Array.isArray(d.domande) ? d.domande.length : 0;
+      if (inCorrezione) parts.push(`${inCorrezione === 1 ? 'Un rilievo da correggere chiede una tua decisione: la correzione applica l\'opzione consigliata da chi verifica, e la domanda esce in un feedback a parte' : `${inCorrezione} rilievi da correggere chiedono una tua decisione: la correzione applica l'opzione consigliata da chi verifica, e ogni domanda esce in un feedback a parte`}. Se scegli diversamente, quel feedback cambia il codice già fuso.`);
     } else {
       parts.push(esterni === list.length
         ? 'Nessun rilievo interno: il lavoro prosegue.'
