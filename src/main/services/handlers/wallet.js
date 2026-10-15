@@ -441,7 +441,7 @@ module.exports = function register(on, ctx) {
     if (status === 'invalid_code' && codes.length > daProvare.length) {
       return { ok: false, status, message: W.tooManyCodesMessage(codes.length, daProvare.length) };
     }
-    if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
+    if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status, r) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
     // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato, e
