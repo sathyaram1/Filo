@@ -436,7 +436,8 @@
       if (!LEVELS.includes(level)) continue;
       const text = String(f.text == null ? '' : f.text).trim().slice(0, MAX_FINDING_TEXT);
       if (!text) continue;
-      out.push({ level, sede: sedeDi(f.sede), text, decision: f.decision === true });
+      const difficile = f.difficile === true;
+      out.push({ level, sede: sedeDi(f.sede), text, decision: f.decision === true || difficile, difficile });
       if (out.length >= MAX_FINDINGS) break;
     }
     return out;
