@@ -226,9 +226,12 @@ Chiusura (si incastra nell'architettura del canale #477):
   questo ramo" sul canale autenticato; il server verifica dallo stato VERO
   (PASS verifier + PASS secaudit registrati, L5 sul diff) e fonde lui via API
   GitHub con una propria identità;
+  - **Superato** (L5 sui lavori fidati): vedi `ROUTINE-AUTH-SPEC.md` §11.
 - **`main` protetto lato GitHub**: possono scriverci solo quell'identità e
   l'owner. Il push diretto da una sessione diventa fisicamente impossibile,
   non solo vietato a parole;
+  - **Superato** (l'owner fra chi ci scrive): vedi `ROUTINE-AUTH-SPEC.md` §11,
+    «Dove sta il muro, per esattezza».
 - `npm run finish` locale continua a funzionare con l'identità dell'owner
   (o passa anch'esso dal server, da decidere all'implementazione);
 - finché non è implementato, il rischio residuo resta documentato (è la coda
