@@ -40,10 +40,24 @@ export const MCP_SENZA_LETTURA = Object.freeze([
 
 const pulisci = (s, n) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, n);
 
-/** Lo strumento può portare dentro testo esterno? Senza guardare dove legge: serve a uscire prima di chiedere a git. PURA. */
+/** Lo strumento può portare dentro testo esterno? Senza guardare i parametri. PURA. */
 export function puoLeggereFuori(nome) {
   const n = String(nome || '');
-  return n === 'Read' || n === 'Artifact' || STRUMENTI_ESTERNI.includes(n) || n.startsWith('mcp__');
+  return !!n && !STRUMENTI_SENZA_LETTURA.includes(n);
+}
+
+/** Il matcher del gancio nelle impostazioni: ogni strumento fuori da STRUMENTI_SENZA_LETTURA. PURA. */
+export function matcherDelGancio() {
+  // `.*` in coda: vale sia come RegExp non ancorata sia ancorata ai due capi.
+  return `^(?!(?:${STRUMENTI_SENZA_LETTURA.join('|')})$).*`;
+}
+
+// ToolSearch porta le descrizioni scritte da chi fa i server MCP: non sporca solo quando chiede per nome strumenti che
+// non lo sono.
+function cercaSoloStrumentiDiClaude(query) {
+  const m = /^\s*select:([\s\S]*)$/.exec(String(query || ''));
+  const nomi = m ? m[1].split(',').map((s) => s.trim()) : [];
+  return nomi.length > 0 && nomi.every((n) => /^[A-Za-z][A-Za-z0-9_]*$/.test(n) && !/^mcp/i.test(n));
 }
 
 function dentro(file, cartella, P, win) {
