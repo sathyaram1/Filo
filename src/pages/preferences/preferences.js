@@ -239,11 +239,12 @@
     row.classList.remove('sn-token-invalid');
     if (v !== '' && !Tokens.validate(name, v)) return;
 
-    if (v === '' || v === Tokens.defaultValue(name, resolvedTheme())) {
+    const canonico = v === '' ? '' : Tokens.normalize(name, v);
+    if (canonico === '' || canonico === Tokens.defaultValue(name, resolvedTheme())) {
       // Vuoto o uguale al predefinito del tema corrente: nessun override.
       delete currentOverrides[name];
     } else {
-      currentOverrides[name] = v;
+      currentOverrides[name] = canonico;
     }
     row.classList.toggle('sn-token-modified', !!Tokens.validate(name, currentOverrides[name]));
     if (isColorToken(name)) {
