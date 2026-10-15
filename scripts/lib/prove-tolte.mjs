@@ -528,7 +528,8 @@ function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, pr
       for (const f of files) {
         const dest = resolve(base, percorsoRipristino(f, etichetta));
         mkdirSync(dirname(dest), { recursive: true });
-        writeFileSync(dest, execFileSync('git', ['show', `${sha}:${f}`], { cwd: root, maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] }));
+        const da = versioni && SHA.test(String(versioni[f] || '')) ? versioni[f] : sha;
+        writeFileSync(dest, execFileSync('git', ['show', `${da}:${f}`], { cwd: root, maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] }));
       }
     }
     const una = prove.length === 1;
