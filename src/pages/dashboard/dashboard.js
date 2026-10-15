@@ -1988,6 +1988,19 @@
       okLabel: 'Evviva!',
     });
   }
+  // Il conto OpenRouter che non regge i crediti vivi o il tetto (#820): l'owner lo sa all'avvio senza aprire la sua
+  // pagina. Per chi non è owner il main risponde null senza chiedere niente al server.
+  async function chiediAllarmeOwner() {
+    await quandoVisibile();
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_OWNER_ALARM_PENDING }); } catch (_) { r = null; }
+    const a = r && r.ok && r.alarm;
+    if (!a || !window.SN_CONFIRM_UI?.confirm) return;
+    const apri = await window.SN_CONFIRM_UI.confirm({
+      title: a.title, text: a.text, okLabel: 'Apri Inviti e utenti', cancelLabel: 'Più tardi',
+    });
+    if (apri) send({ type: MSG.OPEN_URL, url: 'filo://credits/owner.html' });
+  }
   async function chiediBenvenuto() {
     await quandoVisibile();
     try {
