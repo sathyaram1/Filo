@@ -137,6 +137,7 @@
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
         applyTabPreview(m.settings?.tabPreview);
+        applyFeatureFlags(m.settings?.featureFlags);
         applyRingTone(m.settings?.timerRingtone, m.settings?.timerRingtoneVolume);
         // Il volume cambiato mentre suona deve sentirsi subito: senza questo si
         // sentirebbe solo alla scadenza dopo.
