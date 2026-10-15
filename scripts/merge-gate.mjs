@@ -491,7 +491,7 @@ async function main() {
   else if (code === 10) {
     console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
     // Il blocco non è più un vicolo cieco: il server apre una richiesta che
-    // l'owner apre dalla scheda della pratica in Gestione. Dirlo qui evita che
+    // l'owner trova sulla scheda della pratica in Gestione. Dirlo qui evita che
     // chi legge il registro creda che il ramo sia perduto.
     if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
   }
