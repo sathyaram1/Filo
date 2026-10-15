@@ -88,10 +88,15 @@
     const m = fb && fb.localOnly;
     return !!m && typeof m === 'object' && String(m.by || '').trim() !== '';
   }
-  // Un lavoro server passato dal verificatore aspetta il PC dell'owner (server:fondi, #1159): gemello di
-  // select.inAttesaFusioneServer nel server; fuori dalla revisione il segno vecchio non conta.
+  // Le attese di un lavoro server passato (#1159): il PC dell'owner, la suite di filo-security. Gemello di select.ATTESA
+  // nel server; fuori dalla revisione il segno vecchio non conta.
+  const ATTESE_SERVER = Object.freeze({ fusione_server: 'pc', suite_server: 'suite' });
+  function attesaServer(fb) {
+    if (!fb || normalizeStatus(fb).status !== 'revision_security') return '';
+    return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
+  }
   function inAttesaFusioneServer(fb) {
-    return !!fb && fb.attesa === 'fusione_server' && normalizeStatus(fb).status === 'revision_security';
+    return attesaServer(fb) === 'pc';
   }
   function isProvenLocalSender(fb) {
     return !!fb && LOCAL_SENDER_RE.test(String(fb.clientId || '')) && fb.senderProof === 'admin';
@@ -1929,7 +1934,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isTrustedClient, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,
     panelComplete, judgesNote, reasonText,

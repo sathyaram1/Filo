@@ -34,6 +34,15 @@ Il diff può essere GROSSO: la taglia non è una scusa per campionare. Leggilo
 tutto; se il contesto non basta, usa sotto-agenti sequenziali per sezioni del
 diff e tieni tu il giudizio d'insieme.
 
+**Lavoro server.** Se il payload porta anche `diffServerFile` (con
+`diffServerHead` e `diffServerBase`), il lavoro tocca il codice del server
+(filo-security, privato): è il diff del suo ramo contro il main del server, e lo
+scarica il server, perché qui il clone non c'è. Leggilo intero come quello
+dell'app e giudica i due insieme. In più, lì, sono sensibili: il cancello di
+fusione e i suoi token, le chiavi e i segreti, le automazioni di GitHub e gli
+strumenti di pubblicazione, la decifratura dei feedback. Il tuo verdetto copre
+anche quel commit del server: lo sa il server, non devi passarlo.
+
 ## Passi
 
 1. Leggi il diff riga per riga (è intero nel file `diffFile` del payload).
@@ -135,6 +144,12 @@ server un verdetto raccontato non lo legge).
      **Non fare niente**: il server ha già instradato il giro di
      riallineamento (la pratica torna a chi risolve con la critica che spiega
      il rebase). Niente `design`, niente nota: la sovrascriveresti.
+   - `30` → lavoro server: la parte del server la segue il server. O aspetta
+     la suite di filo-security, o è tornata alle routine, o aspetta il PC
+     dell'owner. **Non fare niente**: niente stato, niente nota. Rilascia il
+     biglietto. Un lavoro server con le due parti su main esce `0`; se la
+     parte dell'app si ferma (blocco, conflitto) esce come per l'app, e il
+     server resta fuori da main.
    - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
      nell'output e il tentativo è già a registro). Con `secaudit_stale` o
      `stale` il server ha trovato il tuo verdetto su un commit diverso dalla

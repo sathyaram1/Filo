@@ -396,8 +396,16 @@ export async function lavoroDelRamo({ repo, ramo, sha, feedbackId }, deps = {}) 
 
 /** Le pratiche passate che aspettano il PC: [{ feedbackId, seq, subSeq, branch, parti }]; lancia. */
 export async function attesePc(deps = {}) {
+  return (await attesePcConStato(deps)).pratiche;
+}
+
+/** Le stesse, col conto dei deploy da GitHub che il server tiene (#1159 fase 2): { pratiche, deployDaActions }; lancia. */
+export async function attesePcConStato(deps = {}) {
   const r = await chiama('attese', {}, deps);
-  return Array.isArray(r.pratiche) ? r.pratiche : [];
+  return {
+    pratiche: Array.isArray(r.pratiche) ? r.pratiche : [],
+    deployDaActions: r.deployDaActions && typeof r.deployDaActions === 'object' ? r.deployDaActions : null,
+  };
 }
 
 /**
@@ -407,6 +415,18 @@ export async function attesePc(deps = {}) {
 export async function fineAttesa(feedbackId, { soloApp = false, riallinea = false, ...deps } = {}) {
   const data = riallinea === true ? { feedbackId, riallinea: true } : soloApp === true ? { feedbackId, soloApp: true } : { feedbackId };
   return chiama('fineAttesa', data, deps);
+}
+
+// La fusione dell'app passa da GitHub e da L5 sul server: ben oltre il tetto delle op brevi, dentro il suo (120 s).
+export const TEMPO_FONDI_APP_MS = 110_000;
+
+/**
+ * La parte dell'app di una pratica che aspetta il PC, col cancello di sempre, prima di server:fondi (#1222).
+ * → { result: 'merged'|'blocked'|'conflict'|'rifiutata'|'guasto'…, sha?, reason?, detail? }. Lancia, anche con
+ * «op_sconosciuta» da un server che non la conosce ancora.
+ */
+export async function fondiApp(feedbackId, deps = {}) {
+  return chiama('fondiApp', { feedbackId }, Object.assign({ tempoMs: TEMPO_FONDI_APP_MS }, deps));
 }
 
 /** Chiude i biglietti di questa sessione e ne toglie i file. */

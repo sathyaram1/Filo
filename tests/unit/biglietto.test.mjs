@@ -175,6 +175,20 @@ test('prendi scrive il file; registra il ramo col biglietto della sessione; chiu
   } finally { togliCartella(dir); }
 });
 
+test('fondiApp e fineAttesa del PC (#1222): l’op giusta, e un server che non la conosce lo dice col suo motivo', async () => {
+  const visti = [];
+  const risposta = (result) => async (url, init) => { visti.push(JSON.parse(init.body).data); return { ok: true, status: 200, json: async () => ({ result }) }; };
+  const deps = (result) => ({ fetchImpl: risposta(result), idToken: async () => 'tok', url: 'http://finto/localTicket' });
+  assert.deepEqual(await B.fondiApp('f1', deps({ ok: true, result: 'merged', sha: 'e'.repeat(40) })), { ok: true, result: 'merged', sha: 'e'.repeat(40) });
+  assert.deepEqual(visti.at(-1), { op: 'fondiApp', feedbackId: 'f1' });
+  await assert.rejects(B.fondiApp('f1', deps({ ok: false, reason: 'op_sconosciuta', detail: 'op ammesse: prendi' })), /^Error: op_sconosciuta: op ammesse/);
+  assert.ok(B.TEMPO_FONDI_APP_MS > B.TEMPO_MASSIMO_MS && B.TEMPO_FONDI_APP_MS < 120_000, 'oltre le op brevi, dentro il tetto della callable');
+  await B.fineAttesa('f1', { ...deps({ ok: true }), attendiDeploy: true, sha: 'a'.repeat(40) });
+  assert.deepEqual(visti.at(-1), { op: 'fineAttesa', feedbackId: 'f1' }, 'l’attesa della pubblicazione non c’è più');
+  await B.fineAttesa('f1', { ...deps({ ok: true }), soloApp: true });
+  assert.deepEqual(visti.at(-1), { op: 'fineAttesa', feedbackId: 'f1', soloApp: true });
+});
+
 test('una callable non ancora pubblicata lo dice, non tace', async () => {
   await assert.rejects(B.chiama('stato', { ticket: 'x' }, server({}, { status: 404 }).deps), /non è ancora pubblicata/);
   assert.match(B.messaggioErrore(404, {}), /non è ancora pubblicata/);

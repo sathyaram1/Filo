@@ -46,7 +46,9 @@ Lo stesso nome del ramo di Filo su cui ti ha messo dispatch (`git rev-parse --ab
 - Le prove del server: `npm ci` la prima volta, poi `npm test` in `<CLONE>/functions`, con `FILO_PUBLIC_REPO` uguale
   al checkout di Filo. Se il lavoro tocca anche l'app, le prove dell'app come sempre.
 - Le prove del giro che riguardano il server vanno in `functions/test/` del clone, sul ramo.
-- Spingi solo il tuo ramo: `git -C "<CLONE>" push origin <ramo>`. Subito dopo, a ogni spinta e prima di consegnare:
+- Spingi solo il tuo ramo: `git -C "<CLONE>" push origin <ramo>`, dopo quello dell'app. La suite di GitHub del server
+  prova il ramo di Filo con lo stesso nome com'è al momento della spinta del server (main di Filo se non c'è). Subito
+  dopo, a ogni spinta e prima di consegnare:
 
 ```bash
 node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
@@ -59,5 +61,7 @@ node "<CANALE>" ramo-server <ramo> "$(git -C "<CLONE>" rev-parse HEAD)"
 
 ### Dopo la verifica
 
-Un lavoro server passato non lo fonde il cancello: aspetta il PC dell'owner, che porta il ramo su main di
-filo-security e lo pubblica. Non chiedere la fusione del server da qui.
+Un lavoro server passato va al controllo di sicurezza, che legge anche il diff del server. Poi il cancello, solo con la
+suite di GitHub verde sullo sha esatto della punta registrata (l'ultima spinta, con la sua riga `ramo-server`), porta
+prima la parte dell'app su main di Filo, coi controlli di sempre, e poi il ramo del server su main di filo-security. La
+pubblicazione la fa GitHub, e incorpora main di Filo che ha già la parte dell'app. Non chiedere la fusione del server da qui.

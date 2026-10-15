@@ -995,6 +995,9 @@ class TabManager {
       isInternal,
       // Quando la tab è stata aperta — metadato dell'archivio (§3.1).
       openedAt: new Date().toISOString(),
+      // Da quando c'è la pagina in vista: dopo un collegamento seguito nella stessa scheda non è più l'apertura (#826).
+      paginaDal: null,
+      _paginaUrl: senzaAncora(url),
       // §2.1 segnali per la decisione di auto-archiviazione (popolati a runtime).
       lastActiveAt: activate ? Date.now() : null,
       lastInteractionAt: activate ? Date.now() : null,
@@ -2726,6 +2729,7 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      segnaPagina(tab, url);
       // L'icona in volo era del documento di prima; quella mostrata vale ancora solo sullo stesso sito.
       tab._giroIcona = (tab._giroIcona || 0) + 1;
       if (origineDi(url) !== tab._origineIcona) tab.favicon = '';
@@ -2808,6 +2812,7 @@ class TabManager {
       update({ url: userUrl(url), canBack: this.puoTornare(tab, 'indietro', wc), canFwd: this.puoTornare(tab, 'avanti', wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
       if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
+      if (isMainFrame === true) segnaPagina(tab, url);
     });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
@@ -3689,9 +3694,12 @@ class TabManager {
       .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank' && !t._sorvegliante);
     const tabs = kept.map((t) => t.url);
     const colors = kept.map((t) => t.identityColor || null);
+    // Dopo un riavvio la scheda è ancora quella aperta allora: l'Aiuto risponde a «quando l'ho aperta?» (#826).
+    const aperte = kept.map((t) => t.openedAt || null);
+    const pagine = kept.map((t) => t.paginaDal || null);
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, activeIndex };
+    return { tabs, colors, aperte, pagine, activeIndex };
   }
 
   _sessionKey() {
@@ -3726,6 +3734,8 @@ class TabManager {
     if (this.incognito) return false; // incognito: nessuna sessione da ripristinare
     let urls = [];
     let colors = [];
+    const aperte = [];
+    const pagine = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
@@ -3734,10 +3744,14 @@ class TabManager {
         // tab ripristinato in posizione i (un ripristino vecchio senza `colors`
         // dà semplicemente colori tutti null).
         const savedColors = Array.isArray(saved.colors) ? saved.colors : [];
+        const savedAperte = Array.isArray(saved.aperte) ? saved.aperte : [];
+        const savedPagine = Array.isArray(saved.pagine) ? saved.pagine : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
             urls.push(u);
             colors.push(savedColors[i] || null);
+            aperte.push(aperturaValida(savedAperte[i]));
+            pagine.push(aperturaValida(savedPagine[i]));
           }
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
@@ -3763,6 +3777,8 @@ class TabManager {
         // pronti senza attendere il ricalcolo dei content script. Seeda anche la
         // cache per host, così una did-navigate sullo stesso dominio lo conserva.
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
+        if (aperte[i]) nata.openedAt = aperte[i];
+        nata.paginaDal = pagine[i] || null;
         nate.push(nata);
         return nata;
       });
@@ -3806,6 +3822,24 @@ installCookies(TabManager);
 
 function origineDi(url) {
   try { return new URL(url).origin; } catch (_) { return ''; }
+}
+
+function senzaAncora(url) {
+  return String(url || '').split('#')[0];
+}
+
+// Cambia solo col documento: l'ancora, la ricarica o il ritorno della stessa pagina dopo un riavvio non contano.
+function segnaPagina(tab, url) {
+  const u = senzaAncora(url);
+  if (!u || u === tab._paginaUrl) return;
+  tab._paginaUrl = u;
+  tab.paginaDal = new Date().toISOString();
+}
+
+// L'apertura salvata nella sessione, se è una data vera e non nel futuro; sennò la scheda riparte da adesso.
+function aperturaValida(v) {
+  const t = typeof v === 'string' ? Date.parse(v) : NaN;
+  return Number.isFinite(t) && t > 0 && t <= Date.now() + 60_000 ? new Date(t).toISOString() : null;
 }
 
 // Una scheda riaperta in coda porta il nome del suo sito finché la pagina non le dà il titolo vero.

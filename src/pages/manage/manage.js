@@ -2758,8 +2758,11 @@
     if (!MR.isLocalOnly(fb) || currentTab === 'local') return '';
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
-  // Passato dalla verifica, aspetta il PC per la fusione e il deploy del server (#1159): lo prende `npm run orchestra -- fusioni-server`.
-  const TITOLO_ATTESA_SERVER = 'La verifica è passata, aspetta il tuo PC. Lo porta su main di filo-security e lo pubblica npm run orchestra -- fusioni-server, che parte anche con avvia.';
+  // Un lavoro server passato e le sue attese (#1159): la suite di filo-security, il PC.
+  const ATTESE_SERVER = Object.freeze({
+    pc: ['Pronto: aspetta il PC', 'Il cancello non può portare il ramo su main di filo-security: il lavoro aspetta il tuo PC. Lo porta su main npm run orchestra -- fusioni-server, che parte anche con avvia, prima la parte dell’app e poi quella del server.'],
+    suite: ['Aspetta le prove del server', 'Il cancello porta su main la parte dell’app e poi il ramo di filo-security quando la suite di GitHub è verde su quel commit. Riprova da solo ogni dieci minuti.'],
+  });
   function localSignText(fb) {
     const m = fb && fb.localOnly;
     if (!m) return '';
@@ -2787,9 +2790,11 @@
   // passaggi dell'iter come spunte (✓ fatto · ● in corso · ○ da fare) e se
   // un'istanza ci sta lavorando in questo momento.
   function workStateHtml(progress, fb) {
-    // Un lavoro server passato aspetta il PC (#1159); coi lavori server alle routine, un fidato segue il loro iter.
-    if (fb && MR.inAttesaFusioneServer(fb)) {
-      return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(TITOLO_ATTESA_SERVER)}">Pronto: aspetta il PC</span></div>`;
+    // Un lavoro server passato aspetta il cancello, GitHub o il PC (#1159); coi lavori server alle routine, un fidato
+    // segue il loro iter.
+    const attesa = fb ? ATTESE_SERVER[MR.attesaServer(fb)] : null;
+    if (attesa) {
+      return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(attesa[1])}">${esc(attesa[0])}</span></div>`;
     }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
     if (fb && MR.isLocalOnly(fb) && !(mgLavoriServer && mgLavoriServer.checked && MR.isFidato(fb))) {

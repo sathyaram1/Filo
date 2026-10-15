@@ -1792,3 +1792,17 @@ test('domande: la scheda di ogni stato viene da SN_DOMANDE.schedaDi, e ogni sua 
   ]), { domande: 3, 'domande-lavoro': 1, 'domande-archivio': 1 });
   assert.deepEqual(MR.contaDomande(null), { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 });
 });
+
+test('attesaServer: le due attese di un lavoro server passato, solo in revisione (#1222)', () => {
+  const rev = (attesa) => ({ status: 'revision_security', attesa });
+  assert.equal(MR.attesaServer(rev('fusione_server')), 'pc');
+  assert.equal(MR.attesaServer(rev('suite_server')), 'suite');
+  // L'app si fonde prima del server: nessuno aspetta più la pubblicazione.
+  assert.equal(MR.attesaServer(rev('deploy_server')), '');
+  assert.equal(MR.attesaServer(rev('')), '');
+  assert.equal(MR.attesaServer(rev('toString')), '', 'solo le chiavi sue');
+  assert.equal(MR.attesaServer({ status: 'todo', attesa: 'suite_server' }), '', 'rimessa in coda il segno vecchio non conta');
+  assert.equal(MR.attesaServer(null), '');
+  assert.equal(MR.inAttesaFusioneServer(rev('fusione_server')), true);
+  assert.equal(MR.inAttesaFusioneServer(rev('suite_server')), false);
+});
