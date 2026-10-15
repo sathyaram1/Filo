@@ -156,11 +156,6 @@
     };
   }
 
-  function actionLabelFor(action) {
-    const row = (ModelChain.actionLabels() || []).find(([a]) => a === action);
-    return row ? I18n.t(row[1]) : action;
-  }
-
   // Un "Prova" è una richiesta vera al modello della riga. Con l'interruttore
   // acceso quelli proprietari restano spenti: il main li rifiuta comunque, ma un
   // bottone premibile che poi dice di no è attrito inutile — e su questa pagina
