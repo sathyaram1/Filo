@@ -363,7 +363,9 @@ sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiu
 
 Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
 giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
-alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
+alla chat + `statusReason: clarify`); (2b) un derivato nato da un rilievo col `?`
+(`statusReason: decisione`, domanda in chat dalla nascita, #775): alla risposta torna
+`todo` e lo prende un risolutore da capo, con domanda e risposta nelle `decisioni`; (3) la verifica ha trovato un difetto di livello
 3 che non si può più correggere da soli — bilancio delle correzioni dei 3 esaurito
 (`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3/2 che chiede una
 decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corregge ha
