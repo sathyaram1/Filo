@@ -66,10 +66,51 @@ test('i tre ambiti della verifica condividono livelli, critica e registrazione',
 test('nessun testo di verifica anticipa il seguito del giro', () => {
   for (const scope of ['pieno', 'chiusura', 'riallineamento']) {
     const t = readRoleInstructions('verifier', { scope });
-    for (const spia of [/correggerai/i, /sarai tu a corregg/i, /giri (che )?resta/i, /bilanci/i, /cap[012]\b/]) {
-      assert.ok(!spia.test(t), `ambito ${scope}: il testo anticipa il seguito (${spia})`);
+    for (const spia of [/correggerai/i, /sarai tu a corregg/i, /(?:prima di ogni|anche dopo le) correzion/i, /giri (che )?resta/i, /bilanci/i, /cap[012]\b/]) {
+      assert.ok(!spia.test(t.replace(/\s+/g, ' ')), `ambito ${scope}: il testo anticipa il seguito (${spia})`);
     }
   }
+});
+
+// Lo stesso vale per ciò che si incontra senza cercarlo fuori dal testo del ruolo: i documenti che CLAUDE.md
+// nomina, il compito del giro locale, l'aiuto e le intestazioni degli strumenti. Le formule stanno nell'aiuto
+// `formule-vietate.mjs`; il testo si legge unito, perché una frase va a capo dove capita.
+test('i documenti e le intestazioni che si leggono senza cercarli non anticipano il seguito del giro', async () => {
+  const { OVUNQUE } = await import('../helpers/formule-vietate.mjs');
+  const { testoLavoroServer, usageText } = await import('../../scripts/dispatch.mjs');
+  const { buildVerifierBrief } = await import('../../scripts/verify-local.mjs');
+  const comune = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8');
+  const nominati = [...new Set(['CLAUDE.md', ...(comune.match(/[\w./-]+\.(?:md|txt)\b/g) || [])])]
+    .filter((n) => resolve(ROOT, n).startsWith(ROOT + sep) && existsSync(resolve(ROOT, n)));
+  for (const n of ['FEEDBACK-STATES.md', 'ROUTINE-AUTH-SPEC.md', 'SPEC-RIDISEGNO-MAX.md', 'routines/roles/_criteri-verifica.md']) {
+    assert.ok(nominati.includes(n), `${n} non risulta più fra i documenti nominati da CLAUDE.md: la lettura dei nomi si è rotta`);
+  }
+  const intestazione = (f) => {
+    const righe = [];
+    for (const r of readFileSync(join(ROOT, f), 'utf8').split('\n')) {
+      if (!/^\s*(\/\/|$)/.test(r)) break;
+      righe.push(r.replace(/^\s*\/\/\s?/, ''));
+    }
+    assert.ok(righe.join('\n').trim().length > 500, `intestazione di ${f} vuota: la lettura si è rotta`);
+    return righe.join('\n');
+  };
+  const superfici = [
+    ...['pieno', 'chiusura', 'riallineamento'].map((scope) => [`ruolo verifier, ambito ${scope}`, readRoleInstructions('verifier', { scope })]),
+    ['lavoro server', testoLavoroServer({ clone: '/clone' })],
+    ['compito del giro locale', buildVerifierBrief({ request: 'fai X', branch: 'claude/x', recipe: readRoleInstructions('verifier'), history: [] })],
+    ['aiuto di dispatch', usageText()],
+    ...nominati.map((n) => [n, readFileSync(resolve(ROOT, n), 'utf8')]),
+    ...['scripts/dispatch.mjs', 'scripts/verify-local.mjs', 'scripts/routine-channel.mjs'].map((f) => [`intestazione di ${f}`, intestazione(f)]),
+  ];
+  const colpevoli = [];
+  for (const [nome, testo] of superfici) {
+    const unito = testo.replace(/\s+/g, ' ');
+    for (const formula of OVUNQUE) {
+      const m = unito.match(formula);
+      if (m) colpevoli.push(`${nome}: «${unito.slice(Math.max(0, m.index - 30), m.index + m[0].length + 10)}»`);
+    }
+  }
+  assert.deepEqual(colpevoli, [], 'frasi da riscrivere (il seguito del giro non si anticipa)');
 });
 
 test('un pezzo condiviso dentro un altro viene espanso', () => {
