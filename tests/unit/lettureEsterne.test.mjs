@@ -165,6 +165,7 @@ test('gancio: annota la lettura accanto al biglietto della sessione dello stdin 
     assert.equal(L.gancio({ input: { ...input, session_id: 'altra' }, env: {}, avvia }).esito, 'senza biglietto', 'mai il biglietto di un’altra sessione');
     assert.equal(L.gancio({ input, env: { FILO_ROUTINE: '1' }, avvia }).esito, 'routine');
     assert.equal(L.gancio({ input: { ...input, tool_name: 'Bash' }, env: {}, avvia }).esito, 'nessuna lettura esterna');
+    assert.equal(L.gancio({ input: { ...input, tool_name: 'Agent', tool_input: { prompt: 'x' } }, env: {}, avvia }).esito, 'nessuna lettura esterna');
     assert.equal(L.gancio({ input: 'storto', env: {}, avvia }).esito, 'nessuna lettura esterna');
     assert.equal(avviati.length, 1);
     // Già sporco sul server: nessun processo in più, ma la lettura resta annotata, e un segno falso non pulisce niente.
