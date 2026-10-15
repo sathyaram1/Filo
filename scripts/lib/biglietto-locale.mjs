@@ -660,7 +660,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
       const suo = radice && ID_RE.test(sessionId) ? leggiFile(join(cartellaBiglietti(radice), `${sessionId}.json`)) : null;
       if (suo) {
         path = suo.path;
-        segnaVivo(suo, trascrizione, nowMs);
+        segnaVivo(suo, trascrizione);
         const attesa = (await consegnaSporchi(suo, { deps })).restano;
         const s = await chiama('stato', { ticket: suo.ticket }, deps).catch(() => null);
         fiducia = s && s.fiducia === 'fidato' && s.chiuso !== true && !attesa ? 'fidato' : 'non_fidato';
