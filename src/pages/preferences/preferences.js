@@ -1568,6 +1568,7 @@
     // Ctrl+Z qui è un tasto da registrare, non «torna alla pagina di prima».
     document.documentElement.dataset.filoCtrlZ = 'pagina';
     chiediTasti(true);
+    caricaModuliEditor();
     riga.classList.add('sc-registra');
     mostraErroreScorciatoia(id, '');
     attesaTasti();
