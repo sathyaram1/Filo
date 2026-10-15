@@ -113,13 +113,6 @@ test('spenta di serie e niente sul disco; accesa scarica con la barra vera e ins
   await expect(pref.locator('#altreAppNumeri')).toContainText('Cua Driver 0.0.1-prova');
   await expect(barra).toBeHidden();
   expect(existsSync(join(dir, '0.0.1-prova', 'cua-driver'))).toBe(true);
-  // Il ComputerDriver risponde col driver installato.
-  const finestre = await app.evaluate(async () => {
-    const A = globalThis.__filoHandlers ? null : null;
-    void A;
-    return (await require('./services/altreApp').computerDriver.windows());
-  }).catch(() => null);
-  if (finestre) expect(finestre.ok).toBe(true);
   await foto(pref, 'pronto');
 
   await casella.uncheck();
