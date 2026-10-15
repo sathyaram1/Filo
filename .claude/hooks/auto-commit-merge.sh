@@ -434,7 +434,10 @@ salva_cartella() {
   # Una HEAD staccata non ha un ramo da spedire: il commit qui sopra resta come
   # paracadute locale e basta. Il ramo principale non arriva nemmeno qui.
   if is_spedibile "$BRANCH"; then
-    if COPIE_NEL_RAMO=$(copie_da_spedire "$wt" "$BRANCH"); then
+    AUTOMAZIONI_NEL_RAMO=$(automazioni_da_spedire "$BRANCH")
+    if [ -n "$AUTOMAZIONI_NEL_RAMO" ]; then
+      segnala_fallimento "$wt" "NON spedisco '$BRANCH': i commit ancora da spedire cambiano un'automazione ($AUTOMAZIONI_NEL_RAMO), che gira appena il ramo arriva su GitHub; $RIMEDIO_AUTOMAZIONI. Finche' quei commit restano da spedire, il ramo non parte."
+    elif COPIE_NEL_RAMO=$(copie_da_spedire "$wt" "$BRANCH"); then
       [ -n "$COPIE_NEL_RAMO" ] && segnala_avviso "$wt" "$COPIE_NEL_RAMO"
       spedisci_ramo "$BRANCH" "$wt" || true
     else
