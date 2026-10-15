@@ -1595,7 +1595,9 @@
     const chat = chatId;
     const fine = Date.now() + 10 * 60 * 1000;
     while (sending && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 250));
-    archiviaRiga(r.avviso.testo, 'filo', chat);
+    // Nel filo va l'avviso intero, rimedi compresi: a una risposta a parole Filo sa cosa ha proposto.
+    const perFilo = r.avviso.perFilo || r.avviso.testo;
+    archiviaRiga(perFilo, 'filo', chat);
     // Tornata alla home mentre aspettava: la riga resta nella chat, e i rimedi nella pagina Crediti.
     if (!inChatAperta(chat) || body.dataset.state !== 'thread') return;
     const inFondo = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 40;
@@ -1606,7 +1608,7 @@
       apriChiave: () => chrome.tabs.create({ url: 'filo://credits/credits.html#chiave' }),
     }));
     bubblesEl.appendChild(bolla);
-    threadHistory.push({ role: 'filo', text: r.avviso.testo });
+    threadHistory.push({ role: 'filo', text: perFilo });
     if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
