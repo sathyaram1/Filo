@@ -79,9 +79,14 @@ lo vede:
 
 - **in cloud:** gli ambienti dei lavori fidati hanno la rete limitata al
   repo e ai pacchetti;
-- **in locale:** un gancio sporca il biglietto dopo ogni strumento che porta
-  dentro testo esterno (pagine web e ricerche, strumenti MCP, artefatti, file
-  letti fuori dal repo), senza contare sulla sessione, che un testo malevolo può ingannare;
+- **in locale:** un gancio sporca il biglietto dopo ogni strumento, tranne un
+  elenco chiuso di quelli che non portano dentro niente da fuori (la shell, le
+  ricerche nel disco, le scritture, i sotto-agenti locali, i compiti); uno
+  strumento nuovo sporca finché qualcuno non lo mette nell'elenco. Un file
+  letto sporca solo fuori dal repo. Uno strumento che apre un canale da cui il
+  testo arriva dopo, senza passare da uno strumento (un sotto-agente che gira
+  nel cloud, un artefatto pubblicato che riceve commenti), sporca quando parte.
+  Il gancio non conta sulla sessione, che un testo malevolo può ingannare;
   col server giù lo sporco resta annotato accanto al biglietto, che intanto
   vale sporco, e parte alla prossima occasione. Il resto (un comando di shell
   che scarica qualcosa) lo dichiara la sessione (`biglietto.mjs sporca
