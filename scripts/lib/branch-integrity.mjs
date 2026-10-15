@@ -679,10 +679,9 @@ export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
       ? guardTransition(root, id, { assigned, escalate, clear: () => clearBranchState(root, id) })
       : (() => { const v = checkDelivery(root, assigned); return v.ok ? { ok: true } : { ...v, count: 0, escalated: false }; })();
     if (!g.ok) {
-      return {
-        ok: false, motivo: g.rebase ? 'rebase' : 'deriva', current: g.current || '', assigned: g.assigned || assigned,
-        rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated,
-      };
+      const cur = g.current || '';
+      const motivo = g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur) ? 'principale' : 'deriva';
+      return { ok: false, motivo, current: cur, assigned: g.assigned || assigned, rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated };
     }
     if (g.state && g.state.branch) assigned = g.state.branch;
   }
