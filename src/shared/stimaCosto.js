@@ -220,15 +220,15 @@
     const dollari = c.modo === 'dollari';
     const valore = dollari ? usd : usd * (Number(c.creditiPerDollaro) || 0);
     const cifra = dollari ? cifraDollari(valore) : cifraCrediti(valore);
-    const perUso = `${cifra.testo} per ${unita.s}`;
+    const perUso = `${cifra.circa ? 'circa ' : ''}${cifra.testo} per ${unita.s}`;
     const da = fonte === 'registro' ? `dal listino di OpenRouter e dai token medi dei tuoi ultimi ${unita.p}`
-      : fonte === 'misura' ? `da quanto ti è costato in media con questo modello`
-        : `dal listino di OpenRouter e da una media prudente per questa funzione (non l'hai ancora usata abbastanza)`;
+      : fonte === 'misura' ? 'da quanto ti è costato in media con questo modello'
+        : 'dal listino di OpenRouter e da una media prudente per questa funzione (non l\'hai ancora usata abbastanza)';
     return {
       ok: true, usd, valore, modo: dollari ? 'dollari' : 'crediti', unita, fonte,
       breve: `${cifra.circa ? '≈ ' : ''}${cifra.testo}`,
-      testo: `${cifra.circa ? 'Circa ' : ''}${cifra.circa ? perUso : perUso.charAt(0).toUpperCase() + perUso.slice(1)}, ${da}.`,
-      perUso: `${cifra.circa ? 'circa ' : ''}${perUso}`,
+      perUso,
+      testo: `${perUso.charAt(0).toUpperCase()}${perUso.slice(1)}, ${da}.`,
     };
   }
 
