@@ -67,7 +67,10 @@
         correttoreAcceso: 'featureFlags.spellcheck',
         categorieAutomatiche: 'featureFlags.categorize',
       },
-      gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoSiti: 'menuDelSito.siti' },
+      gruppi: {
+        tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoSiti: 'menuDelSito.siti',
+        scorciatoieFilo: 'scorciatoie.*',
+      },
       altrove: { documentiCercate: 'cartelleCercate' },
       fuori: {},
       messaggi: {
@@ -83,6 +86,7 @@
         TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
         TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',
         OPEN_URL: 'apre una pagina collegata: non salva niente',
+        REGISTRA_TASTI: 'lascia arrivare alla pagina i tasti premuti mentre si registra una scorciatoia: dalla chat la combinazione si scrive (scorciatoia)',
       },
     },
     security: {
@@ -194,13 +198,17 @@
   function jolly(percorso) {
     return String(percorso).endsWith('.*');
   }
-  // Le voci di un percorso jolly: i token estetici, i sei parametri del colore delle tab.
+  // Le voci di un percorso jolly: i token estetici, i sei parametri del colore delle tab, le quattro scorciatoie di Filo.
   function espandi(percorso) {
     if (!jolly(percorso)) return [percorso];
     const base = percorso.slice(0, -2);
     if (base === 'themeTokens') {
       const T = global.SN_THEME_TOKENS;
       return T && T.names ? T.names().map((n) => `themeTokens.${n}`) : [];
+    }
+    if (base === 'scorciatoie') {
+      const T = global.SN_TASTI;
+      return T && T.AZIONI_FILO ? T.AZIONI_FILO.map((a) => `scorciatoie.${a.id}`) : [];
     }
     if (base === 'tabColor') {
       const TC = global.SN_TAB_COLOR;
