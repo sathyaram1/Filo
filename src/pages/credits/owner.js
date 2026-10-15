@@ -73,6 +73,120 @@
     $('ownerRuns').textContent = runs.length ? `Ultime: ${runs.join(' · ')}` : 'Giornaliera e riconciliazione non hanno ancora girato.';
   }
 
+  // ── Le righe delle persone ─────────────────────────────────────────────────
+  // La vista si rilegge a ogni movimento di crediti, anche di un'altra scheda: le righe restano quelle e cambiano solo i
+  // numeri, così la scheda aperta, il menu e il fuoco restano dove l'owner li ha lasciati (#1087.4).
+  const righe = new Map();
+
+  function celleDi(u) {
+    const b = u.balance || {};
+    const rec = u.reconcile;
+    return [
+      u.pseudonym, formatCredits(b.credits), formatInt(b.creditsGranted), fmtUsd(b.usageUsd),
+      !rec ? '—' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'ok'),
+      u.invitedBy === 'owner' ? 'te' : (u.invitedBy || '—'), formatDate(u.createdAt),
+    ];
+  }
+
+  function scriviRiga(r, u) {
+    r.u = u;
+    r.impronta = JSON.stringify(u);
+    celleDi(u).forEach((c, i) => { r.celle[i].textContent = c; });
+    r.celle[4].classList.toggle('is-flagged', Boolean(u.reconcile && u.reconcile.flagged));
+    r.tr.classList.toggle('is-used', Boolean(u.disabled));
+  }
+
+  function nuovaRiga(u) {
+    const tr = document.createElement('tr');
+    tr.className = 'sn-wallet-user';
+    tr.title = 'Apri la scheda di questa persona';
+    tr.tabIndex = 0;
+    tr.setAttribute('role', 'button');
+    tr.setAttribute('aria-expanded', 'false');
+    const celle = celleDi(u).map(() => tr.appendChild(document.createElement('td')));
+    celle[0].className = 'sn-wallet-pseudonym';
+    celle[0].title = 'Copia';
+
+    // La scheda della persona sta in una riga sotto, che si apre al clic sulla riga. Il contenuto è una chiamata a parte
+    // (movimenti, inviti, ultime chiamate), chiesta alla prima apertura: fino ad allora c'è quello che la vista sa già.
+    const detail = document.createElement('tr');
+    detail.className = 'sn-wallet-user-detail';
+    detail.hidden = true;
+    const td = document.createElement('td');
+    td.colSpan = celle.length;
+    td.appendChild(usageDetail(u.usage));
+    detail.appendChild(td);
+
+    const r = { u, impronta: '', tr, celle, detail, td, scheda: null, rileggi: false };
+    r.apriChiudi = () => {
+      detail.hidden = !detail.hidden;
+      tr.classList.toggle('is-open', !detail.hidden);
+      tr.setAttribute('aria-expanded', detail.hidden ? 'false' : 'true');
+      if (!detail.hidden) caricaScheda(r).catch(() => {});
+    };
+    celle[0].addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      try { navigator.clipboard.writeText(r.u.pseudonym); } catch (_) {}
+      $('ownerGrantPseudonym').value = r.u.pseudonym;
+    });
+    tr.addEventListener('click', r.apriChiudi);
+    // Il tasto destro su una persona: quello che si vorrebbe fare proprio a lei (il menu generale della pagina di questa
+    // riga non sa niente). Vale anche dal tasto menu della tastiera, che manda lo stesso evento sulla riga col fuoco.
+    tr.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      apriMenuPersona(r, ev.clientX, ev.clientY);
+    });
+    tr.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      r.apriChiudi();
+    });
+    scriviRiga(r, u);
+    return r;
+  }
+
+  // I numeri di una persona sono cambiati: la sua scheda si richiede (aperta subito, chiusa alla prossima apertura), e
+  // quella vecchia resta sotto gli occhi finché la nuova non arriva.
+  function cambiaRiga(r, u) {
+    scriviRiga(r, u);
+    if (r.scheda === 'chiesta') { r.rileggi = true; return; }
+    r.scheda = null;
+    if (!r.td.querySelector('.sn-wallet-scheda')) r.td.replaceChildren(usageDetail(u.usage));
+    if (!r.detail.hidden) caricaScheda(r).catch(() => {});
+  }
+
+  function aggiornaRighe(tbody, users) {
+    const elenco = [];
+    const viste = new Map();
+    for (const u of users) {
+      const n = viste.get(u.pseudonym) || 0;
+      viste.set(u.pseudonym, n + 1);
+      elenco.push({ chiave: n ? `${u.pseudonym}#${n}` : String(u.pseudonym), u });
+    }
+    const chiavi = new Set(elenco.map((e) => e.chiave));
+    // Prima via chi non c'è più, così le righe che restano non si spostano: una riga spostata perde il fuoco.
+    for (const [chiave, r] of righe) {
+      if (chiavi.has(chiave)) continue;
+      if (menuDi === r) chiudiMenuPersona();
+      r.tr.remove();
+      r.detail.remove();
+      righe.delete(chiave);
+    }
+    let posto = tbody.firstChild;
+    for (const { chiave, u } of elenco) {
+      let r = righe.get(chiave);
+      if (!r) {
+        r = nuovaRiga(u);
+        righe.set(chiave, r);
+      } else if (JSON.stringify(u) !== r.impronta) {
+        cambiaRiga(r, u);
+      }
+      if (posto !== r.tr) tbody.insertBefore(r.tr, posto);
+      if (r.tr.nextSibling !== r.detail) tbody.insertBefore(r.detail, r.tr.nextSibling);
+      posto = r.detail.nextSibling;
+    }
+  }
+
   // ── Quando il server non risponde ──────────────────────────────────────────
   // Il messaggio grezzo (nome della chiamata, numero dell'errore, risposta del
   // server) va nella console, non addosso a chi legge: qui resta una frase e un
