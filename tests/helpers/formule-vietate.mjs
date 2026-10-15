@@ -32,7 +32,9 @@ export const TITOLI = [
 ];
 
 export const OVUNQUE = [
-  /verificatore[^'"\n]{0,30}corregg/i,
+  // «rilievi da correggere» non dice chi corregge: la riga di FEEDBACK-STATES.md
+  // che lo usa è legittima (feedback #794).
+  /verificatore[^'"\n]{0,30}(?<!\bda )corregg/i,
   // La stessa frase detta al contrario, o col sostantivo al posto del verbo:
   // «la consegna dallo STESSO verificatore», «del verificatore, non del
   // correttore». Guardare una faccia sola voleva dire non guardare
