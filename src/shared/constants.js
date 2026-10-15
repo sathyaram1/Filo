@@ -1636,8 +1636,8 @@
       if (!Number.isFinite(t) || t <= 0 || !fc) return '';
       const quando = fc.quando;
       const trascorso = ora - t;
-      const durata = trascorso >= 0 ? `, ${PROMPTS.durataTrascorsa(trascorso)} fa` : '';
-      return `Questa scheda (lo sa Filo): l'utente l'ha aperta ${quando(t)}${durata}. Adesso è ${quando(ora)}, ora del suo computer.\n`;
+      const durata = trascorso >= 0 ? `${PROMPTS.durataTrascorsa(trascorso)} fa ` : '';
+      return `Questa scheda (lo sa Filo): l'utente l'ha aperta ${durata}(${quando(t)}). Adesso è ${quando(ora)}, ora del suo computer.\n`;
     },
 
     durataTrascorsa: (ms) => {
