@@ -566,7 +566,14 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
  *
  * @returns {{ok:boolean, current:string, assigned:string, reason:string}}
  */
-export function checkDelivery(root, assignedBranch) {
+export function checkDelivery(root, assignedBranch, { da } = {}) {
+  const altra = altraCartellaDelDeposito(root, da);
+  if (altra) {
+    return {
+      ok: false, current: altra.ramo, assigned: String(assignedBranch || ''), cartella: altra.cartella, radice: altra.radice,
+      reason: `la registrazione parte dalla cartella "${altra.cartella}"${altra.ramo ? ` (ramo "${altra.ramo}")` : ''}, un'altra cartella dello stesso deposito: il lavoro si registra da "${altra.radice}", dove è stato posizionato`,
+    };
+  }
   const v = identityVerdict(currentBranch(root), assignedBranch);
   if (v.ok || v.current) return v;
   // Durante il rebase del ramo assegnato la cartella è staccata per forza: il rifiuto resta, ma non è una
