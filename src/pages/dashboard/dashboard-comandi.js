@@ -503,8 +503,10 @@
       const cmd = programmaDi(value.trim());
       if (!cmd) { updateInputClass(); return; }
       const chiave = chiaveShell(cmd);
-      // Lo stesso comando già in controllo non ne lancia un secondo: sotto carico ogni spawn in più allunga gli altri.
-      if (shellCmdCache.has(chiave) || shellCmdInVolo.has(chiave)) { updateInputClass(); return; }
+      // Lo stesso comando già in controllo non ne lancia un secondo (sotto carico ogni spawn in più allunga gli
+      // altri): ricolora quello in volo, quando risponde.
+      if (shellCmdInVolo.has(chiave)) return;
+      if (shellCmdCache.has(chiave)) { updateInputClass(); return; }
       shellCmdInVolo.add(chiave);
       let exists = null;
       try {
