@@ -235,6 +235,7 @@ export function preparaClone(principale, n, {
   writeFileSync(resolve(dir, MARCATORE_WORKER), `${JSON.stringify({ indice: i, paralleli: Number(paralleli) || 0, principale: radice })}\n`, 'utf8');
   ensureSessionExcludes(dir);
   try { installaControlloSpedizione(dir); } catch (_) { /* senza, restano i controlli delle singole strade */ }
+  ensureCommentChar(dir);
 
   const registro = registra ? cartellaRegistro(radice) : '';
   if (registro) {
