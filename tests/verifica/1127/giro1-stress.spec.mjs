@@ -1,15 +1,14 @@
 // Verifica #1127 giro 1: la coda della riapertura sotto stress (chiusura a metà, clic in fretta, scheda in vista chiusa
-// o morta) e la barra delle schede in attesa nei due temi.
+// o morta).
 import { test, expect, argomentiScala, chiudiApp, aspettaFinestra } from '../../fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const SHOTS = join(APP_ROOT, 'tests', '.shots');
 
 async function serverLento(ritardo) {
   const richieste = [];
@@ -148,28 +147,6 @@ test('la scheda in vista su un sito spento non tiene ferme le altre', async () =
     const t0 = Date.now();
     await expect.poll(() => caricate(app), { timeout: 30_000 }).toBe(4);
     expect(Date.now() - t0, 'le altre non aspettano il tetto di 15 s').toBeLessThan(12_000);
-  } finally {
-    await chiudiApp(app).catch(() => {});
-    await srv.chiudi();
-    rmSync(dati, { recursive: true, force: true });
-  }
-});
-
-test('la barra con le schede in attesa, tema chiaro e scuro', async () => {
-  test.setTimeout(90_000);
-  const srv = await serverLento(4000);
-  const dati = cartellaTemporanea('filo-v1127-');
-  scriviSessione(dati, Array.from({ length: 8 }, (_, i) => srv.url(i)), 0);
-  const app = await lancia(dati);
-  try {
-    const shell = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/shell.html'), 'la shell non è nata');
-    await expect.poll(async () => (await schede(app)).schede.length, { timeout: 20_000 }).toBe(8);
-    mkdirSync(SHOTS, { recursive: true });
-    for (const tema of ['light', 'dark']) {
-      await app.evaluate(({ nativeTheme }, t) => { nativeTheme.themeSource = t; }, tema);
-      await new Promise((r) => setTimeout(r, 400));
-      await shell.screenshot({ path: join(SHOTS, `v1127-attesa-${tema}.png`) });
-    }
   } finally {
     await chiudiApp(app).catch(() => {});
     await srv.chiudi();
