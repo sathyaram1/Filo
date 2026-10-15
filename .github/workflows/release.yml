@@ -406,14 +406,15 @@ jobs:
         if: steps.check.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token || secrets.GITHUB_TOKEN }}
+          VERSIONE: ${{ steps.bump.outputs.version }}
+          COMMIT: ${{ steps.applica.outputs.sha }}
+          CORSA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
           set -e
           git show "${GITHUB_SHA}:scripts/release-impronte.mjs" > "${RUNNER_TEMP}/release-impronte.mjs"
           node "${RUNNER_TEMP}/release-impronte.mjs" --piattaforma Windows --cartella dist \
-            --versione "${{ steps.bump.outputs.version }}" --repo "${{ github.repository }}" \
-            --commit "${{ steps.applica.outputs.sha }}" \
-            --corsa "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            --versione "$VERSIONE" --repo "$GITHUB_REPOSITORY" --commit "$COMMIT" --corsa "$CORSA"
 
       - name: Pubblica la release (da bozza a pubblicata)
         # electron-builder crea la release come DRAFT. La rendiamo pubblica solo
@@ -492,7 +493,8 @@ jobs:
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
-          cp scripts/npm-ci-ritenta.mjs scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -640,14 +642,15 @@ jobs:
         id: impronte
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Dall'ambiente e non scritta nel comando: sulla strada a mano la versione la scrive una persona.
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
+          CORSA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
           set -e
           node "${{ runner.temp }}/strumenti/release-impronte.mjs" --piattaforma Mac --cartella dist \
-            --versione "${{ steps.bersaglio.outputs.versione }}" --repo "${{ github.repository }}" \
-            --commit "$(git rev-parse HEAD)" \
-            --corsa "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --verifica-dopo 45
+            --versione "$VERSIONE" --repo "$GITHUB_REPOSITORY" --commit "$(git rev-parse HEAD)" \
+            --corsa "$CORSA" --verifica-dopo 45
 
       # `continue-on-error` sul lavoro tiene in piedi la release Windows, e fin
       # qui e' giusto; il prezzo era il silenzio: dal 20/09 al 26/09 nessuno si
@@ -738,7 +741,8 @@ jobs:
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
-          cp scripts/npm-ci-ritenta.mjs scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -905,14 +909,15 @@ jobs:
         id: impronte
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Dall'ambiente e non scritta nel comando: sulla strada a mano la versione la scrive una persona.
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
+          CORSA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         shell: bash
         run: |
           set -e
           node "${{ runner.temp }}/strumenti/release-impronte.mjs" --piattaforma Linux --cartella dist \
-            --versione "${{ steps.bersaglio.outputs.versione }}" --repo "${{ github.repository }}" \
-            --commit "$(git rev-parse HEAD)" \
-            --corsa "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --verifica-dopo 45
+            --versione "$VERSIONE" --repo "$GITHUB_REPOSITORY" --commit "$(git rev-parse HEAD)" \
+            --corsa "$CORSA" --verifica-dopo 45
 
       # `continue-on-error` sul lavoro tiene in piedi la release Windows, e fin
       # qui e' giusto; il prezzo era il silenzio: dal 20/09 al 26/09 nessuno si

@@ -550,9 +550,11 @@ describe('rimettere i file di una piattaforma su una versione già uscita', () =
 });
 
 // ─── #785: la sezione «Verifica» con commit, corsa e SHA-256 di ogni file ───
-// Le regole del testo stanno in tests/unit/releaseImpronte.test.mjs; qui il posto del passo nei tre lavori.
+// Le regole della sezione stanno in tests/unit/releaseImpronte.test.mjs; qui il posto del passo nei tre lavori.
 describe('ogni metà scrive le impronte dei suoi file nella pagina della versione', () => {
-  const CORSA = /--corsa "\$\{\{ github\.server_url \}\}\/\$\{\{ github\.repository \}\}\/actions\/runs\/\$\{\{ github\.run_id \}\}"/;
+  const CORSA = /CORSA: \$\{\{ github\.server_url \}\}\/\$\{\{ github\.repository \}\}\/actions\/runs\/\$\{\{ github\.run_id \}\}[\s\S]*--corsa "\$CORSA"/;
+  // I valori arrivano dall'ambiente: scritti nel comando con ${{ }}, una versione battuta a mano diventerebbe codice.
+  const SENZA_ESPRESSIONI_NEL_COMANDO = (corpo) => assert.doesNotMatch(corpo.slice(corpo.indexOf('run: |')).replace(/\$\{\{ runner\.temp \}\}/g, ''), /\$\{\{/);
 
   test('Windows: dopo il controllo della bozza e prima che diventi pubblica, con lo strumento di questa corsa', () => {
     const r = senzaCommenti(job('release'));
@@ -568,9 +570,10 @@ describe('ogni metà scrive le impronte dei suoi file nella pagina della version
     // Il commit provato può essere più vecchio dello script: lo strumento si prende dal commit di questa corsa.
     assert.match(p, /git show "\$\{GITHUB_SHA\}:scripts\/release-impronte\.mjs" > "\$\{RUNNER_TEMP\}\/release-impronte\.mjs"/);
     assert.doesNotMatch(p, /node scripts\/release-impronte\.mjs/, 'lo strumento della copia di lavoro può non esserci');
-    assert.match(p, /--versione "\$\{\{ steps\.bump\.outputs\.version \}\}"/);
-    assert.match(p, /--commit "\$\{\{ steps\.applica\.outputs\.sha \}\}"/, 'il commit è quello costruito');
+    assert.match(p, /VERSIONE: \$\{\{ steps\.bump\.outputs\.version \}\}[\s\S]*--versione "\$VERSIONE"/);
+    assert.match(p, /COMMIT: \$\{\{ steps\.applica\.outputs\.sha \}\}[\s\S]*--commit "\$COMMIT"/, 'il commit è quello costruito');
     assert.match(p, CORSA);
+    SENZA_ESPRESSIONI_NEL_COMANDO(p);
     assert.match(p, /--cartella dist\b/);
   });
 
@@ -588,7 +591,8 @@ describe('ogni metà scrive le impronte dei suoi file nella pagina della version
       assert.match(p.corpo, new RegExp(`--piattaforma ${piattaforma} --cartella dist\\b`));
       assert.match(p.corpo, /node "\$\{\{ runner\.temp \}\}\/strumenti\/release-impronte\.mjs"/, 'su un tag vecchio lo script della copia di lavoro non c\'è');
       assert.match(elenco.find((x) => x.id === 'riparo').corpo, /cp [^\n]*scripts\/release-impronte\.mjs "\$\{\{ runner\.temp \}\}\/strumenti\/"/);
-      assert.match(p.corpo, /--versione "\$\{\{ steps\.bersaglio\.outputs\.versione \}\}"/);
+      assert.match(p.corpo, /VERSIONE: \$\{\{ steps\.bersaglio\.outputs\.versione \}\}[\s\S]*--versione "\$VERSIONE"/);
+      SENZA_ESPRESSIONI_NEL_COMANDO(p.corpo);
       assert.match(p.corpo, /--commit "\$\(git rev-parse HEAD\)"/, 'il commit è quello che la guardia ha appena controllato');
       assert.match(p.corpo, CORSA);
       assert.match(p.corpo, /--verifica-dopo \d+/, 'Mac e Linux scrivono in parallelo: senza rilettura uno cancella le righe dell\'altro');
