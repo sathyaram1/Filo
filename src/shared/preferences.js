@@ -589,6 +589,26 @@
       },
     },
     {
+      scrive: ['altreApp.enabled'],
+      aiuto: 'true | false (accesa scarica e installa il componente che legge le finestre delle altre applicazioni; spenta lo toglie)',
+      keys: ['altre_applicazioni', 'filo può usare le altre applicazioni', 'filo puo usare le altre applicazioni', 'altre applicazioni',
+        'usa le altre applicazioni', 'altre app', 'uso del computer', 'driver delle applicazioni', 'componente altre applicazioni'],
+      // Accenderla installa un programma di terzi che legge le finestre del computer: conferma esplicita.
+      costo: 2,
+      allenta: (r) => r.partial.altreApp.enabled === true,
+      risk: 'Da accesa, Filo scarica da GitHub un componente esterno (Cua Driver, di trycua, circa 35-50 MB), ne controlla '
+        + 'l\'impronta e lo installa nella sua cartella dei dati. Il componente sa leggere le finestre aperte sul computer e, '
+        + 'quando Filo ne avrà le azioni, cliccarci e scriverci. Da spenta il componente si toglie e Filo non tocca le altre applicazioni.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return {
+          partial: { altreApp: { enabled: b } },
+          label: `Filo può usare le altre applicazioni → ${b ? 'attiva (scarico il componente: l\'avanzamento è in Preferenze)' : 'spenta (il componente si toglie)'}`,
+        };
+      },
+    },
+    {
       scrive: ['nomiSensati.scaricamenti'],
       aiuto: 'true | false (nome sensato da solo ai file scaricati col nome che non dice niente)',
       keys: ['nomi_sensati_scaricamenti', 'nome sensato agli scaricamenti', 'nomi sensati', 'rinomina scaricamenti',
