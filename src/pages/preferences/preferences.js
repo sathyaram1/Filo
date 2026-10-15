@@ -194,7 +194,7 @@
     for (const name of tokenInCorso) {
       const input = $(`tok-${name}`);
       const v = input ? input.value.trim() : '';
-      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = v;
+      if (v !== '' && Tokens && Tokens.validate(name, v)) currentOverrides[name] = Tokens.normalize(name, v);
     }
     chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { themeTokens: next } });
     flashSaved('tokenSavedHint');
