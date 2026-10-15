@@ -1137,10 +1137,12 @@ export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 // ferma la dice lo strumento, o chi corregge non la scopre mai.
 export const FERMA_NOTE = [
   'Se un rilievo non si può correggere senza una decisione dell\'owner (un trade-off vero, una scelta di',
-  'prodotto), scrivi la segnalazione e consegna quello che hai fatto:',
-  '  --record-fixed <id> "<report>" --segnala <file.md>',
-  'Una segnalazione FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha',
-  'risposto. Senza segnalazione torna in coda per un\'altra verifica. Un difetto non è una segnalazione.',
+  'prodotto), scrivi la segnalazione, applica la scelta che consigli e consegna quello che hai fatto:',
+  '  --record-fixed <id> "<report>" --segnala <file.md> --livello <0-3> [--difficile]',
+  'Una segnalazione di livello 3, o con --difficile (dati degli utenti, sicurezza, formati salvati su disco),',
+  'FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha risposto. Con 2, 1 o 0',
+  'torna in coda per un\'altra verifica, e la domanda arriva all\'owner in un feedback derivato. Un difetto non',
+  'è una segnalazione.',
 ].join('\n');
 
 /**
