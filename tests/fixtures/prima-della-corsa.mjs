@@ -1,6 +1,6 @@
 // Il globalSetup di Playwright, che prepara ciò che lavoratori ed Electron ereditano: si ferma sul motore sbagliato
 // (tests/helpers/motoreDelleProve.mjs), su Linux senza schermo accende Xvfb (scripts/lib/schermo-virtuale.mjs, #739) e dà
-// alla corsa una temporanea sua che se ne va con lei (#717): Chromium ci lascia una cartella a ogni avvio. Regole in tests/helpers/percorsi.mjs.
+// alla corsa una temporanea sua che se ne va con lei (#717, regole in tests/helpers/percorsi.mjs).
 import { dirname } from 'node:path';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
 import { accendiSchermo } from '../../scripts/lib/schermo-virtuale.mjs';

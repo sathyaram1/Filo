@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { accendiSchermo, preparaLancioElectron, senzaSchermo, xvfbDisponibile } from '../../scripts/lib/schermo-virtuale.mjs';
+import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
 import { shaDelRiallineamento, cambiatiPerLaScelta } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -133,7 +134,7 @@ test('il lanciatore a mano, dove lo schermo c\'è, esegue il comando com\'è e n
 const LINUX_CON_XVFB = process.platform === 'linux' && xvfbDisponibile();
 const senzaLinuxXvfb = LINUX_CON_XVFB ? false : 'serve Linux con xvfb-run';
 const numero = (display) => display.slice(1);
-const finché = async (cond, ms = 5_000) => {
+const entro = async (cond, ms = 5_000) => {
   const fine = Date.now() + ms;
   while (!cond() && Date.now() < fine) await new Promise((r) => setTimeout(r, 50));
   return cond();
@@ -188,19 +189,20 @@ test('accendiSchermo: uno xvfb-run che esce o risponde storto si dice, col suo m
 
 test('accendiSchermo accende un Xvfb vero, lo dà all\'ambiente e allo spegnimento lo chiude e rimette tutto', { skip: senzaLinuxXvfb }, async () => {
   const env = { PATH: process.env.PATH };
-  const s = await accendiSchermo({ env, worker: null });
+  // Dalla base del worker (#1157), come i lanci veri: i worker in parallelo non si contendono il display.
+  const s = await accendiSchermo({ env, worker: datiWorker({ root: ROOT }) });
   try {
     assert.match(env.DISPLAY, /^:\d+$/);
     assert.equal(s.display, env.DISPLAY);
     assert.equal(env.ELECTRON_DISABLE_SANDBOX, '1');
     assert.ok(existsSync(env.XAUTHORITY), 'il cookie per entrare nello schermo esiste');
     assert.ok(existsSync(`/tmp/.X11-unix/X${numero(env.DISPLAY)}`), 'Xvfb ascolta');
-    assert.match(s.nota, new RegExp(`schermo virtuale ${env.DISPLAY} \\(xvfb-run -a\\)`));
+    assert.match(s.nota, new RegExp(`schermo virtuale ${env.DISPLAY} \\(xvfb-run -a( -n \\d+)?\\)`));
   } finally {
     const { DISPLAY: display, XAUTHORITY: auth } = env;
     await s.spegni();
     assert.deepEqual(env, { PATH: process.env.PATH }, 'l\'ambiente torna quello di prima');
-    assert.ok(await finché(() => !existsSync(`/tmp/.X${numero(display)}-lock`)), 'Xvfb spento');
+    assert.ok(await entro(() => !existsSync(`/tmp/.X${numero(display)}-lock`)), 'Xvfb spento');
     assert.ok(!existsSync(auth), 'il cookie se ne va');
   }
 });
@@ -209,12 +211,12 @@ test('chi accende lo schermo ed esce senza spegnerlo non lascia Xvfb acceso', { 
   // Come il runner che esce di colpo: la temporanea della corsa (col cookie dentro) se ne va all'uscita.
   const codice = `import(${JSON.stringify(pathToFileURL(resolve(ROOT, 'tests', 'helpers', 'percorsi.mjs')).href)})`
     + `.then(() => import(${JSON.stringify(pathToFileURL(resolve(ROOT, 'scripts', 'lib', 'schermo-virtuale.mjs')).href)}))`
-    + '.then(async (m) => { const s = await m.accendiSchermo({ worker: null }); console.log(s.display); process.exit(0); })';
-  const r = spawnSync(process.execPath, ['-e', codice], { encoding: 'utf8', env: ambienteSenzaSchermo(), timeout: 30_000 });
+    + '.then(async (m) => { const s = await m.accendiSchermo(); console.log(s.display); process.exit(0); })';
+  const r = spawnSync(process.execPath, ['-e', codice], { cwd: ROOT, encoding: 'utf8', env: ambienteSenzaSchermo(), timeout: 30_000 });
   assert.equal(r.status, 0, r.stderr);
   const display = r.stdout.trim();
   assert.match(display, /^:\d+$/);
-  return finché(() => !existsSync(`/tmp/.X${numero(display)}-lock`)).then((spento) => assert.ok(spento, `Xvfb ${display} rimasto acceso`));
+  return entro(() => !existsSync(`/tmp/.X${numero(display)}-lock`)).then((spento) => assert.ok(spento, `Xvfb ${display} rimasto acceso`));
 });
 
 test('il globalSetup vero, senza schermo, dà display e sandbox spenta ai lavoratori e alla fine li ritira', { skip: senzaLinuxXvfb }, () => {
@@ -229,5 +231,5 @@ test('il globalSetup vero, senza schermo, dà display e sandbox spenta ai lavora
   assert.equal(durante.ELECTRON_DISABLE_SANDBOX, '1');
   assert.match(r.stderr, /schermo virtuale :\d+/, 'chi lancia vede una riga su cosa è successo');
   assert.deepEqual(dopo, {});
-  return finché(() => !existsSync(`/tmp/.X${numero(durante.DISPLAY)}-lock`)).then((spento) => assert.ok(spento, 'Xvfb spento col teardown'));
+  return entro(() => !existsSync(`/tmp/.X${numero(durante.DISPLAY)}-lock`)).then((spento) => assert.ok(spento, 'Xvfb spento col teardown'));
 });
