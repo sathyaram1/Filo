@@ -168,7 +168,7 @@
   function motivoHostEsclusi(hosts) {
     const { testo, quanti } = elencoNomi(hosts);
     if (!quanti) return NESSUN_HOST_MOTIVO;
-    return `${NESSUN_HOST_MOTIVO} (${quanti > 1 ? 'lo servono' : 'lo serve'} solo ${testo}, che Filo esclude)`;
+    return `${NESSUN_HOST_MOTIVO}. ${quanti > 1 ? 'Lo servono' : 'Lo serve'} solo ${testo}, che Filo esclude`;
   }
   function fraseNessunHost({ modello, funzione, motivo, rimedio: dove } = {}) {
     const m = breve(modello);
