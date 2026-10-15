@@ -343,25 +343,18 @@ module.exports = function register(on, ctx) {
     try { ctx.broadcastToFiloPages?.({ type: MSG.CLIPBOARD_HISTORY_UPDATED }); } catch (_) {}
   };
 
-  // Una voce tolta (o svuotata) mentre è ancora negli appunti di sistema non
-  // deve rientrare dal primo «Incolla» di Filo: la sua chiave resta sospesa
-  // finché si incolla altro o la si ricopia apposta.
-  let chiaveSospesa = '';
-  // Da Electron 44 gli appunti del main rispondono con una Promise: letta senza await la chiave era sempre ''.
-  const chiaveAppunti = async () => {
-    try {
-      const t = await require('electron').clipboard.readText();
-      return t ? globalThis.SN_CLIPBOARD.chiave({ type: 'text', text: t }) : '';
-    } catch (_) { return ''; }
-  };
+  // Tolta o svuotata mentre è ancora negli appunti di sistema, una voce non rientra dal primo «Incolla» (#256.2).
+  const Tolti = () => require('../appuntiTolti').perFilo();
 
   on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, msg.entry)) return vietato;
+    const e = msg.entry;
+    if (!e) return { ok: true };
+    // `tenuta: false` dice alla pagina di non far descrivere a un modello un'immagine che la cronologia non tiene.
+    if (!(await Tolti().daTenere(e, msg.via))) return { ok: true, tenuta: false };
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
-    const e = msg.entry;
-    if (!e) return { ok: true };
     const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
     const keyOf = (x) => {
       if (!x) return '';
@@ -370,11 +363,6 @@ module.exports = function register(on, ctx) {
       return '';
     };
     const newKey = keyOf(e);
-    if (chiaveSospesa) {
-      const incolla = msg.via === 'paste';
-      if (incolla && newKey === chiaveSospesa) return { ok: true };
-      if (incolla || newKey === chiaveSospesa) chiaveSospesa = '';
-    }
     const seen = new Set([newKey]);
     const filtered = [];
     for (const x of arr) {
