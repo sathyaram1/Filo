@@ -233,6 +233,25 @@ test('CLI: risposta da stdin col biglietto → arriva intera, apostrofi compresi
   } finally { srv.close(); }
 });
 
+test('CLI: la risposta dell\'orchestratore porta da sola il costo dei suoi turni dopo l\'ultimo biglietto', async () => {
+  const base = cartellaTemporanea('filo-cli-chiusura-');
+  const { srv, richieste, port } = await fintoServer(200, { ok: true });
+  try {
+    const turno = (id, ts, usage) => JSON.stringify({ type: 'assistant', timestamp: ts, sessionId: 'orch', message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 0, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, ...usage }, content: [{ type: 'text', text: id }] } });
+    const file = join(base, 'orch.jsonl');
+    writeFileSync(file, [turno('p1', '2026-10-15T09:00:00.000Z', { cache_creation_input_tokens: 30000 }), turno('p2', '2026-10-15T09:00:20.000Z', { cache_read_input_tokens: 30000 })].join('\n') + '\n');
+    const r = await cli(port, ['risposta', 'parola', 'c7'], 'niente\n', { FILO_TRANSCRIPT: file });
+    assert.equal(r.status, 0, r.stderr);
+    const { report, ...resto } = richieste[0].body;
+    assert.deepEqual(resto, { passphrase: 'parola', op: 'answer', id: 'c7', answer: 'niente' });
+    assert.equal(report.closing, true);
+    assert.equal(report.role, 'orchestrator');
+    assert.equal(report.turns, 2, 'un\'accensione senza worker: tutta la sessione');
+    assert.ok(report.costUsd > 0);
+    assert.match(r.stderr, /chiusura dell'orchestratore: \$0\.\d{4} \(2 turni/);
+  } finally { srv.close(); togliCartella(base); }
+});
+
 test('CLI: answer_too_big → exit 4 coi numeri stampati', async () => {
   const { srv, port } = await fintoServer(413, { ok: false, reason: 'answer_too_big', bytes: 50001, max: 32768 });
   try {
