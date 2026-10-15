@@ -1295,9 +1295,8 @@ export function verifierReplyText(reply, id = '<id>') {
 export function fixedReplyText(id, reply, conSegnalazione = false) {
   const fermato = reply && reply.outcome === 'stop';
   if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
-  // Un server vecchio, che non ferma su una segnalazione, rimette in coda: dirlo, o chi ha segnalato crede di essersi fermato.
-  if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
-  return `stato ${id}: consegnato, torna in coda per la verifica`;
+  const persa = segnalazioneNonPresaText(conSegnalazione, reply);
+  return `stato ${id}: consegnato, torna in coda per la verifica${persa ? `\n${persa}` : ''}`;
 }
 async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
   const guard = guardIdentity(id);
