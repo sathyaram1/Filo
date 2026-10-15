@@ -53,6 +53,19 @@ test('r1 due domande chiuse altrove sopra non spostano la riga sotto il puntator
   await expect(page.locator('#mgDomandaDettaglio .mg-dq').first()).toHaveAttribute('data-id', 'D-10');
 });
 
+test('r1 una rilettura fallita non sposta le righe sotto il puntatore: il clic spunta la domanda puntata', async ({ app, openTab }) => {
+  const page = await domandeAperte(app, openTab);
+  const [x, y] = await centro(page.locator('.mg-domanda[data-id="D-8"] .mg-dom-sel'));
+  await page.mouse.move(x, y);
+  await aspettaRilettura(app, (F) => { F.guasti = { domande_elenco: { n: 1 } }; });
+  await expect(page.locator('#mgDomandeStato')).toBeVisible({ timeout: 5_000 });
+  await page.mouse.down();
+  await page.mouse.up();
+  const spuntate = await page.evaluate(() => [...document.querySelectorAll('#mgDomandeLista .mg-domanda')]
+    .filter((r) => r.querySelector('.mg-dom-sel')?.checked).map((r) => r.dataset.id));
+  expect(spuntate).toEqual(['D-8']);
+});
+
 test('r1 il fuoco della tastiera resta sulla riga quando la rilettura cambia un\'altra domanda: Invio la apre', async ({ app, openTab }) => {
   const page = await domandeAperte(app, openTab);
   await page.locator('.mg-domanda[data-id="D-11"]').focus();
