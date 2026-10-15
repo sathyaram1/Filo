@@ -681,11 +681,10 @@ export function eRilascio(comando) {
 }
 
 /**
- * L'intestazione di una notifica di Claude Code, solo dove la mette lui (coda, allegato, messaggio di testo):
- * un turno o il risultato di uno strumento che la cita non è una notifica. Fino al riassunto, perché il
- * rapporto di un worker riportato dentro può citare altri id. '' se la riga non è una notifica. PURA.
+ * Il testo che Claude Code mette da sé nel thread principale, nelle sue tre buste (coda, allegato, messaggio di
+ * testo): un turno o il risultato di uno strumento che lo cita non conta. '' se la riga non ne porta. PURA.
  */
-export function testaNotifica(e) {
+function testoDiServizio(e) {
   if (!e || typeof e !== 'object') return '';
   const msg = e.message && typeof e.message === 'object' ? e.message : null;
   let s = '';
@@ -695,9 +694,34 @@ export function testaNotifica(e) {
     s = typeof msg.content === 'string' ? msg.content
       : Array.isArray(msg.content) ? msg.content.filter((b) => b && b.type === 'text').map((b) => String(b.text || '')).join('\n') : '';
   }
-  s = s.trimStart();
+  return s.trimStart();
+}
+
+/**
+ * L'intestazione di una notifica di Claude Code, solo dove la mette lui. Fino al riassunto, perché il
+ * rapporto di un worker riportato dentro può citare altri id. '' se la riga non è una notifica. PURA.
+ */
+export function testaNotifica(e) {
+  const s = testoDiServizio(e);
   if (!s.startsWith('<task-notification>')) return '';
   return s.split(/<summary>|<result>/)[0];
+}
+
+/**
+ * La notifica di un worker fermo ad aspettare un suo comando in sottofondo: la nota di Claude Code dice che lo
+ * stesso task-id notificherà ancora, quindi non è la sua fine. Si legge la busta, non il risultato del worker. PURA.
+ */
+export function notificaProvvisoria(e) {
+  const s = testoDiServizio(e);
+  if (!s.startsWith('<task-notification>')) return false;
+  const nota = s.split('<result>')[0].replace(/<summary>[\s\S]*?<\/summary>/g, '').match(/<note>([\s\S]*?)<\/note>/);
+  return !!nota && /interim|notifies again|may resume/i.test(nota[1]);
+}
+
+/** L'agente che consegna il suo rapporto finale con questa riga (la consegna di Claude Code, in testa), o ''. PURA. */
+export function consegnaDi(e) {
+  const m = testoDiServizio(e).match(/^[^<]{0,200}<agent-message from="([^"]+)">\s*\[Subagent hand-back\]/);
+  return m ? m[1].trim() : '';
 }
 
 /**
