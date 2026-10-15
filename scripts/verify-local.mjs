@@ -482,9 +482,10 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
     // servono a ristampare la risposta tale e quale se si è persa.
     entry.pending = {
       findings: decision.fix, sha: sha || '', serverSha: (server && server.sha) || '', at: when,
-      derived: decision.derived, external: decision.external, budgets: decision.budgets,
+      derived: decision.derived, external: decision.external, domande: decision.domande, budgets: decision.budgets,
     };
-    entry.derived = coda.concat(senzaNumero(decision.derived));
+    // Le domande corrette con l'opzione consigliata escono anche loro come feedback; le loro prove no (non sono in `derived`).
+    entry.derived = coda.concat(senzaNumero(decision.domande), senzaNumero(decision.derived));
   } else {
     entry.verdict = 'pass';
     entry.pending = null;
