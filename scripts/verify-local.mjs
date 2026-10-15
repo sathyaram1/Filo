@@ -576,7 +576,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
   const serverFermo = partenzaServer === String((server && server.sha) || '');
   if (sha && partenza && sha === partenza && serverFermo) {
     if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'non corretto' };
-    // Un vicino conta 0 qualunque livello porti scritto: non corretto non ferma, esce coi rimasti.
+    // Un vicino non ferma mai, qualunque livello porti scritto: non corretto, esce coi rimasti.
     const gravi = pending.filter((f) => ROUND.effectiveLevel(f) >= 2);
     const lievi = pending.filter((f) => !gravi.includes(f));
     if (gravi.length) {
