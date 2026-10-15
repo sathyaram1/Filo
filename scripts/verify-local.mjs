@@ -1462,15 +1462,24 @@ if (isMain) {
     const aperto = readState()[branch];
     const statoP = statoDirectory(ROOT);
     if (!statoP.ok) { console.error(statoIllegibileText(statoP.motivo)); process.exit(1); }
-    const { controllaPulizia, controllaCasiDellaPulizia } = await import('./lib/prove-tolte.mjs');
+    const { controllaPulizia, controllaCasiDellaPulizia, baseDelConfronto } = await import('./lib/prove-tolte.mjs');
     const controllo = aperto && aperto.pending && !statoP.lines.length
-      ? controllaPulizia({ shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch), avvio: aperto.requestedSha })
+      ? controllaPulizia({
+        shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch), avvio: aperto.requestedSha,
+        base: baseDelConfronto(aperto.pending.sha, aperto.pending.shaPulizia, ROOT), pulizieDopo: aperto.pending.pulizieDopo,
+      })
       : null;
     const r = withPulizia(readState(), branch, { controllo, dirtyFiles: statoP.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
-    const casi = controllaCasiDellaPulizia({ shaCritica: aperto.pending.sha, sha: controllo.sha, root: ROOT, messi: r.numeri });
+    const casi = controllaCasiDellaPulizia({ shaCritica: controllo.prima || aperto.pending.sha, sha: controllo.sha, root: ROOT, messi: r.numeri, dopo: !!controllo.dopo });
     if (casi.ferma) { console.error(casi.testo); process.exit(1); }
     writeState(r.state);
+    if (controllo.dopo) {
+      console.log(`Pulizia dopo le correzioni registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'toccata 1 prova' : `toccate ${r.files.length} prove`} dei rilievi messi da parte.`);
+      console.log(r.files.map((f) => `  · ${f}`).join('\n'));
+      console.log('La consegna non le rilancia più com\'erano: di quelle a cui ha tolto un caso rilancia quello che resta, e ogni altra prova del giro tolta o cambiata dalla pulizia di prima, se com\'era è ancora rossa, la ferma.');
+      process.exit(0);
+    }
     console.log(`Pulizia registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'tolta 1 prova' : `tolte ${r.files.length} prove`} dei rilievi messi da parte.`);
     console.log(r.files.map((f) => `  · ${f}`).join('\n'));
     console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com\'era è ancora rossa, la ferma.');
