@@ -22,10 +22,9 @@ di Gestione, dove stanno i feedback da decidere.
   lavoro locale di `npm run finish`, che il server apre senza numero) sta in
   cima ad Automazioni coi tasti di sempre: nasconderla sarebbe un ramo fermo
   per sempre senza dirlo.
-- **Chi manda l'owner lì nomina il posto di oggi.** Il terminale ha continuato
-  a dire «l'avviso in cima ai Ricevuti» per due settimane dopo il 13/09, e
-  l'owner l'ha cercato lì (#761). Il nome sta in `DOVE_SI_APPROVA`
-  (`scripts/lib/owner-merge.mjs`), e la sentinella legge la pagina vera.
+- Il terminale di `npm run finish` nomina il posto con `DOVE_SI_APPROVA`
+  (`scripts/lib/owner-merge.mjs`): la regola sta in
+  [chi manda altrove](vai-a-guardare-in-quellaltro-posto-quel-posto.md) (#761).
 - **Dove:** `fusioniFermeInCima()` / `fusioniSenzaFeedback()` in
   `src/shared/manageReview.js`, `#mgMergeApprovalsOrphans` in `panel-automation`
   (`manage.html`), modulo `src/shared/mergeApprovals.js`. Test:
