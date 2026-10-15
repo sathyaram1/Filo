@@ -1803,9 +1803,9 @@
     // src/content/menuIcons.js (SN_MENU_ICONS), caricato prima di questo file.
     items.push(MenuIcons.buildGlobalIconRow(navState));
 
-    // 2. Aiuto — voce sempre presente, etichettata.
-    items.push({ type: 'separator' });
-    items.push(buildHelpItem());
+    // 2. Aiuto, se è acceso, e le voci di stato qui sotto: il separatore c'è solo se la sezione ha qualcosa.
+    const sezioneAiuto = [];
+    if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
 
     // 2b. Interrompi lettura — presente in QUALSIASI menu mentre la sintesi
     // vocale è in riproduzione, anche senza selezione/contesto, così la
@@ -1813,7 +1813,7 @@
     // è true anche se a leggere è un'ALTRA scheda: lo stop chiede al main di
     // inoltrare l'arresto alla scheda che legge davvero.
     if (TTS.isAnyReading()) {
-      items.push(TTS.buildStopReadingItem());
+      sezioneAiuto.push(TTS.buildStopReadingItem());
     }
 
     // 2c. Mostra originale — solo quando alla traduzione di pagina manca ancora
