@@ -1,22 +1,17 @@
-// Sorgente della guardia anti-fingerprint, iniettata dal page-preload nel main world prima degli
-// script della pagina. Non legge mai il master secret: riceve solo il seed per sito (HMAC in main).
-// Il rumore è legato alla posizione del pixel nell'immagine: stesso pixel, stesso rumore, da ogni porta.
+// Sorgente del preambolo che il page-preload inietta nel main world prima degli script della pagina: oggi la guardia
+// anti-fingerprint, una parte fra quelle che il preambolo porta in ogni finestra della stessa origine (#798; #753 ci
+// aggiunge GPC). Non legge mai il master secret: riceve solo il seed per sito (HMAC in main).
 
-function buildGuardSource(seed, level) {
-  const s = (seed >>> 0);
-  const lvl = level | 0;
-  return `(function(){
-  'use strict';
-  if (window.__filoFpGuard) return;
-  var SEED = ${s} >>> 0;
-  var LEVEL = ${lvl};
-  if (!LEVEL) return;
-  try { Object.defineProperty(window, '__filoFpGuard', { value: true, enumerable: false, configurable: true }); } catch(e) {}
+// La guardia: rumore legato alla posizione del pixel nell'immagine, stesso pixel stesso rumore da ogni porta.
+// `guarda(w)` la monta nella finestra `w`, con le copie native di quella finestra.
+function parteFingerprint(seed) {
+  return `
+  var SEED = ${seed >>> 0} >>> 0;
 
   function ph(x, y) {
-    var h = (SEED ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263)) >>> 0;
-    h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0;
-    h = Math.imul(h ^ (h >>> 13), 3266489917) >>> 0;
+    var h = (SEED ^ imul(x | 0, 374761393) ^ imul(y | 0, 668265263)) >>> 0;
+    h = imul(h ^ (h >>> 15), 2246822519) >>> 0;
+    h = imul(h ^ (h >>> 13), 3266489917) >>> 0;
     return (h ^ (h >>> 16)) >>> 0;
   }
 
@@ -42,28 +37,10 @@ function buildGuardSource(seed, level) {
     }
   }
 
-  // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
-  // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799).
-  var masked = new WeakMap();
-  function mask(fn, orig, name) {
-    var m = fn;
-    try {
-      m = ({ [name]() { return fn.apply(this, arguments); } })[name];
-      Object.defineProperty(m, 'length', { value: orig.length, configurable: true });
-      masked.set(m, 'function ' + name + '() { [native code] }');
-    } catch (e) {}
-    return m;
-  }
-  try {
-    var FP = Function.prototype, oFnToString = FP.toString;
-    FP.toString = mask(function toString() {
-      return (typeof this === 'function' && masked.get(this)) || oFnToString.apply(this, arguments);
-    }, oFnToString, 'toString');
-  } catch (e) {}
-
   // ---- Canvas (elemento e OffscreenCanvas) ----
   // Il contesto di un canvas si annota quando la pagina lo crea: chiederlo alla guardia con
-  // getContext('2d') ne creerebbe uno, e il canvas non potrebbe più diventare WebGL.
+  // getContext('2d') ne creerebbe uno, e il canvas non potrebbe più diventare WebGL. L'annotazione è
+  // di tutte le finestre: un canvas della pagina si legge anche con le funzioni di un suo riquadro.
   var ctxOf = new WeakMap();
   var MAXPX = 8000000;
 
@@ -71,8 +48,8 @@ function buildGuardSource(seed, level) {
     var o = proto && proto.getContext;
     if (!o) return null;
     proto.getContext = mask(function getContext() {
-      var ctx = o.apply(this, arguments);
-      if (ctx && !ctxOf.has(this)) ctxOf.set(this, ctx);
+      var ctx = R(o, this, arguments);
+      if (ctx && !R(wmHas, ctxOf, [this])) R(wmSet, ctxOf, [this, ctx]);
       return ctx;
     }, o, 'getContext');
     return o;
@@ -82,7 +59,7 @@ function buildGuardSource(seed, level) {
     var o = proto && proto.getImageData;
     if (!o) return null;
     proto.getImageData = mask(function getImageData(sx, sy, sw, sh) {
-      var img = o.apply(this, arguments);
+      var img = R(o, this, arguments);
       try {
         var x0 = (sx | 0) + ((sw | 0) < 0 ? (sw | 0) : 0);
         var y0 = (sy | 0) + ((sh | 0) < 0 ? (sh | 0) : 0);
@@ -106,114 +83,251 @@ function buildGuardSource(seed, level) {
   // un istante, e toBlob/convertToBlob, che finiscono dopo, non ripristinano sopra un disegno nuovo.
   // Senza contesto il canvas è vuoto, uguale per tutti: null, e si esporta com'è.
   function noisyCopy(src, F) {
-    var ctx = ctxOf.get(src);
+    var ctx = R(wmGet, ctxOf, [src]);
     if (!ctx || !F) return null;
-    var w = src.width | 0, h = src.height | 0;
-    if (w <= 0 || h <= 0 || (w * h) > MAXPX) return null;
+    var W = src.width | 0, H = src.height | 0;
+    if (W <= 0 || H <= 0 || (W * H) > MAXPX) return null;
     var img = null, cs;
-    try { img = F.get.call(ctx, 0, 0, w, h); cs = img.colorSpace; }
+    try { img = R(F.get, ctx, [0, 0, W, H]); cs = img.colorSpace; }
     catch (e) { img = null; try { cs = ctx.drawingBufferColorSpace; } catch (e2) {} }
-    var tmp = F.make(w, h);
-    var t = F.getCtx.call(tmp, '2d', { colorSpace: cs || 'srgb', willReadFrequently: true });
-    if (!img) { F.draw.call(t, src, 0, 0); img = F.get.call(t, 0, 0, w, h); }
-    perturb(img.data, w, h, 0, 0);
-    F.put.call(t, img, 0, 0);
+    var tmp = F.make(W, H);
+    var t = R(F.getCtx, tmp, ['2d', { colorSpace: cs || 'srgb', willReadFrequently: true }]);
+    if (!img) { R(F.draw, t, [src, 0, 0]); img = R(F.get, t, [0, 0, W, H]); }
+    perturb(img.data, W, H, 0, 0);
+    R(F.put, t, [img, 0, 0]);
     return tmp;
   }
   function copyOrNull(src, F) { try { return noisyCopy(src, F); } catch (e) { return null; } }
 
-  try {
-    var oCreate = Document.prototype.createElement;
-    var HTML = family(window.HTMLCanvasElement, window.CanvasRenderingContext2D, function (w, h) {
-      var c = oCreate.call(document, 'canvas'); c.width = w; c.height = h; return c;
+  // La copia nasce nel documento della finestra a cui appartiene la funzione: il Blob che ne esce è suo.
+  function canvasHtml(w) {
+    var oCreate = w.Document.prototype.createElement;
+    var F = family(w.HTMLCanvasElement, w.CanvasRenderingContext2D, function (W, H) {
+      var c = R(oCreate, w.document, ['canvas']); c.width = W; c.height = H; return c;
     });
-    var CanProto = HTML && window.HTMLCanvasElement.prototype;
-    if (CanProto && CanProto.toDataURL) {
-      var oToData = CanProto.toDataURL;
-      CanProto.toDataURL = mask(function toDataURL() {
-        return oToData.apply(copyOrNull(this, HTML) || this, arguments);
+    var P = F && w.HTMLCanvasElement.prototype;
+    if (P && P.toDataURL) {
+      var oToData = P.toDataURL;
+      P.toDataURL = mask(function toDataURL() {
+        return R(oToData, copyOrNull(this, F) || this, arguments);
       }, oToData, 'toDataURL');
     }
-    if (CanProto && CanProto.toBlob) {
-      var oToBlob = CanProto.toBlob;
-      CanProto.toBlob = mask(function toBlob(cb) {
-        var tmp = typeof cb === 'function' ? copyOrNull(this, HTML) : null;
-        return oToBlob.apply(tmp || this, arguments);
+    if (P && P.toBlob) {
+      var oToBlob = P.toBlob;
+      P.toBlob = mask(function toBlob(cb) {
+        var tmp = typeof cb === 'function' ? copyOrNull(this, F) : null;
+        return R(oToBlob, tmp || this, arguments);
       }, oToBlob, 'toBlob');
     }
-  } catch (e) {}
+  }
 
-  try {
-    var OC = window.OffscreenCanvas;
-    var OFF = family(OC, window.OffscreenCanvasRenderingContext2D, function (w, h) { return new OC(w, h); });
-    var OffProto = OFF && OC.prototype;
-    if (OffProto && OffProto.convertToBlob) {
-      var oConvert = OffProto.convertToBlob;
-      OffProto.convertToBlob = mask(function convertToBlob() {
-        return oConvert.apply(copyOrNull(this, OFF) || this, arguments);
+  function canvasOffscreen(w) {
+    var OC = w.OffscreenCanvas;
+    var F = family(OC, w.OffscreenCanvasRenderingContext2D, function (W, H) { return new OC(W, H); });
+    var P = F && OC.prototype;
+    if (P && P.convertToBlob) {
+      var oConvert = P.convertToBlob;
+      P.convertToBlob = mask(function convertToBlob() {
+        return R(oConvert, copyOrNull(this, F) || this, arguments);
       }, oConvert, 'convertToBlob');
     }
-  } catch (e) {}
+  }
 
   // ---- WebGL readPixels ----
   // Righe e posizioni come le vede toDataURL dello stesso canvas: le due letture devono coincidere.
-  try {
-    var patchGL = function (proto, gl2) {
-      if (!proto || !proto.readPixels) return;
-      var oRead = proto.readPixels, oParam = proto.getParameter;
-      var dbh = Object.getOwnPropertyDescriptor(proto, 'drawingBufferHeight');
-      var dbhGet = dbh && dbh.get;
-      var nf = function readPixels(x, y, width, height, format, type, pixels, dstOffset) {
-        oRead.apply(this, arguments);
-        try {
-          if (format !== 0x1908 || type !== 0x1401) return;
-          if (!(pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray)) return;
-          var w = width | 0, h = height | 0;
-          var align = (oParam.call(this, 0x0D05) | 0) || 4;
-          var rowLen = 0, skipR = 0, skipP = 0;
-          if (gl2) {
-            rowLen = oParam.call(this, 0x0D02) | 0;
-            skipR = oParam.call(this, 0x0D03) | 0;
-            skipP = oParam.call(this, 0x0D04) | 0;
-          }
-          var stride = Math.ceil((rowLen > 0 ? rowLen : w) * 4 / align) * align;
-          var base = (gl2 ? (dstOffset | 0) : 0) + skipR * stride + skipP * 4;
-          var H = dbhGet ? (dbhGet.call(this) | 0) : 0;
-          perturb(pixels, w, h, x | 0, H - 1 - (y | 0), base, stride, -1);
-        } catch (e) {}
-      };
-      proto.readPixels = mask(nf, oRead, 'readPixels');
+  // Il buffer si riconosce dal tipo e non con instanceof: può venire da un'altra finestra.
+  var tagTA = gOPD(getProto(Uint8Array.prototype), Symbol.toStringTag).get;
+  function patchGL(proto, gl2) {
+    if (!proto || !proto.readPixels) return;
+    var oRead = proto.readPixels, oParam = proto.getParameter;
+    var dbh = gOPD(proto, 'drawingBufferHeight');
+    var dbhGet = dbh && dbh.get;
+    var nf = function readPixels(x, y, width, height, format, type, pixels, dstOffset) {
+      R(oRead, this, arguments);
+      try {
+        if (format !== 0x1908 || type !== 0x1401) return;
+        var tipo = R(tagTA, pixels, []);
+        if (tipo !== 'Uint8Array' && tipo !== 'Uint8ClampedArray') return;
+        var w = width | 0, h = height | 0;
+        var align = (R(oParam, this, [0x0D05]) | 0) || 4;
+        var rowLen = 0, skipR = 0, skipP = 0;
+        if (gl2) {
+          rowLen = R(oParam, this, [0x0D02]) | 0;
+          skipR = R(oParam, this, [0x0D03]) | 0;
+          skipP = R(oParam, this, [0x0D04]) | 0;
+        }
+        var stride = ceil((rowLen > 0 ? rowLen : w) * 4 / align) * align;
+        var base = (gl2 ? (dstOffset | 0) : 0) + skipR * stride + skipP * 4;
+        var H = dbhGet ? (R(dbhGet, this, []) | 0) : 0;
+        perturb(pixels, w, h, x | 0, H - 1 - (y | 0), base, stride, -1);
+      } catch (e) {}
     };
-    patchGL((window.WebGLRenderingContext || {}).prototype, false);
-    patchGL((window.WebGL2RenderingContext || {}).prototype, true);
-  } catch (e) {}
+    proto.readPixels = mask(nf, oRead, 'readPixels');
+  }
 
   // ---- AudioContext (OfflineAudioContext.startRendering) ----
-  try {
-    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    if (OAC && OAC.prototype && OAC.prototype.startRendering) {
-      var oStart = OAC.prototype.startRendering;
-      var nf2 = function startRendering() {
-        var p = oStart.apply(this, arguments);
-        if (p && typeof p.then === 'function') {
-          return p.then(function (buf) {
-            try {
-              for (var ch = 0; ch < buf.numberOfChannels; ch++) {
-                var d = buf.getChannelData(ch);
-                for (var i = 0; i < d.length; i++) {
-                  d[i] += ((ph(i, ch) / 4294967295) - 0.5) * 1e-7;
-                }
+  function audio(w) {
+    var OAC = w.OfflineAudioContext || w.webkitOfflineAudioContext;
+    if (!OAC || !OAC.prototype || !OAC.prototype.startRendering) return;
+    var oStart = OAC.prototype.startRendering;
+    var nf = function startRendering() {
+      var p = R(oStart, this, arguments);
+      if (p && typeof p.then === 'function') {
+        return p.then(function (buf) {
+          try {
+            for (var ch = 0; ch < buf.numberOfChannels; ch++) {
+              var d = buf.getChannelData(ch);
+              for (var i = 0; i < d.length; i++) {
+                d[i] += ((ph(i, ch) / 4294967295) - 0.5) * 1e-7;
               }
-            } catch (e) {}
-            return buf;
-          });
+            }
+          } catch (e) {}
+          return buf;
+        });
+      }
+      return p;
+    };
+    OAC.prototype.startRendering = mask(nf, oStart, 'startRendering');
+  }
+
+  parti.push(function (w) {
+    try { canvasHtml(w); } catch (e) {}
+    try { canvasOffscreen(w); } catch (e) {}
+    try { patchGL((w.WebGLRenderingContext || {}).prototype, false); } catch (e) {}
+    try { patchGL((w.WebGL2RenderingContext || {}).prototype, true); } catch (e) {}
+    try { audio(w); } catch (e) {}
+  });`;
+}
+
+// Ogni finestra ha le sue copie native: una pagina che crea un riquadro vuoto (o della sua origine) e ne usa le
+// funzioni le troverebbe intatte. Il preambolo va in ogni finestra della stessa origine prima che la pagina la tocchi:
+// dall'elemento (contentWindow, contentDocument) sempre; per indice o per nome solo da un riquadro vuoto, che il
+// documento segna appena entra. Un riquadro con un indirizzo non si tocca in anticipo: il suo documento erediterebbe
+// la finestra senza il preload; ci pensa il preload, che lo unisce alla finestra che lo contiene.
+const PROPAGAZIONE = `
+  var CORNICI = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'];
+  var EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute, qsa = EP.querySelectorAll;
+  var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(Node.prototype, 'nodeType').get;
+  var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, taglia = SP.slice;
+  var MO = MutationObserver, moObserve = MO.prototype.observe;
+  var finestraDi = {};
+  for (var k = 0; k < CORNICI.length; k++) {
+    var CC = window[CORNICI[k]], dcw = CC && gOPD(CC.prototype, 'contentWindow');
+    if (dcw && dcw.get) finestraDi[CORNICI[k]] = dcw.get;
+  }
+  var GETTER = { IFRAME: finestraDi.HTMLIFrameElement, FRAME: finestraDi.HTMLFrameElement, OBJECT: finestraDi.HTMLObjectElement };
+
+  // Il segno non si toglie: due preamboli sulla stessa finestra annullerebbero il rumore.
+  function prepara(w) {
+    try {
+      if (gOPD(w, '__filoFpGuard')) return;
+      defP(w, '__filoFpGuard', { value: true });
+    } catch (e) { return; }
+    try { mascheraToString(w); } catch (e) {}
+    for (var i = 0; i < parti.length; i++) { try { parti[i](w); } catch (e) {} }
+    try { riquadri(w); } catch (e) {}
+  }
+
+  function avvolgi(CP, prop, cw) {
+    var d = gOPD(CP, prop);
+    if (!d || !d.get || !d.configurable) return;
+    var orig = d.get;
+    defP(CP, prop, {
+      get: mask(function () {
+        var r = R(orig, this, arguments);
+        if (r) { try { prepara(R(cw, this, [])); } catch (e) {} }
+        return r;
+      }, orig, 'get ' + prop),
+      set: d.set, enumerable: d.enumerable, configurable: true,
+    });
+  }
+
+  function vuoto(el, tag) {
+    if (R(haAttr, el, ['srcdoc'])) return false;
+    var s = R(leggiAttr, el, [tag === 'OBJECT' ? 'data' : 'src']);
+    if (s === null) return true;
+    s = R(lower, R(trim, '' + s, []), []);
+    return s === '' || s === 'about:blank' || R(taglia, s, [0, 12]) === 'about:blank#'
+      || R(taglia, s, [0, 12]) === 'about:blank?' || R(taglia, s, [0, 11]) === 'javascript:';
+  }
+  function tocca(el) {
+    var tag = R(tagName, el, []), g = GETTER[tag];
+    if (g && vuoto(el, tag)) prepara(R(g, el, []));
+  }
+  // Il parser segna un riquadro scritto nell'HTML prima di eseguire lo script che lo segue.
+  function osserva(w) {
+    var mo = new MO(function (rec) {
+      for (var i = 0; i < rec.length; i++) {
+        var nodi = rec[i].addedNodes;
+        for (var j = 0; j < nodi.length; j++) {
+          try {
+            var n = nodi[j];
+            if (R(nodeType, n, []) !== 1) continue;
+            tocca(n);
+            var l = R(qsa, n, ['iframe,frame,object']);
+            for (var h = 0; h < l.length; h++) tocca(l[h]);
+          } catch (e) {}
         }
-        return p;
-      };
-      OAC.prototype.startRendering = mask(nf2, oStart, 'startRendering');
+      }
+    });
+    R(moObserve, mo, [w.document, { childList: true, subtree: true }]);
+  }
+
+  function riquadri(w) {
+    for (var i = 0; i < CORNICI.length; i++) {
+      var C = w[CORNICI[i]], CP = C && C.prototype, dcw = CP && gOPD(CP, 'contentWindow');
+      if (!dcw || !dcw.get) continue;
+      avvolgi(CP, 'contentDocument', dcw.get);
+      avvolgi(CP, 'contentWindow', dcw.get);
     }
-  } catch (e) {}
+    try { osserva(w); } catch (e) {}
+  }
+
+  // Un riquadro della stessa origine si unisce al preambolo della finestra che lo contiene: stesse annotazioni,
+  // stesse funzioni mascherate, così una lettura a cavallo fra le due finestre resta col rumore e senza tracce.
+  try { var fe = window.frameElement; if (fe) fe.contentWindow; } catch (e) {}
+  prepara(window);`;
+
+function buildPreamboloSource({ fp } = {}) {
+  const parti = [];
+  if (fp && (fp.level | 0) > 0) parti.push(parteFingerprint(fp.seed));
+  if (!parti.length) return '';
+  return `(function(){
+  'use strict';
+  // Presi prima degli script della pagina: un riquadro si prepara quando la pagina ha già riscritto ciò che voleva,
+  // e da un call o un apply riscritti uscirebbero le copie native.
+  var R = Reflect.apply, defP = Object.defineProperty, gOPD = Object.getOwnPropertyDescriptor;
+  var getProto = Object.getPrototypeOf, setProto = Object.setPrototypeOf, imul = Math.imul, ceil = Math.ceil;
+  var WMP = WeakMap.prototype, wmGet = WMP.get, wmSet = WMP.set, wmHas = WMP.has;
+  var parti = [];
+
+  // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
+  // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799), e
+  // prototipo del nativo che sostituisce, anche quando è di un'altra finestra.
+  var masked = new WeakMap();
+  function mask(fn, orig, name) {
+    var m = fn;
+    try {
+      m = ({ [name]() { return R(fn, this, arguments); } })[name];
+      defP(m, 'length', { value: orig.length, configurable: true });
+      setProto(m, getProto(orig));
+      R(wmSet, masked, [m, 'function ' + name + '() { [native code] }']);
+    } catch (e) {}
+    return m;
+  }
+  function mascheraToString(w) {
+    var FP = w.Function.prototype, o = FP.toString;
+    FP.toString = mask(function toString() {
+      return (typeof this === 'function' && R(wmGet, masked, [this])) || R(o, this, arguments);
+    }, o, 'toString');
+  }
+${parti.join('\n')}
+${PROPAGAZIONE}
 })();`;
 }
 
-module.exports = { buildGuardSource };
+function buildGuardSource(seed, level) {
+  return buildPreamboloSource({ fp: { seed, level } });
+}
+
+module.exports = { buildGuardSource, buildPreamboloSource };
