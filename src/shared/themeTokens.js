@@ -300,7 +300,7 @@
       case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
       case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
       case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
-      case 'factor': return `Valore non valido: un numero fra 0 e ${FACTOR_MAX} col punto, es. 0 (nessuna animazione), 1 (normale) o 1.5.`;
+      case 'factor': return `Valore non valido: un numero fra 0 e ${FACTOR_MAX}, es. 0 (nessuna animazione), 1 (normale) o 1,5.`;
       default: return t ? 'Valore non valido.' : 'Token sconosciuto.';
     }
   }
