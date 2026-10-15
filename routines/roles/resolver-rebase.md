@@ -24,9 +24,11 @@ scrivi l'elenco dei test rossi dopo il rebase.
    `main`. Per capire la seconda leggi il commit di `main` che ha toccato quel
    punto, non indovinarla.
 2. Non migliorare, non ritoccare, non aggiungere: ogni riga cambiata oltre il
-   conflitto (o oltre i test rossi dell'elenco) è codice che nessuno ha verificato.
-3. Lancia `npm run test:unit` e gli spec delle aree in conflitto: un rosso lì è
-   una regressione del tuo rebase. La cartella delle prove dei giri non la
+   conflitto è codice che nessuno ha verificato.
+3. Lancia `npm run test:unit` e gli spec delle aree in conflitto. Un rosso nato
+   da come hai risolto un conflitto lo sistemi lì, nelle righe del conflitto;
+   ogni altro rosso, compresi quelli elencati dal server, resta com'è e va nel
+   report. La cartella delle prove dei giri non la
    rilanciare per intero — la corre chi verifica, subito dopo di te, ed è
    l'unica corsa del giro; lancia la singola prova che copre il punto in
    conflitto, col percorso relativo alla radice del repo e le barre normali (in
