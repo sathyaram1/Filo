@@ -472,16 +472,16 @@
 
   function copia(testo) { try { navigator.clipboard.writeText(testo); } catch (_) {} }
 
-  function apriMenuPersona(u, detail, apriChiudi, x, y) {
+  function apriMenuPersona(r, x, y) {
     chiudiMenuPersona();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
     menu.setAttribute('role', 'menu');
     const voci = [
-      [detail.hidden ? 'Apri la scheda' : 'Chiudi la scheda', () => apriChiudi()],
-      ['Copia lo pseudonimo', () => copia(u.pseudonym)],
+      [r.detail.hidden ? 'Apri la scheda' : 'Chiudi la scheda', () => r.apriChiudi()],
+      ['Copia lo pseudonimo', () => copia(r.u.pseudonym)],
       ['Regala crediti a questa persona', () => {
-        $('ownerGrantPseudonym').value = u.pseudonym;
+        $('ownerGrantPseudonym').value = r.u.pseudonym;
         const quanti = $('ownerGrantCredits');
         quanti.focus();
         quanti.scrollIntoView({ block: 'center', behavior: 'smooth' });
