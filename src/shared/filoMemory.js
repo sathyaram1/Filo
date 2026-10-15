@@ -928,7 +928,7 @@
     // proxy: regole persistenti per dominio (#152)
     listProxyRules, setProxyRule, removeProxyRule, getProxyRule,
     // siti sempre aperti (#823)
-    listKeepOpen, addKeepOpen, removeKeepOpen, frasesempreAperta,
+    listKeepOpen, addKeepOpen, removeKeepOpen, fraseSempreAperta,
     // session
     getSession, setSession, touchSession,
   };
