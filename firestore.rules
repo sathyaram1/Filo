@@ -246,7 +246,7 @@ service cloud.firestore {
     //   - `accountAOff` / `accountBOff` (bool; assente = false): account
     //     escluso — da lì non parte nessuna sessione nuova.
     //   - `roleModels` ({ ruolo: { model?, effort? } }; ruoli new-work,
-    //     verifier, fixer, secaudit, prober; model opus|sonnet|haiku|fable,
+    //     verifier, fixer, secaudit; model opus|sonnet|haiku|fable,
     //     effort low|medium|high|xhigh|max; assente = definizione
     //     dell'agente): modello e sforzo del worker per fase (#1193).
     //
