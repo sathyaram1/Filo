@@ -52,6 +52,9 @@ function nuovoStato() {
     percentuale: null,
     pronto: null,         // il ricordo della versione scaricata, con l'installatore verificato
     modo: R.MODO_PREDEFINITO,
+    canale: R.CANALE_PREDEFINITO,
+    // Scaricata da electron-updater ma fuori dal canale scelto dopo (veloce → stabile): finché c'è, non si installa.
+    scaricataFuori: null,
     automatici: true,
     chiesto: false,       // l'utente ha premuto «Installa»: si installa anche da spento
     chiesta: null,        // la versione di quel «Installa», ricordata fra un avvio e l'altro
