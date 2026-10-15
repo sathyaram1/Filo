@@ -517,6 +517,7 @@
     names,
     get,
     validate,
+    normalize,
     errorMessage,
     motionFactor,
     motionMs,
