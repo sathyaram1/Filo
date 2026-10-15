@@ -12,6 +12,7 @@
       version: '0.2.240', date: '2026-10-15',
       features: [
         'Ogni versione di Filo su GitHub ha una sezione «Verifica» con l\'impronta di ogni file da scaricare e il link alla costruzione pubblica che l\'ha prodotto. Se il file che hai scaricato ha la stessa impronta, è quello costruito dal codice pubblico.',
+        'Nella schermata Mazzi ogni mazzo mostra quanto costa in tutto, senza doverlo aprire. Se di qualche carta il prezzo non è noto, davanti al totale c\'è «≥». Col tasto destro su un mazzo lo puoi anche esportare come lista o rinominare, oltre a duplicarlo ed eliminarlo.',
       ],
       fixes: [],
     },
