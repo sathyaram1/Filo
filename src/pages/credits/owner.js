@@ -1060,6 +1060,19 @@
     }
     return v > 0 ? 'meno di 0,00000001 $' : '—';
   }
+  function fmtEur(n) {
+    const v = Number(n);
+    if (n == null || !Number.isFinite(v)) return '—';
+    return `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} €`;
+  }
+  // Un giorno del registro ('2026-09-17', UTC come lo scrive il server) letto come quel giorno ovunque si sia: preso
+  // come mezzanotte UTC e scritto nell'ora locale, a ovest di Greenwich diventava il giorno prima.
+  function giornoBreve(giorno) {
+    const [a, m, g] = String(giorno).split('-').map(Number);
+    try {
+      return new Date(Date.UTC(a, m - 1, g)).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    } catch (_) { return String(giorno); }
+  }
   function formatDateTime(ts) {
     if (!ts) return '';
     try { return new Date(ts).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
