@@ -25,7 +25,7 @@ const soloRamo = (v) => (/^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(un
 
 // Livello E sede, come il lettore della critica li pretende: un perimetro
 // scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta.
-const formatoMinimo = (list) => list.map((f) => `- [${f.level}${(['e', 'v'].includes(String(f.sede || '').toLowerCase()) ? String(f.sede).toLowerCase() : 'i')}${f.decision ? '?' : ''}] ${unaRiga(f.text)}`).join('\n');
+const formatoMinimo = (list) => list.map((f) => `- [${f.level}${(['e', 'v'].includes(String(f.sede || '').toLowerCase()) ? String(f.sede).toLowerCase() : 'i')}${f.decision ? '?' : ''}${f.decision && f.difficile ? '!' : ''}] ${unaRiga(f.text)}`).join('\n');
 
 // La correzione passata anche dal ramo omonimo del server (#1062): il suo diff sta nel checkout di filo-security.
 function lineaServer(ramo, sha) {
