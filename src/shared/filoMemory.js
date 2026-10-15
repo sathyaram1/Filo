@@ -850,6 +850,33 @@
     return rules[normProxyDomain(domain)] || null;
   }
 
+  // ===== Siti sempre aperti (#823) =====
+  // La pulizia delle schede li legge senza passare dal modello. La voce (host) la calcola il main.
+
+  async function listKeepOpen() {
+    const r = await getRaw(KEYS.FILO_KEEP_OPEN, {});
+    return r && typeof r === 'object' && !Array.isArray(r) ? r : {};
+  }
+
+  async function addKeepOpen(host) {
+    const h = normProxyDomain(host);
+    if (!h) return null;
+    const voci = await listKeepOpen();
+    voci[h] = { ts: (voci[h] && voci[h].ts) || new Date().toISOString() };
+    await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+    return h;
+  }
+
+  // Torna le voci tolte davvero.
+  async function removeKeepOpen(hosts) {
+    const voci = await listKeepOpen();
+    const tolte = (Array.isArray(hosts) ? hosts : [hosts]).map(normProxyDomain).filter((h) => h && h in voci);
+    if (!tolte.length) return [];
+    for (const h of tolte) delete voci[h];
+    await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+    return tolte;
+  }
+
   // ===== Session =====
 
   async function getSession() {
