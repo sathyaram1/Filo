@@ -2224,7 +2224,7 @@ if (isMainModule) {
       if (!livSeg.ok) { console.error(livSeg.message); process.exit(1); }
       const ferma = liv.args.includes('--ferma');
       const [, id, ...rest] = liv.args.filter((a) => a !== '--ferma');
-      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
+      if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md> --livello <0-3> [--difficile]]'); process.exit(1); }
       const senza = fermaSenzaSegnalazione(ferma, seg.file);
       if (senza) { console.error(senza); process.exit(1); }
       // `--frase` è la riga in chiaro per chi ha mandato il feedback; tutto il
