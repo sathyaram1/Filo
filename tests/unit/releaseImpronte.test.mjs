@@ -80,6 +80,8 @@ describe('quello che la sezione dice', () => {
     assert.ok(corpo.includes('`Get-FileHash <file> -Algorithm SHA256`'));
     assert.match(corpo, /PowerShell/);
     assert.ok(corpo.includes('`shasum -a 256 <file>`'));
+    // Su alcuni Linux shasum non c'è di serie; sha256sum sta in ogni sistema con gli strumenti di base.
+    assert.ok(corpo.includes('`sha256sum <file>`'));
   });
 
   test('perché ricostruire dal sorgente non dà lo stesso file', () => {
