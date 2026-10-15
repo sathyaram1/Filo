@@ -1060,11 +1060,13 @@
     }
     return v > 0 ? 'meno di 0,00000001 $' : '—';
   }
-  function fmtEur(n) {
+  // I soldi del conto e gli euro, coi centesimi sempre: «30 $» accanto a «4,20 $» si leggeva come un'altra unità.
+  function fmtSoldi(n, simbolo) {
     const v = Number(n);
     if (n == null || !Number.isFinite(v)) return '—';
-    return `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} €`;
+    return `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} ${simbolo}`;
   }
+  function fmtEur(n) { return fmtSoldi(n, '€'); }
   // Un giorno del registro ('2026-09-17', UTC come lo scrive il server) letto come quel giorno ovunque si sia: preso
   // come mezzanotte UTC e scritto nell'ora locale, a ovest di Greenwich diventava il giorno prima.
   function giornoBreve(giorno) {
