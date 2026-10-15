@@ -617,13 +617,15 @@ export function rebaseInCorso(root) {
  *
  * @returns {{ok:true, state:object|null} | {ok:false, message:string, escalated:boolean, count:number}}
  */
-export function guardTransition(root, id, { escalate, persist, clear } = {}) {
+export function guardTransition(root, id, { escalate, persist, clear, assigned: ripiego = '' } = {}) {
   const prev = readBranchState(root, id);
-  const assigned = prev?.branch || '';
+  // `assigned` vale solo se lo stato non nomina un ramo: chi lo passa (il canale) lo legge dall'identità attesa.
+  const assigned = prev?.branch || String(ripiego || '');
   const v = checkDelivery(root, assigned);
   if (v.ok) return { ok: true, state: prev };
+  const dove = { current: v.current, assigned: v.assigned };
   // Il rebase del ramo assegnato si finisce e poi si registra: non conta verso la sospensione per deriva.
-  if (v.rebase) return { ok: false, rebase: true, escalated: false, count: 0, message: `registrazione rifiutata su ${id}: ${v.reason}` };
+  if (v.rebase) return { ok: false, rebase: true, escalated: false, count: 0, ...dove, message: `registrazione rifiutata su ${id}: ${v.reason}` };
 
   const b = bumpRejects(prev || { id, branch: assigned });
   b.state.id = id;
@@ -631,11 +633,68 @@ export function guardTransition(root, id, { escalate, persist, clear } = {}) {
   if (b.escalate) {
     try { if (typeof escalate === 'function') escalate(b.count); } catch (_) { /* la nota resta in coda */ }
     try { if (typeof clear === 'function') clear(); } catch (_) {}
-    return { ok: false, escalated: true, count: b.count, message: `${base} — rifiuto ${b.count}: feedback portato in design` };
+    return { ok: false, escalated: true, count: b.count, ...dove, message: `${base} — rifiuto ${b.count}: feedback portato in design` };
   }
   writeBranchState(root, b.state);
   try { if (typeof persist === 'function') persist(); } catch (_) {}
-  return { ok: false, escalated: false, count: b.count, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
+  return { ok: false, escalated: false, count: b.count, ...dove, message: `${base} (rifiuto ${b.count}/${IDENTITY_REJECT_LIMIT}); il feedback resta dov'era e verrà ripescato` };
+}
+
+export function clearBranchState(root, id) {
+  if (!id) return;
+  const f = resolve(stateDir(root), `${id}.json`);
+  if (existsSync(f)) rmSync(f, { force: true });
+}
+
+/** Una transizione accettata consuma i rifiuti di fila (vedi clearRejects). Best-effort. */
+export function azzeraRifiuti(root, id) {
+  const s = id ? readBranchState(root, id) : null;
+  if (!s || s.identityRejects === undefined) return;
+  try { writeBranchState(root, clearRejects(s)); } catch (_) { /* il contatore resta: decide la soglia */ }
+}
+
+/** `refs/heads/x` è `x`: la forma piena di git conferma il nome corto. PURA. */
+function nomeRamo(s) {
+  return String(s || '').trim().replace(/^refs\/heads\//, '');
+}
+
+/**
+ * C sulla strada diretta del canale (#772), per le consegne che valgono per un commit. Ramo assegnato e id vengono
+ * dall'identità attesa di dispatch; da lì controllo e contatore sono quelli di guardTransition, e alla soglia la
+ * sospensione la manda `escalate`. Senza identità attesa restano i divieti che non dipendono dall'assegnazione
+ * (linea principale, cartella staccata): il confronto col ramo legato al biglietto lo fa il server sul ramo VERO.
+ * Un ramo dichiarato può solo confermare quello della cartella.
+ *
+ * @returns {{ok:true, branch:string, id:string, assigned:string}
+ *   | {ok:false, motivo:'deriva'|'rebase'|'principale'|'staccata'|'dichiarato', current:string, assigned:string,
+ *      declared?:string, rebaseDi?:string, count?:number, escalated?:boolean}}
+ */
+export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
+  const exp = readExpectation(root);
+  const id = String((exp && exp.id) || '');
+  let assigned = String((exp && exp.branch) || '');
+  const rebaseDi = () => { const r = rebaseInCorso(root); return r ? (r.ramo || '?') : ''; };
+  if (exp) {
+    const g = id
+      ? guardTransition(root, id, { assigned, escalate, clear: () => clearBranchState(root, id) })
+      : (() => { const v = checkDelivery(root, assigned); return v.ok ? { ok: true } : { ...v, count: 0, escalated: false }; })();
+    if (!g.ok) {
+      return {
+        ok: false, motivo: g.rebase ? 'rebase' : 'deriva', current: g.current || '', assigned: g.assigned || assigned,
+        rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated,
+      };
+    }
+    if (g.state && g.state.branch) assigned = g.state.branch;
+  }
+  const current = currentBranch(root);
+  if (!current) {
+    const ramo = rebaseDi();
+    return { ok: false, motivo: ramo ? 'rebase' : 'staccata', current, assigned, rebaseDi: ramo };
+  }
+  if (isProtectedBranch(current)) return { ok: false, motivo: 'principale', current, assigned };
+  const declared = nomeRamo(dichiarato);
+  if (declared && declared !== current) return { ok: false, motivo: 'dichiarato', current, assigned, declared };
+  return { ok: true, branch: current, id, assigned };
 }
 
 /**
