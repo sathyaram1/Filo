@@ -873,8 +873,10 @@
   function t(key, ...args) {
     let s = STRINGS[key];
     if (s === undefined) return key;
-    for (const a of args) s = s.replace('%s', String(a));
-    return s;
+    // In un solo passaggio e con una funzione: un argomento scritto da qualcuno (un nickname) che contiene «%s» o
+    // «$&» non deve finire riscritto dal segnaposto dopo.
+    let i = 0;
+    return s.replace(/%s/g, (m) => (i < args.length ? String(args[i++]) : m));
   }
 
   global.SN_I18N = { t, STRINGS };
