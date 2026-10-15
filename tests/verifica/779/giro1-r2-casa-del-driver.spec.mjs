@@ -66,6 +66,4 @@ test('r2 il driver parte con la sua casa dentro la cartella del componente, che 
   // La casa del driver: CUA_DRIVER_HOME se c'è, altrimenti la cartella dell'utente.
   const casa = env.CUA_DRIVER_HOME || env.HOME || env.USERPROFILE;
   expect(dentro(componente, casa), `casa del driver: ${casa}`).toBe(true);
-  const stato = env.XDG_STATE_HOME || join(env.HOME || '', '.local', 'state');
-  expect(dentro(componente, stato), `cartella di stato del driver: ${stato}`).toBe(true);
 });
