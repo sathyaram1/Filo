@@ -151,7 +151,7 @@ test('nessuna ricetta imposta il carattere per conto suo: la regola vive solo do
       if (e.isDirectory()) { giro(p, filtro); continue; }
       if (!filtro.test(e.name)) continue;
       const rel = relative(ROOT, join(ROOT, p)).replace(/\\/g, '/');
-      if (!ammessi.has(rel) && /commentchar|commentstring/i.test(readFileSync(join(ROOT, p), 'utf8'))) visti.push(rel);
+      if (!ammessi.has(rel) && /core\.comment(char|string)/i.test(readFileSync(join(ROOT, p), 'utf8'))) visti.push(rel);
     }
   };
   giro('routines', /\.md$/);
