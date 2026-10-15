@@ -835,14 +835,41 @@ export async function ramoServer(t, ramo, sha, opts) {
   };
 }
 
-function leggiStdin() {
-  return new Promise((ok) => {
-    let testo = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', (c) => { testo += c; });
-    process.stdin.on('end', () => ok(testo));
-    process.stdin.on('error', () => ok(testo));
-  });
+/**
+ * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security col token del biglietto, dato a quella sola
+ * chiamata. → { exit, righe: [testi per stderr] }; `git` e `env` per le prove.
+ */
+export async function eseguiGitServer({ azione, cartella, ramo, biglietto, root = ROOT, env = process.env, git = 'git', token = gitToken } = {}) {
+  const righe = [];
+  const clonato = Boolean(cartella) && existsSync(join(resolve(String(cartella)), '.git'));
+  const piano = pianoGitServer({ azione, cartella, ramo, root, clonato });
+  if (piano.errore) return { exit: 1, righe: [`git-server: ${piano.errore} Il server non è stato chiamato.`] };
+  if (piano.nota) righe.push(`git-server: ${piano.nota}`);
+  if (piano.controllaOrigin) {
+    const { env: senza } = ambienteGitServer(env, '');
+    const url = (dove) => {
+      const r = spawnSync(git, ['-C', piano.dir, 'remote', 'get-url', ...dove, 'origin'], { env: senza, encoding: 'utf8' });
+      return r.status === 0 ? String(r.stdout || '').trim() : '';
+    };
+    for (const u of [url([]), url(['--push'])]) {
+      if (!originDelServer(u)) {
+        righe.push(`git-server: l'origin del clone è «${urlSenzaSegreti(u) || 'assente'}», non ${URL_SERVER}: il token non esce. Il server non è stato chiamato.`);
+        return { exit: 1, righe };
+      }
+    }
+  }
+  if (!biglietto) return { exit: 1, righe: [...righe, 'NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'] };
+  const t = await token(biglietto);
+  if (t.outcome !== 'ok') {
+    const motivo = `${t.reason}${t.detail ? `: ${t.detail}` : ''}`;
+    righe.push(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
+    return { exit: t.outcome === 'refused' ? 4 : 3, righe };
+  }
+  const { env: figlio, tolte } = ambienteGitServer(env, t.token);
+  const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
+  righe.push(`git-server: token del biglietto ottenuto${scade}, git ${azione} su filo-security.`);
+  if (tolte.length) righe.push(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
+  return { exit: null, righe, argv: piano.argv, env: figlio, git };
 }
 
 /**
