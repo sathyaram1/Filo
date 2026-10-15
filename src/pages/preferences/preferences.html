@@ -435,6 +435,11 @@
             <span>Installa gli aggiornamenti da solo</span>
           </label>
         </div>
+        <label for="aggiornamentiCanale" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Canale</label>
+        <select id="aggiornamentiCanale">
+          <option value="veloce">Veloce: ogni versione nuova, appena esce</option>
+          <option value="stabile">Stabile: una versione a settimana, il lunedì</option>
+        </select>
         <!-- Solo su Windows: su Mac e Linux all'apertura non si installa niente (src/main/aggiornamentoRegole.js). -->
         <div id="aggiornamentiQuando" hidden>
           <p class="sn-muted" style="margin-top:12px;">Installata alla chiusura non si vede: se riapri Filo in quei dieci secondi, Windows dice che il collegamento non funziona.</p>

@@ -662,7 +662,7 @@
         const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
         const map = {
           veloce: 'veloce', rapido: 'veloce', rapida: 'veloce', frequente: 'veloce', frequenti: 'veloce', subito: 'veloce',
-          'ogni versione': 'veloce', tutte: 'veloce', predefinito: 'veloce', 'di serie': 'veloce', beta: 'veloce',
+          'ogni versione': 'veloce', tutte: 'veloce', predefinito: 'veloce', 'di serie': 'veloce',
           stabile: 'stabile', stabili: 'stabile', settimanale: 'stabile', settimanali: 'stabile', lento: 'stabile',
           lunedi: 'stabile', 'lunedì': 'stabile', 'una a settimana': 'stabile', 'una volta a settimana': 'stabile',
         };

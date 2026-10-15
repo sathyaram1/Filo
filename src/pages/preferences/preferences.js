@@ -856,6 +856,7 @@
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
+      case 'aggiornamenti.canale': return $('aggiornamentiCanale').value === 'stabile' ? 'stabile' : 'veloce';
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
       case 'tts.pitch': return parseFloat($('ttsPitch').value) || 1;
@@ -908,6 +909,7 @@
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
+      case 'aggiornamenti.canale': return s.aggiornamenti && s.aggiornamenti.canale === 'stabile' ? 'stabile' : 'veloce';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -1066,6 +1068,9 @@
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
     if (vuole('aggiornamenti.installa')) {
       $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
+    }
+    if (vuole('aggiornamenti.canale')) {
+      $('aggiornamentiCanale').value = settings.aggiornamenti && settings.aggiornamenti.canale === 'stabile' ? 'stabile' : 'veloce';
     }
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
@@ -1614,6 +1619,7 @@
       $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
     }
     $('aggiornamentiInstalla').addEventListener('change', persist);
+    $('aggiornamentiCanale').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
     if (ttsSupported() && typeof window.speechSynthesis.addEventListener === 'function') {

@@ -53,6 +53,7 @@
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
         aggiornamentiInstalla: 'aggiornamenti.installa',
+        aggiornamentiCanale: 'aggiornamenti.canale',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
         lunghezzaConversazioni: 'lunghezzaRisposte.conversazioni',
