@@ -439,7 +439,7 @@ salva_cartella() {
   if is_spedibile "$BRANCH"; then
     AUTOMAZIONI_NEL_RAMO=$(automazioni_da_spedire "$BRANCH")
     if [ -n "$AUTOMAZIONI_NEL_RAMO" ]; then
-      segnala_fallimento "$wt" "NON spedisco '$BRANCH': i commit ancora da spedire cambiano un'automazione ($AUTOMAZIONI_NEL_RAMO), che gira appena il ramo arriva su GitHub; $RIMEDIO_AUTOMAZIONI. Finche' quei commit restano da spedire, il ramo non parte."
+      segnala_fallimento "$wt" "NON spedisco '$BRANCH': i commit ancora da spedire cambiano un'automazione ($AUTOMAZIONI_NEL_RAMO), che gira appena il ramo arriva su GitHub: $RIMEDIO_RAMO."
     elif COPIE_NEL_RAMO=$(copie_da_spedire "$wt" "$BRANCH"); then
       [ -n "$COPIE_NEL_RAMO" ] && segnala_avviso "$wt" "$COPIE_NEL_RAMO"
       spedisci_ramo "$BRANCH" "$wt" || true
