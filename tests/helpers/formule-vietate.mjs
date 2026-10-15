@@ -49,4 +49,10 @@ export const OVUNQUE = [
   /corregg(?:(?! chi )[^.\n]){0,60}chi (?:ha )?(?:verific|critic|scritto la critica)/i,
   /stessa istanza/i,
   /(?:seconda fase|fase 2)[^.\n]{0,40}(?:la fa|la scrive|tocca a)/i,
+  // Le forme tornate nel testo del ruolo, nei documenti e nell'intestazione
+  // di dispatch (feedback #794).
+  /\bti (?:manda|rimanda|chiede di|fa) (?:a )?corregg/i,
+  /corregg\w* chi l[ioae] ha (?:scritt|trovat|registrat)/i,
+  /chi l[ioae] ha (?:scritt|trovat|registrat)\w*(?:(?! chi )[^.\n]){0,30}corregg/i,
+  /stess[oa] (?:agente|worker|sessione)(?:(?! chi )[^.\n]){0,40}(?:critic|verific)/i,
 ];
