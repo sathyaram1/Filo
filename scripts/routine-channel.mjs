@@ -811,36 +811,6 @@ export async function sporca(t, motivo, opts) {
 
 // ─── Lavori server (SPEC-DOMANDE.md §7, mappa #1159 §1.5) ────────────────────
 
-export const REPO_SERVER = 'sathyaram1/filo-security';
-
-/** Le righe `chiave=valore` che git manda a un aiutante di credenziali. PURA. */
-export function leggiRichiestaGit(testo) {
-  const out = {};
-  for (const riga of String(testo || '').split(/\r?\n/)) {
-    const i = riga.indexOf('=');
-    if (i > 0) out[riga.slice(0, i)] = riga.slice(i + 1);
-  }
-  return out;
-}
-
-/**
- * La richiesta è per filo-security, in https su github.com? Il percorso lo manda git solo con
- * `credential.useHttpPath=true` (nel clone): senza, si risponde a nessuno. PURA.
- */
-export function richiestaPerServer(r) {
-  const x = r || {};
-  return x.protocol === 'https' && String(x.host || '').toLowerCase() === 'github.com'
-    && /^sathyaram1\/filo-security(\.git)?\/?$/i.test(String(x.path || ''));
-}
-
-/** Le righe con cui git riceve il token. `scadeIl` in ms. PURA. */
-export function rigaCredenziali(token, scadeIl) {
-  const righe = ['username=x-access-token', `password=${token}`];
-  const s = Math.floor(Number(scadeIl) / 1000);
-  if (Number.isFinite(s) && s > 0) righe.push(`password_expiry_utc=${s}`);
-  return `${righe.join('\n')}\n`;
-}
-
 /** Il token di filo-lavori per il biglietto (routineGitToken). → { outcome:'ok', token, scadeIl } | { outcome, reason } */
 export async function gitToken(t, opts) {
   const { status, body } = await call('routineGitToken', { ticket: t, repo: 'server' }, opts);
