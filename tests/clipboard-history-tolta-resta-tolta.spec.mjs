@@ -83,8 +83,8 @@ async function avvia(items) {
       }, ctx.url);
     },
     async sec() {
-      await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
-      const s = await findTabPage(app, 'security');
+      await ctx.shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
+      const s = await findTabPage(ctx.app, 'security');
       await s.waitForLoadState('domcontentloaded');
       await s.locator('#sec-clip-list .sn-clip-item').first().waitFor({ timeout: 10000 });
       return s;
