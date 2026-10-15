@@ -51,6 +51,12 @@
   accent-color: var(--sn-accent);
 }
 
+/* Token `link.font`: senza override la variabile non esiste, la dichiarazione vale `inherit` e il link
+   resta nel font di chi lo contiene (quindi segue `font`). :where() lascia vincere i link col font proprio. */
+:where(html[data-sn-pagina]) a {
+  font-family: var(--sn-link-font);
+}
+
 [data-sn-theme] ::selection {
   background: var(--sn-selection-bg);
   color: var(--sn-selection-fg);
