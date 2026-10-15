@@ -313,7 +313,7 @@ test('simulate: hits è esatto e accumulare batch converge (feedback #354)', () 
   const want = [{ tag: 'terre', n: 3 }];
 
   // hits/iterations coincide con probability (i due campi sono sommabili).
-  const one = S.simulate({ library, want, turn: 4, iterations: 5000, seed: 1 });
+  const one = S.simulate({ library, want, turn: 4, game: 'play', iterations: 5000, seed: 1 });
   assert.equal(one.hits / one.iterations, one.probability);
   assert.ok(Number.isInteger(one.hits) && one.hits >= 0 && one.hits <= one.iterations);
 
