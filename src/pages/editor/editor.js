@@ -4484,6 +4484,8 @@
     try {
       const settings = await (window.SN_STORAGE?.getSettings?.());
       if (!settings) return;
+      // I tasti di Spiega, Traduci, Salva e Aiuto li sceglie l'utente: la vecchia si libera per i moduli, la nuova è presa (#842).
+      TASTI.usaScorciatoieFilo(settings.scorciatoie);
       window.SN_PAGE_THEME = settings.theme || 'system';
       let theme = settings.theme || 'system';
       if (theme === 'system') theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
