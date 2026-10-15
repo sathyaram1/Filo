@@ -137,6 +137,8 @@ test('«ombre più leggere»: menu, schede e pagine schiariscono l\'ombra in pro
   await expect.poll(async () => alfa(await menuSito.evaluate((m) => getComputedStyle(m).boxShadow))).toBeCloseTo(0.09, 2);
   // Un'ombra scritta a mano nella shell scende della stessa proporzione.
   await expect.poll(async () => alfa(await stile(shell, '.tab.active', 'boxShadow'))).toBeCloseTo(tabPrima / 2, 2);
+  const barra = await barraPage(app);
+  await expect.poll(async () => alfa(await stile(barra, '.pannello', 'boxShadow'))).toBeCloseTo(0.08, 2);
 
   await azione(app, { token: 'shadow', valore: '0' });
   await expect.poll(async () => alfa(await menuSito.evaluate((m) => getComputedStyle(m).boxShadow))).toBe(0);
