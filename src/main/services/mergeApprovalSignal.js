@@ -3,7 +3,7 @@
 //
 // IL GUASTO CHE CHIUDE
 //   Quando i controlli del server fermano una fusione, il terminale dice
-//   "approvala da Filo" (oggi: la dashboard di gestione, in cima ai Ricevuti).
+//   "approvala da Filo" (oggi: Gestione → Automazioni, dove stanno le richieste senza pratica).
 //   Ma quella pagina leggeva l'elenco solo all'apertura, al cambio di account
 //   e dopo una decisione: se era GIÀ APERTA non mostrava niente finché non se
 //   ne apriva una nuova. Un avviso che si vede solo aprendo una finestra in
