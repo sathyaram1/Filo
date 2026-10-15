@@ -213,8 +213,10 @@ export function puliziaDelPass(shaCritica, punti, root) {
  * `{ ok, motivo, sha, files, cancellate, cambiate, vecchie }`: `motivo` è già la frase per chi l'ha lanciata;
  * `files` sono solo le prove (un file di supporto non lo è); `vecchie` (null senza `avvio`) sono le prove
  * tolte che la verifica non ha né scritto né rinominato. Cosa resta rosso lo dice controllaCasiDellaPulizia.
+ * Dopo le correzioni la pulizia è l'ultimo commit da solo (`dopo: true`, `prima` il suo genitore), e toglie solo prove
+ * che le correzioni non hanno toccato dalla `base` (con le `pulizieDopo` già registrate).
  */
-export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' } = {}) {
+export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '', base = '', pulizieDopo = [] } = {}) {
   const critica = String(shaCritica || '');
   if (!SHA.test(critica)) return { ok: false, motivo: 'non so su che commit è stata registrata la critica: senza, non so cosa hai tolto.' };
   let head = '';
@@ -225,10 +227,43 @@ export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' }
   }
   const voci = diffDopoLaVerifica(critica, head, root);
   const tol = soloProveTolte(voci);
-  if (!tol.ok) return { ok: false, motivo: `il commit della pulizia deve solo togliere prove del giro, e qui ${tol.motivo}.` };
+  if (tol.ok) return puliziaDa(voci, tol, { head, cartella, avvio, critica, root });
+  let padre = '';
+  try {
+    padre = gitOut(['rev-parse', '-q', '--verify', `${head}^1`], root).trim();
+    execFileSync('git', ['merge-base', '--is-ancestor', critica, padre], { cwd: root, stdio: 'ignore' });
+  } catch (_) { padre = ''; }
+  const dopo = padre && padre !== critica ? soloProveTolte(diffDopoLaVerifica(padre, head, root)) : null;
+  if (!dopo || !dopo.ok) {
+    return { ok: false, motivo: `il commit della pulizia deve solo togliere prove del giro, e qui ${dopo ? `nell'ultimo commit ${dopo.motivo}` : tol.motivo}. Dopo una correzione la pulizia è un commit a parte, l'ultimo, che toglie solo prove del giro.` };
+  }
+  const vociDopo = diffDopoLaVerifica(padre, head, root);
+  const supporto = supportoDelGiro(dopo.files);
+  if (supporto.length) {
+    return { ok: false, motivo: `dopo le correzioni la pulizia toglie solo prove o loro casi, non righe di un file di supporto: ${supporto.join(', ')}. Annulla il commit (\`git revert --no-edit HEAD\`) e rifallo senza.` };
+  }
+  const da = SHA.test(String(base || '')) ? String(base) : critica;
+  const { atteso } = effettiPulizieDopo(da, pulizieDopo, root, padre);
+  const toccate = proveTolte(dopo.files).filter((f) => oggetto(padre, f, root) !== atteso(f));
+  if (toccate.length) {
+    return {
+      ok: false,
+      motivo: [
+        `le correzioni hanno già cambiato o tolto queste prove dopo ${da.slice(0, 8)}, e la pulizia toglie solo prove com'erano lì:`,
+        ...toccate.map((f) => `  · ${f}`),
+        `Annulla il commit (\`git revert --no-edit HEAD\`), rimettile com'erano (git checkout ${da.slice(0, 12)} -- <file>) e`,
+        '`git add -A && git commit`, poi toglile in un commit a parte, l\'ultimo, e rilancia la pulizia.',
+      ].join('\n'),
+    };
+  }
+  return puliziaDa(vociDopo, dopo, { head, cartella, avvio, critica, root, prima: padre });
+}
+
+function puliziaDa(voci, tol, { head, cartella, avvio, critica, root, prima = '' }) {
   const prove = proveTolte(tol.files);
   if (!prove.length) {
-    return { ok: false, motivo: `dopo la critica non è stata tolta nessuna prova del giro${tol.files.length ? ' (un file di supporto non è una prova)' : ''}.` };
+    const quando = prima ? 'nell\'ultimo commit' : 'dopo la critica';
+    return { ok: false, motivo: `${quando} non è stata tolta nessuna prova del giro${tol.files.length ? ' (un file di supporto non è una prova)' : ''}.` };
   }
   const cartelle = [...new Set(tol.files.map((f) => f.replace(/\\/g, '/').split('/').slice(0, 3).join('/')))];
   const attesa = String(cartella || '').replace(/\\/g, '/').replace(/\/+$/, '');
@@ -242,7 +277,38 @@ export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' }
     cancellate: voci.filter(cancellata).map((v) => v.path),
     cambiate: voci.filter((v) => !cancellata(v)).map((v) => v.path),
     vecchie: proveVecchie(prove, avvio, critica, root),
+    ...(prima ? { dopo: true, prima } : {}),
   };
+}
+
+/**
+ * Le pulizie registrate dopo le correzioni, in ordine, rispetto alla `base`: `esenti` le prove che una ha tolto per
+ * intero, `versioni` quelle a cui ha tolto un caso (si rilanciano com'erano dopo di lei). Conta solo ciò che una pulizia
+ * ha tolto com'era alla base: una prova già cambiata dalle correzioni si rilancia com'era lì. `atteso(f)`: il file come
+ * deve essere prima della prossima pulizia ('' se non c'è).
+ */
+export function effettiPulizieDopo(base, pulizie, root, fino = 'HEAD') {
+  const esenti = new Set();
+  const versioni = {};
+  const b = String(base || '');
+  const atteso = (f) => (esenti.has(f) ? '' : oggetto(versioni[f] || b, f, root));
+  if (!SHA.test(b)) return { esenti, versioni, atteso };
+  for (const sha of [...new Set((Array.isArray(pulizie) ? pulizie : []).map(String))]) {
+    if (!SHA.test(sha) || sha === b) continue;
+    let da = '';
+    try {
+      execFileSync('git', ['merge-base', '--is-ancestor', b, sha], { cwd: root, stdio: 'ignore' });
+      execFileSync('git', ['merge-base', '--is-ancestor', sha, fino], { cwd: root, stdio: 'ignore' });
+      da = gitOut(['rev-parse', '-q', '--verify', `${sha}^1`], root).trim();
+    } catch (_) { continue; }
+    let voci = [];
+    try { voci = vociNameStatus(gitOut(['diff', '--name-status', '-z', '--no-renames', da, sha, '--', PROVE_GIRO], root)); } catch (_) { continue; }
+    for (const v of voci) {
+      if (!proveTolte([v.path]).length || oggetto(da, v.path, root) !== atteso(v.path)) continue;
+      if (v.stato === 'D') { esenti.add(v.path); delete versioni[v.path]; } else if (v.stato === 'M') versioni[v.path] = sha;
+    }
+  }
+  return { esenti, versioni, atteso };
 }
 
 // Il numero nel nome di una prova che questa verifica non ha scritto né rinominato è di una critica passata, e può
