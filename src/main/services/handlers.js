@@ -1067,6 +1067,21 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   if (partial && partial.themeTokens && globalThis.SN_THEME_TOKENS) {
     partial = { ...partial, themeTokens: globalThis.SN_THEME_TOKENS.sanitize(partial.themeTokens).clean };
   }
+  // Una scorciatoia di Filo che non partirebbe mai non si salva: chi scrive (Preferenze, chat) l'ha già rifiutata col
+  // perché, questo è il confine per tutte le altre strade (#842).
+  if (partial && partial.scorciatoie && typeof partial.scorciatoie === 'object' && globalThis.SN_TASTI) {
+    const T = globalThis.SN_TASTI;
+    const buone = {};
+    for (const a of T.AZIONI_FILO) {
+      if (!Object.prototype.hasOwnProperty.call(partial.scorciatoie, a.id)) continue;
+      const v = partial.scorciatoie[a.id];
+      const d = typeof v === 'string' && v.trim() ? T.scorciatoiaDaScritta(v) : null;
+      if (!v) buone[a.id] = '';
+      else if (d && d.accel && !T.rifiutoScorciatoiaFilo(a.id, d.accel)) buone[a.id] = T.valoreDaSalvare(a.id, d.accel);
+      else console.warn('[Filo] scorciatoia non salvata', a.id, String(v).slice(0, 40));
+    }
+    partial = { ...partial, scorciatoie: buone };
+  }
   // La chiave OpenRouter propria si mette e si toglie da due posti
   // (Impostazioni e pagina Crediti, #629): se cambia, il rifiuto registrato
   // per quella di prima non vale più, e la pagina Crediti aperta accanto si
