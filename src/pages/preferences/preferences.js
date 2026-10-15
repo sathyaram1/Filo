@@ -1662,6 +1662,7 @@
     if (r && r.ok) {
       flashSaved('scorciatoieHint');
       disegnaScorciatoie(r.settings && r.settings.scorciatoie);
+      mostraRifiutate();
     } else if (id) {
       mostraErroreScorciatoia(id, 'Non sono riuscito a salvarla: riprova.');
     }
