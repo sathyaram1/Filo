@@ -121,7 +121,7 @@ import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
-import { leggiTestoLivello } from './lib/livelli.mjs';
+import { leggiTestoLivello, segnalazioneNonPresaText } from './lib/livelli.mjs';
 import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
