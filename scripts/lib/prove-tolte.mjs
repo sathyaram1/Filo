@@ -77,11 +77,6 @@ export function percorsoRipristino(prova, etichetta) {
   return parti.join('/');
 }
 
-/**
- * Cosa fare dopo il rilancio. PURA. Le prove dei rilievi messi da parte se ne sono andate prima, nel
- * commit della pulizia, che è la base del confronto: qui ogni rossa riproduce un rilievo da chiudere.
- * `via`: le prove rilanciate perché è cambiato un file di supporto che usano, con quei file.
- */
 const nomeAiuto = (x) => (x.startsWith(PROVE_GIRO) ? x.split('/').slice(3).join('/') : x);
 
 /**
