@@ -208,7 +208,7 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
   trade-off mancanti si segnalano, non si perdonano; solo il trade-off vero va
   all'owner come suggerimento. Motivo: i feedback di Filo saranno spesso poco
   specificati (screenshot + "non va"), il valore sta nel ricostruire l'intento.
-  - **Superato** (#561, la parte «sono FAIL»): vedi `routines/roles/verifier.md`,
+  - **Superato** (#561, l'esito di ciò che si segnala): vedi `routines/roles/verifier.md`,
     `routines/roles/_critica-e-livelli.md` e `src/shared/verifierRound.js`.
 
 ## 10. Chiusura del buco del push diretto su `main` (sicurezza)
