@@ -309,3 +309,26 @@ test('(C) sopra le soglie, con la chiave propria o senza portafoglio non c\'è a
   const crediti = await app.evaluate(async () => (await globalThis.SN_STORAGE.getRaw('avvisoCreditiStato', null)));
   expect(crediti).toBe(null);
 });
+
+test('(D) le soglie e la spiegazione preparata si cambiano dalle Preferenze, e il valore fuori scala torna dentro', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const pref = await openTab('filo://preferences/preferences.html');
+  await expect(pref.locator('#avvisoCreditiAttivo')).toBeChecked({ timeout: 15_000 });
+  await expect(pref.locator('#avvisoCreditiGiorni')).toHaveValue('2');
+  await expect(pref.locator('#avvisoCreditiPercento')).toHaveValue('10');
+  await expect(pref.locator('#spiegaAnticipata')).toBeChecked();
+  await pref.locator('#sec-crediti').scrollIntoViewIfNeeded();
+  await pref.screenshot({ path: `${SHOTS}/preferenze.png` });
+
+  await pref.locator('#avvisoCreditiGiorni').fill('3,5');
+  await pref.locator('#avvisoCreditiGiorni').press('Tab');
+  await pref.locator('#avvisoCreditiPercento').fill('250');
+  await pref.locator('#avvisoCreditiPercento').press('Tab');
+  await expect(pref.locator('#avvisoCreditiPercento')).toHaveValue('100');
+  await pref.locator('#spiegaAnticipata').uncheck();
+  await pref.locator('#avvisoCreditiAttivo').uncheck();
+  await expect.poll(() => app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return { ...s.avvisoCrediti, spiega: s.spiegaAnticipata.enabled };
+  }), { timeout: 10_000 }).toEqual({ attivo: false, giorni: 3.5, percento: 100, spiega: false });
+});
