@@ -411,12 +411,48 @@
     });
   }
 
-  function renderInvites(invites) {
+  // ── Inviti chiusi finché manca Google (#1120) ─────────────────────────────
+  // Il pulsante apre l'accesso di sempre; un ridisegno che arriva mentre l'accesso è aperto non lo riabilita.
+  let accessoInCorso = false;
+  function renderInvitesLocked(blocco) {
+    $('invitesLocked').hidden = !blocco;
+    if (!blocco) return;
+    const testo = $('invitesLockedText');
+    testo.textContent = blocco.testo;
+    testo.hidden = !blocco.testo;
+    const btn = $('linkGoogleBtn');
+    btn.textContent = blocco.bottone;
+    btn.disabled = accessoInCorso;
+  }
+
+  async function collegaGoogle() {
+    if (accessoInCorso) return;
+    accessoInCorso = true;
+    const btn = $('linkGoogleBtn');
+    const msg = $('linkGoogleMsg');
+    btn.disabled = true;
+    msg.classList.remove('is-error');
+    msg.textContent = 'Completa l’accesso a Google: poi i tuoi inviti compaiono qui.';
+    msg.hidden = false;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) { r = null; }
+    accessoInCorso = false;
+    btn.disabled = false;
+    if (r && r.ok) {
+      msg.hidden = true;
+      await load();
+      return;
+    }
+    msg.textContent = (r && r.error) || 'L’accesso a Google non è riuscito: riprova.';
+    msg.classList.add('is-error');
+  }
+
+  function renderInvites(invites, { bloccati = false } = {}) {
     const section = $('invitesSection');
     const list = $('invites');
     list.innerHTML = '';
     const views = (invites || []).map((inv) => W.inviteView(inv));
-    section.hidden = views.length === 0;
+    section.hidden = !bloccati && views.length === 0;
     for (const inv of views) {
       const spento = inv.exhausted || inv.revoked;
       const li = document.createElement('li');
