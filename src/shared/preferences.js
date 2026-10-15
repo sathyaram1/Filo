@@ -232,7 +232,7 @@
       const tranne = no.length ? ` (tranne ${no.map(([a, r]) => `«${a.nome}»: ${T.testoRifiutoFilo(r)}`).join(' ')})` : '';
       return {
         partial: { scorciatoie: Object.fromEntries(buone.map((a) => [a.id, ''])) },
-        label: `Scorciatoie di ${buone.map((a) => a.nome).join(', ')} → di serie${tranne}`,
+        label: `Scorciatoie di ${buone.map((a) => a.nome).join(', ').replace(/, ([^,]*)$/, ' e $1')} → di serie${tranne}`,
       };
     }
     const sep = testo.search(/[:=→]/);
