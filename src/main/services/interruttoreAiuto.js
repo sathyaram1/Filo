@@ -43,8 +43,7 @@ function perImportazione(dati) {
 }
 
 // All'avvio, prima di ogni finestra: una volta sola, poi il segno dice che ogni `false` è una scelta.
-async function migra() {
-  const storage = require('../shim/storage');
+async function migra({ storage = require('../shim/storage'), registro = require('./registroCambi') } = {}) {
   const K = chiavi();
   const dati = await storage.get([K.SETTINGS, K.FILO_CAMBI, SEGNO]);
   if (dati[SEGNO]) return false;
