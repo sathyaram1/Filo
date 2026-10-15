@@ -286,7 +286,8 @@ function lasciaFuoriCanale() {
     stato.percentuale = null;
     if (['pronto', 'scarica'].includes(stato.fase)) stato.fase = 'aggiornato';
   }
-  dimenticaCarte((n) => fuori(n.action.versione), [TIPO_DISPONIBILE, PRONTO.tipo]);
+  // Anche l'avviso di Mac e Linux («scaricala da filo.red») e quello dell'installazione fallita parlano di quella versione.
+  dimenticaCarte((n) => fuori(n.action.versione), TIPI_AVVISO);
 }
 
 // Le carte le ha messe Filo e Filo le toglie del tutto, così tornando al canale di prima ricompaiono. Quelle che
