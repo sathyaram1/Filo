@@ -9,11 +9,11 @@ l'elenco dei test rotti.
 Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 
 **Unit rossi sulla fusione.** Il rebase può andare liscio: i due lavori non si
-toccano nelle righe, si rompono insieme. Dopo il rebase i test elencati vanno
-fatti tornare verdi, ed è l'unica eccezione al punto 2: cambia solo ciò che
-serve a farli passare, tenendo tutte e due le intenzioni (leggi il commit di
-`main` che li ha rotti). Nel report scrivi, per ogni test dell'elenco, cosa
-l'ha rotto e cosa hai cambiato.
+toccano nelle righe, si rompono insieme. Tu fai solo il rebase: quei test non
+li correggi, anche se la critica sembra chiederlo. Correggerli vuol dire
+cambiare la logica, e una logica cambiata la giudica la verifica: chi verifica
+dopo di te rilancia gli unit, e ogni rosso diventa un suo rilievo. Nel report
+scrivi l'elenco dei test rossi dopo il rebase.
 
 <!-- includi: _decisioni-owner.md -->
 
