@@ -21,6 +21,8 @@ const CAMPI_WEB = Object.freeze({
   featureFlags: Object.freeze({ spellcheck: true, help: true }),
   // La spiegazione che parte da sola alla selezione (#818): spenta, la pagina aspetta il tasto destro.
   spiegaAnticipata: true,
+  // I tasti di Spiega e Aiuto scelti dall'utente (#842): il menu del tasto destro li scrive accanto alle voci.
+  scorciatoie: true,
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),
   // Quanto restano gli avvisi di Filo dentro la pagina: la durata delle Preferenze vale anche lì.
   notifications: Object.freeze({ durationSec: true }),
