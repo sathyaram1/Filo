@@ -155,8 +155,6 @@ function lancia(script, argv, { honor = true, copie = null, docs = collezione() 
 const SECCO = [
   ['auto-archive.mjs', ['--dry-run']],
   ['backfill-feedback-numbers.mjs', ['--dry-run']],
-  ['migrate-status.mjs', []],
-  ['migrate-status-padding.mjs', ['--dry-run']],
 ];
 
 for (const [script, argv] of SECCO) {
