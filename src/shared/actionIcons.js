@@ -57,6 +57,8 @@
     RIMUOVI_PROXY_TUTTE: 'globeOff',
     REGOLA_PROXY_DOMINIO: 'globePinned',
     RIMUOVI_REGOLA_PROXY: 'globeOff',
+    TIENI_APERTA: 'pin',
+    NON_TENERE_APERTA: 'eraser',
     COMANDO_FINESTRA: 'windowFrame',
     SPOSTA_ICONA: 'pin',
     INSTALLA_AGGIORNAMENTO: 'download',
