@@ -41,6 +41,8 @@ export async function installa(app, iniziale) {
       const t = msg && msg.type;
       if (!nostri.has(t)) return orig(event, msg);
       F.log.push({ t, at: Date.now() });
+      const g = F.guasti && F.guasti[t];
+      if (g && g.n > 0) { g.n -= 1; return { ok: false, error: 'la rete non risponde' }; }
       const ora = Date.now();
       switch (t) {
         case 'auth_status': return { ok: true, signedIn: F.admin, isAdmin: F.admin, profile: null, remembered: false, googleNelleSchede: false, uid: F.admin ? 'owner' : null };
