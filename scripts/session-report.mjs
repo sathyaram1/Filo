@@ -6,7 +6,9 @@
 //   sforato — il server non sapeva niente: il worker "riportava" a parole, e
 //   le parole non si sommano. Il transcript JSONL di Claude Code contiene già
 //   tutti i numeri: qui si leggono e si impacchettano in un oggetto che
-//   `routine-channel.mjs release` allega da solo al rilascio.
+//   `routine-channel.mjs release` allega da solo al rilascio. I turni
+//   dell'orchestratore dopo l'ultimo biglietto (rapportoChiusura) viaggiano
+//   invece con la sua `risposta` alla domanda di fine sessione.
 //
 // USO
 //   node scripts/session-report.mjs [--transcript <file>] [--role <ruolo>]
