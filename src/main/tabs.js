@@ -3689,9 +3689,11 @@ class TabManager {
       .filter((t) => typeof t.url === 'string' && t.url && t.url !== 'about:blank' && !t._sorvegliante);
     const tabs = kept.map((t) => t.url);
     const colors = kept.map((t) => t.identityColor || null);
+    // Dopo un riavvio la scheda è ancora quella aperta allora: l'Aiuto risponde a «quando l'ho aperta?» (#826).
+    const aperte = kept.map((t) => t.openedAt || null);
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, activeIndex };
+    return { tabs, colors, aperte, activeIndex };
   }
 
   _sessionKey() {
