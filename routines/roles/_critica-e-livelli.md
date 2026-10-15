@@ -126,7 +126,7 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
     Con la scorciatoia di salvataggio, uguale.
 [2e] La pagina Preferenze aperta in due schede cancella le modifiche fatte nell'altra: c'era già su main, per tutte le pagine.
 [1v] Nell'editor, che il ramo modifica, il contatore delle parole conta due volte le parole col trattino: c'era già su main.
-[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto.
+[1i?] Il bordo del riquadro è grigio freddo: caldo come il resto di Filo? Scelta di gusto; consiglio caldo.
 [0i] Con la finestra sotto i 300 pixel il menu esce dallo schermo.
 ```
 
