@@ -583,7 +583,7 @@ oggi il codice dice altro vale il codice (le sezioni sopra).
       done/design (+clarify transizione). DEPLOYATE il 2026-07-03 (deploy ok su
       progetto filo-8b9cb).
 - [x] **F5 — Migrazione** (ESEGUITA 2026-07-03, owner ha confermato le scelte):
-      `scripts/migrate-status.mjs --apply` con token admin in tests/agent/.env
+      lo script una tantum (tolto con #1134, §8) con token admin in tests/agent/.env
       (gitignorato). 101 migrati / 226 già canonici / 0 errori: 40→aligned,
       2→attack, 1→spam, 3→design(judges), 4 clarify→design(clarify),
       21→unlabeled, 30 ignored→archived. Rilanciata a vuoto: 0 da migrare
