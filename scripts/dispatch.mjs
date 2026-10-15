@@ -1231,7 +1231,9 @@ export function verifierReplyText(reply, id = '<id>') {
   const budgets = b && typeof b === 'object'
     ? capKeys.map((k) => (b[k] ? `${k}: ${b[k].left} giri residui su ${b[k].cap}` : null)).filter(Boolean).join(' · ')
     : '';
-  const derivati = derivatiAperti(r.phase2 ? r.phase2.derived : r.derived);
+  const tuttiDerivati = derivatiAperti(r.phase2 ? r.phase2.derived : r.derived);
+  const { daParte: derivati, domande: domandeInCorso } = separaDomandeInCorrezione(tuttiDerivati, r.phase2 && r.phase2.findings);
+  const conDomanda = r.phase2 && Array.isArray(r.phase2.findings) ? r.phase2.findings.filter((f) => f && f.decision) : [];
   // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza dei
   // 3 non fermano il lavoro; il server li ha già messi nel feedback dei rimasti.
   const dueDaParte = derivati.filter((d) => d.tipo === 'rimasti')
