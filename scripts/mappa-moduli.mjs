@@ -42,14 +42,19 @@ export function intestazione(testo) {
   return null;
 }
 
-// La prima frase del primo paragrafo; un punto seguito da minuscola («es. il») non chiude la frase.
+// La prima frase del primo paragrafo (un elenco puntato ne apre un altro); un punto seguito da minuscola («es. il») non
+// chiude la frase.
+const VOCE_DI_ELENCO = /^([-*•]|\d+[.)])\s/;
 export function primaFrase(righe) {
   if (!righe) return SENZA_INTESTAZIONE;
   const dall = righe.findIndex((r) => r.trim());
   const paragrafo = [];
-  for (let i = dall; i >= 0 && i < righe.length && righe[i].trim(); i++) paragrafo.push(righe[i].trim());
+  for (let i = dall; i >= 0 && i < righe.length && righe[i].trim(); i++) {
+    if (i > dall && VOCE_DI_ELENCO.test(righe[i].trim())) break;
+    paragrafo.push(righe[i].trim());
+  }
   const testo = paragrafo.join(' ').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
-  const fine = /[.!?]["'»)\]]*(?=\s+[\p{Lu}«"'(`[])/u.exec(testo);
+  const fine = /[.!?]["'»)\]]*(?=\s+[\p{Lu}\p{N}«"'(`[])/u.exec(testo);
   return taglia(fine ? testo.slice(0, fine.index + fine[0].length) : testo) || SENZA_INTESTAZIONE;
 }
 
