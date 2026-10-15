@@ -39,6 +39,6 @@ di questo giro». Guardi quattro cose.
    cancelletto, percorso relativo alla radice del repo, barre normali). Una
    prova che prima era verde e ora è rossa è un rilievo di livello 2,
    interno.
-3. **I controlli automatici**, descritti più sotto.
+4. **I controlli automatici**, descritti più sotto.
 
 <!-- includi: _critica-e-livelli.md -->
