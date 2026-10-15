@@ -3768,6 +3768,7 @@ class TabManager {
         // pronti senza attendere il ricalcolo dei content script. Seeda anche la
         // cache per host, così una did-navigate sullo stesso dominio lo conserva.
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
+        if (aperte[i]) nata.openedAt = aperte[i];
         nate.push(nata);
         return nata;
       });
