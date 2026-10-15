@@ -128,15 +128,18 @@ function registerIpcHandlers() {
   // main dal master secret (che NON attraversa mai questo confine). Vedi
   // services/fingerprint.js e preload/fingerprint-guard.js.
   // Per un riquadro conta la catena dei frame vista dal main, non l'indirizzo che il riquadro dichiara (#798).
+  // `canale`: il tipo dell'evento con cui un riquadro chiede la guardia di chi lo contiene, segreto per la sessione.
+  const CANALE_FP = 'x' + require('crypto').randomBytes(16).toString('hex');
+  const conCanale = (cfg) => (cfg && cfg.level > 0 ? { ...cfg, canale: CANALE_FP } : cfg);
   ipcMain.on('filo:fp-config', (event, href, opts) => {
     try {
       const F = require('./services/fingerprint');
       const ambito = ambitoIncognitoDi(senderInfo(event));
       const fr = event.senderFrame;
-      if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = F.configForHref(href, ambito); return; }
+      if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = conCanale(F.configForHref(href, ambito)); return; }
       const catena = [];
       for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
-      event.returnValue = catena.length > 1 ? F.configForFrames(catena, ambito) : { level: 0, seed: 0 };
+      event.returnValue = catena.length > 1 ? conCanale(F.configForFrames(catena, ambito)) : { level: 0, seed: 0 };
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
