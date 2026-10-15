@@ -47,8 +47,8 @@ A ogni difetto il verificatore dà un livello, col metro della frequenza
 (quanti utenti lo incontrano), e una sede: **interno** se sta nello scenario
 della segnalazione — i suoi esempi, i suoi passi, i casi ovvi della cosa
 chiesta — o se l'ha creato il tuo ramo; **vicino** se tocca a un altro lavoro
-ma sta in un file che il tuo ramo modifica già (conta come livello 0: si
-corregge insieme al resto se il giro corregge comunque qualcosa); **esterno**
+ma sta in un file che il tuo ramo modifica già (un difetto vicino non lo
+correggi: lo scrivi nel report); **esterno**
 se tocca a un altro lavoro. Usa lo stesso metro: chiudi lo scenario e le porte della stessa causa,
 col 20% dello sforzo che dà l'80% del risultato. **Niente oltre al chiesto**:
 un difetto fuori dallo scenario, o una funzione che nessuno ha chiesto, non si
