@@ -250,9 +250,7 @@ test('una combinazione già data a un modulo dell\'Editor si rifiuta per Traduci
   await editor.locator('.ed-module[data-type="settings"]').click();
   await expect(editor.locator('#settingsView')).toBeHidden();
 
-  // L'Editor salva da sé dopo un attimo: da lì il main la conosce.
-  await expect.poll(() => app.evaluate(() => !!globalThis.SN_TASTI.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y')),
-    { timeout: 10_000 }).toBe(true);
+  // Subito, senza aspettare il salvataggio automatico dell'Editor.
   const r = await chiedi(app, 'Traduci: Ctrl+Shift+Y');
   expect(r.executed).toBe(false);
   expect(r.output.error).toContain('modulo dell\'Editor');
