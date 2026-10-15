@@ -148,7 +148,7 @@ export function mappa(argv, { radice = RADICE, cwd = process.cwd() } = {}) {
     if (a === '--tutto') tutto = true;
     else if (a === '-h' || a === '--help' || a === '--aiuto') return { codice: 0, uscita: [USO], errori: [] };
     else if (a.startsWith('-')) errori.push(`opzione sconosciuta: ${a}`);
-    else cartelle.push(a);
+    else if (a.trim()) cartelle.push(a.trim());
   }
   if (errori.length) return { codice: 2, uscita: [], errori: [...errori, USO] };
   const src = join(radice, 'src');
