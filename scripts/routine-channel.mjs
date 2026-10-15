@@ -84,6 +84,8 @@
 //         <file.md>` (su status, fixed e verdict) è la segnalazione per
 //         l'owner — un trade-off vero, che decide lui — letta intera dal file
 //         e scritta dal server nel livello L3 del feedback.
+//         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
+//         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
 //
 //   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
