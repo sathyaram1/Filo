@@ -342,6 +342,7 @@
     IDENTITY_PARAMS, IDENTITY_PARAM_META, defaultParams, clampParams,
     rgbToHsl, hslToRgb, extractIdentityFromPixels,
     adaptIdentity, blendRgb, inactiveTabBackground,
-    relativeLuminance, contrastRatio, readableInk, inkAndHover, rgbCss, resolveCssColor,
+    relativeLuminance, contrastRatio, readableInk, inkAndHover, rainbowKey, compareRainbow,
+    rgbCss, resolveCssColor,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
