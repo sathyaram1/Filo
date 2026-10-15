@@ -526,6 +526,9 @@ if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
   # Con una copia dei dati nei commit il push e' proprio cio' che non va fatto: prima la copia esce dalla storia.
   grep -q 'NON spedisco il ramo:' "$FALLIMENTI_FILE" 2>/dev/null \
     && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: prima togli la copia dalla storia come detto sopra, poi il salvataggio spedisce da solo; un push a mano viene fermato dallo stesso controllo."
+  # Qui il push a mano e' la strada dell'owner e di nessun altro: la coda generica lo suggerirebbe a una routine.
+  grep -q "cambiano un'automazione" "$FALLIMENTI_FILE" 2>/dev/null \
+    && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin, per l'automazione detta sopra."
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"SALVATAGGIO: %s%s"}}\n' "$HOOK_EVENT" "$TESTO" "$CODA"
 fi
 rm -f "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null
