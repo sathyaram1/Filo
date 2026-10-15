@@ -188,6 +188,74 @@ test('svuotata dal menu, la cosa ancora negli appunti non rientra al primo «Inc
   } finally { await c.chiudi(); }
 });
 
+// L'«Incolla» del tasto destro, e quello che la pagina riceve: il testo nella casella, l'immagine nel riquadro.
+async function incolla(web, dove) {
+  if (dove === '#ta') await web.locator('#ta').fill('');
+  else await web.locator(dove).evaluate((el) => { el.innerHTML = ''; });
+  await web.locator(dove).click({ button: 'right' });
+  await web.locator('.sn-menu-paste-main').first().click();
+}
+
+test('la segnalazione, riapertura: tolta dalla Sicurezza, chiusa e riaperta Filo, la password ancora negli appunti non rientra', async () => {
+  const c = await avvia([]);
+  try {
+    let web = await c.web();
+    await c.testoNegliAppunti('password-segretissima');
+    await incolla(web, '#ta');
+    await expect.poll(() => c.disco()).toContain('password-segretissima');
+    const sec = await c.sec();
+    await sec.locator('#sec-clip-list .sn-clip-remove').first().click();
+    await expect.poll(() => c.disco()).toEqual([]);
+
+    await c.riapri();
+    await c.testoNegliAppunti('password-segretissima');
+    web = await c.web();
+    await incolla(web, '#ta');
+    await expect(web.locator('#ta')).toHaveValue('password-segretissima');
+    await web.waitForTimeout(1000);
+    expect(c.disco(), 'riaperta Filo, la password tolta è rientrata in chiaro').toEqual([]);
+
+    // Negli appunti adesso c'è altro: la cronologia riprende, e la prova sopra non è passata per un incolla muto.
+    await c.testoNegliAppunti('testo normale');
+    await incolla(web, '#ta');
+    await expect.poll(() => c.disco()).toEqual(['testo normale']);
+    expect(readFileSync(join(c.userData, 'appunti-tolti.json'), 'utf8')).not.toContain('password');
+  } finally { await c.chiudi(); }
+});
+
+test('la segnalazione, immagine: tolta dalla Sicurezza, la schermata non rientra al primo «Incolla», nemmeno dopo una riapertura', async () => {
+  const c = await avvia([]);
+  try {
+    let web = await c.web();
+    await c.immagineNegliAppunti([200, 40, 40]);
+    await incolla(web, '#ce');
+    await expect(web.locator('#ce img')).toHaveCount(1);
+    await expect.poll(() => c.disco()).toEqual(['[img]']);
+    const sec = await c.sec();
+    await sec.locator('#sec-clip-list .sn-clip-remove').first().click();
+    await expect.poll(() => c.disco()).toEqual([]);
+
+    await c.mostraWeb();
+    await incolla(web, '#ce');
+    await expect(web.locator('#ce img')).toHaveCount(1);
+    await web.waitForTimeout(1000);
+    expect(c.disco(), 'la schermata tolta è rientrata al primo «Incolla»').toEqual([]);
+
+    await c.riapri();
+    await c.immagineNegliAppunti([200, 40, 40]);
+    web = await c.web();
+    await incolla(web, '#ce');
+    await expect(web.locator('#ce img')).toHaveCount(1);
+    await web.waitForTimeout(1000);
+    expect(c.disco(), 'riaperta Filo, la schermata tolta è rientrata').toEqual([]);
+
+    // Un'altra immagine negli appunti: la cronologia la tiene.
+    await c.immagineNegliAppunti([40, 160, 60]);
+    await incolla(web, '#ce');
+    await expect.poll(() => c.disco()).toEqual(['[img]']);
+  } finally { await c.chiudi(); }
+});
+
 test('menu «Incolla»: tolta una voce, la sua gemella a schermo non resta viva e cliccabile', async () => {
   const c = await avvia([
     { type: 'text', text: 'password-segreta', ts: 200 },
