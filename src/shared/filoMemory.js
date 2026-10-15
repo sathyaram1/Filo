@@ -134,7 +134,7 @@
   }
 
   // La memoria come la rilegge l'utente nelle Preferenze (#592): i moduli in
-  // righe, e le lezioni ancora da riordinare.
+  // righe, le lezioni ancora da riordinare e i siti da tenere aperti (#823).
   async function viewForUser() {
     const mem = await getMemory();
     const moduli = Object.entries(mem || {})
@@ -143,17 +143,21 @@
     const lezioni = (await getLessonsBuffer())
       .filter((l) => l && typeof l.text === 'string' && l.text.trim())
       .map((l) => ({ ts: l.ts, text: l.text }));
-    return { moduli, lezioni };
+    const sempreAperte = Object.keys(await listKeepOpen()).sort();
+    return { moduli, lezioni, sempreAperte };
   }
+
+  const fraseSempreAperta = (host) => `Tieni sempre aperto ${host}`;
 
   // Le righe che una frase detta a voce indica (#592): quelle uguali, se ce ne
   // sono, altrimenti quelle che la contengono. Ognuna porta il `via` di
   // FILO_MEMORY_FORGET, così la voce toglie esattamente quello che toglie la ×.
   async function tutteLeRighe() {
-    const { moduli, lezioni } = await viewForUser();
+    const { moduli, lezioni, sempreAperte } = await viewForUser();
     return [
       ...moduli.flatMap((m) => m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } }))),
       ...lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })),
+      ...sempreAperte.map((host) => ({ testo: fraseSempreAperta(host), via: { sempreAperta: host } })),
     ];
   }
 
