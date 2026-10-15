@@ -651,7 +651,7 @@
     },
     {
       scrive: ['aggiornamenti.canale'],
-      aiuto: '"veloce" | "stabile" (veloce: ogni versione nuova appena esce, più volte al giorno; stabile: una versione a settimana, il lunedì)',
+      aiuto: '"veloce" | "stabile", o true per "stabile" (veloce: ogni versione nuova appena esce, più volte al giorno; stabile: una versione a settimana, il lunedì)',
       keys: ['canale_aggiornamenti', 'canale aggiornamenti', 'canale degli aggiornamenti', 'canale di aggiornamento',
         'canale', 'versione stabile', 'aggiornamenti stabili', 'aggiornamenti veloci', 'aggiornamenti settimanali'],
       costo: 1,
@@ -666,7 +666,8 @@
           stabile: 'stabile', stabili: 'stabile', settimanale: 'stabile', settimanali: 'stabile', lento: 'stabile',
           lunedi: 'stabile', 'lunedì': 'stabile', 'una a settimana': 'stabile', 'una volta a settimana': 'stabile',
         };
-        const canale = map[s] || map[s.replace(/^(il |canale )+/, '')] || null;
+        const stabile = parsePrefBool(v);
+        const canale = map[s] || map[s.replace(/^(il |canale )+/, '')] || (stabile === null ? null : (stabile ? 'stabile' : 'veloce'));
         if (!canale) return null;
         return {
           partial: { aggiornamenti: { canale } },

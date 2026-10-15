@@ -235,10 +235,11 @@
     },
     {
       id: 'aggiornamenti', nome: 'GitHub, per gli aggiornamenti',
-      base: ['https://github.com/sathyaram1/Filo/releases'],
+      // Sul canale stabile l'ultima minor si cerca nell'elenco delle release dell'API (src/main/updater.js, ultimaStabile).
+      base: ['https://github.com/sathyaram1/Filo/releases', 'https://api.github.com/repos/sathyaram1/Filo/releases'],
       quando: 'avvio',
       occasione: 'all’avvio e quando chiedi se c’è una versione nuova; il file dell’aggiornamento arriva dall’archivio di GitHub',
-      riceve: 'la richiesta della versione più recente',
+      riceve: 'la richiesta della versione più recente (sul canale stabile, dell’elenco delle versioni pubblicate)',
       frase: "All'avvio GitHub riceve la richiesta della versione più recente",
       dove: ['src/main/updater.js'], prova: "require('electron-updater')", nellaLibreria: true,
     },
