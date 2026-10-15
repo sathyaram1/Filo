@@ -674,13 +674,16 @@ export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
   const id = String((exp && exp.id) || '');
   let assigned = String((exp && exp.branch) || '');
   const rebaseDi = () => { const r = rebaseInCorso(root); return r ? (r.ramo || '?') : ''; };
+  const def = gitIn(root)(['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const principale = def.ok ? def.out.replace(/^origin\//, '') : '';
   if (exp) {
+    // Un'attesa senza id non ha uno stato a cui intestare i rifiuti: il controllo resta, il contatore no.
     const g = id
       ? guardTransition(root, id, { assigned, escalate, clear: () => clearBranchState(root, id) })
-      : (() => { const v = checkDelivery(root, assigned); return v.ok ? { ok: true } : { ...v, count: 0, escalated: false }; })();
+      : checkDelivery(root, assigned);
     if (!g.ok) {
       const cur = g.current || '';
-      const motivo = g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur) ? 'principale' : 'deriva';
+      const motivo = g.rebase ? 'rebase' : !cur ? 'staccata' : isProtectedBranch(cur, principale) ? 'principale' : 'deriva';
       return { ok: false, motivo, current: cur, assigned: g.assigned || assigned, rebaseDi: rebaseDi(), count: g.count || 0, escalated: !!g.escalated };
     }
     if (g.state && g.state.branch) assigned = g.state.branch;
@@ -690,7 +693,7 @@ export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
     const ramo = rebaseDi();
     return { ok: false, motivo: ramo ? 'rebase' : 'staccata', current, assigned, rebaseDi: ramo };
   }
-  if (isProtectedBranch(current)) return { ok: false, motivo: 'principale', current, assigned };
+  if (isProtectedBranch(current, principale)) return { ok: false, motivo: 'principale', current, assigned };
   const declared = nomeRamo(dichiarato);
   if (declared && declared !== current) return { ok: false, motivo: 'dichiarato', current, assigned, declared };
   return { ok: true, branch: current, id, assigned };
