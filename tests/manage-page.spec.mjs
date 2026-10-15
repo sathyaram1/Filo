@@ -389,6 +389,7 @@ test('#1206 — l\'esplorazione a coda vuota non c\'è più: nessun interruttore
   await expect(page.locator('#mgProberIdle')).toHaveCount(0);
   await expect(page.locator('#mgProberIdleBlock')).toHaveCount(0);
   await expect(page.locator('#panel-automation')).not.toContainText(/coda è vuota/i);
+  await page.locator('#mgAutoApproveBlock, #panel-automation').first().screenshot({ path: 'tests/.shots/1206-automazioni.png' });
 
   // Ogni interruttore della scheda, cliccato: nessuno manda il campo dell'esplorazione.
   const interruttori = await page.locator('#panel-automation input[type="checkbox"]').evaluateAll((els) => els.map((el) => el.id));
