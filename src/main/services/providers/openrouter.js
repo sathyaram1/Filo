@@ -799,7 +799,7 @@
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key) => ({
       method: 'POST', headers: buildHeaders(key), body: payload, signal,
     }));
-    if (!res.ok) throw await httpError(res);
+    if (!res.ok) throw await httpError(res, { apiKey, model, providerRouting });
     const data = await res.json();
     const rows = Array.isArray(data.data) ? data.data.slice() : [];
     rows.sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
