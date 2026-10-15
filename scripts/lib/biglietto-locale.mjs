@@ -617,7 +617,7 @@ export function avviaFine({ input = {}, env = process.env, avvia = avviaInSottof
 }
 
 /**
- * L'hook di avvio (contratto #1148 §1.3). `input` = lo stdin dell'hook ({ session_id, source }). Solo con la
+ * L'hook di avvio (contratto #1148 §1.3). `input` = lo stdin dell'hook ({ session_id, source, transcript_path }). Solo con la
  * credenziale dell'owner e fuori dalle routine. Eredita il biglietto del padre (che non si legge: nasce sporco); alla
  * ripresa riusa il suo, o ne prende
  * uno nato sporco; altrimenti uno pulito. Scrive FILO_BIGLIETTO_FILE in CLAUDE_ENV_FILE. Mai un'eccezione.
