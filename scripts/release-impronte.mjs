@@ -22,7 +22,7 @@ const DATI = /<!-- filo-verifica:dati ([\s\S]*?) -->/;
 
 export const COME_CONTROLLARE = 'Per controllare un file scaricato, calcola la sua impronta e confrontala con quella della tabella. '
   + 'Su Windows apri PowerShell e scrivi `Get-FileHash <file> -Algorithm SHA256`. Le lettere escono maiuscole, l\'impronta è la stessa. '
-  + 'Su Mac e Linux scrivi `shasum -a 256 <file>` nel terminale.';
+  + 'Su Mac e Linux scrivi `shasum -a 256 <file>` nel terminale; se su Linux non c\'è, `sha256sum <file>` dà la stessa impronta.';
 export const PERCHE_LA_CORSA = 'Ricostruire dal sorgente non dà un file identico, perché la costruzione ci mette dentro le chiavi di default. '
   + 'Il riferimento è l\'impronta che la corsa ha scritto qui.';
 
