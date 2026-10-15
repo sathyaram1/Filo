@@ -4,6 +4,7 @@
 // dai riquadri coincidono con Off.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { guardiaAccesa } from './helpers/guardia.mjs';
 import { createServer } from 'node:http';
 
 async function setFpMode(openTab, mode) {
@@ -165,7 +166,7 @@ test('i riquadri della pagina leggono canvas, WebGL e audio col suo rumore; un a
 // La pagina ha riscritto prima ciò che la guardia usa per prepararsi: il riquadro creato dopo ha lo stesso rumore.
 test('un riquadro creato dopo che la pagina ha riscritto Object, call, apply e Object.prototype ha lo stesso rumore', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><title>avvelenata</title><script>${IMPRONTA}</script><p>ok</p>`);
-  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   const r = await page.evaluate(() => {
     const { c } = scena(document);
     const pagina = fnv(c.toDataURL());
@@ -236,12 +237,78 @@ async function profiloRiquadro() {
 
 test('le funzioni del riquadro e i getter dei riquadri sono indistinguibili dalle native', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<title>FP_ON</title><p>ok</p>');
-  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   const on = await page.evaluate(profiloRiquadro);
   await setFpMode(openTab, 'off');
   await page.goto(testServer.html('<title>FP_OFF</title><p>ok</p>'));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
-  expect(await page.evaluate(() => !!window.__filoFpGuard)).toBe(false);
+  expect(await page.evaluate(guardiaAccesa)).toBe(false);
   const off = await page.evaluate(profiloRiquadro);
+  expect(on).toEqual(off);
+});
+
+// Un riquadro raggiunto per indice o per nome subito dopo che uno script l'ha inserito, da qualunque funzione che
+// inserisce, anche dentro un'ombra, o mentre carica un altro sito: la sua finestra è ancora della pagina, col rumore.
+async function perIndice() {
+  /* global fnv, scena */
+  const { c } = scena(document);
+  const leggi = (W) => { try { return fnv(W.HTMLCanvasElement.prototype.toDataURL.call(c)); } catch (e) { return 'errore ' + e.message; } };
+  const ultimo = () => window[window.length - 1];
+  const out = { pagina: fnv(c.toDataURL()) };
+  { const f = document.createElement('iframe'); document.body.appendChild(f); out.appendChild = leggi(ultimo()); }
+  { document.body.insertAdjacentHTML('beforeend', '<iframe></iframe>'); out.insertAdjacentHTML = leggi(ultimo()); }
+  { const d = document.createElement('div'); document.body.appendChild(d); d.innerHTML = '<p><iframe name="dentro"></iframe></p>'; out.innerHTMLPerNome = leggi(window.dentro); }
+  { const fr = document.createDocumentFragment(); fr.appendChild(document.createElement('iframe')); document.body.append(fr); out.frammento = leggi(ultimo()); }
+  { const h = document.createElement('div'); document.body.appendChild(h); const sr = h.attachShadow({ mode: 'closed' }); sr.appendChild(document.createElement('iframe')); out.ombra = leggi(ultimo()); }
+  { const f = document.createElement('iframe'); f.src = location.protocol + '//sito-pubblico.test:' + location.port + '/lento'; document.body.appendChild(f); await new Promise((r) => setTimeout(r, 200)); out.altroSitoInCarico = leggi(ultimo()); }
+  return out;
+}
+
+test('un riquadro raggiunto per indice o per nome subito dopo l\'inserimento ha il rumore della pagina', async ({ openTab }) => {
+  test.setTimeout(90_000);
+  const srv = createServer((req, res) => {
+    if (req.url === '/lento') { setTimeout(() => { try { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<p>lento</p>'); } catch (_) {} }, 8_000); return; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><meta charset="utf-8"><title>indice</title><script>${IMPRONTA}</script><body><p>ok</p></body>`);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${srv.address().port}/`;
+  try {
+    const page = await openTab(url);
+    await page.waitForFunction(guardiaAccesa, null, { timeout: 8_000 });
+    const on = await page.evaluate(perIndice);
+    await setFpMode(openTab, 'off');
+    await page.goto(url + '?off');
+    await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 8_000 });
+    const off = await page.evaluate(perIndice);
+    expect(on.pagina).not.toBe(off.pagina);
+    for (const k of ['appendChild', 'insertAdjacentHTML', 'innerHTMLPerNome', 'frammento', 'ombra', 'altroSitoInCarico']) {
+      expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
+      expect.soft(off[k], `${k}: in Off come la pagina`).toBe(off.pagina);
+    }
+  } finally {
+    srv.closeAllConnections?.();
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+// La protezione non lascia segni che un sito possa vedere: le finestre della pagina e dei suoi riquadri hanno le stesse
+// proprietà con la protezione accesa e con Off.
+async function proprieta() {
+  const f = document.createElement('iframe');
+  document.body.appendChild(f);
+  const nomi = (w) => Object.getOwnPropertyNames(w).concat(Object.getOwnPropertySymbols(w).map(String)).sort().join(',');
+  return { pagina: nomi(window), riquadro: nomi(f.contentWindow) };
+}
+
+test('con la protezione accesa la pagina e i suoi riquadri non hanno proprietà in più', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<title>FP_ON</title><p>ok</p>');
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
+  const on = await page.evaluate(proprieta);
+  await setFpMode(openTab, 'off');
+  await page.goto(testServer.html('<title>FP_OFF</title><p>ok</p>'));
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+  expect(await page.evaluate(guardiaAccesa)).toBe(false);
+  const off = await page.evaluate(proprieta);
   expect(on).toEqual(off);
 });

@@ -214,7 +214,7 @@ const PROPAGAZIONE = `
   var URLc = URL, origineUrl = gOPD(URL.prototype, 'origin').get, costruisci = Reflect.construct;
   var MO = MutationObserver, moObserve = MO.prototype.observe;
   var addEL = EventTarget.prototype.addEventListener, bersaglio = gOPD(Event.prototype, 'target').get;
-  var annulla = Event.prototype.preventDefault;
+  var annulla = Event.prototype.preventDefault, proprio = Object.prototype.hasOwnProperty;
   var WSP = WeakSet.prototype, wsHas = WSP.has, wsAdd = WSP.add, preparate = new WeakSet();
   var GETTER = { __proto__: null };
   for (var k = 0; k < CORNICI.length; k++) {
@@ -300,7 +300,7 @@ const PROPAGAZIONE = `
     return out;
   }
   function conNodi(P, nome) {
-    var d = P && gOPD(P, nome), orig = d && d.value;
+    var d = P && gOPD(P, nome), orig = d && R(proprio, d, ['value']) ? d.value : null;
     if (typeof orig !== 'function') return;
     P[nome] = mask(function () {
       var c = raccogli(arguments);
@@ -323,8 +323,9 @@ const PROPAGAZIONE = `
     var d = P && gOPD(P, nome);
     if (!d) return;
     var dopo = function (c, args) { if (c && conCornici(args)) { try { cornici(c, tocca); } catch (e) {} } };
-    if (typeof d.value === 'function') {
+    if (R(proprio, d, ['value'])) {
       var orig = d.value;
+      if (typeof orig !== 'function') return;
       P[nome] = mask(function () {
         var c = dove(this), r = R(orig, this, arguments);
         dopo(c, arguments);
@@ -358,9 +359,11 @@ const PROPAGAZIONE = `
 
   // Un riquadro della stessa origine col suo preload chiede, prima dei suoi script, questo stesso preambolo: un canvas
   // annotato da uno si legge con le funzioni dell'altro. Il tipo dell'evento è un segreto della sessione.
+  // Con l'aggiunta della finestra stessa: quella di questa può essere già avvolta da chi gira prima della pagina.
   function ascolta(w) {
     if (!CANALE) return;
-    R(addEL, w, [CANALE, function (e) {
+    var d = gOPD(w.EventTarget.prototype, 'addEventListener'), add = d && R(proprio, d, ['value']) ? d.value : addEL;
+    R(add, w, [CANALE, function (e) {
       try {
         var el = R(bersaglio, e, []), g = GETTER[R(tagName, el, [])];
         if (!g) return;

@@ -10,6 +10,7 @@
 // protezione accesa e quindi NON maschera regressioni).
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
+import { guardiaAccesa } from './helpers/guardia.mjs';
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
 import { rmSync } from 'node:fs';
@@ -38,7 +39,7 @@ const PROBE = `(() => {
   }
   for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) { identical = false; break; } }
   return { total: (W*H), deviating, alphaViolations, maxDev, identical,
-           guard: !!window.__filoFpGuard };
+           guard: deviating > 0 };
 })()`;
 
 async function setFpMode(openTab, mode) {
@@ -52,7 +53,7 @@ async function setFpMode(openTab, mode) {
 test('default: il canvas viene perturbato (1 LSB), alpha intatto, deterministico', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<title>FP_ON</title><p>ok</p>');
   // La guardia deve essere stata iniettata nel main world.
-  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   const r = await page.evaluate(PROBE);
   // Rumore applicato: qualche pixel deviato, ma NON tutti (perturbazione mirata).
   expect(r.deviating).toBeGreaterThan(0);
@@ -79,7 +80,7 @@ test('off: i pixel del canvas tornano esatti (controprova)', async ({ openTab, t
 
 test('toDataURL: stabile su letture ripetute, non lancia eccezioni', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<title>FP_DATA</title><p>ok</p>');
-  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   const r = await page.evaluate(`(() => {
     const c = document.createElement('canvas');
     c.width = 80; c.height = 40;
@@ -178,7 +179,7 @@ testSiti('due siti diversi leggono impronte diverse, due pagine dello stesso sit
   for (const nome of NOMI) {
     const id = new URL(testServer.html(`<title>FP ${nome}</title><p>${nome}</p>`)).pathname;
     const page = await openTab(`http://${nome}:${porta}${id}`);
-    await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 8_000 });
+    await page.waitForFunction(guardiaAccesa, null, { timeout: 8_000 });
     impronte[nome] = await page.evaluate(IMPRONTA);
     expect(impronte[nome]).toMatch(/^[0-9a-f]{16}$/);
   }
@@ -273,12 +274,12 @@ testSiti.describe('siti fidati in Privacy', () => {
 
 async function protettaPoiOff(openTab, testServer, probe, arg) {
   const page = await testServer.openReady(openTab, '<title>FP_ON</title><p>ok</p>');
-  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   const on = await page.evaluate(probe, arg);
   await setFpMode(openTab, 'off');
   await page.goto(testServer.html('<title>FP_OFF</title><p>ok</p>'));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
-  expect(await page.evaluate(() => !!window.__filoFpGuard)).toBe(false);
+  expect(await page.evaluate(guardiaAccesa)).toBe(false);
   const off = await page.evaluate(probe, arg);
   return { page, on, off };
 }
