@@ -141,9 +141,6 @@ function crea({ file, decodifica, appunti }) {
       if (uguale) await libera(tipo);
       return true;
     },
-
-    /** Per le prove: aspetta che il file sia scritto. */
-    scritto: () => coda,
   };
 }
 
