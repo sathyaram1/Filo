@@ -1,6 +1,6 @@
 // #826 — L'Aiuto aperto dal menu di una scheda sa quando la scheda è stata aperta, e non manda l'elenco delle altre.
 // La data la mette il main, anche dopo un riavvio di Filo; quella che manda la pagina non conta.
-// Senza il lavoro il modello non riceveva nessuna data e la risposta finta resta senza ora.
+// Senza il lavoro al modello non arriva nessuna data, e la risposta finta resta senza ora.
 
 import { test, expect } from './helpers/reteFinta.mjs';
 import { nelMondoDiFilo } from './helpers/riquadri.mjs';
