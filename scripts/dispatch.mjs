@@ -2157,7 +2157,7 @@ if (isMainModule) {
       const s = await recordVerifier(id, critica, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
-      console.log(verifierReplyText(s.reply, id));
+      console.log(verifierReplyText(s.reply, id, !!String(segnalazione.testo || '').trim()));
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
