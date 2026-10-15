@@ -460,16 +460,14 @@
     return out.filter((r) => r.soloTesto || r.id === 'chiave' || num(r.risparmio) >= 0.5);
   }
 
-  // L'avviso come lo legge il modello della chat: la frase e i rimedi coi loro id, così a una risposta a parole
-  // («sì, usa i più economici») sa cosa ha proposto e come farlo. `lista`: le righe come le mostra la UI.
+  // L'avviso per intero come testo: la frase e i rimedi con le cifre. Lo legge il modello della chat, così a una
+  // risposta a parole («sì, usa i più economici») sa cosa ha proposto; `lista`: le righe come le mostra la UI.
   function perFilo(testo, lista) {
     const righe = [];
     for (const r of Array.isArray(lista) ? lista : []) {
       if (!r || !r.testo) continue;
-      const stato = r.applicato ? ' [applicato: si rimette con RIMEDIO_CREDITI annulla]' : (r.azione === 'applica' ? ' [si applica con RIMEDIO_CREDITI applica]' : '');
-      const id = r.azione === 'applica' || r.azione === 'annulla' ? `${r.id}: ` : '';
-      righe.push(`- ${id}${r.testo}${r.frase ? ` (${r.frase})` : ''}${stato}`);
-      for (const d of r.dettagli || []) righe.push(`    ${d}`);
+      righe.push(`- ${r.testo}${r.frase ? ` (${r.frase})` : ''}`);
+      for (const d of r.dettagli || []) righe.push(`  ${d}`);
     }
     const t = String(testo || '').trim();
     if (!righe.length) return t;
