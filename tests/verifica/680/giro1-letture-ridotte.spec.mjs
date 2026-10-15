@@ -209,7 +209,8 @@ test('il riuso si può rifiutare: con --rileggi si torna al server', () => {
   mkdirSync(copie, { recursive: true });
   lancia('backfill-feedback-numbers.mjs', ['--dry-run'], { copie });
   const r = lancia('backfill-feedback-numbers.mjs', ['--rileggi'], { copie });
-  console.log('RILEGGI', r.stat.lette, r.pulito);
+  expect(r.stat.lette).toBe(7);
+  expect(r.pulito).not.toMatch(/Riuso la lettura/);
 });
 
 test('niente da fare, niente da scaricare: con tutti i numeri già assegnati il riordino non scansiona', () => {
