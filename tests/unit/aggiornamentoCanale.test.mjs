@@ -192,6 +192,16 @@ for (const piattaforma of ['win32', 'linux']) {
   });
 }
 
+test('passando allo stabile se ne va anche l\'avviso di Mac «scaricala da filo.red» della patch, non quello della minor', async () => {
+  await avvia({ piattaforma: 'darwin', inUso: '0.3.9', canale: 'veloce', automatici: false });
+  for (const versione of ['0.4.3', '0.4.0']) {
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'alert', action: { tipo: 'aggiornamento-mac', versione }, text: `C'è la versione ${versione}` });
+  }
+  U.seguiImpostazioni(impostazioni('stabile', false));
+  await calma(12);
+  assert.deepEqual(carteAperte(), ['aggiornamento-disponibile:0.4.0', 'aggiornamento-mac:0.4.0']);
+});
+
 test('stabile, spento: la carta «Installa» è della minor, e «Installa» scarica quella', async () => {
   const { u } = await avvia({ inUso: '0.3.9', canale: 'stabile', automatici: false });
   assert.deepEqual(carteAperte(), ['aggiornamento-disponibile:0.4.0']);
