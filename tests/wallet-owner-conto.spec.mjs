@@ -242,6 +242,8 @@ test('un numero di attivi apre le persone che ha contato: clic, tastiera e tasto
 test('all’avvio l’owner riceve l’allarme del conto una volta sola e da lì apre la pagina', async ({ app }) => {
   const home = await aspettaFinestra(app, (w) => w.url().startsWith('filo://newtab'), 'la home dell’avvio non è nata');
   await home.waitForFunction(() => window.__filoDashActions && window.__filoDashActions.ricompenseAvvio, null, { timeout: 0 });
+  // La home dell'avvio chiede da non-owner: se chiedesse dopo il cambio, l'allarme andrebbe alla pagina che si ricarica.
+  await home.evaluate(() => window.__filoDashActions.allarmeOwnerChiesto());
   stato.account = CONTO_CORTO;
   expect(await simulaOwner(app)).toBe(true);
   await home.reload();
