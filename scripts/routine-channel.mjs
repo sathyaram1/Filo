@@ -1005,7 +1005,7 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
         : `Se il lavoro sta su "${x.declared}", torna lì (\`git checkout ${x.declared}\`) e rilancia; se sta su "${x.current}", togli --branch.`);
   }
   const dove = x.current ? `sul ramo "${x.current}"${x.motivo === 'principale' ? ', la linea principale' : ''}`
-    : x.rebaseDi ? `a metà del rebase di "${x.rebaseDi}"` : 'staccata, su nessun ramo';
+    : x.rebaseDi ? (x.rebaseDi === '?' ? 'a metà di un rebase' : `a metà del rebase di "${x.rebaseDi}"`) : 'staccata, su nessun ramo';
   const atteso = x.assigned ? `il ramo assegnato a questo lavoro è "${x.assigned}"` : 'una consegna che va in verifica parte dal ramo del lavoro';
   const testa = `${quale}: la cartella è ${dove}, ma ${atteso}. ${nulla}\n`;
   if (x.escalated) {
