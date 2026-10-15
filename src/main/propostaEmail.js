@@ -110,10 +110,10 @@ class PropostaEmail {
     return !!c && c.wc === wc && c.frame === frame && c.campo === campo;
   }
 
-  campo(wc, frame, d, { email, tema }) {
+  campo(wc, frame, d, { email, tema, incognito = false }) {
     if (this._vecchio(d)) return;
     if (!this._suo(wc, frame, d.campo)) {
-      this.c = { wc, frame, origine: origineDi(frame), campo: d.campo, chiusa: false, evidenziata: false, armataDa: 0 };
+      this.c = { wc, frame, origine: origineDi(frame), campo: d.campo, chiusa: false, evidenziata: false, armataDa: 0, incognito };
       this._segui(wc);
     }
     const c = this.c;
