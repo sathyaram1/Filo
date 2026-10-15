@@ -8,7 +8,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { datiWorker } from './lib/dati-worker.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
-import { pinnedRepoRoot } from './lib/tools-pin.mjs';
+import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
+
+// I comandi nei testi stampati portano alla copia fissata (#763).
+absolutizeOutput();
 
 const [cmd, ...args] = process.argv.slice(2);
 if (!cmd) {

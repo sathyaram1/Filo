@@ -47,7 +47,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pinnedRepoRoot, absolutizeRecipe, TOOLS_ROOT } from './lib/tools-pin.mjs';
+import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
 import { merge, heartbeat } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
 import { headSha, currentBranch, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
@@ -430,10 +430,7 @@ async function main() {
   const statoRamo = idStato ? readBranchState(ROOT, idStato) : null;
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
-    // I comandi del rimedio con gli attrezzi del GIRO, non con quelli che il
-    // ramo si porta dietro: `scripts/…` qui dentro è la copia del ramo, che può
-    // essere vecchia di giorni e non fare quello che chi legge crede.
-    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source, idStato || ''), TOOLS_ROOT, ROOT));
+    console.error(testoEsitiDecaduti(decaduti, punta, source, idStato || ''));
     process.exit(1);
   }
   const notaVerifica = notaVerificaSuAltroCommit(statoRamo, punta);
@@ -455,9 +452,7 @@ async function main() {
     process.exit(1);
   }
   if (pubblicazione.stato === 'piu_avanti') {
-    // Il rimedio con gli attrezzi del GIRO, come l'altro rifiuto che nomina un
-    // comando: `scripts/…` qui dentro è la copia del ramo.
-    console.error(absolutizeRecipe(testoPiuAvanti(punta, pubblicazione.suOrigin, source), TOOLS_ROOT, ROOT));
+    console.error(testoPiuAvanti(punta, pubblicazione.suOrigin, source));
     process.exit(1);
   }
   if (pubblicazione.stato === 'sconosciuto') {
@@ -505,5 +500,7 @@ async function main() {
 
 // Esegui solo se invocato come script (non quando importato dai test).
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  // I comandi nei testi stampati, i nostri e i motivi del server, portano alla copia fissata (#763).
+  absolutizeOutput(ROOT);
   await main();
 }

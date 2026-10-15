@@ -118,7 +118,7 @@ import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { pinnedRepoRoot } from './lib/tools-pin.mjs';
+import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
@@ -1035,6 +1035,8 @@ export function parolaInPiu(cmd, args) {
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
+  // I comandi nei testi stampati, i nostri e quelli del server, portano alla copia fissata (#763).
+  absolutizeOutput(ROOT);
   const [cmd, ...tutti] = process.argv.slice(2);
   // Il biglietto a mano si toglie per primo, con la stessa regola delle registrazioni (#587).
   const mano = leggiBigliettoAMano(tutti);
