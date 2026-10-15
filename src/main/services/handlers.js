@@ -5720,11 +5720,10 @@ const riassuntoAcceso = (settings) => !(settings && settings.riassuntoSchede && 
 const restaQui = (it, fuori) => Boolean(it.casa || isHomeNetworkUrl(it.url) || it.senzaRiassunto || fuori.voce(it));
 
 // §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
-// candidate + (opz.) un estratto del contenuto e la memoria a lungo termine, e
-// torna per ciascuna una decisione keep/archive con motivazione. Batch unico.
-// Ritorna { decisions: [{ i, action, reason }], model, provider, costEur } oppure
-// lancia se manca la chiave / supera il limite di costo.
-async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' } = {}) {
+// candidate + (opz.) un estratto del contenuto; la memoria la legge da sé, così
+// nessun chiamante la dimentica (#823). Batch unico. Ritorna { decisions: [{ i, action, reason }], model, provider }
+// oppure lancia se manca la chiave / supera il limite di costo.
+async function runTabTriageDecision({ tabs = [], trigger = 'idle' } = {}) {
   if (!Array.isArray(tabs) || !tabs.length) return { decisions: [] };
   const system = [
     'Sei il gestore delle schede del browser dell\'utente. Decidi quali schede',
