@@ -112,7 +112,7 @@ test('«spegni l\'Aiuto» lo toglie da tasto destro, linguetta e Alt+H; «riacce
 
   expect((await chiedi(app, 'acceso')).executed).toBe(true);
   await expect.poll(() => vociPagina(page)).toContain('Aiuto');
-  expect(await vociLinguetta(app, shell)).toContain('Aiuto');
+  await expect.poll(() => linguettaHaAiuto(app, shell), { timeout: 15_000 }).toBe(true);
   await expect.poll(() => vocesulMenuApp(app)).toBe(true);
   await premiAltH(app);
   await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
