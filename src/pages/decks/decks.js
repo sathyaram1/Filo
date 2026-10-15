@@ -1667,7 +1667,7 @@
         <button class="dk-io-btn dk-io-btn-ok" data-io="copy">Copia</button>
       </div>`;
     const ta = body.querySelector('textarea');
-    send({ type: MSG.DECKS_EXPORT, id: current.id }).then((r) => {
+    send({ type: MSG.DECKS_EXPORT, id: deckId }).then((r) => {
       ta.value = (r && r.ok) ? r.text : 'Non riuscito a generare la lista.';
       ta.focus();
       ta.select();
