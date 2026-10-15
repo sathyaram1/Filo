@@ -463,6 +463,7 @@ const REGOLE_IMPORT = {
   LAST_SEEN_VERSION: 'stato',
   LAST_SEEN_NOTES: 'stato',
   FILO_PROXY_RULES: 'contenuto',
+  FILO_KEEP_OPEN: 'contenuto',
   FILO_CAMBI: 'stato',
   // Un backup non accende le operazioni automatiche, come non alza l'autonomia (#530).
   AUTO_MODE: 'stato',

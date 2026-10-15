@@ -449,6 +449,16 @@
       properties: { dominio: S('Il dominio; ometti per la scheda attiva.') },
       required: [],
     },
+    TIENI_APERTA: {
+      description: 'Salva la regola persistente "tieni sempre aperto <sito>" ("tienimi sempre aperta WhatsApp", "questa scheda non chiuderla mai"): da quel momento la pulizia automatica delle schede non archivia mai le schede di quel sito, sottodomini compresi. Se ometti dominio usa la scheda web davanti. L\'utente la vede e la toglie in Preferenze → Memoria.',
+      properties: { dominio: S('Il dominio della pagina, il più preciso che conosci (web.whatsapp.com, mail.google.com, docs.google.com); ometti per la scheda web davanti.') },
+      required: [],
+    },
+    NON_TENERE_APERTA: {
+      description: 'Toglie la regola "tieni sempre aperto <sito>" ("non tenerla più aperta"): la pulizia delle schede potrà di nuovo archiviarlo. Se ometti dominio usa la scheda web davanti.',
+      properties: { dominio: S('Il dominio; ometti per la scheda web davanti.') },
+      required: [],
+    },
     STILE_PAGINA: {
       description: 'Cambia l\'ASPETTO del testo/contenuto della PAGINA WEB che l\'utente sta guardando (NON l\'interfaccia di Filo: per quella usa IMPOSTA_ESTETICA). Per richieste come "scrivi in grassetto tutti i titoli", "ingrandisci il testo", "metti i link in rosso", "sfondo scuro". Scegli selettori ragionevoli per ciò che l\'utente intende (titoli → h1..h6; link → a; testo/paragrafi → p, body). Solo dichiarazioni CSS pure: niente url(), @import, niente JavaScript (il sistema le scarta). Si applica subito e SOLO a quella pagina; un reload la annulla.',
       properties: {

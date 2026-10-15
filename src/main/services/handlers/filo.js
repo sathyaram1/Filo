@@ -245,7 +245,8 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const lezione = msg && msg.lezione && typeof msg.lezione === 'object';
     const riga = msg && typeof msg.modulo === 'string' && typeof msg.riga === 'string';
-    if (!lezione && !riga) return { ok: false, error: 'bad_request' };
+    const sempreAperta = msg && typeof msg.sempreAperta === 'string';
+    if (!lezione && !riga && !sempreAperta) return { ok: false, error: 'bad_request' };
     return { ok: true, tolta: await FiloMem.forgetLine(msg) };
   });
 

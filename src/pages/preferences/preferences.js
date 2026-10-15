@@ -1201,7 +1201,7 @@
     if (r && r.ok) disegnaMemoria(r);
   }
 
-  function disegnaMemoria({ moduli = [], lezioni = [] }) {
+  function disegnaMemoria({ moduli = [], lezioni = [], sempreAperte = [] }) {
     const box = $('memoria');
     if (!box) return;
     box.textContent = '';
@@ -1213,6 +1213,10 @@
     }
     if (lezioni.length) {
       gruppi.push({ titolo: 'Imparato da poco', righe: lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })) });
+    }
+    // La pulizia delle schede non li archivia (#823): si tolgono da qui come le altre righe.
+    if (Array.isArray(sempreAperte) && sempreAperte.length) {
+      gruppi.push({ titolo: 'Siti sempre aperti', righe: sempreAperte.map((host) => ({ testo: host, via: { sempreAperta: host } })) });
     }
     if (!gruppi.length) {
       const p = document.createElement('p');

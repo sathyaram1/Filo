@@ -555,6 +555,8 @@
     RIMUOVI_PROXY_TUTTE: () => 'riportato le schede in Italia',
     REGOLA_PROXY_DOMINIO: () => 'salvato una regola sul paese',
     RIMUOVI_REGOLA_PROXY: () => 'tolto una regola sul paese',
+    TIENI_APERTA: () => 'salvato un sito da tenere aperto',
+    NON_TENERE_APERTA: () => 'tolto un sito da tenere aperto',
     STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
@@ -754,6 +756,11 @@
     RIMUOVI_PROXY_TUTTE: () => ({ icon: '🌍', text: 'Tutte le schede riportate in Italia' }),
     REGOLA_PROXY_DOMINIO: (a) => ({ icon: '🌍', text: `Regola · ${a.dominio || a.domain || a.sito || 'questo sito'} sempre da ${String(a.country || a.paese || '').toUpperCase()}` }),
     RIMUOVI_REGOLA_PROXY: (a) => ({ icon: '🌍', text: `Regola tolta · ${a.dominio || a.domain || a.sito || 'questo sito'}` }),
+    TIENI_APERTA: (a) => ({ icon: '📌', text: `Sempre aperto · ${(a._output && a._output.sito) || a.dominio || 'questo sito'}` }),
+    NON_TENERE_APERTA: (a) => {
+      const siti = a._output && Array.isArray(a._output.siti) ? a._output.siti.join(', ') : '';
+      return { icon: '📌', text: `Non più tenuto aperto · ${siti || a.dominio || 'questo sito'}` };
+    },
     STILE_PAGINA: (a) => {
       const d = String(a.descrizione || a.description || '').trim();
       return { icon: '🖌', text: `Aspetto della pagina · ${d || 'modificato'}` };
@@ -845,7 +852,7 @@
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito', SPOSTA_ICONA: 'Icona non spostata',
-    RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
+    TIENI_APERTA: 'Sito non salvato', NON_TENERE_APERTA: 'Nessun sito da togliere',
     INSTALLA_AGGIORNAMENTO: 'Aggiornamento non partito',
     RIMEDIO_CREDITI: 'Rimedio dei crediti non applicato',
     CARTA_HOME: 'Carta della home non cambiata',

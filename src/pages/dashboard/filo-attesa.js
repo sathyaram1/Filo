@@ -46,6 +46,8 @@
     RIMUOVI_PROXY_TUTTE: ['Riportate le schede in Italia', (k) => `Riportate le schede in Italia ${n(k)} volte`, 'paese'],
     REGOLA_PROXY_DOMINIO: ['Salvata una regola sul paese', (k) => `Salvate ${n(k)} regole sul paese`, 'regola'],
     RIMUOVI_REGOLA_PROXY: ['Tolta una regola sul paese', (k) => `Tolte ${n(k)} regole sul paese`, 'regola'],
+    TIENI_APERTA: ['Salvato un sito da tenere aperto', (k) => `Salvati ${n(k)} siti da tenere aperti`, 'siti aperti'],
+    NON_TENERE_APERTA: ['Tolto un sito da tenere aperto', (k) => `Tolti ${n(k)} siti da tenere aperti`, 'siti aperti'],
     COMANDO_FINESTRA: ['Azionata la finestra', (k) => `Azionata la finestra ${n(k)} volte`, 'finestra'],
     CARTA_HOME: ['Sistemata una carta della home', (k) => `Sistemate ${n(k)} carte della home`, 'carta'],
     SPOSTA_ICONA: ['Spostata un\'icona', (k) => `Spostate ${n(k)} icone`, 'icona'],

@@ -1564,10 +1564,25 @@ class TabManager {
   _triageCandidates() {
     const T = globalThis.SN_TAB_TRIAGE;
     return this.tabs.filter((t) => {
-      if (t.id === this.activeId || t.audible) return false;
+      if (t.id === this.activeId || t.audible || this._sempreAperta(t)) return false;
       if (T) return T.isTriageableUrl(t.url);
       return !t.isInternal && /^https?:\/\//i.test(t.url || '');
     });
+  }
+
+  // «Tieni sempre aperto X» (#823): la regola la applica Filo, qualunque cosa risponda il modello.
+  async _caricaSempreAperte() {
+    try {
+      const FM = globalThis.SN_FILO_MEMORY;
+      this._sempreAperte = FM ? Object.keys(await FM.listKeepOpen()) : [];
+    } catch (_) {
+      this._sempreAperte = this._sempreAperte || [];
+    }
+  }
+
+  _sempreAperta(tab) {
+    const T = globalThis.SN_TAB_TRIAGE;
+    return !!(T && tab && T.voceTenuta(tab.url, this._sempreAperte));
   }
 
   async _gatherTriageInput(cands) {
@@ -1612,10 +1627,11 @@ class TabManager {
   // Se l'LLM manca o fallisce, i duplicati vengono comunque collassati.
   async runAutoTriage({ trigger = 'idle' } = {}) {
     if (this.incognito || this._triageRunning) return { archived: 0 };
-    const cands = this._triageCandidates();
-    if (!cands.length) return { archived: 0 };
     this._triageRunning = true;
     try {
+      await this._caricaSempreAperte();
+      const cands = this._triageCandidates();
+      if (!cands.length) return { archived: 0 };
       // 1) Duplicati esatti: decisione deterministica e affidabile.
       const T = globalThis.SN_TAB_TRIAGE;
       let dupIdx = new Set();
@@ -1668,7 +1684,8 @@ class TabManager {
     cands.forEach((tab, i) => {
       const d = byIndex.get(i);
       if (!d || d.action !== 'archive') return;
-      if (tab.id === this.activeId || tab.audible) return; // salvaguardia dura
+      // Salvaguardia dura. Durante la decisione la scheda può essere andata su un sito da tenere aperto.
+      if (tab.id === this.activeId || tab.audible || this._sempreAperta(tab)) return;
       toArchive.push({ tab, reason: d.reason || 'auto' });
     });
 
