@@ -636,21 +636,22 @@
       // Gli altri interni non si perdono con lo stop: chi riprende li trova nel
       // segnalibro, insieme a quello che ha fermato, e il giro dopo non li riscopre.
       const sospesi = findings.filter((f) => !blocking.includes(f));
-      return { stop: true, blocking, sospesi, fix: [], derived: [], external, consume: null, counts: Object.assign({}, counts), budgets };
+      return { stop: true, blocking, sospesi, fix: [], derived: [], external, domande: [], consume: null, counts: Object.assign({}, counts), budgets };
     }
 
     // Ordine stabile: come nella critica. Il bilancio si paga dal livello più
-    // alto corretto.
+    // alto fra gli interni corretti.
     const fix = findings.filter((f) => fixable.includes(f));
     const rest = findings.filter((f) => derived.includes(f)).map(conPriorita);
+    const domande = fix.filter((f) => f.decision).map((f) => Object.assign(conPriorita(f), { inCorrezione: true }));
     let consume = null;
     if (fix.length) {
-      consume = capKeyOf(maxLevel(fix.map((f) => ({ level: effectiveLevel(f) }))));
+      consume = capKeyOf(maxLevel(fix.filter((f) => f.sede !== 'v')));
       counts[consume.replace('cap', 'count')] += 1;
       budgets[consume].used += 1;
       budgets[consume].left = Math.max(0, budgets[consume].left - 1);
     }
-    return { stop: false, blocking: [], sospesi: [], fix, derived: rest, external, consume, counts, budgets };
+    return { stop: false, blocking: [], sospesi: [], fix, derived: rest, external, domande, consume, counts, budgets };
   }
 
   // ── I feedback derivati ───────────────────────────────────────────────────
