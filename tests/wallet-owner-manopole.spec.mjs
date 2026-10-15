@@ -147,12 +147,13 @@ test.beforeAll(async () => {
       }
       if (url === '/walletUserDetail') {
         detailChiesti.push(body.data);
-        if (!body.data || body.data.pseudonym !== PSEUDONIMO) return json(res, 200, { result: { found: false } });
+        const lei = persone.find((p) => body.data && p.pseudonym === body.data.pseudonym);
+        if (!lei || lei.pseudonym !== PSEUDONIMO) return json(res, 200, { result: { found: false } });
         return json(res, 200, {
           result: {
             found: true,
             pseudonym: PSEUDONIMO,
-            balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
+            balance: lei.balance,
             createdAt: '2026-09-10T08:00:00.000Z',
             invitedBy: 'owner',
             reconcile: { flagged: false },
