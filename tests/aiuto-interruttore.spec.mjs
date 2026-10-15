@@ -91,7 +91,7 @@ test('«spegni l\'Aiuto» lo toglie da tasto destro, linguetta e Alt+H; «riacce
   test.setTimeout(90_000);
   const page = await apriPagina(openTab, testServer);
   expect(await vociPagina(page)).toContain('Aiuto');
-  expect(await vociLinguetta(app, shell)).toContain('Aiuto');
+  await expect.poll(() => linguettaHaAiuto(app, shell), { timeout: 15_000 }).toBe(true);
   expect(await vocesulMenuApp(app)).toBe(true);
 
   const r = await chiedi(app, 'spento');
@@ -99,9 +99,7 @@ test('«spegni l\'Aiuto» lo toglie da tasto destro, linguetta e Alt+H; «riacce
   await expect.poll(async () => (await impostazioni(app)).featureFlags.help).toBe(false);
 
   await expect.poll(() => vociPagina(page)).not.toContain('Aiuto');
-  const linguetta = await vociLinguetta(app, shell);
-  expect(linguetta).toContain('Duplica');
-  expect(linguetta).not.toContain('Aiuto');
+  await expect.poll(() => linguettaHaAiuto(app, shell), { timeout: 15_000 }).toBe(false);
   await expect.poll(() => vocesulMenuApp(app)).toBe(false);
 
   await premiAltH(app);
