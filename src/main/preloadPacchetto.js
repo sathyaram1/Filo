@@ -18,7 +18,6 @@ const RIFATTI = new Set(['path', 'fs']);
 const ESTENSIONI = ['', '.js', '.json', '/index.js'];
 
 const posix = path.posix;
-const relativo = (assoluto) => path.relative(RADICE, assoluto).split(path.sep).join('/');
 
 function riga(src, indice) {
   return src.slice(0, indice).split('\n').length;
@@ -118,7 +117,7 @@ function componi({ radice = RADICE, ingresso = INGRESSO } = {}) {
     }
     if (usaFs) for (const t of testiLetti(src, cartella, radice)) testi.add(t);
   }
-  const testiLetti_ = [...testi].sort().map((t) => [t, fs.readFileSync(path.join(radice, t), 'utf8')]);
+  const fogli = [...testi].sort().map((t) => [t, fs.readFileSync(path.join(radice, t), 'utf8')]);
   const parti = [
     '// Generato da src/main/preloadPacchetto.js da ' + ingresso + ': non si modifica, si rigenera.',
     '(function (richiestaDellaSandbox) {',
@@ -134,14 +133,14 @@ function componi({ radice = RADICE, ingresso = INGRESSO } = {}) {
   }
   parti.push('};');
   parti.push('const TESTI = {');
-  for (const [chiave, src] of testiLetti_) parti.push(`${JSON.stringify('/' + chiave)}: ${JSON.stringify(src)},`);
+  for (const [chiave, src] of fogli) parti.push(`${JSON.stringify(chiave)}: ${JSON.stringify(src)},`);
   parti.push('};');
   parti.push(`(${runtime.toString()})(MODULI, TESTI, richiestaDellaSandbox)(${JSON.stringify('/' + ingresso)});`);
   parti.push('})(require);');
   return {
     codice: parti.join('\n') + '\n',
     moduli: [...moduli.keys()].map((k) => k.slice(1)),
-    testi: testiLetti_.map(([k]) => k),
+    testi: fogli.map(([k]) => k.slice(1)),
     assenti: [...assenti].sort(),
     dinamici,
   };
@@ -181,6 +180,70 @@ function runtime(MODULI, TESTI, richiestaDellaSandbox) {
       const chiave = normalizza(p);
       return Object.prototype.hasOwnProperty.call(TESTI, chiave) || Object.prototype.hasOwnProperty.call(MODULI, chiave);
     },
+  };
+  // Il `url` della sandbox è quello vecchio (parse, format): domainToASCII e domainToUnicode, che il controllo dei link
+  // chiede, li rifà il parser di Chromium, con lo stesso IDNA di Node; il ritorno da xn-- è la RFC 3492.
+  const PUNY = { base: 36, tMin: 1, tMax: 26, skew: 38, damp: 700 };
+  const adatta = (delta, punti, prima) => {
+    let k = 0;
+    delta = prima ? Math.floor(delta / PUNY.damp) : delta >> 1;
+    delta += Math.floor(delta / punti);
+    for (; delta > ((PUNY.base - PUNY.tMin) * PUNY.tMax) >> 1; k += PUNY.base) delta = Math.floor(delta / (PUNY.base - PUNY.tMin));
+    return Math.floor(k + ((PUNY.base - PUNY.tMin + 1) * delta) / (delta + PUNY.skew));
+  };
+  const decodifica = (testo) => {
+    const out = [];
+    const trattino = Math.max(0, testo.lastIndexOf('-'));
+    for (let j = 0; j < trattino; j++) {
+      if (testo.charCodeAt(j) >= 0x80) throw new RangeError('punycode');
+      out.push(testo.charCodeAt(j));
+    }
+    let n = 128, bias = 72, i = 0;
+    for (let indice = trattino > 0 ? trattino + 1 : 0; indice < testo.length;) {
+      const prima = i;
+      for (let w = 1, k = PUNY.base; ; k += PUNY.base) {
+        if (indice >= testo.length) throw new RangeError('punycode');
+        const c = testo.charCodeAt(indice++);
+        const cifra = c - 48 < 10 ? c - 22 : c - 65 < 26 ? c - 65 : c - 97 < 26 ? c - 97 : PUNY.base;
+        if (cifra >= PUNY.base) throw new RangeError('punycode');
+        i += cifra * w;
+        const t = k <= bias ? PUNY.tMin : k >= bias + PUNY.tMax ? PUNY.tMax : k - bias;
+        if (cifra < t) break;
+        w *= PUNY.base - t;
+        if (w > 0x7fffffff) throw new RangeError('punycode');
+      }
+      const lunghezza = out.length + 1;
+      bias = adatta(i - prima, lunghezza, prima === 0);
+      n += Math.floor(i / lunghezza);
+      i %= lunghezza;
+      if (n > 0x10ffff) throw new RangeError('punycode');
+      out.splice(i++, 0, n);
+    }
+    return String.fromCodePoint(...out);
+  };
+  const inAscii = (dominio) => {
+    const d = String(dominio);
+    if (!d || /[\s/\\?#@:%]/.test(d)) return '';
+    try { return new URL('http://' + d).hostname; } catch (_) { return ''; }
+  };
+  const inUnicode = (dominio) => {
+    const ascii = inAscii(dominio);
+    if (!ascii) return '';
+    try {
+      return ascii.split('.').map((e) => (/^xn--/i.test(e) ? decodifica(e.slice(4)) : e)).join('.');
+    } catch (_) { return ''; }
+  };
+  let indirizzi = null;
+  const moduloUrl = () => {
+    if (indirizzi) return indirizzi;
+    let della = {};
+    try { della = richiestaDellaSandbox('url') || {}; } catch (_) {}
+    indirizzi = Object.assign({}, della, {
+      URL, URLSearchParams,
+      domainToASCII: typeof della.domainToASCII === 'function' ? della.domainToASCII : inAscii,
+      domainToUnicode: typeof della.domainToUnicode === 'function' ? della.domainToUnicode : inUnicode,
+    });
+    return indirizzi;
   };
   const caricati = Object.create(null);
   const risolvi = (spec, cartella) => {
@@ -250,4 +313,4 @@ function percorsoDelPreload() {
   return scelto;
 }
 
-module.exports = { componi, scrivi, percorsoDelPreload, NEL_PACCHETTO, INGRESSO, relativo };
+module.exports = { componi, scrivi, percorsoDelPreload, NEL_PACCHETTO, INGRESSO };
