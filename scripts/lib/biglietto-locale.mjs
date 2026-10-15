@@ -453,6 +453,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
     if (!(await haCredenziale())) return { riga: '' };
     const sessionId = String((input && input.session_id) || '').trim();
     const source = String((input && input.source) || '').trim();
+    const trascrizione = String((input && input.transcript_path) || '').trim();
     let path = '';
     let fiducia = '';
     const daEnv = percorsoDiChiLancia({ env, cwd, sessioneCheNasce: sessionId });
