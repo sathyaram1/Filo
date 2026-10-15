@@ -12,6 +12,10 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   classifyOwnerMerge,
@@ -20,7 +24,13 @@ import {
   askServerMerge,
   statoDellaRichiesta,
   richiestaForseInAttesa,
+  DOVE_SI_APPROVA,
 } from '../../scripts/lib/owner-merge.mjs';
+
+const RADICE = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+createRequire(import.meta.url)(join(RADICE, 'src', 'shared', 'feedbackStatus.js'));
+createRequire(import.meta.url)(join(RADICE, 'src', 'shared', 'manageReview.js'));
+const MR = globalThis.SN_MANAGE_REVIEW;
 
 const risposta = (result) => ({ result });
 
