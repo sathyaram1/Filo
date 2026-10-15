@@ -561,7 +561,7 @@ function unisciSveglie(local, imported, prossima, adesso) {
 // livello; `restano` sono quelle del backup che non si importano perché sono stato.
 function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
-  const imp = imported && typeof imported === 'object' ? imported : {};
+  const imp = require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {});
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
   const stats = { added: 0, updated: 0, unchanged: 0, restano: 0, pagineFuori: 0, pagineMieFuori: 0 };
