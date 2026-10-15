@@ -273,7 +273,7 @@ function crea({ sistema = null } = {}) {
     const web = !!(v.filo && /^https?:/i.test(String(v.url || '')));
     const delicata = v.filo && web ? await S().delicata(v.url) : '';
     action._finestra = { id: v.id, nome: v.nome, tipo: v.tipo, filo: !!v.filo, web, ...(delicata ? { delicata } : {}) };
-    action._approvata = !v.filo && approvata(chiave, v.id);
+    action._approvata = approvata(chiave, v.id);
     return { voce: v };
   }
 
