@@ -224,9 +224,15 @@
     if (!T || !testo || testo.length > 200) return null;
     const nomeDi = (id) => T.AZIONI_FILO.find((a) => a.id === id).nome;
     if (DI_SERIE.test(pianoChiave(testo)) || VOCE_AUTOMATICA.test(pianoChiave(testo))) {
+      // Quella il cui tasto di serie è ormai di un modulo dell'Editor resta com'è, e si dice perché.
+      const serie = Object.fromEntries(T.AZIONI_FILO.map((a) => [a.id, a.serie]));
+      const no = T.AZIONI_FILO.map((a) => [a, T.rifiutoScorciatoiaFilo(a.id, a.serie, undefined, serie)]).filter(([, r]) => r);
+      const buone = T.AZIONI_FILO.filter((a) => !no.some(([x]) => x === a));
+      if (!buone.length) return { rifiuto: no.map(([a, r]) => `«${a.nome}»: ${T.testoRifiutoFilo(r)}`).join(' ') };
+      const tranne = no.length ? ` (tranne ${no.map(([a, r]) => `«${a.nome}»: ${T.testoRifiutoFilo(r)}`).join(' ')})` : '';
       return {
-        partial: { scorciatoie: Object.fromEntries(T.AZIONI_FILO.map((a) => [a.id, ''])) },
-        label: 'Scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto → di serie',
+        partial: { scorciatoie: Object.fromEntries(buone.map((a) => [a.id, ''])) },
+        label: `Scorciatoie di ${buone.map((a) => a.nome).join(', ')} → di serie${tranne}`,
       };
     }
     const sep = testo.search(/[:=→]/);
