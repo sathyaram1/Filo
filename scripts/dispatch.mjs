@@ -1938,7 +1938,7 @@ async function finalizeBucket(bucket, fromServer) {
         clearState(bucket.id);
         process.stderr.write(`[dispatch] ${bucket.id}: ${pos.message} → design\n`);
         // Non si ripiega su un altro lavoro: il biglietto vale per QUESTO
-        // feedback e per nessun altro, e mettersi a esplorare tenendoselo in
+        // feedback e per nessun altro, e mettersi a fare altro tenendoselo in
         // mano lascerebbe il semaforo preso su un lavoro che nessuno sta
         // facendo — con il giro che esce dicendo che è andato tutto bene.
         return emitHalt('permanent', pos.message);
