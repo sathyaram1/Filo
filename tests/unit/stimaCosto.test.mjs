@@ -110,7 +110,7 @@ test('voce e dettatura si pagano a durata: cifra solo dopo un uso con quel model
   const reg = { kokoro: { provider: 'openrouter', model: 'hexgrad/kokoro-82m' } };
   const prima = S.valuta(A.TTS, 'kokoro', reg, ctx());
   assert.equal(prima.ok, false);
-  assert.equal(prima.breve, 'costo dopo il primo uso');
+  assert.equal(prima.breve, 'costo da misurare');
   const registro = S.aggiungiCampione({}, A.TTS, { usd: 0.002, model: 'hexgrad/kokoro-82m' });
   const dopo = S.valuta(A.TTS, 'kokoro', reg, ctx({ registro }));
   assert.equal(dopo.ok, true);
