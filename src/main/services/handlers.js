@@ -1078,6 +1078,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   if (ownKeyBefore !== null && ownKeyBefore !== String(merged?.apiKeys?.openrouter || '').trim()) {
     try { await globalThis.SN_WALLET_MAIN?.ownKeyChanged?.(); } catch (_) {}
   }
+  try { require('../movimento').segui(merged); } catch (_) {}
   broadcastToTabs({ type: MSG.SETTINGS_UPDATED, settings: merged });
   avvisaSeLaProntezzaCambia().catch(() => {});
   try {

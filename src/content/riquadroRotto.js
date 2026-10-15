@@ -146,7 +146,7 @@
   border-radius: var(--sn-radius, 6px);
   box-shadow: var(--sn-shadow, 0 4px 16px rgba(0,0,0,0.18));
   pointer-events: auto;
-  animation: entra var(--sn-anim-fast, 160ms) ease-out;
+  animation: entra calc(160ms * var(--sn-motion, 1)) ease-out;
 }
 @keyframes entra { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 /* Sotto questa misura il testo non sta accanto ai pulsanti senza spezzare le parole: i pulsanti vanno sotto. */
@@ -160,7 +160,7 @@ button {
   border-radius: var(--sn-radius, 6px);
   cursor: pointer;
   text-align: center;
-  transition: background var(--sn-anim-fast, 160ms), opacity var(--sn-anim-fast, 160ms);
+  transition: background calc(160ms * var(--sn-motion, 1)), opacity calc(160ms * var(--sn-motion, 1));
 }
 button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-offset: 1px; }
 .si { background: var(--sn-accent, #c45a3b); color: var(--sn-on-accent, #fff); }

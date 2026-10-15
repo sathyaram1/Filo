@@ -305,6 +305,10 @@
   function motionMs(ms, doc) {
     return Math.round(Number(ms) * motionFactor(doc)) || 0;
   }
+  // Lo scorrimento morbido è un'animazione anche lui: con le animazioni tolte si salta.
+  function scrollBehavior(doc) {
+    return motionFactor(doc) ? 'smooth' : 'auto';
+  }
 
   // Tiene solo gli override validi: { clean, rejected: [nomi] }.
   function sanitize(overrides) {
@@ -500,6 +504,7 @@
     errorMessage,
     motionFactor,
     motionMs,
+    scrollBehavior,
     FACTOR_MAX,
     sanitize,
     defaultValue,

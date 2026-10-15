@@ -1396,7 +1396,7 @@
     void btn.offsetWidth;
     btn.classList.add('dk-nudge');
     clearTimeout(nudgeTimer);
-    nudgeTimer = setTimeout(() => btn.classList.remove('dk-nudge'), 900);
+    nudgeTimer = setTimeout(() => btn.classList.remove('dk-nudge'), window.SN_THEME_TOKENS ? window.SN_THEME_TOKENS.motionMs(900) : 900);
   }
 
   async function sendChat(text) {

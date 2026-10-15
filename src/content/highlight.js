@@ -281,7 +281,7 @@
     }
 
     reposition();
-    try { activeTarget.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+    try { activeTarget.scrollIntoView({ block: 'center', behavior: self.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' }); } catch (_) {}
 
     scrollListener = reposition;
     window.addEventListener('scroll', scrollListener, true);

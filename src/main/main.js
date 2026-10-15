@@ -207,6 +207,7 @@ app.whenReady().then(async () => {
   try {
     const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
+    try { require('./movimento').segui(s); } catch (_) {}
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);

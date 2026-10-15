@@ -478,7 +478,7 @@
   }
   // La barra laterale si disegna in una vista sua: le arrivano da qui i colori già calcolati
   // (tema, token dell'utente, incognito) e il profilo da mostrare.
-  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius'];
+  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius', '--sn-motion', '--sn-ombra'];
   function rispecchiaBarra() {
     if (!api.barra) return;
     const cs = getComputedStyle(document.documentElement);
@@ -569,7 +569,7 @@
   const ANTEPRIMA = (() => {
     const RITARDO = 200;
     const CALDA = 600;
-    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius'];
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     let timer = null;
     let attesaDi = null;
     let puntatore = null;
@@ -1492,7 +1492,7 @@
     }
     // Questa pila è il modello e non si disegna (la coprirebbe la scheda): a schermo la disegna la
     // vista sopra la pagina (#588.5), che riceve a ogni cambio lo stato intero, tema compreso.
-    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius'];
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--muted', '--font', '--radius', '--sn-motion', '--sn-ombra'];
     function rispecchia() {
       if (!host || !api.avvisi) return;
       const carte = Array.from(host.querySelectorAll(':scope > .shell-notif')).map((c) => ({
@@ -1544,7 +1544,7 @@
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
       if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
       // attende la transizione prima di rimuovere dal DOM
-      setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
+      setTimeout(() => { try { card.remove(); } catch (_) {} }, ThemeTokens ? ThemeTokens.motionMs(220) : 220);
     }
     // Azioni opzionali (es. "Apri comunque" per i blocchi #170.3). Stanno prima della X.
     function azioni(card, actions) {

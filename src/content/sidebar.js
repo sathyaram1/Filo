@@ -568,7 +568,7 @@
   border: 1px solid var(--sn-border);
   border-radius: 999px;
   font-size: 12px;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-sidebar-feedback-btn:hover {
   background: var(--sn-accent);

@@ -6883,7 +6883,7 @@
     fsDrillDaDove = fsFuocoOra();
     fsDrill = { tipo: src.tipo, chiave: src.chiave, gruppo: src.gruppo };
     renderFsDrill();
-    if (mgFsDrill) mgFsDrill.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (mgFsDrill) mgFsDrill.scrollIntoView({ block: 'nearest', behavior: window.SN_THEME_TOKENS?.scrollBehavior(document) || 'smooth' });
   }
 
   /** L'unica via di chiusura dell'elenco: qualunque porta, stesso ritorno del fuoco. */

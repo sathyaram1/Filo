@@ -10,6 +10,7 @@
   --bordo-campo: #d1d5db;
   --accento: #b91c1c;
   --su-accento: #fff;
+  --sn-ombra: calc(var(--sn-shadow-opacity, 0.18) / 0.18);
   --ombra: 0 24px 60px rgba(0, 0, 0, calc(0.45 * var(--sn-ombra, 1)));
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --fondo: rgba(40, 6, 6, 0.94);

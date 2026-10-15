@@ -1,6 +1,6 @@
-// Sentinella del token `motion` (#837): ogni durata di transition/animation scritta in un CSS o in
-// uno <style> di una pagina HTML sotto src/ passa da calc(<durata> * var(--sn-motion, 1)), così
-// «togli le animazioni» e «animazioni più lente» arrivano ovunque. Le eccezioni stanno in ECCEZIONI.
+// Sentinella del token `motion` (#837): ogni durata di transition/animation scritta sotto src/ (CSS, <style>
+// delle pagine HTML, CSS dentro i .js) passa da calc(<durata> * var(--sn-motion, 1)), così «togli le
+// animazioni» arriva ovunque. Le durate delle .animate() e dei timer le scala SN_THEME_TOKENS.motionMs.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,13 +39,13 @@ function* fileSotto(dir) {
   for (const nome of readdirSync(dir)) {
     const p = join(dir, nome);
     if (statSync(p).isDirectory()) yield* fileSotto(p);
-    else if (/\.(css|html)$/.test(nome)) yield p;
+    else if (/\.(css|html|m?js)$/.test(nome)) yield p;
   }
 }
 
 function cssDi(percorso) {
   const testo = readFileSync(percorso, 'utf8');
-  if (percorso.endsWith('.css')) return testo;
+  if (!percorso.endsWith('.html')) return testo;
   // Fuori dagli <style> si sbianca tutto tranne gli a capo: i numeri di riga restano quelli del file.
   let out = '';
   let da = 0;
@@ -97,4 +97,15 @@ test('la sentinella riconosce le durate nude e lascia passare quelle avvolte', (
     .b { animation: gira calc(.8s * var(--sn-motion, 1)) cubic-bezier(.2, .8, .2, 1) infinite; }
     .c { transition: none; animation: none; transition-property: opacity; animation-name: x; }
     .d { animation: nodo 0s; } /* transition: opacity 2s */`), []);
+});
+
+test('lo scorrimento morbido passa da SN_THEME_TOKENS.scrollBehavior (a motion 0 si salta)', () => {
+  const rossi = [];
+  for (const p of fileSotto(SRC)) {
+    const rel = relative(ROOT, p).split('\\').join('/');
+    readFileSync(p, 'utf8').split('\n').forEach((riga, i) => {
+      if (/behavior\s*:\s*['"`]smooth/.test(riga) || /scroll-behavior\s*:\s*smooth/.test(riga)) rossi.push(`${rel}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(rossi, []);
 });

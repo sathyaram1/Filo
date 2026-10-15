@@ -1448,7 +1448,7 @@
       // Marcato in uscita: non occupa più uno slot del tetto mentre sfuma.
       t.dataset.snClosing = '1';
       t.classList.remove('sn-toast-visible');
-      setTimeout(() => unmountToast(t), 250);
+      setTimeout(() => unmountToast(t), self.SN_THEME_TOKENS?.motionMs(250) ?? 250);
     };
     // Sotto il puntatore il toast prende i clic: chiuderlo è la risposta, e l'unica strada con la durata a 0.
     // Chi ne sta selezionando il testo non lo perde.
