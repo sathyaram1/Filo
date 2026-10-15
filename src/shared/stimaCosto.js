@@ -264,9 +264,29 @@
     return `${chi} ogni ${u.s} costa circa ${it(Math.round(volte), 0)} volte quello del modello predefinito.`;
   }
 
+  // Il modello dietro un nome della catena: la voce del registro, o un id grezzo del router (con «/» o «:»).
+  function voceDi(ref, registry) {
+    const nick = String(ref == null ? '' : ref).trim();
+    if (!nick) return null;
+    const e = registry && Object.prototype.hasOwnProperty.call(registry, nick) ? registry[nick] : null;
+    if (e && e.provider && e.model) return { provider: String(e.provider), model: String(e.model) };
+    if (e && e.openrouter) return { provider: 'openrouter', model: String(e.openrouter) };
+    if (!e && /[/:]/.test(nick)) return { provider: 'openrouter', model: nick };
+    return null;
+  }
+
+  // Stima e avviso di un nome della catena, contro il modello predefinito della funzione (`ctx.predefiniti[action]`).
+  function valuta(action, ref, registry, ctx) {
+    const c = ctx || {};
+    const s = stima(action, voceDi(ref, registry), c);
+    if (!s) return null;
+    const p = c.predefiniti && c.predefiniti[action] ? stima(action, c.predefiniti[action], c) : null;
+    return { ...s, avviso: avviso({ scelta: s, predefinita: p, soglia: c.soglia, saldo: c.saldo, nome: String(ref).trim() }) };
+  }
+
   global.SN_STIMA_COSTO = {
     TIPI, CAMPIONI_MINIMI, FINESTRA, SOGLIA_PREDEFINITA, SOGLIA_MAX,
     funzione, aConsumo, listinoDaCatalogo, prezzoDaCatalogo, prezzoDi, aggiungiCampione, tokenTipici, costoUsd,
-    stima, soglia, avviso,
+    stima, soglia, avviso, voceDi, valuta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
