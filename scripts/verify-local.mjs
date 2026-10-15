@@ -9,8 +9,8 @@
 //   li ha scritti chi ha anche scritto il bug.
 //
 //   In locale quel passaggio non esisteva: si lanciavano i test e si pubblicava.
-//   I test però li scrive la stessa istanza che ha fatto il lavoro, quindi
-//   condividono i suoi punti ciechi. Da qui in poi anche in locale si passa di
+//   I test però li scrive chi ha fatto il lavoro, quindi condividono i suoi
+//   punti ciechi. Da qui in poi anche in locale si passa di
 //   qui, e `npm run finish` non pubblica senza un esito positivo.
 //
 // IL GIRO (feedback #561)
