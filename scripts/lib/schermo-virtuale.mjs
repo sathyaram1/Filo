@@ -88,7 +88,7 @@ export async function accendiSchermo({ env = process.env, attesaMs = 30_000, lan
   let errori = '';
   const esito = await new Promise((risolvi) => {
     const fine = (e) => { clearTimeout(tetto); risolvi(e); };
-    const tetto = setTimeout(() => fine({ errore: `lo schermo virtuale non si è acceso in ${Math.round(attesaMs / 1000)} s` }), attesaMs);
+    const tetto = setTimeout(() => fine({ errore: `lo schermo virtuale non si è acceso in ${Math.round(attesaMs / 100) / 10} s` }), attesaMs);
     figlio.stdout.on('data', (d) => {
       fuori += d;
       const righe = fuori.split('\n');
