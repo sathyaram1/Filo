@@ -60,6 +60,16 @@ test('la segnalazione, immagine: la schermata tolta non rientra, anche se gli ap
   assert.equal(await t.daTenere(immagine(png('rosso-blu')), 'paste'), true);
 });
 
+test('un «Incolla» subito dopo il clic che toglie aspetta la rimozione, non la scavalca', async () => {
+  const a = ambiente();
+  a.appunti.t = 'password';
+  const t = a.apri();
+  const tolta = t.voceTolta(testo('password'));
+  const tenuta = t.daTenere(testo('password'), 'paste');
+  await tolta;
+  assert.equal(await tenuta, false);
+});
+
 test('tolta quando negli appunti c\'è altro: niente sospensione', async () => {
   const a = ambiente();
   a.appunti.t = 'altro';

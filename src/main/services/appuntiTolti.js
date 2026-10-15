@@ -106,16 +106,24 @@ function crea({ file, decodifica, appunti }) {
     await salva();
   }
 
+  // Un «Incolla» che arriva mentre una rimozione guarda ancora gli appunti aspetta che finisca.
+  let inCorso = Promise.resolve();
+  const inFila = (lavoro) => {
+    const p = inCorso.then(lavoro, lavoro);
+    inCorso = p.catch(() => {});
+    return p;
+  };
+
   return {
     /** Una voce tolta: se è ancora negli appunti, il prossimo «Incolla» non la rimette. */
-    async voceTolta(voce) {
+    voceTolta: (voce) => inFila(async () => {
       const tipo = tipoDi(voce);
       const nel = tipo ? await negliAppunti(tipo) : '';
       if (nel && materiale(voce) === nel) await sospendi(tipo, nel);
-    },
+    }),
 
     /** Svuotata: vale per ciò che, fra le voci di prima, sta ancora negli appunti. */
-    async cronologiaSvuotata(voci) {
+    cronologiaSvuotata: (voci) => inFila(async () => {
       const lista = Array.isArray(voci) ? voci : [];
       for (const tipo of TIPI) {
         const delTipo = lista.filter((v) => tipoDi(v) === tipo);
@@ -123,17 +131,17 @@ function crea({ file, decodifica, appunti }) {
         const mat = await negliAppunti(tipo);
         if (mat && delTipo.some((v) => materiale(v) === mat)) await sospendi(tipo, mat);
       }
-    },
+    }),
 
     /**
      * La voce va in cronologia? Un «Incolla» della cosa sospesa no; incollare altro vuol dire che negli appunti
      * c'è altro, e una copia della stessa cosa è l'utente che la vuole di nuovo: tutte e due la liberano.
      */
-    async daTenere(voce, via) {
+    daTenere: (voce, via) => inFila(async () => {
       const tipo = tipoDi(voce);
-      if (!tipo || !carica()[tipo]) return true;
+      const sospesa = tipo ? carica()[tipo] : '';
+      if (!sospesa) return true;
       const mat = materiale(voce);
-      const sospesa = carica()[tipo];
       const uguale = Boolean(mat) && (await impronta(mat)) === sospesa;
       if (via === 'paste') {
         if (uguale) return false;
@@ -142,7 +150,7 @@ function crea({ file, decodifica, appunti }) {
       }
       if (uguale) await libera(tipo);
       return true;
-    },
+    }),
   };
 }
 
