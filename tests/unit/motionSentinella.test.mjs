@@ -44,15 +44,20 @@ function* fileSotto(dir) {
 }
 
 function cssDi(percorso) {
-  const testo = readFileSync(percorso, 'utf8');
+  return cssDiTesto(readFileSync(percorso, 'utf8'), percorso);
+}
+
+function cssDiTesto(testo, percorso) {
   if (!percorso.endsWith('.html')) return testo;
-  // Fuori dagli <style> si sbianca tutto tranne gli a capo: i numeri di riga restano quelli del file.
+  // Fuori dagli <style> e dagli attributi style si sbianca tutto tranne gli a capo: le righe restano quelle del file.
   let out = '';
   let da = 0;
-  for (const m of testo.matchAll(/(<style\b[^>]*>)([\s\S]*?)<\/style>/gi)) {
-    const inizio = m.index + m[1].length;
-    out += testo.slice(da, inizio).replace(/[^\n]/g, ' ') + m[2];
-    da = inizio + m[2].length;
+  for (const m of testo.matchAll(/(<style\b[^>]*>)([\s\S]*?)<\/style>|(\sstyle\s*=\s*["'])([^"']*)/gi)) {
+    const apertura = m[1] ?? m[3];
+    const css = m[2] ?? m[4];
+    const inizio = m.index + apertura.length;
+    out += testo.slice(da, inizio).replace(/[^\n]/g, ' ') + (m[4] !== undefined ? `${css};` : css);
+    da = inizio + css.length;
   }
   return out + testo.slice(da).replace(/[^\n]/g, ' ');
 }
@@ -92,6 +97,8 @@ test('la sentinella riconosce le durate nude e lascia passare quelle avvolte', (
     }`);
   assert.equal(nude.length, 5);
   assert.equal(nude[4].riga, 7);
+  const pagina = '<p style="transition: opacity .2s">x</p>\n<style>.a { animation: gira 1s; }</style>';
+  assert.deepEqual(durateSenzaMotion(cssDiTesto(pagina, 'x.html')).map((f) => f.riga), [1, 2]);
   assert.deepEqual(durateSenzaMotion(`
     .a { transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, visibility 0s linear calc(var(--dur) * var(--sn-motion, 1)); }
     .b { animation: gira calc(.8s * var(--sn-motion, 1)) cubic-bezier(.2, .8, .2, 1) infinite; }

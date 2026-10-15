@@ -51,12 +51,6 @@
   accent-color: var(--sn-accent);
 }
 
-/* Token `link.font`: senza override la variabile non esiste, la dichiarazione vale `inherit` e il link
-   resta nel font di chi lo contiene (quindi segue `font`). :where() lascia vincere i link col font proprio. */
-:where(html[data-sn-pagina]) a {
-  font-family: var(--sn-link-font);
-}
-
 [data-sn-theme] ::selection {
   background: var(--sn-selection-bg);
   color: var(--sn-selection-fg);
@@ -269,8 +263,8 @@
   height: 0;
 }
 
-/* theme.css è iniettato anche nelle pagine esterne, e content.js mette [data-sn-theme] sull'<html> del sito: qui
-   il prefisso sono i contenitori Filo, perché le regole non tocchino il sito. Riafferma le icone outline contro un `svg { fill: currentColor }` del sito. */
+/* Gira anche sui siti, dove content.js mette [data-sn-theme] sull'<html>: il prefisso sono i contenitori Filo.
+   Riafferma le icone outline contro un `svg { fill: currentColor }` del sito. */
 .sn-menu svg,
 .sn-popup svg,
 .sn-sidebar svg,

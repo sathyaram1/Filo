@@ -12,6 +12,7 @@
       version: '0.2.241', date: '2026-10-15',
       features: [
         'Chiedi all\'Aiuto di una scheda «quando l\'ho aperta?» e ti dice giorno, ora e quanto tempo è passato, per la scheda e per la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo.',
+        'Puoi cambiare anche il font dei link, la durata delle animazioni e l\'intensità delle ombre, dalle Preferenze o chiedendolo a Filo: «togli le animazioni» le spegne in tutta l\'app, «animazioni più lente» le rallenta, «ombre più leggere» le schiarisce.',
       ],
       fixes: [],
     },

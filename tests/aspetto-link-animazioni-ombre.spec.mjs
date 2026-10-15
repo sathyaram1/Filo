@@ -1,6 +1,6 @@
 // #837 — Il font dei link, la durata delle animazioni e l'intensità delle ombre si cambiano dalle Preferenze e
 // chiedendolo a Filo. Gli assert guardano quello che arriva all'utente: lo stile calcolato dei link, dei menu,
-// delle schede e della pagina, non solo la variabile.
+// delle schede e della pagina, non solo la variabile. Le foto (tests/.shots/) mostrano il riquadro a 0, a 2 e l'ombra.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
@@ -62,6 +62,9 @@ test('un valore non valido è rifiutato con un errore puntuale, dalle Preferenze
   await riga.locator('input').blur();
   await expect(riga.locator('.sn-token-error')).toBeVisible();
   await expect(riga.locator('.sn-token-error')).toContainText('fra 0 e 3');
+  mkdirSync(SHOTS, { recursive: true });
+  await pref.locator('.sn-token-row[data-token="radius"]').scrollIntoViewIfNeeded();
+  await pref.locator('#tokenCode').screenshot({ path: join(SHOTS, 'preferenze-token.png') });
   expect((await tokensSalvati(app)).motion).toBeUndefined();
 
   const r = await azione(app, { token: 'motion', valore: '2x' });
@@ -164,4 +167,13 @@ test('il riquadro di ritocco della durata usa il cursore e mostra il pallino a 0
   expect(await home.evaluate(() => window.__salvati.at(-1))).toBe('2');
   await home.locator('.sn-refine-panel').screenshot({ path: join(SHOTS, 'motion-2.png') });
   await home.locator('.sn-refine-cancel').click();
+
+  // L'intensità delle ombre: il campione è un riquadro con l'ombra scelta, non il testo selezionato.
+  await home.evaluate(() => window.SN_AESTHETIC_REFINER.openOverlay({ token: 'shadow', valore: '0.5' }, {
+    Tokens: window.SN_THEME_TOKENS, theme: 'light', overrides: { shadow: '0.5' }, applyLive: () => {}, persist: () => {},
+  }));
+  await expect(home.locator('.sn-refine-sample')).toContainText('50%');
+  expect(await stile(home, '.sn-refine-sample-ombra', 'boxShadow')).toContain('rgba(0, 0, 0, 0.5)');
+  await home.locator('.sn-refine-panel').screenshot({ path: join(SHOTS, 'ombra-05.png') });
+  await home.locator('.sn-refine-done').click();
 });

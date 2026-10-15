@@ -37,7 +37,7 @@
     if (reg) reg.applyToDocument(document, tokens || {});
   }
 
-  // theme.css gira anche sui siti (menu, popup): le regole che valgono solo per le pagine di Filo, come il font dei link, si appoggiano a questo segno.
+  // Il segno delle pagine di Filo: gli override dei token girano anche sui siti, e il font dei link vale solo qui.
   document.documentElement.dataset.snPagina = '';
 
   // Tema/scala iniziali "best effort" prima che le impostazioni siano caricate.

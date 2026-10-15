@@ -193,12 +193,14 @@
       css: '--sn-link',
       category: 'accent',
     },
-    // Senza override la variabile non esiste e i link ereditano il font di chi li contiene (theme.css).
+    // Senza override i link ereditano il font di chi li contiene (quindi `font`); con l'override esce anche
+    // `regola`, solo sulle pagine di Filo (data-sn-pagina lo mette pageBootstrap, i siti non ce l'hanno).
     'link.font': {
       label: 'Font dei link',
       type: 'font',
       css: '--sn-link-font',
       category: 'font',
+      regola: 'html[data-sn-pagina] a { font-family: var(--sn-link-font); }',
     },
     'selection.color': {
       label: 'Colore della selezione',
@@ -469,7 +471,9 @@
   // CSS per le superfici a tema --sn-* (pagine filo:// e pagine web esterne).
   function pageCss(overrides) {
     const decls = declsFor(overrides);
-    return decls.length ? `html[data-sn-theme] {\n  ${decls.join('\n  ')}\n}` : '';
+    if (!decls.length) return '';
+    const regole = Object.keys(sanitize(overrides).clean).map((n) => TOKENS[n].regola).filter(Boolean);
+    return [`html[data-sn-theme] {\n  ${decls.join('\n  ')}\n}`, ...regole].join('\n');
   }
 
   // CSS per la shell del browser (palette propria, variabili senza prefisso).

@@ -252,7 +252,12 @@ test('link.font eredita dal font della UI finché non lo si tocca', () => {
   assert.equal(TT.effectiveValue('link.font', { font: 'Georgia, serif' }, 'dark'), 'Georgia, serif');
   assert.equal(TT.effectiveValue('link.font', { font: 'Georgia, serif', 'link.font': 'Verdana, sans-serif' }, 'light'), 'Verdana, sans-serif');
   assert.equal(TT.effectiveValue('font', { 'link.font': 'Verdana, sans-serif' }, 'light'), ui);
-  assert.match(TT.pageCss({ 'link.font': 'Georgia, serif' }), /--sn-link-font: Georgia, serif;/);
+  const css = TT.pageCss({ 'link.font': 'Georgia, serif' });
+  assert.match(css, /--sn-link-font: Georgia, serif;/);
+  // La regola esce solo con l'override, e solo per le pagine di Filo: sui siti l'<html> non ha data-sn-pagina.
+  assert.match(css, /html\[data-sn-pagina\] a \{ font-family: var\(--sn-link-font\); \}/);
+  assert.ok(!TT.pageCss({ font: 'Georgia, serif' }).includes('data-sn-pagina'));
+  assert.ok(!TT.shellCss({ 'link.font': 'Georgia, serif' }).includes('data-sn-pagina'));
   assert.ok(!TT.validate('link.font', 'Georgia; color: red'));
 });
 
