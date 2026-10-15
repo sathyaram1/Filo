@@ -615,7 +615,8 @@ export function rebaseInCorso(root) {
  * solo alla soglia (porta il feedback in `design`); `persist` salva lo stato
  * fuori dal processo, se il chiamante ha un modo per farlo.
  *
- * @returns {{ok:true, state:object|null} | {ok:false, message:string, escalated:boolean, count:number}}
+ * @returns {{ok:true, state:object|null}
+ *   | {ok:false, message:string, escalated:boolean, count:number, current:string, assigned:string, rebase?:true}}
  */
 export function guardTransition(root, id, { escalate, persist, clear, assigned: ripiego = '' } = {}) {
   const prev = readBranchState(root, id);
