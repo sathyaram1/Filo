@@ -412,6 +412,9 @@
     gameOf,
     describeConditions,
     simulate,
+    // Mani per lotto della stima progressiva (~15k = pochi ms): riquadro e chat
+    // lanciano gli stessi lotti con gli stessi seed, così danno lo stesso numero.
+    PROB_BATCH: 15000,
     _mulberry32: mulberry32,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
