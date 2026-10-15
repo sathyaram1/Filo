@@ -490,7 +490,7 @@
     admin_defaults_open_weights_to: 'Passano a %s: %s',
     admin_defaults_open_weights_none_stop: 'Nessuna funzione si ferma.',
     admin_defaults_open_weights_all_open:
-      'Con «Solo modelli a pesi aperti» acceso non cambia niente: tutte le funzioni partono già da modelli a pesi aperti.',
+      'Con «Solo modelli a pesi aperti» acceso non cambia niente. Tutte le funzioni partono già da modelli a pesi aperti.',
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',

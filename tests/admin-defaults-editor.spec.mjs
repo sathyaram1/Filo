@@ -427,7 +427,8 @@ test('salvare i modelli predefiniti tiene la catena delle funzioni spostate in G
 });
 
 // #833 — I modelli predefiniti veri stanno nella config condivisa: una scelta dell'owner può fermare una funzione a
-// chi ha acceso «Solo modelli a pesi aperti». La pagina lo dice prima del salvataggio, senza impedirlo.
+// chi ha acceso «Solo modelli a pesi aperti». La pagina lo dice prima del salvataggio, senza impedirlo, e chiama le
+// funzioni coi nomi della griglia, che sono quelli delle Opzioni.
 const PESI_APERTI = {
   modelRegistry: {
     chiuso: { provider: 'openrouter', model: 'openai/gpt-5.2' },
@@ -493,7 +494,7 @@ test('pesi aperti: tolto dal registro il sostituto aperto, la funzione che conta
 test('pesi aperti: con tutte le funzioni già su modelli aperti la pagina lo dice in una riga, e cambiando un modello torna l\'elenco (#833)', async ({ openTab }) => {
   const page = await openStubbedEditor(openTab, { ...PESI_APERTI, models: { explain: 'aperto', translate_selection: 'aperto, deepseek' } });
   const box = page.locator('#openWeightsImpact');
-  await expect(box).toHaveText('Con «Solo modelli a pesi aperti» acceso non cambia niente: tutte le funzioni partono già da modelli a pesi aperti.');
+  await expect(box).toHaveText('Con «Solo modelli a pesi aperti» acceso non cambia niente. Tutte le funzioni partono già da modelli a pesi aperti.');
   await expect(box).not.toHaveClass(/sn-info-box/);
   await page.screenshot({ path: 'tests/.shots/admin-defaults-open-weights-tutte.png', fullPage: true }).catch(() => {});
 
