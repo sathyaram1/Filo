@@ -615,8 +615,9 @@
       return;
     }
     host.className = 'sn-info-box sn-ow-impact';
-    const titolo = riga(I18n.t('admin_defaults_open_weights_title'));
+    const titolo = document.createElement('div');
     titolo.className = 'sn-info-box-title';
+    titolo.textContent = I18n.t('admin_defaults_open_weights_title');
     host.appendChild(titolo);
     if (impact.unavailable.length) {
       const nomi = impact.unavailable.map((u) => ModelChain.etichetta(u.action));
