@@ -56,7 +56,7 @@ describe('le righe della sezione', () => {
     // Due corse: la testa non può nominarne una sola, la porta ogni riga.
     assert.match(dopo, /^\| `Filo-Setup\.exe` \| `[0-9a-f]{64}` \| \[123456789\]\(https:\/\/github\.com\/proprietario\/Filo\/actions\/runs\/123456789\) \|$/m);
     assert.match(dopo, /^\| `Filo-Mac\.dmg` \| `[0-9a-f]{64}` \| \[987654321\]\(https:\/\/github\.com\/proprietario\/Filo\/actions\/runs\/987654321\) \|$/m);
-    assert.match(dopo, new RegExp(`costruita dal commit \\[\`${COMMIT}\`\\]`), 'il commit è lo stesso: resta in testa');
+    assert.match(dopo, new RegExp(`viene dal commit \\[\`${COMMIT}\`\\]`), 'il commit è lo stesso: resta in testa');
   });
 
   test('i file stanno nell\'ordine Windows, Mac, Linux qualunque sia l\'ordine dei passaggi', () => {
@@ -84,7 +84,7 @@ describe('quello che la sezione dice', () => {
 
   test('perché ricostruire dal sorgente non dà lo stesso file', () => {
     assert.match(corpo, /chiavi di default/);
-    assert.match(corpo, /non si ottiene un file identico/);
+    assert.match(corpo, /non dà un file identico/);
   });
 
   test('il testo che c\'era nella pagina resta, prima e dopo la sezione', () => {

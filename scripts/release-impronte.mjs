@@ -20,11 +20,11 @@ export const INIZIO = '<!-- filo-verifica:inizio -->';
 export const FINE = '<!-- filo-verifica:fine -->';
 const DATI = /<!-- filo-verifica:dati ([\s\S]*?) -->/;
 
-export const COME_CONTROLLARE = 'Per controllare un file scaricato calcolane l\'impronta e confrontala con la sua riga. '
-  + 'Su Windows, in PowerShell: `Get-FileHash <file> -Algorithm SHA256` (la scrive in maiuscolo, le cifre sono le stesse). '
-  + 'Su Mac e Linux: `shasum -a 256 <file>`.';
-export const PERCHE_LA_CORSA = 'Le chiavi di default entrano nel pacchetto durante la costruzione, quindi ricostruendo dal sorgente '
-  + 'non si ottiene un file identico: il riferimento è l\'impronta che la corsa ha scritto qui.';
+export const COME_CONTROLLARE = 'Per controllare un file scaricato, calcola la sua impronta e confrontala con quella della tabella. '
+  + 'Su Windows apri PowerShell e scrivi `Get-FileHash <file> -Algorithm SHA256`. Le lettere escono maiuscole, l\'impronta è la stessa. '
+  + 'Su Mac e Linux scrivi `shasum -a 256 <file>` nel terminale.';
+export const PERCHE_LA_CORSA = 'Ricostruire dal sorgente non dà un file identico, perché la costruzione ci mette dentro le chiavi di default. '
+  + 'Il riferimento è l\'impronta che la corsa ha scritto qui.';
 
 // Tutto ciò che entra nella pagina passa da qui: un valore fuori forma potrebbe chiudere il commento dei dati o scrivere markup.
 const FORMA = {
@@ -87,10 +87,10 @@ export function componiSezione(righe) {
   const commit = unico(tutte.map((r) => r.commit));
   const corsa = unico(tutte.map((r) => r.corsa));
   let testa;
-  if (commit && corsa) testa = `Questa versione è stata costruita dal commit ${linkCommit(tutte[0])} nella ${linkCorsa(corsa)}.`;
-  else if (commit) testa = `Questa versione è stata costruita dal commit ${linkCommit(tutte[0])}. Ogni file porta la corsa di GitHub Actions che l'ha prodotto.`;
-  else if (corsa) testa = `Questa versione è stata costruita nella ${linkCorsa(corsa)}. Ogni file porta il commit da cui viene.`;
-  else testa = 'Ogni file porta il commit da cui viene e la corsa di GitHub Actions che l\'ha prodotto.';
+  if (commit && corsa) testa = `La ${linkCorsa(corsa)} ha costruito questa versione dal commit ${linkCommit(tutte[0])}.`;
+  else if (commit) testa = `Questa versione viene dal commit ${linkCommit(tutte[0])}. Accanto a ogni file c'è la corsa di GitHub Actions che l'ha costruito.`;
+  else if (corsa) testa = `La ${linkCorsa(corsa)} ha costruito questa versione. Accanto a ogni file c'è il commit da cui viene.`;
+  else testa = 'Accanto a ogni file ci sono il commit da cui viene e la corsa di GitHub Actions che l\'ha costruito.';
 
   const colonne = ['File', 'SHA-256', ...(commit ? [] : ['Commit']), ...(corsa ? [] : ['Corsa'])];
   const riga = (r) => ['`' + r.nome + '`', '`' + r.sha256 + '`',
