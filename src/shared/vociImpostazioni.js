@@ -45,6 +45,7 @@
         timerRingtone: 'timerRingtone',
         timerRingtoneVolume: 'timerRingtoneVolume',
         terminalEnabled: 'terminal.enabled',
+        schermoGuarda: 'schermo.guarda',
         terminalShell: 'terminal.shell',
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
         barraSpinta: 'barraLaterale.spinta',
