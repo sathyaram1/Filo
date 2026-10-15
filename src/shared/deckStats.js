@@ -260,15 +260,17 @@
     if (bottom <= junk.length) return [...useful, ...junk.slice(bottom)];
 
     const size = hand.length - bottom;
+    const keepable = handSatisfies(hand, keepReqs);
+    const wantHits = hand.map((c) => c.filter((t) => wantTags.has(t)).length);
     let best = null; let bestScore = null;
     const pick = [];
     const visit = (start) => {
       if (pick.length === size) {
         const cards = pick.map((i) => hand[i]);
         const score = [
-          handSatisfies(cards, keepReqs) ? 1 : 0,
+          keepable && handSatisfies(cards, keepReqs) ? 1 : 0,
           coverage(cards, want, false).covered,
-          cards.reduce((s, c) => s + c.filter((t) => wantTags.has(t)).length, 0),
+          pick.reduce((s, i) => s + wantHits[i], 0),
         ];
         if (!bestScore || (score[0] - bestScore[0] || score[1] - bestScore[1] || score[2] - bestScore[2]) > 0) {
           best = pick.slice(); bestScore = score;
