@@ -145,7 +145,7 @@
   const NESSUN_HOST_MOTIVO = 'nessun fornitore ammesso lo ospita';
   const RIMEDI_NESSUN_HOST = {
     opzioni: 'Scegline un altro in Opzioni → Modelli per azione.',
-    predefiniti: 'Usi i modelli predefiniti: per sceglierne un altro togli «Usa modelli predefiniti» in Opzioni e impostalo in Modelli per azione.',
+    predefiniti: 'Per sceglierne un altro togli «Usa modelli predefiniti» in Opzioni e impostalo in Modelli per azione.',
     gestione: 'Scegline un altro in Gestione → Automazioni, fra i Modelli di supporto.',
   };
   const NOMI_MOSTRATI = 5;
