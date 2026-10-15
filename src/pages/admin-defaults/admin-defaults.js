@@ -146,6 +146,8 @@
 
   function ricontrollaAvvisi() {
     if (modelChains) ModelChain.ricontrolla(modelChains);
+    // Una riga del registro cambiata o tolta può essere il sostituto aperto di qualche funzione.
+    renderOpenWeightsImpact();
   }
 
   function makeModelRow(nick, entry) {
