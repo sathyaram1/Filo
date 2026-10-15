@@ -144,9 +144,11 @@ test('sul conto restano meno dei crediti vivi: l’allarme sta in cima e i riqua
 test('dal conto che non regge si va a ricaricarlo: bottone nell’allarme e tasto destro sui riquadri del conto', async ({ app, openTab }) => {
   stato.account = CONTO_CORTO;
   const page = await apriOwner(app, openTab);
-  const aperti = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => w.getURL()));
+  // L'indirizzo chiesto dalla scheda, non quello caricato: in prova la rete verso OpenRouter può non esserci.
+  const aperti = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((w) => w._filoTabs)
+    .flatMap((w) => w._filoTabs.tabs.map((t) => `${t.url || ''} ${t.view ? t.view.webContents.getURL() : ''}`)));
   await page.locator('#ownerAllarme #ownerRicarica').click();
-  await expect.poll(async () => (await aperti()).some((u) => u.startsWith('https://openrouter.ai/settings/credits')), { timeout: 10_000 }).toBe(true);
+  await expect.poll(async () => (await aperti()).some((u) => u.includes('https://openrouter.ai/settings/credits')), { timeout: 15_000 }).toBe(true);
 
   await riquadro(page, 'restano sul conto').click({ button: 'right' });
   await expect(page.locator('.sn-wallet-ctx .sn-select-option', { hasText: 'Ricarica il conto su OpenRouter' })).toBeVisible();
