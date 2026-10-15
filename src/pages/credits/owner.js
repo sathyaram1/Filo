@@ -577,11 +577,7 @@
   function copia(testo) { try { navigator.clipboard.writeText(testo); } catch (_) {} }
 
   function apriMenuPersona(u, detail, apriChiudi, x, y) {
-    chiudiMenuPersona();
-    const menu = document.createElement('div');
-    menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
-    menu.setAttribute('role', 'menu');
-    const voci = [
+    apriMenu([
       [detail.hidden ? 'Apri la scheda' : 'Chiudi la scheda', () => apriChiudi()],
       ['Copia lo pseudonimo', () => copia(u.pseudonym)],
       ['Regala crediti a questa persona', () => {
@@ -590,7 +586,14 @@
         quanti.focus();
         quanti.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }],
-    ];
+    ], x, y);
+  }
+
+  function apriMenu(voci, x, y) {
+    chiudiMenuPersona();
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
+    menu.setAttribute('role', 'menu');
     for (const [testo, azione] of voci) {
       const voce = document.createElement('div');
       voce.className = 'sn-select-option';
