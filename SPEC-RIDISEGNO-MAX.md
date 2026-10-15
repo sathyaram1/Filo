@@ -363,16 +363,26 @@ alternativo). A quel punto l'intera coda su git si può ritirare.
 Terzo (quarta passata, 18/08): **new-work e fixer FUSI in un ruolo unico,
 `resolver`** — stesso lavoro, cambia solo il punto di partenza (richiesta
 dell'owner vs critica del verifier), e dispatch dice il caso nel payload.
-Anche le correzioni grosse possono usare sotto-agenti (sequenziali). Regole
-collegate:
+Anche le correzioni grosse possono usare sotto-agenti (sequenziali).
+
+> **Superato** (#561, chi corregge la critica): vedi `FEEDBACK-STATES.md` §3 e
+> `routines/roles/_critica-e-livelli.md`; i casi del resolver sono i file
+> `routines/roles/resolver*.md`. Sotto-agenti: `CLAUDE.md`, «Il contesto si
+> paga a ogni turno».
+
+Regole collegate:
 
 - il resolver in correzione NON vede il report del primo passaggio (occhi
   freschi, e comunque è cifrato); vede la riga di changelog nel codice; frase
   e changelog si aggiornano SOLO se il comportamento visibile è cambiato
   (ritocco: `--frase` opzionale nella consegna della correzione);
+  - **Superato** (#561): vedi `FEEDBACK-STATES.md` §3 e
+    `routines/roles/_critica-e-livelli.md`.
 - **i numeri configurabili dalla dashboard non si scrivono MAI nei prompt**
   (la soglia dei FAIL — oggi 5 — la legge il server dalla config; i documenti
   che dicevano "3" erano già stantii: è la prova del principio);
+  - **Superato** (la soglia unica dei FAIL): vedi `src/shared/verifierRound.js`;
+    i bilanci per livello si scrivono in Gestione → Automazioni.
 - i file-ruolo non ripetono il metodo di CLAUDE.md: contengono solo ciò che è
   specifico del ruolo. E **non spiegano ciò che non compete al ruolo** ("cosa
   succede dopo non ti riguarda", soglie altrui, meccaniche a valle):
