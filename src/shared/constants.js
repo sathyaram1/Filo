@@ -1632,8 +1632,9 @@
     aperturaScheda: ({ apertaIl = null, adesso = null } = {}) => {
       const t = apertaIl == null || apertaIl === '' ? NaN : new Date(apertaIl).getTime();
       const ora = adesso != null && Number.isFinite(Number(adesso)) ? Number(adesso) : Date.now();
-      if (!Number.isFinite(t) || t <= 0) return '';
-      const quando = filoContesto().quando;
+      const fc = filoContesto();
+      if (!Number.isFinite(t) || t <= 0 || !fc) return '';
+      const quando = fc.quando;
       const trascorso = ora - t;
       const durata = trascorso >= 0 ? `, ${PROMPTS.durataTrascorsa(trascorso)} fa` : '';
       return `Questa scheda (lo sa Filo): l'utente l'ha aperta ${quando(t)}${durata}. Adesso è ${quando(ora)}, ora del suo computer.\n`;
