@@ -266,6 +266,9 @@ src/shared/     moduli IIFE su globalThis (constants, messages, feedback, …)
 src/content/    content scripts
 ```
 
+- **Dove sta una cosa**: `node scripts/mappa-moduli.mjs <cartella>` (per esempio
+  `src/main/services`) dà percorso, KB e prima frase dell'intestazione di ogni
+  .js; passagli una cartella: senza dà una riga per cartella, `--tutto` tutto.
 - Storage: `storage.json` nella cartella dati dell'app (`app.getPath('userData')`),
   `$FILO_USER_DATA` nei test.
 - **Convenzione IIFE**: i moduli condivisi si auto-registrano su `globalThis`
