@@ -381,6 +381,31 @@ module.exports = function register(on, ctx) {
 
   const RIMEDI_CON_CLIC = new Set(['modello', 'automatiche']);
   const NON_RIUSCITO = { ok: false, frase: 'Non ci sono riuscito: riprova.' };
+
+  // La chat (RIMEDIO_CREDITI): la stessa porta dei pulsanti, e senza rimedio l'elenco di adesso coi suoi id.
+  async function rimedioDaChat({ rimedio, operazione } = {}) {
+    const id = String(rimedio || '').trim().toLowerCase();
+    const op = String(operazione || '').trim().toLowerCase();
+    if (op === 'applica' || op === 'annulla') {
+      if (!RIMEDI_CON_CLIC.has(id)) return { ok: false, error: 'rimedio', frase: 'Si applicano e si rimettono solo «modello» e «automatiche».' };
+      const r = await inFila(() => (op === 'applica' ? applica(id) : annulla(id))).catch(() => NON_RIUSCITO);
+      try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, avvisoCrediti: true }); } catch (_) {}
+      const fatti = (await rimediDaMostrare(await situazione())).find((x) => x.id === id);
+      return {
+        ...r, rimedio: id, operazione: op,
+        frase: r.frase || (r.gia ? (op === 'applica' ? 'Era già applicato.' : 'Era già com\'era.') : ''),
+        dettagli: fatti ? fatti.dettagli || [] : [],
+      };
+    }
+    const sit = await situazione();
+    const lista = await rimediDaMostrare(sit);
+    const testo = sit ? CA.frase({ saldo: sit.saldo, giorni: sit.v.giorni, motivi: sit.v.motivi, percento: sit.soglie.percento }) : '';
+    return {
+      ok: true, operazione: 'elenca', testo: CA.perFilo(testo, lista),
+      rimedi: lista.filter((x) => x.azione === 'applica' || x.azione === 'annulla')
+        .map((x) => ({ id: x.id, applicato: x.applicato, testo: x.testo })),
+    };
+  }
   on(MSG.CREDITS_REMEDY_APPLY, filoOnly(async (msg) => {
     const id = String((msg && msg.id) || '');
     if (!RIMEDI_CON_CLIC.has(id)) return { ok: false, error: 'bad_id' };
