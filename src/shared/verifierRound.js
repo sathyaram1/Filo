@@ -714,7 +714,10 @@
   function groupLabel(g) {
     const findings = g && Array.isArray(g.findings) ? g.findings : [];
     if (g && g.tipo === 'esterno') return g.decision ? 'esterno, da decidere' : 'esterno';
-    if (g && g.tipo === 'decisione') return `${findings[0] && sedeDi(findings[0].sede) === 'v' ? 'vicino' : 'interno'}, da decidere`;
+    if (g && g.tipo === 'decisione') {
+      const chi = findings[0] && sedeDi(findings[0].sede) === 'v' ? 'vicino' : 'interno';
+      return g.inCorrezione ? `${chi}, da decidere: intanto si corregge con l'opzione consigliata` : `${chi}, da decidere`;
+    }
     const n = findings.length;
     return `rimasti del giro: ${n} ${n === 1 ? 'rilievo' : 'rilievi'} (${findings.map(findingTag).join(', ')})`;
   }
