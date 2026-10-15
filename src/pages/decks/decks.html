@@ -466,6 +466,21 @@
       padding: 3px 6px; outline: none;
     }
     .dk-prob-row input[type="number"]:focus { border-color: var(--sn-accent); }
+    .dk-prob-choice {
+      flex: 0 0 auto; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      font: inherit; font-size: 12px; color: var(--sn-text); background: transparent;
+      border: 1px solid var(--sn-border); border-radius: 6px; padding: 3px 6px; cursor: pointer;
+      transition: border-color 120ms ease, color 120ms ease;
+    }
+    .dk-prob-choice:hover, .dk-prob-choice:focus-visible { border-color: var(--sn-accent); color: var(--sn-accent); outline: none; }
+    /* La colonna «per tenere» e la sua intestazione esistono solo con almeno un mulligan: senza, il riquadro
+       resta alto come prima. */
+    .dk-prob-head { display: none; padding: 0; color: var(--sn-muted); font-size: 10px; }
+    .dk-prob-head-gap { flex: 1 1 auto; }
+    .dk-prob-col { flex: 0 0 auto; width: 56px; text-align: right; white-space: nowrap; }
+    .dk-prob-row .dk-prob-keep { display: none; }
+    #probCard[data-mull="1"] .dk-prob-head { display: flex; }
+    #probCard[data-mull="1"] .dk-prob-row .dk-prob-keep { display: inline-block; }
     .dk-prob-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
     .dk-prob-result { font-weight: 600; }
     /* Finché la stima si raffina un puntino pulsa piano accanto al risultato, e sparisce quando ha finito. */
@@ -658,7 +673,26 @@
                     <label for="probTurn">Turno</label>
                     <input id="probTurn" type="number" min="1" max="30" step="1" value="4" />
                   </div>
+                  <div class="dk-prob-row dk-prob-head" aria-hidden="true">
+                    <span class="dk-prob-head-gap"></span>
+                    <span class="dk-prob-col">al turno</span>
+                    <span class="dk-prob-col dk-prob-keep">per tenere</span>
+                  </div>
                   <div id="probNeeds"></div>
+                  <div class="dk-prob-row">
+                    <label for="probGame" id="probGameLabel">Partita</label>
+                    <button id="probGame" class="dk-prob-choice" type="button" data-game="multi"
+                            aria-haspopup="menu" aria-labelledby="probGameLabel probGame"
+                            title="Chi pesca al primo turno, e se il primo mulligan è gratis">a più giocatori ▾</button>
+                  </div>
+                  <div class="dk-prob-row">
+                    <label for="probMull" title="Quante volte al massimo rifai la mano iniziale">Mulligan</label>
+                    <input id="probMull" type="number" min="0" max="7" step="1" value="0" />
+                  </div>
+                  <div class="dk-prob-row">
+                    <label for="probExtra" title="Carte pescate in più entro il turno, oltre a quella di ogni turno">Pescate extra</label>
+                    <input id="probExtra" type="number" min="0" max="99" step="1" value="0" />
+                  </div>
                   <div class="dk-prob-actions">
                     <span class="dk-prob-result" id="probResult" aria-live="polite"></span>
                   </div>
