@@ -236,7 +236,7 @@ test('il calcolatore di probabilità: la categoria è leggibile, il numero sta i
 
   const row = page.locator('#probNeeds .dk-prob-row', { has: page.locator('input[data-tag="ragionamento"]') });
   const label = row.locator('label');
-  const input = row.locator('input');
+  const input = row.locator('input[data-tag]');
   const lb = await label.boundingBox();
   const ib = await input.boundingBox();
 
