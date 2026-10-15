@@ -421,13 +421,16 @@ function actionLabelForSettings(action) {
   return (SN_CONST.actionLabel && SN_CONST.actionLabel(action)) || action || '';
 }
 
+// Dove si sceglie il modello di una funzione: lo dicono sia l'errore di configurazione sia il «nessun host ammesso» (#828).
+function doveSiSceglieIlModello(settings, action) {
+  if (ownerSlotFor(action)) return 'gestione';
+  return settings && settings.useDefaultModels === false ? 'opzioni' : 'predefiniti';
+}
+const DOVE_MODELLO_I18N = { gestione: 'err_model_where_owner', opzioni: 'err_model_where_own', predefiniti: 'err_model_where_default' };
+
 function modelConfigError(settings, action, missingRefs) {
   const label = actionLabelForSettings(action);
-  const where = ownerSlotFor(action)
-    ? I18n.t('err_model_where_owner')
-    : settings && settings.useDefaultModels === false
-      ? I18n.t('err_model_where_own')
-      : I18n.t('err_model_where_default');
+  const where = I18n.t(DOVE_MODELLO_I18N[doveSiSceglieIlModello(settings, action)]);
   const missing = missingRefs || [];
   const e = new Error(missing.length
     ? I18n.t('err_unknown_model_for_action', label, SN_CONST.formatModelRefsForMessage(missing), where)
