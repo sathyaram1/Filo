@@ -1,12 +1,29 @@
-// Macchina a stati dei feedback: le TABELLE come DATI, fonte di verità singola.
-// La dashboard le legge via feedbackStatus.js; il server le INCORPORA al deploy,
-// quindi cambia comportamento solo al rideploy. SOLO DATI: le funzioni stanno altrove.
+// Macchina a stati dei feedback — le TABELLE, promosse a DATI.
+//
+// FONTE DI VERITÀ SINGOLA (SPEC-RIDISEGNO-MAX.md §7): queste tabelle vivevano
+// in DUE copie a mano — la dashboard qui, il server in filo-security — e due
+// copie che divergono sono peggio di una sola permissiva: la dashboard mostra
+// una regola e il server ne applica un'altra. Da qui in avanti:
+//   - la dashboard le LEGGE da questo file (via src/shared/feedbackStatus.js,
+//     che espone l'API canTransition/canReach/… e resta identico per i
+//     chiamanti);
+//   - il server le INCORPORA AL DEPLOY: filo-security/functions/tools/
+//     bake-shared.js legge questo file dal checkout pubblico e genera
+//     functions/src/routine/stateMachine.data.js. Il comportamento del server
+//     cambia solo al rideploy, che è lo stesso livello di fiducia di prima.
+//
+// SOLO DATI: niente funzioni, niente stato. Le funzioni stanno in
+// feedbackStatus.js (dashboard) e stateMachine.js (server).
+//
+// Pattern IIFE su globalThis: vedi CLAUDE.md → convenzione dei moduli shared.
 
 (function (global) {
   'use strict';
 
-  // Stati canonici, lista CHIUSA (FEEDBACK-STATES.md §2).
-  // La presentazione sta in feedbackStatus.js, che verifica di coprire ESATTAMENTE questa.
+  // ── Stati canonici (lista CHIUSA — FEEDBACK-STATES.md §2) ──────────────────
+  // L'ordine è quello storico della tabella; la presentazione (tab, colori,
+  // etichette) resta in feedbackStatus.js, che verifica di coprire ESATTAMENTE
+  // questa lista.
   const STATUSES = [
     'unlabeled', 'suspicious_file', 'attack', 'spam', 'design', 'aligned',
     'todo', 'working', 'revision_capability', 'revision_security', 'done',
@@ -67,34 +84,25 @@
     todo: {
       working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:   ['routine'], // la routine ha domande → chat + statusReason clarify
-      // routine: solo il riordino della coda e l'unione (ambiti `coda` e `unisci`, #1153), su un lavoro non iniziato.
-      archived: ['owner', 'routine'], // un doppione, o una cosa che non si farà più
-      // Il worker che l'ha letto da vicino lo giudica attacco o spam (statusReason worker): Ricevuti L3 (#1358).
-      attack:   ['routine'],
-      spam:     ['routine'],
-      // Una segnalazione unita a un pacchetto: la chiude il server alla fusione del pacchetto, con la sua frase
-      // (FEEDBACK-STATES.md §3a). Per una routine il passo diretto todo→done resta ritirato (SPEC-RIDISEGNO-MAX.md §1).
-      done:     ['pipeline'],
+      archived: ['owner'],   // un doppione, o una cosa che non si farà più
+      // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
+      // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
+      // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
+      // manuali senza branch (npm run feedback -- <id> done --come-routine)
+      // restano legali come CATENA di passi (canReach attraversa l'iter).
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
-      // «Già risolto su main» (FEEDBACK-STATES.md §3a): il server la accetta solo dal primo lavoro con `gia_risolto` e
-      // la fusione provata (linea principale, cita il feedback, dopo nascita e riapertura); ogni altra consegna no.
-      done:                ['routine'],
       design:              ['routine'], // domande a metà lavorazione
-      // Arenato: il ramo fermo da un'ora torna in coda da solo (FEEDBACK-STATES.md §6a).
-      // Alla terza volta va in `design`.
+      // Arenato: il ramo non avanza da un'ora → il pacemaker lo rimette in coda
+      // da solo (FEEDBACK-STATES.md §6a). Alla terza volta va in `design`.
       todo:                ['routine'],
       archived:            ['owner'],
-      attack:              ['routine'],
-      spam:                ['routine'],
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
       design:            ['routine'], // fail cap raggiunto → statusReason loop
       archived:          ['owner'],
-      attack:            ['routine'],
-      spam:              ['routine'],
     },
     revision_security: {
       done:     ['routine'], // PASS secaudit + merge-gate fonde su main
@@ -107,8 +115,6 @@
       // sul contenuto nuovo. Senza questa riga il giro di riallineamento
       // moriva alla consegna: la macchina rifiutava il rientro.
       revision_capability: ['routine'],
-      attack:              ['routine'],
-      spam:                ['routine'],
     },
     done: {
       archived: ['owner'],  // verifica umana ok
@@ -125,8 +131,26 @@
     },
   };
 
-  // SICUREZZA: gli stati «beccati» DEVONO collassare sui valori dei feedback normali, o chi
-  // legge senza chiave fa hill-climbing. Su 'open', mai 'closed' (premia) né un valore nuovo.
+  // ── statusPublic (S1.F2.1): enum grossolano IN CHIARO ──────────────────────
+  // Sta accanto allo status fine (eventualmente cifrato).
+  // ⚠️ SICUREZZA: tutti gli stati "beccati" (attack/spam/suspicious_file e i
+  // confermati) DEVONO collassare sugli stessi valori dei feedback normali —
+  // mai un valore distinto, o chi legge Firestore senza chiave riconosce un
+  // attacco intercettato e fa hill-climbing.
+  //
+  // MA NON BASTA COLLASSARE: conta SU QUALE valore (#476). I confermati stavano
+  // su 'closed', lo stesso dei risolti — che di per sé non dice niente, se non
+  // fosse che 'closed' non è un'etichetta passiva: è il grilletto di due cose
+  // che l'attaccante VEDE.
+  //   1. il popup delle ricompense premia i feedback 'closed' → chi manda un
+  //      attacco riceve 50 crediti e la notifica "risolto";
+  //   2. la sanificazione per la bacheca pubblica lavora i feedback 'closed' →
+  //      il feedback dell'attaccante finisce in vetrina (a pagamento).
+  // Cioè gli confermavamo il colpo, e lo pagavamo pure.
+  //
+  // I confermati stanno quindi su 'open': per chi li ha mandati restano per
+  // sempre "in lavorazione", che è il silenzio. Nessun valore nuovo — quello
+  // sarebbe di nuovo un segnale, solo con un altro nome.
   const PUBLIC_MAP = {
     unlabeled: 'open', suspicious_file: 'open', attack: 'open', spam: 'open',
     design: 'open', aligned: 'open', todo: 'open', working: 'open',
@@ -135,8 +159,12 @@
     attack_confirmed: 'open', spam_confirmed: 'open',
   };
 
-  // Lunghezza fissa dello status cifrato (#476): la cifratura non imbottisce, e contare i
-  // caratteri equivale a leggerlo. La misura è larga apposta e cambiarla non rompe i vecchi.
+  // ── Lunghezza fissa dello status cifrato (#476) ────────────────────────────
+  // La cifratura non imbottisce: contare i caratteri del campo cifrato equivale
+  // a leggerlo. Prima di cifrare, lo status va portato a questa lunghezza fissa
+  // con spazi in coda (padForCipher in feedbackStatus.js / stateMachine.js).
+  // La misura è larga: tiene i canonici (il più lungo è 19), i legacy ritirati
+  // e spazio per stati futuri. Cambiarla NON rompe i documenti già scritti.
   const CIPHER_PAD = 32;
 
   // ── I quattro bilanci dei giri di correzione (feedback #561, §4) ────────
@@ -154,14 +182,16 @@
   //         Filo inutilizzabile). A bilancio finito un 3 ferma la pratica e
   //         chiama l'owner (statusReason `loop`): è l'unico che ferma.
   //   cap2: giri per i rilievi di livello 2 (la cosa chiesta non si ottiene nel
-  //         caso normale). A bilancio finito un 2 NON ferma: diventa un
-  //         feedback a parte a priorità 1, e il lavoro passa (2026-09-23).
+  //         caso normale). A bilancio finito un 2 NON ferma: sale su una
+  //         correzione che parte comunque (#744), altrimenti diventa un
+  //         feedback a parte a priorità 2 e il lavoro passa (2026-09-23).
   //   cap1: giri per i rilievi di livello 1 (di rado, cosmetica evidente). A
-  //         bilancio finito un 1 va nel feedback derivato.
+  //         bilancio finito un 1 sale su una correzione che parte comunque,
+  //         altrimenti va nel feedback derivato.
   //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da
   //         soli non si correggono mai: solo insieme ad altro.
-  // Ogni giro consuma UN giro dal bilancio del livello più alto fra gli interni
-  // corretti: i vicini non pagano niente e da soli non fanno partire un giro (#1202).
+  // Ogni giro consuma UN giro dal bilancio del livello più alto fra quelli
+  // che lo fanno partire; chi ci sale col bilancio finito non paga.
   const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {
