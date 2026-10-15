@@ -108,6 +108,7 @@ export function componiSezione(righe) {
     COME_CONTROLLARE,
     '',
     PERCHE_LA_CORSA,
+    '',
     `<!-- filo-verifica:dati ${JSON.stringify({ righe: tutte })} -->`,
     FINE,
   ].join('\n');
