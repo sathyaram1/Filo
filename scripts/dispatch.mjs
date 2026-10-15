@@ -843,7 +843,7 @@ function tryGit(args) {
  * Il diff del ramo contro il main di GitHub, con la base e la punta su cui è calcolato: chi lo ricalcola usa
  * quelle. Un diff che git non sa calcolare esce con `ok: false` e il motivo, mai come diff vuoto (#740); uno vuoto
  * esce solo se il contenuto del ramo è davvero quello della base comune, e lo dichiara in `vuoto`.
- * @returns {{ok:true, diff:string, base:{ref:string, sha:string}, head:string, vuoto?:{commitPropri:number}}
+ * @returns {{ok:true, diff:string, base:{ref:string, sha:string}, head:string, vuoto?:{commitPropri:number|null}}
  *   | {ok:false, motivo:string, diff:'', base:object|null, head:string}}
  */
 export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi } = {}) {

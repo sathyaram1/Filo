@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname, isAbsolute } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, fuoriDa, togliCartella } from '../helpers/percorsi.mjs';
 
 // STATE_DIR isolata PRIMA di importare il modulo (è letta a import-time).
