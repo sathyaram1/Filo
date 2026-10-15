@@ -814,7 +814,6 @@ export function buildPayload(bucket, ctx = {}) {
     case 'halt':
       // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
       return { kind: bucket.kind || 'transient', message: bucket.message || '' };
-    case 'prober':
     default:
       return {};
   }
