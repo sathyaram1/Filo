@@ -436,8 +436,9 @@
       if (!LEVELS.includes(level)) continue;
       const text = String(f.text == null ? '' : f.text).trim().slice(0, MAX_FINDING_TEXT);
       if (!text) continue;
+      // Il campo c'è solo col segno: lo stato già scritto e i client vecchi restano identici.
       const difficile = f.difficile === true;
-      out.push({ level, sede: sedeDi(f.sede), text, decision: f.decision === true || difficile, difficile });
+      out.push(Object.assign({ level, sede: sedeDi(f.sede), text, decision: f.decision === true || difficile }, difficile ? { difficile: true } : {}));
       if (out.length >= MAX_FINDINGS) break;
     }
     return out;
