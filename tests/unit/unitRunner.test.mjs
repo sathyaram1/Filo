@@ -618,6 +618,32 @@ test('più file appesi insieme si chiudono insieme, e se dopo non finisce più n
     /^\[test:unit\] ROSSO: tests\/unit\/x\.test\.mjs non è andato avanti per 20 minuti ed è stato chiuso; gli altri file sono andati avanti\.$/);
 });
 
+// #1235: la fine di d uno sguardo dopo l'ultimo passo di a faceva chiudere a da solo, e poi c chiudeva la corsa intera:
+// l'esito di d, in fila dietro c, non usciva più. Prima o dopo, l'esito deve essere lo stesso.
+test('chiuso il primo da solo, il fermo dietro di lui si chiude come lui, e la corsa si chiude solo se nemmeno questo serve', () => {
+  const g = guardiaPerFile(1000);
+  assert.equal(g([{ via: 'a' }, { via: 'b' }, { via: 'c' }, { fine: 'b' }, { via: 'd' }, {}], 0), null);
+  assert.equal(g([{ fine: 'd' }], 100), null);
+  assert.deepEqual(g([], 1000), { file: ['a'] }, 'd è finito da poco: si chiude solo il primo');
+  assert.equal(g([{ fine: 'a' }, {}], 1100), null);
+  assert.equal(g([], 2099), null);
+  assert.deepEqual(g([], 2100), { file: ['c'] }, 'dopo a non è finito niente: c era fermo anche lui, non la corsa');
+  assert.equal(g([{ fine: 'c' }, { via: 'e' }], 2200), null);
+  assert.equal(g([], 3199), null);
+  assert.deepEqual(g([], 3200), { tutto: true }, 'chiusi i fermi, non finisce più niente: è ferma la corsa');
+
+  const insieme = guardiaPerFile(1000);
+  insieme([{ via: 'a' }, { via: 'b' }, { via: 'c' }, { fine: 'b' }, { via: 'd' }, {}, { fine: 'd' }], 0);
+  assert.deepEqual(insieme([], 1000), { file: ['a', 'c'] }, 'la fine di d nello stesso sguardo: chiusi insieme, stesso esito');
+
+  const nonServe = guardiaPerFile(1000);
+  nonServe([{ via: 'a' }, {}, { via: 'b' }, { fine: 'b' }], 0);
+  assert.deepEqual(nonServe([{ via: 'c' }, { fine: 'c' }], 999), null);
+  assert.deepEqual(nonServe([], 1000), { file: ['a'] });
+  assert.equal(nonServe([{ via: 'z' }, { fine: 'z' }], 1500), null, 'z finisce da sé, ma a chiuso non esce');
+  assert.deepEqual(nonServe([], 2000), { tutto: true }, 'il primo chiuso è ancora in corso: chiudere non è servito');
+});
+
 test('il processo del file da chiudere si trova dalla riga di comando, coi suoi figli, e solo sotto il node --test', () => {
   const lista = leggiProcessi([
     '  100     1 /usr/bin/node /home/u/Filo/scripts/run-unit-tests.mjs',
