@@ -837,39 +837,46 @@ export async function ramoServer(t, ramo, sha, opts) {
 
 /**
  * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security col token del biglietto, dato a quella sola
- * chiamata. → { exit, righe: [testi per stderr] }; `git` e `env` per le prove.
+ * chiamata. → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia` e `token` per le prove.
  */
-export async function eseguiGitServer({ azione, cartella, ramo, biglietto, root = ROOT, env = process.env, git = 'git', token = gitToken } = {}) {
-  const righe = [];
-  const clonato = Boolean(cartella) && existsSync(join(resolve(String(cartella)), '.git'));
+export async function eseguiGitServer({
+  azione, cartella, ramo, biglietto, root = ROOT, env = process.env,
+  lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
+} = {}) {
+  const clonato = Boolean(String(cartella || '').trim()) && existsSync(join(resolve(String(cartella)), '.git'));
   const piano = pianoGitServer({ azione, cartella, ramo, root, clonato });
-  if (piano.errore) return { exit: 1, righe: [`git-server: ${piano.errore} Il server non è stato chiamato.`] };
-  if (piano.nota) righe.push(`git-server: ${piano.nota}`);
+  if (piano.errore) { scrivi(`git-server: ${piano.errore} Il server non è stato chiamato.`); return 1; }
+  if (piano.nota) scrivi(`git-server: ${piano.nota}`);
   if (piano.controllaOrigin) {
-    const { env: senza } = ambienteGitServer(env, '');
+    const { env: senzaToken } = ambienteGitServer(env, '');
     const url = (dove) => {
-      const r = spawnSync(git, ['-C', piano.dir, 'remote', 'get-url', ...dove, 'origin'], { env: senza, encoding: 'utf8' });
-      return r.status === 0 ? String(r.stdout || '').trim() : '';
+      const r = lancia(['-C', piano.dir, 'remote', 'get-url', ...dove, 'origin'], { env: senzaToken, encoding: 'utf8' });
+      return r && r.status === 0 ? String(r.stdout || '').trim() : '';
     };
     for (const u of [url([]), url(['--push'])]) {
-      if (!originDelServer(u)) {
-        righe.push(`git-server: l'origin del clone è «${urlSenzaSegreti(u) || 'assente'}», non ${URL_SERVER}: il token non esce. Il server non è stato chiamato.`);
-        return { exit: 1, righe };
-      }
+      if (originDelServer(u)) continue;
+      scrivi(`git-server: l'origin del clone è «${urlSenzaSegreti(u) || 'assente'}», non ${URL_SERVER}: il token non esce. Il server non è stato chiamato.`);
+      return 1;
     }
   }
-  if (!biglietto) return { exit: 1, righe: [...righe, 'NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'] };
+  if (!biglietto) { scrivi('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); return 1; }
   const t = await token(biglietto);
   if (t.outcome !== 'ok') {
     const motivo = `${t.reason}${t.detail ? `: ${t.detail}` : ''}`;
-    righe.push(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
-    return { exit: t.outcome === 'refused' ? 4 : 3, righe };
+    scrivi(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
+    return t.outcome === 'refused' ? 4 : 3;
   }
   const { env: figlio, tolte } = ambienteGitServer(env, t.token);
   const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
-  righe.push(`git-server: token del biglietto ottenuto${scade}, git ${azione} su filo-security.`);
-  if (tolte.length) righe.push(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
-  return { exit: null, righe, argv: piano.argv, env: figlio, git };
+  scrivi(`git-server: token del biglietto ottenuto${scade}, git ${piano.argv.includes('clone') ? 'clone' : piano.argv[2]} su filo-security.`);
+  if (tolte.length) scrivi(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
+  const r = lancia(piano.argv, { env: figlio, stdio: 'inherit' });
+  if (r && r.error) { scrivi(`git-server: git non parte (${r.error.code || r.error.message}).`); return 1; }
+  if (!r || r.status !== 0) {
+    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, legato a ${URL_SERVER}: se git parla di autenticazione o di repository non trovato, GitHub l'ha respinto.`);
+    return 1;
+  }
+  return 0;
 }
 
 /**
