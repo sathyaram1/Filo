@@ -55,9 +55,20 @@ async function main() {
     return 0;
   }
   if (args.cmd === 'avvio') {
-    // L'hook di avvio: una riga, sempre uscita 0, anche col server giù.
+    // L'hook di avvio: una riga, sempre uscita 0, anche col server giù. Poi, senza aspettarla, la scadenza dei rimasti.
     const r = await B.avvio({ input: await leggiStdin() });
     if (r.riga) console.log(r.riga);
+    if (r.path) B.avviaInSottofondo(['scadenze'], { env: { ...process.env, [B.ENV_FILE]: r.path } });
+    return 0;
+  }
+  if (args.cmd === 'fine') {
+    B.avviaFine({ input: await leggiStdin() });
+    return 0;
+  }
+  if (args.cmd === 'chiusura' || args.cmd === 'scadenze') {
+    setTimeout(() => process.exit(0), B.TETTO_SOTTOFONDO_MS).unref();
+    if (args.cmd === 'chiusura') await B.fineSessione({ input: { session_id: args.sessione } });
+    else await B.chiudiScaduti();
     return 0;
   }
   if (args.cmd === 'prendi') {
