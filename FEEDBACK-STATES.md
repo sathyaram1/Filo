@@ -291,7 +291,9 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     dopo la scrittura perché un passo appena avvenuto non vada perso;
   - origine sparita → `aligned` (`statusReason: origine_mancante`);
   - senza origine (allarmi della costruzione, esplorazioni) → come un allineato dei giudici: `todo`
-    se l'automatica e l'interruttore del gruppo lo ammettono, altrimenti `aligned`.
+    se l'automatica e l'interruttore del gruppo lo ammettono, altrimenti `aligned`;
+  - un derivato col `?` fa eccezione: dove gli altri andrebbero in coda o ad aspettare, lui va nei
+    Ricevuti fermo sulla domanda (`design`, `decisione`: §3, Pipeline).
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
