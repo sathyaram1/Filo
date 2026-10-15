@@ -690,7 +690,7 @@
       if (item.sede === 'e') {
         groups.push({ tipo: 'esterno', priority, decision: item.decision, findings: [item] });
       } else if (item.decision) {
-        groups.push({ tipo: 'decisione', priority, decision: true, findings: [item] });
+        groups.push(Object.assign({ tipo: 'decisione', priority, decision: true }, item.inCorrezione === true ? { inCorrezione: true } : {}, { findings: [item] }));
       } else {
         if (!rimasti) rimasti = { tipo: 'rimasti', priority, decision: false, findings: [] };
         rimasti.findings.push(item);
