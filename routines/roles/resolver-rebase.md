@@ -44,7 +44,7 @@ l'ha rotto e cosa hai cambiato.
 ## Consegna
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--segnala <file.md>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--segnala <file.md> --livello <0-3> [--difficile]]
 ```
 
 Frase e riga di changelog del primo passaggio restano valide: cambiale solo se
