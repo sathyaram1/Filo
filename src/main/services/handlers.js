@@ -3057,6 +3057,13 @@ async function eseguiAzioneFilo(action, {
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
         return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
       }
+      case 'RIMEDIO_CREDITI': {
+        // #818 — i rimedi dell'avviso dei crediti a parole: la stessa porta dei pulsanti, col suo «com'era».
+        const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
+        if (!AC || !AC.rimedioDaChat) return { executed: false, kept: false, output: { error: 'non disponibile' } };
+        const r = await AC.rimedioDaChat({ rimedio: action.rimedio, operazione: action.operazione || 'elenca' });
+        return { executed: r.ok !== false, kept: false, output: r.ok === false ? { ...r, error: r.frase || r.error } : r };
+      }
       case 'INSTALLA_AGGIORNAMENTO': {
         // #786 — da spento è la stessa porta di «Installa» sulla carta; con una versione pronta riavvia (#1039).
         const r = await require('../updater').aggiornaDaChat({ riavvio: action._riavvio === true });
@@ -4035,6 +4042,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if ((type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') && res.output) return esitoSistemaPerModello(res.output);
+  if (type === 'RIMEDIO_CREDITI' && res.output) {
+    const o = res.output;
+    if (o.operazione === 'elenca') return o.testo ? `Situazione dei crediti e rimedi:\n${o.testo}` : 'Adesso non c\'è niente da proporre per i crediti: dillo in una riga.';
+    const det = Array.isArray(o.dettagli) && o.dettagli.length ? `\n${o.dettagli.join('\n')}` : '';
+    return `${o.frase || (res.executed ? 'Fatto.' : 'Non riuscito.')}${det}\nDillo all'utente in una riga, con parole tue; non ripetere l'azione.`;
+  }
   if (type === 'INSTALLA_AGGIORNAMENTO' && res.output && res.output.frase) {
     return `${res.output.frase}\nDillo all'utente in una riga, con parole tue; non ripetere l'azione.`;
   }
