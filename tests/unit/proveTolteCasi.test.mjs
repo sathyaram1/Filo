@@ -546,7 +546,7 @@ test('#747 la pulizia dopo le correzioni toglie il caso dimenticato di un messo 
     const respinta = consegna([]);
     assert.equal(respinta.ferma, true);
     assert.match(respinta.testo, /giro1-r1-r2-ab\.spec\.mjs \(r2\)/, 'rosso è solo il caso di r2, messo da parte: lo dice il suo titolo');
-    assert.match(respinta.testo, /registra\s+la pulizia/);
+    assert.match(respinta.testo, /Registra la pulizia/);
     assert.doesNotMatch(respinta.testo, /correggi finché/i);
 
     t.g('revert', '--no-edit', 'HEAD');
