@@ -351,8 +351,8 @@
     const t = TOKENS[name];
     if (!t) return undefined;
     const o = overrides || {};
-    if (validate(name, o[name])) return String(o[name]).trim();
-    if (t.category && validate(t.category, o[t.category])) return String(o[t.category]).trim();
+    if (validate(name, o[name])) return normalize(name, o[name]);
+    if (t.category && validate(t.category, o[t.category])) return normalize(t.category, o[t.category]);
     return defaultValue(name, theme);
   }
 
