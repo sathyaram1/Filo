@@ -165,9 +165,12 @@
 
     async function complete({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}) {
       const { s, chain } = await chainFor({ action, settings, attempts });
-      const sicuri = await senzaSegreti(messages);
-      const r = await providers().completeWithFallback({ attempts: chain, messages: sicuri, tools, toolChoice, signal, onFallback })
-        .catch((e) => { throw conLaFunzione(e, s, action); });
+      let r;
+      try {
+        r = await providers().completeWithFallback({ attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onFallback });
+      } catch (e) {
+        throw conLaFunzione(e, s, action);
+      }
       return settleChain(s, action, chain, r);
     }
 
