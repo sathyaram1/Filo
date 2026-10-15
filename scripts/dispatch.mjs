@@ -1237,7 +1237,7 @@ export function verifierReplyText(reply, id = '<id>') {
   // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza dei
   // 3 non fermano il lavoro; il server li ha già messi nel feedback dei rimasti.
   const dueDaParte = derivati.filter((d) => d.tipo === 'rimasti')
-    .reduce((n, d) => n + d.rilievi.filter((f) => Number(f.level) === 2 && (f.sede || 'i') === 'i').length, 0);
+    .reduce((n, d) => n + d.rilievi.filter((f) => Number(f.level) === 2 && (f.sede || 'i') === 'i' && !f.decision).length, 0);
   const dueRiga = dueDaParte
     ? `Bilancio delle correzioni di livello 2 finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto è entrato' : `i ${dueDaParte} rilievi interni di livello 2 rimasti sono entrati`} nel feedback dei rimasti (elencato sopra). Il lavoro non si ferma.`
     : null;
