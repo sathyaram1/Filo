@@ -221,3 +221,30 @@ test('la scelta di una funzione vale sopra i predefiniti solo coi modelli che es
   assert.deepEqual(C.effectiveModels({ x: 'a' }, { x: 'b, google/gemma-x' }, reg), { x: 'b, google/gemma-x' });
   assert.deepEqual(C.effectiveModels({ x: 'a' }, { x: '' }, reg), { x: 'a' }, 'vuoto = nessuna scelta');
 });
+
+test('l\'avviso per il modello della chat porta la frase, i rimedi con le cifre e i dettagli; senza rimedi la frase sola', () => {
+  const t = CA.perFilo('Ti restano 400 crediti: al ritmo di oggi finiscono dopodomani.', [
+    { id: 'modello', testo: 'Usa modelli più economici per Chat con Filo', frase: 'circa 205 crediti in meno al giorno', dettagli: ['Chat con Filo: Gemma invece di DeepSeek'], azione: 'applica' },
+    { id: 'attesa', testo: 'Aspetta la quota del giorno: stanotte arrivano 100 crediti', frase: '', azione: null },
+    { id: 'vuoto', testo: '' },
+  ]);
+  assert.match(t, /^Ti restano 400 crediti/);
+  assert.match(t, /- Usa modelli più economici per Chat con Filo \(circa 205 crediti in meno al giorno\)/);
+  assert.match(t, /\n {2}Chat con Filo: Gemma invece di DeepSeek/);
+  assert.match(t, /- Aspetta la quota del giorno/);
+  assert.equal(CA.perFilo('Solo la frase.', []), 'Solo la frase.');
+});
+
+test('RIMEDIO_CREDITI: la chat applica e rimette i rimedi coi pulsanti, costo 1 come il clic', () => {
+  require('../../src/shared/i18n.js');
+  require('../../src/shared/actionLevels.js');
+  require('../../src/shared/actionTools.js');
+  const def = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'win32' }).find((d) => d.function.name === 'RIMEDIO_CREDITI');
+  assert.ok(def, 'strumento RIMEDIO_CREDITI assente');
+  const p = def.function.parameters.properties;
+  assert.deepEqual(p.operazione.enum, ['applica', 'annulla', 'elenca']);
+  assert.deepEqual(p.rimedio.enum, ['modello', 'automatiche']);
+  const L = globalThis.SN_ACTION_LEVELS;
+  assert.equal(L.costoFor({ type: 'RIMEDIO_CREDITI', operazione: 'applica', rimedio: 'modello' }), 1);
+  assert.match(L.describe({ type: 'RIMEDIO_CREDITI', operazione: 'annulla', rimedio: 'modello' }), /modelli di prima/);
+});

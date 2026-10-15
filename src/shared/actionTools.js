@@ -523,7 +523,7 @@
       risultato: true,
     },
     RIMEDIO_CREDITI: {
-      description: 'Fa durare di più i crediti di Filo, come i pulsanti sotto l\'avviso «Ti restano N crediti…» e nella pagina Crediti. Rimedi: modello = usa modelli più economici per le funzioni che consumano di più ("sì, usa i modelli più economici", "rimetti i modelli di prima"); automatiche = spegne le funzioni automatiche che stanno consumando ("spegnile", "riaccendile"). Senza operazione, o con elenca, l\'esito dice la situazione di adesso e i rimedi con le cifre: usalo prima di consigliare o se l\'utente chiede quale funzione consuma di più. Mettere una chiave OpenRouter propria si fa dalla pagina Crediti. Per le soglie e per spegnere l\'avviso si usa IMPOSTA_PREFERENZA.',
+      description: 'Applica o rimette com\'erano i rimedi dell\'avviso dei crediti, come i pulsanti sotto «Ti restano N crediti…» e nella pagina Crediti: fanno durare di più i crediti di Filo. Rimedi: modello = usa modelli più economici per le funzioni che consumano di più ("sì, usa i modelli più economici", "rimetti i modelli di prima"); automatiche = spegne le funzioni automatiche che stanno consumando ("spegnile", "riaccendile"). Senza operazione, o con elenca, l\'esito dice la situazione di adesso e i rimedi con le cifre: usalo prima di consigliare o se l\'utente chiede quale funzione consuma di più. Mettere una chiave OpenRouter propria si fa dalla pagina Crediti. Per le soglie e per spegnere l\'avviso si usa IMPOSTA_PREFERENZA.',
       properties: {
         operazione: S('applica, annulla (rimette com\'era prima del rimedio) oppure elenca.', { enum: ['applica', 'annulla', 'elenca'] }),
         rimedio: S('Per applica e annulla: modello oppure automatiche.', { enum: ['modello', 'automatiche'] }),

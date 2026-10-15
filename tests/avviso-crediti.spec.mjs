@@ -8,7 +8,8 @@
 //      si annullano; lo stesso calo non avvisa due volte, un saldo risalito sopra la soglia sì;
 //  (C) sopra le soglie, con la chiave propria o senza portafoglio: nessun avviso;
 //  (D) soglie, interruttore e spiegazione preparata si cambiano dalle Preferenze;
-//  (E) una home con la conversazione in una scheda dietro le altre non lo prende: arriva la notifica.
+//  (E) una home con la conversazione in una scheda dietro le altre non lo prende: arriva la notifica;
+//  (F) a parole, dopo l'avviso in chat, Filo vede i rimedi, li applica e li rimette come i pulsanti.
 
 import { createServer } from 'node:http';
 import { mkdirSync } from 'node:fs';
@@ -23,6 +24,7 @@ let base = '';
 let redeemed = false;
 let saldo = 400;
 const modelliVisti = [];
+const corpiChat = [];
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -62,7 +64,18 @@ test.beforeAll(async () => {
         const msgs = Array.isArray(body.messages) ? body.messages : [];
         if (JSON.stringify(msgs).includes('preparare la dashboard')) { req.socket.destroy(); return; }
         const last = msgs[msgs.length - 1] || {};
-        if (body.tools && last.role === 'user') modelliVisti.push(body.model);
+        if (body.tools && last.role === 'user') { modelliVisti.push(body.model); corpiChat.push(body); }
+        // A parole: «usa i modelli più economici» e «rimetti i modelli di prima» diventano il rimedio, come farebbe un modello.
+        const detto = last.role === 'user' ? JSON.stringify(last.content || '') : '';
+        const op = /usa i modelli più economici/.test(detto) ? 'applica' : /rimetti i modelli di prima/.test(detto) ? 'annulla' : '';
+        if (body.tools && op && body.stream === true) {
+          res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          const call = { index: 0, id: `c${corpiChat.length}`, type: 'function', function: { name: 'RIMEDIO_CREDITI', arguments: JSON.stringify({ operazione: op, rimedio: 'modello' }) } };
+          res.write(`data: ${JSON.stringify({ id: 'gen-t', provider: 'Fake', choices: [{ delta: { tool_calls: [call] } }] })}\n\n`);
+          res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0 } })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          return res.end();
+        }
         const testo = 'Ecco fatto.';
         if (body.stream !== true) {
           return json(res, 200, { id: 'gen-1', provider: 'Fake', choices: [{ message: { content: testo }, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0 } });
@@ -97,6 +110,7 @@ test.beforeEach(() => {
   redeemed = false;
   saldo = 400;
   modelliVisti.length = 0;
+  corpiChat.length = 0;
 });
 
 async function redirectHosts(app) {
@@ -224,6 +238,45 @@ test('(A) con una conversazione aperta l\'avviso arriva in chat, una volta; il m
   await home.screenshot({ path: `${SHOTS}/chat-scuro.png` });
 });
 
+test('(F) a parole: dopo l\'avviso in chat Filo vede i rimedi, li applica e li rimette, e i pulsanti in chat lo seguono', async ({ app, shell }) => {
+  test.setTimeout(150_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtab(app);
+  await redirectHosts(app);
+  await treGiorniA300(app);
+  saldo = 4000;
+  await riscatta(app);
+  saldo = 400;
+  await passaUnMinuto(app);
+  await scrivi(home, 'ciao');
+  const avviso = home.locator('.dash-crediti-avviso');
+  await expect(avviso).toHaveCount(1, { timeout: 30_000 });
+  await expect(home.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
+
+  // Filo sa cosa ha proposto: nel filo c'è l'avviso intero, rimedi e cifre compresi.
+  await scrivi(home, 'sì, usa i modelli più economici');
+  await expect.poll(() => corpiChat.length, { timeout: 30_000 }).toBe(2);
+  const filo = JSON.stringify(corpiChat[1].messages);
+  expect(filo).toContain('Usa modelli più economici per Chat con Filo');
+  expect(filo).toContain('Gemma 4 31B invece di DeepSeek V4 Pro');
+  // E l'ha fatto: il pulsante sotto l'avviso lo dice, e la chat dopo usa il modello più economico.
+  const modello = avviso.locator('.sn-crediti-rimedio[data-rimedio="modello"]');
+  await expect(modello.locator('button')).toHaveText('Rimetti i modelli di prima', { timeout: 20_000 });
+  await expect(home.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
+  await scrivi(home, 'e adesso?');
+  await expect.poll(() => modelliVisti.length, { timeout: 30_000 }).toBe(3);
+  expect(modelliVisti[2]).toBe('google/gemma-4-31b-it');
+  await expect(home.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
+
+  // A parole si rimette com'era.
+  await scrivi(home, 'rimetti i modelli di prima');
+  await expect(modello.locator('button')).toHaveText('Usa i più economici', { timeout: 20_000 });
+  await expect(home.locator('#sendBtn')).toBeEnabled({ timeout: 20_000 });
+  await scrivi(home, 'e ora?');
+  await expect.poll(() => modelliVisti.length, { timeout: 30_000 }).toBe(5);
+  expect(modelliVisti[4]).toBe('deepseek/deepseek-v4-pro');
+});
+
 test('(B) senza conversazione è una notifica che apre Crediti; lì i rimedi si applicano e si annullano, e lo stesso calo non torna', async ({ app, shell, avvisi }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -251,8 +304,13 @@ test('(B) senza conversazione è una notifica che apre Crediti; lì i rimedi si 
 
   // Spegnere le automatiche che consumano, e riaccenderle.
   const auto = sez.locator('.sn-crediti-rimedio[data-rimedio="automatiche"]');
+  // La pagina si ridisegna a ogni saldo cambiato: un pulsante che non cambia resta lo stesso, o un clic in mezzo va a vuoto.
+  const altroBtn = sez.locator('.sn-crediti-rimedio[data-rimedio="modello"] button');
+  await altroBtn.evaluate((b) => { b.__resta = true; });
   await auto.locator('button', { hasText: 'Spegnile' }).click();
   await expect(auto.locator('button')).toHaveText('Riaccendi');
+  await new Promise((r) => setTimeout(r, 1000));
+  expect(await altroBtn.evaluate((b) => b.__resta === true)).toBe(true);
   const imp = () => app.evaluate(async () => {
     const s = await globalThis.SN_STORAGE.getSettings();
     return { riassunto: s.riassuntoSchede.enabled, anticipata: s.spiegaAnticipata.enabled };
