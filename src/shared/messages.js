@@ -626,10 +626,11 @@
     // fase 2 (`fixInstructions`, vuoto = quello del server):
     //   cap3  giri per i rilievi di livello 3 (a bilancio finito la pratica si
     //         ferma e chiama l'owner);
-    //   cap2  giri per i rilievi di livello 2 (a bilancio finito escono come
-    //         feedback a priorità 2, il lavoro non si ferma);
-    //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
-    //         feedback derivato);
+    //   cap2  giri per i rilievi di livello 2 (a bilancio finito salgono su una
+    //         correzione che parte comunque, se no escono come feedback a
+    //         priorità 2; il lavoro non si ferma);
+    //   cap1  giri per i rilievi di livello 1 (a bilancio finito salgono su una
+    //         correzione che parte comunque, se no vanno nel feedback derivato);
     //   cap0  giri per i soli rilievi di livello 0.
     // Li applica il SERVER quando registra la critica. Owner-only.
     AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap3, cap2, cap1, cap0, fixInstructions, giroStretto } | { ok:false, error }
