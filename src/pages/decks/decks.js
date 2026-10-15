@@ -156,6 +156,10 @@
 
   async function route() {
     const r = parseRoute();
+    // Una rinomina dalla libreria si salva prima che il banco di lavoro rilegga il mazzo, o lo riscriverebbe col nome vecchio.
+    if (libRename) libRename.finish(true);
+    await libSaving;
+    if (r.screen !== 'library') libPriceToken++;
     if (r.screen === 'builder') {
       const [res] = await Promise.all([send({ type: MSG.DECKS_GET, id: r.id }), ensureChatLoaded(r.id)]);
       if (!res || !res.ok) { location.hash = '#/'; return; }
