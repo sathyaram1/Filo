@@ -38,23 +38,45 @@ async function avvia(items) {
     res.end(PAGE);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const app = await electron.launch({
-    args: [...argomentiScala, '.'], cwd: APP_ROOT,
-    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
-  });
-  const shell = await primaFinestra(app);
-  await shell.waitForLoadState('domcontentloaded');
+  const lancia = async () => {
+    const app = await electron.launch({
+      args: [...argomentiScala, '.'], cwd: APP_ROOT,
+      env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+    });
+    const shell = await primaFinestra(app);
+    await shell.waitForLoadState('domcontentloaded');
+    return { app, shell };
+  };
   const ctx = {
-    app, shell, userData,
+    ...(await lancia()),
+    userData,
     url: `http://127.0.0.1:${server.address().port}/p`,
     async web() {
-      await shell.evaluate((u) => window.filoShell.tabs.open(u), ctx.url);
-      const w = await findTabPage(app, '127.0.0.1');
+      await ctx.shell.evaluate((u) => window.filoShell.tabs.open(u), ctx.url);
+      const w = await findTabPage(ctx.app, '127.0.0.1');
       await w.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 20000 });
       return w;
     },
+    // Chiudere Filo e riaprirlo sulla stessa cartella dati.
+    async riapri() {
+      await ctx.app.close();
+      Object.assign(ctx, await lancia());
+    },
+    // Negli appunti di sistema, come dopo «Copia» in un'altra app: chiuso Filo, su X11 restano vuoti.
+    async testoNegliAppunti(t) {
+      await ctx.app.evaluate(({ clipboard }, x) => clipboard.writeText(x), t);
+    },
+    async immagineNegliAppunti([r, g, b]) {
+      await ctx.app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }, [rr, gg, bb]) => {
+        const w = 48, h = 32;
+        const px = Buffer.alloc(w * h * 4);
+        for (let i = 0; i < w * h; i++) px.set([bb, gg, rr, 255], i * 4);
+        const png = nativeImage.createFromBitmap(px, { width: w, height: h }).toPNG();
+        await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+      }, [r, g, b]);
+    },
     async mostraWeb() {
-      await shell.evaluate(async (u) => {
+      await ctx.shell.evaluate(async (u) => {
         const s = await window.filoShell.tabs.snapshot();
         const t = s.tabs.find((x) => String(x.url || '').startsWith(u));
         if (t) await window.filoShell.tabs.activate(t.id);
