@@ -41,6 +41,8 @@
 //   SN_CHAT_ERRORS.rimedioPagina(code) → { dove, url, label } | null
 //     La stessa cosa già pronta da mostrare: ogni superficie usa questa, così
 //     l'indirizzo e l'etichetta non vengono riscritti uno per riquadro.
+//   SN_CHAT_ERRORS.fraseNessunHost({ modello, funzione, motivo, rimedio })
+//     → la frase di un modello che nessun host ammesso serve (#828), la stessa ovunque.
 //
 // Logica PURA: niente I/O, niente Electron → unit-testabile.
 
