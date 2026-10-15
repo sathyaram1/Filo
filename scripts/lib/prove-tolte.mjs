@@ -162,11 +162,12 @@ export function esitoProveTolte({
       supporto
         ? 'Consegna respinta: hai cancellato o cambiato prove del giro, o file di supporto che usano, e com\'erano sul codice nuovo sono ancora rosse.'
         : 'Consegna respinta: hai cancellato o cambiato prove del giro che, com\'erano, sul codice nuovo sono ancora rosse.',
-      rosse.map(riga).join('\n'),
+      proprie.map(riga).join('\n'),
       ...perche,
       ...(supporto ? ['Un file di supporto, della cartella del giro o un aiuto comune dei test, si rimette com\'era allo stesso modo: indebolirlo spegne le prove che lo usano.'] : []),
       'Una prova, o un suo caso, si toglie solo verde, insieme alla prova durevole che la sostituisce.',
-      ...casi,
+      ...casiRestati,
+      ...lasciate,
     ].join('\n'),
   };
 }
