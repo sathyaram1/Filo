@@ -242,4 +242,8 @@ test('le voci del menu della scheda si accendono al passaggio del mouse', async 
   const prima = await fondo();
   await voce.hover();
   await expect.poll(fondo).not.toBe(prima);
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate((t) => window.SN_PAGE_BOOTSTRAP.applyTheme(t), tema);
+    await page.screenshot({ path: `tests/.shots/decks-library-menu-${tema}.png` }).catch(() => {});
+  }
 });
