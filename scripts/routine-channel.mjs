@@ -1587,12 +1587,13 @@ if (isMain) {
       } catch (_) { /* best-effort: la consegna è già registrata */ }
     }
     if (r.outcome === 'ok') {
-      // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
-      // adesso, o crede di averlo mandato in verifica.
+      // Chi consegna una segnalazione deve sapere adesso se il lavoro si è
+      // fermato, o crede di averlo mandato in verifica (o il contrario).
       const fermo = r.reply && r.reply.outcome === 'stop';
       const conSegnalazione = typeof data.segnalazione === 'string' && data.segnalazione.trim();
       if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
-      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non ha fermato il lavoro (server vecchio?).`);
+      else if (conSegnalazione && livSeg.ferma) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la segnalazione era di livello 3 o difficile da disfare, ma il server non ha fermato il lavoro (server vecchio?).`);
+      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. La segnalazione non ferma il lavoro: prosegue con la scelta che hai fatto nel frattempo, e la domanda arriva all'owner in un feedback derivato.`);
       else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
       process.exit(0);
     }
