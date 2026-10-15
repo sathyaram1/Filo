@@ -6,7 +6,7 @@
 const path = require('path');
 const fs = require('fs');
 const Pacchetti = require('./pacchetti');
-const { creaInstallatore } = require('./installa');
+const { creaInstallatore, frase } = require('./installa');
 const { creaMotoreCua } = require('./cua');
 const { creaComputerDriver } = require('./computerDriver');
 const Permessi = require('./permessi');
@@ -33,19 +33,19 @@ function scarica(url, opz) {
 
 const attiva = (s) => !!(s && s.altreApp && s.altreApp.enabled === true);
 
-const motore = creaMotoreCua({
-  eseguibile: () => eseguibileInstallato,
-  idApp: 'ai.filo.desktop',
-  versioneFilo: (() => { try { return require('../../../../package.json').version; } catch (_) { return '0'; } })(),
-  log,
-});
-
 let eseguibileInstallato = null;
 let mancantiLinux = [];
 let provato = false;
 let voluto = null;
 let coda = Promise.resolve();
 const ascoltatori = new Set();
+
+const motore = creaMotoreCua({
+  eseguibile: () => eseguibileInstallato,
+  idApp: 'ai.filo.desktop',
+  versioneFilo: (() => { try { return require('../../../../package.json').version; } catch (_) { return '0'; } })(),
+  log,
+});
 
 async function provaDriver() {
   motore.ferma();
@@ -123,7 +123,7 @@ async function allinea({ avvio }) {
   // All'avvio un'impronta già rifiutata non si riscarica da sola: la riprova la chiede l'utente.
   const p = pacchetto();
   if (avvio && d.errore && d.errore.codice === 'impronta' && p && d.errore.sha256 === p.sha256) {
-    installatore.imposta({ fase: 'errore', errore: { codice: 'impronta', frase: require('./installa').frase('impronta') } });
+    installatore.imposta({ fase: 'errore', errore: { codice: 'impronta', frase: frase('impronta') } });
     return;
   }
   motore.ferma();
@@ -167,7 +167,7 @@ async function statoPerPagina({ verifica = false } = {}) {
   if (verifica && voluto && installatore.stato().fase === 'pronto' && !provato && !installatore.inCorso()) {
     provato = true;
     const r = await provaDriver();
-    if (!r.ok) installatore.imposta({ fase: 'errore', errore: { codice: 'non-parte', frase: require('./installa').frase('non-parte') } });
+    if (!r.ok) installatore.imposta({ fase: 'errore', errore: { codice: 'non-parte', frase: frase('non-parte') } });
     else installatore.imposta({ ...installatore.stato() });
   }
   return statoBreve();

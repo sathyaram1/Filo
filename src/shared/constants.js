@@ -2689,6 +2689,9 @@
       enabled: true,
       shell: 'powershell',
     },
+    // #779 — Filo può usare le altre applicazioni: accesa scarica il driver esterno (src/main/services/altreApp), spenta
+    // lo toglie. Spenta di serie: chi non la accende non scarica niente.
+    altreApp: { enabled: false },
     // Proxy per-tab — "Apri da un altro paese" (vedi proxy-per-tab-spec.md).
     // Endpoint del provider come template URL con {country} sostituito dal
     // codice paese (es. 'socks5://user-{country}:pass@gate.provider.com:7000').
