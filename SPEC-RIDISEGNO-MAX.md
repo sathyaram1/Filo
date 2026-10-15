@@ -390,55 +390,30 @@ Regole collegate:
 
 ## 13. La verifica: critica a livelli, esito del server
 
-I tre esiti scelti dal verificatore (pass / migliorabile / fail) non esistono
-più dal 2026-09-05 (feedback #561). Il racconto di quella decisione sta nella
-storia di git di questo file; qui c'è lo stato vero, in breve, e dove sta il
-resto.
-
-- **Chi verifica scrive una critica, non un verdetto.** Una riga per rilievo,
-  col livello davanti (3/2/1/0; `?` = chiede una decisione dell'owner). Il
-  metro dei livelli sta nel testo del ruolo
-  (`routines/roles/_critica-e-livelli.md`), uno per tutti gli ambiti.
-- **L'esito lo calcola il server** dai livelli e da un bilancio per livello
-  (`cap3`, `cap2`, `cap1`, `cap0`; dal 2026-09-23 solo il 3 ferma a bilancio
-  finito, il 2 esce come feedback a priorità 2): `pass`, `fix` o `stop`. Le regole
-  stanno in `src/shared/verifierRound.js`, che il server incorpora al deploy; i
-  numeri li scrive l'owner in Gestione → Automazioni e non hanno un default nel
-  codice. Un'istanza catturata non può promuoversi da sola: i conti non li fa
-  lei.
-- **Fase 2.** Con esito `fix` corregge lo stesso agente che ha scritto la
-  critica, sui soli rilievi che il server gli rimanda, e consegna con
-  `--record-fixed`. Se correggere non si può senza una decisione, consegna con
-  `--ferma` e una segnalazione: il lavoro aspetta l'owner. Ogni correzione
-  porta a un'altra verifica, fatta da un'altra istanza.
-- **I rilievi non corretti non spariscono**: il server li raccoglie in un
-  feedback derivato per lavoro, figlio `#N.k`, categoria `routine:residuo`. Il
-  verificatore non apre feedback.
-- **Ambiti.** La verifica è piena di serie. Due giri stretti la sostituiscono
-  quando la ricerca larga è già stata fatta: `chiusura` (dopo una correzione,
-  se l'owner ha acceso «Giro stretto dopo una correzione») e `riallineamento`
-  (dopo un conflitto di fusione risolto a mano su un lavoro già verificato).
-  Cambia il perimetro, non il metro; un difetto fuori perimetro vale al massimo
-  livello 1, salvo danno concreto all'utente. L'ambito lo decide il server e
-  viaggia nel payload.
-- **Un solo modello per la verifica**, quello forte: nel laboratorio (§9) i
-  modelli economici non hanno prodotto un rilievo di completezza in 15 corse.
-
-Stati e transizioni del giro: `FEEDBACK-STATES.md`. Cosa viaggia fra server e
-ruoli (`scope`, `perimetro`, `stop`, la risposta alla critica):
-`ROUTINE-AUTH-SPEC.md` §6 e «I livelli sul feedback».
+*Fatto (§14, passo 8).* I rilievi hanno un livello, l'esito lo calcola il server e i
+non corretti vanno in feedback derivati (`routine:residuo`). Regole: `FEEDBACK-STATES.md`,
+`ROUTINE-AUTH-SPEC.md` (§6 e «I livelli sul feedback») e `src/shared/verifierRound.js`.
 
 ## 14. Ordine di esecuzione
 
+*Tutti i passi sono fatti.*
+
 1. La sessione in corso sui feedback (#477.x) finisce. Fino ad allora: solo
    bozze fuori dal repo (questa cartella) e lavoro nel verifier-lab.
+   **Fatto il 2026-08-18.**
 2. Trasloco documenti (unica modifica, contro lo stato del repo a quel punto).
+   **Fatto il 2026-08-18.**
 3. Smontaggio sotto-feedback (prima drenare i .x ancora in volo), riallineo
-   delle due copie della macchina a stati + rideploy.
+   delle due copie della macchina a stati + rideploy. **Fatto il 2026-08-19.**
 4. Pacemaker + ruolo orchestratore + prompt salvato nuovo della routine.
+   **Fatto il 2026-08-19.**
 5. Merge sul server + protezione di `main` (chiusura del buco §10 — priorità
-   alta: è l'unico punto di sicurezza vero dell'elenco).
+   alta: è l'unico punto di sicurezza vero dell'elenco). **Fatto fra il
+   2026-08-20 e il 21.**
 6. Esperimenti sul verificatore nel lab (possono partire anche subito).
+   **Fatto il 2026-08-18** (§9).
 7. Revisione dei prompt dei ruoli (l'owner li legge per la prima volta) con
-   gli esiti del lab.
-8. Critica a livelli ed esito calcolato dal server (§13): fatto.
+   gli esiti del lab. **Fatto fra il 2026-09-20 e il 21** (storia di git di
+   `routines/roles/`).
+8. Critica a livelli ed esito calcolato dal server (§13). **Fatto il
+   2026-09-05** (#561).
