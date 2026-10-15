@@ -60,20 +60,24 @@ export function idDelFile(sessionId, nowMs = Date.now()) {
   return ID_RE.test(s) ? s : `manuale-${Math.round(Number(nowMs) || Date.now())}`;
 }
 
-/** { ticket, fp, natoIl, path } o null se il file non c'è o non ha la forma giusta. */
+/** { ticket, fp, natoIl, trascrizione?, path } o null se il file non c'è o non ha la forma giusta. */
 export function leggiFile(path) {
   try {
     const d = JSON.parse(readFileSync(path, 'utf8'));
     if (!d || typeof d.ticket !== 'string' || d.ticket.length < 32 || !FP_RE.test(String(d.fp || ''))) return null;
-    return { ticket: d.ticket, fp: d.fp, natoIl: Number(d.natoIl) || 0, path };
+    const b = { ticket: d.ticket, fp: d.fp, natoIl: Number(d.natoIl) || 0, path };
+    if (typeof d.trascrizione === 'string' && d.trascrizione) b.trascrizione = d.trascrizione;
+    return b;
   } catch (_) {
     return null;
   }
 }
 
-export function scriviFile(path, { ticket, fp, natoIl }) {
+// `trascrizione`: la trascrizione della sessione che porta il nome del file, il suo segno di vita per la scadenza.
+export function scriviFile(path, { ticket, fp, natoIl, trascrizione }) {
   mkdirSync(resolve(path, '..'), { recursive: true });
-  writeFileSync(path, `${JSON.stringify({ ticket, fp, natoIl }, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  const dati = Object.assign({ ticket, fp, natoIl }, trascrizione ? { trascrizione: String(trascrizione) } : {});
+  writeFileSync(path, `${JSON.stringify(dati, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
 // Lo sporco che il server non ha ancora ricevuto (#1211): una voce per lettura accanto al biglietto, per impronta (la
