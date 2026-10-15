@@ -36,7 +36,7 @@
 //     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff): il feedback va
 //          messo in stato `design`, decide l'utente. Nessuna fusione — ma il
 //          ramo non è perduto: il server apre una richiesta di approvazione
-//          che l'owner trova in cima alla dashboard di gestione.
+//          che l'owner trova nel quadrato rosso della pratica, in cima ai Ricevuti.
 //     20 → conflitto di merge, o unit rossi sul risultato della fusione con main
 //          (#929): il server ha già instradato il riallineamento. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
@@ -491,9 +491,9 @@ async function main() {
   else if (code === 10) {
     console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
     // Il blocco non è più un vicolo cieco: il server apre una richiesta che
-    // l'owner trova in cima alla dashboard di gestione. Dirlo qui evita che
+    // l'owner trova sulla scheda della pratica in Gestione. Dirlo qui evita che
     // chi legge il registro creda che il ramo sia perduto.
-    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
+    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica');
   }
   else if (code === 20 && reply.result === 'unit_rossi') {
     console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
