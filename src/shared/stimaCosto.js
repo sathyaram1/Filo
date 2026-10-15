@@ -205,7 +205,7 @@
     if (aConsumo(action)) {
       const m = c.registro && c.registro[action] && c.registro[action].modelli && c.registro[action].modelli[model];
       if (!m || !(Number(m.usd) > 0)) {
-        return nonNota('consumo', `${unita.p.charAt(0).toUpperCase()}${unita.p.slice(1)} si pagano a durata, non a token: Filo dice il costo di questo modello dopo il primo uso.`);
+        return nonNota('consumo', 'Questa funzione si paga a durata, non a token: Filo dice il costo di questo modello dopo che l\'hai usato.');
       }
       usd = Number(m.usd);
       fonte = 'misura';
