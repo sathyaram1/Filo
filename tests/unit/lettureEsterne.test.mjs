@@ -235,6 +235,10 @@ test('il gancio vero: sporca per pagine web, MCP e file fuori dal repo; per i fi
     assert.deepEqual(prova('Read', { file_path: join(dirname(ROOT), 'LOCAL.md') }), []);
     assert.deepEqual(prova('Read', { file_path: join(casa, '.claude', 'plans', 'p.md') }, { env: { HOME: casa, USERPROFILE: casa } }), []);
     for (const n of ['Bash', 'Grep', 'Glob', 'mcp__ide__getDiagnostics']) assert.deepEqual(prova(n, { command: 'curl x', pattern: 'x', path: fuori }), [], n);
+    assert.deepEqual(prova('SearchPlugins', { query: 'posta' }), ['SearchPlugins']);
+    assert.deepEqual(prova('Agent', { prompt: 'leggi una pagina', isolation: 'remote' }), ['Agent (remote)']);
+    assert.deepEqual(prova('Agent', { prompt: 'leggi una pagina', subagent_type: 'Explore' }), [], 'un sotto-agente locale');
+    assert.deepEqual(prova('Artifact', { file_path: join(fuori, 'p.html'), url: 'https://claude.ai/artifact/x' }), ['Artifact (publish)']);
     assert.deepEqual(prova('WebFetch', { url: 'https://esempio.it' }, { env: { FILO_ROUTINE: '1' } }), [], 'nelle routine c’è il loro biglietto');
     // Il salto per le Read del repo guarda lo strumento chiamato: chiavi uguali nella risposta o nei parametri di un
     // mcp__ non lo attivano (#1211 giro 1).
