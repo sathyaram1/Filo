@@ -144,6 +144,8 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
   sintomo-vs-causa, invarianti UX e deviazioni, i tre testi di consegna, la
   verifica coi suoi minimi. Meno file, meno chiamate, meno modi di sbagliare.
   Nei ruoli restano solo le meccaniche di consegna specifiche.
+  - **Superato** (il condiviso fra i soli ruoli): vedi i file
+    `routines/roles/_*.md`, che dispatch include nei ruoli.
 - Le CICATRICI degli incidenti (chiave ri-prefissata nelle shell nuove,
   rifiuto≠guasto, mai rilanciare dopo un taglio, riga finale = dato) si
   conservano nel file-ruolo a cui insegnano qualcosa. Non si cancellano.
