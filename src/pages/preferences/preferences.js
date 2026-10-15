@@ -1468,6 +1468,15 @@
   let scorciatoieSalvate = {};
   let registrando = null;
 
+  // I moduli dell'Editor tengono le loro combinazioni nei documenti: una delle quattro sopra le spegnerebbe.
+  const COLLEZIONE_EDITOR = 'filo.editor.collection';
+  async function caricaModuliEditor() {
+    try {
+      const r = await chrome.storage.local.get(COLLEZIONE_EDITOR);
+      window.SN_TASTI?.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+    } catch (_) {}
+  }
+
   function rigaScorciatoia(id) {
     return document.querySelector(`#scorciatoieFilo .sc-riga[data-azione="${id}"]`);
   }
