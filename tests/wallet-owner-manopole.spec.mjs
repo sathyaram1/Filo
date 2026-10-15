@@ -1,4 +1,4 @@
-// La pagina «Inviti e utenti» dell'owner (#652): le sette manopole dei crediti
+// La pagina «Inviti e utenti» dell'owner (#652): le manopole dei crediti
 // si cambiano da qui, i numeri che il server calcola si guardano e basta, e
 // ogni riga della tabella apre la scheda della persona.
 //
@@ -71,6 +71,8 @@ function configDiPartenza() {
     maxGrantCredits: 70000,
     rewardFeedbackSent: 10,
     rewardFeedbackClosed: 50,
+    redeemsPerNetwork: 3,
+    redeemsPerNetworkHours: 24,
     invitesRemaining: 9,
     eurUsd: 1.17,
     totalLimitUsd: 4.2,
@@ -238,13 +240,15 @@ async function apriOwner(app) {
   return page;
 }
 
-test('le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
+test('le manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
 
-  // Ci sono tutte e sette, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(7, { timeout: 15_000 });
+  // Ci sono tutte, col valore che ha il server adesso: anche il tetto per rete (#1120).
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(9, { timeout: 15_000 });
+  await expect(page.locator('#knob-redeemsPerNetwork')).toHaveValue('3');
+  await expect(page.locator('#knob-redeemsPerNetworkHours')).toHaveValue('24');
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
@@ -311,6 +315,18 @@ test('le sette manopole si salvano davvero, un numero storto non arriva al serve
   await page.click('#knob-invitesMaxUses-salva');
   await expect(msgUsi).toHaveText('Persone per invito: almeno 1.');
   expect(patch.length).toBe(2);
+
+  // #1120: la finestra per rete non va oltre i 30 giorni che la Privacy promette; dentro, si salva.
+  const msgOre = page.locator('#knob-redeemsPerNetworkHours-msg');
+  await page.fill('#knob-redeemsPerNetworkHours', '721');
+  await page.click('#knob-redeemsPerNetworkHours-salva');
+  await expect(msgOre).toHaveText(/^Finestra per rete, in ore: .*720/);
+  expect(patch.length).toBe(2);
+  await page.fill('#knob-redeemsPerNetworkHours', '48');
+  await page.click('#knob-redeemsPerNetworkHours-salva');
+  await expect(msgOre).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(patch[2].valori).toEqual({ redeemsPerNetworkHours: 48 });
+  expect(configDoc.redeemsPerNetworkHours).toBe(48);
 });
 
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {

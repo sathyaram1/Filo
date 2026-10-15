@@ -150,3 +150,12 @@ test('i riquadri rotti vanno in foto a un modello da soli, col tetto e l\'interr
   const nome = (/options_cookies_riquadri_modello: '([^']+)'/.exec(leggi('src', 'shared', 'i18n.js')) || [])[1];
   legame(true, privacy, `Si spegne da Sicurezza («${nome}»)`, 'interruttore dei riquadri rotti');
 });
+
+// #1120: l'impronta della rete vive quanto la finestra del tetto, e la manopola dell'owner non la può allungare oltre
+// quello che il documento promette. La cancellazione la fa il server (filo-security), che da qui non si legge.
+test('la finestra del tetto per rete non supera i 30 giorni che la Privacy promette', () => {
+  const w = leggi('src', 'shared', 'wallet.js');
+  const m = /chiave: 'redeemsPerNetworkHours'[^}]*max: (\d+)/.exec(w);
+  assert.ok(m, 'la manopola della finestra per rete non c\'è più: togli la frase dalla Privacy');
+  legame(Number(m[1]) <= 30 * 24, privacy, 'mai più di 30 giorni', 'finestra per rete entro 30 giorni');
+});
