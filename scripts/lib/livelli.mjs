@@ -38,3 +38,18 @@ export function leggiTestoLivello(file, nome) {
   }
   return { ok: true, testo };
 }
+
+/**
+ * Una segnalazione è arrivata solo se il server ha fermato il lavoro (#705): con un altro esito l'ha lasciata cadere
+ * (una consegna già registrata, uguale, sullo stesso commit; o un server vecchio), e chi l'ha mandata deve saperlo. PURA.
+ * @returns {string} il testo da stampare, '' se non c'è niente da dire
+ */
+export function segnalazioneNonPresaText(conSegnalazione, reply) {
+  if (!conSegnalazione || (reply && reply.outcome === 'stop')) return '';
+  return [
+    'ATTENZIONE: la segnalazione NON è arrivata all\'owner e il lavoro NON si è fermato: il server ha risposto alla consegna',
+    'senza prenderla (succede quando la stessa consegna era già registrata su questo commit, o con un server vecchio).',
+    'Rimandarla non serve, il server la riconosce come la stessa: dichiaralo nel rilascio del biglietto con --guasto e',
+    'questa frase: «segnalazione non presa dal server, il lavoro non si è fermato».',
+  ].join('\n');
+}
