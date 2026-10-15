@@ -712,8 +712,9 @@ fila delle forme della scheda):
   (un 3, o difficile; senza livello ferma, come gli strumenti di prima); negli
   altri casi la consegna segue il suo esito normale e la segnalazione apre un
   feedback derivato con la domanda, perché chi l'ha scritta ha già applicato la
-  scelta che consiglia. I due campi non vanno in `livelli.l3`, le cui chiavi
-  le regole di Firestore contano.
+  scelta che consiglia. Se il server li salva in `livelli.l3`, vanno allargate
+  anche le regole di Firestore (`livelloValido` ammette solo `esito`, `at`,
+  `ruolo`, `by`, `testo`).
 - `fixed` accetta `stop: true`, solo insieme a `segnalazione`: chi corregge
   dichiara che non può andare avanti senza una decisione. Il server risponde
   `{ outcome: 'stop' }` e porta il feedback in attesa dell'owner invece che a
