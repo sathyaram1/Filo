@@ -998,6 +998,17 @@ export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
     return `${quale}: c'è un rebase in corso${di}. ${nulla}\n`
       + 'Finiscilo (risolvi i file in conflitto, `git add`, `git rebase --continue`), controlla che la cartella sia tornata sul ramo, poi rilancia lo stesso comando.';
   }
+  if (x.motivo === 'cartella') {
+    const ramo = x.current ? ` (ramo "${x.current}")` : '';
+    const sul = x.assigned ? `, sul ramo assegnato "${x.assigned}"` : '';
+    const testa = `${quale}: la consegna parte dalla cartella "${x.cartella}"${ramo}, ma il lavoro si consegna dalla cartella in cui è stato posizionato, "${x.radice}"${sul}. ${nulla}\n`;
+    if (x.escalated) {
+      const nonArrivata = sospesa && !sospesa.ok ? ` (ma la sospensione non è arrivata al server: ${sospesa.motivo || 'motivo ignoto'})` : '';
+      return `${testa}Rifiuto ${x.count} di fila: la lavorazione automatica di questo feedback è sospesa e passa all'owner${nonArrivata}. Non rilanciare: rilascia il biglietto.`;
+    }
+    const conta = x.count ? ` Rifiuto ${x.count} di ${IDENTITY_REJECT_LIMIT}: al ${IDENTITY_REJECT_LIMIT}° di fila il lavoro passa all'owner.` : '';
+    return `${testa}Porta lì i commit del lavoro (\`git -C "${x.radice}" cherry-pick <i tuoi commit>\`), poi rilancia lo stesso comando da "${x.radice}".${conta}`;
+  }
   if (x.motivo === 'dichiarato') {
     return `${quale}: hai dichiarato il ramo "${x.declared}", ma la cartella è sul ramo "${x.current}". ${nulla} Il ramo lo legge lo strumento dalla cartella: uno dichiarato può solo confermarlo.\n`
       + (x.assigned && x.assigned === x.current
