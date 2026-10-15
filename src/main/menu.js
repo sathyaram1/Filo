@@ -102,6 +102,24 @@ async function staScrivendo(wc) {
   }
 }
 
+// Le Preferenze stanno registrando una scorciatoia (#842): su Mac la barra vede il tasto prima della pagina, che
+// deve poterlo rifiutare col perché invece di vedere aprirsi una scheda. Il tasto le arriva com'è stato premuto.
+function oRegistra(accel, fa, mac, aFuoco = contenutoAFuoco) {
+  return (...args) => {
+    const wc = aFuoco();
+    if (!wc || !require('./shortcuts').staRegistrandoTasti(wc)) return fa(...args);
+    const pezzi = String(accel).split('+');
+    const keyCode = pezzi.pop();
+    const nomi = { commandorcontrol: mac ? 'meta' : 'control', cmd: 'meta', command: 'meta', ctrl: 'control', control: 'control', alt: 'alt', shift: 'shift' };
+    const modifiers = pezzi.map((m) => nomi[m.toLowerCase()]).filter(Boolean);
+    try {
+      wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers });
+      wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers });
+    } catch (_) {}
+    return undefined;
+  };
+}
+
 // ─── le azioni, le stesse delle scorciatoie ─────────────────────────────────
 
 function nuovaScheda() {
@@ -303,7 +321,11 @@ function template(piattaforma) {
     ],
   };
 
-  return [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
+  const barra = [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
+  for (const m of barra) {
+    for (const v of m.submenu || []) if (v.accelerator && typeof v.click === 'function') v.click = oRegistra(v.accelerator, v.click, MAC);
+  }
+  return barra;
 }
 
 // Da chiamare una volta sola, dopo `app.whenReady()`.
@@ -328,4 +350,4 @@ function installaMenuApplicazione() {
   } catch (_) {}
 }
 
-module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo };
+module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo, oRegistra };

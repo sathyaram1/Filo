@@ -205,7 +205,7 @@
   const NOMI_AZIONE_FILO = {
     'explain-selection': ['spiega', 'spiegazione', 'spiegare', 'approfondisci', 'approfondimento'],
     'translate-selection': ['traduci', 'traduzione', 'tradurre'],
-    'save-for-later': ['salva per dopo', 'salvare per dopo', 'salva', 'aperti per dopo'],
+    'save-for-later': ['salva per dopo', 'salvare per dopo', 'salva'],
     'open-help-sidebar': ['aiuto', 'assistente laterale', 'barra dell aiuto'],
   };
   const DI_SERIE = /^(?:(?:tutte|tutti|le scorciatoie|scorciatoie)\s+)?(?:di serie|come di serie|predefinit[aeio]|default|originali?|standard|come prima|ripristina(?:te)?|azzera(?:te)?|reset)$/;

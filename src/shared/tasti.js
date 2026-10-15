@@ -35,8 +35,8 @@
 //
 // QUELLO CHE UNA PAGINA NON PUÒ AVERE
 //   `riservato()` dice se una combinazione arriva mai a una pagina. Serve a chi
-//   fa scegliere una scorciatoia all'utente (le scorciatoie dei moduli
-//   dell'Editor): senza, la scorciatoia si salva, sembra valida e non parte mai
+//   fa scegliere una scorciatoia all'utente (i moduli dell'Editor, le quattro
+//   azioni di Filo): senza, la scorciatoia si salva, sembra valida e non parte mai
 //   — su Mac perché la barra dei menu la intercetta prima, ovunque perché è un
 //   tasto che Filo si tiene per sé.
 

@@ -215,3 +215,22 @@ test('il main ascolta i tasti delle quattro solo da SN_TASTI, e lo fa sapere a c
     assert.match(readFileSync(join(ROOT, ...rel), 'utf8'), /staRegistrandoTasti\(wc\)/, rel.join('/'));
   }
 });
+
+test('su Mac la barra dei menu, che vede i tasti per prima, li rigira alle Preferenze che stanno registrando', () => {
+  const { oRegistra } = require(join(ROOT, 'src', 'main', 'menu.js'));
+  const { registraTasti } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
+  const mandati = [];
+  const wc = { sendInputEvent: (e) => mandati.push(e) };
+  let fatto = 0;
+  const voce = oRegistra('CommandOrControl+Shift+T', () => { fatto += 1; }, true, () => wc);
+  voce();
+  assert.equal(fatto, 1, 'senza registrazione la voce fa la sua cosa');
+  registraTasti(wc, true);
+  voce();
+  assert.equal(fatto, 1, 'mentre si registra la voce non apre la scheda');
+  assert.deepEqual(mandati.map((e) => [e.type, e.keyCode, e.modifiers.join('+')]),
+    [['keyDown', 'T', 'meta+shift'], ['keyUp', 'T', 'meta+shift']]);
+  registraTasti(wc, false);
+  voce();
+  assert.equal(fatto, 2);
+});
