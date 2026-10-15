@@ -141,6 +141,28 @@ test('sul conto restano meno dei crediti vivi: l’allarme sta in cima e i riqua
   await page.screenshot({ path: 'tests/.shots/wallet-owner-conto-allarme.png', fullPage: true });
 });
 
+test('dal conto che non regge si va a ricaricarlo: bottone nell’allarme e tasto destro sui riquadri del conto', async ({ app, openTab }) => {
+  stato.account = CONTO_CORTO;
+  const page = await apriOwner(app, openTab);
+  const aperti = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => w.getURL()));
+  await page.locator('#ownerAllarme #ownerRicarica').click();
+  await expect.poll(async () => (await aperti()).some((u) => u.startsWith('https://openrouter.ai/settings/credits')), { timeout: 10_000 }).toBe(true);
+
+  await riquadro(page, 'restano sul conto').click({ button: 'right' });
+  await expect(page.locator('.sn-wallet-ctx .sn-select-option', { hasText: 'Ricarica il conto su OpenRouter' })).toBeVisible();
+  await expect(page.locator('.sn-wallet-ctx .sn-select-option', { hasText: 'Copia il numero' })).toBeVisible();
+  await page.screenshot({ path: 'tests/.shots/wallet-owner-conto-ricarica.png', fullPage: true });
+
+  // Conto non letto: niente numero da copiare, la ricarica resta.
+  stato.account = undefined;
+  await page.reload();
+  await expect(page.locator('#ownerConto .sn-wallet-numero')).toHaveCount(4, { timeout: 15_000 });
+  await expect(page.locator('#ownerRicarica')).toHaveCount(0);
+  await riquadro(page, 'restano sul conto').click({ button: 'right' });
+  await expect(page.locator('.sn-wallet-ctx .sn-select-option', { hasText: 'Ricarica il conto su OpenRouter' })).toBeVisible();
+  await expect(page.locator('.sn-wallet-ctx .sn-select-option', { hasText: 'Copia il numero' })).toHaveCount(0);
+});
+
 test('conto non letto: trattini e una frase, mai uno zero; né col campo che manca né con OpenRouter che non risponde', async ({ app, openTab }) => {
   stato.account = undefined;
   const page = await apriOwner(app, openTab);
