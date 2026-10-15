@@ -1826,7 +1826,7 @@
       && TranslatePage.showsRestore();
     if (TranslatePage && typeof TranslatePage.canContinue === 'function'
         && TranslatePage.canContinue() && !iconIsRestore) {
-      items.push(TranslatePage.buildRestoreOriginalItem());
+      sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
     }
 
     // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
