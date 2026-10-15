@@ -41,6 +41,8 @@ nati da quei vincoli invece di adattarli.
 
 ## 2. Niente ripresa del lavoro interrotto
 
+*Fatto (§14, passo 4); oggi in `routines/roles/orchestrator.md`, «Regole dure».*
+
 Il lavoro di una sessione morta a metà SI BUTTA: claim rilasciato, ramo
 abbandonato, si riparte da capo al giro dopo. Riprendere il codice senza il
 ragionamento che l'ha prodotto è peggio che rifare. La politica è sostenibile
