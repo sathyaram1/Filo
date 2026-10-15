@@ -121,7 +121,7 @@
   flex: 0 0 auto;
   color: var(--sn-muted);
   font-size: 11px;
-  transition: transform 120ms ease;
+  transition: transform calc(120ms * var(--sn-motion, 1)) ease;
 }
 .sn-select-wrap.sn-open .sn-select-chevron {
   transform: rotate(180deg);
@@ -203,7 +203,7 @@
   border-radius: var(--sn-radius);
   font: inherit;
   outline: none;
-  transition: border-color 0.12s ease;
+  transition: border-color calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .sn-rinomina-campo:focus { border-color: var(--sn-accent); }
 .sn-rinomina-campo:disabled { opacity: 0.6; }
@@ -215,7 +215,7 @@
   border-radius: var(--sn-radius);
   font: inherit;
   cursor: pointer;
-  transition: opacity 0.12s ease, background 0.12s ease;
+  transition: opacity calc(0.12s * var(--sn-motion, 1)) ease, background calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .sn-rinomina-ok { background: var(--sn-btn-bg); color: var(--sn-btn-fg); border: 1px solid transparent; }
 .sn-rinomina-ok:hover:not(:disabled) { opacity: 0.85; }
@@ -233,7 +233,7 @@
   border: 2px solid var(--sn-border);
   border-top-color: var(--sn-accent);
   border-radius: 50%;
-  animation: sn-rinomina-gira 0.8s linear infinite;
+  animation: sn-rinomina-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
 }
 @keyframes sn-rinomina-gira { to { transform: rotate(360deg); } }
 

@@ -59,7 +59,7 @@ body {
   box-shadow: var(--ombra);
   text-align: center;
   outline: none;
-  animation: entra 0.16s ease-out;
+  animation: entra calc(0.16s * var(--sn-motion, 1)) ease-out;
 }
 #carta[hidden], #conferma[hidden] { display: none; }
 @keyframes entra { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
@@ -81,7 +81,7 @@ h1 { font: 700 22px/1.25 var(--font); color: var(--accento); margin: 0 0 10px; o
   box-sizing: border-box;
   color: var(--testo);
   background: var(--campo);
-  transition: border-color 0.15s ease;
+  transition: border-color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 #parola:hover, #parola:focus { border-color: var(--accento); }
 
@@ -92,7 +92,7 @@ button {
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, transform calc(0.15s * var(--sn-motion, 1)) ease, filter calc(0.15s * var(--sn-motion, 1)) ease;
 }
 button:hover { transform: translateY(-1px); filter: brightness(1.08); }
 button:active { transform: translateY(0); }

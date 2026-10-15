@@ -43,7 +43,7 @@
     .fb-imgs img.fb-img-loading {
       width: 140px; height: 100px; object-fit: contain; cursor: default;
       background: var(--sn-surface-2, rgba(127,127,127,.08));
-      animation: fbImgPulse 1.2s ease-in-out infinite;
+      animation: fbImgPulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes fbImgPulse { 0%,100% { opacity: .55; } 50% { opacity: .85; } }
     .fb-img-broken {
@@ -100,7 +100,7 @@
     .fb-act--busy { position: relative; }
     .fb-act--busy::after {
       content: '…'; margin-left: 6px;
-      animation: fb-pulse 900ms ease-in-out infinite;
+      animation: fb-pulse calc(900ms * var(--sn-motion, 1)) ease-in-out infinite;
     }
     @keyframes fb-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
     .fb-card--decisa { opacity: 0.55; }
@@ -193,7 +193,7 @@
     .fb-attach-thumb img.fb-img-loading {
       object-fit: contain; cursor: default;
       background: var(--sn-surface-2, rgba(127,127,127,.08));
-      animation: fbImgPulse 1.2s ease-in-out infinite;
+      animation: fbImgPulse calc(1.2s * var(--sn-motion, 1)) ease-in-out infinite;
     }
     .fb-attach-thumb .fb-img-broken {
       width: 64px; height: 64px; font-size: 10px; line-height: 1.2;
@@ -302,7 +302,7 @@
     .fb-dot {
       width: 13px; height: 13px; padding: 0; border-radius: 50%;
       border: 1px solid var(--sn-muted); background: transparent;
-      cursor: pointer; box-sizing: border-box; transition: background 0.1s, border-color 0.1s;
+      cursor: pointer; box-sizing: border-box; transition: background calc(0.1s * var(--sn-motion, 1)), border-color calc(0.1s * var(--sn-motion, 1));
     }
     .fb-dot:hover { border-color: var(--sn-accent); }
     .fb-dot--on { background: var(--sn-accent); border-color: var(--sn-accent); }

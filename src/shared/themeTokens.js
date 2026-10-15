@@ -157,6 +157,22 @@
       dashCss: ['--dash-radius'],
       default: '6px',
     },
+    // Moltiplica OGNI durata di transition/animation (sentinella: tests/unit/motionSentinella.test.mjs).
+    motion: {
+      label: 'Durata delle animazioni',
+      type: 'factor',
+      css: '--sn-motion',
+      shellCss: ['--sn-motion'],
+      default: '1',
+    },
+    // Alfa dell'ombra di menu e popup; le altre ombre ne seguono la proporzione (--sn-ombra in theme.css).
+    shadow: {
+      label: 'Intensità delle ombre',
+      type: 'opacity',
+      css: '--sn-shadow-opacity',
+      shellCss: ['--sn-shadow-opacity'],
+      default: '0.18',
+    },
 
     // ── token specifici (ereditano dalla categoria) ────────────────────────
     'button.bg': {

@@ -81,7 +81,7 @@ html[data-chrome-compact="1"] .addr {
   background: var(--accent);
   opacity: 0.5;
   cursor: pointer;
-  transition: opacity 0.15s ease, width 0.15s ease;
+  transition: opacity calc(0.15s * var(--sn-motion, 1)) ease, width calc(0.15s * var(--sn-motion, 1)) ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
@@ -155,7 +155,7 @@ html[data-chrome-compact="1"] .addr {
   font-size: 13px;
   color: var(--fg-soft);
   cursor: default;
-  transition: background 0.1s ease;
+  transition: background calc(0.1s * var(--sn-motion, 1)) ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
   /* Contenitore delle priorità delle icone (sotto); la larghezza che chiede alla striscia la calcola shell.js. */
@@ -164,7 +164,7 @@ html[data-chrome-compact="1"] .addr {
 }
 
 .tab.audible {
-  animation: tab-glow-pulse 2.4s ease-in-out infinite;
+  animation: tab-glow-pulse calc(2.4s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 .tab:hover { background: color-mix(in srgb, var(--tab-bg-eff) 85%, var(--bg)); }
 /* Scheda col colore del sito, attiva o no: titolo, crocetta e indicatori prendono l'inchiostro che shell.js
@@ -210,7 +210,7 @@ html[data-chrome-compact="1"] .addr {
 }
 
 .tab.active.audible {
-  animation: tab-glow-pulse 2.4s ease-in-out infinite;
+  animation: tab-glow-pulse calc(2.4s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 
 .tab::after {
@@ -304,7 +304,7 @@ html[data-chrome-compact="1"] .addr {
   border: 2px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+  animation: spin calc(0.6s * var(--sn-motion, 1)) linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -532,7 +532,7 @@ html[data-incognito="1"] {
    regione draggabile, che il compositore disegna SOPRA ogni velo: si scurisce solo col filtro. */
 html[data-feedback-dim="1"] .shell {
   filter: brightness(0.82);
-  transition: filter 120ms ease-out;
+  transition: filter calc(120ms * var(--sn-motion, 1)) ease-out;
 }
 
 /* Durante l'annotazione si disegna a mano libera anche su tab e barra indirizzi. Serve il no-drag,
@@ -604,11 +604,11 @@ html[data-feedback-dim="1"] .shell {
   height: 100%;
   width: 0%;
   background: var(--accent);
-  transition: width 0.2s ease;
+  transition: width calc(0.2s * var(--sn-motion, 1)) ease;
 }
 .dl-indicator.indeterminate .dl-ind-fill {
   width: 40% !important;
-  animation: dlIndet 1.1s ease-in-out infinite;
+  animation: dlIndet calc(1.1s * var(--sn-motion, 1)) ease-in-out infinite;
 }
 @keyframes dlIndet {
   0%   { transform: translateX(-110%); }
@@ -678,8 +678,8 @@ html[data-feedback-dim="1"] .shell {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   overflow: hidden;
 }
-.dl-row-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s ease; }
-.dl-row-bar.indeterminate .dl-row-fill { width: 40%; animation: dlIndet 1.1s ease-in-out infinite; }
+.dl-row-fill { height: 100%; width: 0%; background: var(--accent); transition: width calc(0.2s * var(--sn-motion, 1)) ease; }
+.dl-row-bar.indeterminate .dl-row-fill { width: 40%; animation: dlIndet calc(1.1s * var(--sn-motion, 1)) ease-in-out infinite; }
 .dl-row-meta { font: 11px/1.2 system-ui, sans-serif; color: var(--fg-soft); }
 .dl-row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 1px; }
 .dl-row-btn {
@@ -710,7 +710,7 @@ html[data-feedback-dim="1"] .shell {
   color: var(--fg);
   cursor: pointer;
   outline: none;
-  transition: background 0.12s ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
 }
 .dl-row-menu-voce:hover,
 .dl-row-menu-voce:focus-visible { background: var(--tab-bg); }
@@ -781,7 +781,7 @@ html[data-feedback-dim="1"] .shell {
   color: var(--fg);
   font: inherit;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+  transition: background-color calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease, transform calc(120ms * var(--sn-motion, 1)) ease;
 }
 .permesso-btn:hover:not(:disabled) { background: rgba(var(--accent-rgb), 0.12); }
 .permesso-btn:active:not(:disabled) { transform: scale(0.97); }
@@ -806,7 +806,7 @@ html[data-feedback-dim="1"] .shell {
   border: 1px solid var(--accent);
   color: var(--fg);
   cursor: pointer;
-  animation: ringPulse 1.1s ease-in-out infinite;
+  animation: ringPulse calc(1.1s * var(--sn-motion, 1)) ease-in-out infinite;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
