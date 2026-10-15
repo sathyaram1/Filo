@@ -13,6 +13,8 @@ const FM = () => globalThis.SN_FILO_MEMORY;
 function voceDa(input) {
   const host = T().hostTenuto(input);
   if (!host) return '';
+  // Una macchina senza punto (localhost, il NAS) non ha suffissi pubblici: per la lista sarebbe un dominio di primo livello.
+  if (!host.includes('.') || host.startsWith('[')) return host;
   const sotto = getDomainInfo(`a.${host}`, { soloPsl: true });
   return sotto && sotto.registrable === `a.${host}` ? '' : host;
 }
