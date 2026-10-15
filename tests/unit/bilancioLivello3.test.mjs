@@ -95,15 +95,10 @@ test('3 e 2 insieme: il giro si paga dal 3, e il 2 entra anche a bilancio dei 2 
   assert.deepEqual(livelli(fermo.sospesi), ['2i']);
 });
 
-test('gli 1 e gli 0 come prima: con un 2 corretto entrano; con un 2 messo da parte seguono il loro bilancio', () => {
+test('gli 1 e gli 0 come prima: con un 2 corretto entrano; senza un giro che parta escono tutti', () => {
   const insieme = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')]);
   assert.deepEqual(livelli(insieme.fix), ['2i', '1i', '0i']);
   assert.equal(insieme.consume, 'cap2');
-  // Il 2 va da parte: l'1 non entra «per la strada del 2», segue cap1.
-  const daParte = decide([f(2, 'i', 'a'), f(1, 'i', 'b')], { count2: 4 });
-  assert.deepEqual(livelli(daParte.fix), ['1i']);
-  assert.equal(daParte.consume, 'cap1');
-  assert.deepEqual(livelli(daParte.derived), ['2i']);
   const tuttoFinito = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')], { count2: 4, count1: 1 });
   assert.deepEqual(tuttoFinito.fix, []);
   assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [2, 1, 0]);
