@@ -40,3 +40,42 @@ export function leggiTestoLivello(file, nome) {
   }
   return { ok: true, testo };
 }
+
+// La regola che decide se una segnalazione ferma è quella del server (src/shared/verifierRound.js); senza il modulo
+// si presume che fermi, come prima di #1202.
+const segnalazioneFerma = (() => {
+  try {
+    createRequire(import.meta.url)(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'verifierRound.js'));
+    const R = globalThis.SN_VERIFIER_ROUND;
+    if (R && typeof R.segnalazioneFerma === 'function') return R.segnalazioneFerma;
+  } catch (_) { /* paracadute */ }
+  return () => true;
+})();
+
+export const SPIEGAZIONE_LIVELLO_SEGNALAZIONE = 'Con 3, o con --difficile (una scelta difficile da disfare: dati degli utenti, sicurezza, formati salvati su disco), il lavoro si ferma e aspetta l\'owner; con 2, 1 o 0 va avanti con la scelta che hai fatto nel frattempo, e la segnalazione diventa un feedback derivato con la domanda.';
+
+/**
+ * `--livello <0-3>` e `--difficile` accompagnano `--segnala`: il livello del problema e il segno «difficile da
+ * disfare», da cui il server decide se fermare. Senza livello la consegna si rifiuta qui: un default lo
+ * sceglierebbe al posto di chi segnala. PURA, a parte la regola caricata sopra.
+ * @param {{ livello?: string|number|boolean, difficile?: unknown, conSegnalazione: boolean }} p
+ * @returns {{ ok:true, campi:object, ferma:boolean }|{ ok:false, message:string }}
+ */
+export function livelloSegnalazione({ livello, difficile, conSegnalazione } = {}) {
+  if (!conSegnalazione) {
+    if (livello !== undefined || difficile !== undefined) {
+      return { ok: false, message: '--livello e --difficile accompagnano --segnala <file.md> (il livello del problema segnalato): da soli non hanno dove andare, e non ho consegnato niente.' };
+    }
+    return { ok: true, campi: {}, ferma: false };
+  }
+  if (difficile !== undefined && difficile !== true) {
+    return { ok: false, message: '--difficile non vuole un valore: c\'è o non c\'è. Non ho consegnato niente.' };
+  }
+  const testo = String(livello ?? '').trim();
+  if (livello === undefined || livello === true || !/^[0-3]$/.test(testo)) {
+    return { ok: false, message: `--segnala vuole anche --livello <0-3>, il livello del problema segnalato col metro dei rilievi${livello === undefined || livello === true ? '' : ` (letto: «${testo.slice(0, 20)}»)`}. ${SPIEGAZIONE_LIVELLO_SEGNALAZIONE} Non ho consegnato niente.` };
+  }
+  const level = Number(testo);
+  const campi = { segnalazioneLivello: level, ...(difficile === true ? { segnalazioneDifficile: true } : {}) };
+  return { ok: true, campi, ferma: segnalazioneFerma({ level, difficile: difficile === true }) };
+}
