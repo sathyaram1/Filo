@@ -233,11 +233,11 @@ export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '', 
     padre = gitOut(['rev-parse', '-q', '--verify', `${head}^1`], root).trim();
     execFileSync('git', ['merge-base', '--is-ancestor', critica, padre], { cwd: root, stdio: 'ignore' });
   } catch (_) { padre = ''; }
-  const dopo = padre && padre !== critica ? soloProveTolte(diffDopoLaVerifica(padre, head, root)) : null;
+  const vociDopo = padre && padre !== critica ? diffDopoLaVerifica(padre, head, root) : null;
+  const dopo = vociDopo ? soloProveTolte(vociDopo) : null;
   if (!dopo || !dopo.ok) {
     return { ok: false, motivo: `il commit della pulizia deve solo togliere prove del giro, e qui ${dopo ? `nell'ultimo commit ${dopo.motivo}` : tol.motivo}. Dopo una correzione la pulizia è un commit a parte, l'ultimo, che toglie solo prove del giro.` };
   }
-  const vociDopo = diffDopoLaVerifica(padre, head, root);
   const supporto = supportoDelGiro(dopo.files);
   if (supporto.length) {
     return { ok: false, motivo: `dopo le correzioni la pulizia toglie solo prove o loro casi, non righe di un file di supporto: ${supporto.join(', ')}. Annulla il commit (\`git revert --no-edit HEAD\`) e rifallo senza.` };
