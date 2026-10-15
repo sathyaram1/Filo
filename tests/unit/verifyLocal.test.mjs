@@ -27,7 +27,6 @@ const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o 
 // Il server finto che serve config/routines ai comandi del CLI (processo
 // separato: i comandi si lanciano in modo sincrono). Vale per tutto il file.
 import { avviaConfigRoutinesFinto as fintoConfigRoutines } from '../helpers/server-finto.mjs';
-import { faiLaLettura } from '../helpers/letturaDiff.mjs';
 const FINTO = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify(CAPS_TEST) });
 process.env.FILO_ROUTINE_CONFIG_URL = FINTO.url;
 process.env.FILO_ADMIN_ID_TOKEN = 'finto-id-token';
@@ -133,24 +132,29 @@ test('withFixed senza un giro aperto: rifiutata', () => {
   assert.equal(withFixed(s, 'r', { report: 'x', sha: SHA }).ok, false);
 });
 
-test('un 3 a bilancio esaurito, o un 2 col segno ?!: esito stop; un 2 a bilancio esaurito passa e mette da parte', () => {
+test('un 3 a bilancio esaurito, o un 2 col segno ?: esito stop; un 2 a bilancio esaurito passa e mette da parte', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   s.r.counts = { count3: 5 };
   const r = withCritique(s, 'r', { critique: '[3i] ancora rotto', sha: SHA });
   assert.equal(r.outcome, 'stop');
   assert.equal(r.state.r.verdict, 'fail');
   assert.match(checkVerdict(r.state.r, SHA).reason, /bocciato/);
-  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?!] quale formato su disco?', sha: SHA });
+  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada?', sha: SHA });
   assert.equal(d.outcome, 'stop');
-  // Senza il segno «!» un 2 col ? non ferma più (#1202): si corregge con l'opzione consigliata.
-  const q = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada? Consiglio A.', sha: SHA });
-  assert.equal(q.outcome, 'fix');
-  // Il 2 a bilancio dei 2 finito non ferma (2026-09-23): esce a parte, a priorità 1 (la 2 è del manutentore).
+  // Il 2 a bilancio dei 2 finito non ferma (2026-09-23): esce a parte, a priorità 2.
   let due = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   due.r.counts = { count2: 5 };
   const p = withCritique(due, 'r', { critique: 'P.\n[2i] ancora rotto', sha: SHA });
   assert.equal(p.outcome, 'pass');
-  assert.deepEqual(p.state.r.derived.map((x) => [x.level, x.priority]), [[2, 1]]);
+  assert.deepEqual(p.state.r.derived.map((x) => [x.level, x.priority]), [[2, 2]]);
+  // Se un 1 fa partire la correzione col suo bilancio, il 2 ci sale (#744).
+  let sale = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  sale.r.counts = { count2: 5 };
+  const q = withCritique(sale, 'r', { critique: 'P.\n[2i] ancora rotto\n[1i] bordo storto', sha: SHA });
+  assert.equal(q.outcome, 'fix');
+  assert.deepEqual(q.state.r.rounds.at(-1).fixed, [2, 1]);
+  assert.equal(q.state.r.rounds.at(-1).consumed, 'cap1');
+  assert.deepEqual([q.state.r.counts.count2, q.state.r.counts.count1], [5, 1]);
 });
 
 test('i rilievi fuori dal giro restano in `derived` per il report', () => {
@@ -474,7 +478,7 @@ test('#561 giro 3: dopo un pass (o uno stop) una seconda critica senza un nuovo 
   assert.match(ripensa.reason, /start/);
   assert.equal(ripensa.state.r.verdict, 'pass', 'il pass registrato resta quello');
   assert.equal(ripensa.state.r.counts.count2 || 0, 0, 'nessun giro pagato');
-  const fermo = withCritique(s, 'r', { critique: 'P.\n[3i?] scelta', sha: SHA });
+  const fermo = withCritique(s, 'r', { critique: 'P.\n[2i?] scelta', sha: SHA });
   assert.equal(fermo.outcome, 'stop');
   assert.equal(withCritique(fermo.state, 'r', { critique: 'Regge.', sha: SHA }).ok, false);
   // Dopo start la critica di un'altra istanza passa.
@@ -554,7 +558,6 @@ function depositoUsaEGetta() {
 // ragione (una verifica di due parole non è una verifica).
 const LUNGA_FIX = 'Provato inserimento, tasto destro, tema scuro e finestra stretta: il resto regge bene.\n[2i] rotto';
 function vl(casa, ...args) {
-  if (args[0] === 'critica') faiLaLettura(casa);
   try {
     return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
@@ -618,36 +621,18 @@ test('CLI: una motivazione di due parole è respinta, sia per promuovere sia per
 // caratteri, e i rilievi (in coda) sparivano dal brief del verificatore dopo.
 
 test('una critica lunga entra INTERA nella storia; oltre il tetto è respinta col numero, non tagliata', async () => {
-  const { MAX_CRITIQUE_BYTES, leggiCoda } = await import('../../scripts/verify-local.mjs');
+  const { MAX_CRITIQUE_CHARS, leggiCoda } = await import('../../scripts/verify-local.mjs');
   const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
   const riassunto = 'provato '.repeat(700); // ~5600 caratteri: sopra il vecchio taglio a 4000
   const lunga = withCritique(s, 'r', { critique: `${riassunto}\n[2i] LA PORTA ROSSA: il salvataggio non salva col titolo vuoto`, sha: SHA });
   assert.equal(lunga.outcome, 'fix');
   assert.match(lunga.state.r.critique, /LA PORTA ROSSA/, 'il rilievo in coda sopravvive: non si taglia');
-  const troppa = withCritique(s, 'r', { critique: `${'x'.repeat(MAX_CRITIQUE_BYTES + 1)}\n[2i] rotto`, sha: SHA });
+  const troppa = withCritique(s, 'r', { critique: `${'x'.repeat(MAX_CRITIQUE_CHARS + 1)}\n[2i] rotto`, sha: SHA });
   assert.equal(troppa.ok, false);
   assert.match(troppa.reason, /troppo lunga/);
-  assert.match(troppa.reason, new RegExp(String(MAX_CRITIQUE_BYTES)), 'il rifiuto dice il tetto');
+  assert.match(troppa.reason, new RegExp(String(MAX_CRITIQUE_CHARS)), 'il rifiuto dice il tetto');
   assert.equal(troppa.state.r.verdict, undefined, 'respinta: niente scritto');
   assert.equal(typeof leggiCoda, 'function');
-});
-
-test('il tetto della critica conta i byte: in cirillico e in giapponese la stessa cifra non vale di più (#1333)', async () => {
-  const { MAX_CRITIQUE_BYTES } = await import('../../scripts/verify-local.mjs');
-  const s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  const coda = '\n[2i] rotto';
-  for (const [lingua, lettera, byte] of [['cirillico', 'я', 2], ['giapponese', 'あ', 3], ['emoji', '😀', 4]]) {
-    // Sotto il tetto in caratteri, sopra quello in byte: prima passava e valeva tre volte tanto.
-    const sopra = lettera.repeat(Math.floor(MAX_CRITIQUE_BYTES / byte) + 1);
-    const r = withCritique(s, 'r', { critique: `${sopra}${coda}`, sha: SHA });
-    assert.equal(r.ok, false, `${lingua}: oltre i byte del tetto doveva essere respinta`);
-    assert.match(r.reason, /troppo lunga: \d+ byte, il massimo è 12000/);
-    assert.equal(r.state.r.verdict, undefined, `${lingua}: respinta, non tagliata a metà carattere`);
-    const dentro = lettera.repeat(Math.floor((MAX_CRITIQUE_BYTES - coda.length) / byte) - 1);
-    const ok = withCritique(s, 'r', { critique: `${dentro}${coda}`, sha: SHA });
-    assert.equal(ok.outcome, 'fix', `${lingua}: dentro il tetto passa intera`);
-    assert.ok(ok.state.r.critique.includes(dentro), `${lingua}: la critica resta intera`);
-  }
 });
 
 // ─── #256 sulla strada locale: la critica non si registra con file non registrati ───
@@ -705,7 +690,6 @@ test('#256 locale (CLI): una spec cancellata dalla shell ma non committata ferma
   // Committata la pulizia, la stessa critica passa, e vale per il commit nuovo.
   g(work, ['add', '-A']);
   g(work, ['commit', '-q', '-m', 'verifica: pulizia']);
-  faiLaLettura(work);
   const pulita = spawnSync(process.execPath, [VERIFY, 'critica', critica], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
   assert.equal(pulita.status, 0, pulita.stderr);
   assert.match(String(pulita.stdout), /Si può pubblicare/);
@@ -982,10 +966,7 @@ test('CLI giro stretto: dopo «corretto», start consegna la chiusura solo con l
   try {
     const casa = depositoUsaEGetta();
     const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_ROUTINE_CONFIG_URL: acceso.url };
-    const lancia = (...args) => {
-      if (args[0] === 'critica') faiLaLettura(casa);
-      return spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
-    };
+    const lancia = (...args) => spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
     const primo = lancia('start', 'richiesta di prova');
     assert.equal(primo.status, 0, primo.stderr);
     assert.doesNotMatch(primo.stdout, /Perimetro di questo giro/, 'il primo giro è pieno anche a interruttore acceso');
