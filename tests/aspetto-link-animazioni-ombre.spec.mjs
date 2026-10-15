@@ -186,3 +186,35 @@ test('il riquadro di ritocco della durata usa il cursore e mostra il pallino a 0
   await home.locator('.sn-refine-panel').screenshot({ path: join(SHOTS, 'ombra-05.png') });
   await home.locator('.sn-refine-done').click();
 });
+
+// #837 r1 — i numeri si scrivono come li scrive un italiano, e la chat può passarli come numero.
+const fattore = (page) => page.evaluate(() => window.SN_THEME_TOKENS.motionFactor(document));
+
+test('Preferenze: «1,5» nella velocità delle animazioni e «0,1» nelle ombre si applicano e si salvano col punto', async ({ app, openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  const riga = (n) => page.locator(`.sn-token-row[data-token="${n}"]`);
+  const motion = riga('motion').locator('input').first();
+  await motion.fill('1,5');
+  await motion.blur();
+  await expect(riga('motion').locator('.sn-token-error')).toBeHidden();
+  await expect.poll(() => fattore(page)).toBe(1.5);
+  const ombra = riga('shadow').locator('input').first();
+  await ombra.fill('0,1');
+  await ombra.blur();
+  await expect(riga('shadow').locator('.sn-token-error')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sn-shadow-opacity').trim())).toBe('0.1');
+  await expect.poll(() => tokensSalvati(app)).toMatchObject({ motion: '1.5', shadow: '0.1' });
+});
+
+test('chat: «togli le animazioni» col valore passato come numero dal modello le toglie', async ({ app }) => {
+  const page = await homeChat(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 't1', name: 'IMPOSTA_ESTETICA', arguments: '{"token":"motion","valore":0}' }] },
+    { text: 'Fatto, animazioni tolte.' },
+  ]);
+  await chiedi(page, 'togli le animazioni');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'animazioni tolte' })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => fattore(page)).toBe(0);
+  expect((await tokensSalvati(app)).motion).toBe('0');
+  await ripristina(app);
+});
