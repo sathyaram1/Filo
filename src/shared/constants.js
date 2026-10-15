@@ -1626,7 +1626,7 @@
     // la riga non c'è: meglio niente che un'ora inventata. La durata è già fatta perché il modello non sbagli i conti.
     aperturaScheda: ({ apertaIl = null, adesso = null } = {}) => {
       const t = apertaIl == null || apertaIl === '' ? NaN : new Date(apertaIl).getTime();
-      const ora = Number.isFinite(Number(adesso)) && adesso != null ? Number(adesso) : Date.now();
+      const ora = adesso != null && Number.isFinite(Number(adesso)) ? Number(adesso) : Date.now();
       if (!Number.isFinite(t) || t <= 0) return '';
       const quando = filoContesto().quando;
       const trascorso = ora - t;
