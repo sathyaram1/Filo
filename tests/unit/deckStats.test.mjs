@@ -155,7 +155,7 @@ test('simulate ≈ ipergeometrica: caso stretto (2 combo su 99, turno 10)', () =
     ...Array.from({ length: 2 }, () => ['combo']),
     ...Array.from({ length: 97 }, () => []),
   ];
-  const r = S.simulate({ library, want: [{ tag: 'combo', n: 1 }], turn: 10, iterations: 20000, seed: 7 });
+  const r = S.simulate({ library, want: [{ tag: 'combo', n: 1 }], turn: 10, game: 'play', iterations: 20000, seed: 7 });
   const oracle = hyperAtLeast(99, 2, 16, 1); // 7 + 9 = 16 carte viste
   assert.ok(Math.abs(r.probability - oracle) < 0.02,
     `Monte Carlo ${r.probability} vs oracolo ${oracle.toFixed(4)}`);
