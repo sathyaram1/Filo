@@ -898,6 +898,20 @@ jobs:
             exit 1
           fi
 
+      # Stesso passo della meta' Mac, che puo' scrivere la pagina nello stesso momento.
+      - name: Impronte dei file nella sezione Verifica
+        id: impronte
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -e
+          node "${{ runner.temp }}/strumenti/release-impronte.mjs" --piattaforma Linux --cartella dist \
+            --versione "${{ steps.bersaglio.outputs.versione }}" --repo "${{ github.repository }}" \
+            --commit "$(git rev-parse HEAD)" \
+            --corsa "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --verifica-dopo 45
+
       # `continue-on-error` sul lavoro tiene in piedi la release Windows, e fin
       # qui e' giusto; il prezzo era il silenzio: dal 20/09 al 26/09 nessuno si
       # e' accorto che Filo per Linux non usciva (#733). Da qui il guasto
