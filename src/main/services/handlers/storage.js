@@ -424,10 +424,7 @@ module.exports = function register(on, ctx) {
   on(MSG.CLEAR_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
     const prima = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
-    const inAppunti = await chiaveAppunti();
-    if (inAppunti && Array.isArray(prima) && prima.some((x) => globalThis.SN_CLIPBOARD.chiave(x) === inAppunti)) {
-      chiaveSospesa = inAppunti;
-    }
+    await Tolti().cronologiaSvuotata(prima);
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     clipboardChanged();
     return { ok: true };
