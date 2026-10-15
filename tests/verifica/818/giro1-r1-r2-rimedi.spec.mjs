@@ -70,6 +70,8 @@ test.afterAll(async () => {
   await new Promise((r) => server.close(r));
 });
 
+test.beforeEach(() => { redeemed = false; saldo = 400; richieste.length = 0; });
+
 async function newtab(app) {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
@@ -127,4 +129,42 @@ test('r1 dopo l\'avviso in chat, «sì, usa i modelli più economici» scritto a
   expect(testo).toMatch(/modelli più economici per/);
   // …e ha come applicarli e rimetterli com'erano (uno strumento o un'azione descritta nelle istruzioni).
   expect(testo + strumenti).toMatch(/credits_remedy|rimedi dell'avviso|modelliScelti/);
+});
+
+test('r2 nella pagina Crediti un pulsante dei rimedi resta lo stesso quando la pagina si aggiorna da sola', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await newtab(app);
+  await app.evaluate((_, b) => {
+    const vero = globalThis.fetch;
+    globalThis.fetch = (url, init) => vero(String(url).replace(/^https:\/\/openrouter\.ai/, b).replace(/^https:\/\/firestore\.googleapis\.com/, b), init);
+  }, base);
+  await app.evaluate(async () => {
+    const CA = globalThis.SN_CREDITI_AVVISO;
+    const A = globalThis.SN_CONST.ACTIONS;
+    let d = {};
+    for (let i = 1; i <= 3; i++) {
+      const giorno = CA.chiaveGiorno(new Date(Date.now() - i * 86400000));
+      d = CA.aggiungi(d, { giorno, azione: A.FILO_CHAT, crediti: 240, prompt: 240000, completion: 24000 });
+      d = CA.aggiungi(d, { giorno, azione: A.FILO_TAB_SUMMARY, crediti: 60, prompt: 60000, completion: 6000 });
+    }
+    await globalThis.SN_AVVISO_CREDITI_MAIN.impostaDiarioPerTest(d);
+  });
+  saldo = 400;
+  const r = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'wallet_redeem', code: 'ABCD-EFGH' },
+    { tab: { id: 8, url: 'filo://credits/credits.html' }, url: 'filo://credits/credits.html' }));
+  expect(r.ok).toBe(true);
+  // Si apre la pagina Crediti come la apre la notifica.
+  const crediti = await openTab('filo://credits/credits.html#avviso');
+  const btn = crediti.locator('#avviso .sn-crediti-rimedio[data-rimedio="modello"] button');
+  await expect(btn).toBeVisible({ timeout: 20_000 });
+  await btn.evaluate((b) => { b.__segnato = true; });
+  // Qualcosa cambia il saldo altrove (qui: l'altro rimedio applicato dal main): la pagina si ridisegna da sola.
+  const ok = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.CREDITS_REMEDY_APPLY, id: 'automatiche' },
+    { tab: { id: 9, url: 'filo://credits/credits.html' }, url: 'filo://credits/credits.html' }));
+  expect(ok.ok).toBe(true);
+  await expect(crediti.locator('#avviso .sn-crediti-rimedio[data-rimedio="automatiche"] button')).toHaveText('Riaccendi', { timeout: 10_000 });
+  await new Promise((ok2) => setTimeout(ok2, 1500));
+  // Il pulsante sotto il dito è ancora quello: un clic che attraversa il ridisegno non si perde.
+  expect(await btn.evaluate((b) => b.__segnato === true)).toBe(true);
 });
