@@ -591,6 +591,27 @@ export function checkDelivery(root, assignedBranch, { da } = {}) {
 }
 
 /**
+ * Un worktree dello stesso deposito da cui parte la registrazione, diverso dalla cartella posizionata (`root`): lì
+ * ramo e commit non sono quelli che il controllo guarda (#772). null se no; fuori da ogni deposito, o in un altro, non conta.
+ */
+export function altraCartellaDelDeposito(root, da = process.cwd()) {
+  const chiedi = (dir) => {
+    const r = gitIn(dir)(['rev-parse', '--show-toplevel', '--git-common-dir']);
+    if (!r.ok) return null;
+    const [top, comune] = r.out.split(/\r?\n/);
+    return top && comune ? { top: percorsoVero(resolve(dir, top)), comune: percorsoVero(resolve(dir, comune)) } : null;
+  };
+  const qui = chiedi(da);
+  const lavoro = qui ? chiedi(root) : null;
+  if (!qui || !lavoro || qui.comune !== lavoro.comune || qui.top === lavoro.top) return null;
+  return { cartella: qui.top, radice: lavoro.top, ramo: currentBranch(da) };
+}
+
+function percorsoVero(p) {
+  try { return realpathSync.native(p); } catch (_) { return p; }
+}
+
+/**
  * Rebase interrotto in `root`? null se no, altrimenti `{ ramo }` (il ramo che si sta riscrivendo, '' se
  * non si legge). La cartella git si chiede a git: in un worktree `.git` è un file, non una cartella.
  */
