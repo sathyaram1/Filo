@@ -624,16 +624,17 @@ export function numeriDelTitolo(titolo) {
 
 /**
  * I casi rossi alla critica che la pulizia ha tolto per intero senza che siano di un rilievo messo da parte: il titolo
- * deve citarne solo di messi da parte, o, se non ne cita, il nome del file. `messi`: i loro numeri nella critica. PURA.
+ * deve citarne solo di messi da parte, o, se non ne cita, il nome del file. `messi`: i loro numeri nella critica.
+ * `ancheVerdi`: dopo le correzioni un caso da correggere può essere già verde, e non esce lo stesso. PURA.
  */
-export function casiToltiNonMessi(prova, prima, dopo, messi) {
+export function casiToltiNonMessi(prova, prima, dopo, messi, ancheVerdi = false) {
   const p = prima && prima.casi;
   const d = dopo && dopo.casi;
   if (!p || !d || !Array.isArray(messi)) return [];
   const m = new Set(messi.filter((n) => Number.isInteger(n)));
   const daParte = (n) => n.length > 0 && n.every((x) => m.has(x));
   const restano = new Set(Object.keys(d).map(ultimo));
-  return Object.keys(p).filter((t) => p[t] === false && !(t in d) && !restano.has(ultimo(t))).filter((t) => {
+  return Object.keys(p).filter((t) => (ancheVerdi || p[t] === false) && !(t in d) && !restano.has(ultimo(t))).filter((t) => {
     const n = numeriDelTitolo(ultimo(t));
     return !daParte(n.length ? n : numeriDelNome(prova));
   });
