@@ -1202,8 +1202,12 @@ export function numeraRisposta(reply, critica) {
   return r;
 }
 
-export function verifierReplyText(reply, id = '<id>') {
+export function verifierReplyText(reply, id = '<id>', conSegnalazione = false) {
   const r = reply && typeof reply === 'object' ? reply : {};
+  // Un server che non ferma su una segnalazione la lascia senza nessuno che risponda: dirlo, come fixedReplyText.
+  const nonFermata = conSegnalazione && (r.outcome === 'fix' || r.outcome === 'pass')
+    ? 'ATTENZIONE: la critica portava una segnalazione, ma il server non ha fermato il lavoro: la segnalazione è registrata, e nessuno chiede all\'owner di rispondere. Scrivilo nel rapporto di fine sessione.'
+    : null;
   const fmt = (list) => (Array.isArray(list) && list.length ? list.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n') : '  (nessuno)');
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
   // I bilanci come li manda il server, nell'ordine dei livelli: uno che il
