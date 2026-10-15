@@ -209,8 +209,12 @@ test('un numero di attivi apre le persone che ha contato: clic, tastiera e tasto
   await expect(righeVisibili(page)).toHaveCount(2);
 
   // Una rilettura della vista (un regalo, una manopola) tiene il filtro.
-  await page.evaluate(() => chrome.runtime.sendMessage({ type: 'credits_changed' }).catch(() => {}));
+  const prima = stato.overview;
+  await app.evaluate(() => globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED }));
+  await expect.poll(() => stato.overview).toBeGreaterThan(prima);
+  await expect(page.locator('#ownerUsers tbody tr.sn-wallet-user')).toHaveCount(4);
   await expect(righeVisibili(page)).toHaveCount(2);
+  await expect(page.locator('#ownerFiltro')).toBeVisible();
 });
 
 test('all’avvio l’owner riceve l’allarme del conto una volta sola e da lì apre la pagina', async ({ app }) => {
