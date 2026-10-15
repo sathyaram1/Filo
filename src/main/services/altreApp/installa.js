@@ -94,7 +94,7 @@ function creaInstallatore({ cartella, pacchetto, sistema = () => `${process.plat
     let parziale = false;
     try { parziale = (await fs.promises.readdir(path.join(cartella(), PARZIALE))).length > 0; } catch (_) {}
     let esiste = false;
-    try { esiste = (await fs.promises.readdir(cartella())).length > 0; } catch (_) {}
+    try { esiste = (await fs.promises.stat(cartella())).isDirectory(); } catch (_) {}
     return {
       installato: m ? { versione: m.versione, percorso: m.percorso, sha256: m.sha256 } : null,
       aggiornato: !!(m && p && m.versione === p.versione && m.sha256 === p.sha256),
@@ -240,7 +240,11 @@ function creaInstallatore({ cartella, pacchetto, sistema = () => `${process.plat
   /** Toglie tutto: anche un'installazione a metà. */
   async function disinstalla() {
     await ferma();
-    try { await togli(cartella()); } catch (e) {
+    try {
+      await togli(cartella());
+      // La cartella che la conteneva, se è rimasta vuota: chi spegne non deve trovare avanzi.
+      await fs.promises.rmdir(path.dirname(cartella())).catch(() => {});
+    } catch (e) {
       log(`[altreApp] disinstallazione non riuscita: ${e && e.message}`);
       annuncia({ fase: 'errore', errore: { codice: 'disco', frase: 'Non riesco a togliere il componente dalla cartella dei dati di Filo.' } });
       return stato;

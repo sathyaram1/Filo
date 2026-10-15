@@ -8,7 +8,7 @@
   let $ = null;
   let ultimo = null;
 
-  const mb = (b) => (Number(b) / 1048576).toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const mb = (b) => (Number(b) / 1048576).toLocaleString('it-IT', { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: true });
   const senzaNumeri = { verifica: 'Controllo l\'impronta del file scaricato…', estrae: 'Installo il componente…', prova: 'Controllo che il componente parta…' };
 
   function bottone(el, testo, visibile) {

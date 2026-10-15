@@ -107,6 +107,7 @@ test('spenta di serie e niente sul disco; accesa scarica con la barra vera e ins
   expect(meta).toBeLessThan(100);
   await expect(pref.locator('#altreAppNumeri')).toContainText(/MB di .* MB · \d+%/);
   await expect(pref.locator('#altreAppAnnulla')).toBeVisible();
+  await expect(pref.locator('#altreAppRiprova')).toBeHidden();
   await foto(pref, 'scarica');
 
   await expect(pref.locator('#altreAppFrase')).toHaveText('Il componente è installato e pronto.', { timeout: 20_000 });
@@ -130,6 +131,7 @@ test('con un\'impronta sbagliata non si installa, e la pagina dice in chiaro per
   await expect(pref.locator('#altreAppFrase')).toContainText('la sua impronta non combacia, quindi non l\'ho installato', { timeout: 20_000 });
   await expect(pref.locator('#altreAppStato')).toHaveClass(/aa-errore/);
   await expect(pref.locator('#altreAppRiprova')).toHaveText('Riprova');
+  await expect(pref.locator('#altreAppAnnulla')).toBeHidden();
   const dir = await cartellaComponente(app);
   expect(existsSync(join(dir, '0.0.1-prova'))).toBe(false);
   await foto(pref, 'impronta');
@@ -139,6 +141,46 @@ test('con un\'impronta sbagliata non si installa, e la pagina dice in chiaro per
   await pref.locator('#altreAppRiprova').click();
   await expect(pref.locator('#altreAppFrase')).toHaveText('Il componente è installato e pronto.', { timeout: 20_000 });
   expect(existsSync(join(dir, '0.0.1-prova', 'cua-driver'))).toBe(true);
+});
+
+test('«Annulla» a metà dello scaricamento spegne l\'impostazione e non lascia niente sul disco', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  scriviElenco(SHA);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.locator('#altreAppEnabled').check();
+  await expect.poll(async () => Number(await pref.locator('#altreAppBarra').getAttribute('aria-valuenow')) || 0, { timeout: 10_000 }).toBeGreaterThan(0);
+  await pref.locator('#altreAppAnnulla').click();
+  await expect(pref.locator('#altreAppEnabled')).not.toBeChecked();
+  await expect.poll(async () => (await impostazioni(app)).altreApp?.enabled).toBe(false);
+  await expect(pref.locator('#altreAppStato')).toBeHidden();
+  const dir = await cartellaComponente(app);
+  await expect.poll(() => existsSync(dir), { timeout: 10_000 }).toBe(false);
+  // Riaccesa subito dopo, riparte da capo e arriva in fondo.
+  await pref.locator('#altreAppEnabled').check();
+  await expect(pref.locator('#altreAppFrase')).toHaveText('Il componente è installato e pronto.', { timeout: 20_000 });
+});
+
+test('i permessi che mancano (su Mac) si leggono uno per uno, ognuno col pulsante del suo pannello', async ({ app, shell, openTab }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.locator('#altreAppEnabled').evaluate((el) => { el.checked = true; });
+  // Lo stato come lo manda il main su un Mac senza permessi: qui si guarda solo come la pagina lo disegna.
+  await pref.evaluate(() => window.SN_PREF_ALTRE_APP.disegna({
+    attiva: true, fase: 'pronto', versione: '0.35.4', byte: 96341278,
+    permessi: [
+      { id: 'accessibilita', nome: 'Accessibilità', frase: 'Su Mac serve il permesso «Accessibilità» per Filo, per leggere e toccare le finestre.', apribile: true },
+      { id: 'schermo', nome: 'Registrazione schermo', frase: 'Su Mac serve il permesso «Registrazione schermo» per Filo, per vedere le finestre.', apribile: true },
+    ],
+  }));
+  await expect(pref.locator('#altreAppFrase')).toContainText('non gli dà ancora tutto quello che serve');
+  await expect(pref.locator('.aa-permesso')).toHaveCount(2);
+  await expect(pref.locator('.aa-permesso button')).toHaveText(['Apri le impostazioni del sistema', 'Apri le impostazioni del sistema']);
+  await expect(pref.locator('#altreAppNumeri')).toHaveText('Cua Driver 0.35.4 · 91,9 MB');
+  await foto(pref, 'permessi');
+  // Fuori dal Mac il main risponde che non c'è un pannello da aprire: il pulsante torna usabile.
+  await pref.locator('.aa-permesso button').first().click();
+  await expect(pref.locator('.aa-permesso button').first()).toBeEnabled();
 });
 
 test('dalla chat: la conferma spiega cosa si installa, e dopo «conferma» le Preferenze aperte lo mostrano installato', async ({ app, shell, openTab }) => {
