@@ -13,14 +13,21 @@ della dashboard di gestione, dove stanno i feedback da decidere.
   cima se è più urgente — non su una superficie in più "per visibilità". Due
   posti per la stessa decisione sono rumore per uno dei due, e prima o poi i
   due imparano cose diverse.
-- Il pannello dei Ricevuti è condiviso dalle quattro schede-lista: la
-  visibilità dell'avviso dipende da "c'è qualcosa" E "sei sulla scheda giusta",
-  e il cambio scheda riapplica la regola senza rileggere dal server.
-- L'avviso nomina la segnalazione da cui nasce il lavoro (`automazione ·
-  feedback #N`) e — vivendo già dentro la dashboard dei feedback — quel numero
-  è un bottone che la apre: "guarda cosa era stato chiesto" è il gesto che
-  serve prima di approvare.
-- **Dove:** `#mgMergeApprovals` dentro `panel-list` in
-  `src/pages/manage/manage.html`, `applyMergeApprovalsVisibility()` /
-  `openFeedbackByNum()` in `manage.js`, modulo `src/shared/mergeApprovals.js`.
-  Test: `tests/merge-approvals.spec.mjs`.
+- **Una cosa sola, un posto solo (contratto 2026-09-13).** L'avviso in cima ai
+  Ricevuti è stato tolto: una fusione ferma è la scheda della sua pratica, col
+  quadrato rosso, portata in cima ai Ricevuti; la richiesta si apre dal
+  quadrato. Prima la pratica e il ramo che ne era uscito stavano in due posti
+  che non si citavano.
+- **Chi non ha una scheda non sparisce.** Una richiesta senza pratica (il
+  lavoro locale di `npm run finish`, che il server apre senza numero) sta in
+  cima ad Automazioni coi tasti di sempre: nasconderla sarebbe un ramo fermo
+  per sempre senza dirlo.
+- **Chi manda l'owner lì nomina il posto di oggi.** Il terminale ha continuato
+  a dire «l'avviso in cima ai Ricevuti» per due settimane dopo il 13/09, e
+  l'owner l'ha cercato lì (#761). Il nome sta in `DOVE_SI_APPROVA`
+  (`scripts/lib/owner-merge.mjs`), e la sentinella legge la pagina vera.
+- **Dove:** `fusioniFermeInCima()` / `fusioniSenzaFeedback()` in
+  `src/shared/manageReview.js`, `#mgMergeApprovalsOrphans` in `panel-automation`
+  (`manage.html`), modulo `src/shared/mergeApprovals.js`. Test:
+  `tests/merge-approvals.spec.mjs`, `tests/manage-fusione-nei-ricevuti.spec.mjs`,
+  `tests/unit/ownerMerge.test.mjs`.
