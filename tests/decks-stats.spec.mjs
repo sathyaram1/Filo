@@ -454,6 +454,27 @@ test('chat e riquadro danno lo stesso numero alle stesse condizioni (#791)', asy
   await expect(page.locator('.dk-msg-bot').last()).toContainText('Nel mazzo non c\'è la categoria «ramp»: puoi chiedere terre.');
 });
 
+test('in chat un mulligan detto senza la mano da tenere parte da 2 terre, come nel riquadro (#791)', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedBigDeck(page, await seedDeck(page));
+
+  await page.fill('#chatInput', 'che probabilità ho di avere 3 terre al turno 3 con due mulligan?');
+  await page.press('#chatInput', 'Enter');
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla).toContainText('Probabilità di avere 3 terre al turno 3 (partita a più giocatori; fino a 2 mulligan se la mano non ha almeno 2 terre): ≈ ');
+  const chat = pctOf(/≈ ([\d,]+)%/.exec(await bolla.textContent())[1]);
+
+  await page.fill('#probTurn', '3');
+  await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
+  await page.fill('#probMull', '2');
+  await expect(page.locator('#probNeeds input[data-keep="terre"]')).toHaveValue('2');
+  expect(Math.abs(chat - await settledPct(page))).toBeLessThan(0.6);
+});
+
 test('il riquadro resta compatto: senza mulligan nessuna colonna in più, con il mulligan le categorie restano leggibili (#791)', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
