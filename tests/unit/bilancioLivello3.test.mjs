@@ -73,7 +73,7 @@ test('un 2 interno paga il bilancio dei 2; a bilancio finito NON ferma: va da pa
   assert.match(uno, /Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità 2: \[2i\] non salva/);
 });
 
-test('un 2 interno col segno ? a bilancio dei 2 finito non ferma: non si corregge ed esce da solo con la domanda', () => {
+test('un 2 interno col segno ? a bilancio dei 2 finito non ferma: resta fuori dal giro ed esce da solo con la domanda', () => {
   const d = decide([f(2, 'i', 'A o B?', true)], { count2: 4 });
   assert.equal(d.stop, false);
   assert.deepEqual(d.fix, []);
