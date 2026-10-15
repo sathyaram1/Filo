@@ -694,7 +694,13 @@
   // questa pagina che escono i codici per i primi invitati, e un invito da tre
   // posti con uno occupato è ancora da dare. Un invito «usato» e basta faceva
   // sparire gli altri due posti: barrato, pulsante spento, nessun link.
+  // Riletti uguali, i codici restano quelli: un pulsante col fuoco o appena
+  // copiato non si rifà sotto le dita (#1087.4, come le righe delle persone).
+  let codiciScritti = null;
   function renderOwnerCodes(invites) {
+    const impronta = JSON.stringify(invites);
+    if (impronta === codiciScritti) return;
+    codiciScritti = impronta;
     const list = $('ownerCodes');
     list.innerHTML = '';
     $('ownerCodesTitle').hidden = invites.length === 0;
