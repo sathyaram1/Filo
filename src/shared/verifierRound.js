@@ -476,21 +476,18 @@
    *
    * Regole:
    *   - un rilievo di livello 3 o 2 che chiede una decisione ferma il lavoro;
-   *   - un 3 si corregge se il bilancio dei 3 ha ancora giri; a bilancio
-   *     finito ferma il lavoro (è l'unico livello che ferma per bilancio);
-   *   - un 2 si corregge se nello stesso giro si corregge anche un 3 (il giro
-   *     lo paga il 3) oppure se il bilancio dei 2 ha ancora giri; a bilancio
-   *     finito NON ferma: va nel feedback derivato, a priorità 2, e il giro
-   *     passa se non c'è altro (decisione dell'owner del 2026-09-23);
-   *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
-   *     giro lo paga già il livello più alto, e un altro verificatore arriva
-   *     comunque: decisione dell'owner del 2026-09-16) oppure se il suo
-   *     bilancio ha ancora giri; altrimenti va nel feedback derivato;
-   *   - un 1 che chiede una decisione va nel feedback derivato;
-   *   - gli 0 si correggono solo se nello stesso giro si corregge anche altro
-   *     (un altro verificatore arriva comunque) oppure se l'owner ha dato
-   *     giri al loro bilancio; altrimenti vanno nel feedback derivato;
-   *   - un giro consuma UN giro dal bilancio del livello più alto corretto;
+   *   - un 3 a bilancio dei 3 finito ferma il lavoro (è l'unico livello che
+   *     ferma per bilancio);
+   *   - la correzione parte se almeno un rilievo ha ancora giri nel bilancio
+   *     del SUO livello (gli 0 in `cap0`: a zero, da soli mai);
+   *   - se parte, ci salgono tutti gli altri senza `?`, anche quelli col
+   *     bilancio finito, di livello più basso o più alto: il giro e la verifica
+   *     dopo ci sono comunque (2026-09-16 per gli 1, #744 per i 2);
+   *   - se non parte, vanno nel feedback derivato: un 2 a bilancio finito NON
+   *     ferma, esce a priorità 2 e il giro passa (2026-09-23);
+   *   - un 1 o uno 0 col `?` va nel feedback derivato anche se il giro parte;
+   *   - il giro consuma UN giro dal bilancio del livello più alto fra quelli
+   *     che lo fanno partire: chi sale non paga;
    *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto;
    *   - senza uno dei quattro bilanci LANCIA (`bilanci del verificatore
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
