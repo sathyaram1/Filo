@@ -44,7 +44,8 @@
     .dk-price { color: var(--sn-fg); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .dk-price:empty { display: none; }
     .sn-card-title[hidden] { display: none; }
-    .dk-card-rename {
+    /* L'id batte lo stile generico dei campi di .sn-page: il campo prende il posto del titolo senza spostarne il testo. */
+    #deckGrid .dk-card-rename {
       font: inherit; font-size: 13px; font-weight: 600;
       color: var(--sn-fg); background: transparent;
       border: 1px solid var(--sn-accent); border-radius: 6px;

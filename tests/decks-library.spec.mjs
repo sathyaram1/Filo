@@ -191,6 +191,10 @@ test('Rinomina… dal tasto destro: il nome nuovo compare sulla scheda, al suo p
   await scheda(page, 'Artefatti').click({ button: 'right' });
   await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Rinomina…' }).click();
   await campo.fill('Goblin');
+  for (const tema of ['light', 'dark']) {
+    await page.evaluate((t) => window.SN_PAGE_BOOTSTRAP.applyTheme(t), tema);
+    await page.locator('#screenLibrary').screenshot({ path: `tests/.shots/decks-library-rinomina-${tema}.png` }).catch(() => {});
+  }
   await campo.click();
   await campo.press('End');
   await campo.pressSequentially(' <b>rossi</b> 🔥');
