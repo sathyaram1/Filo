@@ -378,7 +378,7 @@
     // ──────────────────── Assistente e agente di pagina ──────────────────────
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
-      desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Sa quando hai aperto la scheda, anche se nel frattempo hai chiuso e riaperto Filo. I passi che fai con lui, per ora, non escono dal tuo computer. Ogni conversazione resta sul tuo computer come una riga nel filo della home, e Filo la ritrova quando gliene chiedi.',
+      desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Sa quando hai aperto la scheda e quando ci è arrivata la pagina che stai guardando, anche se nel frattempo hai chiuso e riaperto Filo. I passi che fai con lui, per ora, non escono dal tuo computer. Ogni conversazione resta sul tuo computer come una riga nel filo della home, e Filo la ritrova quando gliene chiedi.',
       invoke: 'Alt+H (Ctrl+Alt+H su Mac), oppure tasto destro sulla scheda › Aiuto, o tasto destro sulla pagina › Aiuto.',
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Per ora non ti chiede se ha funzionato e non condivide con nessuno i passi delle tue sessioni.',
     },

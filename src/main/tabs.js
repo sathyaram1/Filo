@@ -3696,9 +3696,10 @@ class TabManager {
     const colors = kept.map((t) => t.identityColor || null);
     // Dopo un riavvio la scheda è ancora quella aperta allora: l'Aiuto risponde a «quando l'ho aperta?» (#826).
     const aperte = kept.map((t) => t.openedAt || null);
+    const pagine = kept.map((t) => t.paginaDal || null);
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, aperte, activeIndex };
+    return { tabs, colors, aperte, pagine, activeIndex };
   }
 
   _sessionKey() {
@@ -3734,6 +3735,7 @@ class TabManager {
     let urls = [];
     let colors = [];
     const aperte = [];
+    const pagine = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
@@ -3743,11 +3745,13 @@ class TabManager {
         // dà semplicemente colori tutti null).
         const savedColors = Array.isArray(saved.colors) ? saved.colors : [];
         const savedAperte = Array.isArray(saved.aperte) ? saved.aperte : [];
+        const savedPagine = Array.isArray(saved.pagine) ? saved.pagine : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
             urls.push(u);
             colors.push(savedColors[i] || null);
             aperte.push(aperturaValida(savedAperte[i]));
+            pagine.push(aperturaValida(savedPagine[i]));
           }
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
@@ -3774,6 +3778,7 @@ class TabManager {
         // cache per host, così una did-navigate sullo stesso dominio lo conserva.
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
         if (aperte[i]) nata.openedAt = aperte[i];
+        nata.paginaDal = pagine[i] || null;
         nate.push(nata);
         return nata;
       });

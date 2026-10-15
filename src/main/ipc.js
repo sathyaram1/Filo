@@ -71,7 +71,7 @@ function senderInfo(event) {
   }
   return {
     riserva,
-    tab: tab ? { id: tab.id, url: tab.url, title: tab.title, openedAt: tab.openedAt || null } : null,
+    tab: tab ? { id: tab.id, url: tab.url, title: tab.title, openedAt: tab.openedAt || null, paginaDal: tab.paginaDal || null } : null,
     url: wc.getURL(),
     isShell: Boolean(finestraDellaBarra(wc)),
     // Riferimento alla finestra proprietaria (in-process: l'handler è chiamato

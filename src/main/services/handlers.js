@@ -204,7 +204,7 @@ async function buildMessages(action, payload) {
     const sys = { role: 'system', content: PROMPTS.help({
       url: payload.url, title: payload.title, outline: payload.outline,
       viewport: payload.viewport, siteKnowledge, knownPaths,
-      apertaIl: payload.schedaApertaIl, adesso: Date.now(),
+      apertaIl: payload.schedaApertaIl, paginaDal: payload.paginaDal, adesso: Date.now(),
     }) };
     const parts = [];
     const userText = payload.userMessage || testoDelTurnoAutomatico(payload);

@@ -52,3 +52,12 @@ test('il contesto dell\'Aiuto la mette fuori dalla busta dei dati del sito', () 
   assert.ok(ctx.indexOf("l'utente l'ha aperta") > fineBusta);
   assert.doesNotMatch(PROMPTS.helpContext({ url: 'https://example.org/a', title: 'A' }), /l'ha aperta/);
 });
+
+test('la pagina arrivata dopo l\'apertura ha la sua ora; arrivata con la scheda, niente riga in più', () => {
+  const aperta = new Date(2026, 9, 15, 10, 42).toISOString();
+  const riga = PROMPTS.aperturaScheda({ apertaIl: aperta, paginaDal: new Date(2026, 9, 15, 12, 40).toISOString(), adesso: ADESSO });
+  assert.match(riga, /l'ha aperta 2 ore e 5 minuti fa \(gio 15 ott 2026, 10:42\)\. La pagina che mostra adesso ci è arrivata dopo, 7 minuti fa \(gio 15 ott 2026, 12:40\)\. Adesso è/);
+  for (const paginaDal of [null, '', 'ieri', aperta, new Date(2026, 9, 15, 10, 42, 30).toISOString()]) {
+    assert.doesNotMatch(PROMPTS.aperturaScheda({ apertaIl: aperta, paginaDal, adesso: ADESSO }), /La pagina/, String(paginaDal));
+  }
+});

@@ -123,22 +123,23 @@ test('dopo un riavvio la scheda ricorda quando era stata aperta', async ({ app, 
   const urlA = rete.pagina('example.org', '/a', PAGINA_A);
   await preparaModelli(app);
   const ieri = new Date(Date.now() - 26 * 3600 * 1000).toISOString();
+  const treOre = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
 
   // La sessione salvata da un Filo precedente: la scheda era aperta da ieri.
   await app.evaluate(async ({ BrowserWindow }, args) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    await globalThis.SN_STORAGE.setRaw(tm._sessionKey(), { tabs: [args.url], colors: [null], aperte: [args.ieri], activeIndex: 0 });
+    await globalThis.SN_STORAGE.setRaw(tm._sessionKey(), { tabs: [args.url], colors: [null], aperte: [args.ieri], pagine: [args.treOre], activeIndex: 0 });
     await tm.restoreSession();
-  }, { url: urlA, ieri });
+  }, { url: urlA, ieri, treOre });
 
   const a = await schedaDi(app, urlA);
   expect(a.openedAt).toBe(ieri);
   // E torna nella sessione che si salva, per il riavvio dopo.
   const salvata = await app.evaluate(({ BrowserWindow }, u) => {
     const s = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.sessionState();
-    return s.aperte[s.tabs.indexOf(u)];
+    return { aperta: s.aperte[s.tabs.indexOf(u)], pagina: s.pagine[s.tabs.indexOf(u)] };
   }, urlA);
-  expect(salvata).toBe(ieri);
+  expect(salvata).toEqual({ aperta: ieri, pagina: treOre });
 
   let pageA = null;
   await expect.poll(() => { pageA = app.windows().find((w) => w.url() === urlA) || null; return !!pageA; }, { timeout: 10_000 }).toBe(true);
@@ -149,4 +150,34 @@ test('dopo un riavvio la scheda ricorda quando era stata aperta', async ({ app, 
   await chiedi(pageA, 'quando l\'ho aperta?');
 
   await expect(pageA.locator('.sn-sidebar-msg-assistant').last()).toContainText(`1 giorno e 2 ore fa (${a.quando})`, { timeout: 15_000 });
+  // La pagina che la scheda mostrava prima del riavvio c'era da tre ore, non da adesso.
+  expect(testoDi((await app.evaluate(() => globalThis.__visti))[0])).toContain('La pagina che mostra adesso ci è arrivata dopo, 3 ore fa');
+});
+
+test('scheda aperta da due ore, pagina raggiunta adesso con un collegamento: l\'Aiuto sa che la pagina è appena arrivata', async ({ app, shell, rete }) => {
+  test.setTimeout(60_000);
+  const urlA = rete.pagina('example.org', '/a', PAGINA_A.replace('</h1>', '</h1><a id="vai" href="/b">vai</a>'));
+  const urlB = rete.pagina('example.org', '/b', PAGINA_B);
+  const pageA = await apri(app, shell, urlA);
+  await preparaModelli(app);
+  const due = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+  const id = await app.evaluate(({ BrowserWindow }, args) => {
+    const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.url === args.u);
+    t.openedAt = args.due;
+    return t.id;
+  }, { u: urlA, due });
+
+  await pageA.click('#vai');
+  let pageB = null;
+  await expect.poll(() => { pageB = app.windows().find((w) => w.url() === urlB) || null; return !!pageB; }, { timeout: 10_000 }).toBe(true);
+  await pageB.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10_000 });
+  await aiutoFinto(app);
+  await shell.evaluate((i) => window.filoShell.tabs.help(i), id);
+  await expect(pageB.locator('.sn-sidebar[data-invoked-from="tab"]')).toBeVisible({ timeout: 8_000 });
+  await chiedi(pageB, 'quando ho aperto questa pagina?');
+  await expect.poll(async () => (await app.evaluate(() => globalThis.__visti)).length, { timeout: 15_000 }).toBeGreaterThan(0);
+
+  const primo = testoDi((await app.evaluate(() => globalThis.__visti))[0]);
+  expect(primo).toContain("l'utente l'ha aperta 2 ore fa");
+  expect(primo).toContain('La pagina che mostra adesso ci è arrivata dopo, meno di un minuto fa');
 });
