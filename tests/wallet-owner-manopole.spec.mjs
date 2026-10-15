@@ -141,12 +141,7 @@ test.beforeAll(async () => {
               { code: 'AAAA2222', max: 3, used: 1, uses: [{ pseudonym: 'fedebb00', at: '2026-09-17T10:00:00.000Z' }], createdAt: '2026-09-11T09:00:00.000Z' },
               { code: 'CCCC4444', max: 3, used: 3, uses: [], createdAt: '2026-09-11T09:00:00.000Z' },
             ],
-            users: [{
-              pseudonym: PSEUDONIMO,
-              balance: { credits: 4890.5, creditsGranted: 5128, usageUsd: 0.21, limitUsd: 4.2 },
-              invitedBy: 'owner', createdAt: '2026-09-10T08:00:00.000Z',
-              reconcile: { flagged: false }, usage: { rows: 2, byAction: { chat: 0.2 }, byDay: { '2026-09-17': 0.2 } },
-            }],
+            users: persone,
           },
         });
       }
