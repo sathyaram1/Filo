@@ -636,10 +636,9 @@ module.exports = function register(on, ctx) {
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
       const enabled = await Defaults.getAutomationGate(idToken);
       const autoApprove = await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = await Defaults.getAutomationProberIdle(idToken);
       const routinesEnabled = await Defaults.getRoutinesEnabled(idToken);
       const lavoriServer = await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
