@@ -104,8 +104,10 @@ export const test = base.extend({
   // riaccende con `test.use({ riservaNuovaScheda: true })`.
   riservaNuovaScheda: [false, { option: true }],
   argomentiInPiu: [[], { option: true }],
+  // Nomi in più portati al loopback, per le prove che vogliono un sito col suo nome (example.org, #823).
+  hostInPiu: [[], { option: true }],
 
-  app: async ({ accoglienzaFatta, riservaNuovaScheda, argomentiInPiu }, use, testInfo) => {
+  app: async ({ accoglienzaFatta, riservaNuovaScheda, argomentiInPiu, hostInPiu }, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
@@ -130,7 +132,7 @@ export const test = base.extend({
       args: [
         ...argomentiScala,
         ...argomentiInPiu,
-        '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1',
+        `--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1${hostInPiu.map((h) => `, MAP ${h} 127.0.0.1`).join('')}`,
         '.',
       ],
       cwd: APP_ROOT,
