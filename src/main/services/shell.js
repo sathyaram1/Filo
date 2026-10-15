@@ -565,6 +565,8 @@ async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS }
 // su una macchina carica.
 module.exports = {
   createSession, defaultCwd, commandExists, existenceProbes,
+  // per la guardia di #1176: un probe scaduto o non partito non diventa un «non esiste».
+  esitoDeiProbe,
   // La cartella di lavoro, controllata in un posto solo (#551, quarto giro):
   // la usano il comando one-shot dell'assistente e il popup di conferma.
   cartellaViva, cartellaPerComando, usableCwd, unitaDiRete,
