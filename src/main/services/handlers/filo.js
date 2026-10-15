@@ -333,8 +333,12 @@ module.exports = function register(on, ctx) {
     const esterno = role === 'filo' && Object.hasOwn(ESTERNI, msg.esterno) ? ESTERNI[msg.esterno] : '';
     // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
     const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');
+    // Una finestra guardata dopo l'OK (#778): ne resta il nome, che toStoredMessage accorcia.
+    const guardate = role === 'filo' && actions.some((a) => a.type === 'VEDI_SCHERMO')
+      ? (Array.isArray(msg.guardate) ? msg.guardate : []).filter((n) => typeof n === 'string') : [];
     await FiloChats.append(id, {
       role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}), ...(cambi.length ? { cambi } : {}),
+      ...(guardate.length ? { guardate } : {}),
     });
     return { ok: true };
   });

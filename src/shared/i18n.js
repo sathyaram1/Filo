@@ -341,7 +341,7 @@
     options_action_translate_page: 'Traduci pagina',
     options_action_help: 'Aiuto',
     options_action_categorize: 'Categorizza',
-    options_action_describe_image: 'Descrizione immagini (cronologia incolla)',
+    options_action_describe_image: 'Descrizione immagini (cronologia incolla, finestre guardate dalla chat)',
     options_action_transcribe_image: 'Trascrizione (OCR) di una regione dello schermo',
     options_action_transcribe_audio: 'Dettatura (trascrizione audio dal microfono)',
     options_action_tts: 'Lettura ad alta voce (sintesi vocale)',

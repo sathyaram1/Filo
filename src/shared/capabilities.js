@@ -435,6 +435,12 @@
       doesNot: 'Da spenta Filo non esegue nessun comando. Non cambia, installa o cancella niente senza chiedertelo prima.',
     },
     {
+      id: 'look-at-screen', title: 'Filo guarda una finestra o lo schermo', category: 'assistant',
+      desc: 'Chiedi in chat «cosa mi sta chiedendo questa finestra?», «leggimi l’errore di Word» o «cosa c’è sull’altro schermo?»: Filo trova la finestra giusta fra quelle aperte (o lo schermo intero), ne cattura l’immagine, la fa leggere al modello che descrive le immagini insieme alla tua domanda e ti risponde. Se non si capisce quale finestra intendi, te lo chiede. La prima volta che guarda una finestra di un’altra app, o una pagina delicata in Filo, ti chiede l’OK dicendoti quale; le occhiate dopo alla stessa finestra, nella stessa richiesta, partono da sole. Su Mac serve il permesso «Registrazione schermo»: se manca Filo te lo dice e apre il pannello giusto. Su Linux con Wayland la finestra la scegli tu nel selettore del sistema.',
+      invoke: 'È spenta all’installazione: si accende in Preferenze, alla voce «Guardare lo schermo», oppure chiedendolo a Filo, che ti propone di accenderla con un clic. Poi chiedi a parole all’assistente (nuova scheda).',
+      doesNot: 'Guarda soltanto: non clicca, non scrive e non scorre nelle altre app. L’immagine non viene salvata, non entra nella memoria di Filo né nelle chat archiviate: lì resta solo il nome della finestra guardata. Da spenta, Filo non guarda niente fuori dalla chat.',
+    },
+    {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
       desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te. I suggerimenti stanno nella carta «Filo ti suggerisce», a destra nella home.',
       invoke: 'Si genera da sola all’apertura di una nuova scheda; «Aggiorna» sulla carta dei suggerimenti la rifà subito. Il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home"); la carta dei suggerimenti si toglie come ogni carta della home.',
