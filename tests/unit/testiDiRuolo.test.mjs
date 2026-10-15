@@ -72,9 +72,8 @@ test('nessun testo di verifica anticipa il seguito del giro', () => {
   }
 });
 
-// Lo stesso vale per ciò che si incontra senza cercarlo fuori dal testo del ruolo: i documenti che CLAUDE.md
-// nomina, il compito del giro locale, l'aiuto e le intestazioni degli strumenti. Le formule stanno nell'aiuto
-// `formule-vietate.mjs`; il testo si legge unito, perché una frase va a capo dove capita.
+// Vale anche per ciò che si incontra senza cercarlo fuori dal ruolo (documenti nominati da CLAUDE.md, compito
+// locale, aiuto, intestazioni degli strumenti), letto unito perché una frase va a capo dove capita.
 test('i documenti e le intestazioni che si leggono senza cercarli non anticipano il seguito del giro', async () => {
   const { OVUNQUE } = await import('../helpers/formule-vietate.mjs');
   const { testoLavoroServer, usageText } = await import('../../scripts/dispatch.mjs');
