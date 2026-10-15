@@ -324,7 +324,12 @@ function crea({ sistema = null } = {}) {
     return { executed: true, kept: false, output: { finestra: nome, tipo: f.tipo, filo: !!f.filo, web: !!f.web, testo } };
   }
 
-  return { elenca, prepara, guarda, nuovoTurno, approva, approvata };
+  const _perProve = {
+    // Le prove sostituiscono i pezzi del sistema che il contenitore non ha (finestre di altre app, permessi del Mac).
+    usaSistema(parziale) { sis = parziale && typeof parziale === 'object' ? { ...sistemaVero(), ...parziale } : null; },
+  };
+
+  return { elenca, prepara, guarda, nuovoTurno, approva, approvata, _perProve };
 }
 
 module.exports = {

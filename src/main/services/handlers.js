@@ -3835,7 +3835,7 @@ function vediSchermoForPrompt(actions) {
     if (!String(out.testo || '').trim()) continue;
     const quale = out.tipo === 'schermo' ? 'lo schermo' : (out.filo ? 'la finestra di Filo' : 'la finestra');
     blocks.push(`[Ho guardato ${quale} «${nome}»: ecco cosa c'è, letto dall'immagine da un modello che vede]\n`
-      + E.imbusta({ tipo: 'SCHERMO', testo: String(out.testo), conIntestazione: true }));
+      + E.imbusta({ tipo: 'FINESTRA_GUARDATA', testo: String(out.testo), conIntestazione: true }));
   }
   return blocks.join('\n\n').trim();
 }
@@ -6630,6 +6630,8 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
 // Esposto su globalThis per i test Playwright (app.evaluate non ha require):
 // è il dispatch con il gate dei livelli di sicurezza (#146.2).
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
+// #778 — le prove mettono un sistema finto sotto la cattura delle finestre (_perProve.usaSistema).
+globalThis.SN_SCHERMO = Schermo;
 globalThis.SN_SEGRETI_LETTI = SegretiLetti;
 // Idem per la chat della home: i test ne ispezionano il prompt costruito (#158).
 globalThis.SN_HANDLE_FILO_CHAT = handleFiloChat;

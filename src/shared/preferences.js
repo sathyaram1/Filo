@@ -1748,7 +1748,7 @@
       ...b,
       costo: setter.costo,
       allenta,
-      chiede,
+      ...(chiede ? { chiede: true } : {}),
       elencoFisso: setter.elencoFisso || '',
       dove: setter.dove || '',
       risk: setter.risk || '',
