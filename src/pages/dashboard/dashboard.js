@@ -2005,6 +2005,7 @@
     await finoAChiusura('thanksOverlay');
     let r = null;
     try { r = await send({ type: MSG.WALLET_OWNER_ALARM_PENDING }); } catch (_) { r = null; }
+    fineAllarmeOwner();
     const a = r && r.ok && r.alarm;
     if (!a || !window.SN_CONFIRM_UI?.confirm) return;
     const apri = await window.SN_CONFIRM_UI.confirm({
