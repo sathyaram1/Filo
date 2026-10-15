@@ -319,6 +319,29 @@
       </select>
     </section>
 
+    <section id="sec-altre-app">
+      <h2>Altre applicazioni</h2>
+      <p class="sn-muted">Per leggere le finestre aperte sul computer, e più avanti agire nelle altre applicazioni, Filo usa un componente esterno: Cua Driver. Si scarica quando la accendi, si installa solo se la sua impronta è quella attesa e si toglie quando la spegni.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="altreAppEnabled" />
+          <span>Filo può usare le altre applicazioni</span>
+        </label>
+      </div>
+      <div id="altreAppStato" class="aa-stato" aria-live="polite" hidden>
+        <div class="aa-riga">
+          <span id="altreAppFrase" class="aa-frase"></span>
+          <span id="altreAppNumeri" class="aa-numeri"></span>
+        </div>
+        <div id="altreAppBarra" class="aa-barra" role="progressbar" aria-label="Installazione del componente" aria-valuemin="0" aria-valuemax="100" hidden><span></span></div>
+        <div id="altreAppPermessi" class="aa-permessi"></div>
+        <div class="aa-azioni">
+          <button type="button" class="sn-btn sn-btn-secondary" id="altreAppAnnulla" hidden>Annulla</button>
+          <button type="button" class="sn-btn sn-btn-secondary" id="altreAppRiprova" hidden>Riprova</button>
+        </div>
+      </div>
+    </section>
+
     <section id="sec-nomi-file">
       <h2>Nomi dei file scaricati</h2>
       <p class="sn-muted">Un file che arriva con un nome che non dice niente («scan_00231.pdf», «IMG_2026…», «documento (3)») prende un nome che dice cosa contiene, come «Bolletta luce marzo 2026.pdf». Filo ne legge l'inizio o una miniatura, l'estensione resta quella, e l'avviso che compare ha «Annulla». I nomi scelti da qualcuno restano com'erano, e nelle finestre in incognito non succede.</p>

@@ -241,6 +241,8 @@ app.whenReady().then(async () => {
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
+    // #779 — il componente delle altre applicazioni segue l'impostazione: in sottofondo, l'avvio non lo aspetta.
+    try { require('./services/altreApp').seguiImpostazioni(s); } catch (_) {}
     // Le risposte date ai siti vanno lette prima della prima scheda: il controllo dei permessi è sincrono.
     try { await require('./services/permessiPagine').carica(); } catch (_) {}
     // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
@@ -470,6 +472,8 @@ app.whenReady().then(async () => {
 // prossima apertura vengono ripristinati anche se l'utente esce subito dopo
 // aver aperto/chiuso un tab (il salvataggio normale è con debounce).
 app.on('before-quit', () => {
+  // Il driver delle altre applicazioni è un figlio di Filo: esce con lui, e uno scaricamento a metà si ferma.
+  try { require('./services/altreApp').allUscita(); } catch (_) {}
   try {
     const tm = mainWindow?._filoTabs;
     const Storage = require('./shim/storage');

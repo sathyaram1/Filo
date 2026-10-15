@@ -103,8 +103,8 @@ function statoBreve() {
 
 // Le operazioni sul disco una dopo l'altra: accendi-spegni-accendi in fretta non le sovrappone mai.
 function inCoda(fn) {
-  const giro = coda.then(fn, fn);
-  coda = giro.catch(() => {});
+  const giro = coda.then(fn, fn).catch(log);
+  coda = giro;
   return giro;
 }
 
