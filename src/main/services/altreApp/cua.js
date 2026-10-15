@@ -146,7 +146,7 @@ function creaMotoreCua({ eseguibile, avvia = Mcp.avvia, ambienteBase = process.e
       try {
         const s = strutturato(await c.chiama('check_permissions', {}, 15000));
         if (s.atspi === false) mancanti.push('atspi');
-        if (s.x11 === false && !(s.wayland && s.wayland_enabled)) mancanti.push('schermo');
+        if (s.x11 === false && !(s.wayland && s.wayland_enabled)) mancanti.push('display');
       } catch (_) {}
     }
     return { ok: true, mancanti };
