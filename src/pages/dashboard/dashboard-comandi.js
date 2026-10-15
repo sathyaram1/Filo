@@ -463,7 +463,9 @@
       // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
       const cmd = programmaDi(t);
       if (!cmd) return 'none';
-      if (shellCmdCache.has(cmd)) return shellCmdCache.get(cmd) ? 'shell' : 'unknown';
+      const chiave = chiaveShell(cmd);
+      if (shellCmdCache.has(chiave)) return shellCmdCache.get(chiave) ? 'shell' : 'unknown';
+      if (Date.now() - (shellCmdIncerti.get(chiave) ?? -Infinity) < RIPROVA_INCERTO_MS) return 'incerto';
       return 'pending'; // verifica in corso (vedi scheduleShellWhich)
     }
     // Modalità normale: un "/comando" che non è interno né un sito non verrà
