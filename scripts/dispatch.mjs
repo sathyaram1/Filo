@@ -738,7 +738,6 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
  *              in conflitto, e il perché scritto dal server (`critique`): un
  *              conflitto, o gli unit rossi sulla fusione con il loro elenco (#929).
  *   - new-work (resolver, caso `primo-passaggio`): il feedback decifrato.
- *   - prober:   niente.
  *
  * @param {object} bucket  bucket costruito dalla busta del server
  * @param {object} ctx     { diff?, feedback? } dati già raccolti dal chiamante
