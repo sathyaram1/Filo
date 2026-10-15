@@ -367,51 +367,66 @@
   }
 
   // Scritti in forma canonica (Windows): `riservato` confronta per forma, e
-  // Cmd vale Ctrl, quindi valgono anche scritti col tasto del Mac.
+  // Cmd vale Ctrl, quindi valgono anche scritti col tasto del Mac. Accanto a
+  // ognuno quello che fa: lo legge chi si vede rifiutare la combinazione.
   const PRESI_OVUNQUE = [
-    // La shell del browser se li prende prima della pagina (src/main/tabs.js).
-    'Ctrl+T', 'Ctrl+W', 'Ctrl+L', 'Ctrl+R',
+    // La shell del browser se li prende prima della pagina, con Shift o senza (src/main/tabs.js, #545.5).
+    ['Ctrl+T', 'apre una scheda nuova'], ['Ctrl+Shift+T', 'apre una scheda nuova'],
+    ['Ctrl+W', 'chiude la scheda'], ['Ctrl+Shift+W', 'chiude la scheda'],
+    ['Ctrl+L', 'porta alla home per scrivere un indirizzo'], ['Ctrl+Shift+L', 'porta alla home per scrivere un indirizzo'],
+    ['Ctrl+R', 'ricarica la pagina'], ['Ctrl+Shift+R', 'ricarica la pagina'],
     // Indietro e avanti: Alt+freccia qui, Cmd+[ e Cmd+] su Mac (la riscrittura
     // la fa `etichetta`, e con lei il fatto che su Mac Alt+freccia resti libera
     // per il movimento del cursore).
-    'Alt+\u2190', 'Alt+\u2192',
+    ['Alt+\u2190', 'torna alla pagina precedente'], ['Alt+\u2192', 'va alla pagina successiva'],
     // La barra laterale (src/main/barraLaterale.js), da qualunque vista abbia il fuoco.
-    ACCEL_BARRA,
+    [ACCEL_BARRA, 'apre e chiude la barra laterale'],
   ];
   const PRESI_SU_MAC = [
     // Le voci della barra dei menu (src/main/menu.js), anche col tasto che un role di Electron
     // si porta da sé: su Mac «Incolla senza formato» è Cmd+Alt+Shift+V, il menu Aiuto Cmd+?.
-    'Ctrl+Z', 'Ctrl+Shift+Z',
-    'Ctrl+Plus', 'Ctrl+=', 'Ctrl+-', 'Ctrl+0',
-    'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Alt+Shift+V', 'Ctrl+A',
-    'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H', 'Ctrl+?',
+    ['Ctrl+Z', 'annulla'], ['Ctrl+Shift+Z', 'ripete'],
+    ['Ctrl+Plus', 'ingrandisce la pagina'], ['Ctrl+=', 'ingrandisce la pagina'],
+    ['Ctrl+-', 'rimpicciolisce la pagina'], ['Ctrl+0', 'riporta la pagina al 100%'],
+    ['Ctrl+X', 'taglia'], ['Ctrl+C', 'copia'], ['Ctrl+V', 'incolla'],
+    ['Ctrl+Alt+Shift+V', 'incolla senza formato'], ['Ctrl+A', 'seleziona tutto'],
+    ['Ctrl+Q', 'chiude Filo'], ['Ctrl+M', 'riduce a icona la finestra'], ['Ctrl+H', 'nasconde Filo'],
+    ['Ctrl+Alt+H', 'nasconde le altre app'], ['Ctrl+?', 'apre il menu Aiuto'],
     // Cmd+freccia: indietro e avanti fuori dai campi di testo (`comandoNavigazioneFuoriDalCampo`).
-    'Ctrl+\u2190', 'Ctrl+\u2192',
+    ['Ctrl+\u2190', 'torna alla pagina precedente'], ['Ctrl+\u2192', 'va alla pagina successiva'],
   ];
-  // Spiega, Traduci, Salva, Aiuto (src/main/shortcuts.js): con Filo davanti se
-  // li prende lui prima della pagina.
-  const DI_FILO = ['Alt+E', 'Alt+T', 'Alt+S', 'Alt+H'];
 
-  // Tutte le combinazioni che su questo sistema non raggiungono una pagina,
-  // nella forma con cui l'utente le vedrebbe scritte.
-  function tastiRiservati(esplicita) {
-    const mac = suMac(esplicita);
+  // Le combinazioni che su questo sistema non raggiungono una pagina, nella forma
+  // con cui l'utente le vedrebbe scritte, con quello che fanno. `senzaFilo`: senza
+  // le quattro azioni di Filo, che chi ne sceglie una confronta da sé.
+  function presi(esplicita, { senzaFilo = false } = {}) {
     const lista = [
       ...PRESI_OVUNQUE,
-      ...(mac ? PRESI_SU_MAC : []),
-      ...DI_FILO.map((g) => etichetta(g, esplicita)),
+      ...(suMac(esplicita) ? PRESI_SU_MAC : []),
       // Il salto di scheda: Alt+cifra qui, Cmd+cifra su Mac.
-      ...'0123456789'.split('').map((d) => etichetta(`Alt+${d}`, esplicita)),
-    ];
-    // Su Mac le voci canoniche vanno mostrate col nome del Mac.
-    return [...new Set(lista.map((a) => etichetta(a, esplicita)))];
+      ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
+    ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
+    if (!senzaFilo) {
+      for (const a of AZIONI_FILO) lista.push([etichetta(scorciatoiaFilo(a.id), esplicita), `è «${a.nome}» di Filo`]);
+    }
+    return lista;
+  }
+
+  function tastiRiservati(esplicita) {
+    return [...new Set(presi(esplicita).map(([a]) => a))];
+  }
+
+  // Quello che fa la combinazione che Filo si prende prima della pagina, o ''.
+  function chiLaPrende(accel, esplicita, opzioni) {
+    const f = forma(accel);
+    if (!f) return '';
+    const preso = presi(esplicita, opzioni).find(([a]) => forma(a) === f);
+    return preso ? preso[1] : '';
   }
 
   // La combinazione arriva mai a una pagina su questo sistema?
   function riservato(accel, esplicita) {
-    const f = forma(accel);
-    if (!f) return false;
-    return tastiRiservati(esplicita).some((a) => forma(a) === f);
+    return !!chiLaPrende(accel, esplicita);
   }
 
   // ── Una scorciatoia scelta dall'utente ─────────────────────────────────────
