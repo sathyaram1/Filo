@@ -31,6 +31,8 @@ nati da quei vincoli invece di adattarli.
   finché la feature non è chiusa".
 - I sotto-feedback storici (#146.x, #379.x, #477.x…) restano VISIBILI in
   dashboard; sparisce solo la possibilità di crearne di nuovi.
+  - **Superato** (i figli `#N.k` di oggi): vedi `FEEDBACK-STATES.md` §3. Il
+    divieto di spezzare per chi lavora resta: `routines/roles/resolver.md`.
 - La macchina a stati vive in due copie (dashboard + server filo-security):
   lo smontaggio va fatto su entrambe, con rideploy (v. §7 per la soluzione
   definitiva alle due copie).
