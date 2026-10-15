@@ -159,6 +159,8 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
 
 ## 9. Laboratorio del verificatore (già operativo)
 
+*Fatto (§14, passo 6).*
+
 - Clone in Desktop/Filo/verifier-lab: senza remoto (non può pushare per
   costruzione), hook staccati, 34 rami e storia completa per il checkout dei
   commit verificati all'epoca.
