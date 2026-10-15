@@ -80,6 +80,17 @@ functions. Qui sotto il perché dei passaggi, per attore.
 - `attack`/`spam` → `unlabeled`: un mittente fidato segnalato per errore torna al ri-giudizio
   (sotto, «Mittenti fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
   `unlabeled` | `todo`: solo i derivati che seguono la loro origine (§4c).
+- **Un feedback che aspetta una scelta dell'owner non gira** (regola dell'owner del 22/09,
+  #775). Il derivato nato da un rilievo col `?` porta il segno `chiedeDecisione` (in chiaro,
+  lo scrive solo il server alla nascita) e la domanda come turno di Filo nella conversazione.
+  Ogni esito che lo metterebbe in coda o ad aspettare l'origine (sicuro dei giudici, salto dei
+  fidati, origine fusa, chiusa, sparita o non ancora fusa) diventa `design` (`statusReason:
+  decisione`): nei Ricevuti, col rombo e la casella. Attacco, spam, origine bloccata e
+  giudizio incompleto vincono come per gli altri; con l'origine si blocca e si sblocca, ma la
+  sua fusione non lo mette in coda. Dopo la risposta va in coda come un feedback normale (non
+  ha un ramo da riprendere) e chi lo prende trova domanda e risposta (`decisioni`). Un
+  `design` che aspetta la risposta (`decisione`, `clarify`) la pipeline non lo sovrascrive:
+  una ri-valutazione non lo rimette in coda.
 
 **Owner**: le sue righe sono le azioni di §4a, una per azione e nessuna in più (sentinella
 `tests/unit/ownerActionsTransizioni.test.mjs`). La tabella ammette all'owner gli stessi
