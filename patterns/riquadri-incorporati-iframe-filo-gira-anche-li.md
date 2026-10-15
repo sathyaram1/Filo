@@ -74,6 +74,28 @@ Quattro regole quando si tocca qualcosa che vive nel content script:
   riquadri senza indirizzo: in quelli con un indirizzo vero il content script
   c'è e traduce da sé, e leggerli anche da fuori è pagare due volte.
 
+- **Ciò che Filo mette nel mondo della pagina va in ogni sua finestra** (#798,
+  la guardia anti-fingerprint; #753, GPC, passa dallo stesso preambolo). Ogni
+  riquadro della stessa origine è un'altra finestra con le sue copie native di
+  canvas, WebGL e audio: una pagina che crea un `iframe` vuoto e ne usa le
+  funzioni legge senza la guardia. Cinque cose misurate, non supposte:
+  il preload entra in `srcdoc`, `data:`, `blob:` e negli indirizzi veri, non in
+  `about:blank`; il riquadro vuoto lo prepara la finestra che lo contiene,
+  dall'elemento (`contentWindow`, `contentDocument`) e, per indice o per nome,
+  appena entra nel documento (un osservatore: chi lo inserisce e lo legge per
+  indice nello stesso script resta scoperto). **Un riquadro con un indirizzo
+  ancora in caricamento non si tocca**: la sua finestra vuota, toccata, la
+  riusa il documento vero e il preload non gira più (niente Filo lì dentro);
+  la pagina che la tocca da sé l'ha già creata, quindi lì prepararla non costa
+  niente. **Un preambolo per albero della stessa origine**: quello iniettato
+  dal preload si unisce al primo contenitore della stessa origine che ne ha
+  uno, o un canvas annotato da uno e letto con le funzioni dell'altro uscirebbe
+  pulito. **Ciò che il preambolo usa dopo l'avvio si prende all'avvio**
+  (`Reflect.apply`, `Object.*`, descrittori senza prototipo): un riquadro si
+  prepara quando la pagina ha già riscritto quello che voleva. Quali riquadri
+  con un documento loro la ricevono lo decide il main dalla catena dei frame
+  (`configForFrames`), mai dall'indirizzo che il riquadro dichiara.
+
 Il menu si adatta anche allo spazio: se il riquadro è più basso del menu, il menu
 diventa scorrevole invece di essere tagliato.
 
