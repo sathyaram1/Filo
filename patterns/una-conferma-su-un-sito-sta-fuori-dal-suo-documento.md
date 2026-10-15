@@ -145,5 +145,9 @@ selezione).
 Dove vive: `src/main/propostaEmail.js` (vista, tasti, scelta), `src/content/propostaEmail.js` (il campo),
 `src/shared/campoAccesso.js` (quali campi, quando proporre), `src/renderer/proposta-email.*`. Prove:
 `tests/proposta-email.spec.mjs` (prima della scelta la pagina non trova l'email, dopo la riceve con un `input` vero),
-`tests/unit/campoAccesso.test.mjs`. Limite: un campo dentro un riquadro di un'altra origine non ha proposta, perché
-quel frame non sa dove sta il suo riquadro nella pagina.
+`tests/unit/campoAccesso.test.mjs`.
+
+- **Un riquadro di un'altra origine non sa dove sta**: il suo content script manda un segno a caso alla finestra
+  sopra (`postMessage`), e il documento sopra riconosce il riquadro dalla finestra che lo spedisce, non dal segno; ne
+  dà al main la posizione finché il riquadro ha il fuoco. Il main somma gli anelli e accetta la posizione solo da un
+  frame che contiene quello del campo. Un riquadro intermedio ancora senza Filo si monta al segno.

@@ -218,12 +218,11 @@
   }
 
   // Vale solo il segno spedito dalla finestra di un riquadro di questo documento: chi lo spedisce non sceglie il riquadro.
-  window.addEventListener('message', (e) => {
-    const segno = e.data && typeof e.data === 'object' ? e.data.filoPropostaEmail : null;
-    if (typeof segno !== 'string' || !SEGNO.test(segno) || !e.source || e.source === window) return;
+  function riceviSegno(segno, sorgente) {
+    if (typeof segno !== 'string' || !SEGNO.test(segno) || !sorgente || sorgente === window) return;
     let ifr = attivo();
-    if (!ifr || !/^i?frame$/i.test(ifr.tagName || '') || ifr.contentWindow !== e.source) {
-      ifr = [...document.querySelectorAll('iframe, frame')].find((f) => f.contentWindow === e.source) || null;
+    if (!ifr || !/^i?frame$/i.test(ifr.tagName || '') || ifr.contentWindow !== sorgente) {
+      ifr = [...document.querySelectorAll('iframe, frame')].find((f) => f.contentWindow === sorgente) || null;
     }
     if (!ifr) return;
     let q = riquadri.get(segno);
@@ -234,6 +233,9 @@
     }
     misuraRiquadro(segno, q);
     if (!timerRiquadri) timerRiquadri = setInterval(seguiRiquadri, PASSO_MS);
+  }
+  window.addEventListener('message', (e) => {
+    riceviSegno(e.data && typeof e.data === 'object' ? e.data.filoPropostaEmail : null, e.source);
   });
 
   let inCoda = false;
@@ -267,5 +269,6 @@
     if (document.hasFocus() && a) entra(a, 'focus');
   } catch (_) {}
 
-  global.SN_PROPOSTA_EMAIL = { _test: { idoneo, rettangolo, corrente: () => (corrente ? corrente.dati.campo : null) } };
+  // `segno`: il page-preload ci passa quello arrivato prima che Filo fosse montato in questo riquadro.
+  global.SN_PROPOSTA_EMAIL = { segno: riceviSegno, _test: { idoneo, rettangolo, corrente: () => (corrente ? corrente.dati.campo : null) } };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

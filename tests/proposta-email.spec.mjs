@@ -222,9 +222,25 @@ test('in un riquadro della stessa origine la proposta sta sotto il campo del riq
 const RIQUADRO = '<!doctype html><body style="margin:0;padding:20px"><input id="u" type="email" style="width:260px;height:30px"></body>';
 const altraOrigine = (url) => url.replace('127.0.0.1', 'localhost');
 
-async function sottoIlCampoDelRiquadro(app, page, misura) {
+// Il campo nella scheda: la sua misura dentro il riquadro più gli spostamenti dei riquadri, ciascuno col suo bordo.
+async function campoNellaScheda(page, catena, campo) {
+  let left = 0; let bottom = 0;
+  const b = await campo.evaluate((el) => el.getBoundingClientRect());
+  left += b.left; bottom += b.bottom;
+  for (const ifr of catena) {
+    const o = await ifr.evaluate((f) => {
+      const r = f.getBoundingClientRect();
+      const cs = getComputedStyle(f);
+      return { x: r.left + f.clientLeft + parseFloat(cs.paddingLeft), y: r.top + f.clientTop + parseFloat(cs.paddingTop) };
+    });
+    left += o.x; bottom += o.y;
+  }
+  return { left, bottom };
+}
+
+async function sottoIlCampoDelRiquadro(app, page, catena, campo) {
   const s = await stato(app);
-  const r = await page.evaluate(misura);
+  const r = await campoNellaScheda(page, catena, campo);
   return { dx: Math.abs(s.bounds.x - (s.scheda.x + r.left * s.zoom)), dy: Math.abs(s.bounds.y - (s.scheda.y + r.bottom * s.zoom)) };
 }
 
@@ -236,17 +252,13 @@ test('in un riquadro di un\'altra origine la proposta sta sotto il campo, segue 
   const riquadro = page.frameLocator('#r');
   await riquadro.locator('#u').click();
   await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
-  // Il campo sta a 20px dal bordo interno del riquadro, e il riquadro ha bordo e spaziatura.
-  const misura = () => {
-    const f = document.getElementById('r').getBoundingClientRect();
-    return { left: f.left + 5 + 3 + 20, bottom: f.top + 5 + 3 + 20 + 30 };
-  };
-  let d = await sottoIlCampoDelRiquadro(app, page, misura);
+  const misura = [[page.locator('#r')], riquadro.locator('#u')];
+  const d = await sottoIlCampoDelRiquadro(app, page, ...misura);
   expect(d.dx).toBeLessThanOrEqual(1);
   expect(d.dy).toBeLessThanOrEqual(4);
 
   await page.evaluate(() => window.scrollBy(0, 25));
-  await expect.poll(async () => (await sottoIlCampoDelRiquadro(app, page, misura)).dy, { timeout: 3000 }).toBeLessThanOrEqual(4);
+  await expect.poll(async () => (await sottoIlCampoDelRiquadro(app, page, ...misura)).dy, { timeout: 3000 }).toBeLessThanOrEqual(4);
 
   const vista = await vistaProposta(app);
   await expect(vista.locator('#email')).toHaveText(EMAIL);
@@ -265,12 +277,10 @@ test('in un riquadro di un\'altra origine dentro un altro riquadro di un\'altra 
     <iframe id="i" src="${interno}" style="margin-left:40px;width:340px;height:120px;border:2px solid #999"></iframe></body>`));
   const page = await testServer.openReady(openTab, `<!doctype html><body style="margin:0;padding:30px">
     <iframe id="r" src="${medio}" style="margin-left:50px;width:500px;height:220px;border:5px solid #ccc"></iframe></body>`);
-  await page.frameLocator('#r').frameLocator('#i').locator('#u').click();
+  const campo = page.frameLocator('#r').frameLocator('#i').locator('#u');
+  await campo.click();
   await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
-  const d = await sottoIlCampoDelRiquadro(app, page, () => {
-    const f = document.getElementById('r').getBoundingClientRect();
-    return { left: f.left + 5 + 10 + 40 + 2 + 20, bottom: f.top + 5 + 10 + 2 + 20 + 30 };
-  });
+  const d = await sottoIlCampoDelRiquadro(app, page, [page.frameLocator('#r').locator('#i'), page.locator('#r')], campo);
   expect(d.dx).toBeLessThanOrEqual(1);
   expect(d.dy).toBeLessThanOrEqual(4);
 });

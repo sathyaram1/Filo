@@ -951,5 +951,15 @@ if (!IS_SUBFRAME) {
       window.addEventListener(ev, ensureContentScripts, { capture: true, passive: true, once: true });
     } catch (_) {}
   }
+  // #1124 — un campo email in un riquadro qui dentro chiede dove sta: il gesto è stato là, ma la misura tocca a noi.
+  try {
+    window.addEventListener('message', (e) => {
+      const segno = e.data && typeof e.data === 'object' ? e.data.filoPropostaEmail : null;
+      if (contentScriptsStarted || typeof segno !== 'string' || !e.source) return;
+      const sorgente = e.source;
+      ensureContentScripts();
+      waitForContentScripts(() => { try { globalThis.SN_PROPOSTA_EMAIL?.segno?.(segno, sorgente); } catch (_) {} });
+    });
+  } catch (_) {}
 }
 
