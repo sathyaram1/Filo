@@ -477,13 +477,14 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
       const radice = radiceCondivisa(cwd);
       const suo = radice && ID_RE.test(sessionId) ? join(cartellaBiglietti(radice), `${sessionId}.json`) : '';
       const ereditatoOra = suo && resolve(suo) !== resolve(path) ? leggiFile(path) : null;
-      if (ereditatoOra) { try { scriviFile(suo, ereditatoOra); } catch (_) { /* resta la variabile, per Bash */ } }
+      if (ereditatoOra) { try { scriviFile(suo, Object.assign({}, ereditatoOra, { trascrizione })); } catch (_) { /* resta la variabile, per Bash */ } }
     }
     if (!path && (source === 'resume' || source === 'compact')) {
       const radice = radiceCondivisa(cwd);
       const suo = radice && ID_RE.test(sessionId) ? leggiFile(join(cartellaBiglietti(radice), `${sessionId}.json`)) : null;
       if (suo) {
         path = suo.path;
+        segnaVivo(suo, trascrizione, nowMs);
         const attesa = (await consegnaSporchi(suo, { deps })).restano;
         const s = await chiama('stato', { ticket: suo.ticket }, deps).catch(() => null);
         fiducia = s && s.fiducia === 'fidato' && s.chiuso !== true && !attesa ? 'fidato' : 'non_fidato';
