@@ -4342,7 +4342,10 @@ function ricordoComeAzione(ricordi) {
 async function handleFiloChat(richiesta) {
   const volo = { accoglienza: false };
   try {
-    return await turnoFiloChat(richiesta, volo);
+    // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
+    const Costi = global.SN_COSTS;
+    const turno = () => turnoFiloChat(richiesta, volo);
+    return await (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno());
   } finally {
     if (volo.accoglienza) onbTurniInVolo -= 1;
   }
