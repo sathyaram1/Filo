@@ -163,6 +163,7 @@
     'pricing.*': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
     usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
     azzeramento: 'cancellare tutti i dati non lascia traccia: è proprio quello che si è chiesto',
+    migrazione: 'un valore di serie che cambia con un aggiornamento non l\'ha scelto nessuno: un file di dati vecchio lo riceve come chi installa adesso',
     'timer:suona': 'un timer o una sveglia che arriva all\'ora e suona è il tempo che passa, non un cambio di qualcuno',
     'timer:ferma': 'fermare la suoneria chiude il giro del timer: rimetterlo non avrebbe più niente da far suonare',
     'timer:pausa': 'pausa e ripresa di un timer sono il suo pulsante play: si riprende da lì',
