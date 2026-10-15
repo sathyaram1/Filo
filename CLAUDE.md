@@ -280,5 +280,5 @@ src/content/    content scripts
   seconda del contesto (main / pagine filo:// / pagine web).
 
 Macchina a stati dei feedback: **`FEEDBACK-STATES.md`**; canale autenticato
-delle routine: **`ROUTINE-AUTH-SPEC.md`**; ridisegno in corso:
-**`SPEC-RIDISEGNO-MAX.md`**.
+delle routine: **`ROUTINE-AUTH-SPEC.md`**; decisioni del ridisegno per il piano
+Max, chiuso: **`SPEC-RIDISEGNO-MAX.md`**.

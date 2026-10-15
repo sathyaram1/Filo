@@ -13,8 +13,10 @@
       features: [
         'Ogni versione di Filo su GitHub ha una sezione «Verifica» con l\'impronta di ogni file da scaricare e il link alla costruzione pubblica che l\'ha prodotto. Se il file che hai scaricato ha la stessa impronta, è quello costruito dal codice pubblico.',
         'Nella schermata Mazzi ogni mazzo mostra quanto costa in tutto, senza doverlo aprire. Se di qualche carta il prezzo non è noto, davanti al totale c\'è «≥». Col tasto destro su un mazzo lo puoi anche esportare come lista o rinominare, oltre a duplicarlo ed eliminarlo.',
+        'Nel Deck builder MTG il calcolatore di probabilità ti lascia scegliere la partita (a più giocatori, oppure a due iniziando tu o l\'avversario), quante volte rifai la mano e cosa deve avere per tenerla, e le carte che peschi in più. Puoi dirlo anche in chat, per esempio «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre».',
       ],
       fixes: [
+        'Nel Deck builder MTG il calcolatore di probabilità conta la pescata del primo turno, come in una partita Commander vera, e il mulligan mette le carte in fondo al mazzo come vuole la regola attuale. Prima le probabilità uscivano più basse del vero.',
         'La protezione fingerprinting vale anche nei riquadri che un sito crea dentro la sua pagina e in quelli dello stesso sito. Passare da un riquadro non basta più per riconoscere il tuo browser.',
       ],
     },
