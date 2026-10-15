@@ -3,7 +3,7 @@
 // aggiunge GPC). Non legge mai il master secret: riceve solo il seed per sito (HMAC in main).
 
 // La guardia: rumore legato alla posizione del pixel nell'immagine, stesso pixel stesso rumore da ogni porta.
-// `guarda(w)` la monta nella finestra `w`, con le copie native di quella finestra.
+// La parte che aggiunge a `parti` la monta nella finestra che riceve, sulle copie native di quella finestra.
 function parteFingerprint(seed) {
   return `
   var SEED = ${seed >>> 0} >>> 0;
@@ -206,6 +206,7 @@ const PROPAGAZIONE = `
   var CORNICI = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'];
   var EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute, qsa = EP.querySelectorAll;
   var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(Node.prototype, 'nodeType').get;
+  var primoFiglio = gOPD(EP, 'firstElementChild').get;
   var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, taglia = SP.slice;
   var MO = MutationObserver, moObserve = MO.prototype.observe;
   var GETTER = { __proto__: null };
@@ -270,6 +271,7 @@ const PROPAGAZIONE = `
             var n = nodi[j];
             if (R(nodeType, n, []) !== 1) continue;
             tocca(n);
+            if (!R(primoFiglio, n, [])) continue;
             var l = R(qsa, n, ['iframe,frame,object']);
             for (var h = 0; h < l.length; h++) tocca(l[h]);
           } catch (e) {}
