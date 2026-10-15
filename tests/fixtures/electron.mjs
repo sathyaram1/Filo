@@ -126,6 +126,7 @@ export const test = base.extend({
       //    la pagina con un nome da internet (testServer.html(…, { pubblico: true })).
       args: [
         ...argomentiScala,
+        ...argomentiInPiu,
         '--host-resolver-rules=MAP blocked.test 127.0.0.1, MAP 192.168.1.1 127.0.0.1:9, MAP sito-pubblico.test 127.0.0.1',
         '.',
       ],
