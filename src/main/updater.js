@@ -306,6 +306,17 @@ function quandoScaricato(info) {
   // electron-updater aggancia l'installazione alla chiusura subito dopo questo evento, solo se è accesa adesso.
   if (updater && updater.autoInstallOnAppQuit) stato.agganciata = true;
   stato.scaricamento = null;
+  // Partita sul veloce e finita dopo il passaggio allo stabile: resta nella cache, ma non si installa né si annuncia.
+  if (!R.nelCanale(versione, stato.canale)) {
+    stato.scaricataFuori = versione;
+    regola();
+    if (stato.fase !== 'pronto') stato.fase = 'aggiornato';
+    if (stato.versioneTrovata && siInstalla()) Promise.resolve().then(scarica);
+    stato.annuncia();
+    return;
+  }
+  stato.scaricataFuori = null;
+  regola();
   stato.pronta = versione;
   let meta = null;
   try { meta = JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'update-info.json'), 'utf8')); } catch (_) {}
