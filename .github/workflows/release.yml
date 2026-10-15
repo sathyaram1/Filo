@@ -10,6 +10,8 @@
 #   Niente di verde e nuovo: non fa nulla; se dura da piu' di 48 ore apre un
 #   feedback e la corsa e' rossa. Anche un verde che non esce (la meta'
 #   Windows si ferma dopo la scelta) apre un feedback, passate le 48 ore.
+#   Ogni meta' scrive nella pagina della versione la sezione «Verifica» (commit,
+#   corsa, SHA-256 dei suoi file): scripts/release-impronte.mjs.
 #
 # QUESTO LAVORO NON SCRIVE SU `main` (SPEC-RIDISEGNO-MAX.md §10)
 #   Fino al 18/08/2026 alzava la patch version da sé e la pushava. Su `main`
@@ -490,7 +492,7 @@ jobs:
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
-          cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/npm-ci-ritenta.mjs scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -736,7 +738,7 @@ jobs:
           set -e
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
-          cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/npm-ci-ritenta.mjs scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'

@@ -268,17 +268,21 @@ async function main() {
       log: (t) => console.log(t),
     });
   } catch (e) {
-    const motivo = primaRiga(e);
-    console.error(`::error::sezione «Verifica» non scritta: ${motivo}`);
-    riassunto([
-      '### La sezione «Verifica» non è stata scritta',
-      '',
-      `Motivo: ${motivo}`,
-      ...(e.bozza ? ['', 'La versione è ancora una bozza e resta non pubblicata.'] : []),
-      '',
-    ].join('\n'));
+    console.error(`::error::sezione «Verifica» non scritta: ${primaRiga(e)}`);
+    riassunto(testoFallimento(e));
     process.exit(1);
   }
+}
+
+/** Il riassunto di un passo fermo: il motivo, e se la versione resta una bozza che non esce. PURA. */
+export function testoFallimento(e) {
+  return [
+    '### La sezione «Verifica» non è stata scritta',
+    '',
+    `Motivo: ${primaRiga(e)}`,
+    ...(e?.bozza ? ['', 'La versione è ancora una bozza e resta non pubblicata.'] : []),
+    '',
+  ].join('\n');
 }
 
 // Il workflow lancia una COPIA fuori dalla copia di lavoro: dietro un collegamento argv[1] e import.meta.url non
