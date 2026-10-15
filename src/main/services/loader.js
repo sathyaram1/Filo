@@ -71,6 +71,7 @@ require(path.join(SHARED, 'chatArchive.js'));
 require(path.join(SHARED, 'filoEventi.js'));  // #866 — forma degli eventi del filo: prima di services/ilFilo.js
 require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come righe ripiegate del filo (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
+require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
 require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedback mandati da questa installazione
@@ -92,6 +93,8 @@ require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete 
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
 require(path.join(SHARED, 'codaAdattiva.js'));  // #1118 — lavori in parallelo che rallentano ai 429: prima del cancello dei modelli
 require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: righe del registro, 402, messaggi
+require(path.join(SHARED, 'stimaCosto.js'));  // #819 — quanto costa un uso tipico di una funzione con un modello
+require(path.join(SHARED, 'creditiAvviso.js')); // #818 — proiezione dei crediti, soglie e rimedi
 // #652 — una manopola numerica: controllo del numero e frase di rifiuto. La
 // parte pura serve anche al main, che rifiuta gli stessi valori della pagina.
 require(path.join(SHARED, 'campoNumero.js'));
@@ -102,6 +105,7 @@ require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei ma
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
 require(path.join(SHARED, 'provenienzaImmagine.js'));
+require(path.join(SHARED, 'marchiInvisibili.js'));  // #889 — i marchi aperti nei pixel: li legge il thread di provenienzaIsolata
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 // #530 — la regola «Filo può fare X?» come dati: prima del registro, che le passa gli ingressi.
 require(path.join(SHARED, 'autonomia.js'));

@@ -1,12 +1,15 @@
-// La lettura delle etichette d'origine (#711) in un thread a parte, con un tempo e una memoria massimi.
-// I byte li sceglie chi ha fatto il file: uno costruito apposta non deve fermare né chiudere Filo (#946).
-// Il lettore è src/shared/provenienzaImmagine.js; qui c'è solo il recinto.
+// La lettura delle etichette d'origine (#711) e dei marchi nei pixel (#889) in un thread a parte, con un tempo e una
+// memoria massimi: i byte li sceglie chi ha fatto il file, e uno costruito apposta non deve fermare né chiudere Filo (#946).
+// I lettori sono src/shared/provenienzaImmagine.js e src/shared/marchiInvisibili.js; qui c'è solo il recinto.
 
 'use strict';
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { Worker } = require('node:worker_threads');
+
+// Cercato al caricamento: se il pacchetto manca, chi importa il modulo cade subito e col motivo (#1231).
+const DECODIFICA_JPEG = require.resolve('jpeg-js/lib/decoder.js');
 
 // Un'immagine vera da 64 MB si legge in qualche centinaio di millisecondi.
 const TEMPO_MAX_MS = 10_000;
@@ -18,8 +21,12 @@ const { parentPort } = require('node:worker_threads');
 let versione = null;
 let ancore = null;
 let ancoreTsa = null;
-parentPort.on('message', ({ id, byte, elenco }) => {
+parentPort.on('message', ({ id, byte, elenco, marchi }) => {
   try {
+    if (marchi) {
+      parentPort.postMessage({ id, res: globalThis.SN_MARCHI_INVISIBILI.cerca(byte, { jpeg: decodificaJpeg }) });
+      return;
+    }
     const P = globalThis.SN_PROVENIENZA;
     if (elenco && elenco.versione !== versione) {
       versione = elenco.versione;
@@ -42,8 +49,15 @@ const attese = new Map();
 
 function codiceThread() {
   if (!codice) {
-    const sorgente = fs.readFileSync(path.join(__dirname, '..', '..', 'shared', 'provenienzaImmagine.js'), 'utf8');
-    codice = sorgente + '\n' + CORPO_THREAD;
+    const condiviso = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'shared', nome), 'utf8');
+    // jpeg-js (JS puro) entra come testo anche lui, chiuso in una funzione che gli fa da modulo.
+    const jpeg = fs.readFileSync(DECODIFICA_JPEG, 'utf8');
+    codice = [
+      condiviso('provenienzaImmagine.js'),
+      condiviso('marchiInvisibili.js'),
+      `const decodificaJpeg = (function () { const module = { exports: {} };\n${jpeg}\n;return module.exports; })();`,
+      CORPO_THREAD,
+    ].join('\n');
   }
   return codice;
 }
@@ -78,6 +92,15 @@ function avvia() {
 
 // `elenco`: { versione, pem, pemTsa }. Il thread riconverte l'elenco solo quando cambia versione.
 function analizza(byte, elenco) {
+  return chiedi(byte, elenco, false);
+}
+
+// Il marchio aperto nei pixel: la forma la dice `cerca` di src/shared/marchiInvisibili.js.
+function cercaMarchi(byte) {
+  return chiedi(byte, null, true);
+}
+
+function chiedi(byte, elenco, marchi) {
   if (!thread) thread = avvia();
   const w = thread;
   const id = prossimo++;
@@ -91,8 +114,8 @@ function analizza(byte, elenco) {
     }, TEMPO_MAX_MS);
     attese.set(id, { resolve, reject, timer, w });
     const copia = byte instanceof ArrayBuffer ? new Uint8Array(byte.slice(0)) : new Uint8Array(byte);
-    w.postMessage({ id, byte: copia, elenco: conElenco ? elenco : null }, [copia.buffer]);
+    w.postMessage({ id, byte: copia, elenco: conElenco ? elenco : null, marchi }, [copia.buffer]);
   });
 }
 
-module.exports = { analizza, TEMPO_MAX_MS };
+module.exports = { analizza, cercaMarchi, TEMPO_MAX_MS };

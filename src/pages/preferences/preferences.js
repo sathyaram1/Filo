@@ -877,6 +877,13 @@
       case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
       case 'contestoFilo.giorni': return tettoContesto('giorni', $('contestoGiorni').value);
       case 'contestoFilo.token': return tettoContesto('token', $('contestoToken').value);
+      case 'lunghezzaRisposte.conversazioni': return tettoRisposte($('lunghezzaConversazioni').value);
+      case 'lunghezzaRisposte.testi': return tettoRisposte($('lunghezzaTesti').value);
+      case 'lunghezzaRisposte.brevi': return tettoRisposte($('lunghezzaBrevi').value);
+      case 'avvisoCrediti.attivo': return $('avvisoCreditiAttivo').checked;
+      case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
+      case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
+      case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
       default: return undefined;
     }
   }
@@ -927,8 +934,22 @@
       case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
       case 'contestoFilo.giorni': return tettoContesto('giorni', s.contestoFilo && s.contestoFilo.giorni);
       case 'contestoFilo.token': return tettoContesto('token', s.contestoFilo && s.contestoFilo.token);
+      case 'lunghezzaRisposte.conversazioni':
+      case 'lunghezzaRisposte.testi':
+      case 'lunghezzaRisposte.brevi': return tettoRisposte(s.lunghezzaRisposte && s.lunghezzaRisposte[k.split('.')[1]]);
+      case 'avvisoCrediti.attivo': return !(s.avvisoCrediti && s.avvisoCrediti.attivo === false);
+      case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
+      case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
+      case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
       default: return undefined;
     }
+  }
+
+  // Le soglie dell'avviso dei crediti (#818): vuoto = il predefinito, fuori scala torna dentro come nella chat.
+  const sogliaCrediti = (k, v) => window.SN_CREDITI_AVVISO.numeroSoglia(k, v);
+  const CAMPI_CREDITI = [['giorni', 'avvisoCreditiGiorni'], ['percento', 'avvisoCreditiPercento']];
+  function canonCrediti() {
+    for (const [k, id] of CAMPI_CREDITI) $(id).value = String(sogliaCrediti(k, $(id).value));
   }
 
   // Quanto ricorda la chat (#868): vuoto = come i predefiniti; fuori scala si riporta dentro come fa il main.
@@ -943,6 +964,16 @@
       $(id).value = v == null ? '' : String(v);
     }
   }
+  // Quanto può essere lunga una risposta (#1097.3): vuoto = come i predefiniti; fuori scala torna dentro come nel main.
+  const CAMPI_LUNGHEZZA = [['conversazioni', 'lunghezzaConversazioni'], ['testi', 'lunghezzaTesti'], ['brevi', 'lunghezzaBrevi']];
+  const tettoRisposte = (v) => window.SN_LUNGHEZZA_RISPOSTE.numeroIn(v);
+  function canonLunghezza() {
+    for (const [, id] of CAMPI_LUNGHEZZA) {
+      const v = tettoRisposte($(id).value);
+      $(id).value = v == null ? '' : String(v);
+    }
+  }
+
   // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
   async function segnapostiContesto() {
     try {
@@ -950,6 +981,8 @@
       const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
       if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
       if (d.token != null) $('contestoToken').placeholder = String(d.token);
+      const l = { ...((r && r.lunghezzaRisposteDiSerie) || {}), ...((r && r.lunghezzaRisposte) || {}) };
+      for (const [f, id] of CAMPI_LUNGHEZZA) if (l[f] != null) $(id).placeholder = String(l[f]);
     } catch (_) {}
   }
 
@@ -1082,6 +1115,16 @@
     const cf = settings.contestoFilo || {};
     if (vuole('contestoFilo.giorni')) $('contestoGiorni').value = cf.giorni == null ? '' : String(cf.giorni);
     if (vuole('contestoFilo.token')) $('contestoToken').value = cf.token == null ? '' : String(cf.token);
+    const lr = settings.lunghezzaRisposte || {};
+    for (const [f, id] of CAMPI_LUNGHEZZA) {
+      if (vuole(`lunghezzaRisposte.${f}`)) $(id).value = lr[f] == null ? '' : String(lr[f]);
+    }
+    const ac = settings.avvisoCrediti || {};
+    if (vuole('avvisoCrediti.attivo')) $('avvisoCreditiAttivo').checked = ac.attivo !== false;
+    for (const [k, id] of CAMPI_CREDITI) {
+      if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
+    }
+    if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
 
     if (vuole('timerRingtone')) {
       const ringtone = settings.timerRingtone || 'default';
@@ -1357,6 +1400,50 @@
     await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
   }
 
+  // ── Siti dove il tasto destro apre il loro menu (#975) ───────────────────
+  // Si aggiungono dal tasto destro sul sito o chiedendolo a Filo; qui si vedono tutti e si tolgono.
+  let sitiMenuSalvati = null;
+
+  function disegnaSitiMenu(elenco) {
+    const box = $('menuDelSitoSiti');
+    if (!box) return;
+    sitiMenuSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
+    box.textContent = '';
+    const tasto = $('menuDelSitoTasto');
+    if (tasto) tasto.textContent = window.SN_TASTI ? window.SN_TASTI.etichetta('Shift') : 'Shift';
+    if (!sitiMenuSalvati.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessun sito. Lo aggiungi da «Menu di …» in cima al menu di Filo, o chiedendolo a Filo.';
+      box.appendChild(p);
+    }
+    for (const sito of sitiMenuSalvati) {
+      const row = document.createElement('div');
+      row.className = 'mem-riga';
+      row.dataset.sito = sito;
+      const t = document.createElement('span');
+      t.className = 'mem-testo';
+      t.textContent = (window.SN_NOMI_SITO && window.SN_NOMI_SITO.leggibile(sito)) || sito;
+      row.appendChild(t);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mem-via';
+      b.textContent = '×';
+      b.title = 'Torna al menu di Filo';
+      b.setAttribute('aria-label', `Su ${t.textContent} torna al menu di Filo`);
+      b.addEventListener('click', () => salvaSitiMenu((sitiMenuSalvati || []).filter((x) => x !== sito)));
+      row.appendChild(b);
+      box.appendChild(row);
+    }
+  }
+
+  async function salvaSitiMenu(nuovo) {
+    const elenco = Array.from(new Set(nuovo));
+    disegnaSitiMenu(elenco);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { menuDelSito: { siti: elenco } } });
+    flashSaved('menuDelSitoHint');
+  }
+
   let caricato = false;
 
   // ── Autonomia di Filo (#530) ─────────────────────────────────────────────
@@ -1436,6 +1523,7 @@
     riempi(settings);
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
+    disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
@@ -1473,6 +1561,8 @@
       disegnaCartelle(cartelle);
       setTimeout(caricaStatoDocumenti, 400);
     }
+    const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
+    if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1529,6 +1619,18 @@
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
       $(id).addEventListener('blur', canonContesto);
+    }
+    for (const [, id] of CAMPI_LUNGHEZZA) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
+      $(id).addEventListener('blur', canonLunghezza);
+    }
+    $('avvisoCreditiAttivo').addEventListener('change', persist);
+    $('spiegaAnticipata').addEventListener('change', persist);
+    for (const [, id] of CAMPI_CREDITI) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
+      $(id).addEventListener('blur', canonCrediti);
     }
     segnapostiContesto();
     $('terminalShell').addEventListener('change', persist);

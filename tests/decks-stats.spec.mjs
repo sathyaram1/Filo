@@ -71,7 +71,15 @@ async function mockProvider(app) {
       const last = String(messages[messages.length - 1].content || '');
       let text;
       if (/budget/i.test(last)) text = JSON.stringify({ reply: '', budget: 40 });
-      else if (/probabilit/i.test(last)) {
+      else if (/\bramp\b/i.test(last)) {
+        text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, mulligans: 1, keep: { ramp: 1 } } });
+      } else if (/due mulligan/i.test(last)) {
+        // #791: mulligan detti senza la mano da tenere.
+        text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, mulligans: 2 } });
+      } else if (/mulligan/i.test(last)) {
+        // #791: «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre».
+        text = JSON.stringify({ reply: '', prob: { turn: 3, needs: { terre: 3 }, game: 'draw', mulligans: 1, keep: { terre: 2 } } });
+      } else if (/probabilit/i.test(last)) {
         text = JSON.stringify({ reply: '', prob: { turn: 1, needs: { terre: 1 } } });
       } else text = JSON.stringify({ reply: 'Ok.' });
       return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
@@ -233,7 +241,7 @@ test('il calcolatore di probabilità: la categoria è leggibile, il numero sta i
 
   const row = page.locator('#probNeeds .dk-prob-row', { has: page.locator('input[data-tag="ragionamento"]') });
   const label = row.locator('label');
-  const input = row.locator('input');
+  const input = row.locator('input[data-tag]');
   const lb = await label.boundingBox();
   const ib = await input.boundingBox();
 
@@ -329,5 +337,191 @@ test('budget e probabilità via chat: il sistema applica il tetto e risponde con
   // risultato (caso certo: 1 terra al turno 1 con 3 carte viste) è nella bolla.
   await page.fill('#chatInput', 'che probabilità ho di avere 1 terra al turno 1?');
   await page.press('#chatInput', 'Enter');
-  await expect(page.locator('.dk-msg-bot').last()).toContainText('Probabilità di avere 1 terre al turno 1: ≈ 100,0%');
+  await expect(page.locator('.dk-msg-bot').last()).toContainText('Probabilità di avere 1 terre al turno 1 (partita a più giocatori): ≈ 100,0%');
+});
+
+// ── #791: partita a più giocatori di default, mulligan London, pescate extra ──
+
+function comb(n, k) { let r = 1; for (let i = 0; i < k; i++) r = r * (n - i) / (i + 1); return r; }
+function hyperAtLeast(N, K, n, k) {
+  let p = 0;
+  for (let x = k; x <= Math.min(K, n); x++) p += (comb(K, x) * comb(N - K, n - x)) / comb(N, n);
+  return p;
+}
+
+// 40 terre su 99 carte: probabilità intermedie, lontane da 0 e da 100.
+async function seedBigDeck(page, deckId) {
+  await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    const r = await chrome.runtime.sendMessage({ type: MSG.DECKS_GET, id });
+    const deck = r.deck;
+    deck.carte = [
+      { scryfall_id: 'c-mountain', qty: 40 },
+      { scryfall_id: 'c-bolt', qty: 30 },
+      { scryfall_id: 'c-dragon', qty: 29 },
+    ];
+    await chrome.runtime.sendMessage({ type: MSG.DECKS_UPDATE, deck });
+  }, deckId);
+  await page.evaluate(() => location.reload());
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#probNeeds input[data-tag="terre"]')).toBeVisible();
+}
+
+const pctOf = (txt) => Number(String(txt).replace(/[^\d,]/g, '').replace(',', '.'));
+
+// Aspetta che la stima smetta di raffinarsi e la legge in punti percentuali.
+async function settledPct(page) {
+  const result = page.locator('#probResult');
+  await expect(result).toHaveText(/≈ \d/);
+  await expect(result).not.toHaveClass(/dk-prob-refining/, { timeout: 30_000 });
+  return pctOf(await result.textContent());
+}
+
+test('il riquadro fa scegliere partita, mulligan e pescate extra, e il numero cambia come in una partita vera (#791)', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedBigDeck(page, await seedDeck(page));
+
+  await page.fill('#probTurn', '1');
+  await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
+
+  // Default a più giocatori: al turno 1 si pesca, 8 carte viste.
+  await expect(page.locator('#probGame')).toHaveText(/più giocatori/);
+  const multi = await settledPct(page);
+  expect(Math.abs(multi - hyperAtLeast(99, 40, 8, 3) * 100)).toBeLessThan(0.5);
+  await expect(page.locator('#probResult')).toHaveAttribute('title', /8 carte viste/);
+
+  // A due iniziando si salta la pescata: 7 carte, una in meno.
+  await page.click('#probGame');
+  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizio io' }).click();
+  await expect(page.locator('#probGame')).toHaveText(/a due, inizio io/);
+  const play = await settledPct(page);
+  expect(Math.abs(play - hyperAtLeast(99, 40, 7, 3) * 100)).toBeLessThan(0.5);
+  expect(multi).toBeGreaterThan(play + 5);
+
+  // Se inizia l'altro si pesca, come a più giocatori.
+  await page.click('#probGame');
+  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizia l\'altro' }).click();
+  expect(Math.abs((await settledPct(page)) - multi)).toBeLessThan(0.5);
+
+  // Mulligan: compare la colonna «per tenere», già con 2 terre, e la probabilità sale.
+  const keepTerre = page.locator('#probNeeds input[data-keep="terre"]');
+  await expect(keepTerre).toBeHidden();
+  await page.fill('#probMull', '1');
+  await expect(keepTerre).toBeVisible();
+  await expect(keepTerre).toHaveValue('2');
+  const mull = await settledPct(page);
+  expect(mull).toBeGreaterThan(multi + 3);
+  // Tolto il mulligan si torna al numero di prima, e la colonna sparisce.
+  await page.fill('#probMull', '0');
+  await expect(keepTerre).toBeHidden();
+  expect(Math.abs((await settledPct(page)) - multi)).toBeLessThan(0.5);
+
+  // Pescate extra: due carte in più entro il turno.
+  await page.fill('#probExtra', '2');
+  await expect(page.locator('#probResult')).toHaveAttribute('title', /10 carte viste/);
+  expect(Math.abs((await settledPct(page)) - hyperAtLeast(99, 40, 10, 3) * 100)).toBeLessThan(0.5);
+});
+
+test('chat e riquadro danno lo stesso numero alle stesse condizioni (#791)', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedBigDeck(page, await seedDeck(page));
+
+  await page.fill('#chatInput', 'che probabilità ho di avere 3 terre al turno 3 in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre?');
+  await page.press('#chatInput', 'Enter');
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla).toContainText('Probabilità di avere 3 terre al turno 3 (partita a due, inizia l\'altro; fino a 1 mulligan se la mano non ha almeno 2 terre): ≈ ');
+  const chat = pctOf(/≈ ([\d,]+)%/.exec(await bolla.textContent())[1]);
+
+  await page.fill('#probTurn', '3');
+  await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
+  await page.click('#probGame');
+  await page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Partita a due, inizia l\'altro' }).click();
+  await page.fill('#probMull', '1');
+  await expect(page.locator('#probNeeds input[data-keep="terre"]')).toHaveValue('2');
+  const riquadro = await settledPct(page);
+  expect(Math.abs(chat - riquadro)).toBeLessThan(0.6);
+
+  // Una mano da tenere con una categoria che il mazzo non ha non diventa un numero inventato.
+  await page.fill('#chatInput', 'e se tengo solo mani con un ramp?');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-bot').last()).toContainText('Nel mazzo non c\'è la categoria «ramp»: puoi chiedere terre.');
+});
+
+test('in chat un mulligan detto senza la mano da tenere parte da 2 terre, come nel riquadro (#791)', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await seedBigDeck(page, await seedDeck(page));
+
+  await page.fill('#chatInput', 'che probabilità ho di avere 3 terre al turno 3 con due mulligan?');
+  await page.press('#chatInput', 'Enter');
+  const bolla = page.locator('.dk-msg-bot').last();
+  await expect(bolla).toContainText('Probabilità di avere 3 terre al turno 3 (partita a più giocatori; fino a 2 mulligan se la mano non ha almeno 2 terre): ≈ ');
+  const chat = pctOf(/≈ ([\d,]+)%/.exec(await bolla.textContent())[1]);
+
+  await page.fill('#probTurn', '3');
+  await page.locator('#probNeeds input[data-tag="terre"]').fill('3');
+  await page.fill('#probMull', '2');
+  await expect(page.locator('#probNeeds input[data-keep="terre"]')).toHaveValue('2');
+  expect(Math.abs(chat - await settledPct(page))).toBeLessThan(0.6);
+});
+
+test('il riquadro resta compatto: senza mulligan nessuna colonna in più, con il mulligan le categorie restano leggibili (#791)', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await seedDeck(page);
+  await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    const r = await chrome.runtime.sendMessage({ type: MSG.DECKS_GET, id });
+    let deck = window.SN_DECKS.addTagToCard(r.deck, 'c-bolt', 'rimozione');
+    deck = window.SN_DECKS.addTagToCard(deck, 'c-dragon', 'minaccia');
+    await chrome.runtime.sendMessage({ type: MSG.DECKS_UPDATE, deck });
+  }, deckId);
+  await page.evaluate(() => location.reload());
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#probNeeds input[data-tag="minaccia"]')).toBeVisible();
+
+  const card = page.locator('#probCard');
+  const rowH = (await page.locator('#probNeeds .dk-prob-row').first().boundingBox()).height;
+  // Tre righe in più (partita, mulligan, pescate extra) e niente intestazione di colonna.
+  await expect(page.locator('.dk-prob-head')).toBeHidden();
+  const before = (await card.boundingBox()).height;
+  await page.fill('#probMull', '1');
+  await expect(page.locator('.dk-prob-head')).toBeVisible();
+  const after = (await card.boundingBox()).height;
+  // Con il mulligan cresce solo della riga d'intestazione.
+  expect(after - before).toBeLessThanOrEqual(rowH);
+
+  // Le caselle restano piccole e allineate sotto le loro intestazioni; i nomi si leggono.
+  for (const tag of ['rimozione', 'minaccia', 'terre']) {
+    const row = page.locator('#probNeeds .dk-prob-row', { has: page.locator(`input[data-tag="${tag}"]`) });
+    const label = row.locator('label');
+    expect(await label.evaluate((el) => el.scrollWidth > el.clientWidth + 1)).toBe(false);
+    expect((await row.locator('input[data-keep]').boundingBox()).width).toBeLessThanOrEqual(70);
+  }
+  const head = await page.locator('.dk-prob-head .dk-prob-keep').boundingBox();
+  const keepBox = await page.locator('#probNeeds input[data-keep="terre"]').boundingBox();
+  expect(Math.abs((head.x + head.width) - (keepBox.x + keepBox.width))).toBeLessThan(2);
+  await card.scrollIntoViewIfNeeded();
+  await card.screenshot({ path: 'tests/.shots/decks-prob-791.png' });
+
+  // Anche col tema scuro, e con la scelta della partita aperta.
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE(
+    { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
+    { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
+  await page.click('#probGame');
+  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveCount(3);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'tests/.shots/decks-prob-791-scuro.png' });
 });

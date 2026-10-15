@@ -60,6 +60,7 @@
     COMANDO_FINESTRA: 'windowFrame',
     SPOSTA_ICONA: 'pin',
     INSTALLA_AGGIORNAMENTO: 'download',
+    RIMEDIO_CREDITI: 'credits',
     CARTA_HOME: 'home',
     ZOOM_PAGINA: 'zoomPagina',
     VOLUME: 'volume',

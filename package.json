@@ -1,6 +1,6 @@
 {
   "name": "filo",
-  "version": "0.2.237",
+  "version": "0.2.240",
   "private": true,
   "license": "Apache-2.0",
   "description": "Filo — browser AI-native cross-device. Layer di interazione, non solo finestra.",
@@ -169,6 +169,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
+    "jpeg-js": "^0.4.4",
     "unpdf": "^1.8.1"
   }
 }

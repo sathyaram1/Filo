@@ -84,6 +84,8 @@
 //         <file.md>` (su status, fixed e verdict) è la segnalazione per
 //         l'owner — un trade-off vero, che decide lui — letta intera dal file
 //         e scritta dal server nel livello L3 del feedback.
+//         Revisione, correzione, critica e verdetto partono solo dal ramo assegnato (uscita 1 altrimenti): il ramo
+//         lo legge lo strumento dalla cartella, e `--branch` può solo confermarlo.
 //
 //   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
@@ -118,8 +120,8 @@ import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { pinnedRepoRoot } from './lib/tools-pin.mjs';
-import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
+import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
+import { isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
 import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
@@ -984,6 +986,47 @@ export function testoImprontaDiversa(quale, dichiarato, punta, motivo = 'altro_c
     + 'Niente è stato consegnato: un esito vale per il contenuto che hai davvero davanti, e l\'impronta la timbra lo strumento. Togli --sha e rilancia, oppure posizionati sul commit che hai esaminato.';
 }
 
+/**
+ * Il rifiuto di una consegna fatta da fuori del ramo assegnato (#772): dov'è la cartella, qual è il ramo assegnato e
+ * come tornarci. PURA. `g` è l'esito di guardiaConsegna; `sospesa` ({ ok, motivo }) c'è se il rifiuto ha toccato la soglia.
+ */
+export function testoConsegnaFuoriRamo(quale, g, sospesa = null) {
+  const x = g || {};
+  const nulla = 'Niente è stato consegnato.';
+  const sospeso = (testa) => {
+    const nonArrivata = sospesa && !sospesa.ok ? ` (ma la sospensione non è arrivata al server: ${sospesa.motivo || 'motivo ignoto'})` : '';
+    return `${testa}Rifiuto ${x.count} di fila: la lavorazione automatica di questo feedback è sospesa e passa all'owner${nonArrivata}. Non rilanciare: rilascia il biglietto.`;
+  };
+  const conta = () => (x.count ? ` Rifiuto ${x.count} di ${IDENTITY_REJECT_LIMIT}: al ${IDENTITY_REJECT_LIMIT}° di fila il lavoro passa all'owner.` : '');
+  if (x.motivo === 'rebase') {
+    const di = x.rebaseDi && x.rebaseDi !== '?' ? ` del ramo "${x.rebaseDi}"` : '';
+    return `${quale}: c'è un rebase in corso${di}. ${nulla}\n`
+      + 'Finiscilo (risolvi i file in conflitto, `git add`, `git rebase --continue`), controlla che la cartella sia tornata sul ramo, poi rilancia lo stesso comando.';
+  }
+  if (x.motivo === 'cartella') {
+    const ramo = x.current ? ` (ramo "${x.current}")` : '';
+    const sul = x.assigned ? `, sul ramo assegnato "${x.assigned}"` : '';
+    const testa = `${quale}: la consegna parte dalla cartella "${x.cartella}"${ramo}, ma il lavoro si consegna dalla cartella in cui è stato posizionato, "${x.radice}"${sul}. ${nulla}\n`;
+    if (x.escalated) return sospeso(testa);
+    return `${testa}Porta lì i commit del lavoro (\`git -C "${x.radice}" cherry-pick <i tuoi commit>\`), poi rilancia lo stesso comando da "${x.radice}".${conta()}`;
+  }
+  if (x.motivo === 'dichiarato') {
+    return `${quale}: hai dichiarato il ramo "${x.declared}", ma la cartella è sul ramo "${x.current}". ${nulla} Il ramo lo legge lo strumento dalla cartella: uno dichiarato può solo confermarlo.\n`
+      + (x.assigned && x.assigned === x.current
+        ? 'La cartella è sul ramo assegnato: togli --branch e rilancia.'
+        : `Se il lavoro sta su "${x.declared}", torna lì (\`git checkout ${x.declared}\`) e rilancia; se sta su "${x.current}", togli --branch.`);
+  }
+  const dove = x.current ? `sul ramo "${x.current}"${x.motivo === 'principale' ? ', la linea principale' : ''}`
+    : x.rebaseDi ? (x.rebaseDi === '?' ? 'a metà di un rebase' : `a metà del rebase di "${x.rebaseDi}"`) : 'staccata, su nessun ramo';
+  const atteso = x.assigned ? `il ramo assegnato a questo lavoro è "${x.assigned}"` : 'una consegna che va in verifica parte dal ramo del lavoro';
+  const testa = `${quale}: la cartella è ${dove}, ma ${atteso}. ${nulla}\n`;
+  if (x.escalated) return sospeso(testa);
+  const prima = !x.current && x.rebaseDi ? 'Chiudi quel rebase (`git rebase --continue` o `git rebase --abort`), poi torna' : 'Torna';
+  const comando = `git checkout ${x.assigned || '<il ramo del tuo lavoro>'}`;
+  const lavoro = x.current ? ` su "${x.current}"` : '';
+  return `${testa}${prima} sul ramo ${x.assigned ? 'assegnato' : 'del lavoro'} con \`${comando}\`; se hai committato il lavoro${lavoro}, portalo lì (\`git cherry-pick\` dei tuoi commit) e rilancia lo stesso comando.${conta()}`;
+}
+
 /** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */
 export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback', 'domanda'];
 
@@ -1035,6 +1078,8 @@ export function parolaInPiu(cmd, args) {
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
+  // I comandi nei testi stampati, i nostri e quelli del server, portano alla copia fissata (#763).
+  absolutizeOutput(ROOT);
   const [cmd, ...tutti] = process.argv.slice(2);
   // Il biglietto a mano si toglie per primo, con la stessa regola delle registrazioni (#587).
   const mano = leggiBigliettoAMano(tutti);
@@ -1493,10 +1538,30 @@ if (isMain) {
     // finisce a parlare di un contenuto diverso da quello esaminato.
     const passaAllaVerifica = intento === 'verdict' || intento === 'fixed' || intento === 'secaudit'
       || (intento === 'status' && data.status === 'revision_capability');
+    let guardia = null;
     if (passaAllaVerifica) {
       const cosa = intento === 'verdict' ? 'critica'
         : intento === 'fixed' ? 'consegna'
           : intento === 'secaudit' ? 'verdetto' : 'revisione';
+      const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato' : 'consegna non registrata';
+      // Parte solo dal ramo assegnato, e al server va il ramo VERO della cartella (#772; regola in guardiaConsegna).
+      let sospensione = null;
+      guardia = guardiaConsegna(ROOT, {
+        dichiarato: data.branch,
+        escalate: () => { sospensione = deliver(biglietto, 'status', { status: 'design', reason: 'loop', notes: escalationNote() }); },
+      });
+      let sospesa = null;
+      if (sospensione) {
+        try {
+          const s = await sospensione;
+          sospesa = { ok: s.outcome === 'ok', motivo: s.reason };
+        } catch (e) { sospesa = { ok: false, motivo: String((e && e.message) || e) }; }
+      }
+      if (!guardia.ok) {
+        console.error(testoConsegnaFuoriRamo(quale, guardia, sospesa));
+        process.exit(1);
+      }
+      data.branch = guardia.branch;
       const stato = statoDirectory(ROOT);
       if (!stato.ok) {
         console.error(statoIllegibileText(stato.motivo, cosa));
@@ -1515,7 +1580,6 @@ if (isMain) {
       // contenuto mai esaminato (verifica del giro 1 su questo lavoro).
       // Anche correzione e revisione (#1148): il registro del ramo confronta questa punta con quella che troverà chi
       // viene dopo, e una consegna senza impronta il server la segna come buco.
-      const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato' : 'consegna non registrata';
       const punta = headSha(ROOT);
       if (!punta) {
         console.error(`${quale}: non riesco a farmi dire su quale commit è la directory, e un esito vale per il contenuto esaminato, non per il nome del ramo.`);
@@ -1579,6 +1643,7 @@ if (isMain) {
         sealCurrentWork(ROOT, { by: `deliver:${intento}` });
       } catch (_) { /* best-effort: la consegna è già registrata */ }
     }
+    if (r.outcome === 'ok' && guardia && guardia.id) azzeraRifiuti(ROOT, guardia.id);
     if (r.outcome === 'ok') {
       // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
       // adesso, o crede di averlo mandato in verifica.

@@ -94,6 +94,18 @@ if (process.argv.includes('--filo-suppress-autoplay')) {
 // ha bisogno di settings/spellcheck/Menu) si installa più tardi via
 // __snSetContextMenuHandler; fino ad allora il bridge non fa nulla.
 let contextMenuHandler = null;
+// I siti col menu proprio (#975): la sonda va nel mondo della pagina prima dei suoi script. content.js dice, coi siti
+// scelti nelle impostazioni, se qui il tasto destro va prima alla pagina; Shift allora porta al menu di Filo.
+let MenuDelSito = null;
+try { MenuDelSito = require('./menu-del-sito.js').crea({ webFrame, riserva: (clic) => menuDiRiserva(clic) }); } catch (e) { console.error('[Filo CS] menu del sito', e); }
+let menuDelSitoPrima = () => false;
+try {
+  globalThis.__snMenuDelSito = MenuDelSito;
+  globalThis.__snSetMenuDelSitoPrima = (fn) => { if (typeof fn === 'function') menuDelSitoPrima = fn; };
+} catch (_) {}
+function sitoPrima() {
+  try { return !!MenuDelSito && menuDelSitoPrima() === true; } catch (_) { return false; }
+}
 // Ogni tasto destro dell'utente apre un menu: quello di Filo o, se non parte (guasto, pagina ancora in caricamento,
 // Filo spento sul sito, Shift), quello di riserva del main, salvo che la pagina mostri il suo (#1122).
 // `clic` è l'ora del gesto: il main la usa per accoppiarlo al suo `context-menu`, non a quello di un clic prima.
@@ -103,9 +115,9 @@ function menuDiRiserva(clic, motivo = '') {
 function riservaSeLaPaginaTace(e, clic) {
   setTimeout(() => { if (!e.defaultPrevented) menuDiRiserva(clic); }, 0);
 }
-function apriMenuDiFilo(e, clic = Date.now()) {
+function apriMenuDiFilo(e, clic = Date.now(), opzioni = undefined) {
   let esito;
-  try { esito = contextMenuHandler(e); } catch (err) { esito = Promise.reject(err); }
+  try { esito = contextMenuHandler(e, opzioni); } catch (err) { esito = Promise.reject(err); }
   Promise.resolve(esito).catch((err) => {
     console.error('[Filo CS] menu del tasto destro', err);
     menuDiRiserva(clic, (err && err.stack) || err || 'errore');
@@ -118,12 +130,18 @@ try {
     // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
     if (!e.isTrusted) return;
     const clic = Date.now();
-    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser.
-    if (e.shiftKey) { riservaSeLaPaginaTace(e, clic); return; }
+    const prima = typeof contextMenuHandler === 'function' && sitoPrima();
+    // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sui siti dove il tasto
+    // destro apre il loro menu, Shift è la strada per quello di Filo.
+    if (e.shiftKey && !prima) { riservaSeLaPaginaTace(e, clic); return; }
+    if (prima && !e.shiftKey) {
+      MenuDelSito.lasciaAllaPagina(e, (copia) => apriMenuDiFilo(copia, clic));
+      return;
+    }
     // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
     // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
     if (typeof contextMenuHandler === 'function') {
-      apriMenuDiFilo(e, clic);
+      apriMenuDiFilo(e, clic, prima ? { conMaiusc: true } : undefined);
       try { e.stopImmediatePropagation(); } catch (_) {}
       return;
     }
@@ -149,26 +167,9 @@ try {
   }
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
 
-// Copia inerte del clic destro da rigiocare quando l'handler vero è pronto.
-// Il vero evento, una volta consegnato, perde composedPath() (torna vuoto):
-// fotografiamo SUBITO l'elemento reale — quello sotto shadow DOM compreso — e
-// i dati che l'handler legge, così il menu si apre sull'elemento giusto.
+// Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
 function replayContextMenu(e, clic) {
-  let node = null;
-  try { node = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target; }
-  catch (_) { node = e.target; }
-  const copy = {
-    target: node,
-    currentTarget: node,
-    clientX: e.clientX, clientY: e.clientY,
-    pageX: e.pageX, pageY: e.pageY,
-    screenX: e.screenX, screenY: e.screenY,
-    button: e.button,
-    shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey,
-    defaultPrevented: false,
-    composedPath: () => (node ? [node] : []),
-    preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {},
-  };
+  const copy = require('./menu-del-sito.js').copiaDelClic(e);
   const deadline = Date.now() + 3000;
   const tick = () => {
     if (typeof contextMenuHandler === 'function') { apriMenuDiFilo(copy, clic); return; }
@@ -594,6 +595,15 @@ try {
     if (!SCHEMI_APRIBILI.test(url)) return;
     try { ipcRenderer.sendSync('filo:apertura-scelta', url); } catch (_) {}
   };
+  // Un collegamento file: da una pagina web lo rifiuta Chromium prima che Filo lo veda, senza dire niente (#482): il clic
+  // dell'utente che la pagina non ha fermato lo riferisce, e Filo lo dice. data: no: con «download» scarica davvero.
+  const rifiutato = (e) => {
+    if (!e.isTrusted || e.defaultPrevented || (e.type === 'auxclick' && e.button !== 1)) return;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href);
+    if (!a || !/^file:/i.test(String(a.href))) return;
+    try { ipcRenderer.send('filo:indirizzo-rifiutato', String(a.href)); } catch (_) {}
+  };
   const ascolta = (win) => {
     // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
     for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
@@ -603,6 +613,7 @@ try {
     for (const ev of ['click', 'auxclick']) {
       win.addEventListener(ev, scelto, { capture: true, passive: true });
       win.addEventListener(ev, scelto, { passive: true });
+      win.addEventListener(ev, rifiutato, { passive: true });
     }
     win.addEventListener('pointerover', confine, { capture: true, passive: true });
   };

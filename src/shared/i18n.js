@@ -24,6 +24,8 @@
     menu_origin_hint: 'Filo legge solo le etichette che il file si porta dietro. Uno screenshot le cancella, un social pure, e molti generatori non le scrivono affatto.',
     menu_image_unreadable: 'Filo non è riuscito a scaricare questa immagine.',
     menu_origin_hint_unverified: 'Filo non ha ancora scaricato l’elenco ufficiale dei firmatari riconosciuti, quindi per ora sa solo che la firma è valida. Appena lo scarica, lo verifica.',
+    // #889 — la riga viene da un marchio nei pixel, non da un'etichetta del file.
+    menu_origin_hint_mark: 'Il programma che ha generato l’immagine ha scritto questo marchio nei pixel. Un ritaglio o un ridimensionamento lo cancellano, e molti generatori non lo mettono.',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
@@ -332,6 +334,7 @@
     options_theme_dark: 'Scuro',
     options_monthly_limit: 'Limite mensile (€)',
     options_current_spent: 'Speso questo mese',
+    options_cost_warn_ratio: 'Avviso sui modelli costosi: oltre quante volte il costo del predefinito (0 = mai)',
     options_action_explain: 'Spiega (inline)',
     options_action_explain_deep: 'Approfondisci',
     options_action_translate_sel: 'Traduci selezione',
@@ -471,11 +474,23 @@
       'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
     admin_defaults_contesto_giorni: 'Giorni',
     admin_defaults_contesto_token: 'Tetto in token',
+    // Quanto può essere lunga una risposta dei modelli (#1097.3)
+    admin_defaults_lunghezza: 'Quanto può essere lunga una risposta',
+    admin_defaults_lunghezza_desc:
+      'Il tetto in token di ogni risposta, per famiglia di funzioni: ferma il modello che si incarta, e una risposta che lo tocca si vede interrotta. Un fornitore che non regge il tetto viene scartato. Vale per chi non l\'ha cambiato in Preferenze; un campo vuoto segue il codice.',
+    admin_defaults_lunghezza_conversazioni: 'Chat e conversazioni',
+    admin_defaults_lunghezza_testi: 'Traduzioni, riscritture, riassunti',
+    admin_defaults_lunghezza_brevi: 'Risposte brevi',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
     admin_defaults_excluded_drift: 'Questa lista sostituisce quella scritta nel codice, e queste esclusioni non ci sono: %s. Finché mancano, quei fornitori possono servire le richieste.',
     admin_defaults_excluded_drift_fix: 'Rimettili nella lista',
+    admin_defaults_open_weights_title: 'Per chi accende «Solo modelli a pesi aperti»',
+    admin_defaults_open_weights_to: 'Passano a %s: %s',
+    admin_defaults_open_weights_none_stop: 'Nessuna funzione si ferma.',
+    admin_defaults_open_weights_all_open:
+      'Con «Solo modelli a pesi aperti» acceso non cambia niente. Tutte le funzioni partono già da modelli a pesi aperti.',
     admin_defaults_save: 'Salva e propaga',
     admin_defaults_saving: 'Salvataggio…',
     admin_defaults_saved: 'Salvato e propagato a tutti gli utenti.',
@@ -552,29 +567,34 @@
     options_security_popup_dismiss: 'Chiudi',
     // Rilevamento siti pericolosi
     options_security_safebrowse: 'Avvisa sui siti pericolosi',
+    // Ogni frase qui sotto descrive il rilevatore com'è oggi: tests/unit/safebrowseSpiegazione.test.mjs.
     options_security_safebrowse_desc:
-      'Riconosce i siti che fingono di essere un altro marchio (es. una finta pagina di login), ' +
-      'i domini appena creati e le connessioni non sicure, e ti avvisa prima che tu inserisca password ' +
-      'o dati di pagamento. I controlli di base sono gratuiti e attivi sempre; non bloccano mai la ' +
-      'navigazione, ti mostrano solo un avviso che puoi ignorare.',
+      'Ti avvisa quando un sito imita un marchio noto, è nella lista nera di Google per phishing o malware, ' +
+      'ha un certificato che non torna o ti chiede la password su una connessione non protetta. L\'avviso ' +
+      'copre la pagina finché non scegli. Su un sito sospetto premi «Continua», su uno pericoloso scrivi ' +
+      '«confermo». La scelta vale per quel sito in quella scheda, finché resta aperta. Spento, Filo non ' +
+      'chiede più niente fuori dal computer, ma ti avvisa ancora sui sosia e sulle password chieste senza ' +
+      'connessione protetta, che riconosce da solo.',
     options_security_safebrowse_network: 'Controlli di rete (età del dominio e del certificato)',
     options_security_safebrowse_network_desc:
-      'Interroga servizi pubblici per sapere da quanto tempo esiste il dominio e il suo certificato: ' +
-      'un sito "di un marchio noto" creato pochi giorni fa è un forte segnale di truffa. Non richiede ' +
-      'alcuna chiave. Disattivalo se non vuoi che Filo faccia queste richieste esterne.',
+      'Quando un sito ha già un indizio sospetto, Filo chiede a due registri pubblici (rdap.org e crt.sh) ' +
+      'da quanto esistono il dominio e il suo certificato. Manda solo il nome del sito. Un sito "di un ' +
+      'marchio noto" nato pochi giorni fa è un forte segnale di truffa. Non serve nessuna chiave. ' +
+      'Disattivalo se non vuoi che Filo faccia queste richieste.',
     options_security_safebrowse_llm: 'Giudizio AI sui casi sospetti',
     options_security_safebrowse_llm_desc:
-      'Solo quando un sito resta dubbio, un modello AI valuta i soli indizi di identità del dominio ' +
-      '(mai il contenuto della pagina) per decidere se avvisarti. Usa i modelli e le chiavi che hai già ' +
-      'configurato.',
+      'Solo quando un sito resta dubbio, un modello AI guarda i dati del suo indirizzo (il nome, il marchio ' +
+      'a cui somiglia, l\'età, il certificato, se la pagina chiede una password), mai il contenuto della ' +
+      'pagina. Può solo renderlo sospetto, mai dichiararlo sicuro o pericoloso, e in incognito non parte. ' +
+      'Usa il modello scelto in Modelli alla voce «Rilevamento siti pericolosi — giudizio».',
     options_security_safebrowse_sandbox: 'Prova i link sospetti in una finestra isolata',
     options_security_safebrowse_sandbox_desc:
-      'Quando Filo prova un link sospetto prima che tu lo apra, lo fa in una finestra nascosta e senza ' +
-      'i tuoi dati. Una pagina che hai già aperto non ci torna mai.',
+      'La finestra nascosta e senza i tuoi dati in cui Filo proverebbe un link sospetto prima che tu lo ' +
+      'apra. Oggi nessuna funzione la usa, e una pagina che hai già aperto non ci torna mai.',
     options_security_safebrowse_key_managed:
-      'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
-      'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
-      'account, non devi configurare nulla qui.',
+      'Per la lista nera di Google (phishing e malware) Filo usa una chiave che arriva col programma. ' +
+      'Funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
+      'arriva solo un pezzo dell\'impronta degli indirizzi che apri, mai gli indirizzi.',
     // #1004 — pagine delicate
     options_security_delicate: 'Non mandare ai modelli le pagine delicate',
     options_security_delicate_desc:
@@ -653,6 +673,17 @@
     riquadro_cookie_fatto: 'Cookie di %s attivi: ricarico il contenuto',
     riquadro_cookie_menu_attiva: 'Attiva i cookie di %s qui',
     riquadro_cookie_menu_togli: 'Togli i cookie riattivati di %s',
+    // #975 — il menu che un sito si disegna da sé. Il nome viene dalla pagina: si sostituisce con una funzione.
+    menu_del_sito: 'Menu di %s',
+    menu_del_sito_scelta: 'Cosa apre il tasto destro qui',
+    menu_del_sito_sempre: 'Aprilo subito col tasto destro',
+    menu_del_sito_torna_filo: 'Col tasto destro apri il menu di Filo',
+    menu_del_sito_proposta: 'Su %s scegli spesso il menu del sito. Te lo apro subito col tasto destro? Quello di Filo resta a %s + tasto destro.',
+    menu_del_sito_si: 'Sì',
+    menu_del_sito_no: 'No',
+    menu_del_sito_fatto: 'Su %s il tasto destro apre il menu del sito; quello di Filo resta a %s + tasto destro.',
+    menu_del_sito_annulla: 'Annulla',
+    menu_del_sito_tolto: 'Su %s il tasto destro apre di nuovo il menu di Filo.',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
     options_cookies_banners_remove: 'Rifiuta in automatico',
     options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',
@@ -794,6 +825,8 @@
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',
     history_timing_title: 'Dalla partenza della richiesta: primo pezzo di ragionamento, prima parola (o prima azione), fine della risposta.',
+    history_timing_prep: 'prepara %s · ',
+    history_timing_prep_title: 'Prima della richiesta il turno ha aspettato %s, di cui stato del computer %s e saldo %s.',
     history_clear_confirm: 'Cancellare definitivamente tutta la cronologia AI?',
     history_empty: 'Nessuna interazione AI registrata.',
     history_no_results: 'Nessun risultato per la ricerca.',
@@ -840,8 +873,10 @@
   function t(key, ...args) {
     let s = STRINGS[key];
     if (s === undefined) return key;
-    for (const a of args) s = s.replace('%s', String(a));
-    return s;
+    // In un solo passaggio e con una funzione: un argomento scritto da qualcuno (un nickname) che contiene «%s» o
+    // «$&» non deve finire riscritto dal segnaposto dopo.
+    let i = 0;
+    return s.replace(/%s/g, (m) => (i < args.length ? String(args[i++]) : m));
   }
 
   global.SN_I18N = { t, STRINGS };

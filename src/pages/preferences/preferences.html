@@ -20,8 +20,12 @@
   <script src="filo://shared/autonomia.js"></script>
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
+  <script src="filo://shared/nomiSito.js"></script>
+  <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
   <script src="filo://shared/filoContesto.js"></script>
+  <script src="filo://shared/lunghezzaRisposte.js"></script>
+  <script src="filo://shared/creditiAvviso.js"></script>
   <style>
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -339,6 +343,13 @@
       <span id="documentiHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
     </section>
 
+    <section id="sec-menu-siti">
+      <h2>Siti col loro menu del tasto destro</h2>
+      <p class="sn-muted">Su questi siti il tasto destro apre il menu del sito; quello di Filo resta a <span id="menuDelSitoTasto"></span> + tasto destro.</p>
+      <div id="menuDelSitoSiti" class="mem-box"></div>
+      <span id="menuDelSitoHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
+    </section>
+
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">
       <h2>Impostazioni avanzate</h2>
       <p class="sn-muted">Qui puoi modificare ogni aspetto estetico di Filo. Ricorda però che puoi sempre chiedere a Filo di fare le modifiche, se non ti va di cercare l'impostazione giusta.</p>
@@ -394,6 +405,51 @@
           <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di quello che Filo ha davanti. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
             <span>Tetto in token</span>
             <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+          </label>
+        </div>
+      </section>
+
+      <section id="sec-lunghezza">
+        <h2>Quanto può essere lunga una risposta</h2>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;">
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di una risposta della chat (anche quella delle app e dell'Aiuto). Oltre si ferma e te lo dice, con «Continua». Vuoto: il valore predefinito.">
+            <span>Chat</span>
+            <input type="number" id="lunghezzaConversazioni" min="1024" max="262144" step="1024" style="width:140px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di traduzioni, riscritture e riassunti. Vuoto: il valore predefinito.">
+            <span>Traduzioni e riassunti</span>
+            <input type="number" id="lunghezzaTesti" min="1024" max="262144" step="1024" style="width:140px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token delle risposte brevi: spiegazioni, titoli, correttore. Vuoto: il valore predefinito.">
+            <span>Risposte brevi</span>
+            <input type="number" id="lunghezzaBrevi" min="1024" max="262144" step="1024" style="width:140px;" />
+          </label>
+        </div>
+      </section>
+
+      <!-- #818 — quando Filo avvisa che i crediti stanno per finire, e il pre-calcolo che li consuma senza che si veda. -->
+      <section id="sec-crediti">
+        <h2>Crediti</h2>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="avvisoCreditiAttivo" />
+            <span>Avvisami prima che i crediti finiscano</span>
+          </label>
+        </div>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;margin-top:8px;">
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Avvisa quando, al ritmo di questi giorni e contando la quota che arriva ogni notte, i crediti durano al più questi giorni. 0 spegne questa condizione.">
+            <span>Quando durano al più (giorni)</span>
+            <input type="number" id="avvisoCreditiGiorni" min="0" max="30" step="0.5" style="width:120px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Avvisa quando il saldo scende sotto questa parte dei crediti che avevi all'ingresso. 0 spegne questa condizione.">
+            <span>O sotto (% di quelli d'ingresso)</span>
+            <input type="number" id="avvisoCreditiPercento" min="0" max="100" step="1" style="width:120px;" />
+          </label>
+        </div>
+        <div class="sn-toggle-row" style="margin-top:12px">
+          <label title="Al tasto destro la spiegazione è già pronta, ma la paghi anche le volte che non la apri.">
+            <input type="checkbox" id="spiegaAnticipata" />
+            <span>Prepara la spiegazione appena selezioni un testo</span>
           </label>
         </div>
       </section>

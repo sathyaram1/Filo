@@ -18,6 +18,7 @@ const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installZoom } = require('./tabs/tabZoom');
 const { installCookies } = require('./tabs/tabCookies');
 const Permessi = require('./services/permessiPagine');
+const { avvisoIndirizzoFermato } = require('./services/indirizzoFermato');
 const MenuDiRiserva = require('./menuDiRiserva');
 const IconaScheda = require('./services/iconaScheda');
 const ChiusuraConCaselle = require('./tabs/chiusuraConCaselle');
@@ -29,6 +30,8 @@ require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalH
 const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
+require('../shared/tabColor');
+const { compareRainbow } = globalThis.SN_TAB_COLOR;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
@@ -36,7 +39,9 @@ const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
 const { AnteprimeSchede } = require('./tabs/anteprime');
+const { RiservaNuovaScheda, vistePerAnnunci } = require('./tabs/riservaNuovaScheda');
 const { VisiteSchede } = require('./tabs/visite');
+const { CodaRiapertura, perVicinanza } = require('./tabs/codaRiapertura');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
 const Storia = require('./tabs/storia');
@@ -262,8 +267,17 @@ function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
   try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {}
   return true;
 }
+// Un indirizzo fermato non resta muto (#482): il silenzio sembra un'app rotta. Solo testo, niente «Apri comunque».
+function avvisaIndirizzoFermato(rawUrl, win) {
+  const a = avvisoIndirizzoFermato(rawUrl);
+  if (!a || !win || win.isDestroyed?.()) return;
+  try { win.webContents.send('shell:toast', { text: a.testo, opts: { unica: a.chiave } }); } catch (_) {}
+}
+// Vero se l'indirizzo ha avuto la sua strada (invito, posta al sistema); falso se è stato fermato, e allora lo dice.
 function fermaNavigazione(rawUrl, ctx) {
-  if (!invitoFermato(rawUrl, ctx)) openExternalScheme(rawUrl);
+  if (invitoFermato(rawUrl, ctx) || openExternalScheme(rawUrl)) return true;
+  avvisaIndirizzoFermato(rawUrl, ctx && ctx.win);
+  return false;
 }
 // La pagina intera passa da will-navigate; qui solo i riquadri, e solo l'invito.
 function fermaInvitoNelRiquadro(event, ctx) {
@@ -275,6 +289,11 @@ function fermaInvitoNelRiquadro(event, ctx) {
 // La lista dei bloccati si salva mentre si scrive (#590.2): una riga a metà non sposta le schede aperte,
 // né verso la pagina «Sito bloccato» né fuori. La seguono quando la lista sta ferma per questo tempo, o quando l'utente le guarda.
 const LISTA_FERMA_MS = 3000;
+
+// Il riordino della riapertura parte non prima di questo dall'apertura, e un attimo dopo che la coda ha caricato
+// tutto: i siti a pagina unica riempiono il testo dopo la fine del caricamento.
+const TRIAGE_RIAPERTURA_MS = 4000;
+const TRIAGE_DOPO_CODA_MS = 1500;
 
 // webContents → sito di un «Apri comunque»: il sì vale anche per il blocco delle richieste.
 const permessiApriComunque = new Map();
@@ -395,7 +414,11 @@ class TabManager {
       suNuova: (id, dato) => CartaAnteprima.precarica(window, id, dato),
       suTolte: (ids) => CartaAnteprima.dimentica(window, ids),
     });
-    if (window && typeof window.once === 'function') window.once('closed', () => this.anteprime.chiudi());
+    this.riserva = new RiservaNuovaScheda(this);
+    this.codaRiapertura = new CodaRiapertura({ carica: (tab) => this._caricaRinviata(tab) });
+    if (window && typeof window.once === 'function') {
+      window.once('closed', () => { this.anteprime.chiudi(); this.riserva.spegni(); this.codaRiapertura.chiudi(); });
+    }
     this.avvisi = new AvvisiSopraPagina(window, {
       dopoInCima: () => this.conferme.inCima(),
       alto: () => this._altezzaCornice(),
@@ -748,7 +771,7 @@ class TabManager {
   // invece di uscire a tempo. Lo dichiara il content script appena montato.
   paginaRispondeAllEsc(tabId) {
     if (tabId == null) return;
-    const t = this.tabs.find((x) => x.id === tabId);
+    const t = this._perScheda(tabId);
     if (t) t._rispondeAllEsc = true;
   }
 
@@ -791,7 +814,7 @@ class TabManager {
   // (e «Esci da schermo intero» a chi ne era già uscito, rimettendocelo con un
   // clic), e il suo Esc chiudeva il menu portandosi via anche la modalità.
   _broadcastToViews(message) {
-    for (const t of this.tabs) spingiAllaScheda(t.view?.webContents, message, { inVista: t.id === this.activeId });
+    for (const { wc, inVista } of vistePerAnnunci(this)) spingiAllaScheda(wc, message, { inVista });
   }
 
   // ─── lifecycle ──────────────────────────────────────────────────────────
@@ -895,7 +918,8 @@ class TabManager {
   // `permessoRichieste`: è un «Apri comunque» vero, e passa anche il blocco delle richieste.
   // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
   // `adotta`: { webContents, partition, sito } della finestra che una pagina ha aperto e tiene; si carica da sé.
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null } = {}) {
+  // `rinvia`: la scheda dietro nasce senza caricarsi; la carica la coda della riapertura, o chi la apre (_caricaRinviata).
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false, adotta = null, rinvia = false } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -946,15 +970,20 @@ class TabManager {
       this._notifyBlocked(bloccata);
       return null;
     }
-    const id = randomUUID();
     const isInternal = url.startsWith('filo://');
+    const rinviata = !!rinvia && !activate && !adotta;
     const partition = adotta ? adotta.partition : this._partitionFor(url);
-    const view = this._makeView(url, partition, { suppressAutoplay, webContents: adotta && adotta.webContents });
+    // La home già pronta (#1128) vale per la scheda che si apre davanti e non ha niente da rifare al caricamento.
+    const pronta = activate && !adotta && !bloccata && restoreScrollPct == null && restoreZoomLevel == null
+      ? this.riserva.prendi(url, this._sessionePer(partition))
+      : null;
+    const id = pronta ? pronta.id : randomUUID();
+    const view = pronta ? pronta.vista : this._makeView(url, partition, { suppressAutoplay, webContents: adotta && adotta.webContents });
 
     const tab = {
       id,
       view,
-      title: 'Nuova scheda',
+      title: rinviata ? titoloInAttesa(url) : 'Nuova scheda',
       url,
       // `favicon` è il data: URL che vede la barra; `faviconUrl` l'indirizzo dichiarato dalla pagina, per archivio e salvati.
       favicon: '',
@@ -1003,8 +1032,10 @@ class TabManager {
 
     this._wireEvents(tab);
     this._applySecurity(tab);
+    // Anche la riserva, che è già figlia della finestra: aggiungerla di nuovo la porta in cima, come una vista nuova.
     this.win.contentView.addChildView(view);
     this.tabs.push(tab);
+    if (pronta) this._daRiserva(tab, pronta);
 
     // IMPORTANTE: setBounds PRIMA di loadURL così la WebContentsView ha una
     // dimensione valida quando il compositor alloca il display surface.
@@ -1029,8 +1060,9 @@ class TabManager {
     }
     // Una scheda aperta da un clic vero eredita il gesto per la sua prima navigazione e i suoi rinvii (#664 giro 2).
     if (daGesto) view.webContents._filoGestoAlle = Date.now();
-    if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
-    else if (!adotta) view.webContents.loadURL(url);
+    if (rinviata) tab._rinviata = true;
+    else if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
+    else if (!adotta && !pronta) view.webContents.loadURL(url);
     // La pagina che l'ha aperta può chiuderla (window.close): la scheda se ne va con lei.
     if (adotta) {
       const wc = view.webContents;
@@ -1039,13 +1071,67 @@ class TabManager {
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
       for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
-      this._tastieraAllaSchedaAttiva();
+      // Una home che si carica si prende la tastiera da sola, anche dalla barra (Ctrl+T, «+»); quella pronta è già
+      // carica e la riceve qui, o quello che si scrive subito resta alla barra (#1128).
+      if (pronta && !this.win.isDestroyed() && this.win.isFocused()) {
+        try { view.webContents.focus(); } catch (_) {}
+      } else this._tastieraAllaSchedaAttiva();
     }
     // #152 — born proxied: se il dominio ha una regola persistente, la scheda
     // nasce instradata da quel paese (ricrea la view nella partition proxata).
-    if (!bloccata) this._maybeApplyDomainRule(tab, url);
+    if (!bloccata && !rinviata) this._maybeApplyDomainRule(tab, url);
     this._broadcast();
+    this.riserva.prepara(pronta ? { fra: 0 } : undefined);
     return id;
+  }
+
+  // Una scheda nata in attesa si carica una volta sola, dalla prima strada che ci arriva; la lista dei siti
+  // bloccati si guarda adesso, perché può essere cambiata mentre aspettava.
+  _caricaRinviata(tab) {
+    if (!tab || !tab._rinviata || !this.tabs.includes(tab)) return false;
+    tab._rinviata = false;
+    let wc;
+    try { wc = tab.view.webContents; if (wc.isDestroyed()) return false; } catch (_) { return false; }
+    const url = tab.url;
+    const bloccata = this._decisioneBlocco(tab, url);
+    if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
+    else {
+      Promise.resolve(wc.loadURL(url)).catch(() => {});
+      this._maybeApplyDomainRule(tab, url);
+    }
+    return true;
+  }
+
+  // Caricata da un'altra strada (un indirizzo nuovo, la vista ricreata): alla coda non tocca più.
+  _rinviataPresa(tab) {
+    if (!tab || !tab._rinviata) return;
+    tab._rinviata = false;
+    this.codaRiapertura.togli(tab);
+  }
+
+  // Gli eventi del caricamento la riserva li ha già avuti da sola: la scheda parte da dove è arrivata la pagina, con
+  // quello che la pagina ha detto di sé intanto (colore, risposta all'Esc).
+  _daRiserva(tab, pronta) {
+    const wc = tab.view.webContents;
+    try {
+      // Prima del <title> Chromium dà l'indirizzo come titolo: lì resta quello di ogni scheda nuova.
+      const titolo = wc.getTitle();
+      if (titolo && titolo !== wc.getURL() && !/^filo:/i.test(titolo)) tab.title = titolo;
+      tab.loading = wc.isLoading();
+    } catch (_) {}
+    Object.assign(tab, pronta.campi);
+    this._misuraStoria(tab, wc);
+    if (pronta.icone) this._aggiornaIcona(tab, wc, pronta.icone);
+  }
+
+  // Una scheda che c'è, o la riserva che lo diventerà con questo id: quello che la pagina dice di sé vale per tutte e due.
+  _perScheda(id) {
+    return this.tabs.find((t) => t.id === id) || this.riserva.campiPer(id);
+  }
+
+  // La sessione di una partizione come la vede una vista nata lì (null è quella di sempre).
+  _sessionePer(partition) {
+    try { return partition ? session.fromPartition(partition) : session.defaultSession; } catch (_) { return null; }
   }
 
   // Chi ha aperto una scheda per seguirne il percorso (l'accesso a Google, #1123) riceve i suoi indirizzi e la sua
@@ -1486,7 +1572,7 @@ class TabManager {
       // Di una pagina delicata il testo non si legge nemmeno: al modello arriva solo il tipo (#1004).
       const delicata = fuori(t.url);
       let contentExtract = '';
-      if (!delicata) {
+      if (!delicata && !t._rinviata) {
         try {
           contentExtract = await t.view.webContents.executeJavaScript(
             '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
@@ -1606,19 +1692,13 @@ class TabManager {
     return { archived: toArchive.length };
   }
 
-  // §1.3 — riordina la striscia per colore (arcobaleno) in base all'identityColor.
-  // Le tab senza colore (interne, identità ignota) restano in coda nell'ordine.
+  // §1.3 — riordina la striscia per colore con la stessa regola della Cronologia (compareRainbow).
   // Ritorna true se l'ordine è effettivamente cambiato (per decidere se
   // ribroadcastare alla shell).
   reorderTabsByColor() {
     const before = this.tabs;
     const withIdx = before.map((t, i) => ({ t, i }));
-    withIdx.sort((a, b) => {
-      const ha = hueOf(a.t.identityColor);
-      const hb = hueOf(b.t.identityColor);
-      if (ha !== hb) return ha - hb;
-      return a.i - b.i; // stabile
-    });
+    withIdx.sort((a, b) => compareRainbow(a.t.identityColor, b.t.identityColor) || a.i - b.i);
     const next = withIdx.map((x) => x.t);
     const changed = next.some((t, i) => t !== before[i]);
     this.tabs = next;
@@ -1648,12 +1728,12 @@ class TabManager {
   // pagina, campionato dal content script. Solo se cambia davvero (i sample
   // arrivano spesso durante lo scroll) per non inondare la shell di redraw.
   setTabColor(id, color) {
-    const tab = this.tabs.find((t) => t.id === id);
+    const tab = this._perScheda(id);
     if (!tab) return;
     const next = color || null;
     if (tab.color === next) return;
     tab.color = next;
-    this._broadcast();
+    if (this.tabs.includes(tab)) this._broadcast();
   }
 
   // L'icona la scarica il main con la sessione di questa scheda: la barra riceve solo byte già scaricati (#1083).
@@ -1682,14 +1762,14 @@ class TabManager {
   // inattive. A differenza del colore live (§1.1) non cambia con lo scroll né si
   // azzera a ogni navigazione: persiste finché la tab resta sullo stesso dominio.
   setTabIdentityColor(id, color) {
-    const tab = this.tabs.find((t) => t.id === id);
+    const tab = this._perScheda(id);
     if (!tab) return;
     const next = color || null;
     const host = hostOf(tab.url);
     if (next && host) this._identityColorCache.set(host, next);
     if (tab.identityColor === next) return;
     tab.identityColor = next;
-    this._broadcast();
+    if (this.tabs.includes(tab)) this._broadcast();
   }
 
   // Apre una copia della tab (stesso URL), attivandola — come "Duplica" di Chrome.
@@ -1766,6 +1846,8 @@ class TabManager {
       t.view.setVisible?.(this._visibile(t));
     }
     this.layout();
+    // Dopo layout(): la pagina si carica con le misure della scheda davanti.
+    if (tab._rinviata && !this.codaRiapertura.subito(tab)) this._caricaRinviata(tab);
     this._tastieraAllaSchedaAttiva();
     if (tab._listaTimer) this._seguiLista(tab, { ora: true });
     this._broadcast();
@@ -1826,6 +1908,7 @@ class TabManager {
       return;
     }
     if (this._maybeBlockNavigation(tab, target)) return;
+    this._rinviataPresa(tab);
     // La WebContentsView va RICREATA (non basta un loadURL) quando cambia la
     // partizione (privacy, fra siti diversi) oppure quando si attraversa il
     // confine di fiducia interno↔esterno: il preload e contextIsolation sono
@@ -1878,6 +1961,7 @@ class TabManager {
   // configurata (preload/partition/isInternal) per `url`. Usato dal recupero
   // crash per mostrare la pagina d'errore in una view pronta a ritentare il sito.
   _recreateView(tab, url, opts = {}) {
+    this._rinviataPresa(tab);
     const wasActive = tab.id === this.activeId;
     const partition = this._partitionForTab(tab, url);
     // La pagina che la vista vecchia mostrava: se il primo salto della nuova si ferma sulla lista, si torna lì.
@@ -2126,6 +2210,11 @@ class TabManager {
   reload(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    // Una scheda ancora in coda non ha niente da ricaricare: chi lo chiede la vuole adesso.
+    if (tab._rinviata) {
+      if (!this.codaRiapertura.subito(tab)) this._caricaRinviata(tab);
+      return;
+    }
     // #327 — parità di cammini: ricaricare una scheda che mostra la pagina
     // d'errore deve RITENTARE il sito fallito (come il bottone "Riprova"),
     // non ricaricare la pagina d'errore stessa.
@@ -2191,6 +2280,7 @@ class TabManager {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
     }
+    this.riserva.posa();
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
     this.avvisi.posa();
@@ -2605,7 +2695,10 @@ class TabManager {
         canBack: this.puoTornare(tab, 'indietro', wc),
         canFwd: this.puoTornare(tab, 'avanti', wc),
       });
-      if (tab.view && tab.view.webContents === wc) this.anteprime.caricata(tab);
+      if (tab.view && tab.view.webContents === wc) {
+        this.anteprime.caricata(tab);
+        this.codaRiapertura.caricata(tab);
+      }
       this.visite.caricata(wc);
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
@@ -3108,7 +3201,13 @@ class TabManager {
   // `navigazione`: la navigazione è già partita, e il gesto che la porta Permessi l'ha messo da parte.
   _esternoDallaPagina(wc, tabId, url, referrer, { navigazione = false } = {}) {
     const invito = Boolean(globalThis.SN_WALLET?.isInviteDeepLink?.(url));
-    if (!invito && !isOsDelegatedScheme(url)) return;
+    if (!invito && !isOsDelegatedScheme(url)) {
+      // Il clic dell'utente su un indirizzo fermato (zoommtg:, ms-teams:…) lo dice (#482); la pagina da sola resta muta.
+      const dalClic = Permessi.perUnaFinestra(wc, url, referrer)
+        || (navigazione && (Permessi.gestoPerLaNavigazione(wc) || Permessi.navigazioneDaGesto(wc)));
+      if (dalClic) avvisaIndirizzoFermato(url, this.win);
+      return;
+    }
     // Per l'invito il clic che ha fatto partire la navigazione lo conta `invitoFermato`, che lo spegne all'arrivo (#664).
     const gesto = Permessi.perUnaFinestra(wc, url, referrer) || (!invito && navigazione && Permessi.gestoPerLaNavigazione(wc));
     // L'invito scelto dall'utente (anche dal menu di Filo, che alla pagina non dà il gesto) lo porta dentro Filo.
@@ -3118,6 +3217,13 @@ class TabManager {
       return;
     }
     openExternalScheme(url);
+  }
+
+  // Il collegamento file: che Chromium ha rifiutato a una pagina (page-preload.js): vale solo dopo un input vero, che
+  // la pagina non può fingere.
+  indirizzoRifiutatoDallaPagina(wc, url) {
+    if (!/^file:/i.test(String(url || '')) || !Permessi.gestoRecente(wc)) return;
+    avvisaIndirizzoFermato(url, this.win);
   }
 
   // Il lasciapassare che «Apri» dà alla finestra di accesso che la pagina richiede su suo ordine: una volta, subito.
@@ -3242,7 +3348,7 @@ class TabManager {
   // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
   // siti in blacklist fermati come un clic, il resto in una scheda nuova.
   apriDaCollegamento(url, { sfondo = false } = {}) {
-    if (isWebUnsafeNav(url)) return invitoFermato(url, { win: this.win }) || openExternalScheme(url);
+    if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
     this.openTab(url, { activate: !sfondo, openedByLink: true });
     return true;
@@ -3516,7 +3622,8 @@ class TabManager {
         title: t.title,
         url: t.url,
         favicon: t.favicon,
-        loading: t.loading,
+        // In coda la pagina non è pronta (le anteprime aspettano) ma non sta caricando: niente rotella (#1127).
+        loading: t.loading && !t._rinviata,
         canBack: t.canBack,
         canFwd: t.canFwd,
         muted: !!t.muted,
@@ -3541,6 +3648,7 @@ class TabManager {
 
   _broadcast() {
     this.anteprime.pota(new Set(this.tabs.map((t) => t.id)));
+    this.codaRiapertura.pota(this.tabs);
     // La shell è il primary webContents della BrowserWindow.
     try {
       this.win.webContents.send('tabs:updated', this._snapshotPerBarra());
@@ -3638,42 +3746,52 @@ class TabManager {
     if (!urls.length) return false;
 
     this._restoring = true;
+    const nate = [];
     try {
       // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
       // al boot (niente più video YouTube che ripartono tutti insieme).
-      urls.forEach((url, i) => {
+      // #1127 — nascono tutte senza caricarsi: la coda carica prima quella in vista, poi le vicine.
+      const perIndice = urls.map((url, i) => {
         // Una scheda su un sito della lista torna sulla pagina «Sito bloccato»:
         // non sparisce dalla sessione e il sito non si riapre da solo (#590).
-        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true });
-        const nata = id && this.tabs.find((t) => t.id === id);
-        if (nata) this.visite.giaVista(nata.view.webContents, url);
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true, rinvia: true });
+        const nata = id ? this.tabs.find((t) => t.id === id) : null;
+        if (!nata) return null;
+        this.visite.giaVista(nata.view.webContents, url);
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
         // riparte già tinta e il riordino cromatico alla riapertura ha i dati
         // pronti senza attendere il ricalcolo dei content script. Seeda anche la
         // cache per host, così una did-navigate sullo stesso dominio lo conserva.
-        if (id && colors[i]) this.setTabIdentityColor(id, colors[i]);
+        if (colors[i]) this.setTabIdentityColor(id, colors[i]);
+        nate.push(nata);
+        return nata;
       });
-      if (activeIndex < 0 || activeIndex >= this.tabs.length) activeIndex = this.tabs.length - 1;
-      const target = this.tabs[activeIndex];
+      const i = activeIndex >= 0 && activeIndex < perIndice.length ? activeIndex : perIndice.length - 1;
+      const target = perIndice[i] || nate[nate.length - 1] || null;
+      this.codaRiapertura.accoda(perVicinanza(nate, target));
       if (target) this.activate(target.id);
+      this.codaRiapertura.avanti();
     } finally {
       this._restoring = false;
     }
+    if (!nate.length) return false;
     this._persistSession();
-    // §2.1 decisione utente: a ogni riapertura Filo riordina/archivia le tab.
-    // Lo facciamo dopo un attimo, così le pagine hanno tempo di caricarsi e di
-    // fornire un estratto del contenuto all'LLM. No-op se la pref è disattivata
-    // o manca la chiave.
+    // §2.1 decisione utente: a ogni riapertura Filo riordina/archivia le tab, a pagine
+    // caricate (forniscono l'estratto all'LLM). No-op se la pref è disattivata o manca la chiave.
     this._maybeTriageOnReopen();
     return true;
   }
 
   async _maybeTriageOnReopen() {
+    const inizio = Date.now();
     try {
       const s = await this._readSettings();
       const aa = s && s.autoArchive;
       if (!aa || !aa.enabled || !aa.onClose) return;
-      setTimeout(() => { this.runAutoTriage({ trigger: 'reopen' }).catch(() => {}); }, 4000);
+      // Il riordino legge il contenuto delle pagine: parte quando la coda della riapertura le ha caricate tutte.
+      await this.codaRiapertura.finita();
+      const attesa = Math.max(TRIAGE_DOPO_CODA_MS, TRIAGE_RIAPERTURA_MS - (Date.now() - inizio));
+      setTimeout(() => { this.runAutoTriage({ trigger: 'reopen' }).catch(() => {}); }, attesa);
     } catch (_) {}
   }
 }
@@ -3690,6 +3808,12 @@ function origineDi(url) {
   try { return new URL(url).origin; } catch (_) { return ''; }
 }
 
+// Una scheda riaperta in coda porta il nome del suo sito finché la pagina non le dà il titolo vero.
+function titoloInAttesa(url) {
+  const host = hostOf(url);
+  return host ? host.replace(/^www\./i, '') : 'Nuova scheda';
+}
+
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.
 function hostOf(url) {
@@ -3698,24 +3822,6 @@ function hostOf(url) {
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
     return u.host || null;
   } catch (_) { return null; }
-}
-
-// Hue (0..360) del colore identità per l'ordine cromatico (§1.3). Le tab senza
-// colore tornano Infinity → finiscono in coda.
-function hueOf(rgbStr) {
-  const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-  if (!m) return Infinity;
-  const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-  if (p.length < 3 || p.some((n) => Number.isNaN(n))) return Infinity;
-  const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-  if (mx === mn) return Infinity;
-  const d = mx - mn;
-  let h;
-  if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-  else if (mx === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  return (h / 6) * 360;
 }
 
 function canGoBack(wc) {

@@ -607,6 +607,8 @@ module.exports = function register(on, ctx) {
       return {
         ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
         contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
+        lunghezzaRisposte: d.lunghezzaRisposte || {},
+        lunghezzaRisposteDiSerie: globalThis.SN_LUNGHEZZA_RISPOSTE ? { ...globalThis.SN_LUNGHEZZA_RISPOSTE.DI_SERIE } : {},
       };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };

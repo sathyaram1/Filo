@@ -93,12 +93,13 @@ import {
   leggiBigliettoAMano,
 } from './lib/routine-ticket.mjs';
 import { startBeat, stopBeat } from './lib/routine-beat.mjs';
-import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
+import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe, absolutizeOutput } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
+import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -313,6 +314,7 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   if (String(sha || '')) s.verifierSha = String(sha);
   // Una critica nuova apre un giro nuovo: la pulizia di quello prima non ne è la base.
   s.puliziaSha = '';
+  s.pulizieDopo = [];
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'stop';
@@ -329,6 +331,7 @@ export function applyFixed(state) {
   s.verifierCritique = '';
   s.verifierSha = '';
   s.puliziaSha = '';
+  s.pulizieDopo = [];
   s.secauditDone = false;
   s.secauditVerdict = null;
   // Gli sha degli esiti se ne vanno con gli esiti: una correzione è contenuto
@@ -340,7 +343,8 @@ export function applyFixed(state) {
 
 /**
  * La pulizia dopo la critica: le prove dei rilievi messi da parte tolte PRIMA di correggere. PURA.
- * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed.
+ * `controllo` è l'esito di controllaPulizia; da `puliziaSha` parte il confronto di --record-fixed. Una pulizia dopo
+ * le correzioni non sposta la base: va in `pulizieDopo`, e la consegna non rilancia ciò che ha tolto.
  */
 export function applyPulizia(state, controllo) {
   const s = { ...defaultState(state?.id, state?.branch), ...(state || {}) };
@@ -357,7 +361,8 @@ export function applyPulizia(state, controllo) {
   if (!controllo || !controllo.ok) return { ok: false, message: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
   const fuori = testoPuliziaFuoriNumero(controllo, md.numeri);
   if (fuori) return { ok: false, message: fuori };
-  s.puliziaSha = controllo.sha;
+  if (controllo.dopo) s.pulizieDopo = [...(Array.isArray(s.pulizieDopo) ? s.pulizieDopo : []).filter((x) => x !== controllo.sha), controllo.sha];
+  else s.puliziaSha = controllo.sha;
   return { ok: true, state: s, files: controllo.files };
 }
 
@@ -755,6 +760,13 @@ function conImmagini(ctx) {
   return Array.isArray(ctx && ctx.immagini) && ctx.immagini.length ? { immagini: ctx.immagini } : {};
 }
 
+// Perché un diff vuoto è vuoto davvero: senza questa riga il controllo non lo distingue da un calcolo fallito (#740).
+function testoDiffVuoto({ commitPropri = null } = {}) {
+  if (commitPropri === 0) return 'Il diff è vuoto davvero: il ramo non ha commit propri rispetto a main, quindi non porta nessuna modifica.';
+  const quanti = commitPropri > 0 ? `ha ${commitPropri} commit propri, ma ` : '';
+  return `Il diff è vuoto davvero: il ramo ${quanti}ha lo stesso contenuto della sua base comune con main (modifiche che si annullano a vicenda).`;
+}
+
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {
     case 'secaudit':
@@ -765,6 +777,7 @@ export function buildPayload(bucket, ctx = {}) {
           diffBase: ctx.diffBase,
           ...(ctx.diffHead ? { diffHead: ctx.diffHead, diffComando: `git diff ${ctx.diffBase.sha}...${ctx.diffHead}` } : {}),
         } : {}),
+        ...(ctx.diffVuoto ? { diffVuoto: testoDiffVuoto(ctx.diffVuoto) } : {}),
       };
     case 'verifier':
       // Sintomo (feedback) + branch, MAI il diff né il report del risolutore.
@@ -830,45 +843,58 @@ function tryGit(args) {
   catch (e) { return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || e.message }; }
 }
 
-// Ritorna anche su quale base e su quale punta il diff è stato calcolato: chi lo ricalcola deve usare
-// quelle, non il `main` locale (nel clone delle routine è indietro e gonfia il diff).
-export function diffForBranch(branch, root = ROOT) {
+/**
+ * Il diff del ramo contro il main di GitHub, con la base e la punta su cui è calcolato: chi lo ricalcola usa
+ * quelle. Un diff che git non sa calcolare esce con `ok: false` e il motivo, mai come diff vuoto (#740); uno vuoto
+ * esce solo se il contenuto del ramo è davvero quello della base comune, e lo dichiara in `vuoto`.
+ * @returns {{ok:true, diff:string, base:{ref:string, sha:string}, head:string, vuoto?:{commitPropri:number|null}}
+ *   | {ok:false, motivo:string, diff:'', base:object|null, head:string}}
+ */
+export function diffForBranch(branch, root = ROOT, { main = MAIN_BRANCH, passi } = {}) {
   // Il diff non si ripulisce: gli spazi in fondo all'ultima riga fanno parte del ramo.
-  const tryGit = (args, { grezzo = false } = {}) => {
+  const git = (args, { grezzo = false } = {}) => {
     try {
-      const out = execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 30 });
+      const out = execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 30, timeout: TETTO_STORIA_MS });
       return { ok: true, out: grezzo ? out : out.trim() };
-    } catch (e) { return { ok: false, out: '' }; }
+    } catch (e) {
+      return { ok: false, out: `${e.stdout || ''}${e.stderr || ''}`.trim() || String(e.message || e) };
+    }
   };
-  if (!branch) return { diff: '', base: null, head: '' };
-  // La base del confronto DEVE essere lo stato REMOTO di main. In cloud il clone
-  // è shallow e il ref locale `main` non viene mai aggiornato (l'orchestratore fa
-  // `pull --rebase origin main` sul branch driver `claude/*`, non fa avanzare il
-  // ref `main`), quindi un `git diff main...branch` userebbe un main vecchio di
-  // decine di versioni: il diff si gonfia con modifiche GIÀ in main e fa scattare
-  // falsi positivi L5/secaudit (file sensibili "toccati" che in realtà erano già
-  // su main). Il cancello di fusione (sul server) confronta con il main VERO di
-  // GitHub per lo stesso motivo; qui allineiamo la stessa logica per il diff
-  // che alimenta il secaudit.
-  tryGit(['fetch', 'origin', MAIN_BRANCH]);
-  const base = tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${MAIN_BRANCH}`]).ok
-    ? `origin/${MAIN_BRANCH}`
-    : MAIN_BRANCH;
-  // Il branch può esistere solo su origin (worker/* pushato ma non in locale).
-  const ref = tryGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).ok
-    ? branch
-    : (tryGit(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]).ok
-        ? `origin/${branch}`
-        : branch);
-  const baseSha = tryGit(['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
-  const headSha = tryGit(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+  const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
+  const guasto = (motivo, base = null, head = '') => ({ ok: false, motivo, diff: '', base, head });
+  if (!branch) return guasto('nessun ramo di cui calcolare il diff');
+  // La base è il main REMOTO: quello locale, nel clone delle routine, è indietro di decine di versioni e gonfia il
+  // diff di modifiche già fuse. Il refspec è esplicito perché in un clone a ramo singolo `fetch origin main` non
+  // crea origin/main; e niente ripiego sul main locale, che è proprio la base sbagliata.
+  const f = git(['fetch', '--quiet', 'origin', `+refs/heads/${main}:refs/remotes/origin/${main}`]);
+  const baseSha = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${main}^{commit}`]);
+  if (!baseSha.ok) {
+    return guasto(`non ho origin/${main} da usare come base${f.ok ? '' : `, e scaricarlo non riesce (${primaRiga(f.out)})`}`);
+  }
+  // Senza download riuscito si usa l'ultimo origin/main scaricato: più vecchio, il diff può solo crescere.
+  if (!f.ok) process.stderr.write(`[dispatch] origin/${main} non si aggiorna (${primaRiga(f.out)}): diff calcolato sull'ultima copia scaricata\n`);
+  const base = { ref: `origin/${main}`, sha: baseSha.out };
+  // Il ramo può esistere solo su origin (worker/* pushato ma non in locale).
+  const ref = [`refs/heads/${branch}`, `refs/remotes/origin/${branch}`]
+    .find((r) => git(['rev-parse', '--verify', '--quiet', r]).ok);
+  const headSha = ref ? git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]) : { ok: false };
+  if (!headSha.ok) return guasto(`il ramo ${branch} non c'è, né qui né fra quelli scaricati da origin`, base);
+  const head = headSha.out;
+  // Un clone poco profondo non ha la base comune: si scarica la storia che manca, come per la fusione di prova.
+  const storia = assicuraStoria({ git, mainSha: base.sha, punta: head, main, ...(passi ? { passi } : {}) });
+  if (storia.errore) return guasto(storia.errore, base, head);
+  const comune = git(['merge-base', base.sha, head]);
+  if (!comune.ok) return guasto(`ramo e origin/${main} non hanno una base comune`, base, head);
   // Fra gli sha, non fra i nomi: il diff è esattamente quello del comando che il payload dichiara.
-  const r = baseSha.ok && headSha.ok ? tryGit(['diff', `${baseSha.out}...${headSha.out}`], { grezzo: true }) : { ok: false, out: '' };
-  return {
-    diff: r.ok ? r.out : '',
-    base: baseSha.ok ? { ref: base, sha: baseSha.out } : null,
-    head: headSha.ok ? headSha.out : '',
-  };
+  const r = git(['diff', `${base.sha}...${head}`], { grezzo: true });
+  if (!r.ok) return guasto(`git diff non riesce (${primaRiga(r.out)})`, base, head);
+  if (r.out) return { ok: true, diff: r.out, base, head };
+  // Vuoto vale solo se l'albero del ramo è quello della base comune: è la prova che non passa dal testo del diff.
+  const albero = (sha) => git(['rev-parse', '--verify', '--quiet', `${sha}^{tree}`]);
+  const [a, b] = [albero(comune.out.split('\n')[0]), albero(head)];
+  if (!a.ok || !b.ok || a.out !== b.out) return guasto('il diff è uscito vuoto ma il ramo cambia dei file rispetto alla base comune con main', base, head);
+  const propri = git(['rev-list', '--count', `${base.sha}..${head}`]);
+  return { ok: true, diff: '', base, head, vuoto: { commitPropri: propri.ok ? Number(propri.out) : null } };
 }
 
 // ─── Retry (esportato, testato in tests/unit/dispatch.test.mjs) ───────────────
@@ -1138,7 +1164,7 @@ export { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText };
 export const FERMA_NOTE = [
   'Se un rilievo non si può correggere senza una decisione dell\'owner (un trade-off vero, una scelta di',
   'prodotto), scrivi la segnalazione e consegna quello che hai fatto:',
-  '  --record-fixed <id> "<report>" --segnala <file.md>',
+  '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --segnala <file.md>',
   'Una segnalazione FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha',
   'risposto. Senza segnalazione torna in coda per un\'altra verifica. Un difetto non è una segnalazione.',
 ].join('\n');
@@ -1326,12 +1352,17 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
     process.stderr.write(`Dopo la verifica superata le prove del giro tolte in ${puliziaPass.slice(0, 8)} sono la pulizia: il confronto parte da lì.\n`);
   }
   if (baseTolte && baseTolte !== headSha(ROOT)) {
-    const md = guard.state?.messiDaParteGiro;
+    const md = guard.state?.messiDaParteGiro && guard.state.messiDaParteGiro.sha === shaCritica ? guard.state.messiDaParteGiro : null;
     const tolte = controllaProveTolte({
       shaPrima: baseTolte, root: ROOT,
       conPulizia: baseTolte !== shaCritica,
-      messi: md && md.sha === shaCritica ? Number(md.n) || 0 : 0,
+      messi: md ? Number(md.n) || 0 : 0,
       shaCritica,
+      // Il numero nel nome dice quali rosse sono di un rilievo messo da parte: quelle escono con la pulizia (#747).
+      numeri: md && Array.isArray(md.numeri) ? md.numeri : undefined,
+      avvio: md ? md.avvio || '' : '',
+      pulizieDopo: guard.state?.pulizieDopo,
+      comando: `node scripts/dispatch.mjs --record-pulizia ${id}`,
       log: (m) => process.stderr.write(`${m}\n`),
     });
     if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
@@ -1372,14 +1403,20 @@ async function recordPulizia(id) {
   if (stato.lines.length) return { rejected: true, formatRejected: true, message: dirtyTreeText(stato.lines, 'pulizia') };
   const st = { ...(guard.state || defaultState(id, '')), id };
   const avvio = st.messiDaParteGiro && st.messiDaParteGiro.sha === st.verifierSha ? st.messiDaParteGiro.avvio : '';
-  const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT, avvio }) : null);
+  const controllo = st.verifierSha ? controllaPulizia({
+    shaCritica: st.verifierSha, root: ROOT, avvio, base: baseDelConfronto(st.verifierSha, st.puliziaSha, ROOT), pulizieDopo: st.pulizieDopo,
+  }) : null;
+  const r = applyPulizia(st, controllo);
   if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
   const numeri = Array.isArray(st.messiDaParteGiro?.numeri) ? st.messiDaParteGiro.numeri : undefined;
-  const casi = controllaCasiDellaPulizia({ shaCritica: st.verifierSha, sha: r.state.puliziaSha, root: ROOT, messi: numeri, log: (m) => process.stderr.write(`${m}\n`) });
+  const casi = controllaCasiDellaPulizia({
+    shaCritica: controllo.prima || st.verifierSha, sha: controllo.sha, root: ROOT, messi: numeri, dopo: !!controllo.dopo,
+    log: (m) => process.stderr.write(`${m}\n`),
+  });
   if (casi.ferma) return { rejected: true, formatRejected: true, message: casi.testo };
   // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
   sealTransition(r.state, 'pulizia');
-  return { ...r.state, files: r.files };
+  return { ...r.state, files: r.files, sha: controllo.sha, dopo: !!controllo.dopo };
 }
 async function recordSecaudit(id, verdict, testo = '') {
   const guard = guardIdentity(id);
@@ -1621,7 +1658,8 @@ export function usageText() {
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
     '  --record-pulizia  <id> [--ticket <b>]   dopo una critica che manda a correggere e mette rilievi',
     '                         da parte: registra il commit che toglie SOLO le loro prove del giro, dopo aver',
-    '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso)',
+    '                         rilanciato quelle a cui ha tolto un caso o un aiuto (un caso rosso resta rosso);',
+    '                         più tardi, per una prova dimenticata, il commit è l\'ultimo e da solo',
     '  --record-fixed    <id> "<report>" [--frase "…"] [--segnala <file.md>] [--ticket <b>]',
     '                         il report non è facoltativo: da qui esce un esito, e l’owner legge questo',
     '  --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]',
@@ -1889,7 +1927,9 @@ export function serverCtx(bucket, fromServer, diff = '') {
   // non chiede nessuna chiave. Del feedback non riceve niente, e non è più una
   // consegna da rispettare — senza chiave, il testo cifrato per lui è un blob.
   if (role === 'secaudit') {
-    if (diff && typeof diff === 'object') return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '' };
+    if (diff && typeof diff === 'object') {
+      return { diff: diff.diff || '', diffBase: diff.base || null, diffHead: diff.head || '', ...(diff.vuoto ? { diffVuoto: diff.vuoto } : {}) };
+    }
     return { diff };
   }
   if (role === 'verifier' || role === 'fixer' || role === 'new-work') {
@@ -1992,8 +2032,13 @@ async function finalizeBucket(bucket, fromServer) {
   }
 
   // Raccogli il contesto specifico del ruolo (rispettando l'isolamento).
-  const ctx = serverCtx(bucket, fromServer,
-    bucket.role === 'secaudit' ? diffForBranch(bucket.branch) : '');
+  let diff = '';
+  if (bucket.role === 'secaudit') {
+    diff = diffForBranch(bucket.branch);
+    // Un diff che non si calcola non arriva al controllo come se fosse vuoto: darebbe il via libera su niente (#740).
+    if (!diff.ok) return emitHalt('transient', `il diff del ramo ${bucket.branch} non si calcola: ${diff.motivo}`);
+  }
+  const ctx = serverCtx(bucket, fromServer, diff);
 
   emit(bucket, ctx);
   return { exit: 0 };
@@ -2056,6 +2101,8 @@ export function emit(bucket, ctx) {
 
 const isMainModule = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMainModule) {
+  // Anche i comandi nei testi stampati (i nostri e quelli del server) portano alla copia fissata (#763).
+  absolutizeOutput(ROOT);
   // Il biglietto a mano si toglie PRIMA di tutto, con la regola del canale: l'ordine non conta (davanti
   // a un --record-* finiva «argomento non riconosciuto», #724.1, #545) e un codice storto o doppio si ferma qui.
   const mano = stripTicketArg(process.argv.slice(2));
@@ -2200,7 +2247,10 @@ if (isMainModule) {
       }
       const s = await recordPulizia(id);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com'era è ancora rossa, la ferma.`);
+      const quante = s.files.length === 1 ? '1 prova toccata' : `${s.files.length} prove toccate`;
+      console.log(s.dopo
+        ? `stato ${id}: pulizia dopo le correzioni registrata su ${String(s.sha).slice(0, 8)} (${quante}). La consegna non le rilancia più com'erano: di quelle a cui ha tolto un caso rilancia quello che resta, e ogni altra prova del giro tolta o cambiata dalla pulizia di prima, se com'era è ancora rossa, la ferma.`
+        : `stato ${id}: pulizia registrata su ${String(s.puliziaSha).slice(0, 8)} (${s.files.length === 1 ? '1 prova tolta' : `${s.files.length} prove tolte`}). Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com'era è ancora rossa, la ferma.`);
       console.log(s.files.map((f) => `  · ${f}`).join('\n'));
       process.exit(0);
     } else if (flag === '--record-secaudit') {

@@ -1,8 +1,11 @@
 # Ridisegno delle routine per il piano Max — decisioni prese (2026-08-18)
 
-Decisioni concordate owner + Claude nella sessione del 2026-08-18. Questa spec
-è la fonte per l'implementazione. **Cantiere aperto il 2026-08-18** (questa
-copia è entrata nel repo con il trasloco documenti, passo 2 del §14).
+**Stato: chiuso il 2026-09-21**, con l'ultimo passo del §14. Qui resta il
+racconto delle decisioni; dove una è cambiata dopo, una riga **Superato** dice
+in quale file vive la regola di oggi.
+
+Decisioni concordate owner + Claude nella sessione del 2026-08-18 (questa copia
+è entrata nel repo con il trasloco documenti, passo 2 del §14).
 
 ## 0. Contesto
 
@@ -13,9 +16,13 @@ nati da quei vincoli invece di adattarli.
 
 ## 1. Sotto-feedback: aboliti
 
+*Fatto (§14, passo 3).*
+
 - Un feedback non si spezza più: il worker lo lavora INTERO e, se serve, usa
   sotto-agenti propri (SEMPRE sequenziali, mai in parallelo: l'hook di
   salvataggio si pesta sui lock, e il ritmo di consumo resta contenuto).
+  - **Superato** (sotto-agenti in parallelo): vedi `CLAUDE.md`, «Il contesto si
+    paga a ogni turno».
 - Verifica, secaudit e cancello di merge operano sull'INTERO feedback. La
   verifica avversariale torna a confrontarsi con le parole originali
   dell'owner, non con spec di seconda mano scritte da chi spezzava.
@@ -24,13 +31,18 @@ nati da quei vincoli invece di adattarli.
   finché la feature non è chiusa".
 - I sotto-feedback storici (#146.x, #379.x, #477.x…) restano VISIBILI in
   dashboard; sparisce solo la possibilità di crearne di nuovi.
+  - **Superato** (i figli `#N.k` di oggi): vedi `FEEDBACK-STATES.md` §3. Il
+    divieto di spezzare per chi lavora resta: `routines/roles/resolver.md`.
 - La macchina a stati vive in due copie (dashboard + server filo-security):
   lo smontaggio va fatto su entrambe, con rideploy (v. §7 per la soluzione
   definitiva alle due copie).
+  - **Superato** (le due copie): vedi `CLAUDE.md`, «Fonti di verità singole».
 - L'owner può sempre "spezzare" da sé aprendo più feedback distinti: non serve
   nessun meccanismo.
 
 ## 2. Niente ripresa del lavoro interrotto
+
+*Fatto (§14, passo 4); oggi in `routines/roles/orchestrator.md`, «Regole dure».*
 
 Il lavoro di una sessione morta a metà SI BUTTA: claim rilasciato, ramo
 abbandonato, si riparte da capo al giro dopo. Riprendere il codice senza il
@@ -39,6 +51,8 @@ perché col nuovo impianto i tagli a metà diventano rari per costruzione
 (niente finestre, il giro in corso finisce sempre).
 
 ## 3. Budget: solo rete reattiva
+
+*Fatto (§14, passo 4); oggi in `routines/roles/orchestrator.md`, «Regole dure».*
 
 - Abolite la stima del tetto 5h (CAP_5H), la soglia di spawn al 70% e tutta la
   contabilità ccusage: col piano Max un giro sequenziale non esaurisce la
@@ -50,11 +64,18 @@ perché col nuovo impianto i tagli a metà diventano rari per costruzione
 
 ## 4. Niente finestre d'ore
 
+*Fatto (§14, passo 4); oggi in `routines/roles/orchestrator.md`, «Loop».*
+
 Un giro finisce quando: il server dice basta, la coda è vuota, o il contesto
 dell'orchestratore è quasi pieno. Nessun tetto d'orologio, nessuna stima di
 durata, nessun "margine per l'ultimo worker".
 
 ## 5. Il pacemaker (Firebase, progetto filo-security)
+
+*Fatto (§14, passo 4); i freni del pacemaker in `ROUTINE-AUTH-SPEC.md` §10.*
+
+> **Superato** (una routine sola, e il suo tetto di accensioni): vedi
+> `SPEC-DOMANDE.md` §12.1 e `src/shared/routineSessioni.js`.
 
 - La routine su claude.ai NON ha più la schedulazione fitta: parte quasi solo
   su chiamata (trigger API, endpoint di accensione con token al portatore).
@@ -75,16 +96,22 @@ durata, nessun "margine per l'ultimo worker".
 
 ## 6. Controllo dalla dashboard
 
+*Fatto (§14, passo 4); oggi in `ROUTINE-AUTH-SPEC.md` §10.*
+
 - Lo stesso interruttore di oggi (config/routines): spento → il server smette
   di dare lavoro nuovo E il pacemaker non accende più. Il feedback in corso
   finisce e viene consegnato. Nessun lavoro troncato.
 - Politiche di ricambio (contesto, "basta per oggi", fasce orarie) = risposte
   del server alla richiesta di lavoro ("chiudi"), non logica nelle sessioni.
+  - **Superato** (il contesto lo misura l'orchestratore): vedi
+    `routines/roles/orchestrator.md`, «Loop».
 - I battiti (heartbeat del canale autenticato, già in costruzione con #477)
   sono l'UNICA definizione di "qualcuno sta lavorando". Niente flag che una
   sessione morta lascia in giro.
 
 ## 7. Fonti di verità singole (fine delle copie a mano)
+
+*Fatto (§14, passo 3); oggi in `CLAUDE.md`, «Fonti di verità singole».*
 
 - Filosofia per i giudici L2: incorporata nel prompt AL DEPLOY delle functions,
   leggendo filo_filosofia.txt dal repo pubblico (checkout locale o raw GitHub).
@@ -96,6 +123,8 @@ durata, nessun "margine per l'ultimo worker".
   di oggi).
 
 ## 8. Documenti: nuova struttura
+
+*Fatto (§14, passo 2).*
 
 Principio: i file sono per chi li mantiene; le istanze ricevono testo già
 composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
@@ -118,9 +147,13 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
   sintomo-vs-causa, invarianti UX e deviazioni, i tre testi di consegna, la
   verifica coi suoi minimi. Meno file, meno chiamate, meno modi di sbagliare.
   Nei ruoli restano solo le meccaniche di consegna specifiche.
+  - **Superato** (il condiviso fra i soli ruoli): vedi i file
+    `routines/roles/_*.md`, che dispatch include nei ruoli.
 - Le CICATRICI degli incidenti (chiave ri-prefissata nelle shell nuove,
   rifiuto≠guasto, mai rilanciare dopo un taglio, riga finale = dato) si
   conservano nel file-ruolo a cui insegnano qualcosa. Non si cancellano.
+  - **Superato** (la cicatrice della chiave): vedi `routines/roles/orchestrator.md`,
+    «Regole dure».
 - La scorciatoia che salta la verifica in `npm run finish`: eliminata da
   documenti E script.
 - Mai lavorare direttamente su main: una riga di divieto; la protezione sta
@@ -130,6 +163,8 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
   server, riconciliazione).
 
 ## 9. Laboratorio del verificatore (già operativo)
+
+*Fatto (§14, passo 6).*
 
 - Clone in Desktop/Filo/verifier-lab: senza remoto (non può pushare per
   costruzione), hook staccati, 34 rami e storia completa per il checkout dei
@@ -143,6 +178,8 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
 - Anche modelli open economici via OpenRouter come possibile setaccio
   AGGIUNTIVO (mai sostitutivo), nel rispetto della politica modelli: pesi
   aperti, mai dai server del produttore.
+  - **Superato** (verifica con un modello solo, dagli esiti qui sotto): vedi
+    `.claude/agents/routine-worker.md` e `routines/roles/orchestrator.md`, «Loop».
 - **Varianti di prompt già in lista** (18/08): la lente "immagina di essere un
   utente che si vuole lamentare" — proposta dall'owner, sospesa perché rischia
   solo rumore ("si trova sempre di che lamentarsi"): entra nel prompt SOLO se
@@ -176,11 +213,12 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
   trade-off mancanti si segnalano, non si perdonano; solo il trade-off vero va
   all'owner come suggerimento. Motivo: i feedback di Filo saranno spesso poco
   specificati (screenshot + "non va"), il valore sta nel ricostruire l'intento.
-  ⚠️ **Aggiornamento**: la parte «sono FAIL» è **superata da §13**. Il prompt
-  resta audace nel CERCARE; a ciò che trova dà un livello, e l'esito lo calcola
-  il server. Non ammorbidire la ricerca: cambia solo dove finisce l'esito.
+  - **Superato** (#561, l'esito di ciò che si segnala): vedi `routines/roles/verifier.md`,
+    `routines/roles/_critica-e-livelli.md` e `src/shared/verifierRound.js`.
 
 ## 10. Chiusura del buco del push diretto su `main` (sicurezza)
+
+*Fatto (§14, passo 5); oggi in `ROUTINE-AUTH-SPEC.md` §11 e §12.*
 
 Individuato dall'owner il 18/08: oggi NIENTE impedisce fisicamente a
 un'istanza catturata da una prompt injection di pushare dritta su `main`,
@@ -193,9 +231,12 @@ Chiusura (si incastra nell'architettura del canale #477):
   questo ramo" sul canale autenticato; il server verifica dallo stato VERO
   (PASS verifier + PASS secaudit registrati, L5 sul diff) e fonde lui via API
   GitHub con una propria identità;
+  - **Superato** (L5 sui lavori fidati): vedi `ROUTINE-AUTH-SPEC.md` §11.
 - **`main` protetto lato GitHub**: possono scriverci solo quell'identità e
   l'owner. Il push diretto da una sessione diventa fisicamente impossibile,
   non solo vietato a parole;
+  - **Superato** (l'owner fra chi ci scrive): vedi `ROUTINE-AUTH-SPEC.md` §11,
+    «Dove sta il muro, per esattezza».
 - `npm run finish` locale continua a funzionare con l'identità dell'owner
   (o passa anch'esso dal server, da decidere all'implementazione);
 - finché non è implementato, il rischio residuo resta documentato (è la coda
@@ -208,9 +249,10 @@ da decidere all'implementazione sono decise così:
   (il PAT resta come ripiego): non è l'account di nessuno e il token con cui
   parla dura un'ora;
 - **anche il finish locale passa dal server** (`ownerMerge`): niente più
-  fusione né push da questa macchina. Non pretende i verdetti registrati — quelli
+  fusione né push su `main` da questa macchina. Non pretende i verdetti registrati — quelli
   sono il vocabolario delle routine — ma **L5 gira lo stesso**, e lo `sha`
   dichiarato deve combaciare con la punta vera del ramo.
+  - **Superato** (L5 sui lavori fidati): vedi `ROUTINE-AUTH-SPEC.md` §11.
 
 La **ruleset su `main`** (passo dell'owner) è stata messa il **2026-08-20**: da
 lì il push diretto da una sessione non è più vietato a parole. Riverificato sul
@@ -242,9 +284,10 @@ l'unico che può.
   contenuto, né il ramo: accettarli sarebbe un push diretto travestito.
 - **Freno anti-raffica** con lo stato sul server: al massimo un aumento ogni 20
   minuti e 12 al giorno (il cron pubblica ogni sei ore: non intralcia).
-- Il lavoro di pubblicazione **chiede** il numero, poi rilegge `main` e
-  costruisce. Non fa più nessun `git push`, e una sentinella negli unit test
-  diventa rossa se ci torna.
+- Il lavoro di pubblicazione **chiede** il numero e non fa più nessun
+  `git push`: una sentinella negli unit test diventa rossa se ci torna.
+  - **Superato** (#641, quale commit si costruisce): vedi `ROUTINE-AUTH-SPEC.md`
+    §12.
 
 Dettaglio in `ROUTINE-AUTH-SPEC.md` §12.
 
@@ -256,10 +299,14 @@ Collegato (18/08, revisione del ruolo secaudit con l'owner):
   attacco è passato. Cifratura retroattiva o rimozione; valutare quanto della
   superficie pubblica (titoli compresi) si può chiudere. I testi vecchi sono
   "sicuri" (unico utente: l'owner) ma lasciarli lì non è pulito né coerente.
+  - **Superato** (#583: la lettura dei feedback non è più pubblica, la vista
+    pubblica tiene solo campi sicuri): vedi l'intestazione di `firestore.rules`.
 - **la nota di un blocco di sicurezza è cifrata e dettagliata**: su pass una
   riga; su blocco spiegazione esaustiva (cosa, dove, perché, scenario, cosa
   verificare se falso positivo) — e MAI in chiaro: è la descrizione esatta di
   come l'attacco è stato scoperto.
+  - **Superato** (la nota del pass): vedi `routines/roles/secaudit.md`, «Quanto
+    scrivere».
 
 ## 11. Suite completa: in GitHub, non dentro il giro
 
@@ -280,11 +327,17 @@ più scemo, che è la direzione giusta).
 
 ## 12. Ritorno dei worker: niente canale di testo
 
+*Fatto (§14, passi 2 e 4); oggi in `ROUTINE-AUTH-SPEC.md` §10 e
+`routines/roles/_contratto-worker.md`.*
+
 Deciso con l'owner il 18/08 (terza passata): il "contratto della riga finale"
 è ABOLITO. Il testo con cui un worker chiude non viene letto da nessuna
 macchina — l'orchestratore decide il passo successivo SOLO interrogando il
 canale (chiede un biglietto nuovo: exit 0 = spawna, 2 = chiudi, 3 = guasto,
 chiudi senza rispawnare) più il controllo del proprio contesto (~70%).
+
+> **Superato** (i passi fra un worker e l'altro): vedi
+> `routines/roles/orchestrator.md`, «Loop».
 
 Perché: il testo di ritorno entra comunque nel contesto dell'orchestratore
 (non si può impedire), quindi la difesa non è chiedere una riga corta ma
@@ -314,75 +367,64 @@ Secondo corollario, da confermare a canale maturo: muore anche il **ripiego
 sulla coda git** per la scelta del lavoro (exit 3 = chiudi, nessun cammino
 alternativo). A quel punto l'intera coda su git si può ritirare.
 
+> **Confermato e fatto** (#477.4): vedi `FEEDBACK-STATES.md` §7b.
+
 Terzo (quarta passata, 18/08): **new-work e fixer FUSI in un ruolo unico,
 `resolver`** — stesso lavoro, cambia solo il punto di partenza (richiesta
 dell'owner vs critica del verifier), e dispatch dice il caso nel payload.
-Anche le correzioni grosse possono usare sotto-agenti (sequenziali). Regole
-collegate:
+Anche le correzioni grosse possono usare sotto-agenti (sequenziali).
+
+> **Superato** (#561, chi corregge la critica): vedi `FEEDBACK-STATES.md` §3 e
+> `routines/roles/_critica-e-livelli.md`; i casi del resolver sono i file
+> `routines/roles/resolver*.md`. Sotto-agenti: `CLAUDE.md`, «Il contesto si
+> paga a ogni turno».
+
+Regole collegate:
 
 - il resolver in correzione NON vede il report del primo passaggio (occhi
   freschi, e comunque è cifrato); vede la riga di changelog nel codice; frase
   e changelog si aggiornano SOLO se il comportamento visibile è cambiato
   (ritocco: `--frase` opzionale nella consegna della correzione);
+  - **Superato** (#561): vedi `FEEDBACK-STATES.md` §3 e
+    `routines/roles/_critica-e-livelli.md`.
 - **i numeri configurabili dalla dashboard non si scrivono MAI nei prompt**
   (la soglia dei FAIL — oggi 5 — la legge il server dalla config; i documenti
   che dicevano "3" erano già stantii: è la prova del principio);
+  - **Superato** (la soglia unica dei FAIL): vedi `src/shared/verifierRound.js`;
+    i bilanci per livello si scrivono in Gestione → Automazioni.
 - i file-ruolo non ripetono il metodo di CLAUDE.md: contengono solo ciò che è
   specifico del ruolo. E **non spiegano ciò che non compete al ruolo** ("cosa
   succede dopo non ti riguarda", soglie altrui, meccaniche a valle):
   informazione inutile è superficie in più.
+  - **Superato** (le meccaniche a valle, per chi deve sceglierne livello e
+    sede): vedi `routines/roles/_critica-e-livelli.md`.
 
 ## 13. La verifica: critica a livelli, esito del server
 
-I tre esiti scelti dal verificatore (pass / migliorabile / fail) non esistono
-più dal 2026-09-05 (feedback #561). Il racconto di quella decisione sta nella
-storia di git di questo file; qui c'è lo stato vero, in breve, e dove sta il
-resto.
-
-- **Chi verifica scrive una critica, non un verdetto.** Una riga per rilievo,
-  col livello davanti (3/2/1/0; `?` = chiede una decisione dell'owner). Il
-  metro dei livelli sta nel testo del ruolo
-  (`routines/roles/_critica-e-livelli.md`), uno per tutti gli ambiti.
-- **L'esito lo calcola il server** dai livelli e da un bilancio per livello
-  (`cap3`, `cap2`, `cap1`, `cap0`; dal 2026-09-23 solo il 3 ferma a bilancio
-  finito, il 2 esce come feedback a priorità 2): `pass`, `fix` o `stop`. Le regole
-  stanno in `src/shared/verifierRound.js`, che il server incorpora al deploy; i
-  numeri li scrive l'owner in Gestione → Automazioni e non hanno un default nel
-  codice. Un'istanza catturata non può promuoversi da sola: i conti non li fa
-  lei.
-- **Fase 2.** Con esito `fix` corregge lo stesso agente che ha scritto la
-  critica, sui soli rilievi che il server gli rimanda, e consegna con
-  `--record-fixed`. Se correggere non si può senza una decisione, consegna con
-  `--ferma` e una segnalazione: il lavoro aspetta l'owner. Ogni correzione
-  porta a un'altra verifica, fatta da un'altra istanza.
-- **I rilievi non corretti non spariscono**: il server li raccoglie in un
-  feedback derivato per lavoro, figlio `#N.k`, categoria `routine:residuo`. Il
-  verificatore non apre feedback.
-- **Ambiti.** La verifica è piena di serie. Due giri stretti la sostituiscono
-  quando la ricerca larga è già stata fatta: `chiusura` (dopo una correzione,
-  se l'owner ha acceso «Giro stretto dopo una correzione») e `riallineamento`
-  (dopo un conflitto di fusione risolto a mano su un lavoro già verificato).
-  Cambia il perimetro, non il metro; un difetto fuori perimetro vale al massimo
-  livello 1, salvo danno concreto all'utente. L'ambito lo decide il server e
-  viaggia nel payload.
-- **Un solo modello per la verifica**, quello forte: nel laboratorio (§9) i
-  modelli economici non hanno prodotto un rilievo di completezza in 15 corse.
-
-Stati e transizioni del giro: `FEEDBACK-STATES.md`. Cosa viaggia fra server e
-ruoli (`scope`, `perimetro`, `stop`, la risposta alla critica):
-`ROUTINE-AUTH-SPEC.md` §6 e «I livelli sul feedback».
+*Fatto (§14, passo 8).* I rilievi hanno un livello, l'esito lo calcola il server e i
+non corretti vanno in feedback derivati (`routine:residuo`). Regole: `FEEDBACK-STATES.md`,
+`ROUTINE-AUTH-SPEC.md` (§6 e «I livelli sul feedback») e `src/shared/verifierRound.js`.
 
 ## 14. Ordine di esecuzione
 
+*Tutti i passi sono fatti.*
+
 1. La sessione in corso sui feedback (#477.x) finisce. Fino ad allora: solo
    bozze fuori dal repo (questa cartella) e lavoro nel verifier-lab.
+   **Fatto il 2026-08-18.**
 2. Trasloco documenti (unica modifica, contro lo stato del repo a quel punto).
+   **Fatto il 2026-08-18.**
 3. Smontaggio sotto-feedback (prima drenare i .x ancora in volo), riallineo
-   delle due copie della macchina a stati + rideploy.
+   delle due copie della macchina a stati + rideploy. **Fatto il 2026-08-19.**
 4. Pacemaker + ruolo orchestratore + prompt salvato nuovo della routine.
+   **Fatto il 2026-08-19.**
 5. Merge sul server + protezione di `main` (chiusura del buco §10 — priorità
-   alta: è l'unico punto di sicurezza vero dell'elenco).
+   alta: è l'unico punto di sicurezza vero dell'elenco). **Fatto fra il
+   2026-08-20 e il 21.**
 6. Esperimenti sul verificatore nel lab (possono partire anche subito).
+   **Fatto il 2026-08-18** (§9).
 7. Revisione dei prompt dei ruoli (l'owner li legge per la prima volta) con
-   gli esiti del lab.
-8. Critica a livelli ed esito calcolato dal server (§13): fatto.
+   gli esiti del lab. **Fatto fra il 2026-09-20 e il 21** (storia di git di
+   `routines/roles/`).
+8. Critica a livelli ed esito calcolato dal server (§13). **Fatto il
+   2026-09-05** (#561).

@@ -15,6 +15,7 @@ import {
 } from '../../scripts/lib/clone-worker.mjs';
 import { PINNED_PATHS, pinnedDirWorker, pinnedRepoRoot } from '../../scripts/lib/tools-pin.mjs';
 import { SESSION_MARKERS } from '../../scripts/lib/branch-integrity.mjs';
+import { carattereSicuro } from '../../scripts/lib/carattere-commento.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -64,6 +65,7 @@ test('il clone nasce con l\'origin VERO del principale, node_modules collegato, 
     assert.deepEqual(JSON.parse(readFileSync(resolve(dest, MARCATORE_WORKER), 'utf8')).indice, 1);
     assert.deepEqual(datiWorker({ env: {}, root: dest }), { indice: 1, paralleli: 3 });
     assert.equal(git(dest, ['status', '--porcelain']), '', 'ne\' il marcatore ne\' il collegamento finiscono in un commit');
+    assert.ok(carattereSicuro(git(dest, ['config', '--get', 'core.commentChar'])), 'i titoli `#n` sopravvivono a un rebase nel clone (#762)');
     assert.deepEqual(elencoCloni(s.principale).map((c) => [c.indice, resolve(c.cartella)]), [[1, dest]], 'il registro lo conosce');
     assert.ok(cartellaRegistro(s.principale).startsWith(resolve(s.principale, '.git')), 'e sta dentro la .git del principale');
     assert.equal(r.strumenti, pinnedDirWorker(1, s.basePin));

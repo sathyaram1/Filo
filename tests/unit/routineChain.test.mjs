@@ -60,7 +60,7 @@ function fintoServer(rispostaLavoro, consegne = []) {
  * cartella git usa-e-getta (così claim e posizionamento non toccano niente di
  * reale). Ritorna il JSON che il giro consegna al lavoratore.
  */
-async function giro(rispostaLavoro, consegne = []) {
+async function giro(rispostaLavoro, consegne = [], prepara = null) {
   const { srv, port } = await fintoServer(rispostaLavoro, consegne);
   const casa = cartellaTemporanea('filo-catena-');
   try {
@@ -98,6 +98,7 @@ async function giro(rispostaLavoro, consegne = []) {
       execFileSync('git', ['branch', ramo], { cwd: casa });
       execFileSync('git', ['push', '-q', 'origin', ramo], { cwd: casa });
     }
+    if (prepara) prepara(casa);
 
     const out = await new Promise((risolvi) => {
       const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--ticket', 'biglietto-di-prova'], {
@@ -201,6 +202,26 @@ test('controllo di sicurezza: ramo e differenze, MAI il feedback', async () => {
   assert.equal(json.payload.feedback, undefined);
   assert.equal(JSON.stringify(json.payload).includes(FEEDBACK.text), false,
     'il testo del feedback non deve raggiungerlo per nessuna strada');
+});
+
+test('controllo di sicurezza su un clone che non sa calcolare il diff → il giro si ferma, non consegna un diff vuoto (#740)', async () => {
+  // Il clone a ramo singolo delle routine: niente main, né locale né scaricato, e origin che non risponde.
+  const { json } = await giro({
+    ok: true, role: 'secaudit', id: 'fid-740', num: '#740', branch: 'worker/740',
+    payload: { role: 'secaudit', branch: 'worker/740' },
+  }, [], (casa) => {
+    const g = (...a) => execFileSync('git', a, { cwd: casa, stdio: ['ignore', 'pipe', 'pipe'] });
+    g('checkout', '-q', 'worker/740');
+    writeFileSync(resolve(casa, 'del-ramo.txt'), 'modifica da controllare\n', 'utf8');
+    g('add', '-A');
+    g('commit', '-qm', 'lavoro del ramo');
+    g('push', '-q', 'origin', 'worker/740');
+    g('branch', '-D', 'main');
+    g('update-ref', '-d', 'refs/remotes/origin/main');
+    g('remote', 'set-url', 'origin', resolve(casa, 'non-esiste.git'));
+  });
+  assert.equal(json.role, 'halt', 'un diff che non si calcola non arriva al controllo come se fosse vuoto');
+  assert.match(json.payload.message, /diff del ramo worker\/740 non si calcola[^]*origin\/main/);
 });
 
 test('busta formalmente giusta ma VUOTA dentro → il giro si ferma', async () => {

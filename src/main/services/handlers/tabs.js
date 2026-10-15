@@ -46,7 +46,8 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     const tabs = win && win._filoTabs;
     if (!tabs || !sender?.tab?.id) return { ok: true, inVista: true };
-    return { ok: true, inVista: tabs.inVista(sender.tab.id) };
+    // `riserva`: la home pronta per la scheda nuova (#1128), che aspetta di diventarlo.
+    return { ok: true, inVista: tabs.inVista(sender.tab.id), riserva: !!sender.riserva };
   });
 
   on(MSG.CASELLE_IN_SOSPESO, soloFilo(async (msg, sender) => {

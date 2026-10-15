@@ -30,15 +30,20 @@
     return /^OpenRouter(?:\s+\S+)?\s+402\b/.test(raw) || /insufficient credits|key limit exceeded/i.test(raw);
   }
 
-  // Quanti crediti vale una spesa in dollari, coi parametri del server
-  // (euro per credito, cambio). Per eccesso al decimo: ciò che si scala al
-  // saldo mostrato non deve essere meno di ciò che OpenRouter conta.
-  function creditsForUsd(costUsd, { eurPerCredit, eurUsd } = {}) {
-    const usd = Number(costUsd);
-    if (!Number.isFinite(usd) || usd <= 0) return 0;
+  // Quanti crediti vale un dollaro, coi parametri del server (euro per
+  // credito, cambio): la stessa tariffa scala il saldo e fa le stime (#819).
+  function creditsPerUsd({ eurPerCredit, eurUsd } = {}) {
     const e = Number(eurPerCredit) || 0.0007;
     const fx = Number(eurUsd) || 1.1;
-    return Math.ceil((usd / (e * fx)) * 10 - 1e-6) / 10;
+    return 1 / (e * fx);
+  }
+
+  // Quanti crediti vale una spesa in dollari. Per eccesso al decimo: ciò che
+  // si scala al saldo mostrato non deve essere meno di ciò che OpenRouter conta.
+  function creditsForUsd(costUsd, params = {}) {
+    const usd = Number(costUsd);
+    if (!Number.isFinite(usd) || usd <= 0) return 0;
+    return Math.ceil(usd * creditsPerUsd(params) * 10 - 1e-6) / 10;
   }
 
   // Costruisce la riga, scartando tutto ciò che non è nel contratto. `at` è
@@ -527,8 +532,110 @@
       : 'Sei entrato con un invito: i tuoi crediti sono pronti.';
   }
 
+  // ── Chi usa Filo e se il conto OpenRouter regge (#820) ───────────────────
+  // Per la pagina «Inviti e utenti» e per l'avviso all'owner all'avvio, dalla vista del server. Un cambio che manca
+  // dà null, mai un cambio inventato: il numero che ne viene è un trattino, non uno zero.
+  const GIORNO_MS = 24 * 60 * 60 * 1000;
+  const GIORNO_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const giornoUtc = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const numeroO = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+
+  function creditiDaUsd(usd, cfg = {}) {
+    const u = numeroO(usd); const e = numeroO(cfg.eurPerCredit); const fx = numeroO(cfg.eurUsd);
+    return u == null || !(e > 0) || !(fx > 0) ? null : u / (e * fx);
+  }
+  function usdDaCrediti(crediti, cfg = {}) {
+    const c = numeroO(crediti); const e = numeroO(cfg.eurPerCredit); const fx = numeroO(cfg.eurUsd);
+    return c == null || !(e > 0) || !(fx > 0) ? null : c * e * fx;
+  }
+  function euroDaCrediti(crediti, cfg = {}) {
+    const c = numeroO(crediti); const e = numeroO(cfg.eurPerCredit);
+    return c == null || !(e > 0) ? null : c * e;
+  }
+  function euroDaUsd(usd, cfg = {}) {
+    const u = numeroO(usd); const fx = numeroO(cfg.eurUsd);
+    return u == null || !(fx > 0) ? null : u / fx;
+  }
+
+  // Attivo vuol dire almeno una riga nel registro d'uso nella finestra: un giorno presente in `usage.byDay` conta
+  // anche se la sua spesa è zero. I giorni sono quelli del server (UTC); oggi compreso, 7 giorni sono oggi e i sei prima.
+  function usoPersone(users, now = Date.now()) {
+    const da7 = giornoUtc(now - 6 * GIORNO_MS);
+    const da30 = giornoUtc(now - 29 * GIORNO_MS);
+    const ultimo = Object.create(null);
+    const attivi7 = [];
+    const attivi30 = [];
+    let spesoUsd = 0;
+    let spesoIgnoti = 0;
+    for (const u of Array.isArray(users) ? users : []) {
+      if (!u || typeof u.pseudonym !== 'string') continue;
+      const perGiorno = u.usage && u.usage.byDay && typeof u.usage.byDay === 'object' ? u.usage.byDay : {};
+      const giorni = Object.keys(perGiorno).filter((k) => GIORNO_RE.test(k)).sort();
+      const fine = giorni.length ? giorni[giorni.length - 1] : null;
+      ultimo[u.pseudonym] = fine;
+      if (fine && fine >= da7) attivi7.push(u.pseudonym);
+      if (fine && fine >= da30) attivi30.push(u.pseudonym);
+      const s = numeroO(u.balance && u.balance.usageUsd);
+      if (s == null) spesoIgnoti += 1;
+      else spesoUsd += s;
+    }
+    const nessuno = spesoIgnoti > 0 && spesoIgnoti === (Array.isArray(users) ? users.length : 0);
+    return { attivi7, attivi30, ultimo, spesoUsd: nessuno ? null : spesoUsd, spesoIgnoti };
+  }
+
+  function usd2(n) {
+    return `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0)} $`;
+  }
+  function crediti0(n) {
+    return new Intl.NumberFormat('it-IT', { useGrouping: true, maximumFractionDigits: 0 }).format(Math.floor(Number(n) || 0));
+  }
+
+  // Il conto lo legge il server (`overview.account`, contratto in messages.js accanto a WALLET_OWNER_OVERVIEW). Senza
+  // il campo, o con un errore, il conto non è letto: nessun numero e nessun allarme, perché non si sa.
+  function contoOwner(overview) {
+    const o = overview && typeof overview === 'object' ? overview : {};
+    const cfg = o.config || {};
+    const tot = o.totals || {};
+    const a = o.account;
+    if (!a || typeof a !== 'object') return { letto: false, motivo: 'assente', allarmi: [] };
+    const caricatoUsd = numeroO(a.totalCreditsUsd);
+    const spesoUsd = numeroO(a.totalUsageUsd);
+    if (a.error || caricatoUsd == null || spesoUsd == null) return { letto: false, motivo: 'errore', allarmi: [] };
+    const restaUsd = Math.max(0, caricatoUsd - spesoUsd);
+    const restaCrediti = creditiDaUsd(restaUsd, cfg);
+    const vivi = numeroO(tot.liveCredits);
+    const margine = restaCrediti != null && vivi != null ? restaCrediti - vivi : null;
+    const tettoUsd = numeroO(tot.maxGrantUsd) != null ? numeroO(tot.maxGrantUsd) : usdDaCrediti(tot.maxGrantCredits, cfg);
+    const allarmi = [];
+    if (margine != null && margine < -1e-6) {
+      allarmi.push({
+        kind: 'vivi_oltre_conto',
+        testo: `Sul conto OpenRouter restano ${usd2(restaUsd)}, cioè ${crediti0(restaCrediti)} crediti, e le persone ne hanno ${crediti0(vivi)} da spendere: se li spendessero tutti il conto si svuoterebbe e Filo smetterebbe di rispondere a tutti, anche a chi ha ancora crediti. Ricarica il conto.`,
+      });
+    }
+    if (tettoUsd != null && tettoUsd > caricatoUsd + 1e-9) {
+      allarmi.push({
+        kind: 'tetto_oltre_caricato',
+        testo: `Il tetto dei crediti da regalare vale ${usd2(tettoUsd)}, più dei ${usd2(caricatoUsd)} caricati sul conto OpenRouter: abbassa il tetto o ricarica il conto.`,
+      });
+    }
+    return {
+      letto: true, caricatoUsd, spesoUsd, restaUsd, restaCrediti, caricatoCrediti: creditiDaUsd(caricatoUsd, cfg),
+      vivi, margine, tettoUsd, readAt: typeof a.readAt === 'string' ? a.readAt : '', allarmi,
+    };
+  }
+
+  // Quali allarmi dire all'owner all'avvio: gli accesi che l'avviso precedente non aveva già detto. Un conto non
+  // letto non cambia niente; uno letto senza allarmi li azzera, così un allarme che torna si ridice.
+  function allarmiDaDire(detti, conto) {
+    const prima = Array.isArray(detti) ? detti.filter((k) => typeof k === 'string') : [];
+    if (!conto || !conto.letto) return { dire: [], detti: prima };
+    const accesi = (conto.allarmi || []).map((a) => a.kind);
+    return { dire: (conto.allarmi || []).filter((a) => !prima.includes(a.kind)), detti: accesi };
+  }
+
   global.SN_WALLET = {
-    USAGE_FIELDS, isOutOfCredits, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
@@ -539,5 +646,7 @@
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
     formatCredits, PREMIO_ATTESA_MS, resolutionReward,
+    // Chi usa Filo e se il conto OpenRouter regge (#820)
+    creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

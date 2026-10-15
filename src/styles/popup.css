@@ -125,6 +125,8 @@
   transition: background 120ms ease;
 }
 .sn-msg-rimedio:hover { background: var(--sn-hover); }
+/* Sotto una risposta fermata dal tetto di lunghezza la riga è in corsivo, il tasto no. */
+.sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
 
 .sn-msg-text p,
 .sn-menu-inline p { margin: 0 0 8px 0; }

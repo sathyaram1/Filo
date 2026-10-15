@@ -522,6 +522,15 @@
       required: [],
       risultato: true,
     },
+    RIMEDIO_CREDITI: {
+      description: 'Applica o rimette com\'erano i rimedi dell\'avviso dei crediti, come i pulsanti sotto «Ti restano N crediti…» e nella pagina Crediti: fanno durare di più i crediti di Filo. Rimedi: modello = usa modelli più economici per le funzioni che consumano di più ("sì, usa i modelli più economici", "rimetti i modelli di prima"); automatiche = spegne le funzioni automatiche che stanno consumando ("spegnile", "riaccendile"). Senza operazione, o con elenca, l\'esito dice la situazione di adesso e i rimedi con le cifre: usalo prima di consigliare o se l\'utente chiede quale funzione consuma di più. Mettere una chiave OpenRouter propria si fa dalla pagina Crediti. Per le soglie e per spegnere l\'avviso si usa IMPOSTA_PREFERENZA.',
+      properties: {
+        operazione: S('applica, annulla (rimette com\'era prima del rimedio) oppure elenca.', { enum: ['applica', 'annulla', 'elenca'] }),
+        rimedio: S('Per applica e annulla: modello oppure automatiche.', { enum: ['modello', 'automatiche'] }),
+      },
+      required: ['operazione'],
+      risultato: true,
+    },
     CARTA_HOME: {
       description: 'Dispone le carte della home. A destra quelle che l\'utente tiene ("togli la carta dei mazzi", "rimetti l\'editor", "metti i suggerimenti in cima", "rimetti le carte com\'erano"): una carta tolta diventa un\'icona in «altro», sotto le carte, e da lì si rimette. A sinistra quello che sta succedendo (timer, sveglie, scaricamenti, avvisi, lavori in corso): si spostano ("metti il timer della pasta in cima") e si tolgono ("togli l\'avviso del backup": un avviso si chiude, uno scaricamento o un lavoro spariscono solo dalla home, e con rimetti tornano). Un timer o una sveglia si tolgono con CANCELLA_SVEGLIA. Se la carta di sinistra non si trova, l\'esito elenca quelle che ci sono con la loro chiave.',
       properties: {

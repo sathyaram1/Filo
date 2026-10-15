@@ -321,9 +321,11 @@ test('il main ferma le chiamate automatiche oltre il tetto per scheda, avvisa un
     const M = globalThis.SN_MSG.MSG;
     let chiamate = 0;
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ messages }) => {
+      const testo = JSON.stringify(messages);
       // La home aperta scrive il suo saluto col modello: non è una chiamata di questa scheda.
-      if (JSON.stringify(messages).includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
-      chiamate += 1;
+      if (testo.includes('preparare la dashboard')) return { text: '{"message":"","suggestions":[]}', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
+      // Si contano le spiegazioni chieste qui: una chiamata di fondo dell'app nel frattempo faceva 122 (#1219).
+      if (testo.includes('parola ')) chiamate += 1;
       return { text: 'ok', model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
     };
     const wc = webContents.getAllWebContents().find((w) => w.getURL() === url);
@@ -543,4 +545,17 @@ test('chi esce dalla casella e ci rientra, anche col fuoco dato dalla pagina, ri
   await page.evaluate(() => { const ta = document.getElementById('ta'); ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; });
   await page.keyboard.type(' poi xqseconda2 ');
   await expect(page.locator('.sn-spell-overlay .sn-semantic-error')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
+});
+
+test('spenta la spiegazione preparata (#818), il doppio clic non la paga; il tasto destro sì', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ spiegaAnticipata: { enabled: false } }); });
+  const page = await apri(app, openTab, testServer);
+  const p = await puntoDellaParola(page, 'p2', 'Pitagora');
+  await page.mouse.dblclick(p.x, p.y);
+  await pausa(1500);
+  expect((await conti(app)).spiega).toBe(0);
+  await page.mouse.click(p.x, p.y, { button: 'right' });
+  await expect(page.locator('.sn-menu .sn-menu-inline-explain')).toContainText('Spiegazione di prova', { timeout: 10_000 });
+  expect((await conti(app)).spiega).toBe(1);
 });

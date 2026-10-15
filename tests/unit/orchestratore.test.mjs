@@ -4,12 +4,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, passoDalRamo,
+  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, oraLocale, passoDalRamo,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
@@ -310,6 +310,42 @@ test('attesaLimite: solo il limite d’uso, fino all’ora che dice', () => {
   assert.equal(attesaLimite('Claude AI usage limit reached|1759600000', 1759590000000), 10_060_000);
   assert.equal(attesaLimite('Claude AI usage limit reached|1759600000', 1759700000000), 60_000);
   assert.equal(attesaLimite('Weekly limit reached', 0, { pausaLimiteMs: 5 }), 5);
+});
+
+test('oraLocale: l’ora dell’orologio della macchina, non quella UTC dell’ISO (#1064)', () => {
+  const roma = { timeZone: 'Europe/Rome' };
+  assert.equal(oraLocale('2026-10-06T18:42:47.185Z', roma), '20:42');
+  assert.equal(oraLocale('2026-10-06T22:30:09Z', roma), '00:30');
+  assert.equal(oraLocale('2026-12-01T10:05:00Z', roma), '11:05', 'ora solare');
+  assert.equal(oraLocale('2026-10-06T22:30:09Z', { ...roma, conData: true }), '2026-10-07 00:30:09');
+  assert.equal(oraLocale(Date.parse('2026-10-06T18:42:47Z'), roma), '20:42');
+  const d = new Date('2026-10-06T18:42:47Z');
+  const due = (n) => String(n).padStart(2, '0');
+  assert.equal(oraLocale(d.toISOString()), `${due(d.getHours())}:${due(d.getMinutes())}`, 'senza fuso vale quello della macchina');
+  for (const x of ['', '   ', null, undefined, 'ieri', {}]) assert.equal(oraLocale(x), '', String(x));
+});
+
+test('nessuna ora per l’owner nasce tagliando un ISO, che è UTC (#1064)', () => {
+  const dir = join(ROOT, 'scripts', 'lib');
+  const file = [join(ROOT, 'scripts', 'orchestratore-locale.mjs'), join(dir, 'fusioni-server.mjs'), ...readdirSync(dir).filter((f) => /^orchestratore.*\.mjs$/.test(f)).map((f) => join(dir, f))];
+  for (const f of file) {
+    const righe = readFileSync(f, 'utf8').split('\n').map((r, i) => [i + 1, r]).filter(([, r]) => /\.slice\(\s*(?:0|11)\s*,\s*(?:16|19)\s*\)/.test(r));
+    assert.deepEqual(righe, [], `${f}: un ISO tagliato dà l’ora UTC; l’ora che legge l’owner si scrive con oraLocale (scripts/lib/orchestratore.mjs)`);
+  }
+});
+
+test('le righe del log di avvia portano l’ora della macchina', () => {
+  // Kiritimati sta a +14 tutto l'anno: la sua ora non coincide mai con quella UTC.
+  const d = cartellaTemporanea('orch-ora-');
+  const prima = Date.now();
+  const r = spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'avvia', '--dry-run', '4243'], {
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d, TZ: 'Pacific/Kiritimati' }, timeout: TETTO_ATTESA_MS,
+  });
+  assert.equal(r.status, 0, r.stderr);
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) /m.exec(r.stdout);
+  assert.ok(m, `nessuna riga di log con data e ora locali:\n${r.stdout.slice(0, 400)}`);
+  const quando = Date.parse(`${m[1]}T${m[2]}+14:00`);
+  assert.ok(quando >= Math.floor(prima / 1000) * 1000 && quando <= Date.now(), `${m[0]}è fuori dalla corsa`);
 });
 
 test('ramo con un merge commit e indietro: merge di origin/main prima di start; se va in conflitto, lo riallinea il lavoratore', async () => {

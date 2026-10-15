@@ -37,24 +37,6 @@
     render();
   }
 
-  // Hue (0..360) del colore identità, per l'ordine cromatico. Le tab senza
-  // colore vanno in fondo (hue = Infinity), così i siti colorati guidano l'occhio.
-  function hueOf(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return Infinity;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return Infinity;
-    const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    if (mx === mn) return Infinity; // grigio → niente identità cromatica
-    const d = mx - mn;
-    let h;
-    if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-    else if (mx === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    return (h / 6) * 360;
-  }
-
   // Chip colorata con la stessa regola delle schede in alto (tabColor.js): tinta
   // del sito sul neutro della chip quanto dice opacita_tab, titolo per contrasto.
   const TabColor = window.SN_TAB_COLOR;
@@ -419,8 +401,8 @@
 
     for (const k of orderedDays) {
       const items = groups.get(k);
-      // Ordine cromatico dentro il giorno (arcobaleno); i senza colore in fondo.
-      items.sort((a, b) => hueOf(a.identityColor) - hueOf(b.identityColor));
+      // Dentro il giorno lo stesso ordine arcobaleno della barra.
+      if (TabColor) items.sort((a, b) => TabColor.compareRainbow(a.identityColor, b.identityColor));
 
       const day = document.createElement('div');
       day.className = 'arc-day';
@@ -551,11 +533,12 @@
     fuocoPrimaDelMenu = document.activeElement;
     menu.tabIndex = -1;
     try { menu.focus(); } catch (_) {}
+    document.addEventListener('keydown', onMenuKeydown, true);
     // setTimeout: evita che il mousedown/click che ha aperto il menu lo chiuda
     // subito tramite il listener "outside click".
     setTimeout(() => {
+      if (openMenu !== menu) return;
       document.addEventListener('mousedown', onOutsideClick, true);
-      document.addEventListener('keydown', onMenuKeydown, true);
       window.addEventListener('scroll', closeCtxMenu, true);
       window.addEventListener('resize', closeCtxMenu);
     }, 0);

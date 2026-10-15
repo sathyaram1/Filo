@@ -11,18 +11,16 @@
 //   il server apre una richiesta che aspetta il sì dell'owner, QUI. Da #908 il
 //   lavoro locale di una pratica provata non la apre: fonde e registra i blocchi.
 //
-// DOVE VIVE (scelta dell'owner, 2026-08-26)
-//   SOLO nella dashboard di gestione, in cima ai Ricevuti: i Ricevuti sono le
-//   cose che aspettano una decisione dell'owner, e questa È una decisione —
-//   sta lì, prima dei feedback, non su una superficie a parte. Prima l'avviso
-//   viveva anche sulla prima schermata del browser: due posti per la stessa
-//   decisione erano rumore per la home di tutti i giorni.
+// DOVE VIVE (contratto 2026-09-13)
+//   Solo in Gestione, mai sulla home. Una richiesta con la sua pratica si apre
+//   dal quadrato rosso della scheda, che sta in cima ai Ricevuti; una senza
+//   (il lavoro locale di `npm run finish`) sta in cima ad Automazioni.
 //   Dal #489 le stesse card si disegnano anche nella pagina da browser (site/approvazioni): è la via
 //   d'uscita per il giorno in cui Filo non parte, non un secondo posto da guardare.
 //
-//   Il modulo resta separato dalla pagina perché tiene insieme le due rese —
-//   l'avviso da decidere (Ricevuti) e la traccia delle decisioni passate
-//   (Log) — e la parte PURA che gli unit test coprono.
+//   Il modulo resta separato dalla pagina perché tiene insieme le rese — le
+//   card da decidere e la traccia delle decisioni passate (Log) — e la parte
+//   PURA che gli unit test coprono.
 //
 //   Le frasi che spiegano COSA è stato bloccato NON stanno qui: le manda il
 //   server, che è l'unico posto dove la tabella dei controlli vive. Questo file

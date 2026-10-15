@@ -1433,9 +1433,10 @@
     menu.style.left = `${Math.max(4, Math.min(x, vw - w - 4))}px`;
     menu.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
     titleMenuEl = menu;
+    document.addEventListener('keydown', onTitleMenuKeydown, true);
     setTimeout(() => {
+      if (titleMenuEl !== menu) return;
       document.addEventListener('mousedown', onTitleMenuOutside, true);
-      document.addEventListener('keydown', onTitleMenuKeydown, true);
       window.addEventListener('scroll', closeTitleMenu, true);
       window.addEventListener('resize', closeTitleMenu);
     }, 0);
@@ -3810,8 +3811,17 @@
       for (const msg of m.data.messages) {
         const b = document.createElement('div');
         b.className = 'ed-chat-msg ' + (msg.role === 'user' ? 'user' : 'assistant');
-        b.textContent = msg.content;
+        // La riga «interrotta» sta nel testo salvato (il modello la rilegge), ma si mostra come nota, non come risposta.
+        const parti = String(msg.content || '').split('\n\n');
+        const interrotta = msg.role !== 'user' && parti.length > 1 && window.SN_CHAT_ERRORS?.eFraseInterrotta?.(parti[parti.length - 1]);
+        b.textContent = interrotta ? parti.slice(0, -1).join('\n\n') : msg.content;
         log.appendChild(b);
+        if (interrotta) {
+          const n = document.createElement('div');
+          n.className = 'ed-chat-note';
+          n.textContent = parti[parti.length - 1];
+          log.appendChild(n);
+        }
         const nota = noteRipiego.get(msg);
         if (nota) {
           const n = document.createElement('div');
@@ -3819,6 +3829,18 @@
           n.textContent = nota;
           log.appendChild(n);
         }
+      }
+      // L'ultima risposta finisce con la riga «interrotta»: «Continua» chiede il seguito, come nelle altre chat.
+      const ultimo = m.data.messages[m.data.messages.length - 1];
+      const CE = window.SN_CHAT_ERRORS;
+      if (ultimo && ultimo.role !== 'user' && CE?.eFraseInterrotta?.(String(ultimo.content || '').split('\n\n').pop())) {
+        const tasto = document.createElement('button');
+        tasto.type = 'button';
+        tasto.className = 'ed-chat-continua';
+        tasto.textContent = 'Continua';
+        tasto.title = 'Continua la risposta da dove si è interrotta';
+        tasto.addEventListener('click', (e) => { e.stopPropagation(); input.value = CE.CHIEDI_SEGUITO; send(); });
+        log.appendChild(tasto);
       }
       log.scrollTop = log.scrollHeight;
     };
@@ -3865,6 +3887,9 @@
           } else {
             thinking.content = raw;
           }
+          // Fermata al tetto di lunghezza (#1097.3): lo si legge sotto, e il modello lo vede al giro dopo.
+          const interrotta = window.SN_CHAT_ERRORS?.rispostaInterrotta?.(r.finishReason);
+          if (interrotta) thinking.content = `${thinking.content}\n\n${interrotta}`;
           annotaNelFilo(conv, 'filo', thinking.content);
         }
       } catch (e) {
