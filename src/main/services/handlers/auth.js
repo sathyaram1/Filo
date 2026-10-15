@@ -670,7 +670,7 @@ module.exports = function register(on, ctx) {
       const lavoriServer = (typeof msg.lavoriServer === 'boolean')
         ? await Defaults.setLavoriServer(msg.lavoriServer, idToken)
         : await Defaults.getLavoriServer(idToken);
-      return { ok: true, enabled, autoApprove, proberWhenIdle, routinesEnabled, lavoriServer };
+      return { ok: true, enabled, autoApprove, routinesEnabled, lavoriServer };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
