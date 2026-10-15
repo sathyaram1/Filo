@@ -118,6 +118,32 @@ test('«spegni l\'Aiuto» lo toglie da tasto destro, linguetta e Alt+H; «riacce
   await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
 });
 
+test('spento con il pannello aperto, il pannello se ne va', async ({ app, openTab, testServer }) => {
+  const page = await apriPagina(openTab, testServer);
+  await premiAltH(app);
+  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8000 });
+  expect((await chiedi(app, 'spento')).executed).toBe(true);
+  await expect(page.locator('.sn-sidebar')).toHaveCount(0, { timeout: 8000 });
+});
+
+test('sotto l\'avviso del sito, da spento Alt+H e la linguetta dicono perché nella cornice', async ({ app, shell, openTab, testServer }) => {
+  await apriPagina(openTab, testServer);
+  await chiedi(app, 'spento');
+  await expect.poll(async () => (await impostazioni(app)).featureFlags.help).toBe(false);
+  // L'avviso vero chiede un sito finto in lista: qui basta che la scheda risulti coperta.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    const tab = tm.tabs.find((t) => t.id === tm.activeId);
+    tm.avvisoSito.coperta = () => tab;
+  });
+  const avviso = shell.getByText('L\'Aiuto è spento', { exact: false });
+  await premiAltH(app);
+  await expect(avviso.first()).toBeVisible({ timeout: 8000 });
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  await expect(avviso.first()).toBeVisible();
+});
+
 test('in Preferenze ci sono i tre interruttori: cambiano le stesse impostazioni della chat e seguono la chat', async ({ app, openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
   const aiuto = page.locator('#aiutoAcceso');
