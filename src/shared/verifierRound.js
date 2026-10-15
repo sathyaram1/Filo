@@ -621,6 +621,13 @@
       else if (fixable.length || left('cap0') > 0) fixable.push(f);
       else derived.push(f);
     }
+    // I vicini: dentro solo una correzione già partita per gli interni.
+    const conInterni = fixable.length > 0;
+    for (const f of findings) {
+      if (f.sede !== 'v') continue;
+      if (!f.decision && conInterni) fixable.push(f);
+      else derived.push(f);
+    }
 
     const budgets = {};
     for (const k of CAP_KEYS) budgets[k] = { cap: caps[k], used: counts[k.replace('cap', 'count')], left: Math.max(0, left(k)) };
