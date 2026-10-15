@@ -198,9 +198,9 @@
   // quanto è ancora in mano alle persone. Un riquadro che non si può toccare
   // accanto a uno che si può toccare deve VEDERSI diverso: il valore grande,
   // il nome sotto, nessun campo.
-  function riquadro(valore, nome, spiega, { barra = null } = {}) {
+  function riquadro(valore, nome, spiega, { barra = null, nota = '', allarme = false } = {}) {
     const li = document.createElement('li');
-    li.className = 'sn-wallet-numero';
+    li.className = 'sn-wallet-numero' + (allarme ? ' is-allarme' : '');
     if (spiega) li.title = spiega;
     const v = document.createElement('span');
     v.className = 'sn-wallet-numero-valore';
@@ -209,6 +209,12 @@
     n.className = 'sn-wallet-numero-nome';
     n.textContent = nome;
     li.append(v, n);
+    if (nota) {
+      const s = document.createElement('span');
+      s.className = 'sn-wallet-numero-nota';
+      s.textContent = nota;
+      li.appendChild(s);
+    }
     if (barra != null && Number.isFinite(barra)) {
       const b = document.createElement('span');
       b.className = 'sn-wallet-numero-barra';
