@@ -19,6 +19,8 @@ export const HOSTS = [
   'libero.test', 'www.ecosia.org',
   // Nomi internazionali nella forma che arriva alla rete: münchen.de e сайт.рф.
   'xn--mnchen-3ya.de', 'xn--80aswg.xn--p1ai',
+  // Le due schede dello stesso sito dell'Aiuto di una scheda (#826).
+  'example.org',
 ];
 
 export const test = filoTest.extend({
