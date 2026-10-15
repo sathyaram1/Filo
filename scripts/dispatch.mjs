@@ -1330,12 +1330,17 @@ async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma
     process.stderr.write(`Dopo la verifica superata le prove del giro tolte in ${puliziaPass.slice(0, 8)} sono la pulizia: il confronto parte da lì.\n`);
   }
   if (baseTolte && baseTolte !== headSha(ROOT)) {
-    const md = guard.state?.messiDaParteGiro;
+    const md = guard.state?.messiDaParteGiro && guard.state.messiDaParteGiro.sha === shaCritica ? guard.state.messiDaParteGiro : null;
     const tolte = controllaProveTolte({
       shaPrima: baseTolte, root: ROOT,
       conPulizia: baseTolte !== shaCritica,
-      messi: md && md.sha === shaCritica ? Number(md.n) || 0 : 0,
+      messi: md ? Number(md.n) || 0 : 0,
       shaCritica,
+      // Il numero nel nome dice quali rosse sono di un rilievo messo da parte: quelle escono con la pulizia (#747).
+      numeri: md && Array.isArray(md.numeri) ? md.numeri : undefined,
+      avvio: md ? md.avvio || '' : '',
+      pulizieDopo: guard.state?.pulizieDopo,
+      comando: `node scripts/dispatch.mjs --record-pulizia ${id}`,
       log: (m) => process.stderr.write(`${m}\n`),
     });
     if (tolte.ferma) return { rejected: true, formatRejected: true, message: tolte.testo };
