@@ -1201,7 +1201,7 @@
     if (r && r.ok) disegnaMemoria(r);
   }
 
-  function disegnaMemoria({ moduli = [], lezioni = [] }) {
+  function disegnaMemoria({ moduli = [], lezioni = [], sempreAperte = [] }) {
     const box = $('memoria');
     if (!box) return;
     box.textContent = '';
