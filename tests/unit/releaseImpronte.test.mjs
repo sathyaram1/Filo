@@ -153,7 +153,10 @@ function releaseFinta({ corpo = '', bozza = false, dopoScrittura, falliscePrime 
       fallimenti--;
       throw Object.assign(new Error('Command failed: gh'), { stderr: 'HTTP 502: Bad Gateway\n' });
     }
-    if (args[0] === 'release' && args[1] === 'view') return JSON.stringify({ body: stato.corpo, isDraft: stato.bozza });
+    if (args[0] === 'release' && args[1] === 'view') {
+      const tutto = { body: stato.corpo, isDraft: stato.bozza, assets: allegati };
+      return JSON.stringify(Object.fromEntries(args[args.indexOf('--json') + 1].split(',').map((c) => [c, tutto[c]])));
+    }
     if (args[0] === 'release' && args[1] === 'edit') {
       stato.corpo = readFileSync(args[args.indexOf('--notes-file') + 1], 'utf8');
       stato.scritture++;
