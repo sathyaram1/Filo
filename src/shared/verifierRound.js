@@ -374,6 +374,11 @@
     let current = null;
     for (const raw of lines) {
       const m = FINDING_LINE.exec(raw);
+      if (m && difficileSenzaDomanda(m)) {
+        rifiutati.push(`${raw.trim()} (${SPIEGAZIONE_DIFFICILE})`);
+        current = null;
+        continue;
+      }
       if (m) {
         current = rilievoDa(m);
         findings.push(current);
