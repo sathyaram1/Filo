@@ -1638,7 +1638,23 @@
     await salvaMappaScorciatoie({ [id]: T.valoreDaSalvare(id, accel) }, id);
   }
 
-  async function salvaMappaScorciatoie(cambio, id) {
+  async function salvaMappaScorciatoie(richiesto, id) {
+    const T = window.SN_TASTI;
+    await caricaModuliEditor();
+    // «Ripristina» ne tocca quattro: quella che non può tornare di serie resta com'è, col perché sulla sua riga.
+    const dopo = Object.fromEntries(T.AZIONI_FILO.map((a) => {
+      const v = Object.prototype.hasOwnProperty.call(richiesto, a.id) ? richiesto[a.id] : scorciatoieSalvate[a.id];
+      return [a.id, v || a.serie];
+    }));
+    const cambio = {};
+    const rifiutate = [];
+    for (const [x, v] of Object.entries(richiesto)) {
+      const no = T.rifiutoScorciatoiaFilo(x, v || T.AZIONI_FILO.find((a) => a.id === x).serie, undefined, dopo);
+      if (no) rifiutate.push([x, T.testoRifiutoFilo(no)]);
+      else cambio[x] = v;
+    }
+    const mostraRifiutate = () => { for (const [x, testo] of rifiutate) mostraErroreScorciatoia(x, testo); };
+    if (!Object.keys(cambio).length) { if (registrando) fermaRegistrazione(); mostraRifiutate(); return; }
     scorciatoieSalvate = { ...scorciatoieSalvate, ...cambio };
     if (registrando) fermaRegistrazione();
     else disegnaScorciatoie(scorciatoieSalvate);
