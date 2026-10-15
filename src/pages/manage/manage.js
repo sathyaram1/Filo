@@ -228,6 +228,25 @@
   const MR  = window.SN_MANAGE_REVIEW;
   const TH  = window.SN_FEEDBACK_THREAD;
   const SRCH = window.SN_MANAGE_SEARCH;
+  const DOMANDE = window.SN_MG_DOMANDE;
+
+  // ── Sezioni (SPEC-DOMANDE §2.1) ───────────────────────────────────────────
+  const mgSezioni = document.getElementById('mgSezioni');
+  const mgLivelliFiltro = document.getElementById('mgLivelliFiltro');
+  const SEZIONE_KEY = 'filo_manage_sezione';
+  let sezioneAttiva = 'feedback';
+  const schedaPerSezione = {};
+  for (const s of MR.SEZIONI) schedaPerSezione[s.id] = s.schede[0];
+  // Dopo un gesto vero dell'owner la sezione d'apertura non scatta più: una pratica aperta, un filtro o una ricerca
+  // cominciati mentre le domande arrivano non si portano via. Vale ogni gesto, non le sole schede.
+  let utenteHaScelto = false;
+  let aperturaFatta = false;
+  for (const ev of ['pointerdown', 'keydown', 'wheel']) {
+    document.addEventListener(ev, (e) => { if (e.isTrusted) utenteHaScelto = true; }, { capture: true, passive: true });
+  }
+  // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
+  let livelliScelti = [];
+  const DOMANDE_TABS = (MR.SEZIONI.find((s) => s.id === 'domande') || { schede: [] }).schede;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
   const SORT_MODE_KEY = 'filo_manage_sort';
   const AUTOMATION_GET = (window.SN_MSG?.MSG?.AUTOMATION_GET) || 'automation_get';
@@ -401,6 +420,7 @@
     if (isAdmin && !eraAdmin && impostazioniAvviate) await caricaImpostazioni();
     // Stessa pagina, stessa regola: i Modelli di supporto rifiutati da non owner si rileggono anche loro.
     if (isAdmin && !eraAdmin) rileggiModelliRifiutati();
+    if (isAdmin && !eraAdmin && DOMANDE && DOMANDE.stato().soloOwner) DOMANDE.carica();
   }
 
   mgSignInBtn.addEventListener('click', () => {
@@ -1534,6 +1554,7 @@
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
   let fusioniLette = false;
+  let fusioniOk = false;      // l'ultima lettura delle fusioni è riuscita: senza, Routine non dice numeri
   // L'esito di quel tentativo, per richiesta: il riquadro in basso e la riga
   // del dettaglio sono un posto solo, e chi arriva dopo cancella chi c'era.
   const esitiTentati = new Map();
@@ -1586,6 +1607,8 @@
     if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
     const fb = allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
     if (!fb) return;
+    // Aprire una pratica precisa spegne il filtro dei livelli se la nasconderebbe.
+    mostraNelFiltro(fb);
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
     if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
@@ -1662,6 +1685,7 @@
     if (!UI) return 0;
     const spegni = () => {
       fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+      fusioniOk = false;
       if (mgMergeApprovalsOrphans) {
         mgMergeApprovalsOrphans.replaceChildren();
         mgMergeApprovalsOrphans.hidden = true;
@@ -1692,6 +1716,7 @@
     const primaDelleFusioni = fusioniLette ? live.fotoSezioni() : null;
     fusioni = LIVE.fusioniDa(r, fusioni);
     fusioniLette = true;
+    fusioniOk = true;
     if (primaDelleFusioni && dataLoaded) segnaArrivi(primaDelleFusioni, allFeedbacks);
     // Una richiesta che non c'è più non ha un esito da raccontare.
     const vive = new Set(fusioni.pending.concat(fusioni.failed).map((req) => req.id));
@@ -1700,6 +1725,7 @@
     // Il quadrato della scheda aperta e il bordo delle card in lista vengono da
     // questi elenchi: una richiesta nuova deve vedersi subito, senza riaprire.
     riflettiFusioni();
+    updateSezioniCounts();
     UI.renderRecent(mgMergeApprovalsRecent, { recent: r.recent || [] });
     // Le fuse senza chiedere: il controllo a posteriori del lavoro fidato e dei rami di prima. Quando il main avvisa
     // di un cambiamento manda solo l'elenco in attesa: quello che c'era resta finché non si rilegge.
@@ -1753,14 +1779,23 @@
   // `panel-list`: cambia solo quale sottoinsieme di feedback popola la lista a
   // sinistra. Le altre (fbstats/stats/models/automation/log) hanno il loro
   // pannello, `panel-<nome>`.
-  function selectTab(tab) {
+  // `opts.apertura`: la scelta automatica d'apertura, che non conta come scelta dell'utente e non si ricorda.
+  function selectTab(tab, opts) {
+    const sezione = MR.sezioneDiScheda(tab);
+    if (!sezione) return;
+    const apertura = !!(opts && opts.apertura);
+    if (!apertura) utenteHaScelto = true;
+    sezioneAttiva = sezione;
+    schedaPerSezione[sezione] = tab;
+    if (!apertura) salvaSezione();
     // Cambiando scheda la ricerca si chiude da sola: vedi la scheda scelta.
     if (searchMode) closeSearch({ keepList: true });
     document.querySelectorAll('.mg-tab').forEach((t) => {
       t.classList.toggle('mg-tab--active', t.dataset.tab === tab);
     });
+    aggiornaSezioniAttive();
     const isList = LIST_TABS.includes(tab);
-    const panelId = isList ? 'panel-list' : `panel-${tab}`;
+    const panelId = isList ? 'panel-list' : (DOMANDE_TABS.includes(tab) ? 'panel-domande' : `panel-${tab}`);
     document.querySelectorAll('.mg-panel').forEach((p) => {
       p.classList.toggle('mg-panel--active', p.id === panelId);
     });
@@ -1781,6 +1816,22 @@
       closeSidebar();
       renderList();
     }
+    if (DOMANDE && DOMANDE_TABS.includes(tab)) DOMANDE.mostra(tab);
+    // I caricamenti pigri ascoltano questo, non il clic: una scheda si mostra anche da una sezione o all'apertura.
+    document.dispatchEvent(new CustomEvent('mg-scheda', { detail: { tab, apertura } }));
+  }
+
+  // Le domande si rileggono a ogni apertura di una loro scheda; all'avvio le ha già chieste init.
+  document.addEventListener('mg-scheda', (e) => {
+    if (DOMANDE && DOMANDE_TABS.includes(e.detail.tab) && !e.detail.apertura) DOMANDE.carica();
+  });
+  if (DOMANDE) {
+    DOMANDE.alCambio(() => updateSezioniCounts());
+    // Un feedback nominato da una domanda si apre nella sua scheda, come dall'avviso di una fusione.
+    DOMANDE.collega({
+      apriFeedback: (num) => openFeedbackByNum(String(num || '').replace(/^#/, '')),
+      apriScheda: (tab) => selectTab(tab),
+    });
   }
 
   function schedaAttiva() {
@@ -1793,6 +1844,96 @@
     if (!btn) return;
     selectTab(btn.dataset.tab);
   });
+
+  if (mgSezioni) {
+    mgSezioni.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mg-sezione');
+      if (!btn) return;
+      selectTab(schedaPerSezione[btn.dataset.sezione]);
+    });
+  }
+
+  function aggiornaSezioniAttive() {
+    if (mgSezioni) {
+      mgSezioni.querySelectorAll('.mg-sezione').forEach((b) => {
+        const on = b.dataset.sezione === sezioneAttiva;
+        b.classList.toggle('mg-sezione--active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+    }
+    aggiornaSchedeVisibili();
+    updateSezioniCounts();
+  }
+
+  // Una scheda si vede se è della sezione accesa; le schede-lista anche solo se lo stato si legge (mostraSezioni).
+  function aggiornaSchedeVisibili() {
+    const ok = sezioniAttendibili();
+    mgTabs.querySelectorAll('.mg-tab').forEach((btn) => {
+      const tab = btn.dataset.tab;
+      btn.hidden = MR.sezioneDiScheda(tab) !== sezioneAttiva || (LIST_TABS.includes(tab) && !ok);
+    });
+    if (mgNoSections) mgNoSections.hidden = ok || sezioneAttiva !== 'feedback';
+  }
+
+  function salvaSezione() {
+    try { localStorage.setItem(SEZIONE_KEY, JSON.stringify({ sezione: sezioneAttiva, schede: schedaPerSezione })); } catch (_) {}
+  }
+  function leggiSezione() {
+    try { return MR.leggiSceltaSezione(localStorage.getItem(SEZIONE_KEY)); } catch (_) { return null; }
+  }
+
+  // Gira una volta, quando feedback e domande sono arrivati (o falliti), e mai dopo un clic dell'utente.
+  function sceltaApertura(opts) {
+    const forza = !!(opts && opts.forza);
+    if (!forza && (aperturaFatta || utenteHaScelto)) return null;
+    aperturaFatta = true;
+    const d = DOMANDE ? DOMANDE.stato() : null;
+    const ricevuti = dataLoaded && sezioniAttendibili()
+      ? MR.listForManageTab(allFeedbacks, 'inbox', { releasedVersion, fusioni }).length
+      : null;
+    const scelta = MR.sezioneDiApertura({ domande: d && d.lette ? d.domande : null, ricevuti, ultima: leggiSezione() });
+    // Si apre sui Ricevuti per quello che c'è dentro: a filtri spenti, o un blocco nuovo resterebbe nascosto.
+    if (scelta.scheda === 'inbox' && livelliScelti.length) { livelliScelti = []; renderList(); }
+    const giaQui = scelta.sezione === sezioneAttiva && schedaPerSezione[sezioneAttiva] === scelta.scheda
+      && document.querySelector(`.mg-tab--active[data-tab="${scelta.scheda}"]`);
+    if (!giaQui) selectTab(scelta.scheda, { apertura: true });
+    return scelta;
+  }
+
+  // ── Filtro dei Ricevuti per livello ──────────────────────────────────────
+  if (mgLivelliFiltro) {
+    mgLivelliFiltro.querySelectorAll('.mg-livello-btn').forEach((b) => {
+      const forma = MR.FORME_SVG[MR.FORMA_DI_LIVELLO[b.dataset.livello]];
+      if (forma) b.insertAdjacentHTML('afterbegin', `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${forma}"/></svg>`);
+    });
+    mgLivelliFiltro.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mg-livello-btn');
+      if (!btn) return;
+      const l = btn.dataset.livello;
+      livelliScelti = livelliScelti.includes(l) ? livelliScelti.filter((x) => x !== l) : livelliScelti.concat(l);
+      renderList();
+    });
+  }
+
+  // Aprire una pratica precisa (avviso, statistiche, ricerca) la deve far vedere anche col filtro acceso.
+  function mostraNelFiltro(fb) {
+    if (!fb || !livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
+    if (!MR.filtraLivelli([fb], livelliScelti, { releasedVersion, fusioni }).length) livelliScelti = [];
+  }
+
+  function updateLivelliFiltro() {
+    if (!mgLivelliFiltro) return;
+    const show = currentTab === 'inbox' && !searchMode && sezioniAttendibili();
+    mgLivelliFiltro.hidden = !show;
+    if (!show) return;
+    const n = dataLoaded ? MR.contaLivelliRicevuti(allFeedbacks, { releasedVersion, fusioni }) : null;
+    mgLivelliFiltro.querySelectorAll('.mg-livello-btn').forEach((b) => {
+      const l = b.dataset.livello;
+      b.setAttribute('aria-pressed', livelliScelti.includes(l) ? 'true' : 'false');
+      const c = b.querySelector('.mg-livello-count');
+      if (c) c.textContent = n ? ` ${countText(n[l])}` : '';
+    });
+  }
 
   // Filtro ⭐ della tab Archiviati: ricalcola la lista (la selezione resta).
   if (mgStarFilter) {
@@ -2279,14 +2420,8 @@
   // restano raggiungibili. Ritorna true se le sezioni si possono disegnare.
   function mostraSezioni() {
     const ok = sezioniAttendibili();
-    for (const tab of LIST_TABS) {
-      const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
-      if (btn) btn.hidden = !ok;
-    }
-    if (mgNoSections) {
-      mgNoSections.hidden = ok;
-      if (!ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
-    }
+    if (mgNoSections && !ok) mgNoSections.textContent = SENZA_SEZIONI_AVVISO;
+    aggiornaSchedeVisibili();
     return ok;
   }
   // "(24)" o "(24+)" secondo il tetto: una sola regola per la barra, per
@@ -2321,9 +2456,11 @@
     // Sezioni non disegnabili: non c'è niente da numerare. Uscire QUI evita di
     // lasciare "(3) (0) (0) (0)" appiccicato ai bottoni nascosti, pronto a
     // ricomparire al primo dato leggibile che non passa da renderList.
+    updateSezioniCounts();
+    updateLivelliFiltro();
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly, fusioni })
+      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly, fusioni, livelli: livelliScelti })
       : null;
     const capped = counts ? loadHitCap() : false;
     // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
@@ -2346,6 +2483,49 @@
     }
   }
 
+  // Domande e le tre schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md).
+  const DOMANDE_LABELS = { domande: 'Da rispondere', 'domande-lavoro': 'In lavorazione', 'domande-archivio': 'Archivio' };
+  function updateSezioniCounts() {
+    if (!mgSezioni) return;
+    const scrivi = (sez, testo, titolo) => {
+      const b = mgSezioni.querySelector(`.mg-sezione[data-sezione="${sez}"]`);
+      const c = b && b.querySelector('.mg-sezione-count');
+      if (!c) return null;
+      c.textContent = testo;
+      if (titolo) b.title = titolo; else b.removeAttribute('title');
+      return b;
+    };
+    const d = DOMANDE ? DOMANDE.stato() : null;
+    const nd = d && d.lette ? MR.contaDomande(d.domande) : null;
+    const bd = scrivi('domande', nd ? `(${nd.domande})` : '',
+      nd ? `${nd.domande} da rispondere${d.aggiornamento ? ' · l’ultimo aggiornamento non è riuscito' : ''}` : '');
+    if (bd) bd.classList.toggle('mg-sezione--urgente', !!(nd && MR.bloccanteAperta(d.domande)));
+    for (const tab of DOMANDE_TABS) {
+      const btn = mgTabs.querySelector(`.mg-tab[data-tab="${tab}"]`);
+      if (!btn) continue;
+      btn.textContent = nd ? `${DOMANDE_LABELS[tab]} ` : DOMANDE_LABELS[tab];
+      if (!nd) continue;
+      const badge = document.createElement('span');
+      badge.className = 'mg-tab-count';
+      // Oltre il tetto dell'elenco l'archivio ha solo le più recenti: il numero è un minimo.
+      badge.textContent = `(${nd[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
+      btn.appendChild(badge);
+    }
+
+    // Feedback = i Ricevuti a filtro spento: il filtro è una vista della scheda, non della sezione.
+    const leggibili = dataLoaded && sezioniAttendibili();
+    const ricevuti = leggibili ? MR.listForManageTab(allFeedbacks, 'inbox', { releasedVersion, fusioni }).length : null;
+    const bf = scrivi('feedback', ricevuti === null ? '' : countText(ricevuti),
+      ricevuti === null ? '' : `${ricevuti} nei Ricevuti${loadHitCap() ? ` · ${FB.COUNT_INCOMPLETE_HINT}` : ''}`);
+    if (bf) bf.classList.toggle('mg-sezione--arrivi', sezioneAttiva !== 'feedback'
+      && allFeedbacks.some((fb) => arrivate.has(String(fb._id))));
+
+    // Routine: le fusioni senza segnalazione che aspettano il via libera in Automazioni. Zero non si scrive:
+    // la sezione non è vuota, contiene le automazioni.
+    const orfane = fusioniOk && dataLoaded ? fusioniOrfane().filter((r) => !r.used).length : 0;
+    scrivi('routine', orfane ? `(${orfane})` : '', orfane ? `${orfane} fusioni aspettano il tuo via libera in Automazioni` : '');
+  }
+
   // ── Rendering colonna sinistra ────────────────────────────────────────────
   function renderList() {
     mgListLoading.hidden = true;
@@ -2361,6 +2541,7 @@
         new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
       mgListEmpty.textContent = TAB_EMPTY.inbox;
       setListHead(SENZA_SEZIONI_LABEL, dataLoaded ? currentList.length : null);
+      updateTabCounts();
       renderListBody();
       renderFusioniOrfane();
       return;
@@ -2387,7 +2568,10 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, fusioni });
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, fusioni, livelli: livelliScelti });
+      if (currentTab === 'inbox' && livelliScelti.length) {
+        mgListEmpty.textContent = `Nessun feedback fermo a ${livelliScelti.slice().sort().map((l) => l.toUpperCase()).join(' o ')}.`;
+      }
     }
 
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
@@ -2664,13 +2848,18 @@
     mgReevalMsg.textContent = text || '';
     mgReevalMsg.className = 'mg-reeval-msg' + (kind ? ` mg-${kind}` : '');
   }
+  // Le due barre agiscono su pratiche ferme ai giudici (L2): col filtro che le nasconde agirebbero su ciò che non si vede.
+  function l2Visibili() {
+    return !livelliScelti.length || livelliScelti.includes('l2');
+  }
+
   function updateReevalBar() {
     if (!mgReevalBar) return;
     // Senza il criterio non c'è nessun "bianco": ogni segnalazione cifrata
     // ricadrebbe lì, e la barra offrirebbe di ri-giudicare anche i chiusi.
     const whites = sezioniAttendibili() ? unfilteredFeedbacks() : [];
     // Solo l'owner, solo nei Ricevuti (dove vivono i bianchi), solo se ce n'è.
-    const show = isAdmin && currentTab === 'inbox' && whites.length > 0;
+    const show = isAdmin && currentTab === 'inbox' && l2Visibili() && whites.length > 0;
     mgReevalBar.hidden = !show;
     if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
   }
@@ -2689,7 +2878,7 @@
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
     const blues = alignedFeedbacks();
-    const show = isAdmin && currentTab === 'inbox' && blues.length > 0;
+    const show = isAdmin && currentTab === 'inbox' && l2Visibili() && blues.length > 0;
     mgAlignedBar.hidden = !show;
     if (!show || !mgAlignedBtn) return;
     // Quelli col segno locale approvati vanno nei Lavori locali (#908): la freccia dice dove.
@@ -2843,6 +3032,7 @@
   // approva allineati): durante la ricerca la lista è "trasversale" alle schede.
   function hideTabBars() {
     if (mgArchiveFilter) mgArchiveFilter.hidden = true;
+    if (mgLivelliFiltro) mgLivelliFiltro.hidden = true;
     if (mgReevalBar)     mgReevalBar.hidden = true;
     if (mgAlignedBar)    mgAlignedBar.hidden = true;
   }
@@ -3124,8 +3314,13 @@
 
   if (mgSearchToggle) {
     mgSearchToggle.addEventListener('click', () => {
-      if (searchMode) closeSearch();
-      else openSearch();
+      if (searchMode) { closeSearch(); return; }
+      // I risultati prendono il posto della lista dei feedback: da un'altra scheda si torna lì prima di cercare.
+      if (!LIST_TABS.includes(schedaPerSezione[sezioneAttiva])) {
+        const lista = LIST_TABS.includes(schedaPerSezione.feedback) ? schedaPerSezione.feedback : 'inbox';
+        selectTab(lista);
+      }
+      openSearch();
     });
   }
   if (mgSearchClose) mgSearchClose.addEventListener('click', () => closeSearch());
@@ -5311,8 +5506,21 @@
     },
     rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(); },
     avvisi: (testo) => segnaAvvisoGiro(testo),
-    segno: () => aggiornaSegnoFerma(),
+    segno: () => { aggiornaSegnoFerma(); domandeDalVivo(); },
+    quandoInVista: () => domandeDalVivo(),
   });
+
+  // Anche le domande cambiano sul server: col ritmo del giro dal vivo, e solo in vista, se ne rileggono le cambiate.
+  // Senza, contatore e segno di una bloccante restavano quelli dell'apertura.
+  let domandePollMs = (window.SN_FEEDBACK_LIVE && window.SN_FEEDBACK_LIVE.POLL_MS) || 60000;
+  let domandeChiesteAt = Date.now();
+  function domandeDalVivo() {
+    if (!DOMANDE || !live.acceso() || !live.inVista()) return;
+    const s = DOMANDE.stato();
+    if (s.nonDisponibile || s.soloOwner || Date.now() - domandeChiesteAt < domandePollMs) return;
+    domandeChiesteAt = Date.now();
+    DOMANDE.carica();
+  }
   // Arrivate in una sezione mentre la pagina era aperta: con un ordinamento a
   // scelta possono finire a metà lista, e senza un segno l'arrivo non si vede.
   const arrivate = live.arrivate;
@@ -5511,7 +5719,7 @@
     },
     // Le soglie dell'orologio, accorciate: un giro vero ogni minuto farebbe
     // aspettare minuti a ogni spec.
-    setLiveTiming(t) { live.tempi(t); },
+    setLiveTiming(t) { live.tempi(t); if (t && t.pollMs) domandePollMs = t.pollMs; },
     liveArrivate() { return Array.from(arrivate); },
     // Caricamento FALLITO, su richiesta. Lo spec che verifica "niente numeri
     // inventati quando i dati non sono arrivati" si affidava al fatto che nel
@@ -5572,6 +5780,21 @@
     // mittenti auto-approvati, esplorazione a coda vuota — usato dai test.
     loadAutoMode,
     setTab(tab) { selectTab(tab); },
+    setSezione(sezione) { if (schedaPerSezione[sezione]) selectTab(schedaPerSezione[sezione]); },
+    sezioneAttiva() { return sezioneAttiva; },
+    apriSegnalazione(id) { fsApriSegnalazione(id); },
+    // Domande finte, o { errore } per un guasto finto: il main non le rimpiazza più.
+    setDomande(lista, opts) { if (DOMANDE) DOMANDE.imposta(lista, opts); },
+    domandeStato() { return DOMANDE ? DOMANDE.stato() : null; },
+    // Rifà la scelta d'apertura coi dati finti già in pagina; `{ comeAvvio: true }` rispetta il clic dell'utente come all'avvio.
+    sceltaApertura(opts) {
+      if (opts && opts.comeAvvio) { aperturaFatta = false; return sceltaApertura(); }
+      return sceltaApertura({ forza: true });
+    },
+    livelliFiltro(livelli) {
+      if (Array.isArray(livelli)) { livelliScelti = livelli.filter((l) => MR.LIVELLI_RICEVUTI.includes(l)); renderList(); }
+      return livelliScelti.slice();
+    },
     // Ordinamento della lista (menu tasto destro): impostalo e rirender.
     setSortMode(mode) { if (SORT_MODES[mode]) { sortMode = mode; reflectSortBtn(); renderList(); } },
     getSortMode() { return sortMode; },
@@ -5924,30 +6147,25 @@
     if (mgSmRegistryList) mgSmRegistryList.appendChild(makeRegistryRow('', {}));
   });
 
-  // Caricamento pigro: alla prima apertura di "Automazioni", che li ospita (#1110).
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'automation') return;
+  // Caricamento pigro: la prima volta che si mostra "Automazioni", che li ospita (#1110).
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab !== 'automation') return;
     if (!smLoaded && !smLoading) loadSupportModels();
   });
 
   // Tab "Log": ricarica il log dei worker a OGNI apertura (non solo la prima) —
   // vogliamo vedere gli spawn nuovi dall'ultima volta. È una singola lettura di
   // documento, quindi rileggerla a ogni click è a costo trascurabile.
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'log') return;
-    loadWorkerLog();
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab === 'log') loadWorkerLog();
   });
 
   // "Ricevuti" e "Automazioni" (le richieste da decidere) e "Log" (la traccia
   // delle decisioni passate): le fusioni si rileggono a OGNI apertura — una
   // richiesta già decisa o appena arrivata renderebbe la sezione una
   // fotografia vecchia.
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || !['automation', 'inbox', 'log'].includes(btn.dataset.tab)) return;
-    loadMergeApprovals();
+  document.addEventListener('mg-scheda', (e) => {
+    if (['automation', 'inbox', 'log'].includes(e.detail.tab)) loadMergeApprovals();
   });
 
   // ══ Tab "Statistiche feedback" (#496) ═══════════════════════════════════
@@ -7370,22 +7588,18 @@
   function fsApriSegnalazione(id) {
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb) { toast('Questa segnalazione non è fra quelle caricate nella lista'); return; }
-    const ST = window.SN_FB_STATUS;
+    // La stessa scheda della lista (manageTabFor): con tabFor un lavoro locale si apriva «In coda», dove non c'è.
     let tab = 'inbox';
-    try {
-      const n = MR.normalizeStatus(fb) || {};
-      if (n.status && ST && ST.tabFor) tab = ST.tabFor(n.status) || 'inbox';
-    } catch (_) { /* senza stato leggibile si apre dai Ricevuti */ }
+    try { tab = MR.manageTabFor(fb, { releasedVersion, fusioni }) || 'inbox'; } catch (_) { /* senza stato leggibile si apre dai Ricevuti */ }
+    mostraNelFiltro(fb);
     selectTab(tab);
     openDetail(id);
   }
 
   // La scheda si rilegge a OGNI apertura: nel frattempo le routine possono
   // aver lavorato, e una fotografia vecchia qui è peggio di nessuna.
-  mgTabs.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mg-tab');
-    if (!btn || btn.dataset.tab !== 'fbstats') return;
-    loadFsData();
+  document.addEventListener('mg-scheda', (e) => {
+    if (e.detail.tab === 'fbstats') loadFsData();
   });
 
   // …e anche a pagina ferma: il main avvisa quando l'elenco cambia (una
@@ -7576,6 +7790,7 @@
     // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.
     firstListPromise = leggiTutti();
     firstListPromise.catch(() => {});
+    const domandePronte = DOMANDE ? DOMANDE.carica().catch(() => {}) : Promise.resolve();
     injectSearchIcons();
     await loadLayout();
     await refreshAuth();
@@ -7585,6 +7800,8 @@
     impostazioniAvviate = true;
     await Promise.allSettled([caricaImpostazioni(), loadSortMode()]);
     await loadData();
+    await domandePronte;
+    sceltaApertura();
     startLive();
   }
 

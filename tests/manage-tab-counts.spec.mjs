@@ -10,6 +10,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { righeDiTesto } from './helpers/righe.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -200,7 +201,7 @@ test('#495 — a finestra stretta il nome e il suo numero restano sulla stessa r
   await page.locator('#mgSearchClose').click();
 
   // E le schede andate a capo restano cliccabili: l'ultima si apre davvero.
-  await tab(page, 'log').click();
+  await apriScheda(page, 'log');
   await expect(tab(page, 'log')).toHaveClass(/mg-tab--active/);
 });
 

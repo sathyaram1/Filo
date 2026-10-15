@@ -11,6 +11,7 @@
 //   5. La pagina gemella dei feedback offre la stessa azione e scrive gli stessi campi.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriScheda } from './helpers/gestione.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const FEEDBACK = 'filo://feedback/feedback.html';
@@ -81,7 +82,7 @@ test('dai Ricevuti: «💻 Lavoro locale» lo porta nei Lavori locali col sì de
   expect(await page.evaluate(() => window.__fiducia)).toEqual([{ type: 'fiducia_segna', feedbackId: 'u-913' }]);
 
   // Nei Lavori locali: è fidato, e l'hover del segno dice chi l'ha approvato.
-  await tabBtn(page, 'local').click();
+  await apriScheda(page, 'local');
   await page.locator('.mg-item').click();
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('title', /^Fidato: l’hai segnato tu/);
