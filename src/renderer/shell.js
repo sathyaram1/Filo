@@ -110,6 +110,11 @@
     };
     if (!anteprimaSchede.enabled) try { ANTEPRIMA.nascondi(); } catch (_) {}
   }
+  // L'Aiuto spento (#841) non ha la sua voce nel menu della linguetta.
+  let aiutoAcceso = true;
+  function applyFeatureFlags(ff) {
+    aiutoAcceso = !(ff && ff.help === false);
+  }
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
