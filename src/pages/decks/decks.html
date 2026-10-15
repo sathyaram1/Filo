@@ -658,7 +658,26 @@
                     <label for="probTurn">Turno</label>
                     <input id="probTurn" type="number" min="1" max="30" step="1" value="4" />
                   </div>
+                  <div class="dk-prob-row dk-prob-head" aria-hidden="true">
+                    <span class="dk-prob-head-gap"></span>
+                    <span class="dk-prob-col">al turno</span>
+                    <span class="dk-prob-col dk-prob-keep">per tenere</span>
+                  </div>
                   <div id="probNeeds"></div>
+                  <div class="dk-prob-row">
+                    <span class="dk-prob-label" id="probGameLabel">Partita</span>
+                    <button id="probGame" class="dk-prob-choice" type="button" data-game="multi"
+                            aria-haspopup="menu" aria-labelledby="probGameLabel probGame"
+                            title="Chi pesca al primo turno, e se il primo mulligan è gratis">a più giocatori ▾</button>
+                  </div>
+                  <div class="dk-prob-row">
+                    <label for="probMull" title="Quante volte al massimo rifai la mano iniziale">Mulligan</label>
+                    <input id="probMull" type="number" min="0" max="7" step="1" value="0" />
+                  </div>
+                  <div class="dk-prob-row">
+                    <label for="probExtra" title="Carte pescate in più entro il turno, oltre a quella di ogni turno">Pescate extra</label>
+                    <input id="probExtra" type="number" min="0" max="99" step="1" value="0" />
+                  </div>
                   <div class="dk-prob-actions">
                     <span class="dk-prob-result" id="probResult" aria-live="polite"></span>
                   </div>
