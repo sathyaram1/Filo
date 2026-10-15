@@ -254,6 +254,9 @@ function crea({ sistema = null } = {}) {
     } else {
       scelta = scegli(voci, richiesta);
     }
+    // Su un Mac senza permesso anche l'elenco porta al permesso: è il primo passo del modello, e senza la domanda di
+    // macOS Filo non compare nemmeno nel pannello.
+    if (permesso && (scelta.manca || scelta.nessuna)) return { esito: await esitoPermessoMac(chiave, permesso, voci) };
     if (scelta.manca || scelta.ambigue) {
       return {
         esito: {
