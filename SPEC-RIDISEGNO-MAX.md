@@ -51,6 +51,8 @@ perché col nuovo impianto i tagli a metà diventano rari per costruzione
 
 ## 3. Budget: solo rete reattiva
 
+*Fatto (§14, passo 4); oggi in `routines/roles/orchestrator.md`, «Regole dure».*
+
 - Abolite la stima del tetto 5h (CAP_5H), la soglia di spawn al 70% e tutta la
   contabilità ccusage: col piano Max un giro sequenziale non esaurisce la
   finestra.
