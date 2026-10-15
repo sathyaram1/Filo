@@ -584,12 +584,13 @@
     const ones = [];
     const zeros = [];
     for (const f of findings) {
-      const level = effectiveLevel(f);
+      if (f.sede === 'v') continue;
+      const level = f.level;
       if (level >= 3) {
         if (f.decision || left('cap3') <= 0) blocking.push(f);
         else fixable.push(f);
       } else if (level === 2) {
-        if (f.decision) blocking.push(f);
+        if (f.decision && f.difficile) blocking.push(f);
         else twos.push(f);
       } else if (level === 1) {
         ones.push(f);
