@@ -1180,14 +1180,20 @@ if (isMain) {
     data.segnalazione = seg.testo;
   }
   delete data.segnala;
+  // Il livello della segnalazione decide se il lavoro si ferma (#1202): viaggia accanto al testo, e qui si sa già cosa aspettarsi.
+  const livSeg = livelloSegnalazione({ livello: data.livello, difficile: data.difficile, conSegnalazione: typeof data.segnalazione === 'string' });
+  if (!livSeg.ok) { console.error(livSeg.message); process.exit(1); }
+  delete data.livello;
+  delete data.difficile;
+  Object.assign(data, livSeg.campi);
 
-  // `--stop` resta accettato per chi lo scrive ancora, ma non serve: è la
-  // segnalazione che ferma il lavoro, e senza l'owner non saprebbe cosa
-  // decidere. Stessa regola di dispatch --record-fixed --ferma.
+  // `--stop` resta accettato per chi lo scrive ancora, ma non serve: a
+  // fermare è la segnalazione di livello 3 o con --difficile, e senza l'owner
+  // non saprebbe cosa decidere. Stessa regola di dispatch --record-fixed --ferma.
   if (data.stop !== undefined) {
     const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
     if (data.stop !== true || !suFixed || !data.segnalazione) {
-      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (che da sola ferma già il lavoro): non ho consegnato niente.');
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (a fermare è lei, col suo --livello): non ho consegnato niente.');
       process.exit(1);
     }
   }
