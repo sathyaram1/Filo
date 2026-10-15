@@ -64,6 +64,9 @@ test('i tre ambiti della verifica condividono livelli, critica e registrazione',
 
 // Chi verifica dà i livelli con misura solo se non sa cosa ne seguirà: che poi
 // correggerà lui, o quanti giri restano, non deve leggerlo da nessuna parte.
+// La pulizia messa prima o dopo le correzioni dice che chi l'ha registrata c'è ancora quando si corregge.
+const PULIZIA_E_CORREZIONI = /(?:prima d(?:i ogni|ella|elle)|anche dopo (?:la|le)) correzion/i;
+
 test('nessun testo di verifica anticipa il seguito del giro', () => {
   for (const scope of ['pieno', 'chiusura', 'riallineamento']) {
     const t = readRoleInstructions('verifier', { scope });
