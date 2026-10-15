@@ -69,6 +69,45 @@ function modoScelto(impostazioni) {
   return MODI.includes(m) ? m : MODO_PREDEFINITO;
 }
 
+function canaleScelto(impostazioni) {
+  const c = impostazioni && impostazioni.aggiornamenti && impostazioni.aggiornamenti.canale;
+  return CANALI.includes(c) ? c : CANALE_PREDEFINITO;
+}
+
+// Le minor le pubblica solo il lavoro del lunedì (.github/workflows/release.yml): una x.y.0 è una versione stabile.
+function versioneStabile(v) {
+  return typeof v === 'string' && /^v?\d+\.\d+\.0$/.test(v);
+}
+
+// L'unica domanda «questa versione appartiene al canale scelto?»: scaricarla, installarla, annunciarla.
+function nelCanale(versione, canale) {
+  if (typeof versione !== 'string' || !parti(versione)) return false;
+  return canale !== 'stabile' || versioneStabile(versione);
+}
+
+function releaseUsabile(r, fileCanale) {
+  if (!r || typeof r !== 'object' || r.draft === true || r.prerelease === true) return false;
+  if (typeof r.tag_name !== 'string' || !/^v\d+\.\d+\.\d+$/.test(r.tag_name)) return false;
+  if (!fileCanale) return true;
+  return Array.isArray(r.assets) && r.assets.some((a) => a && a.name === fileCanale);
+}
+
+// Una pagina dell'elenco delle release di GitHub, dalla più nuova: l'etichetta da dare a electron-updater sul canale
+// stabile. La minor più nuova di quella in uso; se non c'è, la prima release non più nuova di quella in uso, così
+// electron-updater risponde «già aggiornato». `finito` false: la risposta sta nelle pagine dopo.
+// Le release senza il file del canale di questo sistema (latest-mac.yml…) non si contano: lì non c'è niente da scaricare.
+function sceltaStabile(pagina, { inUso, fileCanale } = {}) {
+  let minor = null;
+  for (const r of Array.isArray(pagina) ? pagina : []) {
+    if (!releaseUsabile(r, fileCanale)) continue;
+    const cmp = confrontaVersioni(r.tag_name, inUso);
+    if (cmp == null) continue;
+    if (cmp <= 0) return { tag: minor || r.tag_name, finito: true };
+    if (versioneStabile(r.tag_name) && (!minor || confrontaVersioni(r.tag_name, minor) > 0)) minor = r.tag_name;
+  }
+  return { tag: minor, finito: !!minor };
+}
+
 // Il ramo di piattaforma intero: cosa succede alla chiusura, all'avvio e col pulsante.
 function piano(piattaforma, modo) {
   if (piattaforma === 'win32') {
