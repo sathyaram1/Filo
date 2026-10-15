@@ -561,29 +561,34 @@
     options_security_popup_dismiss: 'Chiudi',
     // Rilevamento siti pericolosi
     options_security_safebrowse: 'Avvisa sui siti pericolosi',
+    // Ogni frase qui sotto descrive il rilevatore com'è oggi: tests/unit/safebrowseSpiegazione.test.mjs.
     options_security_safebrowse_desc:
-      'Riconosce i siti che fingono di essere un altro marchio (es. una finta pagina di login), ' +
-      'i domini appena creati e le connessioni non sicure, e ti avvisa prima che tu inserisca password ' +
-      'o dati di pagamento. I controlli di base sono gratuiti e attivi sempre; non bloccano mai la ' +
-      'navigazione, ti mostrano solo un avviso che puoi ignorare.',
+      'Ti avvisa quando un sito imita un marchio noto, è nella lista nera di Google per phishing o malware, ' +
+      'ha un certificato che non torna o ti chiede la password su una connessione non protetta. L\'avviso ' +
+      'copre la pagina finché non scegli. Su un sito sospetto premi «Continua», su uno pericoloso scrivi ' +
+      '«confermo». La scelta vale per quel sito in quella scheda, finché resta aperta. Spento, Filo non ' +
+      'chiede più niente fuori dal computer, ma ti avvisa ancora sui sosia e sulle password chieste senza ' +
+      'connessione protetta, che riconosce da solo.',
     options_security_safebrowse_network: 'Controlli di rete (età del dominio e del certificato)',
     options_security_safebrowse_network_desc:
-      'Interroga servizi pubblici per sapere da quanto tempo esiste il dominio e il suo certificato: ' +
-      'un sito "di un marchio noto" creato pochi giorni fa è un forte segnale di truffa. Non richiede ' +
-      'alcuna chiave. Disattivalo se non vuoi che Filo faccia queste richieste esterne.',
+      'Quando un sito ha già un indizio sospetto, Filo chiede a due registri pubblici (rdap.org e crt.sh) ' +
+      'da quanto esistono il dominio e il suo certificato. Manda solo il nome del sito. Un sito "di un ' +
+      'marchio noto" nato pochi giorni fa è un forte segnale di truffa. Non serve nessuna chiave. ' +
+      'Disattivalo se non vuoi che Filo faccia queste richieste.',
     options_security_safebrowse_llm: 'Giudizio AI sui casi sospetti',
     options_security_safebrowse_llm_desc:
-      'Solo quando un sito resta dubbio, un modello AI valuta i soli indizi di identità del dominio ' +
-      '(mai il contenuto della pagina) per decidere se avvisarti. Usa i modelli e le chiavi che hai già ' +
-      'configurato.',
+      'Solo quando un sito resta dubbio, un modello AI guarda i dati del suo indirizzo (il nome, il marchio ' +
+      'a cui somiglia, l\'età, il certificato, se la pagina chiede una password), mai il contenuto della ' +
+      'pagina. Può solo renderlo sospetto, mai dichiararlo sicuro o pericoloso, e in incognito non parte. ' +
+      'Usa il modello scelto in Modelli alla voce «Rilevamento siti pericolosi — giudizio».',
     options_security_safebrowse_sandbox: 'Prova i link sospetti in una finestra isolata',
     options_security_safebrowse_sandbox_desc:
-      'Quando Filo prova un link sospetto prima che tu lo apra, lo fa in una finestra nascosta e senza ' +
-      'i tuoi dati. Una pagina che hai già aperto non ci torna mai.',
+      'La finestra nascosta e senza i tuoi dati in cui Filo proverebbe un link sospetto prima che tu lo ' +
+      'apra. Oggi nessuna funzione la usa, e una pagina che hai già aperto non ci torna mai.',
     options_security_safebrowse_key_managed:
-      'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
-      'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
-      'account, non devi configurare nulla qui.',
+      'Per la lista nera di Google (phishing e malware) Filo usa una chiave che arriva col programma. ' +
+      'Funziona per tutti, anche senza aver fatto l\'accesso, e non devi configurare niente. A Google ' +
+      'arriva solo un pezzo dell\'impronta degli indirizzi che apri, mai gli indirizzi.',
     // #1004 — pagine delicate
     options_security_delicate: 'Non mandare ai modelli le pagine delicate',
     options_security_delicate_desc:

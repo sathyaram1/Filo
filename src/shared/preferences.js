@@ -834,12 +834,14 @@
     },
     {
       scrive: ['security.safeBrowse.enabled'],
-      aiuto: 'true | false (avviso sui siti pericolosi)',
+      aiuto: 'true | false (avviso sui siti pericolosi; spento ferma la lista nera di Google, l\'età del dominio e il giudizio AI, '
+        + 'restano gli avvisi che Filo decide da solo dall\'indirizzo)',
       keys: ['navigazione_sicura', 'navigazione sicura', 'rilevamento siti pericolosi', 'siti pericolosi', 'safe browsing', 'safebrowsing', 'protezione phishing', 'rilevamento phishing'],
       costo: 2,
       allenta: (r) => r.partial.security.safeBrowse.enabled === false,
-      risk: 'Controlla il rilevamento dei siti pericolosi (phishing e malware). Disattivarlo '
-        + 'toglie l’avviso prima che tu apra un sito potenzialmente dannoso.',
+      risk: 'Controlla il rilevamento dei siti pericolosi (phishing e malware). Spegnerlo toglie l’avviso sui siti '
+        + 'nella lista nera di Google, il controllo dell’età del dominio e il giudizio AI; restano solo gli avvisi '
+        + 'che Filo decide da solo dall’indirizzo, come quello su un sosia di un marchio.',
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
