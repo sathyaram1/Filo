@@ -702,22 +702,65 @@
   }
 
   // Sotto-pannello probabilità (§9.3): una riga-input per categoria (tag del
-  // mazzo + "terre"). I valori già digitati sopravvivono al rerender.
+  // mazzo + "terre"), con accanto quante ne servono nella mano per tenerla
+  // (visibile solo con almeno un mulligan). I valori digitati sopravvivono al rerender.
   function renderProbForm() {
     const cats = Stats.categoriesOf(current, cardsById);
     const host = $('probNeeds');
     const prev = {};
-    for (const inp of host.querySelectorAll('input[data-tag]')) {
-      prev[inp.dataset.tag] = inp.value;
-    }
+    const prevKeep = {};
+    for (const inp of host.querySelectorAll('input[data-tag]')) prev[inp.dataset.tag] = inp.value;
+    for (const inp of host.querySelectorAll('input[data-keep]')) prevKeep[inp.dataset.keep] = inp.value;
     host.innerHTML = cats.map((tag, i) => `
       <div class="dk-prob-row">
         <label for="probTag${i}">${esc(tag)}</label>
         <input id="probTag${i}" data-tag="${esc(tag)}" type="number"
                min="0" max="99" step="1" value="${esc(prev[tag] || '0')}" />
+        <input class="dk-prob-keep" data-keep="${esc(tag)}" type="number" min="0" max="7" step="1"
+               value="${esc(prevKeep[tag] || '0')}" aria-label="${esc(tag)} nella mano da tenere"
+               title="Quante ne vuoi nella mano iniziale per tenerla" />
       </div>`).join('');
     $('probHint').hidden = cats.length > 1;
     $('probCard').hidden = !cats.length;
+  }
+
+  // Partita (#791): Commander si gioca in più persone, quindi il default pesca al primo turno.
+  const PROB_GAMES = [
+    { id: 'multi', label: 'a più giocatori' },
+    { id: 'play', label: 'a due, inizio io' },
+    { id: 'draw', label: 'a due, inizia l\'altro' },
+  ];
+  function setProbGame(id) {
+    const g = PROB_GAMES.find((x) => x.id === id) || PROB_GAMES[0];
+    $('probGame').dataset.game = g.id;
+    $('probGame').textContent = `${g.label} ▾`;
+  }
+
+  const probCount = (id, max) => Math.min(max, Math.max(0, Math.floor(Number($(id).value) || 0)));
+
+  function probConditions() {
+    const mulligans = probCount('probMull', 7);
+    const keep = mulligans > 0
+      ? [...$('probNeeds').querySelectorAll('input[data-keep]')]
+        .map((inp) => ({ tag: inp.dataset.keep, n: Number(inp.value) || 0 }))
+        .filter((w) => w.n > 0)
+      : [];
+    return { game: $('probGame').dataset.game, mulligans, keep, extraDraws: probCount('probExtra', 99) };
+  }
+
+  // Con il primo mulligan compare la colonna «per tenere»: se è vuota parte da
+  // 2 terre, la mano più comune da tenere, perché un mulligan senza mano da
+  // tenere non cambierebbe niente.
+  let probMullBefore = 0;
+  function onProbMull() {
+    const m = probCount('probMull', 7);
+    $('probCard').dataset.mull = m > 0 ? '1' : '0';
+    const keeps = [...$('probNeeds').querySelectorAll('input[data-keep]')];
+    if (m > 0 && probMullBefore === 0 && keeps.every((inp) => !(Number(inp.value) > 0))) {
+      const lands = keeps.find((inp) => inp.dataset.keep === Stats.LAND_TAG);
+      if (lands) lands.value = '2';
+    }
+    probMullBefore = m;
   }
 
   // Calcolatore di probabilità (§9.3): la stima si raffina DA SOLA (feedback
