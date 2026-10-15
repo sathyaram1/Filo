@@ -331,6 +331,70 @@ test('nella finestra in incognito niente proposta, finché l\'utente non la chie
   await expect.poll(async () => (await inIncognito()).mostrata, { timeout: 8000 }).toBe(true);
 });
 
+// Tornando alla scheda col campo ancora a fuoco la proposta rispecchia lo stato di adesso, non quello della sua comparsa.
+async function vaiEtorna(app, openTab, shell, testServer, mentreSeiVia) {
+  const davanti = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.activeId);
+  const primo = await davanti();
+  await openTab(altraOrigine(testServer.html('<!doctype html><body>altra</body>')));
+  await expect.poll(() => mostrata(app), { timeout: 4000 }).toBe(false);
+  await mentreSeiVia();
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), primo);
+  await expect.poll(() => davanti()).toBe(primo);
+}
+
+test('tornando alla scheda, la proposta segue l\'account e il tema di adesso', async ({ app, openTab, testServer, shell }) => {
+  await accountFinto(app);
+  await impostazioni(app, { theme: 'light' });
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.click('#e');
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  const vista = await vistaProposta(app);
+  const sfondo = () => vista.evaluate(() => getComputedStyle(document.getElementById('riquadro')).backgroundColor);
+  const chiaro = await sfondo();
+
+  await vaiEtorna(app, openTab, shell, testServer, () => accountFinto(app, 'altro-account@example.org'));
+  await expect.poll(() => mostrata(app), { timeout: 4000 }).toBe(true);
+  await expect(vista.locator('#email')).toHaveText('altro-account@example.org');
+  await page.waitForTimeout(600);
+  await vista.click('#voce');
+  await expect.poll(() => page.inputValue('#e')).toBe('altro-account@example.org');
+
+  await page.fill('#e', '');
+  await page.click('#altro');
+  await page.click('#e');
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  await vaiEtorna(app, openTab, shell, testServer, () => impostazioni(app, { theme: 'dark' }));
+  await expect.poll(() => mostrata(app), { timeout: 4000 }).toBe(true);
+  await expect.poll(sfondo).not.toBe(chiaro);
+
+  await vaiEtorna(app, openTab, shell, testServer, () => accountFinto(app, ''));
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('e');
+  expect(await mostrata(app), 'senza account collegato non compare niente').toBe(false);
+});
+
+test('spegnere la proposta in incognito toglie quella già a schermo nella finestra in incognito', async ({ app, shell, testServer }) => {
+  await accountFinto(app);
+  await impostazioni(app, { propostaEmail: { incognito: true } });
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  const inIncognito = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    return w && w._filoTabs ? { schede: w._filoTabs.tabs.length, mostrata: !!w._filoTabs.propostaEmail.mostrata } : { schede: 0, mostrata: false };
+  });
+  await expect.poll(async () => (await inIncognito()).schede, { timeout: 15_000 }).toBe(1);
+  const url = testServer.html(PAGINA);
+  await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().find((x) => x._filoIncognito)._filoTabs.openTab(u), url);
+  let page = null;
+  await expect.poll(async () => {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
+    return page ? page.evaluate(() => document.documentElement.dataset.filoReady === '1').catch(() => false) : false;
+  }, { timeout: 10_000 }).toBe(true);
+  await page.click('#e');
+  await expect.poll(async () => (await inIncognito()).mostrata, { timeout: 8000 }).toBe(true);
+  await impostazioni(app, { propostaEmail: { incognito: false } });
+  await expect.poll(async () => (await inIncognito()).mostrata, { timeout: 4000 }).toBe(false);
+});
+
 const leggiOpzioni = (app) => app.evaluate(async () => ((await globalThis.SN_STORAGE.getSettings()) || {}).propostaEmail || null);
 
 test('col tasto destro sulla proposta si inserisce l\'email o la si spegne', async ({ app, openTab, testServer }) => {
