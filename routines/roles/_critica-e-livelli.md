@@ -189,8 +189,7 @@ di livello 2 o 3 col `?` e la segnalazione allegata, anche senza rilievi: con
 `--segnala` il lavoro aspetta l'owner in ogni esito, e i rilievi da correggere
 restano davanti a chi riprende dopo la sua risposta. Un 1 col `?`, o un
 esterno di qualunque livello, va avanti in un feedback derivato che l'owner
-decide a parte. Se poi il server ti manda a correggere, una segnalazione a
-QUELLA consegna ferma il lavoro come per chi risolve.
+decide a parte.
 
 La critica registrata non si modifica più.
 
