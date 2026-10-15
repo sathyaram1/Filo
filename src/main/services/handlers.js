@@ -3074,7 +3074,7 @@ async function eseguiAzioneFilo(action, {
       }
       case 'TIENI_APERTA': {
         if (!action._voce) {
-          return { executed: false, kept: false, output: { sempreAperta: 'non_salvata', error: 'nessun sito riconosciuto: serve il dominio (es. web.whatsapp.com), per un sito locale l\'indirizzo (es. http://nas:5000), o una scheda web davanti' } };
+          return { executed: false, kept: false, output: { sempreAperta: 'non_salvata', error: 'nessun sito riconosciuto: serve il dominio (es. web.whatsapp.com), per un sito locale l\'indirizzo con la porta (es. localhost:3000), o una scheda web davanti' } };
         }
         await SempreAperte.aggiungi(action._voce);
         return { executed: true, kept: false, output: { sempreAperta: 'salvata', sito: action._voce } };
