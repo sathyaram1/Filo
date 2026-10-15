@@ -607,34 +607,6 @@
     });
   }
 
-  // ── Esplorazione automatica a coda vuota (#448) ───────────────────────────
-  // Indipendente dall'automatica: riguarda cosa fanno le routine quando NON c'è
-  // più niente in coda, non chi entra in coda.
-  let proberScelte = 0;
-  if (mgProberIdle) {
-    mgProberIdle.addEventListener('change', () => {
-      const want = mgProberIdle.checked;
-      const mia = ++proberScelte;
-      if (mgProberIdleMsg) mgProberIdleMsg.textContent = '';
-      return salvaAuto('proberWhenIdle', async () => {
-        try {
-          const r = await sendToMain({ type: AUTOMATION_SET, proberWhenIdle: want });
-          if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
-          if (mia !== proberScelte) return;
-          mgProberIdle.checked = r.proberWhenIdle !== false;
-        } catch (err) {
-          console.error('[manage] salvataggio esplorazione automatica fallito:', err);
-          if (mia !== proberScelte) return;
-          mgProberIdle.checked = !want;
-          if (mgProberIdleMsg) {
-            mgProberIdleMsg.textContent = 'Salvataggio fallito: l\'impostazione NON è cambiata.';
-            mgProberIdleMsg.classList.add('mg-err');
-          }
-        }
-      });
-    });
-  }
-
   // ── Lavori server alle routine (#1159) ─────────────────────────────────────
   // Spento (o mai scritto): i lavori server restano alle sessioni locali, come prima.
   let lavoriServerScelte = 0;
