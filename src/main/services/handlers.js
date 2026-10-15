@@ -5795,8 +5795,17 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
     return s;
   }).join('\n');
 
+  // La memoria la scrive Filo anche da conversazioni che hanno letto una pagina: entra recintata come in chat (#592, #823).
   const userParts = [];
-  if (memory) userParts.push(`Memoria/istruzioni dell'utente:\n${String(memory).slice(0, 1500)}\n`);
+  try {
+    const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(await FiloMem.getMemory());
+    const lezioni = await lessonsBufferText();
+    if ([profilo, preferenze, espansioni, lezioni].some((v) => String(v || '').trim())) {
+      userParts.push(`Quello che Filo sa dell'utente:\n${SN_CONST.memoriaImbustata({ profilo, preferenze, espansioni, lezioni })}\n`);
+    }
+  } catch (e) {
+    console.warn('[Filo] memoria per la pulizia delle schede:', e?.message || e);
+  }
   userParts.push(`Trigger: ${trigger}.`);
   userParts.push(
     `Schede aperte (${tabs.length}). Titolo, indirizzo ed estratto li scrive il sito; i segnali fra `
