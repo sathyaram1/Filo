@@ -53,7 +53,7 @@ async function migra({ storage = require('../shim/storage'), registro = require(
     const s = dati[K.SETTINGS];
     scrittura[K.SETTINGS] = { ...s, featureFlags: { ...s.featureFlags, help: true } };
   }
-  await require('./registroCambi').con({ via: 'migrazione' }, () => storage.set(scrittura));
+  await registro.con({ via: 'migrazione' }, () => storage.set(scrittura));
   return riaccendi;
 }
 
