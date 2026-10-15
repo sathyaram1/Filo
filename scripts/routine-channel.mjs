@@ -571,9 +571,21 @@ export async function domandaChiusura(cred, opts) {
   return r;
 }
 
-export async function rispostaChiusura(cred, answer, opts) {
-  const { status, body } = await call('routineClosing', { ...corpoChiusura('answer', { ...cred, answer }), ...creditiDi(opts) }, opts);
-  return leggiRispostaChiusura(status, body);
+/**
+ * `report` (solo orchestratore): i suoi turni dopo l'ultimo biglietto. La risposta conta più del rapporto: a un
+ * rifiuto che non riguarda la lunghezza della risposta riparte senza, e `avviso` lo dice. Un rifiuto non salva niente.
+ */
+export async function rispostaChiusura(cred, answer, opts, report = null) {
+  const tenta = async (rap) => {
+    const { status, body } = await call('routineClosing', { ...corpoChiusura('answer', { ...cred, answer, report: rap }), ...creditiDi(opts) }, opts);
+    return leggiRispostaChiusura(status, body);
+  };
+  const conRapporto = !!(cred && cred.passphrase && report && typeof report === 'object');
+  const r = await tenta(conRapporto ? report : null);
+  if (!conRapporto || r.esito !== 'rifiutato' || r.reason === 'answer_too_big') return r;
+  const senza = await tenta(null);
+  if (senza.esito !== 'ok') return senza;
+  return { ...senza, avviso: `il server non ha preso il rapporto della chiusura (${r.reason}${r.detail ? `: ${r.detail}` : ''}): risposta registrata SENZA rapporto.` };
 }
 
 /**
