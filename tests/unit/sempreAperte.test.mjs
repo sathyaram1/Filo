@@ -94,6 +94,19 @@ test('«dimentica che tengo aperto WhatsApp» la trova fra le righe della memori
   assert.deepEqual(await FM.listKeepOpen(), {});
 });
 
+test('due voci salvate insieme restano tutte e due, anche con la scrittura lenta', async () => {
+  backing.clear();
+  const set = globalThis.chrome.storage.local.set;
+  globalThis.chrome.storage.local.set = async (obj) => { await new Promise((r) => setTimeout(r, 20)); return set(obj); };
+  try {
+    await Promise.all([FM.addKeepOpen('web.whatsapp.com'), FM.addKeepOpen('mail.google.com'), FM.addKeepOpen('example.org')]);
+    await Promise.all([FM.removeKeepOpen(['example.org']), FM.addKeepOpen('docs.google.com')]);
+  } finally {
+    globalThis.chrome.storage.local.set = set;
+  }
+  assert.deepEqual(Object.keys(await FM.listKeepOpen()).sort(), ['docs.google.com', 'mail.google.com', 'web.whatsapp.com']);
+});
+
 test('a ogni cambio delle voci le Preferenze aperte vengono avvisate', async () => {
   backing.clear();
   let avvisi = 0;
