@@ -695,7 +695,8 @@ function nomeRamo(s) {
  * Un ramo dichiarato può solo confermare quello della cartella.
  *
  * @returns {{ok:true, branch:string, id:string, assigned:string}
- *   | {ok:false, motivo:'deriva'|'rebase'|'principale'|'staccata'|'dichiarato', current:string, assigned:string,
+ *   | {ok:false, motivo:'deriva'|'rebase'|'principale'|'staccata'|'dichiarato'|'cartella', current:string, assigned:string,
+ *      cartella?:string, radice?:string,
  *      declared?:string, rebaseDi?:string, count?:number, escalated?:boolean}}
  */
 export function guardiaConsegna(root, { dichiarato = '', escalate } = {}) {
