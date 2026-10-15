@@ -30,6 +30,8 @@ require('../shared/urlNav'); // #398 — sorgente unica di normalizeUrl/isLocalH
 const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
+require('../shared/tabColor');
+const { compareRainbow } = globalThis.SN_TAB_COLOR;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
 const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
@@ -1690,19 +1692,13 @@ class TabManager {
     return { archived: toArchive.length };
   }
 
-  // §1.3 — riordina la striscia per colore (arcobaleno) in base all'identityColor.
-  // Le tab senza colore (interne, identità ignota) restano in coda nell'ordine.
+  // §1.3 — riordina la striscia per colore con la stessa regola della Cronologia (compareRainbow).
   // Ritorna true se l'ordine è effettivamente cambiato (per decidere se
   // ribroadcastare alla shell).
   reorderTabsByColor() {
     const before = this.tabs;
     const withIdx = before.map((t, i) => ({ t, i }));
-    withIdx.sort((a, b) => {
-      const ha = hueOf(a.t.identityColor);
-      const hb = hueOf(b.t.identityColor);
-      if (ha !== hb) return ha - hb;
-      return a.i - b.i; // stabile
-    });
+    withIdx.sort((a, b) => compareRainbow(a.t.identityColor, b.t.identityColor) || a.i - b.i);
     const next = withIdx.map((x) => x.t);
     const changed = next.some((t, i) => t !== before[i]);
     this.tabs = next;
@@ -3826,24 +3822,6 @@ function hostOf(url) {
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
     return u.host || null;
   } catch (_) { return null; }
-}
-
-// Hue (0..360) del colore identità per l'ordine cromatico (§1.3). Le tab senza
-// colore tornano Infinity → finiscono in coda.
-function hueOf(rgbStr) {
-  const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-  if (!m) return Infinity;
-  const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-  if (p.length < 3 || p.some((n) => Number.isNaN(n))) return Infinity;
-  const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-  if (mx === mn) return Infinity;
-  const d = mx - mn;
-  let h;
-  if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-  else if (mx === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  return (h / 6) * 360;
 }
 
 function canGoBack(wc) {
