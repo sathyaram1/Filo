@@ -3814,6 +3814,12 @@ function origineDi(url) {
   try { return new URL(url).origin; } catch (_) { return ''; }
 }
 
+// L'apertura salvata nella sessione, se è una data vera e non nel futuro; sennò la scheda riparte da adesso.
+function aperturaValida(v) {
+  const t = typeof v === 'string' ? Date.parse(v) : NaN;
+  return Number.isFinite(t) && t > 0 && t <= Date.now() + 60_000 ? new Date(t).toISOString() : null;
+}
+
 // Una scheda riaperta in coda porta il nome del suo sito finché la pagina non le dà il titolo vero.
 function titoloInAttesa(url) {
   const host = hostOf(url);
