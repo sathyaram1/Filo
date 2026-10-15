@@ -738,6 +738,11 @@ export function codaText({ findings, derived, external, domande, budgets, branch
     `Ramo: ${branch}.`,
     'Rilievi da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
     fmt(findings),
+    ...(Array.isArray(domande) && domande.length ? [
+      `${domande.length === 1 ? 'Il rilievo col «?» qui sopra chiede' : `I ${domande.length} rilievi col «?» qui sopra chiedono`} una decisione dell'owner che non ferma il lavoro: applica l'opzione`,
+      'che chi verifica consiglia nel rilievo e scrivi nel report quale. La domanda arriva all\'owner come feedback derivato',
+      '(lo apre chi guida dal report): se sceglie diversamente, cambierà quello il codice già fuso. Le loro prove restano.',
+    ] : []),
     'Rilievi messi da parte (fuori da questo giro: finiscono nel report per l\'owner):',
     derivatiText(derived),
     'Rilievi esterni (non toccano a questo lavoro: ciascuno diventa un feedback suo, lo apre chi guida dal report):',
