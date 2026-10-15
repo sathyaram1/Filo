@@ -5,6 +5,7 @@
 const { BrowserWindow } = require('electron');
 const storage = require('../shim/storage');
 const { spingiAllaScheda } = require('./impostazioniPerOrigine');
+const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 
 const CHIAVE = 'sn_icon_layout';
 const SEGNO_QR = 'sn_qr_in_primary_migrated';
@@ -54,8 +55,8 @@ function annuncia(layout, { incognito = false } = {}) {
   for (const win of BrowserWindow.getAllWindows()) {
     const tabs = win && !win.isDestroyed() && win._filoTabs;
     if (!tabs || !!win._filoIncognito !== !!incognito) continue;
-    for (const t of tabs.tabs) {
-      try { spingiAllaScheda(t.view.webContents, { type: tipo, layout }, { inVista: t.id === tabs.activeId }); } catch (_) {}
+    for (const { wc, inVista } of vistePerAnnunci(tabs)) {
+      try { spingiAllaScheda(wc, { type: tipo, layout }, { inVista }); } catch (_) {}
     }
     try { tabs.barra?.disposizione(layout); } catch (_) {}
   }

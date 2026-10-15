@@ -464,7 +464,8 @@ module.exports = function register(on, ctx) {
     // Chi apre una seconda scheda nuova mentre la prima aspetta la risposta
     // riceve `resume: false`: vede la conversazione e si aggiorna con
     // FILO_ONBOARDING_UPDATED, invece di rilanciare lo stesso messaggio.
-    const resume = Onboarding.hasPendingTurn(state) && claimOnboardingResume();
+    // La home pronta per la scheda nuova (#1128) non la prende: nessuno la guarda, e la chiede quando arriva davanti.
+    const resume = Onboarding.hasPendingTurn(state) && !sender?.riserva && claimOnboardingResume();
     return {
       ok: true,
       ready: true,

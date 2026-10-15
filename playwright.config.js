@@ -28,6 +28,9 @@ if (process.argv.some((a) => a === '--headed' || a === '--ui' || a === '--debug'
 if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
 // Ogni Filo aperto da una prova parte già accolto (src/main/shim/storage.js); chi prova l'accoglienza passa '0'.
 process.env.FILO_TEST_ACCOLTO = '1';
+// La home nascosta pronta per la scheda nuova (#1128) è una pagina in più che conta come home: le prove che contano o
+// cercano le viste partono senza; tests/riserva-nuova-scheda.spec.mjs la riaccende. `=1` la tiene accesa ovunque.
+if (process.env.FILO_RISERVA_NUOVA_SCHEDA !== '1') process.env.FILO_RISERVA_NUOVA_SCHEDA = '0';
 
 export default defineConfig({
   testDir: './tests',

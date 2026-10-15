@@ -641,6 +641,19 @@
     renderSuggestions();
   }
 
+  // Come loadDashboard, ma la home è già a schermo: niente passaggio dal vuoto, cambia solo se il main ha di meglio.
+  async function aggiornaDashboardInSilenzio() {
+    const giro = giroDashboard;
+    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD });
+    if (giro !== giroDashboard || !r?.ok) return;
+    const messaggio = r.message || 'Filo è in ascolto.';
+    if (homeMessageEl.textContent !== messaggio) homeMessageEl.textContent = messaggio;
+    const nuovi = Array.isArray(r.suggestions) ? r.suggestions : [];
+    if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
+    suggestions = nuovi;
+    renderSuggestions();
+  }
+
   // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è
   // ciò che l'utente aspetta al primo avvio; se resta chiusa (già fatta, o
   // c'è una conversazione in corso) si rifà almeno il messaggio della home,
@@ -1933,9 +1946,29 @@
   // all'apertura) e a ogni home aperta: lo racconta una scheda sola (#664),
   // la prima che l'utente ha davanti. Una home dietro aspetta di tornare
   // visibile, poi lo chiede al main, che lo dà a una sola.
-  function quandoVisibile() {
-    if (document.visibilityState !== 'hidden') return Promise.resolve();
-    return new Promise((ok) => {
+  // La home pronta per la scheda nuova (#1128) è caricata ma nessuno la guarda, e `document.hidden` in una scheda non
+  // cambia mai: lo sa dal main, e quello che va fatto davanti all'utente aspetta che diventi una scheda. Le home che
+  // sono già schede restano come prima.
+  let inRiserva = null;
+  const attesiConsegna = [];
+  function nonPiuRiserva() {
+    const era = inRiserva === true;
+    inRiserva = false;
+    for (const ok of attesiConsegna.splice(0)) ok();
+    if (era) allaComparsa();
+  }
+  send({ type: MSG.TAB_IN_VISTA_GET }).then((r) => !!(r && r.riserva), () => false).then((si) => {
+    if (inRiserva !== null) return;
+    if (si) inRiserva = true;
+    else nonPiuRiserva();
+  });
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === MSG.TAB_IN_VISTA && msg.inVista && inRiserva !== false) nonPiuRiserva();
+  });
+  async function quandoVisibile() {
+    if (inRiserva !== false) await new Promise((ok) => attesiConsegna.push(ok));
+    if (document.visibilityState !== 'hidden') return;
+    await new Promise((ok) => {
       const guarda = () => {
         if (document.visibilityState === 'hidden') return;
         document.removeEventListener('visibilitychange', guarda);
@@ -2181,6 +2214,14 @@
     }
   }
 
+  // La home pronta (#1128) arriva davanti con quello che gli annunci le hanno portato: rilegge solo ciò che una home
+  // nuova chiede aprendosi e che nessun annuncio porta.
+  function allaComparsa() {
+    richiestaDellAvviso(Accoglienza.isActive()).catch(() => {});
+    if (Accoglienza.isActive()) Accoglienza.riprendiAllaComparsa().catch(() => {});
+    else if (body.dataset.state === 'home') aggiornaDashboardInSilenzio().catch(() => {});
+  }
+
   (async function init() {
     renderControls();
     await applySavedTheme();
@@ -2236,6 +2277,8 @@
     inCodaPopup(chiediBenvenuto);
     if (onbState) { fineRicompenseAvvio(); return; }
     inCodaPopup(async () => {
+      // Recap e ringraziamento non li prende la home pronta per la scheda nuova: si consumerebbero dove nessuno li guarda.
+      await quandoVisibile();
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
         if (!shown) await maybeShowFeedbackRewards();

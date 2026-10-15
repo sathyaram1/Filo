@@ -13,6 +13,7 @@ const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
+const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
 const GiroAzioni = require('./giroAzioni');
@@ -6383,10 +6384,8 @@ ConversazioniApp.collega({
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) {
-        for (const t of win._filoTabs.tabs) {
-          try { spingiAllaScheda(t.view.webContents, message, { inVista: t.id === win._filoTabs.activeId }); } catch (_) {}
-        }
+      for (const { wc, inVista } of vistePerAnnunci(win._filoTabs)) {
+        try { spingiAllaScheda(wc, message, { inVista }); } catch (_) {}
       }
       spingiAllaFinestra(win, message);
     }
@@ -6417,7 +6416,7 @@ function broadcastToFiloPages(message) {
     for (const win of BrowserWindow.getAllWindows()) {
       const m = typeof message === 'function' ? message(ambitoDellaFinestra(win)) : message;
       if (m == null) continue;
-      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents, m);
+      for (const { wc } of vistePerAnnunci(win._filoTabs)) aFilo(wc, m);
       aFilo(win.webContents, m);
     }
   } catch (_) {}

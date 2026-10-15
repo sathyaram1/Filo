@@ -37,6 +37,7 @@ const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
 const { AnteprimeSchede } = require('./tabs/anteprime');
+const { RiservaNuovaScheda, vistePerAnnunci } = require('./tabs/riservaNuovaScheda');
 const { VisiteSchede } = require('./tabs/visite');
 const { CodaRiapertura, perVicinanza } = require('./tabs/codaRiapertura');
 const CartaAnteprima = require('./popup-anteprima');
@@ -411,8 +412,11 @@ class TabManager {
       suNuova: (id, dato) => CartaAnteprima.precarica(window, id, dato),
       suTolte: (ids) => CartaAnteprima.dimentica(window, ids),
     });
+    this.riserva = new RiservaNuovaScheda(this);
     this.codaRiapertura = new CodaRiapertura({ carica: (tab) => this._caricaRinviata(tab) });
-    if (window && typeof window.once === 'function') window.once('closed', () => { this.anteprime.chiudi(); this.codaRiapertura.chiudi(); });
+    if (window && typeof window.once === 'function') {
+      window.once('closed', () => { this.anteprime.chiudi(); this.riserva.spegni(); this.codaRiapertura.chiudi(); });
+    }
     this.avvisi = new AvvisiSopraPagina(window, {
       dopoInCima: () => this.conferme.inCima(),
       alto: () => this._altezzaCornice(),
@@ -765,7 +769,7 @@ class TabManager {
   // invece di uscire a tempo. Lo dichiara il content script appena montato.
   paginaRispondeAllEsc(tabId) {
     if (tabId == null) return;
-    const t = this.tabs.find((x) => x.id === tabId);
+    const t = this._perScheda(tabId);
     if (t) t._rispondeAllEsc = true;
   }
 
@@ -808,7 +812,7 @@ class TabManager {
   // (e «Esci da schermo intero» a chi ne era già uscito, rimettendocelo con un
   // clic), e il suo Esc chiudeva il menu portandosi via anche la modalità.
   _broadcastToViews(message) {
-    for (const t of this.tabs) spingiAllaScheda(t.view?.webContents, message, { inVista: t.id === this.activeId });
+    for (const { wc, inVista } of vistePerAnnunci(this)) spingiAllaScheda(wc, message, { inVista });
   }
 
   // ─── lifecycle ──────────────────────────────────────────────────────────
@@ -964,11 +968,15 @@ class TabManager {
       this._notifyBlocked(bloccata);
       return null;
     }
-    const id = randomUUID();
     const isInternal = url.startsWith('filo://');
     const rinviata = !!rinvia && !activate && !adotta;
     const partition = adotta ? adotta.partition : this._partitionFor(url);
-    const view = this._makeView(url, partition, { suppressAutoplay, webContents: adotta && adotta.webContents });
+    // La home già pronta (#1128) vale per la scheda che si apre davanti e non ha niente da rifare al caricamento.
+    const pronta = activate && !adotta && !bloccata && restoreScrollPct == null && restoreZoomLevel == null
+      ? this.riserva.prendi(url, this._sessionePer(partition))
+      : null;
+    const id = pronta ? pronta.id : randomUUID();
+    const view = pronta ? pronta.vista : this._makeView(url, partition, { suppressAutoplay, webContents: adotta && adotta.webContents });
 
     const tab = {
       id,
@@ -1022,8 +1030,10 @@ class TabManager {
 
     this._wireEvents(tab);
     this._applySecurity(tab);
+    // Anche la riserva, che è già figlia della finestra: aggiungerla di nuovo la porta in cima, come una vista nuova.
     this.win.contentView.addChildView(view);
     this.tabs.push(tab);
+    if (pronta) this._daRiserva(tab, pronta);
 
     // IMPORTANTE: setBounds PRIMA di loadURL così la WebContentsView ha una
     // dimensione valida quando il compositor alloca il display surface.
@@ -1050,7 +1060,7 @@ class TabManager {
     if (daGesto) view.webContents._filoGestoAlle = Date.now();
     if (rinviata) tab._rinviata = true;
     else if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
-    else if (!adotta) view.webContents.loadURL(url);
+    else if (!adotta && !pronta) view.webContents.loadURL(url);
     // La pagina che l'ha aperta può chiuderla (window.close): la scheda se ne va con lei.
     if (adotta) {
       const wc = view.webContents;
@@ -1059,12 +1069,17 @@ class TabManager {
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
       for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
-      this._tastieraAllaSchedaAttiva();
+      // Una home che si carica si prende la tastiera da sola, anche dalla barra (Ctrl+T, «+»); quella pronta è già
+      // carica e la riceve qui, o quello che si scrive subito resta alla barra (#1128).
+      if (pronta && !this.win.isDestroyed() && this.win.isFocused()) {
+        try { view.webContents.focus(); } catch (_) {}
+      } else this._tastieraAllaSchedaAttiva();
     }
     // #152 — born proxied: se il dominio ha una regola persistente, la scheda
     // nasce instradata da quel paese (ricrea la view nella partition proxata).
     if (!bloccata && !rinviata) this._maybeApplyDomainRule(tab, url);
     this._broadcast();
+    this.riserva.prepara(pronta ? { fra: 0 } : undefined);
     return id;
   }
 
@@ -1090,6 +1105,31 @@ class TabManager {
     if (!tab || !tab._rinviata) return;
     tab._rinviata = false;
     this.codaRiapertura.togli(tab);
+  }
+
+  // Gli eventi del caricamento la riserva li ha già avuti da sola: la scheda parte da dove è arrivata la pagina, con
+  // quello che la pagina ha detto di sé intanto (colore, risposta all'Esc).
+  _daRiserva(tab, pronta) {
+    const wc = tab.view.webContents;
+    try {
+      // Prima del <title> Chromium dà l'indirizzo come titolo: lì resta quello di ogni scheda nuova.
+      const titolo = wc.getTitle();
+      if (titolo && titolo !== wc.getURL() && !/^filo:/i.test(titolo)) tab.title = titolo;
+      tab.loading = wc.isLoading();
+    } catch (_) {}
+    Object.assign(tab, pronta.campi);
+    this._misuraStoria(tab, wc);
+    if (pronta.icone) this._aggiornaIcona(tab, wc, pronta.icone);
+  }
+
+  // Una scheda che c'è, o la riserva che lo diventerà con questo id: quello che la pagina dice di sé vale per tutte e due.
+  _perScheda(id) {
+    return this.tabs.find((t) => t.id === id) || this.riserva.campiPer(id);
+  }
+
+  // La sessione di una partizione come la vede una vista nata lì (null è quella di sempre).
+  _sessionePer(partition) {
+    try { return partition ? session.fromPartition(partition) : session.defaultSession; } catch (_) { return null; }
   }
 
   // Chi ha aperto una scheda per seguirne il percorso (l'accesso a Google, #1123) riceve i suoi indirizzi e la sua
@@ -1692,12 +1732,12 @@ class TabManager {
   // pagina, campionato dal content script. Solo se cambia davvero (i sample
   // arrivano spesso durante lo scroll) per non inondare la shell di redraw.
   setTabColor(id, color) {
-    const tab = this.tabs.find((t) => t.id === id);
+    const tab = this._perScheda(id);
     if (!tab) return;
     const next = color || null;
     if (tab.color === next) return;
     tab.color = next;
-    this._broadcast();
+    if (this.tabs.includes(tab)) this._broadcast();
   }
 
   // L'icona la scarica il main con la sessione di questa scheda: la barra riceve solo byte già scaricati (#1083).
@@ -1726,14 +1766,14 @@ class TabManager {
   // inattive. A differenza del colore live (§1.1) non cambia con lo scroll né si
   // azzera a ogni navigazione: persiste finché la tab resta sullo stesso dominio.
   setTabIdentityColor(id, color) {
-    const tab = this.tabs.find((t) => t.id === id);
+    const tab = this._perScheda(id);
     if (!tab) return;
     const next = color || null;
     const host = hostOf(tab.url);
     if (next && host) this._identityColorCache.set(host, next);
     if (tab.identityColor === next) return;
     tab.identityColor = next;
-    this._broadcast();
+    if (this.tabs.includes(tab)) this._broadcast();
   }
 
   // Apre una copia della tab (stesso URL), attivandola — come "Duplica" di Chrome.
@@ -2244,6 +2284,7 @@ class TabManager {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
     }
+    this.riserva.posa();
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
     this.avvisi.posa();
