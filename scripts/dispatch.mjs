@@ -119,7 +119,7 @@ const ROLES_DIR = resolve(TOOLS_ROOT, 'routines', 'roles');
 const MAIN_BRANCH = process.env.FILO_MAIN_BRANCH || 'main';
 
 // Il documento che dice alle routine come devono comportarsi: acceso/spento,
-// esplorazione a coda vuota, tentativi del loop. Leggibile SENZA credenziali
+// tentativi del loop. Leggibile SENZA credenziali
 // (le regole lo aprono in lettura, la scrittura resta all'owner) — vedi
 // fetchRoutineConfig per il perché.
 const ROUTINES_DOC = 'config/routines';
