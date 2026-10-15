@@ -117,6 +117,6 @@ const lanciato = (() => { try { return realpathSync(process.argv[1]); } catch (_
 if (process.argv[1] && lanciato === fileURLToPath(import.meta.url)) {
   main().then((code) => { process.exitCode = code; }, (e) => {
     console.error(`biglietto: ${String((e && e.message) || e)}`);
-    process.exitCode = ['avvio', 'gancio', 'consegna'].includes(process.argv[2]) ? 0 : 1;
+    process.exitCode = ['avvio', 'gancio', 'consegna', 'fine', 'chiusura', 'scadenze'].includes(process.argv[2]) ? 0 : 1;
   });
 }
