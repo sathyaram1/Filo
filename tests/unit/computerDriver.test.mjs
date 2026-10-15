@@ -29,7 +29,8 @@ function motoreFinto(over = {}) {
         ok: true, applicazione: 'Accesso', titolo: 'Accedi',
         nodi: [
           { id: 'a', ruolo: 'Edit', nome: 'Utente', valore: 'mario', abilitato: true, posizione: { x: 1, y: 1, w: 9, h: 9 } },
-          { id: 'b', ruolo: 'Edit', nome: SEGRETO, valore: SEGRETO },
+          // Windows: il driver non riporta IsPassword e il nome, senza etichetta, è il valore; lo dice l'id di automazione.
+          { id: 'b', ruolo: 'Edit', nome: SEGRETO, valore: SEGRETO, idAutomazione: 'txtPassword' },
           { id: 'c', ruolo: 'AXTextField', sottoruolo: 'AXSecureTextField', nome: 'Codice', valore: SEGRETO },
           { id: 'd', ruolo: 'password text', nome: 'Chiave', valore: SEGRETO },
           { id: 'e', ruolo: 'Edit', nome: 'Password', valore: SEGRETO },

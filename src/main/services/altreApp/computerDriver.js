@@ -46,7 +46,7 @@ function ruoloNormale(grezzo) {
 // I ruoli che sono password per definizione (AT-SPI «password text», AX «AXSecureTextField»).
 const RUOLI_PASSWORD = new Set(['passwordtext', 'securetextfield', 'password']);
 // UIA non ha un ruolo password e il driver oggi non riporta IsPassword: per un campo si guarda anche nome e valore.
-const NOME_PASSWORD = /pass(?:word|wort|wd|phrase|code)?\b|contrase|mot de passe|senha|wachtwoord|parola d.ordine|has[lł]o|heslo|jelsz|şifre|sifre|lösenord|losenord|adgangskode|salasana|пароль|パスワード|密码|密碼|비밀번호|\bpin\b|codice segreto|\bpwd\b/i;
+const NOME_PASSWORD = /password|passwort|passwd|passphrase|passcode|\bpass\b|contrase|mot de passe|senha|wachtwoord|parola d.ordine|has[lł]o|heslo|jelsz|şifre|sifre|lösenord|losenord|adgangskode|salasana|пароль|パスワード|密码|密碼|비밀번호|\bpin\b|codice segreto|\bpwd\b/i;
 const SOLO_MASCHERA = /^[•●∙·*◦⦁⚫✱⬤]+$/;
 
 /** Vero se il nodo grezzo è un campo password, con qualunque segno lo dica il driver o il campo stesso. */
