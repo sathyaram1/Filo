@@ -1273,6 +1273,7 @@ export function verifierReplyText(reply, id = '<id>', conSegnalazione = false) {
   if (r.outcome === 'pass') {
     return [
       '══ RISPOSTA DEL SERVER: verifica superata ══',
+      nonFermata,
       derivati.length ? `Rilievi non corretti, diventati feedback derivati (esterni e domande uno per rilievo, gli altri insieme nel feedback dei rimasti):\n${derivatiRighe(derivati)}` : 'Nessun rilievo da mettere da parte.',
       dueRiga,
       budgets ? `Bilanci: ${budgets}` : null,
