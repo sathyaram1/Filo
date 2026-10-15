@@ -1344,6 +1344,11 @@
     return global.SN_ESTERNO;
   }
 
+  function filoContesto() {
+    if (!global.SN_FILO_CONTESTO && typeof require === 'function') require('./filoContesto.js');
+    return global.SN_FILO_CONTESTO;
+  }
+
   // L'id del modello si scrive a mano nelle Opzioni e nella chat diventa «il tuo
   // nome»: ci entra solo se ha la forma di un id, mai come frase (#592).
   const ID_MODELLO_RE = /^[A-Za-z0-9~_][A-Za-z0-9._:\/@+~-]{0,199}$/;
