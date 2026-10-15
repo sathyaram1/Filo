@@ -29,7 +29,7 @@
 // test girano su repo git temporanei con un finto `origin`.
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { ensureCommentChar } from './carattere-commento.mjs';
