@@ -441,6 +441,35 @@ function puntaDellaCartella() {
 }
 
 /**
+ * Toglie `--livello <0-3>` (anche `--livello=2`) e `--difficile` dagli argomenti: accompagnano `--segnala`, e
+ * lasciati lì finivano nella critica o nel report. `livello` è `true` se manca il valore. PURA.
+ */
+export function stripLivelloArgs(list) {
+  const args = Array.isArray(list) ? [...list] : [];
+  let livello;
+  let difficile;
+  for (let i = 0; i < args.length;) {
+    const a = String(args[i]);
+    if (a === '--livello' || a.startsWith('--livello=')) {
+      if (livello !== undefined) return { args, livello, difficile, error: '--livello va passato una volta sola: non ho consegnato niente.' };
+      if (a.includes('=')) { livello = a.slice(a.indexOf('=') + 1); args.splice(i, 1); continue; }
+      const v = args[i + 1];
+      const manca = v === undefined || SEMBRA_OPZIONE(String(v));
+      livello = manca ? true : String(v);
+      args.splice(i, manca ? 1 : 2);
+      continue;
+    }
+    if (a === '--difficile' || a.startsWith('--difficile=')) {
+      difficile = a === '--difficile' ? true : a.slice(a.indexOf('=') + 1);
+      args.splice(i, 1);
+      continue;
+    }
+    i += 1;
+  }
+  return { args, livello, difficile, error: '' };
+}
+
+/**
  * `--ferma` da solo non ferma niente: è la segnalazione che ferma il lavoro, e
  * senza l'owner non saprebbe cosa decidere. Ritorna la frase che ferma, o ''. PURA.
  */
