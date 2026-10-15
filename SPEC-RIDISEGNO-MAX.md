@@ -352,8 +352,10 @@ resto.
   lei.
 - **Fase 2.** Con esito `fix` corregge lo stesso agente che ha scritto la
   critica, sui soli rilievi che il server gli rimanda, e consegna con
-  `--record-fixed`. Se correggere non si può senza una decisione, consegna con
-  `--ferma` e una segnalazione: il lavoro aspetta l'owner. Ogni correzione
+  `--record-fixed`. Se correggere non si può senza una decisione, applica la
+  scelta che consiglia e consegna con una segnalazione col suo livello: il lavoro
+  aspetta l'owner solo per un 3 o per una scelta difficile da disfare, altrimenti
+  la domanda esce in un feedback derivato (#1202). Ogni correzione
   porta a un'altra verifica, fatta da un'altra istanza.
 - **I rilievi non corretti non spariscono**: il server li raccoglie in un
   feedback derivato per lavoro, figlio `#N.k`, categoria `routine:residuo`. Il
