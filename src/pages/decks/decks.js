@@ -825,6 +825,8 @@
   // digitare più cifre o una raffica di rerender del mazzo non lancia mille run.
   function scheduleProb() {
     clearTimeout(probDebounce);
+    // Il numero di prima non vale più: il puntino lo dice già durante l'attesa.
+    $('probResult').classList.add('dk-prob-refining');
     probDebounce = setTimeout(runProb, 120);
   }
 
