@@ -294,6 +294,8 @@
     const m = countOf(mulligans);
     if (m > 0 && keepReqs.length) {
       parts.push(`fino a ${m} mulligan se la mano non ha almeno ${keepReqs.map((w) => `${w.n} ${w.tag}`).join(' e ')}`);
+    } else if (m > 0) {
+      parts.push('mulligan non contati: dimmi che mano terresti');
     }
     const x = countOf(extraDraws);
     if (x > 0) parts.push(`${x} ${x === 1 ? 'pescata extra' : 'pescate extra'}`);
