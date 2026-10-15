@@ -440,6 +440,182 @@ export async function chiudi({ env, cwd, deps = {} } = {}) {
   return out;
 }
 
+// ── La fine dei biglietti (#1208): a fine sessione se sporchi, per età tutti ──
+
+// Come la pulizia delle trascrizioni di Claude Code (cleanupPeriodDays, 30 di serie): una sessione ferma da più di
+// così non si riprende, e chiudere prima farebbe nascere sporca la ripresa di una sessione pulita.
+export const SCADENZA_MS = 30 * 24 * 60 * 60 * 1000;
+// Nessuno aspetta i processi in sottofondo della fine e della scadenza: il tetto serve solo a non lasciarli appesi.
+export const TETTO_SOTTOFONDO_MS = 60000;
+
+/** L'ultimo segno di vita della sessione del biglietto: il file o la trascrizione della sessione, il più recente. */
+export function ultimaAttivita(b) {
+  let t = 0;
+  for (const p of [b && b.path, b && b.trascrizione]) {
+    if (!p) continue;
+    try { t = Math.max(t, statSync(p).mtimeMs); } catch (_) { /* sparita: vale l'altro */ }
+  }
+  return t;
+}
+
+/** La sessione che riprende il suo biglietto ne rinnova il segno di vita. Mai un'eccezione. */
+function segnaVivo(b, trascrizione) {
+  try {
+    if (trascrizione && b.trascrizione !== trascrizione) scriviFile(b.path, Object.assign({}, b, { trascrizione }));
+    else { const ora = new Date(); utimesSync(b.path, ora, ora); }
+  } catch (_) { /* resta il segno di prima */ }
+}
+
+/** Un token solo per tutte le chiamate di un giro in sottofondo: se no ognuna ne conia uno. */
+function conTokenUnico(deps) {
+  if (deps.idToken) return deps;
+  let token = null;
+  return Object.assign({}, deps, { idToken: () => (token = token || tokenOwner()) });
+}
+
+/** Chiude `b` sul server. Un rifiuto (sconosciuto, già chiuso) vale chiuso: riprovare non cambierebbe niente. */
+async function chiudiSulServer(b, deps) {
+  try {
+    await chiama('chiudi', { ticket: b.ticket }, deps);
+    return { chiuso: true };
+  } catch (e) {
+    return e && e.rifiuto ? { chiuso: true } : { chiuso: false, errore: String((e && e.message) || e) };
+  }
+}
+
+function togliFile(path) {
+  try { rmSync(path, { force: true }); return true; } catch (_) { return false; }
+}
+
+function togliSporchi(b) {
+  try { rmSync(cartellaSporchi(b), { recursive: true, force: true }); } catch (_) { /* resta, inerte */ }
+}
+
+/** Lo stesso biglietto sta in un altro file: nella sua cartella (chi ha lanciato, un figlio) o in quello di chi ha lanciato. */
+function inAltriFile(b, { env, cwd, sessione }) {
+  let nomi = [];
+  try { nomi = readdirSync(dirname(b.path)).filter((n) => n.endsWith('.json')); } catch (_) { /* solo chi ha lanciato */ }
+  const percorsi = nomi.map((n) => join(dirname(b.path), n)).concat([percorsoDiChiLancia({ env, cwd, sessioneCheNasce: sessione })]);
+  return percorsi.some((p) => p && resolve(p) !== resolve(b.path) && (leggiFile(p) || {}).fp === b.fp);
+}
+
+/**
+ * Il gancio di fine sessione (in sottofondo): il biglietto sporco della sessione `input.session_id` si chiude sul server
+ * e il suo file sparisce. Uno pulito resta, perché la sessione si può riprendere: lo chiude la scadenza. Uno che vive
+ * anche in un altro file resta aperto, e si toglie solo il file della sessione. Server giù: resta tutto. Mai un'eccezione.
+ * @returns {Promise<{ esito: string, errore?: string }>}
+ */
+export async function fineSessione({ input = {}, env = process.env, cwd = process.cwd(), deps = {}, haCredenziale = haCredenzialeOwner } = {}) {
+  try {
+    if (env.FILO_ROUTINE) return { esito: 'routine' };
+    const sessione = String((input && input.session_id) || '').trim();
+    if (!ID_RE.test(sessione)) return { esito: 'senza sessione' };
+    const radice = radiceCondivisa(cwd);
+    const b = radice ? leggiFile(join(cartellaBiglietti(radice), `${sessione}.json`)) : null;
+    if (!b) return { esito: 'senza biglietto' };
+    if (!(await haCredenziale())) return { esito: 'senza credenziale' };
+    const d = conTokenUnico(deps);
+    const consegna = await consegnaSporchi(b, { deps: d });
+    if (consegna.restano) return { esito: 'resta', errore: consegna.errore || 'sporco annotato non consegnato' };
+    let s;
+    try { s = await chiama('stato', { ticket: b.ticket }, d); } catch (e) { return { esito: 'resta', errore: String((e && e.message) || e) }; }
+    if (s.fiducia === 'fidato' && s.chiuso !== true) return { esito: 'pulito' };
+    if (inAltriFile(b, { env, cwd, sessione })) {
+      togliFile(b.path);
+      return { esito: 'file tolto' };
+    }
+    if (s.chiuso !== true) {
+      const r = await chiudiSulServer(b, d);
+      if (!r.chiuso) return { esito: 'resta', errore: r.errore };
+    }
+    togliFile(b.path);
+    togliSporchi(b);
+    return { esito: 'chiuso' };
+  } catch (e) {
+    return { esito: 'guasto', errore: String((e && e.message) || e) };
+  }
+}
+
+/**
+ * La scadenza (sessioni morte senza il gancio di fine): chiude i biglietti fermi da più di SCADENZA_MS e ne toglie i
+ * file. Un biglietto che ha ancora un file vivo resta aperto, e se ne tolgono solo i file scaduti; restano sempre quello
+ * della sessione e quello di chi l'ha lanciata. Al primo guasto del server si ferma: riprova la volta dopo.
+ * @returns {Promise<{ chiusi: number, tolti: number, errori: string[] }>}
+ */
+export async function chiudiScaduti({ env = process.env, cwd = process.cwd(), nowMs = Date.now(), deps = {} } = {}) {
+  const out = { chiusi: 0, tolti: 0, errori: [] };
+  try {
+    const radice = radiceCondivisa(cwd);
+    if (!radice) return out;
+    const dir = cartellaBiglietti(radice);
+    let nomi = [];
+    try { nomi = readdirSync(dir).filter((n) => n.endsWith('.json')); } catch (_) { return out; }
+    const sessione = String(env[ENV_SESSIONE] || '').trim();
+    const tieni = new Set([String(env[ENV_FILE] || '').trim(), ID_RE.test(sessione) ? join(dir, `${sessione}.json`) : '']
+      .filter(Boolean).map((p) => resolve(p)));
+    const scaduto = (b) => !tieni.has(resolve(b.path)) && nowMs - ultimaAttivita(b) > SCADENZA_MS;
+    const gruppi = new Map();
+    for (const nome of nomi) {
+      const path = join(dir, nome);
+      const b = leggiFile(path);
+      if (!b) {
+        if (scaduto({ path }) && togliFile(path)) out.tolti += 1;
+        continue;
+      }
+      const g = gruppi.get(b.fp) || { vivo: false, scaduti: [] };
+      if (scaduto(b)) g.scaduti.push(b); else g.vivo = true;
+      gruppi.set(b.fp, g);
+    }
+    for (const g of gruppi.values()) {
+      if (g.vivo) for (const b of g.scaduti) if (togliFile(b.path)) out.tolti += 1;
+    }
+    const d = conTokenUnico(deps);
+    for (const g of gruppi.values()) {
+      if (g.vivo || !g.scaduti.length) continue;
+      const b = g.scaduti[0];
+      const consegna = await consegnaSporchi(b, { deps: d });
+      const r = consegna.restano ? { chiuso: false, errore: consegna.errore || 'sporco annotato non consegnato' } : await chiudiSulServer(b, d);
+      if (!r.chiuso) { out.errori.push(r.errore); break; }
+      out.chiusi += 1;
+      togliSporchi(b);
+      for (const s of g.scaduti) if (togliFile(s.path)) out.tolti += 1;
+    }
+    // Lo sporco annotato di un biglietto che non ha più file non parte più: col tempo se ne va anche lui.
+    const sporchi = join(dir, 'sporchi');
+    let impronte = [];
+    try { impronte = readdirSync(sporchi).filter((n) => FP_RE.test(n) && !gruppi.has(n)); } catch (_) { /* nessuno */ }
+    for (const fp of impronte) {
+      const c = join(sporchi, fp);
+      if (nowMs - ultimaAttivita({ path: c }) > SCADENZA_MS) { try { rmSync(c, { recursive: true, force: true }); } catch (_) { /* la prossima volta */ } }
+    }
+  } catch (e) {
+    out.errori.push(String((e && e.message) || e));
+  }
+  return out;
+}
+
+/** Lancia `node scripts/biglietto.mjs <argomenti>` staccato: chi chiama non aspetta, e il processo sopravvive alla sessione. */
+export function avviaInSottofondo(argomenti, { cwd = process.cwd(), env = process.env } = {}) {
+  const script = fileURLToPath(new URL('../biglietto.mjs', import.meta.url));
+  const figlio = spawn(process.execPath, [script, ...argomenti], { cwd, env, detached: true, stdio: 'ignore', windowsHide: true });
+  figlio.on('error', () => {});
+  figlio.unref();
+}
+
+/**
+ * Il gancio SessionEnd: Claude Code gli lascia poco tempo, quindi passa la chiusura a un processo in sottofondo.
+ * @returns {boolean} se l'ha lanciata
+ */
+export function avviaFine({ input = {}, env = process.env, avvia = avviaInSottofondo } = {}) {
+  if (env.FILO_ROUTINE) return false;
+  const sessione = String((input && input.session_id) || '').trim();
+  if (!ID_RE.test(sessione)) return false;
+  // Il progetto prima della cartella corrente, che può essere un worktree già tolto: il biglietto sta nel progetto.
+  const cwd = [env.CLAUDE_PROJECT_DIR, input && input.cwd].map((c) => String(c || '').trim()).find((c) => c && existsSync(c));
+  avvia(['chiusura', sessione], { cwd: cwd || process.cwd(), env });
+  return true;
+}
+
 /**
  * L'hook di avvio (contratto #1148 §1.3). `input` = lo stdin dell'hook ({ session_id, source }). Solo con la
  * credenziale dell'owner e fuori dalle routine. Eredita il biglietto del padre (che non si legge: nasce sporco); alla
