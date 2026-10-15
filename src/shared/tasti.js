@@ -724,7 +724,7 @@
     const mods = pezzi(testo).slice(0, -1).map((m) => m.toLowerCase());
     const cmd = mods.some((m) => /^(cmd|command|comando|meta|\u2318)$/.test(m));
     const control = mods.some((m) => /^(ctrl|control|controllo|\u2303)$/.test(m));
-    if (suMac(esplicita) && control && !cmd && f.includes('a')) return { accel: daForma(f.replace(/^c/, '')) };
+    if (suMac(esplicita) && control && !cmd && f.slice(0, f.indexOf('|')).includes('a')) return { accel: daForma(f.replace(/^c/, '')) };
     return { accel: daForma(f) };
   }
 
