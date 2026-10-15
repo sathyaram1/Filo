@@ -2222,7 +2222,13 @@
   // ------------------------------------------------------------
   // Sidebar Aiuto (Fase 2)
   // ------------------------------------------------------------
+  // L'interruttore dell'Aiuto (#841): spento, nessuna strada apre il pannello e il tasto dice perché.
+  function aiutoAcceso() {
+    return !(settings && settings.featureFlags && settings.featureFlags.help === false);
+  }
+
   function openHelpSidebar(context) {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
 
