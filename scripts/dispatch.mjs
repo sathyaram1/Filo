@@ -1115,8 +1115,8 @@ async function recordVerifier(id, critiqueText, segnalazione = '', campiSegnalaz
     branch: base.branch || '',
     sha: shaProvato,
     // L3: la segnalazione per l'owner, se c'è (un trade-off vero trovato
-    // verificando). Il server la cifra in `livelli.l3`.
-    ...(String(segnalazione || '').trim() ? { segnalazione: String(segnalazione).trim() } : {}),
+    // verificando), col suo livello. Il server la cifra in `livelli.l3`.
+    ...(String(segnalazione || '').trim() ? { segnalazione: String(segnalazione).trim(), ...campiSegnalazione } : {}),
   });
   if (sent.outcome === 'refused') {
     return { rejected: true, fromChannel: true, message: `critica non accettata (${motivoRifiuto(sent)})` };
