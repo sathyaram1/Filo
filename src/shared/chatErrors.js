@@ -177,7 +177,7 @@
     const perche = String(motivo == null ? '' : motivo).trim().replace(/[.\s]+$/, '') || NESSUN_HOST_MOTIVO;
     let cosaFare = String(dove == null ? '' : dove).trim() || RIMEDI_NESSUN_HOST.opzioni;
     if (!/[.!?]$/.test(cosaFare)) cosaFare += '.';
-    return `${chi} non può usare ${m ? `«${m}»` : 'il modello scelto'}: ${perche}. ${cosaFare}`;
+    return `${chi} non può usare ${m ? `«${m}»` : 'il modello scelto'} perché ${perche}. ${cosaFare}`;
   }
 
   // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
