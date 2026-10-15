@@ -7,7 +7,8 @@
 //  (B) senza conversazione è una notifica nella finestra che apre la pagina Crediti, dove i rimedi si applicano e
 //      si annullano; lo stesso calo non avvisa due volte, un saldo risalito sopra la soglia sì;
 //  (C) sopra le soglie, con la chiave propria o senza portafoglio: nessun avviso;
-//  (D) soglie, interruttore e spiegazione preparata si cambiano dalle Preferenze.
+//  (D) soglie, interruttore e spiegazione preparata si cambiano dalle Preferenze;
+//  (E) una home con la conversazione in una scheda dietro le altre non lo prende: arriva la notifica.
 
 import { createServer } from 'node:http';
 import { mkdirSync } from 'node:fs';
@@ -284,6 +285,26 @@ test('(B) senza conversazione è una notifica che apre Crediti; lì i rimedi si 
   saldo = 380;
   await rileggi(app);
   expect(await valuta(app)).toBe('avvisato');
+});
+
+test('(E) una home con la conversazione in una scheda che non si vede non lo prende: arriva la notifica', async ({ app, shell, avvisi, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtab(app);
+  await redirectHosts(app);
+  await treGiorniA300(app);
+  saldo = 4000;
+  await riscatta(app);
+  await scrivi(home, 'ciao');
+  await expect(home.locator('.dash-bubble-filo', { hasText: 'Ecco fatto' }).first()).toBeVisible({ timeout: 30_000 });
+
+  // Si passa a un'altra scheda; poi il saldo scende.
+  await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><p>altro</p>', { pubblico: true });
+  saldo = 400;
+  await rileggi(app);
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif', { hasText: 'al ritmo di oggi finiscono dopodomani' })).toBeVisible({ timeout: 15_000 });
+  await expect(home.locator('.dash-crediti-avviso')).toHaveCount(0);
 });
 
 test('(C) sopra le soglie, con la chiave propria o senza portafoglio non c\'è avviso', async ({ app, shell }) => {

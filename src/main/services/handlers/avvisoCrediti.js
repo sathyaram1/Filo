@@ -275,9 +275,13 @@ module.exports = function register(on, ctx) {
     } catch (_) {}
   }
 
-  on(MSG.CREDITS_WARNING_CLAIM, filoOnly(async (msg) => {
+  on(MSG.CREDITS_WARNING_CLAIM, filoOnly(async (msg, sender) => {
     const id = String((msg && msg.id) || '');
     if (!inAttesa || inAttesa.preso || inAttesa.avviso.id !== id) return { ok: false };
+    // Una home in una scheda dietro le altre non lo prende: lo direbbe a nessuno, e la notifica non partirebbe più.
+    // Lo decide il main: in una scheda di Filo `document.hidden` resta falso anche dietro.
+    const tabs = ctx.winOf(sender)?._filoTabs;
+    if (tabs && sender?.tab?.id && tabs.activeId !== sender.tab.id) return { ok: false };
     inAttesa.preso = true;
     if (inAttesa.timer) clearTimeout(inAttesa.timer);
     inAttesa.timer = null;
