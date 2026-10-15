@@ -14,7 +14,9 @@
         'Quando riapri Filo la scheda che stavi guardando arriva per prima. Le altre si caricano dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se ne apri una che non è ancora pronta, si carica subito.',
         'L\'Aiuto di una scheda comincia a rispondere prima a ogni passo, perché la foto della pagina che manda al modello adesso pesa molto meno. Si sente di più sugli schermi con la scala al 125% o più.',
       ],
-      fixes: [],
+      fixes: [
+        'Nel terminale della home un comando valido non diventa più rosso quando il computer è lento a controllarlo. Il rosso compare solo se Filo ha verificato che il comando non esiste.',
+      ],
     },
     {
       version: '0.2.238', date: '2026-10-07',
