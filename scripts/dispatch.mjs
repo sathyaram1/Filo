@@ -1843,7 +1843,7 @@ export function checkEnvelope(w) {
   if (RUOLI_CON_RAMO.includes(role) && !String((w && w.branch) || '')) {
     return `lavoro "${role}" senza il ramo su cui lavorare`;
   }
-  if (role !== 'prober' && !String((w && w.id) || '')) {
+  if (!String((w && w.id) || '')) {
     return `lavoro "${role}" senza il feedback a cui si riferisce`;
   }
   // La busta può essere formalmente perfetta e VUOTA dentro: succede se il
