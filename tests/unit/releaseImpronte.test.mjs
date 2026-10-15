@@ -170,14 +170,8 @@ function releaseFinta({ corpo = '', bozza = false, dopoScrittura, falliscePrime 
 
 function cartellaDist() {
   const dir = cartellaTemporanea('filo-impronte-');
-  const contenuti = {
-    'Filo-Setup.exe': 'installer windows',
-    'Filo-Mac.dmg': 'disco mac',
-    'Filo-Mac.zip': 'pacchetto mac',
-    'Filo-Linux.AppImage': 'appimage linux',
-  };
-  for (const [nome, c] of Object.entries(contenuti)) writeFileSync(join(dir, nome), c);
-  return { dir, contenuti };
+  for (const [nome, c] of Object.entries(CONTENUTI)) writeFileSync(join(dir, nome), c);
+  return { dir, contenuti: CONTENUTI };
 }
 
 const argv = (piattaforma, cartella, extra = []) => ['--piattaforma', piattaforma, '--cartella', cartella,
