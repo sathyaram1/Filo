@@ -179,6 +179,7 @@
 
   async function forgetLine(via) {
     if (via && via.lezione && typeof via.lezione === 'object') return forgetLesson(via.lezione);
+    if (via && typeof via.sempreAperta === 'string') return (await removeKeepOpen(via.sempreAperta)).length > 0;
     if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') return forgetModuleLine(via.modulo, via.riga);
     return false;
   }
