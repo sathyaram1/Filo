@@ -3728,6 +3728,7 @@ class TabManager {
     if (this.incognito) return false; // incognito: nessuna sessione da ripristinare
     let urls = [];
     let colors = [];
+    const aperte = [];
     let activeIndex = 0;
     try {
       const saved = await globalThis.SN_STORAGE?.getRaw?.(this._sessionKey(), null);
@@ -3736,10 +3737,12 @@ class TabManager {
         // tab ripristinato in posizione i (un ripristino vecchio senza `colors`
         // dà semplicemente colori tutti null).
         const savedColors = Array.isArray(saved.colors) ? saved.colors : [];
+        const savedAperte = Array.isArray(saved.aperte) ? saved.aperte : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
             urls.push(u);
             colors.push(savedColors[i] || null);
+            aperte.push(aperturaValida(savedAperte[i]));
           }
         });
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
