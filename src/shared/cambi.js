@@ -36,13 +36,17 @@
     return l && l !== k ? l : 'una funzione';
   }
   const NOMI_CHIAVI = { openrouter: 'OpenRouter', tavily: 'Tavily' };
+  function tastiDiFilo() {
+    if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+    return global.SN_TASTI;
+  }
   function nomeAzioneFilo(k) {
-    const T = global.SN_TASTI;
+    const T = tastiDiFilo();
     const azione = T && T.AZIONI_FILO ? T.AZIONI_FILO.find((x) => x.id === k) : null;
     return azione ? azione.nome : 'un\'azione di Filo';
   }
   function scorciatoiaLeggibile(v) {
-    const T = global.SN_TASTI;
+    const T = tastiDiFilo();
     return v ? (T ? T.etichettaFilo(v) : String(v)) : 'quella di serie';
   }
 

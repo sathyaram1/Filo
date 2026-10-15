@@ -214,8 +214,12 @@
     const trovate = Object.keys(NOMI_AZIONE_FILO).filter((id) => NOMI_AZIONE_FILO[id].some((n) => (` ${t} `).includes(` ${n} `)));
     return trovate.length === 1 ? trovate[0] : null;
   }
+  function tastiDiFilo() {
+    if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
+    return global.SN_TASTI;
+  }
   function scorciatoiaFiloDetta(v) {
-    const T = global.SN_TASTI;
+    const T = tastiDiFilo();
     const testo = String(v == null ? '' : v).trim();
     if (!T || !testo || testo.length > 200) return null;
     const nomeDi = (id) => T.AZIONI_FILO.find((a) => a.id === id).nome;
@@ -1097,7 +1101,7 @@
     {
       scrive: ['scorciatoie.explain-selection', 'scorciatoie.translate-selection', 'scorciatoie.save-for-later', 'scorciatoie.open-help-sidebar'],
       aiuto: () => {
-        const T = global.SN_TASTI;
+        const T = tastiDiFilo();
         const esempio = T ? T.etichettaFilo('Ctrl+Shift+Y') : '';
         return `"<azione>: <combinazione>", azione fra Spiega, Traduci, Salva per dopo e Aiuto (es. "Traduci: ${esempio}"); "<azione>: di serie" la rimette com'era, "tutte di serie" tutte e quattro`;
       },

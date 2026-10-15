@@ -553,7 +553,7 @@
     }
     // Senza Ctrl/Cmd/Alt la lettera scatterebbe mentre si scrive (Shift da solo scrive la maiuscola).
     const p = pressioneScritta(testo);
-    if (!p || !(p.ctrlKey || p.altKey) || tipoModificatore(p.key)) return { tipo: 'senzaModificatore' };
+    if (!p || !(p.ctrlKey || p.metaKey || p.altKey) || tipoModificatore(p.key)) return { tipo: 'senzaModificatore' };
     if (ignoto) return { tipo: 'tasto', nome: ignoto.nome };
     return null;
   }
@@ -687,9 +687,7 @@
     if (SOLO_MODIFICATORI.has(String(ev.key || ''))) return { attesa: true };
     const tasto = tastoDaPressione(ev);
     if (!tasto) return { rifiuto: { tipo: 'tasto', nome: String(ev.key || ev.code || '?').slice(0, 20) } };
-    const ctrl = !!ev.ctrlKey;
-    const alt = !!ev.altKey;
-    const meta = !!ev.metaKey;
+    const [ctrl, meta, alt] = [!!ev.ctrlKey, !!ev.metaKey, !!ev.altKey];
     let c;
     if (suMac(esplicita)) {
       if (ctrl && meta) return { rifiuto: { tipo: 'macDue' } };

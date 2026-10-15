@@ -219,26 +219,32 @@ test('nessuna scorciatoia guarda solo il tasto di Windows', () => {
 });
 
 test('le scorciatoie di Filo non rubano il tasto degli accenti su Mac', () => {
-  // Alt+E/T/S/H valgono con Filo davanti (#838). Su Mac Alt è il tasto Opzione,
-  // che compone gli accenti (Opzione+E → é) anche dentro le pagine di Filo:
-  // prenderselo toglierebbe l'accento acuto a chi scrive in italiano.
-  const src = stripComments(readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8'));
-  assert.match(src, /darwin/,
-    'shortcuts.js non distingue più il Mac: le scorciatoie tornerebbero a essere Opzione+lettera');
-  const { acceleratorePerPiattaforma, COMMANDS } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
-  const vero = process.platform;
+  // Le quattro valgono con Filo davanti (#838) e sui tasti scelti (#842). Su Mac Alt è il tasto Opzione,
+  // che compone gli accenti (Opzione+E → é) anche dentro le pagine di Filo: una scelta senza Ctrl si preme
+  // con Control+Opzione, e l'etichetta lo dice. Il tasto e il suo nome li decide SN_TASTI.
+  const { comandoDaTasto, COMMANDS } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
+  const T = globalThis.SN_TASTI;
+  const premi = (lettera, mods) => ({ type: 'keyDown', key: lettera, code: `Key${lettera.toUpperCase()}`,
+    alt: false, control: false, meta: false, shift: false, ...mods });
+  const prova = () => {
+    for (const a of T.AZIONI_FILO) {
+      const accel = T.scorciatoiaFilo(a.id);
+      if (!/^Alt\+[A-Z]$/.test(accel)) continue;
+      const l = accel.slice(-1).toLowerCase();
+      assert.equal(comandoDaTasto(premi(l, { alt: true }), 'darwin'), null, `su Mac ${accel} resta Opzione+lettera: mangia gli accenti`);
+      assert.equal(comandoDaTasto(premi(l, { alt: true, control: true }), 'darwin'), a.id);
+      assert.equal(T.etichettaFilo(accel, 'darwin'), `Ctrl+${accel}`);
+      assert.equal(comandoDaTasto(premi(l, { alt: true }), 'win32'), a.id, `su Windows ${accel} non deve cambiare`);
+    }
+  };
+  assert.equal(Object.keys(COMMANDS).length, 4);
   try {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
-    for (const accel of Object.keys(COMMANDS)) {
-      assert.notEqual(acceleratorePerPiattaforma(accel), accel,
-        `su Mac ${accel} resta Opzione+lettera: mangia gli accenti a chi scrive in Filo`);
-    }
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-    for (const accel of Object.keys(COMMANDS)) {
-      assert.equal(acceleratorePerPiattaforma(accel), accel, `su Windows ${accel} non deve cambiare`);
-    }
+    prova();
+    T.usaScorciatoieFilo({ 'translate-selection': 'Alt+K' });
+    assert.equal(T.scorciatoiaFilo('translate-selection'), 'Alt+K');
+    prova();
   } finally {
-    Object.defineProperty(process, 'platform', { value: vero, configurable: true });
+    T.usaScorciatoieFilo({});
   }
 });
 
@@ -792,7 +798,7 @@ test('nessuno può assegnarsi un tasto che Filo si prende prima', () => {
 
   // E l'Editor, che è l'unico posto dove l'utente si assegna una scorciatoia,
   // deve chiedere qui invece di accettarla e non farla partire mai.
-  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8'), /\.riservato\(/,
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8'), /\.rifiutoScritta\(/,
     'l\'Editor salva ancora scorciatoie che non arriveranno mai al modulo');
 });
 

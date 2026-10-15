@@ -1592,9 +1592,10 @@
   // I modificatori tenuti premuti, coi nomi di questa tastiera.
   function modificatoriPremuti(e) {
     const mac = window.SN_TASTI.suMac();
+    const [meta, ctrl] = [e.metaKey, e.ctrlKey];
     const out = [];
-    if (e.metaKey) out.push(mac ? 'Cmd' : 'Win');
-    if (e.ctrlKey) out.push('Ctrl');
+    if (meta) out.push(mac ? 'Cmd' : 'Win');
+    if (ctrl) out.push('Ctrl');
     if (e.altKey) out.push(mac ? 'Opzione' : 'Alt');
     if (e.shiftKey) out.push('Shift');
     return out;
@@ -1733,6 +1734,7 @@
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
     disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
+    disegnaScorciatoie(settings.scorciatoie);
 
     Bootstrap.applyTheme(settings.theme);
     Bootstrap.applyTextScale(settings.textScale);
@@ -1772,6 +1774,7 @@
     }
     const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
     if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
+    if (JSON.stringify(settings.scorciatoie || {}) !== JSON.stringify(scorciatoieSalvate)) disegnaScorciatoie(settings.scorciatoie);
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1791,6 +1794,16 @@
     load();
     caricaMemoria();
     $('documentiAggiungi').addEventListener('click', aggiungiCartella);
+    window.addEventListener('keydown', tastoRegistrato, true);
+    window.addEventListener('keyup', (e) => {
+      if (!registrando) return;
+      e.preventDefault();
+      attesaTasti(modificatoriPremuti(e));
+    }, true);
+    window.addEventListener('blur', fermaRegistrazione);
+    $('scorciatoieRipristina').addEventListener('click', () => {
+      salvaMappaScorciatoie(Object.fromEntries(window.SN_TASTI.AZIONI_FILO.map((a) => [a.id, ''])));
+    });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) caricaStatoDocumenti(); });
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.

@@ -207,6 +207,7 @@
       return T && T.names ? T.names().map((n) => `themeTokens.${n}`) : [];
     }
     if (base === 'scorciatoie') {
+      if (!global.SN_TASTI && typeof require === 'function') require('./tasti.js');
       const T = global.SN_TASTI;
       return T && T.AZIONI_FILO ? T.AZIONI_FILO.map((a) => `scorciatoie.${a.id}`) : [];
     }
