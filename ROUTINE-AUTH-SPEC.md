@@ -172,8 +172,8 @@ Punti non negoziabili del flusso:
    il BIGLIETTO (la sua impronta), non il semaforo del feedback, che è lo
    stesso per tutti i biglietti emessi su quel feedback: un biglietto nuovo
    giudica sempre. Non chiude feedback e non ne apre (dal 2026-09-05,
-   feedback #561: i rilievi che non corregge li raccoglie il server in UN
-   feedback derivato per lavoro). Sono respinti, prima di scrivere qualsiasi
+   feedback #561): i feedback derivati li apre il server, come dice
+   `FEEDBACK-STATES.md` §3. Sono respinti, prima di scrivere qualsiasi
    cosa: una critica vuota (nessun rilievo e nessun riassunto), un verdetto
    senza lo sha del commit provato (in ogni forma), una critica coi livelli
    scritti fuori posto (`Rilievo [2]: …` non è un rilievo), una consegna il
