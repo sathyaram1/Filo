@@ -154,7 +154,8 @@ describe('cosa legge l’owner', () => {
     const html = readFileSync(join(RADICE, 'src', 'pages', 'manage', 'manage.html'), 'utf8');
     const inizio = html.indexOf('data-panel="automation"');
     assert.ok(inizio > 0, 'la scheda Automazioni non c’è più');
-    const pannello = html.slice(inizio, html.indexOf('data-panel=', inizio + 1) >>> 0 || html.length);
+    const fine = html.indexOf('data-panel=', inizio + 1);
+    const pannello = html.slice(inizio, fine > 0 ? fine : undefined);
     const orfane = pannello.indexOf('id="mgMergeApprovalsOrphans"');
     assert.ok(orfane > 0, 'le richieste senza pratica non stanno più in Automazioni: va cambiato DOVE_SI_APPROVA');
     assert.ok(orfane < pannello.indexOf('mg-auto-main'), 'non sono più in cima alla scheda');
