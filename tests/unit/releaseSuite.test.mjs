@@ -380,20 +380,19 @@ describe('ogni allarme dice al server cosa è rotto', () => {
 
 // Nel contenitore delle routine (Linux, senza schermo, da root) un comando
 // con xvfb-run ma senza la sandbox spenta non fa partire Electron: un testo
-// che lo scrive a metà è la trappola che ogni giro riscopriva.
+// che lo scrive a metà è la trappola che ogni giro riscopriva. Dal #739
+// `npx playwright test` se lo prepara da solo e i testi non lo chiedono più:
+// dove resta scritto (i comandi fuori da Playwright), è intero.
 describe('il comando del contenitore è scritto intero, dovunque compaia', () => {
   test('ogni riga con `xvfb-run -a` in CLAUDE.md, nei ruoli e nei rossi noti porta anche ELECTRON_DISABLE_SANDBOX=1', () => {
     const files = ['CLAUDE.md', 'tests/rossi-noti.json',
       ...readdirSync(resolve(ROOT, 'routines', 'roles')).filter((n) => n.endsWith('.md')).map((n) => `routines/roles/${n}`)];
-    let trovate = 0;
     for (const f of files) {
       for (const riga of readFileSync(resolve(ROOT, f), 'utf8').split(/\r?\n/)) {
         if (!/xvfb-run -a/.test(riga)) continue;
-        trovate += 1;
         assert.match(riga, /ELECTRON_DISABLE_SANDBOX=1/, `${f}: «${riga.trim().slice(0, 120)}» — metà comando`);
       }
     }
-    assert.ok(trovate >= 3, 'il comando del contenitore deve stare scritto in CLAUDE.md, nei ruoli e nei rossi noti');
   });
 });
 
