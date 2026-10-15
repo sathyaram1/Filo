@@ -358,6 +358,8 @@ Secondo corollario, da confermare a canale maturo: muore anche il **ripiego
 sulla coda git** per la scelta del lavoro (exit 3 = chiudi, nessun cammino
 alternativo). A quel punto l'intera coda su git si può ritirare.
 
+> **Confermato e fatto** (#477.4): vedi `FEEDBACK-STATES.md` §7b.
+
 Terzo (quarta passata, 18/08): **new-work e fixer FUSI in un ruolo unico,
 `resolver`** — stesso lavoro, cambia solo il punto di partenza (richiesta
 dell'owner vs critica del verifier), e dispatch dice il caso nel payload.
