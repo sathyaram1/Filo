@@ -305,6 +305,11 @@
     for (const raw of lines) {
       const m = FINDING_LINE.exec(raw);
       if (m) {
+        if (difficileSenzaDomanda(m)) {
+          flush();
+          out.push(`${raw.trim()} (${SPIEGAZIONE_DIFFICILE})`);
+          continue;
+        }
         // Due livelli sulla STESSA riga: il secondo finiva dentro al testo del
         // primo, e un difetto di sicurezza spariva in coda a uno cosmetico.
         // Basta un a capo dimenticato, che è lo stesso errore della virgoletta
