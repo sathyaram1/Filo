@@ -646,6 +646,38 @@ module.exports = function register(on, ctx) {
     }
   });
   on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await callable('walletOverview', {}, { asOwner: true }) })));
+
+  // L'allarme del conto all'avvio (#820). Ogni home che si apre lo chiede: la lettura del server vale un quarto d'ora,
+  // e gli allarmi già detti stanno su disco, così una situazione che resta quella non si ridice a ogni avvio.
+  const ALLARMI_DETTI_KEY = 'walletOwnerAllarmiDetti';
+  const CONTO_VALE_MS = 15 * 60 * 1000;
+  let contoLetto = null;
+  let filaAllarmi = Promise.resolve();
+  async function leggiContoOwner() {
+    if (contoLetto && Date.now() - contoLetto.at < CONTO_VALE_MS) return contoLetto.conto;
+    const overview = await callable('walletOverview', {}, { asOwner: true });
+    const conto = W.contoOwner(overview);
+    contoLetto = { at: Date.now(), conto };
+    return conto;
+  }
+  on(MSG.WALLET_OWNER_ALARM_PENDING, filoOnly(async () => {
+    if (!ctx.isAdmin()) return { ok: true, alarm: null };
+    const turno = filaAllarmi.then(async () => {
+      let conto = null;
+      try { conto = await leggiContoOwner(); } catch (e) {
+        console.warn('[wallet] allarme del conto: vista non arrivata', String(e?.message || e));
+        return null;
+      }
+      let detti = [];
+      try { detti = await globalThis.SN_STORAGE.getRaw(ALLARMI_DETTI_KEY, []); } catch (_) {}
+      const esito = W.allarmiDaDire(detti, conto);
+      try { await globalThis.SN_STORAGE.setRaw(ALLARMI_DETTI_KEY, esito.detti); } catch (_) {}
+      if (!esito.dire.length) return null;
+      return { title: 'Il conto OpenRouter non regge', text: esito.dire.map((a) => a.testo).join('\n\n') };
+    });
+    filaAllarmi = turno.catch(() => {});
+    return { ok: true, alarm: await turno };
+  }));
   on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => {
     const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
     // Se il regalo è alla propria installazione, la pagina Crediti aperta
