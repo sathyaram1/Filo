@@ -183,6 +183,10 @@ function righeDelleParti(r, pratica, num) {
 const RIPROPONI = '  Per riproporla serve un commit nuovo, anche vuoto, poi rilancia npm run finish:\n'
   + '    git commit --allow-empty -m "riproposta"';
 
+// La richiesta del lavoro locale nasce senza pratica, anche con --feedback: in Gestione non ha una scheda e sta in
+// Automazioni con le altre orfane (#761). Sentinella: tests/unit/ownerMerge.test.mjs.
+export const DOVE_SI_APPROVA = 'Gestione → Automazioni';
+
 /** Il seguito di un blocco: dove sta la richiesta, o perché in Filo non c'è niente da approvare (#486). PURA. */
 function righeDellaRichiesta(r) {
   if (!r.requestId) {
