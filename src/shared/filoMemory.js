@@ -863,23 +863,36 @@
     return r && typeof r === 'object' && !Array.isArray(r) ? r : {};
   }
 
-  async function addKeepOpen(host) {
+  // Rilegge e riscrive la chiave intera: le scritture in fila, o due insieme si mangiano a vicenda
+  // (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).
+  let codaKeepOpen = Promise.resolve();
+  function inCodaKeepOpen(fn) {
+    const r = codaKeepOpen.then(fn, fn);
+    codaKeepOpen = r.then(() => {}, () => {});
+    return r;
+  }
+
+  function addKeepOpen(host) {
     const h = normProxyDomain(host);
-    if (!h) return null;
-    const voci = await listKeepOpen();
-    voci[h] = { ts: (voci[h] && voci[h].ts) || new Date().toISOString() };
-    await setRaw(KEYS.FILO_KEEP_OPEN, voci);
-    return h;
+    if (!h) return Promise.resolve(null);
+    return inCodaKeepOpen(async () => {
+      const voci = await listKeepOpen();
+      voci[h] = { ts: (voci[h] && voci[h].ts) || new Date().toISOString() };
+      await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+      return h;
+    });
   }
 
   // Torna le voci tolte davvero.
-  async function removeKeepOpen(hosts) {
-    const voci = await listKeepOpen();
-    const tolte = (Array.isArray(hosts) ? hosts : [hosts]).map(normProxyDomain).filter((h) => h && h in voci);
-    if (!tolte.length) return [];
-    for (const h of tolte) delete voci[h];
-    await setRaw(KEYS.FILO_KEEP_OPEN, voci);
-    return tolte;
+  function removeKeepOpen(hosts) {
+    return inCodaKeepOpen(async () => {
+      const voci = await listKeepOpen();
+      const tolte = (Array.isArray(hosts) ? hosts : [hosts]).map(normProxyDomain).filter((h) => h && h in voci);
+      if (!tolte.length) return [];
+      for (const h of tolte) delete voci[h];
+      await setRaw(KEYS.FILO_KEEP_OPEN, voci);
+      return tolte;
+    });
   }
 
   // ===== Session =====
