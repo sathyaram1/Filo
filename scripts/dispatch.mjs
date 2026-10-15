@@ -1925,7 +1925,7 @@ async function finalizeBucket(bucket, fromServer) {
   // Rovesciando l'ordine si guadagna anche un'altra cosa: se il posizionamento
   // fallisce, il feedback resta in coda invece di restare marchiato "in
   // lavorazione" da nessuno.
-  if (bucket.id && bucket.role !== 'prober') {
+  if (bucket.id) {
     const pos = positionOnBranch(bucket);
     if (!pos.ok) {
       if (pos.kind === 'permanent') {
