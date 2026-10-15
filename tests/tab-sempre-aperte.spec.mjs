@@ -98,7 +98,30 @@ test('«tienimi sempre aperta example.org»: la chat salva la regola, la pulizia
   expect((await urlAperte(shell)).filter((u) => u.startsWith('http://example.org:'))).toHaveLength(2);
 });
 
-test('le regole si vedono nella memoria delle Preferenze, la × le toglie, e «non tenerla più aperta» pure', async ({ app, openTab }) => {
+test('«tienimi sempre aperta questa scheda» davanti a un sito locale (localhost): si salva e la pulizia la lascia', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await openTab(testServer.html(pagina('Locale')).replace('127.0.0.1', 'localhost'));
+  await expect.poll(async () => (await urlAperte(shell)).some((u) => u.startsWith('http://localhost:'))).toBe(true);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'l1', name: 'TIENI_APERTA', arguments: JSON.stringify({}) }] },
+    { text: 'Fatto.' },
+  ]);
+  await puliziaCheArchiviaTutto(app);
+  const chat = await home(app);
+  await chiedi(chat, 'tienimi sempre aperta questa scheda');
+  await expect(chat.locator('.dash-bubble-filo')).toContainText('Fatto.', { timeout: 15_000 });
+  await ripristina(app);
+  expect(Object.keys(await app.evaluate(() => globalThis.SN_FILO_MEMORY.listKeepOpen()))).toEqual(['localhost']);
+
+  await testServer.openReady(openTab, pagina('Altra'), { pubblico: true });
+  await testServer.openReady(openTab, pagina('Davanti'));
+  await pulisci(app);
+  const dopo = await urlAperte(shell);
+  expect(dopo.filter((u) => u.startsWith('http://localhost:'))).toHaveLength(1);
+  expect(dopo.some((u) => u.startsWith('http://sito-pubblico.test:'))).toBe(false);
+});
+
+test('le regole si vedono nella memoria delle Preferenze, la × le toglie, e «non tenerla più aperta» pure',async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await app.evaluate(async () => {
     await globalThis.SN_FILO_MEMORY.addKeepOpen('example.org');
