@@ -231,6 +231,39 @@ describe('i tre lavori di una pubblicazione', () => {
     }
   });
 
+  test('se GitHub fa scaricare un file con un\'altra impronta il passo si ferma, e la pagina non si tocca', async () => {
+    const { dir } = cartellaDist();
+    try {
+      const diverso = allegatiDi({ ...CONTENUTI, 'Filo-Linux.AppImage': 'il file vecchio rimasto su GitHub' });
+      const { gh, stato } = releaseFinta({ corpo: 'Note.', bozza: true, allegati: diverso });
+      const errore = await M.esegui({ argv: argv('Linux', dir), gh, attendi: senzaAttese }).catch((e) => e);
+      assert.ok(errore instanceof Error, 'la pagina riporterebbe un\'impronta che il file scaricato non ha');
+      assert.match(errore.message, /Filo-Linux\.AppImage: GitHub dichiara sha256:/);
+      assert.equal(errore.bozza, true, 'il riassunto deve poter dire che la versione resta bozza');
+      assert.equal(stato.scritture, 0);
+      assert.equal(stato.corpo, 'Note.');
+
+      const senzaFile = releaseFinta({ allegati: allegatiDi({ 'Filo-Setup.exe': CONTENUTI['Filo-Setup.exe'] }) });
+      await assert.rejects(M.esegui({ argv: argv('Mac', dir), gh: senzaFile.gh, attendi: senzaAttese }), /Filo-Mac\.dmg non è fra gli allegati/);
+      assert.equal(senzaFile.stato.scritture, 0);
+    } finally {
+      togliCartella(dir);
+    }
+  });
+
+  test('un allegato di cui GitHub non dichiara l\'impronta non ferma il passo, ma lo si dice', async () => {
+    const { dir } = cartellaDist();
+    try {
+      const { gh, stato } = releaseFinta({ allegati: [{ name: 'Filo-Setup.exe', digest: null }] });
+      const log = [];
+      await M.esegui({ argv: argv('Windows', dir), gh, attendi: senzaAttese, log: (t) => log.push(t) });
+      assert.deepEqual(righeTabella(stato.corpo), [['Filo-Setup.exe', sha(CONTENUTI['Filo-Setup.exe'])]]);
+      assert.ok(log.some((t) => /::warning::.*non dichiara l'impronta di Filo-Setup\.exe/.test(t)), log.join('\n'));
+    } finally {
+      togliCartella(dir);
+    }
+  });
+
   test('una bozza che resta tale lo dice nel riassunto', () => {
     const testo = M.testoFallimento(Object.assign(new Error('x'), { bozza: true }));
     assert.match(testo, /resta non pubblicata/);
