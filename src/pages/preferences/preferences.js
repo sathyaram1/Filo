@@ -943,6 +943,12 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'featureFlags.help':
+      case 'featureFlags.spellcheck':
+      case 'featureFlags.categorize': {
+        const [nome, , diSerie] = INTERRUTTORI.find(([n]) => k === `featureFlags.${n}`);
+        return interruttore(s, nome, diSerie);
+      }
       default: return undefined;
     }
   }
