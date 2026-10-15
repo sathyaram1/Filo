@@ -745,6 +745,14 @@ section:has(#dictList) .sn-spell-add-row {
 /* Sotto la pillola, non dentro: il modello resta scelto ma la funzione con lui non parte. */
 .sn-chain-warn { color: var(--sn-error); font-size: 12px; line-height: 1.4; margin-top: 4px; }
 .sn-chain-warn p { margin: 2px 0 0; }
+/* Il costo di un uso accanto al modello (#819): piccolo e tenue, la spiegazione sta nell'hover. */
+.sn-chain-cost { color: var(--sn-muted); font-size: 11px; white-space: nowrap; padding: 0 4px 0 2px; cursor: help; }
+.sn-chain-pop .sn-select-option { display: flex; align-items: baseline; }
+.sn-chain-pop .sn-chain-opt-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sn-chain-opt-cost { color: var(--sn-muted); font-size: 11px; margin-left: auto; padding-left: 14px; flex: none; }
+/* L'avviso del costo informa e non ferma niente: col colore di Filo, non con quello d'errore. */
+.sn-chain-costo { color: var(--sn-accent); font-size: 12px; line-height: 1.4; margin-top: 4px; }
+.sn-chain-costo p { margin: 2px 0 0; }
 
 .sn-page .sn-cookie-modes {
   display: flex;

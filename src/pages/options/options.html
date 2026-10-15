@@ -17,6 +17,7 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/comboBox.js"></script>
   <script src="filo://shared/modelChainEditor.js"></script>
+  <script src="filo://shared/stimaCosto.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
 </head>
@@ -102,6 +103,10 @@
         <div>
           <label id="lbl-spent"></label>
           <div id="spentBox" class="sn-muted">—</div>
+        </div>
+        <div>
+          <label id="lbl-cost-warn" for="costWarnRatio"></label>
+          <input type="number" id="costWarnRatio" min="0" max="1000" step="1" />
         </div>
       </div>
       <p class="sn-muted">Stima locale. Il dato autoritativo è quello del provider.</p>

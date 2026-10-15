@@ -106,4 +106,55 @@ async function contesto({ Defaults, forzaListino = false } = {}) {
   };
 }
 
-module.exports = { contesto, listino };
+// Un cambio di modello chiesto in chat (#819), prima della conferma: deve poter partire come dalla griglia delle
+// Opzioni (configurazione personale, nomi che esistono, modello adatto alla funzione), e dice quanto costerà.
+// → { rifiuto, perModello } oppure { costo } (la frase del costo e dell'avviso, '' se il contesto non arriva in tempo).
+const ATTESA_CHAT_MS = 4000;
+async function verificaCambio({ action, refs } = {}, { Defaults } = {}) {
+  const S = globalThis.SN_STIMA_COSTO;
+  const C = globalThis.SN_CONST;
+  const Caps = globalThis.SN_MODEL_CAPS;
+  let settings = {};
+  try { settings = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
+  if (settings.useDefaultModels !== false) {
+    return {
+      rifiuto: 'stai usando i modelli predefiniti, e con loro il modello di ogni funzione lo sceglie Filo',
+      perModello: 'Dillo all\'utente: per scegliere lui il modello di una funzione serve spegnere «Usa modelli predefiniti» in Opzioni → Modelli e tenere lì i suoi modelli. Non spegnerlo tu se non te lo chiede.',
+    };
+  }
+  const registry = settings.modelRegistry || {};
+  const lista = (Array.isArray(refs) ? refs : []).map((r) => String(r || '').trim()).filter(Boolean);
+  const ignoti = lista.filter((r) => !S.voceDi(r, registry));
+  if (ignoti.length) {
+    const nomi = Object.keys(registry);
+    return {
+      rifiuto: `${ignoti.map((r) => `«${r}»`).join(', ')} non ${ignoti.length > 1 ? 'sono fra i tuoi modelli' : 'è fra i tuoi modelli'}`,
+      perModello: `I modelli del registro sono: ${nomi.length ? nomi.join(', ') : 'nessuno'}. Usa uno di questi, o un id di OpenRouter (con «/»), se è chiaro quale vuole l'utente; altrimenti chiediglielo.`,
+    };
+  }
+  for (const r of lista) {
+    const voce = S.voceDi(r, registry);
+    const meta = registry[r] && C.entryModalities ? C.entryModalities(registry[r], r) : null;
+    const ok = Caps ? Caps.modelMatchesAction(voce.provider, voce.model, action, meta || undefined) : { ok: true };
+    if (ok && ok.ok === false) return { rifiuto: `«${r}» non va bene per questa funzione: ${ok.reason || 'non sa fare quello che serve'}` };
+  }
+  const ctx = await Promise.race([
+    contesto({ Defaults }).catch(() => null),
+    new Promise((res) => { const t = setTimeout(() => res(null), ATTESA_CHAT_MS); if (t.unref) t.unref(); }),
+  ]);
+  return { costo: ctx ? fraseCosto(action, lista, registry, ctx) : '' };
+}
+
+// «Circa 133 crediti per messaggio. Con opus i tuoi 4.300 crediti bastano per circa 32 messaggi.»
+function fraseCosto(action, refs, registry, ctx) {
+  const S = globalThis.SN_STIMA_COSTO;
+  const stime = refs.map((r) => ({ r, v: S.valuta(action, r, registry, ctx) })).filter((x) => x.v);
+  if (!stime.length) return '';
+  const cifre = stime.length === 1
+    ? (stime[0].v.ok ? `${stime[0].v.perUso.charAt(0).toUpperCase()}${stime[0].v.perUso.slice(1)}.` : stime[0].v.testo)
+    : `${stime.map((x) => `${x.r}: ${x.v.ok ? x.v.perUso : x.v.breve}`).join('; ')}.`;
+  const avvisi = [...new Set(stime.map((x) => x.v.avviso).filter(Boolean))];
+  return [cifre, ...avvisi].join(' ');
+}
+
+module.exports = { contesto, listino, verificaCambio, fraseCosto };

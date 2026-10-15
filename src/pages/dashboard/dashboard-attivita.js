@@ -653,9 +653,11 @@
     // evento il valore era già quello.
     IMPOSTA_PREFERENZA: (a) => {
       const f = frasiCambi(a);
-      if (f) return { icon: '⚙', text: `Impostato · ${f}` };
+      // Il costo del modello scelto per una funzione resta scritto anche se il modello non lo ripete (#819).
+      const costo = pulito(a._output && a._output.costoModello);
+      if (f) return { icon: '⚙', text: `Impostato · ${f}${costo ? ` · ${costo}` : ''}` };
       const etichetta = pulito(a._output && a._output.etichetta);
-      return { icon: '⚙', text: etichetta ? `Già così · ${etichetta}` : 'Impostazione già così' };
+      return { icon: '⚙', text: `${etichetta ? `Già così · ${etichetta}` : 'Impostazione già così'}${costo ? ` · ${costo}` : ''}` };
     },
     ANNULLA_CAMBIO: (a) => {
       const f = pulito(a._output && a._output.frase);

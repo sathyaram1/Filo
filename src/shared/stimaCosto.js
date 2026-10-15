@@ -242,7 +242,7 @@
     return Math.min(SOGLIA_MAX, n);
   }
 
-  // L'avviso accanto a una scelta: solo coi crediti di Filo, solo se il modello costa almeno `soglia` volte quello
+  // L'avviso accanto a una scelta: solo coi crediti di Filo, solo se il modello costa più di `soglia` volte quello
   // predefinito per la funzione. Informa e basta: la scelta resta salvata. '' quando non c'è niente da dire.
   // `scelta` e `predefinita` sono esiti di `stima`; `nome` è come l'utente chiama il modello.
   function avviso({ scelta, predefinita, soglia: s, saldo, nome } = {}) {
@@ -251,7 +251,7 @@
     const limite = Number(s);
     if (!(limite > 0)) return '';
     const volte = scelta.usd / predefinita.usd;
-    if (!(volte >= limite)) return '';
+    if (!(volte > limite)) return '';
     const chi = nome ? `Con ${nome}` : 'Con questo modello';
     const u = scelta.unita;
     const tot = Number(saldo);

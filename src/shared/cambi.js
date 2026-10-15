@@ -111,6 +111,11 @@
       valore: (v) => `${Number(v).toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: Number.isInteger(Number(v)) ? 0 : 2, maximumFractionDigits: 2 })} €`,
       livello: 2,
     },
+    'costoModelli.soglia': {
+      nome: 'avviso sui modelli costosi',
+      valore: (v) => (Number(v) > 0 ? `oltre ${Number(v).toLocaleString('it-IT', { maximumFractionDigits: 1 })} volte il predefinito` : 'mai'),
+      livello: 1,
+    },
     'security.protectIpLeak': { nome: 'protezione dell\'IP locale (WebRTC)', valore: ATTIVA, livello: 2 },
     'security.blockPopups': { nome: 'blocco dei popup non richiesti', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.enabled': { nome: 'avviso sui siti pericolosi', valore: ATTIVO, livello: 2 },
