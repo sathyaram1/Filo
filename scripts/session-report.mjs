@@ -888,7 +888,7 @@ export async function rapportoChiusura({ transcript = '', cwd = process.cwd(), e
   try {
     const r = await rapportoOrchestratore(principale);
     if (!r) return { ...base, notes: [`thread principale assente: ${principale}`] };
-    return { ...base, sessionId: basename(principale, '.jsonl'), ...r };
+    return { ...base, ...r };
   } catch (e) {
     return { ...base, notes: [`thread principale illeggibile: ${String((e && e.message) || e)}`] };
   }
