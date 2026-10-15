@@ -300,6 +300,17 @@
   // adesso c'è: la apriamo, ma solo se l'utente è ancora sulla home e non sta
   // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
   // che aspettare la prossima scheda.
+  // Una home preparata nascosta (#1128) non prende la ripresa del turno rimasto a metà: la chiede arrivando davanti.
+  async function riprendiAllaComparsa() {
+    if (!onboardingActive || isSending()) return;
+    const state = await fetchOnboarding();
+    const thread = (state && state.thread) || [];
+    const last = thread[thread.length - 1];
+    if (!state || !state.resume || !onboardingActive || isSending() || !last || last.role !== 'user') return;
+    beginSending();
+    await runTurnAndContinue({ userMessage: last.text });
+  }
+
   async function maybeOpenOnboardingLater() {
     if (onboardingActive || isSending() || !nienteDaInterrompere()) return;
     const state = await fetchOnboarding();
@@ -474,6 +485,7 @@
     onboardingClosing,
     onboardingDone,
     maybeOpenOnboardingLater,
+    riprendiAllaComparsa,
     refreshOnboardingNotice,
     hideOnboardingNotice,
     makeSkipOnboardingBtn,

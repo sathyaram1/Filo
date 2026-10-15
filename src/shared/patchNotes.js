@@ -9,10 +9,11 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.239', date: '2026-10-14',
+      version: '0.2.239', date: '2026-10-15',
       features: [
         'Quando riapri Filo la scheda che stavi guardando arriva per prima. Le altre si caricano dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se ne apri una che non è ancora pronta, si carica subito.',
         'L\'Aiuto di una scheda comincia a rispondere prima a ogni passo, perché la foto della pagina che manda al modello adesso pesa molto meno. Si sente di più sugli schermi con la scala al 125% o più.',
+        'La scheda nuova compare subito. Filo ne tiene una pronta in ogni finestra, anche in incognito, e Ctrl+T, il «+» o la chiusura dell\'ultima scheda ti mostrano la home già disegnata invece di un attimo di vuoto.',
       ],
       fixes: [
         'Nel terminale della home un comando valido non diventa più rosso quando il computer è lento a controllarlo. Il rosso compare solo se Filo ha verificato che il comando non esiste.',
