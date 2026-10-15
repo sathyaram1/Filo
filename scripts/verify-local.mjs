@@ -39,8 +39,8 @@
 //     Lo lancia chi ha registrato una critica che manda a correggere e mette
 //     rilievi da parte, SUBITO dopo: registra il commit che toglie SOLO le
 //     loro prove del giro, se nessun caso rosso si è spento. Da lì la consegna
-//     blocca ogni prova tolta rossa. Una dimenticata esce anche dopo le
-//     correzioni: allora il commit della pulizia è l'ultimo, e da solo.
+//     blocca ogni prova tolta rossa. Una dimenticata esce più tardi con
+//     un'altra pulizia: il suo commit è l'ultimo, e da solo.
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
