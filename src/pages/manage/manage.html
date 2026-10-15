@@ -1713,20 +1713,6 @@
                 </div>
               </section>
 
-              <!-- Esplorazione automatica a coda vuota: riguarda solo le routine. -->
-              <section class="mg-auto-block" id="mgProberIdleBlock">
-                <label class="mg-switch" title="Ferma l'esplorazione automatica quando non ci sono più feedback da lavorare">
-                  <span class="mg-switch-text">Esplora quando la coda è vuota</span>
-                  <input type="checkbox" id="mgProberIdle" checked />
-                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
-                </label>
-                <p class="mg-auto-block-desc">
-                  Finiti i feedback da lavorare, Filo va a cercare da solo problemi che
-                  nessuno ha segnalato. Spento, quando la coda è vuota si ferma.
-                  <span class="mg-action-msg" id="mgProberIdleMsg" role="status"></span>
-                </p>
-              </section>
-
               <!-- I lavori server alle routine (#1159): spento, restano alle sessioni locali. -->
               <section class="mg-auto-block" id="mgLavoriServerBlock">
                 <label class="mg-switch" id="mgLavoriServerSwitch" title="Le routine lavorano anche i lavori server fidati, su filo-security, con un token da un'ora. Fusione e deploy del server li fa il tuo PC.">
