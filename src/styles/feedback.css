@@ -39,7 +39,7 @@
   max-height: 94%;
   object-fit: contain;
   border-radius: 6px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, calc(0.5 * var(--sn-ombra, 1)));
 }
 .sn-fb-thumb img { cursor: zoom-in; }
 

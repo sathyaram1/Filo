@@ -646,7 +646,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   background: var(--sn-bg);
   border: 1px solid var(--sn-border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
 }
 .ed-doc-pop[hidden] { display: none; }
 

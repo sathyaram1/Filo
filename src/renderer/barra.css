@@ -79,7 +79,7 @@ html.aperta .striscia::before { opacity: 0; }
   border: 1px solid var(--border);
   border-left: none;
   border-radius: 0 14px 14px 0;
-  box-shadow: 4px 2px 14px rgba(0, 0, 0, 0.16);
+  box-shadow: 4px 2px 14px rgba(0, 0, 0, calc(0.16 * var(--sn-ombra, 1)));
   transform: translateX(-110%);
   visibility: hidden;
   transition: transform calc(var(--dur) * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear calc(var(--dur) * var(--sn-motion, 1));
@@ -185,6 +185,6 @@ html.aperta .pannello {
   pointer-events: none;
   opacity: 0.9;
   background: var(--tab-active);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
 }
 [hidden] { display: none !important; }

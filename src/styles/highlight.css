@@ -81,7 +81,7 @@
   font-family: var(--sn-font);
   font-size: 12px;
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, calc(0.22 * var(--sn-ombra, 1)));
   max-width: 360px;
   word-break: break-word;
   display: flex;

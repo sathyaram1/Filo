@@ -19,7 +19,7 @@
   font-size: 13px;
   border: 1px solid var(--sn-border);
   border-radius: var(--sn-radius);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, calc(0.22 * var(--sn-ombra, 1)));
   backdrop-filter: blur(6px);
   animation: sn-sidebar-in calc(160ms * var(--sn-motion, 1)) ease-out;
   overflow: hidden;
