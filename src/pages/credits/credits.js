@@ -39,12 +39,56 @@
       $('refillHint').textContent = `Ricevi +${formatInt(refill)} crediti ogni giorno a mezzanotte.`;
     }
 
-    // Le due letture non dipendono l'una dall'altra: partono insieme.
-    const [r, w] = await Promise.all([
+    // Le letture non dipendono l'una dall'altra: partono insieme.
+    const [r, w, a] = await Promise.all([
       chrome.runtime.sendMessage({ type: MSG.GET_CREDITS }),
       chrome.runtime.sendMessage({ type: MSG.WALLET_STATE }).catch(() => null),
+      chrome.runtime.sendMessage({ type: MSG.CREDITS_WARNING_STATE }).catch(() => null),
     ]);
     render(r || {}, w || null);
+    renderAvviso(a);
+    seguiAncora();
+  }
+
+  // ── L'avviso prima che i crediti finiscano (#818) ──────────────────────────
+  // C'è finché le soglie lo dicono, o finché c'è un rimedio applicato da poter rimettere com'era. La frase
+  // dell'ultimo clic resta sotto il suo rimedio anche quando la pagina si ridisegna da sola.
+  let esitoAvviso = null;
+  function renderAvviso(a) {
+    const sez = $('avviso');
+    const avviso = a && a.ok && a.mostra ? a.avviso : null;
+    sez.hidden = !avviso;
+    if (!avviso) return;
+    $('avvisoTesto').textContent = avviso.testo || '';
+    $('avvisoTesto').hidden = !avviso.testo;
+    const host = $('avvisoRimedi');
+    host.textContent = '';
+    host.appendChild(window.SN_CREDITI_AVVISO_UI.elenco({
+      avviso,
+      invia: (m) => chrome.runtime.sendMessage(m),
+      classeBottone: 'sn-btn sn-btn-secondary',
+      apriChiave: apriCampoChiave,
+      esito: esitoAvviso,
+      onEsito: (id, frase) => { esitoAvviso = frase ? { id, frase } : null; },
+    }));
+  }
+
+  // «Metti la chiave»: il campo della chiave propria, qui sotto.
+  function apriCampoChiave() {
+    const sez = $('ownKeySection');
+    if (sez.hidden || $('ownKeyForm').hidden) return;
+    sez.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    $('ownKeyInput').focus();
+  }
+
+  // Arrivati dalla notifica (#avviso) o da «Metti la chiave» in chat (#chiave): una volta, al primo disegno.
+  let ancora = String(location.hash || '').slice(1);
+  function seguiAncora() {
+    if (!ancora) return;
+    const a = ancora;
+    ancora = '';
+    if (a === 'chiave') apriCampoChiave();
+    else if (a === 'avviso' && !$('avviso').hidden) $('avviso').scrollIntoView({ block: 'start' });
   }
 
   function render(r, w) {

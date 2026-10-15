@@ -1585,8 +1585,35 @@
   });
 
   // ===== Bridge cambio stato live dal background =====
+  // #818 — l'avviso prima che i crediti finiscano lo prende la home con una conversazione aperta, e arriva in fondo
+  // alla conversazione, dopo la risposta che sta arrivando. Senza conversazione lo lascia alla notifica della finestra.
+  async function avvisoCrediti(id) {
+    if (body.dataset.state !== 'thread' || inRiserva === true || Accoglienza.isActive()) return;
+    let r = null;
+    try { r = await send({ type: MSG.CREDITS_WARNING_CLAIM, id }); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.avviso) return;
+    const chat = chatId;
+    const fine = Date.now() + 10 * 60 * 1000;
+    while (sending && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 250));
+    archiviaRiga(r.avviso.testo, 'filo', chat);
+    // Tornata alla home mentre aspettava: la riga resta nella chat, e i rimedi nella pagina Crediti.
+    if (!inChatAperta(chat) || body.dataset.state !== 'thread') return;
+    const inFondo = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 40;
+    const bolla = makeBubble({ role: 'filo', text: r.avviso.testo });
+    bolla.classList.add('dash-crediti-avviso');
+    bolla.appendChild(window.SN_CREDITI_AVVISO_UI.elenco({
+      avviso: r.avviso, invia: send, classeBottone: 'dash-action-btn',
+      apriChiave: () => chrome.tabs.create({ url: 'filo://credits/credits.html#chiave' }),
+    }));
+    bubblesEl.appendChild(bolla);
+    threadHistory.push({ role: 'filo', text: r.avviso.testo });
+    if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
+    if (msg?.type === MSG.CREDITS_WARNING && msg.id) {
+      avvisoCrediti(String(msg.id)).catch(() => {});
+    } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
       notaFermata(String(msg.frase), vicino);
     } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {

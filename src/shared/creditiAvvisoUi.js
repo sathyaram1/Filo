@@ -7,21 +7,19 @@
 
   const MSG = () => (global.SN_MSG && global.SN_MSG.MSG) || {};
 
-  // { avviso, invia(msg) → Promise<risposta>, classeBottone, apriChiave() } → <ul>
-  function elenco({ avviso, invia, classeBottone = '', apriChiave = null } = {}) {
+  // { avviso, invia(msg) → Promise<risposta>, classeBottone, apriChiave(), esito: { id, frase }, onEsito(id, frase) } → <ul>
+  // `esito` rimette sotto il suo rimedio la frase dell'ultimo clic, se chi ridisegna la vuole tenere.
+  function elenco({ avviso, invia, classeBottone = '', apriChiave = null, esito = null, onEsito = null } = {}) {
     const ul = document.createElement('ul');
     ul.className = 'sn-crediti-rimedi';
+    const opz = { invia, classeBottone, apriChiave, onEsito };
     for (const r of (avviso && Array.isArray(avviso.rimedi) ? avviso.rimedi : [])) {
-      ul.appendChild(riga(r, { invia, classeBottone, apriChiave }));
+      const li = document.createElement('li');
+      li.className = 'sn-crediti-rimedio';
+      disegna(li, r, opz, esito && esito.id === r.id ? esito.frase : '');
+      ul.appendChild(li);
     }
     return ul;
-  }
-
-  function riga(r, opz) {
-    const li = document.createElement('li');
-    li.className = 'sn-crediti-rimedio';
-    disegna(li, r, opz, '');
-    return li;
   }
 
   function disegna(li, r, opz, esito) {
@@ -75,12 +73,15 @@
     try { res = await opz.invia({ type: tipo, id: r.id }); } catch (_) { res = null; }
     if (!res || res.ok === false) {
       btn.disabled = false;
-      disegna(li, r, opz, (res && res.frase) || 'Non ci sono riuscito: riprova.');
+      const frase = (res && res.frase) || 'Non ci sono riuscito: riprova.';
+      if (opz.onEsito) opz.onEsito(r.id, frase);
+      disegna(li, r, opz, frase);
       return;
     }
     const nuovo = res.avviso && Array.isArray(res.avviso.rimedi) ? res.avviso.rimedi.find((x) => x.id === r.id) : null;
+    if (opz.onEsito) opz.onEsito(r.id, res.frase || '');
     // Rimesso com'era e la proposta non c'è più (le soglie non dicono più niente): resta solo l'esito.
-    disegna(li, nuovo || { id: r.id, testo: r.testo, applicato: false }, opz, res.frase || '');
+    disegna(li, nuovo || { id: r.id, testo: '', applicato: false }, opz, res.frase || '');
   }
 
   global.SN_CREDITI_AVVISO_UI = { elenco };
