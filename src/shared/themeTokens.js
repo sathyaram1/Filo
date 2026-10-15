@@ -272,8 +272,38 @@
         const ms = m[1] !== undefined ? Number(m[1]) : Number(m[2]) * 1000;
         return ms >= 0 && ms <= 10000;
       }
+      case 'factor': return RE_FACTOR.test(v) && Number(v) <= FACTOR_MAX;
       default: return false;
     }
+  }
+
+  // L'errore puntuale per un valore rifiutato: lo mostrano le Preferenze e lo legge la chat.
+  function errorMessage(name) {
+    const t = TOKENS[name];
+    switch (t && t.type) {
+      case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
+      case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
+      case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
+      case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
+      case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
+      case 'factor': return `Valore non valido: un numero fra 0 e ${FACTOR_MAX} col punto, es. 0 (nessuna animazione), 1 (normale) o 1.5.`;
+      default: return t ? 'Valore non valido.' : 'Token sconosciuto.';
+    }
+  }
+
+  // Il moltiplicatore delle durate in vigore su un documento, per le animazioni fatte in JS.
+  function motionFactor(doc) {
+    try {
+      const d = doc || (typeof document !== 'undefined' ? document : null);
+      if (!d || !d.documentElement || typeof getComputedStyle !== 'function') return 1;
+      const raw = getComputedStyle(d.documentElement).getPropertyValue('--sn-motion').trim();
+      if (!raw) return 1;
+      const n = Number(raw);
+      return Number.isFinite(n) ? Math.min(FACTOR_MAX, Math.max(0, n)) : 1;
+    } catch (_) { return 1; }
+  }
+  function motionMs(ms, doc) {
+    return Math.round(Number(ms) * motionFactor(doc)) || 0;
   }
 
   // Tiene solo gli override validi: { clean, rejected: [nomi] }.
