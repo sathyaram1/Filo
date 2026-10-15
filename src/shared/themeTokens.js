@@ -254,10 +254,22 @@
   const RE_FACTOR = /^(?:\d(?:\.\d{1,3})?|\.\d{1,3})$/;
   const FACTOR_MAX = 3;
 
+  // I numeri si scrivono come li scrive un italiano («1,5») o arrivano come numero dalla chat: la forma
+  // canonica col punto è l'unica che si salva e finisce nel CSS.
+  const NUMERICI = new Set(['opacity', 'factor']);
+  function normalize(name, value) {
+    const t = TOKENS[name];
+    if (t && NUMERICI.has(t.type)) {
+      if (typeof value === 'number') return Number.isFinite(value) ? String(value) : value;
+      if (typeof value === 'string') return value.trim().replace(/^(\d*),(\d+)$/, '$1.$2');
+    }
+    return typeof value === 'string' ? value.trim() : value;
+  }
+
   function validate(name, value) {
     const t = TOKENS[name];
-    if (!t || typeof value !== 'string') return false;
-    const v = value.trim();
+    const v = normalize(name, value);
+    if (!t || typeof v !== 'string') return false;
     if (!v) return false;
     switch (t.type) {
       case 'color': return RE_HEX.test(v) || RE_RGB.test(v);
