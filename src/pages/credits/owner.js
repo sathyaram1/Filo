@@ -400,9 +400,38 @@
       nota.textContent = [regge, quando ? `Letto ${quando}.` : ''].filter(Boolean).join(' ');
     }
 
+    // Ogni riquadro del conto ha il suo tasto destro: il numero da copiare e la ricarica, che sta su OpenRouter.
+    for (const li of lista.querySelectorAll('.sn-wallet-numero')) {
+      li.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        const valore = li.querySelector('.sn-wallet-numero-valore').textContent;
+        apriMenu([
+          ...(valore === '—' ? [] : [['Copia il numero', () => copia(valore)]]),
+          ['Ricarica il conto su OpenRouter', ricaricaConto],
+        ], ev.clientX, ev.clientY);
+      });
+    }
+
     const allarme = $('ownerAllarme');
-    allarme.textContent = c.allarmi.map((a) => a.testo).join(' ');
+    allarme.textContent = '';
+    if (c.allarmi.length) {
+      allarme.append(c.allarmi.map((a) => a.testo).join(' '));
+      const vai = document.createElement('button');
+      vai.type = 'button';
+      vai.className = 'sn-btn sn-wallet-allarme-ricarica';
+      vai.id = 'ownerRicarica';
+      vai.textContent = 'Ricarica su OpenRouter';
+      vai.title = 'Apre la pagina dei crediti del conto OpenRouter';
+      vai.addEventListener('click', ricaricaConto);
+      allarme.appendChild(vai);
+    }
     allarme.hidden = c.allarmi.length === 0;
+  }
+
+  // La ricarica non si fa da Filo: si apre la pagina dei crediti di OpenRouter, dove l'owner paga.
+  const RICARICA_URL = 'https://openrouter.ai/settings/credits';
+  function ricaricaConto() {
+    chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: RICARICA_URL }).catch(() => {});
   }
 
   // ── Le manopole ────────────────────────────────────────────────────────────
