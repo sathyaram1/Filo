@@ -396,7 +396,8 @@ function registerIpcHandlers() {
       const exists = await commandExists({ shell, cwd, command });
       return { ok: true, exists };
     } catch (_) {
-      return { ok: false, exists: false };
+      // Un controllo andato storto non sa niente: `null` lascia il comando senza colore, mai rosso (#1176).
+      return { ok: false, exists: null };
     }
   });
 
