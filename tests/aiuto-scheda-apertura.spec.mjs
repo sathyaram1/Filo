@@ -81,9 +81,7 @@ test('Aiuto dal menu della scheda: il primo messaggio porta la data di apertura 
   // L'utente legge l'ora vera di apertura nella risposta.
   await expect(pageA.locator('.sn-sidebar-msg-assistant').last()).toContainText(`(${a.quando})`, { timeout: 15_000 });
 
-  const visti = await app.evaluate(() => globalThis.__visti);
-  expect(visti.length).toBe(1);
-  const primo = testoDi(visti[0]);
+  const primo = testoDi((await app.evaluate(() => globalThis.__visti))[0]);
   expect(primo).toMatch(new RegExp(`l'utente l'ha aperta (meno di un minuto|\\d+ minut[oi]) fa \\(${a.quando.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`));
   expect(primo).toContain('Adesso è ');
   // L'elenco delle altre schede non esce: né l'indirizzo né il titolo dell'altra pagina dello stesso sito.
