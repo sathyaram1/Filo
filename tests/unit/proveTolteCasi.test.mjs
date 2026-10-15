@@ -446,8 +446,10 @@ test('dopo una pulizia che toglie righe da un aiuto, la consegna rilancia le pro
 test('le due pulizie, locale e routine, rilanciano le prove toccate prima di registrare', () => {
   const locale = readFileSync(resolve(ROOT, 'scripts', 'verify-local.mjs'), 'utf8');
   const routine = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
-  assert.match(locale, /controllaCasiDellaPulizia\(\{ shaCritica: aperto\.pending\.sha, sha: controllo\.sha, root: ROOT/);
-  assert.match(routine, /controllaCasiDellaPulizia\(\{ shaCritica: st\.verifierSha, sha: r\.state\.puliziaSha, root: ROOT/);
+  assert.match(locale, /controllaCasiDellaPulizia\(\{ shaCritica: controllo\.prima \|\| aperto\.pending\.sha, sha: controllo\.sha, root: ROOT/);
+  assert.match(routine, /controllaCasiDellaPulizia\(\{\s*shaCritica: controllo\.prima \|\| st\.verifierSha, sha: controllo\.sha, root: ROOT/);
+  // Dopo le correzioni la pulizia si confronta col commit prima di lei, e anche un caso verde da correggere non esce (#747).
+  assert.match(`${locale}\n${routine}`.replace(/\s+/g, ' '), /(?:[^]*dopo: !!controllo\.dopo){2}/);
 });
 
 function esegui(script, argv, env, cwd) {
