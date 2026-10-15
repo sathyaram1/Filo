@@ -39,6 +39,36 @@ test('corpo: una credenziale sola, e l\'id viaggia solo con la parola d\'ordine'
   assert.throws(() => canale.corpoChiusura('question', {}));
 });
 
+test('corpo: il rapporto della chiusura viaggia solo con la risposta dell\'orchestratore', () => {
+  const report = { v: 3, role: 'orchestrator', closing: true, turns: 2 };
+  assert.deepEqual(canale.corpoChiusura('answer', { passphrase: 'p', id: 'c1', answer: 'niente', report }),
+    { passphrase: 'p', op: 'answer', id: 'c1', answer: 'niente', report });
+  assert.equal('report' in canale.corpoChiusura('answer', { ticket: 't', answer: 'x', report }), false, 'i turni del worker li porta il suo rilascio');
+  assert.equal('report' in canale.corpoChiusura('question', { passphrase: 'p', report }), false);
+});
+
+test('risposta col rapporto: a un rifiuto riparte senza e lo dice; answer_too_big no, perché riguarda la risposta', async () => {
+  const report = { v: 3, role: 'orchestrator', closing: true, turns: 2 };
+  const corpi = [];
+  const prima = (status, body) => async (u, init) => { corpi.push(JSON.parse(init.body)); return corpi.length === 1 ? reply(status, body) : reply(200, { ok: true }); };
+  const r = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'niente', { fetchImpl: prima(400, { ok: false, reason: 'report_malformed', detail: 'turns' }), ...piano }, report);
+  assert.equal(r.esito, 'ok');
+  assert.match(r.avviso, /report_malformed: turns.*SENZA rapporto/);
+  assert.deepEqual(corpi[0].report, report);
+  assert.equal('report' in corpi[1], false);
+  assert.equal(corpi[1].answer, 'niente');
+  corpi.length = 0;
+  const lunga = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'x', { fetchImpl: prima(413, { ok: false, reason: 'answer_too_big', bytes: 9, max: 1 }), ...piano }, report);
+  assert.equal(lunga.esito, 'rifiutato');
+  assert.equal(corpi.length, 1, 'senza rapporto sarebbe lunga uguale');
+  // Accettato al primo colpo: una chiamata sola, nessun avviso.
+  corpi.length = 0;
+  const ok = await canale.rispostaChiusura({ passphrase: 'p', id: 'c1' }, 'niente', { fetchImpl: prima(200, { ok: true }), ...piano }, report);
+  assert.equal(ok.esito, 'ok');
+  assert.equal(ok.avviso, undefined);
+  assert.equal(corpi.length, 1);
+});
+
 // ─── lettura delle risposte ed exit ─────────────────────────────────────────
 
 test('endpoint che non esiste (404 senza motivo del server), rete giù, 5xx → nessuna domanda, exit 2', () => {
