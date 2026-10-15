@@ -166,7 +166,7 @@
         "repo": "Filo"
       }
     ],
-    "beforePack": "scripts/before-pack.js",
+    "beforePack": "src/main/preloadPacchetto.js",
     "afterPack": "scripts/after-pack.js"
   },
   "dependencies": {

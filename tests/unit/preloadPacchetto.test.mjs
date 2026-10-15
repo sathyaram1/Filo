@@ -6,11 +6,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, readdirSync, statSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import vm from 'node:vm';
 import nodeUrl from 'node:url';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
@@ -133,7 +133,7 @@ test('domainToASCII e domainToUnicode del pacchetto rispondono come quelli di No
 });
 
 test('scrivi() mette il file intero e non lo riscrive se non cambia', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'filo-pacchetto-'));
+  const dir = cartellaTemporanea('filo-pacchetto-');
   try {
     const dest = join(dir, 'sotto', 'page-preload.js');
     scrivi(dest);
@@ -142,14 +142,14 @@ test('scrivi() mette il file intero e non lo riscrive se non cambia', () => {
     scrivi(dest);
     assert.equal(statSync(dest).mtimeMs, prima);
     assert.deepEqual(readdirSync(dirname(dest)), ['page-preload.js'], 'nessun file provvisorio lasciato indietro');
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { togliCartella(dir); }
 });
 
 test('il pacchetto di Filo porta il preload impacchettato, scritto prima dell\'asar', () => {
   const pkg = JSON.parse(leggi('package.json'));
-  assert.equal(pkg.build.beforePack, 'scripts/before-pack.js');
-  assert.ok(existsSync(join(ROOT, 'scripts', 'before-pack.js')));
-  assert.equal(typeof require('../../scripts/before-pack.js').default, 'function');
+  assert.equal(pkg.build.beforePack, 'src/main/preloadPacchetto.js');
+  assert.ok(existsSync(join(ROOT, pkg.build.beforePack)));
+  assert.equal(typeof require(join(ROOT, pkg.build.beforePack)).default, 'function', 'electron-builder chiama il default del modulo');
   const dentro = relative(ROOT, NEL_PACCHETTO).split('\\').join('/');
   assert.equal(dentro, 'generato/page-preload.js');
   assert.ok(pkg.build.files.includes('generato/**/*'), 'build.files non porta generato/: il pacchetto partirebbe senza preload');
@@ -162,7 +162,8 @@ test('le pagine web, la finestrella di accesso, la shell e il fumetto non tornan
   const giro = (d) => { for (const e of readdirSync(d)) { const p = join(d, e); if (statSync(p).isDirectory()) giro(p); else if (e.endsWith('.js')) tutti.push(p); } };
   giro(dir);
   for (const p of tutti) {
-    const src = readFileSync(p, 'utf8');
+    // Il codice, non i commenti che raccontano la scelta delle pagine interne.
+    const src = readFileSync(p, 'utf8').split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
     const f = relative(ROOT, p).split('\\').join('/');
     assert.doesNotMatch(src, /sandbox:\s*false/, `${f}: sandbox spenta`);
     assert.doesNotMatch(src, /nodeIntegration:\s*true/, `${f}: Node dentro una pagina`);

@@ -9,7 +9,7 @@ const path = require('node:path');
 
 const RADICE = path.join(__dirname, '..', '..');
 const INGRESSO = 'src/preload/page-preload.js';
-// Il file che il pacchetto di Filo porta con sé: lo scrive scripts/before-pack.js prima che nasca l'asar. Fuori da src/,
+// Il file che il pacchetto di Filo porta con sé: lo scrive beforePack qui sotto prima che nasca l'asar. Fuori da src/,
 // perché chi legge i sorgenti (sentinelle, mappe) non trovi tutto due volte.
 const NEL_PACCHETTO = path.join(RADICE, 'generato', 'page-preload.js');
 // Quelli che la sandbox dà da sé: li chiede il preload vero, a chiamata.
@@ -316,4 +316,11 @@ function percorsoDelPreload() {
   return scelto;
 }
 
-module.exports = { componi, scrivi, percorsoDelPreload, runtime, NEL_PACCHETTO, INGRESSO };
+// build.beforePack di electron-builder, che chiama il `default` di questo modulo: scrive dai sorgenti di adesso, sempre
+// uguale a sé stesso (il Mac universale impacchetta due copie che devono coincidere).
+async function beforePack() {
+  scrivi(NEL_PACCHETTO);
+  console.log(`[preload impacchettato] scritto per il pacchetto: ${NEL_PACCHETTO}`);
+}
+
+module.exports = { componi, scrivi, percorsoDelPreload, runtime, beforePack, default: beforePack, NEL_PACCHETTO, INGRESSO };

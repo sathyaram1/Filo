@@ -99,5 +99,5 @@ filo-security/
 .claude/cap-observations.jsonl
 *.stackdump
 # Il preload delle pagine web impacchettato per la sandbox (src/main/preloadPacchetto.js): lo rigenera
-# scripts/before-pack.js a ogni pacchetto, e senza pacchetto Filo lo compone da sé nella cartella dati.
+# electron-builder a ogni pacchetto (build.beforePack), e senza pacchetto Filo lo compone da sé nella cartella dati.
 generato/
