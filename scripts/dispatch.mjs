@@ -360,7 +360,8 @@ export function applyPulizia(state, controllo) {
   if (!controllo || !controllo.ok) return { ok: false, message: `pulizia non registrata: ${(controllo && controllo.motivo) || 'non so cosa è stato tolto.'}` };
   const fuori = testoPuliziaFuoriNumero(controllo, md.numeri);
   if (fuori) return { ok: false, message: fuori };
-  s.puliziaSha = controllo.sha;
+  if (controllo.dopo) s.pulizieDopo = [...(Array.isArray(s.pulizieDopo) ? s.pulizieDopo : []).filter((x) => x !== controllo.sha), controllo.sha];
+  else s.puliziaSha = controllo.sha;
   return { ok: true, state: s, files: controllo.files };
 }
 
