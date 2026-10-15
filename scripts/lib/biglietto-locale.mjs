@@ -655,7 +655,8 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
       const ereditatoOra = suo && resolve(suo) !== resolve(path) ? leggiFile(path) : null;
       if (ereditatoOra) { try { scriviFile(suo, Object.assign({}, ereditatoOra, { trascrizione })); } catch (_) { /* resta la variabile, per Bash */ } }
     }
-    if (!path && (source === 'resume' || source === 'compact')) {
+    // Una sessione biforcata porta la conversazione di un'altra, che da qui non si sa nominare: come una ripresa senza il suo.
+    if (!path && (source === 'resume' || source === 'compact' || source === 'fork')) {
       const radice = radiceCondivisa(cwd);
       const suo = radice && ID_RE.test(sessionId) ? leggiFile(join(cartellaBiglietti(radice), `${sessionId}.json`)) : null;
       if (suo) {
