@@ -484,4 +484,13 @@ test('il riquadro resta compatto: senza mulligan nessuna colonna in più, con il
   expect(Math.abs((head.x + head.width) - (keepBox.x + keepBox.width))).toBeLessThan(2);
   await card.scrollIntoViewIfNeeded();
   await card.screenshot({ path: 'tests/.shots/decks-prob-791.png' });
+
+  // Anche col tema scuro, e con la scelta della partita aperta.
+  await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE(
+    { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
+    { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
+  await page.click('#probGame');
+  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveCount(3);
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'tests/.shots/decks-prob-791-scuro.png' });
 });
