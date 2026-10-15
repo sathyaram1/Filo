@@ -152,18 +152,18 @@ async function chiama(data) {
   return body.result || {};
 }
 
-async function main(argv) {
-  const x = leggiArgomenti(argv);
-  if (x.aiuto) { console.log(USO); return 0; }
-  if (x.errore) { console.error(`RIFIUTATO: ${x.errore}`); return 1; }
+export async function main(argv, { chiamata = chiama, scrivi = console.log, errore = console.error, ora = Date.now() } = {}) {
+  const x = leggiArgomenti(argv, ora);
+  if (x.aiuto) { scrivi(USO); return 0; }
+  if (x.errore) { errore(`RIFIUTATO: ${x.errore}`); return 1; }
   let result;
   try {
-    result = await chiama({ op: 'giri', da: x.da, a: x.a });
+    result = await chiamata({ op: 'giri', da: x.da, a: x.a });
   } catch (e) {
-    console.error(String((e && e.message) || e));
+    errore(String((e && e.message) || e));
     return 1;
   }
-  console.log(x.json ? JSON.stringify(comeJson(result, x), null, 2) : formatta(result, x));
+  scrivi(x.json ? JSON.stringify(comeJson(result, x), null, 2) : formatta(result, x));
   return 0;
 }
 
