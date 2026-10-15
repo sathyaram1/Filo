@@ -183,6 +183,8 @@ class PropostaEmail {
     const c = this.c;
     if (!c) { this._nascondi(); return; }
     if (c.wc.isDestroyed()) { this.fine(); return; }
+    // L'account di adesso, non quello di quando il campo ha parlato: tornando alla scheda può essere cambiato.
+    c.email = emailAccount();
     let a = null;
     if (!c.chiusa && C.daProporre(c.valore, c.email, c.digitato)) {
       try { a = this.area(c.wc); } catch (_) { a = null; }
