@@ -414,6 +414,7 @@
     handSatisfies,
     keptAfterBottom,
     gameOf,
+    DEFAULT_KEEP,
     describeConditions,
     simulate,
     // Mani per lotto della stima progressiva (~15k = pochi ms): riquadro e chat
