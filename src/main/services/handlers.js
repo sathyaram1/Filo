@@ -1331,6 +1331,10 @@ function consumePendingConfirm(sender, action) {
 function daPaginaDiFilo(sender) {
   return String(sender?.tab?.url || sender?.url || '').startsWith('filo://');
 }
+// La richiesta in cui una finestra guardata resta approvata (#778): la scheda della chat, finché l'utente non scrive di nuovo.
+function chiaveSchermo(sender) {
+  return String(sender?.wc?.id ?? senderKey(sender));
+}
 // All'OK si agisce su quello che il popup ha mostrato, non su ciò che lo stesso
 // riferimento trova adesso: nel frattempo la lista può essere cambiata (#592).
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
