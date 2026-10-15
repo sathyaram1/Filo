@@ -33,8 +33,10 @@ scrivi l'elenco dei test rossi dopo il rebase.
    l'unica corsa del giro; lancia la singola prova che copre il punto in
    conflitto, col percorso relativo alla radice del repo e le barre normali (in
    ogni altra forma risponde «No tests found» anche a file esistente).
-4. Nel report scrivi **dove c'erano i conflitti** e se per risolverli hai
-   dovuto toccare la logica del lavoro, o se è stato solo meccanico.
+4. Nel report scrivi **dove c'erano i conflitti**, se per risolverli hai
+   dovuto toccare la logica del lavoro o se è stato solo meccanico, e
+   **l'elenco degli unit rossi dopo il rebase** (o che sono tutti verdi): chi
+   verifica lo riceve insieme al resto del report.
 
 <!-- includi: _segnala.md -->
 
