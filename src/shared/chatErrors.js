@@ -406,6 +406,7 @@
 
   global.SN_CHAT_ERRORS = {
     friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
+    fraseNessunHost, motivoHostEsclusi, NESSUN_HOST_MOTIVO, RIMEDI_NESSUN_HOST,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
