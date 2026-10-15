@@ -593,17 +593,17 @@
 
   function updateInputClass() {
     const kind = classifyInput(inputEl.value);
-    // 'pending' (terminale, esistenza del comando ancora da verificare) viene
-    // mostrato GIÀ in rosso: aggiungere caratteri a un "/comando" non deve far
-    // lampeggiare il colore tornando a neutro a ogni tasto mentre il controllo
-    // è in corso. Quando il check risolve, il comando diventa azzurro (esiste)
-    // o resta rosso (non esiste), senza flicker intermedi.
-    const showUnknown = kind === 'unknown' || kind === 'pending';
-    inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
-    inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
-    inputEl.classList.toggle('is-cmd-unknown', showUnknown);
-    // In attesa del controllo "esiste?": rosso (vedi sopra) e avvia il check.
-    if (kind === 'pending') scheduleShellWhich(inputEl.value);
+    // 'pending' (controllo "esiste?" in corso) tiene il colore che c'era: aggiungere
+    // caratteri a un "/comando" non fa lampeggiare il rosso a ogni tasto, e un comando
+    // incollato non diventa rosso prima che il controllo dica «non esiste» (#1176).
+    if (kind === 'pending') {
+      inputEl.classList.remove('is-cmd-filo');
+      scheduleShellWhich(inputEl.value);
+    } else {
+      inputEl.classList.toggle('is-cmd-filo', kind === 'filo');
+      inputEl.classList.toggle('is-cmd-shell', kind === 'shell');
+      inputEl.classList.toggle('is-cmd-unknown', kind === 'unknown');
+    }
     // Sito (arancione) non ancora verificato: avvia il lookup DNS (debounce)
     // così, se il dominio non esiste, l'input diventa rosso.
     const t = inputEl.value.trim();
