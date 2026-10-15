@@ -47,23 +47,38 @@ test('con una correzione in corso i vicini entrano, e il giro lo paga il livello
   assert.equal(r.budgets.cap3.left, 5);
 });
 
-test('da soli i vicini valgono 0: senza cap0 escono, con cap0 partono e lo consumano', () => {
+test('da soli i vicini non fanno partire il giro, nemmeno con cap0: escono derivati col livello scritto', () => {
   const senza = decide([f(3, 'v', 'grave ma non di questo lavoro')]);
   assert.equal(senza.stop, false, 'un 3 vicino non ferma il lavoro');
   assert.deepEqual(senza.fix, []);
   assert.equal(senza.consume, null);
   assert.deepEqual(senza.derived.map((x) => [x.level, x.sede, x.priority]), [[3, 'v', 3]], 'priorità = il livello SCRITTO');
-  const con = decide([f(2, 'v', 'a'), f(0, 'v', 'b')], {}, { ...CAPS, cap0: 1 });
-  assert.deepEqual(tag(con.fix), ['2v', '0v']);
-  assert.equal(con.consume, 'cap0');
-  assert.equal(con.counts.count0, 1);
-  assert.equal(con.counts.count2, 0);
+  // Decisione dell'owner del 2026-10-12: cap0 sopra zero non basta più, e un vicino non consuma nessun bilancio.
+  const con = decide([f(2, 'v', 'a'), f(0, 'v', 'b')], {}, { ...CAPS, cap0: 3 });
+  assert.equal(con.stop, false);
+  assert.deepEqual(con.fix, [], 'un vicino da solo non ritarda la chiusura di un lavoro finito');
+  assert.equal(con.consume, null);
+  assert.deepEqual(con.counts, { count3: 0, count2: 0, count1: 0, count0: 0 });
+  assert.deepEqual(con.derived.map((x) => [x.level, x.sede, x.priority]), [[2, 'v', 2], [0, 'v', 0]]);
+  assert.deepEqual(R.derivedGroups(con).map((g) => [g.tipo, g.priority, tag(g.findings)]), [['rimasti', 2, ['2v', '0v']]]);
+});
+
+test('un vicino entra solo in una correzione partita per gli interni, e non paga il bilancio', () => {
+  const conZero = decide([f(0, 'i', 'qui'), f(3, 'v', 'nel file vicino')], {}, { ...CAPS, cap0: 1 });
+  assert.deepEqual(tag(conZero.fix), ['0i', '3v']);
+  assert.equal(conZero.consume, 'cap0', 'paga lo 0 interno, non il 3 scritto sul vicino');
+  // Un interno messo da parte dal bilancio non porta dentro il vicino.
+  const interniDaParte = decide([f(1, 'i', 'qui'), f(2, 'v', 'vicino')], { count1: 2 });
+  assert.deepEqual(interniDaParte.fix, []);
+  assert.deepEqual(tag(interniDaParte.derived), ['1i', '2v']);
+  assert.equal(interniDaParte.consume, null);
 });
 
 test('un 3 vicino a cap3 finito non ferma; un v col ? non ferma e va da parte', () => {
   const finito = decide([f(3, 'v', 'a')], { count3: 5 }, { ...CAPS, cap0: 1 });
   assert.equal(finito.stop, false);
-  assert.equal(finito.consume, 'cap0');
+  assert.equal(finito.consume, null);
+  assert.deepEqual(tag(finito.derived), ['3v']);
   const domanda = decide([f(3, 'v', 'scelta', true), f(2, 'i', 'qui')]);
   assert.equal(domanda.stop, false);
   assert.deepEqual(tag(domanda.fix), ['2i']);
