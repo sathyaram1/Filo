@@ -84,26 +84,70 @@ export function percorsoRipristino(prova, etichetta) {
  */
 const nomeAiuto = (x) => (x.startsWith(PROVE_GIRO) ? x.split('/').slice(3).join('/') : x);
 
-export function esitoProveTolte({ rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0, via = {} } = {}) {
+/**
+ * I numeri dei rilievi messi da parte che una prova rossa riproduce, se riproduce solo quelli; [] altrimenti. Ogni caso
+ * rosso conta col numero del titolo, o se non ne porta con quelli del nome; senza l'esito per caso decide il nome. Una
+ * prova che questa verifica non ha scritto (`vecchie`) porta numeri di una critica passata. PURA.
+ */
+export function soloDiMessiDaParte(prova, messi, rossi = null, vecchie = []) {
+  const m = new Set((Array.isArray(messi) ? messi : []).filter((n) => Number.isInteger(n)));
+  if (!m.size || (Array.isArray(vecchie) && vecchie.includes(prova))) return [];
+  const delNome = numeriDelNome(prova);
+  const gruppi = Array.isArray(rossi) && rossi.length
+    ? rossi.map((t) => { const n = numeriDelTitolo(ultimo(t)); return n.length ? n : delNome; })
+    : [delNome];
+  if (gruppi.some((n) => !n.length || n.some((x) => !m.has(x)))) return [];
+  return [...new Set(gruppi.flat())].sort((a, b) => a - b);
+}
+
+/**
+ * `numeri`: i posti dei rilievi messi da parte nella critica (assente se non si sanno); `casi`: per prova rossa i titoli
+ * dei casi rossi (null senza rapporto); `comando`: come si registra la pulizia. PURA.
+ */
+export function esitoProveTolte({
+  rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0, via = {}, numeri, casi = {}, vecchie = [], comando = '',
+} = {}) {
   if (!rosse.length && !dallaPulizia.length) return { ferma: false, testo: '' };
   const dove = via && typeof via === 'object' ? via : {};
-  const riga = (f) => `  · ${f}${Array.isArray(dove[f]) && dove[f].length ? ` (usa ${dove[f].map(nomeAiuto).join(', ')})` : ''}`;
+  const usa = (f) => (Array.isArray(dove[f]) && dove[f].length ? `usa ${dove[f].map(nomeAiuto).join(', ')}` : '');
+  const riga = (f) => `  · ${f}${usa(f) ? ` (${usa(f)})` : ''}`;
+  const rimetti = `git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>`;
+  // Il numero nel nome (o nel titolo del caso rosso) dice di chi è la prova: quella di un rilievo messo da parte esce
+  // con la pulizia, e mandare a correggerlo lo farebbe lavorare su un feedback suo.
+  const daParte = new Map();
+  if (Array.isArray(numeri)) {
+    for (const f of [...rosse, ...dallaPulizia]) {
+      const n = soloDiMessiDaParte(f, numeri, casi && typeof casi === 'object' ? casi[f] : null, vecchie);
+      if (n.length) daParte.set(f, n);
+    }
+  }
+  const sue = (l) => l.filter((f) => !daParte.has(f));
+  const [proprie, accorciate] = [sue(rosse), sue(dallaPulizia)];
+  const lasciate = daParte.size ? [
+    `${proprie.length || accorciate.length ? 'Queste invece' : 'Consegna respinta: queste prove'}, com'erano, sul codice nuovo sono ancora rosse ma riproducono solo`,
+    'rilievi messi da parte in questo giro (lo dice il numero nel nome, o nel titolo del caso rosso): la pulizia le ha',
+    'lasciate indietro, e quei rilievi non si correggono qui.',
+    [...daParte].map(([f, n]) => `  · ${f} (${[n.map((x) => `r${x}`).join(', '), usa(f)].filter(Boolean).join('; ')})`).join('\n'),
+    `Rimetti com'erano quelle che hai tolto o cambiato (${rimetti}) e \`git add -A && git commit\`. Poi toglile in un`,
+    'commit a parte, l\'ultimo (il caso del rilievo messo da parte, o il file intero se nel nome porta solo rilievi messi',
+    `da parte), \`git add -A && git commit\`, e registra la pulizia${comando ? `: ${comando}` : ''}. Vale anche dopo le correzioni.`,
+    'Poi consegna di nuovo.',
+  ] : [];
   // Un file che copriva anche un rilievo messo da parte: la pulizia gli ha tolto un caso, e quello che resta è da correggere.
-  const casi = dallaPulizia.length ? [
+  const casiRestati = accorciate.length ? [
     'Consegna respinta: a queste prove la pulizia ha tolto il caso di un rilievo messo da parte (o righe di un file di',
     'supporto che usano), e il caso che resta riproduce un rilievo da correggere. Sul codice nuovo è ancora rosso:',
-    dallaPulizia.map(riga).join('\n'),
+    accorciate.map(riga).join('\n'),
     'Correggi finché è verde, e consegna di nuovo.',
   ] : [];
-  if (!rosse.length) return { ferma: true, testo: casi.join('\n') };
-  const rimetti = `git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>`;
-  const supporto = rosse.some((f) => Array.isArray(dove[f]) && dove[f].length);
-  // Senza pulizia registrata una rossa può essere di un rilievo messo da parte: quello aspetta l'owner, non si corregge qui.
+  if (!proprie.length) return { ferma: true, testo: [...casiRestati, ...lasciate].join('\n') };
+  const supporto = proprie.some((f) => usa(f));
+  // Senza pulizia registrata, e senza i numeri, una rossa può essere di un rilievo messo da parte: quello aspetta l'owner.
   const perche = conPulizia ? [
     'Le prove dei rilievi messi da parte sono uscite prima, nel commit della pulizia: ognuna di queste riproduce',
     `un rilievo da chiudere, e la porta è ancora aperta. Rimetti la prova (${rimetti}),`,
     'correggi finché è verde, e consegna di nuovo.',
-  ] : Number(messi) > 0 ? [
+  ] : !Array.isArray(numeri) && Number(messi) > 0 ? [
     'Nessuna pulizia è stata registrata dopo la critica. Se una di queste è la prova di un rilievo messo da parte,',
     `rimettila com'era (${rimetti}) e lasciala lì: quel rilievo non si corregge in questo giro, e la sua prova`,
     'esce quando il lavoro passa. Le altre riproducono un rilievo da chiudere: rimettile, correggi finché sono verdi,',
