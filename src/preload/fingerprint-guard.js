@@ -198,36 +198,37 @@ function parteFingerprint(seed) {
 }
 
 // Ogni finestra ha le sue copie native: una pagina che crea un riquadro vuoto (o della sua origine) e ne usa le
-// funzioni le troverebbe intatte. Il preambolo va in ogni finestra della stessa origine prima che la pagina la tocchi:
-// dall'elemento (contentWindow, contentDocument) sempre; per indice o per nome solo un riquadro vuoto, che il documento
-// segna appena entra. Uno con un indirizzo non si tocca in anticipo: il suo documento erediterebbe la finestra senza
-// il preload. Ci pensa il preload, e il preambolo che inietta si unisce a quello delle finestre della stessa origine.
+// funzioni le troverebbe intatte. Il preambolo si monta in ogni finestra vuota della pagina prima che la pagina la
+// raggiunga: dall'elemento sempre, per indice o per nome appena il riquadro entra nel documento (anche da uno script).
+// Un riquadro che carica un documento della stessa origine non si tocca prima: il documento erediterebbe la finestra
+// senza il preload. Nessun segno sulla finestra: un sito vedrebbe chi usa Filo (regole e porte rimaste:
+// patterns/riquadri-incorporati-iframe-filo-gira-anche-li.md).
 const PROPAGAZIONE = `
   var CORNICI = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'];
-  var EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute, qsa = EP.querySelectorAll;
-  var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(Node.prototype, 'nodeType').get;
+  var NP = Node.prototype, EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute;
+  var qsaE = EP.querySelectorAll, qsaF = DocumentFragment.prototype.querySelectorAll, qsaD = Document.prototype.querySelectorAll;
+  var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(NP, 'nodeType').get, genitore = gOPD(NP, 'parentNode').get;
+  var docDi = gOPD(NP, 'ownerDocument').get, baseDi = gOPD(NP, 'baseURI').get, quanti = gOPD(NodeList.prototype, 'length').get;
   var primoFiglio = gOPD(EP, 'firstElementChild').get;
-  var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, taglia = SP.slice;
+  var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, taglia = SP.slice, cerca = SP.indexOf;
+  var URLc = URL, origineUrl = gOPD(URL.prototype, 'origin').get, costruisci = Reflect.construct;
   var MO = MutationObserver, moObserve = MO.prototype.observe;
+  var addEL = EventTarget.prototype.addEventListener, bersaglio = gOPD(Event.prototype, 'target').get;
+  var annulla = Event.prototype.preventDefault;
+  var WSP = WeakSet.prototype, wsHas = WSP.has, wsAdd = WSP.add, preparate = new WeakSet();
   var GETTER = { __proto__: null };
   for (var k = 0; k < CORNICI.length; k++) {
     var CC = window[CORNICI[k]], dcw = CC && gOPD(CC.prototype, 'contentWindow');
     if (dcw && dcw.get) GETTER[k === 0 ? 'IFRAME' : k === 1 ? 'FRAME' : 'OBJECT'] = dcw.get;
   }
 
-  // Il segno non si toglie (due preamboli sulla stessa finestra annullerebbero il rumore). Letto da un'altra
-  // finestra, il suo getter le dà questo preambolo: è così che un riquadro appena nato si unisce.
-  function segna(w) {
-    var g = mask(function () {
-      if (this !== w) { try { prepara(this); } catch (e) {} }
-      return true;
-    }, w.Function.prototype.toString, 'get __filoFpGuard');
-    defP(w, '__filoFpGuard', { __proto__: null, get: g, enumerable: false, configurable: false });
-  }
-  function prepara(w) {
+  // Una finestra con un documento suo ha già il preambolo dal suo preload: un secondo annullerebbe il rumore.
+  // La forza la passa solo chi lo chiede per sé (questa finestra, un riquadro che si unisce).
+  function prepara(w, forza) {
     try {
-      if (gOPD(w, '__filoFpGuard')) return;
-      segna(w);
+      if (!w || R(wsHas, preparate, [w])) return;
+      if (!forza && R(taglia, '' + w.location.href, [0, 11]) !== 'about:blank') return;
+      R(wsAdd, preparate, [w]);
     } catch (e) { return; }
     try { mascheraToString(w); } catch (e) {}
     for (var i = 0; i < parti.length; i++) { try { parti[i](w); } catch (e) {} }
@@ -249,36 +250,125 @@ const PROPAGAZIONE = `
     });
   }
 
-  function vuoto(el, tag) {
+  // Si tocca in anticipo un riquadro che resterà la finestra vuota della pagina, o che andrà su un'altra origine e
+  // avrà una finestra nuova; mai uno che carica un documento della stessa origine.
+  function anticipabile(el, tag) {
     if (R(haAttr, el, ['srcdoc'])) return false;
     var s = R(leggiAttr, el, [tag === 'OBJECT' ? 'data' : 'src']);
     if (s === null) return true;
     s = R(lower, R(trim, '' + s, []), []);
-    return s === '' || s === 'about:blank' || R(taglia, s, [0, 12]) === 'about:blank#'
-      || R(taglia, s, [0, 12]) === 'about:blank?' || R(taglia, s, [0, 11]) === 'javascript:';
+    if (s === '' || R(taglia, s, [0, 11]) === 'about:blank' || R(taglia, s, [0, 11]) === 'javascript:') return true;
+    try {
+      return R(origineUrl, costruisci(URLc, [s, R(baseDi, el, [])]), []) !== R(docDi, el, []).location.origin;
+    } catch (e) { return false; }
   }
   function tocca(el) {
     var tag = R(tagName, el, []), g = GETTER[tag];
-    if (g && vuoto(el, tag)) prepara(R(g, el, []));
+    if (g && anticipabile(el, tag)) prepara(R(g, el, []));
   }
+  var SEL = 'iframe,frame,object';
+  function cornici(n, fa) {
+    var t = R(nodeType, n, []), l = null;
+    if (t === 1) {
+      if (GETTER[R(tagName, n, [])]) fa(n);
+      if (R(primoFiglio, n, [])) l = R(qsaE, n, [SEL]);
+    } else if (t === 11) l = R(qsaF, n, [SEL]);
+    else if (t === 9) l = R(qsaD, n, [SEL]);
+    if (l) for (var i = 0, m = R(quanti, l, []); i < m; i++) fa(l[i]);
+  }
+
   // Il parser segna un riquadro scritto nell'HTML prima di eseguire lo script che lo segue.
   function osserva(w) {
     var mo = new MO(function (rec) {
       for (var i = 0; i < rec.length; i++) {
         var nodi = rec[i].addedNodes;
-        for (var j = 0; j < nodi.length; j++) {
-          try {
-            var n = nodi[j];
-            if (R(nodeType, n, []) !== 1) continue;
-            tocca(n);
-            if (!R(primoFiglio, n, [])) continue;
-            var l = R(qsa, n, ['iframe,frame,object']);
-            for (var h = 0; h < l.length; h++) tocca(l[h]);
-          } catch (e) {}
-        }
+        for (var j = 0; j < nodi.length; j++) { try { cornici(nodi[j], tocca); } catch (e) {} }
       }
     });
     R(moObserve, mo, [w.document, { __proto__: null, childList: true, subtree: true }]);
+  }
+
+  // Uno script che inserisce un riquadro lo legge per indice nella riga dopo, prima dell'osservatore: le funzioni che
+  // inseriscono lo segnano subito. I riquadri di un frammento si contano prima, dopo il frammento è vuoto.
+  function raccogli(args) {
+    var out = { __proto__: null, n: 0 };
+    for (var i = 0; i < args.length; i++) {
+      var a = args[i];
+      if (a === null || typeof a !== 'object') continue;
+      try { cornici(a, function (el) { out[out.n++] = el; }); } catch (e) {}
+    }
+    return out;
+  }
+  function conNodi(P, nome) {
+    var d = P && gOPD(P, nome), orig = d && d.value;
+    if (typeof orig !== 'function') return;
+    P[nome] = mask(function () {
+      var c = raccogli(arguments);
+      var r = R(orig, this, arguments);
+      for (var i = 0; i < c.n; i++) { try { tocca(c[i]); } catch (e) {} }
+      return r;
+    }, orig, nome);
+  }
+  function conCornici(args) {
+    for (var i = 0; i < args.length; i++) {
+      var a = args[i];
+      if (typeof a === 'string') {
+        var s = R(lower, a, []);
+        if (R(cerca, s, ['frame']) >= 0 || R(cerca, s, ['object']) >= 0) return true;
+      } else if (a !== null && typeof a === 'object') return true;
+    }
+    return false;
+  }
+  function conTesto(P, nome, dove) {
+    var d = P && gOPD(P, nome);
+    if (!d) return;
+    var dopo = function (c, args) { if (c && conCornici(args)) { try { cornici(c, tocca); } catch (e) {} } };
+    if (typeof d.value === 'function') {
+      var orig = d.value;
+      P[nome] = mask(function () {
+        var c = dove(this), r = R(orig, this, arguments);
+        dopo(c, arguments);
+        return r;
+      }, orig, nome);
+    } else if (d.set && d.configurable) {
+      var os = d.set;
+      defP(P, nome, {
+        __proto__: null, get: d.get, enumerable: d.enumerable, configurable: true,
+        set: mask(function () { var c = dove(this); R(os, this, arguments); dopo(c, arguments); }, os, 'set ' + nome),
+      });
+    }
+  }
+  function se(t) { return t; }
+  function suo(t) { try { return R(genitore, t, []); } catch (e) { return null; } }
+  function suoOSe(t) { return suo(t) || t; }
+  function inserimenti(w) {
+    var p = function (n) { var C = w[n]; return C && C.prototype; };
+    var N = p('Node'), E = p('Element'), F = p('DocumentFragment'), D = p('Document'), C = p('CharacterData');
+    var T = p('DocumentType'), G = p('Range'), S = p('ShadowRoot');
+    var nodi = [[N, 'appendChild'], [N, 'insertBefore'], [N, 'replaceChild'], [E, 'append'], [E, 'prepend'],
+      [E, 'replaceChildren'], [E, 'before'], [E, 'after'], [E, 'replaceWith'], [E, 'insertAdjacentElement'],
+      [F, 'append'], [F, 'prepend'], [F, 'replaceChildren'], [D, 'append'], [D, 'prepend'], [D, 'replaceChildren'],
+      [C, 'before'], [C, 'after'], [C, 'replaceWith'], [T, 'before'], [T, 'after'], [T, 'replaceWith'],
+      [G, 'insertNode'], [G, 'surroundContents']];
+    for (var i = 0; i < nodi.length; i++) { try { conNodi(nodi[i][0], nodi[i][1]); } catch (e) {} }
+    var testi = [[E, 'innerHTML', se], [S, 'innerHTML', se], [E, 'outerHTML', suo], [E, 'insertAdjacentHTML', suoOSe],
+      [E, 'setHTMLUnsafe', se], [S, 'setHTMLUnsafe', se], [D, 'write', se], [D, 'writeln', se], [D, 'execCommand', se]];
+    for (var j = 0; j < testi.length; j++) { try { conTesto(testi[j][0], testi[j][1], testi[j][2]); } catch (e) {} }
+  }
+
+  // Un riquadro della stessa origine col suo preload chiede, prima dei suoi script, questo stesso preambolo: un canvas
+  // annotato da uno si legge con le funzioni dell'altro. Il tipo dell'evento è un segreto della sessione.
+  function ascolta(w) {
+    if (!CANALE) return;
+    R(addEL, w, [CANALE, function (e) {
+      try {
+        var el = R(bersaglio, e, []), g = GETTER[R(tagName, el, [])];
+        if (!g) return;
+        var cw = R(g, el, []);
+        prepara(cw, true);
+        if (R(wsHas, preparate, [cw])) R(annulla, e, []);
+      } catch (x) {}
+    }, true]);
   }
 
   function riquadri(w) {
@@ -288,29 +378,14 @@ const PROPAGAZIONE = `
       avvolgi(CP, 'contentDocument', d.get);
       avvolgi(CP, 'contentWindow', d.get);
     }
+    try { inserimenti(w); } catch (e) {}
     try { osserva(w); } catch (e) {}
+    try { ascolta(w); } catch (e) {}
   }
 
-  // Il primo preambolo della stessa origine fra i frame che lo contengono: un canvas annotato da uno si legge con le
-  // funzioni dell'altro, e ognuno riconosce come native le funzioni dell'altro. Solo i contenitori, già caricati: un
-  // riquadro ancora vuoto toccato da qui perderebbe il preload. Si leggono solo il segno e il genitore coi getter
-  // nativi di questa finestra: la pagina non può far girare il suo codice prima che questa finestra sia protetta.
-  function unisci() {
-    var genitore = gOPD(window, 'parent').get, w = window;
-    for (var i = 0; i < 1000; i++) {
-      var p = R(genitore, w, []);
-      if (!p || p === w) return;
-      w = p;
-      try {
-        var d = gOPD(w, '__filoFpGuard'), g = d && gOPD(d, 'get');
-        if (g && !d.configurable && typeof g.value === 'function') { R(g.value, window, []); return; }
-      } catch (e) {}
-    }
-  }
-  if (window.top !== window) { try { unisci(); } catch (e) {} }
-  prepara(window);`;
+  prepara(window, true);`;
 
-function buildPreamboloSource({ fp } = {}) {
+function buildPreamboloSource({ fp, canale } = {}) {
   const parti = [];
   if (fp && (fp.level | 0) > 0) parti.push(parteFingerprint(fp.seed));
   if (!parti.length) return '';
@@ -322,7 +397,7 @@ function buildPreamboloSource({ fp } = {}) {
   var R = Reflect.apply, defP = Object.defineProperty, gOPD = Object.getOwnPropertyDescriptor;
   var getProto = Object.getPrototypeOf, setProto = Object.setPrototypeOf, imul = Math.imul, ceil = Math.ceil;
   var WMP = WeakMap.prototype, wmGet = WMP.get, wmSet = WMP.set, wmHas = WMP.has;
-  var parti = [];
+  var parti = [], CANALE = ${JSON.stringify(String(canale || ''))};
 
   // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
   // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799), e
@@ -349,8 +424,8 @@ ${PROPAGAZIONE}
 })();`;
 }
 
-function buildGuardSource(seed, level) {
-  return buildPreamboloSource({ fp: { seed, level } });
+function buildGuardSource(seed, level, canale) {
+  return buildPreamboloSource({ fp: { seed, level }, canale });
 }
 
 module.exports = { buildGuardSource, buildPreamboloSource };

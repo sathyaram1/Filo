@@ -206,8 +206,19 @@ try {
   if (IS_SUBFRAME ? /^(https?|data|blob):|^about:srcdoc$/i.test(loc) : /^https?:/i.test(loc)) {
     const cfg = ipcRenderer.sendSync('filo:fp-config', loc, { riquadro: IS_SUBFRAME }) || { level: 0, seed: 0 };
     if (cfg && cfg.level > 0) {
-      const { buildGuardSource } = require('./fingerprint-guard.js');
-      webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level), false).catch(() => {});
+      // Un riquadro della stessa origine chiede prima la guardia della finestra che lo contiene: se gliela monta lei,
+      // le due finestre condividono ciò che sanno dei canvas (fingerprint-guard.js, ascolta).
+      let unito = false;
+      if (IS_SUBFRAME && cfg.canale) {
+        try {
+          const el = window.frameElement;
+          if (el) unito = !el.dispatchEvent(new Event(cfg.canale, { cancelable: true, composed: true }));
+        } catch (_) { unito = false; }
+      }
+      if (!unito) {
+        const { buildGuardSource } = require('./fingerprint-guard.js');
+        webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level, cfg.canale), false).catch(() => {});
+      }
     }
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
