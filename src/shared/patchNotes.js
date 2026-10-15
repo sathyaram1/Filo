@@ -11,6 +11,7 @@
     {
       version: '0.2.239', date: '2026-10-14',
       features: [
+        'Gli inviti restano a chi entra davvero. Per dare i tuoi serve aver collegato Google a Filo: nella pagina Crediti, al posto dei codici, trovi «Collega Google per dare i tuoi inviti». Dalla stessa rete entrano fino a tre persone ogni 24 ore, abbastanza per una famiglia, e la quarta sa da che ora riprovare.',
         'Quando riapri Filo la scheda che stavi guardando arriva per prima. Le altre si caricano dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se ne apri una che non è ancora pronta, si carica subito.',
         'L\'Aiuto di una scheda comincia a rispondere prima a ogni passo, perché la foto della pagina che manda al modello adesso pesa molto meno. Si sente di più sugli schermi con la scala al 125% o più.',
       ],

@@ -99,11 +99,13 @@ Filo scrive anche un registro d'uso: una riga per ogni chiamata ai modelli fatta
 
 Lo pseudonimo è stabile, lo stesso per sempre per la stessa installazione. Lo trovi nella pagina Crediti, e basta quello per ricevere un regalo di crediti. Non contiene il tuo nome, la tua email o il tuo account Google, e da lì non si risale a loro.
 
-Per i crediti non serve il login: l'identità è quella dell'installazione, un account anonimo che Filo crea da solo. Se poi fai il login con Google, Filo collega l'account a quella stessa identità, così crediti e chiave restano tuoi; se il tuo account Google è già legato a un altro computer, le due identità restano separate.
+Per i crediti non serve il login: l'identità è quella dell'installazione, un account anonimo che Filo crea da solo. Se poi fai il login con Google, Filo collega l'account a quella stessa identità, così crediti e chiave restano tuoi; se il tuo account Google è già legato a un altro computer, le due identità restano separate. Il collegamento serve per dare inviti: il server, quando qualcuno usa il tuo codice o quando apri la pagina Crediti, chiede al servizio di accesso se la tua identità ha Google collegato, e nel documento dei crediti scrive solo quando ti ha dato i codici, non l'account.
 
 **Con il login Google c'è un secondo documento.** Viene da un vecchio conteggio dei crediti, ancora acceso: è legato al tuo account Google e Filo lo aggiorna sul server a ogni chiamata ai modelli e quando apri la pagina Crediti. Dentro ci sono la tua email e il tuo nome, il saldo di quel conteggio, quante chiamate e quanti crediti per ogni funzione (chat, traduzione, correttore...), il costo in euro e quali tue segnalazioni sono state premiate. Il testo delle richieste non c'è. Si aggiorna anche se usi una tua chiave OpenRouter. Lo leggiamo solo tu e io; senza login non esiste. È un punto debole, e lo trovi in fondo.
 
 **Gli inviti dal sito.** Se apri un link d'invito sul sito di Filo, il server salva il codice insieme a un'impronta del tuo indirizzo IP, mescolato con un segreto che sta solo sul server. Se entro un'ora Filo si apre per la prima volta dallo stesso indirizzo, l'invito si attiva da solo, senza bisogno di copiarlo. L'impronta si cancella quando l'invito viene usato, e comunque entro due giorni.
+
+**Quante persone entrano dalla stessa rete.** Quando qualcuno riscatta un invito, il server conserva un'impronta del suo indirizzo IP, mescolato con lo stesso segreto, insieme a quante persone sono entrate da lì e quando. Di un indirizzo IPv6 conta solo la parte che indica la rete, perché ogni dispositivo di una casa ne ha uno suo. Serve a far entrare al più tre persone dalla stessa rete in 24 ore, così una famiglia che condivide la connessione passa e una persona sola non apre portafogli a catena. L'impronta si cancella quando la finestra è passata: 24 ore di serie, mai più di 30 giorni.
 
 ## Contatori e percorsi
 
@@ -148,7 +150,7 @@ Detto in negativo, perché in negativo si controlla meglio. Sul mio server non a
 - dati sul dispositivo oltre a browser e sistema operativo, che arrivano solo dentro un feedback;
 - niente da servizi di analisi o di pubblicità: Filo ne blocca, non ne usa.
 
-Il tuo indirizzo IP il server lo vede passare, come ogni server, e il mio codice non lo conserva, salvo l'impronta degli inviti descritta sopra. I registri tecnici di Google Cloud, su cui il server gira, annotano le richieste e con loro l'indirizzo, per un tempo limitato. Se un giorno servisse conservarlo per fermare abusi, verrebbe conservato per un tempo dichiarato qui, e questo documento cambierebbe prima del codice.
+Il tuo indirizzo IP il server lo vede passare, come ogni server, e il mio codice non lo conserva, salvo le due impronte degli inviti descritte sopra. I registri tecnici di Google Cloud, su cui il server gira, annotano le richieste e con loro l'indirizzo, per un tempo limitato. Se un giorno servisse conservarlo per fermare abusi, verrebbe conservato per un tempo dichiarato qui, e questo documento cambierebbe prima del codice.
 
 ## Il login
 
@@ -162,7 +164,7 @@ Sono due cose diverse. La politica sui modelli riguarda chi finanzio con l'infer
 
 ## Conservazione
 
-Quello che sta sul server non ha una scadenza automatica, con un'eccezione: l'impronta degli inviti aperti dal sito, che sparisce entro due giorni. I feedback, l'elenco dei mittenti del filtro all'ingresso, i documenti dei crediti (compreso quello dei consumi, con email e nome), il registro d'uso e il red team restano finché esiste il servizio. Non lo nascondo dietro parole come «per il tempo necessario»: è per sempre, a meno che tu non chieda. Se chiedi, cancello a mano quello che è tuo: i feedback che hai mandato con la tua voce nell'elenco dei mittenti, i tuoi documenti dei crediti con il loro registro, il tuo account del red team.
+Quello che sta sul server non ha una scadenza automatica, con due eccezioni: l'impronta degli inviti aperti dal sito, che sparisce entro due giorni, e quella che conta gli ingressi dalla stessa rete, che sparisce quando passa la sua finestra, al più dopo 30 giorni. I feedback, l'elenco dei mittenti del filtro all'ingresso, i documenti dei crediti (compreso quello dei consumi, con email e nome), il registro d'uso e il red team restano finché esiste il servizio. Non lo nascondo dietro parole come «per il tempo necessario»: è per sempre, a meno che tu non chieda. Se chiedi, cancello a mano quello che è tuo: i feedback che hai mandato con la tua voce nell'elenco dei mittenti, i tuoi documenti dei crediti con il loro registro, il tuo account del red team.
 
 ## I punti deboli
 
