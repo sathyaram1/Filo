@@ -258,6 +258,7 @@ function runtime(MODULI, TESTI, richiestaDellaSandbox) {
     const nome = spec.replace(/^node:/, '');
     if (nome === 'path') return percorso;
     if (nome === 'fs') return archivio;
+    if (nome === 'url') return moduloUrl();
     if (!spec.startsWith('.') && !spec.startsWith('/')) return richiestaDellaSandbox(spec);
     const chiave = risolvi(spec, cartella);
     if (!chiave) {
