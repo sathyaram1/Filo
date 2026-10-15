@@ -571,9 +571,24 @@
       else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
       if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
     } else if (refusal) err.code = refusal;
-    if (res.keySource) err.keySource = res.keySource;
-    if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
+  }
+
+  // Un 404 del router su un modello che servono solo host esclusi (#828). Lo dicono gli host dichiarati, non il testo
+  // dell'errore, che il router può cambiare; e vince sugli altri motivi del 404, perché strumenti e tetto non contano più.
+  async function nessunHostAmmesso(err, { apiKey, model, providerRouting }) {
+    let v = null;
+    try { v = await hostVerdict({ apiKey, model, providerRouting }); } catch (_) { v = null; }
+    if (!v || v.ok || v.reason !== 'excluded') return false;
+    console.warn(`[Filo policy] "${model}" lo servono solo host esclusi (${v.excluded.join(', ')}): ${err.message}`);
+    const CE = global.SN_CHAT_ERRORS;
+    err.dettaglio = err.message;
+    err.message = CE ? CE.fraseNessunHost({ modello: model, motivo: CE.motivoHostEsclusi(v.excluded) }) : `NO_ALLOWED_HOST ${model}`;
+    err.code = 'NO_ALLOWED_HOST';
+    err.reason = 'excluded';
+    err.model = model;
+    err.hosts = v.excluded;
+    return true;
   }
 
   // ─── Chi può servire un modello, prima di chiamarlo ───────────────────────
