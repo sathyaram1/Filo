@@ -71,6 +71,11 @@ durata, nessun "margine per l'ultimo worker".
 
 ## 5. Il pacemaker (Firebase, progetto filo-security)
 
+*Fatto (§14, passo 4); i freni del pacemaker in `ROUTINE-AUTH-SPEC.md` §10.*
+
+> **Superato** (una routine sola, e il suo tetto di accensioni): vedi
+> `SPEC-DOMANDE.md` §12.1 e `src/shared/routineSessioni.js`.
+
 - La routine su claude.ai NON ha più la schedulazione fitta: parte quasi solo
   su chiamata (trigger API, endpoint di accensione con token al portatore).
 - Una funzione schedulata nel progetto filo-security ("pacemaker"), ogni
