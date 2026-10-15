@@ -2570,7 +2570,9 @@ async function eseguiAzioneFilo(action, {
           await applySettingsUpdate({ themeTokens: restanti });
           return { executed: true, kept: true };
         }
-        if (!T || !T.validate(token, valore)) return { executed: false, kept: false };
+        if (!T || !T.validate(token, valore)) {
+          return { executed: false, kept: false, ...(T ? { output: { error: `${String(valore ?? '').slice(0, 80)}: ${T.errorMessage(token)}` } } : {}) };
+        }
         const settings = await Storage.getSettings();
         const overrides = { ...(settings.themeTokens || {}) };
         overrides[token] = String(valore).trim();
