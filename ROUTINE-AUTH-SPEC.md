@@ -220,7 +220,9 @@ server:
   (Gestione → Automazioni, spento di serie). `rilievi` sono i rilievi corretti
   in quel giro, `shaPrima` il commit su cui era stata scritta la critica;
 - `riallineamento`, con `perimetro: { shaVerificato?, reportRebase? }`: il
-  lavoro era verificato e un conflitto di fusione è stato risolto a mano.
+  lavoro era verificato e la base è stata rifatta su main, dopo un conflitto
+  di fusione o dopo unit rossi sul risultato della fusione. Chi verifica
+  rilancia gli unit: ogni rosso è un rilievo interno.
 
 dispatch sceglie il testo del ruolo dall'ambito (`verifier-chiusura.md`,
 `verifier-riallineamento.md`) e scrive il perimetro in coda al compito, come
