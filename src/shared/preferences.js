@@ -241,6 +241,8 @@
     const combo = testo.slice(sep + 1).replace(/^>/, '').trim();
     if (DI_SERIE.test(pianoChiave(combo)) || VOCE_AUTOMATICA.test(pianoChiave(combo))) {
       const serie = T.AZIONI_FILO.find((a) => a.id === id).serie;
+      const presa = T.rifiutoScorciatoiaFilo(id, serie);
+      if (presa) return { rifiuto: T.testoRifiutoFilo(presa) };
       return { partial: { scorciatoie: { [id]: '' } }, label: `Scorciatoia di «${nomeDi(id)}» → ${T.etichettaFilo(serie)}, quella di serie` };
     }
     const d = T.scorciatoiaDaScritta(combo);

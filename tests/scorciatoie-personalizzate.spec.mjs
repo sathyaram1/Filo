@@ -79,6 +79,9 @@ test('in Preferenze Traduci si cambia premendo i tasti; un tasto preso o di un\'
   // Ctrl+T non apre una scheda: dice perché non si può.
   await premi(app, 'T', ['control']);
   await expect(errore).toContainText('apre una scheda nuova');
+  mkdirSync(SHOTS, { recursive: true });
+  await page.locator('#sec-scorciatoie').scrollIntoViewIfNeeded();
+  await page.locator('#sec-scorciatoie').screenshot({ path: join(SHOTS, 'preferenze-scorciatoie-rifiuto.png') });
   // #545.5: con Shift è lo stesso tasto della shell.
   await premi(app, 'T', ['control', 'shift']);
   await expect(errore).toContainText('Ctrl+Shift+T');
@@ -102,19 +105,35 @@ test('in Preferenze Traduci si cambia premendo i tasti; un tasto preso o di un\'
     return (t.view.webContents._filoRegistraTastiFino || 0) > Date.now();
   })).toBe(false);
 
-  mkdirSync(SHOTS, { recursive: true });
-  await page.locator('#sec-scorciatoie').scrollIntoViewIfNeeded();
   await page.locator('#sec-scorciatoie').screenshot({ path: join(SHOTS, 'preferenze-scorciatoie.png') });
+  await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'scuro' }, { sender: null }));
+  await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark');
+  await page.locator('#sec-scorciatoie').screenshot({ path: join(SHOTS, 'preferenze-scorciatoie-scuro.png') });
+  await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'IMPOSTA_PREFERENZA', chiave: 'tema', valore: 'chiaro' }, { sender: null }));
 
   // Esc lascia quella di prima.
   await tastiDellaRiga(page, 'explain-selection').click();
   await premi(app, 'Escape');
   await expect(tastiDellaRiga(page, 'explain-selection')).toHaveText('Alt+E');
 
-  // ↺ la rimette com'era.
-  await riga.locator('.sc-ripristina').click();
+  // Tasto destro sulla riga: cambiarla e rimetterla, come i tasti della riga.
+  await tastiDellaRiga(page, 'translate-selection').click({ button: 'right' });
+  const voci = page.locator('.sn-menu .sn-menu-item');
+  await expect(voci.filter({ hasText: 'Cambia la scorciatoia di «Traduci»' })).toHaveCount(1);
+  await voci.filter({ hasText: 'Rimetti Alt+T' }).click();
   await expect(tastiDellaRiga(page, 'translate-selection')).toHaveText('Alt+T');
   await expect.poll(async () => (await scelte(app))['translate-selection']).toBe('');
+
+  // ↺ e «Ripristina i tasti di serie».
+  expect((await chiedi(app, 'Aiuto: Alt+Shift+K')).executed).toBe(true);
+  await expect(tastiDellaRiga(page, 'open-help-sidebar')).toHaveText('Alt+Shift+K');
+  await page.locator('#scorciatoieFilo .sc-riga[data-azione="open-help-sidebar"] .sc-ripristina').click();
+  await expect(tastiDellaRiga(page, 'open-help-sidebar')).toHaveText('Alt+H');
+  expect((await chiedi(app, 'Spiega: Alt+Shift+E')).executed).toBe(true);
+  await expect(tastiDellaRiga(page, 'explain-selection')).toHaveText('Alt+Shift+E');
+  await page.locator('#scorciatoieRipristina').click();
+  await expect(tastiDellaRiga(page, 'explain-selection')).toHaveText('Alt+E');
+  await expect.poll(async () => Object.values(await scelte(app)).filter(Boolean)).toEqual([]);
 });
 
 test('cambiata Traduci, la nuova funziona su un sito e su una pagina interna e la vecchia arriva alla pagina', async ({ app, openTab, testServer }) => {
@@ -171,38 +190,46 @@ test('il menu del tasto destro e Altro dicono il tasto scelto; un tasto preso ch
   await expect(altro.locator('#shortcutsList')).toContainText('Alt+H — Aiuto');
 });
 
-test('la scorciatoia scelta resta dopo aver chiuso e riaperto Filo', async () => {
+test('la scorciatoia scelta resta dopo aver chiuso e riaperto Filo', async ({ testServer }) => {
   const userData = cartellaTemporanea('filo-scorciatoie-');
   const lancia = async () => {
     const app = await electron.launch({
       args: [...argomentiScala, '.'], cwd: APP_ROOT,
       env: { ...process.env, FILO_USER_DATA: userData, FILO_TEST_ACCOLTO: '1', NODE_ENV: 'test' },
     });
-    await primaFinestra(app);
-    return app;
+    const shell = await primaFinestra(app);
+    return { app, shell };
   };
-  let app = await lancia();
+  const apri = async ({ app, shell }) => {
+    const url = testServer.html(TESTO);
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => {
+      page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
+      return !!page;
+    }, { timeout: 20_000 }).toBe(true);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 20_000 });
+    return page;
+  };
+  let filo = await lancia();
   try {
-    await expect.poll(() => app.evaluate(() => typeof globalThis.SN_EXECUTE_FILO_ACTION)).toBe('function');
-    expect((await chiedi(app, 'Traduci: Ctrl+Shift+Y')).executed).toBe(true);
-    await expect.poll(async () => (await scelte(app))['translate-selection']).toBe('Ctrl+Shift+Y');
+    await expect.poll(() => filo.app.evaluate(() => typeof globalThis.SN_EXECUTE_FILO_ACTION)).toBe('function');
+    expect((await chiedi(filo.app, 'Traduci: Ctrl+Shift+Y')).executed).toBe(true);
+    await expect.poll(async () => (await scelte(filo.app))['translate-selection']).toBe('Ctrl+Shift+Y');
   } finally {
-    await app.close();
+    await filo.app.close();
   }
-  app = await lancia();
+  filo = await lancia();
   try {
-    // Al riavvio il main ascolta la scelta salvata, prima di qualunque visita alle Preferenze.
-    const ascolta = await app.evaluate(() => {
-      const { comandoDaTasto } = require(require('node:path').join(process.cwd(), 'src', 'main', 'shortcuts.js'));
-      const p = (key, mods) => ({ type: 'keyDown', key, code: `Key${key.toUpperCase()}`, alt: false, control: false, meta: false, shift: false, ...mods });
-      return {
-        nuova: comandoDaTasto(p('Y', { control: true, shift: true }), 'win32'),
-        vecchia: comandoDaTasto(p('t', { alt: true }), 'win32'),
-      };
-    });
-    expect(ascolta).toEqual({ nuova: 'translate-selection', vecchia: null });
+    const page = await apri(filo);
+    await page.locator('#testo').click();
+    await seleziona(page, '#testo');
+    await premi(filo.app, 'T', ['alt']);
+    await expect.poll(() => page.evaluate(() => window.__visti)).toContain('t');
+    await premi(filo.app, 'Y', ['control', 'shift']);
+    await expect.poll(() => titolo(filo.app, page), { timeout: 8000 }).toBe('Traduzione');
   } finally {
-    await app.close();
+    await filo.app.close();
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 });

@@ -364,6 +364,12 @@
       return `${l.length} ${l.length === 1 ? 'voce' : 'voci'}${trovati ? `${trovati}; elenco` : ''}: ${l.slice(0, MAX_ELENCO).join(', ')}${altri}`;
     }
     if (voce && voce.testo) return String(v || '').trim() ? `«${String(v).trim()}»` : 'nessuno';
+    // Una scorciatoia di Filo vuota è quella di serie: si dice quale, coi tasti di chi chiede (#842).
+    if (percorso.startsWith('scorciatoie.') && global.SN_TASTI) {
+      const T = global.SN_TASTI;
+      const a = T.AZIONI_FILO.find((x) => `scorciatoie.${x.id}` === percorso);
+      if (a) return typeof v === 'string' && v ? T.etichettaFilo(v, sistema || undefined) : `${T.etichettaFilo(a.serie, sistema || undefined)} (di serie)`;
+    }
     if (percorso === 'terminal.shell' && sistema && sistema !== 'win32' && !['bash', 'sh'].includes(v)) return 'shell di sistema (sh)';
     if (percorso === 'aggiornamenti.installa') {
       const A = global.SN_AGGIORNAMENTI;

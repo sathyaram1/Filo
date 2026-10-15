@@ -31,7 +31,8 @@
     .sc-lista { display: flex; flex-direction: column; gap: 2px; max-width: 620px; }
     .sc-riga {
       display: grid;
-      grid-template-columns: 150px minmax(0, 1fr) 28px;
+      grid-template-columns: 150px auto 28px;
+      justify-content: start;
       align-items: center;
       column-gap: 10px;
       padding: 4px 0;

@@ -721,8 +721,9 @@
   }
 
   // Perché `accel` (nella forma salvata) non può diventare la scorciatoia
-  // dell'azione `id`, o null.
-  function rifiutoScorciatoiaFilo(id, accel, esplicita) {
+  // dell'azione `id`, o null. `altre`: le scorciatoie delle altre azioni da
+  // confrontare (id → combinazione), se non sono quelle in uso.
+  function rifiutoScorciatoiaFilo(id, accel, esplicita, altre) {
     const r = rifiutoScritta(accel, esplicita, { senzaFilo: true });
     if (r) return { ...r, nome: etichettaFilo(accel, esplicita) };
     const f = forma(accel);
@@ -732,7 +733,8 @@
     if (piattaforma(esplicita) === 'win32' && mods.includes('c') && mods.includes('a') && [...f.slice(f.indexOf('|') + 1)].length === 1) {
       return { tipo: 'altgr', nome };
     }
-    const altra = AZIONI_FILO.find((a) => a.id !== id && forma(scorciatoiaFilo(a.id)) === f);
+    const di = (x) => (altre && typeof altre[x] === 'string' ? altre[x] : scorciatoiaFilo(x));
+    const altra = AZIONI_FILO.find((a) => a.id !== id && forma(di(a.id)) === f);
     if (altra) return { tipo: 'filo', nome, azione: altra.nome };
     const usata = USATI_NELLE_PAGINE.find(([x]) => forma(x) === f);
     if (usata) return { tipo: 'presa', nome, cosa: usata[1] };
