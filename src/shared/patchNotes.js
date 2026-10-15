@@ -16,6 +16,7 @@
         'Nel Deck builder MTG il calcolatore di probabilità ti lascia scegliere la partita (a più giocatori, oppure a due iniziando tu o l\'avversario), quante volte rifai la mano e cosa deve avere per tenerla, e le carte che peschi in più. Puoi dirlo anche in chat, per esempio «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre».',
       ],
       fixes: [
+        'Quando Filo riordina le schede per colore, i siti bianchi come Wikipedia vanno in testa e quelli neri come GitHub dopo l\'ultimo colore. Prima finivano in coda, mescolati alle schede senza icona. Ogni giorno della Cronologia segue lo stesso ordine.',
         'Nel Deck builder MTG il calcolatore di probabilità conta la pescata del primo turno, come in una partita Commander vera, e il mulligan mette le carte in fondo al mazzo come vuole la regola attuale. Prima le probabilità uscivano più basse del vero.',
         'Chiedi a Filo «mi protegge dai siti truffa?» o «come tolgo questo avviso?» e ti risponde con quello che fa davvero: cosa controlla, i due livelli di avviso, cosa esce dal computer e dove si spegne. Le descrizioni nella pagina Sicurezza adesso dicono la stessa cosa.',
       ],
