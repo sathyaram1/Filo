@@ -1074,10 +1074,10 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     const buone = {};
     for (const a of T.AZIONI_FILO) {
       if (!Object.prototype.hasOwnProperty.call(partial.scorciatoie, a.id)) continue;
+      // Arriva già nella forma salvata (Ctrl vale Cmd anche su Mac): non si rilegge come una frase detta.
       const v = partial.scorciatoie[a.id];
-      const d = typeof v === 'string' && v.trim() ? T.scorciatoiaDaScritta(v) : null;
       if (!v) buone[a.id] = '';
-      else if (d && d.accel && !T.rifiutoScorciatoiaFilo(a.id, d.accel)) buone[a.id] = T.valoreDaSalvare(a.id, d.accel);
+      else if (typeof v === 'string' && v.length <= 80 && !T.rifiutoScorciatoiaFilo(a.id, v)) buone[a.id] = T.valoreDaSalvare(a.id, v);
       else console.warn('[Filo] scorciatoia non salvata', a.id, String(v).slice(0, 40));
     }
     partial = { ...partial, scorciatoie: buone };
