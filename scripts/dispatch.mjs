@@ -2211,8 +2211,12 @@ if (isMainModule) {
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
       if (seg.error) { console.error(seg.error); process.exit(1); }
-      const ferma = seg.args.includes('--ferma');
-      const [, id, ...rest] = seg.args.filter((a) => a !== '--ferma');
+      const liv = stripLivelloArgs(seg.args);
+      if (liv.error) { console.error(liv.error); process.exit(1); }
+      const livSeg = livelloSegnalazione({ livello: liv.livello, difficile: liv.difficile, conSegnalazione: !!seg.file });
+      if (!livSeg.ok) { console.error(livSeg.message); process.exit(1); }
+      const ferma = liv.args.includes('--ferma');
+      const [, id, ...rest] = liv.args.filter((a) => a !== '--ferma');
       if (!id) { console.error('Uso: --record-fixed <id> ["report"] [--frase "…"] [--segnala <file.md>]'); process.exit(1); }
       const senza = fermaSenzaSegnalazione(ferma, seg.file);
       if (senza) { console.error(senza); process.exit(1); }
