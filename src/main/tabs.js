@@ -3585,7 +3585,8 @@ class TabManager {
         title: t.title,
         url: t.url,
         favicon: t.favicon,
-        loading: t.loading,
+        // In coda la pagina non è pronta (le anteprime aspettano) ma non sta caricando: niente rotella (#1127).
+        loading: t.loading && !t._rinviata,
         canBack: t.canBack,
         canFwd: t.canFwd,
         muted: !!t.muted,
