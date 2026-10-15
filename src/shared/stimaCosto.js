@@ -139,11 +139,11 @@
       const modelli = r.modelli && typeof r.modelli === 'object' ? r.modelli : {};
       const m = modelli[model] || { n: 0, usd: 0 };
       const n = Math.min((Number(m.n) || 0) + 1, FINESTRA);
+      // In coda l'ultimo usato: oltre dieci modelli esce quello usato meno di recente.
+      delete modelli[model];
       modelli[model] = { n, usd: (Number(m.usd) || 0) + (spesa - (Number(m.usd) || 0)) / n };
-      // Una funzione a consumo non cambia modello spesso: si tengono gli ultimi dieci usati.
       const nomi = Object.keys(modelli);
       if (nomi.length > 10) delete modelli[nomi[0]];
-      if (nomi.length > 10) delete modelli[model] && (modelli[model] = { n, usd: m.usd });
       r.modelli = modelli;
     }
     reg[action] = r;
