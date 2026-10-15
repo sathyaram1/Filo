@@ -135,8 +135,16 @@ describe('quello che non deve entrare nella pagina', () => {
   });
 });
 
-/** Una release finta: gh legge e scrive il suo testo come farebbe con quella vera. */
-function releaseFinta({ corpo = '', bozza = false, dopoScrittura, falliscePrime = 0 } = {}) {
+const CONTENUTI = {
+  'Filo-Setup.exe': 'installer windows',
+  'Filo-Mac.dmg': 'disco mac',
+  'Filo-Mac.zip': 'pacchetto mac',
+  'Filo-Linux.AppImage': 'appimage linux',
+};
+const allegatiDi = (contenuti) => Object.entries(contenuti).map(([name, c]) => ({ name, digest: `sha256:${sha(c)}` }));
+
+/** Una release finta: gh legge e scrive il suo testo come farebbe con quella vera, e risponde solo coi campi chiesti. */
+function releaseFinta({ corpo = '', bozza = false, dopoScrittura, falliscePrime = 0, allegati = allegatiDi(CONTENUTI) } = {}) {
   const stato = { corpo, bozza, scritture: 0, chiamate: [] };
   let fallimenti = falliscePrime;
   const gh = (args) => {
