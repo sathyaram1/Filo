@@ -141,7 +141,7 @@ test('eseguiGitServer: token negato, guasto, git che fallisce, origin estraneo',
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(URL_SERVER), scrivi, token: async () => ({ outcome: 'fault', reason: 'http_503' }) }), 3);
     righe = [];
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(URL_SERVER, 128), scrivi, token: async () => ({ outcome: 'ok', token: TOKEN }) }), 1);
-    assert.match(righe.join('\n'), /git è uscito con 128[^]*GitHub l'ha respinto/);
+    assert.match(righe.join('\n'), /git è uscito con 128[^]*a GitHub non è arrivato buono/);
     righe = [];
     const estraneo = 'https://x-access-token:SEGRETO@example.com/filo-security.git';
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(estraneo), scrivi, token: async () => { chiamato = true; return { outcome: 'ok', token: TOKEN }; } }), 1);

@@ -478,8 +478,10 @@ vale per tutti i compiti di quel tipo.
 
   Un token di applicazione GitHub dura al massimo un'ora: è un limite di
   GitHub, non una scelta. Per il worker vale **finché il lavoro serve**:
-  - git chiede il token a un aiutante di credenziali (`biglietto.mjs token`),
-    che ne chiede uno nuovo al server quando quello vecchio sta per scadere;
+  - ogni git che parla con GitHub passa da un comando fisso del canale
+    (`routine-channel.mjs git-server`, #1233), che chiede il token al server e
+    lo dà solo a quella chiamata: niente aiutante di credenziali, che il
+    controllo dei permessi della sessione cloud blocca;
   - il worker non se ne accorge;
   - alla chiusura del biglietto il server revoca il token in corso.
 

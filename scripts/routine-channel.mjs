@@ -874,7 +874,7 @@ export async function eseguiGitServer({
   const r = lancia(piano.argv, { env: figlio, stdio: 'inherit' });
   if (r && r.error) { scrivi(`git-server: git non parte (${r.error.code || r.error.message}).`); return 1; }
   if (!r || r.status !== 0) {
-    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, legato a ${URL_SERVER}: se git parla di autenticazione o di repository non trovato, GitHub l'ha respinto.`);
+    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, legato a ${URL_SERVER}: se git parla di autenticazione o di repository non trovato, a GitHub non è arrivato buono (respinto, o sostituito dal proxy della sessione con le credenziali sue: #1233).`);
     return 1;
   }
   return 0;

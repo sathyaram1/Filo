@@ -22,8 +22,8 @@ node "<CANALE>" git-server push "<CLONE>" <ramo>
 
 Uscita 4: il server non ha dato il token, e il motivo è stampato (biglietto sporco o chiuso, feedback non fidato, ramo
 del server scritto fuori registro, GitHub che non risponde). Uscita 1 dopo «git è uscito con»: l'errore di git sta
-sopra; se parla di autenticazione o di repository non trovato, il token c'era e GitHub l'ha respinto. Se è il
-controllo dei permessi della sessione a bloccare il comando, copia nelle note il suo messaggio esatto. Non aggirare nessuno di questi no: niente token scritti nell'URL, niente aiutanti di credenziali, niente altre
+sopra; se parla di autenticazione o di repository non trovato, il token c'era ma a GitHub non è arrivato buono. Se è
+il controllo dei permessi della sessione a bloccare il comando, copia nelle note il suo messaggio esatto. Non aggirare nessuno di questi no: niente token scritti nell'URL, niente aiutanti di credenziali, niente altre
 credenziali. La parte del server da qui non si fa:
 
 - se fai il primo lavoro o correggi, rimanda la pratica in locale con la consegna che trovi più su, nella
