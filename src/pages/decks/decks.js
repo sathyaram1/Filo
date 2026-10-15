@@ -156,6 +156,10 @@
 
   async function route() {
     const r = parseRoute();
+    // Una rinomina dalla libreria si salva prima che il banco di lavoro rilegga il mazzo, o lo riscriverebbe col nome vecchio.
+    if (libRename) libRename.finish(true);
+    await libSaving;
+    if (r.screen !== 'library') libPriceToken++;
     if (r.screen === 'builder') {
       const [res] = await Promise.all([send({ type: MSG.DECKS_GET, id: r.id }), ensureChatLoaded(r.id)]);
       if (!res || !res.ok) { location.hash = '#/'; return; }
@@ -185,6 +189,73 @@
     const res = await send({ type: MSG.DECKS_LIST });
     decks = Decks.sortForLibrary((res && res.decks) || []);
     renderLibrary();
+    loadLibraryPrices();
+  }
+
+  // Prezzo totale sulla scheda (§10): stesso conto e formato del pannello statistiche (budgetInfo, fmtEur).
+  // Prima la cache, poi i prezzi freschi dietro, senza far aspettare la griglia (#380).
+  const PRICE_CHUNK = 25;
+  let libPricesRead = false; // prima della cache la scheda tace: «n.d.» direbbe che il prezzo manca, non che arriva
+  let libPriceToken = 0;
+
+  function deckCardIds(deck) {
+    const ids = deck.carte.map((c) => c.scryfall_id);
+    if (deck.commander) ids.push(deck.commander);
+    return ids;
+  }
+
+  function paintPrice(slot, deck) {
+    if (!libPricesRead) return;
+    const b = Stats.budgetInfo(deck, cardsById);
+    const carte = (n) => `${n} cart${n === 1 ? 'a' : 'e'}`;
+    if (b.missing && !b.total) {
+      slot.textContent = 'prezzo n.d.';
+      slot.title = `Prezzo non noto per ${carte(b.missing)}`;
+    } else if (b.missing) {
+      slot.textContent = `≥ ${fmtEur(b.total)}`;
+      slot.title = `Totale parziale: ${carte(b.missing)} senza prezzo noto`;
+    } else {
+      slot.textContent = fmtEur(b.total);
+      slot.title = 'Prezzo totale del mazzo';
+    }
+    slot.dataset.missing = String(b.missing);
+  }
+
+  function paintLibraryPrices() {
+    for (const el of $('deckGrid').querySelectorAll('[data-deck-id]')) {
+      const deck = decks.find((d) => d.id === el.dataset.deckId);
+      const slot = el.querySelector('.dk-price');
+      if (deck && slot) paintPrice(slot, deck);
+    }
+  }
+
+  // I freschi vanno mazzo per mazzo nell'ordine della griglia e a pezzi: lasciata la libreria il giro si ferma al
+  // pezzo dopo, invece di occupare Scryfall con mazzi che nessuno sta guardando.
+  async function loadLibraryPrices() {
+    const token = ++libPriceToken;
+    const live = () => token === libPriceToken;
+    const all = [...new Set(decks.flatMap(deckCardIds))];
+    if (all.length) {
+      const r = await send({ type: MSG.SCRYFALL_CARDS, ids: all, cacheOnly: true }).catch(() => null);
+      if (!live()) return;
+      Object.assign(cardsById, (r && r.ok && r.cards) || {});
+    }
+    libPricesRead = true;
+    paintLibraryPrices();
+    const seen = new Set();
+    for (const deck of decks) {
+      const ids = deckCardIds(deck).filter((id) => !seen.has(id));
+      ids.forEach((id) => seen.add(id));
+      for (let i = 0; i < ids.length; i += PRICE_CHUNK) {
+        if (!live()) return;
+        const r = await send({ type: MSG.SCRYFALL_CARDS, ids: ids.slice(i, i + PRICE_CHUNK), freshPrices: true }).catch(() => null);
+        if (!live()) return;
+        if (r && r.ok && r.cards) {
+          Object.assign(cardsById, r.cards);
+          paintLibraryPrices();
+        }
+      }
+    }
   }
 
   function pipsHtml(deck) {
@@ -213,6 +284,7 @@
           <div class="dk-meta">
             ${pipsHtml(deck)}
             <span>${Decks.deckCount(deck)}/100</span>
+            <span class="dk-price"></span>
             <span style="margin-left:auto">${esc(dateStr)}</span>
           </div>
         </div>
@@ -223,9 +295,73 @@
     const grid = $('deckGrid');
     grid.innerHTML = decks.map(deckCardHtml).join('');
     $('deckEmpty').hidden = decks.length > 0;
+    paintLibraryPrices();
   }
 
-  // ── Menu contestuale sulla card (duplica / elimina) ────────────────────────
+  function libraryCardEl(id) {
+    return [...$('deckGrid').querySelectorAll('[data-deck-id]')].find((el) => el.dataset.deckId === id) || null;
+  }
+
+  // Rinomina dalla libreria: un campo al posto del titolo, come nel banco di lavoro (Invio o uscita salvano, Esc
+  // annulla). La scheda resta al suo posto: il riordino per data aspetta il prossimo giro della libreria (#509).
+  let libRename = null;
+  let libSaving = Promise.resolve();
+
+  function renameFromLibrary(id) {
+    if (libRename) libRename.finish(true);
+    const cardEl = libraryCardEl(id);
+    const deck = decks.find((d) => d.id === id);
+    if (!cardEl || !deck) return;
+    const title = cardEl.querySelector('.sn-card-title');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'dk-card-rename';
+    input.setAttribute('aria-label', 'Rinomina il mazzo');
+    input.value = deck.nome;
+    title.hidden = true;
+    title.after(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (commit) => {
+      if (done) return;
+      done = true;
+      libRename = null;
+      const refocus = document.activeElement === input;
+      const nome = input.value;
+      input.remove();
+      title.hidden = false;
+      if (commit) libSaving = libSaving.then(() => saveLibraryName(id, nome, refocus)).catch(() => {});
+      else if (refocus) cardEl.focus();
+    };
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    libRename = { finish };
+  }
+
+  // Si rinomina il mazzo salvato, non la riga della griglia: quella può essere più vecchia di una modifica fatta altrove.
+  async function saveLibraryName(id, nome, refocus) {
+    const r = await send({ type: MSG.DECKS_GET, id });
+    if (!r || !r.ok) return;
+    const next = Decks.renameDeck(r.deck, nome);
+    if (next === r.deck) return;
+    const res = await send({ type: MSG.DECKS_UPDATE, deck: next });
+    if (!res || !res.ok) { showToast('Rinomina non riuscita.'); return; }
+    const i = decks.findIndex((d) => d.id === id);
+    if (i >= 0) decks[i] = res.deck;
+    const old = libraryCardEl(id);
+    if (!old) return;
+    old.insertAdjacentHTML('afterend', deckCardHtml(res.deck));
+    const fresh = old.nextElementSibling;
+    old.remove();
+    paintPrice(fresh.querySelector('.dk-price'), res.deck);
+    if (refocus) fresh.focus();
+  }
+
+  // ── Menu contestuale sulla card (duplica / esporta / rinomina / elimina) ───
   // Stesso pattern dell'archivio: popup .sn-select-pop posizionato fixed alle
   // coordinate del click, chiuso al primo click fuori / Escape.
 
@@ -1522,7 +1658,7 @@
     return box.querySelector('.dk-io-body');
   }
 
-  function openExportDialog() {
+  function openExportDialog(deckId) {
     const body = buildIoOverlay('Esporta mazzo');
     body.innerHTML = `
       <textarea class="dk-io-textarea" readonly rows="14">(generazione…)</textarea>
@@ -1531,7 +1667,7 @@
         <button class="dk-io-btn dk-io-btn-ok" data-io="copy">Copia</button>
       </div>`;
     const ta = body.querySelector('textarea');
-    send({ type: MSG.DECKS_EXPORT, id: current.id }).then((r) => {
+    send({ type: MSG.DECKS_EXPORT, id: deckId }).then((r) => {
       ta.value = (r && r.ok) ? r.text : 'Non riuscito a generare la lista.';
       ta.focus();
       ta.select();
@@ -2201,7 +2337,7 @@
       if (r && r.ok) location.hash = `#/deck/${encodeURIComponent(r.deck.id)}`;
     });
     add('Importa…', () => openImportDialog(), 'dk-sw-sep');
-    add('Esporta…', () => openExportDialog());
+    add('Esporta…', () => openExportDialog(current.id));
     add('Rinomina…', () => startEdit('deckNameEdit', current.nome, async (v) => {
       await saveDeck(Decks.renameDeck(current, v));
     }));
@@ -2279,22 +2415,30 @@
     $('gameBack').addEventListener('click', () => { location.hash = '#/'; });
 
     const grid = $('deckGrid');
+    // Dentro il campo della rinomina clic, Invio e spazio sono del campo, non della scheda che apre il mazzo.
+    const inRename = (e) => !!e.target.closest('.dk-card-rename');
     grid.addEventListener('click', (e) => {
+      if (inRename(e)) return;
       const card = e.target.closest('[data-deck-id]');
       if (card) location.hash = `#/deck/${encodeURIComponent(card.dataset.deckId)}`;
     });
     grid.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (inRename(e)) return;
       const card = e.target.closest('[data-deck-id]');
       if (card) { e.preventDefault(); location.hash = `#/deck/${encodeURIComponent(card.dataset.deckId)}`; }
     });
+    // Le stesse azioni del menu del mazzo nel banco di lavoro, con lo stesso dialogo d'esportazione.
     grid.addEventListener('contextmenu', (e) => {
+      if (inRename(e)) return;
       const card = e.target.closest('[data-deck-id]');
       if (!card) return;
       e.preventDefault();
       const id = card.dataset.deckId;
       openCtx(e.clientX, e.clientY, [
         { label: 'Duplica', run: () => duplicateDeck(id) },
+        { label: 'Esporta…', run: () => openExportDialog(id) },
+        { label: 'Rinomina…', run: () => renameFromLibrary(id) },
         { label: 'Elimina…', run: () => deleteDeck(id) },
       ]);
     });
