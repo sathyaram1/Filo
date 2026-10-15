@@ -271,8 +271,10 @@ test('describeConditions: le condizioni dette a parole, la partita sempre', () =
   assert.equal(
     S.describeConditions({ game: 'draw', mulligans: 1, keep: [{ tag: 'Terre', n: 2 }], extraDraws: 1 }),
     'partita a due, inizia l\'altro; fino a 1 mulligan se la mano non ha almeno 2 terre; 1 pescata extra');
-  // Un mulligan senza mano da tenere non cambia niente, e non si racconta.
-  assert.equal(S.describeConditions({ mulligans: 2, extraDraws: 3 }), 'partita a più giocatori; 3 pescate extra');
+  // Un mulligan senza mano da tenere non cambia niente: si dice, non sparisce.
+  assert.equal(S.describeConditions({ mulligans: 2, extraDraws: 3 }),
+    'partita a più giocatori; mulligan non contati: dimmi che mano terresti; 3 pescate extra');
+  assert.deepEqual(S.DEFAULT_KEEP, [{ tag: S.LAND_TAG, n: 2 }]);
 });
 
 test('simulate: il mulligan con regola di keep alza la probabilità', () => {
