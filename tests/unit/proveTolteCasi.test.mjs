@@ -449,7 +449,7 @@ test('le due pulizie, locale e routine, rilanciano le prove toccate prima di reg
   assert.match(locale, /controllaCasiDellaPulizia\(\{ shaCritica: controllo\.prima \|\| aperto\.pending\.sha, sha: controllo\.sha, root: ROOT/);
   assert.match(routine, /controllaCasiDellaPulizia\(\{\s*shaCritica: controllo\.prima \|\| st\.verifierSha, sha: controllo\.sha, root: ROOT/);
   // Dopo le correzioni la pulizia si confronta col commit prima di lei, e anche un caso verde da correggere non esce (#747).
-  assert.match(`${locale}\n${routine}`.replace(/\s+/g, ' '), /(?:[^]*dopo: !!controllo\.dopo){2}/);
+  for (const testo of [locale, routine]) assert.match(testo, /controllaCasiDellaPulizia\(\{[^}]*dopo: !!controllo\.dopo/);
 });
 
 function esegui(script, argv, env, cwd) {
