@@ -144,6 +144,7 @@
   // Le funzioni che hanno un modello scelto da chi usa Filo, coi nomi con cui si possono dire: quello delle Opzioni,
   // quello del censimento, l'id. «chat» da sola è la chat con Filo: è quella che si intende quasi sempre.
   function funzioniConModello() {
+    if (!global.SN_MODEL_USAGE && typeof require === 'function') require('./modelUsage.js');
     const U = global.SN_MODEL_USAGE;
     if (!U || typeof U.list !== 'function') return [];
     const MC = global.SN_MODEL_CHAIN;
@@ -1103,7 +1104,7 @@
         if (predefinito(v)) n = 5;
         if (!Number.isFinite(n) || n < 0) return null;
         n = Math.min(1000, n);
-        const volte = n.toLocaleString('it-IT', { maximumFractionDigits: 1 });
+        const volte = n.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: 1 });
         return {
           partial: { costoModelli: { soglia: n } },
           label: n > 0 ? `Avviso sui modelli costosi → oltre ${volte} volte il predefinito` : 'Avviso sui modelli costosi → mai',

@@ -13,6 +13,7 @@
       features: [
         'Ogni versione di Filo su GitHub ha una sezione «Verifica» con l\'impronta di ogni file da scaricare e il link alla costruzione pubblica che l\'ha prodotto. Se il file che hai scaricato ha la stessa impronta, è quello costruito dal codice pubblico.',
         'Nella schermata Mazzi ogni mazzo mostra quanto costa in tutto, senza doverlo aprire. Se di qualche carta il prezzo non è noto, davanti al totale c\'è «≥». Col tasto destro su un mazzo lo puoi anche esportare come lista o rinominare, oltre a duplicarlo ed eliminarlo.',
+        'Quando scegli il modello di una funzione, accanto a ogni modello vedi quanto costa usarla, per esempio «≈ 3 crediti» per un messaggio in chat. Se scegli un modello che costa molto più di quello predefinito, sotto compare quanti messaggi ti bastano i crediti che hai. Puoi cambiare il modello anche chiedendolo a Filo, e la risposta ti dice le stesse cifre. Con una tua chiave OpenRouter vedi il costo in dollari.',
         'Nel Deck builder MTG il calcolatore di probabilità ti lascia scegliere la partita (a più giocatori, oppure a due iniziando tu o l\'avversario), quante volte rifai la mano e cosa deve avere per tenerla, e le carte che peschi in più. Puoi dirlo anche in chat, per esempio «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre».',
       ],
       fixes: [

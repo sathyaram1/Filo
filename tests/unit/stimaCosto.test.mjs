@@ -51,7 +51,8 @@ test('senza un prezzo dal listino non esce nessuna cifra, nemmeno per un modello
   const v = S.valuta(A.FILO_CHAT, 'haiku', REG, ctx());
   assert.equal(v.ok, false);
   assert.equal(v.breve, 'prezzo non noto');
-  assert.doesNotMatch(v.testo, /\d/);
+  assert.equal(v.valore, undefined);
+  assert.doesNotMatch(v.testo, /credit|\$/);
   const senza = S.valuta(A.FILO_CHAT, 'opus', REG, ctx({ listino: null }));
   assert.equal(senza.ok, false);
   assert.equal(senza.motivo, 'listino');
@@ -157,7 +158,29 @@ test('chat: «Chat con Filo: opus» cambia il modello di quella funzione sola, e
   // Una funzione che non c'è: rifiuto, e al modello l'elenco dei nomi giusti.
   const no = P.buildPreferencePartial('modello_funzione', 'Calcolatrice: opus');
   assert.ok(no.rifiuto);
-  assert.match(no.perModello, /Chat con Filo/);
+  assert.match(no.perModello, /chat con Filo/);
   assert.deepEqual(P.buildPreferencePartial('avviso_modelli_costosi', 'mai').partial, { costoModelli: { soglia: 0 } });
   assert.deepEqual(P.buildPreferencePartial('avviso modelli costosi', '10').partial, { costoModelli: { soglia: 10 } });
+});
+
+test('registro d\'uso: le chiamate di un messaggio in chat (giri di strumenti) fanno un campione solo', async () => {
+  const backing = {};
+  globalThis.chrome = { storage: { local: {
+    async get(key) { return { [key]: backing[key] }; },
+    async set(obj) { Object.assign(backing, obj); },
+  } } };
+  require(join(ROOT, 'src', 'main', 'services', 'creditStore.js'));
+  require(join(ROOT, 'src', 'main', 'services', 'costTracker.js'));
+  const Costs = globalThis.SN_COSTS;
+  const giro = (p, c) => Costs.record({ action: A.FILO_CHAT, provider: 'openrouter', model: 'm', usage: { promptTokens: p, completionTokens: c } });
+  await Costs.unUso(A.FILO_CHAT, async () => { await giro(5000, 100); await giro(6000, 300); });
+  let reg = await Costs.registroToken();
+  assert.equal(reg[A.FILO_CHAT].n, 1);
+  assert.equal(reg[A.FILO_CHAT].prompt, 11000);
+  assert.equal(reg[A.FILO_CHAT].completion, 400);
+  // Fuori da un uso, ogni chiamata è un campione.
+  await Costs.record({ action: A.EXPLAIN, provider: 'openrouter', model: 'm', usage: { promptTokens: 800, completionTokens: 90 } });
+  reg = await Costs.registroToken();
+  assert.equal(reg[A.EXPLAIN].n, 1);
+  assert.equal(reg[A.FILO_CHAT].n, 1);
 });

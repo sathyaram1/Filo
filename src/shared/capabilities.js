@@ -541,8 +541,14 @@
     {
       id: 'options-models', title: 'Modelli e chiavi AI', category: 'settings',
       desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile, che ferma ogni chiamata ai modelli: anche quelle che Filo fa da solo, come il controllo dei siti pericolosi o il riconoscimento dei blocchi geografici, e le prove delle Opzioni. Puoi anche affidarti ai modelli predefiniti di Filo.',
-      invoke: 'Menu del tasto destro → "Opzioni Filo", oppure filo://options/options.html.',
-      doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo.',
+      invoke: 'Menu del tasto destro → "Opzioni Filo", oppure filo://options/options.html. Il modello di una funzione si cambia anche chiedendolo a Filo ("usa claude per la chat"), se usi i tuoi modelli e non quelli predefiniti.',
+      doesNot: 'Le chiavi sono salvate cifrate in locale. Nessuna funzione usa un modello che non hai impostato: se a una funzione manca il modello, o punta a uno che non esiste, quella funzione si ferma e lo segnala quando la usi — non ne sceglie uno per conto suo. Con i modelli predefiniti il modello di ogni funzione lo sceglie Filo, e dalla chat non si cambia.',
+    },
+    {
+      id: 'model-cost-estimate', title: 'Quanto costa un modello', category: 'settings',
+      desc: 'Accanto a ogni modello di ogni funzione c’è quanto costa un uso tipico, per esempio «≈ 3 crediti» per un messaggio in chat: viene dal listino di OpenRouter e da quanti token usa in media quella funzione quando la usi tu (finché non l’hai usata abbastanza, da una media prudente). Passando il mouse sulla cifra c’è la spiegazione, e nella tendina dei modelli ognuno ha la sua cifra. Se il modello scelto costa più di cinque volte quello predefinito per la funzione, sotto compare una riga come «Con opus i tuoi 4.300 crediti bastano per circa 30 messaggi»: la scelta resta salvata, l’avviso informa e basta. Chiedendo il cambio di modello a Filo in chat, la conferma e la risposta dicono le stesse cifre. Con una tua chiave OpenRouter il costo è in dollari, senza avviso.',
+      invoke: 'Opzioni → modelli per funzione (con «Usa modelli predefiniti» spento), e Modelli predefiniti per chi gestisce Filo. La soglia dell’avviso sta in Opzioni → Costi o si cambia chiedendolo a Filo ("avvisami solo oltre 10 volte", "non avvisarmi dei modelli costosi").',
+      doesNot: 'Non inventa cifre: se il listino di OpenRouter non risponde, o non elenca quel modello, accanto c’è scritto. La voce e la dettatura si pagano a durata: la cifra compare dopo che le hai usate con quel modello. Non vende crediti e non avvisa quando stanno per finire.',
     },
     {
       id: 'open-weights-only', title: 'Solo modelli a pesi aperti', category: 'settings',
