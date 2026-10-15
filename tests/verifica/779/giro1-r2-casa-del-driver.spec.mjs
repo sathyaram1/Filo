@@ -1,5 +1,5 @@
 // Verifica #779 giro 1, rilievo 2: il driver vero tiene configurazione, identificativo e storico nella sua «casa»
-// (~/.cua-driver e la cartella di stato dell'utente) se nessuno gliela indica: spegnere deve toglierli, quindi deve stare
+// (~/.cua-driver) se nessuno gliela indica: spegnere deve toglierli, quindi deve stare
 // nella cartella del componente. Il driver finto scrive in FINTO_REGISTRO l'ambiente con cui parte.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
