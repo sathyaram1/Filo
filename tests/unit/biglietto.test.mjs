@@ -640,7 +640,7 @@ test('scadenza: i biglietti fermi da più di 30 giorni si chiudono e i file spar
       sporca: false, pulita: false, viva: true, padre: true, copia: false, corrente: true, lancia: true, storto: false, stortoNuovo: true, orfano: false,
     });
     assert.equal(existsSync(B.cartellaSporchi(bPulita)), false);
-    assert.equal(s.biglietti[SEGRETO('p')].chiuso, false, 'la copia scaduta di un figlio non chiude il biglietto del padre vivo');
+    assert.ok(!s.biglietti[SEGRETO('p')].chiuso, 'la copia scaduta di un figlio non chiude il biglietto del padre vivo');
     // Server giù: non toglie niente e si ferma al primo guasto; un biglietto che il server non conosce più se ne va.
     const giu1 = vecchio(scriviBiglietto(dir, 'giu-1', SEGRETO('x'), FP('7')));
     const giu2 = vecchio(scriviBiglietto(dir, 'giu-2', SEGRETO('y'), FP('8')));
