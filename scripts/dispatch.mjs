@@ -1675,7 +1675,7 @@ export async function run() {
   // leggere la coda, e leggere la coda vuole la chiave che apre TUTTI i
   // feedback — chiave che non vive più su queste macchine
   // (ROUTINE-AUTH-SPEC.md). Ci si ferma con un guasto DICHIARATO, non si
-  // ripiega sull'esplorazione: travestire un giro cieco da audit è già
+  // ripiega su un lavoro inventato: travestire un giro cieco da audit è già
   // costato un'ondata di lavoro fantasma.
   const ticket = readRoutineTicket(ROOT);
   if (!ticket) {
