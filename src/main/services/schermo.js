@@ -77,7 +77,7 @@ function scegli(voci, richiesta) {
 }
 
 function perElenco(voci) {
-  return voci.map((v) => ({ nome: v.nome, tipo: v.tipo, filo: !!v.filo }));
+  return voci.map((v) => ({ nome: v.nome, tipo: v.tipo, filo: !!v.filo, ...(v.davanti ? { davanti: true } : {}) }));
 }
 
 // Un'immagine tutta nera è quello che macOS dà senza permesso: non va al modello come se fosse la finestra.
