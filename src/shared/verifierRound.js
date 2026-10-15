@@ -529,7 +529,8 @@
    *     giro lo paga già il livello più alto, e un altro verificatore arriva
    *     comunque: decisione dell'owner del 2026-09-16) oppure se il suo
    *     bilancio ha ancora giri; altrimenti va nel feedback derivato;
-   *   - un 1 che chiede una decisione va nel feedback derivato;
+   *   - un 1 o uno 0 che chiede una decisione va nel feedback derivato, anche
+   *     col `!`: non si corregge, quindi non c'è niente da disfare;
    *   - gli 0 si correggono solo se nello stesso giro si corregge anche altro
    *     (un altro verificatore arriva comunque) oppure se l'owner ha dato
    *     giri al loro bilancio; altrimenti vanno nel feedback derivato;
@@ -539,11 +540,12 @@
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
    *     peggio di un errore (decisione del 2026-09-16).
    *
-   * Contano i rilievi interni (sede `i`) e i vicini (sede `v`), questi ultimi
-   * come livello 0 qualunque sia il livello scritto: entrano in una correzione
-   * che parte comunque, da soli la fanno partire solo col bilancio `cap0`, e
-   * un `v?` va da parte come uno 0 col `?`. Gli esterni non entrano in
-   * nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
+   * Le regole sopra valgono per gli interni (sede `i`), i soli che fanno
+   * partire un giro o lo fermano. Un vicino (sede `v`) entra nella correzione
+   * solo se il giro parte comunque per gli interni, e non paga nessun
+   * bilancio; altrimenti va nel feedback derivato col livello scritto, e così
+   * un vicino col `?` (decisione dell'owner del 2026-10-12). Gli esterni non
+   * entrano in nessuna regola: tornano a parte in `external`, ciascuno con
    * `priority` uguale al livello, in ogni esito (anche a lavoro fermo: sono
    * di un altro lavoro, ed escono in un feedback loro). Un esterno col `?`
    * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
@@ -553,11 +555,14 @@
    * @param {object} p { findings, caps:{cap3,cap2,cap1,cap0}, counts:{count3,count2,count1,count0} }
    * @returns {{
    *   stop: boolean, blocking: object[], sospesi: object[], fix: object[], derived: object[], external: object[],
-   *   consume: 'cap3'|'cap2'|'cap1'|'cap0'|null, counts: object,
+   *   domande: object[], consume: 'cap3'|'cap2'|'cap1'|'cap0'|null, counts: object,
    *   budgets: { cap3:{cap,used,left}, cap2:…, cap1:…, cap0:… }
    * }}
    *   `sospesi` (solo allo stop): gli altri interni della stessa critica, che
    *   restano davanti a chi riprende dopo la risposta dell'owner.
+   *   `domande`: i rilievi di `fix` col `?`, con `inCorrezione: true`. Non
+   *   stanno in `derived` (quello è ciò che NON si corregge, e le sue prove si
+   *   tolgono), ma diventano feedback come loro: derivedGroups li accoglie.
    */
   function decideRound(p) {
     const tutti = normalizeFindings(p && p.findings);
