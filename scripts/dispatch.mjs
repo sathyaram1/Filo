@@ -313,6 +313,7 @@ export function applyVerifierVerdict(state, outcome, critique = '', sha = '') {
   if (String(sha || '')) s.verifierSha = String(sha);
   // Una critica nuova apre un giro nuovo: la pulizia di quello prima non ne è la base.
   s.puliziaSha = '';
+  s.pulizieDopo = [];
   if (outcome === 'pass') s.verifierVerdict = 'pass';
   else if (outcome === 'fix') s.verifierVerdict = 'fix-pending';
   else if (outcome === 'stop') s.verifierVerdict = 'stop';
