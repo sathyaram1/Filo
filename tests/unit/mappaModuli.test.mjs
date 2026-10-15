@@ -21,7 +21,7 @@ function albero() {
   const file = {
     'src/zeta.js': pesa('// Ultimo per nome. Seconda frase che non si vede.\nconst z = 1;\n', 2048),
     'src/alfa.js': "'use strict';\n// Dopo use strict, la prima frase.\nconst a = 1;\n",
-    'src/main/crlf.js': '﻿// Fine riga di Windows.\r\n// Seconda riga.\r\nconst c = 1;\r\n',
+    'src/main/crlf.js': '\uFEFF// Fine riga di Windows.\r\n// Seconda riga.\r\nconst c = 1;\r\n',
     'src/main/vuoto.js': '/**/\n/*\n *\n */\n// Dopo due commenti vuoti.\n',
     'src/main/elenco.js': '// Pagina "Aperti per dopo".\n// - voce uno\n// - voce due\n',
     'src/main/nudo.js': 'const x = 1; // il commento dopo il codice non è un\'intestazione\n',
@@ -53,10 +53,11 @@ test('con una cartella: una riga per .js sotto di lei, in ordine di percorso, co
   const voci = righe(r.uscita);
   assert.deepEqual(voci.map((v) => v.percorso), [
     'src/main/crlf.js', 'src/main/elenco.js', 'src/main/nudo.js',
-    'src/main/servizi/blocco.js', 'src/main/servizi/direttiva.js', 'src/main/servizi/lungo.js',
+    'src/main/servizi/blocco.js', 'src/main/servizi/direttiva.js', 'src/main/servizi/lungo.js', 'src/main/vuoto.js',
   ]);
   const d = Object.fromEntries(voci.map((v) => [v.percorso, v.descrizione]));
-  assert.equal(d['src/main/crlf.js'], 'Fine riga di Windows.');
+  assert.equal(d['src/main/crlf.js'], 'Fine riga di Windows.', 'il BOM e il CRLF non entrano nella descrizione');
+  assert.equal(d['src/main/vuoto.js'], 'Dopo due commenti vuoti.');
   assert.equal(d['src/main/elenco.js'], 'Pagina "Aperti per dopo".');
   assert.equal(d['src/main/servizi/blocco.js'], 'Blocco in cima, es. con un punto in mezzo.', '#! si salta, «es.» non chiude la frase');
   assert.equal(d['src/main/servizi/direttiva.js'], 'Il commento vero dopo la direttiva.');
@@ -85,14 +86,14 @@ test('senza argomenti: una riga per cartella con file e KB; con --tutto ogni fil
   const r = mappa([], { radice, cwd: radice });
   assert.equal(r.codice, 0);
   assert.deepEqual(r.uscita.slice(0, -1).map((x) => x.replace(/ {2}\d+\.\d KB$/, '')), [
-    'src  8 file', 'src/main  6 file', 'src/main/servizi  3 file',
+    'src  9 file', 'src/main  7 file', 'src/main/servizi  3 file',
   ], 'la cartella senza .js non compare');
   assert.ok(r.uscita.includes('src/main/servizi  3 file  3.0 KB'), r.uscita.join('\n'));
   assert.match(r.uscita.at(-1), /--tutto/, 'l’ultima riga dice come proseguire');
 
   const t = mappa(['--tutto'], { radice, cwd: radice });
   const tutti = righe(t.uscita).map((v) => v.percorso);
-  assert.equal(tutti.length, 8);
+  assert.equal(tutti.length, 9);
   assert.deepEqual(tutti, [...tutti].sort());
   assert.deepEqual(tutti.slice(0, 1).concat(tutti.slice(-1)), ['src/alfa.js', 'src/zeta.js']);
   assert.ok(t.uscita.includes('src/zeta.js  2.0 KB  Ultimo per nome.'), t.uscita.join('\n'));

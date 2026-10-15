@@ -78,12 +78,15 @@ export function percorsoMostrato(base, p, sistema = path) {
 }
 
 // Ogni .js sotto `dir`, con le cartelle collegate seguite una volta sola: un collegamento circolare non gira per sempre.
+// Dentro non si scende in node_modules né nelle cartelle col punto: un «.» dalla radice darebbe migliaia di righe altrui.
+const NON_NOSTRA = (nome) => nome === 'node_modules' || nome.startsWith('.');
 export function fileJs(dir, acc = [], visti = new Set()) {
   let vero;
   try { vero = realpathSync(dir); } catch (_) { vero = dir; }
   if (visti.has(vero)) return acc;
   visti.add(vero);
   for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (NON_NOSTRA(e.name)) continue;
     const p = join(dir, e.name);
     let tipo = e;
     if (e.isSymbolicLink()) { try { tipo = statSync(p); } catch (_) { tipo = null; } }
