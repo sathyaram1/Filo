@@ -462,6 +462,22 @@
     return `entrati ${view.used} su ${view.max}`;
   }
 
+  // ── Inviti solo con Google collegato (#1120) ───────────────────────────────
+  // Lo dice il server (`invitesLocked`), perché il riscatto controlla chi ha dato il codice: i codici di un portafoglio
+  // senza Google non farebbero entrare nessuno, quindi al loro posto va la strada per sbloccarli. `google` è lo stato
+  // locale: con un accesso già fatto su un'altra identità, ripetere lo stesso accesso non sblocca niente, e va detto.
+  // → null (inviti liberi) | { testo, bottone }
+  function invitesLock({ server, google } = {}) {
+    if (!server || server.invitesLocked !== 'need_google') return null;
+    if (google && google.signedIn && google.linkedHere === false) {
+      return {
+        testo: 'Il tuo account Google è già collegato a un altro portafoglio di Filo, per esempio su un altro computer: i tuoi inviti li dai da lì. Per darli anche da qui serve un altro account Google.',
+        bottone: 'Collega un altro account Google',
+      };
+    }
+    return { testo: '', bottone: 'Collega Google per dare i tuoi inviti' };
+  }
+
   // ── Le manopole dei crediti (#652) ─────────────────────────────────────────
   // Le impostazioni che l'owner può cambiare in `config/credits`: come si
   // chiamano nella pagina e quanto possono valere. Stanno qui perché le usano
