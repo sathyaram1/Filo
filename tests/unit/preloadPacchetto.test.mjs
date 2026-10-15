@@ -178,6 +178,14 @@ test('il pacchetto di Filo porta il preload impacchettato, scritto prima dell\'a
   assert.match(leggi('.gitignore'), /^generato\/$/m, 'il file generato non va nel repo');
 });
 
+test('i pacchetti per Windows, Mac e Linux si guardano dentro prima di uscire', () => {
+  for (const f of ['release.yml', 'verifica-mac.yml', 'verifica-linux.yml']) {
+    const w = leggi('.github', 'workflows', f);
+    assert.match(w, /extractFile\(process\.argv\[1\], 'generato\/page-preload\.js'\)/, `${f}: nessuno controlla il preload nell'asar`);
+    assert.match(w, /componi\(\)\.codice/, `${f}: il preload nel pacchetto non si confronta coi sorgenti`);
+  }
+});
+
 test('le pagine web, la finestrella di accesso, la shell e il fumetto non tornano fuori dalla sandbox', () => {
   const dir = join(ROOT, 'src', 'main');
   const tutti = [];

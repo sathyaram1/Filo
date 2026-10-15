@@ -31,7 +31,10 @@ all'avvio nella cartella dei dati, `preload-pacchetto/`; nel pacchetto lo scrive
 `build.beforePack` (il `default` dello stesso modulo) in `generato/`, fuori da
 `src/` perché sentinelle e mappe non leggano tutto due volte. Il file è sempre
 uguale a parità di sorgenti: il Mac universale fonde due copie che devono
-coincidere. Prima di toccare la ricetta del pacchetto:
+coincidere. Prima che un pacchetto esca qualcuno ci guarda dentro: «Verifica build
+Mac», «Verifica build Linux» e il lavoro Windows della release confrontano il file
+nell'asar coi sorgenti, e senza quel file la bozza Windows non si pubblica. Prima di
+toccare la ricetta del pacchetto:
 [Mac e Linux si rompono in silenzio](mac-e-linux-si-rompono-in-silenzio.md).
 
 **Il caso.** #834, rilievo 7 dell'analisi di sicurezza di giugno 2026: ogni vista
