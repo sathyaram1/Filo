@@ -1253,14 +1253,17 @@ export function verifierReplyText(reply, id = '<id>', conSegnalazione = false) {
   if (r.outcome === 'stop') {
     // Fermo per la segnalazione allegata, o per un rilievo che decide l'owner:
     // in tutti e due i casi i rilievi non bloccanti restano davanti a chi riprende.
-    const perSegnalazione = r.motivo === 'segnalazione';
+    // Con tutte e due le cause (#706) si dicono tutte e due: il motivo del server ne nomina una sola.
+    const perSegnalazione = r.motivo === 'segnalazione' || conSegnalazione;
     const sospesi = Array.isArray(r.sospesi) ? r.sospesi : [];
+    const bloccanti = Array.isArray(r.blocking) ? r.blocking : [];
     return [
       '══ RISPOSTA DEL SERVER: il lavoro si ferma ══',
-      perSegnalazione
-        ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
-        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
-      perSegnalazione ? null : fmt(r.blocking),
+      perSegnalazione ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.' : null,
+      !perSegnalazione || bloccanti.length
+        ? `Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l'owner${perSegnalazione ? ', insieme alla segnalazione' : ''}.`
+        : null,
+      !perSegnalazione || bloccanti.length ? fmt(r.blocking) : null,
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
       budgets ? `Bilanci: ${budgets}` : null,
