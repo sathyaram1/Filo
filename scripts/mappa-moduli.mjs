@@ -54,7 +54,7 @@ export function primaFrase(righe) {
     paragrafo.push(righe[i].trim());
   }
   // I caratteri di controllo e di direzione non arrivano al terminale: un commento non deve poter riscrivere le altre righe.
-  const testo = paragrafo.join(' ').replace(/[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g, ' ')
+  const testo = paragrafo.join(' ').replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ')
     .replace(/\s+/g, ' ').trim();
   const fine = /[.!?]["'»)\]]*(?=\s+[\p{Lu}\p{N}«"'(`[])/u.exec(testo);
   return taglia(fine ? testo.slice(0, fine.index + fine[0].length) : testo) || SENZA_INTESTAZIONE;
@@ -93,7 +93,7 @@ export function fileJs(dir, acc = [], visti = new Set()) {
     let tipo = e;
     if (e.isSymbolicLink()) { try { tipo = statSync(p); } catch (_) { tipo = null; } }
     if (tipo?.isDirectory()) fileJs(p, acc, visti);
-    else if (e.name.endsWith('.js') && (tipo?.isFile() || e.isSymbolicLink())) acc.push(p);
+    else if (e.name.endsWith('.js') && (tipo ? tipo.isFile() : e.isSymbolicLink())) acc.push(p);
   }
   return acc;
 }

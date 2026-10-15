@@ -30,6 +30,9 @@ function albero() {
     'src/main/servizi/lungo.js': pesa(`// ${LUNGA}\n`, 1024),
     'src/main/servizi/pagina.html': '<!-- non è un .js -->\n',
     'src/stili/solo.css': '/* niente .js qui */\n',
+    'altro/controllo.js': '// Un \u001b[2Jcommento \u202esbieco\u202c senza controlli.\n',
+    'node_modules/pacchetto/indice.js': '// Di un altro.\n',
+    '.git/hooks/gancio.js': '// Nascosto.\n',
   };
   for (const [nome, testo] of Object.entries(file)) {
     const dest = join(radice, nome);
@@ -114,6 +117,17 @@ test('la cartella si trova anche scritta da dentro src, con le barre di Windows 
   const opzione = mappa(['--tuto'], { radice, cwd: radice });
   assert.equal(opzione.codice, 2);
   assert.match(opzione.errori.join('\n'), /--tuto/);
+});
+
+test('dalla radice non si scende in node_modules né nelle cartelle col punto, e i caratteri di controllo non escono', () => {
+  const radice = albero();
+  const r = mappa(['.'], { radice, cwd: radice });
+  const voci = righe(r.uscita);
+  assert.equal(voci.length, 10, r.uscita.join('\n'));
+  assert.ok(voci.every((v) => /^(src|altro)\//.test(v.percorso)), r.uscita.join('\n'));
+  const controllo = voci.find((v) => v.percorso === 'altro/controllo.js').descrizione;
+  assert.equal(controllo, 'Un [2Jcommento sbieco senza controlli.');
+  assert.doesNotMatch(controllo, /[\u0000-\u001f\u202a-\u202e]/);
 });
 
 test('i percorsi escono con le barre normali anche su Windows', () => {
