@@ -626,10 +626,10 @@ async function setAutomationAutoApprove(partial, idToken) {
 }
 
 // ── Ciò che le routine devono sapere (config/routines) ──────────────────────
-// Interruttore master, esplorazione a coda vuota e tentativi del loop vivono in
-// un documento SEPARATO da config/automation, e leggibile senza credenziali.
+// Interruttore master e tentativi del loop vivono in un documento SEPARATO da
+// config/automation, e leggibile senza credenziali.
 //
-// Perché separato: chi legge queste tre cose sono le macchine delle routine, che
+// Perché separato: chi legge queste cose sono le macchine delle routine, che
 // non hanno nessuna credenziale. Finché stavano nel documento admin-only la
 // lettura falliva sempre, in silenzio, e si ricadeva sui default: in dashboard
 // sembravano attive, ma nessuna routine le ha mai viste (stessa radice del
