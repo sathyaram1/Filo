@@ -5,6 +5,11 @@
 
 const MODI = ['avvio', 'chiusura'];
 const MODO_PREDEFINITO = 'avvio';
+// Veloce: ogni versione pubblicata, anche le patch delle sei ore. Stabile: solo la minor del lunedì (x.y.0).
+const CANALI = ['veloce', 'stabile'];
+const CANALE_PREDEFINITO = 'veloce';
+// Pagine da cento release lette per trovare l'ultima stabile: mille pubblicazioni, otto mesi a quattro al giorno.
+const PAGINE_STABILE = 10;
 // Dopo il secondo fallimento Filo non ritenta più da solo: restano l'avviso col link e il pulsante.
 const TENTATIVI_DA_SOLI = 2;
 
