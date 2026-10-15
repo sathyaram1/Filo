@@ -674,6 +674,11 @@
       parts.push(`La correzione riguarda ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un'altra verifica ricontrolla.`);
       const vicini = d.fix.filter((f) => f && sedeDi(f.sede) === 'v').length;
       if (vicini) parts.push(`${vicini === 1 ? 'Un rilievo è vicino (di un altro lavoro, ma in un file che il ramo modifica già): si corregge' : `${vicini} rilievi sono vicini (di un altro lavoro, ma in file che il ramo modifica già): si correggono`} insieme al resto.`);
+      // Chi sta sopra il livello che paga ha per forza il bilancio finito: senza
+      // questa riga un 2 corretto a cap2 esaurito sembra un conto sbagliato.
+      const paga = CAP_KEYS.includes(d.consume) ? Number(d.consume.slice(3)) : null;
+      const salgono = paga === null ? 0 : d.fix.filter((f) => f && effectiveLevel(f) > paga).length;
+      if (salgono) parts.push(`Il giro lo paga il bilancio del livello ${paga}: ${salgono === 1 ? 'un rilievo di livello più alto, col suo bilancio finito, sale' : `${salgono} rilievi di livello più alto, col loro bilancio finito, salgono`} sulla correzione che parte comunque.`);
     } else {
       parts.push(esterni === list.length
         ? 'Nessun rilievo interno: il lavoro prosegue.'
