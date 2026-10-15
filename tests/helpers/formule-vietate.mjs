@@ -33,7 +33,7 @@ export const TITOLI = [
 
 export const OVUNQUE = [
   // «rilievi da correggere» non dice chi corregge: la riga di FEEDBACK-STATES.md
-  // che lo usa è legittima (feedback #794).
+  // che lo usa è legittima; «ha da correggere» invece lo dice (feedback #794).
   /verificatore[^'"\n]{0,30}(?<!(?<!\b(?:ho|hai|ha|hanno|avrà|avrai|avranno) )\bda )corregg/i,
   // La stessa frase detta al contrario, o col sostantivo al posto del verbo:
   // «la consegna dallo STESSO verificatore», «del verificatore, non del
