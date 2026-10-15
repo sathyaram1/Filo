@@ -247,6 +247,7 @@ da decidere all'implementazione sono decise così:
   fusione né push da questa macchina. Non pretende i verdetti registrati — quelli
   sono il vocabolario delle routine — ma **L5 gira lo stesso**, e lo `sha`
   dichiarato deve combaciare con la punta vera del ramo.
+  - **Superato** (L5 sui lavori fidati): vedi `ROUTINE-AUTH-SPEC.md` §11.
 
 La **ruleset su `main`** (passo dell'owner) è stata messa il **2026-08-20**: da
 lì il push diretto da una sessione non è più vietato a parole. Riverificato sul
