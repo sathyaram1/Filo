@@ -465,6 +465,9 @@ function soloTagDiRilascio(au) {
   }
   const originale = au.getUpdateInfoAndProvider;
   const cancello = async function (...args) {
+    if (this.filoCanale === 'stabile' && !canaleAgganciato) {
+      throw new Error('aggiornamenti stabili fermi: electron-updater non lascia più scegliere la release');
+    }
     const r = await originale.apply(this, args);
     const info = r && r.info;
     if (!R.tagAccettato(info)) {
