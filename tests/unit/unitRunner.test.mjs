@@ -541,7 +541,8 @@ test('un file appeso si chiude da solo, col suo nome e il tetto nel rosso, e gli
     writeFileSync(join(dir, 'a-appeso-dopo.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
     writeFileSync(join(dir, 'b-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano dopo il primo appeso', () => {});\n");
     writeFileSync(join(dir, 'c-appeso-subito.test.mjs'), "setInterval(() => {}, 1000);\nawait new Promise(() => {});\n");
-    writeFileSync(join(dir, 'd-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano in fondo', () => {});\n");
+    // d finisce dopo l'ultimo passo di a, come sulla macchina carica (#1235): a si chiude da solo, poi c.
+    writeFileSync(join(dir, 'd-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano in fondo', async () => { await new Promise((r) => setTimeout(r, 1500)); });\n");
     // Sei secondi bastano a un file sano per partire e finire anche su una macchina lenta, dove a vuoto ci mette poco.
     const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '6000' };
     delete env.NODE_TEST_CONTEXT;
