@@ -488,6 +488,7 @@
   }
 
   global.SN_MODEL_CHAIN = {
-    buildChain, renderGrid, collect, conferma, ricontrolla, aggiornaCosti, actionLabels, makeValidator, makeKnownCheck, avvisoHostAudio,
+    buildChain, renderGrid, collect, conferma, ricontrolla, aggiornaCosti, actionLabels, etichetta, makeValidator, makeKnownCheck,
+    avvisoHostAudio,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
