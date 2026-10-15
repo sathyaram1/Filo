@@ -239,7 +239,11 @@ export async function esegui({ argv, gh, attendi, riassunto = () => {}, log = ()
       }
       log(`Le righe di ${a.piattaforma} non ci sono più in ${a.versione}: un altro lavoro ha scritto la pagina nello stesso momento. Le rimetto.`);
     }
-    throw Object.assign(new Error(`dopo ${GIRI} giri le righe di ${a.piattaforma} non restano nella pagina di ${a.versione}`), { bozza });
+    throw new Error(`dopo ${GIRI} giri le righe di ${a.piattaforma} non restano nella pagina di ${a.versione}`);
+  } catch (e) {
+    // Una bozza che resta tale è una versione che non esce: chi legge il riassunto deve saperlo.
+    e.bozza = bozza;
+    throw e;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
