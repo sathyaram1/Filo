@@ -71,7 +71,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { basename, dirname, isAbsolute, join, resolve, relative, sep } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
