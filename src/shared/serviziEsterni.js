@@ -243,6 +243,16 @@
       dove: ['src/main/updater.js'], prova: "require('electron-updater')", nellaLibreria: true,
     },
     {
+      id: 'driver-altre-app', nome: 'GitHub, per il componente delle altre applicazioni',
+      base: ['https://github.com/trycua/cua/releases/download/'],
+      quando: 'funzione',
+      occasione: 'quando accendi «Filo può usare le altre applicazioni», e quando una versione nuova di Filo fissa un componente nuovo; il file arriva dall’archivio di GitHub',
+      riceve: 'la richiesta del file del componente, sempre la stessa versione',
+      frase: 'Quando accendi «Filo può usare le altre applicazioni»',
+      dove: ['src/main/services/altreApp/pacchetti.js', 'src/main/services/altreApp/index.js'],
+      via: 'pacchettoPer', prova: 'scarica(',
+    },
+    {
       id: 'liste-pubblicita', nome: 'EasyList, StevenBlack e le liste nazionali, per bloccare la pubblicità',
       base: [
         'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts',

@@ -853,6 +853,7 @@
       case 'timerRingtoneVolume': return volumeDa('timerRingtoneVolume');
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
+      case 'altreApp.enabled': return $('altreAppEnabled').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
@@ -906,6 +907,7 @@
       case 'timerRingtoneVolume': return volumeSalvato(s.timerRingtoneVolume);
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
+      case 'altreApp.enabled': return !!(s.altreApp && s.altreApp.enabled === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
@@ -1063,6 +1065,7 @@
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
+    if (vuole('altreApp.enabled')) $('altreAppEnabled').checked = !!(settings.altreApp && settings.altreApp.enabled === true);
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
     if (vuole('aggiornamenti.installa')) {
       $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
@@ -1561,6 +1564,7 @@
     load();
     caricaMemoria();
     $('documentiAggiungi').addEventListener('click', aggiungiCartella);
+    window.SN_PREF_ALTRE_APP.init({ MSG, $ });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) caricaStatoDocumenti(); });
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
@@ -1593,6 +1597,7 @@
     $('riassuntoSchede').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
+    $('altreAppEnabled').addEventListener('change', persist);
     $('aggiornamentiAutomatici').addEventListener('change', persist);
     for (const id of ['contestoGiorni', 'contestoToken']) {
       $(id).addEventListener('change', persist);
