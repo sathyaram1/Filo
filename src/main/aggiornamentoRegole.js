@@ -174,12 +174,13 @@ function contaTentativo(pronto) {
 // `pronto: null` vuol dire «togli il ricordo». `avvisa`: è il secondo fallimento, l'utente lo legge fra le notifiche.
 // Dopo un fallimento Filo si apre sempre normalmente: due installatori di fila lascerebbero l'utente senza Filo.
 // Con «Installa gli aggiornamenti da solo» spento (#786) si installa solo la versione `chiesta` con «Installa».
-function decidiAllAvvio({ piattaforma, versioneInUso, modo, pronto, installatoreValido = true, automatici = true, chiesta = null } = {}) {
+// Una versione scaricata prima di passare al canale stabile, e che lì non c'è, si dimentica.
+function decidiAllAvvio({ piattaforma, versioneInUso, modo, pronto, installatoreValido = true, automatici = true, chiesta = null, canale = CANALE_PREDEFINITO } = {}) {
   const p = normalizza(pronto);
   const apri = (resta, avvisa = false) => ({ azione: 'apri', pronto: resta, avvisa });
   if (!p) return apri(null);
   const cmp = confrontaVersioni(p.versione, versioneInUso);
-  if (cmp == null || cmp <= 0) return apri(null);
+  if (cmp == null || cmp <= 0 || !nelCanale(p.versione, canale)) return apri(null);
   if (p.tentativi > p.falliti) {
     const dopo = { ...p, falliti: p.tentativi };
     return apri(dopo, dopo.falliti >= TENTATIVI_DA_SOLI);
