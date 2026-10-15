@@ -248,6 +248,9 @@
   const RE_FONT = /^[\w\s,'"-]{1,200}$/;
   // Durate: millisecondi interi o secondi, fino a dieci secondi. Zero spegne l'animazione.
   const RE_TIME = /^(\d{1,5})ms$|^(\d{1,2}(?:\.\d{1,3})?)s$/;
+  // Moltiplicatore senza unità: finisce dentro calc(), quindi solo cifre e un punto.
+  const RE_FACTOR = /^(?:\d(?:\.\d{1,3})?|\.\d{1,3})$/;
+  const FACTOR_MAX = 3;
 
   function validate(name, value) {
     const t = TOKENS[name];
