@@ -366,8 +366,8 @@ export function guardiaFermo(tetto = TETTO_FERMO_MS) {
  *   di lui costerebbero un tetto ciascuno (#1231).
  * - Se dopo la chiusura dei partiti da un tetto non finisce più nessun file per un altro tetto, è ferma la corsa (il
  *   disco pieno, #717); così anche se un file chiuso resta in corso: chiudere non è servito.
- * - Chiuso il primo da solo, il turno dopo senza fini è muto e chiude i fermi, non la corsa: chiudere il primo da solo
- *   o insieme agli altri dipendeva solo da quando arrivava la fine di un file sano, e la corsa chiusa ne perdeva l'esito (#1235).
+ * - Chiuso il primo da solo, se poi non finisce più niente si chiudono i fermi, non la corsa: da solo o insieme
+ *   dipendeva da quando arrivava la fine di un file sano, e la corsa chiusa ne perdeva l'esito (#1235).
  */
 export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   const partenza = new Map();
