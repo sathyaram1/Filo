@@ -139,6 +139,24 @@ export function presenti(corpo, nuove) {
   });
 }
 
+/**
+ * Il file che GitHub fa scaricare è quello costruito qui? GitHub dichiara il SHA-256 di ogni allegato e lo mostra
+ * accanto al file: un'impronta diversa nella sezione farebbe sembrare manomesso un file buono. PURA.
+ */
+export function confrontaAllegati(allegati, righe) {
+  const perNome = new Map((Array.isArray(allegati) ? allegati : []).map((x) => [x?.name, x]));
+  const problemi = [];
+  const senzaImpronta = [];
+  for (const r of righe) {
+    const allegato = perNome.get(r.nome);
+    if (!allegato) { problemi.push(`${r.nome} non è fra gli allegati della versione`); continue; }
+    const dichiarata = String(allegato.digest ?? '').trim().toLowerCase();
+    if (!dichiarata) senzaImpronta.push(r.nome);
+    else if (dichiarata !== `sha256:${r.sha256}`) problemi.push(`${r.nome}: GitHub dichiara ${dichiarata}, il file costruito qui ha sha256:${r.sha256}`);
+  }
+  return { problemi, senzaImpronta };
+}
+
 /** Le stesse impronte per il riassunto della corsa. PURA. */
 export function testoRiassunto({ piattaforma, versione, righe }) {
   return [
