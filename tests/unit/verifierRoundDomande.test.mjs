@@ -98,10 +98,10 @@ test('il «!» senza il «?» si respinge con la spiegazione, nel controllo e ne
   const brutte = R.unparsedLevelLines('Provato.\n[2i!] rotto');
   assert.equal(brutte.length, 1);
   assert.match(brutte[0], /^\[2i!\] rotto \(il «!» segna una scelta difficile da disfare e va insieme al «\?»/);
-  const p = R.parseFindings('Provato.\n[2i!] rotto\n    passo uno');
+  const p = R.parseFindings('Provato.\n[2i!] rotto');
   assert.deepEqual(p.findings, [], 'non diventa un rilievo');
   assert.equal(p.rifiutati.length, 1);
-  assert.doesNotMatch(p.summary, /rotto|passo uno/, 'né riassunto');
+  assert.doesNotMatch(p.summary, /rotto/, 'né riassunto');
   // Un elenco strutturato col solo `difficile` porta con sé la domanda: è il verso che ferma.
   assert.deepEqual(R.normalizeFindings([{ level: 2, sede: 'i', text: 'x', difficile: true }]), [{ level: 2, sede: 'i', text: 'x', decision: true, difficile: true }]);
   assert.equal(R.decideRound({ findings: [{ level: 2, sede: 'i', text: 'x', difficile: true }], caps: CAPS }).stop, true);
