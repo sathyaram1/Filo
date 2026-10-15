@@ -450,11 +450,13 @@
   // a QUELLA persona: aprire la sua scheda, prendere il suo pseudonimo,
   // regalarle crediti.
   let menuAperto = null;
+  let menuDi = null;
 
   function chiudiMenuPersona() {
     if (!menuAperto) return;
     menuAperto.remove();
     menuAperto = null;
+    menuDi = null;
     document.removeEventListener('mousedown', fuoriDalMenu, true);
     document.removeEventListener('keydown', tastoSulMenu, true);
     window.removeEventListener('wheel', fuoriDalMenu, true);
