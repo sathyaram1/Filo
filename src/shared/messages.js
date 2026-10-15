@@ -345,6 +345,17 @@
     DOCUMENTI_STATO: 'documenti_stato',
     // {} → { ok, percorso } | { ok:false } (annullata)
     DOCUMENTI_SCEGLI_CARTELLA: 'documenti_scegli_cartella',
+    // #779 — il componente delle altre applicazioni per la pagina Preferenze. Installano un programma e aprono pannelli del
+    // sistema: solo da Filo (soloFilo). Lo stato: { attiva, fase: assente|scarica|verifica|estrae|prova|pronto|errore,
+    // ricevuti, totali, versione, byte, errore: { codice, frase } | null, permessi: [{ id, nome, frase, apribile }] }
+    // {} → { ok, stato } (la prima volta in una sessione prova anche che il driver parta)
+    ALTRE_APP_STATO: 'altre_app_stato',
+    // {} → { ok, stato } | { ok:false, motivo }: riscarica e reinstalla, con l'impostazione accesa.
+    ALTRE_APP_REINSTALLA: 'altre_app_reinstalla',
+    // { permesso: 'accessibilita'|'schermo' } → { ok } | { ok:false, motivo }: su Mac apre il pannello del permesso.
+    ALTRE_APP_PERMESSO: 'altre_app_permesso',
+    // main → pagine di Filo: { stato } a ogni passo dell'installazione (l'avanzamento al più ogni 120 ms).
+    ALTRE_APP_CAMBIATO: 'altre_app_cambiato',
     // #947.3 — toglie dall'indice una cartella cercata per l'occasione (Preferenze). Solo da Filo.
     // { percorso } → { ok, tolta, documenti }
     DOCUMENTI_DIMENTICA: 'documenti_dimentica',
