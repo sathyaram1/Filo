@@ -847,7 +847,7 @@ async function main() {
   // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
-  // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
+  // l'unica cosa che impedisce alla richiesta di cui parla il messaggio qui sotto
   // di comparire soltanto a chi apre una scheda nuova.
   if (richiestaForseInAttesa(reply)) mergeApprovalSignal.note(reply.requestId);
   const code = exitCodeForOwnerMerge(reply);
