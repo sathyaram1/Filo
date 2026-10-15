@@ -524,7 +524,7 @@ async function daContenuto(msg, sender) {
     if (p) p.via(wc, frame, d, { subito: true });
     return { ok: true, segui: false };
   }
-  p.campo(wc, frame, d, { email, tema: temaDi(s) });
+  p.campo(wc, frame, d, { email, tema: temaDi(s), incognito: inIncognito(sender) });
   return { ok: true, segui: true };
 }
 
