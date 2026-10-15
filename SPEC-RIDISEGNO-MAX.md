@@ -95,6 +95,8 @@ durata, nessun "margine per l'ultimo worker".
 
 ## 6. Controllo dalla dashboard
 
+*Fatto (§14, passo 4); oggi in `ROUTINE-AUTH-SPEC.md` §10.*
+
 - Lo stesso interruttore di oggi (config/routines): spento → il server smette
   di dare lavoro nuovo E il pacemaker non accende più. Il feedback in corso
   finisce e viene consegnato. Nessun lavoro troncato.
