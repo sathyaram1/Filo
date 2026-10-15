@@ -183,7 +183,7 @@ Registra col testo intero, **in un pezzo solo** dentro le stesse virgolette:
 ```bash
 node scripts/dispatch.mjs --record-verifier <id> "Provato: …
 [2i] …
-[0e] …" [--segnala <file.md>]
+[0e] …" [--segnala <file.md> --livello <0-3> [--difficile]]
 ```
 
 <!-- includi: _segnala.md -->
