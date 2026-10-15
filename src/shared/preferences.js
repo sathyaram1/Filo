@@ -667,6 +667,25 @@
       },
     },
     {
+      scrive: ['schermo.guarda'],
+      aiuto: 'true | false (Filo guarda una finestra o lo schermo quando glielo chiedi in chat)',
+      keys: ['guarda_schermo', 'filo può guardare lo schermo', 'filo puo guardare lo schermo', 'guardare lo schermo',
+        'guarda lo schermo', 'vedi schermo', 'vedi_schermo', 'guarda le finestre'],
+      costo: 2,
+      // Accenderla vuole sempre un OK, a ogni livello di autonomia: un clic, non la parola (#778). Non abbassa una
+      // difesa: anche accesa, la prima occhiata a ogni finestra di un'altra app chiede.
+      chiede: (r) => r.partial.schermo.guarda === true,
+      risk: 'Da accesa, quando glielo chiedi in chat Filo cattura l\'immagine di una finestra o dello schermo e la fa leggere '
+        + 'a un modello che vede le immagini, insieme alla tua domanda. Quello che si vede in quella finestra arriva quindi al modello. '
+        + 'La prima volta che guarda una finestra di un\'altra app, a ogni tua richiesta, ti chiede l\'OK dicendoti quale. '
+        + 'Filo guarda soltanto: non clicca, non scrive e non salva l\'immagine. Da spenta, non guarda niente fuori dalla chat.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { schermo: { guarda: b } }, label: `Guardare lo schermo → ${b ? 'acceso' : 'spento'}` };
+      },
+    },
+    {
       scrive: ['nomiSensati.scaricamenti'],
       aiuto: 'true | false (nome sensato da solo ai file scaricati col nome che non dice niente)',
       keys: ['nomi_sensati_scaricamenti', 'nome sensato agli scaricamenti', 'nomi sensati', 'rinomina scaricamenti',
@@ -1723,10 +1742,13 @@
     if (!b) return null;
     let allenta = false;
     try { allenta = typeof setter.allenta === 'function' ? !!setter.allenta(b, attuali) : false; } catch (_) { allenta = true; }
+    let chiede = false;
+    try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
     return {
       ...b,
       costo: setter.costo,
       allenta,
+      ...(chiede ? { chiede: true } : {}),
       elencoFisso: setter.elencoFisso || '',
       dove: setter.dove || '',
       risk: setter.risk || '',

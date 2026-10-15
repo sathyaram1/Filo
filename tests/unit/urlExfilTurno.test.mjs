@@ -75,6 +75,19 @@ test('conta anche un segreto corto con lettere e cifre, e ciò che è letto nei 
   assert.equal(livello('https://x.example/?i=IT60X0542811101000000123456', storia), 2);
 });
 
+test('#778 — VEDI_SCHERMO seguito da un NAVIGA che contiene un pezzo del testo letto: costo 2', () => {
+  const testo = 'Microsoft Word\nImpossibile aprire Bilancio_riservato_2026.xlsx: accesso negato.\nCodice pratica 7QX4-PL92-RTW8-ZZ31';
+  const vista = { type: 'VEDI_SCHERMO', finestra: 'Errore di Word', _output: { finestra: 'Errore di Word', tipo: 'finestra', testo } };
+  const pezzo = 'Impossibile aprire Bilancio_riservato_2026.xlsx: accesso negato';
+  const url = `https://raccolta.example/?d=${encodeURIComponent(pezzo)}`;
+  assert.equal(livello(url, [vista]), 2);
+  assert.equal(livelloRicerca(pezzo, [vista]), 2, 'anche una ricerca che lo porta fuori');
+  // Senza la finestra guardata lo stesso indirizzo resta 1: è quello che il modello ha letto a farlo salire.
+  assert.equal(livello(url, []), 1);
+  // Spenta o in attesa dell'OK non ha letto niente.
+  assert.equal(livello(url, [{ type: 'VEDI_SCHERMO', finestra: 'Word', _output: { spenta: true } }]), 1);
+});
+
 test('link normali dopo un comando: nessun OK in più', () => {
   const ls = cat('Documenti\nScaricati\nMusica\nImmagini\nfoto_vacanze_2025\n');
   for (const url of [

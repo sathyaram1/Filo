@@ -69,6 +69,7 @@
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
     ANNULLA_CAMBIO: 'undo',
+    VEDI_SCHERMO: 'screenshot',
   };
 
   const PREVISTE = {

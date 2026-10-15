@@ -20,6 +20,7 @@ const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
+const Schermo = require('./schermo').crea();
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -1317,7 +1318,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra },
   });
 }
 function consumePendingConfirm(sender, action) {
@@ -1330,12 +1331,16 @@ function consumePendingConfirm(sender, action) {
 function daPaginaDiFilo(sender) {
   return String(sender?.tab?.url || sender?.url || '').startsWith('filo://');
 }
+// La richiesta in cui una finestra guardata resta approvata (#778): la scheda della chat, finché l'utente non scrive di nuovo.
+function chiaveSchermo(sender) {
+  return String(sender?.wc?.id ?? senderKey(sender));
+}
 // All'OK si agisce su quello che il popup ha mostrato, non su ciò che lo stesso
 // riferimento trova adesso: nel frattempo la lista può essere cambiata (#592).
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
@@ -1933,7 +1938,7 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
     const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
     if (daPulito !== d.risposta) perche = A.frasePerche(st.fonte);
     else if (d.regola === 'difesa') perche = 'Te lo chiedo perché abbassa una difesa di Filo.';
-    else if (d.regola === 'perimetro') perche = 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
+    else if (d.regola === 'perimetro') perche = ing.perchePerimetro || 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
   return { ...d, livello, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
 }
@@ -2152,6 +2157,17 @@ async function eseguiAzioneFilo(action, {
     // La frase che spiega il terminale va coi comandi in chat finché non è stata
     // mostrata (#892); la conferma è un secondo giro della stessa proposta.
     if (cmd && !confirmed && !assistente && await primaVoltaDelTerminale()) action._primaVolta = true;
+  }
+
+  // ── guardare lo schermo (#778): gate duro e scelta della finestra, prima del gate dei livelli ──────────
+  // Spenta in Preferenze, Filo non elenca e non cattura niente. Il popup deve dire QUALE finestra: la sceglie
+  // qui il main, dal nome che ha dato il modello; all'OK vale quella mostrata.
+  if (type === 'VEDI_SCHERMO') {
+    let s = {};
+    try { s = await Storage.getSettings(); } catch (_) {}
+    const mostrata = confirmed ? ((bersagliMostrati(sender, action) || {}).finestra || null) : null;
+    const pre = await Schermo.prepara(action, { settings: s, chiave: chiaveSchermo(sender), mostrata });
+    if (pre.esito) return pre.esito;
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
@@ -2983,6 +2999,20 @@ async function eseguiAzioneFilo(action, {
         if (out.cwd) setAssistantCwd(sender, out.cwd);
         return { executed: out.code === 0, kept: true, output: out };
       }
+      case 'VEDI_SCHERMO': {
+        // L'immagine va solo al modello di «Descrivi immagine», senza cronologia né cache: al giro torna testo (#778).
+        const CE = globalThis.SN_CHAT_ERRORS;
+        return await Schermo.guarda(action, {
+          chiave: chiaveSchermo(sender),
+          domanda,
+          leggi: ({ dataUrl, finestra, domanda: chiesta, cosa }) => Gate.text({
+            action: ACTIONS.DESCRIBE_IMAGE,
+            messages: PROMPTS.leggiSchermo({ dataUrl, finestra, domanda: chiesta, cosa }),
+            ...(segnale ? { signal: segnale } : {}),
+          }),
+          fraseErrore: (e) => String((e && e.userMessage) || (CE && CE.friendly(e)) || ''),
+        });
+      }
       // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
       // Le primitive sono le STESSE della UI (tasto destro sulla tab): l'agente
       // chiama setTabProxy/clearTabProxy/regole-per-dominio del TabManager.
@@ -3787,6 +3817,74 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #778 — quello che Filo ha visto in una finestra lo legge un modello dall'immagine, ma lo SCRIVE chi ha fatto la
+// finestra (un'app, un sito, una mail): torna imbustato, e il nome della finestra passa dal canale di sistema.
+function vediSchermoForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'VEDI_SCHERMO') continue;
+    const out = a._output;
+    if (!out || typeof out !== 'object') continue;
+    const nome = E.perCanaleSistema(String(out.finestra || ''));
+    if (out.nonConservata) {
+      blocks.push(`[Avevo guardato «${nome}»: quello che c'era non è conservato. Se serve di nuovo, guardala un'altra volta.]`);
+      continue;
+    }
+    if (!String(out.testo || '').trim()) continue;
+    const quale = out.tipo === 'schermo' ? 'lo schermo' : (out.filo ? 'la finestra di Filo' : 'la finestra');
+    blocks.push(`[Ho guardato ${quale} «${nome}»: ecco cosa c'è, letto dall'immagine da un modello che vede]\n`
+      + E.imbusta({ tipo: 'FINESTRA_GUARDATA', testo: String(out.testo), conIntestazione: true }));
+  }
+  return blocks.join('\n\n').trim();
+}
+
+// Gli esiti di VEDI_SCHERMO che non sono una lettura: spenta, in attesa dell'OK, permesso, elenco, errore (#778).
+function vediSchermoPerModello(action, res) {
+  const E = globalThis.SN_ESTERNO;
+  const o = (res && res.output) || {};
+  const finestre = (l) => E.imbusta({
+    tipo: 'FINESTRE_APERTE',
+    testo: (Array.isArray(l) ? l : []).map((v) => `- ${E.neutralizza(v && v.nome, { unaRiga: true })}`
+      + (v && v.filo ? ' (di Filo)' : (v && v.tipo === 'schermo' ? ' (schermo)' : ''))
+      + (v && v.davanti ? ' (in primo piano subito dietro Filo: è «questa finestra» dell\'utente)' : '')).join('\n') || '(nessuna)',
+    conIntestazione: true,
+  });
+  const nota = o.nota ? `\n${E.perCanaleSistema(o.nota)}` : '';
+  const nome = E.perCanaleSistema(String(o.finestra || (action && action._finestra && action._finestra.nome) || action.finestra || ''));
+  if (o.spenta) {
+    return 'Non ho guardato niente: l\'impostazione «Filo può guardare lo schermo» è spenta, e da spenta Filo non cattura nessuna finestra. '
+      + 'Proponi all\'utente di accenderla chiamando adesso IMPOSTA_PREFERENZA con chiave guarda_schermo e valore true: il sistema gli mostra '
+      + 'il popup e gli basta un clic. Non riprovare a guardare finché non è accesa.';
+  }
+  if (res && res.needsConfirm) {
+    return `In attesa dell'OK dell'utente per guardare «${nome}»: il popup è davanti a lui. Quando lo dà, la finestra si guarda e la `
+      + 'conversazione riprende da sola con quello che c\'è. NON richiamare questa azione e non immaginare cosa c\'è scritto: '
+      + 'scrivi solo, in una riga, che aspetti il suo OK.';
+  }
+  if (o.permesso === 'mac') {
+    return `Non ho guardato: ${E.perCanaleSistema(o.frase)}. Sotto la tua risposta c'è «Apri le impostazioni». Dillo all'utente in una riga `
+      + 'e non riprovare finché non ha dato il permesso e riaperto Filo.'
+      + (Array.isArray(o.elenco) && o.elenco.length ? `\nIntanto si vedono solo queste:\n${finestre(o.elenco)}` : '');
+  }
+  if (Array.isArray(o.ambigue)) {
+    return `Più finestre corrispondono a «${E.perCanaleSistema(o.richiesta)}»:\n${finestre(o.ambigue)}\n`
+      + 'Chiedi all\'utente quale intende, elencandogliele: non sceglierne una a caso.';
+  }
+  if (o.nessuna) {
+    return `Nessuna finestra aperta si chiama «${E.perCanaleSistema(o.richiesta)}». Queste sono quelle che si possono guardare:\n${finestre(o.elenco)}${nota}\n`
+      + 'Se una è chiaramente quella che intende l\'utente, richiama VEDI_SCHERMO col suo nome esatto; se non si capisce, chiediglielo.';
+  }
+  if (Array.isArray(o.elenco)) {
+    return `Finestre che si possono guardare adesso:\n${finestre(o.elenco)}${nota}\n`
+      + 'Richiama VEDI_SCHERMO con in «finestra» il nome esatto di quella che intende l\'utente. Se dalla richiesta non si capisce quale, '
+      + 'chiediglielo elencando le candidate.';
+  }
+  if (o.errore) return `Non ho potuto guardare «${nome}»: ${E.perCanaleSistema(o.errore)}. Dillo all'utente in una riga, senza inventare cosa c'era.`;
+  return '';
+}
+
 // #947 — re-immissione di quello che CERCA_DOCUMENTI ha trovato: la compone PROMPTS.documentiTrovati, la stessa
 // dell'Aiuto di una scheda.
 function documentSearchesForPrompt(actions) {
@@ -3808,7 +3906,8 @@ function documentSearchesForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), transparencyDocsForPrompt(actions),
+    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), vediSchermoForPrompt(actions),
+    transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions), testiDiFuoriForPrompt(actions),
@@ -4022,6 +4121,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return n > 0
       ? `Schede riordinate: ${n} archiviate, riapribili da «Tab archiviate». Dillo all'utente in una riga.`
       : 'Schede riordinate: nessuna da archiviare. Dillo all\'utente in una riga.';
+  }
+  if (type === 'VEDI_SCHERMO') {
+    const t = vediSchermoPerModello(action, res);
+    if (t) return t;
   }
   if (res.output && res.output.blocked === 'disabled') {
     return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
@@ -4387,6 +4490,8 @@ async function handleFiloChat(richiesta) {
 
 async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }, volo) {
   const inizioTurno = Date.now();
+  // Un messaggio vero dell'utente è una richiesta nuova: le finestre guardate prima tornano a chiedere (#778).
+  if (!internal) Schermo.nuovoTurno(chiaveSchermo(sender));
   await FiloMem.touchSession();
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
   // perché la parola di stop deve funzionare anche quando il resto non
@@ -6526,6 +6631,8 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
 // Esposto su globalThis per i test Playwright (app.evaluate non ha require):
 // è il dispatch con il gate dei livelli di sicurezza (#146.2).
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
+// #778 — le prove mettono un sistema finto sotto la cattura delle finestre (_perProve.usaSistema).
+globalThis.SN_SCHERMO = Schermo;
 globalThis.SN_SEGRETI_LETTI = SegretiLetti;
 // Idem per la chat della home: i test ne ispezionano il prompt costruito (#158).
 globalThis.SN_HANDLE_FILO_CHAT = handleFiloChat;

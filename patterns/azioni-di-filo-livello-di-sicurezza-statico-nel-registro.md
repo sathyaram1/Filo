@@ -126,6 +126,12 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   non entra MAI nel livello. Quello che il sistema sa da sé (cartella, «perché
   te lo chiedo», «non è reversibile») resta sotto e non lo scrive il modello.
   Sentinella: `tests/unit/terminaleAccesoDiSerie.test.mjs`.
+- **Leggere fuori da Filo chiede alla prima occhiata, non a ogni occhiata (#778).** `VEDI_SCHERMO` costa 0, ma la
+  prima lettura di ogni finestra di un'altra app in una richiesta sta fuori dal `perimetro` e chiede a ogni livello;
+  le finestre approvate le ricorda il main per la scheda finché l'utente non scrive di nuovo, e `_approvata` la scrive
+  solo lui. La frase del popup la dà l'azione (`perchePerimetro`); un setter che vuole sempre un clic senza abbassare
+  una difesa dichiara `chiede`. L'OK che risponde a una domanda rimasta aperta fa riprendere la richiesta da sola,
+  dopo l'ultimo popup della fila. Sentinella: `tests/unit/vediSchermo.test.mjs`.
 - **UI:** le conferme usano i componenti riusabili `SN_CONFIRM_UI.confirm`
   (livello 2) e `SN_CONFIRM_UI.confirmTyped` (livello 3) in
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.

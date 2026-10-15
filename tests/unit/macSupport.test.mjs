@@ -939,3 +939,24 @@ test('una scadenza che suona si fa garantire una finestra che la vede', () => {
     'la garanzia vive in un posto solo, accanto a chi le finestre le crea',
   );
 });
+
+// #778 — guardare le finestre delle altre app vuole il permesso «Registrazione schermo»: senza, macOS dà immagini nere.
+// Filo lo dice e apre il pannello giusto, e le sue finestre le fotografa da sé, senza permesso.
+test('su Mac guardare lo schermo senza permesso apre il pannello giusto invece di dare un\'immagine nera', async () => {
+  const Schermo = require(join(ROOT, 'src', 'main', 'services', 'schermo.js'));
+  const C = require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'));
+  assert.match(C.uriImpostazioni(Schermo.PANNELLO_MAC), /^x-apple\.systempreferences:com\.apple\.preference\.security\?Privacy_ScreenCapture$/);
+  const conti = { fonti: 0, pannello: 0 };
+  const S = Schermo.crea({
+    sistema: {
+      piattaforma: () => 'darwin', wayland: () => false, permessoMac: () => 'denied',
+      chiediPermessoMac: async () => {}, apriPannello: async () => { conti.pannello += 1; },
+      fonti: async () => { conti.fonti += 1; return []; },
+      finestreFilo: () => [], maniglieFilo: () => [], schermi: () => ({}), delicata: async () => '',
+    },
+  });
+  const r = await S.prepara({ type: 'VEDI_SCHERMO', finestra: 'Word' }, { settings: { schermo: { guarda: true } }, chiave: 't' });
+  assert.equal(r.esito.output.permesso, 'mac');
+  assert.equal(conti.pannello, 1);
+  assert.equal(conti.fonti, 0, 'senza permesso non si chiede la cattura al sistema');
+});

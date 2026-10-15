@@ -453,6 +453,48 @@
         return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
     },
+    VEDI_SCHERMO: {
+      // #778 — guardare una finestra non cambia niente: costo 0. Leggere fuori da Filo è un fatto di privacy, quindi
+      // la prima lettura di ogni finestra esterna (o di una pagina delicata in Filo) in una richiesta sta fuori dal
+      // perimetro e chiede a ogni livello; le letture dopo della stessa finestra partono da sole. `_finestra` e
+      // `_approvata` li scrive il main (src/main/services/schermo.js), mai il modello.
+      costo: 0,
+      campo: null,
+      perimetro: (a) => {
+        const f = a && a._finestra;
+        if (!f) return false;
+        return (f.filo === true && !f.delicata) || a._approvata === true;
+      },
+      perchePerimetro: (a) => (a && a._finestra && a._finestra.delicata
+        ? 'Te lo chiedo perché in quella scheda c\'è una pagina delicata.'
+        : 'Te lo chiedo la prima volta che guardo una finestra fuori da Filo, a ogni tua richiesta.'),
+      fonte: (a, out) => {
+        if (out.testo) {
+          if (out.filo && !out.web) return null;
+          return { classe: 5, campo: null, chiave: 'schermo:finestra', motivo: out.filo ? 'ho guardato una pagina web' : 'ho guardato una finestra fuori da Filo' };
+        }
+        return Array.isArray(out.elenco) && out.elenco.some((v) => v && !v.filo)
+          ? { classe: 5, campo: null, chiave: 'schermo:titoli', motivo: 'ho letto i titoli delle finestre aperte' }
+          : null;
+      },
+      describe: (a) => {
+        const f = (a && a._finestra) || {};
+        const nome = String(f.nome || (a && a.finestra) || '').trim();
+        let quale = nome ? `la finestra «${nome}»` : 'una finestra';
+        if (f.tipo === 'schermo') quale = nome ? `«${nome}»` : 'lo schermo';
+        else if (f.tipo === 'selettore') quale = 'una finestra o lo schermo, che scegli tu nel selettore del sistema';
+        else if (f.filo) quale = `la finestra di Filo «${nome}»`;
+        return `Filo vuole guardare ${quale}.\n\nNe cattura l'immagine e la fa leggere al modello che descrive le immagini, `
+          + 'insieme alla tua domanda. Non clicca, non scrive e non salva l\'immagine.';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const nome = String(o.finestra || (a && a._finestra && a._finestra.nome) || '').trim();
+        if (Array.isArray(o.elenco) && !o.testo) return 'Ho guardato quali finestre sono aperte';
+        if (!nome) return 'Ho guardato lo schermo';
+        return o.tipo === 'schermo' ? `Ho guardato «${nome}»` : `Ho guardato la finestra «${nome}»`;
+      },
+    },
     CERCA_DOCUMENTI: {
       // #947 — Filo cerca fra i documenti dell'utente per contenuto, nell'indice che tiene sul computer. Sola lettura
       // come LEGGI_DOCUMENTO: costo 0 nelle cartelle dell'elenco e nella cartella personale, 2 se la cartella chiesta
@@ -573,6 +615,13 @@
         return !!(built && !built.rifiuto && built.allenta);
       },
       dove: (a) => { const built = prefBuilt(a); return (built && built.dove) || ''; },
+      // Un setter che vuole sempre l'OK (`chiede` in preferences.js) sta fuori dal perimetro: un clic, a ogni livello.
+      perimetro: (a) => {
+        if (a && a._invariato) return true;
+        const built = prefBuilt(a);
+        return !(built && !built.rifiuto && built.chiede);
+      },
+      perchePerimetro: 'Te lo chiedo sempre prima di accenderla.',
       describe: (a) => {
         const built = prefBuilt(a);
         if (!built || built.rifiuto) return 'Modificare una preferenza';
@@ -941,6 +990,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+    'VEDI_SCHERMO',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
@@ -974,7 +1024,10 @@
     try { dove = String(valore(entry.dove, action, ctx) || ''); } catch (_) { dove = ''; }
     let dentroPerimetro = true;
     try { dentroPerimetro = typeof entry.perimetro === 'function' ? !!entry.perimetro(action, ctx) : true; } catch (_) { dentroPerimetro = false; }
-    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro };
+    // La frase del popup quando chiede perché l'azione sta fuori dal perimetro: la dice chi conosce l'azione.
+    let perchePerimetro = '';
+    try { perchePerimetro = dentroPerimetro ? '' : String(valore(entry.perchePerimetro, action, ctx) || ''); } catch (_) { perchePerimetro = ''; }
+    return { costo, campo: campoFor(action), elenco, segreto, difesa, dove, dentroPerimetro, perchePerimetro };
   }
 
   // Spiegazione in chiaro di cosa Filo sta tentando, per il popup di conferma.
