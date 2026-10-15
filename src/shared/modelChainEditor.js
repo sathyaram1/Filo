@@ -98,6 +98,13 @@
     return actions.map((action) => [action, labelOf(action)]);
   }
 
+  // Il nome di una funzione com'è scritto nella griglia: chi la nomina altrove (avvisi delle Opzioni e di Modelli
+  // predefiniti) lo chiede qui, così le pagine non la chiamano in due modi.
+  function etichetta(action) {
+    const row = actionLabels().find(([a]) => a === action);
+    return row ? t(row[1]) : action;
+  }
+
   function splitRefs(value) {
     return String(value == null ? '' : value)
       .split(',')
