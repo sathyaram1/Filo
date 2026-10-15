@@ -164,6 +164,8 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   una prova senza più un rosso, la respinge (può durare qualche minuto: lanciala
   in sottofondo). Da quel commit una prova rossa tolta ferma la consegna, e una
   a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
+  Una che la pulizia ha dimenticato esce con un'altra, anche dopo le correzioni:
+  un commit a parte che toglie solo lei, registrato finché è l'ultimo.
   Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
