@@ -761,17 +761,27 @@ export function finestraOrchestratore(linee) {
         if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
         const testo = testoDi(b.content);
         const c = chiamate.get(b.tool_use_id);
-        if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || ''; continue; }
+        const agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || '';
+        if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = agentId; continue; }
+        // Tipo d'agente che non c'è, gancio che dice no: nessun worker è partito, e il lancio si riprova.
+        if ((b.is_error === true || /^\s*<tool_use_error>/.test(testo)) && !agentId) { c.mancato = true; continue; }
         c.fine = ms;
       }
     }
   }
-  // Un worker in sottofondo finisce solo con la prima notifica dopo il lancio che lo NOMINA (tool-use-id della
-  // chiamata o task-id = agentId del lancio): un Monitor, un comando, un artefatto o un testo che ne parla non lo chiudono.
+  // Un worker in sottofondo finisce col primo segno dopo il lancio che lo NOMINA: la sua consegna (from = agentId del
+  // lancio) o una notifica non provvisoria (tool-use-id della chiamata o task-id = agentId). Un Monitor, un comando,
+  // un artefatto o un testo che ne parla non lo chiudono; e se la consegna arriva prima, i turni di mezzo sono già dopo.
   const aperta = (c, ms) => c.inizio <= ms && !(c.fine <= ms);
   for (const { e, ms } of voci) {
-    const testa = Number.isFinite(ms) ? testaNotifica(e) : '';
-    if (!testa) continue;
+    if (!Number.isFinite(ms)) continue;
+    const da = consegnaDi(e);
+    if (da) {
+      for (const c of chiamate.values()) if (aperta(c, ms) && c.agentId === da) c.fine = ms;
+      continue;
+    }
+    const testa = testaNotifica(e);
+    if (!testa || notificaProvvisoria(e)) continue;
     const ids = [...testa.matchAll(/<tool-use-id>([^<]+)<\/tool-use-id>/g)].map((m) => m[1].trim());
     const task = [...testa.matchAll(/<task-id>([^<]+)<\/task-id>/g)].map((m) => m[1].trim());
     for (const [id, c] of chiamate) {
@@ -780,7 +790,7 @@ export function finestraOrchestratore(linee) {
   }
   // La finestra arriva fino a adesso: in primo piano dopo la chiamata aperta
   // non c'è niente, in sottofondo i turni d'attesa dopo il lancio sono suoi.
-  const confini = [...[...chiamate.values()].map((c) => c.fine), ...rilasci].filter((t) => Number.isFinite(t));
+  const confini = [...[...chiamate.values()].filter((c) => !c.mancato).map((c) => c.fine), ...rilasci].filter((t) => Number.isFinite(t));
   let inizio = confini.length ? Math.max(...confini) : -Infinity;
   // Un turno sta su più righe con la stessa usage: il confine che ne taglia uno va dopo la sua ultima riga,
   // o le righe scritte dopo (un'altra chiamata nello stesso turno del rilascio) lo farebbero contare due volte.
