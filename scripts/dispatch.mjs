@@ -697,12 +697,7 @@ export function cartellaCloneServer(env = process.env) {
   return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
 }
 
-/** Il clone cade dentro il checkout di Filo? L'hook di salvataggio lo pubblicherebbe intero. PURA. */
-export function cloneDentroIlRepo(clone, root) {
-  const norm = (p) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p));
-  const r = relative(norm(root), norm(clone));
-  return r === '' || (!r.startsWith('..') && !isAbsolute(r));
-}
+export { cloneDentroIlRepo };
 
 /** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
 export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {

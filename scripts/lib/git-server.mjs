@@ -84,7 +84,7 @@ export function ambienteGitServer(base, token) {
 
 /**
  * Cosa lanciare per `git-server <azione> <cartella> [<ramo>]`. `clonato`: la cartella ha già un `.git`. PURA.
- * → { errore } | { argv, cwd, controllaOrigin, nota? }
+ * → { errore } | { argv, dir, controllaOrigin, nota? }
  */
 export function pianoGitServer({ azione, cartella, ramo, root, clonato = false } = {}) {
   if (!AZIONI_GIT_SERVER.includes(azione)) return { errore: `git-server vuole un'azione fra ${AZIONI_GIT_SERVER.join(', ')}.` };
@@ -101,7 +101,7 @@ export function pianoGitServer({ azione, cartella, ramo, root, clonato = false }
   }
   if (azione === 'clone' && !clonato) {
     if (r) return { errore: 'git-server clone prende solo la cartella: il ramo si sceglie dopo, nel clone.' };
-    return { argv: ['clone', URL_SERVER, dir], cwd: resolve(dir, '..'), controllaOrigin: false };
+    return { argv: ['clone', URL_SERVER, dir], dir, controllaOrigin: false };
   }
   if (!clonato) return { errore: `in ${dir} non c'è un clone: prima git-server clone.` };
   const passi = {
@@ -111,5 +111,5 @@ export function pianoGitServer({ azione, cartella, ramo, root, clonato = false }
     push: ['push', 'origin', r],
   };
   const nota = azione === 'clone' ? `il clone c'è già in ${dir}: lo aggiorno con fetch.` : '';
-  return { argv: ['-C', dir, ...passi[azione]], cwd: dir, controllaOrigin: true, ...(nota ? { nota } : {}) };
+  return { argv: ['-C', dir, ...passi[azione]], dir, controllaOrigin: true, ...(nota ? { nota } : {}) };
 }
