@@ -192,8 +192,7 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
     const progetto = String(env.CLAUDE_PROJECT_DIR || '').trim();
     if (!biglietti.length && progetto && progetto !== cwd) biglietti = B.trovaBiglietti({ env: envSessione, cwd: progetto });
     if (!biglietti.length) return { esito: 'senza biglietto' };
-    // Le cartelle fidate (altre chiamate a git) servono solo a Read.
-    const motivo = motivoLettura(input, input.tool_name === 'Read' ? contesto({ cwd, env, biglietti }) : {});
+    const motivo = subito ?? motivoLettura(input, contesto({ cwd, env, biglietti }));
     if (!motivo) return { esito: 'nessuna lettura esterna' };
     for (const b of biglietti) {
       let annotato = true;
