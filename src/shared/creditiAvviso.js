@@ -381,9 +381,8 @@
       });
     }
 
-    const accese = automatiche().filter((f) => leggiPercorso(x.impostazioni || {}, f.percorso) !== false
-      && (f.id !== 'nomiFile' && f.id !== 'categorie' ? true : leggiPercorso(x.impostazioni || {}, f.percorso) === true));
-    const consumano = accese
+    const consumano = automatiche()
+      .filter((f) => leggiPercorso(x.impostazioni || {}, f.percorso) === true)
       .map((f) => ({ ...f, c: f.chiavi.reduce((s, k) => s + num(perAzione[k] && perAzione[k].c), 0) }))
       .filter((f) => f.c > 0 && f.c >= totale * 0.01)
       .sort((p, q) => q.c - p.c);
