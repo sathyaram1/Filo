@@ -573,7 +573,7 @@
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
     normalizeCode, formatCode, inviteLink, codeFromInput, codesFromInput, CODE_TRIES, tooManyCodesMessage, inviteCodeFromLink,
     isInviteDeepLink, inviteCodeFromDeepLink, filoUrlFromArgv,
-    inviteView, inviteStateLine, entryNoticeText,
+    inviteView, inviteStateLine, entryNoticeText, invitesLock, networkCapMessage,
     // Manopole e movimenti della pagina dell'owner (#652)
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
     // Le cifre dette fuori dalla pagina Crediti (#816)
