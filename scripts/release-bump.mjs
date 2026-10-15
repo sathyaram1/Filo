@@ -20,7 +20,8 @@
 //   così non si mescola.
 //
 // USO
-//   node scripts/release-bump.mjs
+//   node scripts/release-bump.mjs            la patch delle sei ore
+//   node scripts/release-bump.mjs --minor    la minor del lunedì (canale stabile): scripts/minor-del-lunedi.mjs
 //
 //   Exit code:
 //     0 → fatto: il numero nuovo è su main (stampato su stdout)
@@ -32,6 +33,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parolaDellaCostruzione, DOVE_VA_LA_PAROLA } from './build-alarm.mjs';
+import { chiediMinor, fraseRinvio } from './minor-del-lunedi.mjs';
 
 // Dove vive il server. `FILO_ROUTINE_API` esiste per i test e per un eventuale
 // ambiente di prova: NON è un segreto, è solo un indirizzo.
@@ -83,6 +85,7 @@ export function exitCodeForBump(reply) {
     case 'throttled':
     case 'denied':
     case 'rejected':
+    case 'rinviata':
     case 'no_passphrase': return 2;
     default: return 3;   // not_deployed, unreachable, fault
   }
@@ -105,6 +108,8 @@ export function messageForBump(reply) {
         + '  Il manifesto su main non è come il server se lo aspetta: niente è cambiato.';
     case 'no_passphrase':
       return '[release-bump] RIFIUTATO: manca FILO_BUILD_PASSPHRASE, non posso nemmeno chiedere.';
+    case 'rinviata':
+      return `[release-bump] RIFIUTATO: niente minor, ${fraseRinvio(r.motivo)} Nessun numero è stato scritto.`;
     case 'not_deployed':
       return '[release-bump] il server non espone (ancora) l’aumento di versione.\n'
         + '  Nessun numero è stato scritto: vanno rideployate le funzioni di sicurezza.';
@@ -142,7 +147,8 @@ export async function askServerBump({ passphrase, fetchImpl = fetch, url = RELEA
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const reply = await askServerBump({ passphrase: parolaDellaCostruzione() });
+  const passphrase = parolaDellaCostruzione();
+  const reply = process.argv.includes('--minor') ? await chiediMinor({ passphrase }) : await askServerBump({ passphrase });
   const code = exitCodeForBump(reply);
   console.error(messageForBump(reply));
   // Su stdout SOLO il numero, e solo se c'è: è quello che il lavoro di

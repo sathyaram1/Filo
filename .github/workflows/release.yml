@@ -11,6 +11,14 @@
 #   feedback e la corsa e' rossa. Anche un verde che non esce (la meta'
 #   Windows si ferma dopo la scelta) apre un feedback, passate le 48 ore.
 #
+# LA MINOR DEL LUNEDI' (canale stabile, #1160)
+#   Il lunedi' alle 00:00 ora italiana la corsa chiede al server il permesso
+#   per una minor (x.y.0): esce col commit verde piu' nuovo, anche se e' lo
+#   stesso dell'ultima patch. Il server la rinvia se c'e' un feedback di
+#   sicurezza a priorita' 3 aperto, o se quella settimana e' gia' uscita; il
+#   motivo lo tiene lui. Chi sceglie il canale stabile riceve solo le minor.
+#   Regole e finestra: scripts/minor-del-lunedi.mjs.
+#
 # QUESTO LAVORO NON SCRIVE SU `main` (SPEC-RIDISEGNO-MAX.md §10)
 #   Fino al 18/08/2026 alzava la patch version da sé e la pushava. Su `main`
 #   adesso scrive UNA SOLA identità, quella del server di sicurezza: la ruleset
@@ -51,8 +59,17 @@ name: Release Filo (Windows + Mac + Linux)
 on:
   schedule:
     - cron: '0 */6 * * *'   # ogni 6 ore (UTC); modificabile
+    # La minor del lunedi' alle 00:00 a Roma: 22 UTC con l'ora legale, 23 con la solare (CRON_MINOR).
+    - cron: '0 22 * * 0'
+    - cron: '0 23 * * 0'
   workflow_dispatch:         # pulsante "Run workflow" manuale
     inputs:
+      # Una minor saltata (GitHub a volte non fa partire una corsa programmata) si pubblica da qui,
+      # se il server la permette.
+      minor:
+        description: "Pubblica adesso la minor della settimana (canale stabile)"
+        type: boolean
+        default: false
       # RIMETTERE I FILE DI UNA PIATTAFORMA SU UNA VERSIONE GIA' USCITA
       #   Se la meta' Mac o Linux fallisce, la release esce senza i suoi file e
       #   il collegamento del sito risponde 404. Rilanciare la pubblicazione non
@@ -97,6 +114,7 @@ jobs:
       actions: read
     outputs:
       sha: ${{ steps.scelta.outputs.sha }}
+      tipo: ${{ steps.scelta.outputs.tipo }}
     steps:
       - name: Checkout di main (con storia e tag completi)
         uses: actions/checkout@v4
@@ -114,6 +132,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          FILO_CRON: ${{ github.event.schedule }}
+          FILO_MINOR_A_MANO: ${{ inputs.minor }}
         run: node scripts/ultima-suite-verde.mjs
 
   release:
@@ -155,6 +175,10 @@ jobs:
           LAST_TAG=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
             echo "Nessun tag precedente -> si rilascia."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.scegli.outputs.tipo }}" = "minor" ]; then
+            # La minor porta sullo stabile anche un commit gia' uscito come patch.
+            echo "Minor del lunedi' dopo $LAST_TAG -> si rilascia."
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           else
             # Il tag sta sul commit provato e pubblicato; il commit del numero
@@ -325,7 +349,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          VERSION=$(node scripts/release-bump.mjs)
+          VERSION=$(node scripts/release-bump.mjs ${{ needs.scegli.outputs.tipo == 'minor' && '--minor' || '' }})
           echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
 
       # Si costruisce il commit PROVATO, non la punta di main (#641): il numero

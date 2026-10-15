@@ -96,7 +96,8 @@ export function decidiMinor({ tipo, finestra, permesso, verde, tag, verdeOk } = 
   if (p.outcome !== 'permessa') {
     return esito('', `Il permesso del server non è arrivato (${p.outcome || 'nessuna risposta'}${p.reason ? `: ${p.reason}` : ''}): la minor di questa settimana non esce.`, true);
   }
-  if (!verde) return esito('', 'Niente minor: nessun commit di main ha la suite verde fra le ultime corse riuscite.', true);
+  // Senza verdi da 48 ore il fermo lo segnala già la corsa delle sei ore.
+  if (!verde) return esito('', 'Niente minor: nessun commit di main ha la suite verde fra le ultime corse riuscite.');
   if (!verdeOk) return esito('', `Niente minor: il commit verde \`${verde}\` è più vecchio di ${tag}.`, true);
   return esito(verde, `Si pubblica come minor \`${verde}\`, il commit più nuovo di main con la suite verde${tag ? ` (l'ultima versione è ${tag})` : ''}.`);
 }

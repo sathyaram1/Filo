@@ -6,7 +6,8 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inviaAllarme, spedisciAllarme } from './build-alarm.mjs';
+import { inviaAllarme, spedisciAllarme, parolaDellaCostruzione } from './build-alarm.mjs';
+import { tipoDellaCorsa, nellaFinestra, chiediMinor, decidiMinor } from './minor-del-lunedi.mjs';
 
 /** Oltre questa età dell'ultima versione, con codice nuovo dopo di lei e niente uscito, si grida. */
 export const SOGLIA_ORE = 48;
@@ -204,6 +205,24 @@ async function main() {
   const testa = gitForse('rev-parse', 'HEAD');
   const tag = gitForse('describe', '--tags', '--abbrev=0', '--match', 'v*', 'HEAD');
   const tagSha = tag ? gitForse('rev-parse', `${tag}^{commit}`) : '';
+
+  // La corsa della minor del lunedì: niente fermo da gridare (lo fa quella delle sei ore), solo il permesso del server.
+  const tipo = tipoDellaCorsa({ evento: process.env.GITHUB_EVENT_NAME, cron: process.env.FILO_CRON, aMano: process.env.FILO_MINOR_A_MANO });
+  if (tipo !== 'patch') {
+    const finestra = nellaFinestra();
+    const permesso = tipo === 'minor-programmata' && !finestra ? null : await chiediMinor({ passphrase: parolaDellaCostruzione(), controllo: true });
+    const verdeOk = Boolean(verde) && (verde === tagSha || verdePiuNuovoDelTag(verde, tagSha, eAntenato));
+    const d = decidiMinor({ tipo, finestra, permesso, verde, tag, verdeOk });
+    if (erroreApi) d.righe.push(`- Le corse della suite non si sono lette: ${erroreApi}.`);
+    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `sha=${d.sha}\ntipo=${d.sha ? 'minor' : ''}\n`);
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${d.righe.join('\n')}\n`);
+    console.log(d.righe.join('\n'));
+    if (d.rossa) {
+      console.log('::error::la minor del lunedì non esce per un guasto: il riassunto della corsa dice quale.');
+      process.exit(1);
+    }
+    return;
+  }
   let pubblicataIl = '';
   if (tag && repo) {
     try { pubblicataIl = ghApi(`repos/${repo}/releases/tags/${tag}`)?.published_at || ''; } catch { /* sotto, la data del commit */ }
