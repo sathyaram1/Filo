@@ -17,6 +17,7 @@ import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import { ENV_FILE as ENV_BIGLIETTO, attesePcConStato, fineAttesa, fondiApp, percorsoDiChiLancia, rigaSporco } from './lib/biglietto-locale.mjs';
 import { fusioniServer } from './lib/fusioni-server.mjs';
 import { MODELLI, SFORZI } from './lib/orchestratore-cieco.mjs';
+import { ensureCommentChar } from './lib/carattere-commento.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
@@ -625,6 +626,8 @@ async function main(argv) {
       } catch (e) {
         log(`lavori server in attesa del PC non letti: ${String((e && e.message) || e).slice(0, 200)}`);
       }
+      // Le worktree dei lavori nascono qui sotto e leggono la config del principale.
+      for (const radice of [P.radice, P.serverRadice].filter(Boolean)) ensureCommentChar(radice);
       const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
       for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
       // 2 = qualche lavoro fermo: chi ha lanciato in sottofondo lo sa dal codice, senza leggere le righe.

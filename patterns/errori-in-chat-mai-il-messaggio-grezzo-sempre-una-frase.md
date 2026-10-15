@@ -29,6 +29,12 @@ ha funzionato e cosa fare**.
 - **Se il messaggio dice "riprova", il tasto per riprovare ci deve essere**: la
   bolla d'errore porta un "↻ Riprova" che rimanda lo stesso messaggio senza
   farlo riscrivere (parità col "Riprova" della pagina d'errore di una scheda).
+- **Un ostacolo che riprovare non toglie non dice «riprova»**: dice quale modello,
+  quale funzione e dove se ne sceglie un altro. Il caso «nessun host ammesso» lo
+  riconoscono gli host dichiarati dal catalogo, non il testo del 404 (che il router
+  può cambiare), e la frase la compone solo `fraseNessunHost`: chi ha un altro
+  motivo o un altro rimedio li passa, senza scriverne una seconda (#828,
+  `tests/unit/nessunHostAmmesso.test.mjs`).
 - **Dove:** chat della home (`src/pages/dashboard/dashboard.js` +
   `src/main/services/handlers/filo.js`), chat dei mazzi
   (`src/main/services/handlers/scryfall.js`), assistente laterale

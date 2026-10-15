@@ -49,7 +49,10 @@
     mostraManopole(true);
     const cfg = o.config || {};
     const tot = o.totals || {};
-    renderNumeri(cfg, tot, o.ownerInvites || []);
+    const uso = W.usoPersone(o.users || []);
+    usoLetto = uso;
+    renderNumeri(cfg, tot, o.ownerInvites || [], uso);
+    renderConto(o);
     const quando = formatDate(cfg.eurUsdAt);
     $('ownerTotals').textContent = cfg.eurUsd
       ? `Un credito vale ${formatDecimale(cfg.eurPerCredit, 6)} €, e un euro ${formatDecimale(cfg.eurUsd, 4)} $`
@@ -78,9 +81,11 @@
       const b = u.balance || {};
       const rec = u.reconcile;
       const regTxt = !rec ? '—' : (rec.flagged ? `scarto ${fmtUsd(rec.driftUsd)}` : 'ok');
+      const fine = uso.ultimo[u.pseudonym];
       const cells = [
         u.pseudonym, formatCredits(b.credits), formatInt(b.creditsGranted), fmtUsd(b.usageUsd), regTxt,
         u.invitedBy === 'owner' ? 'te' : (u.invitedBy || '—'), formatDate(u.createdAt),
+        fine ? giornoBreve(fine) : (u.usage && !u.usage.rows ? 'mai' : '—'),
       ];
       cells.forEach((c, i) => {
         const td = document.createElement('td');
@@ -91,6 +96,7 @@
       });
       if (u.disabled) tr.className = 'is-used';
       tr.classList.add('sn-wallet-user');
+      tr.dataset.pseudonym = u.pseudonym;
       tr.title = 'Apri la scheda di questa persona';
       tr.tabIndex = 0;
       tr.setAttribute('role', 'button');
@@ -102,6 +108,7 @@
       // ultime chiamate): si chiede alla prima apertura, non prima.
       const detail = document.createElement('tr');
       detail.className = 'sn-wallet-user-detail';
+      detail.dataset.pseudonym = u.pseudonym;
       detail.hidden = true;
       const td = document.createElement('td');
       td.colSpan = cells.length;
@@ -134,6 +141,7 @@
         apriChiudi();
       });
     }
+    applicaFiltro();
     const runs = [];
     if (o.daily && o.daily.lastRunAt) runs.push(`giornaliera ${formatDateTime(o.daily.lastRunAt)}${summ(o.daily.summary)}`);
     if (o.reconcile && o.reconcile.lastRunAt) runs.push(`riconciliazione ${formatDateTime(o.reconcile.lastRunAt)}${summ(o.reconcile.summary)}`);
@@ -198,9 +206,9 @@
   // quanto è ancora in mano alle persone. Un riquadro che non si può toccare
   // accanto a uno che si può toccare deve VEDERSI diverso: il valore grande,
   // il nome sotto, nessun campo.
-  function riquadro(valore, nome, spiega, { barra = null } = {}) {
+  function riquadro(valore, nome, spiega, { barra = null, nota = '', allarme = false } = {}) {
     const li = document.createElement('li');
-    li.className = 'sn-wallet-numero';
+    li.className = 'sn-wallet-numero' + (allarme ? ' is-allarme' : '');
     if (spiega) li.title = spiega;
     const v = document.createElement('span');
     v.className = 'sn-wallet-numero-valore';
@@ -209,6 +217,12 @@
     n.className = 'sn-wallet-numero-nome';
     n.textContent = nome;
     li.append(v, n);
+    if (nota) {
+      const s = document.createElement('span');
+      s.className = 'sn-wallet-numero-nota';
+      s.textContent = nota;
+      li.appendChild(s);
+    }
     if (barra != null && Number.isFinite(barra)) {
       const b = document.createElement('span');
       b.className = 'sn-wallet-numero-barra';
@@ -220,7 +234,7 @@
     return li;
   }
 
-  function renderNumeri(cfg, tot, ownerInvites) {
+  function renderNumeri(cfg, tot, ownerInvites, uso) {
     const lista = $('ownerNumeri');
     lista.innerHTML = '';
     const nUsers = Number(tot.users) || 0;
@@ -228,19 +242,33 @@
     const dati = Number(tot.grantedCredits);
     const restano = Number.isFinite(tetto) && Number.isFinite(dati) ? Math.max(0, tetto - dati) : null;
     const vivi = tot.liveCredits;
+    const inEuro = (crediti) => fmtEur(W.euroDaCrediti(crediti, cfg));
 
     lista.appendChild(riquadro(formatInt(nUsers), nUsers === 1 ? 'utente' : 'utenti',
       'Quante persone hanno un portafoglio su questo server.'));
+    for (const giorni of [7, 30]) {
+      const chi = giorni === 7 ? uso.attivi7 : uso.attivi30;
+      lista.appendChild(riquadroAttivi(giorni, chi));
+    }
     lista.appendChild(riquadro(
       Number.isFinite(dati) ? formatInt(dati) : '—',
       Number.isFinite(tetto) ? `crediti elargiti su ${formatInt(tetto)}` : 'crediti elargiti',
       'Quanto hai dato finora, contro il tetto che hai messo.',
-      { barra: Number.isFinite(tetto) && tetto > 0 && Number.isFinite(dati) ? dati / tetto : null },
+      { barra: Number.isFinite(tetto) && tetto > 0 && Number.isFinite(dati) ? dati / tetto : null, nota: Number.isFinite(dati) ? inEuro(dati) : '' },
     ));
     lista.appendChild(riquadro(restano == null ? '—' : formatInt(restano), 'ancora elargibili',
       'Quanto puoi ancora dare prima di sbattere sul tetto. A zero si fermano ingressi, quote e premi.'));
     lista.appendChild(riquadro(vivi == null ? '—' : formatCredits(vivi), 'crediti vivi',
-      'La somma dei saldi di tutti: quello che le persone hanno ancora da spendere.'));
+      'La somma dei saldi di tutti: quello che le persone hanno ancora da spendere.',
+      { nota: vivi == null ? '' : inEuro(vivi) }));
+    const spesiCrediti = uso.spesoUsd == null ? null : W.creditiDaUsd(uso.spesoUsd, cfg);
+    const spesiNota = uso.spesoUsd == null ? '' : [fmtUsd(uso.spesoUsd), fmtEur(W.euroDaUsd(uso.spesoUsd, cfg))]
+      .filter((t) => t !== '—').join(' · ');
+    lista.appendChild(riquadro(spesiCrediti == null ? '—' : formatCredits(spesiCrediti), 'crediti spesi',
+      `Quello che hanno speso tutti: la somma della colonna «Speso», al cambio del giorno.${uso.spesoIgnoti
+        ? ` ${uso.spesoIgnoti === 1 ? 'Una persona non ha' : `${formatInt(uso.spesoIgnoti)} persone non hanno`} la spesa letta e non ${uso.spesoIgnoti === 1 ? 'è contata' : 'sono contate'}.`
+        : ''}`,
+      { nota: spesiNota }));
 
     // «In circolazione» sono i codici che questa pagina ha generato e che
     // hanno ancora un posto libero: sono gli unici che il server manda qui.
@@ -250,6 +278,160 @@
       `Codici usciti da qui con ancora un posto libero: ${formatInt(posti)} ${posti === 1 ? 'persona può entrare' : 'persone possono entrare'}.`));
     lista.appendChild(riquadro(formatInt(cfg.invitesRemaining || 0), 'riscatti rimasti',
       'Quante volte si può ancora entrare con un invito, in tutto.'));
+  }
+
+  // ── Chi ha usato Filo: il numero apre le persone che ha contato ────────────
+  // Pattern «un numero si apre su cosa ha contato»: clic, Invio, Spazio e tasto destro lasciano nella tabella solo
+  // quelle persone; a zero il riquadro non finge di essere cliccabile.
+  let filtro = null;
+
+  function riquadroAttivi(giorni, chi) {
+    const n = chi.length;
+    const li = riquadro(formatInt(n), `${n === 1 ? 'attivo' : 'attivi'} negli ultimi ${giorni} giorni`,
+      `Le persone col portafoglio che negli ultimi ${giorni} giorni hanno almeno una riga nel registro d’uso.`);
+    li.dataset.giorni = String(giorni);
+    if (!n) return li;
+    li.classList.add('is-apribile');
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
+    li.setAttribute('aria-pressed', filtro && filtro.giorni === giorni ? 'true' : 'false');
+    if (filtro && filtro.giorni === giorni) li.classList.add('is-attivo');
+    li.title = `${li.title} Clic per vedere solo loro nella tabella.`;
+    const scegli = () => (filtro && filtro.giorni === giorni ? togliFiltro() : filtraAttivi(giorni));
+    li.addEventListener('click', scegli);
+    li.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      scegli();
+    });
+    li.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      const acceso = filtro && filtro.giorni === giorni;
+      apriMenu([
+        [acceso ? 'Mostra tutte le persone' : `Mostra le ${n === 1 ? 'persona contata' : `${formatInt(n)} persone contate`}`, scegli],
+        ['Copia il numero', () => copia(String(n))],
+      ], ev.clientX, ev.clientY);
+    });
+    return li;
+  }
+
+  let usoLetto = { attivi7: [], attivi30: [] };
+
+  function filtraAttivi(giorni) {
+    filtro = { giorni };
+    applicaFiltro();
+  }
+
+  function togliFiltro() {
+    const da = filtro && filtro.giorni;
+    filtro = null;
+    applicaFiltro();
+    // Il fuoco torna sul numero da cui si era partiti, come alla chiusura di ogni elenco aperto da un numero.
+    const torna = da && $('ownerNumeri').querySelector(`[data-giorni="${da}"]`);
+    if (torna && typeof torna.focus === 'function') torna.focus();
+  }
+
+  function applicaFiltro() {
+    const chi = filtro ? new Set(filtro.giorni === 7 ? usoLetto.attivi7 : usoLetto.attivi30) : null;
+    // Se il conto nuovo è vuoto non c'è più niente da mostrare: il filtro si toglie da sé.
+    if (chi && !chi.size) { filtro = null; return applicaFiltro(); }
+    for (const tr of $('ownerUsers').querySelectorAll('tbody tr[data-pseudonym]')) {
+      tr.classList.toggle('is-fuori', Boolean(chi && !chi.has(tr.dataset.pseudonym)));
+    }
+    for (const li of $('ownerNumeri').querySelectorAll('[data-giorni].is-apribile')) {
+      const acceso = Boolean(filtro && String(filtro.giorni) === li.dataset.giorni);
+      li.classList.toggle('is-attivo', acceso);
+      li.setAttribute('aria-pressed', acceso ? 'true' : 'false');
+    }
+    const riga = $('ownerFiltro');
+    riga.textContent = '';
+    riga.hidden = !chi;
+    if (!chi) return;
+    riga.append(`Solo ${chi.size === 1 ? 'la persona che ha' : `le ${formatInt(chi.size)} persone che hanno`} usato Filo negli ultimi ${filtro.giorni} giorni. `);
+    const tutte = document.createElement('button');
+    tutte.type = 'button';
+    tutte.className = 'sn-btn sn-btn-secondary';
+    tutte.id = 'ownerFiltroTogli';
+    tutte.textContent = 'Mostra tutte';
+    tutte.addEventListener('click', togliFiltro);
+    riga.appendChild(tutte);
+  }
+
+  // ── Il conto OpenRouter: se tutti spendessero tutto, regge? ────────────────
+  function renderConto(o) {
+    const cfg = o.config || {};
+    const c = W.contoOwner(o);
+    const lista = $('ownerConto');
+    lista.innerHTML = '';
+    $('ownerContoTitle').hidden = false;
+    lista.hidden = false;
+    const tettoAllarme = c.allarmi.some((a) => a.kind === 'tetto_oltre_caricato');
+    const scoperto = c.allarmi.some((a) => a.kind === 'vivi_oltre_conto');
+    const crediti = (n) => (n == null ? '' : `${formatInt(n)} crediti`);
+    const euroUsd = (usd) => fmtEur(W.euroDaUsd(usd, cfg));
+    const insieme = (...pezzi) => pezzi.filter((t) => t && t !== '—').join(' · ');
+
+    lista.appendChild(riquadro(c.letto ? fmtSoldi(c.restaUsd, '$') : '—', 'restano sul conto',
+      'Quello che il conto OpenRouter di Filo può ancora pagare: caricato meno speso. Le chiavi di tutti pescano da qui.',
+      { nota: c.letto ? insieme(crediti(c.restaCrediti), euroUsd(c.restaUsd)) : '', allarme: scoperto }));
+    lista.appendChild(riquadro(c.letto ? fmtSoldi(c.caricatoUsd, '$') : '—', 'caricati',
+      'Tutto quello che è stato caricato sul conto OpenRouter. Il tetto dei crediti da regalare deve stare sotto.',
+      { nota: c.letto ? insieme(crediti(c.caricatoCrediti), euroUsd(c.caricatoUsd)) : '', allarme: tettoAllarme }));
+    lista.appendChild(riquadro(c.letto ? fmtSoldi(c.spesoUsd, '$') : '—', 'spesi dal conto',
+      'Quanto OpenRouter ha già scalato dal conto, da tutte le chiavi.',
+      { nota: c.letto ? euroUsd(c.spesoUsd) : '' }));
+    const m = c.letto ? c.margine : null;
+    lista.appendChild(riquadro(m == null ? '—' : formatInt(Math.abs(m)),
+      m != null && m < 0 ? 'crediti vivi scoperti' : 'crediti di margine sui vivi',
+      'Quello che resta sul conto meno i crediti che le persone hanno ancora da spendere. Sotto zero, se tutti spendessero tutto il conto si svuoterebbe.',
+      { allarme: scoperto }));
+
+    const nota = $('ownerContoNota');
+    nota.hidden = false;
+    if (!c.letto) {
+      nota.textContent = c.motivo === 'assente'
+        ? 'Il server non manda ancora il saldo del conto OpenRouter: finché non lo legge, qui non si può dire se il conto regge.'
+        : 'Il saldo del conto OpenRouter non è arrivato: OpenRouter non ha risposto al server. Riapri la pagina per riprovare.';
+    } else {
+      const quando = formatDateTime(c.readAt);
+      const regge = c.allarmi.length ? '' : (c.margine == null
+        ? 'Manca il cambio del giorno: senza, i crediti vivi non si confrontano col conto.'
+        : 'Se tutti spendessero tutto quello che hanno, il conto regge.');
+      nota.textContent = [regge, quando ? `Letto ${quando}.` : ''].filter(Boolean).join(' ');
+    }
+
+    // Ogni riquadro del conto ha il suo tasto destro: il numero da copiare e la ricarica, che sta su OpenRouter.
+    for (const li of lista.querySelectorAll('.sn-wallet-numero')) {
+      li.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        const valore = li.querySelector('.sn-wallet-numero-valore').textContent;
+        apriMenu([
+          ...(valore === '—' ? [] : [['Copia il numero', () => copia(valore)]]),
+          ['Ricarica il conto su OpenRouter', ricaricaConto],
+        ], ev.clientX, ev.clientY);
+      });
+    }
+
+    const allarme = $('ownerAllarme');
+    allarme.textContent = '';
+    if (c.allarmi.length) {
+      allarme.append(c.allarmi.map((a) => a.testo).join(' '));
+      const vai = document.createElement('button');
+      vai.type = 'button';
+      vai.className = 'sn-btn sn-wallet-allarme-ricarica';
+      vai.id = 'ownerRicarica';
+      vai.textContent = 'Ricarica su OpenRouter';
+      vai.title = 'Apre la pagina dei crediti del conto OpenRouter';
+      vai.addEventListener('click', ricaricaConto);
+      allarme.appendChild(vai);
+    }
+    allarme.hidden = c.allarmi.length === 0;
+  }
+
+  // La ricarica non si fa da Filo: si apre la pagina dei crediti di OpenRouter, dove l'owner paga.
+  const RICARICA_URL = 'https://openrouter.ai/settings/credits';
+  function ricaricaConto() {
+    chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: RICARICA_URL }).catch(() => {});
   }
 
   // ── Le manopole ────────────────────────────────────────────────────────────
@@ -424,11 +606,7 @@
   function copia(testo) { try { navigator.clipboard.writeText(testo); } catch (_) {} }
 
   function apriMenuPersona(u, detail, apriChiudi, x, y) {
-    chiudiMenuPersona();
-    const menu = document.createElement('div');
-    menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
-    menu.setAttribute('role', 'menu');
-    const voci = [
+    apriMenu([
       [detail.hidden ? 'Apri la scheda' : 'Chiudi la scheda', () => apriChiudi()],
       ['Copia lo pseudonimo', () => copia(u.pseudonym)],
       ['Regala crediti a questa persona', () => {
@@ -437,7 +615,14 @@
         quanti.focus();
         quanti.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }],
-    ];
+    ], x, y);
+  }
+
+  function apriMenu(voci, x, y) {
+    chiudiMenuPersona();
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop sn-wallet-ctxmenu sn-wallet-ctx';
+    menu.setAttribute('role', 'menu');
     for (const [testo, azione] of voci) {
       const voce = document.createElement('div');
       voce.className = 'sn-select-option';
@@ -903,6 +1088,21 @@
       if (Number(s.replace(/\./g, '').replace(',', '.')) !== 0) return `${s} $`;
     }
     return v > 0 ? 'meno di 0,00000001 $' : '—';
+  }
+  // I soldi del conto e gli euro, coi centesimi sempre: «30 $» accanto a «4,20 $» si leggeva come un'altra unità.
+  function fmtSoldi(n, simbolo) {
+    const v = Number(n);
+    if (n == null || !Number.isFinite(v)) return '—';
+    return `${new Intl.NumberFormat('it-IT', { useGrouping: true, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)} ${simbolo}`;
+  }
+  function fmtEur(n) { return fmtSoldi(n, '€'); }
+  // Un giorno del registro ('2026-09-17', UTC come lo scrive il server) letto come quel giorno ovunque si sia: preso
+  // come mezzanotte UTC e scritto nell'ora locale, a ovest di Greenwich diventava il giorno prima.
+  function giornoBreve(giorno) {
+    const [a, m, g] = String(giorno).split('-').map(Number);
+    try {
+      return new Date(Date.UTC(a, m - 1, g)).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    } catch (_) { return String(giorno); }
   }
   function formatDateTime(ts) {
     if (!ts) return '';

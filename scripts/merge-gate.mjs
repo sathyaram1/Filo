@@ -36,7 +36,7 @@
 //     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff): il feedback va
 //          messo in stato `design`, decide l'utente. Nessuna fusione — ma il
 //          ramo non è perduto: il server apre una richiesta di approvazione
-//          che l'owner trova in cima alla dashboard di gestione.
+//          che l'owner trova nel quadrato rosso della pratica, in cima ai Ricevuti.
 //     20 → conflitto di merge, o unit rossi sul risultato della fusione con main
 //          (#929): il server ha già instradato il riallineamento. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
@@ -47,7 +47,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pinnedRepoRoot, absolutizeRecipe, TOOLS_ROOT } from './lib/tools-pin.mjs';
+import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
 import { merge, heartbeat } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
 import { headSha, currentBranch, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
@@ -443,10 +443,7 @@ async function main() {
   const statoRamo = idStato ? readBranchState(ROOT, idStato) : null;
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
-    // I comandi del rimedio con gli attrezzi del GIRO, non con quelli che il
-    // ramo si porta dietro: `scripts/…` qui dentro è la copia del ramo, che può
-    // essere vecchia di giorni e non fare quello che chi legge crede.
-    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source, idStato || ''), TOOLS_ROOT, ROOT));
+    console.error(testoEsitiDecaduti(decaduti, punta, source, idStato || ''));
     process.exit(1);
   }
   const notaVerifica = notaVerificaSuAltroCommit(statoRamo, punta);
@@ -468,9 +465,7 @@ async function main() {
     process.exit(1);
   }
   if (pubblicazione.stato === 'piu_avanti') {
-    // Il rimedio con gli attrezzi del GIRO, come l'altro rifiuto che nomina un
-    // comando: `scripts/…` qui dentro è la copia del ramo.
-    console.error(absolutizeRecipe(testoPiuAvanti(punta, pubblicazione.suOrigin, source), TOOLS_ROOT, ROOT));
+    console.error(testoPiuAvanti(punta, pubblicazione.suOrigin, source));
     process.exit(1);
   }
   if (pubblicazione.stato === 'sconosciuto') {
@@ -504,9 +499,9 @@ async function main() {
   else if (code === 10) {
     console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
     // Il blocco non è più un vicolo cieco: il server apre una richiesta che
-    // l'owner trova in cima alla dashboard di gestione. Dirlo qui evita che
+    // l'owner trova sulla scheda della pratica in Gestione. Dirlo qui evita che
     // chi legge il registro creda che il ramo sia perduto.
-    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
+    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner in Gestione, sulla scheda della pratica');
   }
   else if (code === 20 && reply.result === 'unit_rossi') {
     console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
@@ -519,5 +514,7 @@ async function main() {
 
 // Esegui solo se invocato come script (non quando importato dai test).
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  // I comandi nei testi stampati, i nostri e i motivi del server, portano alla copia fissata (#763).
+  absolutizeOutput(ROOT);
   await main();
 }

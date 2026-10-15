@@ -125,7 +125,12 @@ module.exports = function register(on, ctx) {
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
     // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).
-    const chiedi = () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    // La spiegazione partita da sola alla selezione si conta a parte nel diario dei crediti (#818).
+    const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
+    const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
+    const chiedi = daSola
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin }))
+      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
     const K = globalThis.SN_WALLET_MAIN;
     const r = await (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     if (lettura) await lettura;
@@ -798,6 +803,16 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Le stime di costo accanto ai modelli (#819): la pagina le calcola col contesto che solo il main ha.
+  on(MSG.STIMA_COSTO_MODELLI, soloFilo(async (msg) => {
+    try {
+      const contesto = await require('../costoModelli').contesto({ Defaults, forzaListino: Boolean(msg && msg.forzaListino) });
+      return { ok: true, contesto };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Fornitori che lo smistatore conosce: riempiono il menu dei fornitori
   // esclusi e fanno scoprire un nome che non esclude nessuno (un refuso).
   on(MSG.DEFAULT_PROVIDERS_LIST, soloFilo(async () => {
@@ -867,7 +882,7 @@ module.exports = function register(on, ctx) {
         // giro), e un token preso adesso a quel punto è scaduto. Chi manda se
         // lo fa dare al momento dell'invio, da `ottieniIdToken` (vedi l'init
         // della coda in handlers/misc.js).
-        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin });
+        const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin, intera: true });
         const r = await PathsCollector.collectAndSave({ session: msg.payload?.session, invokeAI });
         if (r?.saved) console.info('[Filo] percorso in coda:', r.id, r.intent);
       } catch (e) { console.warn('[Filo] save_path failed', e); }

@@ -380,20 +380,19 @@ describe('ogni allarme dice al server cosa è rotto', () => {
 
 // Nel contenitore delle routine (Linux, senza schermo, da root) un comando
 // con xvfb-run ma senza la sandbox spenta non fa partire Electron: un testo
-// che lo scrive a metà è la trappola che ogni giro riscopriva.
+// che lo scrive a metà è la trappola che ogni giro riscopriva. Dal #739
+// `npx playwright test` se lo prepara da solo e i testi non lo chiedono più:
+// dove resta scritto (i comandi fuori da Playwright), è intero.
 describe('il comando del contenitore è scritto intero, dovunque compaia', () => {
   test('ogni riga con `xvfb-run -a` in CLAUDE.md, nei ruoli e nei rossi noti porta anche ELECTRON_DISABLE_SANDBOX=1', () => {
     const files = ['CLAUDE.md', 'tests/rossi-noti.json',
       ...readdirSync(resolve(ROOT, 'routines', 'roles')).filter((n) => n.endsWith('.md')).map((n) => `routines/roles/${n}`)];
-    let trovate = 0;
     for (const f of files) {
       for (const riga of readFileSync(resolve(ROOT, f), 'utf8').split(/\r?\n/)) {
         if (!/xvfb-run -a/.test(riga)) continue;
-        trovate += 1;
         assert.match(riga, /ELECTRON_DISABLE_SANDBOX=1/, `${f}: «${riga.trim().slice(0, 120)}» — metà comando`);
       }
     }
-    assert.ok(trovate >= 3, 'il comando del contenitore deve stare scritto in CLAUDE.md, nei ruoli e nei rossi noti');
   });
 });
 
@@ -546,6 +545,58 @@ describe('rimettere i file di una piattaforma su una versione già uscita', () =
       const occorrenze = (passiJob.match(/needs\.release\.outputs\.version/g) || []).length;
       assert.equal(occorrenze, 1,
         'la versione del lavoro Windows va letta una volta sola, nel passo che la sceglie: negli altri passi sarebbe vuota sulla strada a mano');
+    });
+  }
+});
+
+// ─── #785: la sezione «Verifica» con commit, corsa e SHA-256 di ogni file ───
+// Le regole della sezione stanno in tests/unit/releaseImpronte.test.mjs; qui il posto del passo nei tre lavori.
+describe('ogni metà scrive le impronte dei suoi file nella pagina della versione', () => {
+  const CORSA = /CORSA: \$\{\{ github\.server_url \}\}\/\$\{\{ github\.repository \}\}\/actions\/runs\/\$\{\{ github\.run_id \}\}[\s\S]*--corsa "\$CORSA"/;
+  // I valori arrivano dall'ambiente: scritti nel comando con ${{ }}, una versione battuta a mano diventerebbe codice.
+  const SENZA_ESPRESSIONI_NEL_COMANDO = (corpo) => assert.doesNotMatch(corpo.slice(corpo.indexOf('run: |')).replace(/\$\{\{ runner\.temp \}\}/g, ''), /\$\{\{/);
+
+  test('Windows: dopo il controllo della bozza e prima che diventi pubblica, con lo strumento di questa corsa', () => {
+    const r = senzaCommenti(job('release'));
+    const elenco = passi(r);
+    const iControllo = elenco.findIndex((p) => /I file per Windows sono davvero nella bozza/.test(p.nome));
+    const iImpronte = elenco.findIndex((p) => /release-impronte\.mjs"? --piattaforma Windows/.test(p.corpo));
+    const iPubblica = elenco.findIndex((p) => /gh release edit[^\n]*--draft=false/.test(p.corpo));
+    assert.ok(iImpronte > iControllo && iImpronte < iPubblica,
+      'le impronte vanno nella bozza dopo il controllo dei file e prima che diventi pubblica: una versione non esce senza «Verifica»');
+    const p = elenco[iImpronte].corpo;
+    assert.match(p, /if:\s*steps\.check\.outputs\.should_release == 'true'/);
+    assert.match(p, /GH_TOKEN:\s*\$\{\{\s*steps\.app\.outputs\.token\s*\|\|\s*secrets\.GITHUB_TOKEN\s*\}\}/, 'la bozza si scrive con il token che l\'ha creata');
+    // Il commit provato può essere più vecchio dello script: lo strumento si prende dal commit di questa corsa.
+    assert.match(p, /git show "\$\{GITHUB_SHA\}:scripts\/release-impronte\.mjs" > "\$\{RUNNER_TEMP\}\/release-impronte\.mjs"/);
+    assert.doesNotMatch(p, /node scripts\/release-impronte\.mjs/, 'lo strumento della copia di lavoro può non esserci');
+    assert.match(p, /VERSIONE: \$\{\{ steps\.bump\.outputs\.version \}\}[\s\S]*--versione "\$VERSIONE"/);
+    assert.match(p, /COMMIT: \$\{\{ steps\.applica\.outputs\.sha \}\}[\s\S]*--commit "\$COMMIT"/, 'il commit è quello costruito');
+    assert.match(p, CORSA);
+    SENZA_ESPRESSIONI_NEL_COMANDO(p);
+    assert.match(p, /--cartella dist\b/);
+  });
+
+  for (const [nomeJob, piattaforma] of [['release-mac', 'Mac'], ['release-linux', 'Linux']]) {
+    test(`${nomeJob}: dopo il controllo dei file e prima dell'allarme, con lo strumento al riparo`, () => {
+      const testo = senzaCommenti(job(nomeJob));
+      const elenco = passi(testo);
+      const trovati = elenco.filter((x) => /release-impronte\.mjs"? --piattaforma/.test(x.corpo));
+      assert.equal(trovati.length, 1, 'un passo solo scrive le impronte');
+      const p = trovati[0];
+      assert.equal(p.id, 'impronte', 'l\'allarme deve poter dire che si è fermato lì');
+      const i = elenco.indexOf(p);
+      assert.ok(i > elenco.findIndex((x) => x.id === 'controllo'), 'le righe si scrivono solo per file che sono davvero nella release');
+      assert.ok(i < elenco.findIndex((x) => x.id === 'allarme'), 'un guasto qui deve aprire il feedback');
+      assert.match(p.corpo, new RegExp(`--piattaforma ${piattaforma} --cartella dist\\b`));
+      assert.match(p.corpo, /node "\$\{\{ runner\.temp \}\}\/strumenti\/release-impronte\.mjs"/, 'su un tag vecchio lo script della copia di lavoro non c\'è');
+      assert.match(elenco.find((x) => x.id === 'riparo').corpo, /cp [^\n]*scripts\/release-impronte\.mjs "\$\{\{ runner\.temp \}\}\/strumenti\/"/);
+      assert.match(p.corpo, /VERSIONE: \$\{\{ steps\.bersaglio\.outputs\.versione \}\}[\s\S]*--versione "\$VERSIONE"/);
+      SENZA_ESPRESSIONI_NEL_COMANDO(p.corpo);
+      assert.match(p.corpo, /--commit "\$\(git rev-parse HEAD\)"/, 'il commit è quello che la guardia ha appena controllato');
+      assert.match(p.corpo, CORSA);
+      assert.match(p.corpo, /--verifica-dopo \d+/, 'Mac e Linux scrivono in parallelo: senza rilettura uno cancella le righe dell\'altro');
+      assert.match(p.corpo, /GH_TOKEN:\s*\$\{\{\s*secrets\.GITHUB_TOKEN\s*\}\}/);
     });
   }
 });

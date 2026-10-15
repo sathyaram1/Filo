@@ -29,6 +29,8 @@ async function apri(app, openTab, testServer) {
       if (t.includes('Analizza il testo qui sotto')) {
         globalThis.__scan += 1;
         const parole = [...new Set(t.match(/xq[a-z]+\d+/g) || [])];
+        // `__trattieni`: la risposta aspetta che la prova la lasci andare, come un modello lento.
+        if (globalThis.__trattieni) await new Promise((ok) => globalThis.__rilascia.push(ok));
         return { text: JSON.stringify({ annotated: parole.map((w) => `**${w}**`).join(' '), issues: parole.map(() => ({ type: 'grammar', explanation: 'x', correction: 'y' })) }), model: 'finto', provider: 'openrouter', costEur: 0, usage: {} };
       }
       // «Correggi» nel riquadro Modifica, sulla prima riga della prova del rosso.
@@ -208,4 +210,33 @@ test('con «Risolvi» dal tasto destro sul blu, le altre parole blu restano segn
   await corr.click();
   await expect(page.locator('#ta')).toHaveValue('oggi xqprima1 bella giornata con y e poi xqterza3 fine ');
   expect(await restanoPer(page, ['xqprima1', 'xqterza3'], 1000)).toEqual([]);
+});
+
+test('#1097.5 — la risposta arrivata mentre si scriveva non si butta; spazi e punteggiatura non rifanno lo scan', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await apri(app, openTab, testServer);
+  await app.evaluate(() => { globalThis.__trattieni = true; globalThis.__rilascia = []; });
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi xqprima1 bella giornata ');
+  await expect.poll(() => scan(app), { timeout: 6000 }).toBe(1);
+  // Lo scan è partito: l'utente continua a scrivere, e la risposta arriva dopo.
+  await page.keyboard.type('e poi xqdopo2 al mare ');
+  await app.evaluate(() => globalThis.__rilascia.shift()());
+  // Il segno della risposta vecchia compare subito, sulla sua parola, senza aspettare lo scan del testo nuovo.
+  await expect(blu(page)).toHaveText(['xqprima1'], { timeout: 1000 });
+  expect(await restanoPer(page, ['xqprima1'], 300)).toEqual([]);
+  await expect.poll(() => scan(app), { timeout: 6000 }).toBe(2);
+  await app.evaluate(() => { globalThis.__trattieni = false; for (const ok of globalThis.__rilascia.splice(0)) ok(); });
+  await expect(blu(page)).toHaveText(['xqprima1', 'xqdopo2'], { timeout: 6000 });
+  await page.screenshot({ path: 'tests/.shots/1097-correttore-risposta-tardiva.png' }).catch(() => {});
+
+  // Un punto e uno spazio in più: le parole sono le stesse, nessuna domanda nuova al modello.
+  await page.keyboard.type('. ');
+  await new Promise((r) => setTimeout(r, 2500));
+  expect(await scan(app)).toBe(2);
+  await expect(blu(page)).toHaveText(['xqprima1', 'xqdopo2']);
+  // Una parola nuova invece sì.
+  await page.keyboard.type('xqterza3 ');
+  await expect.poll(() => scan(app), { timeout: 6000 }).toBe(3);
+  await expect(blu(page)).toHaveText(['xqprima1', 'xqdopo2', 'xqterza3'], { timeout: 6000 });
 });

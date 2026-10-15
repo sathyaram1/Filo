@@ -446,8 +446,10 @@ test('dopo una pulizia che toglie righe da un aiuto, la consegna rilancia le pro
 test('le due pulizie, locale e routine, rilanciano le prove toccate prima di registrare', () => {
   const locale = readFileSync(resolve(ROOT, 'scripts', 'verify-local.mjs'), 'utf8');
   const routine = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
-  assert.match(locale, /controllaCasiDellaPulizia\(\{ shaCritica: aperto\.pending\.sha, sha: controllo\.sha, root: ROOT/);
-  assert.match(routine, /controllaCasiDellaPulizia\(\{ shaCritica: st\.verifierSha, sha: r\.state\.puliziaSha, root: ROOT/);
+  assert.match(locale, /controllaCasiDellaPulizia\(\{ shaCritica: controllo\.prima \|\| aperto\.pending\.sha, sha: controllo\.sha, root: ROOT/);
+  assert.match(routine, /controllaCasiDellaPulizia\(\{\s*shaCritica: controllo\.prima \|\| st\.verifierSha, sha: controllo\.sha, root: ROOT/);
+  // Dopo le correzioni la pulizia si confronta col commit prima di lei, e anche un caso verde da correggere non esce (#747).
+  for (const testo of [locale, routine]) assert.match(testo, /controllaCasiDellaPulizia\(\{[^}]*dopo: !!controllo\.dopo/);
 });
 
 function esegui(script, argv, env, cwd) {
@@ -518,6 +520,112 @@ test('verify-local pulizia respinge allo stesso modo la pulizia che spegne il ca
     const si = await esegui('verify-local.mjs', ['pulizia'], env, t.dir);
     assert.equal(si.code, 0, si.testo);
     assert.equal(entry().pending.shaPulizia, giusta);
+  } finally {
+    togliCartella(t.dir);
+  }
+});
+
+// ─── #747: il caso dimenticato dalla pulizia esce con una pulizia dopo le correzioni ───
+
+test('#747 la pulizia dopo le correzioni toglie il caso dimenticato di un messo da parte, non quello di uno da correggere, nemmeno verde', () => {
+  const file = `${CARTELLA}/giro1-r1-r2-ab.spec.mjs`;
+  const t = giro({ [file]: prova(caso('r1 caso a', 'a'), caso('r2 caso b', 'b')), [AIUTO]: banco('a', 'b'), 'stato-a.txt': 'rotto\n', 'stato-b.txt': 'rotto\n' });
+  const opz = { root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} };
+  const consegna = (pulizieDopo) => controllaProveTolte({ ...opz, shaPrima: t.critica, conPulizia: false, shaCritica: t.critica, numeri: [2], avvio: t.avvio, pulizieDopo });
+  const pulizia = () => {
+    const c = controllaPulizia({ shaCritica: t.critica, root: t.dir, avvio: t.avvio });
+    assert.equal(c.ok, true, c.motivo);
+    assert.equal(c.dopo, true);
+    return { c, casi: controllaCasiDellaPulizia({ ...opz, shaCritica: c.prima, sha: c.sha, messi: [2], dopo: true }) };
+  };
+  try {
+    t.scrivi('stato-a.txt', 'corretto\n');
+    t.commit('correzione di a');
+    t.scrivi(file, prova(caso('r1 caso a', 'a')));
+    t.commit('via il caso di b, insieme alla correzione');
+    const respinta = consegna([]);
+    assert.equal(respinta.ferma, true);
+    assert.match(respinta.testo, /giro1-r1-r2-ab\.spec\.mjs \(r2\)/, 'rosso è solo il caso di r2, messo da parte: lo dice il suo titolo');
+    assert.match(respinta.testo, /Registra la pulizia/);
+    assert.doesNotMatch(respinta.testo, /correggi finché/i);
+
+    t.g('revert', '--no-edit', 'HEAD');
+    t.scrivi(file, prova());
+    t.commit('pulizia che toglie anche il caso di a, ormai verde');
+    const larga = pulizia();
+    assert.equal(larga.casi.ferma, true, 'il caso di r1 è verde ma è di un rilievo da correggere: non esce con la pulizia');
+    assert.match(larga.casi.testo, /«r1 caso a» è stato tolto, ma non è di un rilievo messo da parte/);
+    assert.match(larga.casi.testo, /git revert --no-edit HEAD/);
+
+    t.g('revert', '--no-edit', 'HEAD');
+    t.scrivi(file, prova(caso('r1 caso a', 'a')));
+    const giusta = t.commit('pulizia: solo il caso di b');
+    const buona = pulizia();
+    assert.deepEqual(buona.casi, { ferma: false, testo: '' }, 'resta solo il caso di a, già verde: niente da spiegare');
+    t.visti.length = 0;
+    assert.deepEqual(consegna([giusta]), { ferma: false, testo: '' });
+    assert.deepEqual(nomi(t.visti), ['giro1-r1-r2-ab.spec.mjs'], 'si rilancia com\'era dopo la pulizia: il caso di a');
+    t.scrivi('stato-a.txt', 'rotto\n');
+    t.commit('a si rompe di nuovo');
+    const rotta = consegna([giusta]);
+    assert.equal(rotta.ferma, true, 'quello che resta dopo la pulizia è ancora controllato');
+    assert.match(rotta.testo, /giro1-r1-r2-ab\.spec\.mjs\n[\s\S]*correggi finché è verde/);
+  } finally {
+    togliCartella(t.dir);
+  }
+});
+
+test('#747 dispatch: la consegna manda alla pulizia la prova dimenticata, e la pulizia dopo le correzioni la lascia uscire', async () => {
+  const [a, b, bis] = ['giro1-r1-a', 'giro1-r2-b', 'giro1-r2-bis'].map((n) => `${CARTELLA}/${n}.spec.mjs`);
+  const t = giro({
+    [a]: prova(caso('caso a', 'a')), [b]: prova(caso('caso b', 'b')), [bis]: prova(caso('ancora b', 'b')), [AIUTO]: banco('a', 'b'),
+    'stato-a.txt': 'rotto\n', 'stato-b.txt': 'rotto\n',
+  });
+  const stato = resolve(t.dir, 'stato', 'fid-747.json');
+  mkdirSync(dirname(stato), { recursive: true });
+  writeFileSync(stato, JSON.stringify({
+    id: 'fid-747', branch: 'worker/746', verifierVerdict: 'fix-pending', verifierSha: t.critica,
+    messiDaParteGiro: { sha: t.critica, n: 1, numeri: [2], avvio: t.avvio }, checkpoints: [{ sha: t.critica, by: 'verifier:fix' }],
+  }));
+  const env = {
+    FILO_REPO_ROOT: t.dir, FILO_TOOLS_ROOT: t.dir, FILO_DISPATCH_STATE_DIR: resolve(t.dir, 'stato'), FILO_ROUTINES_ENABLED: '1',
+    FILO_ROUTINE_API: 'http://127.0.0.1:9', FILO_ROUTINE_TICKET: 'biglietto-di-prova', FILO_ROUTINE_ROLE: 'verifier', FILO_NO_BEAT: '1',
+    DISPLAY: process.env.DISPLAY || ':0', PATH: `${resolve(t.dir, 'bin')}${delimiter}${process.env.PATH}`,
+  };
+  const leggi = () => JSON.parse(readFileSync(stato, 'utf8'));
+  const REPORT = 'Corretta la cosa a: adesso funziona, provata con la sua prova del giro e a mano. Lasciata stare la b, messa da parte.';
+  try {
+    t.g('rm', '-q', b);
+    const prima = t.commit('pulizia che dimentica il bis');
+    const p1 = await esegui('dispatch.mjs', ['--record-pulizia', 'fid-747'], env, t.dir);
+    assert.equal(p1.code, 0, p1.testo);
+    assert.equal(leggi().puliziaSha, prima);
+
+    t.scrivi('stato-a.txt', 'corretto\n');
+    t.g('rm', '-q', bis);
+    t.commit('correzione, e via anche il bis');
+    const no = await esegui('dispatch.mjs', ['--record-fixed', 'fid-747', REPORT], env, t.dir);
+    assert.equal(no.code, 1, no.testo);
+    assert.match(no.testo, /giro1-r2-bis\.spec\.mjs \(r2\)/);
+    assert.match(no.testo, /node scripts\/dispatch\.mjs --record-pulizia fid-747/);
+    assert.doesNotMatch(no.testo, /correggi finché/i);
+
+    const mista = await esegui('dispatch.mjs', ['--record-pulizia', 'fid-747'], env, t.dir);
+    assert.notEqual(mista.code, 0, 'la correzione sta nello stesso commit');
+    assert.match(mista.testo, /un commit a parte, l'ultimo/);
+
+    t.g('checkout', prima, '--', bis); t.commit('rimessa com\'era');
+    t.g('rm', '-q', bis);
+    const dopo = t.commit('pulizia dopo le correzioni');
+    const p2 = await esegui('dispatch.mjs', ['--record-pulizia', 'fid-747'], env, t.dir);
+    assert.equal(p2.code, 0, p2.testo);
+    assert.match(p2.testo, /pulizia dopo le correzioni registrata/);
+    assert.equal(leggi().puliziaSha, prima, 'la base della consegna non si sposta');
+    assert.deepEqual(leggi().pulizieDopo, [dopo]);
+
+    const si = await esegui('dispatch.mjs', ['--record-fixed', 'fid-747', REPORT], env, t.dir);
+    assert.equal(si.code, 3, `superato il controllo, la consegna arriva al server (che qui è giù): ${si.testo}`);
+    assert.doesNotMatch(si.testo, /Consegna respinta/);
   } finally {
     togliCartella(t.dir);
   }

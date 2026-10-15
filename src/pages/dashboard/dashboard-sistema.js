@@ -51,6 +51,10 @@
     window.addEventListener('offline', () => chiedi({ subito: true }));
     programmaRichiamo();
     programmaOra();
+    // Chi usa la home sta per mandare un turno anche senza scrivere (un suggerimento, «Riprova», «Continua»), e una
+    // bozza lasciata lì parte con un Invio anche dopo una pausa lunga: finché è così il lettore resta sveglio (#1097.1).
+    for (const t of ['pointermove', 'pointerdown', 'keydown', 'wheel']) document.addEventListener(t, () => scrive(), { passive: true, capture: true });
+    setInterval(() => { if (deps.bozza && deps.bozza() && document.hasFocus()) scrive(); }, 60 * 1000);
   }
 
   async function chiedi({ subito = false } = {}) {
@@ -60,13 +64,17 @@
     if (r && r.ok && r.stato) aggiornato(r.stato);
   }
 
-  // Chi scrive in chat manderà presto un turno che vuole lo stato di adesso: il lettore parte mentre si scrive,
-  // così all'invio la lettura è pronta. Serve solo alla home che non lo tiene già sveglio da sé.
-  function scrive() {
-    if (!send || segue() || document.visibilityState === 'hidden') return;
-    const adesso = Date.now();
-    if (adesso - svegliatoPerChat < 20 * 1000) return;
-    svegliatoPerChat = adesso;
+  // Chi entra nel campo della chat o ci scrive manderà presto un turno che vuole lo stato di adesso: il lettore parte
+  // subito, così all'invio la lettura è pronta (#1097.1). Anche con la home che lo segue: dopo una pausa dorme.
+  // `entra`: il campo ha appena preso il fuoco, cosa rara: non aspetta il passo dei tasti e non lo consuma, così il
+  // primo tasto dopo un fuoco preso all'apertura della home sveglia comunque il lettore che nel frattempo dorme.
+  function scrive({ entra = false } = {}) {
+    if (!send || document.visibilityState === 'hidden') return;
+    if (!entra) {
+      const adesso = Date.now();
+      if (adesso - svegliatoPerChat < 20 * 1000) return;
+      svegliatoPerChat = adesso;
+    }
     send({ type: MSG.SISTEMA_STATO, perChat: true }).catch(() => {});
   }
 

@@ -98,6 +98,13 @@
     return actions.map((action) => [action, labelOf(action)]);
   }
 
+  // Il nome di una funzione com'è scritto nella griglia: chi la nomina altrove (avvisi delle Opzioni e di Modelli
+  // predefiniti) lo chiede qui, così le pagine non la chiamano in due modi.
+  function etichetta(action) {
+    const row = actionLabels().find(([a]) => a === action);
+    return row ? t(row[1]) : action;
+  }
+
   function splitRefs(value) {
     return String(value == null ? '' : value)
       .split(',')
@@ -195,8 +202,16 @@
       popClass: 'sn-chain-pop',
       valueClass: 'sn-chain-opt-nick',
       labelClass: 'sn-chain-opt-label',
+      extraClass: 'sn-chain-opt-cost',
       sizeInput: true,
     });
+  }
+
+  // Il costo accanto al modello (#819): la cifra breve nel segmento, la spiegazione nell'hover.
+  function mostraCosto(tag, c) {
+    tag.hidden = !c || !c.breve;
+    tag.textContent = c && c.breve ? c.breve : '';
+    if (c && c.testo) tag.title = c.testo; else tag.removeAttribute('title');
   }
 
   // Costruisce l'editor a segmenti per UNA azione.
@@ -205,6 +220,13 @@
     const validate = ctx && ctx.validate;
     const isKnown = (ctx && ctx.isKnown) || (() => true);
     const avvisoDi = ctx && typeof ctx.avvisoDi === 'function' ? ctx.avvisoDi : null;
+    // `costoDi(ref)` → { breve, testo, avviso } | null: sincrona, la pagina ha già il contesto della stima.
+    const costoDi = ctx && typeof ctx.costoDi === 'function' ? ctx.costoDi : null;
+    const costoSicuro = (ref) => { try { return costoDi ? costoDi(String(ref || '').trim()) : null; } catch (_) { return null; } };
+    const leggiOpzioni = (ctx && ctx.readOptions) || readNicknameOptions;
+    const opzioniColCosto = costoDi
+      ? () => leggiOpzioni().map((o) => { const c = costoSicuro(o.value); return c && c.breve ? { ...o, extra: c.breve } : o; })
+      : leggiOpzioni;
     const el = document.createElement('div');
     el.className = 'sn-chain';
     let refs = splitRefs(value);
@@ -217,7 +239,29 @@
     avviso.setAttribute('role', 'status');
     avviso.hidden = true;
     let giroAvviso = 0;
+    // L'avviso del costo informa e non blocca (#819): sta in una riga sua, col colore di Filo e non quello d'errore.
+    const costoAvviso = document.createElement('div');
+    costoAvviso.className = 'sn-chain-costo';
+    costoAvviso.setAttribute('role', 'status');
+    costoAvviso.hidden = true;
+    function aggiornaCosti() {
+      if (!costoDi) return;
+      for (const seg of el.querySelectorAll('.sn-chain-seg')) {
+        const tag = seg.querySelector('.sn-chain-cost');
+        const inp = seg.querySelector('.sn-chain-input');
+        if (tag) mostraCosto(tag, costoSicuro(inp ? inp.value : confermati[Number(seg.dataset.i)]));
+      }
+      const scelti = [...new Set(confermati.map((r) => String(r || '').trim()).filter(Boolean))];
+      const righe = [...new Set(scelti.map((r) => (costoSicuro(r) || {}).avviso).filter((x) => typeof x === 'string' && x))];
+      costoAvviso.replaceChildren(...righe.map((x) => {
+        const p = document.createElement('p');
+        p.textContent = x;
+        return p;
+      }));
+      costoAvviso.hidden = !righe.length;
+    }
     function ricontrolla() {
+      aggiornaCosti();
       if (!avvisoDi) return;
       const mio = ++giroAvviso;
       const scelti = [...new Set(confermati.map((r) => String(r || '').trim()).filter(Boolean))];
@@ -262,6 +306,7 @@
         }
         const seg = document.createElement('span');
         seg.className = 'sn-chain-seg';
+        seg.dataset.i = String(i);
 
         const inp = document.createElement('input');
         inp.type = 'text';
@@ -298,20 +343,34 @@
           showSegMsg(seg, reason);
           inp.value = confermati[i]; fit(inp);
           refs[i] = confermati[i]; emit();
+          const tag = seg.querySelector('.sn-chain-cost');
+          if (tag) mostraCosto(tag, costoSicuro(inp.value));
         };
         const confermaSegmento = () => {
           const val = inp.value.trim();
           const v = validate ? validate(val) : { ok: true };
           if (v.ok) accept(val); else reject(v.reason);
         };
-        inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(true); });
+        // Il costo segue quello che si scrive, come la larghezza del campo: cambiarlo all'uscita sposterebbe «+» e «×»
+        // fra la pressione e il rilascio del clic, e il clic andrebbe perso.
+        inp.addEventListener('input', () => {
+          refs[i] = inp.value; fit(inp); emit(true);
+          const tag = seg.querySelector('.sn-chain-cost');
+          if (tag) mostraCosto(tag, costoSicuro(inp.value));
+        });
         inp.addEventListener('change', confermaSegmento);
         conferme.push(() => { if (inp.value.trim() !== String(confermati[i] || '').trim()) confermaSegmento(); });
         seg.appendChild(inp);
+        if (costoDi) {
+          const tag = document.createElement('span');
+          tag.className = 'sn-chain-cost';
+          seg.appendChild(tag);
+          mostraCosto(tag, costoSicuro(ref));
+        }
         attachDropdown(seg, inp, (value) => {
           const v = validate ? validate(value) : { ok: true };
           if (v.ok) accept(value); else reject(v.reason);
-        }, validate, ctx && ctx.readOptions);
+        }, validate, opzioniColCosto);
 
         // Il pulsante di rimozione c'è solo se ci sono più segmenti: l'ultimo
         // rimasto non si può rimuovere (resterebbe l'azione senza modello).
@@ -363,7 +422,7 @@
 
     render();
     ricontrolla();
-    return { el, avviso, getValue, conferma, ricontrolla, imposta };
+    return { el, avviso, costoAvviso, getValue, conferma, ricontrolla, aggiornaCosti, imposta };
   }
 
   // Popola un host (.sn-grid-2) con una cella per azione: etichetta + editor a
@@ -382,10 +441,12 @@
         validate: makeValidator(action, getRegistry),
         isKnown: makeKnownCheck(getRegistry),
         avvisoDi: typeof o.avvisoDi === 'function' ? (ref) => o.avvisoDi(action, ref) : null,
+        costoDi: typeof o.costoDi === 'function' ? (ref) => o.costoDi(action, ref) : null,
       });
       cell.appendChild(label);
       cell.appendChild(chain.el);
       cell.appendChild(chain.avviso);
+      cell.appendChild(chain.costoAvviso);
       host.appendChild(cell);
       chains[action] = chain;
     }
@@ -406,6 +467,10 @@
     for (const action of Object.keys(chains || {})) chains[action].ricontrolla();
   }
 
+  function aggiornaCosti(chains) {
+    for (const action of Object.keys(chains || {})) chains[action].aggiornaCosti();
+  }
+
   // Avviso della griglia per voce e dettatura: lo stesso verdetto sui fornitori che le ferma a runtime (#1141).
   // `entry` è la riga del registro com'è sulla pagina, anche non salvata; `excluded`, se c'è, la lista che la
   // pagina sta modificando al posto di quella in vigore.
@@ -423,6 +488,7 @@
   }
 
   global.SN_MODEL_CHAIN = {
-    buildChain, renderGrid, collect, conferma, ricontrolla, actionLabels, makeValidator, makeKnownCheck, avvisoHostAudio,
+    buildChain, renderGrid, collect, conferma, ricontrolla, aggiornaCosti, actionLabels, etichetta, makeValidator, makeKnownCheck,
+    avvisoHostAudio,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

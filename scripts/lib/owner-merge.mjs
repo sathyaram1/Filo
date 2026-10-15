@@ -183,6 +183,10 @@ function righeDelleParti(r, pratica, num) {
 const RIPROPONI = '  Per riproporla serve un commit nuovo, anche vuoto, poi rilancia npm run finish:\n'
   + '    git commit --allow-empty -m "riproposta"';
 
+// La richiesta del lavoro locale nasce senza pratica, anche con --feedback: in Gestione non ha una scheda e sta in
+// Automazioni con le altre orfane (#761). Sentinella: tests/unit/ownerMerge.test.mjs.
+export const DOVE_SI_APPROVA = 'Gestione → Automazioni';
+
 /** Il seguito di un blocco: dove sta la richiesta, o perché in Filo non c'è niente da approvare (#486). PURA. */
 function righeDellaRichiesta(r) {
   if (!r.requestId) {
@@ -192,9 +196,9 @@ function righeDellaRichiesta(r) {
   const giaDecisa = (perche) => `  NON l'ho messa in attesa: ${perche}\n  In Filo non c'è niente da approvare.\n${RIPROPONI}`;
   switch (r.requestState) {
     case 'pending':
-      return '  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
-        + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
-        + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
+      return `  L'ho messa IN ATTESA: approvala da Filo, in ${DOVE_SI_APPROVA}\n`
+        + '  (in cima alla scheda). Da lì puoi anche scartarla.\n'
+        + '  Se la pagina è già aperta la richiesta compare da sola, non serve riaprirla.\n'
         + `  Se Filo non si apre: ${PAGINA_APPROVAZIONI} da un browser qualunque,\n`
         + '  con l\'account del proprietario.\n'
         + '  Vale per il commit appena controllato e per 7 giorni: se scade, o se il\n'
@@ -207,7 +211,7 @@ function righeDellaRichiesta(r) {
       return giaDecisa('questa versione era già stata decisa (approvata o\n  scartata), e una richiesta decisa non si riapre.');
     default:
       return `  Il server dice di averla messa in attesa, ma non sono riuscito a\n  controllarlo${r.requestCheck ? ` (${r.requestCheck})` : ''}.\n`
-        + '  Se in cima ai Ricevuti della dashboard di gestione non c\'è l\'avviso,\n'
+        + `  Se in ${DOVE_SI_APPROVA} la richiesta non c'è,\n`
         + '  questa versione era già stata decisa e non si riapre.\n'
         + RIPROPONI;
   }

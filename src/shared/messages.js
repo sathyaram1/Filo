@@ -110,6 +110,8 @@
     SCRYFALL_SYMBOLS: 'scryfall_symbols', // {} → mappa '{U}' → svg_uri
     SCRYFALL_PRINTS: 'scryfall_prints',   // { name } → { ok, prints } (n. stampe, cache permanente)
     GET_COSTS: 'get_costs',
+    // Le stime di costo dei modelli (#819): {} → { ok, contesto } (listino, saldo, tariffa, token medi, predefiniti).
+    STIMA_COSTO_MODELLI: 'stima_costo_modelli',
     // Crediti (gamification): saldo + consumo aggregato per tipo d'uso, per la
     // pagina Crediti del profilo. NON espone mai il costo in €. Vedi creditStore.
     GET_CREDITS: 'get_credits',
@@ -211,6 +213,23 @@
     //   la chiave resta nel main). { } → { ok, limit|null, usage,
     //   limit_remaining|null, line } oppure { ok:false, status, message }
     WALLET_OWN_KEY_INFO: 'wallet_own_key_info',
+    // === L'avviso prima che i crediti finiscano (#818) =======================
+    // ORIGINE: solo pagine filo:// e la shell (come i WALLET_*).
+    // CREDITS_WARNING: spinta del main alle pagine filo:// quando scatta l'avviso. { id }
+    //   La home con una conversazione aperta lo prende con CREDITS_WARNING_CLAIM; se nessuna lo prende, diventa una
+    //   notifica nella cornice che apre la pagina Crediti.
+    CREDITS_WARNING: 'credits_warning',
+    // CREDITS_WARNING_CLAIM: { id } → { ok, avviso:{ id, testo, rimedi:[…] } } solo alla prima che lo chiede.
+    CREDITS_WARNING_CLAIM: 'credits_warning_claim',
+    // CREDITS_WARNING_STATE: l'avviso com'è adesso, per la pagina Crediti. { } → { ok, mostra, avviso|null }
+    CREDITS_WARNING_STATE: 'credits_warning_state',
+    // CREDITS_REMEDY_APPLY / _UNDO: un rimedio con un clic, e com'era con un altro. Il main ricalcola il rimedio da
+    //   sé: dalla pagina arriva solo l'id. { id: 'modello'|'automatiche' } → { ok, frase, avviso }
+    CREDITS_REMEDY_APPLY: 'credits_remedy_apply',
+    CREDITS_REMEDY_UNDO: 'credits_remedy_undo',
+    // SPIEGAZIONE_ANTICIPATA_USATA: la spiegazione preparata alla selezione è stata aperta col tasto destro. Anche dai
+    //   siti (content script): serve solo a non contarla fra quelle che spegnere farebbe risparmiare. { } → { ok }
+    SPIEGAZIONE_ANTICIPATA_USATA: 'spiegazione_anticipata_usata',
     // WALLET_NOTICE_SEEN (#651): l'avviso di benvenuto («Sei entrato con un
     //   invito: hai N crediti») è stato mostrato da una superficie. Lo dicono
     //   la home e la pagina Crediti, ognuna per sé: chi l'ha già visto in
@@ -235,7 +254,14 @@
     // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
     // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
     //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).
+    //   `overview.account` (#820) è il conto OpenRouter di Filo, che il server legge con la sua chiave di gestione
+    //   (GET /api/v1/credits): { totalCreditsUsd, totalUsageUsd, readAt } (caricato e speso), o { error } se
+    //   OpenRouter non ha risposto. Senza il campo la pagina dice che il conto non è letto.
     WALLET_OWNER_OVERVIEW: 'wallet_owner_overview',
+    // WALLET_OWNER_ALARM_PENDING (#820): gli allarmi del conto OpenRouter da dire all'owner all'avvio, una volta
+    //   finché la situazione resta quella. Chi non è owner non fa partire nessuna lettura.
+    //   { } → { ok, alarm: { title, text } | null }
+    WALLET_OWNER_ALARM_PENDING: 'wallet_owner_alarm_pending',
     // WALLET_OWNER_GRANT: alza il tetto di un utente. { pseudonym, credits, why } → { ok, result }
     WALLET_OWNER_GRANT: 'wallet_owner_grant',
     // WALLET_OWNER_INVITES: genera codici d'invito dell'owner. { count } → { ok, codes }
@@ -251,7 +277,7 @@
     //   lo pseudonimo non esiste).
     WALLET_OWNER_USER_DETAIL: 'wallet_owner_user_detail',
     // Le due foto (pagina e barra) vanno solo alla pagina in vista, che inquadra sé stessa: services/fotoDellaPagina.js.
-    CAPTURE_VISIBLE_TAB: 'capture_visible_tab', // → { ok, dataUrl? }
+    CAPTURE_VISIBLE_TAB: 'capture_visible_tab', // { leggera? } → { ok, dataUrl? }; leggera: JPEG ai pixel che si vedono
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
     // (session download + will-download) perché l'attributo `download` di un
     // <a> lato pagina è onorato da Chromium SOLO per URL same-origin/blob:/

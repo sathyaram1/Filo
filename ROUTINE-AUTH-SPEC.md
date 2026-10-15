@@ -600,9 +600,10 @@ La regola, uguale per tutti e due:
   tolte dopo il pass). Quindi la verifica decaduta la registra il server dentro
   `routineMerge`, e il rifiuto locale resta solo per il verdetto di sicurezza:
   detta la rilettura del pezzo nuovo (`git diff <controllato> <punta>`) e una
-  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto si stampano con gli **attrezzi
-  del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
-  copia che il ramo si porta dietro;
+  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto, come quelli di ogni testo che
+  uno strumento del giro stampa (suo o del server), portano agli **attrezzi del
+  giro** (`absolutizeOutput`), non a `scripts/…`, che riporterebbe alla copia
+  che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
   Il rifiuto e le note del citofono si reggono sullo specchio locale («la
   verifica ha dato l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo

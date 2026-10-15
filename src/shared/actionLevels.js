@@ -583,7 +583,9 @@
         // prima riga resta corta perché fa anche da bottone.
         const base = `Filo vuole impostare: ${built.label}.`;
         const testo = built.testo ? `\n\nTesto esatto:\n«${built.testo}»` : '';
-        return built.risk ? `${base}${testo}\n\n${built.risk}` : `${base}${testo}`;
+        // Il costo del modello scelto per una funzione (#819): lo calcola il main prima della conferma.
+        const costo = a && typeof a._costoModello === 'string' && a._costoModello ? `\n\n${a._costoModello}` : '';
+        return built.risk ? `${base}${testo}${costo}\n\n${built.risk}` : `${base}${testo}${costo}`;
       },
       // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
       describeDone: (a) => {
@@ -871,6 +873,20 @@
           + 'Filo si riapre da solo con le schede di adesso. Le finestre in incognito si chiudono.'
         : 'Cercare la versione nuova di Filo e scaricarla'),
     },
+    // #818 — un rimedio dell'avviso dei crediti: lo stesso clic dei pulsanti, che si rimette com'era con un altro.
+    RIMEDIO_CREDITI: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const op = String((a && a.operazione) || '').trim().toLowerCase();
+        const r = String((a && a.rimedio) || '').trim().toLowerCase();
+        if (op === 'applica' && r === 'modello') return 'Usare modelli più economici per le funzioni che consumano di più';
+        if (op === 'applica' && r === 'automatiche') return 'Spegnere le funzioni automatiche che consumano crediti';
+        if (op === 'annulla' && r === 'modello') return 'Rimettere i modelli di prima';
+        if (op === 'annulla' && r === 'automatiche') return 'Riaccendere le funzioni automatiche';
+        return 'Guardare come far durare i crediti';
+      },
+    },
     ZOOM_PAGINA: {
       costo: 1,
       campo: null,
@@ -920,6 +936,13 @@
       ? { classe: 4, campo: 'terminale', chiave: 'terminale:uscita', motivo: 'ho letto l\'uscita di un comando' }
       : { classe: 5, campo: 'web', chiave: 'filo:da-fuori', motivo: 'ho letto un testo arrivato da fuori' };
   }
+
+  // Sola lettura: non cambiano niente e nessuna aspetta l'esito di un'altra, quindi il giro della chat le lancia insieme
+  // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
+  const LETTURE = Object.freeze([
+    'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
+  ]);
+  const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
   function fonteDi(action) {
     const entry = voce(action);
@@ -971,5 +994,5 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, costoFor, campoFor, fonteDi, ingressi, describe, describeDone, spiegazioneComando, stileDellAccoglienza };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, costoFor, campoFor, fonteDi, ingressi, describe, describeDone, spiegazioneComando, stileDellAccoglienza };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

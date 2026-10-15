@@ -327,7 +327,9 @@ module.exports = function register(on, ctx) {
     const wc = Foto.paginaDaFotografare(sender);
     if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
     const img = await wc.capturePage();
-    return { ok: true, dataUrl: img.toDataURL() };
+    if (!msg || msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL() };
+    const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
+    return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
   });
 
   // "Salva immagine come…" (#274). Il vecchio cammino era un <a download>

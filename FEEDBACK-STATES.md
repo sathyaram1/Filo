@@ -513,7 +513,10 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   `workingSince`. Deploy manuale (`npm run regole:pubblica`).
 
 ### 8. Migrazione legacy → nuovi stati (confermata dall'owner ed eseguita il 2026-07-03, F5)
-Script one-shot, più la normalizzazione in lettura per lo storico:
+Script una tantum, più la normalizzazione in lettura per lo storico (che resta). Lo
+script è stato tolto il 2026-10-15 (#1134), con quello dell'imbottitura dello `status`
+cifrato: una prova a vuoto su tutte le segnalazioni in produzione non trovava più
+niente da cambiare. La storia di git li conserva.
 - `new` → derivare dal pipeline con la STESSA logica di oggi (classifyBlock/isAligned):
   nessun pipeline o parziale → `unlabeled`; attacco → `attack`; spam → `spam`; design →
   `design`; aligned+`candidate_change` → `todo`; aligned senza → `aligned`.
@@ -580,7 +583,7 @@ oggi il codice dice altro vale il codice (le sezioni sopra).
       done/design (+clarify transizione). DEPLOYATE il 2026-07-03 (deploy ok su
       progetto filo-8b9cb).
 - [x] **F5 — Migrazione** (ESEGUITA 2026-07-03, owner ha confermato le scelte):
-      `scripts/migrate-status.mjs --apply` con token admin in tests/agent/.env
+      lo script una tantum (tolto con #1134, §8) con token admin in tests/agent/.env
       (gitignorato). 101 migrati / 226 già canonici / 0 errori: 40→aligned,
       2→attack, 1→spam, 3→design(judges), 4 clarify→design(clarify),
       21→unlabeled, 30 ignored→archived. Rilanciata a vuoto: 0 da migrare

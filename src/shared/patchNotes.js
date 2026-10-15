@@ -9,6 +9,34 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.240', date: '2026-10-15',
+      features: [
+        'Ogni versione di Filo su GitHub ha una sezione «Verifica» con l\'impronta di ogni file da scaricare e il link alla costruzione pubblica che l\'ha prodotto. Se il file che hai scaricato ha la stessa impronta, è quello costruito dal codice pubblico.',
+        'Nella schermata Mazzi ogni mazzo mostra quanto costa in tutto, senza doverlo aprire. Se di qualche carta il prezzo non è noto, davanti al totale c\'è «≥». Col tasto destro su un mazzo lo puoi anche esportare come lista o rinominare, oltre a duplicarlo ed eliminarlo.',
+        'Nelle Opzioni, accanto a ogni modello di ogni funzione, vedi quanto costa usarla, per esempio «≈ 3 crediti» per un messaggio in chat. Se scegli un modello che costa molto più di quello predefinito, sotto compare per quanti messaggi ti bastano i crediti che hai. Se usi i tuoi modelli puoi cambiarli anche chiedendolo a Filo, e la conferma ti dice le stesse cifre. Con una tua chiave OpenRouter il costo è in dollari.',
+        'Nel Deck builder MTG il calcolatore di probabilità ti lascia scegliere la partita (a più giocatori, oppure a due iniziando tu o l\'avversario), quante volte rifai la mano e cosa deve avere per tenerla, e le carte che peschi in più. Puoi dirlo anche in chat, per esempio «in 1 contro 1 andando per secondo, con un mulligan se ho meno di 2 terre».',
+        'Quando i crediti di Filo stanno per finire, Filo te lo dice prima, una volta: quanti ne restano, quando finiscono al ritmo di oggi e come farli durare, con quanto risparmi al giorno. Puoi passare a modelli più economici le funzioni che consumano di più, spegnere quelle automatiche, mettere una tua chiave o aspettare la quota della notte. Un clic applica, lo stesso pulsante rimette com\'era, e lo puoi chiedere anche a parole («sì, usa i modelli più economici»). Soglie e avviso li cambi in Preferenze o chiedendolo a Filo. Lì puoi anche spegnere la spiegazione che Filo prepara appena selezioni un testo: partirà solo dal tasto destro, e spendi meno.',
+      ],
+      fixes: [
+        'Quando Filo riordina le schede per colore, i siti bianchi come Wikipedia vanno in testa e quelli neri come GitHub dopo l\'ultimo colore. Prima finivano in coda, mescolati alle schede senza icona. Ogni giorno della Cronologia segue lo stesso ordine.',
+        'Nel Deck builder MTG il calcolatore di probabilità conta la pescata del primo turno, come in una partita Commander vera, e il mulligan mette le carte in fondo al mazzo come vuole la regola attuale. Prima le probabilità uscivano più basse del vero.',
+        'Chiedi a Filo «mi protegge dai siti truffa?» o «come tolgo questo avviso?» e ti risponde con quello che fa davvero: cosa controlla, i due livelli di avviso, cosa esce dal computer e dove si spegne. Le descrizioni nella pagina Sicurezza adesso dicono la stessa cosa.',
+        'Se il modello scelto per una funzione lo servono solo fornitori che Filo esclude, la chat, la funzione e il tasto «Prova» delle Opzioni ti dicono quale modello è e dove sceglierne un altro. Prima un messaggio generico ti invitava a riprovare, e riprovare non serviva.',
+      ],
+    },
+    {
+      version: '0.2.239', date: '2026-10-15',
+      features: [
+        'Quando riapri Filo la scheda che stavi guardando arriva per prima. Le altre si caricano dopo, due alla volta, a partire da quelle accanto, e finché aspettano portano il nome del sito. Se ne apri una che non è ancora pronta, si carica subito.',
+        'L\'Aiuto di una scheda comincia a rispondere prima a ogni passo, perché la foto della pagina che manda al modello adesso pesa molto meno. Si sente di più sugli schermi con la scala al 125% o più.',
+        'La scheda nuova compare subito. Filo ne tiene una pronta in ogni finestra, anche in incognito, e Ctrl+T, il «+» o la chiusura dell\'ultima scheda ti mostrano la home già disegnata invece di un attimo di vuoto.',
+      ],
+      fixes: [
+        'Nel terminale della home un comando valido non diventa più rosso quando il computer è lento a controllarlo. Il rosso compare solo se Filo ha verificato che il comando non esiste.',
+        'Una password o un\'immagine tolta dalla cronologia appunti resta tolta anche se è ancora negli appunti e la incolli di nuovo, pure dopo aver chiuso e riaperto Filo.',
+      ],
+    },
+    {
       version: '0.2.238', date: '2026-10-07',
       features: [
         'Sui siti con un loro menu del tasto destro, come Google Docs e Figma, il menu di Filo ha in cima «Menu di Google Docs»: un clic e si apre quello del sito, nello stesso punto. Se lo scegli spesso, Filo ti propone di aprirlo subito col tasto destro, e quello di Filo resta a Shift + tasto destro. Cambi idea dalle Preferenze, dal menu di Filo su quel sito o chiedendolo a Filo.',
@@ -31,6 +59,7 @@
         'Nel terminale della home, se incolli in un comando un percorso con spazi, per esempio la tua cartella utente con nome e cognome, Filo lo mette fra virgolette e le vedi prima di premere Invio. Se un comando scritto a mano fallisce perché le virgolette mancavano, sotto l\'errore trovi lo stesso comando corretto: premi «Esegui» e parte.',
         'Quanto Filo fa da solo lo scegli con un clic durante l\'intervista di benvenuto, e poi lo cambi in Preferenze, sotto «Autonomia di Filo». La casella dove scrivi nella home non lo mostra più.',
         'Col tasto destro su un\'immagine Filo riconosce anche quelle fatte con Stable Diffusion o FLUX che hanno perso le etichette: legge il marchio invisibile che questi programmi scrivono nei pixel, e lo dice in cima alla descrizione. Te lo dice anche in chat, se gli chiedi se l\'immagine è fatta con l\'AI. Un ritaglio o un ridimensionamento cancellano il marchio, quindi se non compare niente non vuol dire che la foto sia vera.',
+        'Quando una risposta di Filo è più lunga del tetto si ferma e te lo dice, con «Continua» per farla finire. Prima arrivava tagliata come se fosse intera. Vale per la chat della home, i riquadri delle spiegazioni, l\'Aiuto, l\'Editor e i Mazzi. Il tetto lo cambi in Preferenze, «Quanto può essere lunga una risposta», o chiedendolo a Filo.',
       ],
       fixes: [
         'Nella home il riquadro del Bluetooth e del Wi-Fi si chiude con Esc anche se lo premi appena aperto. Mentre legge dispositivi e reti non copre più la sua voce, e un clic sulla voce non nasconde il Bluetooth per sbaglio.',
@@ -101,6 +130,10 @@
         'Se Filo fa molti passi senza arrivare a una risposta, adesso lo scrive in chat e ti dà il tasto «Continua», che lo fa ripartire da dove era arrivato senza rifare le ricerche già fatte. Prima la conversazione poteva finire con «Ha cercato sul web 9 volte» e nient\'altro.',
         'Nella Cronologia AI il filtro per tipo elenca ogni nome una volta sola, e scegliendo «Aiuto» vedi tutte le richieste fatte all\'Aiuto. Prima lo stesso nome poteva comparire due o tre volte, e ognuno mostrava solo una parte delle righe.',
         'Se scrivi nelle Preferenze la tua chiave Tavily, le ricerche sul web di Filo usano quella. Prima Filo cercava sempre con la sua, e quando la esauriva passava a risultati peggiori anche se la tua avrebbe funzionato.',
+        'Quando Filo deve fare più ricerche o leggere più documenti per risponderti, li fa tutti insieme e la risposta arriva prima.',
+        'Dopo una pausa il primo messaggio alla chat della home parte subito: Filo rilegge batteria, rete e Bluetooth appena entri nel campo, non quando premi Invio.',
+        'Il correttore non butta più il controllo se nel frattempo hai continuato a scrivere: le parole da rivedere compaiono subito al loro posto. E un punto o uno spazio in più non lo fanno ripartire.',
+        'Se il servizio dei modelli è sovraccarico per un attimo, Filo aspetta quanto chiede e riprova, invece di passare subito a un altro modello o darti errore.',
       ],
     },
     {

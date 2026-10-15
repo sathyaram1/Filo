@@ -425,10 +425,10 @@
   // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
   // incolla, non da una copia scelta: una voce appena tolta non rientra così.
   function pushClipboardEntry(entry, via) {
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry, via }).catch(() => {});
-    // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
+    const spinta = chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry, via }).catch(() => null);
+    // Un'immagine che l'utente ha tolto dalla cronologia non torna a un modello per farsi descrivere.
     if (entry?.type === 'image' && entry.dataUrl) {
-      requestImageDescription(entry.dataUrl).catch(() => {});
+      spinta.then((r) => { if (r?.tenuta !== false) requestImageDescription(entry.dataUrl).catch(() => {}); });
     }
   }
 
@@ -481,7 +481,8 @@
       return null;
     }
     if (!res?.ok) {
-      if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
+      // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
+      if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
         warnModelConfigOnce(res.error);
         // La voce in cronologia incolla resterebbe su «Descrizione…» per
@@ -599,6 +600,8 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // Spenta dalle Preferenze, o per far durare i crediti (#818): la spiegazione parte al tasto destro.
+    if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) return;
     // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
     if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
@@ -615,6 +618,7 @@
     // seleziona altrove (#1070).
     if (!Gesto.prendi('spiega', Gesto.SELEZIONA, Gesto.sullaSelezione)) return;
     prefetchedExplain = startExplainRequest(sel);
+    prefetchedExplain.anticipata = true;
   }
 
   // `suRichiesta`: l'ha chiesta l'utente col tasto destro, e il tetto del main sulle automatiche non la ferma.
@@ -651,6 +655,11 @@
     };
     const pre = prefetchedExplain;
     if (pre && pre.key === key && !pre.fermata) {
+      // Preparata e aperta: per i crediti non è una chiamata sprecata (#818).
+      if (pre.anticipata && !pre.usata) {
+        pre.usata = true;
+        Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
+      }
       return pre.promise.then((res) => (pre.fermata ? chiedi() : res));
     }
     return chiedi();
@@ -703,6 +712,7 @@
           }
           body.innerHTML = Popup.renderMarkdown(daMostrare);
           Popup.notaRipiego(body, res.keyFallback);
+          Popup.notaInterrotta(body, res.finishReason);
         });
         return () => { cancelled = true; };
       },
@@ -815,6 +825,7 @@
             }
             testoChiuso(body, res.text);
             Popup.notaRipiego(el, res.keyFallback);
+            Popup.notaInterrotta(el, res.finishReason);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -885,6 +896,7 @@
               body.textContent = '';
             } else if (m.type === 'done') {
               Popup.notaRipiego(el, m.keyFallback);
+              Popup.notaInterrotta(el, m.finishReason);
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
@@ -1717,7 +1729,9 @@
         ta.remove();
       }
       try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
-      Popup.showToast(I18n.t('toast_transcribed'));
+      // Copiato, ma non intero: fermato al tetto di lunghezza (#1097.3).
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
     } catch (_) {
       Popup.showToast(I18n.t('err_provider_failed'));
     }

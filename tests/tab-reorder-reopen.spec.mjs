@@ -7,6 +7,7 @@
 //   2) la sessione salva e ripristina il colore identità di ogni scheda, così
 //      la barra riparte già tinta e il riordino ha i dati subito.
 
+import { createRequire } from 'node:module';
 import { test, expect } from './fixtures/electron.mjs';
 
 const mk = (title, color) =>
@@ -14,23 +15,10 @@ const mk = (title, color) =>
   + `${color ? `<meta name="theme-color" content="${color}">` : ''}</head>`
   + `<body style="margin:0"><div style="height:1200px;background:#fff"></div></body></html>`;
 
-// Replica di hueOf del main (0..360, Infinity se senza croma) per calcolare
-// l'ordine cromatico atteso dai colori REALI assegnati dall'app.
-function hueOf(rgbStr) {
-  const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-  if (!m) return Infinity;
-  const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-  if (p.length < 3 || p.some((n) => Number.isNaN(n))) return Infinity;
-  const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-  if (mx === mn) return Infinity;
-  const d = mx - mn;
-  let h;
-  if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-  else if (mx === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  return (h / 6) * 360;
-}
+// La regola d'ordine della barra, dal modulo condiviso: l'ordine atteso si calcola dai colori REALI assegnati.
+createRequire(import.meta.url)('../src/shared/tabColor.js');
+const TC = globalThis.SN_TAB_COLOR;
+const tinta = (c) => { const p = TC.parseRgb(c); return p ? TC.rgbToHsl(...p)[0] * 360 : NaN; };
 
 test('alla riapertura le schede vengono riordinate per colore anche senza archiviare nulla', async ({ app, shell, openTab, testServer }) => {
   // Aperte in ordine NON cromatico (blu → verde → rosso): dopo il riordino
@@ -49,7 +37,7 @@ test('alla riapertura le schede vengono riordinate per colore anche senza archiv
         .map((t) => ({ title: t.title, identityColor: t.identityColor }));
     });
     return web.length === 3 && web.every((t) => dichiarato[t.title]
-      && Math.abs(hueOf(t.identityColor) - hueOf(dichiarato[t.title])) < 2);
+      && Math.abs(tinta(t.identityColor) - tinta(dichiarato[t.title])) < 2);
   }, { timeout: 12_000 }).toBe(true);
 
   // Ordine di inserimento e ordine cromatico atteso, dai colori REALI assegnati.
@@ -60,7 +48,7 @@ test('alla riapertura le schede vengono riordinate per colore anche senza archiv
   });
   const insertionOrder = before.map((t) => t.title);
   const expectedOrder = [...before]
-    .sort((a, b) => hueOf(a.identityColor) - hueOf(b.identityColor))
+    .sort((a, b) => TC.compareRainbow(a.identityColor, b.identityColor))
     .map((t) => t.title);
   // Sanity: lo scenario è non-banale (l'ordine cromatico differisce da quello
   // d'inserimento), altrimenti il test passerebbe anche senza riordino.

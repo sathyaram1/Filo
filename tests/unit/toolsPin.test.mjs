@@ -21,8 +21,8 @@
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +38,7 @@ const comeScritto = (p) => resolve(p).split('\\').join('/');
 
 import {
   PINNED_PATHS, TOOLS_ROOT, pinTools, pinnedRepoRoot, absolutizeRecipe, pinWorkerTools, pinnedDirWorker,
+  absolutizeOutput, absolutizePrinted,
 } from '../../scripts/lib/tools-pin.mjs';
 
 function progettoFinto() {
@@ -278,6 +279,96 @@ test('più comandi nella stessa ricetta vengono riscritti tutti', () => {
   const base = comeScritto('/t');
   assert.equal(fuori.split(`node "${base}/scripts/`).length - 1, 3);
   assert.ok(fuori.includes(`node "${base}/scripts/lib/b.mjs"`), fuori);
+});
+
+// ── I testi stampati (#763) ────────────────────────────────────────────────
+
+const REPO_VERO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const flussoFinto = () => {
+  const scritto = [];
+  return { scritto, write: (c) => { scritto.push(c); return true; } };
+};
+
+test('i comandi che gli strumenti stampano, quelli del server compresi, portano agli strumenti fissati', async () => {
+  // Le porte di #763: il pass senza nota, la pulizia delle prove, e le istruzioni del server che dispatch ristampa.
+  const { verifierReplyText, secauditSenzaNota } = await import('../../scripts/dispatch.mjs');
+  const f = flussoFinto();
+  assert.equal(absolutizeOutput('/progetto', { toolsRoot: '/strumenti', streams: [f] }), true);
+  f.write(verifierReplyText({
+    outcome: 'fix',
+    phase2: {
+      findings: [{ level: 2, text: 'rotto' }],
+      derived: [{ level: 0, text: 'raro' }],
+      instructions: 'Consegna con node scripts/dispatch.mjs --record-fixed X "<report>".\nPoi node scripts/routine-channel.mjs release <biglietto> --role fixer',
+    },
+  }, 'X'));
+  f.write(`${secauditSenzaNota('pass', '')}\n`);
+  const tutto = f.scritto.join('');
+  assert.ok(!/node scripts\//.test(tutto), `resta un comando relativo:\n${tutto}`);
+  const base = comeScritto('/strumenti');
+  for (const c of ['dispatch.mjs" --record-pulizia X', 'dispatch.mjs" --record-fixed X', 'routine-channel.mjs" release', 'dispatch.mjs" --record-secaudit <id> pass', 'dispatch.mjs" --record-fixed <id>']) {
+    assert.ok(tutto.includes(`node "${base}/scripts/${c}`), `manca ${c}:\n${tutto}`);
+  }
+});
+
+test('un JSON stampato resta intatto: dentro c\'è testo di altri, e le virgolette lo romperebbero', () => {
+  const busta = `${JSON.stringify({ feedback: 'danno ancora `node scripts/dispatch.mjs …`' }, null, 2)}\n`;
+  assert.equal(absolutizePrinted(busta, '/strumenti', '/progetto'), busta);
+  assert.doesNotThrow(() => JSON.parse(absolutizePrinted(busta, '/strumenti', '/progetto')));
+  // Una parentesi in testa non basta a fare un JSON.
+  assert.ok(absolutizePrinted('[dispatch] rilancia: node scripts/dispatch.mjs --help', '/strumenti', '/progetto')
+    .includes(`node "${comeScritto('/strumenti')}/scripts/dispatch.mjs"`));
+  assert.equal(absolutizePrinted(Buffer.from('node scripts/x.mjs'), '/t', '/p').toString(), 'node scripts/x.mjs');
+});
+
+test('a strumenti NON fissati le stampe restano quelle scritte, e il filtro non si somma', () => {
+  const f = flussoFinto();
+  const scrivi = f.write;
+  assert.equal(absolutizeOutput('/progetto', { toolsRoot: '/progetto', streams: [f] }), false);
+  assert.equal(f.write, scrivi);
+  const g = flussoFinto();
+  absolutizeOutput('/progetto', { toolsRoot: '/strumenti', streams: [g] });
+  const una = g.write;
+  absolutizeOutput('/progetto', { toolsRoot: '/altrove', streams: [g] });
+  assert.equal(g.write, una);
+});
+
+test('ogni strumento che le ricette nominano passa le sue stampe dal filtro', () => {
+  const ruoli = resolve(REPO_VERO, 'routines', 'roles');
+  const nomi = new Set();
+  for (const f of readdirSync(ruoli).filter((n) => n.endsWith('.md'))) {
+    for (const m of readFileSync(resolve(ruoli, f), 'utf8').matchAll(/\bnode\s+scripts\/([A-Za-z0-9._-]+\.mjs)/g)) nomi.add(m[1]);
+  }
+  assert.ok(nomi.has('dispatch.mjs') && nomi.has('routine-channel.mjs') && nomi.has('merge-gate.mjs'), [...nomi].join(', '));
+  for (const n of nomi) {
+    assert.match(readFileSync(resolve(REPO_VERO, 'scripts', n), 'utf8'), /\babsolutizeOutput\(/,
+      `${n} stampa comandi che dalla cartella di lavoro portano agli strumenti del ramo`);
+  }
+});
+
+test('dalla copia, i testi che gli strumenti stampano portano alla copia', () => {
+  const dove = resolve(tmpdir(), `filo-strumenti-stampe-${process.pid}`);
+  const casa = cartellaTemporanea('filo-progetto-stampe-');
+  try {
+    const pin = pinTools(REPO_VERO, { dest: dove });
+    assert.equal(pin.ok, true, pin.why);
+    const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'), FILO_NO_BEAT: '1', FILO_ROUTINE_TICKET: '' };
+    const casi = [
+      ['dispatch.mjs', ['--record-secaudit', 'X', 'pass'], 'dispatch.mjs" --record-secaudit'],
+      ['merge-gate.mjs', [], 'merge-gate.mjs" <ramo>'],
+      ['routine-channel.mjs', ['deliver', 'b-prova-con-la-forma-vera-di-un-biglietto', 'domanda', '--notes', 'x'], 'domanda.mjs" chiedi'],
+      ['lancia-electron.mjs', [], 'lancia-electron.mjs" <comando>'],
+    ];
+    for (const [strumento, args, atteso] of casi) {
+      const r = spawnSync(process.execPath, [resolve(dove, 'scripts', strumento), ...args], { cwd: casa, env, encoding: 'utf8' });
+      const tutto = `${r.stdout}${r.stderr}`;
+      assert.ok(tutto.includes(`${basename(dove)}/scripts/${atteso}`), `${strumento}: il comando non nomina la copia:\n${tutto.slice(-600)}`);
+      assert.ok(!/node scripts\//.test(tutto), `${strumento}: resta un comando relativo:\n${tutto.slice(-600)}`);
+    }
+  } finally {
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+  }
 });
 
 // ── Il controllo che conta ─────────────────────────────────────────────────

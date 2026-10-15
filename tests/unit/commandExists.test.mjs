@@ -21,7 +21,7 @@ import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const { commandExists, existenceProbes } = require(
+const { commandExists, existenceProbes, esitoDeiProbe } = require(
   join(__dirname, '..', '..', 'src', 'main', 'services', 'shell.js'),
 );
 
@@ -94,4 +94,32 @@ test('un token che sembra codice NON viene eseguito (niente RCE nel controllo)',
   const executed = fs.existsSync(sentinel);
   try { fs.unlinkSync(sentinel); } catch (_) { /* ok */ }
   assert.equal(executed, false, 'il controllo di esistenza NON deve eseguire il token');
+});
+
+// #1176 — con la macchina carica il controllo scade, e uno scaduto finiva come «non esiste»: rosso su un comando valido.
+// Qui i probe sono processi veri con un esito noto, così la regola si prova senza dipendere dal carico.
+const esce = (codice) => ({ file: process.execPath, args: ['-e', `process.exit(${codice})`] });
+const restaAppeso = { file: process.execPath, args: ['-e', 'setInterval(() => {}, 1 << 30)'] };
+const nonParte = { file: 'filo-programma-che-non-esiste-1176', args: [] };
+// Il probe appeso lo fa scadere la prova stessa: è il tempo dato al codice, non una guardia contro l'appeso.
+const SCADE_SUBITO_MS = 300;
+
+test('#1176: un probe scaduto non è un «non esiste»', async () => {
+  assert.equal(await esitoDeiProbe([restaAppeso], undefined, SCADE_SUBITO_MS), null);
+});
+
+test('#1176: un probe che non parte non è un «non esiste»', async () => {
+  assert.equal(await esitoDeiProbe([nonParte], undefined, TETTO_ATTESA_MS), null);
+});
+
+test('#1176: il «no» del secondo probe non basta se il primo non ha risposto', async () => {
+  // È il caso di PowerShell: `where.exe` scaduto, poi Get-Command che sbaglia sugli shim npm.
+  assert.equal(await esitoDeiProbe([nonParte, esce(1)], undefined, TETTO_ATTESA_MS), null);
+  assert.equal(await esitoDeiProbe([esce(1), restaAppeso], undefined, SCADE_SUBITO_MS), null);
+});
+
+test('#1176: un probe che conferma basta anche dopo uno incerto, e solo tutti «no» fanno un «non esiste»', async () => {
+  assert.equal(await esitoDeiProbe([nonParte, esce(0)], undefined, TETTO_ATTESA_MS), true);
+  assert.equal(await esitoDeiProbe([esce(1), esce(1)], undefined, TETTO_ATTESA_MS), false);
+  assert.equal(await esitoDeiProbe([esce(2)], undefined, TETTO_ATTESA_MS), false);
 });

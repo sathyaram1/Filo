@@ -550,6 +550,7 @@
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
     SPOSTA_ICONA: () => 'spostato un\'icona',
     INSTALLA_AGGIORNAMENTO: () => 'chiesto la versione nuova di Filo',
+    RIMEDIO_CREDITI: () => 'lavorato sui crediti',
     CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
     VOLUME: () => 'cambiato il volume',
     BLUETOOTH: () => 'comandato il Bluetooth',
@@ -653,9 +654,11 @@
     // evento il valore era già quello.
     IMPOSTA_PREFERENZA: (a) => {
       const f = frasiCambi(a);
-      if (f) return { icon: '⚙', text: `Impostato · ${f}` };
+      // Il costo del modello scelto per una funzione resta scritto anche se il modello non lo ripete (#819).
+      const costo = pulito(a._output && a._output.costoModello);
+      if (f) return { icon: '⚙', text: `Impostato · ${f}${costo ? ` · ${costo}` : ''}` };
       const etichetta = pulito(a._output && a._output.etichetta);
-      return { icon: '⚙', text: etichetta ? `Già così · ${etichetta}` : 'Impostazione già così' };
+      return { icon: '⚙', text: `${etichetta ? `Già così · ${etichetta}` : 'Impostazione già così'}${costo ? ` · ${costo}` : ''}` };
     },
     ANNULLA_CAMBIO: (a) => {
       const f = pulito(a._output && a._output.frase);
@@ -769,6 +772,15 @@
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
+    RIMEDIO_CREDITI: (a) => {
+      const op = String(a.operazione || '').toLowerCase();
+      const r = String(a.rimedio || '').toLowerCase();
+      const testi = {
+        'applica:modello': 'Modelli più economici', 'annulla:modello': 'Rimessi i modelli di prima',
+        'applica:automatiche': 'Funzioni automatiche spente', 'annulla:automatiche': 'Funzioni automatiche riaccese',
+      };
+      return { icon: '◎', text: testi[`${op}:${r}`] || 'Crediti guardati' };
+    },
     INSTALLA_AGGIORNAMENTO: (a) => {
       const o = a._output || {};
       if (o.aggiornamento === 'aggiornato') return { icon: '⬇', text: 'Filo è già aggiornato' };
@@ -816,6 +828,7 @@
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito', SPOSTA_ICONA: 'Icona non spostata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
     INSTALLA_AGGIORNAMENTO: 'Aggiornamento non partito',
+    RIMEDIO_CREDITI: 'Rimedio dei crediti non applicato',
     CARTA_HOME: 'Carta della home non cambiata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',

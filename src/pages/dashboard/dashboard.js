@@ -33,6 +33,9 @@
   // Dopo un turno finito senza risposta (#557) i passi fatti bastano spesso già: rifarli rimetterebbe Filo nello stesso giro.
   const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
     + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
+  // Una risposta fermata dal tetto di lunghezza (#1097.3) riprende dalla parola dove si è interrotta.
+  const CONTINUA_RISPOSTA = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
+    + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
   const dashDir = $('dashDir');
 
   // ===== Stato locale =====
@@ -155,7 +158,7 @@
   // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
   const inChatAperta = (chat) => !chat || chat === chatId;
 
-  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS });
+  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS, bozza: () => !!($('input')?.value || '').trim() });
   Term.init({
     dashDir,
     inputEl,
@@ -638,6 +641,19 @@
     renderSuggestions();
   }
 
+  // Come loadDashboard, ma la home è già a schermo: niente passaggio dal vuoto, cambia solo se il main ha di meglio.
+  async function aggiornaDashboardInSilenzio() {
+    const giro = giroDashboard;
+    const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD });
+    if (giro !== giroDashboard || !r?.ok) return;
+    const messaggio = r.message || 'Filo è in ascolto.';
+    if (homeMessageEl.textContent !== messaggio) homeMessageEl.textContent = messaggio;
+    const nuovi = Array.isArray(r.suggestions) ? r.suggestions : [];
+    if (JSON.stringify(nuovi) === JSON.stringify(suggestions)) return;
+    suggestions = nuovi;
+    renderSuggestions();
+  }
+
   // È cambiato se Filo ha un modello da chiamare: prima l'accoglienza, che è
   // ciò che l'utente aspetta al primo avvio; se resta chiusa (già fatta, o
   // c'è una conversazione in corso) si rifà almeno il messaggio della home,
@@ -675,6 +691,9 @@
     if (markdown && text && self.SN_MARKDOWN) {
       el.innerHTML = self.SN_MARKDOWN.render(text);
       el.classList.add('dash-bubble-md');
+      // La riga «interrotta» la scrive il main dentro la risposta: si legge come nota, non come parole del modello.
+      const ultimo = el.lastElementChild;
+      if (ultimo && self.SN_CHAT_ERRORS?.eFraseInterrotta?.(ultimo.textContent)) ultimo.classList.add('dash-bubble-interrotta');
     } else {
       el.textContent = text || '';
     }
@@ -725,6 +744,7 @@
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
     INSTALLA_AGGIORNAMENTO: 'Cerco la versione nuova…',
+    RIMEDIO_CREDITI: 'Guardo i crediti…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
@@ -969,15 +989,13 @@
       // scritto qui: un ostacolo nuovo restava col solo «Riprova», che finché
       // l'ostacolo c'è rimanda sempre la stessa risposta (#663).
       const CE = window.SN_CHAT_ERRORS;
-      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused }) : null;
+      const pagina = CE?.rimedioPagina ? CE.rimedioPagina({ code: r?.code, keyRefused, maxTokens: r?.maxTokens, finishReason: r?.finishReason }) : null;
       if (pagina) {
         const via = document.createElement('button');
         via.type = 'button';
         via.className = 'dash-action-btn';
         via.textContent = pagina.label;
-        via.title = pagina.dove === 'opzioni'
-          ? 'Scegli il modello per questa funzione'
-          : (r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : 'Controlla o togli la chiave OpenRouter');
+        via.title = r?.code === 'NO_API_KEY' ? 'Riscatta il codice d\'invito' : pagina.title;
         via.addEventListener('click', () => chrome.tabs.create({ url: pagina.url }));
         row.appendChild(via);
       }
@@ -1132,7 +1150,9 @@
     sending = false;
     // Riprendere ha senso solo nella conversazione che è ancora a schermo.
     if (r?.ok && r.stopped && activity.el.isConnected) ripresa = { nota: r._notaFermato || null, blocco: activity.el };
-    else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) offriContinua(r._bubble, activity.el);
+    else if (r?.ok && r.senzaRisposta && r._bubble && r._bubble.isConnected) {
+      offriContinua(r._bubble, activity.el, { interrotta: r.senzaRisposta.interrotta === true });
+    }
     aggiornaTasto();
     inputEl.focus();
 
@@ -1223,7 +1243,7 @@
   }
   // Un turno finito senza risposta (#557): la frase la scrive il main, qui il «Continua» sotto e lo stesso «riprendi»
   // di un turno fermato sul tasto d'invio e nel tasto destro del blocco.
-  function offriContinua(bolla, blocco) {
+  function offriContinua(bolla, blocco, { interrotta = false } = {}) {
     let riga = bolla.querySelector('.dash-bubble-actions');
     if (!riga) {
       riga = document.createElement('div');
@@ -1234,10 +1254,10 @@
     tasto.type = 'button';
     tasto.className = 'dash-action-btn dash-action-btn-primary dash-continua';
     tasto.textContent = 'Continua';
-    tasto.title = 'Riprendi da dove si era fermato';
+    tasto.title = interrotta ? 'Continua la risposta da dove si è interrotta' : 'Riprendi da dove si era fermato';
     tasto.addEventListener('click', () => { riprendi(); inputEl.focus(); });
     riga.appendChild(tasto);
-    ripresa = { nota: null, blocco, tasto, messaggio: CONTINUA };
+    ripresa = { nota: null, blocco, tasto, messaggio: interrotta ? CONTINUA_RISPOSTA : CONTINUA };
   }
   // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
   // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
@@ -1541,6 +1561,8 @@
     inputEl.style.height = `${inputEl.scrollHeight}px`;
   }
 
+  inputEl.addEventListener('focus', () => Sistema.scrive({ entra: true }));
+
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
   inputEl.addEventListener('input', (e) => {
@@ -1564,8 +1586,60 @@
   });
 
   // ===== Bridge cambio stato live dal background =====
+  // #818 — l'avviso prima che i crediti finiscano lo prende la home con una conversazione aperta, e arriva in fondo
+  // alla conversazione, dopo la risposta che sta arrivando. Senza conversazione lo lascia alla notifica della finestra.
+  // Un rimedio applicato altrove (pagina Crediti, o chiesto a parole) cambia anche i pulsanti sotto l'avviso in chat;
+  // la frase dell'ultimo clic resta sotto il suo rimedio anche dopo il riallineamento.
+  let rimediInChat = null;
+  let esitoInChat = null;
+  const opzRimediInChat = {
+    invia: send, classeBottone: 'dash-action-btn',
+    apriChiave: () => chrome.tabs.create({ url: 'filo://credits/credits.html#chiave' }),
+    onEsito: (id, frase) => { esitoInChat = frase ? { id, frase } : null; },
+  };
+  async function riallineaRimediInChat() {
+    if (!rimediInChat || !rimediInChat.isConnected) { rimediInChat = null; return; }
+    let st = null;
+    try { st = await send({ type: MSG.CREDITS_WARNING_STATE }); } catch (_) { st = null; }
+    if (!st || !st.ok || !st.mostra || !st.avviso || !rimediInChat) return;
+    // Senza la frase le soglie non dicono più niente e lo stato porta solo i rimedi applicati: gli altri in chat restano.
+    if (!st.avviso.testo) {
+      const applicati = new Map(st.avviso.rimedi.map((x) => [x.id, x]));
+      const correnti = Array.from(rimediInChat.children).map((li) => li._rimedio).filter(Boolean);
+      st.avviso = { rimedi: correnti.map((x) => applicati.get(x.id) || x) };
+    }
+    window.SN_CREDITI_AVVISO_UI.aggiorna(rimediInChat, { avviso: st.avviso, esito: esitoInChat, ...opzRimediInChat });
+  }
+
+  async function avvisoCrediti(id) {
+    if (body.dataset.state !== 'thread' || inRiserva === true || Accoglienza.isActive()) return;
+    let r = null;
+    try { r = await send({ type: MSG.CREDITS_WARNING_CLAIM, id }); } catch (_) { r = null; }
+    if (!r || !r.ok || !r.avviso) return;
+    const chat = chatId;
+    const fine = Date.now() + 10 * 60 * 1000;
+    while (sending && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 250));
+    // Nel filo va l'avviso intero, rimedi compresi: a una risposta a parole Filo sa cosa ha proposto.
+    const perFilo = r.avviso.perFilo || r.avviso.testo;
+    archiviaRiga(perFilo, 'filo', chat);
+    // Tornata alla home mentre aspettava: la riga resta nella chat, e i rimedi nella pagina Crediti.
+    if (!inChatAperta(chat) || body.dataset.state !== 'thread') return;
+    const inFondo = bubblesEl.scrollHeight - bubblesEl.scrollTop - bubblesEl.clientHeight < 40;
+    const bolla = makeBubble({ role: 'filo', text: r.avviso.testo });
+    bolla.classList.add('dash-crediti-avviso');
+    const elenco = window.SN_CREDITI_AVVISO_UI.elenco({ avviso: r.avviso, ...opzRimediInChat });
+    bolla.appendChild(elenco);
+    rimediInChat = elenco;
+    esitoInChat = null;
+    bubblesEl.appendChild(bolla);
+    threadHistory.push({ role: 'filo', text: perFilo });
+    if (inFondo) bubblesEl.scrollTop = bubblesEl.scrollHeight;
+  }
+
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
+    if (msg?.type === MSG.CREDITS_WARNING && msg.id) {
+      avvisoCrediti(String(msg.id)).catch(() => {});
+    } else if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
       const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
       notaFermata(String(msg.frase), vicino);
     } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
@@ -1630,6 +1704,7 @@
       // scheda nuova.
       if (msg.signedIn) Accoglienza.maybeOpenOnboardingLater();
     } else if (msg?.type === MSG.CREDITS_CHANGED) {
+      if (msg.avvisoCrediti) riallineaRimediInChat().catch(() => {});
       // Un invito riscattato da fuori (#651): il link aperto da un'altra
       // applicazione, o l'invito che aspettava questa installazione al primo
       // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
@@ -1725,9 +1800,8 @@
     }
   }
 
-  // Le fusioni in attesa del via libera dell'owner NON compaiono più qui: la
-  // decisione vive in cima ai Ricevuti della dashboard di gestione, insieme
-  // alle altre cose che aspettano lui (scelta owner 2026-08-26).
+  // Le fusioni in attesa del via libera dell'owner NON compaiono qui: la
+  // decisione vive in Gestione (scelta owner 2026-08-26), dove stanno le altre.
 
   // ===== Recap aggiornamento (C4) =====
   // Popup all'avvio dopo un update: il main (che ha sia app.getVersion() sia le
@@ -1925,9 +1999,29 @@
   // all'apertura) e a ogni home aperta: lo racconta una scheda sola (#664),
   // la prima che l'utente ha davanti. Una home dietro aspetta di tornare
   // visibile, poi lo chiede al main, che lo dà a una sola.
-  function quandoVisibile() {
-    if (document.visibilityState !== 'hidden') return Promise.resolve();
-    return new Promise((ok) => {
+  // La home pronta per la scheda nuova (#1128) è caricata ma nessuno la guarda, e `document.hidden` in una scheda non
+  // cambia mai: lo sa dal main, e quello che va fatto davanti all'utente aspetta che diventi una scheda. Le home che
+  // sono già schede restano come prima.
+  let inRiserva = null;
+  const attesiConsegna = [];
+  function nonPiuRiserva() {
+    const era = inRiserva === true;
+    inRiserva = false;
+    for (const ok of attesiConsegna.splice(0)) ok();
+    if (era) allaComparsa();
+  }
+  send({ type: MSG.TAB_IN_VISTA_GET }).then((r) => !!(r && r.riserva), () => false).then((si) => {
+    if (inRiserva !== null) return;
+    if (si) inRiserva = true;
+    else nonPiuRiserva();
+  });
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === MSG.TAB_IN_VISTA && msg.inVista && inRiserva !== false) nonPiuRiserva();
+  });
+  async function quandoVisibile() {
+    if (inRiserva !== false) await new Promise((ok) => attesiConsegna.push(ok));
+    if (document.visibilityState !== 'hidden') return;
+    await new Promise((ok) => {
       const guarda = () => {
         if (document.visibilityState === 'hidden') return;
         document.removeEventListener('visibilitychange', guarda);
@@ -1947,6 +2041,34 @@
       text: `Ti sono stati regalati ${n} crediti! Sono già sul tuo saldo.`,
       okLabel: 'Evviva!',
     });
+  }
+  // Il conto OpenRouter che non regge i crediti vivi o il tetto (#820): l'owner lo sa all'avvio senza aprire la sua
+  // pagina. Per chi non è owner il main risponde null senza chiedere niente al server.
+  function finoAChiusura(id) {
+    return new Promise((ok) => {
+      if (!document.getElementById(id)) { ok(); return; }
+      const obs = new MutationObserver(() => { if (!document.getElementById(id)) { obs.disconnect(); ok(); } });
+      obs.observe(document.body, { childList: true, subtree: true });
+    });
+  }
+  // Si scioglie quando questa home ha avuto risposta sull'allarme del conto: gli spec la aspettano prima di cambiare chi è owner.
+  let fineAllarmeOwner = () => {};
+  const allarmeOwnerChiesto = new Promise((ok) => { fineAllarmeOwner = ok; });
+  async function chiediAllarmeOwner() {
+    await quandoVisibile();
+    // Recap e ringraziamento non tengono la coda fino alla chiusura: si aspetta che se ne vadano, mai sopra di loro.
+    await ricompenseAvvio;
+    await finoAChiusura('recapOverlay');
+    await finoAChiusura('thanksOverlay');
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_OWNER_ALARM_PENDING }); } catch (_) { r = null; }
+    fineAllarmeOwner();
+    const a = r && r.ok && r.alarm;
+    if (!a || !window.SN_CONFIRM_UI?.confirm) return;
+    const apri = await window.SN_CONFIRM_UI.confirm({
+      title: a.title, text: a.text, okLabel: 'Apri Inviti e utenti', cancelLabel: 'Più tardi',
+    });
+    if (apri) send({ type: MSG.OPEN_URL, url: 'filo://credits/owner.html' });
   }
   async function chiediBenvenuto() {
     await quandoVisibile();
@@ -2173,6 +2295,14 @@
     }
   }
 
+  // La home pronta (#1128) arriva davanti con quello che gli annunci le hanno portato: rilegge solo ciò che una home
+  // nuova chiede aprendosi e che nessun annuncio porta.
+  function allaComparsa() {
+    richiestaDellAvviso(Accoglienza.isActive()).catch(() => {});
+    if (Accoglienza.isActive()) Accoglienza.riprendiAllaComparsa().catch(() => {});
+    else if (body.dataset.state === 'home') aggiornaDashboardInSilenzio().catch(() => {});
+  }
+
   (async function init() {
     renderControls();
     await applySavedTheme();
@@ -2228,11 +2358,14 @@
     inCodaPopup(chiediBenvenuto);
     if (onbState) { fineRicompenseAvvio(); return; }
     inCodaPopup(async () => {
+      // Recap e ringraziamento non li prende la home pronta per la scheda nuova: si consumerebbero dove nessuno li guarda.
+      await quandoVisibile();
       try {
         const shown = await maybeShowUpdateRecap(() => maybeShowFeedbackRewards());
         if (!shown) await maybeShowFeedbackRewards();
       } catch (_) {}
     });
+    inCodaPopup(chiediAllarmeOwner);
   })();
 
   // Hook per i test Playwright (stesso pattern di __filoEditorFormat
@@ -2244,5 +2377,6 @@
     getCwd: Term.getCwd,
     refreshAccountControl,
     ricompenseAvvio: () => ricompenseAvvio,
+    allarmeOwnerChiesto: () => allarmeOwnerChiesto,
   };
 })();

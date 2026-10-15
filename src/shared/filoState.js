@@ -148,15 +148,18 @@
   async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
+    // Le due letture che possono far aspettare un turno (computer e saldo): i loro tempi vanno nella cronologia (#1097.1).
+    const attese = {};
+    const cronometra = (nome, p) => { const t = Date.now(); return p.finally(() => { attese[nome] = Date.now() - t; }); };
     const [tabs, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
       Mem.listNotifications(),
       Mem.getDashboardCache(),
-      readCredits({ fresco: creditiFreschi }),
+      cronometra('saldoMs', readCredits({ fresco: creditiFreschi })),
       readCambi(),
-      conSistema ? readSistema() : Promise.resolve(undefined),
+      conSistema ? cronometra('sistemaMs', readSistema()) : Promise.resolve(undefined),
       readAutonomia(),
     ]);
 
@@ -214,7 +217,7 @@
     };
 
     const stateText = renderForPrompt(state);
-    return { state, stateText };
+    return { state, stateText, attese };
   }
 
   // #593 (terzo giro di verifica) — la busta del contenuto esterno, e la

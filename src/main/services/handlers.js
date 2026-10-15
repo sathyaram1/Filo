@@ -13,8 +13,10 @@ const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
+const { vistePerAnnunci } = require('../tabs/riservaNuovaScheda');
 const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
+const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
@@ -33,6 +35,9 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   costs: Costs,
   segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
   ricordaEsterni: (messages) => SegretiLetti.ricordaBuste(messages),
+  // La prova di una riga delle Opzioni non è una funzione: la frase nomina solo il modello.
+  funzioneDi: (action) => (action === ACTIONS.PROVIDER_TEST ? '' : actionLabelForSettings(action)),
+  rimedioDi: (s, action) => globalThis.SN_CHAT_ERRORS.RIMEDI_NESSUN_HOST[doveSiSceglieIlModello(s, action)],
 });
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
@@ -367,7 +372,7 @@ function withDefaults(settings) {
   return {
     ...settings,
     provider: d.provider,
-    models: d.models,
+    models: SN_CONST.effectiveModels(d.models, settings.modelliScelti, d.modelRegistry),
     modelRegistry: d.modelRegistry,
     openWeightsOnly,
     excludedProviders,
@@ -419,13 +424,16 @@ function actionLabelForSettings(action) {
   return (SN_CONST.actionLabel && SN_CONST.actionLabel(action)) || action || '';
 }
 
+// Dove si sceglie il modello di una funzione: lo dicono sia l'errore di configurazione sia il «nessun host ammesso» (#828).
+function doveSiSceglieIlModello(settings, action) {
+  if (ownerSlotFor(action)) return 'gestione';
+  return settings && settings.useDefaultModels === false ? 'opzioni' : 'predefiniti';
+}
+const DOVE_MODELLO_I18N = { gestione: 'err_model_where_owner', opzioni: 'err_model_where_own', predefiniti: 'err_model_where_default' };
+
 function modelConfigError(settings, action, missingRefs) {
   const label = actionLabelForSettings(action);
-  const where = ownerSlotFor(action)
-    ? I18n.t('err_model_where_owner')
-    : settings && settings.useDefaultModels === false
-      ? I18n.t('err_model_where_own')
-      : I18n.t('err_model_where_default');
+  const where = I18n.t(DOVE_MODELLO_I18N[doveSiSceglieIlModello(settings, action)]);
   const missing = missingRefs || [];
   const e = new Error(missing.length
     ? I18n.t('err_unknown_model_for_action', label, SN_CONST.formatModelRefsForMessage(missing), where)
@@ -521,6 +529,12 @@ function buildAttemptChain(settings, modelRef, action) {
       if (a.provider === 'openrouter') a.providerRouting = routing;
     }
   }
+  // Il tetto della risposta per la famiglia della funzione (#1097.3): Preferenze, poi Modelli predefiniti, poi il codice.
+  const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
+  let owner = null;
+  try { owner = Defaults.get().lunghezzaRisposte; } catch (_) {}
+  const tetto = LR ? LR.perAzione(action, settings.lunghezzaRisposte, owner) : null;
+  if (tetto) for (const a of out) a.maxTokens = tetto;
   return out;
 }
 
@@ -717,7 +731,16 @@ function createAnswerStreamer(onText) {
 // Gli strumenti si passano all'istante e i tempi si MISURANO (idee «Latenza
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
-async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false }) {
+// `intera`: chi legge la risposta come dati (JSON, memoria, etichette) non riceve mai un pezzo tagliato, ma un errore.
+// Un taglio senza niente da mostrare è un errore per tutti: «qualcosa è andato storto» non direbbe del tetto.
+async function handleAIRequest({ intera = false, ...opts }) {
+  const r = await chiamaIlModello(opts);
+  const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(r, { intera });
+  if (taglio) throw taglio;
+  return r;
+}
+
+async function chiamaIlModello({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false, tempiPrima = null }) {
   const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
@@ -750,10 +773,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
   // Con gli strumenti in richiesta la cache si salta: conserva solo il testo, e
   // una risposta fatta di chiamate rientrerebbe come una risposta muta.
   const hasTools = Array.isArray(tools) && tools.length > 0;
-  // Il giudice delle carte ha la sua cache per carta e criterio: qui le sue venti risposte a ricerca butterebbero
-  // fuori quelle del resto di Filo, che ha un tetto di voci (#382).
-  const skipCache = hasTools || action === ACTIONS.DECKS_SEARCH_FILTER;
-  const cached = (noCache || skipCache) ? null : await AICache.get({ provider: settings.provider, model, messages });
+  const skipCache = hasTools || AICache.esclusa(action);
+  const cached = (noCache || skipCache) ? null : await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
     return { text: cached.text, toolCalls: [], reasoningDetails: [], model, provider: settings.provider, costEur: 0, usage: cached.usage || {}, cached: true };
   }
@@ -802,6 +823,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
       })()
     : await Gate.complete({ action, settings, attempts, messages, tools, toolChoice, signal });
   timing.totalMs = Date.now() - t0;
+  // Quanto il turno ha aspettato prima di chiamare il modello (stato del computer, saldo, contesto): `preparazioneMs`.
+  if (tempiPrima && typeof tempiPrima === 'object') Object.assign(timing, tempiPrima);
   const toolCalls = Array.isArray(result.toolCalls) ? result.toolCalls : [];
   const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
   const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
@@ -830,7 +853,8 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     });
   }
 
-  if (!skipCache) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
+  // Una risposta tagliata (tetto o errore a metà flusso) non si rilegge dalla cache: chi riprova deve poterla avere intera (#1097.3).
+  if (!skipCache && !globalThis.SN_CHAT_ERRORS.troncata(result.finishReason)) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
   return {
     text: result.text, toolCalls, reasoningDetails, finishReason: result.finishReason || null,
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
@@ -864,7 +888,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   const compostoQui = !(payload && Array.isArray(payload.messages) && payload.messages.length);
   if (onMeta) onMeta({ model, provider: settings.provider, messages: compostoQui ? messages : null });
 
-  const cached = await AICache.get({ provider: settings.provider, model, messages });
+  const cached = await AICache.get({ provider: settings.provider, model, messages, action });
   if (cached) {
     if (onDelta) onDelta(cached.text);
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
@@ -885,8 +909,13 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
   });
 
-  AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
-  return { costEur, usage: result.usage, provider: usedProvider, model: concreteModel, keyFallback: ripiegoDaDire(result.keyFallback) };
+  if (!globalThis.SN_CHAT_ERRORS.troncata(result.finishReason)) AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage, action }).catch(() => {});
+  const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(result);
+  if (taglio) throw taglio;
+  return {
+    costEur, usage: result.usage, provider: usedProvider, model: concreteModel, keyFallback: ripiegoDaDire(result.keyFallback),
+    finishReason: result.finishReason || null,
+  };
 }
 
 // ─── Filo agents ────────────────────────────────────────────────────────────
@@ -935,6 +964,7 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText }) {
       action: ACTIONS.FILO_LESSON,
       payload: { profilo, preferenze, lezioni: lezioniText, interazione, stato: stateText },
       origin: 'filo:lesson',
+      intera: true,
     });
     const text = (r?.text || '').trim();
     if (!text || /^NULLA DA IMPARARE/i.test(text)) return;
@@ -974,6 +1004,7 @@ async function maybeRunCompactor() {
       action: ACTIONS.FILO_COMPACT,
       payload: { moduli: moduliText, lezioni: lezioniText },
       origin: 'filo:compact',
+      intera: true,
     });
     const text = (r?.text || '').trim();
     if (!text || /^NESSUNA MODIFICA/i.test(text)) {
@@ -1142,12 +1173,12 @@ const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate
   + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
-// Letture: l'esito serve solo al modello per rispondere. Un turno muto dopo sole letture non ha detto niente all'utente (#557).
-const AZIONI_DI_LETTURA = new Set([
-  'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-]);
-// Una lettura che aspetta l'OK, o fermata per un segreto, ha già la sua parola sotto la risposta.
-const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (AZIONI_DI_LETTURA.has(String(a.type || '').toUpperCase())
+// L'esito al modello di un'azione che il tetto ha tagliato a metà degli argomenti.
+const ARGOMENTI_TAGLIATI = 'non eseguita: la tua risposta ha raggiunto la lunghezza massima mentre scrivevi gli argomenti di questa azione. '
+  + 'Se l\'utente ti chiede di continuare, rifalla più corta o dividila in più azioni.';
+// Letture (elenco in SN_ACTION_LEVELS.LETTURE): una che aspetta l'OK, o fermata per un segreto, ha già la sua parola
+// sotto la risposta.
+const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type)
   && !a._confirm && !a._domanda && !(a._output && a._output.blocked)));
 const fraseSenzaRisposta = (passi) => `Mi sono fermato dopo ${passi === 1 ? 'un passo' : `${passi} passi`} senza arrivare a una risposta.`;
 
@@ -1968,6 +1999,8 @@ async function eseguiAzioneFilo(action, {
   // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
   if (type === 'IMPOSTA_PREFERENZA') {
     delete action._invariato;
+    // Il costo del modello scelto per una funzione (#819): lo scrive solo il main, qui sotto.
+    delete action._costoModello;
     // Mai dal modello né da una conferma: lo scrive solo un turno dell'intervista di benvenuto (#592.2).
     delete action._accoglienza;
     try {
@@ -1996,6 +2029,12 @@ async function eseguiAzioneFilo(action, {
         action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,
         action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
       );
+      // Il modello di una funzione: si controlla prima della conferma, che non chieda un OK a un cambio che non parte.
+      if (built && built.modelloFunzione) {
+        const v = await require('./costoModelli').verificaCambio(built.modelloFunzione, { Defaults });
+        if (v.rifiuto) return { executed: false, kept: false, output: { error: v.rifiuto, rifiuto: true, ...(v.perModello ? { perModello: v.perModello } : {}) } };
+        if (v.costo) action._costoModello = v.costo;
+      }
       if (built && built.elenco) {
         const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
         if (r.invariato) action._invariato = r.invariato;
@@ -2506,7 +2545,8 @@ async function eseguiAzioneFilo(action, {
         await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
         const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
-        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}) } };
+        const costo = typeof action._costoModello === 'string' && action._costoModello ? { costoModello: action._costoModello } : {};
+        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}), ...costo } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
@@ -3022,6 +3062,13 @@ async function eseguiAzioneFilo(action, {
         const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat' });
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
         return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
+      }
+      case 'RIMEDIO_CREDITI': {
+        // #818 — i rimedi dell'avviso dei crediti a parole: la stessa porta dei pulsanti, col suo «com'era».
+        const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
+        if (!AC || !AC.rimedioDaChat) return { executed: false, kept: false, output: { error: 'non disponibile' } };
+        const r = await AC.rimedioDaChat({ rimedio: action.rimedio, operazione: action.operazione || 'elenca' });
+        return { executed: r.ok !== false, kept: false, output: r.ok === false ? { ...r, error: r.frase || r.error } : r };
       }
       case 'INSTALLA_AGGIORNAMENTO': {
         // #786 — da spento è la stessa porta di «Installa» sulla carta; con una versione pronta riavvia (#1039).
@@ -4001,6 +4048,12 @@ function toolResultText({ action, res, rendered }, giro = null) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if ((type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') && res.output) return esitoSistemaPerModello(res.output);
+  if (type === 'RIMEDIO_CREDITI' && res.output) {
+    const o = res.output;
+    if (o.operazione === 'elenca') return o.testo ? `Situazione dei crediti e rimedi:\n${o.testo}` : 'Adesso non c\'è niente da proporre per i crediti: dillo in una riga.';
+    const det = Array.isArray(o.dettagli) && o.dettagli.length ? `\n${o.dettagli.join('\n')}` : '';
+    return `${o.frase || (res.executed ? 'Fatto.' : 'Non riuscito.')}${det}\nDillo all'utente in una riga, con parole tue; non ripetere l'azione.`;
+  }
   if (type === 'INSTALLA_AGGIORNAMENTO' && res.output && res.output.frase) {
     return `${res.output.frase}\nDillo all'utente in una riga, con parole tue; non ripetere l'azione.`;
   }
@@ -4054,8 +4107,10 @@ function toolResultText({ action, res, rendered }, giro = null) {
     done = String(done || describe()).replace(/\.+\s*$/, '');
     // #949 — un cambio fatto da Filo dice cosa ha cambiato e come si torna indietro.
     if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
+      const costo = res.output && typeof res.output.costoModello === 'string' && res.output.costoModello
+        ? ` Nella stessa risposta riporta il costo, con le stesse cifre: «${res.output.costoModello}»` : '';
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
-        + 'sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+        + `sul segno accanto al messaggio dell'utente, o chiedendolo a te.${costo}`;
     }
     return `Eseguita: ${done}.`;
   }
@@ -4317,13 +4372,17 @@ function ricordoComeAzione(ricordi) {
 async function handleFiloChat(richiesta) {
   const volo = { accoglienza: false };
   try {
-    return await turnoFiloChat(richiesta, volo);
+    // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
+    const Costi = global.SN_COSTS;
+    const turno = () => turnoFiloChat(richiesta, volo);
+    return await (Costi && Costi.unUso ? Costi.unUso(ACTIONS.FILO_CHAT, turno) : turno());
   } finally {
     if (volo.accoglienza) onbTurniInVolo -= 1;
   }
 }
 
 async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }, volo) {
+  const inizioTurno = Date.now();
   await FiloMem.touchSession();
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
   // perché la parola di stop deve funzionare anche quando il resto non
@@ -4439,7 +4498,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble({ creditiFreschi: true });
+  const { stateText, attese: attesePrimaDelModello } = await FiloState.assemble({ creditiFreschi: true });
   // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
   // file), non come testo integrale: economico e sempre presente. Filo, se serve,
   // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
@@ -4631,7 +4690,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let finestraDaRicordare = null;
   const stringiDopoRifiuto = async (e) => {
     const FC = globalThis.SN_FILO_CONTESTO;
-    const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 ? FC.troppoLungo(e) : null;
+    // Un rifiuto dato dal tetto della risposta non si cura stringendo la conversazione, salvo `stringibile`: lì
+    // accorciare il tratto basta e non chiede niente all'utente.
+    const rifiuto = filo && tettiChat && Array.isArray(payloadBase.filoTratto) && strette < 3 && (e?.code !== 'TETTO_RISPOSTA' || e?.stringibile) ? FC.troppoLungo(e) : null;
     if (!rifiuto) return false;
     let inviati = [];
     try { inviati = await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages }); } catch (_) {}
@@ -4675,6 +4736,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (ultimo && ultimo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, ultimo.ts, { azioni: successe });
   };
   let fermato = false;
+  // La risposta si è fermata al tetto di lunghezza (#1097.3): lo si dice, e «Continua» la riprende.
+  let interrotta = false;
+  // Il primo giro che risponde porta nella cronologia anche l'attesa prima del modello: chi aspetta la vive (#1097.1).
+  let tempiPrima = { preparazioneMs: Date.now() - inizioTurno, ...(attesePrimaDelModello || {}) };
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       if (turno.fermato) { fermato = true; break; }
@@ -4683,7 +4748,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         action: ACTIONS.FILO_CHAT,
         payload: { ...payloadBase, threadMessages },
         origin: 'filo:chat',
-        onReasoning, onText, onToolCall, tools, signal: turno.ctrl.signal,
+        onReasoning, onText, onToolCall, tools, signal: turno.ctrl.signal, tempiPrima,
       });
       const KW = global.SN_WALLET_MAIN;
       try {
@@ -4694,6 +4759,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         if (await stringiDopoRifiuto(e)) { round--; continue; }
         throw e;
       }
+      tempiPrima = null;
       if (finestraDaRicordare != null) { finestreDeiModelli.set(modelloChat, finestraDaRicordare); finestraDaRicordare = null; }
       if (r && r.keyFallback) keyFallback = r.keyFallback;
       costEur += Number(r.costEur) || 0;
@@ -4704,6 +4770,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const toolCalls = (Array.isArray(r.toolCalls) ? r.toolCalls : [])
         .map((c, i) => ({ ...c, id: String(c.id || '') || `call_${round}_${i}` }));
       let actions = Tools ? Tools.toolCallsToActions(toolCalls) : [];
+      // Il tetto ha tagliato gli argomenti di un'azione: il modello lo sa, e il turno si ferma con «Continua» invece di
+      // rifare la stessa azione troppo lunga a ogni giro.
+      const tagliataInAzione = globalThis.SN_CHAT_ERRORS.troncata(r.finishReason) && actions.some((a) => a._argsError);
+      if (tagliataInAzione) for (const a of actions) if (a._argsError) a._argsError = ARGOMENTI_TAGLIATI;
       // Tolleranza per il formato vecchio (JSON nel testo): le azioni passano
       // comunque dal registro invece di finire in chat come JSON grezzo.
       const legacy = (!actions.length && Tools) ? Tools.legacyEnvelope(text) : null;
@@ -4729,19 +4799,18 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         textReply = text;
         reasoningDetails = r.reasoningDetails || [];
         exhausted = false;
+        interrotta = globalThis.SN_CHAT_ERRORS.troncata(r.finishReason) ? r.finishReason : false;
         break;
       }
       if (turno.fermato) { fermato = true; break; }
       passi += 1;
       const roundRendered = [];
       const results = [];
-      // Le aperture di pagina di fila partono insieme: ognuna aspetta l'esito della sua scheda,
-      // nessuna quello delle altre. Il resto resta in ordine (i suoi esiti decidono i passi dopo).
-      const esiti = new Map();
-      const avvia = (a) => (a._argsError
+      // Aperture di pagina e letture di fila partono insieme; il resto in ordine (regole in giroAzioni.js).
+      const avvia = (a, { contesto, fonti }) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
+          sender, contesto, parole: paroleUtente, domanda: domandaDiAdesso, chatId, fontiLette: fonti, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali, dettaglio) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -4749,16 +4818,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           }) : null,
           segnale: turno.ctrl.signal,
         }));
-      const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
-      for (let i = 0; i < actions.length; i++) {
-        const a = actions[i];
-        if (!esiti.has(a) && turno.fermato) { fermato = true; break; }
+      const dopo = async (a, res) => {
         rawActions.push(a);
-        if (!esiti.has(a)) {
-          if (apertura(a)) for (let j = i; j < actions.length && apertura(actions[j]); j++) esiti.set(actions[j], avvia(actions[j]));
-          else esiti.set(a, avvia(a));
-        }
-        const res = await esiti.get(a);
         // Fermata (#810): l'archivio la salva come tale.
         if (res.output && res.output.blocked === 'segreto') a._output = res.output;
         // Contiene la home con il nome utente: serve solo al gate, non alla chat.
@@ -4793,8 +4854,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         azioniViste.push(rendered);
         ricordaLettoInChat([rendered]);
         await segnaFonteLetta(chatId, fontiLette, rendered);
-      }
-      if (fermato) break;
+      };
+      const partite = await GiroAzioni.eseguiGiro(actions, {
+        contesto: azioniViste, fonti: fontiLette, avvia, dopo, fermo: () => turno.fermato,
+        apertura: (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA',
+        lettura: (a) => !!a && !a._argsError && globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type),
+      });
+      if (partite.fermato) { fermato = true; break; }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       // Quello di un giro di soli bottoni invece resta nella bolla.
@@ -4824,6 +4890,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         const esito = toolResultText(x, { risposta: diRisposta });
         threadMessages.push(Tools.toolMessage(x.action._callId, fraLeNote && i === results.length - 1 ? `${esito} ${RISPOSTA_FRA_LE_NOTE}` : esito));
       });
+      if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; break; }
     }
   } catch (e) {
     // Il turno è fallito (rete, provider, crediti): la prenotazione della
@@ -4862,7 +4929,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // La scheda mette «Continua» sotto la frase: si riprende da qui, senza riscrivere la domanda.
   let senzaRisposta = null;
   // Muto dopo sole letture: una frase di lavoro che diventa la bolla («cerco ancora…») non è una risposta (#557).
-  const mutoDopoLetture = !exhausted && !String(textReply || '').trim() && rawActions.length > 0 && soloLetture(renderedActions);
+  const mutoDopoLetture = !exhausted && !interrotta && !String(textReply || '').trim() && rawActions.length > 0 && soloLetture(renderedActions);
   if (exhausted) {
     senzaRisposta = { passi };
     textReply = unisciTesti([...risposta, textReply, fraseSenzaRisposta(passi)]);
@@ -4887,6 +4954,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (mutoDopoLetture) {
     senzaRisposta = { passi };
     textReply = unisciTesti([textReply, fraseSenzaRisposta(passi)]);
+  }
+  if (interrotta && !senzaRisposta) {
+    senzaRisposta = { passi, interrotta: true };
+    textReply = unisciTesti([globalThis.SN_CHAT_ERRORS.chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
   }
   textReply = String(textReply || '').trim() || (rawActions.length ? '' : '(vuoto)');
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
@@ -5276,6 +5347,7 @@ async function generateDashboardFromInputs(inputs) {
     action: ACTIONS.FILO_DASHBOARD,
     payload: { ...inputs.payload, ultimoMessaggio: cached?.message || '' },
     origin: 'filo:dashboard',
+    intera: true,
   });
   const parsed = extractJson(r.text);
   let message = '';
@@ -5390,7 +5462,7 @@ async function maybeCategorizeAsync(savedEntry, pageInput) {
   if (!settings.featureFlags?.categorize) return;
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) return;
   if (!SN_CONST.canServeAction(settings, ACTIONS.CATEGORIZE)) return;
-  const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '' });
+  const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '', intera: true });
   const result = await Categorizer.categorize({
     invokeAI,
     page: {
@@ -5490,6 +5562,7 @@ require('./handlers/filo')(on, handlerCtx);
 require('./handlers/auth')(on, handlerCtx);
 require('./handlers/credits')(on, handlerCtx);
 require('./handlers/wallet')(on, handlerCtx);   // #598 — chiave personale, inviti, registro d'uso
+require('./handlers/avvisoCrediti')(on, handlerCtx); // #818 — l'avviso prima che i crediti finiscano, coi rimedi
 require('./handlers/board')(on, handlerCtx);
 require('./handlers/decks')(on, handlerCtx);
 require('./handlers/scryfall')(on, handlerCtx);
@@ -5625,6 +5698,7 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   ];
 
   const result = await Gate.complete({ action: ACTIONS.FILO_TAB_TRIAGE, messages });
+  if (globalThis.SN_CHAT_ERRORS.troncata(result.finishReason)) throw globalThis.SN_CHAT_ERRORS.erroreTagliata(result.finishReason);
   const { provider: usedProvider, model: concreteModel } = result;
 
   const parsed = extractJson(result.text) || {};
@@ -6344,10 +6418,8 @@ ConversazioniApp.collega({
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) {
-        for (const t of win._filoTabs.tabs) {
-          try { spingiAllaScheda(t.view.webContents, message, { inVista: t.id === win._filoTabs.activeId }); } catch (_) {}
-        }
+      for (const { wc, inVista } of vistePerAnnunci(win._filoTabs)) {
+        try { spingiAllaScheda(wc, message, { inVista }); } catch (_) {}
       }
       spingiAllaFinestra(win, message);
     }
@@ -6378,7 +6450,7 @@ function broadcastToFiloPages(message) {
     for (const win of BrowserWindow.getAllWindows()) {
       const m = typeof message === 'function' ? message(ambitoDellaFinestra(win)) : message;
       if (m == null) continue;
-      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents, m);
+      for (const { wc } of vistePerAnnunci(win._filoTabs)) aFilo(wc, m);
       aFilo(win.webContents, m);
     }
   } catch (_) {}

@@ -34,6 +34,7 @@
     btn.type = 'button';
     btn.className = 'sn-msg-rimedio';
     btn.textContent = pagina.label;
+    if (pagina.title) btn.title = pagina.title;
     btn.addEventListener('click', () => {
       try { chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: pagina.url }); } catch (_) {}
     });
@@ -1108,6 +1109,28 @@
     return el;
   }
 
+  // Una risposta fermata dal tetto di lunghezza (#1097.3) non passa per intera: lo si dice sotto, e dove la
+  // conversazione può andare avanti c'è «Continua».
+  function notaInterrotta(parent, finishReason, onContinua = null) {
+    const CE = global.SN_CHAT_ERRORS;
+    const frase = CE && CE.rispostaInterrotta ? CE.rispostaInterrotta(finishReason) : '';
+    if (!parent || !frase) return null;
+    const el = document.createElement('div');
+    el.className = 'sn-key-fallback sn-risposta-interrotta';
+    el.textContent = frase;
+    if (typeof onContinua === 'function') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-msg-rimedio';
+      btn.textContent = 'Continua';
+      btn.title = 'Continua la risposta da dove si è interrotta';
+      btn.addEventListener('click', () => { btn.remove(); onContinua(); });
+      el.appendChild(btn);
+    }
+    parent.appendChild(el);
+    return el;
+  }
+
   // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
   // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
   // posa), l'informazione resta comunque: passando sopra l'intestazione.
@@ -1195,6 +1218,7 @@
             bubble.text.innerHTML = renderMarkdown(daMostrare);
           }
           notaRipiego(bubble.text, m.keyFallback);
+          notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
@@ -1231,7 +1255,17 @@
     if (popup.activePort) return; // già in streaming
     popup.inputEl.value = '';
     popup.inputEl.style.height = 'auto';
+    chiedi(popup, txt);
+  }
 
+  // «Continua» sotto una risposta interrotta è una domanda come le altre, già scritta.
+  const CONTINUA_RISPOSTA = global.SN_CHAT_ERRORS?.CHIEDI_SEGUITO || 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  function continuaRisposta(popup) {
+    if (!popup || popup.activePort) return;
+    chiedi(popup, CONTINUA_RISPOSTA);
+  }
+
+  function chiedi(popup, txt) {
     // Mostra bolla utente
     const userBubble = appendBubble(popup, 'user');
     userBubble.text.textContent = txt;
@@ -1433,7 +1467,7 @@
 
   global.SN_POPUP = {
     openStreaming,
-    notaRipiego, ripiegoMostrato,
+    notaRipiego, ripiegoMostrato, notaInterrotta,
     close,
     closeTopmost,
     showToast,

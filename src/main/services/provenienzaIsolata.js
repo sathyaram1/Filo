@@ -8,6 +8,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Worker } = require('node:worker_threads');
 
+// Cercato al caricamento: se il pacchetto manca, chi importa il modulo cade subito e col motivo (#1231).
+const DECODIFICA_JPEG = require.resolve('jpeg-js/lib/decoder.js');
+
 // Un'immagine vera da 64 MB si legge in qualche centinaio di millisecondi.
 const TEMPO_MAX_MS = 10_000;
 const MEMORIA_MB = 512;
@@ -48,7 +51,7 @@ function codiceThread() {
   if (!codice) {
     const condiviso = (nome) => fs.readFileSync(path.join(__dirname, '..', '..', 'shared', nome), 'utf8');
     // jpeg-js (JS puro) entra come testo anche lui, chiuso in una funzione che gli fa da modulo.
-    const jpeg = fs.readFileSync(require.resolve('jpeg-js/lib/decoder.js'), 'utf8');
+    const jpeg = fs.readFileSync(DECODIFICA_JPEG, 'utf8');
     codice = [
       condiviso('provenienzaImmagine.js'),
       condiviso('marchiInvisibili.js'),
