@@ -844,6 +844,7 @@
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'timerRingtoneVolume': return volumeDa('timerRingtoneVolume');
       case 'terminal.enabled': return $('terminalEnabled').checked;
+      case 'schermo.guarda': return $('schermoGuarda').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
@@ -911,6 +912,7 @@
       case 'timerRingtone': return s.timerRingtone || 'default';
       case 'timerRingtoneVolume': return volumeSalvato(s.timerRingtoneVolume);
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
+      case 'schermo.guarda': return !!(s.schermo && s.schermo.guarda === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
       case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
@@ -1085,6 +1087,7 @@
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
+    if (vuole('schermo.guarda')) $('schermoGuarda').checked = !!(settings.schermo && settings.schermo.guarda === true);
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
     if (vuole('aggiornamenti.installa')) {
@@ -1624,6 +1627,7 @@
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
     $('riassuntoSchede').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
+    $('schermoGuarda').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('aggiornamentiAutomatici').addEventListener('change', persist);
     for (const id of ['contestoGiorni', 'contestoToken']) {

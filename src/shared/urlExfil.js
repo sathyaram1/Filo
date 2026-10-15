@@ -465,6 +465,12 @@
         if (out.blocked) continue;
         const t = `${testo(out.stdout)}\n${testo(out.stderr)}`;
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
+      } else if (type === 'VEDI_SCHERMO') {
+        // #778 — quello che si vede in una finestra (e i titoli delle finestre aperte) l'hanno scritto altri.
+        const titoli = [out.finestra, ...(Array.isArray(out.elenco) ? out.elenco.map((v) => v && v.nome) : [])]
+          .map(testo).filter((t) => t.trim()).join('\n');
+        const t = [testo(out.testo), titoli].filter((x) => x.trim()).join('\n');
+        if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, 'da una finestra guardata sullo schermo'); }
       } else if (type === 'LEGGI_DOCUMENTO') {
         if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, 'da un documento'); }
       } else if (type === 'CERCA_DOCUMENTI') {

@@ -980,6 +980,7 @@ const IMPOSTAZIONI = {
   'win-bluetooth': 'ms-settings:bluetooth',
   'mac-bluetooth': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth',
   'mac-wifi': 'x-apple.systempreferences:com.apple.wifi-settings-extension',
+  'mac-registrazione-schermo': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
 };
 
 function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}) {
