@@ -103,6 +103,8 @@ durata, nessun "margine per l'ultimo worker".
   finisce e viene consegnato. Nessun lavoro troncato.
 - Politiche di ricambio (contesto, "basta per oggi", fasce orarie) = risposte
   del server alla richiesta di lavoro ("chiudi"), non logica nelle sessioni.
+  - **Superato** (il contesto lo misura l'orchestratore): vedi
+    `routines/roles/orchestrator.md`, «Loop».
 - I battiti (heartbeat del canale autenticato, già in costruzione con #477)
   sono l'UNICA definizione di "qualcuno sta lavorando". Niente flag che una
   sessione morta lascia in giro.
