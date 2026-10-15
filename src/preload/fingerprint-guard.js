@@ -386,9 +386,11 @@ const PROPAGAZIONE = `
     try { ascolta(w); } catch (e) {}
   }
 
-  prepara(window, true);`;
+  prepara(window, true);
+  // Solo nelle prove: un segno sul prototipo che le prove dei giri leggono, mai una proprietà della finestra.
+  if (SONDA) { try { defP(getProto(window), '__filoFpGuard', { __proto__: null, get: function () { return true; }, configurable: true }); } catch (e) {} }`;
 
-function buildPreamboloSource({ fp, canale } = {}) {
+function buildPreamboloSource({ fp, canale, sonda } = {}) {
   const parti = [];
   if (fp && (fp.level | 0) > 0) parti.push(parteFingerprint(fp.seed));
   if (!parti.length) return '';
@@ -400,7 +402,7 @@ function buildPreamboloSource({ fp, canale } = {}) {
   var R = Reflect.apply, defP = Object.defineProperty, gOPD = Object.getOwnPropertyDescriptor;
   var getProto = Object.getPrototypeOf, setProto = Object.setPrototypeOf, imul = Math.imul, ceil = Math.ceil;
   var WMP = WeakMap.prototype, wmGet = WMP.get, wmSet = WMP.set, wmHas = WMP.has;
-  var parti = [], CANALE = ${JSON.stringify(String(canale || ''))};
+  var parti = [], CANALE = ${JSON.stringify(String(canale || ''))}, SONDA = ${sonda ? 'true' : 'false'};
 
   // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
   // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799), e
@@ -427,8 +429,8 @@ ${PROPAGAZIONE}
 })();`;
 }
 
-function buildGuardSource(seed, level, canale) {
-  return buildPreamboloSource({ fp: { seed, level }, canale });
+function buildGuardSource(seed, level, canale, sonda) {
+  return buildPreamboloSource({ fp: { seed, level }, canale, sonda });
 }
 
 module.exports = { buildGuardSource, buildPreamboloSource };

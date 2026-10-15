@@ -63,3 +63,10 @@ test('in Off nessun riquadro ha la protezione', () => {
     FP.setMode({ security: { fingerprint: { mode: 'default' } } }, false);
   }
 });
+
+test('fuori dalle prove la guardia non lascia nessun segno che un sito possa leggere', () => {
+  const G = require('../../src/preload/fingerprint-guard.js');
+  assert.doesNotMatch(G.buildGuardSource(123, 1, 'xabc'), /__filoFp/);
+  assert.doesNotMatch(G.buildGuardSource(123, 1, 'xabc', false), /SONDA = true/);
+  assert.match(G.buildGuardSource(123, 1, 'xabc', true), /SONDA = true/);
+});

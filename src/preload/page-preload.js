@@ -217,7 +217,7 @@ try {
       }
       if (!unito) {
         const { buildGuardSource } = require('./fingerprint-guard.js');
-        webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level, cfg.canale), false).catch(() => {});
+        webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level, cfg.canale, cfg.sonda), false).catch(() => {});
       }
     }
   }

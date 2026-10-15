@@ -129,8 +129,10 @@ function registerIpcHandlers() {
   // services/fingerprint.js e preload/fingerprint-guard.js.
   // Per un riquadro conta la catena dei frame vista dal main, non l'indirizzo che il riquadro dichiara (#798).
   // `canale`: il tipo dell'evento con cui un riquadro chiede la guardia di chi lo contiene, segreto per la sessione.
+  // `sonda`: nelle prove la guardia si lascia riconoscere (preload/fingerprint-guard.js), fuori mai.
   const CANALE_FP = 'x' + require('crypto').randomBytes(16).toString('hex');
-  const conCanale = (cfg) => (cfg && cfg.level > 0 ? { ...cfg, canale: CANALE_FP } : cfg);
+  const SONDA_FP = !!process.env.FILO_USER_DATA;
+  const conCanale = (cfg) => (cfg && cfg.level > 0 ? { ...cfg, canale: CANALE_FP, sonda: SONDA_FP } : cfg);
   ipcMain.on('filo:fp-config', (event, href, opts) => {
     try {
       const F = require('./services/fingerprint');

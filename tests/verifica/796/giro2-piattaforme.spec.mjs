@@ -1,7 +1,6 @@
 // #796 giro 2: siti sulla stessa piattaforma o sotto suffissi nazionali del giro 1 leggono impronte diverse.
 
 import { test as base, expect, argomentiScala, chiudiApp } from '../../fixtures/electron.mjs';
-import { guardiaAccesa } from '../../helpers/guardia.mjs';
 import { _electron as electron } from '@playwright/test';
 import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -45,7 +44,7 @@ test('piattaforme e suffissi nazionali separano, i sottodomini dello stesso sito
   for (const nome of NOMI) {
     const id = new URL(testServer.html(`<title>FP ${nome}</title><p>${nome}</p>`)).pathname;
     const page = await openTab(`http://${nome}:${porta}${id}`);
-    await page.waitForFunction(guardiaAccesa, null, { timeout: 8_000 });
+    await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 8_000 });
     impronte[nome] = await page.evaluate(IMPRONTA);
     expect(impronte[nome]).toMatch(/^[0-9a-f]{16}$/);
   }

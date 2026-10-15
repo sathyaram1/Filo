@@ -1,7 +1,6 @@
 // #796 giro 3: i suffissi del giro 2 (jolly, tre etichette, nomi non latini) separano; le eccezioni e i sottodomini no.
 
 import { test as base, expect, argomentiScala, chiudiApp } from '../../fixtures/electron.mjs';
-import { guardiaAccesa } from '../../helpers/guardia.mjs';
 import { _electron as electron } from '@playwright/test';
 import { rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -45,7 +44,7 @@ test('jolly, tre etichette e nomi non latini separano, eccezioni e sottodomini n
   for (const nome of NOMI) {
     const id = new URL(testServer.html(`<title>FP ${nome}</title><p>${nome}</p>`)).pathname;
     const page = await openTab(`http://${nome}:${porta}${id}`);
-    await page.waitForFunction(guardiaAccesa, null, { timeout: 8_000 });
+    await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 8_000 });
     impronte[nome] = await page.evaluate(IMPRONTA);
     expect(impronte[nome]).toMatch(/^[0-9a-f]{16}$/);
   }
