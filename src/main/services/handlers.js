@@ -20,6 +20,7 @@ const GiroAzioni = require('./giroAzioni');
 const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
+const Schermo = require('./schermo').crea();
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -1317,7 +1318,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra },
   });
 }
 function consumePendingConfirm(sender, action) {
@@ -1335,7 +1336,7 @@ function daPaginaDiFilo(sender) {
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
@@ -2152,6 +2153,17 @@ async function eseguiAzioneFilo(action, {
     // La frase che spiega il terminale va coi comandi in chat finché non è stata
     // mostrata (#892); la conferma è un secondo giro della stessa proposta.
     if (cmd && !confirmed && !assistente && await primaVoltaDelTerminale()) action._primaVolta = true;
+  }
+
+  // ── guardare lo schermo (#778): gate duro e scelta della finestra, prima del gate dei livelli ──────────
+  // Spenta in Preferenze, Filo non elenca e non cattura niente. Il popup deve dire QUALE finestra: la sceglie
+  // qui il main, dal nome che ha dato il modello; all'OK vale quella mostrata.
+  if (type === 'VEDI_SCHERMO') {
+    let s = {};
+    try { s = await Storage.getSettings(); } catch (_) {}
+    const mostrata = confirmed ? ((bersagliMostrati(sender, action) || {}).finestra || null) : null;
+    const pre = await Schermo.prepara(action, { settings: s, chiave: chiaveSchermo(sender), mostrata });
+    if (pre.esito) return pre.esito;
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO' || type === 'CERCA_DOCUMENTI') action._perimetro = perimetroLettura(sender);
@@ -2982,6 +2994,20 @@ async function eseguiAzioneFilo(action, {
         const out = await runCommand(cmd, { shell, cwd, trackCwd: true });
         if (out.cwd) setAssistantCwd(sender, out.cwd);
         return { executed: out.code === 0, kept: true, output: out };
+      }
+      case 'VEDI_SCHERMO': {
+        // L'immagine va solo al modello di «Descrivi immagine», senza cronologia né cache: al giro torna testo (#778).
+        const CE = globalThis.SN_CHAT_ERRORS;
+        return await Schermo.guarda(action, {
+          chiave: chiaveSchermo(sender),
+          domanda,
+          leggi: ({ dataUrl, finestra, domanda: chiesta, cosa }) => Gate.text({
+            action: ACTIONS.DESCRIBE_IMAGE,
+            messages: PROMPTS.leggiSchermo({ dataUrl, finestra, domanda: chiesta, cosa }),
+            ...(segnale ? { signal: segnale } : {}),
+          }),
+          fraseErrore: (e) => String((e && e.userMessage) || (CE && CE.friendly(e)) || ''),
+        });
       }
       // ── proxy per-tab via linguaggio naturale (#152) ───────────────────────
       // Le primitive sono le STESSE della UI (tasto destro sulla tab): l'agente
