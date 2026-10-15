@@ -29,6 +29,7 @@
   let apriProposta = () => {};
   let archiviaAzione = () => {};
   let sceltaAutonomiaEl = () => null;
+  let prosegui = () => {};
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
@@ -519,6 +520,7 @@
     CERCA_CHAT: (n) => (n > 1 ? `cercato nel filo ${n} volte` : 'cercato nel filo'),
     RICORDO_FILO: () => 'ripescato un ricordo dal filo',
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
+    VEDI_SCHERMO: (n) => (n > 1 ? `guardato lo schermo ${n} volte` : 'guardato lo schermo'),
     CERCA_DOCUMENTI: (n) => (n > 1 ? `cercato fra i tuoi documenti ${n} volte` : 'cercato fra i tuoi documenti'),
     RINOMINA_FILE: () => 'dato un nome ai file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
@@ -695,6 +697,14 @@
       const nome = (a._output && a._output.name) || '';
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
+    // #778 — quale finestra ha guardato; quello che c'era sta nella risposta, non nel diario.
+    VEDI_SCHERMO: (a) => {
+      const o = a._output || {};
+      if (Array.isArray(o.ambigue)) return { icon: '🖥', text: `Più finestre per «${pulito(o.richiesta)}»` };
+      if (Array.isArray(o.elenco) && !o.testo) return { icon: '🖥', text: 'Guardato quali finestre sono aperte' };
+      const nome = pulito(o.finestra);
+      return { icon: '🖥', text: nome ? `Ho guardato «${nome}»` : 'Ho guardato lo schermo' };
+    },
     CERCA_DOCUMENTI: (a) => ({ icon: '🔎', text: testoRicercaDocumenti(a) }),
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
@@ -817,6 +827,7 @@
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
+    VEDI_SCHERMO: 'Finestra non guardata',
     CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     TOGLI_PERMESSO_SITO: 'Permesso non tolto',
@@ -911,6 +922,12 @@
   function motivoFallimento(a) {
     const o = a && a._output;
     if (!o) return '';
+    if (isType(a, 'VEDI_SCHERMO')) {
+      if (o.spenta) return 'è spento in Preferenze';
+      if (o.permesso === 'mac') return 'serve il permesso «Registrazione schermo»';
+      if (o.nessuna) return `nessuna finestra «${pulito(o.richiesta)}»`;
+      if (o.errore) return `${o.finestra ? `«${pulito(o.finestra)}»: ` : ''}${pulito(o.errore)}`;
+    }
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     if (o.blocked === 'site') {
       const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
@@ -1016,7 +1033,7 @@
   // delle impostazioni dove si concede (l'indirizzo lo sceglie il main da un elenco suo, qui passa solo la chiave).
   function permessoDaConcedere(a) {
     const o = a && a._output;
-    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI')) && a._executed === false
+    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI') || isType(a, 'VEDI_SCHERMO')) && a._executed === false
       && !!o && typeof o.apri === 'string' && !!o.apri;
   }
 
@@ -1086,6 +1103,10 @@
     for (const a of actions) {
       const f = a && a._callId && isType(a, 'NAVIGA') ? fermateInAttesa.get(a._callId) : null;
       if (f) { fermateInAttesa.delete(a._callId); segnaFermata(a, f); }
+    }
+    // #778 — l'impostazione proposta perché guardare lo schermo era spento: col suo OK la richiesta riprende.
+    if (actions.some((a) => isType(a, 'VEDI_SCHERMO') && a._output && a._output.spenta)) {
+      for (const a of actions) if (isType(a, 'IMPOSTA_PREFERENZA') && a._confirm) a._riprende = true;
     }
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions';
@@ -1518,7 +1539,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO'];
       // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
       if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';
@@ -1554,6 +1575,14 @@
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
         if (r && r.executed) segnaConfermata(a, r.output, activity, r.cambi);
+        // #778 — l'OK a guardare una finestra, o ad accendere la funzione che lo permette, risponde a una domanda
+        // rimasta in sospeso: Filo riprende da solo, anche per dire che non è riuscito.
+        if (type === 'VEDI_SCHERMO' && r && !r.rejected) {
+          if (!r.executed) segnaNonRiuscita(a, r.output, activity, btn);
+          prosegui();
+          if (!r.executed) return;
+        }
+        if (type === 'IMPOSTA_PREFERENZA' && a._riprende && r && r.executed) prosegui();
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           segnaComando((r && r.executed) ? '✓' : '✗');
@@ -1761,7 +1790,18 @@
     const row = activityRowFor(a);
     if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a);
     // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
-    try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id)); } catch (_) {}
+    try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id), a); } catch (_) {}
+  }
+
+  // Confermata ma non riuscita (la finestra si è chiusa, il modello non ha risposto): il diario e il bottone lo dicono.
+  function segnaNonRiuscita(a, output, activity, btn) {
+    a._output = output || {};
+    a._executed = false;
+    delete a._confirm;
+    const row = activityRowFor(a);
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, true, null, a);
+    btn.textContent = `✗ ${row ? row.text : 'Non eseguita'}`;
+    if (permessoDaConcedere(a)) btn.after(bottonePermesso(a));
   }
 
   // Il riordino che la regola non fa partire da solo parte al clic, e chiede come dice `_domanda` (#530).
@@ -1942,6 +1982,7 @@
     if (deps.apriProposta) apriProposta = deps.apriProposta;
     if (deps.archiviaAzione) archiviaAzione = deps.archiviaAzione;
     if (deps.sceltaAutonomia) sceltaAutonomiaEl = deps.sceltaAutonomia;
+    if (deps.prosegui) prosegui = deps.prosegui;
   }
 
   global.SN_DASH_ATTIVITA = {
