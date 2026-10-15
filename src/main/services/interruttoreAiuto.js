@@ -64,8 +64,15 @@ async function accesoPer(win) {
   return acceso(s);
 }
 
+// Spento, dice perché nella cornice: sotto l'avviso del sito l'avviso della pagina non si vedrebbe.
 function seAcceso(win, fn) {
-  accesoPer(win).then((si) => { if (si) fn(); }, () => {});
+  accesoPer(win).then((si) => {
+    if (si) { fn(); return; }
+    try {
+      const testo = globalThis.SN_I18N && globalThis.SN_I18N.t('help_disabled');
+      if (testo && win && !win.isDestroyed()) win.webContents.send('shell:toast', { text: testo, opts: { unica: 'aiuto-spento' } });
+    } catch (_) {}
+  }, () => {});
 }
 
 module.exports = { SEGNO, acceso, sceltaRegistrata, spentoDiSerie, perImportazione, migra, accesoPer, seAcceso };
