@@ -817,7 +817,7 @@
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,
-    AZIONI_FILO, usaScorciatoieFilo, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
+    AZIONI_FILO, usaScorciatoieFilo, usaScorciatoieModuli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
     scorciatoiaDaEvento, scorciatoiaDaScritta, rifiutoScorciatoiaFilo, testoRifiutoFilo, combaciaFilo, azioneFiloDaTasto,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
