@@ -241,7 +241,8 @@ function fileDiRilascio({ versione, urls, owner, repo, host = 'github.com' } = {
 }
 
 module.exports = {
-  MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI,
+  MODI, MODO_PREDEFINITO, TENTATIVI_DA_SOLI, CANALI, CANALE_PREDEFINITO, PAGINE_STABILE,
+  canaleScelto, versioneStabile, nelCanale, sceltaStabile,
   confrontaVersioni, etichettaCoincide, fileDellaRelease, releaseCoerente, modoScelto, piano, sceltaNonVale, haPulsante,
   ricordaScaricato, contaTentativo, decidiAllAvvio, fraseScaricato, tagAccettato, tagDiGitHubAccettato, fileDiRilascio,
 };
