@@ -1495,10 +1495,30 @@ if (isMain) {
     // finisce a parlare di un contenuto diverso da quello esaminato.
     const passaAllaVerifica = intento === 'verdict' || intento === 'fixed' || intento === 'secaudit'
       || (intento === 'status' && data.status === 'revision_capability');
+    let guardia = null;
     if (passaAllaVerifica) {
       const cosa = intento === 'verdict' ? 'critica'
         : intento === 'fixed' ? 'consegna'
           : intento === 'secaudit' ? 'verdetto' : 'revisione';
+      const quale = intento === 'verdict' ? 'critica non registrata' : intento === 'secaudit' ? 'verdetto non registrato' : 'consegna non registrata';
+      // Parte solo dal ramo assegnato, e al server va il ramo VERO della cartella (#772; regola in guardiaConsegna).
+      let sospensione = null;
+      guardia = guardiaConsegna(ROOT, {
+        dichiarato: data.branch,
+        escalate: () => { sospensione = deliver(biglietto, 'status', { status: 'design', reason: 'loop', notes: escalationNote() }); },
+      });
+      let sospesa = null;
+      if (sospensione) {
+        try {
+          const s = await sospensione;
+          sospesa = { ok: s.outcome === 'ok', motivo: s.reason };
+        } catch (e) { sospesa = { ok: false, motivo: String((e && e.message) || e) }; }
+      }
+      if (!guardia.ok) {
+        console.error(testoConsegnaFuoriRamo(quale, guardia, sospesa));
+        process.exit(1);
+      }
+      data.branch = guardia.branch;
       const stato = statoDirectory(ROOT);
       if (!stato.ok) {
         console.error(statoIllegibileText(stato.motivo, cosa));
