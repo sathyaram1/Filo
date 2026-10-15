@@ -51,6 +51,25 @@
     .agent-style-note { margin: 6px 0 0; font-size: 12px; color: var(--sn-muted); text-align: right; }
     .agent-style-note.agent-style-over { color: var(--sn-error); text-align: left; }
     #agentStyleText.agent-style-over { border-color: var(--sn-error); }
+    /* Il componente delle altre applicazioni (#779): frase e numeri, un filo d'accento che avanza, i permessi che mancano. */
+    .aa-stato { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .aa-stato[hidden] { display: none; }
+    .aa-riga { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+    .aa-frase { line-height: 1.45; }
+    .aa-errore .aa-frase { color: var(--sn-error); }
+    .aa-numeri { margin-left: auto; color: var(--sn-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .aa-barra { position: relative; height: 3px; border-radius: 2px; overflow: hidden; background: var(--sn-border); }
+    .aa-barra[hidden] { display: none; }
+    .aa-barra > span { display: block; height: 100%; width: 0; background: var(--sn-accent); transition: width .18s ease; }
+    /* Senza numeri (impronta, estrazione, prova) il filo scorre invece di riempirsi. */
+    .aa-barra.aa-senza-numeri > span { position: absolute; width: 30%; animation: aa-scorre 1.2s ease-in-out infinite; }
+    @keyframes aa-scorre { from { left: -30%; } to { left: 100%; } }
+    @media (prefers-reduced-motion: reduce) { .aa-barra.aa-senza-numeri > span { animation: none; left: 0; width: 100%; opacity: 0.5; } }
+    .aa-permessi { display: flex; flex-direction: column; gap: 6px; }
+    .aa-permessi:empty { display: none; }
+    .aa-permesso { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; line-height: 1.45; }
+    .aa-azioni { display: flex; gap: 8px; }
+    .aa-azioni:not(:has(button:not([hidden]))) { display: none; }
     /* Memoria di Filo: una riga per cosa imparata, ognuna si toglie da sola (#592). */
     .mem-box { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
     .mem-gruppo { margin: 12px 0 4px; font-size: 13px; font-weight: 600; opacity: 0.8; }
