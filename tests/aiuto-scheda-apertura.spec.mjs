@@ -97,8 +97,8 @@ test('dal menu della pagina c\'è la stessa data, e quella scritta dalla pagina 
   await aiutoFinto(app);
   const a = await schedaDi(app, urlA);
 
-  // La pagina prova a dire al main un'altra data di apertura.
-  await pageA.evaluate(() => {
+  // Il mondo dell'Aiuto prova a dire al main un'altra data di apertura.
+  await nelMondoDiFilo(app, pageA, () => {
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
     chrome.runtime.sendMessage = (msg, ...rest) => {
       if (msg && msg.type === 'ai_request' && msg.payload) msg.payload.schedaApertaIl = '2001-01-01T08:00:00.000Z';
