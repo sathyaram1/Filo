@@ -1052,7 +1052,7 @@ function sealTransition(state, by) {
  * per quel commit. L'ESITO lo calcola il server e torna nella risposta, che
  * si stampa intera: non sta da nessun'altra parte.
  */
-async function recordVerifier(id, critiqueText, segnalazione = '') {
+async function recordVerifier(id, critiqueText, segnalazione = '', campiSegnalazione = {}) {
   const guard = guardIdentity(id);
   if (!guard.ok) return { rejected: true, rebase: !!guard.rebase, message: guard.message };
   // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
