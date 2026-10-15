@@ -252,7 +252,12 @@
       // Il testo passa dal router, che per complete e streamComplete ha già il suo smistamento per nome.
       const router = providers();
       const viaRouter = (method === 'complete' || method === 'streamComplete') && typeof router[method] === 'function';
-      const r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
+      let r;
+      try {
+        r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
+      } catch (e) {
+        throw DAL_ROUTER.has(method) ? conLaFunzione(e, s, action) : e;
+      }
       const usage = r.usage;
       const { servedBy, violation } = noteServed(s, action, { ...r, model: r.model || a.model });
       const later = !servedBy && Boolean(r.generationId);
