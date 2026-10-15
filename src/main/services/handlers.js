@@ -2571,7 +2571,7 @@ async function eseguiAzioneFilo(action, {
           return { executed: true, kept: true };
         }
         if (!T || !T.validate(token, valore)) {
-          return { executed: false, kept: false, ...(T ? { output: { error: `${String(valore ?? '').slice(0, 80)}: ${T.errorMessage(token)}` } } : {}) };
+          return { executed: false, kept: false, ...(T ? { output: { error: T.errorMessage(token) } } : {}) };
         }
         const settings = await Storage.getSettings();
         const overrides = { ...(settings.themeTokens || {}) };
