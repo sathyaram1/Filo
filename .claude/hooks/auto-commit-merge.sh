@@ -258,7 +258,8 @@ fi
 # Un file di .github/workflows gira appena il suo ramo arriva su GitHub, senza fusione, e le automazioni le cambia
 # solo l'owner: questo salvataggio non le committa e non spedisce un ramo che ne cambia una, in nessuna sessione.
 AUTOMAZIONI='.github/workflows'
-in_una_riga() { sed '/^$/d' | sort -u | awk 'NR>1{printf ", "}{printf "%s",$0}'; }
+# Senza sort: su Windows il sort.exe di sistema puo' venire prima di quello di Git Bash.
+in_una_riga() { awk 'NF && !visto[$0]++ { printf "%s%s", (n++ ? ", " : ""), $0 }'; }
 if is_routine_session; then
   IN_LOCALE="da una routine un'automazione non si cambia: se il lavoro ne ha bisogno, rimandalo in locale (--reason locale) con nelle note la modifica che serve"
   RIMEDIO_FILE="riportalo com'era (git checkout HEAD -- <file>, o toglilo se e' nuovo); $IN_LOCALE"
