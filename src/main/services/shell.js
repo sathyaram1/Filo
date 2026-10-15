@@ -556,10 +556,7 @@ async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS }
   if (process.platform === 'win32' && /[\\/]/.test(cmd)) {
     try { if (fs.statSync(path.resolve(cwd || defaultCwd(), cmd)).isFile()) return true; } catch (_) {}
   }
-  for (const probe of existenceProbes({ shell, cmd })) {
-    if (await runProbe(probe, cwd, attesaMs)) return true;
-  }
-  return false;
+  return esitoDeiProbe(existenceProbes({ shell, cmd }), cwd, attesaMs);
 }
 
 // `existenceProbes` è esportata SOLO per il guard di regressione nei test
