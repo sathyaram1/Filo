@@ -640,27 +640,42 @@ export function casiToltiNonMessi(prova, prima, dopo, messi, ancheVerdi = false)
   });
 }
 
-/** Il rifiuto della pulizia che ha spento o tolto un caso rosso da correggere, o '' se non l'ha fatto. PURA. */
-export function testoCasiSpenti(fuori, via = {}, shaCritica = '') {
+/**
+ * Il rifiuto della pulizia che ha spento o tolto un caso rosso da correggere, o '' se non l'ha fatto. `dopo`: la pulizia
+ * dopo le correzioni, dove anche un caso verde da correggere non esce e il rimedio è rifare il suo commit. PURA.
+ */
+export function testoCasiSpenti(fuori, via = {}, shaCritica = '', { dopo = false } = {}) {
   const elenco = (Array.isArray(fuori) ? fuori : []).filter((x) => x && (x.vuota || (x.spenti && x.spenti.length) || (x.tolti && x.tolti.length)));
   if (!elenco.length) return '';
   const dove = via && typeof via === 'object' ? via : {};
   const casi = (l) => l.map((t) => `«${t}»`).join(', ');
+  const tolto = (n) => (dopo
+    ? (n === 1 ? 'è stato tolto, ma non è' : 'sono stati tolti, ma non sono')
+    : (n === 1 ? 'era rosso ed è stato tolto, ma non è' : 'erano rossi e sono stati tolti, ma non sono'));
   const righe = elenco.map(({ f, spenti = [], tolti = [], vuota }) => {
     const usa = Array.isArray(dove[f]) && dove[f].length ? ` (usa ${dove[f].map(nomeAiuto).join(', ')})` : '';
     const cosa = [
       spenti.length ? `${casi(spenti)} ${spenti.length === 1 ? 'era rosso ed è verde' : 'erano rossi e sono verdi'}` : '',
-      tolti.length ? `${casi(tolti)} ${tolti.length === 1 ? 'era rosso ed è stato tolto, ma non è' : 'erano rossi e sono stati tolti, ma non sono'} di un rilievo messo da parte` : '',
+      tolti.length ? `${casi(tolti)} ${tolto(tolti.length)} di un rilievo messo da parte` : '',
       !spenti.length && !tolti.length && vuota ? 'non ha più un caso rosso' : '',
     ].filter(Boolean).join('; ');
     return `  · ${f}${usa}: ${cosa}`;
   });
+  const rimetti = `git checkout ${String(shaCritica).slice(0, 12) || '<commit della critica>'} -- <file>`;
   return [
-    'pulizia non registrata: il codice è ancora quello della critica, e la pulizia ha spento o tolto casi rossi da correggere.',
+    dopo
+      ? 'pulizia non registrata: sullo stesso codice la pulizia ha spento casi rossi, o tolto casi di rilievi da correggere.'
+      : 'pulizia non registrata: il codice è ancora quello della critica, e la pulizia ha spento o tolto casi rossi da correggere.',
     ...righe,
     'Esce solo il caso del rilievo messo da parte: quello di un rilievo da correggere resta rosso finché il codice non lo',
-    `fa diventare verde. Rimetti com'erano (git checkout ${String(shaCritica).slice(0, 12) || '<commit della critica>'} -- <file>), togli solo le righe`,
-    'del rilievo messo da parte, `git add -A && git commit`, e rilancia la pulizia.',
+    ...(dopo ? [
+      'fa diventare verde, e resta anche verde finché non lo sostituisce una prova durevole. Annulla il commit',
+      '(`git revert --no-edit HEAD`), rifallo togliendo solo le righe del rilievo messo da parte, `git add -A && git commit`,',
+      'e rilancia la pulizia.',
+    ] : [
+      `fa diventare verde. Rimetti com'erano (${rimetti}), togli solo le righe`,
+      'del rilievo messo da parte, `git add -A && git commit`, e rilancia la pulizia.',
+    ]),
     ...(elenco.some((x) => x.tolti && x.tolti.length)
       ? ['In una prova che copre più rilievi un caso tolto è di un rilievo messo da parte solo se il suo titolo ne porta il numero (r<n>).']
       : []),
