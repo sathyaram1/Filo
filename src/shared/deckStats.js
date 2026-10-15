@@ -395,6 +395,9 @@
     buildLibrary,
     categoriesOf,
     handSatisfies,
+    keptAfterBottom,
+    gameOf,
+    describeConditions,
     simulate,
     _mulberry32: mulberry32,
   };
