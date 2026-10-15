@@ -90,6 +90,12 @@
 
     <section id="invitesSection" class="sn-wallet-section" hidden>
       <h2>I tuoi inviti</h2>
+      <!-- Senza Google collegato i codici non fanno entrare nessuno (#1120): al loro posto, la strada per sbloccarli. -->
+      <div class="sn-wallet-locked" id="invitesLocked" hidden>
+        <p class="sn-muted" id="invitesLockedText" hidden></p>
+        <button type="button" class="sn-btn sn-btn-secondary" id="linkGoogleBtn"></button>
+        <p class="sn-wallet-msg" id="linkGoogleMsg" role="status" hidden></p>
+      </div>
       <ul id="invites" class="sn-wallet-invites"></ul>
     </section>
 
