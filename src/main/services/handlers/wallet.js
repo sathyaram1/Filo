@@ -240,6 +240,7 @@ module.exports = function register(on, ctx) {
   async function readState() {
     const state = await leggiStato();
     ultimaLettura = { at: Date.now(), state };
+    try { globalThis.SN_AVVISO_CREDITI_MAIN?.dopoLettura(state); } catch (_) {}
     return state;
   }
   async function leggiStato() {
@@ -443,6 +444,7 @@ module.exports = function register(on, ctx) {
     }
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
+    try { await globalThis.SN_AVVISO_CREDITI_MAIN?.ricordaIngresso(r.entryCredits != null ? r.entryCredits : r.credits); } catch (_) {}
     // La config dei modelli effettivi legge la chiave a ogni chiamata: non c'è
     // niente da ricaricare. Si avvisano le pagine che il saldo è cambiato, e
     // la home si rifà: da adesso Filo risponde.
@@ -797,6 +799,7 @@ module.exports = function register(on, ctx) {
       credits: W.creditsForUsd(costUsd, { eurPerCredit: fx.eurPerCredit, eurUsd: fx.eurUsd }),
     });
     if (!row) return;
+    try { globalThis.SN_AVVISO_CREDITI_MAIN?.registraConsumo({ action, credits: row.credits, usage }); } catch (_) {}
     queue.push(row);
     if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
     await saveQueue();
@@ -864,6 +867,8 @@ module.exports = function register(on, ctx) {
     // Le cifre dette fuori dalla pagina Crediti (#816): chat, premi delle
     // segnalazioni. `redeemedAt`: da quando le segnalazioni portano lo pseudonimo.
     haPortafoglio, saldoPerChat,
+    // L'avviso prima che i crediti finiscano (#818) legge l'ultimo stato senza chiederne uno nuovo.
+    ultimaLettura: () => ultimaLettura,
     redeemedAt: () => { try { return (walletStore.load() || {}).redeemedAt || null; } catch (_) { return null; } },
     // Lo pseudonimo di questa installazione, letto dal deposito locale (niente
     // rete): lo scrive chi manda un feedback, così il server sa a chi

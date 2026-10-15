@@ -375,6 +375,7 @@
       out.push({
         id: 'modello',
         testo: `Usa modelli più economici per ${elenco(modelli.map((m) => m.nomeFunzione))}`,
+        fatto: `Stai usando modelli più economici per ${elenco(modelli.map((m) => m.nomeFunzione))}`,
         dettagli: modelli.map((m) => `${m.nomeFunzione}: ${m.nome} invece di ${m.daNome}`),
         risparmio,
         cambi: modelli.map((m) => ({ azione: m.azione, catena: m.catena })),
@@ -390,6 +391,7 @@
       out.push({
         id: 'automatiche',
         testo: `Spegni ${elenco(consumano.map((f) => f.nome))}`,
+        fatto: `Hai spento ${elenco(consumano.map((f) => f.nome))}`,
         risparmio: consumano.reduce((s, f) => s + f.c, 0),
         cambi: consumano.map((f) => ({ percorso: f.percorso, valore: false })),
       });
