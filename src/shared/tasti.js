@@ -605,7 +605,6 @@
     ['Ctrl+\\', 'mostra e nasconde la barra laterale dell\'Editor'],
     ['Ctrl+Plus', 'ingrandisce la pagina'], ['Ctrl+-', 'rimpicciolisce la pagina'],
     ['Ctrl+_', 'rimpicciolisce la pagina'], ['Ctrl+0', 'riporta la pagina al 100%'],
-    ['Ctrl+Shift+Spazio', 'apre il microfono delle chat'],
   ];
 
   // I nomi con cui Filo SALVA un tasto: italiani, e riletti da `forma` come gli altri.
