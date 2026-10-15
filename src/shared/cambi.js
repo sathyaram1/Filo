@@ -49,7 +49,7 @@
     timerRingtone: { nome: 'suoneria del timer', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     timerRingtoneVolume: { nome: 'volume della suoneria del timer', valore: (v) => `${numero(v)}%`, livello: 1 },
     'terminal.enabled': { nome: 'modalità terminale', valore: ATTIVA, livello: 2 },
-    'schermo.guarda': { nome: 'Filo che guarda lo schermo', valore: sino('acceso', 'spento'), livello: 2 },
+    'schermo.guarda': { nome: 'guardare lo schermo', valore: sino('acceso', 'spento'), livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
     'aggiornamenti.installa': {

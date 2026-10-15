@@ -682,7 +682,7 @@
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { schermo: { guarda: b } }, label: `Filo può guardare lo schermo → ${b ? 'sì' : 'no'}` };
+        return { partial: { schermo: { guarda: b } }, label: `Guardare lo schermo → ${b ? 'acceso' : 'spento'}` };
       },
     },
     {

@@ -30,6 +30,14 @@
   let archiviaAzione = () => {};
   let sceltaAutonomiaEl = () => null;
   let prosegui = () => {};
+  // #778 — mentre i popup di una risposta si aprono in fila, la ripresa aspetta l'ultimo: un turno partito a metà
+  // fila troverebbe le altre richieste ancora senza risposta, e le rifarebbe.
+  let filaPopup = 0;
+  let riprendiDopoFila = false;
+  function proseguiQuandoLibero() {
+    if (filaPopup > 0) riprendiDopoFila = true;
+    else prosegui();
+  }
 
   function isType(a, t) {
     return a && String(a.type || '').toUpperCase() === t;
@@ -1170,8 +1178,14 @@
       const autos = Array.from(wrap.querySelectorAll('[data-auto-confirm="1"]'));
       if (autos.length) {
         setTimeout(async () => {
-          for (const auto of autos) {
-            try { await auto._runConfirm?.(); } catch (_) {}
+          filaPopup += 1;
+          try {
+            for (const auto of autos) {
+              try { await auto._runConfirm?.(); } catch (_) {}
+            }
+          } finally {
+            filaPopup -= 1;
+            if (!filaPopup && riprendiDopoFila) { riprendiDopoFila = false; prosegui(); }
           }
         }, 0);
       }
@@ -1579,10 +1593,10 @@
         // rimasta in sospeso: Filo riprende da solo, anche per dire che non è riuscito.
         if (type === 'VEDI_SCHERMO' && r && !r.rejected) {
           if (!r.executed) segnaNonRiuscita(a, r.output, activity, btn);
-          prosegui();
+          proseguiQuandoLibero();
           if (!r.executed) return;
         }
-        if (type === 'IMPOSTA_PREFERENZA' && a._riprende && r && r.executed) prosegui();
+        if (type === 'IMPOSTA_PREFERENZA' && a._riprende && r && r.executed) proseguiQuandoLibero();
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           segnaComando((r && r.executed) ? '✓' : '✗');

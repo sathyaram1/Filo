@@ -128,7 +128,7 @@ function fileSotto(dir) {
     let s;
     try { s = statSync(p); } catch (_) { continue; }
     if (s.isDirectory()) out.push(...fileSotto(p));
-    else if (s.size < 50 * 1024 * 1024) out.push(p);
+    else if (s.isFile() && s.size < 50 * 1024 * 1024) out.push(p);
   }
   return out;
 }
@@ -251,4 +251,51 @@ test('la finestra di Filo si guarda senza chiedere, con la cattura vera della sc
   const viste = await app.evaluate(() => globalThis.__vs_occhio);
   expect(viste).toHaveLength(1);
   expect(viste[0].colore.every((c, k) => Math.abs(c - VERDE[k]) < 24)).toBe(true);
+});
+
+test('due finestre nella stessa risposta: un popup per ciascuna, in fila, e una ripresa sola dopo l\'ultimo', async ({ app }) => {
+  test.setTimeout(120_000);
+  await finestreFinte(app);
+  await occhioFinto(app);
+  await chatFinta(app, [
+    { toolCalls: [
+      { id: 'a1', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: ESTERNA }) },
+      { id: 'a2', name: 'VEDI_SCHERMO', arguments: JSON.stringify({ finestra: 'Note - Blocco note' }) },
+    ] },
+    { text: 'Aspetto i tuoi OK.' },
+    { eco: `${NOTO}[^»"\\\\]*` },
+  ]);
+  const page = await home(app);
+  await contaPopup(page);
+  await chiedi(page, 'confronta le due finestre aperte');
+  for (const nome of [ESTERNA, 'Note - Blocco note']) {
+    await expect.poll(async () => (await confirmState(page))?.text || '', { timeout: 20_000 }).toContain(nome);
+    await scrollConfirmToEnd(page);
+    await clickConfirm(page, 'ok');
+  }
+  await expect(page.locator('.dash-bubble-filo', { hasText: NOTO })).toBeVisible({ timeout: 30_000 });
+  expect((await page.evaluate(() => window.__popup)).length).toBe(2);
+  // Un turno per la richiesta e UNA ripresa: tre chiamate al modello della chat, non quattro.
+  await page.waitForTimeout(1500);
+  expect((await app.evaluate(() => globalThis.__vs_chat)).length).toBe(3);
+  expect((await app.evaluate(() => globalThis.__vs_occhio)).length).toBe(2);
+});
+
+test('l\'interruttore in Preferenze parte spento, accende e spegne davvero, e si legge nei due temi', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab('filo://preferences/preferences.html');
+  const casella = page.locator('#schermoGuarda');
+  await expect(casella).not.toBeChecked();
+  const leggi = async () => (await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).schermo || {})).guarda;
+  await casella.check();
+  await expect.poll(leggi, { timeout: 10_000 }).toBe(true);
+  for (const tema of ['light', 'dark']) {
+    await app.evaluate((_e, t) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } },
+      { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }), tema);
+    await page.waitForTimeout(500);
+    await page.locator('#sec-schermo').scrollIntoViewIfNeeded();
+    await page.locator('#sec-schermo').screenshot({ path: `tests/.shots/vedi-schermo-preferenze-${tema}.png` });
+  }
+  await casella.uncheck();
+  await expect.poll(leggi, { timeout: 10_000 }).toBe(false);
 });

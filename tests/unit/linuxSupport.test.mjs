@@ -599,3 +599,22 @@ test('su Linux volume, Bluetooth e Wi-Fi si comandano con la shell di sistema e 
   // La shell vera la decide resolveShell: su Linux «sh» resta la shell di sistema anche se l'utente preferisce PowerShell.
   if (process.platform === 'linux') assert.equal(resolveShell('sh'), 'sh');
 });
+
+// #778 — su una sessione Wayland Chromium cattura dal selettore del sistema anche con Filo su X: lì le finestre non si
+// elencano, la scelta la fa l'utente nel selettore, e ogni sessione X normale resta col suo elenco.
+test('su Linux con Wayland guardare lo schermo passa dal selettore del sistema', async () => {
+  const Schermo = require(join(ROOT, 'src', 'main', 'services', 'schermo.js'));
+  assert.equal(Schermo.sessioneWayland({ XDG_SESSION_TYPE: 'wayland', WAYLAND_DISPLAY: 'wayland-0', DISPLAY: ':0' }, 'linux'), true);
+  assert.equal(Schermo.sessioneWayland({ XDG_SESSION_TYPE: 'x11', DISPLAY: ':0' }, 'linux'), false);
+  let fonti = 0;
+  const S = Schermo.crea({
+    sistema: {
+      piattaforma: () => 'linux', wayland: () => true, permessoMac: () => 'granted',
+      fonti: async () => { fonti += 1; return []; },
+      finestreFilo: () => [], maniglieFilo: () => [], schermi: () => ({}), delicata: async () => '',
+    },
+  });
+  const r = await S.prepara({ type: 'VEDI_SCHERMO' }, { settings: { schermo: { guarda: true } }, chiave: 't' });
+  assert.deepEqual(r.esito.output.elenco.map((v) => v.tipo), ['selettore']);
+  assert.equal(fonti, 0, 'elencare non apre il selettore');
+});
