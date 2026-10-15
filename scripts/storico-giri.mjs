@@ -4,6 +4,7 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import './lib/freno-letture.mjs';
 import '../src/shared/feedback.js';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineStateAdmin';
