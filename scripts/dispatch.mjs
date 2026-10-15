@@ -228,7 +228,6 @@ export function parseRoutineConfig(fields) {
   const f = fields && typeof fields === 'object' ? fields : {};
   const out = {};
   if (f.enabled && typeof f.enabled.booleanValue === 'boolean') out.enabled = f.enabled.booleanValue;
-  if (f.proberWhenIdle && f.proberWhenIdle.booleanValue === false) out.proberWhenIdle = false;
   return out;
 }
 
