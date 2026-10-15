@@ -186,9 +186,10 @@
   //         feedback a parte a priorità 2, e il lavoro passa (2026-09-23).
   //   cap1: giri per i rilievi di livello 1 (di rado, cosmetica evidente). A
   //         bilancio finito un 1 va nel feedback derivato.
-  //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da
-  //         soli non si correggono mai: solo insieme ad altro.
-  // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
+  //   cap0: giri per i soli rilievi interni di livello 0 (casi rari). Con 0 gli
+  //         0 da soli non si correggono mai: solo insieme ad altro.
+  // Ogni giro consuma UN giro dal bilancio del livello più alto fra gli interni
+  // corretti: un vicino non ne consuma nessuno (2026-10-12).
   const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {
