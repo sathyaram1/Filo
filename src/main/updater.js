@@ -248,6 +248,10 @@ function scaricaVerificata(u) {
     rifiuta(info);
     return Promise.reject(new Error('versione rifiutata: il numero non è quello della sua etichetta'));
   }
+  // Trovata sul veloce prima del passaggio allo stabile: sullo stabile non c'è.
+  if (!R.nelCanale(info.version, stato.canale)) {
+    return Promise.reject(new Error(`la ${info.version} non è del canale ${stato.canale}`));
+  }
   return u.downloadUpdate();
 }
 
