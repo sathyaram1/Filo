@@ -214,7 +214,7 @@ test('un feedback vecchio lavorato oggi conta come lavoro di oggi', () => {
   assert.equal(r.lavorati.totale, 1);
 });
 
-test('le esplorazioni si contano per lancio, e i ritrovamenti per feedback', () => {
+test('le esplorazioni rimaste nel registro contano fra i lanci, non fra i lavorati, e non hanno un conto loro', () => {
   const r = S.compute({
     range: S.rangeOf('7g', ORA),
     feedbacks: [
@@ -229,8 +229,12 @@ test('le esplorazioni si contano per lancio, e i ritrovamenti per feedback', () 
       { role: 'prober', startedAt: g(30), num: '' },  // fuori finestra
     ],
   });
-  assert.equal(r.prober.lanciati, 3);
-  assert.equal(r.prober.ritrovamenti, 2);
+  assert.equal(r.prober, undefined, 'l\'esplorazione a coda vuota non c\'è più: niente riquadro che la conti');
+  assert.equal(r.lanci.totale, 3);
+  assert.deepEqual(r.lanci.perRuolo, [{ role: 'prober', n: 3 }]);
+  assert.equal(r.lavorati.totale, 0);
+  // I mittenti restano: la classe «esplorazione» serve ancora alle statistiche.
+  assert.deepEqual(r.ricevuti.creatori.map((c) => [c.kind, c.n]), [['prober', 2]]);
 });
 
 // ── La torta dei giri ───────────────────────────────────────────────────────
@@ -481,7 +485,6 @@ test('i numeri della fila in fondo portano gli id delle segnalazioni che hanno c
       { role: 'verifier', startedAt: g(1), num: '2' },
     ],
   });
-  assert.deepEqual(r.prober.ritrovamentiIds, ['p1']);
   assert.deepEqual(r.auditIds.pass, ['w1']);
   assert.deepEqual(r.arenati.ids, ['w1']);
   assert.deepEqual(r.tempi.presaInCarico.ids, ['w1']);
@@ -566,7 +569,7 @@ test('il registro dichiara da dove parte invece di far passare un minimo per un 
 test('registro vuoto: lo dice, non finge zero lanci', () => {
   const r = S.compute({ range: S.rangeOf('7g', ORA), feedbacks: [], workerLog: [] });
   assert.equal(r.copertura.logVuoto, true);
-  assert.equal(r.prober.lanciati, 0);
+  assert.equal(r.lanci.totale, 0);
 });
 
 test('il tetto del caricamento dei feedback si propaga nella copertura', () => {
@@ -671,32 +674,6 @@ test('una lavorazione che la lista non ha si conta fra gli ignoti anche senza ve
   assert.equal(quadra(r), r.lavorati.totale);
 });
 
-// ── Il filtro per mittente vale anche sui ritrovamenti (giro 18) ────────────
-
-test('con l\'esploratore fuori dal filtro, le sue segnalazioni non si contano più', () => {
-  const dati = {
-    feedbacks: [
-      fb({ seq: 1, clientId: 'routine:prober' }),
-      fb({ seq: 2, clientId: 'routine:prober' }),
-      fb({ seq: 3, clientId: 'persona@x.it' }),
-    ],
-    workerLog: [{ role: 'prober', startedAt: g(1), num: '' }],
-  };
-  const tutti = S.compute(Object.assign({ range: S.rangeOf('30g', ORA) }, dati));
-  assert.equal(tutti.prober.ritrovamenti, 2);
-  assert.equal(tutti.prober.ritrovamentiIds.length, 2);
-
-  const solePersone = S.compute(Object.assign({ range: S.rangeOf('30g', ORA), creatori: ['user'] }, dati));
-  assert.equal(solePersone.prober.ritrovamenti, 0);
-  assert.equal(solePersone.prober.ritrovamentiIds.length, 0);
-  // Il NUMERO GRANDE del riquadro resta: una partenza dell'esploratore non ha
-  // un mittente, e il filtro non la tocca.
-  assert.equal(solePersone.prober.lanciati, 1);
-
-  const soloEsploratore = S.compute(Object.assign({ range: S.rangeOf('30g', ORA), creatori: ['prober'] }, dati));
-  assert.equal(soloEsploratore.prober.ritrovamenti, 2);
-});
-
 // ── I gruppi del filtro coprono tutti i mittenti, una volta sola (giro 18) ──
 
 test('le pasticche di gruppo coprono esattamente i mittenti, senza doppioni', () => {
@@ -787,7 +764,6 @@ test('registro non letto: i numeri che ne vengono sono null, non zero', () => {
   assert.equal(r.lavorati.totale, null);
   assert.equal(r.lavorati.verifiche, null);
   assert.equal(r.lanci.totale, null);
-  assert.equal(r.prober.lanciati, null);
   assert.equal(r.giri.fermati, null);
   assert.equal(r.giri.rimandati, null);
   assert.equal(r.giri.aperti, null);
@@ -796,7 +772,6 @@ test('registro non letto: i numeri che ne vengono sono null, non zero', () => {
   assert.equal(r.tempi.lavorazione.mediana, null);
   // Quello che NON viene dal registro si sa lo stesso e resta un numero.
   assert.equal(r.ricevuti.totale, 2);
-  assert.equal(r.prober.ritrovamenti, 0);
 });
 
 test('registro letto e vuoto: quelli sono zeri veri', () => {
@@ -873,10 +848,8 @@ test('segnalazioni non lette: anche i loro numeri sono null, non zero', () => {
   });
   assert.equal(r.copertura.feedbackLetti, false);
   assert.equal(r.ricevuti.totale, null);
-  assert.equal(r.prober.ritrovamenti, null);
   assert.equal(r.tempi.presaInCarico.mediana, null);
   // Il registro invece ha risposto: quei numeri si sanno.
-  assert.equal(r.prober.lanciati, 1);
   assert.equal(r.lanci.totale, 1);
 });
 

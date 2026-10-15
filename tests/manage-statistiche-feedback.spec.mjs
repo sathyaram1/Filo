@@ -234,7 +234,7 @@ test('#496 — «Feedback ricevuti» si apre e mostra la divisione per categoria
   await expect(page.locator('.mg-fs-detail')).toHaveCount(0);
 });
 
-test('#496 — esplorazioni lanciate e lanci per mestiere vengono dal registro delle esecuzioni', async ({ openTab }) => {
+test('#1206 — le esplorazioni rimaste nel registro contano fra i lanci, e non hanno più un riquadro loro', async ({ openTab }) => {
   const page = await openTab(URL);
   await apri(page, {
     feedbacks: [fb({ seq: 5, clientId: 'agent:prober', createdAt: g(1) })],
@@ -248,11 +248,18 @@ test('#496 — esplorazioni lanciate e lanci per mestiere vengono dal registro d
   });
   await page.locator('[data-fs-range="30g"]').click();
 
-  await expect(tile(page, 'prober')).toHaveText('3');
   await expect(tile(page, 'lanci')).toHaveText('5');
+  await expect(page.locator('#mgFsTiles [data-fs-id]')).toHaveCount(3);
+  await expect(page.locator('[data-fs-id="prober"], [data-fs-id="proberTrovate"]')).toHaveCount(0);
+  await expect(page.locator('#mgFsTiles')).not.toContainText(/esplora/i);
   await page.locator('[data-fs-tile="lanci"]').click();
+  // Lo storico resta leggibile: i lanci di allora col loro nome, non l'id grezzo.
   await expect(page.locator('.mg-fs-detail [data-fs-bar="prober"] .mg-bar-n')).toHaveText('3');
+  await expect(page.locator('.mg-fs-detail [data-fs-bar="prober"]')).toContainText('Esplorazione');
   await expect(page.locator('.mg-fs-detail [data-fs-bar="verifier"] .mg-bar-n')).toHaveText('1');
+  // Il mittente «esplorazione» resta un filtro: serve alle statistiche dei feedback già aperti.
+  await expect(page.locator('[data-fs-creator="prober"] .mg-chip-n')).toHaveText('1');
+  await page.locator('#mgFsTiles').screenshot({ path: 'tests/.shots/1206-riquadri-statistiche.png' });
 });
 
 // ── 5. Due sorgenti, due date ───────────────────────────────────────────────
@@ -769,10 +776,9 @@ test('#496 anche i numeri della fila in fondo portano alle segnalazioni che hann
   });
   await page.locator('[data-fs-range="7g"]').click();
 
-  // Nelle esplorazioni e negli arenamenti a contare segnalazioni è la riga
-  // piccola, non il numero grande (che conta partenze e arenamenti, e una
-  // segnalazione arenata due volte ne vale due): quindi è lei ad aprirsi.
-  for (const id of ['proberTrovate', 'attesa', 'durata', 'arenatiFeedback']) {
+  // Negli arenamenti a contare segnalazioni è la riga piccola, non il numero
+  // grande (una segnalazione arenata due volte ne vale due): quindi è lei ad aprirsi.
+  for (const id of ['attesa', 'durata', 'arenatiFeedback']) {
     await page.locator(`[data-fs-id="${id}"]`).click();
     await expect(page.locator('#mgFsDrill'), `il riquadro «${id}» non apre niente`).toBeVisible();
     await expect(page.locator('#mgFsDrill [data-fs-open]')).toHaveCount(1);
@@ -945,32 +951,6 @@ test('#496 la finestra scritta a mano e il filtro tornano interi alla riapertura
   await expect(tile(page, 'ricevuti'), 'i numeri dopo la riapertura non sono quelli della finestra salvata').toHaveText('1');
 });
 
-// ══ Il riquadro delle esplorazioni sta dentro il filtro ════════════════════
-//
-// Il numero grande conta partenze, che un mittente non ce l'hanno: il filtro
-// non lo tocca, e il suggerimento lo dice. La riga sotto conta SEGNALAZIONI,
-// che un mittente ce l'hanno.
-
-test('#496 col filtro sulle persone il riquadro non conta le segnalazioni dell\'esploratore', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await apri(page, {
-    feedbacks: [
-      fb({ seq: 1, clientId: 'routine:prober', createdAt: g(1) }),
-      fb({ seq: 2, clientId: 'routine:prober', createdAt: g(1) }),
-      fb({ seq: 3, clientId: 'persona@x.it', createdAt: g(1) }),
-    ],
-    workerLog: [{ role: 'prober', startedAt: g(1), num: '' }],
-  });
-  await page.locator('[data-fs-range="30g"]').click();
-  await expect(page.locator('[data-fs-id="prober"] .mg-tile-sub')).toContainText('2 segnalazioni');
-
-  await page.locator('[data-fs-creator="__persone"]').click();
-  await expect(page.locator('[data-fs-id="prober"] .mg-tile-sub')).toContainText('0 segnalazioni');
-  // Le partenze restano: un lancio non ha un mittente.
-  await expect(tile(page, 'prober')).toHaveText('1');
-  await expect(page.locator('[data-fs-id="prober"]')).not.toHaveClass(/mg-tile--click/);
-});
-
 // ══ Ogni numero si apre su cosa ha contato, anche da TASTIERA ══════════════
 //
 // La regola (patterns/un-numero-si-apre-su-cosa-ha-contato.md) chiede tre
@@ -995,12 +975,9 @@ test('#496 i riquadri che aprono un elenco sono pulsanti: Invio e Spazio li apro
   });
   await page.locator('[data-fs-range="30g"]').click();
 
-  // Per le esplorazioni si apre la riga piccola, l'unica delle due a contare
-  // segnalazioni: da tastiera vale quanto un riquadro.
-  for (const id of ['proberTrovate', 'attesa', 'durata']) {
+  for (const id of ['attesa', 'durata']) {
     const riquadro = page.locator(`[data-fs-id="${id}"]`);
-    await expect(riquadro, `«${id}» non si apre nemmeno col mouse`)
-      .toHaveClass(id === 'proberTrovate' ? /mg-tile-sub--click/ : /mg-tile--click/);
+    await expect(riquadro, `«${id}» non si apre nemmeno col mouse`).toHaveClass(/mg-tile--click/);
     const fuoco = await page.evaluate((i) => {
       const el = document.querySelector(`[data-fs-id="${i}"]`);
       el.focus();
@@ -1159,7 +1136,7 @@ test('col registro irraggiungibile i suoi riquadri scrivono un trattino, non uno
     logOk: false,
   });
 
-  for (const id of ['lavorati', 'prober', 'lanci']) {
+  for (const id of ['lavorati', 'lanci']) {
     await expect(tile(page, id), `«${id}» scrive un numero che nessuno ha letto`).toHaveText('—');
   }
   // E i riquadri lo dicono anche a parole: la riga in cima è scritta piccola.
@@ -1302,38 +1279,6 @@ test('#496 un ridisegno non porta via il fuoco della tastiera', async ({ openTab
     return out;
   }, dati);
   expect(persi, `il fuoco se n'è andato da: ${persi.join(', ')}`).toEqual([]);
-});
-
-// ── Un numero apre ciò che HA contato ─────────────────────────────────────
-// Nel riquadro delle esplorazioni i numeri sono due: le partenze (in grande,
-// che non sono segnalazioni) e i ritrovamenti (la riga piccola). Ad aprirsi
-// dev'essere la seconda, e col suo numero.
-
-test('#496 «Esplorazioni lanciate»: ad aprirsi è la riga che conta le segnalazioni', async ({ openTab }) => {
-  const page = await openTab(URL);
-  await apri(page, {
-    feedbacks: [fb({ _id: 'pr1', seq: 1, clientId: 'routine:prober', createdAt: g(1) })],
-    workerLog: [
-      { role: 'prober', startedAt: g(1) },
-      { role: 'prober', startedAt: g(2) },
-      { role: 'prober', startedAt: g(3) },
-    ],
-  });
-  await page.locator('[data-fs-range="tutto"]').click();
-  await expect(tile(page, 'prober')).toHaveText('3');
-  // Il numero grande non promette di aprirsi: dietro non ci sono segnalazioni.
-  await expect(page.locator('[data-fs-id="prober"]')).not.toHaveAttribute('type', 'button');
-  // La riga piccola sì, e apre esattamente la sua segnalazione.
-  const riga = page.locator('[data-fs-id="proberTrovate"]');
-  await expect(riga).toContainText('1 segnalazione');
-  await riga.click();
-  await expect(page.locator('#mgFsDrillTitle')).toContainText('1 segnalazione');
-  await expect(page.locator('#mgFsDrillList li')).toHaveCount(1);
-  // E si apre anche da tastiera, come ogni altra superficie della scheda.
-  await page.locator('#mgFsDrillClose').click();
-  await riga.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#mgFsDrill')).toBeVisible();
 });
 
 // ── Esc chiude il riquadro aperto ─────────────────────────────────────────

@@ -306,9 +306,9 @@ Corollario (osservazione dell'owner): **i ruoli `idle` e `off` sono ABOLITI.**
 Esistevano perché lo smistamento girava dentro un worker già spawnato, che
 aveva bisogno di istruzioni anche per il caso "non fare niente". Ora coda
 vuota e interruttore spento sono un **exit 2 alla richiesta di biglietto**
-(o al preflight): l'orchestratore chiude senza spawnare nessuno. La logica
-"prober sì/no a coda vuota" si sposta nel server, che a coda vuota dà un
-biglietto da prober oppure exit 2 secondo l'impostazione della dashboard.
+(o al preflight): l'orchestratore chiude senza spawnare nessuno. A coda vuota
+il server non dà nessun ruolo: l'esplorazione a coda vuota (`prober`, con
+l'interruttore `proberWhenIdle`) è stata tolta del tutto il 12/10/2026 (#1206).
 
 Secondo corollario, da confermare a canale maturo: muore anche il **ripiego
 sulla coda git** per la scelta del lavoro (exit 3 = chiudi, nessun cammino

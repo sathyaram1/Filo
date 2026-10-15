@@ -336,7 +336,9 @@ La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackT
 
 C'È UN GRUPPO PER OGNI CATEGORIA D'AUTORE, quelle che la coda mostra con un'icona:
 `owner`, `user`, `local` (la sessione locale), `worker`, `verifier`, `residuo`, `prober`,
-`claude` (automazioni che non dichiarano il ruolo) e `filo`. Fino al 2026-08-22 le cinque
+`claude` (automazioni che non dichiarano il ruolo) e `filo`. `prober` sono i ritrovamenti
+dell'esplorazione a coda vuota: il ruolo è stato tolto (#1206), la categoria resta per i
+feedback già aperti e per le statistiche. Fino al 2026-08-22 le cinque
 istanze di Claude stavano dietro un interruttore solo: la coda le distingueva ma la
 fiducia era una sola, quindi per fermare l'esploratore si fermava anche la sessione
 locale. Adesso i due assi coincidono — chi si vede separato si regola separato.

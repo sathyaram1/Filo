@@ -2,8 +2,8 @@
 //
 // COSA C'È QUI
 //   I conti della scheda «Statistiche feedback» della dashboard di gestione:
-//   quanti ne sono arrivati, quanti ne sono stati lavorati, quante
-//   esplorazioni sono partite, quanti giri di verifica è costato ogni lavoro,
+//   quanti ne sono arrivati, quanti ne sono stati lavorati, quanti giri di
+//   verifica è costato ogni lavoro,
 //   più i tempi e le ripartizioni. Tutto su una FINESTRA di tempo scelta
 //   dall'owner e su un filtro per creatore.
 //
@@ -12,8 +12,8 @@
 //     (`createdAt`): rispondono a «quanti ne sono arrivati»;
 //   · il REGISTRO DEI WORKER (`config/automation.workerLog`, che il server
 //     scrive al rilascio di ogni biglietto: `{ role, startedAt, num }`) ha la
-//     data di LAVORAZIONE: risponde a «quanto lavoro è stato fatto», «quante
-//     esplorazioni sono partite» e «quanti giri è costato un fix».
+//     data di LAVORAZIONE: risponde a «quanto lavoro è stato fatto» e
+//     «quanti giri è costato un fix».
 //   Contare i lavorati sulla data d'invio sarebbe una risposta sbagliata data
 //   in silenzio: un feedback di marzo lavorato oggi è lavoro di oggi.
 //
@@ -237,8 +237,8 @@
   // «Quanto è arrivato dalle persone» e «quanto hanno prodotto le routine».
   // Con una pasticca per mittente, la seconda costava sei clic e la
   // conoscenza di quale delle nove voci è una routine: la segnalazione
-  // chiedeva per esempio «i feedback lanciati da prober o altre routine
-  // cloud», e quello è un gruppo, non un mittente.
+  // chiedeva per esempio i feedback lanciati dalle routine cloud, e quello è
+  // un gruppo, non un mittente.
   //
   // `filo` sta con le PERSONE, non con le routine: un feedback che nasce da
   // Filo è la voce di un utente vero filtrata da un modello, non un processo
@@ -267,8 +267,8 @@
     return out;
   }
 
-  // I ruoli che LAVORANO su una segnalazione (l'esplorazione no: gira sull'app,
-  // non su un numero).
+  // I ruoli che LAVORANO su una segnalazione: le voci senza un numero dietro
+  // (le esplorazioni del registro vecchio) restano solo fra i lanci.
   var RUOLI_LAVORO = ['new-work', 'fixer', 'resolver', 'verifier', 'secaudit'];
   function isLavoro(role) { return RUOLI_LAVORO.indexOf(role) >= 0; }
 
@@ -608,8 +608,7 @@
       }
     }
 
-    // ── Lavorati ed esplorazioni (data di LAVORAZIONE) ──────────────────────
-    var proberLanciati = 0;
+    // ── Lavorati (data di LAVORAZIONE) ──────────────────────────────────────
     var lavoratiNumeri = Object.create(null);  // numero → { primo, ultimo, verifiche }
     var verificheTotali = 0;
     var lanciTot = 0;
@@ -632,10 +631,6 @@
       // mostrava. Senza mestiere la chiave resta vuota e chi disegna la
       // chiama «Sconosciuto», con la stessa parola della scheda Log.
       if (inRange(e.t, range)) { lanciTot += 1; conta(perRuolo, e.role); }
-      if (e.role === 'prober') {
-        if (inRange(e.t, range)) proberLanciati += 1;
-        continue;
-      }
       if (!isLavoro(e.role) || !e.num) continue;
       if (!inRange(e.t, range)) continue;
       if (!numeroPassa(e.num)) continue;
@@ -646,26 +641,6 @@
       if (e.role === 'verifier') { rec.verifiche += 1; verificheTotali += 1; }
     }
     var numeriLavorati = Object.keys(lavoratiNumeri);
-
-    // I ritrovamenti dell'esplorazione: i feedback che l'esploratore ha
-    // mandato nella finestra. Non è «quante esplorazioni hanno trovato
-    // qualcosa» (un giro può mandarne più d'uno), ed è detto così in pagina.
-    //
-    // Il filtro per mittente vale anche QUI. Il numero grande del riquadro
-    // (quante volte è partita l'esplorazione) non ha un mittente e il filtro
-    // non lo tocca; queste sono SEGNALAZIONI, un mittente ce l'hanno, e
-    // contarle con l'esploratore escluso dal filtro faceva dire alla scheda
-    // «3 segnalazioni dall'esploratore» proprio mentre stavi guardando le sole
-    // segnalazioni delle persone.
-    var proberRitrovamenti = 0;
-    var proberIds = [];
-    var proberNelFiltro = !filtro || filtro.indexOf('prober') >= 0;
-    for (i = 0; proberNelFiltro && i < feedbacks.length; i++) {
-      if (!inRange(feedbacks[i] && feedbacks[i].createdAt, range)) continue;
-      if (creatoreDi(feedbacks[i]) !== 'prober') continue;
-      proberRitrovamenti += 1;
-      if (feedbacks[i]._id) proberIds.push(feedbacks[i]._id);
-    }
 
     // ── La torta dei giri ───────────────────────────────────────────────────
     // OGNI lavorazione contata dal riquadro «Feedback lavorati» esce da qui in
@@ -830,9 +805,6 @@
         mancanti: ignotiNumeri,
       },
       lanci: { totale: seNoto(lanciTot), perRuolo: ordinaRuoli(perRuolo) },
-      // `ritrovamenti` viene dalle SEGNALAZIONI, non dal registro: quello si sa
-      // anche quando il registro non risponde, e resta un numero.
-      prober: { lanciati: seNoto(proberLanciati), ritrovamenti: seNotoFb(proberRitrovamenti), ritrovamentiIds: proberIds },
       giri: {
         fette: ordinaFette(fette),
         media: mediaGiri,

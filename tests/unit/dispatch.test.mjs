@@ -244,8 +244,8 @@ test('buildPayload new-work: feedback completo', () => {
   assert.equal(p.id, 'F1');
 });
 
-test('buildPayload prober: payload vuoto', () => {
-  assert.deepEqual(buildPayload({ role: 'prober' }), {});
+test('buildPayload: un ruolo che questa versione non conosce (il vecchio prober) non riceve niente', () => {
+  assert.deepEqual(buildPayload({ role: 'prober' }, { feedback: { text: 'spec' } }), {});
 });
 
 // ─── Le decisioni dell'owner: dalla busta del server al compito del lavoratore ─
@@ -363,8 +363,8 @@ function silently(fn) {
 }
 
 test('emit: consegnare un ruolo lo registra per chi accoderà feedback', () => {
-  silently(() => emit({ role: 'prober' }, {}));
-  assert.equal(readRole(TMP), 'prober');
+  silently(() => emit({ role: 'secaudit', id: 'y', branch: 'worker/y' }, {}));
+  assert.equal(readRole(TMP), 'secaudit');
   // Il giro successivo sovrascrive: un worker alla volta, un ruolo alla volta.
   silently(() => emit({ role: 'verifier', id: 'x', branch: 'worker/x' }, {}));
   assert.equal(readRole(TMP), 'verifier');
@@ -449,14 +449,13 @@ test('resolveRoutinesEnabled: l\'override d\'ambiente batte il remoto', () => {
   assert.equal(resolveRoutinesEnabled({ envRaw: 'sì?', remote: false }), false); // valore ignoto → decide il remoto
 });
 
-test('parseRoutineConfig: legge interruttore ed esplorazione', () => {
+test('parseRoutineConfig: legge l\'interruttore, e un proberWhenIdle rimasto nel documento non arriva a nessuno', () => {
   assert.deepEqual(parseRoutineConfig({
     enabled: { booleanValue: false },
     proberWhenIdle: { booleanValue: false },
-  }), { enabled: false, proberWhenIdle: false });
+  }), { enabled: false });
   // Documento vuoto (mai scritto) = nessuna decisione presa.
   assert.deepEqual(parseRoutineConfig({}), {});
-  // proberWhenIdle: solo il false esplicito compare (true = storico).
   assert.deepEqual(parseRoutineConfig({ proberWhenIdle: { booleanValue: true } }), {});
 });
 
@@ -832,12 +831,12 @@ test('i file-ruolo del repo esistono e non sono stub (orchestrator compreso)', (
   // Il preflight consegna orchestrator.md, dispatch consegna gli altri: un file
   // spostato o svuotato è un ruolo che parte senza istruzioni.
   const realDir = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
-  for (const f of ['orchestrator.md', 'resolver.md', 'resolver-rebase.md', '_criteri-verifica.md', '_segnala.md', 'verifier.md', 'secaudit.md', 'prober.md', 'halt.md', '_contratto-worker.md']) {
+  for (const f of ['orchestrator.md', 'resolver.md', 'resolver-rebase.md', '_criteri-verifica.md', '_segnala.md', 'verifier.md', 'secaudit.md', 'halt.md', '_contratto-worker.md']) {
     const p = resolve(realDir, f);
     assert.ok(existsSync(p), `${f} deve esistere`);
     assert.ok(readFileSync(p, 'utf8').length > 300, `${f} non deve essere uno stub`);
   }
-  for (const f of ['new-work.md', 'fixer.md', 'idle.md', 'off.md']) {
+  for (const f of ['new-work.md', 'fixer.md', 'idle.md', 'off.md', 'prober.md']) {
     assert.ok(!existsSync(resolve(realDir, f)), `${f} è abolito e non deve riapparire`);
   }
 });

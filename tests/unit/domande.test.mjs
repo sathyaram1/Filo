@@ -26,7 +26,7 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
   assert.equal(D.etichettaAzione({ tipo: 'compito' }, {}), 'Affida a un agente');
   for (const [nome, spec] of Object.entries(D.TIPI)) {
     if (!spec.attivo) continue;
-    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, approva_locale: { feedbackId: 'f1' }, automazione: { chiave: 'routine.proberWhenIdle', valore: true }, compito: {} }[nome];
+    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, approva_locale: { feedbackId: 'f1' }, automazione: { chiave: 'routine.enabled', valore: true }, compito: {} }[nome];
     assert.ok(esempio, `il tipo attivo «${nome}» non ha un esempio in questo test`);
     assert.equal(typeof D.etichettaAzione({ tipo: nome, ...esempio }, RIF), 'string', nome);
   }
@@ -36,6 +36,8 @@ test('tipo ignoto, non attivo, parametri storti o riferimento assente: nessun pu
   assert.equal(D.etichettaAzione({ tipo: 'cancella_tutto', feedbackId: 'f1' }, RIF), null);
   assert.equal(D.etichettaAzione({ tipo: 'ambito' }, RIF), null);
   assert.equal(D.etichettaAzione({ tipo: 'esperimento' }, RIF), null);
+  assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.proberWhenIdle', valore: true }, RIF), null,
+    'l\'esplorazione a coda vuota non esiste più: nessuna domanda può riaccenderla');
   assert.equal(D.etichettaAzione({ tipo: 'priorita', feedbackId: 'f1', valore: 7 }, RIF), null);
   assert.equal(D.etichettaAzione({ tipo: 'priorita', feedbackId: 'f1', valore: '3' }, RIF), null);
   assert.equal(D.etichettaAzione({ tipo: 'archivia', feedbackId: 'f1', etichetta: 'Approva tutto' }, RIF), null, 'un parametro in più non passa');

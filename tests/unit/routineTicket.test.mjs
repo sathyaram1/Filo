@@ -117,7 +117,7 @@ test('busta assente o incartata male → pacchetto vuoto, mai un feedback invent
   assert.equal(serverCtx({ role: 'new-work' }, { server: BUSTA }).feedback, null);
 });
 
-test('chi esplora non riceve niente', () => {
+test('un ruolo che questa versione non conosce (il vecchio prober) non riceve niente', () => {
   assert.deepEqual(serverCtx({ role: 'prober' }, BUSTA), {});
 });
 
@@ -167,10 +167,17 @@ test('una busta senza niente dentro NON si consegna, per chi il feedback lo deve
   assert.equal(checkEnvelope({ role: 'secaudit', id: 'x', branch: 'worker/1' }), null);
 });
 
-test('un lavoro senza il feedback a cui si riferisce NON si consegna', () => {
-  assert.match(checkEnvelope({ role: 'new-work', id: '' }), /senza il feedback/);
-  // L'esplorazione è l'unica che non ha un feedback: quella passa.
-  assert.equal(checkEnvelope({ role: 'prober', id: '' }), null);
+test('un lavoro senza il feedback a cui si riferisce NON si consegna, qualunque sia il ruolo', () => {
+  for (const role of ['new-work', 'verifier', 'fixer', 'secaudit']) {
+    assert.match(checkEnvelope({ role, id: '', branch: 'worker/1' }), /senza il feedback/, role);
+  }
+});
+
+test('l\'esplorazione a coda vuota non esiste più: una busta da prober è un guasto, non un lavoro', () => {
+  // Un server non ancora aggiornato potrebbe mandarla a coda vuota: si ferma il
+  // giro dichiarandolo, invece di lavorare su main senza istruzioni.
+  assert.match(checkEnvelope({ role: 'prober', id: '' }), /non sa eseguire/);
+  assert.match(checkEnvelope({ role: 'prober', id: 'x', branch: 'worker/1' }), /non sa eseguire/);
 });
 
 test('un rifiuto NON è un guasto: sono due esiti diversi', () => {

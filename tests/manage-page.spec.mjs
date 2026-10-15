@@ -142,7 +142,7 @@ test('lo switch attiva/disattiva la modalità automatica e lo stato persiste', a
   // del token risolto in rgb → theme-independent, rosso se si torna a --sn-border.
   const trackOk = await page.evaluate(() => {
     // La pista DI QUESTO interruttore: la tab ne contiene altri (interruttore
-    // master delle routine, mittenti, esplorazione) e "il primo della pagina"
+    // master delle routine, mittenti, lavori server) e "il primo della pagina"
     // dipenderebbe dall'ordine dei blocchi.
     const track = document.querySelector('#mgAutoToggle + .mg-switch-track');
     const bg = getComputedStyle(track).backgroundColor;
@@ -229,7 +229,7 @@ test("se il salvataggio fallisce lo switch NON resta acceso a vuoto", async ({ o
 });
 
 // Stub dell'IPC dell'automatica: simula il doc Firestore config/automation
-// (campi `enabled`, `autoApprove`, `proberWhenIdle`) senza rete né main.
+// (campi `enabled`, `autoApprove`, `routinesEnabled`) senza rete né main.
 // `__automationSets` raccoglie ciò che il client MANDA: è la prova che
 // l'impostazione lascia la pagina e arriva dove il backend la legge.
 async function stubAutomation(page, initial = {}) {
@@ -237,7 +237,6 @@ async function stubAutomation(page, initial = {}) {
     window.__automation = Object.assign({
       enabled: false,
       autoApprove: { owner: true, filo: true, claude: true, user: true },
-      proberWhenIdle: true,
       routinesEnabled: true,
     }, init);
     window.__automationSets = [];
@@ -256,10 +255,8 @@ async function stubAutomation(page, initial = {}) {
           Object.assign(window.__automation.autoApprove, msg.autoApprove);
           sent.autoApprove = { ...msg.autoApprove };
         }
-        if (typeof msg.proberWhenIdle === 'boolean') {
-          window.__automation.proberWhenIdle = msg.proberWhenIdle;
-          sent.proberWhenIdle = msg.proberWhenIdle;
-        }
+        // Un campo che la pagina non deve più mandare si registra lo stesso: è la prova che non parte.
+        if ('proberWhenIdle' in msg) sent.proberWhenIdle = msg.proberWhenIdle;
         if (typeof msg.routinesEnabled === 'boolean') {
           window.__automation.routinesEnabled = msg.routinesEnabled;
           sent.routinesEnabled = msg.routinesEnabled;
@@ -377,35 +374,37 @@ test('#446 — con l\'automatica spenta gli interruttori per mittente restano mo
   expect(await page.evaluate(() => window.__automation.enabled)).toBe(false);
 });
 
-test('#448 — spegnere l\'esplorazione a coda vuota arriva alla config delle routine', async ({ openTab }) => {
+test('#1206 — l\'esplorazione a coda vuota non c\'è più: nessun interruttore, e nessun clic la scrive', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await page.locator('.mg-tab[data-tab="automation"]').click();
 
-  // Il checkbox è visivamente nascosto (switch custom: la levetta è il fratello
-  // .mg-switch-track), quindi si asserisce sul controllo reale, non sulla resa.
-  const sw = page.locator('#mgProberIdle');
-  await expect(page.locator('#mgProberIdle + .mg-switch-track')).toBeVisible();
-  // Non-admin: sola lettura, come il resto della tab.
-  await expect(sw).toBeDisabled();
-
-  await stubAutomation(page);
+  // Un main non aggiornato può ancora rispondere col vecchio campo: la pagina lo ignora.
+  await stubAutomation(page, { proberWhenIdle: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadAutoMode());
-  await expect(sw).toBeEnabled();
-  // Acceso di default: è il comportamento che le routine hanno sempre avuto.
-  await expect(sw).toBeChecked();
+  await expect(page.locator('#mgRoutinesToggle')).toBeEnabled();
 
-  await page.evaluate(() => {
-    const el = document.getElementById('mgProberIdle');
-    el.checked = false;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  await expect.poll(() => page.evaluate(() => window.__automation.proberWhenIdle)).toBe(false);
-  await expect.poll(() => page.evaluate(() => window.__automationSets)).toContainEqual({
-    proberWhenIdle: false,
-  });
+  await expect(page.locator('#mgProberIdle')).toHaveCount(0);
+  await expect(page.locator('#mgProberIdleBlock')).toHaveCount(0);
+  await expect(page.locator('#panel-automation')).not.toContainText(/coda è vuota/i);
+
+  // Ogni interruttore della scheda, cliccato: nessuno manda il campo dell'esplorazione.
+  const interruttori = await page.locator('#panel-automation input[type="checkbox"]').evaluateAll((els) => els.map((el) => el.id));
+  expect(interruttori.length).toBeGreaterThan(5);
+  for (const id of interruttori) {
+    await page.evaluate((x) => {
+      const el = document.getElementById(x);
+      if (!el || el.disabled) return;
+      el.checked = !el.checked;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, id);
+  }
+  // Nove mittenti, l'automatica e l'interruttore master: tutti arrivati prima di guardare.
+  await expect.poll(() => page.evaluate(() => window.__automationSets.length)).toBeGreaterThanOrEqual(11);
+  const mandati = await page.evaluate(() => window.__automationSets);
+  expect(mandati.filter((m) => 'proberWhenIdle' in m)).toEqual([]);
 });
 
 test('l\'interruttore master spegne le routine e le impostazioni che valgono per loro restano modificabili', async ({ openTab }) => {
@@ -438,8 +437,8 @@ test('l\'interruttore master spegne le routine e le impostazioni che valgono per
   await expect.poll(() => page.evaluate(() => window.__automation.routinesEnabled)).toBe(false);
   await expect(page.locator('#mgRoutinesState')).toHaveText('Off');
 
-  // Spente le routine, bilanci, istruzioni ed esplorazione si preparano per la riaccensione.
-  await expect(page.locator('#mgProberIdle')).toBeEnabled();
+  // Spente le routine, bilanci, istruzioni e lavori server si preparano per la riaccensione.
+  await expect(page.locator('#mgLavoriServer')).toBeEnabled();
   for (const id of ['#mgCap3', '#mgCap2', '#mgCap1', '#mgCap0', '#mgFixInstructions',
     '#mgCap3Save', '#mgCap2Save', '#mgCap1Save', '#mgCap0Save', '#mgFixInstructionsSave']) {
     await expect(page.locator(id)).toBeEnabled();
@@ -463,11 +462,9 @@ test('a routine spente un bilancio e le istruzioni si modificano e restano salva
   await page.locator('#mgFixInstructions').fill('Correggi prima i livelli 3.');
   await page.locator('#mgFixInstructionsSave').click();
   await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato.');
-  await page.locator('#mgProberIdle + .mg-switch-track').click();
 
   await expect.poll(() => page.evaluate(() => window.__capsSets))
     .toEqual([{ cap3: 6 }, { fixInstructions: 'Correggi prima i livelli 3.' }]);
-  await expect.poll(() => page.evaluate(() => window.__automation.proberWhenIdle)).toBe(false);
 
   // Riletti dalla config, i valori nuovi sono quelli che la pagina mostra.
   await page.evaluate(() => {

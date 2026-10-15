@@ -1273,7 +1273,8 @@
   // config/automation.workerLog, scritto dal server al rilascio di ogni
   // biglietto; qui è di sola lettura via il canale main (owner-gated).
   const WORKER_LOG_GET = (window.SN_MSG?.MSG?.WORKER_LOG_GET) || 'worker_log_get';
-  // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo).
+  // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo). Esplorazione,
+  // Fermo e Routine spente non partono più: restano per leggere le voci vecchie del registro.
   const ROLE_LABELS = {
     'new-work': 'Nuovo lavoro',
     verifier:   'Verifica',
@@ -6105,10 +6106,10 @@
       fsFeedbacks = Array.from(perId.values());
     }
     // Il registro delle esecuzioni è l'ALTRA sorgente, e cammina per conto
-    // suo: un'esplorazione che non trova niente lo fa crescere senza toccare
+    // suo: un lancio che non cambia niente lo fa crescere senza toccare
     // nessuna segnalazione. Finché lo si rileggeva solo a rimorchio di una
-    // segnalazione cambiata, tre numeri della stessa riga (esplorazioni,
-    // lavorati, lanci) restavano fermi all'apertura della scheda mentre
+    // segnalazione cambiata, i numeri della stessa riga (lavorati, lanci)
+    // restavano fermi all'apertura della scheda mentre
     // quelli accanto camminavano, e niente lo diceva. Costa una lettura al
     // minuto, e solo mentre la scheda è davanti agli occhi.
     if (aperto) {
@@ -6180,7 +6181,7 @@
     // hanno prodotto le routine» sono le due domande che ci si fa qui, e con
     // una pasticca per mittente costavano sei clic e la conoscenza di quale
     // voce è una routine. La segnalazione chiedeva per esempio i feedback
-    // «lanciati da prober o altre routine cloud».
+    // lanciati dalle routine cloud.
     const gruppi = FS.GRUPPI_CREATORI.map((gr) => {
       const on = fsGruppoAcceso(gr);
       const n = gr.kinds.reduce((s, k) => s + (conti[k] || 0), 0);
@@ -6222,11 +6223,11 @@
     }
     const cop = stat.copertura;
     if (!fsLogOk) {
-      righe.push('Il registro delle esecuzioni delle routine non si è letto: esplorazioni, lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
+      righe.push('Il registro delle esecuzioni delle routine non si è letto: lavorati, lanci e giri di verifica non si sanno finché non torna, e al loro posto c\'è un trattino.');
     } else if (cop.logVuoto) {
-      righe.push('Il registro delle esecuzioni delle routine è vuoto: esplorazioni, lavorati e giri di verifica non hanno ancora niente da contare.');
+      righe.push('Il registro delle esecuzioni delle routine è vuoto: lavorati, lanci e giri di verifica non hanno ancora niente da contare.');
     } else if (cop.logCorto) {
-      righe.push(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Esplorazioni, lavorati e giri di verifica contano da lì, non dall'inizio della finestra.`);
+      righe.push(`Il registro delle esecuzioni tiene le ultime: parte dal ${FS.dataBreve(cop.logDa)}. Lavorati, lanci e giri di verifica contano da lì, non dall'inizio della finestra.`);
     }
     // Una segnalazione con la data d'arrivo mancante o illeggibile non cade in
     // nessuna finestra, «Tutto» compreso. Sparire in silenzio da un totale è la
@@ -6258,7 +6259,6 @@
   const FS_SPIEGA = {
     ricevuti: 'Segnalazioni la cui DATA D\'INVIO cade nella finestra. Cliccalo per la divisione per categoria e per mittente.',
     lavorati: 'Segnalazioni su cui una routine ha lavorato nella finestra, contate sulla DATA DI LAVORAZIONE: una segnalazione vecchia lavorata ieri conta qui, non fra i ricevuti.',
-    prober: 'Quante volte è partita l\'esplorazione dell\'app. Un lancio non ha un mittente, quindi il filtro per creatore non lo tocca.',
     lanci: 'Tutte le esecuzioni delle routine nella finestra, di qualunque mestiere. Un\'esecuzione non ha un mittente, quindi il filtro per creatore non la tocca. Cliccalo per la divisione per mestiere.',
     attesa: 'Quanto è rimasta in attesa una segnalazione prima che tu la prendessi in mano, al centro dell\'ordine.',
     durata: 'Dal primo all\'ultimo passaggio di lavorazione della stessa segnalazione, al centro dell\'ordine.',
@@ -6312,10 +6312,10 @@
 
   /**
    * `sottoId`: il sottotitolo conta delle segnalazioni SUE, diverse da quelle
-   * del numero grande, e si apre su quelle. Serve al riquadro delle
-   * esplorazioni, dove il numero grande conta PARTENZE — che non sono
-   * segnalazioni e non si aprono su niente — mentre la riga piccola conta i
-   * ritrovamenti. Finché ad aprirsi era il riquadro intero, un numero che
+   * del numero grande, e si apre su quelle. Serve al riquadro degli
+   * arenamenti, dove il numero grande conta ARENAMENTI — che non sono
+   * segnalazioni e non si aprono su niente — mentre la riga piccola conta le
+   * segnalazioni. Finché ad aprirsi era il riquadro intero, un numero che
    * diceva cinque apriva un elenco di uno, e il tasto destro sopra quel cinque
    * offriva «Mostra la segnalazione contata»
    * (patterns/un-numero-si-apre-su-cosa-ha-contato.md: un numero apre ciò che
@@ -6433,18 +6433,6 @@
         ko ? noto : (stat.lavorati.verifiche
           ? `${fsNum(stat.lavorati.verifiche)} ${stat.lavorati.verifiche === 1 ? 'verifica partita' : 'verifiche partite'} in questa finestra`
           : ''), ko ? false : 'espandi'),
-      // Il numero grande conta PARTENZE dell'esplorazione: non sono
-      // segnalazioni e non si aprono su niente, quindi il riquadro non promette
-      // di aprirsi. A portare alle segnalazioni è la riga piccola, che è
-      // l'unica delle due a contarle.
-      fsTile('prober', stat.prober.lanciati, 'Esplorazioni lanciate',
-        // I ritrovamenti vengono dalle segnalazioni: quelli si sanno lo stesso.
-        (ko ? noto + ' · ' : '')
-          + (fbKo
-            ? 'segnalazioni dell\'esploratore non lette'
-            : `${fsNum(stat.prober.ritrovamenti)} ${stat.prober.ritrovamenti === 1 ? 'segnalazione' : 'segnalazioni'} dall'esploratore`),
-        false,
-        stat.prober.ritrovamentiIds.length ? 'proberTrovate' : ''),
       fsTile('lanci', stat.lanci.totale, 'Lanci delle routine', ko ? noto : '', ko ? false : 'espandi'),
     ].join('') + (det
       ? `<div class="mg-fs-detail"><h4>${esc(det.titolo)}</h4>${det.html}</div>`
@@ -6699,7 +6687,7 @@
         auditN ? 'espandi' : false),
       // Il numero grande conta ARENAMENTI: una segnalazione arenata due volte
       // ne vale due, quindi non è un conto di segnalazioni e non si apre.
-      // Ad aprirle è la riga piccola, come nel riquadro delle esplorazioni.
+      // Ad aprirle è la riga piccola.
       fsTile('arenati', stat.arenati.lavorazioni, 'Lavorazioni arenate e rimesse in coda',
         ko ? noto : (stat.arenati.feedback
           ? `su ${fsNum(stat.arenati.feedback)} ${stat.arenati.feedback === 1 ? 'segnalazione' : 'segnalazioni'}`
@@ -6828,10 +6816,8 @@
       const dietro = {
         ricevuti: ['Feedback ricevuti in questa finestra', fsStat.ricevuti.ids],
         lavorati: ['Feedback lavorati in questa finestra', fsStat.lavorati.ids, fsStat.lavorati.mancanti],
-        // `prober` e `arenati` (i numeri grandi) contano partenze e
-        // arenamenti, non segnalazioni: non stanno qui apposta. A contare
-        // segnalazioni è la riga piccola sotto.
-        proberTrovate: ['Segnalazioni trovate dall\'esploratore', fsStat.prober.ritrovamentiIds],
+        // `arenati` (il numero grande) conta arenamenti, non segnalazioni:
+        // non sta qui apposta. A contare segnalazioni è la riga piccola sotto.
         attesa:   ['Segnalazioni che hai preso in mano', fsStat.tempi.presaInCarico.ids],
         durata:   ['Lavorazioni misurate in questa finestra', fsStat.tempi.lavorazione.ids, fsStat.tempi.lavorazione.mancanti],
         audit:    ['Controllo di sicurezza passato', (fsStat.auditIds || {}).pass],

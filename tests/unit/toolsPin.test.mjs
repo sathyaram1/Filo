@@ -355,7 +355,8 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     req.on('end', () => {
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) {
-        res.end(JSON.stringify({ ok: true, role: 'prober', id: '', num: '', branch: '', payload: { role: 'prober' } }));
+        // Una busta col feedback vuoto: dispatch consegna la ricetta del guasto, l'unica che non chiede un deposito git.
+        res.end(JSON.stringify({ ok: true, role: 'new-work', id: 'f1', num: '#1', branch: '', payload: { feedback: { text: '' } } }));
       } else if (req.url.includes('config')) {
         res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
       } else res.end(JSON.stringify({ ok: true }));
@@ -369,7 +370,7 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
   try {
     // Il progetto: strumenti veri (servono a farlo girare) e ricetta AGGIORNATA.
     cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'),
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'),
       'RICETTA AGGIORNATA\nRilascia con node scripts/routine-channel.mjs release <biglietto>\n', 'utf8');
 
     // Il giro fissa gli strumenti finché la cartella è ancora aggiornata.
@@ -377,7 +378,7 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
     assert.equal(pin.ok, true, pin.why);
 
     // Poi si apre il ramo vecchio: da qui il progetto dice un'altra cosa.
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'RICETTA DI DUE GIORNI FA\n', 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'), 'RICETTA DI DUE GIORNI FA\n', 'utf8');
 
     const out = await new Promise((fine) => {
       const p = spawn(process.execPath, [resolve(dove, 'scripts', 'dispatch.mjs'), '--ticket', 'b-prova-con-la-forma-vera-di-un-biglietto'], {
@@ -549,7 +550,8 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
     req.on('end', () => {
       res.setHeader('Content-Type', 'application/json');
       if (req.url.endsWith('/routineWork')) {
-        res.end(JSON.stringify({ ok: true, role: 'prober', id: '', num: '', branch: '', payload: { role: 'prober' } }));
+        // Una busta col feedback vuoto: dispatch consegna la ricetta del guasto, l'unica che non chiede un deposito git.
+        res.end(JSON.stringify({ ok: true, role: 'new-work', id: 'f1', num: '#1', branch: '', payload: { feedback: { text: '' } } }));
       } else if (req.url.includes('config')) {
         res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
       } else res.end(JSON.stringify({ ok: true }));
@@ -563,7 +565,7 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
   try {
     cpSync(resolve(REPO, 'scripts'), resolve(casa, 'scripts'), { recursive: true });
     cpSync(resolve(REPO, 'src', 'main', 'auth'), resolve(casa, 'src', 'main', 'auth'), { recursive: true });
-    writeFileSync(resolve(casa, 'routines', 'roles', 'prober.md'), 'ricetta\n', 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'halt.md'), 'ricetta\n', 'utf8');
     const pin = pinTools(casa, { dest: dove });
     assert.equal(pin.ok, true, pin.why);
 

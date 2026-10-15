@@ -128,12 +128,14 @@ async function scegli(page, ruolo, campo, voce) {
 }
 
 test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si toglie', async ({ app, openTab }) => {
-  await preparaServer(app, { routines: { enabled: true, maxSessions: 2, roleModels: { secaudit: { effort: 'high' } } } });
+  // `prober`: la fase dell'esplorazione a coda vuota, tolta (#1206); la sua scelta rimasta nel documento non torna in pagina.
+  await preparaServer(app, { routines: { enabled: true, maxSessions: 2, roleModels: { secaudit: { effort: 'high' }, prober: { model: 'opus' } } } });
   let page = await apri(openTab);
 
   // Tutte le fasi, ognuna con le sue due tendine; quello che c'è già sul server si vede.
-  await expect(page.locator('#mgRoleModels select')).toHaveCount(10);
-  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Correzione', 'Controllo cieco', 'Esplorazione']);
+  await expect(page.locator('#mgRoleModels select')).toHaveCount(8);
+  await expect(page.locator('#mgRoleModels .mg-role-name')).toHaveText(['Primo lavoro', 'Verifica', 'Correzione', 'Controllo cieco']);
+  await expect(page.locator('select[data-ruolo="prober"]')).toHaveCount(0);
   await expect(tendina(page, 'secaudit', 'effort').locator('.sn-select-value')).toHaveText('high');
   await expect(tendina(page, 'verifier', 'model').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('');
@@ -141,7 +143,7 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   await scegli(page, 'verifier', 'model', 'Sonnet');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Verifica: salvato.');
   // Sul server la sola foglia scelta: il resto del documento e le altre fasi non si toccano.
-  expect(await sulServer(app)).toEqual({ enabled: true, maxSessions: 2, roleModels: { secaudit: { effort: 'high' }, verifier: { model: 'sonnet' } } });
+  expect(await sulServer(app)).toEqual({ enabled: true, maxSessions: 2, roleModels: { secaudit: { effort: 'high' }, prober: { model: 'opus' }, verifier: { model: 'sonnet' } } });
 
   // Il trattino del primo lavoro arriva al server come nome, non come espressione.
   await scegli(page, 'new-work', 'effort', 'max');
@@ -177,14 +179,14 @@ test('«Definizione dell\'agente» si legge intera, anche nella colonna stretta'
   for (const [w, h] of [[1536, 864], [1280, 800], [1000, 800]]) {
     await app.evaluate(({ BrowserWindow }, s) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).setSize(s[0], s[1]); }, [w, h]);
     await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeGreaterThan(w - 60);
-    await expect(tendina(page, 'prober', 'effort').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
+    await expect(tendina(page, 'secaudit', 'effort').locator('.sn-select-value')).toHaveText('Definizione dell\'agente');
     const tagliate = await page.evaluate(() => Array.from(document.querySelectorAll('#mgRoleModels .sn-select-value'))
       .filter((v) => v.scrollWidth > v.clientWidth + 1).length);
     expect(tagliate, `${w}px`).toBe(0);
   }
   // L'ultima tendina aperta scende sotto il riquadro senza essere tagliata.
-  await tendina(page, 'prober', 'model').locator('.sn-select-button').click();
-  const pop = tendina(page, 'prober', 'model').locator('.sn-select-pop');
+  await tendina(page, 'secaudit', 'model').locator('.sn-select-button').click();
+  const pop = tendina(page, 'secaudit', 'model').locator('.sn-select-pop');
   await expect(pop).toBeVisible();
   await pop.scrollIntoViewIfNeeded();
   await expect(pop.locator('.sn-select-option')).toHaveCount(5);
@@ -196,13 +198,13 @@ test('due scelte di fila sulla stessa tendina: vince l\'ultima, sullo schermo e 
   const page = await apri(openTab);
   await app.evaluate(() => { globalThis.__g1193.ritardi = [900, 0]; });
 
-  await scegli(page, 'prober', 'model', 'Opus');
-  await scegli(page, 'prober', 'model', 'Fable');
+  await scegli(page, 'secaudit', 'model', 'Opus');
+  await scegli(page, 'secaudit', 'model', 'Fable');
   // Mentre la prima risposta è per strada la tendina dice già Fable, e non torna indietro quando arriva.
-  await expect(tendina(page, 'prober', 'model').locator('.sn-select-value')).toHaveText('Fable');
-  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Esplorazione: salvato.');
-  await expect(tendina(page, 'prober', 'model').locator('.sn-select-value')).toHaveText('Fable');
-  expect((await sulServer(app)).roleModels.prober).toEqual({ model: 'fable' });
+  await expect(tendina(page, 'secaudit', 'model').locator('.sn-select-value')).toHaveText('Fable');
+  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Controllo cieco: salvato.');
+  await expect(tendina(page, 'secaudit', 'model').locator('.sn-select-value')).toHaveText('Fable');
+  expect((await sulServer(app)).roleModels.secaudit).toEqual({ model: 'fable' });
 });
 
 test('impostazioni non lette: nessuna voce scelta, e la pagina lo dice; salvare si può e lo dice', async ({ app, openTab }) => {
@@ -224,13 +226,13 @@ test('impostazioni non lette: nessuna voce scelta, e la pagina lo dice; salvare 
 });
 
 test('un valore scritto a mano fuori elenco si vede com\'è', async ({ app, openTab }) => {
-  await preparaServer(app, { routines: { roleModels: { prober: { model: 'claude-opus-4' } } } });
+  await preparaServer(app, { routines: { roleModels: { secaudit: { model: 'claude-opus-4' } } } });
   const page = await apri(openTab);
-  await expect(tendina(page, 'prober', 'model').locator('.sn-select-value')).toHaveText('claude-opus-4 (fuori elenco)');
+  await expect(tendina(page, 'secaudit', 'model').locator('.sn-select-value')).toHaveText('claude-opus-4 (fuori elenco)');
   // Cambiarlo si può; dopo, la voce scritta a mano non resta fra le scelte.
-  await scegli(page, 'prober', 'model', 'Sonnet');
-  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Esplorazione: salvato.');
-  await expect(page.locator('select[data-ruolo="prober"][data-campo="model"] option')).toHaveCount(5);
+  await scegli(page, 'secaudit', 'model', 'Sonnet');
+  await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Controllo cieco: salvato.');
+  await expect(page.locator('select[data-ruolo="secaudit"][data-campo="model"] option')).toHaveCount(5);
 });
 
 test('chi non è owner vede le tendine spente, e non si aprono', async ({ app, openTab }) => {
