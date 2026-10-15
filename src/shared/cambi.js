@@ -50,6 +50,7 @@
     timerRingtoneVolume: { nome: 'volume della suoneria del timer', valore: (v) => `${numero(v)}%`, livello: 1 },
     'terminal.enabled': { nome: 'modalità terminale', valore: ATTIVA, livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
+    'altreApp.enabled': { nome: 'uso delle altre applicazioni', valore: ATTIVO, livello: 2 },
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
     'aggiornamenti.installa': {
       nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
