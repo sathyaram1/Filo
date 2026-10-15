@@ -2203,7 +2203,7 @@ if (isMainModule) {
       // assente ferma con la frase giusta, e niente parte a metà.
       const segnalazione = seg.file ? leggiTestoLivello(seg.file, 'segnala') : { ok: true, testo: '' };
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
-      const s = await recordVerifier(id, critica, segnalazione.testo);
+      const s = await recordVerifier(id, critica, segnalazione.testo, livSeg.campi);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
       console.log(verifierReplyText(s.reply, id));
