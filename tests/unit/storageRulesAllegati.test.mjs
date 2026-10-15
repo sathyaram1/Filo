@@ -339,9 +339,9 @@ test('l’owner scarica un allegato firmando la richiesta; il token non esce alt
 test('il token dell’owner non esce verso un bucket che non è quello di Filo', () => {
   // Il caso che l'ha fatta nascere (verifica #582, giro 1). Fermarsi all'HOST
   // non basta: l'URL dell'allegato non lo sceglie l'owner, sta dentro il
-  // documento del feedback, e un feedback lo crea CHIUNQUE senza login (le
-  // firestore.rules validano `images` solo come lista di al più 5 elementi, non
-  // il contenuto). Bastava indicare un bucket qualunque ospitato da Google e la
+  // documento del feedback, e un feedback lo crea CHIUNQUE senza login (allora
+  // le firestore.rules validavano `images` solo come lista di al più 5 elementi;
+  // dal #597 anche il deposito, ma i documenti di prima restano). Bastava indicare un bucket qualunque ospitato da Google e la
   // dashboard, aprendo quel feedback, ci portava l'id token dell'owner — la
   // credenziale che vale su tutto il progetto per un'ora.
   const estranei = [
