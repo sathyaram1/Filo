@@ -681,8 +681,10 @@ export function codaDalServer(testoServer) {
     '- qui i rilievi lasciati fuori non prendono un numero di feedback: le prove da togliere sono quelle dei rilievi',
     '  elencati più su, riconosciute dal numero r<n> che le precede e che la prova porta nel nome;',
     '- non c\'è `--segnala`, quindi qui una segnalazione non ferma niente da sola: un trade-off vero si scrive',
-    '  PER PRIMO nel report, con le strade e i loro costi, e lo porta all\'owner chi guida il giro, che è lui a',
-    '  fermare il lavoro. Un rilievo che chiede una sua decisione non si corregge a metà: consegna il resto;',
+    '  PER PRIMO nel report, con le strade, i loro costi e il livello del problema, applicando intanto la scelta che',
+    '  consigli; lo porta all\'owner chi guida il giro, che ferma il lavoro solo per un 3 o per una scelta difficile da',
+    '  disfare (dati degli utenti, sicurezza, formati salvati su disco). Un rilievo col «?» dell\'elenco si corregge con',
+    '  l\'opzione consigliata da chi verifica;',
     '- la consegna è `node scripts/verify-local.mjs corretto "<report della correzione>"`, e non c\'è un biglietto',
     '  da rilasciare. Dopo serve un\'altra verifica, di un\'altra istanza: la lancia chi guida.',
   ].join('\n');
