@@ -13,6 +13,7 @@
 //   guida i giri locali, deve rimandare lì invece di tenerne una copia più
 //   corta.
 
+import '../helpers/senzaSessione.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
