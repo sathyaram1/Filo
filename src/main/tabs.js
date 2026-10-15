@@ -3819,6 +3819,18 @@ function origineDi(url) {
   try { return new URL(url).origin; } catch (_) { return ''; }
 }
 
+function senzaAncora(url) {
+  return String(url || '').split('#')[0];
+}
+
+// Cambia solo col documento: l'ancora, la ricarica o il ritorno della stessa pagina dopo un riavvio non contano.
+function segnaPagina(tab, url) {
+  const u = senzaAncora(url);
+  if (!u || u === tab._paginaUrl) return;
+  tab._paginaUrl = u;
+  tab.paginaDal = new Date().toISOString();
+}
+
 // L'apertura salvata nella sessione, se è una data vera e non nel futuro; sennò la scheda riparte da adesso.
 function aperturaValida(v) {
   const t = typeof v === 'string' ? Date.parse(v) : NaN;
