@@ -173,7 +173,8 @@ function copiaDelClic(e) {
 }
 
 function crea({ webFrame, riserva = () => {}, finestra = globalThis.window, nome = null } = {}) {
-  const segreto = nome || `x${require('node:crypto').randomBytes(12).toString('hex')}`;
+  // Web Crypto, non node:crypto: nella sandbox del preload Node non c'è (#834).
+  const segreto = nome || `x${Array.from(globalThis.crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
   try { webFrame.executeJavaScript(sorgenteSonda(segreto), false).catch(() => {}); } catch (_) {}
   const doc = () => finestra.document;
 

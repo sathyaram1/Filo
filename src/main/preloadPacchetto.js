@@ -13,7 +13,7 @@ const INGRESSO = 'src/preload/page-preload.js';
 const NEL_PACCHETTO = path.join(__dirname, '..', 'preload', 'pacchetto', 'page-preload.js');
 // Quelli che la sandbox dà da sé: li chiede il preload vero, a chiamata.
 const DELLA_SANDBOX = new Set(['electron', 'events', 'timers', 'url']);
-// Quelli di Node che il pacchetto rifà: `path` sui suoi percorsi, `fs` in sola lettura sui testi che porta.
+// Quelli di Node che il pacchetto rifà: `path` sui suoi percorsi, `fs` in sola lettura sui testi che porta; `url` lo completa.
 const RIFATTI = new Set(['path', 'fs']);
 const ESTENSIONI = ['', '.js', '.json', '/index.js'];
 
@@ -223,7 +223,8 @@ function runtime(MODULI, TESTI, richiestaDellaSandbox) {
   };
   const inAscii = (dominio) => {
     const d = String(dominio);
-    if (!d || /[\s/\\?#@:%]/.test(d)) return '';
+    // Come Node: spazi, credenziali e porte non fanno un dominio; quello che segue / ? # cade.
+    if (!d || /[\s@]/.test(d) || (d.includes(':') && !d.startsWith('['))) return '';
     try { return new URL('http://' + d).hostname; } catch (_) { return ''; }
   };
   const inUnicode = (dominio) => {
