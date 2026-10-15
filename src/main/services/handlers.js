@@ -21,6 +21,7 @@ const ContestoFilo = require('./contestoFilo');
 const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
 const Schermo = require('./schermo').crea();
+const SempreAperte = require('./sempreAperte');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
