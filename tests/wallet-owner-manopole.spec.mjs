@@ -319,22 +319,26 @@ test('i numeri che il server calcola si leggono in cima, e non si possono toccar
   const page = await apriOwner(app);
 
   const numeri = page.locator('#ownerNumeri .sn-wallet-numero');
-  await expect(numeri).toHaveCount(6, { timeout: 15_000 });
+  await expect(numeri).toHaveCount(9, { timeout: 15_000 });
   // Un utente si conta al singolare.
   await expect(numeri.nth(0)).toContainText('utente');
   await expect(numeri.nth(0)).not.toContainText('utenti');
+  // Chi l'ha usato davvero (#820): attivi a 7 e 30 giorni.
+  await expect(numeri.nth(1)).toContainText('negli ultimi 7 giorni');
+  await expect(numeri.nth(2)).toContainText('negli ultimi 30 giorni');
   // Elargiti contro il tetto, e quanto manca (70.000 − 5.128).
-  await expect(numeri.nth(1)).toContainText('5.128');
-  await expect(numeri.nth(1)).toContainText('su 70.000');
-  await expect(numeri.nth(2)).toContainText('64.872');
-  await expect(numeri.nth(2)).toContainText('ancora elargibili');
+  await expect(numeri.nth(3)).toContainText('5.128');
+  await expect(numeri.nth(3)).toContainText('su 70.000');
+  await expect(numeri.nth(4)).toContainText('64.872');
+  await expect(numeri.nth(4)).toContainText('ancora elargibili');
   // Crediti vivi: la somma dei saldi.
-  await expect(numeri.nth(3)).toContainText('4.890,5');
+  await expect(numeri.nth(5)).toContainText('4.890,5');
+  await expect(numeri.nth(6)).toContainText('crediti spesi');
   // Inviti ancora da dare: uno dei due ha posti liberi.
-  await expect(numeri.nth(4)).toContainText('tuo invito da dare');
+  await expect(numeri.nth(7)).toContainText('tuo invito da dare');
   // Riscatti rimasti.
-  await expect(numeri.nth(5)).toContainText('9');
-  await expect(numeri.nth(5)).toContainText('riscatti rimasti');
+  await expect(numeri.nth(8)).toContainText('9');
+  await expect(numeri.nth(8)).toContainText('riscatti rimasti');
   // Sono numeri, non campi: nessuno di questi si scrive.
   expect(await page.locator('#ownerNumeri input').count()).toBe(0);
 });

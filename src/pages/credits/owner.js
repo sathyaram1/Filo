@@ -371,13 +371,13 @@
     const euroUsd = (usd) => fmtEur(W.euroDaUsd(usd, cfg));
     const insieme = (...pezzi) => pezzi.filter((t) => t && t !== '—').join(' · ');
 
-    lista.appendChild(riquadro(c.letto ? fmtUsd(c.restaUsd) : '—', 'restano sul conto',
+    lista.appendChild(riquadro(c.letto ? fmtSoldi(c.restaUsd, '$') : '—', 'restano sul conto',
       'Quello che il conto OpenRouter di Filo può ancora pagare: caricato meno speso. Le chiavi di tutti pescano da qui.',
       { nota: c.letto ? insieme(crediti(c.restaCrediti), euroUsd(c.restaUsd)) : '', allarme: scoperto }));
-    lista.appendChild(riquadro(c.letto ? fmtUsd(c.caricatoUsd) : '—', 'caricati',
+    lista.appendChild(riquadro(c.letto ? fmtSoldi(c.caricatoUsd, '$') : '—', 'caricati',
       'Tutto quello che è stato caricato sul conto OpenRouter. Il tetto dei crediti da regalare deve stare sotto.',
       { nota: c.letto ? insieme(crediti(c.caricatoCrediti), euroUsd(c.caricatoUsd)) : '', allarme: tettoAllarme }));
-    lista.appendChild(riquadro(c.letto ? fmtUsd(c.spesoUsd) : '—', 'spesi dal conto',
+    lista.appendChild(riquadro(c.letto ? fmtSoldi(c.spesoUsd, '$') : '—', 'spesi dal conto',
       'Quanto OpenRouter ha già scalato dal conto, da tutte le chiavi.',
       { nota: c.letto ? euroUsd(c.spesoUsd) : '' }));
     const m = c.letto ? c.margine : null;
