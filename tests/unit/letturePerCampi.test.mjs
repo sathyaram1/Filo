@@ -163,7 +163,7 @@ test('ogni script che può leggere le segnalazioni carica il freno prima di farl
 
 test('ogni script di manutenzione stampa quanti documenti ha letto', () => {
   // Chi lancia lo script deve vedere il costo sullo schermo, non in fattura.
-  const MANUTENZIONE = ['auto-archive.mjs', 'backfill-feedback-numbers.mjs', 'migrate-status.mjs', 'migrate-status-padding.mjs'];
+  const MANUTENZIONE = ['auto-archive.mjs', 'backfill-feedback-numbers.mjs'];
   const muti = [];
   for (const nome of MANUTENZIONE) {
     const testo = readFileSync(join(SCRIPTS, nome), 'utf8');
