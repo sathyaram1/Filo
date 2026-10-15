@@ -226,8 +226,10 @@ Le forme che cadevano, e cosa le ha sostituite:
   file sano sotto carico è lento ma avanza): il file fermo si chiude da solo, rosso col suo
   nome, e gli altri girano (#1231). Node mostra in diretta solo i passi del primo file in
   corso: se in un tetto non finisce nessun file, con lui si chiudono i file partiti da più
-  di un tetto (in fila costerebbero un tetto ciascuno), e se dopo non finisce più niente si
-  chiude la corsa (il disco pieno). Una prova sola che ci si avvicina si divide, e una
+  di un tetto (in fila costerebbero un tetto ciascuno), e se dopo questa chiusura non finisce
+  più niente si chiude la corsa (il disco pieno). Chiuso il primo da solo, la corsa non si
+  chiude: prima si chiudono i fermi, se no l'esito dei file sani in fila dietro di loro
+  dipende da quando arriva la loro fine (#1235). Una prova sola che ci si avvicina si divide, e una
   scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
   (`tests/helpers/scenaHook.mjs`). Nessun tempo d'orologio sopra di lui: anche gli unit sul
   risultato della fusione, che la chiusura rifà quando main si è mosso, passano dal
