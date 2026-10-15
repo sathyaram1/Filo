@@ -7,9 +7,14 @@ import { accendiSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { temporaneaDellaCorsa, togliCartella } from '../helpers/percorsi.mjs';
 
-export default async function primaDellaCorsa(config) {
+// Il motore si controlla prima di qualunque attesa: sul motore sbagliato si ferma subito, senza aver acceso niente.
+export default function primaDellaCorsa(config) {
   const radice = config?.configFile ? dirname(config.configFile) : null;
   assicuraMotore(radice ? { radice } : {});
+  return preparaLaCorsa(radice);
+}
+
+async function preparaLaCorsa(radice) {
   // La base del display è quella del worker (#1157), nel marcatore del clone a cui appartiene la config.
   const schermo = await accendiSchermo(radice ? { worker: datiWorker({ root: radice }) } : {});
   if (schermo.nota) console.error(schermo.nota);
