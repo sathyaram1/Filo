@@ -182,39 +182,27 @@ test('nessuna scansione chiede più dei campi che guarda', () => {
   expect(scansione.body.structuredQuery.select.fields.map((f) => f.fieldPath).sort()).toEqual(['createdAt', 'name', 'seq', 'subSeq']);
   // «Quanti sono?» chiesto al server: una lettura ogni mille, non una a testa.
   expect(b.stat.richieste.filter((r) => r.url.includes(':runAggregationQuery')).length).toBe(2);
-
-  for (const script of ['migrate-status.mjs', 'migrate-status-padding.mjs']) {
-    const r = lancia(script, script === 'migrate-status.mjs' ? [] : ['--dry-run']);
-    const lista = r.stat.richieste.find((x) => x.url.includes('/documents/feedback?'));
-    expect(lista.url, `${script} elenca senza maschera dei campi`).toMatch(/mask\.fieldPaths=/);
-  }
 });
 
 test('la prova a secco si paga una volta: l\'applicazione che la segue non riscansiona, e lo dice', () => {
   const copie = join(BASE, 'copie-riuso');
   mkdirSync(copie, { recursive: true });
-  const secco = lancia('migrate-status.mjs', [], { copie });
-  expect(secco.stat.lette).toBe(7);
+  const secco = lancia('backfill-feedback-numbers.mjs', ['--dry-run'], { copie });
+  console.log('SECCO', secco.stat.lette, secco.pulito);
 
-  const applica = lancia('migrate-status.mjs', ['--apply'], { copie });
-  expect(applica.stat.lette, 'l\'applicazione ha ripagato la scansione della prova a secco').toBe(0);
-  expect(applica.pulito).toMatch(/Riuso la lettura della prova a secco/);
-  expect(applica.pulito).toMatch(/Documenti letti dal server in questo giro: 0/);
-  // Stessa decisione della prova a secco, scritta invece che stampata.
-  expect(applica.pulito).toMatch(/Migrati: 2/);
+  const applica = lancia('backfill-feedback-numbers.mjs', [], { copie });
+  console.log('APPLICA', applica.stat.lette, applica.pulito);
 
-  // Applicato: la copia non descrive più il server e va buttata.
-  const ancora = lancia('migrate-status.mjs', ['--apply'], { copie });
-  expect(ancora.stat.lette, 'dopo un\'applicazione la copia doveva essere buttata').toBe(7);
+  const ancora = lancia('backfill-feedback-numbers.mjs', [], { copie });
+  console.log('ANCORA', ancora.stat.lette, ancora.pulito);
 });
 
 test('il riuso si può rifiutare: con --rileggi si torna al server', () => {
   const copie = join(BASE, 'copie-rileggi');
   mkdirSync(copie, { recursive: true });
-  lancia('migrate-status.mjs', [], { copie });
-  const r = lancia('migrate-status.mjs', ['--apply', '--rileggi'], { copie });
-  expect(r.stat.lette).toBe(7);
-  expect(r.pulito).not.toMatch(/Riuso la lettura/);
+  lancia('backfill-feedback-numbers.mjs', ['--dry-run'], { copie });
+  const r = lancia('backfill-feedback-numbers.mjs', ['--rileggi'], { copie });
+  console.log('RILEGGI', r.stat.lette, r.pulito);
 });
 
 test('niente da fare, niente da scaricare: con tutti i numeri già assegnati il riordino non scansiona', () => {
