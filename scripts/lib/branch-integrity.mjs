@@ -485,6 +485,7 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   ensureSessionExcludes(root);
   // Prima del ramo di scarto spedito più sotto: i commit locali di una sessione morta possono portare una copia dei dati (#1108).
   try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
+  ensureCommentChar(root);
 
   if (create) {
     const wanted = base || mainBranch;
