@@ -437,3 +437,12 @@ test('#530: spegnere una protezione o allargare un\'eccezione della pagina Sicur
   assert.equal(allenta('siti_delicati', 'togli x.com'), true);
   assert.equal(allenta('domini_esclusi', 'aggiungi x.com'), false, 'non è una difesa');
 });
+
+test('l\'avviso dei crediti dalla chat (#818): soglie dentro i limiti, fuori è un rifiuto col numero, e si spegne', () => {
+  assert.deepEqual(build('avvisa quando i crediti durano', '3,5').partial, { avvisoCrediti: { giorni: 3.5 } });
+  assert.deepEqual(build('soglia_percento_crediti', '20%').partial, { avvisoCrediti: { percento: 20 } });
+  assert.deepEqual(build('soglia_giorni_crediti', 'predefinito').partial, { avvisoCrediti: { giorni: 2 } });
+  assert.match(build('soglia_percento_crediti', '250').rifiuto, /250 è fuori dai limiti: da 0 a 100/);
+  assert.deepEqual(build('avviso_crediti', 'spento').partial, { avvisoCrediti: { attivo: false } });
+  assert.deepEqual(build('spiegazione_anticipata', 'no').partial, { spiegaAnticipata: { enabled: false } });
+});

@@ -6,7 +6,8 @@
 //      cifre; «Usa i più economici» cambia davvero il modello della chat, e un clic lo rimette com'era;
 //  (B) senza conversazione è una notifica nella finestra che apre la pagina Crediti, dove i rimedi si applicano e
 //      si annullano; lo stesso calo non avvisa due volte, un saldo risalito sopra la soglia sì;
-//  (C) sopra le soglie, con la chiave propria o senza portafoglio: nessun avviso.
+//  (C) sopra le soglie, con la chiave propria o senza portafoglio: nessun avviso;
+//  (D) soglie, interruttore e spiegazione preparata si cambiano dalle Preferenze.
 
 import { createServer } from 'node:http';
 import { mkdirSync } from 'node:fs';
@@ -320,7 +321,7 @@ test('(D) le soglie e la spiegazione preparata si cambiano dalle Preferenze, e i
   await pref.locator('#sec-crediti').scrollIntoViewIfNeeded();
   await pref.screenshot({ path: `${SHOTS}/preferenze.png` });
 
-  await pref.locator('#avvisoCreditiGiorni').fill('3,5');
+  await pref.locator('#avvisoCreditiGiorni').fill('3.5');
   await pref.locator('#avvisoCreditiGiorni').press('Tab');
   await pref.locator('#avvisoCreditiPercento').fill('250');
   await pref.locator('#avvisoCreditiPercento').press('Tab');
