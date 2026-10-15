@@ -558,6 +558,9 @@
     return null;
   }
 
+  // Tasti che Filo ascolta nelle chat di ogni pagina, sue o no: arrivano alla pagina, ma una scorciatoia lì sopra ne perde una delle due.
+  const USATI_NELLE_CHAT = [['Ctrl+Shift+Spazio', 'apre il microfono delle chat']];
+
   function rifiutoScritta(sc, esplicita, opzioni) {
     const testo = String(sc == null ? '' : sc).trim();
     if (!testo) return null;
@@ -565,11 +568,17 @@
     if (r) return r;
     const nome = etichettaScritta(testo, esplicita);
     if (delSistema(testo, esplicita)) return { tipo: 'sistema', nome };
-    const cosa = chiLaPrende(testo, esplicita, opzioni);
+    const f = forma(testo);
+    const cosa = chiLaPrende(testo, esplicita, opzioni) || (USATI_NELLE_CHAT.find(([x]) => forma(x) === f) || [])[1];
     if (cosa) return { tipo: 'presa', nome, cosa };
     // Dopo i tasti presi: la pressione che il nome descrive non è quella vera.
     const cambia = modificatoreCheCambiaSimbolo(testo, esplicita);
     if (cambia) return { tipo: 'simbolo', nome, modificatore: cambia };
+    // AltGr su Windows è Ctrl+Alt: con la E scrive €, con la Q @ su molte tastiere.
+    const mods = f.slice(0, f.indexOf('|'));
+    if (piattaforma(esplicita) === 'win32' && mods.includes('c') && mods.includes('a') && [...f.slice(f.indexOf('|') + 1)].length === 1) {
+      return { tipo: 'altgr', nome };
+    }
     return null;
   }
 
