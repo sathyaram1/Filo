@@ -49,7 +49,10 @@
     mostraManopole(true);
     const cfg = o.config || {};
     const tot = o.totals || {};
-    renderNumeri(cfg, tot, o.ownerInvites || []);
+    const uso = W.usoPersone(o.users || []);
+    ultimoUso = uso;
+    renderNumeri(cfg, tot, o.ownerInvites || [], uso);
+    renderConto(o);
     const quando = formatDate(cfg.eurUsdAt);
     $('ownerTotals').textContent = cfg.eurUsd
       ? `Un credito vale ${formatDecimale(cfg.eurPerCredit, 6)} €, e un euro ${formatDecimale(cfg.eurUsd, 4)} $`
