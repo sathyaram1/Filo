@@ -15,7 +15,8 @@ import { createServer } from 'node:http';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SEC_URL = 'filo://security/security.html';
-const PAGE = '<!doctype html><html><body style="padding:40px"><textarea id="ta" rows="4" cols="40"></textarea></body></html>';
+const PAGE = '<!doctype html><html><body style="padding:40px"><textarea id="ta" rows="4" cols="40"></textarea>'
+  + '<div id="ce" contenteditable="true" style="margin-top:20px;min-height:80px;border:1px solid #999"></div></body></html>';
 
 async function findTabPage(app, hostname, timeout = 20000) {
   const deadline = Date.now() + timeout;
