@@ -217,7 +217,9 @@ function crea({ sistema = null } = {}) {
       let info = {};
       try { info = s.schermi(); } catch (_) {}
       const schermi = nomiSchermi(fonti.filter((f) => f.tipo === 'schermo'), info);
-      esterne = [...finestre.map((f) => ({ id: f.id, tipo: 'finestra', filo: false, nome: f.nome })), ...schermi.map((f) => ({ id: f.id, tipo: 'schermo', filo: false, nome: f.nome }))];
+      // Il sistema le dà nell'ordine in cui sono sovrapposte: la prima è quella appena lasciata per scrivere a Filo,
+      // cioè «questa finestra».
+      esterne = [...finestre.map((f, i) => ({ id: f.id, tipo: 'finestra', filo: false, nome: f.nome, ...(i === 0 ? { davanti: true } : {}) })), ...schermi.map((f) => ({ id: f.id, tipo: 'schermo', filo: false, nome: f.nome }))];
     }
     return { voci: nomiUnici([...esterne, ...filo.map((f) => ({ id: f.id, tipo: 'finestra', filo: true, nome: f.nome, url: f.url }))]), nota, permesso };
   }
