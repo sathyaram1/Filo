@@ -218,6 +218,63 @@ test('in un riquadro della stessa origine la proposta sta sotto il campo del riq
   await expect.poll(() => riquadro.locator('#u').inputValue()).toBe(EMAIL);
 });
 
+// Un modulo di accesso servito da un altro indirizzo: il suo frame non sa dove sta il riquadro, glielo dice la pagina.
+const RIQUADRO = '<!doctype html><body style="margin:0;padding:20px"><input id="u" type="email" style="width:260px;height:30px"></body>';
+const altraOrigine = (url) => url.replace('127.0.0.1', 'localhost');
+
+async function sottoIlCampoDelRiquadro(app, page, misura) {
+  const s = await stato(app);
+  const r = await page.evaluate(misura);
+  return { dx: Math.abs(s.bounds.x - (s.scheda.x + r.left * s.zoom)), dy: Math.abs(s.bounds.y - (s.scheda.y + r.bottom * s.zoom)) };
+}
+
+test('in un riquadro di un\'altra origine la proposta sta sotto il campo, segue la pagina e la scelta lo riempie', async ({ app, openTab, testServer }) => {
+  await accountFinto(app);
+  const dentro = altraOrigine(testServer.html(RIQUADRO));
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="margin:0;padding:30px;height:3000px">
+    <iframe id="r" src="${dentro}" style="margin-left:100px;margin-top:60px;width:400px;height:200px;border:5px solid #ccc;padding:3px"></iframe></body>`);
+  const riquadro = page.frameLocator('#r');
+  await riquadro.locator('#u').click();
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  // Il campo sta a 20px dal bordo interno del riquadro, e il riquadro ha bordo e spaziatura.
+  const misura = () => {
+    const f = document.getElementById('r').getBoundingClientRect();
+    return { left: f.left + 5 + 3 + 20, bottom: f.top + 5 + 3 + 20 + 30 };
+  };
+  let d = await sottoIlCampoDelRiquadro(app, page, misura);
+  expect(d.dx).toBeLessThanOrEqual(1);
+  expect(d.dy).toBeLessThanOrEqual(4);
+
+  await page.evaluate(() => window.scrollBy(0, 25));
+  await expect.poll(async () => (await sottoIlCampoDelRiquadro(app, page, misura)).dy, { timeout: 3000 }).toBeLessThanOrEqual(4);
+
+  const vista = await vistaProposta(app);
+  await expect(vista.locator('#email')).toHaveText(EMAIL);
+  expect(await page.evaluate((e) => document.documentElement.outerHTML.includes(e), EMAIL)).toBe(false);
+  expect(await riquadro.locator('#u').inputValue()).toBe('');
+  await page.waitForTimeout(600);
+  await vista.click('#voce');
+  await expect.poll(() => riquadro.locator('#u').inputValue()).toBe(EMAIL);
+  await expect.poll(() => mostrata(app)).toBe(false);
+});
+
+test('in un riquadro di un\'altra origine dentro un altro riquadro di un\'altra origine la proposta sta sotto il campo', async ({ app, openTab, testServer }) => {
+  await accountFinto(app);
+  const interno = testServer.html(RIQUADRO);
+  const medio = altraOrigine(testServer.html(`<!doctype html><body style="margin:0;padding:10px">
+    <iframe id="i" src="${interno}" style="margin-left:40px;width:340px;height:120px;border:2px solid #999"></iframe></body>`));
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="margin:0;padding:30px">
+    <iframe id="r" src="${medio}" style="margin-left:50px;width:500px;height:220px;border:5px solid #ccc"></iframe></body>`);
+  await page.frameLocator('#r').frameLocator('#i').locator('#u').click();
+  await expect.poll(() => mostrata(app), { timeout: 8000 }).toBe(true);
+  const d = await sottoIlCampoDelRiquadro(app, page, () => {
+    const f = document.getElementById('r').getBoundingClientRect();
+    return { left: f.left + 5 + 10 + 40 + 2 + 20, bottom: f.top + 5 + 10 + 2 + 20 + 30 };
+  });
+  expect(d.dx).toBeLessThanOrEqual(1);
+  expect(d.dy).toBeLessThanOrEqual(4);
+});
+
 test('in incognito si propone solo se l\'utente l\'ha chiesto, e mai sulle pagine di Filo', async ({ app }) => {
   const esiti = await app.evaluate(() => {
     const M = process.getBuiltinModule('module');

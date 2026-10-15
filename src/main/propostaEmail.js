@@ -17,6 +17,8 @@ const LARGHEZZA_MAX = 480;
 const MARGINE = 4;
 const STACCO = 2;
 const CAMPO = /^[0-9a-f]{32}$/;
+// Riquadri di un'altra origine uno dentro l'altro: oltre questo non si risale.
+const ANELLI_MAX = 8;
 const MOTIVI = new Set(['focus', 'input', 'posto']);
 const RIEMPI = () => (globalThis.SN_MSG && globalThis.SN_MSG.MSG.PROPOSTA_EMAIL_RIEMPI) || 'proposta_email_riempi';
 
@@ -52,6 +54,15 @@ function stessoFrame(frame, pid, rid) {
   try { return frame.processId === pid && frame.routingId === rid; } catch (_) { return true; }
 }
 
+// La posizione di un riquadro la dà solo un documento che contiene il frame del campo: sopra di lui c'è la sua pagina.
+function antenato(a, frame) {
+  try {
+    let p = frame.parent;
+    for (let i = 0; p && i < 32; i++, p = p.parent) if (p.processId === a.pid && p.routingId === a.rid) return true;
+  } catch (_) {}
+  return false;
+}
+
 const istanze = new Set();
 
 class PropostaEmail {
@@ -78,6 +89,8 @@ class PropostaEmail {
     this.seguite = new WeakSet();
     // Per istanza del content script, l'ultimo messaggio visto: uno arrivato in ritardo non riapre un campo lasciato.
     this.numeri = new Map();
+    // Per segno: dove sta, nel documento sopra, il riquadro di un'altra origine che contiene il campo.
+    this.ancore = new Map();
     istanze.add(this);
     if (win && typeof win.once === 'function') win.once('closed', () => { istanze.delete(this); this._butta(); });
   }
@@ -108,9 +121,33 @@ class PropostaEmail {
     if (d.motivo === 'focus' && !this._toccata()) c.chiusa = false;
     // Chi scrive dopo aver evidenziato con la freccia vuole il suo testo: il prossimo Invio è della pagina.
     if (d.motivo === 'input') c.evidenziata = false;
-    Object.assign(c, { x: d.x, y: d.y, w: d.w, h: d.h, valore: d.valore, digitato: d.digitato, email, lasciato: false });
+    Object.assign(c, { x: d.x, y: d.y, w: d.w, h: d.h, ancora: d.ancora, valore: d.valore, digitato: d.digitato, email, lasciato: false });
     this.tema = tema;
     this.posa();
+  }
+
+  riquadro(wc, frame, d) {
+    if (this._vecchio(d)) return;
+    let pid = 0; let rid = 0;
+    try { pid = frame.processId; rid = frame.routingId; } catch (_) { return; }
+    this.ancore.delete(d.ancora);
+    this.ancore.set(d.ancora, { wc, pid, rid, x: d.x, y: d.y, s: d.s, su: d.su });
+    if (this.ancore.size > 32) this.ancore.delete(this.ancore.keys().next().value);
+    if (this.c && this.c.wc === wc) this.posa();
+  }
+
+  // Il campo in px CSS della scheda: dentro riquadri di un'altra origine, sommando le loro posizioni. null finché
+  // un anello non è arrivato, o se lo dà un documento che non contiene il campo.
+  _campo(c) {
+    let r = { x: c.x, y: c.y, w: c.w, h: c.h };
+    let segno = c.ancora;
+    for (let i = 0; segno; i++) {
+      const a = this.ancore.get(segno);
+      if (i >= ANELLI_MAX || !a || a.wc !== c.wc || !(a.s > 0) || !antenato(a, c.frame)) return null;
+      r = { x: a.x + r.x * a.s, y: a.y + r.y * a.s, w: r.w * a.s, h: r.h * a.s };
+      segno = a.su;
+    }
+    return r;
   }
 
   // Il campo ha perso il fuoco. Se l'ha preso la proposta (un clic, il suo tasto destro) si aspetta che torni.
@@ -157,10 +194,11 @@ class PropostaEmail {
 
   // Sotto il campo, largo almeno quanto lui; sopra se sotto non c'è posto. Fuori dall'area della pagina, niente.
   _dove(a, c) {
-    if (!(c.w > 0 && c.h > 0)) return null;
+    const m = this._campo(c);
+    if (!m || !(m.w > 0 && m.h > 0)) return null;
     let z = 1;
     try { z = c.wc.getZoomFactor() || 1; } catch (_) { z = 1; }
-    const fx = a.x + c.x * z; const fy = a.y + c.y * z; const fw = c.w * z; const fh = c.h * z;
+    const fx = a.x + m.x * z; const fy = a.y + m.y * z; const fw = m.w * z; const fh = m.h * z;
     if (fy + fh <= a.y || fy >= a.y + a.height || fx + fw <= a.x || fx >= a.x + a.width) return null;
     const spazio = a.width - 2 * MARGINE;
     if (spazio < 80) return null;
@@ -431,13 +469,22 @@ function inIncognito(sender) {
 }
 
 function pulisci(msg) {
+  const ancora = testo(msg.ancora);
+  if (msg.fase === 'riquadro') {
+    if (!CAMPO.test(ancora) || ![msg.x, msg.y, msg.s].every(numero) || (msg.su && !CAMPO.test(testo(msg.su)))) return null;
+    return {
+      istanza: testo(msg.istanza).slice(0, 64), n: Number.isSafeInteger(msg.n) && msg.n > 0 ? msg.n : 0,
+      ancora, x: msg.x, y: msg.y, s: Math.max(0, msg.s), su: testo(msg.su),
+    };
+  }
+  if (ancora && !CAMPO.test(ancora)) return null;
   const campo = testo(msg.campo);
   if (!CAMPO.test(campo)) return null;
   const d = { campo, istanza: testo(msg.istanza).slice(0, 64), n: Number.isSafeInteger(msg.n) && msg.n > 0 ? msg.n : 0 };
   if (msg.fase === 'via') return d;
   if (!MOTIVI.has(msg.motivo) || ![msg.x, msg.y, msg.w, msg.h].every(numero) || typeof msg.valore !== 'string') return null;
   return {
-    ...d, motivo: msg.motivo, x: msg.x, y: msg.y, w: Math.max(0, msg.w), h: Math.max(0, msg.h),
+    ...d, ancora, motivo: msg.motivo, x: msg.x, y: msg.y, w: Math.max(0, msg.w), h: Math.max(0, msg.h),
     valore: msg.valore.slice(0, C.VALORE_MAX + 1), digitato: msg.digitato === true,
   };
 }
@@ -456,6 +503,11 @@ async function daContenuto(msg, sender) {
   if (!msg || !wc || !frame || wc.isDestroyed()) return { ok: false };
   const d = pulisci(msg);
   if (!d) return { ok: false };
+  if (msg.fase === 'riquadro') {
+    const p = propostaDi(wc, { crea: true });
+    if (p) p.riquadro(wc, frame, d);
+    return { ok: true };
+  }
   if (msg.fase === 'via') {
     const p = propostaDi(wc);
     if (p) p.via(wc, frame, d);

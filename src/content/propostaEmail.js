@@ -66,22 +66,19 @@
     return r.width <= 0 || r.height <= 0 || r.bottom <= 0 || r.right <= 0 || r.top >= win.innerHeight || r.left >= win.innerWidth;
   }
 
-  // Il campo in px CSS della scheda: risale i riquadri della stessa origine; null se un anello è di un'altra origine,
-  // { w: 0 } se il campo non si vede.
-  function rettangolo(el) {
-    let r;
-    try { r = el.getBoundingClientRect(); } catch (_) { return null; }
-    let win = window;
-    if (fuoriVista(r, win)) return { x: 0, y: 0, w: 0, h: 0 };
+  // Un rettangolo di `win` in px CSS della scheda, risalendo i riquadri della stessa origine. Al primo anello di
+  // un'altra origine si ferma e ne restituisce la finestra in `ancora`: il resto lo misura il documento sopra.
+  function risali(r, win) {
+    if (fuoriVista(r, win)) return { fuori: true };
     let x = r.left; let y = r.top;
-    const w = r.width; const h = r.height;
     for (let i = 0; win !== win.top; i++) {
+      if (i >= ANELLI_MAX) return null;
       let fe = null;
       try { fe = win.frameElement; } catch (_) { fe = null; }
-      if (!fe || i >= ANELLI_MAX) return null;
+      if (!fe) return { x, y, s: 1, ancora: win };
       const sopra = fe.ownerDocument.defaultView;
       const fr = fe.getBoundingClientRect();
-      if (fuoriVista(fr, sopra)) return { x: 0, y: 0, w: 0, h: 0 };
+      if (fuoriVista(fr, sopra)) return { fuori: true };
       const cs = sopra.getComputedStyle(fe);
       x += fr.left + fe.clientLeft + (parseFloat(cs.paddingLeft) || 0);
       y += fr.top + fe.clientTop + (parseFloat(cs.paddingTop) || 0);
@@ -89,8 +86,24 @@
     }
     const vv = win.visualViewport;
     const s = vv && vv.scale > 0 ? vv.scale : 1;
-    if (s !== 1) return { x: (x - vv.offsetLeft) * s, y: (y - vv.offsetTop) * s, w: w * s, h: h * s };
-    return { x, y, w, h };
+    if (s !== 1) return { x: (x - vv.offsetLeft) * s, y: (y - vv.offsetTop) * s, s, ancora: null };
+    return { x, y, s: 1, ancora: null };
+  }
+
+  // Il campo in px CSS della scheda (o del suo riquadro di un'altra origine, `ancora`); { w: 0 } se non si vede.
+  function rettangolo(el) {
+    let r;
+    try { r = el.getBoundingClientRect(); } catch (_) { return null; }
+    const p = risali(r, window);
+    if (!p) return null;
+    if (p.fuori) return { x: 0, y: 0, w: 0, h: 0, ancora: null };
+    return { x: p.x, y: p.y, w: r.width * p.s, h: r.height * p.s, ancora: p.ancora };
+  }
+
+  // Dentro un riquadro di un'altra origine il documento sopra sa dove sta il riquadro: gli si manda un segno che
+  // riconosce dalla finestra che lo spedisce, e lui ne dà la posizione al main.
+  function segnaAncora(win, segno) {
+    try { win.parent.postMessage({ filoPropostaEmail: segno }, '*'); } catch (_) {}
   }
 
   function invia(motivo) {
@@ -100,10 +113,14 @@
     if (!r) { c.muto = true; return; }
     const valore = String(c.el.value || '');
     const digitato = valore === c.dati.digitato;
-    const firma = [r.x, r.y, r.w, r.h].map((n) => Math.round(n)).join(',') + `|${global.devicePixelRatio}|${digitato}|${valore}`;
+    const firma = [r.x, r.y, r.w, r.h].map((n) => Math.round(n)).join(',') + `|${global.devicePixelRatio}|${digitato}|${valore}|${!!r.ancora}`;
     if (motivo === 'posto' && firma === c.firma) return;
     c.firma = firma;
-    send({ type: T, fase: 'campo', campo: c.dati.campo, motivo, x: r.x, y: r.y, w: r.w, h: r.h, valore, digitato }, (res) => {
+    if (r.ancora) segnaAncora(r.ancora, c.ancora);
+    send({
+      type: T, fase: 'campo', campo: c.dati.campo, motivo, x: r.x, y: r.y, w: r.w, h: r.h, valore, digitato,
+      ancora: r.ancora ? c.ancora : '',
+    }, (res) => {
       if (res && res.segui === false && corrente === c) c.muto = true;
     });
   }
@@ -125,7 +142,7 @@
   function inizia(el) {
     let dati = perCampo.get(el);
     if (!dati) { dati = { campo: chiave(), digitato: '' }; perCampo.set(el, dati); }
-    corrente = { el, dati, firma: '', muto: false, timer: setInterval(passo, PASSO_MS) };
+    corrente = { el, dati, firma: '', muto: false, ancora: chiave(), timer: setInterval(passo, PASSO_MS) };
     el.addEventListener('input', suInput, true);
   }
 
@@ -169,11 +186,65 @@
     if (corrente && bersaglio(e) === corrente.el) chiudi();
   }, true);
 
+  // I riquadri di un'altra origine con dentro un campo seguito, per segno: si rimisurano finché hanno il fuoco.
+  const riquadri = new Map();
+  let timerRiquadri = null;
+  const SEGNO = /^[0-9a-f]{32}$/;
+
+  function misuraRiquadro(segno, q) {
+    let fr;
+    try { fr = q.ifr.getBoundingClientRect(); } catch (_) { return; }
+    let cs = null;
+    try { cs = getComputedStyle(q.ifr); } catch (_) { return; }
+    const left = fr.left + q.ifr.clientLeft + (parseFloat(cs.paddingLeft) || 0);
+    const top = fr.top + q.ifr.clientTop + (parseFloat(cs.paddingTop) || 0);
+    const p = risali({ left, top, right: fr.right, bottom: fr.bottom, width: fr.width, height: fr.height }, window);
+    if (!p) return;
+    const dati = p.fuori ? { x: 0, y: 0, s: 0 } : { x: p.x, y: p.y, s: p.s };
+    if (p.ancora) segnaAncora(p.ancora, q.su);
+    const firma = `${Math.round(dati.x)},${Math.round(dati.y)},${dati.s}|${!!p.ancora}`;
+    if (firma === q.firma) return;
+    q.firma = firma;
+    send({ type: T, fase: 'riquadro', ancora: segno, ...dati, su: p.ancora ? q.su : '' });
+  }
+
+  function seguiRiquadri() {
+    const a = attivo();
+    for (const [segno, q] of riquadri) {
+      if (!q.ifr.isConnected || a !== q.ifr) riquadri.delete(segno);
+      else misuraRiquadro(segno, q);
+    }
+    if (!riquadri.size && timerRiquadri) { clearInterval(timerRiquadri); timerRiquadri = null; }
+  }
+
+  // Vale solo il segno spedito dalla finestra di un riquadro di questo documento: chi lo spedisce non sceglie il riquadro.
+  window.addEventListener('message', (e) => {
+    const segno = e.data && typeof e.data === 'object' ? e.data.filoPropostaEmail : null;
+    if (typeof segno !== 'string' || !SEGNO.test(segno) || !e.source || e.source === window) return;
+    let ifr = attivo();
+    if (!ifr || !/^i?frame$/i.test(ifr.tagName || '') || ifr.contentWindow !== e.source) {
+      ifr = [...document.querySelectorAll('iframe, frame')].find((f) => f.contentWindow === e.source) || null;
+    }
+    if (!ifr) return;
+    let q = riquadri.get(segno);
+    if (!q || q.ifr !== ifr) {
+      q = { ifr, su: chiave(), firma: '' };
+      riquadri.set(segno, q);
+      if (riquadri.size > 8) riquadri.delete(riquadri.keys().next().value);
+    }
+    misuraRiquadro(segno, q);
+    if (!timerRiquadri) timerRiquadri = setInterval(seguiRiquadri, PASSO_MS);
+  });
+
   let inCoda = false;
   const rimisura = () => {
-    if (!corrente || inCoda) return;
+    if ((!corrente && !riquadri.size) || inCoda) return;
     inCoda = true;
-    requestAnimationFrame(() => { inCoda = false; invia('posto'); });
+    requestAnimationFrame(() => {
+      inCoda = false;
+      invia('posto');
+      for (const [segno, q] of riquadri) misuraRiquadro(segno, q);
+    });
   };
   window.addEventListener('scroll', rimisura, { capture: true, passive: true });
   window.addEventListener('resize', rimisura, { passive: true });
