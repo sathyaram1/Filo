@@ -5532,8 +5532,8 @@
     loadRoleModels,
     // Ri-legge il timeout dei giudici (IPC) — usato dai test dopo lo stub.
     loadJudgeTimeout,
-    // Ri-legge la config dell'automatica (IPC): interruttore master, mappa dei
-    // mittenti auto-approvati, esplorazione a coda vuota — usato dai test.
+    // Ri-legge la config dell'automatica (IPC): interruttori e mappa dei
+    // mittenti auto-approvati — usato dai test.
     loadAutoMode,
     setTab(tab) { selectTab(tab); },
     // Ordinamento della lista (menu tasto destro): impostalo e rirender.
