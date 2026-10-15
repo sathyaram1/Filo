@@ -748,6 +748,7 @@
   });
   $('ownKeyRemoveYes').addEventListener('click', () => { removeOwnKey().catch(() => {}); });
   $('reissueBtn').addEventListener('click', () => { reissueKey().catch(() => {}); });
+  $('linkGoogleBtn').addEventListener('click', () => { collegaGoogle().catch(() => {}); });
   $('pseudonym').addEventListener('click', () => { copiaPseudonimo().catch(() => {}); });
   $('pseudonymRow').addEventListener('contextmenu', (ev) => {
     ev.preventDefault();
