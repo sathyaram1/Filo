@@ -511,7 +511,14 @@
    * L'esito di un giro, calcolato dai livelli e dai bilanci (spec §4). PURA.
    *
    * Regole:
-   *   - un rilievo di livello 3 o 2 che chiede una decisione ferma il lavoro;
+   *   - ferma il lavoro un 3 che chiede una decisione, e un 2 che chiede una
+   *     decisione difficile da disfare (`[2i?!]`);
+   *   - un 2 che chiede una decisione facile da disfare (`[2i?]`) non ferma:
+   *     segue la regola dei 2 qui sotto, e se si corregge (chi corregge
+   *     applica l'opzione consigliata dal verificatore) esce ANCHE in
+   *     `domande`, cioè in un feedback derivato con la domanda per l'owner;
+   *     se lui sceglie diversamente, quel feedback cambia il codice già fuso
+   *     (decisione dell'owner del 2026-10-12);
    *   - un 3 si corregge se il bilancio dei 3 ha ancora giri; a bilancio
    *     finito ferma il lavoro (è l'unico livello che ferma per bilancio);
    *   - un 2 si corregge se nello stesso giro si corregge anche un 3 (il giro
