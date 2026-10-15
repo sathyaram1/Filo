@@ -360,11 +360,11 @@
   /**
    * Legge la critica scritta dal verificatore. PURA.
    *
-   * `rifiutati` sono le righe con un livello ma SENZA la sede («[2] …»), con
-   * la spiegazione: non diventano rilievi né riassunto, e chi registra deve
-   * respingere la critica finché ce ne sono (le altre forme storte le elenca
-   * unparsedLevelLines).
-   * @returns {{ summary: string, findings: Array<{level:number, sede:'i'|'e', text:string, decision:boolean}>, rifiutati: string[] }}
+   * `rifiutati` sono le righe con un livello ma SENZA la sede («[2] …») e
+   * quelle col «!» senza il «?» («[2i!] …»), con la spiegazione: non
+   * diventano rilievi né riassunto, e chi registra deve respingere la critica
+   * finché ce ne sono (le altre forme storte le elenca unparsedLevelLines).
+   * @returns {{ summary: string, findings: Array<{level:number, sede:'i'|'e'|'v', text:string, decision:boolean, difficile:boolean}>, rifiutati: string[] }}
    */
   function parseFindings(text) {
     const lines = normalizeCritique(text).split('\n');
