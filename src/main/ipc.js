@@ -135,7 +135,7 @@ function registerIpcHandlers() {
       const riquadro = !!(opts && opts.riquadro);
       if (!riquadro) { event.returnValue = F.configForHref(href, ambito); return; }
       const catena = [];
-      for (let f = event.senderFrame; f && catena.length < 64; f = f.parent) catena.push(String(f.url || ''));
+      for (let f = event.senderFrame; f; f = f.parent) catena.push(String(f.url || ''));
       event.returnValue = catena.length > 1 ? F.configForFrames(catena, ambito) : { level: 0, seed: 0 };
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
