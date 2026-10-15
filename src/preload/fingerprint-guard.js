@@ -386,9 +386,12 @@ const PROPAGAZIONE = `
     try { ascolta(w); } catch (e) {}
   }
 
-  prepara(window, true);
-  // Solo nelle prove: un segno sul prototipo che le prove dei giri leggono, mai una proprietà della finestra.
-  if (SONDA) { try { defP(getProto(window), '__filoFpGuard', { __proto__: null, get: function () { return true; }, configurable: true }); } catch (e) {} }`;
+  prepara(window, true);`;
+
+// Solo nelle prove: un segno sul prototipo che le prove dei giri leggono, mai una proprietà della finestra; fuori dalle
+// prove il preambolo non ne contiene nemmeno il nome.
+const SONDA = `
+  try { defP(getProto(window), '__filoFpGuard', { __proto__: null, get: function () { return true; }, configurable: true }); } catch (e) {}`;
 
 function buildPreamboloSource({ fp, canale, sonda } = {}) {
   const parti = [];
@@ -402,7 +405,7 @@ function buildPreamboloSource({ fp, canale, sonda } = {}) {
   var R = Reflect.apply, defP = Object.defineProperty, gOPD = Object.getOwnPropertyDescriptor;
   var getProto = Object.getPrototypeOf, setProto = Object.setPrototypeOf, imul = Math.imul, ceil = Math.ceil;
   var WMP = WeakMap.prototype, wmGet = WMP.get, wmSet = WMP.set, wmHas = WMP.has;
-  var parti = [], CANALE = ${JSON.stringify(String(canale || ''))}, SONDA = ${sonda ? 'true' : 'false'};
+  var parti = [], CANALE = ${JSON.stringify(String(canale || ''))};
 
   // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
   // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799), e
@@ -425,7 +428,7 @@ function buildPreamboloSource({ fp, canale, sonda } = {}) {
     }, o, 'toString');
   }
 ${parti.join('\n')}
-${PROPAGAZIONE}
+${PROPAGAZIONE}${sonda ? SONDA : ''}
 })();`;
 }
 
