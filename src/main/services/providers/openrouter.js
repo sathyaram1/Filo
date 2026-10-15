@@ -552,6 +552,9 @@
     err.provider = 'openrouter';
     const attesa = attesaChiesta(res);
     if (attesa != null) err.retryAfterMs = attesa;
+    if (res.keySource) err.keySource = res.keySource;
+    if (res.keyFallback) err.keyFallback = res.keyFallback;
+    if (res.status === 404 && model && await nessunHostAmmesso(err, { apiKey, model, providerRouting })) return err;
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
