@@ -7,6 +7,7 @@ import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSy
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { ensureSessionExcludes } from './branch-integrity.mjs';
+import { ensureCommentChar } from './carattere-commento.mjs';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { MARCATORE_WORKER } from './dati-worker.mjs';
 import { pinWorkerTools, pinnedDirWorker, TOOLS_ROOT } from './tools-pin.mjs';
