@@ -33,8 +33,10 @@
   // 2026-09-22): `i` interno (tocca a questo lavoro: lo scenario della
   // segnalazione, o l'ha creato il ramo), `e` esterno (un altro lavoro), `v`
   // vicino (un altro lavoro, ma in un file che il ramo modifica già: decisione
-  // del 2026-09-27). Il giro conta gli interni, e i vicini come livello 0; ogni
-  // esterno esce subito in un feedback suo con priorità uguale al livello.
+  // del 2026-09-27). Solo gli interni fanno partire un giro o lo fermano; un
+  // vicino entra in una correzione partita per gli interni, e non paga nessun
+  // bilancio (decisione del 2026-10-12); ogni esterno esce subito in un
+  // feedback suo con priorità uguale al livello.
   const SEDI = ['i', 'e', 'v'];
   const SPIEGAZIONE_SEDE = 'manca la sede dopo il livello: «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro (per esempio [2i], [1v], [1e?])';
 
