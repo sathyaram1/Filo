@@ -180,6 +180,9 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
   try {
     if (env.FILO_ROUTINE) return { esito: 'routine' };
     if (!input || typeof input !== 'object' || !puoLeggereFuori(input.tool_name)) return { esito: 'nessuna lettura esterna' };
+    // Le cartelle fidate (altre chiamate a git) servono solo a Read: per il resto il motivo si sa subito.
+    const subito = input.tool_name === 'Read' ? null : motivoLettura(input);
+    if (subito === '') return { esito: 'nessuna lettura esterna' };
     const cwd = String(input.cwd || env.CLAUDE_PROJECT_DIR || process.cwd());
     const sessione = String(input.session_id || '').trim();
     const envSessione = sessione ? { ...env, [B.ENV_SESSIONE]: sessione } : env;
