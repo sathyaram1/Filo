@@ -660,9 +660,6 @@ module.exports = function register(on, ctx) {
       const autoApprove = (msg.autoApprove && typeof msg.autoApprove === 'object')
         ? await Defaults.setAutomationAutoApprove(msg.autoApprove, idToken)
         : await Defaults.getAutomationAutoApprove(idToken);
-      const proberWhenIdle = (typeof msg.proberWhenIdle === 'boolean')
-        ? await Defaults.setAutomationProberIdle(msg.proberWhenIdle, idToken)
-        : await Defaults.getAutomationProberIdle(idToken);
       // Interruttore master delle routine (config/routines): è ciò che ferma il
       // lavoro autonomo, mentre `enabled` qui sopra riguarda solo chi entra in
       // coda da solo. Due decisioni diverse, due interruttori.
