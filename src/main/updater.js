@@ -264,6 +264,40 @@ function rifiuta(info) {
 
 // Una preferenza cambiata a sessione aperta vale subito: chi spegne dopo lo scaricamento dell'avvio non se lo
 // ritrova installato, chi riaccende scarica come all'avvio, e la carta pronta segue la scelta di quando installare.
+// Quello che il canale di prima aveva trovato, chiesto o scaricato e che in questo non c'è: via la carta, la richiesta
+// e il ricordo dell'installatore (Windows lo installerebbe al prossimo avvio). Il file resta nella cache di electron-updater.
+function lasciaFuoriCanale() {
+  const fuori = (v) => v != null && !R.nelCanale(String(v), stato.canale);
+  if (fuori(stato.versioneTrovata)) {
+    stato.versioneTrovata = null;
+    stato.info = null;
+    stato.errore = null;
+  }
+  if (stato.scaricamento && fuori(stato.scaricamento.versione)) stato.scaricamento = null;
+  if (fuori(stato.chiesta)) dimenticaRichiesta();
+  if (fuori(stato.pronta)) {
+    stato.scaricataFuori = stato.pronta;
+    stato.pronta = null;
+    stato.pronto = null;
+    stato.agganciata = false;
+  }
+  const r = leggiRicordo();
+  if (r && fuori(r.versione)) scriviRicordo(null);
+  if (fuori(stato.versione)) {
+    stato.versione = null;
+    stato.percentuale = null;
+    if (['pronto', 'scarica'].includes(stato.fase)) stato.fase = 'aggiornato';
+  }
+  togliCarte((n) => fuori(n.action.versione), { tipi: [TIPO_DISPONIBILE, PRONTO.tipo] });
+}
+
+function ricontrolla() {
+  const u = updater;
+  Promise.resolve().then(() => u && u.checkForUpdates()).catch((e) => {
+    console.error('[updater] controllo dopo il cambio di canale fallito:', e?.message || e);
+  });
+}
+
 // Un canale cambiato vale come un avvio nuovo: quello trovato o scaricato sull'altro canale, se qui non c'è, non si
 // installa e non si annuncia, e si ricontrolla subito.
 function seguiImpostazioni(settings) {
