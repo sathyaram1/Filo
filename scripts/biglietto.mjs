@@ -14,8 +14,9 @@ export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"]
 export function leggiArgomenti(argv) {
   const a = (Array.isArray(argv) ? argv : []).map(String);
   const cmd = a[0] || '';
-  if (cmd === 'stato' || cmd === 'chiudi' || cmd === 'avvio' || cmd === 'gancio') return a.length === 1 ? { cmd } : { errore: `${cmd} non vuole altro. ${USO}` };
+  if (['stato', 'chiudi', 'avvio', 'gancio', 'fine', 'scadenze'].includes(cmd)) return a.length === 1 ? { cmd } : { errore: `${cmd} non vuole altro. ${USO}` };
   if (cmd === 'consegna') return { cmd, motivo: a.slice(1).join(' ').trim() };
+  if (cmd === 'chiusura') return a.length === 2 && a[1].trim() ? { cmd, sessione: a[1].trim() } : { errore: `chiusura vuole il nome della sessione. ${USO}` };
   if (cmd === 'sporca') {
     const motivo = a.slice(1).join(' ').trim();
     return motivo ? { cmd, motivo } : { errore: `sporca vuole il motivo: cosa hai letto che il server non vede. ${USO}` };
