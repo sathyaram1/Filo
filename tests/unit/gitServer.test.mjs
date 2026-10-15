@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   URL_SERVER, ambienteGitServer, originDelServer, pianoGitServer, ramoAccettabile, urlSenzaSegreti, voceDiAccesso, vociGitServer,
 } from '../../scripts/lib/git-server.mjs';
@@ -73,7 +74,7 @@ test('piano di git-server: azioni, cartella fuori da Filo, rami ammessi, mai mai
   assert.deepEqual(pianoGitServer({ azione: 'ls-remote', cartella: fuori, root, clonato: true }).argv, ['-C', fuori, 'ls-remote', 'origin', 'HEAD']);
   assert.deepEqual(pianoGitServer({ azione: 'fetch', cartella: fuori, ramo: 'main', root, clonato: true }).argv, ['-C', fuori, 'fetch', 'origin', 'main']);
   assert.deepEqual(pianoGitServer({ azione: 'push', cartella: fuori, ramo: 'worker/f1-20261015T090000Z', root, clonato: true }).argv,
-    ['-C', fuori, 'push', 'origin', 'worker/f1-20261015T090000Z']);
+    ['-C', fuori, 'push', 'origin', 'refs/heads/worker/f1-20261015T090000Z:refs/heads/worker/f1-20261015T090000Z']);
   for (const [chiesto, motivo] of [
     [{ azione: 'pull', cartella: fuori }, /azione/],
     [{ azione: 'clone' }, /cartella/],
@@ -113,7 +114,7 @@ test('eseguiGitServer: il token chiesto col biglietto arriva a git nell’ambien
     assert.deepEqual(chiesti, ['B1']);
     assert.equal(lanciati.length, 3, 'due letture dell’origin e la spinta');
     const spinta = lanciati[2];
-    assert.deepEqual(spinta.argv, ['-C', clone, 'push', 'origin', 'worker/f1']);
+    assert.deepEqual(spinta.argv, ['-C', clone, 'push', 'origin', 'refs/heads/worker/f1:refs/heads/worker/f1']);
     assert.ok(vociDi(spinta.env).some(([k, v]) => k === `http.${URL_SERVER}.extraHeader` && v === `AUTHORIZATION: ${BASIC(TOKEN)}`));
     assert.ok(!('GIT_ASKPASS' in spinta.env));
     for (const l of lanciati.slice(0, 2)) assert.ok(!JSON.stringify(l).includes(BASIC(TOKEN)), 'la lettura dell’origin non porta il token');
@@ -219,7 +220,7 @@ test('git vero: con l’ambiente del proxy il clone fallisce, con quello di git-
   writeFileSync(globale, '');
   // Asincrono: il server git sta in questo processo, e una chiamata sincrona lo fermerebbe.
   const git = (args, env = macchina, cwd = casa) => new Promise((ok, ko) => {
-    execFile('git', args, { cwd, env, encoding: 'utf8', timeout: 60_000 }, (e, so, se) => (e ? ko(Object.assign(e, { se })) : ok(so)));
+    execFile('git', args, { cwd, env, encoding: 'utf8', timeout: TETTO_ATTESA_MS }, (e, so, se) => (e ? ko(Object.assign(e, { se })) : ok(so)));
   });
   const { srv, visti, port } = await servitoreGit(radice, BASIC(TOKEN));
   const url = `http://127.0.0.1:${port}/filo-security.git`;
@@ -266,7 +267,7 @@ test('git vero: con l’ambiente del proxy il clone fallisce, con quello di git-
     await git(['checkout', '-q', '-b', 'worker/f1-prova'], macchina, clone);
     writeFileSync(join(clone, 'README.md'), 'filo-security\nuna riga\n');
     await git(['-c', 'user.name=prova', '-c', 'user.email=prova@example.invalid', 'commit', '-q', '-am', 'una riga'], macchina, clone);
-    await git(['-C', clone, 'push', '-q', 'origin', 'worker/f1-prova'], env);
+    await git(['-C', clone, 'push', '-q', 'origin', 'worker/f1-prova:worker/f1-prova'], env);
     assert.match(await git(['-C', clone, 'ls-remote', 'origin', 'worker/f1-prova'], env), /refs\/heads\/worker\/f1-prova/);
 
     // Con un token diverso il server dice di no, e git non ripiega sulle credenziali del proxy.

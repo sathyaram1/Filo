@@ -111,7 +111,7 @@ export function pianoGitServer({ azione, cartella, ramo, root, clonato = false }
     clone: ['fetch', 'origin'],
     'ls-remote': ['ls-remote', 'origin', r || 'HEAD'],
     fetch: ['fetch', 'origin', ...(r ? [r] : [])],
-    push: ['push', 'origin', r],
+    push: ['push', 'origin', `refs/heads/${r}:refs/heads/${r}`],
   };
   const nota = azione === 'clone' ? `il clone c'è già in ${dir}: lo aggiorno con fetch.` : '';
   return { argv: ['-C', dir, ...passi[azione]], dir, controllaOrigin: true, ...(nota ? { nota } : {}) };

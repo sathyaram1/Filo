@@ -481,7 +481,10 @@ vale per tutti i compiti di quel tipo.
   - ogni git che parla con GitHub passa da un comando fisso del canale
     (`routine-channel.mjs git-server`, #1233), che chiede il token al server e
     lo dà solo a quella chiamata: niente aiutante di credenziali, che il
-    controllo dei permessi della sessione cloud blocca;
+    controllo dei permessi della sessione cloud blocca. Da una sessione cloud
+    però il token non arriva a GitHub: il proxy della sessione mette al posto
+    dell'autorizzazione la credenziale sua (misurato su #1233; la strada la
+    sceglie l'owner);
   - il worker non se ne accorge;
   - alla chiusura del biglietto il server revoca il token in corso.
 
