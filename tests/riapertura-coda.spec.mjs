@@ -101,6 +101,8 @@ test('riapertura con 10 schede: prima quella in vista, poi le vicine due alla vo
     const lontana = schede.find((t) => t.url === srv.url(9));
     const host = new URL(srv.origin).host;
     await expect(shell.locator(`.tab[data-id="${lontana.id}"] .title`)).toHaveText(host);
+    // Non sta caricando: niente rotella, che farebbe sembrare di nuovo tutte le schede in caricamento insieme.
+    await expect(shell.locator(`.tab[data-id="${lontana.id}"] .spinner`)).toHaveCount(0);
     expect(srv.prima(9), 'la scheda più lontana non è ancora partita').toBeNull();
     mkdirSync(SHOTS, { recursive: true });
     await shell.screenshot({ path: join(SHOTS, 'riapertura-coda-in-attesa.png') });
