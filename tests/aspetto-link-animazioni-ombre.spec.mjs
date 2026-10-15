@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { menuAperto } from './helpers/barra.mjs';
+import { menuAperto, barraPage } from './helpers/barra.mjs';
 
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 
