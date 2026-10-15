@@ -183,6 +183,54 @@ test('la combinazione detta a parole: nomi italiani, e su Mac «Ctrl» con Alt �
   }
 });
 
+test('su Mac «Ctrl» senza Alt vale Cmd anche quando il tasto ha una A nel nome (verifica #842)', () => {
+  for (const [scritta, accel] of [['Ctrl+Shift+A', 'Ctrl+Shift+A'], ['Ctrl+Shift+Spazio', 'Ctrl+Shift+Spazio'],
+    ['Control+PagGiù', 'Ctrl+PagGiù'], ['Ctrl+Alt+A', 'Alt+A'], ['Ctrl+Pausa', 'Ctrl+Pausa']]) {
+    assert.deepEqual(T.scorciatoiaDaScritta(scritta, 'darwin'), { accel }, scritta);
+  }
+});
+
+test('i moduli dell\'Editor hanno gli stessi rifiuti delle quattro: AltGr e il microfono delle chat (verifica #842)', () => {
+  assert.equal(T.rifiutoScritta('Ctrl+Alt+E', 'win32').tipo, 'altgr');
+  assert.equal(T.rifiutoScritta('Ctrl+Alt+Shift+1', 'win32').tipo, 'altgr');
+  assert.equal(T.rifiutoScritta('Ctrl+Alt+E', 'linux'), null);
+  assert.equal(T.rifiutoScritta('Ctrl+Alt+Invio', 'win32'), null, 'AltGr scrive solo con un tasto che è un carattere');
+  for (const s of ['win32', 'linux', 'darwin']) {
+    const r = T.rifiutoScritta(s === 'darwin' ? 'Cmd+Shift+Spazio' : 'Ctrl+Shift+Spazio', s);
+    assert.equal(r && r.tipo, 'presa', s);
+    assert.match(r.cosa, /microfono/);
+  }
+  const editor = readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8');
+  assert.match(editor, /r\.tipo === 'altgr'/, 'l\'Editor spiega il rifiuto AltGr con le sue parole');
+});
+
+test('una combinazione di un modulo dell\'Editor, in qualunque documento, non va a una delle quattro (verifica #842)', () => {
+  const build = (v) => P.buildPreferencePartial('scorciatoia', v);
+  const collezione = (sc) => ({ files: [
+    { meta: { title: 'Lettera' }, modules: [{ type: 'bold', data: {} }] },
+    { meta: { title: 'Ricette' }, modules: [{ type: 'word-count', data: { shortcut: sc } }] },
+  ] });
+  try {
+    T.usaScorciatoieModuli(collezione('Ctrl+Shift+Y'));
+    const r = T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32');
+    assert.equal(r && r.tipo, 'presa');
+    assert.match(T.testoRifiutoFilo(r, 'win32'), /modulo dell'Editor nel documento «Ricette»/);
+    assert.match(build('Traduci: Ctrl+Shift+Y').rifiuto, /«Ricette»/);
+    // Il tasto di serie preso da un modulo: «tutte di serie» rimette le altre e dice perché quella resta.
+    conScelta({ 'translate-selection': 'Ctrl+Shift+Y' }, () => {
+      T.usaScorciatoieModuli(collezione('Alt+T'));
+      const tutte = build('tutte di serie');
+      assert.deepEqual(tutte.partial.scorciatoie, { 'explain-selection': '', 'save-for-later': '', 'open-help-sidebar': '' });
+      assert.match(tutte.label, /tranne «Traduci»: Alt\+T è già in uso/);
+      assert.match(build('Traduci: di serie').rifiuto, /«Ricette»/);
+    });
+    T.usaScorciatoieModuli(null);
+    assert.equal(T.rifiutoScorciatoiaFilo('translate-selection', 'Ctrl+Shift+Y', 'win32'), null, 'tolto il modulo, la combinazione si libera');
+  } finally {
+    T.usaScorciatoieModuli(null);
+  }
+});
+
 test('chiederlo a Filo cambia la scorciatoia con gli stessi controlli', () => {
   const build = (v) => P.buildPreferencePartial('scorciatoia', v);
   conScelta({}, () => {
