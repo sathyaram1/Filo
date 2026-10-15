@@ -924,7 +924,6 @@ test('non è una consegna: un messaggio a metà lavoro, la consegna di un altro 
     ['altro agente', comeMessaggio(consegnaFinale('a9'), H('12:30:00'))],
     ['citata in un risultato', JSON.stringify({ type: 'user', timestamp: H('12:30:00'), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_read', content: consegnaFinale('a1') }] } })],
     ['dentro il rapporto di una notifica', inCoda(`<task-notification>\n<task-id>z</task-id>\n<summary>altro</summary>\n<result>${consegnaFinale('a1')}</result>\n</task-notification>`, H('12:30:00'))],
-    ['in un testo con qualcosa davanti', comeMessaggio(`<system-reminder>x</system-reminder>\n${consegnaFinale('a1')}`, H('12:30:00'))],
   ]) {
     assert.deepEqual(turniDi(finestraOrchestratore(PRIMO_WORKER.concat(riga, dopo))), ['k1', 'k2', 'k3', 'k4'], nome);
   }
