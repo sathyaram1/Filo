@@ -49,7 +49,7 @@ porta solo l'ultima.
 ## Consegna
 
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--segnala <file.md>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--segnala <file.md> --livello <0-3> [--difficile]]
 ```
 
 Il lavoro torna in verifica sul commit nuovo. Infine rilascia il biglietto:
