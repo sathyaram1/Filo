@@ -3847,7 +3847,8 @@ function vediSchermoPerModello(action, res) {
   const finestre = (l) => E.imbusta({
     tipo: 'FINESTRE_APERTE',
     testo: (Array.isArray(l) ? l : []).map((v) => `- ${E.neutralizza(v && v.nome, { unaRiga: true })}`
-      + (v && v.filo ? ' (di Filo)' : (v && v.tipo === 'schermo' ? ' (schermo)' : ''))).join('\n') || '(nessuna)',
+      + (v && v.filo ? ' (di Filo)' : (v && v.tipo === 'schermo' ? ' (schermo)' : ''))
+      + (v && v.davanti ? ' (in primo piano subito dietro Filo: è «questa finestra» dell\'utente)' : '')).join('\n') || '(nessuna)',
     conIntestazione: true,
   });
   const nota = o.nota ? `\n${E.perCanaleSistema(o.nota)}` : '';
