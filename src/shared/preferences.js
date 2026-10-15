@@ -650,6 +650,31 @@
       },
     },
     {
+      scrive: ['aggiornamenti.canale'],
+      aiuto: '"veloce" | "stabile" (veloce: ogni versione nuova appena esce, più volte al giorno; stabile: una versione a settimana, il lunedì)',
+      keys: ['canale_aggiornamenti', 'canale aggiornamenti', 'canale degli aggiornamenti', 'canale di aggiornamento',
+        'canale', 'versione stabile', 'aggiornamenti stabili', 'aggiornamenti veloci', 'aggiornamenti settimanali'],
+      costo: 1,
+      risk: 'Sceglie quali versioni nuove di Filo arrivano. Sul canale veloce arrivano tutte, appena escono, comprese '
+        + 'le correzioni di sicurezza. Sul canale stabile arriva una versione a settimana, il lunedì, e le novità e le '
+        + 'correzioni uscite nel frattempo aspettano quella.',
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
+        const map = {
+          veloce: 'veloce', rapido: 'veloce', rapida: 'veloce', frequente: 'veloce', frequenti: 'veloce', subito: 'veloce',
+          'ogni versione': 'veloce', tutte: 'veloce', predefinito: 'veloce', 'di serie': 'veloce', beta: 'veloce',
+          stabile: 'stabile', stabili: 'stabile', settimanale: 'stabile', settimanali: 'stabile', lento: 'stabile',
+          lunedi: 'stabile', 'lunedì': 'stabile', 'una a settimana': 'stabile', 'una volta a settimana': 'stabile',
+        };
+        const canale = map[s] || map[s.replace(/^(il |canale )+/, '')] || null;
+        if (!canale) return null;
+        return {
+          partial: { aggiornamenti: { canale } },
+          label: `Canale degli aggiornamenti → ${canale === 'stabile' ? 'stabile, una versione a settimana' : 'veloce, ogni versione nuova'}`,
+        };
+      },
+    },
+    {
       scrive: ['terminal.shell'],
       aiuto: (ctx) => ctx.shellPref,
       keys: ['shell_terminale', 'shell terminale', 'shell'],
