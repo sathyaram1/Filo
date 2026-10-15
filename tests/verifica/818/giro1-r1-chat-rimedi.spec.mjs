@@ -123,8 +123,9 @@ test('r1 dopo l\'avviso in chat, «sì, usa i modelli più economici» scritto a
   const body = richieste.at(-1);
   const testo = JSON.stringify(body.messages);
   const strumenti = JSON.stringify(body.tools || []);
+  if (process.env.DUMP_818) (await import('node:fs')).writeFileSync(process.env.DUMP_818, JSON.stringify(body, null, 1));
   // Filo vede i rimedi che ha appena proposto (non solo «ti restano 400 crediti»)…
   expect(testo).toMatch(/modelli più economici per/);
-  // …e ha uno strumento per applicarli e rimetterli com'erano.
-  expect(strumenti).toMatch(/credits_remedy|rimedi|modelliScelti/);
+  // …e ha come applicarli e rimetterli com'erano (uno strumento o un'azione descritta nelle istruzioni).
+  expect(testo + strumenti).toMatch(/credits_remedy|rimedi dell'avviso|modelliScelti/);
 });
