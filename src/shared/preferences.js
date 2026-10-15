@@ -200,6 +200,55 @@
     return null;
   }
 
+  // Le scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto (#842), come le cambiano le Preferenze: lettura e
+  // controlli stanno in SN_TASTI. «Traduci: Ctrl+Maiusc+Y», «Aiuto: di serie», «tutte di serie».
+  const NOMI_AZIONE_FILO = {
+    'explain-selection': ['spiega', 'spiegazione', 'spiegare', 'approfondisci', 'approfondimento'],
+    'translate-selection': ['traduci', 'traduzione', 'tradurre'],
+    'save-for-later': ['salva per dopo', 'salvare per dopo', 'salva', 'aperti per dopo'],
+    'open-help-sidebar': ['aiuto', 'assistente laterale', 'barra dell aiuto'],
+  };
+  const DI_SERIE = /^(?:(?:tutte|tutti|le scorciatoie|scorciatoie)\s+)?(?:di serie|come di serie|predefinit[aeio]|default|originali?|standard|come prima|ripristina(?:te)?|azzera(?:te)?|reset)$/;
+  function azioneFiloDetta(testo) {
+    const t = pianoChiave(testo).replace(/[«»"']/g, ' ').replace(/\s+/g, ' ').trim();
+    const trovate = Object.keys(NOMI_AZIONE_FILO).filter((id) => NOMI_AZIONE_FILO[id].some((n) => (` ${t} `).includes(` ${n} `)));
+    return trovate.length === 1 ? trovate[0] : null;
+  }
+  function scorciatoiaFiloDetta(v) {
+    const T = global.SN_TASTI;
+    const testo = String(v == null ? '' : v).trim();
+    if (!T || !testo || testo.length > 200) return null;
+    const nomeDi = (id) => T.AZIONI_FILO.find((a) => a.id === id).nome;
+    if (DI_SERIE.test(pianoChiave(testo)) || VOCE_AUTOMATICA.test(pianoChiave(testo))) {
+      return {
+        partial: { scorciatoie: Object.fromEntries(T.AZIONI_FILO.map((a) => [a.id, ''])) },
+        label: 'Scorciatoie di Spiega, Traduci, Salva per dopo e Aiuto → di serie',
+      };
+    }
+    const sep = testo.search(/[:=→]/);
+    if (sep <= 0) return null;
+    const id = azioneFiloDetta(testo.slice(0, sep));
+    if (!id) {
+      return {
+        rifiuto: 'non capisco di quale azione cambiare la scorciatoia',
+        perModello: `Le azioni sono ${T.AZIONI_FILO.map((a) => `«${a.nome}»`).join(', ')}: scrivi "<azione>: <combinazione>".`,
+      };
+    }
+    const combo = testo.slice(sep + 1).replace(/^>/, '').trim();
+    if (DI_SERIE.test(pianoChiave(combo)) || VOCE_AUTOMATICA.test(pianoChiave(combo))) {
+      const serie = T.AZIONI_FILO.find((a) => a.id === id).serie;
+      return { partial: { scorciatoie: { [id]: '' } }, label: `Scorciatoia di «${nomeDi(id)}» → ${T.etichettaFilo(serie)}, quella di serie` };
+    }
+    const d = T.scorciatoiaDaScritta(combo);
+    if (!d) return null;
+    const no = d.rifiuto || T.rifiutoScorciatoiaFilo(id, d.accel);
+    if (no) return { rifiuto: T.testoRifiutoFilo(no) };
+    return {
+      partial: { scorciatoie: { [id]: T.valoreDaSalvare(id, d.accel) } },
+      label: `Scorciatoia di «${nomeDi(id)}» → ${T.etichettaFilo(d.accel)}`,
+    };
+  }
+
   // «predefinito», «di serie», «come prima»: torna al valore dei Modelli predefiniti.
   function predefinito(v) {
     if (v === null) return true;
