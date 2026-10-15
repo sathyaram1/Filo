@@ -430,9 +430,6 @@ async function main() {
   const statoRamo = idStato ? readBranchState(ROOT, idStato) : null;
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
-    // I comandi del rimedio con gli attrezzi del GIRO, non con quelli che il
-    // ramo si porta dietro: `scripts/…` qui dentro è la copia del ramo, che può
-    // essere vecchia di giorni e non fare quello che chi legge crede.
     console.error(testoEsitiDecaduti(decaduti, punta, source, idStato || ''));
     process.exit(1);
   }
