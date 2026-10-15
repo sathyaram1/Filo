@@ -411,7 +411,7 @@ module.exports = function register(on, ctx) {
       return '';
     };
     const target = keyOf(e);
-    if (target && target === await chiaveAppunti()) chiaveSospesa = target;
+    if (target) await Tolti().voceTolta(e);
     const next = arr.filter((x) => keyOf(x) !== target);
     if (next.length !== arr.length) {
       await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, next);
