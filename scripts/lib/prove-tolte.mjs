@@ -126,10 +126,10 @@ export function esitoProveTolte({
     'messi da parte in questo giro (lo dice il numero nel nome, o nel titolo del caso rosso). La pulizia le ha lasciate',
     'indietro: quei rilievi non si correggono qui.',
     [...daParte].map(([f, n]) => `  · ${f} (${[n.map((x) => `r${x}`).join(', '), usa(f)].filter(Boolean).join('; ')})`).join('\n'),
-    'Escono con la pulizia, che vale anche dopo le correzioni: un commit a parte, l\'ultimo, che toglie solo il caso del',
-    'rilievo messo da parte (o il file intero, se nel nome porta solo rilievi messi da parte). Rimetti com\'erano quelle che',
-    `hai tolto o cambiato (${rimetti}), \`git add -A && git commit\`, poi toglile così, \`git add -A && git commit\`, e`,
-    `registra la pulizia${comando ? `: ${comando}` : ''}. Poi consegna di nuovo.`,
+    `Escono con la pulizia, che si registra anche dopo le correzioni. Rimetti com'erano quelle che hai tolto o cambiato`,
+    `(${rimetti}) e \`git add -A && git commit\`; poi, in un commit a parte, togli solo il caso del rilievo`,
+    'messo da parte (il file intero, se nel nome porta solo rilievi messi da parte), `git add -A && git commit`, e registra',
+    `la pulizia subito, finché è l'ultimo commit${comando ? `: ${comando}` : ''}. Poi consegna di nuovo.`,
   ] : [];
   // Un file che copriva anche un rilievo messo da parte: la pulizia gli ha tolto un caso, e quello che resta è da correggere.
   const casiRestati = accorciate.length ? [
