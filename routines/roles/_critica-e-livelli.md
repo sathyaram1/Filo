@@ -151,8 +151,9 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   un giro passato che riporti di nuovo come rilievo la rinomini (`git mv`) col
   giro e il numero di adesso: il numero che porta è di una critica vecchia.
   Serve alla pulizia: quelle dei rilievi che la risposta del server mette da
-  parte le togli tu appena la leggi, in un commit che toglie solo quelle, e lo registri con `--record-pulizia` (la risposta ti dà il
-  comando e ripete il numero davanti a ogni rilievo). Esce solo una prova che nel
+  parte le togli tu appena la leggi, in un commit che toglie solo quelle, e lo
+  registri con `--record-pulizia` (la risposta ti dà il comando e ripete il
+  numero davanti a ogni rilievo). Esce solo una prova che nel
   nome porta soli numeri di rilievi messi da parte, scritta o rinominata in
   questa verifica; a una che copre anche un rilievo da correggere togli solo il
   caso dei messi da parte. Un file di supporto (un aiuto, una pagina) non è una
