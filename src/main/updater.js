@@ -315,9 +315,11 @@ function quandoScaricato(info) {
     stato.annuncia();
     return;
   }
+  const eraFuori = stato.scaricataFuori != null;
   stato.scaricataFuori = null;
-  regola();
   stato.pronta = versione;
+  // Con quella di prima fuori canale l'installazione alla chiusura era spenta: si riaccende e si riaggancia.
+  if (eraFuori) regola();
   let meta = null;
   try { meta = JSON.parse(fs.readFileSync(path.join(path.dirname(file), 'update-info.json'), 'utf8')); } catch (_) {}
   const r = R.ricordaScaricato(leggiRicordo(), {
