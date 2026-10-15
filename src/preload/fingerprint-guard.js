@@ -91,7 +91,7 @@ function parteFingerprint(seed) {
     try { img = R(F.get, ctx, [0, 0, W, H]); cs = img.colorSpace; }
     catch (e) { img = null; try { cs = ctx.drawingBufferColorSpace; } catch (e2) {} }
     var tmp = F.make(W, H);
-    var t = R(F.getCtx, tmp, ['2d', { colorSpace: cs || 'srgb', willReadFrequently: true }]);
+    var t = R(F.getCtx, tmp, ['2d', { __proto__: null, colorSpace: cs || 'srgb', willReadFrequently: true }]);
     if (!img) { R(F.draw, t, [src, 0, 0]); img = R(F.get, t, [0, 0, W, H]); }
     perturb(img.data, W, H, 0, 0);
     R(F.put, t, [img, 0, 0]);
@@ -201,27 +201,34 @@ function parteFingerprint(seed) {
 
 // Ogni finestra ha le sue copie native: una pagina che crea un riquadro vuoto (o della sua origine) e ne usa le
 // funzioni le troverebbe intatte. Il preambolo va in ogni finestra della stessa origine prima che la pagina la tocchi:
-// dall'elemento (contentWindow, contentDocument) sempre; per indice o per nome solo da un riquadro vuoto, che il
-// documento segna appena entra. Un riquadro con un indirizzo non si tocca in anticipo: il suo documento erediterebbe
-// la finestra senza il preload; ci pensa il preload, che lo unisce alla finestra che lo contiene.
+// dall'elemento (contentWindow, contentDocument) sempre; per indice o per nome solo un riquadro vuoto, che il documento
+// segna appena entra. Uno con un indirizzo non si tocca in anticipo: il suo documento erediterebbe la finestra senza
+// il preload. Ci pensa il preload, e il preambolo che inietta si unisce a quello delle finestre della stessa origine.
 const PROPAGAZIONE = `
   var CORNICI = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'];
   var EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute, qsa = EP.querySelectorAll;
   var tagName = gOPD(EP, 'tagName').get, nodeType = gOPD(Node.prototype, 'nodeType').get;
   var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, taglia = SP.slice;
-  var MO = MutationObserver, moObserve = MO.prototype.observe;
-  var finestraDi = {};
+  var MO = MutationObserver, moObserve = MO.prototype.observe, lunghezza = gOPD(window, 'length').get;
+  var GETTER = {};
   for (var k = 0; k < CORNICI.length; k++) {
     var CC = window[CORNICI[k]], dcw = CC && gOPD(CC.prototype, 'contentWindow');
-    if (dcw && dcw.get) finestraDi[CORNICI[k]] = dcw.get;
+    if (dcw && dcw.get) GETTER[k === 0 ? 'IFRAME' : k === 1 ? 'FRAME' : 'OBJECT'] = dcw.get;
   }
-  var GETTER = { IFRAME: finestraDi.HTMLIFrameElement, FRAME: finestraDi.HTMLFrameElement, OBJECT: finestraDi.HTMLObjectElement };
 
-  // Il segno non si toglie: due preamboli sulla stessa finestra annullerebbero il rumore.
+  // Il segno non si toglie (due preamboli sulla stessa finestra annullerebbero il rumore). Letto da un'altra
+  // finestra, il suo getter le dà questo preambolo: è così che un riquadro appena nato si unisce.
+  function segna(w) {
+    var g = mask(function () {
+      if (this !== w) { try { prepara(this); } catch (e) {} }
+      return true;
+    }, w.Function.prototype.toString, 'get __filoFpGuard');
+    defP(w, '__filoFpGuard', { __proto__: null, get: g, enumerable: false, configurable: false });
+  }
   function prepara(w) {
     try {
       if (gOPD(w, '__filoFpGuard')) return;
-      defP(w, '__filoFpGuard', { value: true });
+      segna(w);
     } catch (e) { return; }
     try { mascheraToString(w); } catch (e) {}
     for (var i = 0; i < parti.length; i++) { try { parti[i](w); } catch (e) {} }
@@ -233,6 +240,7 @@ const PROPAGAZIONE = `
     if (!d || !d.get || !d.configurable) return;
     var orig = d.get;
     defP(CP, prop, {
+      __proto__: null,
       get: mask(function () {
         var r = R(orig, this, arguments);
         if (r) { try { prepara(R(cw, this, [])); } catch (e) {} }
@@ -270,22 +278,38 @@ const PROPAGAZIONE = `
         }
       }
     });
-    R(moObserve, mo, [w.document, { childList: true, subtree: true }]);
+    R(moObserve, mo, [w.document, { __proto__: null, childList: true, subtree: true }]);
   }
 
   function riquadri(w) {
     for (var i = 0; i < CORNICI.length; i++) {
-      var C = w[CORNICI[i]], CP = C && C.prototype, dcw = CP && gOPD(CP, 'contentWindow');
-      if (!dcw || !dcw.get) continue;
-      avvolgi(CP, 'contentDocument', dcw.get);
-      avvolgi(CP, 'contentWindow', dcw.get);
+      var C = w[CORNICI[i]], CP = C && C.prototype, d = CP && gOPD(CP, 'contentWindow');
+      if (!d || !d.get) continue;
+      avvolgi(CP, 'contentDocument', d.get);
+      avvolgi(CP, 'contentWindow', d.get);
     }
     try { osserva(w); } catch (e) {}
   }
 
-  // Un riquadro della stessa origine si unisce al preambolo della finestra che lo contiene: stesse annotazioni,
-  // stesse funzioni mascherate, così una lettura a cavallo fra le due finestre resta col rumore e senza tracce.
-  try { var fe = window.frameElement; if (fe) fe.contentWindow; } catch (e) {}
+  // Il primo preambolo della stessa origine nella scheda, cercato dalla cima: un canvas annotato da uno si legge con
+  // le funzioni dell'altro, e ognuno riconosce come native le funzioni dell'altro. Si legge solo il segno, che la
+  // pagina non può aver messo prima del preambolo della sua finestra.
+  function unisci() {
+    var coda = [window.top], visti = 0;
+    while (coda.length && visti++ < 500) {
+      var w = coda.shift();
+      if (w !== window) {
+        try {
+          var d = gOPD(w, '__filoFpGuard');
+          if (d && !d.configurable && typeof d.get === 'function') { R(d.get, window, []); return; }
+        } catch (e) {}
+      }
+      var n = 0;
+      try { n = R(lunghezza, w, []) | 0; } catch (e) {}
+      for (var i = 0; i < n; i++) { try { coda.push(w[i]); } catch (e) {} }
+    }
+  }
+  if (window.top !== window) { try { unisci(); } catch (e) {} }
   prepara(window);`;
 
 function buildPreamboloSource({ fp } = {}) {
@@ -295,7 +319,8 @@ function buildPreamboloSource({ fp } = {}) {
   return `(function(){
   'use strict';
   // Presi prima degli script della pagina: un riquadro si prepara quando la pagina ha già riscritto ciò che voleva,
-  // e da un call o un apply riscritti uscirebbero le copie native.
+  // e da un call o un apply riscritti uscirebbero le copie native. I descrittori senza prototipo non leggono
+  // proprietà messe dalla pagina su Object.prototype.
   var R = Reflect.apply, defP = Object.defineProperty, gOPD = Object.getOwnPropertyDescriptor;
   var getProto = Object.getPrototypeOf, setProto = Object.setPrototypeOf, imul = Math.imul, ceil = Math.ceil;
   var WMP = WeakMap.prototype, wmGet = WMP.get, wmSet = WMP.set, wmHas = WMP.has;
@@ -309,7 +334,7 @@ function buildPreamboloSource({ fp } = {}) {
     var m = fn;
     try {
       m = ({ [name]() { return R(fn, this, arguments); } })[name];
-      defP(m, 'length', { value: orig.length, configurable: true });
+      defP(m, 'length', { __proto__: null, value: orig.length, configurable: true });
       setProto(m, getProto(orig));
       R(wmSet, masked, [m, 'function ' + name + '() { [native code] }']);
     } catch (e) {}
