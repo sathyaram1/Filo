@@ -96,7 +96,11 @@ const JS = {
 };
 test('sentinella: ogni canale che una pagina delle impostazioni usa ha la sua strada dalla chat (o dice perché non serve)', () => {
   for (const [pagina, file] of Object.entries(JS)) {
-    const src = fs.readFileSync(path.join(radice, file), 'utf8');
+    // Le parti della pagina (`<pagina>-<parte>.js` accanto a lei) usano gli stessi canali: si leggono insieme.
+    const dir = path.dirname(file);
+    const nome = path.basename(file, '.js');
+    const parti = fs.readdirSync(path.join(radice, dir)).filter((f) => f.startsWith(`${nome}-`) && f.endsWith('.js'));
+    const src = [file, ...parti.map((f) => path.join(dir, f))].map((f) => fs.readFileSync(path.join(radice, f), 'utf8')).join('\n');
     const usati = new Set([...src.matchAll(/type:\s*MSG\.([A-Z_]+)/g)].map((m) => m[1]));
     usati.delete('UPDATE_SETTINGS');
     const def = V.PAGINE[pagina].messaggi || {};

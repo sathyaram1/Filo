@@ -40,10 +40,12 @@ let voluto = null;
 let coda = Promise.resolve();
 const ascoltatori = new Set();
 
+// Su Mac il driver si presenta coi permessi di Filo: l'identità è quella con cui Filo è costruito.
+const pkg = (() => { try { return require('../../../../package.json'); } catch (_) { return {}; } })();
 const motore = creaMotoreCua({
   eseguibile: () => eseguibileInstallato,
-  idApp: 'ai.filo.desktop',
-  versioneFilo: (() => { try { return require('../../../../package.json').version; } catch (_) { return '0'; } })(),
+  idApp: (pkg.build && pkg.build.appId) || '',
+  versioneFilo: pkg.version || '0',
   log,
 });
 

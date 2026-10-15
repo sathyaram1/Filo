@@ -25,10 +25,10 @@ const AMBIENTE_FILO = {
 // Le chiavi e i segreti dell'ambiente di Filo non servono a un programma di terzi.
 const VARIABILI_TOLTE = /(API_?KEY|TOKEN|SECRET|PASSW|CREDENTIAL|PRIVKEY|^FILO_|^ELECTRON_|^NODE_OPTIONS$|^OPENROUTER|^ANTHROPIC|^OPENAI|^GH_|^GITHUB_|^NPM_)/i;
 
-function ambiente(base = process.env, idApp = 'ai.filo.desktop') {
+function ambiente(base = process.env, idApp = '') {
   const out = {};
   for (const [k, v] of Object.entries(base || {})) if (!VARIABILI_TOLTE.test(k)) out[k] = v;
-  return { ...out, ...AMBIENTE_FILO, CUA_DRIVER_HOST_BUNDLE_ID: idApp };
+  return { ...out, ...AMBIENTE_FILO, ...(idApp ? { CUA_DRIVER_HOST_BUNDLE_ID: idApp } : {}) };
 }
 
 const INATTIVO_MS = 2 * 60 * 1000;
