@@ -146,6 +146,8 @@
     // Alla navigazione verso il dominio la tab nasce già instradata da quel
     // paese (born proxied), e la regola sopravvive al riavvio dell'app.
     FILO_PROXY_RULES: 'filo_proxy_rules',
+    // Siti che l'utente vuole sempre aperti (#823): { <host>: { ts } }. La pulizia delle schede non li archivia.
+    FILO_KEEP_OPEN: 'filo_keep_open',
     // I cambi di stato come eventi del filo, in ordine, senza tetto (#867): src/main/services/registroCambi.js.
     FILO_CAMBI: 'filo_cambi',
     // Modalità automatica (dashboard Gestione → tab Automazioni): switch owner-only
