@@ -46,6 +46,13 @@ la cartella.
   (`giro<k>-r<n>-<cosa>.spec.mjs`, il posto del rilievo nella critica): contare quante ne
   escono non bastava, perché un rilievo messo da parte senza prova sua lasciava uscire la
   prova rossa di uno da correggere.
+- **Una prova che la pulizia ha dimenticato** (#747) e chi corregge toglie ancora rossa ferma
+  la consegna lo stesso, ma il rifiuto la riconosce dallo stesso numero (nel nome, o nel titolo
+  del caso rosso) e manda a pulirla, non a correggere un rilievo che sta in un feedback suo. La
+  pulizia si registra anche dopo le correzioni: è l'ultimo commit da solo, toglie solo prove o
+  loro casi di rilievi messi da parte (niente righe di supporto), com'erano alla base, e un caso
+  di un rilievo da correggere non esce nemmeno verde. Non sposta la base: la consegna non rilancia
+  le prove che ha tolto per intero, e quelle a cui ha tolto un caso le rilancia com'erano dopo di lei.
 - **Un file di supporto della cartella** (un aiuto, una pagina, dei dati) non è una prova, ma
   le prove ne dipendono (#746): quale file carica una prova lo decide Playwright (un import
   senza estensione, una cartella col suo indice, un file nuovo che fa ombra), non il nome
