@@ -97,7 +97,7 @@
   // codice nuovo dimenticato qui diventa «qualcosa è andato storto» (#663).
   const CODICI_GIA_SCRITTI = [
     'NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
-    'FEEDBACK_READ_DENIED',
+    'NO_ALLOWED_HOST', 'FEEDBACK_READ_DENIED',
   ];
 
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
