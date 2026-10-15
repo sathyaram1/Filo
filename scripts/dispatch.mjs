@@ -2157,7 +2157,11 @@ if (isMainModule) {
       // biglietto: il resto è la critica, un testo solo.
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
       if (seg.error) { console.error(seg.error); process.exit(1); }
-      const [, id, ...rest] = seg.args;
+      const liv = stripLivelloArgs(seg.args);
+      if (liv.error) { console.error(liv.error); process.exit(1); }
+      const livSeg = livelloSegnalazione({ livello: liv.livello, difficile: liv.difficile, conSegnalazione: !!seg.file });
+      if (!livSeg.ok) { console.error(livSeg.message); process.exit(1); }
+      const [, id, ...rest] = liv.args;
       if (!id) { console.error('Uso: --record-verifier <id> "<critica: una riga per rilievo, con livello e sede davanti: [2i] …>"'); process.exit(1); }
       // La parola del vecchio verdetto (pass|migliorabile|fail) NON si tollera
       // più: veniva buttata via in silenzio, e senza rilievi la verifica
