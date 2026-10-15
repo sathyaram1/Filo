@@ -83,7 +83,9 @@
 //         mandato il feedback, che la vede nella sua bacheca. `--segnala
 //         <file.md>` (su status, fixed e verdict) è la segnalazione per
 //         l'owner — un trade-off vero, che decide lui — letta intera dal file
-//         e scritta dal server nel livello L3 del feedback.
+//         e scritta dal server nel livello L3 del feedback; vuole accanto
+//         `--livello <0-3>` e, per una scelta difficile da disfare,
+//         `--difficile`: fermano il lavoro solo un 3 o `--difficile`.
 //
 //   node scripts/routine-channel.mjs sporca "<motivo>" [--ticket <biglietto>]
 //       → ti dichiari sporco (#1148): hai letto qualcosa che il server non vede (una pagina web, un file fuori dal
