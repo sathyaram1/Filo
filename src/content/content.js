@@ -1835,7 +1835,8 @@
     // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
     // con un evento, la risposta arriva nel dataset nello stesso dispatch.
     const zoomItem = buildZoomItem();
-    if (zoomItem) items.push(zoomItem);
+    if (zoomItem) sezioneAiuto.push(zoomItem);
+    if (sezioneAiuto.length) items.push({ type: 'separator' }, ...sezioneAiuto);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
     // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
