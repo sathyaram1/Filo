@@ -269,7 +269,6 @@ function crea({ sistema = null } = {}) {
       };
     }
     if (scelta.nessuna) {
-      if (permesso) return { esito: await esitoPermessoMac(chiave, permesso, voci) };
       return { esito: { executed: false, kept: false, output: { richiesta, nessuna: true, elenco: perElenco(voci), ...(nota ? { nota } : {}) } } };
     }
     const v = scelta.voce;
