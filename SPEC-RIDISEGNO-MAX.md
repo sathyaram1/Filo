@@ -152,6 +152,8 @@ composto (dispatch inlina). MAI duplicare a mano un blocco in due posti.
 - Le CICATRICI degli incidenti (chiave ri-prefissata nelle shell nuove,
   rifiuto≠guasto, mai rilanciare dopo un taglio, riga finale = dato) si
   conservano nel file-ruolo a cui insegnano qualcosa. Non si cancellano.
+  - **Superato** (la cicatrice della chiave): vedi `routines/roles/orchestrator.md`,
+    «Regole dure».
 - La scorciatoia che salta la verifica in `npm run finish`: eliminata da
   documenti E script.
 - Mai lavorare direttamente su main: una riga di divieto; la protezione sta
