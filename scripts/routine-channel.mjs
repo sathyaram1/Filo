@@ -118,7 +118,7 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot, absolutizeOutput } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT } from './lib/branch-integrity.mjs';
@@ -128,6 +128,7 @@ import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticke
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
+import { URL_SERVER, ambienteGitServer, originDelServer, pianoGitServer, urlSenzaSegreti } from './lib/git-server.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 
@@ -868,7 +869,7 @@ export async function eseguiGitServer({
   }
   const { env: figlio, tolte } = ambienteGitServer(env, t.token);
   const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
-  scrivi(`git-server: token del biglietto ottenuto${scade}, git ${piano.argv.includes('clone') ? 'clone' : piano.argv[2]} su filo-security.`);
+  scrivi(`git-server: token del biglietto ottenuto${scade}, git ${piano.argv[0] === 'clone' ? 'clone' : piano.argv[2]} su filo-security.`);
   if (tolte.length) scrivi(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
   const r = lancia(piano.argv, { env: figlio, stdio: 'inherit' });
   if (r && r.error) { scrivi(`git-server: git non parte (${r.error.code || r.error.message}).`); return 1; }
@@ -1672,22 +1673,11 @@ if (isMain) {
     if (r.outcome === 'ok') { console.log('Biglietto sporcato: da qui ciò che scrivi nasce non fidato.'); process.exit(0); }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
-  } else if (cmd === 'git-credenziali') {
-    // Lo chiama git, mai una persona: stdout porta solo le credenziali, e un no è uno stdout vuoto (git non si autentica).
-    const azione = args[0];
-    const richiesta = await leggiStdin();
-    if (azione !== 'get') process.exit(0);
-    if (!richiestaPerServer(leggiRichiestaGit(richiesta))) process.exit(0);
+  } else if (cmd === 'git-server') {
     const { readTicket } = await import('./lib/routine-ticket.mjs');
-    const biglietto = mano.ticket || readTicket(ROOT);
-    if (!biglietto) { console.error('git-credenziali: nessun biglietto del giro, niente token per filo-security.'); process.exit(0); }
-    const r = await gitToken(biglietto);
-    if (r.outcome !== 'ok') {
-      console.error(`git-credenziali: niente token per filo-security (${r.reason}${r.detail ? `: ${r.detail}` : ''}).`);
-      process.exit(0);
-    }
-    process.stdout.write(rigaCredenziali(r.token, r.scadeIl));
-    process.exit(0);
+    const [azione, cartella, ramo, ...troppi] = args;
+    if (troppi.length) { console.error(`git-server prende azione, cartella e al più un ramo: «${troppi.join(' ')}» è di troppo. Il server non è stato chiamato.`); process.exit(1); }
+    process.exit(await eseguiGitServer({ azione, cartella, ramo, biglietto: mano.ticket || readTicket(ROOT) }));
   } else if (cmd === 'ramo-server') {
     const ramo = String(args[0] || '').trim();
     const sha = String(args[1] || data.sha || '').trim();
