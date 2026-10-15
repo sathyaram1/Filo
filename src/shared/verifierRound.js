@@ -661,20 +661,23 @@
    * (decisione dell'owner del 2026-09-27). PURA. Tre tipi di gruppo:
    *   - `esterno`: un rilievo con sede `e`, da solo (anche col `?`: la domanda
    *     viaggia nel suo feedback), così un esterno di livello 3 nasce subito;
-   *   - `decisione`: un interno o vicino col `?`, da solo;
+   *   - `decisione`: un interno o vicino col `?`, da solo; con `inCorrezione`
+   *     se il giro lo corregge già con l'opzione consigliata (un `[2i?]`):
+   *     la domanda resta all'owner, e la sua risposta cambia il codice fuso;
    *   - `rimasti`: TUTTI gli altri (interni messi da parte dal bilancio, vicini
    *     non corretti) in un feedback solo, a priorità = il livello scritto più alto.
    * Accetta un elenco di rilievi o una decisione di decideRound (`external` +
-   * `derived`). I rilievi escono con i campi che avevano (anche `num`, `id`),
-   * più `sede`, `level`, `priority` e `decision` canonici. Ordine: i gruppi da
-   * soli come arrivano, `rimasti` in fondo.
-   * @returns {Array<{ tipo: 'esterno'|'decisione'|'rimasti', priority: number, decision: boolean, findings: object[] }>}
+   * `domande` + `derived`). I rilievi escono con i campi che avevano (anche
+   * `num`, `id`), più `sede`, `level`, `priority` e `decision` canonici.
+   * Ordine: i gruppi da soli come arrivano, `rimasti` in fondo.
+   * @returns {Array<{ tipo: 'esterno'|'decisione'|'rimasti', priority: number, decision: boolean, inCorrezione?: true, findings: object[] }>}
    */
   function derivedGroups(input) {
     let list = input;
     if (!Array.isArray(list)) {
       const d = list && typeof list === 'object' ? list : {};
-      list = [].concat(Array.isArray(d.external) ? d.external : [], Array.isArray(d.derived) ? d.derived : []);
+      const di = (k) => (Array.isArray(d[k]) ? d[k] : []);
+      list = [].concat(di('external'), di('domande'), di('derived'));
     }
     const groups = [];
     let rimasti = null;
