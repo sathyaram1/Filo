@@ -425,10 +425,10 @@
   // Cache "il comando shell esiste?" (shell + token → bool), per non rifare lo
   // spawn di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
   // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
-  // Tiene solo risposte certe: un controllo scaduto (macchina carica) va in
-  // `shellCmdIncerti` e si ritenta dopo RIPROVA_INCERTO_MS, alla prossima occasione (#1176).
+  // Tiene solo risposte certe: un controllo scaduto (macchina carica) resta senza
+  // colore e si ritenta passati RIPROVA_INCERTO_MS, alla prossima battitura (#1176).
   const shellCmdCache = new Map();
-  const shellCmdIncerti = new Map(); // chiave → quando è scaduto
+  const shellCmdIncerti = new Map(); // chiave → quando non ha saputo rispondere
   const shellCmdInVolo = new Set();
   const RIPROVA_INCERTO_MS = 20000;
   let whichTimer = null;
