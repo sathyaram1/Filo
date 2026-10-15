@@ -554,7 +554,7 @@ test('una rilettura della vista lascia aperti il menu e la scheda di una persona
   // Entra una persona nuova, in cima: la riga col fuoco non si sposta e non lo perde.
   persone.unshift({
     pseudonym: 'f00dfeed00000001', balance: { credits: 5000, creditsGranted: 5000, usageUsd: 0, limitUsd: 3.5 },
-    invitedBy: PSEUDONIMO, createdAt: '2026-10-01T08:00:00.000Z', reconcile: null, usage: { rows: 0, byAction: {}, byDay: {} },
+    invitedBy: 'owner', createdAt: '2026-10-01T08:00:00.000Z', reconcile: null, usage: { rows: 0, byAction: {}, byDay: {} },
   });
   await rileggi();
   await expect(righe).toHaveCount(2, { timeout: 15_000 });
