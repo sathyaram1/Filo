@@ -532,10 +532,10 @@ export async function riapriPerIlServer({ id, ramo, pendingParts = [] }, { of, o
   const letta = await of.partiDellaPratica(id).catch((e) => ({ ok: false, motivo: String((e && e.message) || e).slice(0, 200) }));
   if (!letta.ok) return `  ! la pratica non si legge (${letta.motivo}): se è chiusa, il ramo del server la troverà chiusa`;
   if (letta.status !== 'done') return '';
-  const t = parteTardiva({ status: letta.status, parti: letta.parti, parte: 'app', ramo, locale: letta.locale, ora });
+  const t = riaperturaConAltraInArrivo({ status: letta.status, parti: letta.parti, parte: 'app', ramo, locale: letta.locale, ora });
   if (!t.ok) return '';
   const rami = pendingParts.map((p) => p.branch).join(', ');
-  const perche = `l'aveva chiusa la fusione della parte del server (${new Date(t.at).toISOString()}), ma ${rami} del server non è su main. Le parti già su main ripartono da zero.`;
+  const perche = `l'aveva chiusa la fusione della parte ${NOME_PARTE[t.chiusaDa]} (${new Date(t.at).toISOString()}), ma ${rami} del server non è su main. Le parti già su main ripartono da zero.`;
   const riaperta = await of.scrivi(id, 'todo', `Riaperta da finish su ${ramo}: ${perche}`);
   if (!riaperta.ok) return `  ! la pratica non si è riaperta (${riaperta.motivo}): ${rami} la troverà chiusa`;
   const presa = await of.annotaPratica(id, '');
