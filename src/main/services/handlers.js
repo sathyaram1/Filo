@@ -5300,6 +5300,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const res = await executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta });
     if (res && res.kept && res.executed && !res.needsConfirm) renderedActions.push({ ...a, _executed: true, ...(res.output ? { _output: res.output } : {}) });
   }
+  segnaSalvateNominate(textReply, renderedActions);
   // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
   let lettiRisposta = [];
   try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
