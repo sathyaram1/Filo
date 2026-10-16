@@ -2566,7 +2566,7 @@ async function eseguiAzioneFilo(action, {
         // questo punto la conferma è già passata (il gate sopra ha lasciato
         // procedere solo con confirmed:true). Il feedback parte come quelli
         // inviati dal box: stesso schema, ma clientId 'filo:chat' così in
-        // dashboard si vede che l'ha mandato Filo.
+        // dashboard si vede che l'ha mandato Filo. L'owner lo firma come dal riquadro (#953).
         const testo = String(action.testo ?? action.text ?? action.messaggio ?? '').trim();
         if (!testo) return { executed: false, kept: false };
         const FB = globalThis.SN_FEEDBACK;
@@ -2576,7 +2576,15 @@ async function eseguiAzioneFilo(action, {
         let userAgent = 'Filo desktop';
         try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
         try {
-          const r = await FB.submit({ text: testo, name: titolo, clientId: 'filo:chat', userAgent });
+          const Mittente = require('./feedbackMittente');
+          const firmato = Mittente.firma('filo:chat');
+          const payload = { text: testo, name: titolo, clientId: firmato.clientId, userAgent };
+          const r = firmato.dallOwner ? await Mittente.spedisciDallOwner(payload) : await FB.submit(payload);
+          // In coda ad aspettare l'accesso dell'owner: nella sua lista è «in partenza», e la coda la aggiorna.
+          if (r && r.queued) {
+            try { await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({ id: r.id, testo, titolo }); } catch (_) {}
+            return { executed: true, kept: false };
+          }
           // #986 — scritta da Filo ma confermata dall'utente: è sua, e la ritrova con le altre.
           if (r && r.id) {
             try {
