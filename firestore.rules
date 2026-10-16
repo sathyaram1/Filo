@@ -866,6 +866,51 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── I contatori giornalieri (#969) ───────────────────────────────────────
+    //
+    // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), quante
+    // chiamate sono fallite e di che tipo, la versione dell'app e la famiglia di sistema. Un documento per copia di
+    // Filo e per giorno: l'id è pseudonimo più giorno, e si scrive una volta sola (create, mai update). Lo pseudonimo è
+    // casuale, cambia ogni mese, e non è il codice dei feedback né lo pseudonimo dei crediti.
+    //
+    // SOLA CREAZIONE E SENZA LOGIN, come i feedback: chi ha la chiave web può scrivere numeri falsi, e i contatori
+    // servono a leggere tendenze, non a dare niente a nessuno. Qui si tiene la forma: i campi, i tipi, le chiavi delle
+    // mappe dall'elenco chiuso delle funzioni (che ne fa anche il tetto). I valori annidati (fasce, errori) le regole
+    // non li sanno passare in rassegna: li ricostruisce dagli elenchi chiusi l'app (src/shared/contatoriGiornalieri.js).
+    // L'elenco qui sotto è la copia di quello dell'app: tests/unit/firestoreRulesContatori.test.mjs li confronta, e una
+    // funzione nuova va aggiunta qui e ripubblicata, o i giorni che la portano vengono rifiutati e restano in attesa.
+    // Legge solo l'admin.
+    match /contatori-giornalieri/{docId} {
+      function funzioniContate() {
+        return [
+          'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
+          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic',
+          'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
+          'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
+          'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
+          'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
+          'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
+        ];
+      }
+      function contatoriValidi(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && docId == d.pseudonimo + '_' + d.giorno
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && d.uso is map && d.uso.keys().hasOnly(funzioniContate())
+          && d.errori is map && d.errori.keys().hasOnly(funzioniContate());
+      }
+      allow get, list: if isAdmin();
+      allow create: if contatoriValidi(request.resource.data);
+      allow update, delete: if false;
+    }
+
     // Le manopole dei crediti (euro per credito, ingresso, quota, inviti
     // rimasti, tetto globale) più cambio e somma dei tetti scritti dal server.
     // Campi non enumerati, come gli altri config/*: aggiungerne uno non
