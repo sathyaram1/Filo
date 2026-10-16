@@ -8401,6 +8401,11 @@ async function wireSafebrowse(settingsArg) {
   }
   settings = settings || {};
   const sb = (settings.security && settings.security.safeBrowse) || {};
+  // I siti fidati valgono anche col rilevatore spento: l'analisi locale resta, e l'elenco è dell'utente (#967).
+  const fidati = SB.impostaFidati ? SB.impostaFidati(sb.trustedSites) : { aggiunti: [], tolti: [] };
+  if (fidati.aggiunti.length || fidati.tolti.length) {
+    for (const w of BrowserWindow.getAllWindows()) { try { w._filoTabs?._sbFidatiCambiati?.(fidati); } catch (_) {} }
+  }
   if (sb.enabled === false) {
     SB.configure({ gsbKey: '', runLlm: null, enableSandbox: false, enableNetwork: false });
     return;
