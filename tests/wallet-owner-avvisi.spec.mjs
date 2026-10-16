@@ -180,7 +180,17 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
 
       // Alzato il tetto, la pagina dell'owner rilegge la vista: l'avviso non è più vero e se ne va.
       stato.dati = 30000;
+      const adm = () => app.evaluate(() => {
+        const Module = process.getBuiltinModule('module');
+        const path = process.getBuiltinModule('path');
+        const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+        const ga = req('./auth/google-auth');
+        return [ga.isAdmin(), ga.isSignedIn(), JSON.stringify(ga.getProfile()), process.uptime()];
+      });
+      console.log('DEBUG1', JSON.stringify(await adm()));
       await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.OPEN_URL, url: 'filo://credits/owner.html' }));
+      await home.waitForTimeout(3000);
+      console.log('DEBUG2', JSON.stringify(await adm()), stato.letture);
       await expect.poll(() => avvisiOwner(app), { timeout: 15_000 }).toEqual([]);
       await expect(carte(home)).toHaveCount(0, { timeout: 15_000 });
     } finally { await chiudiApp(app); }
