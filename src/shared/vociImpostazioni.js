@@ -123,6 +123,8 @@
         'sec-clip-search': 'cerca fra le voci della cronologia appunti mostrate nella pagina: non è un valore da salvare',
         'sec-wipe-identity': 'sceglie se «Cancella tutti i dati di Filo» porta via anche l’identità dei crediti: vale per quella conferma, non è un valore da salvare',
         'sec-wipe-word': 'la parola «conferma» che sblocca «Cancella tutti i dati di Filo»: la scrive l’utente, non è un valore da salvare',
+        'sec-export-keys': 'sceglie se l’archivio esportato porta anche le chiavi API: vale per quell’esportazione, non è un valore da salvare',
+        'sec-wipe-export-keys': 'la stessa scelta di «Includi le chiavi» dentro la conferma di «Cancella tutti i dati di Filo»: vale per quell’esportazione, non è un valore da salvare',
       },
       messaggi: {
         PERMESSI_SITI_GET: 'LEGGI_IMPOSTAZIONI',
