@@ -183,8 +183,7 @@ function togliSegreti(dati, filo) {
     const m = isPlainObject(s) && o === s.proxy ? CREDENZIALI_PROXY.exec(v) : null;
     if (!m) { delete o[k]; continue; }
     segreti.add(m[2]);
-    const password = m[2].slice(m[2].indexOf(':') + 1);
-    if (m[2].includes(':')) segreti.add(password);
+    if (m[2].includes(':')) segreti.add(m[2].slice(m[2].indexOf(':') + 1));
     o[k] = proxySenzaCredenziali(v);
     proxy.push(k);
   }
@@ -385,6 +384,7 @@ function readExportZip(zipBuffer) {
   let dichiarate = 0;
   let filoDichiarato = null;
   let contoNoto = false;
+  let proxyTolti = [];
   const manifest = files.get(prefix + 'manifest.json');
   if (manifest) {
     try {
@@ -393,6 +393,7 @@ function readExportZip(zipBuffer) {
       dichiarate = Number.isInteger(m.imageCount) && m.imageCount > 0 ? m.imageCount : 0;
       if (typeof m.filo === 'boolean') filoDichiarato = m.filo;
       contoNoto = Number.isInteger(m.imageCount);
+      if (Array.isArray(m.proxySenzaCredenziali)) proxyTolti = CAMPI_PROXY.filter((k) => m.proxySenzaCredenziali.includes(k));
     } catch (_) {}
   }
 
@@ -407,7 +408,7 @@ function readExportZip(zipBuffer) {
     || filoDichiarato === true || (mancanti > 0 && filoDichiarato !== false));
   return {
     data, imageCount: stats.images, immaginiPerse: stats.perse, filoPerso, saltate,
-    exportedAt, sectionCount: Object.keys(data).length, filo,
+    exportedAt, sectionCount: Object.keys(data).length, filo, proxySenzaCredenziali: proxyTolti,
   };
 }
 
@@ -624,13 +625,21 @@ function unisciSveglie(local, imported, prossima, adesso) {
 
 // `opzioni`: { tettoPagine, prossimaSveglia(t, adesso) → ms, adesso }. Le statistiche contano le sezioni di primo
 // livello; `restano` sono quelle del backup che non si importano perché sono stato.
-// Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905).
-function senzaSegretiVuoti(dati) {
+// Una chiave vuota nel backup (chi esportava non l'aveva) non cancella quella che c'è qui (#905); lo stesso proxy
+// arrivato senza utente e password lascia quello di qui, che li ha.
+function senzaSegretiVuoti(dati, cur) {
   if (!isPlainObject(dati.settings)) return dati;
   const settings = JSON.parse(JSON.stringify(dati.settings));
   const via = (o, campi) => { if (isPlainObject(o)) for (const k of campi) if (k in o && !pieno(o[k])) delete o[k]; };
   via(settings.apiKeys, isPlainObject(settings.apiKeys) ? Object.keys(settings.apiKeys) : []);
   via(settings.proxy, CAMPI_PROXY);
+  const proxyQui = isPlainObject(cur) && isPlainObject(cur.settings) && isPlainObject(cur.settings.proxy) ? cur.settings.proxy : {};
+  if (isPlainObject(settings.proxy)) {
+    for (const k of CAMPI_PROXY) {
+      const v = settings.proxy[k];
+      if (pieno(v) && !haCredenziali(v) && haCredenziali(proxyQui[k]) && proxySenzaCredenziali(proxyQui[k]) === v.trim()) delete settings.proxy[k];
+    }
+  }
   via(isPlainObject(settings.security) ? settings.security.safeBrowse : null, ['safeBrowsingKey']);
   if ('apiKeys' in settings && !isPlainObject(settings.apiKeys)) delete settings.apiKeys;
   return { ...dati, settings };
@@ -638,7 +647,7 @@ function senzaSegretiVuoti(dati) {
 
 function mergeImportedData(current, imported, opzioni = {}) {
   const cur = current && typeof current === 'object' ? current : {};
-  const imp = senzaSegretiVuoti(require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {}));
+  const imp = senzaSegretiVuoti(require('./interruttoreAiuto').perImportazione(imported && typeof imported === 'object' ? imported : {}), cur);
   const adesso = Number.isFinite(opzioni.adesso) ? opzioni.adesso : Date.now();
   const merged = { ...cur };
   const stats = { added: 0, updated: 0, unchanged: 0, restano: 0, pagineFuori: 0, pagineMieFuori: 0 };
@@ -671,8 +680,16 @@ function mergeImportedData(current, imported, opzioni = {}) {
   return { merged, stats };
 }
 
+// I campi del proxy che dopo l'importazione restano col solo indirizzo perché l'archivio li portava così: si dice
+// prima del sì, ché senza utente e password il proxy non funziona.
+function proxyDaCompletare(merged, campi) {
+  const proxy = isPlainObject(merged) && isPlainObject(merged.settings) && isPlainObject(merged.settings.proxy) ? merged.settings.proxy : {};
+  return (Array.isArray(campi) ? campi : []).filter((k) => pieno(proxy[k]) && !haCredenziali(proxy[k]));
+}
+
 module.exports = {
   buildExportZip,
+  proxyDaCompletare,
   zipStore,
   crc32,
   unzip,
