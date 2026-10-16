@@ -149,3 +149,43 @@ test('un sito visitato non può chiedere al main l\'icona di un sito: la porta r
   expect(r.richiesteDopoIlSito, 'il rifiuto non fa partire nessuna richiesta').toEqual([]);
   expect(r.filo).toMatchObject({ ok: true, dato: dato(PNG_ROSSO) });
 });
+
+// Il nome del sito può portare il dato: l'OK al clic non serve se l'icona ha già contattato il sito all'apertura della home.
+test('un suggerimento che chiede l\'OK non contatta il sito per l\'icona prima del clic', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const SPIA = 'n3471234567.raccolta.test';
+  await sitiFinti(app);
+  await app.evaluate(async (_e, SPIA) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.SN_PROVIDERS.completeWithFallback = globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (args) => {
+      const tutto = (args.messages || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+      const base = { model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {}, toolCalls: [], finishReason: 'stop' };
+      if (!tutto.includes('preparare la dashboard')) return { ...base, text: 'Segnato.' };
+      return { ...base, text: JSON.stringify({ message: 'Ciao', suggestions: [
+        { icon: 'link', text: 'Offerte per te', action: { type: 'NAVIGA', url: `https://${SPIA}/offerte` } },
+        { icon: 'link', text: 'L\'articolo con l\'icona', action: { type: 'NAVIGA', url: 'https://sito-con-icona.test/articolo' } },
+      ] }) };
+    };
+  }, SPIA);
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'il mio numero di cellulare è 3471234567', threadHistory: [], chatId: 'scheda-numero' }));
+  const gen = await app.evaluate(() => globalThis.__filoHandlers.handleMessage(
+    { type: globalThis.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true }, { url: 'filo://newtab/' }));
+  expect((gen.suggestions || []).find((s) => s.text === 'Offerte per te')?.chiedeOk).toBeTruthy();
+
+  const home = await openTab(NEWTAB);
+  await home.reload();
+  await expect(vociSuggerite(home).filter({ hasText: 'L\'articolo con l\'icona' }).locator('img')).toHaveAttribute('src', dato(PNG_ROSSO), { timeout: 15000 });
+  const offerte = vociSuggerite(home).filter({ hasText: 'Offerte per te' });
+  await expect(offerte.locator('.dash-carta-voce-ico svg')).toBeVisible({ timeout: 10000 });
+  // Anche chi chiede l'icona senza sapere dell'OK riceve il no del main: il collegamento in attesa basta.
+  const diretta = await app.evaluate((_e, SPIA) => globalThis.SN_HANDLE_MESSAGE(
+    { type: globalThis.SN_MSG.MSG.ICONA_SITO, url: `https://${SPIA}/altro` }, { url: 'filo://newtab/' }), SPIA);
+  expect(diretta).toMatchObject({ ok: true, dato: '' });
+  expect((await richieste(app)).filter((r) => r.startsWith(SPIA)), 'nessuna richiesta al sito prima dell\'OK').toEqual([]);
+});
