@@ -753,19 +753,12 @@ module.exports = function register(on, ctx) {
         };
       }
       const payload = msg.payload || {};
-      // Se l'utente è loggato come admin (l'owner), marca il suo invio come
-      // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
-      // esterni (arancione). L'identità owner è nota solo qui nel main (auth
-      // singleton): il content script che genera il clientId non sa di esserlo.
-      // `dallOwner` lo decide il main, non il payload: vale il token admin alla spedizione (#595).
+      // Il mittente lo decide il main, non il payload: il content script non sa di essere dell'owner (#595).
       let dallOwner = false;
       try {
-        // #912: anche l'owner appena buttato fuori da un rinnovo fallito: il suo feedback aspetta che rientri.
-        const owner = auth.isAdmin() || !!auth.accessoOwnerCaduto?.();
-        if (owner && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
-          payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
-          dallOwner = String(payload.clientId || '').startsWith('owner:');
-        }
+        const firmato = Mittente.firma(payload.clientId);
+        payload.clientId = firmato.clientId;
+        dallOwner = firmato.dallOwner;
       } catch (_) {}
       console.log('[Filo feedback] submit start', {
         textLen: (payload.text || '').length,
