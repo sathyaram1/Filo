@@ -49,7 +49,8 @@ const safebrowseMethods = {
     return verdict;
   },
 
-  // Un verdetto arrivato in ritardo per un sito da cui la scheda è già andata via non vale più.
+  // Un verdetto arrivato in ritardo per un sito da cui la scheda è già andata via non vale più. Quello della pagina che
+  // risulta pulita non toglie l'avviso di un link cliccato da lei (`prima`, #965), che aspetta la scelta dell'utente.
   _sbMostra(tab, url, verdict) {
     const wc = tab && tab.view && tab.view.webContents;
     if (!wc || wc.isDestroyed()) return;
@@ -58,8 +59,9 @@ const safebrowseMethods = {
     // È anche l'input «sito flaggato» delle regole geo-block (#151), che non devono aggirare i controlli di sicurezza.
     tab.sbLevel = level;
     const prima = JSON.stringify(tab.sbAvviso || null);
+    const delLink = tab.sbAvviso && tab.sbAvviso.prima ? tab.sbAvviso : null;
     tab.sbAvviso = (level === 'pericoloso' || level === 'sospetto')
-      ? { level, message: verdict.message || null, url: url || wc.getURL() } : null;
+      ? { level, message: verdict.message || null, url: url || wc.getURL() } : delLink;
     if (tab.id === this.activeId && JSON.stringify(tab.sbAvviso) !== prima) this.layout();
     if (tab.sbAvviso && tab._sbFinestrelle) for (const segui of [...tab._sbFinestrelle]) { try { segui(); } catch (_) {} }
   },
