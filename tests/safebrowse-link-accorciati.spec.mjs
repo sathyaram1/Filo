@@ -72,10 +72,10 @@ const finito = (app) => app.evaluate(() => globalThis.SN_SAFEBROWSE._settled());
 
 // Quanto dopo il clic la scheda ha l'avviso «pericoloso», misurato nel main.
 async function cliccaEMisura(app, page, sel) {
-  await app.evaluate(() => {
+  await app.evaluate(({ BrowserWindow }) => {
     globalThis.__clic966 = Date.now();
     globalThis.__avviso966 = null;
-    const win = require('electron').BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     clearInterval(globalThis.__guarda966);
     globalThis.__guarda966 = setInterval(() => {
       const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
@@ -130,6 +130,9 @@ test('puntatore che passa veloce su un link accorciato, o fermo su un link norma
   try {
     await listaNeraLenta(app);
     const page = await openTab(s.pagina);
+    // La pagina stessa si controlla all'apertura, come sempre: da qui in poi conta solo il puntatore.
+    await finito(app);
+    await app.evaluate(() => { globalThis.__gsb966.length = 0; });
     await page.hover('#corto');
     await page.waitForTimeout(150);
     await page.hover('#fuori');
