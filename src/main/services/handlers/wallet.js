@@ -647,20 +647,86 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: String(e?.message || e) + rete };
     }
   });
-  on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await callable('walletOverview', {}, { asOwner: true }) })));
+  // La vista fa leggere al server tutti i portafogli: chi non la vuole fresca (home, controllo da solo) si accontenta di
+  // una lettura di meno di un quarto d'ora, chi arriva mentre una è in volo aspetta quella, e ogni lettura riuscita
+  // rifà gli avvisi della home (#855), che così non costano letture loro.
+  const VISTA_VALE_MS = 15 * 60 * 1000;
+  let vistaLetta = null;
+  let vistaInVolo = null;
+  function vistaOwner({ fresca = false } = {}) {
+    if (!fresca && vistaLetta && Date.now() - vistaLetta.at < VISTA_VALE_MS) return Promise.resolve(vistaLetta.overview);
+    if (!vistaInVolo) {
+      vistaInVolo = callable('walletOverview', {}, { asOwner: true }).then((overview) => {
+        if (overview && typeof overview === 'object') {
+          vistaLetta = { at: Date.now(), overview };
+          rifaiAvvisiOwner(overview);
+        }
+        return overview;
+      }).finally(() => { vistaInVolo = null; });
+    }
+    return vistaInVolo;
+  }
+  on(MSG.WALLET_OWNER_OVERVIEW, ownerOnly(async () => ({ overview: await vistaOwner({ fresca: true }) })));
 
-  // L'allarme del conto all'avvio (#820). Ogni home che si apre lo chiede: la lettura del server vale un quarto d'ora,
-  // e gli allarmi già detti stanno su disco, così una situazione che resta quella non si ridice a ogni avvio.
+  // Gli avvisi all'owner fra le notifiche della home (#855). Una carta per caso; quali marcatori sono già stati detti
+  // sta su disco, così una situazione che resta quella non si ridice a ogni avvio. Il portafoglio è dell'installazione:
+  // anche una lettura partita da una finestra incognito scrive sul disco.
+  const AVVISI_DETTI_KEY = 'walletOwnerAvvisiDetti';
+  const CONTROLLO_OGNI_MS = 6 * 60 * 60 * 1000;
+  let filaAvvisi = Promise.resolve();
+  function rifaiAvvisiOwner(overview) {
+    filaAvvisi = filaAvvisi.then(() => Disco.runNormale(() => scriviAvvisiOwner(overview))).catch((e) => {
+      console.warn('[wallet] avvisi dell’owner non scritti', String(e?.message || e));
+    });
+    return filaAvvisi;
+  }
+  async function scriviAvvisiOwner(overview) {
+    const FiloMem = globalThis.SN_FILO_MEMORY;
+    if (!FiloMem?.addNotification) return;
+    let detti = [];
+    try { detti = await globalThis.SN_STORAGE.getRaw(AVVISI_DETTI_KEY, []); } catch (_) {}
+    const piano = W.avvisiOwnerPiano(detti, W.avvisiOwner(overview));
+    const vive = (await FiloMem.listNotifications()).filter((n) => n.action && n.action.tipo === W.AVVISO_OWNER);
+    let cambiato = false;
+    const togli = async (caso) => {
+      for (const n of vive.filter((x) => x.action.caso === caso)) { await FiloMem.dismissNotification(n.id); cambiato = true; }
+    };
+    for (const caso of piano.togli) await togli(caso);
+    for (const c of piano.scrivi) {
+      await togli(c.caso);
+      await FiloMem.addNotification({
+        kind: 'alert', text: c.testo,
+        action: { tipo: W.AVVISO_OWNER, caso: c.caso, marcatori: c.marcatori, apri: W.PAGINA_OWNER, etichetta: 'Apri Inviti e utenti' },
+      });
+      cambiato = true;
+    }
+    for (const c of piano.riscrivi) {
+      for (const n of vive.filter((x) => x.action.caso === c.caso)) {
+        if (await FiloMem.setNotificationText(n.id, c.testo)) cambiato = true;
+      }
+    }
+    await globalThis.SN_STORAGE.setRaw(AVVISI_DETTI_KEY, piano.detti);
+    if (cambiato) ctx.broadcastLiveUpdate();
+  }
+  // Il controllo da solo: all'avvio e ogni sei ore, solo sulla copia dell'owner. Un server muto non scrive niente.
+  async function controllaAvvisiOwner() {
+    if (!ctx.isAdmin()) return 'non_owner';
+    try { await vistaOwner(); } catch (e) {
+      console.warn('[wallet] avvisi dell’owner: vista non arrivata', String(e?.message || e));
+      return 'non_letta';
+    }
+    await filaAvvisi;
+    return 'fatto';
+  }
+  setTimeout(() => { controllaAvvisiOwner().catch(() => {}); }, 6000).unref?.();
+  setInterval(() => { controllaAvvisiOwner().catch(() => {}); }, CONTROLLO_OGNI_MS).unref?.();
+
+  // L'allarme del conto all'avvio (#820). Ogni home che si apre lo chiede, e gli allarmi già detti stanno su disco,
+  // così una situazione che resta quella non si ridice a ogni avvio.
   const ALLARMI_DETTI_KEY = 'walletOwnerAllarmiDetti';
-  const CONTO_VALE_MS = 15 * 60 * 1000;
-  let contoLetto = null;
   let filaAllarmi = Promise.resolve();
   async function leggiContoOwner() {
-    if (contoLetto && Date.now() - contoLetto.at < CONTO_VALE_MS) return contoLetto.conto;
-    const overview = await callable('walletOverview', {}, { asOwner: true });
-    const conto = W.contoOwner(overview);
-    contoLetto = { at: Date.now(), conto };
-    return conto;
+    return W.contoOwner(await vistaOwner());
   }
   on(MSG.WALLET_OWNER_ALARM_PENDING, filoOnly(async () => {
     if (!ctx.isAdmin()) return { ok: true, alarm: null };
