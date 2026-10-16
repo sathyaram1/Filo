@@ -27,5 +27,5 @@ test('r1 titolo accorciato prima dei due punti: la pagina nominata diventa comun
 
 test('r1 una sola pagina trovata e descritta a parole: il bottone c\'è', async ({ app, rete }) => {
   test.setTimeout(60_000);
-  try { await provaRisposta(app, rete, 'È la ricetta della carbonara di Cucina Facile, salvata il 3 ottobre.'); } finally { await ripristina(app); }
+  try { await provaRisposta(app, rete, 'È la tua ricetta della carbonara, salvata il 3 ottobre.'); } finally { await ripristina(app); }
 });
