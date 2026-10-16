@@ -46,6 +46,7 @@
     REMOVE_SAVED_PAGE: 'remove_saved_page',       // { id }
     RESTORE_SAVED_PAGE: 'restore_saved_page',     // { id } — l'«Annulla» di una rimozione: la voce la tiene il main
     CONSUME_SAVED_PAGE: 'consume_saved_page',     // { id }
+    APRI_PAGINA_SALVATA: 'apri_pagina_salvata',   // { id, tieni } — dalla chat: apre con l'indirizzo in elenco e la toglie (#845)
     SET_SAVED_PAGE_THUMB: 'set_saved_page_thumb', // { id } — il main fotografa la scheda di chi chiede e ne fa la miniatura
 
     // §3.1/§3.3 — archivio tab chiuse (metadati). La scrittura avviene nel main
