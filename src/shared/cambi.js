@@ -122,6 +122,7 @@
     provider: { nome: 'fornitore dei modelli', valori: { openrouter: 'OpenRouter' }, livello: 2 },
     useDefaultModels: { nome: 'modelli predefiniti', valore: sino('in uso', 'spenti'), livello: 2 },
     openWeightsOnly: { nome: 'solo modelli a pesi aperti', valore: sino('sì', 'no'), livello: 2 },
+    ownKeyAllProviders: { nome: 'fornitori esclusi con la tua chiave', valore: sino('usati', 'esclusi'), livello: 2 },
     'apiKeys.*': { nome: (k) => `chiave ${NOMI_CHIAVI[k] || 'di un servizio'}`, segreto: true },
     'models.*': { nome: (k) => `modello per «${etichettaFunzione(k)}»`, valore: (v) => v || 'nessuno', livello: 2 },
     'scorciatoie.*': { nome: (k) => `scorciatoia di «${nomeAzioneFilo(k)}»`, valore: scorciatoiaLeggibile, livello: 1 },

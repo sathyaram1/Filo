@@ -908,6 +908,50 @@
     return base;
   }
 
+  // La chiave OpenRouter scritta da chi usa Filo (Opzioni o Crediti), non quella dei crediti. PURA.
+  function hasOwnOpenrouterKey(impostazioni) {
+    const k = impostazioni && impostazioni.apiKeys && impostazioni.apiKeys.openrouter;
+    return typeof k === 'string' && k.trim() !== '';
+  }
+
+  // La lista delle richieste pagate con la chiave propria (#962), dalle impostazioni SALVATE: a interruttore acceso
+  // resta solo quella che aggiunge «solo pesi aperti», che vale comunque; null quando vale la lista intera. PURA.
+  function ownKeyExcludedProviders(salvate, openWeightsOnly) {
+    if (!salvate || salvate.ownKeyAllProviders !== true || !hasOwnOpenrouterKey(salvate)) return null;
+    return effectiveExcludedProviders([], openWeightsOnly);
+  }
+
+  // La lista che vale per una richiesta pagata con `keySource` ('own' | 'personal' | 'factory' | ''): quella della
+  // chiave propria solo se c'è; i crediti di Filo, anche dopo un ripiego, hanno sempre l'intera. PURA.
+  function excludedProvidersForKey(effettive, keySource) {
+    const e = effettive || {};
+    if (keySource === 'own' && Array.isArray(e.excludedProvidersOwnKey)) return e.excludedProvidersOwnKey;
+    return Array.isArray(e.excludedProviders) ? e.excludedProviders : [];
+  }
+
+  // Perché chi ha servito una risposta viola la politica (come servedPolicyViolation), giudicato con la lista della
+  // chiave che l'ha pagata: con la chiave propria a interruttore acceso chi serve si registra e basta. PURA.
+  function servedViolationOf(effettive, result) {
+    const r = result || {};
+    const keySource = r.keySource || (r.usage && r.usage.keySource) || '';
+    return servedPolicyViolation(r.servedBy, r.model, excludedProvidersForKey(effettive, keySource));
+  }
+
+  // Le istruzioni di routing per OpenRouter dalle impostazioni effettive: chi NON deve servire, l'ordinamento e, con
+  // l'interruttore della chiave propria, la lista per quella chiave (`ownKeyIgnore`, la sceglie il provider dalla
+  // chiave con cui parte davvero). null se non c'è niente da dire. PURA.
+  function providerRoutingFor(effettive) {
+    const e = effettive || {};
+    const ignore = providerIgnoreList(e.excludedProviders || []);
+    const sort = typeof e.providerSort === 'string' ? e.providerSort : '';
+    if (!ignore.length && !sort) return null;
+    const routing = {};
+    if (ignore.length) routing.ignore = ignore;
+    if (sort) routing.sort = sort;
+    if (Array.isArray(e.excludedProvidersOwnKey)) routing.ownKeyIgnore = providerIgnoreList(e.excludedProvidersOwnKey);
+    return routing;
+  }
+
   // Chiavi dei fornitori con «usa modelli predefiniti» acceso. PURA. Per ogni servizio vince la
   // chiave scritta da chi usa Filo (#598, #1107): è il suo conto; quella di fabbrica è il ripiego.
   function effectiveApiKeys(utente, personale, fabbrica) {
@@ -2537,6 +2581,9 @@
     // predefiniti" attivo (cioè con i crediti di Filo): è una scelta di chi usa
     // Filo, non una preferenza che la config condivisa può scavalcare.
     openWeightsOnly: false,
+    // #962 — con una chiave OpenRouter propria, le richieste pagate con lei partono senza la lista dei fornitori
+    // esclusi. Spento di serie: chi ha messo la chiave solo per non consumare i crediti resta coperto.
+    ownKeyAllProviders: false,
     apiKeys: {
       openrouter: '',
       // Tavily: provider di web search "LLM-friendly" usato dalla sidebar
@@ -3102,6 +3149,11 @@
     OPEN_WEIGHTS_SUBSTITUTES,
     OPEN_WEIGHTS_SUBSTITUTE_MODALITIES,
     OPEN_WEIGHTS_EXTRA_EXCLUDED,
+    hasOwnOpenrouterKey,
+    ownKeyExcludedProviders,
+    excludedProvidersForKey,
+    servedViolationOf,
+    providerRoutingFor,
     isOpenWeightsModelId,
     isOpenWeightsEntry,
     isOpenWeightsRef,

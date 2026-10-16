@@ -39,7 +39,7 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   ricordaEsterni: (messages) => SegretiLetti.ricordaBuste(messages),
   // La prova di una riga delle Opzioni non è una funzione: la frase nomina solo il modello.
   funzioneDi: (action) => (action === ACTIONS.PROVIDER_TEST ? '' : actionLabelForSettings(action)),
-  rimedioDi: (s, action) => globalThis.SN_CHAT_ERRORS.RIMEDI_NESSUN_HOST[doveSiSceglieIlModello(s, action)],
+  rimedioDi: (s, action, err) => globalThis.SN_CHAT_ERRORS.rimedioNessunHost(doveSiSceglieIlModello(s, action), err, s),
 });
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
@@ -356,6 +356,9 @@ function withDefaults(settings) {
   // dell'interruttore è poter rifiutare anche la scelta di chi Filo lo fa.
   const openWeightsOnly = settings.openWeightsOnly === true;
   const excludedProviders = SN_CONST.effectiveExcludedProviders(baseExcluded, openWeightsOnly);
+  // Con la chiave propria e il suo interruttore (#962) le richieste pagate con lei hanno una lista loro; quale vale lo
+  // decide la chiave con cui una chiamata parte davvero (SN_CONST.excludedProvidersForKey).
+  const excludedProvidersOwnKey = SN_CONST.ownKeyExcludedProviders(settings, openWeightsOnly);
 
   if (settings.useDefaultModels === false) {
     // Anche chi gestisce i modelli da sé usa la chiave personale (#598), se
@@ -366,7 +369,7 @@ function withDefaults(settings) {
     const apiKeys = own.openrouter || !personal ? own : { ...own, openrouter: personal };
     // Un fornitore salvato che Filo non ha più (Gemini) spegnerebbe ogni funzione che cerca la sua chiave.
     const provider = Defaults.fornitoreUsabile(settings.provider) ? settings.provider : d.provider;
-    return { ...settings, provider, apiKeys, openWeightsOnly, excludedProviders, providerSort, security };
+    return { ...settings, provider, apiKeys, openWeightsOnly, excludedProviders, excludedProvidersOwnKey, providerSort, security };
   }
   // OpenRouter (#598): fra la chiave dell'utente e quella di fabbrica c'è la
   // PERSONALE creata dal server al riscatto dell'invito (il suo tetto sono i
@@ -379,6 +382,7 @@ function withDefaults(settings) {
     modelRegistry: d.modelRegistry,
     openWeightsOnly,
     excludedProviders,
+    excludedProvidersOwnKey,
     providerSort,
     apiKeys,
     security,
@@ -548,13 +552,7 @@ function buildAttemptChain(settings, modelRef, action) {
 // l'unica richiesta di Filo libera di essere servita da un fornitore escluso.
 // Ritorna null se non c'è niente da dire.
 function providerRouting(settings) {
-  const ignore = SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
-  const sort = typeof (settings && settings.providerSort) === 'string' ? settings.providerSort : '';
-  if (!ignore.length && !sort) return null;
-  const routing = {};
-  if (ignore.length) routing.ignore = ignore;
-  if (sort) routing.sort = sort;
-  return routing;
+  return SN_CONST.providerRoutingFor(settings);
 }
 
 // Cancello della politica per le chiamate che NON passano da buildAttemptChain:
@@ -589,7 +587,8 @@ function openWeightsBlockReason(settings, entry) {
 function noteServedProvider(settings, action, result) {
   const servedBy = (result && result.servedBy) || null;
   const model = (result && result.model) || '';
-  const why = SN_CONST.servedPolicyViolation(servedBy, model, settings.excludedProviders || []);
+  // Con la lista della chiave che ha pagato (#962): coi crediti, anche dopo un ripiego, vale l'intera.
+  const why = SN_CONST.servedViolationOf(settings, { ...result, servedBy, model });
   const violation = Boolean(why);
   if (why === 'not-producer') {
     console.error(
@@ -2071,6 +2070,11 @@ async function eseguiAzioneFilo(action, {
         action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,
         action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
       );
+      // Senza una chiave propria l'interruttore dei fornitori esclusi non ha effetto (#962): si dice, senza chiedere un OK.
+      if (built && built.partial && built.partial.ownKeyAllProviders === true
+        && !SN_CONST.hasOwnOpenrouterKey(await Storage.getSettings())) {
+        return { executed: false, kept: false, output: { error: global.SN_PREF.SENZA_CHIAVE_PROPRIA, rifiuto: true } };
+      }
       // Il modello di una funzione: si controlla prima della conferma, che non chieda un OK a un cambio che non parte.
       if (built && built.modelloFunzione) {
         const v = await require('./costoModelli').verificaCambio(built.modelloFunzione, { Defaults });

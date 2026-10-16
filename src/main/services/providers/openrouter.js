@@ -51,8 +51,13 @@
   // personale un 402 sono i crediti finiti), e il rifiuto della chiave
   // propria resta comunque registrato: la pagina Crediti lo mostra.
   // La prova di una chiave non ripiega (SN_WALLET_MAIN.senzaRipiego).
-  async function fetchWithKey(url, apiKey, makeInit) {
-    let res = await fetch(url, makeInit(apiKey));
+  // `makeInit(chiave, { own })` riceve anche se quella chiave è la propria: con l'interruttore della chiave propria
+  // (#962) il corpo cambia lista di esclusione, e il ripiego sui crediti riparte con l'intera. `ripiegoAmmesso`, se
+  // c'è, decide prima del ripiego se i crediti ammettono la chiamata: dove il router non applica la lista (voce,
+  // dettatura) la si controlla qui, e se non la ammettono il rifiuto della chiave propria risale com'è.
+  async function fetchWithKey(url, apiKey, makeInit, { ripiegoAmmesso = null } = {}) {
+    const startSource = await keySourceOf(apiKey);
+    let res = await fetch(url, makeInit(apiKey, { own: startSource === 'own' }));
     let keyUsed = apiKey;
     let keyFallback = null;
     const W = global.SN_WALLET;
@@ -67,12 +72,20 @@
       if (W.isKeyRefusal(res.status, detail)) {
         try { alt = await K.alternativeKeyFor(apiKey); } catch (_) { alt = null; }
       }
+      if (alt && alt.key && typeof ripiegoAmmesso === 'function') {
+        let ammesso = false;
+        try { ammesso = await ripiegoAmmesso(); } catch (_) { ammesso = false; }
+        if (!ammesso) {
+          try { await K.noteOwnKeyRefusal({ status: res.status, detail, served: false }); } catch (_) {}
+          alt = null;
+        }
+      }
       if (alt && alt.key) {
         const refused = { status: res.status, detail };
         // Il rifiuto si annota DOPO il ripiego: Crediti dice che Filo ha
         // usato i crediti solo se la personale ha risposto davvero.
         try {
-          res = await fetch(url, makeInit(alt.key));
+          res = await fetch(url, makeInit(alt.key, { own: false }));
         } catch (e) {
           try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
           throw e;
@@ -83,10 +96,7 @@
         if (!res.ok) keyFallback.failed = res.status;
       }
     }
-    let keySource = '';
-    if (K && typeof K.keySourceOf === 'function') {
-      try { keySource = await K.keySourceOf(keyUsed); } catch (_) { keySource = ''; }
-    }
+    const keySource = keyUsed === apiKey ? startSource : await keySourceOf(keyUsed);
     // La chiave propria ha appena servito una chiamata: il rifiuto ricordato
     // in Crediti (se c'era) non vale più, e spesa e residuo sono cambiati.
     if (res.ok && keySource === 'own' && K && typeof K.noteOwnKeySuccess === 'function') {
@@ -97,6 +107,27 @@
     // (e ha fallito), e chi lo racconta all'utente può dirlo per esteso.
     try { res.keySource = keySource; res.keyFallback = keyFallback; } catch (_) {}
     return { res, keyUsed, keySource, keyFallback };
+  }
+
+  // Da dove viene una chiave ('own' | 'personal' | 'factory'), per chi tiene le chiavi; '' se non c'è chi lo sa.
+  async function keySourceOf(apiKey) {
+    const K = global.SN_WALLET_MAIN;
+    if (!K || typeof K.keySourceOf !== 'function') return '';
+    try { return (await K.keySourceOf(apiKey)) || ''; } catch (_) { return ''; }
+  }
+
+  // La lista di esclusione di una chiamata (#962): pagata con la chiave propria a interruttore acceso vale la sua
+  // (`ownKeyIgnore`), pagata coi crediti di Filo, anche dopo un ripiego, sempre l'intera.
+  function excludedFor(routing, ownKey) {
+    const r = routing && typeof routing === 'object' ? routing : {};
+    const list = ownKey && Array.isArray(r.ownKeyIgnore) ? r.ownKeyIgnore : r.ignore;
+    return Array.isArray(list) ? list.filter(Boolean) : [];
+  }
+
+  // Parte con la chiave propria e una lista sua? Chi tiene le chiavi si interroga solo se la lista c'è.
+  async function startsOwn(apiKey, routing) {
+    if (!routing || !Array.isArray(routing.ownKeyIgnore)) return false;
+    return (await keySourceOf(apiKey)) === 'own';
   }
 
   // Traduce il livello di reasoning scelto dall'owner (#369) nel campo
@@ -123,10 +154,11 @@
   // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
   // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`.
-  function providerBlock(routing, model, { tools = false } = {}) {
+  // `ownKey`: la chiamata è pagata con la chiave propria (la lista la sceglie excludedFor).
+  function providerBlock(routing, model, { tools = false, ownKey = false } = {}) {
     const p = {};
     const r = routing && typeof routing === 'object' ? routing : {};
-    const ignore = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    const ignore = excludedFor(r, ownKey);
     if (ignore.length) p.ignore = ignore;
     if (r.sort === 'latency' || r.sort === 'throughput' || r.sort === 'price') {
       p.sort = r.sort;
@@ -139,6 +171,12 @@
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
     if (rule) p.only = rule.only.slice();
     return Object.keys(p).length ? p : null;
+  }
+
+  // Il corpo serializzato per la chiave con cui parte, col suo blocco `provider`.
+  function payloadFor(body, routing, model, own, opts = {}) {
+    const pb = providerBlock(routing, model, { ...opts, ownKey: own });
+    return JSON.stringify(pb ? { ...body, provider: pb } : body);
   }
 
   // Le definizioni degli strumenti nel corpo della richiesta, se ci sono.
@@ -173,14 +211,16 @@
   const reasoningRefused = new Map();
   function forgetReasoningRefusals() { reasoningRefused.clear(); }
 
-  async function postChat(body, apiKey, signal) {
-    const send = (b, key) => {
-      const payload = JSON.stringify(b);
-      return fetchWithKey(ENDPOINT, key, (k) => ({ method: 'POST', headers: buildHeaders(k), body: payload, signal }));
-    };
-    const needsParams = !!(body.provider && body.provider.require_parameters);
+  // `body` arriva senza `provider`: il blocco dipende dalla chiave con cui ogni invio parte (#962).
+  async function postChat(body, apiKey, signal, routing) {
+    const tools = !!body.tools;
+    const send = (b, key) => fetchWithKey(ENDPOINT, key, (k, { own } = {}) => ({
+      method: 'POST', headers: buildHeaders(k), body: payloadFor(b, routing, b.model, own, { tools }), signal,
+    }));
     const { reasoning: _omesso, ...senzaRagionamento } = body;
-    const refusalKey = needsParams && body.reasoning ? JSON.stringify([body.model, body.provider]) : null;
+    const refusalKey = tools && body.reasoning
+      ? JSON.stringify([body.model, providerBlock(routing, body.model, { tools }), providerBlock(routing, body.model, { tools, ownKey: true })])
+      : null;
     if (refusalKey) {
       if ((reasoningRefused.get(refusalKey) || 0) > Date.now()) return send(senzaRagionamento, apiKey);
       reasoningRefused.delete(refusalKey);
@@ -353,9 +393,7 @@
     const body = { model, messages, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
-    const pb = providerBlock(providerRouting, model, { tools: !!body.tools });
-    if (pb) body.provider = pb;
-    const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal);
+    const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal, providerRouting);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
     if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens, apiKey, model, providerRouting });
@@ -392,11 +430,9 @@
     // non ragionano semplicemente non ne emettono — best-effort.
     const r = reasoningField(reasoning, !!onReasoning);
     if (r) reqBody.reasoning = r;
-    const pb = providerBlock(providerRouting, model, { tools: !!reqBody.tools });
-    if (pb) reqBody.provider = pb;
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
-    const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal);
+    const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal, providerRouting);
     if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens, apiKey, model, providerRouting });
 
     const reader = res.body.getReader();
@@ -530,13 +566,12 @@
   // Un «nessun host per i parametri chiesti» con gli strumenti e un tetto: gli host dichiarati dicono quale dei due manca.
   // false: nessun host ammesso regge gli strumenti, il tetto non c'entra; true: li reggono, ma nessuno fino a quel
   // tetto; null: non si sa, e la frase li nomina tutti e due.
-  async function tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools }) {
+  async function tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey = false }) {
     let hosts = null;
     try { hosts = await modelHosts({ apiKey, model }); } catch (_) { hosts = null; }
     if (!Array.isArray(hosts) || !hosts.length) return null;
     const C = global.SN_CONST;
-    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
-    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    const excluded = excludedFor(providerRouting, ownKey);
     const ammessi = C && typeof C.hostPolicyViolation === 'function'
       ? hosts.filter((h) => !C.hostPolicyViolation(h, model, excluded)) : hosts;
     if (ammessi.some((h) => h.tools == null || h.maxOut == null)) return null;
@@ -554,7 +589,9 @@
     if (attesa != null) err.retryAfterMs = attesa;
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
-    if (res.status === 404 && model && await nessunHostAmmesso(err, { apiKey, model, providerRouting })) return err;
+    // Gli host si giudicano con la lista con cui è partita la risposta arrivata (#962).
+    const ownKey = res.keySource === 'own';
+    if (res.status === 404 && model && await nessunHostAmmesso(err, { apiKey, model, providerRouting, ownKey })) return err;
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
@@ -566,7 +603,7 @@
       if (perTetto.stringibile) err.stringibile = true;
     } else if (refusal === 'PARAMS') {
       // Il tetto è uno dei parametri che il router fa reggere agli host: il suo «nessun host» può venire da lì.
-      const colpa = maxTokens ? await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools }) : false;
+      const colpa = maxTokens ? await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey }) : false;
       if (tools) err.code = 'NO_TOOL_HOST';
       else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
       if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
@@ -576,9 +613,9 @@
 
   // Un 404 del router su un modello che servono solo host esclusi (#828). Lo dicono gli host dichiarati, non il testo
   // dell'errore, che il router può cambiare; e vince sugli altri motivi del 404, perché strumenti e tetto non contano più.
-  async function nessunHostAmmesso(err, { apiKey, model, providerRouting }) {
+  async function nessunHostAmmesso(err, { apiKey, model, providerRouting, ownKey }) {
     let v = null;
-    try { v = await hostVerdict({ apiKey, model, providerRouting }); } catch (_) { v = null; }
+    try { v = await hostVerdict({ apiKey, model, providerRouting, ownKey }); } catch (_) { v = null; }
     if (!v || v.ok || v.reason !== 'excluded') return false;
     console.warn(`[Filo policy] "${model}" lo servono solo host esclusi (${v.excluded.join(', ')}): ${err.message}`);
     const CE = global.SN_CHAT_ERRORS;
@@ -679,11 +716,12 @@
   // Voce e dettatura partono solo se chi serve il modello è noto e TUTTO ammesso (#1141): con host misti il
   // router sceglie per prezzo e può dare l'audio proprio a quello escluso.
   // { ok: true } | { ok: false, reason: 'unknown' | 'mixed' | 'excluded', excluded: [nomi] }
-  async function hostVerdict({ apiKey, model, providerRouting }) {
+  // Senza `ownKey` la lista la sceglie la chiave data (#962).
+  async function hostVerdict({ apiKey, model, providerRouting, ownKey }) {
     const C = global.SN_CONST;
     if (!C || typeof C.hostPolicyViolation !== 'function') return { ok: true };
-    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
-    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    const own = ownKey === undefined ? await startsOwn(apiKey, providerRouting) : ownKey;
+    const excluded = excludedFor(providerRouting, own);
     if (!excluded.length && !C.producerOnlyRule(model)) return { ok: true };
     const hosts = await modelHosts({ apiKey, model });
     if (!Array.isArray(hosts) || !hosts.length) return { ok: false, reason: 'unknown', excluded: [] };
@@ -698,8 +736,8 @@
     excluded: ['err_audio_no_allowed_host', 'err_audio_no_allowed_host_many'],
   };
 
-  async function ensureAllowedHost({ apiKey, model, providerRouting }) {
-    const v = await hostVerdict({ apiKey, model, providerRouting });
+  async function ensureAllowedHost({ apiKey, model, providerRouting, ownKey }) {
+    const v = await hostVerdict({ apiKey, model, providerRouting, ownKey });
     if (v.ok) return;
     const I18n = global.SN_I18N;
     const [one, many] = NO_HOST_KEYS[v.reason];
@@ -713,23 +751,30 @@
     throw err;
   }
 
+  // Voce, dettatura e classificatori: il controllo degli host con la lista della chiave di partenza, e il ripiego sui
+  // crediti solo se chi serve il modello lo ammette anche la loro (#962).
+  async function hostCheckedFetch(url, { apiKey, model, providerRouting, body, signal }) {
+    const own = await startsOwn(apiKey, providerRouting);
+    await ensureAllowedHost({ apiKey, model, providerRouting, ownKey: own });
+    const ripiegoAmmesso = own
+      ? async () => (await hostVerdict({ apiKey, model, providerRouting, ownKey: false })).ok
+      : null;
+    return fetchWithKey(url, apiKey, (key, { own: o } = {}) => ({
+      method: 'POST', headers: buildHeaders(key), body: payloadFor(body, providerRouting, model, o), signal,
+    }), { ripiegoAmmesso });
+  }
+
   // ─── Lettura ad alta voce ──────────────────────────────────────────────────
   // Chiede l'audio in PCM grezzo (16 bit, mono): il content script lo incapsula
   // in un WAV e lo suona, lo stesso formato che usava prima. Il router risponde
   // con i byte e basta: chi ha servito non è nella risposta, ma l'id della
   // generazione sì (header), e con quello si chiede dopo (lookupServedBy).
   async function synthesizeSpeech({ apiKey, model, text, voice, speed, providerRouting, signal }) {
-    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, input: String(text == null ? '' : text), response_format: 'pcm' };
     if (voice) body.voice = voice;
     const sp = Number(speed);
     if (Number.isFinite(sp) && sp > 0 && sp !== 1) body.speed = sp;
-    const pb = providerBlock(providerRouting, model);
-    if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(SPEECH_ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
-    }));
+    const { res, keyUsed, keySource, keyFallback } = await hostCheckedFetch(SPEECH_ENDPOINT, { apiKey, model, providerRouting, body, signal });
     if (!res.ok) throw await httpError(res);
     const buf = Buffer.from(await res.arrayBuffer());
     if (!buf.length) {
@@ -752,15 +797,9 @@
   // l'estensione ('wav', 'mp3', 'webm', …). `language` è un codice ISO-639-1
   // ('it'): se manca, il modello la riconosce da sé.
   async function transcribe({ apiKey, model, audioBase64, format, language, providerRouting, signal }) {
-    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, input_audio: { data: audioBase64, format: format || 'wav' } };
     if (language) body.language = language;
-    const pb = providerBlock(providerRouting, model);
-    if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(TRANSCRIPTIONS_ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
-    }));
+    const { res, keyUsed, keySource, keyFallback } = await hostCheckedFetch(TRANSCRIPTIONS_ENDPOINT, { apiKey, model, providerRouting, body, signal });
     if (!res.ok) throw await httpError(res);
     const data = await res.json();
     const usage = data.usage || {};
@@ -793,11 +832,8 @@
     const body = { model, input };
     const d = Number(dim);
     if (Number.isInteger(d) && d > 0) body.dimensions = d;
-    const pb = providerBlock(providerRouting, model);
-    if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key, { own } = {}) => ({
+      method: 'POST', headers: buildHeaders(key), body: payloadFor(body, providerRouting, model, own), signal,
     }));
     if (!res.ok) throw await httpError(res, { apiKey, model, providerRouting });
     const data = await res.json();
@@ -828,14 +864,8 @@
   // dopo aver letto `state`. Le risposte tornano per nome in `answers`, tali e quali; il costo lo dice il router.
   // `retryAfterMs` sull'errore è l'attesa chiesta da un 429, per chi rimette la richiesta in coda.
   async function decisions({ apiKey, model, state, questions, providerRouting, signal }) {
-    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, state, questions };
-    const pb = providerBlock(providerRouting, model);
-    if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(DECISIONS_ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
-    }));
+    const { res, keyUsed, keySource, keyFallback } = await hostCheckedFetch(DECISIONS_ENDPOINT, { apiKey, model, providerRouting, body, signal });
     if (!res.ok) {
       const err = await httpError(res);
       const attesa = Number(res.headers && typeof res.headers.get === 'function' ? res.headers.get('retry-after') : NaN);
