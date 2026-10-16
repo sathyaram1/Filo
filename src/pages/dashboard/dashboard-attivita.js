@@ -530,6 +530,8 @@
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
     VEDI_SCHERMO: (n) => (n > 1 ? `guardato lo schermo ${n} volte` : 'guardato lo schermo'),
     CERCA_DOCUMENTI: (n) => (n > 1 ? `cercato fra i tuoi documenti ${n} volte` : 'cercato fra i tuoi documenti'),
+    CERCA_SALVATE: (n) => (n > 1 ? `cercato fra le pagine salvate ${n} volte` : 'cercato fra le pagine salvate'),
+    APRI_SALVATA: (n) => (n > 1 ? `aperto ${n} pagine salvate` : 'aperto una pagina salvata'),
     RINOMINA_FILE: () => 'dato un nome ai file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
@@ -716,6 +718,12 @@
       return { icon: '🖥', text: nome ? `Ho guardato «${nome}»` : 'Ho guardato lo schermo' };
     },
     CERCA_DOCUMENTI: (a) => ({ icon: '🔎', text: testoRicercaDocumenti(a) }),
+    CERCA_SALVATE: (a) => ({ icon: '🔖', text: testoRicercaSalvate(a) }),
+    APRI_SALVATA: (a) => {
+      const o = a._output || {};
+      const t = pulito(o.titolo) || 'una pagina salvata';
+      return { icon: '↗', text: `Aperta «${t}»${o.tolta ? ' · tolta da «Aperti per dopo»' : ' · resta in «Aperti per dopo»'}` };
+    },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
@@ -844,6 +852,8 @@
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     VEDI_SCHERMO: 'Finestra non guardata',
     CERCA_DOCUMENTI: 'Ricerca nei documenti non riuscita',
+    CERCA_SALVATE: 'Ricerca fra le pagine salvate non riuscita',
+    APRI_SALVATA: 'Pagina salvata non aperta',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
@@ -1135,7 +1145,8 @@
       // bottone è come si risponde.
       const anche = aspettaUtente(a)
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
-        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || sceltaAutonomia(a);
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || sceltaAutonomia(a)
+        || salvateDaMostrare(a).length > 0;
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -1463,6 +1474,101 @@
     return `Cercato fra i documenti${breve ? ` · ${breve}` : ''}${quanti}${o.fermata ? ' · fermata da te' : ''}`;
   }
 
+  function testoRicercaSalvate(a) {
+    const o = (a && a._output) || {};
+    const q = pulito(a && (a.cerca || a.query)) || pulito(o.cercato);
+    const breve = q.length > 60 ? `${q.slice(0, 59)}…` : q;
+    const n = Number.isInteger(o.trovate) ? o.trovate : (Array.isArray(o.pagine) ? o.pagine.length : null);
+    const quante = n == null ? '' : (n ? ` · ${n === 1 ? 'una trovata' : `${n} trovate`}` : ' · nessuna trovata');
+    return `Cercato fra le pagine salvate${breve ? ` · ${breve}` : ''}${quante}`;
+  }
+
+  // #845 — le pagine salvate che la risposta nomina: il clic fa quello della lista «Aperti per dopo» (la apre e la
+  // toglie), il tasto destro ha le sue voci, e si trascinano come un link.
+  function salvateDaMostrare(a) {
+    const o = a && a._output;
+    if (!isType(a, 'CERCA_SALVATE') || a._executed === false || !o || !Array.isArray(o.pagine) || !Array.isArray(o.nominate)) return [];
+    return o.nominate.map((id) => o.pagine.find((p) => p && p.id === id)).filter((p) => p && /^https?:\/\//i.test(String(p.url || '')));
+  }
+  async function apriSalvataDaChat(btn, p, { tieni = false } = {}) {
+    if (btn.dataset.inCorso) return;
+    btn.dataset.inCorso = '1';
+    const msg = { type: MSG.APRI_PAGINA_SALVATA, id: p.id, tieni };
+    let r = null;
+    try { r = await send(msg); } catch (_) { r = null; }
+    // Un indirizzo che la porta delle uscite vuole confermato si conferma qui, come i collegamenti della chat.
+    if (r && r.conferma) {
+      const Ui = window.SN_CONFIRM_UI;
+      const ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: String(r.conferma) }) : window.confirm(String(r.conferma));
+      r = null;
+      if (ok) { try { r = await send({ ...msg, confermato: true }); } catch (_) { r = null; } }
+      if (!ok) { delete btn.dataset.inCorso; return; }
+    }
+    delete btn.dataset.inCorso;
+    // Già aperta da un'altra strada, o tolta dalla lista: resta un link, e si apre come gli altri della chat.
+    if (!r || !r.ok) { apriProposta(p.url, btn); return; }
+    if (!r.tolta) return;
+    btn.classList.add('dash-salvata-aperta');
+    btn.title = `Riapri ${p.title || p.url} · non è più in «Aperti per dopo»`;
+  }
+  function bottoneSalvata(p) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn dash-action-link-chip dash-salvata-btn';
+    btn.draggable = true;
+    btn.dataset.pageId = String(p.id || '');
+    btn.dataset.url = String(p.url || '');
+    btn.title = `Apri ${p.title || p.url} e toglila da «Aperti per dopo»`;
+    const favUrl = faviconUrl(p.url);
+    if (favUrl) {
+      const img = document.createElement('img');
+      img.className = 'dash-action-favicon';
+      img.src = favUrl;
+      img.alt = '';
+      img.referrerPolicy = 'no-referrer';
+      img.onerror = () => img.remove();
+      btn.appendChild(img);
+    }
+    let sito = '';
+    try { sito = new URL(p.url).hostname.replace(/^www\./, ''); } catch (_) {}
+    const titolo = pulito(p.title) || sito || p.url;
+    btn.appendChild(document.createTextNode(`↗ ${titolo.length > 70 ? `${titolo.slice(0, 69)}…` : titolo}`));
+    btn.addEventListener('click', () => apriSalvataDaChat(btn, p));
+    btn.addEventListener('dragstart', (e) => {
+      if (!e.dataTransfer) return;
+      e.dataTransfer.setData('text/uri-list', p.url);
+      e.dataTransfer.setData('text/plain', p.url);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+    const R = window.SN_RINOMINA_UI;
+    const apriMenu = (e) => {
+      if (!R || typeof R.menu !== 'function') return;
+      e.preventDefault();
+      const rect = btn.getBoundingClientRect();
+      const x = e.type === 'contextmenu' && e.clientX ? e.clientX : rect.left;
+      const y = e.type === 'contextmenu' && e.clientY ? e.clientY : rect.bottom;
+      R.menu(x, y, [
+        ['Apri', () => apriSalvataDaChat(btn, p)],
+        ['Apri e tienila in lista', () => apriSalvataDaChat(btn, p, { tieni: true })],
+        ['Copia link', () => { navigator.clipboard.writeText(p.url).catch(() => {}); }],
+        ['Apri «Aperti per dopo»', () => send({ type: MSG.OPEN_HOME, highlight: p.id }).catch(() => {})],
+      ], { ancora: btn });
+    };
+    btn.addEventListener('contextmenu', apriMenu);
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) apriMenu(e);
+    });
+    return btn;
+  }
+  function bottoniSalvate(a) {
+    const pagine = salvateDaMostrare(a);
+    if (!pagine.length) return null;
+    const box = document.createElement('span');
+    box.className = 'dash-salvate';
+    for (const p of pagine) box.appendChild(bottoneSalvata(p));
+    return box;
+  }
+
   function testoRinominati(o) {
     const n = o && Array.isArray(o.rinominati) ? o.rinominati.length : 0;
     const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
@@ -1698,6 +1804,7 @@
       return btn;
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
+    if (type === 'CERCA_SALVATE') return bottoniSalvate(a);
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);

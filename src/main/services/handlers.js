@@ -2085,6 +2085,18 @@ async function eseguiAzioneFilo(action, {
     } catch (_) {}
   }
 
+  // #845 — una pagina salvata si apre con l'indirizzo che ha in elenco, mai con uno scritto dal modello: lo mette qui il
+  // main, e la porta delle uscite lo guarda come quello di NAVIGA. Un id che non c'è non chiede niente.
+  if (type === 'APRI_SALVATA') {
+    let voce = null;
+    try { voce = (await SavedPages.list()).find((p) => p && p.id === String(action.id ?? '').trim()) || null; } catch (_) {}
+    if (!voce) return { executed: false, kept: true, output: { aperta: false, trovata: false } };
+    action.url = voce.url;
+    action._titolo = voce.title || '';
+    // I modelli piccoli a volte mandano "true" come stringa.
+    action.tieni = action.tieni === true || /^(true|1|si|sì|yes)$/i.test(String(action.tieni ?? ''));
+  }
+
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
@@ -2805,6 +2817,22 @@ async function eseguiAzioneFilo(action, {
         } catch (e) {
           return { executed: false, kept: true, output: { chatSearch: query, results: [], error: e?.message || String(e) } };
         }
+      }
+      case 'CERCA_SALVATE': {
+        const cercato = String(action.cerca ?? action.query ?? action.testo ?? '').trim();
+        try {
+          return { executed: true, kept: true, output: await salvatePerChat(cercato) };
+        } catch (e) {
+          return { executed: false, kept: true, output: { cercato, pagine: [], errore: e?.message || String(e) } };
+        }
+      }
+      case 'APRI_SALVATA': {
+        // La porta delle uscite l'ha già guardata prima del gate, con l'indirizzo dell'elenco.
+        const r = await apriPaginaSalvata(action.id, { sender, tieni: action.tieni === true, porta: false });
+        if (!r.ok) {
+          return { executed: false, kept: true, output: { aperta: false, trovata: r.trovata !== false, ...(r.blocked ? { blocked: r.blocked, host: r.host, reason: r.reason, url: r.url } : {}) } };
+        }
+        return { executed: true, kept: true, output: { aperta: true, tolta: r.tolta, id: r.id, titolo: r.titolo, url: r.url } };
       }
       case 'LEGGI_FILE': {
         // #379.5 — lettura ON-DEMAND del contenuto completo di un file
@@ -3608,6 +3636,58 @@ async function paginePerChat(query) {
   return out.filter((p) => p.url);
 }
 
+// #845 — «Aperti per dopo» per CERCA_SALVATE: per titolo, indirizzo e categoria, coi tre passi della ricerca nel filo.
+// Al modello vanno le più recenti fino al tetto, e il numero vero: le altre le dice, non le tace.
+const MAX_SALVATE_CHAT = 30;
+async function salvatePerChat(query) {
+  const CA = ChatArchive;
+  const pagine = (await SavedPages.list()).filter((p) => p && p.id && p.url);
+  let categorie = [];
+  try { categorie = await Categorizer.listCategories(); } catch (_) {}
+  const categoria = (p) => (p.categoryId && (categorie.find((c) => c.id === p.categoryId) || {}).name) || p.category || '';
+  // «ricetta» deve trovare /ricette/ e «campeggio» i campeggi: le parole che contano si cercano senza la vocale finale.
+  const radici = CA.normalizeForSearch(query).split(/\s+/).filter(Boolean)
+    .map((w) => (w.length >= 5 && CA.terminiCheDistinguono([w]).length ? w.replace(/[aeiou]$/, '') : w)).join(' ');
+  const { results, termini, allargata } = CA.searchWide(pagine, radici, {
+    testo: (p) => `${p.title || ''} ${p.url} ${categoria(p)}`,
+  });
+  return {
+    cercato: query,
+    cercatoCon: termini,
+    allargata,
+    totale: pagine.length,
+    trovate: results.length,
+    pagine: results.slice(0, MAX_SALVATE_CHAT).map((p) => ({
+      id: p.id, title: p.title || '', url: p.url, categoria: categoria(p), savedAt: p.savedAt || null,
+    })),
+  };
+}
+
+// La pagina salvata che la chat apre (lo strumento o il bottone sotto la risposta) fa quello del clic sulla lista:
+// si apre davanti con l'indirizzo che ha in elenco e, salvo `tieni`, esce dalla lista. `porta`: il bottone passa
+// dalla porta delle uscite come i collegamenti delle pagine di Filo; lo strumento ci è già passato prima del gate.
+async function apriPaginaSalvata(id, { sender = null, tieni = false, porta = true, confermato = false } = {}) {
+  const voce = (await SavedPages.list()).find((p) => p && p.id === String(id || '').trim());
+  if (!voce || !/^https?:\/\//i.test(String(voce.url || ''))) return { ok: false, trovata: false };
+  const win = winOf(sender);
+  const tm = win && win._filoTabs;
+  if (!tm || typeof tm.openTab !== 'function') return { ok: false, trovata: true, error: 'no_window' };
+  let tabId = null;
+  if (porta) {
+    const r = await apriDaFilo(voce.url, { wc: (sender && sender.wc) || null, avvisa: false, confermato, apri: () => { tabId = tm.openTab(voce.url, { activate: true }); } });
+    if (!r.aperto) return { ok: false, trovata: true, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
+  } else {
+    tabId = tm.openTab(voce.url, { activate: true });
+  }
+  if (!tabId) {
+    let d = null;
+    try { d = require('./siteBlock').shouldBlockNavigation(voce.url); } catch (_) {}
+    return { ok: false, trovata: true, blocked: 'site', host: (d && d.host) || '', reason: (d && d.reason) || '', url: voce.url };
+  }
+  if (!tieni) await SavedPages.consume(voce.id);
+  return { ok: true, trovata: true, tolta: !tieni, tabId, id: voce.id, titolo: voce.title || '', url: voce.url };
+}
+
 // I cambi di impostazioni, aspetto, sveglie e zoom (#867) che combaciano: si annullano con ANNULLA_CAMBIO e l'id.
 async function cambiPerChat(query) {
   const CA = ChatArchive;
@@ -3949,6 +4029,43 @@ function documentSearchesForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #845 — quello che CERCA_SALVATE ha trovato in «Aperti per dopo»: titoli e indirizzi li hanno scritti i siti, in busta.
+function salvateTrovateForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'CERCA_SALVATE' || !a._output) continue;
+    const o = a._output;
+    const cercato = o.cercato ? E.perCanaleSistema(o.cercato) : '';
+    const pagine = Array.isArray(o.pagine) ? o.pagine : [];
+    if (o.errore) { blocks.push('[La lista «Aperti per dopo» non si è potuta leggere: dillo all\'utente in una riga.]'); continue; }
+    if (!o.totale) {
+      blocks.push('[«Aperti per dopo» è vuota: l\'utente non ha ancora messo da parte nessuna pagina. Diglielo, e che una pagina si salva dal tasto destro → «Salva per dopo» o chiedendolo all\'Aiuto sopra la pagina.]');
+      continue;
+    }
+    if (!pagine.length) {
+      blocks.push(`[Nessuna delle ${o.totale} pagine di «Aperti per dopo» ha "${cercato}" nel titolo, nell'indirizzo o nella categoria. `
+        + 'Riprova con la parola che conta (una o due, oppure vuoto per vederle tutte) prima di dire all\'utente che non c\'è.]');
+      continue;
+    }
+    const righe = pagine.map((p) => {
+      const quando = p.savedAt ? new Date(p.savedAt).toLocaleDateString('it-IT') : '';
+      return `- [${p.id}] ${E.neutralizza(p.title || '(senza titolo)', { unaRiga: true })}${p.categoria ? ` · categoria ${E.neutralizza(p.categoria, { unaRiga: true })}` : ''}${quando ? ` · salvata il ${quando}` : ''}\n  ${p.url}`;
+    });
+    const quali = cercato ? `che combaciano con "${cercato}"` : 'salvate';
+    const oltre = o.trovate > pagine.length
+      ? ` Ne combaciano ${o.trovate}: qui le ${pagine.length} più recenti, le altre si vedono in «Aperti per dopo» o cercando parole più precise.` : '';
+    const largo = o.allargata && Array.isArray(o.cercatoCon) && o.cercatoCon.length
+      ? ` Nessuna conteneva tutte le parole: queste arrivano cercando "${E.perCanaleSistema(o.cercatoCon.join(' '))}", controlla che siano quelle giuste.` : '';
+    blocks.push(`[Le pagine di «Aperti per dopo» ${quali} (${o.trovate} su ${o.totale}).${oltre}${largo} `
+      + 'Nella risposta nomina quelle giuste col titolo così com\'è: sotto la risposta diventano bottoni che le aprono. '
+      + 'Per aprirne una adesso usa APRI_SALVATA con l\'id.]\n'
+      + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
@@ -3957,7 +4074,8 @@ function documentSearchesForPrompt(actions) {
 function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
-    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), vediSchermoForPrompt(actions),
+    fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
+    vediSchermoForPrompt(actions),
     transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
@@ -4006,6 +4124,7 @@ const CAMPI_SALVATI = {
   ANNULLA_CAMBIO: ['_fraseCambio'],
   BLUETOOTH: ['_nomeSistema'],
   WIFI: ['_nomeSistema'],
+  APRI_SALVATA: ['_titolo'],
 };
 
 // I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
@@ -4135,6 +4254,15 @@ function toolResultText({ action, res, rendered }, giro = null) {
   }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
+  if (type === 'APRI_SALVATA' && res.output && !res.needsConfirm) {
+    const o = res.output;
+    if (o.trovata === false) return 'Nessuna pagina con quell\'id in «Aperti per dopo»: forse è già stata aperta o tolta. Se serve rifai CERCA_SALVATE e usa un id preso da lì, mai inventato.';
+    if (o.blocked === 'site') return `Pagina NON aperta: ${o.host || 'quel sito'} è fra i siti bloccati, ed è rimasta in «Aperti per dopo». Diglielo in una riga.`;
+    if (!o.aperta) return 'Pagina NON aperta, ed è rimasta in «Aperti per dopo». Diglielo in una riga.';
+    const E = globalThis.SN_ESTERNO;
+    return `Aperta in una scheda nuova${o.tolta ? ' e tolta da «Aperti per dopo»' : ', ed è rimasta in «Aperti per dopo»'}:\n`
+      + `${E.imbusta({ tipo: 'DATI_PAGINA', testo: `${E.neutralizza(o.titolo || '(senza titolo)', { unaRiga: true })}\n${o.url || ''}` })}\nDillo all'utente in una riga.`;
+  }
   // #950 — i nomi vengono dal disco e da un modello che ha letto i file: tornano recintati.
   if (type === 'RINOMINA_FILE') {
     const E = globalThis.SN_ESTERNO;
@@ -4494,6 +4622,69 @@ function fileNominatiDallaRisposta(textReply, azioni) {
   }
   return trovati.sort((a, b) => a.i - b.i).slice(0, 3)
     .map(({ r }, k) => ({ type: 'APRI_FILE', percorso: r.percorso, etichetta: r.nome, _callId: `trovato_${k}` }));
+}
+
+// #845 — le pagine trovate con CERCA_SALVATE che la risposta nomina diventano bottoni sotto la risposta, nell'ordine in
+// cui le nomina (`_output.nominate`). Nominata vuol dire il titolo, un suo pezzo di almeno due parole fra « - », « | » o
+// «: », l'indirizzo o una parola lunga del titolo che le altre trovate non hanno (i modelli accorciano e raccontano);
+// non scartata («non X»), né già aperta. Una sola trovata, e una risposta che non dice di no: è lei.
+function nomiDellaSalvata(p, piano) {
+  const titolo = piano(p.title);
+  const nomi = titolo.length >= 4 ? [titolo] : [];
+  for (const pezzo of titolo.split(/\s[-–—|·:]\s|:\s/)) {
+    const t = pezzo.trim();
+    if (t !== titolo && t.length >= 8 && t.includes(' ')) nomi.push(t);
+  }
+  const indirizzo = piano(String(p.url || '').replace(/^https?:\/\//i, '').replace(/\/+$/, ''));
+  if (indirizzo.length >= 6) nomi.push(indirizzo);
+  return nomi;
+}
+// Parole che una risposta sulle pagine salvate dice comunque («salvata il 3 ottobre», «eccola»): non nominano nessuna.
+const PAROLE_DELLA_RISPOSTA = new Set([
+  'salvata', 'salvato', 'salvate', 'salvati', 'pagina', 'pagine', 'trovata', 'trovato', 'trovate', 'trovati', 'aperta',
+  'aperto', 'aperte', 'ricerca', 'eccola', 'eccole', 'eccolo', 'gennaio', 'febbraio', 'aprile', 'maggio', 'giugno',
+  'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre', 'lunedi', 'martedi', 'mercoledi', 'giovedi',
+  'venerdi', 'sabato', 'domenica',
+]);
+const NEGA_RISPOSTA = /(?<![\p{L}])(?:non|nessun[aeo]?|niente|nulla)(?![\p{L}])/iu;
+function paroleSoloSue(p, pagine, cercate, piano) {
+  const parole = (s) => piano(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const altre = new Set(pagine.filter((q) => q !== p).flatMap((q) => parole(q.title)));
+  return ChatArchive.terminiCheDistinguono(parole(p.title)).filter((w) => w.length >= 6 && !/^\d+$/.test(w)
+    && !PAROLE_DELLA_RISPOSTA.has(w) && !altre.has(w) && !cercate.some((c) => w.startsWith(c)));
+}
+function segnaSalvateNominate(textReply, azioni) {
+  const piano = (s) => ChatArchive.normalizeForSearch(String(s || '')).replace(/[«»"“”‘’*_`]/g, ' ').replace(/\s+/g, ' ').trim();
+  const testo = piano(textReply);
+  const lista = Array.isArray(azioni) ? azioni : [];
+  const aperte = new Set(lista.filter((x) => x && String(x.type || '').toUpperCase() === 'APRI_SALVATA' && x._output && x._output.aperta)
+    .map((x) => x._output.id));
+  // Due ricerche nello stesso turno possono trovare la stessa pagina: il bottone è uno.
+  const giaMostrate = new Set();
+  for (const x of lista) {
+    if (!x || String(x.type || '').toUpperCase() !== 'CERCA_SALVATE' || !x._output || !Array.isArray(x._output.pagine)) continue;
+    const trovate = [];
+    const pagine = x._output.pagine.filter((p) => p && p.id);
+    const cercate = (Array.isArray(x._output.cercatoCon) ? x._output.cercatoCon : String(x._output.cercato || '').split(/\s+/))
+      .map((w) => piano(w).replace(/[aeiou]$/, '')).filter((w) => w.length >= 3);
+    for (const p of pagine) {
+      if (aperte.has(p.id) || giaMostrate.has(p.id)) continue;
+      let i = -1;
+      const nomi = testo ? [...nomiDellaSalvata(p, piano), ...paroleSoloSue(p, pagine, cercate, piano)] : [];
+      for (const nome of nomi) {
+        const k = posizioneDelNome(testo, nome);
+        if (k >= 0 && (i < 0 || k < i)) i = k;
+      }
+      if (i >= 0) { trovate.push({ id: p.id, i }); giaMostrate.add(p.id); }
+    }
+    // Una pagina sola trovata con tutte le parole, e una risposta che la racconta senza nominarla né dire di no: è lei.
+    const sola = pagine.length === 1 && !x._output.allargata ? pagine[0] : null;
+    if (!trovate.length && sola && testo && !aperte.has(sola.id) && !giaMostrate.has(sola.id) && !NEGA_RISPOSTA.test(testo)) {
+      trovate.push({ id: sola.id, i: 0 });
+      giaMostrate.add(sola.id);
+    }
+    x._output.nominate = trovate.sort((a, b) => a.i - b.i).map((t) => t.id);
+  }
 }
 
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
@@ -5151,6 +5342,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const res = await executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta });
     if (res && res.kept && res.executed && !res.needsConfirm) renderedActions.push({ ...a, _executed: true, ...(res.output ? { _output: res.output } : {}) });
   }
+  segnaSalvateNominate(textReply, renderedActions);
   // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
   let lettiRisposta = [];
   try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
@@ -5681,6 +5873,7 @@ const handlerCtx = {
   modelGate: Gate,
   handleAIRequest,
   maybeCategorizeAsync,
+  apriPaginaSalvata,
   searchArchivedTabs,
   archivioDaCancellare,
   handleFiloChat,

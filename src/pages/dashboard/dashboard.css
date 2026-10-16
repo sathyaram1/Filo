@@ -921,6 +921,11 @@ html, body {
   height: 16px;
   border-radius: 4px;
 }
+/* #845 — le pagine salvate che la risposta nomina stanno fra gli altri bottoni; una già aperta e tolta dalla lista
+   resta per riaprirla, più tenue. Si trascinano, quindi niente selezione. */
+.dash-salvate { display: contents; }
+.dash-salvata-btn { max-width: 100%; user-select: none; text-align: left; }
+.dash-salvata-aperta { opacity: 0.6; }
 /* #162 — bolla che contiene SOLO azioni (Filo ha solo eseguito, niente testo):
    margini stretti, niente padding di testo che lascerebbe una "scatola vuota". */
 .dash-bubble.dash-bubble-actions-only {

@@ -16,6 +16,8 @@
     LEGGI_DOCUMENTO: ['Letto un documento', (k) => `Letti ${n(k)} documenti`, 'documento'],
     VEDI_SCHERMO: ['Guardato lo schermo', (k) => `Guardato lo schermo ${n(k)} volte`, 'schermo'],
     CERCA_DOCUMENTI: ['Cercato fra i documenti', (k) => `Fatte ${n(k)} ricerche fra i documenti`, 'documenti'],
+    CERCA_SALVATE: ['Cercato fra le pagine salvate', (k) => `Fatte ${n(k)} ricerche fra le pagine salvate`, 'pagine salvate'],
+    APRI_SALVATA: ['Aperta una pagina salvata', (k) => `Aperte ${n(k)} pagine salvate`, 'pagina salvata'],
     LEGGI_TRASPARENZA: ['Riletta la trasparenza', (k) => `Rilette ${n(k)} pagine di trasparenza`, 'trasparenza'],
     LEGGI_IMPOSTAZIONI: ['Lette le impostazioni', (k) => `Lette le impostazioni ${n(k)} volte`, 'impostazioni'],
     CAPACITA_DETTAGLIO: ['Verificato cosa so fare', (k) => `Verificato cosa so fare ${n(k)} volte`, 'capacità'],

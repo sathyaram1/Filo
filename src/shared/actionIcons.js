@@ -35,6 +35,8 @@
     // #525 — rileggere le conversazioni di prima: l'icona è quella della
     // cronologia, che è esattamente quello che sta facendo.
     CERCA_CHAT: 'history',
+    CERCA_SALVATE: 'saveForLater',
+    APRI_SALVATA: 'openTab',
     ONBOARDING: 'checklist',
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',

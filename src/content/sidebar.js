@@ -245,6 +245,7 @@
       root.style.bottom = bassoPer(startBottom, rect.left, rect.width);
       root.style.right = 'auto';
       root.style.top = 'auto';
+      root.dataset.spostata = '1';
       e.preventDefault();
     });
     window.addEventListener('mousemove', (e) => {
@@ -288,6 +289,7 @@
     root.style.right = 'auto';
     root.style.top = 'auto';
     root.style.bottom = bassoPer(currentBottom, newLeft, w);
+    root.dataset.spostata = '1';
   }
 
   // ---------- Rendering conv ----------
@@ -1144,7 +1146,14 @@
     copy_link:  { target: 'link', costo: 1, label: 'copia link' },
     save_link:  { target: 'link', costo: 1, label: 'salva link per dopo' },
     share_link: { target: 'link', costo: 2, label: 'condividi link' },
+    // la pagina intera: la stessa strada di «Salva per dopo» del menu, che poi chiude la scheda (niente passo dopo).
+    save_page: { target: 'none', costo: 1, label: 'salva la pagina per dopo', chiude: true },
   };
+
+  // Come Alt+S: le pagine di Filo non si mettono da parte, tranne quella d'errore, che salva il sito non caricato.
+  function paginaDaSalvare() {
+    try { return location.protocol !== 'filo:' || location.href.startsWith('filo://error/'); } catch (_) { return false; }
+  }
 
   // Testo bersaglio: quello fornito dall'agente, altrimenti la selezione corrente.
   function resolveActionText(page) {
@@ -1225,6 +1234,9 @@
         appendActionLog(`${label}: link non trovato`);
         return false;
       }
+    } else if (page.op === 'save_page' && !paginaDaSalvare()) {
+      appendActionLog(`${label}: le pagine di Filo non si salvano per dopo`);
+      return false;
     }
 
     // Senza risposta dal main si chiede: il caso prudente.
@@ -1271,6 +1283,11 @@
         }
         case 'copy_link': Actions?.copyUrlToClipboard(linkEl.href); break;
         case 'save_link': await Actions?.saveLink(linkEl); break;
+        case 'save_page': {
+          if (!(await Actions?.savePage())) { appendActionLog(`${label}: non riuscita`); return false; }
+          appendActionLog('pagina salvata in «Aperti per dopo»: chiudo la scheda');
+          return true;
+        }
         case 'share_link': await Actions?.shareLink(linkEl); break;
         default: appendActionLog(`${label}: non riuscita`); return false;
       }
@@ -1649,7 +1666,7 @@
         const ok = await runPageAction(parsed.page);
         // Se l'agente vuole concatenare passi (status:"continue") e l'azione è
         // andata a buon fine, prosegue con una nota di sistema; altrimenti chiude.
-        if (parsed.status === 'continue' && ok) {
+        if (parsed.status === 'continue' && ok && !PAGE_ACTIONS[parsed.page.op].chiude) {
           const note = `ho eseguito l'azione di pagina "${parsed.page.op}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
           setTimeout(() => submit({ userAction: note, preActionUrl: location.href }), 200);
         } else {

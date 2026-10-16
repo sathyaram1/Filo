@@ -415,6 +415,36 @@
         return `Cercare nel filo${q ? ` ("${q}")` : ''}`;
       },
     },
+    // #845 — la lista «Aperti per dopo»: l'ha fatta l'utente, ma titoli e indirizzi li hanno scritti i siti che ha
+    // scelto di tenere (classe 3, come i siti segnati da lui). Sola lettura, niente esce → costo 0.
+    CERCA_SALVATE: {
+      costo: 0,
+      campo: null,
+      fonte: (a, out) => (Array.isArray(out.pagine) && out.pagine.length
+        ? { classe: 3, campo: 'web', chiave: 'salvate:titoli', motivo: 'ho letto i titoli delle pagine che hai salvato per dopo, scritti dai siti' }
+        : null),
+      describe: (a) => {
+        const q = String((a && (a.cerca ?? a.query ?? a.testo)) || '').replace(/\s+/g, ' ').trim();
+        return q ? `Cercare fra le pagine salvate per dopo «${q.slice(0, 60)}»` : 'Guardare le pagine salvate per dopo';
+      },
+    },
+    // Come il clic sulla lista: apre la pagina e la toglie, che si rimette salvandola di nuovo → costo 1.
+    // L'indirizzo è quello in elenco, mai uno scritto dal modello.
+    APRI_SALVATA: {
+      costo: 1,
+      campo: 'web',
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        const quale = t ? `«${t}»` : 'una pagina salvata per dopo';
+        return a && a.tieni === true ? `Aprire ${quale}, lasciandola in «Aperti per dopo»` : `Aprire ${quale} e toglierla da «Aperti per dopo»`;
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const titolo = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (!o.aperta) return 'Pagina salvata non aperta';
+        return `Aperta «${titolo || 'la pagina salvata'}»${o.tolta ? ' e tolta da «Aperti per dopo»' : ', ancora in «Aperti per dopo»'}`;
+      },
+    },
     LEGGI_FILE: {
       // Filo apre per intero un file dell'EDITOR di cui vede solo il riassunto
       // (#379.5). Sola lettura di dati che sono già in parte nel contesto (i
@@ -1007,7 +1037,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-    'VEDI_SCHERMO',
+    'VEDI_SCHERMO', 'CERCA_SALVATE',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 

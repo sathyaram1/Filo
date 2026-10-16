@@ -76,6 +76,12 @@ module.exports = function register(on, ctx) {
 
   soloFilo(MSG.CONSUME_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.consume(msg.id) }));
 
+  // Il bottone di una pagina salvata in chat (#845): l'indirizzo è quello in elenco, non uno che manda la pagina.
+  soloFilo(MSG.APRI_PAGINA_SALVATA, async (msg, sender) => {
+    const r = await ctx.apriPaginaSalvata(msg.id, { sender, tieni: msg.tieni === true, confermato: msg.confermato === true });
+    return r.ok ? { ok: true, tolta: r.tolta } : { ok: false, ...(r.conferma ? { conferma: r.conferma } : {}), ...(r.frase ? { frase: r.frase } : {}) };
+  });
+
   // La miniatura la scatta il main dalla scheda di chi la chiede: un'immagine mandata dalla pagina qui non si decodifica (#839).
   on(MSG.SET_SAVED_PAGE_THUMB, async (msg, sender, origin) => {
     const tab = sender?.win?._filoTabs?.tabs?.find((t) => t.id === sender?.tab?.id);
