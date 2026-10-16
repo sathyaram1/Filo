@@ -412,6 +412,47 @@ test('gli ingressi con invito rimasti si cambiano dalla pagina, come le altre ma
   await expect(page.locator('#knob-invitesRemaining')).toHaveValue('1000');
 });
 
+// #854 — il contatore degli ingressi lo scala il server a ogni riscatto: una manopola appena salvata restava ferma
+// sul numero salvato finché non si riapriva la pagina.
+test('dopo un salvataggio la manopola degli ingressi segue il numero che il server ha scalato, e si può ancora rimettere com’era', async ({ app }) => {
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+  const campo = page.locator('#knob-invitesRemaining');
+  const msg = page.locator('#knob-invitesRemaining-msg');
+  await expect(campo).toHaveValue('9', { timeout: 15_000 });
+
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+
+  // Tre persone entrano con un invito; poi l'owner cambia un'altra manopola e la pagina rilegge i numeri.
+  configDoc.invitesRemaining = 17;
+  const prima = overviewChiesti;
+  await page.fill('#knob-dailyCredits', '120');
+  await page.click('#knob-dailyCredits-salva');
+  await expect(page.locator('#knob-dailyCredits-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  await expect.poll(() => overviewChiesti, { timeout: 10_000 }).toBeGreaterThan(prima);
+  await expect(campo).toHaveValue('17', { timeout: 10_000 });
+  // Il campo salvato prima resta lì col suo valore e col suo «rimetti com'era».
+  await expect(page.locator('#knob-dailyCredits')).toHaveValue('120');
+
+  await page.click('#knob-invitesRemaining-rimetti');
+  await expect(msg).toHaveText('Rimesso com’era.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(9);
+  await expect(campo).toHaveValue('9');
+
+  // Mentre l'owner scrive, una rilettura non gli cambia il numero sotto le dita.
+  await campo.fill('33');
+  configDoc.invitesRemaining = 8;
+  const ancora = overviewChiesti;
+  await page.fill('#knob-entryCredits', '5100');
+  await page.click('#knob-entryCredits-salva');
+  await expect(page.locator('#knob-entryCredits-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  await expect.poll(() => overviewChiesti, { timeout: 10_000 }).toBeGreaterThan(ancora);
+  await expect(campo).toHaveValue('33');
+});
+
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);

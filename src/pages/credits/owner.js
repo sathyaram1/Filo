@@ -39,7 +39,10 @@
     renderOwner(w);
   }
 
+  // Le manopole prendono solo l'ultima lettura chiesta: una partita prima di un salvataggio riporterebbe il valore vecchio.
+  let letturaOverview = 0;
   async function loadOverview() {
+    const mia = ++letturaOverview;
     const r = await chrome.runtime.sendMessage({ type: MSG.WALLET_OWNER_OVERVIEW });
     const o = r && r.ok && r.overview;
     if (!o) {
@@ -58,7 +61,7 @@
       ? `Un credito vale ${formatDecimale(cfg.eurPerCredit, 6)} €, e un euro ${formatDecimale(cfg.eurUsd, 4)} $`
         + `${quando ? ` (cambio del ${quando})` : ''}.`
       : 'Manca il cambio del giorno: finché non arriva, Filo non regala crediti a nessuno.';
-    riempiManopole(cfg, tot);
+    if (mia === letturaOverview) riempiManopole(cfg, tot);
     // I codici dell'owner li conserva il server: si rileggono a ogni apertura,
     // con quelli usati barrati, così chi ne genera cinque e chiude la pagina sa
     // ancora quali ha già dato.
@@ -537,13 +540,12 @@
     for (const k of W.OWNER_KNOBS) {
       const campo = campi.get(k.chiave);
       if (!campo) continue;
-      // Non si riscrive un campo che qualcuno sta usando, né uno che ha ancora
-      // un salvataggio da poter rimettere com'era: la rilettura arriva anche
-      // mentre si digita (il server avvisa a ogni cambio di crediti).
+      // Non si riscrive un campo che qualcuno sta usando: la rilettura arriva anche mentre si digita. Uno salvato
+      // segue il server (gli ingressi li scala lui, #854) e tiene il suo «rimetti com'era».
       const st = campo.stato();
-      if (!primaLettura && (!st.pulito || st.disfabile)) continue;
+      if (!primaLettura && !st.pulito) continue;
       const v = valoreManopola(k.chiave, cfg, tot);
-      campo.mostra(v == null ? '' : v, { daCapo: true });
+      campo.mostra(v == null ? '' : v, { daCapo: primaLettura });
     }
     primaLettura = false;
   }
