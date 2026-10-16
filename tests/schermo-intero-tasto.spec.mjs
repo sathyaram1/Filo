@@ -126,3 +126,15 @@ test('il nome del tasto si legge nel suggerimento della barra laterale e fra le 
   const altro = await openTab('filo://options/altro.html');
   await expect(altro.locator('#shortcutsList')).toContainText('F11 — Metti e togli lo schermo intero');
 });
+
+test('rimessa nel menu del tasto destro, l\'icona dello schermo intero nomina il tasto passandoci sopra', async ({ app, openTab, testServer }) => {
+  await mettiNelMenu(app, ['fullscreen'], 'primary');
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.locator('#box').click({ button: 'right' });
+  const voce = page.locator('[data-sn-icon-id="fullscreen"], .sn-menu-row-btn[aria-label="Schermo intero"]').first();
+  await expect(voce).toBeVisible({ timeout: 8000 });
+  await expect(voce).toHaveAttribute('aria-label', 'Schermo intero');
+  await voce.hover();
+  await expect(page.locator('.sn-tooltip')).toHaveText('Schermo intero (F11)', { timeout: 4000 });
+  await page.screenshot({ path: 'tests/.shots/858-menu-schermo-intero.png' });
+});
