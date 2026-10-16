@@ -98,7 +98,8 @@ test('le descrizioni della pagina Sicurezza non promettono quello che il codice 
   assert.match(prova, /lista nera di Google/);
   assert.match(prova, /mai in incognito/);
   const index = leggi('src/main/services/safebrowse/index.js');
-  assert.match(index, /if \(ctx\.incognito \|\| !providers\.destinazione\) return null;/, 'in incognito la finestra non parte');
+  assert.match(index, /if \(ctx\.incognito \|\| !providers\.destinazione\) \{ voce\.senzaFinestra = true; return null; \}/,
+    'in incognito la finestra non parte');
   assert.match(prova, /Una finestra alla volta/);
   assert.equal(require(join(ROOT, 'src/main/services/safebrowse/sandbox.js')).MAX_CONCURRENT, 1);
   assert.match(prova, /Spento, resta solo la lista nera/);
