@@ -195,6 +195,11 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
       const t0 = Date.now();
       const st = await ow.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WALLET_STATE }).then((r) => JSON.stringify(r).slice(0, 600), (e) => 'ERR ' + e.message));
       console.log('DEBUG3', Date.now() - t0, st);
+      console.log('DEBUG4', await ow.evaluate(() => JSON.stringify([window.SN_PAGE_THEME, document.getElementById('ownerSection').hidden, document.readyState, typeof window.SN_WALLET])));
+      ow.on('console', (m) => console.log('PAGE', m.text()));
+      await ow.reload();
+      await ow.waitForTimeout(3000);
+      console.log('DEBUG5', stato.letture, await ow.evaluate(() => JSON.stringify([window.SN_PAGE_THEME, document.getElementById('ownerSection').hidden])));
       await expect.poll(() => avvisiOwner(app), { timeout: 15_000 }).toEqual([]);
       await expect(carte(home)).toHaveCount(0, { timeout: 15_000 });
     } finally { await chiudiApp(app); }
