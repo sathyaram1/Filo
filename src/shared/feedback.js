@@ -1306,6 +1306,8 @@
   // dovuto o solo più alto di quello che aveva visto, e per prudenza non lo
   // toccava: la cura scritta per un contatore gonfiato non è mai partita.
   // Questa domanda costa UNA lettura e la risposta è esatta.
+  // Conta anche i numeri scelti da chi manda: è il pavimento del contatore,
+  // mai il numero a cui alzarlo (vedi ensureSeqCounter, #923).
   async function maxSeq({ idToken = '', timeoutMs = 0 } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const headers = { 'Content-Type': 'application/json' };
