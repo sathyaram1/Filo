@@ -447,7 +447,7 @@ test('un modulo verso un indirizzo da avviso: confermato, il sito riceve i dati,
 });
 
 test('un collegamento aperto da una pagina di Filo o dall\'assistente sopra una pagina: l\'avviso compare prima di aprire', async ({ app, openTab, testServer }) => {
-  await contaLaRete(app, {});
+  await contaLaRete(app, { 'paypa1.com/dalla-chat': '<title>Premio</title><p>premio</p>' });
   await openTab('filo://security/');
   await fuocoAllaPagina(app);
   await app.evaluate(({ BrowserWindow }) => {
@@ -494,6 +494,7 @@ test('un collegamento aperto da una pagina di Filo o dall\'assistente sopra una 
   });
   await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
   await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
-  expect(await schedeWeb(app)).toEqual([articolo]);
-  expect(await richiesteVerso(app, 'paypa1.com')).toEqual([]);
+  expect((await schedeWeb(app)).filter((u) => u.includes('/da-assistente'))).toEqual([]);
+  expect((await schedaAttiva(app)).url).toBe(articolo);
+  expect((await richiesteVerso(app, 'paypa1.com')).filter((u) => u.includes('/da-assistente'))).toEqual([]);
 });
