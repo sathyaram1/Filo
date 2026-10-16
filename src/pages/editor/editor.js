@@ -4319,7 +4319,7 @@
     if (r.tipo === 'altgr') return `${r.nome} su Windows è anche AltGr, che scrive caratteri come € e @: scegline un'altra${perEsempio}.`;
     if (r.tipo === 'simbolo') {
       return r.modificatore === 'Shift'
-        ? `Con Shift il simbolo cambia, quindi ${r.nome} non partirebbe mai (scrivi il simbolo che esce, senza Shift): scegline un'altra${perEsempio}.`
+        ? `Con Shift il simbolo cambia, quindi ${r.nome} scritta così non partirebbe mai: premi la combinazione invece di scriverla, o scegline un'altra${perEsempio}.`
         : `Con ${tasto(r.modificatore)} il simbolo cambia, quindi ${r.nome} non partirebbe mai: scegline un'altra${perEsempio}.`;
     }
     const motivo = r.cosa ? `${r.nome} è già di Filo (${r.cosa}) e non arriverebbe mai a questo modulo` : r.motivo;
