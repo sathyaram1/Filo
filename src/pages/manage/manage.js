@@ -300,7 +300,7 @@
   // loro) se ne mostra un pezzo: per owner/Filo/automazioni sarebbe rumore.
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
-    const m = AUTHOR_META[kind] || AUTHOR_META.user;
+    const m = authorMetaOf(fb);
     if (kind !== 'user') return `${m.icon} ${m.label}`;
     // Senza il nome riservato che si era dato: ne mostrerebbe la firma.
     const id = String((fb && fb.clientId) || '').trim().replace(/^(non-provato:)?(owner|routine|agent|local):/i, '');
