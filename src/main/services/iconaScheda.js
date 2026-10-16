@@ -41,11 +41,11 @@ function bytesDaDataUrl(url) {
   return /;\s*base64\s*$/i.test(m[1]) ? Buffer.from(grezzo, 'base64') : Buffer.from(grezzo, 'latin1');
 }
 
-async function scarica(ses, url) {
+async function scarica(ses, url, cookie) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ATTESA_MS);
   try {
-    const res = await ses.fetch(url, { signal: ctrl.signal, credentials: 'include', redirect: 'follow' });
+    const res = await ses.fetch(url, { signal: ctrl.signal, credentials: cookie ? 'include' : 'omit', redirect: 'follow' });
     if (!res.ok || !res.body) return null;
     if (Number(res.headers.get('content-length')) > TETTO_BYTE) return null;
     const lettore = res.body.getReader();
