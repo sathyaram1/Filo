@@ -1244,7 +1244,7 @@ class Segreto {
     let nome = 'nome-di-prova-di-un-file-nuovo.bin';
     while (s.S.tabella.has(nome)) nome = `_${nome}`;
     let usati = 0;
-    for (const f of s.S.tabella.values()) usati += f.d;
+    for (const [n, f] of s.S.tabella) if (n !== RISERVA) usati += f.d;
     return { usati, disponibili: massimoScrivibile(s.S, s.N - s.mappa.vive, nome) };
   }
 
