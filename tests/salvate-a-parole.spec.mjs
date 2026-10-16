@@ -171,6 +171,50 @@ test('se la pagina salvata non c\'è, il modello lo sa e la chat non mostra bott
   }
 });
 
+// I modelli accorciano i titoli e raccontano le pagine: il bottone non deve dipendere dalla citazione alla lettera.
+test('la pagina nominata accorciata o raccontata ha comunque il suo bottone; una risposta che dice di no non ne ha', async ({ app, rete }) => {
+  test.setTimeout(90_000);
+  const CARBONARA = rete.pagina('cucina.test', '/ricette/carbonara', '<title>c</title>');
+  const SAPONE = rete.pagina('example.org', '/fai-da-te/ricetta-sapone', '<title>s</title>');
+  await semina(app, [
+    { id: 'g1', url: CARBONARA, title: 'Spaghetti alla carbonara: la ricetta originale | Cucina Facile', favicon: '', thumbnail: '', savedAt: '2026-10-03T10:00:00.000Z', category: null },
+    { id: 'g2', url: SAPONE, title: 'Ricetta del sapone di Marsiglia fatto in casa', favicon: '', thumbnail: '', savedAt: '2026-10-01T10:00:00.000Z', category: null },
+  ]);
+  const bottoniDi = (page, frase) => page.locator('.dash-bubble').filter({ hasText: frase }).locator('.dash-salvata-btn');
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 's1', name: 'CERCA_SALVATE', arguments: JSON.stringify({ cerca: 'ricetta' }) }] },
+      { text: 'È «Spaghetti alla carbonara», salvata il 3 ottobre.' },
+      { toolCalls: [{ id: 's2', name: 'CERCA_SALVATE', arguments: JSON.stringify({ cerca: 'carbonara' }) }] },
+      { text: 'È la tua ricetta della carbonara, del 3 ottobre.' },
+      { toolCalls: [{ id: 's3', name: 'CERCA_SALVATE', arguments: JSON.stringify({ cerca: 'ricetta' }) }] },
+      { text: 'Sono due: la carbonara e il sapone di Marsiglia.' },
+      { toolCalls: [{ id: 's4', name: 'CERCA_SALVATE', arguments: JSON.stringify({ cerca: 'carbonara' }) }] },
+      { text: 'Di carbonara con le zucchine non ne hai salvate.' },
+    ]);
+    const page = await home(app);
+    await chiedi(page, 'dov\'era quella ricetta che avevo salvato?');
+    await expect(bottoniDi(page, 'salvata il 3 ottobre')).toHaveCount(1, { timeout: 20_000 });
+    await expect(bottoniDi(page, 'salvata il 3 ottobre')).toHaveAttribute('data-url', CARBONARA);
+
+    await chiedi(page, 'e la carbonara?');
+    await expect(bottoniDi(page, 'del 3 ottobre')).toHaveCount(1, { timeout: 20_000 });
+    await expect(bottoniDi(page, 'del 3 ottobre')).toHaveAttribute('data-url', CARBONARA);
+
+    await chiedi(page, 'quali ricette ho salvato?');
+    const due = bottoniDi(page, 'Sono due');
+    await expect(due).toHaveCount(2, { timeout: 20_000 });
+    await expect(due.nth(0)).toHaveAttribute('data-url', CARBONARA);
+    await expect(due.nth(1)).toHaveAttribute('data-url', SAPONE);
+
+    await chiedi(page, 'quella della carbonara con le zucchine?');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'non ne hai salvate' })).toBeVisible({ timeout: 20_000 });
+    await expect(bottoniDi(page, 'non ne hai salvate')).toHaveCount(0);
+  } finally {
+    await ripristina(app);
+  }
+});
+
 // L'Aiuto ha la risposta già pronta: l'azione di pagina che salva.
 async function aiutoCheSalva(app) {
   await app.evaluate(async () => {
