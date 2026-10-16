@@ -4670,6 +4670,13 @@
     mgUserNoteText.addEventListener('blur', () => { salvaFraseAutomatico(); });
     mgUserNoteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
+      // Un Esc chiude una cosa sola: senza fermarlo, chiuderebbe anche la ricerca aperta. Il blur salva.
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        collassaFrase();
+        if (mgUserNoteToggle) mgUserNoteToggle.focus();
+      }
     });
   }
 
