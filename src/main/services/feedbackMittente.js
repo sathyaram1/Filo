@@ -35,6 +35,9 @@ async function spedisciDallOwner(payload) {
   }
   const Outbox = globalThis.SN_FEEDBACK_OUTBOX;
   if (!Outbox || typeof Outbox.enqueue !== 'function') throw new Error('SN_FEEDBACK_OUTBOX non caricato nel main process');
+  // Come il riquadro (#602): una voce che non si potrà cifrare non entra in coda a promettere un invio che non ci sarà.
+  const motivo = typeof FB.encryptionUnavailable === 'function' ? FB.encryptionUnavailable() : '';
+  if (motivo) throw new Error(FB.encryptionBlockedMessage ? FB.encryptionBlockedMessage(motivo) : motivo);
   const q = await Outbox.enqueue(payload, { dallOwner: true });
   return { id: q.id, queued: true };
 }
