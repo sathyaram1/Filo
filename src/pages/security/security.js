@@ -968,8 +968,17 @@
     }
     for (const domain of cookieWhitelist) {
       const li = document.createElement('li');
+      const voce = document.createElement('div');
       const span = document.createElement('span');
       span.textContent = leggibile(domain);
+      voce.appendChild(span);
+      // Una piattaforma salvata prima che la si rifiutasse non tiene connessi i siti ospitati: lo si dice, come fra i programmi.
+      if (Sito.piattaforma(domain) && Sito.voceSalvata(`http://x.${domain}/`, [domain]) !== domain) {
+        const nota = document.createElement('small');
+        nota.className = 'sn-cookie-wl-nota';
+        nota.textContent = Eseguibili.testoPiattaforma(domain);
+        voce.appendChild(nota);
+      }
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn-secondary';
