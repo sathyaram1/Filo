@@ -4,7 +4,7 @@
 // si tiene il tasto. I tasti passano da sendInputEvent: quelli di Playwright non toccano before-input-event.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi, mettiNelMenu } from './helpers/barra.mjs';
 
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
