@@ -216,7 +216,7 @@ test('in locale chi corregge il rilievo di una prova segnata e le toglie il segn
   }
 });
 
-test('la fase 2, in cloud e in locale, dice come si tratta una prova segnata che adesso passa', async () => {
+test('la risposta alla critica, in cloud e in locale, dice come si tratta una prova segnata che adesso passa', async () => {
   const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
   const { codaText } = await import('../../scripts/verify-local.mjs');
   const risposta = verifierReplyText({ outcome: 'fix', phase2: { findings: [{ level: 2, text: 'rotto', n: 1 }], derived: [] } });
