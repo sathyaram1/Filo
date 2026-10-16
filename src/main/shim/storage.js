@@ -209,13 +209,34 @@ function loadIfNeeded() {
 const CHIAVE_LETTURA = 'dati-letti';
 const CHIAVE_SALVATAGGIO = 'dati-non-salvati';
 
-function avvisa(testo, chiave, durataSec = 0) {
+function avvisa(testo, chiave, durataSec = 0, detto) {
   STATE.avvisi.push({ testo, chiave });
   try {
     const A = require('../services/avvisoFinestra');
     if (durataSec) A.avvisoNellaFinestra(testo, { chiave, durataSec });
-    else A.avvisoQuandoPronta(testo, { chiave });
+    else A.avvisoQuandoPronta(testo, { chiave, detto });
   } catch (_) {}
+}
+
+// Senza portachiavi le chiavi API vanno sul disco in chiaro: lo si dice una volta per installazione (#905), e
+// la volta conta solo se una finestra l'ha mostrato. Il segno sta nello storage, così «Cancella tutto» lo porta via.
+const CHIAVE_IN_CHIARO = 'avvisoChiaviInChiaro';
+let inChiaroInCorso = false;
+
+function testoChiaviInChiaro() {
+  const rimedio = process.platform === 'linux'
+    ? 'Se installi o sblocchi un portachiavi (GNOME Keyring o KWallet) e riapri Filo, le cifra da solo.'
+    : 'Quando il portachiavi torna disponibile, alla riapertura Filo le cifra da solo.';
+  return `Su questo computer il portachiavi del sistema non risponde, quindi Filo salva le tue chiavi API in chiaro nella sua cartella dei dati: chi può leggere i tuoi file può leggere anche loro. ${rimedio}`;
+}
+
+function chiaviInChiaro() {
+  if (inChiaroInCorso || STATE.data[CHIAVE_IN_CHIARO] || !app.isReady()) return;
+  inChiaroInCorso = true;
+  // Fuori dal giro di serializzazione in corso, e sul disco anche se la scrittura era partita da un incognito.
+  setImmediate(() => avvisa(testoChiaviInChiaro(), 'chiavi-in-chiaro', 0, () => {
+    runNormale(() => set({ [CHIAVE_IN_CHIARO]: Date.now() })).catch(() => {});
+  }));
 }
 
 function quando(ms) {
