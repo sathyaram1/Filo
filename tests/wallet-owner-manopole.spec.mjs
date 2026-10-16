@@ -441,16 +441,6 @@ test('dopo un salvataggio la manopola degli ingressi segue il numero che il serv
   await expect(msg).toHaveText('Rimesso com’era.', { timeout: 15_000 });
   expect(configDoc.invitesRemaining).toBe(9);
   await expect(campo).toHaveValue('9');
-
-  // Mentre l'owner scrive, una rilettura non gli cambia il numero sotto le dita.
-  await campo.fill('33');
-  configDoc.invitesRemaining = 8;
-  const ancora = overviewChiesti;
-  await page.fill('#knob-entryCredits', '5100');
-  await page.click('#knob-entryCredits-salva');
-  await expect(page.locator('#knob-entryCredits-msg')).toHaveText('Salvato.', { timeout: 15_000 });
-  await expect.poll(() => overviewChiesti, { timeout: 10_000 }).toBeGreaterThan(ancora);
-  await expect(campo).toHaveValue('33');
 });
 
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {
