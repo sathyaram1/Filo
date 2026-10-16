@@ -135,6 +135,12 @@ function cercaMarchi(norm) {
 // di download ingannevole.
 const DOUBLE_EXT = /\.(pdf|jpe?g|png|gif|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp[34]|avi|html?)\.(exe|scr|bat|cmd|com|pif|vbs|vbe|js|jar|msi|apk|dmg|ps1|hta|cpl)(\?|#|$)/i;
 
+// Il nome del file travestito, come lo dirà l'avviso: l'ultimo pezzo del percorso o del parametro che lo porta.
+function nomeFile(path, fine) {
+  const nome = path.slice(0, fine).split(/[/?&=#]/).pop() || '';
+  return nome.length > 80 ? '…' + nome.slice(-79) : nome;
+}
+
 // Calcola i segnali deterministici locali. `norm` = output di normalize().
 // `ctx` = indizi opzionali (mai unica base): { hasPassword, hasPayment,
 // mixedContent, autoDownload, linkOrigin, urlPath }.
