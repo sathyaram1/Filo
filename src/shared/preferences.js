@@ -299,7 +299,36 @@
     const N = nomiSito();
     return N ? N.daScritto(raw) : '';
   }
-  function opElenco(v) {
+  function stessoSito() {
+    return global.SN_STESSO_SITO || (typeof require === 'function' ? require('./stessoSito.js') : null);
+  }
+  function eseguibili() {
+    if (!global.SN_ESEGUIBILI && typeof require === 'function') require('./eseguibili.js');
+    return global.SN_ESEGUIBILI || null;
+  }
+  // #876 — i siti fidati si salvano come li usa Filo, uguali alla pagina Sicurezza: mail.google.com vale google.com, e fra
+  // i programmi fidati una piattaforma che ospita i siti di chiunque (github.io) non entra, col perché.
+  const RIDUZIONI = {
+    'security.cookies.trustedSites': (d) => {
+      const S = stessoSito();
+      return { sito: (S && S.sitoDellaVoce(d)) || d };
+    },
+    'security.downloads.trustedSites': (d) => {
+      const E = eseguibili();
+      const v = E ? E.sitoFidabile(d) : null;
+      if (v && v.piattaforma) return { piattaforma: v.piattaforma, rifiuto: E.testoPiattaforma(v.piattaforma) };
+      return { sito: (v && v.sito) || d };
+    },
+  };
+  // La voce che un elenco salva per `x`: per chi toglie o confronta una voce salvata prima della riduzione.
+  function vocePer(percorso, x) {
+    const riduci = RIDUZIONI[percorso];
+    const d = dominioDa(x);
+    if (!riduci || !d) return x;
+    const r = riduci(d);
+    return (r && r.sito) || d;
+  }
+  function opElenco(v, riduci) {
     const s = String(v == null ? '' : v).trim();
     if (!s) return null;
     if (SVUOTA.test(s)) return { op: 'sostituisci', voci: [] };
@@ -313,8 +342,13 @@
     if (!pezzi.length) return null;
     const voci = [];
     const errati = [];
+    const rifiuti = [];
     for (const p of pezzi) {
-      const d = dominioDa(p);
+      let d = dominioDa(p);
+      // Togliere una piattaforma salvata prima che la si rifiutasse deve riuscire: lì resta com'è.
+      const r = d && riduci ? riduci(d) : null;
+      if (r && r.rifiuto && op !== 'togli') { if (!rifiuti.includes(r.rifiuto)) rifiuti.push(r.rifiuto); continue; }
+      if (r && r.sito) d = r.sito;
       if (!d) errati.push(p);
       else if (!voci.includes(d)) voci.push(d);
     }
@@ -322,6 +356,7 @@
       const mostra = (x) => `«${x.length > 60 ? `${x.slice(0, 59)}…` : x}»`;
       return { rifiuto: `${errati.map(mostra).join(', ')} non ${errati.length > 1 ? 'sono domini' : 'è un dominio'}: scrivi il sito con la sua estensione, come facebook.com` };
     }
+    if (rifiuti.length) return { rifiuto: rifiuti.join(' ') };
     return { op, voci };
   }
   // `allentaSe` (#530): il verso che abbassa una difesa. 'togli' per un elenco che protegge (un sito tolto
@@ -342,7 +377,7 @@
       },
       risk,
       build(v) {
-        const o = opElenco(v);
+        const o = opElenco(v, RIDUZIONI[percorso]);
         if (!o || o.rifiuto) return o;
         const lista = o.voci.map(sitoLeggibile).join(', ');
         const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
@@ -397,9 +432,11 @@
     const sitoLeggibile = e.percorso === 'documenti.cartelle' ? nomeCartella : sitoLeggibileDi;
     const attuale = (Array.isArray(dentro(correnti, e.percorso)) ? dentro(correnti, e.percorso) : [])
       .filter((x) => typeof x === 'string' && x.trim());
+    // Una voce salvata prima della riduzione (mail.google.com) è la stessa di quella ridotta (google.com).
+    const presente = (voci, x) => voci.includes(x) || voci.includes(vocePer(e.percorso, x));
     let nuovo;
-    if (e.op === 'aggiungi') nuovo = attuale.concat(e.voci.filter((x) => !attuale.includes(x)));
-    else if (e.op === 'togli') nuovo = attuale.filter((x) => !e.voci.includes(x));
+    if (e.op === 'aggiungi') nuovo = attuale.concat(e.voci.filter((x) => !attuale.some((a) => a === x || vocePer(e.percorso, a) === x)));
+    else if (e.op === 'togli') nuovo = attuale.filter((x) => !presente(e.voci, x));
     else nuovo = e.voci.slice();
     if (nuovo.length === attuale.length && nuovo.every((x, i) => x === attuale[i])) {
       const ha = attuale.length ? `adesso contiene: ${attuale.map(sitoLeggibile).join(', ')}` : 'adesso è vuoto';
