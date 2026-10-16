@@ -38,12 +38,12 @@ Se è l'ultimo caso, dillo nella critica.
    `npx playwright test tests/verifica/<numero>` (numero del feedback senza
    cancelletto, percorso relativo alla radice del repo, barre normali: in altre
    forme risponde «No tests found» anche a cartella piena). Al primo giro la
-   cartella non c'è: controlla con `ls tests/verifica`. **È l'unica corsa di quella cartella
-   in tutto il giro, e tocca a te**: dopo di te chi corregge lancia solo le
-   prove dei rilievi che sta correggendo, e la chiusura non la rilancia. Quindi
-   qui, adesso, in partenza. Una porta di un giro passato che si riapre è un
-   rilievo di livello 2, interno; le porte già chiuse si ri-provano, non si
-   riscoprono come nuove.
+   cartella non c'è: controlla con `ls tests/verifica`. **È l'unica corsa di
+   quella cartella in tutto il giro, e tocca a te**: dopo di te chi corregge
+   lancia solo le prove dei rilievi che sta correggendo, e la chiusura non la
+   rilancia. Quindi qui, adesso, in partenza. Una porta di un giro passato che
+   si riapre è un rilievo di livello 2, interno; le porte già chiuse si
+   ri-provano, non si riscoprono come nuove.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
    rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
    sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li
