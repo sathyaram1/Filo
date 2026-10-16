@@ -645,6 +645,9 @@
   const INVITI_POCHI = 2;
   const PSEUDONIMI_DETTI = 3;
   const DOVE = 'nella pagina Inviti e utenti';
+  const TITOLI_OWNER = Object.freeze({
+    tetto: 'Tetto dei regali', giornaliera: 'Quota del giorno', inviti: 'Ingressi con invito', scarto: 'Registro d’uso',
+  });
 
   const alPercento = (p) => (/^(1|8|11|8\d)$/.test(String(p)) ? `all'${p}%` : `al ${p}%`);
   function elencoBreve(nomi) {
