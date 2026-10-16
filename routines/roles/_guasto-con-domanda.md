@@ -50,8 +50,11 @@ Davanti a un guasto, in quest'ordine:
      stesso gruppo, e le domande stanno insieme.
    - Nel `problema`, il feedback che ferma è il tuo (`payload.num`); gli
      identificativi delle azioni e del collegamento sono `payload.id`.
-   - Senza un feedback (l'esplorazione) togli opzioni, consiglio e
-     collegamenti: l'owner archivia la domanda quando il guasto è riparato.
+   - Le opzioni valgono per chi mette il feedback in attesa (passo 2). Per gli
+     altri ruoli il feedback torna in coda da sé quando il guasto passa: togli
+     opzioni e consiglio e tieni il collegamento. Senza un feedback
+     (l'esplorazione) togli anche quello. L'owner archivia la domanda quando
+     il guasto è riparato.
 
    ```bash
    node scripts/domanda.mjs chiedi ../guasto-<numero>.json
@@ -61,15 +64,8 @@ Davanti a un guasto, in quest'ordine:
    il tuo JSON: correggilo e rilancia. Con `RIFIUTATO dal server: …` la domanda
    non è partita: nella nota e nel rilascio, al posto del numero, va quel
    messaggio esatto.
-2. **Il feedback in attesa**, se il tuo lavoro ne ha uno:
-
-   ```bash
-   node scripts/routine-channel.mjs deliver status --status design --reason guasto \
-     --notes "Guasto, non lavoro locale: <gruppo>. Domanda D-<n>. [cosa resta sul ramo]"
-   ```
-
-   Se il server rifiuta questa consegna (exit 4), non insistere: il suo
-   messaggio va nel motivo del rilascio.
+2. **Il feedback in attesa**: chi risolve o corregge ha la ricetta nelle sue
+   istruzioni, nella sezione «Il feedback fermo per un guasto».
 3. La domanda di fine sessione, poi **il rilascio col guasto**:
 
    ```bash
