@@ -1004,7 +1004,7 @@
     // altrimenti il toast finisce dentro la miniatura (#325): si aspetta la
     // risposta. Se la pagina è già cambiata la cattura può fallire: il
     // salvataggio resta comunque valido, solo senza anteprima.
-    const rimetti = nascondiPannelli();
+    const rimetti = () => {};
     try {
       await attendiCompositor();
       if (entry?.id) await chrome.runtime.sendMessage({ type: MSG.SET_SAVED_PAGE_THUMB, id: entry.id });
