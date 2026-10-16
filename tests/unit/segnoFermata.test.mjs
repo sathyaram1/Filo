@@ -31,6 +31,7 @@ test('ogni motivo dei Ricevuti ha un segno, con la forma del suo livello', () =>
     [{ status: 'design', statusReason: 'decisione' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'loop' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'arenato' }, 'rombo', 'l3'],
+    [{ status: 'design', statusReason: 'guasto' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'locale' }, 'rombo', 'l3'],
     [{ status: 'design', statusReason: 'judges' }, 'cerchio', 'l2'],
     [{ status: 'design' }, 'cerchio', 'l2'],
