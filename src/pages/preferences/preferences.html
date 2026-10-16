@@ -52,7 +52,7 @@
       color: var(--sn-fg);
       font: inherit;
       cursor: pointer;
-      transition: border-color 120ms, background 120ms, box-shadow 120ms;
+      transition: border-color calc(120ms * var(--sn-motion, 1)), background calc(120ms * var(--sn-motion, 1)), box-shadow calc(120ms * var(--sn-motion, 1));
     }
     .sc-tasti:hover, .sc-tasti:focus-visible { border-color: var(--sn-accent); background: var(--sn-hover); outline: none; }
     .sc-kbd {
