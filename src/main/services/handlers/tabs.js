@@ -156,7 +156,9 @@ module.exports = function register(on, ctx) {
     }
     const voci = async () => [...await globalThis.SN_SAVED_PAGES.list(), ...await ArchivedTabs.list()];
     const ses = (sender && sender.wc && sender.wc.session) || session.defaultSession;
-    const dato = await require('../iconeSiti').cercaIconaSito(msg && msg.url, { ses, schede, voci, incognito });
+    // Un indirizzo che al clic chiede l'OK (#848): né il suggerimento né la sua icona contattano il sito prima dell'OK.
+    const soloCopie = (msg && msg.soloCopie === true) || !!(sitoDaConfermare && sitoDaConfermare(msg && msg.url));
+    const dato = await require('../iconeSiti').cercaIconaSito(msg && msg.url, { ses, schede, voci, incognito, soloCopie });
     return { ok: true, dato };
   }));
 
