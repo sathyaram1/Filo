@@ -185,7 +185,7 @@ export function descriviEsitoServer(esito) {
     case 'http':
       return `Il server ha risposto HTTP ${e.status}.`;
     case 'rete':
-      return `Il server non era raggiungibile (${e.messaggio || 'motivo ignoto'}).`;
+      return `Il server non era raggiungibile (${e.messaggio || 'motivo ignoto'}${e.tentativi > 1 ? `, ${e.tentativi} tentativi` : ''}).`;
     case 'illeggibile':
       return 'Il server ha risposto qualcosa che non è JSON: non è detto che sia il server giusto.';
     case 'senza-chiavi':
