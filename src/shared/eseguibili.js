@@ -95,42 +95,94 @@
   function nomiSito() {
     return global.SN_NOMI_SITO || require('./nomiSito.js');
   }
+  // La regola di «stesso sito» (#876). Nella barra e nella pagina Download non c'è: lì i nomi arrivano già decisi dal main.
+  function stessoSito() {
+    return global.SN_STESSO_SITO || (typeof require === 'function' ? require('./stessoSito.js') : null);
+  }
+  // Per fidarsi di un programma anche un blog su wordpress.com o un sito su sharepoint.com è di qualcuno: lo stesso
+  // giudizio di safebrowse, più severo di quello dei cookie.
+  const OSPITI = { tutteLePiattaforme: true };
 
-  // Righe scritte a mano nelle impostazioni → elenco di domini confrontabili.
-  // Tollera l'indirizzo intero incollato (`https://sito.it/percorso` → `sito.it`).
+  // Una voce scritta per i siti fidati: { sito } come Filo la confronta (`download.mozilla.org` → `mozilla.org`),
+  // { piattaforma } se è un suffisso o una piattaforma che ospita i siti di chiunque (github.io, co.uk), null se non è un sito.
+  function sitoFidabile(raw) {
+    const d = nomiSito().daScritto(raw);
+    if (!d) return null;
+    const S = stessoSito();
+    if (S.piattaforma(d, OSPITI)) return { piattaforma: d };
+    return { sito: S.sitoDi(d, OSPITI) || d };
+  }
+
+  // Righe scritte a mano nelle impostazioni → i siti che coprono. Tollera l'indirizzo intero incollato; una
+  // piattaforma non copre nessuno, nemmeno se è stata salvata prima che la si rifiutasse.
   function normalizzaSiti(righe) {
     const fonte = Array.isArray(righe) ? righe : String(righe || '').split(/[\n,]/);
     const out = [];
     for (const raw of fonte) {
-      let s = String(raw || '').trim().toLowerCase();
-      if (!s) continue;
-      if (s.includes('/') || s.includes(':')) s = sito(s.includes('://') ? s : `https://${s}`);
-      s = s.replace(/^www\./, '').replace(/^\.+|\.+$/g, '');
-      if (!s || !nomiSito().valido(s)) continue;
-      if (!out.includes(s)) out.push(s);
+      const v = sitoFidabile(raw);
+      if (v && v.sito && !out.includes(v.sito)) out.push(v.sito);
     }
     return out;
   }
 
-  // Un dominio in elenco vale anche per i suoi sottodomini (`sito.it` copre
-  // `cdn.sito.it`), mai al contrario: `sito.it` non deve coprire `sito.it.evil.com`.
+  // La casella dei siti fidati: come nomiSito.elencoDaTesto, coi siti ridotti a quello che coprono e le piattaforme
+  // fra le righe scartate; `piattaforme` le nomina, per dire perché.
+  function elencoFidati(testo) {
+    const piattaforme = [];
+    const out = nomiSito().elencoDaTesto(testo, (d) => {
+      const v = sitoFidabile(d);
+      if (v && v.piattaforma && !piattaforme.includes(v.piattaforma)) piattaforme.push(v.piattaforma);
+      return v && v.sito ? v.sito : '';
+    });
+    return { ...out, piattaforme };
+  }
+
+  // Un sito in elenco copre tutto il suo sito (`cdn.sito.it` e `sito.it` sono uno), mai un altro: né
+  // `sito.it.evil.com`, né `bob.github.io` per chi ha scritto `alice.github.io`.
   function fidato(url, elenco) {
     const host = comeSito(url);
     if (!host) return false;
-    for (const d of normalizzaSiti(elenco)) {
-      if (host === d || host.endsWith('.' + d)) return true;
-    }
-    return false;
+    const s = stessoSito().sitoDi(host, OSPITI);
+    return !!s && normalizzaSiti(elenco).includes(s);
   }
 
   // Chi ha servito il file, se non è il sito del primo indirizzo cliccato: la
   // fiducia vale per l'uno o per l'altro (#588.3), e chi decide deve vedere
-  // anche dove il rimando l'ha portato. Un sottodominio è lo stesso sito.
+  // anche dove il rimando l'ha portato. Un sottodominio è lo stesso sito, come per la fiducia.
   function servitoDa(primo, ultimo) {
     const a = comeSito(primo);
     const b = comeSito(ultimo);
-    if (!a || !b || b === a || b.endsWith('.' + a)) return '';
-    return b;
+    if (!a || !b || b === a) return '';
+    const S = stessoSito();
+    return S && S.stessoSito(a, b, OSPITI) ? '' : b;
+  }
+
+  // Il sito della pagina dice da dove arriva un file solo se ogni suo riquadro è dello stesso sito: con un riquadro
+  // di altri (una pubblicità) il file può venire da lui (#588). `pagina` e `origini` come le dà il browser.
+  function riquadriDiAltri(pagina, origini) {
+    const p = comeSito(pagina);
+    if (!p) return true;
+    const S = stessoSito();
+    return (Array.isArray(origini) ? origini : []).some((o) => {
+      const h = comeSito(o);
+      return !(h && (h === p || S.stessoSito(h, p, OSPITI)));
+    });
+  }
+
+  // Perché una piattaforma non entra fra i fidati, e il sito preciso da scrivere: uno di `esempi` (i siti da cui sono
+  // scesi programmi) se ce n'è uno sotto di lei, se no la forma.
+  function testoPiattaforma(p, esempi) {
+    const N = nomiSito();
+    const S = stessoSito();
+    const sotto = [];
+    for (const e of Array.isArray(esempi) ? esempi : []) {
+      const h = comeSito(e);
+      const s = h && h.endsWith(`.${p}`) ? S.sitoDi(h, OSPITI) : '';
+      if (s && !S.piattaforma(s, OSPITI) && !sotto.includes(s)) sotto.push(s);
+    }
+    const preciso = sotto.length ? sotto.slice(0, 3).map((s) => N.leggibile(s)).join(' o ') : `nome.${N.leggibile(p)}`;
+    return `«${N.leggibile(p)}» raccoglie i siti di chiunque: fidarsi di lui vorrebbe dire fidarsi di tutti. `
+      + `Scrivi il sito preciso, come ${preciso}.`;
   }
 
   // Le frasi vivono qui perché le dicono tre superfici diverse (l'avviso della
@@ -185,9 +237,13 @@
     eImmagineDisco,
     sito,
     comeSito,
+    sitoFidabile,
     normalizzaSiti,
+    elencoFidati,
     fidato,
     servitoDa,
+    riquadriDiAltri,
+    testoPiattaforma,
     ETICHETTA,
     provenienza,
     testoScarica,
