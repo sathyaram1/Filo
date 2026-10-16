@@ -1,6 +1,6 @@
 // Link accorciati e rimandi noti (#966): gli unici link su cui il puntatore fermo fa partire controlli di rete prima
 // del clic. Un rimando che porta la destinazione nell'indirizzo si legge da qui, senza aprirlo; un accorciato no.
-// Regole: patterns/un-link-accorciato-si-controlla-prima-del-clic.md
+// Regole: tests/unit/safebrowseLinkAccorciati.test.mjs
 
 'use strict';
 
