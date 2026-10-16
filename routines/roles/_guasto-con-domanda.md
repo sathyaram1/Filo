@@ -1,0 +1,26 @@
+## Un guasto dell'ambiente si dice con una domanda
+
+Guasto è ciò che da qui dovrebbe funzionare e non va, e ti ferma. «Non posso
+perché è rotto» è un guasto; «dalla cloud non si fa, per regola»
+(segreti, deploy, automazioni GitHub del server, prove sulla macchina
+dell'owner) è il rimando in locale.
+Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
+
+1. La domanda, coi campi di SPEC-DOMANDE § 3.1 in un JSON fuori dal repo:
+   `priorita` `bloccante`; nel `contesto` cosa hai provato e il messaggio
+   esatto; il feedback che ferma (`payload.id`) nei `collegamenti`. Il `gruppo`
+   è un nome fisso, così chi cade sullo stesso guasto finisce nello stesso:
+   `guasto: filo-security` (clone o token), `guasto: github`, `guasto: npm`,
+   `guasto: electron` (anche lo schermo virtuale); per gli altri `guasto:
+   <causa> <nome>`, la causa fra `credenziali` `clone` `rete` `servizio`
+   `strumento` `permessi`, il nome il programma fallito o l'host che non
+   risponde, minuscolo (`guasto: rete openrouter.ai`).
+   `node scripts/domanda.mjs chiedi <file.json>` risponde `OK: domanda D-<n>
+   aperta.`; con `RIFIUTATO dal server: …`, al posto del numero va quel
+   messaggio esatto.
+2. Chi risolve o corregge mette il feedback in attesa (sezione «Il feedback
+   fermo per un guasto»); per gli altri torna in coda da sé.
+3. La domanda di fine sessione, poi `node scripts/routine-channel.mjs release
+   <biglietto> --role <il tuo ruolo> --guasto "<gruppo>, D-<n>: <messaggio>"`.
+
+<!-- includi: _dopo-un-guasto.md -->

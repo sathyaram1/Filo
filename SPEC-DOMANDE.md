@@ -334,6 +334,7 @@ gruppo e poi per età. Un gruppo si apre come un blocco solo.
 |---|---|
 | `design` + `clarify`/`decisione`, segnalazione L3 | domanda, azione `riprendi` |
 | `design` + `locale` | domanda «lavoro server?» se il feedback è fidato; Ricevuti («rendere fidato») se non lo è |
+| `design` + `guasto` | la domanda c'è già: la apre chi cade sul guasto, col gruppo `guasto: <la cosa rotta>` e il numero nella nota (#1241) |
 | `attesa_chiusa`, `loop`, `arenato` | domanda, azioni `riprendi` / `archivia` |
 | `design` + `secaudit`, `l5`; attacchi, spam, sospetti | Ricevuti |
 

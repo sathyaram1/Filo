@@ -25,13 +25,19 @@ del server scritto fuori registro, GitHub che non risponde). Uscita 1 dopo «git
 sopra, e la riga dopo dice chi ha respinto il token: GitHub, il proxy della sessione, o un rifiuto senza firma. Nelle
 note va il testo esatto di git, con quella riga. Se è
 il controllo dei permessi della sessione a bloccare il comando, copia nelle note il suo messaggio esatto. Non aggirare nessuno di questi no: niente token scritti nell'URL, niente aiutanti di credenziali, niente altre
-credenziali. La parte del server da qui non si fa:
+credenziali. La parte del server da qui non si fa, e la strada dipende dal perché:
 
-- se fai il primo lavoro o correggi, rimanda la pratica in locale con la consegna che trovi più su, nella
-  sezione «Se il lavoro si fa solo in locale», e scrivi nelle note il motivo;
-- se verifichi, non passare il lavoro guardando solo l'app. Registra la critica con un rilievo `[2i?]` che dice che la
-  parte del server non si è potuta verificare, col motivo, e allega con `--segnala` un file per l'owner con le due
-  strade: lavorarlo in locale, o ridarlo alle routine quando il motivo è sparito. Il lavoro si ferma finché non risponde.
+- **un guasto** (GitHub che non risponde, il token respinto da GitHub o dal proxy, un rifiuto senza firma, i permessi
+  della sessione, la rete): per qualunque ruolo è la domanda della
+  sezione «Un guasto dell'ambiente si dice con una domanda», col testo esatto di git e la riga su chi ha respinto il
+  token. Il gruppo è `guasto: filo-security`;
+- **un no per regola** (biglietto sporco o chiuso, feedback non fidato, ramo del server scritto fuori registro):
+  - se fai il primo lavoro o correggi, rimanda la pratica in locale con la consegna che trovi più su, nella
+    sezione «Se il lavoro si fa solo in locale», e scrivi nelle note il motivo;
+  - se verifichi, non passare il lavoro guardando solo l'app. Registra la critica con un rilievo `[2i?]` che dice che
+    la parte del server non si è potuta verificare, col motivo, e allega con `--segnala` un file per l'owner con le due
+    strade: lavorarlo in locale, o ridarlo alle routine quando il motivo è sparito. Il lavoro si ferma finché non
+    risponde.
 
 ### Il ramo
 
