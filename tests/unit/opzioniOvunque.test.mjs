@@ -175,5 +175,5 @@ test('leggiOpzioniRegistrazione: stesso risultato in ogni posizione; il resto re
   assert.equal(leggiOpzioniRegistrazione(['--record-fixed', ID, REPORT, '--frase', '- ora va']).valori['--frase'], '- ora va');
   assert.equal(leggiOpzioniRegistrazione(['--record-fixed', ID, REPORT, '--frase', '']).error, '');
   // Senza opzioni non cambia niente, nemmeno per i comandi che non le leggono.
-  assert.deepEqual(leggiOpzioniRegistrazione(['--preflight']), { args: ['--preflight'], valori: {}, error: '' });
+  assert.deepEqual(leggiOpzioniRegistrazione(['--clear-state', ID]), { args: ['--clear-state', ID], valori: {}, error: '' });
 });
