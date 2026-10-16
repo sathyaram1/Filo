@@ -130,7 +130,7 @@ export async function fetchRemoteKeys(passphrase, { fetchImpl = fetch, sleep } =
     }
     return { apiKeys, esito };
   } catch (e) {
-    const esito = { stato: 'rete', messaggio: e.message };
+    const esito = { stato: 'rete', messaggio: descriviErroreDiRete(e), tentativi: e && e.tentativi };
     console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
     return { apiKeys: {}, esito };
   }
