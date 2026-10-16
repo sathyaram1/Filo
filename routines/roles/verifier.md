@@ -36,10 +36,9 @@ Se è l'ultimo caso, dillo nella critica.
    un'altra versione del codice viene rifiutata.
 3. **Rilancia le prove dei giri passati**, se `payload.history` non è vuoto:
    `npx playwright test tests/verifica/<numero>` (numero del feedback senza
-   cancelletto). Il percorso va scritto relativo alla radice del repo e con le
-   barre normali: in ogni altra forma la risposta è «No tests found» anche a
-   cartella piena. Al primo giro la cartella non c'è: controlla con
-   `ls tests/verifica`, non dal messaggio. **È l'unica corsa di quella cartella
+   cancelletto, percorso relativo alla radice del repo, barre normali: in altre
+   forme risponde «No tests found» anche a cartella piena). Al primo giro la
+   cartella non c'è: controlla con `ls tests/verifica`. **È l'unica corsa di quella cartella
    in tutto il giro, e tocca a te**: dopo di te chi corregge lancia solo le
    prove dei rilievi che sta correggendo, e la chiusura non la rilancia. Quindi
    qui, adesso, in partenza. Una porta di un giro passato che si riapre è un
