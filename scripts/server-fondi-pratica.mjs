@@ -306,7 +306,7 @@ export async function esegui(argv, deps = {}) {
     // Un ramo dell'app legato e fuori da main vince sul registro: è un seguito, o la pratica è stata riaperta.
     const ramiApp = (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
     // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915), salvo che dell'app
-    // arrivi ancora un ramo: lasciata chiusa, la pratica lo rifiuterebbe, quindi si riapre (#938).
+    // arrivi ancora un ramo: lasciata chiusa, la pratica lo rifiuterebbe, quindi si riapre, anche per un seguito (#938).
     let tardiva = null;
     let riapertaDa = null;
     if (letta.status === 'done') {
