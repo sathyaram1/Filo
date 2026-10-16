@@ -34,14 +34,15 @@ test('la chat che riceve «Filo mi protegge dal phishing?» ha la voce nell\'ind
     ['la lista nera di Google', /lista nera di Google/],
     ['l\'età del dominio', /da quanti giorni esiste/],
     ['i campi password o carta', /password o i dati della carta/],
-    ['la scelta legata alla scheda', /in quella scheda finché resta aperta/],
+    ['il «confermo» legato alla scheda', /«confermo» del pericoloso vale solo per quel sito in quella scheda finché resta aperta/],
+    ['il «Continua» che vale per sempre (#967)', /«Continua» sul sospetto mette il sito[^.]*fra i «Siti di cui ti fidi»: da lì l'avviso sospetto non torna su quel sito, in nessuna scheda e dopo i riavvii/],
     ['cosa esce verso Google', /verso Google solo un pezzo dell'impronta dell'indirizzo, mai l'indirizzo/],
     ['cosa esce verso il modello', /verso il modello AI[^.]*mai la pagina/],
     ['dove si spegne', /filo:\/\/security\/security\.html/],
   ]) assert.match(d, re, `il dettaglio dice ${cosa}`);
   for (const [cosa, re] of [
     ['che la pagina carica', /Non impedisce il caricamento/],
-    ['che la conferma vale per la scheda', /La conferma vale solo per quella scheda/],
+    ['che il «confermo» vale per la scheda e nessun elenco tace il pericoloso', /«confermo» del pericoloso vale solo per quella scheda: nessun elenco fa tacere l'avviso pericoloso/],
     ['che il testo della pagina non si legge', /non legge il testo della pagina: guarda solo se ci sono campi password o carta/],
   ]) assert.match(v.doesNot, re, `i limiti dicono ${cosa}`);
 });
