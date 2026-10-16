@@ -1,5 +1,5 @@
-// git verso filo-security col token del biglietto (#1233): l'intestazione legata all'URL vince su aiutanti, askpass,
-// intestazioni e riscritture del proxy, e non resta nel clone. La prova vera usa git e un server git http in locale.
+// git verso filo-security col token del biglietto (#1233): l'URL riscritto col token vince su aiutanti, askpass,
+// intestazioni e riscritture del proxy, non resta nel clone e non esce a video. La prova vera usa git e un server git http in locale.
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,12 +11,15 @@ import { join, resolve } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
-  URL_SERVER, ambienteGitServer, originDelServer, pianoGitServer, ramoAccettabile, urlSenzaSegreti, voceDiAccesso, vociGitServer,
+  URL_SERVER, ambienteGitServer, originDelServer, pianoGitServer, ramoAccettabile, senzaToken, urlConToken, urlSenzaSegreti, voceDiAccesso,
+  vociGitServer,
 } from '../../scripts/lib/git-server.mjs';
 import { eseguiGitServer } from '../../scripts/routine-channel.mjs';
 
 const TOKEN = 'ghs_tokendiprova_abcdefghijklmnopqrstuvwxyz';
-const BASIC = (t) => `basic ${Buffer.from(`x-access-token:${t}`).toString('base64')}`;
+const BASIC = (t) => `Basic ${Buffer.from(`x-access-token:${t}`).toString('base64')}`;
+// Git manda la prima richiesta senza credenziali e quelle dell'URL dopo il 401: conta che ogni Authorization sia la nostra.
+const soloIl = (visti, attesa) => visti.some((v) => v.auth.length) && visti.every((v) => !v.auth.length || (v.auth.length === 1 && v.auth[0] === attesa));
 const vociDi = (env) => Array.from({ length: Number(env.GIT_CONFIG_COUNT) }, (_, i) => [env[`GIT_CONFIG_KEY_${i}`], env[`GIT_CONFIG_VALUE_${i}`]]);
 
 test('voci di accesso: aiutanti, askpass, intestazioni e riscritture; il resto della configurazione resta', () => {
@@ -29,7 +32,7 @@ test('voci di accesso: aiutanti, askpass, intestazioni e riscritture; il resto d
   }
 });
 
-test('l’ambiente del git figlio: niente askpass né aiutanti del proxy, il token solo come intestazione per filo-security', () => {
+test('l’ambiente del git figlio: niente askpass né aiutanti del proxy, il token solo nell’URL riscritto di filo-security', () => {
   const base = {
     PATH: '/bin', HTTPS_PROXY: 'http://proxy:1', GIT_ASKPASS: '/proxy/askpass', SSH_ASKPASS: '/proxy/ssh', GIT_TRACE_REDACT: '0',
     GIT_CONFIG_PARAMETERS: "'credential.helper'='!x'",
@@ -53,16 +56,30 @@ test('l’ambiente del git figlio: niente askpass né aiutanti del proxy, il tok
   assert.deepEqual(voci.slice(1), vociGitServer(TOKEN));
   assert.deepEqual(tolte, ['GIT_ASKPASS', 'SSH_ASKPASS', 'GIT_CONFIG_PARAMETERS', 'GIT_TRACE_REDACT',
     'credential.helper', 'url.http://127.0.0.1:9/git/.insteadOf', 'http.https://github.com/.extraheader']);
-  // Il token esce solo nell'intestazione legata all'URL esatto del repo, dopo l'azzeramento della stessa chiave.
-  const conToken = voci.filter(([, v]) => v.includes(BASIC(TOKEN)));
-  assert.deepEqual(conToken.map(([k]) => k), [`http.${URL_SERVER}.extraHeader`, `http.${URL_SERVER.replace(/\.git$/, '')}.extraHeader`]);
-  for (const [k] of conToken) {
-    const i = voci.findIndex(([kk, v]) => kk === k && v === '');
-    assert.ok(i >= 0 && i < voci.findIndex(([kk, v]) => kk === k && v !== ''), `${k}: prima l'azzeramento`);
-  }
-  assert.ok(!Object.entries(env).some(([k, v]) => !k.startsWith('GIT_CONFIG_VALUE_') && String(v).includes(TOKEN)));
-  // Senza token: solo gli azzeramenti, per i comandi che non vanno in rete.
-  assert.ok(!vociDi(ambienteGitServer(base, '').env).some(([, v]) => /AUTHORIZATION/i.test(v)));
+  // Il token esce solo nel riscrittore dell'URL esatto del repo, in lettura e in spinta, e mai come intestazione.
+  const nudo = URL_SERVER.replace(/\.git$/, '');
+  const conToken = voci.filter(([k, v]) => k.includes(TOKEN) || v.includes(TOKEN));
+  assert.deepEqual(conToken, [
+    [`url.${urlConToken(TOKEN)}.insteadOf`, URL_SERVER], [`url.${urlConToken(TOKEN)}.pushInsteadOf`, URL_SERVER],
+    [`url.${urlConToken(TOKEN, nudo)}.insteadOf`, nudo], [`url.${urlConToken(TOKEN, nudo)}.pushInsteadOf`, nudo],
+  ]);
+  assert.equal(urlConToken(TOKEN), `https://x-access-token:${TOKEN}@github.com/sathyaram1/filo-security.git`);
+  assert.ok(voci.some(([k, v]) => k === 'transfer.credentialsInUrl' && v === 'allow'), 'git non rifiuta l’URL col token');
+  assert.ok(voci.filter(([k]) => /extraheader$/i.test(k)).every(([, v]) => v === ''), 'le intestazioni si azzerano soltanto');
+  assert.ok(!Object.entries(env).some(([k, v]) => !/^GIT_CONFIG_(KEY|VALUE)_/.test(k) && String(v).includes(TOKEN)));
+  // Senza token: solo gli azzeramenti, e l'URL del repo resta sé stesso.
+  const nude = vociDi(ambienteGitServer(base, '').env);
+  assert.ok(!nude.some(([k, v]) => /@/.test(k) || /AUTHORIZATION/i.test(v)));
+  assert.ok(nude.some(([k, v]) => k === `url.${URL_SERVER}.insteadOf` && v === URL_SERVER));
+});
+
+test('l’uscita di git senza token: in chiaro, codificato, e ogni credenziale in un URL', () => {
+  const strano = 'ghs_a/b+c';
+  const testo = `fatal: unable to access '${urlConToken(strano)}': 403\nuser ${strano}\nhttps://altro:segreto@example.com/x`;
+  const pulito = senzaToken(testo, strano);
+  assert.ok(!pulito.includes(strano) && !pulito.includes(encodeURIComponent(strano)) && !pulito.includes('segreto'), pulito);
+  assert.match(pulito, /https:\/\/\*\*\*@github\.com\/sathyaram1\/filo-security\.git/);
+  assert.equal(senzaToken('To https://github.com/sathyaram1/filo-security.git\n', TOKEN), 'To https://github.com/sathyaram1/filo-security.git\n');
 });
 
 test('piano di git-server: azioni, cartella fuori da Filo, rami ammessi, mai main', () => {
@@ -99,25 +116,29 @@ test('eseguiGitServer: il token chiesto col biglietto arriva a git nell’ambien
   mkdirSync(join(clone, '.git'), { recursive: true });
   const lanciati = [];
   const righe = [];
+  const echi = [];
   const lancia = (argv, o) => {
     lanciati.push({ argv, env: o.env });
-    return argv.includes('get-url') ? { status: 0, stdout: `${URL_SERVER}\n` } : { status: 0 };
+    return argv.includes('get-url') ? { status: 0, stdout: `${URL_SERVER}\n` }
+      : { status: 0, stdout: `ok ${TOKEN}\n`, stderr: `To ${urlConToken(TOKEN)}\n` };
   };
   const chiesti = [];
   const token = async (b) => { chiesti.push(b); return { outcome: 'ok', token: TOKEN, scadeIl: Date.parse('2026-10-15T11:00:00Z') }; };
   try {
     const exit = await eseguiGitServer({
       azione: 'push', cartella: clone, ramo: 'worker/f1', biglietto: 'B1', root: join(casa, 'Filo'),
-      env: { GIT_ASKPASS: '/proxy/askpass' }, lancia, token, scrivi: (r) => righe.push(r),
+      env: { GIT_ASKPASS: '/proxy/askpass' }, lancia, token, scrivi: (r) => righe.push(r), eco: (d, t) => echi.push([d, t]),
     });
     assert.equal(exit, 0, righe.join('\n'));
     assert.deepEqual(chiesti, ['B1']);
     assert.equal(lanciati.length, 3, 'due letture dell’origin e la spinta');
     const spinta = lanciati[2];
     assert.deepEqual(spinta.argv, ['-C', clone, 'push', 'origin', 'refs/heads/worker/f1:refs/heads/worker/f1']);
-    assert.ok(vociDi(spinta.env).some(([k, v]) => k === `http.${URL_SERVER}.extraHeader` && v === `AUTHORIZATION: ${BASIC(TOKEN)}`));
+    assert.ok(vociDi(spinta.env).some(([k, v]) => k === `url.${urlConToken(TOKEN)}.pushInsteadOf` && v === URL_SERVER));
+    assert.ok(!spinta.argv.join(' ').includes(TOKEN), 'il token non sta fra gli argomenti');
+    assert.deepEqual(echi, [['out', 'ok ***\n'], ['err', 'To https://***@github.com/sathyaram1/filo-security.git\n']], 'l’uscita di git passa ripulita');
     assert.ok(!('GIT_ASKPASS' in spinta.env));
-    for (const l of lanciati.slice(0, 2)) assert.ok(!JSON.stringify(l).includes(BASIC(TOKEN)), 'la lettura dell’origin non porta il token');
+    for (const l of lanciati.slice(0, 2)) assert.ok(!JSON.stringify(l).includes(TOKEN), 'la lettura dell’origin non porta il token');
     assert.ok(!righe.join('\n').includes(TOKEN));
     assert.match(righe.join('\n'), /scade alle 11:00 UTC/);
     assert.match(righe.join('\n'), /tolti per questa chiamata: GIT_ASKPASS/);
@@ -130,7 +151,7 @@ test('eseguiGitServer: token negato, guasto, git che fallisce, origin estraneo',
   const casa = cartellaTemporanea('filo-git-server-');
   const clone = join(casa, 'filo-security');
   mkdirSync(join(clone, '.git'), { recursive: true });
-  const base = { azione: 'fetch', cartella: clone, biglietto: 'B1', root: join(casa, 'Filo'), env: {} };
+  const base = { azione: 'fetch', cartella: clone, biglietto: 'B1', root: join(casa, 'Filo'), env: {}, eco: () => {} };
   const origin = (url, esito = 0) => (argv) => (argv.includes('get-url') ? { status: 0, stdout: url } : { status: esito });
   try {
     let righe = [];
@@ -142,7 +163,7 @@ test('eseguiGitServer: token negato, guasto, git che fallisce, origin estraneo',
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(URL_SERVER), scrivi, token: async () => ({ outcome: 'fault', reason: 'http_503' }) }), 3);
     righe = [];
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(URL_SERVER, 128), scrivi, token: async () => ({ outcome: 'ok', token: TOKEN }) }), 1);
-    assert.match(righe.join('\n'), /git è uscito con 128[^]*a GitHub non è arrivato buono/);
+    assert.match(righe.join('\n'), /git è uscito con 128[^]*GitHub l'ha respinto/);
     righe = [];
     const estraneo = 'https://x-access-token:SEGRETO@example.com/filo-security.git';
     assert.equal(await eseguiGitServer({ ...base, lancia: origin(estraneo), scrivi, token: async () => { chiamato = true; return { outcome: 'ok', token: TOKEN }; } }), 1);
@@ -240,7 +261,7 @@ test('git vero: con l’ambiente del proxy il clone fallisce, con quello di git-
     writeFileSync(globale, [
       '[credential]', `\thelper = "!f() { echo chiamato >> '${segno.split('\\').join('/')}'; echo username=proxy; echo password=sbagliata; }; f"`,
       `[http "http://127.0.0.1:${port}/"]`, '\textraHeader = AUTHORIZATION: basic globale-sbagliata',
-      '[url "http://127.0.0.1:1/morto-globale/"]', `\tinsteadOf = http://127.0.0.1:${port}/`, '',
+      '[url "http://127.0.0.1:1/morto-globale/"]', `\tinsteadOf = http://127.0.0.1:${port}/`, `\tpushInsteadOf = http://127.0.0.1:${port}/`, '',
     ].join('\n'));
     const proxy = {
       ...macchina, GIT_ASKPASS: join(casa, 'askpass-che-non-esiste'),
@@ -258,7 +279,7 @@ test('git vero: con l’ambiente del proxy il clone fallisce, con quello di git-
     const clone = join(casa, 'filo-security');
     visti.length = 0;
     await git(['clone', '-q', url, clone], env);
-    assert.ok(visti.length > 0 && visti.every((v) => v.auth.length === 1 && v.auth[0] === BASIC(TOKEN)), JSON.stringify(visti.map((v) => v.auth)));
+    assert.ok(soloIl(visti, BASIC(TOKEN)), JSON.stringify(visti.map((v) => v.auth)));
     assert.equal(readFileSync(join(clone, 'README.md'), 'utf8'), 'filo-security\n');
     const configClone = readFileSync(join(clone, '.git', 'config'), 'utf8');
     assert.ok(!configClone.includes(TOKEN) && !configClone.includes(BASIC(TOKEN).split(' ')[1]), 'il token non resta nel clone');
@@ -274,7 +295,7 @@ test('git vero: con l’ambiente del proxy il clone fallisce, con quello di git-
     const { env: altro } = ambienteGitServer(proxy, 'ghs_scaduto', url);
     visti.length = 0;
     await assert.rejects(git(['-C', clone, 'ls-remote', 'origin'], altro));
-    assert.ok(visti.length > 0 && visti.every((v) => v.auth.length === 1 && v.auth[0] === BASIC('ghs_scaduto')), JSON.stringify(visti.map((v) => v.auth)));
+    assert.ok(soloIl(visti, BASIC('ghs_scaduto')), JSON.stringify(visti.map((v) => v.auth)));
     assert.equal(existsSync(segno), false, 'l’aiutante del proxy non è stato chiamato');
   } finally {
     srv.closeAllConnections();

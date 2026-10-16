@@ -1,6 +1,6 @@
 // Git verso filo-security col token del biglietto (#1233): un comando fisso del canale, nessun aiutante di credenziali.
-// Il token vive solo nell'ambiente del git figlio, come intestazione legata all'URL del repo: mai in argv, nel clone o a video.
-// Sentinella: tests/unit/gitServer.test.mjs.
+// Il token vive solo nell'ambiente del git figlio, come credenziale nell'URL riscritto (scelta owner su #1233): mai in
+// argv, nel clone o a video. Sentinella: tests/unit/gitServer.test.mjs.
 
 import { isAbsolute, relative, resolve } from 'node:path';
 
@@ -41,19 +41,31 @@ export function ramoAccettabile(ramo) {
     && !r.endsWith('.lock') && !r.includes('..') && !r.includes('//');
 }
 
+/** L'URL del repo con dentro il token, come utente `x-access-token`. Solo per l'ambiente del git figlio. PURA. */
+export function urlConToken(token, url = URL_SERVER) {
+  return String(url).replace(/^(https?:\/\/)/i, `$1x-access-token:${encodeURIComponent(token)}@`);
+}
+
+/** Il testo che git stampa, senza il token in nessuna forma e senza credenziali negli URL. PURA. */
+export function senzaToken(testo, token) {
+  let t = String(testo || '');
+  for (const f of token ? [...new Set([token, encodeURIComponent(token)])] : []) t = t.split(f).join('***');
+  return t.replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s'"]*@/gi, '$1***@');
+}
+
 /**
- * Le voci di git che fanno passare il token, e solo lui, verso filo-security. Senza token: solo gli azzeramenti.
- * `url` cambia solo nelle prove: il comando non lo espone. PURA.
+ * Le voci di git che fanno passare il token, e solo lui, verso filo-security. Senza token: solo gli azzeramenti, e
+ * l'URL del repo resta sé stesso. `url` cambia solo nelle prove: il comando non lo espone. PURA.
  */
 export function vociGitServer(token, url = URL_SERVER) {
   const voci = [['credential.helper', ''], ['core.askPass', '']];
-  const auth = token ? `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}` : '';
+  if (token) voci.push(['transfer.credentialsInUrl', 'allow']);
   for (const u of [url, url.replace(/\.git$/, '')]) {
-    // Il riscrittore più lungo vince: l'identità sull'URL intero batte quelli del proxy su github.com.
-    voci.push([`url.${u}.insteadOf`, u], [`url.${u}.pushInsteadOf`, u]);
-    // Un valore vuoto azzera le intestazioni raccolte; sull'URL esatto nessuna voce dei file può valere di più.
+    // Il riscrittore più lungo vince: quello sull'URL intero batte quelli del proxy su github.com, anche in spinta.
+    const verso = token ? urlConToken(token, u) : u;
+    voci.push([`url.${verso}.insteadOf`, u], [`url.${verso}.pushInsteadOf`, u]);
+    // Un valore vuoto azzera le intestazioni raccolte dai file: nessuna Authorization estranea accanto al token.
     voci.push([`http.${u}.extraHeader`, '']);
-    if (auth) voci.push([`http.${u}.extraHeader`, auth]);
   }
   return voci;
 }

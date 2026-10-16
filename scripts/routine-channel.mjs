@@ -128,7 +128,7 @@ import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticke
 import { scriviImmagine } from './lib/consegna-file.mjs';
 import { consumoSessione } from './lib/consumo-progressivo.mjs';
 import { quotaFile } from './statusline.mjs';
-import { URL_SERVER, ambienteGitServer, originDelServer, pianoGitServer, urlSenzaSegreti } from './lib/git-server.mjs';
+import { URL_SERVER, ambienteGitServer, originDelServer, pianoGitServer, senzaToken, urlSenzaSegreti } from './lib/git-server.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 
@@ -838,20 +838,21 @@ export async function ramoServer(t, ramo, sha, opts) {
 
 /**
  * `git-server <azione> <cartella> [<ramo>]`: un git verso filo-security col token del biglietto, dato a quella sola
- * chiamata. → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia` e `token` per le prove.
+ * chiamata. → exit: 0 fatto, 1 uso o git fallito, 3 guasto, 4 token rifiutato. `lancia`, `token` ed `eco` per le prove.
  */
 export async function eseguiGitServer({
   azione, cartella, ramo, biglietto, root = ROOT, env = process.env,
   lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
+  eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo),
 } = {}) {
   const clonato = Boolean(String(cartella || '').trim()) && existsSync(join(resolve(String(cartella)), '.git'));
   const piano = pianoGitServer({ azione, cartella, ramo, root, clonato });
   if (piano.errore) { scrivi(`git-server: ${piano.errore} Il server non è stato chiamato.`); return 1; }
   if (piano.nota) scrivi(`git-server: ${piano.nota}`);
   if (piano.controllaOrigin) {
-    const { env: senzaToken } = ambienteGitServer(env, '');
+    const { env: ambienteNudo } = ambienteGitServer(env, '');
     const url = (dove) => {
-      const r = lancia(['-C', piano.dir, 'remote', 'get-url', ...dove, 'origin'], { env: senzaToken, encoding: 'utf8' });
+      const r = lancia(['-C', piano.dir, 'remote', 'get-url', ...dove, 'origin'], { env: ambienteNudo, encoding: 'utf8' });
       return r && r.status === 0 ? String(r.stdout || '').trim() : '';
     };
     for (const u of [url([]), url(['--push'])]) {
@@ -871,10 +872,13 @@ export async function eseguiGitServer({
   const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
   scrivi(`git-server: token del biglietto ottenuto${scade}, git ${piano.argv[0] === 'clone' ? 'clone' : piano.argv[2]} su filo-security.`);
   if (tolte.length) scrivi(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
-  const r = lancia(piano.argv, { env: figlio, stdio: 'inherit' });
-  if (r && r.error) { scrivi(`git-server: git non parte (${r.error.code || r.error.message}).`); return 1; }
+  // L'URL con dentro il token può finire in un messaggio di git: l'uscita passa da qui, ripulita, mai diretta.
+  const r = lancia(piano.argv, { env: figlio, stdio: ['inherit', 'pipe', 'pipe'], encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  if (r && r.stdout) eco('out', senzaToken(r.stdout, t.token));
+  if (r && r.stderr) eco('err', senzaToken(r.stderr, t.token));
+  if (r && r.error) { scrivi(`git-server: git non parte o si è fermato (${r.error.code || r.error.message}).`); return 1; }
   if (!r || r.status !== 0) {
-    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, legato a ${URL_SERVER}: se git parla di autenticazione o di repository non trovato, a GitHub non è arrivato buono (respinto, o sostituito dal proxy della sessione con le credenziali sue: #1233).`);
+    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, nell'URL di ${URL_SERVER} per questa sola chiamata: se git parla di autenticazione o di repository non trovato, GitHub l'ha respinto (scaduto, revocato, o il biglietto non porta il repo).`);
     return 1;
   }
   return 0;
