@@ -724,6 +724,11 @@ test('emit verifier: col testo vero del ruolo, una storia normale e le decisioni
     assert.ok(out.length < 30000, `stampa di ${out.length} caratteri`);
     const j = JSON.parse(out);
     assert.match(j.instructions, /Ruolo: verifier/);
+    // Con i percorsi lunghi di Windows il ruolo può uscire nel suo file: in stampa o lì, arriva intero.
+    const ruolo = j.istruzioniFile ? readFileSync(j.istruzioniFile, 'utf8') : j.instructions;
+    if (j.istruzioniFile) assert.ok(j.instructions.includes(j.istruzioniFile), 'la stampa dice dove sta il ruolo');
+    assert.match(ruolo, /Ruolo: verifier[\s\S]*Contratto comune dei worker[\s\S]*NON RISPONDE \(exit 3\)/);
+    if (payload.history) assert.match(ruolo, /Avvertenza di serie/);
     // Quello che è uscito dalla stampa sta tutto nei file citati.
     const nei = Object.values(j.payload.fileEsterni || {}).map((f) => readFileSync(f, 'utf8')).join('\n');
     if (payload.history) assert.ok(nei.includes(critica) || JSON.stringify(j.payload).includes(critica.slice(0, 200)));
