@@ -619,6 +619,23 @@ test('readRoleInstructions: il pezzo della ripresa si accoda al ruolo che ripart
   assert.ok(!readRoleInstructions('secaudit', { ripresa: true }).includes('Stai riprendendo'), 'il controllo di sicurezza non riprende niente');
 });
 
+test('emit: un verificatore che riparte riceve la verifica completa col pezzo della ripresa, e la ripresa nel payload', () => {
+  const bucket = { role: 'verifier', id: 'x', num: '#9', branch: 'worker/x' };
+  const consegna = (payload) => {
+    let out = '';
+    const real = process.stdout.write;
+    process.stdout.write = (s) => { out += s; return true; };
+    try { emit(bucket, serverCtx(bucket, { payload })); } finally { process.stdout.write = real; }
+    return JSON.parse(out);
+  };
+  const con = consegna({ feedback: { text: 't' }, history: [], ripresa: RIPRESA });
+  assert.match(con.instructions, /# verifica piena[\s\S]*Stai riprendendo un lavoro fermo/);
+  assert.equal(con.payload.scope, 'pieno');
+  assert.deepEqual(con.payload.ripresa, RIPRESA);
+  const senza = consegna({ feedback: { text: 't' }, history: [] });
+  assert.ok(!senza.instructions.includes('Stai riprendendo') && !('ripresa' in senza.payload));
+});
+
 test('nel repo c\'è il pezzo condiviso della ripresa, e il vecchio ruolo della ripresa non c\'è più', () => {
   const ruoli = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
   assert.ok(!existsSync(resolve(ruoli, 'resolver-ripresa.md')), 'resolver-ripresa.md è stato tolto');

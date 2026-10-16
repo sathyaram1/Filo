@@ -54,11 +54,11 @@ test('il segno senza la fiducia, o un valore sconosciuto, non vale; la prova del
 });
 
 // Chi risolve per una routine non apre lavoro locale: rimanda nei Ricevuti col motivo di --serve-locale.
-test('i tre ruoli di chi risolve dicono come rimandare un lavoro che si fa solo in locale', async () => {
+test('i ruoli di chi risolve dicono come rimandare un lavoro che si fa solo in locale', async () => {
   const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
   const { readFileSync } = await import('node:fs');
   const dir = join(__dirname, '..', '..', 'routines', 'roles');
-  for (const ruolo of ['resolver.md', 'resolver-rebase.md', 'resolver-ripresa.md']) {
+  for (const ruolo of ['resolver.md', 'resolver-rebase.md']) {
     const t = espandiInclusioni(readFileSync(join(dir, ruolo), 'utf8'), dir);
     assert.match(t, /deliver status --status design --reason locale/, ruolo);
     assert.match(t, /le\s+routine non ne aprono/, ruolo);
