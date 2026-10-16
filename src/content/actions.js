@@ -961,6 +961,9 @@
       salvataggioInCorso = salva().then((entry) => {
         if (!entry) salvataggioInCorso = null;
         return entry;
+      }, () => {
+        salvataggioInCorso = null;
+        return null;
       });
     }
     return salvataggioInCorso;
