@@ -1,15 +1,24 @@
 ## Se il lavoro si fa solo in locale
 
-Da qui non puoi toccare il codice del server, fare un deploy (funzioni,
-regole), usare un segreto o le credenziali dell'owner, né provare qualcosa
-sulla sua macchina. Se il feedback ha bisogno di una di queste per stare in
-piedi, non aggirarla e non aprire un feedback per una sessione locale (le
-routine non ne aprono): rimandalo nei Ricevuti. Lì l'owner lo approva come
-lavoro locale, e lo prende una sessione sulla sua macchina.
+Da qui non puoi fare un deploy (funzioni, regole), usare un segreto o le
+credenziali dell'owner, toccare le automazioni GitHub del server, né provare
+qualcosa sulla sua macchina. Il codice del server lo tocchi solo in un lavoro
+server, che ha le sue istruzioni: se il feedback ne ha bisogno e il tuo
+biglietto non lo è, vale come qui. Se il feedback ha bisogno di una di queste
+cose per stare in piedi, non aggirarla e non aprire un feedback per una
+sessione locale (le routine non ne aprono): rimandalo nei Ricevuti. Lì l'owner
+lo approva come lavoro locale, e lo prende una sessione sulla sua macchina.
+
+È il caso di un lavoro che dalla cloud non si fa **per regola**. Se invece si
+farebbe da qui ma qualcosa è rotto (un clone, una credenziale, la rete, uno
+strumento, i permessi della sessione), non è lavoro locale: è un guasto, e va
+nella domanda della sezione «Un guasto dell'ambiente si dice con una domanda».
+La nota comincia dicendo quale regola lo tiene fuori dalla cloud, così l'owner
+non lo scambia per un guasto:
 
 ```bash
 node scripts/routine-channel.mjs deliver status --status design --reason locale \
-  --notes "[cosa va fatto in locale e perché; cosa hai già fatto sul ramo]"
+  --notes "Lavoro locale per regola: [quale delle cose sopra serve e perché; cosa hai già fatto sul ramo]"
 ```
 
 Poi rilascia il biglietto: il ramo resta, e chi lavora in locale riparte da lì.
