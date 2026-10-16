@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { visibile } from './routine-domanda.mjs';
+import { absolutizeOutput } from './lib/tools-pin.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
