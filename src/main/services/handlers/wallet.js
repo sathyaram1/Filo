@@ -785,6 +785,7 @@ module.exports = function register(on, ctx) {
     // Le manopole cambiano quota e premi: chi guarda i crediti in un'altra
     // pagina deve rileggere, e la chat anche.
     ultimaLettura = null;
+    vistaLetta = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     return { knobs };
   }));
