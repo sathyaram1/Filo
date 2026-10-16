@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
-  URL_SERVER, ambienteGitServer, originDelServer, pianoGitServer, ramoAccettabile, senzaToken, urlConToken, urlSenzaSegreti, voceDiAccesso,
+  URL_SERVER, ambienteGitServer, chiHaRespinto, originDelServer, pianoGitServer, ramoAccettabile, senzaToken, urlConToken, urlSenzaSegreti, voceDiAccesso,
   vociGitServer,
 } from '../../scripts/lib/git-server.mjs';
 import { eseguiGitServer } from '../../scripts/routine-channel.mjs';
