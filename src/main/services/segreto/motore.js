@@ -7,7 +7,7 @@
 const crypto = require('node:crypto');
 const fsp = require('node:fs/promises');
 const RS = require('./reedSolomon.js');
-const { derivaChiavi } = require('./chiave.js');
+const { derivaChiavi, SALE_MIN } = require('./chiave.js');
 
 const BLOCCO = 4096;
 const NONCE = 12;
