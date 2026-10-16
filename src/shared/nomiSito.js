@@ -106,7 +106,8 @@
 
   // Un elenco scritto a righe: i siti validi (ridotti, senza doppioni) e le righe scartate così com'erano, per dirle;
   // `scartate` le tiene col posto (quanti siti validi le precedevano), per ridarle dove l'utente le aveva scritte.
-  function elencoDaTesto(raw) {
+  // `riduci`, se c'è, dà a ogni sito la voce che l'elenco salva ('' la scarta): così fa la casella dei fidati.
+  function elencoDaTesto(raw, riduci) {
     const valid = [];
     const invalid = [];
     const scartate = [];
@@ -117,7 +118,8 @@
       // una riga che è già un sito intero (un indirizzo con virgole nei parametri) resta una.
       const pezzi = daScritto(intera) ? [intera] : intera.split(/[\s,;]+/).filter(Boolean);
       for (const riga of pezzi) {
-        const sito = daScritto(riga);
+        const scritto = daScritto(riga);
+        const sito = scritto && typeof riduci === 'function' ? riduci(scritto) : scritto;
         if (!sito) { invalid.push(riga); scartate.push({ riga, dopo: valid.length }); continue; }
         if (!valid.includes(sito)) valid.push(sito);
       }
