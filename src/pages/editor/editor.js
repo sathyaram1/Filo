@@ -4119,6 +4119,113 @@
   // ── Scorciatoie modulo personalizzate ──────────────────────────────────
   // Nome scritto, tasto premuto e controlli comuni (tasti di Filo e del sistema, nomi sconosciuti, simboli che
   // cambiano) stanno in SN_TASTI, la stessa regola delle scorciatoie di Filo: qui solo l'Editor e i suoi moduli (#545, #842).
+  // Si salva il tasto fisico (m.data.tasto, #893); m.data.shortcut ne tiene il nome, e da solo è una scorciatoia
+  // salvata come testo prima, che parte come allora.
+
+  // Cosa scrive ogni tasto lo dice il sistema, e cambia se l'utente cambia tastiera: si richiede a ogni campo.
+  let layoutTastiera = null;
+  function leggiLayout() {
+    try {
+      const k = navigator.keyboard;
+      if (!k || typeof k.getLayoutMap !== 'function') return Promise.resolve(layoutTastiera);
+      return Promise.resolve(k.getLayoutMap()).then((mappa) => {
+        const o = {};
+        mappa.forEach((v, c) => { o[c] = v; });
+        layoutTastiera = o;
+        return o;
+      }, () => layoutTastiera);
+    } catch (_) { return Promise.resolve(layoutTastiera); }
+  }
+
+  // Una scorciatoia di modulo: { nome } in forma Windows, `tasto` se è legata al tasto fisico, `car` il carattere
+  // uscito premendola (solo appena premuta: serve ai confronti coi tasti scritti a nome, come «Ctrl+?»).
+  function candidatoDi(data) {
+    const nome = data && typeof data.shortcut === 'string' ? data.shortcut.trim() : '';
+    if (!nome) return null;
+    return TASTI.tastoValido(data.tasto) ? { nome, tasto: data.tasto } : { nome };
+  }
+  function nomeMostrato(c) {
+    if (!c) return '';
+    if (!c.tasto) return c.nome;
+    return TASTI.etichettaScritta((layoutTastiera && TASTI.nomeTastoFisico(c.tasto, layoutTastiera)) || c.nome, TASTI.piattaforma());
+  }
+  function pressioneDi(c) {
+    if (!c) return null;
+    return c.tasto ? TASTI.pressioneFisica(c.tasto, layoutTastiera, TASTI.piattaforma(), c.car) : TASTI.pressioneScritta(c.nome);
+  }
+  function colpisce(c, e) {
+    return !!c && !!e && (c.tasto ? TASTI.combaciaFisico(e, c.tasto) : matchShortcut(e, c.nome));
+  }
+  // Due scorciatoie partono dallo stesso tasto? Quella scritta si prova sulla pressione dell'altra, come farebbe il tasto vero.
+  function stessoTasto(a, b) {
+    if (a.tasto && b.tasto) return a.tasto === b.tasto;
+    const [fisica, altra] = b.tasto ? [b, a] : [a, b];
+    return colpisce(altra, pressioneDi(fisica));
+  }
+  // Scritta a mano: { c } o { rifiuto }. Senza sapere com'è fatta la tastiera, una lettera o un simbolo restano testo.
+  function daScritta(sc) {
+    const r = TASTI.tastoFisicoDaScritta(sc, layoutTastiera, TASTI.piattaforma());
+    if (r && r.rifiuto) return { rifiuto: r.rifiuto };
+    return { c: r ? { nome: r.nome, tasto: r.tasto } : { nome: String(sc).trim() } };
+  }
+
+  // Le scorciatoie salvate come testo si legano al tasto appena si sa com'è fatta la tastiera; quelle che non si
+  // convertono (un simbolo senza un tasto suo) restano testo, e il pannello del modulo lo dice.
+  function convertiScorciatoie(moduli) {
+    let cambiate = 0;
+    for (const m of moduli || []) {
+      const d = m && m.data;
+      if (!d || typeof d.shortcut !== 'string' || !d.shortcut.trim() || TASTI.tastoValido(d.tasto)) continue;
+      const r = TASTI.tastoFisicoDaScritta(d.shortcut, layoutTastiera, TASTI.piattaforma());
+      if (!r || !r.tasto) continue;
+      d.tasto = r.tasto;
+      d.shortcut = r.nome;
+      cambiate++;
+    }
+    return cambiate;
+  }
+  function convertiCollezione() {
+    let n = doc ? convertiScorciatoie(doc.modules) : 0;
+    for (const f of (collection && collection.files) || []) n += convertiScorciatoie(f.modules);
+    if (!n) return;
+    writeCollection();
+    dichiaraCtrlZ();
+  }
+
+  // Il campo che sta registrando una combinazione: il main gli lascia anche i tasti che si prende prima della
+  // pagina (patterns/chi-registra-una-combinazione-riceve-anche-i-tasti-che-filo.md), e li rinnova finché ascolta.
+  let ascolto = null;
+  function chiediTasti(attivo) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REGISTRA_TASTI, attivo })).catch(() => {}); } catch (_) {}
+  }
+  function avviaAscolto(el, gestori) {
+    if (ascolto && ascolto.el === el) return;
+    fermaAscolto();
+    const html = document.documentElement;
+    ascolto = { el, ...gestori, ctrlZ: html.dataset.filoCtrlZ, rinnovo: setInterval(() => chiediTasti(true), 20000) };
+    // Ctrl+Z qui è un tasto da registrare, non «torna alla pagina di prima».
+    html.dataset.filoCtrlZ = 'pagina';
+    chiediTasti(true);
+    leggiLayout();
+  }
+  function fermaAscolto() {
+    if (!ascolto) return;
+    const a = ascolto;
+    ascolto = null;
+    clearInterval(a.rinnovo);
+    if (a.ctrlZ === undefined) delete document.documentElement.dataset.filoCtrlZ;
+    else document.documentElement.dataset.filoCtrlZ = a.ctrlZ;
+    chiediTasti(false);
+  }
+  window.addEventListener('keydown', (e) => {
+    if (!ascolto || e.target !== ascolto.el || !(e.ctrlKey || e.metaKey || e.altKey)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.isComposing || e.repeat) return;
+    ascolto.premuto(e);
+  }, true);
+  window.addEventListener('keyup', (e) => { if (ascolto && e.target === ascolto.el) ascolto.lasciato(e); }, true);
+
   // Un modificatore "reale" cambia il carattere prodotto: Ctrl/Cmd/Alt. Shift da
   // solo NON basta (Shift+b digita comunque "B"), quindi non conta come reale.
   function shortcutHasRealModifier(sc) {
