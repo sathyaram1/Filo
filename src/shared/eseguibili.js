@@ -178,11 +178,15 @@
     // Sotto un indirizzo che serve i file di tutti non c'è un sito preciso da proporre.
     if (S.condiviso(p)) return perche;
     const sotto = [];
+    let soloCondivisi = false;
     for (const e of Array.isArray(esempi) ? esempi : []) {
       const h = comeSito(e);
       const s = h && h.endsWith(`.${p}`) ? S.sitoDi(h, OSPITI) : '';
-      if (s && !S.piattaforma(s, OSPITI) && !sotto.includes(s)) sotto.push(s);
+      if (s && S.condiviso(s)) soloCondivisi = true;
+      else if (s && !S.piattaforma(s, OSPITI) && !sotto.includes(s)) sotto.push(s);
     }
+    // Un programma arrivato da storage.googleapis.com/<secchio>/… non ha un sito preciso: «nome.googleapis.com» porterebbe lì.
+    if (!sotto.length && soloCondivisi) return perche;
     const preciso = sotto.length ? sotto.slice(0, 3).map((s) => N.leggibile(s)).join(' o ') : `nome.${N.leggibile(p)}`;
     return `${perche} Scrivi il sito preciso, come ${preciso}.`;
   }
