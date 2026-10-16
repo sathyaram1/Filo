@@ -4671,7 +4671,7 @@
     mgUserNoteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
       // Un Esc chiude una cosa sola: senza fermarlo, chiuderebbe anche la ricerca aperta. Il blur salva.
-      else if (e.key === 'Escape') {
+      else if (e.key === 'Escape' && !e.isComposing) {
         e.preventDefault();
         e.stopPropagation();
         collassaFrase();
