@@ -106,7 +106,7 @@ function allAvvio(app) {
   } else {
     try { fs.rmSync(path.join(dir, SEGNO), { force: true }); } catch (_) {}
   }
-  esito = { rimasti, riprova: rimasti.length > 0 && tentativi < TENTATIVI_MASSIMI, ancheIdentita: segno.ancheIdentita === true };
+  esito = { rimasti, riprova: rimasti.length > 0 && tentativi < TENTATIVI_MASSIMI, ancheIdentita: segno.ancheIdentita === true, cartella: dir };
   return esito;
 }
 
