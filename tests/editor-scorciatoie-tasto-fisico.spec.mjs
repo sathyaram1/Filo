@@ -75,7 +75,8 @@ async function premi(page, { key, code, modifiers }) {
 
 const salvata = (page, id) => page.evaluate((mid) => {
   const col = JSON.parse(localStorage.getItem('filo.editor.collection') || '{}');
-  const m = ((col.files || [])[0] || { modules: [] }).modules.find((x) => x.id === mid);
+  const file = (col.files || []).find((f) => f.id === 'file-tasti') || { modules: [] };
+  const m = (file.modules || []).find((x) => x.id === mid);
   return m ? { shortcut: m.data.shortcut || '', tasto: m.data.tasto || '' } : null;
 }, id);
 
