@@ -163,11 +163,17 @@
   const CONDIVISI = ['githubusercontent.com', 'googleusercontent.com', 'dropboxusercontent.com',
     'github-production-release-asset-2e65be.s3.amazonaws.com'];
   // Questi lo sono da soli, non coi nomi sotto: storage.googleapis.com/<secchio>/… è di tutti, <secchio>.storage… è di uno.
+  // Anche dentro un sito di un'azienda sola: Google Drive e gli allegati di Discord consegnano ciò che chiunque condivide.
   const CONDIVISI_HOST = new Set(['storage.googleapis.com', 'commondatastorage.googleapis.com',
-    'storage-download.googleapis.com', 'firebasestorage.googleapis.com', 'www.googleapis.com']);
+    'storage-download.googleapis.com', 'firebasestorage.googleapis.com', 'www.googleapis.com',
+    'drive.google.com', 'drive.usercontent.google.com', 'docs.google.com', 'sites.google.com',
+    'cdn.discordapp.com', 'media.discordapp.net']);
+  // I file dei clienti di Backblaze, per numero di gruppo (f000…) o per regione nella forma di S3.
+  const CONDIVISI_FORMA = /^(?:f\d+|s3\.[a-z0-9-]+)\.backblazeb2\.com$/;
   function condiviso(voce) {
     const host = hostDi(voce).replace(/\.+$/, '');
-    return !!host && (CONDIVISI_HOST.has(host) || CONDIVISI.some((c) => host === c || host.endsWith(`.${c}`)));
+    return !!host && (CONDIVISI_HOST.has(host) || CONDIVISI_FORMA.test(host)
+      || CONDIVISI.some((c) => host === c || host.endsWith(`.${c}`)));
   }
 
   // Una voce che non è il sito di nessuno: un suffisso pubblico (co.uk) o una piattaforma che ospita i siti di chiunque
