@@ -82,7 +82,7 @@ import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifie
 import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
-import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import { numeraRilievi, rigaNumerata, ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
 import { installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
