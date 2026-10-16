@@ -921,8 +921,21 @@ function pianifica(S, fisicheLibere, modifica, { riusa = [] } = {}) {
   let blocchiTabella = [];
   if (bytes.length > TABELLA_IN_TESTA) {
     const t = Math.ceil(bytes.length / CARICO);
-    blocchiTabella = Array.from({ length: t }, prendi);
-    if (estensioni(blocchiTabella).length > ESTENSIONI_MAX) blocchiTabella = Array.from({ length: t }, () => coda++);
+    const a = Array.from({ length: t }, prendi);
+    const gruppiA = new Set(a.map((j) => Math.floor(j / GRUPPO)));
+    const b = [];
+    while (b.length < t) {
+      const j = prendi();
+      if (!gruppiA.has(Math.floor(j / GRUPPO))) b.push(j);
+    }
+    blocchiTabella = [...a, ...b];
+    if (estensioni(blocchiTabella).length > ESTENSIONI_MAX) {
+      const da = coda;
+      coda = Math.ceil((coda + t) / GRUPPO) * GRUPPO;
+      const db = coda;
+      coda += t;
+      blocchiTabella = [...Array.from({ length: t }, (_, x) => da + x), ...Array.from({ length: t }, (_, x) => db + x)];
+    }
   }
   const L2 = Math.max(S.L, coda);
   if (2 * (L2 - S.L) > fisicheLibere) return null;
