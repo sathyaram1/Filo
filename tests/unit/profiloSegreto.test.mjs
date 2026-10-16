@@ -770,3 +770,111 @@ describe('dichiarato alla creazione, poi aperto come tutti i giorni', () => {
     rmSync(base.contenitore, { force: true });
   });
 });
+
+describe('corrente che salta e finestra che non si ferma', () => {
+  // Il disco tiene un sottoinsieme qualsiasi delle scritture fatte dopo l'ultima sincronizzazione: qui le prime m di
+  // quelle sopra le copie vecchie e nessuna nei posti nuovi, il caso che guasta la versione vecchia senza dare la nuova.
+  test('salvare un file che allunga un gruppo, con la corrente che salta a ogni punto: i file già salvati restano', async () => {
+    const fsp = require('node:fs/promises');
+    const base = await contenitore(16 * MB);
+    const PIENO = randomBytes(12 * F.CARICO);
+    const A = randomBytes(3 * F.CARICO + 100);
+    const B = randomBytes(6 * F.CARICO);
+    const s = await crea(base, 'Casa');
+    await s.scriviFile('pieno', PIENO);
+    await s.scriviFile('a', A);
+    await s.chiudi();
+    const r0 = (await apri(base, 'Casa')).segreto;
+    const prima = readFileSync(base.contenitore);
+    const k = await K.derivaChiavi(F.normalizzaNome('Casa'), base.sale, PROVA);
+    const giaSue = new Set();
+    for (let p = 0; p < prima.length / F.BLOCCO; p++) if (F.leggiPrefisso(F.apriBlocco(k.cifra, p, blocco(prima, p)))) giaSue.add(p);
+    const registro = [];
+    const open0 = fsp.open;
+    fsp.open = async (...a) => {
+      const fh = await open0(...a);
+      const w0 = fh.write.bind(fh);
+      const s0 = fh.datasync.bind(fh);
+      fh.write = async (buf, off, len, pos) => {
+        for (let x = 0; x < len; x += F.BLOCCO) registro.push({ p: (pos + x) / F.BLOCCO, dati: Buffer.from(buf.subarray(off + x, off + x + F.BLOCCO)) });
+        return w0(buf, off, len, pos);
+      };
+      fh.datasync = async () => { registro.push(null); return s0(); };
+      return fh;
+    };
+    try {
+      await r0.scriviFile('b', B);
+    } finally {
+      fsp.open = open0;
+    }
+    await r0.chiudi();
+    const tratti = [[]];
+    for (const w of registro) if (w) tratti[tratti.length - 1].push(w); else tratti.push([]);
+    const guasti = [];
+    let casi = 0;
+    for (let t = 0; t < tratti.length; t++) {
+      const sopra = tratti[t].filter((w) => giaSue.has(w.p));
+      for (let m = 1; m <= sopra.length; m++) {
+        const disco = Buffer.from(prima);
+        for (let x = 0; x < t; x++) for (const w of tratti[x]) w.dati.copy(disco, w.p * F.BLOCCO);
+        for (const w of sopra.slice(0, m)) w.dati.copy(disco, w.p * F.BLOCCO);
+        writeFileSync(base.contenitore, disco);
+        casi++;
+        const r = await apri(base, 'Casa');
+        const e = { esito: r.esito };
+        if (r.segreto) {
+          const uguale = (n, atteso) => r.segreto.leggiFile(n).then((b) => b.equals(atteso), (err) => err.codice);
+          e.pieno = await uguale('pieno', PIENO);
+          e.a = await uguale('a', A);
+          e.b = r.segreto.elencaFile().some((f) => f.nome === 'b') ? await uguale('b', B) : 'assente';
+          await r.segreto.chiudi();
+        }
+        if (!(e.esito === 'aperto' && e.pieno === true && e.a === true && (e.b === true || e.b === 'assente'))) guasti.push(`tratto ${t + 1}, ${m} di ${sopra.length}: ${JSON.stringify(e)}`);
+      }
+    }
+    assert.ok(casi > 10, `troppi pochi tagli provati: ${casi}`);
+    assert.deepEqual(guasti, []);
+    rmSync(base.contenitore, { force: true });
+  });
+
+  // Il motore gira nel processo della finestra: fra un giro e l'altro del ciclo degli eventi lavora su pochi blocchi,
+  // qualunque sia la dimensione del segreto. Si contano cifrature, decifrature e byte casuali per giro.
+  test('aprire, salvare, leggere e togliere un file da 24 MB lascia il turno ogni poche centinaia di blocchi', async () => {
+    const crypto = require('node:crypto');
+    const base = await contenitore(64 * MB);
+    const dati = randomBytes(24 * MB);
+    const orig = { d: crypto.createDecipheriv, c: crypto.createCipheriv, r: crypto.randomBytes };
+    let blocchi = 0;
+    let max = 0;
+    let acceso = true;
+    const giro = () => { max = Math.max(max, blocchi); blocchi = 0; if (acceso) setImmediate(giro); };
+    crypto.createDecipheriv = function (...a) { blocchi++; return orig.d.apply(this, a); };
+    crypto.createCipheriv = function (...a) { blocchi++; return orig.c.apply(this, a); };
+    crypto.randomBytes = function (n, ...a) { blocchi += Math.ceil(n / F.BLOCCO); return orig.r.call(this, n, ...a); };
+    const massimi = {};
+    const misura = async (nome, fn) => {
+      await new Promise((ok) => setImmediate(ok));
+      max = 0;
+      blocchi = 0;
+      const r = await fn();
+      massimi[nome] = Math.max(max, blocchi);
+      return r;
+    };
+    setImmediate(giro);
+    try {
+      const s = await misura('crea', () => crea(base, 'Casa'));
+      await misura('salva', () => s.scriviFile('foto', dati));
+      await s.chiudi();
+      const r = (await misura('apri', () => apri(base, 'Casa'))).segreto;
+      assert.ok((await misura('leggi', () => r.leggiFile('foto'))).equals(dati));
+      await misura('togli', () => r.cancellaFile('foto'));
+      await misura('cancella', () => r.cancella());
+    } finally {
+      acceso = false;
+      Object.assign(crypto, { createDecipheriv: orig.d, createCipheriv: orig.c, randomBytes: orig.r });
+    }
+    const troppi = Object.fromEntries(Object.entries(massimi).filter(([, n]) => n > 1536));
+    assert.deepEqual(troppi, {}, `blocchi lavorati in un giro solo: ${JSON.stringify(massimi)}`);
+    rmSync(base.contenitore, { force: true });
+  });
+});
