@@ -1561,12 +1561,26 @@
         if (!item) return;
         const v = input.value.slice(0, 500);
         if (String(item.userNote || '') === v) return;
-        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true });
+        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true }).then((ok) => { if (ok) riflettiFrase(id); });
       };
       input.addEventListener('blur', flush);
       input.addEventListener('input', () => {
         clearTimeout(timer);
         timer = setTimeout(flush, 1500);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation();
+        mostraFrase(input.closest('.fb-card'), input.dataset.id, false);
+      });
+    });
+
+    root.querySelectorAll('.fb-usernote-toggle').forEach((b) => {
+      b.addEventListener('click', () => {
+        const card = b.closest('.fb-card');
+        const box = card && card.querySelector('.fb-usernote-box');
+        if (box) mostraFrase(card, b.dataset.id, box.hidden);
       });
     });
   }
