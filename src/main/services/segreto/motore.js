@@ -858,38 +858,45 @@ async function crescita(ctx, S, L2) {
   await scriviTestaGruppo(ctx, S);
 }
 
+// Un gruppo che non si decodifica più mentre il segreto è aperto l'ha toccato qualcun altro: la vista in memoria non
+// vale più, e la riapertura ritrova tutto e segna i file rovinati.
+function daRiaprire() {
+  return errore('RIAPRI', 'Il segreto è cambiato mentre era aperto: va riaperto col suo nome.');
+}
+
 async function transazione(ctx, S, piano, dati) {
   const { tabella, bytes, blocchiTabella, L2 } = piano;
   for (let x = 0; x < blocchiTabella.length; x++) dati.set(blocchiTabella[x], bytes.subarray(x * CARICO, (x + 1) * CARICO));
   const prima = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   const Lprima = S.L;
-  if (L2 > S.L) await crescita(ctx, S, L2);
   const gruppi = [...new Set([...dati.keys()].filter((j) => j >= GRUPPO).map((j) => Math.floor(j / GRUPPO)))].sort((a, b) => a - b);
-  const danneggiati = [];
+  // Prima di scrivere: il contenuto vecchio che deve restare accanto ai blocchi nuovi.
+  const vecchi = new Map();
+  for (const g of gruppi) {
+    if (GRUPPO * g >= Lprima) continue;
+    const servono = [];
+    for (let s = 0; s < Math.min(GRUPPO, Lprima - GRUPPO * g); s++) if (!dati.has(GRUPPO * g + s) && prima[GRUPPO * g + s]) servono.push(s);
+    if (!servono.length) continue;
+    const c = await carichiGruppo(ctx, S, g);
+    if (servono.some((s) => !c[s])) throw daRiaprire();
+    vecchi.set(g, c);
+  }
+  if (L2 > S.L) await crescita(ctx, S, L2);
   for (let x = 0; x < gruppi.length; x += GRUPPI_PER_LOTTO) {
-    const voci = [];
-    for (const g of gruppi.slice(x, x + GRUPPI_PER_LOTTO)) {
-      const ke = kAtteso(S, g);
-      const serveVecchio = Array.from({ length: ke }, (_, s) => GRUPPO * g + s).some((j) => !dati.has(j) && j < Lprima && prima[j]);
-      const vecchi = serveVecchio ? await carichiGruppo(ctx, S, g) : [];
-      voci.push({
-        g,
-        carichi: Array.from({ length: ke }, (_, s) => {
-          const j = GRUPPO * g + s;
-          if (dati.has(j)) return dati.get(j);
-          if (j < Lprima && prima[j] && !vecchi[s]) danneggiati.push(j);
-          return (j < Lprima && prima[j] && vecchi[s]) || ZERO;
-        }),
-      });
-    }
-    await riscriviGruppi(ctx, S, voci);
+    await riscriviGruppi(ctx, S, gruppi.slice(x, x + GRUPPI_PER_LOTTO).map((g) => ({
+      g,
+      carichi: Array.from({ length: kAtteso(S, g) }, (_, s) => {
+        const j = GRUPPO * g + s;
+        if (dati.has(j)) return dati.get(j);
+        const v = vecchi.get(g);
+        return (j < Lprima && prima[j] && v && v[s]) || ZERO;
+      }),
+    })));
   }
   await ctx.fh.datasync();
-  if (danneggiati.length) marcaDanneggiati(tabella, danneggiati);
-  const nuovi = new Map([...dati].filter(([j]) => j < GRUPPO));
   S.tabella = tabella;
   S.blocchiTabella = blocchiTabella;
-  await scriviTestaGruppo(ctx, S, { nuovi, bytes: danneggiati.length ? serializzaTabella(tabella) : bytes });
+  await scriviTestaGruppo(ctx, S, { nuovi: new Map([...dati].filter(([j]) => j < GRUPPO)), bytes });
   await liberaEStringi(ctx, S, prima);
 }
 
