@@ -164,6 +164,9 @@ comando no); lo stesso tasto, premuto, la toglie: biglietti e derivati nuovi nas
 **La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
 scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
 ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
+Dalla copia dell'owner (#953) firmano tutte le strade: riquadro, chat (`owner:filo:chat`), riapertura dalla
+bacheca (`owner:uid:<uid>`); la segnalazione automatica resta `auto:` (non l'ha letta né confermata) ma porta la sua
+prova, che in Gestione la distingue da quella di un estraneo. Chi decide il mittente: `src/main/services/feedbackMittente.js`.
 Dal #1148 serve solo alle statistiche, alle raffiche e al segno di pericolo: non dà permessi.
 
 **Mittenti provati** (`owner:`/`routine:`/`agent:`/`local:` con la prova; per mittente fino al §10, non per fiducia): mai `attack`/`spam`; se un
