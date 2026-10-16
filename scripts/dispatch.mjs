@@ -2127,14 +2127,26 @@ export function emit(bucket, ctx) {
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: pieno && pieno.case });
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
   const instructions = server || serial ? [base.replace(/\s+$/, ''), server, serial].filter(Boolean).join('\n\n') : base;
-  const stampaCon = (payload) => ({ role: bucket.role, payload, claim: bucket.id || null, instructions });
+  const stampaCon = (payload, istr = instructions, file = '') => ({
+    role: bucket.role, payload, claim: bucket.id || null, instructions: istr, ...(file ? { istruzioniFile: file } : {}),
+  });
+  // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
+  const misuraCon = (istr, file) => (p) => JSON.stringify(stampaCon(p, istr, file), null, 2).length + 1;
+  const scarica = (misura) => scaricaPayload(pieno, { root: ROOT, sempre: ['diff', 'diffServer'], max: STAMPA_MAX, misura });
   let payload = pieno;
+  let istr = instructions;
+  let fileIstr = '';
   try {
-    // Si misura la stampa vera, ruolo e rientri compresi: il testo del ruolo cambia da ruolo a ruolo.
-    payload = scaricaPayload(pieno, {
-      root: ROOT, sempre: ['diff', 'diffServer'], max: STAMPA_MAX,
-      misura: (p) => JSON.stringify(stampaCon(p), null, 2).length + 1,
-    });
+    payload = scarica(misuraCon(instructions));
+    // Un ruolo lungo con un payload già tutto fuori (un verificatore di un lavoro server) passerebbe la soglia
+    // dell'harness: esce il ruolo, intero, e il payload si riscarica attorno al rimando.
+    if (misuraCon(instructions)(payload) > STAMPA_TETTO) {
+      const f = fileRuolo(ROOT);
+      const rimando = rimandoAlRuolo(instructions, f);
+      payload = scarica(misuraCon(rimando, f));
+      scriviRuolo(f, instructions);
+      [istr, fileIstr] = [rimando, f];
+    }
   } catch (e) {
     // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché. Le immagini
     // no: megabyte di base64 in stampa non li legge nessuno, la voce porta il motivo.
