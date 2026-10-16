@@ -1307,7 +1307,7 @@ async function apriOCrea(opzioni, crea) {
     } finally {
       for (const d of D) cancellaChiavi(d);
       for (const k of chiaviAltri) if (k) { k.cifra.fill(0); k.posto.fill(0); }
-      await ctx.fh.close();
+      await chiudiContenitore(ctx);
     }
   });
 }
