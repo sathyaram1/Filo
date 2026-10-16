@@ -28,7 +28,7 @@ test('r2 col portachiavi la chiave di Safe Browsing e la password del proxy non 
       safeStorage.decryptString = (b) => Buffer.from(b).reverse().toString('utf8');
     });
     await primaFinestra(app);
-    await app.evaluate(async ({ k, p }) => {
+    await app.evaluate(async (_electron, { k, p }) => {
       const s = await globalThis.SN_STORAGE.getSettings();
       await globalThis.SN_STORAGE.updateSettings({
         security: { ...s.security, safeBrowse: { ...(s.security?.safeBrowse || {}), safeBrowsingKey: k } },
