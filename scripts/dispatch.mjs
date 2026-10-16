@@ -419,9 +419,8 @@ export const OPZIONI_REGISTRAZIONE = {
 const FORMA_OPZIONE = { file: ' <file.md>', testo: ' "…"', bandiera: '' };
 
 /**
- * Toglie le opzioni dei --record-* in qualunque posizione, anche come `--opzione=valore` (la forma del
- * canale). PURA. `valori` per nome (`true` per una bandiera); `error` è la frase da stampare: valore
- * mancante, un flag al posto del valore, opzione ripetuta, o un'opzione che il comando non legge.
+ * Anche come `--opzione=valore`, la forma del canale. PURA. `error`: valore mancante o storto, opzione
+ * ripetuta, o un'opzione che il comando non legge.
  * @returns {{ args: string[], valori: Record<string, string|true>, error: string }}
  */
 export function leggiOpzioniRegistrazione(list) {
