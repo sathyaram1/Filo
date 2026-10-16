@@ -91,14 +91,16 @@ function primaStringa(...valori) {
 // che serve a chi legge il guasto — degradare in silenzio non è degradare.
 // Non lancia: si ripiega sui segreti del job, perché una versione con quelle
 // chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
-async function fetchRemoteKeys(passphrase) {
+// La richiesta è una lettura: ogni guasto di rete si ritenta, perché un solo
+// tentativo andato a vuoto lasciava una piattaforma fuori dalla release (#1240).
+export async function fetchRemoteKeys(passphrase, { fetchImpl = fetch, sleep } = {}) {
   if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
   try {
-    const res = await fetch(`${CANALE}/buildKeys`, {
+    const res = await fetchRitentato(`${CANALE}/buildKeys`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ passphrase }),
-    });
+    }, { fetchImpl, sleep, tentativi: 4, attese: [2000, 5000, 15000], ritentaSe: () => true });
     if (!res.ok) {
       const esito = { stato: 'http', status: res.status };
       console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
