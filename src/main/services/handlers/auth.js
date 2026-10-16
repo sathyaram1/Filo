@@ -402,8 +402,14 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
-      // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938).
-      const localMerges = await globalThis.SN_FEEDBACK.partiDaAzzerare(id, status, { idToken }) ? null : undefined;
+      // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
+      // partenza si chiede al documento, non alla copia della pagina.
+      const FB = globalThis.SN_FEEDBACK;
+      let localMerges;
+      if (status !== undefined && FB.statusToPublic(status) === 'open') {
+        const [ora] = await FB.getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
+        if (ora && ora.localMerges && FB.riapre(ora.statusPublic, status)) localMerges = null;
+      }
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
         { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges },
