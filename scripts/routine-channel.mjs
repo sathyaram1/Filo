@@ -878,7 +878,12 @@ export async function eseguiGitServer({
   if (r && r.stderr) eco('err', senzaToken(r.stderr, t.token));
   if (r && r.error) { scrivi(`git-server: git non parte o si è fermato (${r.error.code || r.error.message}).`); return 1; }
   if (!r || r.status !== 0) {
-    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, nell'URL di ${URL_SERVER} per questa sola chiamata: se git parla di autenticazione o di repository non trovato, GitHub l'ha respinto (scaduto, revocato, o il biglietto non porta il repo).`);
+    const chi = {
+      proxy: 'a respingerlo è il proxy della sessione, non GitHub: il token non è arrivato a GitHub. Il testo esatto, sopra, è quello da riportare.',
+      github: 'GitHub l\'ha respinto (scaduto, revocato, o il biglietto non porta il repo).',
+      ignoto: 'il rifiuto non dice chi lo manda: può essere GitHub o il proxy della sessione. Il testo esatto, sopra, è quello da riportare.',
+    }[chiHaRespinto(r && r.stderr)] || 'il motivo è nel testo di git, sopra.';
+    scrivi(`git-server: git è uscito con ${r ? (r.status ?? r.signal) : '?'}. Il token c'era, nell'URL di ${URL_SERVER} per questa sola chiamata: ${chi}`);
     return 1;
   }
   return 0;
