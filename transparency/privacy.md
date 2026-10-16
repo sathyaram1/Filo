@@ -2,7 +2,7 @@
 id: privacy
 title: Privacy
 subtitle: Cosa resta sul tuo computer, cosa esce, verso chi, e perché.
-updated: 2026-10-12
+updated: 2026-10-16
 order: 2
 ---
 
