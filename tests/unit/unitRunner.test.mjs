@@ -745,16 +745,17 @@ test('--solo fa girare solo i file dati, con la guardia della corsa intera: un f
     writeFileSync(join(dir, 'scelto.test.mjs'), "import { test } from 'node:test';\ntest('scelto', () => {});\n");
     writeFileSync(join(dir, 'altro.test.mjs'), "import { test } from 'node:test';\ntest('altro', () => { throw new Error('non doveva girare'); });\n");
     writeFileSync(join(dir, 'fermo.test.mjs'), "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
-    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    const env = { ...process.env, FILO_UNIT_DIR: dir };
     delete env.NODE_TEST_CONTEXT;
-    const lancia = (...file) => spawnSync(process.execPath, [LANCIATORE, '--solo', ...file], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    // Il tetto piccolo solo dove c'è un fermo da chiudere: sotto carico un file sano può metterci di più a partire (#1235).
+    const lancia = (file, tetto = {}) => spawnSync(process.execPath, [LANCIATORE, '--solo', ...file], { env: { ...env, ...tetto }, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
 
-    const scelto = lancia(join(dir, 'scelto.test.mjs'));
+    const scelto = lancia([join(dir, 'scelto.test.mjs')]);
     assert.equal(scelto.status, 0, scelto.stdout + scelto.stderr);
     assert.match(scelto.stdout, /^ok 1 - scelto$/m);
     assert.doesNotMatch(scelto.stdout, /altro|fermo/);
 
-    const fermo = lancia(join(dir, 'fermo.test.mjs'));
+    const fermo = lancia([join(dir, 'fermo.test.mjs')], { FILO_UNIT_TETTO_FERMO_MS: '3000' });
     assert.notEqual(fermo.error?.code, 'ETIMEDOUT', 'la riprova è rimasta appesa');
     assert.match(fermo.stdout, /ROSSO: .*fermo\.test\.mjs non è andato avanti/);
     assert.equal(fermo.status, 1);
