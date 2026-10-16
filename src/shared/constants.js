@@ -3117,6 +3117,8 @@
     DEFAULT_PROVIDER,
     PROVIDER_ORDER,
     modelProvidersWithKey,
+    campiSegreti,
+    haSegreti,
     canServeAction,
     whyCannotServe,
     DEFAULT_SETTINGS,
