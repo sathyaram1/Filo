@@ -175,8 +175,8 @@ test('la pulizia non toglie il caso segnato di un rilievo da correggere al posto
   }
 });
 
-// Il caso del 03/10 (#765, #896, #913), con verify-local vero: chi verifica segna la prova, corregge lui il rilievo nella
-// fase 2, le toglie il segno e consegna.
+// Il caso del 03/10 (#765, #896, #913), con verify-local vero: la prova del rilievo è segnata, il rilievo si corregge, il
+// segno si toglie e si consegna.
 const { withRequest, withCritique } = await import('../../scripts/verify-local.mjs');
 const REPORT = 'Corretto il rilievo 1: il pannello della pausa non cancella più la frase. Tolto il segno di rosso atteso dalla sua prova.';
 
