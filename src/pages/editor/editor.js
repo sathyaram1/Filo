@@ -4305,8 +4305,8 @@
     const libera = scorciatoiaLibera(m);
     const perEsempio = libera ? `, per esempio ${libera}` : '';
     if (r.tipo === 'senzaTastoProprio') return `Su questa tastiera «${r.nome}» non ha un tasto suo: premi la combinazione invece di scriverla.`;
-    if (r.tipo === 'macControl') return `Su Mac le scorciatoie dei moduli si fanno con ${tasto('Ctrl')}: Control da solo non lo distinguo.`;
-    if (r.tipo === 'win') return `Il tasto ${TASTI.suMac() ? 'Cmd' : 'Windows'} lo usa il sistema: usa ${tasto('Ctrl')} o Alt.`;
+    if (r.tipo === 'macControl') return `Su Mac le scorciatoie dei moduli si fanno con ${tasto('Ctrl')}, non con Control.`;
+    if (r.tipo === 'win') return `Il tasto ${TASTI.piattaforma() === 'linux' ? 'Super' : 'Windows'} lo usa il sistema: usa Ctrl o Alt.`;
     if (r.tipo === 'modificatore') {
       return `Non riconosco «${r.nome}» come tasto da tenere premuto: usa ${tasto('Ctrl')}, Alt o Shift (Maiusc)${libera ? `, es. ${libera}` : ''}.`;
     }
