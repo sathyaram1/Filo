@@ -219,10 +219,10 @@ module.exports = function register(on, ctx) {
           url: '',
           title: '',
           userAgent: '',
-          clientId: `uid:${uid}`,
+          clientId: firmato.clientId,
           parentId: id,
           name: '',
-        });
+        }, firmato.dallOwner ? { idToken, soloAdmin: true } : undefined);
         // #678 — la riapertura è una segnalazione di questa installazione:
         // entra nel registro, e la prossima apertura della home va a vedere
         // subito se c'è una ricompensa da dare (l'attesa si azzera).
