@@ -590,33 +590,45 @@ function analizzaGruppi(S) {
   }
 }
 
-// I k blocchi di dati della versione buona del gruppo, ricostruiti dalla parità se serve; null se ne restano meno di k.
-async function decodificaGruppo(ctx, S, g) {
-  const info = S.gruppi[g];
-  if (!info) return null;
-  const { k, v } = info;
-  const base = 2 * GRUPPO * g;
-  const presenti = new Map();
-  const prova = async (ids) => {
-    const buone = ids.filter((i) => S.pos[i] >= 0 && S.ver[i] === v && S.kk[i] === k);
-    const blocchi = await leggiPosizioni(ctx, buone.map((i) => S.pos[i]));
-    for (const i of buone) {
+// I k blocchi di dati della versione buona di ogni gruppo, ricostruiti dalla parità se serve (null se ne restano meno
+// di k). Un lotto si legge tutto insieme: dopo che altri hanno scritto molto, i gruppi da rifare sono migliaia.
+async function decodificaGruppi(ctx, S, gruppi) {
+  const presenti = new Map(gruppi.map((g) => [g, new Map()]));
+  const copie = (g, c) => Array.from({ length: S.gruppi[g].k }, (_, s) => 2 * GRUPPO * g + 2 * s + c)
+    .filter((i) => valida(S, g, i)).map((i) => ({ g, i }));
+  const leggi = async (voci) => {
+    const blocchi = await leggiPosizioni(ctx, voci.map(({ i }) => S.pos[i]));
+    for (const { g, i } of voci) {
+      const { k, v } = S.gruppi[g];
       const pre = leggiPrefisso(apriBlocco(S.cifra, S.pos[i], blocchi.get(S.pos[i])));
       if (!pre || !pre.inc.equals(S.inc) || 2 * pre.j + pre.c !== i || pre.v !== v || pre.k !== k) continue;
       const s = pre.j - GRUPPO * g;
-      presenti.set(pre.c === 0 ? s : k + s, Buffer.from(pre.carico));
+      presenti.get(g).set(pre.c === 0 ? s : k + s, Buffer.from(pre.carico));
     }
   };
-  await prova(Array.from({ length: k }, (_, s) => base + 2 * s));
-  if (presenti.size < k) await prova(Array.from({ length: k }, (_, s) => base + 2 * s + 1));
-  return RS.ricostruisci(k, presenti);
+  const vivi = gruppi.filter((g) => S.gruppi[g]);
+  await leggi(vivi.flatMap((g) => copie(g, 0)));
+  await leggi(vivi.filter((g) => presenti.get(g).size < S.gruppi[g].k).flatMap((g) => copie(g, 1)));
+  return new Map(gruppi.map((g) => [g, S.gruppi[g] ? RS.ricostruisci(S.gruppi[g].k, presenti.get(g)) : null]));
 }
 
-// I carichi dei blocchi del gruppo dentro L: null per quelli che la versione buona non copre o se il gruppo è perso.
+// I carichi dei blocchi dentro L di ogni gruppo: null per quelli che la versione buona non copre o se il gruppo è perso.
+async function carichiGruppi(ctx, S, gruppi) {
+  const dati = await decodificaGruppi(ctx, S, gruppi);
+  return new Map(gruppi.map((g) => {
+    const d = dati.get(g);
+    return [g, Array.from({ length: kAtteso(S, g) }, (_, s) => (d && s < d.length ? d[s] : null))];
+  }));
+}
+
 async function carichiGruppo(ctx, S, g) {
-  const ke = kAtteso(S, g);
-  const dati = await decodificaGruppo(ctx, S, g);
-  return Array.from({ length: ke }, (_, s) => (dati && s < dati.length ? dati[s] : null));
+  return (await carichiGruppi(ctx, S, [g])).get(g);
+}
+
+function aLotti(lista, n = GRUPPI_PER_LOTTO) {
+  const out = [];
+  for (let x = 0; x < lista.length; x += n) out.push(lista.slice(x, x + n));
+  return out;
 }
 
 async function caricaTabella(ctx, S, testa) {
