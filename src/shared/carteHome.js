@@ -127,6 +127,16 @@
     return [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
   }
 
+  // La pagina di Filo a cui porta un avviso (#855), scritta dal main in `action.apri`: solo un indirizzo filo://, e
+  // gli avvisi che non la portano restano come sono.
+  function paginaDiAvviso(n) {
+    const a = n && n.action && typeof n.action === 'object' ? n.action : null;
+    const url = a && typeof a.apri === 'string' ? a.apri.trim() : '';
+    if (!/^filo:\/\/[a-z0-9-]+\/\S*$/i.test(url)) return null;
+    const etichetta = typeof a.etichetta === 'string' && a.etichetta.trim() ? a.etichetta.trim() : 'Apri';
+    return { url, etichetta };
+  }
+
   // Le carte di sinistra che l'utente ha tolto e che ci sarebbero ancora: stanno in «altro», da cui si rimettono una per una.
   function nascosteSinistra(dati, layout, ora = Date.now()) {
     const l = normalizza(layout);
