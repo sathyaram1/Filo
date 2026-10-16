@@ -189,12 +189,10 @@ function togliSegreti(dati, filo) {
     proxy.push(k);
   }
   if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; }
-  const daTogliere = [...segreti].filter((v) => v.length >= SEGRETO_MIN);
-  if (!daTogliere.length || !filo || !filo.length) {
-    if (daTogliere.length) oscura(dati, daTogliere);
-    return { filo, proxy };
-  }
-  oscura(dati, daTogliere);
+  // Il più lungo prima: l'indirizzo intero del proxy contiene la sua password.
+  const daTogliere = [...segreti].filter((v) => v.length >= SEGRETO_MIN).sort((a, b) => b.length - a.length);
+  if (daTogliere.length) oscura(dati, daTogliere);
+  if (!daTogliere.length || !filo || !filo.length) return { filo, proxy };
   return { filo: Buffer.from(sostituisci(Buffer.isBuffer(filo) ? filo.toString('utf8') : String(filo), daTogliere), 'utf8'), proxy };
 }
 
