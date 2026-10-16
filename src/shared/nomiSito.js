@@ -111,11 +111,16 @@
     const invalid = [];
     const scartate = [];
     for (const line of String(raw == null ? '' : raw).split('\n')) {
-      const riga = line.trim();
-      if (!riga) continue;
-      const sito = daScritto(riga);
-      if (!sito) { invalid.push(riga); scartate.push({ riga, dopo: valid.length }); continue; }
-      if (!valid.includes(sito)) valid.push(sito);
+      const intera = line.trim();
+      if (!intera) continue;
+      // Più siti incollati su una riga («a.it, b.com», «a.it b.com») valgono uno per uno, come in chat;
+      // una riga che è già un sito intero (un indirizzo con virgole nei parametri) resta una.
+      const pezzi = daScritto(intera) ? [intera] : intera.split(/[\s,;]+/).filter(Boolean);
+      for (const riga of pezzi) {
+        const sito = daScritto(riga);
+        if (!sito) { invalid.push(riga); scartate.push({ riga, dopo: valid.length }); continue; }
+        if (!valid.includes(sito)) valid.push(sito);
+      }
     }
     return { valid, invalid, scartate };
   }
