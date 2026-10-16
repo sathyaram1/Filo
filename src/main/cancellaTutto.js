@@ -11,7 +11,7 @@ const PAROLA = 'conferma';
 
 // Si tiene per nome esatto, col perché: tutto il resto della cartella se ne va, anche ciò che nascerà dopo.
 const RESTA = Object.freeze({
-  'Local State': 'la chiave con cui il sistema cifra i file di Filo: senza, l\'identità dei crediti non si rilegge più',
+  'Local State': 'su Windows la chiave con cui il sistema cifra i file di Filo: senza, l\'identità dei crediti tenuta non si rilegge più',
   SingletonLock: 'il segno di Chromium che tiene aperta una copia sola di Filo, non un dato',
   SingletonCookie: 'il segno di Chromium che tiene aperta una copia sola di Filo, non un dato',
   SingletonSocket: 'il segno di Chromium che tiene aperta una copia sola di Filo, non un dato',
