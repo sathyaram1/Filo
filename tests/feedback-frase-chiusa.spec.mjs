@@ -169,4 +169,14 @@ test('Gestione: Esc nella frase la richiude, rende il fuoco al tasto e salva', a
   await expect(tastoMg).toHaveAttribute('aria-expanded', 'false');
   await expect.poll(() => page.evaluate(() => window.__updates.map((u) => u.userNote))).toEqual(['Ora la condivisione apre il foglio di sistema.']);
   await expect(tastoMg).toHaveClass(/mg-usernote-piena/);
+
+  // Un Esc chiude una cosa sola: con la ricerca aperta, chiude la frase e la ricerca resta.
+  await page.locator('#mgSearchToggle').click();
+  await expect.poll(() => page.evaluate(() => window.__mgTest.isSearchMode())).toBe(true);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), CODA[0]._id);
+  await tastoMg.click();
+  await expect(page.locator('#mgUserNoteText')).toBeFocused();
+  await page.locator('#mgUserNoteText').press('Escape');
+  await expect(modulo).toBeHidden();
+  expect(await page.evaluate(() => window.__mgTest.isSearchMode())).toBe(true);
 });
