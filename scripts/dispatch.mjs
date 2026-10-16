@@ -530,12 +530,10 @@ const ROLE_FILE = {
   prober: 'prober.md',
   halt: 'halt.md',
 };
-// Il correttore ha due casi (payload.case), e la ripresa dopo la risposta
-// dell'owner non è un rebase: un caso sconosciuto vale il riallineamento.
-const FIXER_CASE_FILE = {
-  riallineamento: ROLE_FILE.fixer,
-  ripresa: 'resolver-ripresa.md',
-};
+// Dopo la risposta dell'owner riparte il ruolo che si era fermato (#1203): la
+// ripresa è un pezzo in più del suo testo, non un ruolo a sé.
+const RIPRESA_FILE = '_ripresa.md';
+const RUOLI_CON_RIPRESA = ['new-work', 'resolver', 'verifier', 'fixer'];
 
 // Il contratto comune dei worker (testo di ritorno non è un canale,
 // rifiuto ≠ guasto): UNA copia, accodata qui a ogni ruolo lavorante — prima
