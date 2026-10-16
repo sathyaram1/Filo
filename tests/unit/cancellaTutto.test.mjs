@@ -123,8 +123,8 @@ test('un file che non si lascia cancellare si dice, e il giro dopo riprova solo 
   const esito = C.allAvvio(appFinta(dir));
   assert.deepEqual(esito.rimasti, ['Cookies']);
   assert.equal(esito.riprova, true);
-  assert.match(C.fraseEsito(esito), /«Cookies»/);
-  assert.match(C.fraseEsito(esito), /riprovo al prossimo avvio/);
+  assert.match(C.fraseEsito(esito), /tranne «Cookies» nella cartella dei dati/);
+  assert.match(C.fraseEsito(esito), /Riprovo al prossimo avvio\.$/);
   const segno = JSON.parse(fs.readFileSync(join(dir, C.SEGNO), 'utf8'));
   assert.deepEqual(segno.soli, ['Cookies']);
   // Nel frattempo l'utente ha ricominciato: il giro dopo non deve portargli via niente.
