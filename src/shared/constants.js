@@ -3007,6 +3007,8 @@
   }
 
   const SAVED_PAGES_LIMIT = 1000;
+  // Il nome di una categoria di «Aperti per dopo» scritto a mano: il campo lo ferma qui, il main rifiuta oltre.
+  const CATEGORY_NAME_MAX = 100;
   // §3.2 ricerca semantica: dimensione del vettore di indicizzazione
   // (Matryoshka: 256 dim = buon compromesso qualità/peso), quantizzato a int8.
   // L'archivio delle schede non ha tetti (patterns/un-archivio-che-cresce-sta-in-file-suoi-a-sole-aggiunte.md).
@@ -3113,6 +3115,7 @@
     PROMPTS,
     FILO_CHAT_TRIAGE_CHARS,
     SAVED_PAGES_LIMIT,
+    CATEGORY_NAME_MAX,
     EMBED_DIM,
     AI_CACHE_MAX_PER_FUNZIONE,
     CLIPBOARD_HISTORY_MAX,

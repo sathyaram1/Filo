@@ -49,14 +49,30 @@ module.exports = function register(on, ctx) {
     return { ok: true, categories: await Categorizer.listCategories() };
   });
 
+  // `nome`: la categoria nuova scritta a mano; se ne esiste già una con quel nome si usa quella.
   soloFilo(MSG.MOVE_PAGE_CATEGORY, async (msg) => {
-    const p = await Categorizer.movePageToCategory(msg.pageId, msg.categoryId);
-    return { ok: true, page: p };
+    let categoryId = msg.categoryId || null;
+    if (msg.nome !== undefined) {
+      const nome = String(msg.nome || '').trim();
+      const max = globalThis.SN_CONST.CATEGORY_NAME_MAX;
+      if (!nome) return { ok: false, error: 'empty_name' };
+      if (nome.length > max) return { ok: false, error: 'name_too_long', max };
+      // Senza la pagina non si crea niente: una categoria vuota resterebbe nelle Opzioni senza averla chiesta.
+      if (!(await SavedPages.list()).some((p) => p.id === msg.pageId)) return { ok: false, error: 'not_found' };
+      categoryId = (await Categorizer.ensureCategory({ name: nome })).id;
+    }
+    const p = await Categorizer.movePageToCategory(msg.pageId, categoryId);
+    return p ? { ok: true, page: p } : { ok: false, error: 'not_found' };
   });
 
   soloFilo(MSG.GET_SAVED_PAGES, async () => ({ ok: true, pages: await SavedPages.list() }));
 
   soloFilo(MSG.REMOVE_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.remove(msg.id) }));
+
+  soloFilo(MSG.RESTORE_SAVED_PAGE, async (msg) => {
+    const { pages, entry } = await SavedPages.rimetti(msg.id, await Categorizer.listCategories());
+    return { ok: !!entry, pages };
+  });
 
   soloFilo(MSG.CONSUME_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.consume(msg.id) }));
 

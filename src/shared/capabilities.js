@@ -317,8 +317,8 @@
     },
     {
       id: 'open-for-later', title: 'Aperti per dopo', category: 'save',
-      desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire. Con le categorie automatiche ogni pagina salvata prende una categoria scelta da un modello e la lista si raggruppa per categoria: sono spente di serie, e si accendono in Preferenze → Impostazioni avanzate → «Funzioni» o chiedendolo a Filo.',
-      invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Anche cliccando la conferma che appare dopo «Salva per dopo». Clicca una scheda per riaprirla.',
+      desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire. Con le categorie automatiche ogni pagina salvata prende una categoria scelta da un modello e la lista si raggruppa per categoria: sono spente di serie, e si accendono in Preferenze → Impostazioni avanzate → «Funzioni» o chiedendolo a Filo. Su ogni scheda il menu proprio (tasto destro, tasto Menu o Maiusc+F10): «Apri», «Apri e tienila in lista», «Copia link», «Sposta in…» (fra le categorie che ci sono o in una «Nuova categoria…»; compare solo se ci sono categorie) e «Rimuovi», che per qualche secondo si annulla dall’avviso.',
+      invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Anche cliccando la conferma che appare dopo «Salva per dopo». Clicca una scheda per riaprirla (si toglie dalla lista).',
       doesNot: 'Non è la home: l’icona Home della barra laterale porta alla nuova scheda, non a questa lista.',
     },
     {

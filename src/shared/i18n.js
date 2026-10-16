@@ -815,6 +815,18 @@
     home_empty: 'Nessuna scheda salvata. Click destro su una pagina → "Salva per dopo".',
     home_no_results: 'Nessun risultato per la ricerca.',
     home_remove: 'Rimuovi',
+    home_menu_open: 'Apri',
+    home_menu_open_keep: 'Apri e tienila in lista',
+    home_menu_copy_link: 'Copia link',
+    home_menu_move: 'Sposta in…',
+    home_menu_new_category: 'Nuova categoria…',
+    home_new_category_placeholder: 'Nome della nuova categoria',
+    home_removed: '«%s» rimossa.',
+    home_undo: 'Annulla',
+    home_link_copied: 'Link copiato',
+    home_link_copy_failed: 'Il link non si è copiato: riprova.',
+    home_moved: 'Spostata in «%s»',
+    home_move_failed: 'Non si è spostata: nel frattempo l’elenco è cambiato. Riprova da qui.',
 
     // History
     history_title: 'Cronologia AI',
