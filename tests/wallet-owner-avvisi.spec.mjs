@@ -179,7 +179,6 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
       stato.dati = 30000;
       await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.OPEN_URL, url: 'filo://credits/owner.html' }));
       await expect.poll(() => avvisiOwner(app), { timeout: 15_000 }).toEqual([]);
-      await home.bringToFront();
       await expect(carte(home)).toHaveCount(0, { timeout: 15_000 });
     } finally { await chiudiApp(app); }
   } finally {
