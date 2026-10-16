@@ -405,7 +405,7 @@ function nuovoStato(chiavi, etichetta, N) {
   return {
     etichetta, cifra: chiavi.cifra, posto: chiavi.posto, inc: null, L: 0, contatore: 0, vmax: 0,
     pos: new Float64Array(0), ver: new Uint32Array(0), kk: new Uint8Array(0), zero: new Uint8Array(0),
-    gruppi: [], tabella: new Map(), blocchiTabella: [], creato: 0, aperto: 0, apertoPrima: 0,
+    gruppi: [], tabella: new Map(), blocchiTabella: [], bytesTabella: null, creato: 0, aperto: 0, apertoPrima: 0,
     letti: new Uint8Array(N), vuote: 0, catena: 0, scansionato: false, spazzatura: new Set(), candidati: null, caseVecchie: null,
   };
 }
@@ -1122,10 +1122,11 @@ async function riparaProprio(ctx, S) {
   const persiInteri = [];
   const daRifare = [];
   const blocchiDi = (g) => Array.from({ length: kAtteso(S, g) }, (_, s) => GRUPPO * g + s);
+  const tab = caricoTabella(S);
   for (let g = 1; g < G; g++) {
     const info = S.gruppi[g];
     if (!info) {
-      persiInteri.push({ g, carichi: blocchiDi(g).map(() => ZERO) });
+      persiInteri.push({ g, carichi: blocchiDi(g).map((j) => tab.get(j) || ZERO) });
       continue;
     }
     const blocchi = blocchiDi(g);
@@ -1163,7 +1164,7 @@ async function riparaProprio(ctx, S) {
 async function creaNuovo(ctx, S, ora) {
   Object.assign(S, {
     inc: crypto.randomBytes(8), L: 1, contatore: 0, creato: ora, aperto: ora, apertoPrima: 0,
-    tabella: new Map(), blocchiTabella: [], gruppi: [],
+    tabella: new Map(), blocchiTabella: [], bytesTabella: null, gruppi: [],
     pos: new Float64Array(0), ver: new Uint32Array(0), kk: new Uint8Array(0), zero: new Uint8Array(0),
   });
   dimensiona(S, 1);
