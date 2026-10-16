@@ -480,6 +480,16 @@ test('#876 — i siti fidati dalla chat: il sito che la voce copre, e nessuna pi
   assert.ok(no.rifiuto && !no.partial);
   assert.match(no.rifiuto, /«github\.io» raccoglie i siti di chiunque.*nome\.github\.io/);
   assert.ok(build('siti_fidati_programmi', 'solo vercel.app, mozilla.org').rifiuto);
+  // Fra i siti dove resti connesso una piattaforma non entra nemmeno: come nella pagina Sicurezza.
+  for (const p of ['github.io', 'co.uk']) {
+    const c = build('siti_fidati_cookie', `aggiungi ${p}`);
+    assert.ok(c.rifiuto && !c.partial, p);
+    assert.match(c.rifiuto, /raccoglie i siti di chiunque/);
+  }
+  assert.deepEqual(build('siti_fidati_cookie', 'aggiungi wordpress.com, alice.github.io').elenco.voci, ['wordpress.com', 'alice.github.io']);
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_cookie', 'togli github.io').elenco,
+    { security: { cookies: { trustedSites: ['github.io', 'libero.it'] } } }).partial,
+  { security: { cookies: { trustedSites: ['libero.it'] } } }, 'una piattaforma salvata prima si toglie');
 
   // Una voce salvata prima della riduzione si toglie col suo sito, e non si raddoppia aggiungendolo.
   const prima = { security: { cookies: { trustedSites: ['mail.google.com', 'libero.it'] }, downloads: { trustedSites: ['github.io', 'download.mozilla.org'] } } };
