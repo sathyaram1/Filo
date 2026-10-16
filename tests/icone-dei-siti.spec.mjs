@@ -5,8 +5,8 @@
 import { test, expect } from './fixtures/electron.mjs';
 
 const NEWTAB = 'filo://newtab/';
-const PNG_ROSSO = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==';
-const PNG_BLU = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPj/HwADBwIAMCbHYQAAAABJRU5ErkJggg==';
+const PNG_ROSSO = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4YaMBAAL8AS3/gzpXAAAAAElFTkSuQmCC';
+const PNG_BLU = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQCDgBAAHkAUEYgvCnAAAAAElFTkSuQmCC';
 const dato = (b64) => `data:image/png;base64,${b64}`;
 
 // sito-con-icona.test ha solo /favicon.ico; scheda.test dichiara la sua icona in un altro indirizzo; senza-icona.test niente.
@@ -117,10 +117,20 @@ test('l\'icona viene dalla scheda aperta e, chiusa la scheda, dall\'archivio: ma
   expect(versoTerzi(await richieste(app))).toEqual([]);
 });
 
-test('un sito web non può chiedere al main l\'icona di un sito', async ({ openTab, testServer }) => {
-  const page = await openTab(testServer.html('<!doctype html><title>Sito</title><h1>sito</h1>'));
-  const r = await page.evaluate(() => new Promise((res) => {
-    try { chrome.runtime.sendMessage({ type: 'icona_sito', url: 'https://sito-con-icona.test/' }, (x) => res(x || null)); } catch (e) { res({ eccezione: String(e) }); }
-  }));
-  expect(r && r.dato).toBeFalsy();
+test('un sito visitato non può chiedere al main l\'icona di un sito: la porta risponde solo alle pagine di Filo', async ({ app, shell }) => {
+  void shell;
+  await sitiFinti(app);
+  const r = await app.evaluate(async () => {
+    const msg = { type: globalThis.SN_MSG.MSG.ICONA_SITO, url: 'https://sito-con-icona.test/' };
+    return {
+      sito: await globalThis.SN_HANDLE_MESSAGE(msg, { url: 'https://evil.example/pagina' }),
+      sitoConScheda: await globalThis.SN_HANDLE_MESSAGE(msg, { tab: { id: 1, url: 'https://evil.example/pagina' }, url: 'https://evil.example/pagina' }),
+      richiesteDopoIlSito: globalThis.__richiesteSiti.slice(),
+      filo: await globalThis.SN_HANDLE_MESSAGE(msg, { url: 'filo://newtab/' }),
+    };
+  });
+  expect(r.sito).toMatchObject({ ok: false, code: 'forbidden' });
+  expect(r.sitoConScheda).toMatchObject({ ok: false, code: 'forbidden' });
+  expect(r.richiesteDopoIlSito, 'il rifiuto non fa partire nessuna richiesta').toEqual([]);
+  expect(r.filo).toMatchObject({ ok: true, dato: dato(PNG_ROSSO) });
 });
