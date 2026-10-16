@@ -410,10 +410,15 @@
 
     let chiuso = false;
     let tempo = null;
+    let ritorno = null;
     const chiudi = () => {
       if (chiuso) return;
       chiuso = true;
       if (tempo) { tempo.annulla(); tempo = null; }
+      // Chi aveva il fuoco sull'avviso torna all'elenco, non in cima alla pagina.
+      if (el.contains(document.activeElement) && ritorno && document.contains(ritorno)) {
+        try { ritorno.focus(); } catch (_) {}
+      }
       el.dataset.snClosing = '1';
       el.classList.remove('sn-toast-visible');
       setTimeout(() => P.unmountToast(el), window.SN_THEME_TOKENS?.motionMs(250) ?? 250);
@@ -422,13 +427,29 @@
       e.stopPropagation();
       if (chiuso) return;
       const prendiFuoco = document.activeElement === btn;
+      ritorno = null;
       chiudi();
       rimetti(page, { prendiFuoco });
     });
     el.addEventListener('click', chiudi);
+    el.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      chiudi();
+    });
+    el.addEventListener('focusin', () => { if (tempo) { tempo.annulla(); tempo = null; } });
+    el.addEventListener('focusout', (e) => {
+      if (chiuso || el.contains(e.relatedTarget)) return;
+      tempo = P.tempoAvviso(7000, chiudi);
+    });
     P.mountToast(el, { sticky: true, chiudi });
     requestAnimationFrame(() => el.classList.add('sn-toast-visible'));
     tempo = P.tempoAvviso(7000, chiudi);
+    if (daTastiera) {
+      ritorno = document.activeElement;
+      try { btn.focus(); } catch (_) {}
+    }
   }
 
   function corto(s, max = 60) {
