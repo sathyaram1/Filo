@@ -90,9 +90,11 @@ export const CAMPI_NUMERAZIONE = ['name', 'createdAt', 'seq', 'subSeq', 'senderP
 
 // I numeri nuovi partono oltre il contatore (ogni numero dato da un invio ne è uscito) e oltre i
 // numeri provati; non oltre il massimo di tutti, che un anonimo porta a un milione (#923).
+// Senza contatore si riparte oltre ogni numero in uso: dal solo provato si ridarebbero numeri già presi.
 function ultimoNumeroBuono(contatore, docs) {
+  if (!Number.isInteger(contatore)) return docs.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0);
   const provato = FB.maxSeqProvato(docs.map((d) => ({ seq: intField(d, 'seq'), senderProof: strField(d, 'senderProof') })));
-  return Math.max(Number.isInteger(contatore) ? contatore : 0, provato);
+  return Math.max(contatore, provato);
 }
 
 // Il nome con cui la lettura si mette da parte fra la prova a secco e
@@ -205,7 +207,14 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     // quello del contatore, non il massimo dei documenti (#923).
     const contatore = await FB.submissionCount({ idToken: bearer || '' });
     letture.aggiungi(1, 'contatore');
-    console.log(`${conto.totale} feedback totali: ${conto.numerati} già numerati, 0 da numerare (si parte da #${ultimoNumeroBuono(contatore, []) + 1}).`);
+    // Un contatore che manca lo si ricrea oltre il numero più alto in uso, o l'app non numera più niente.
+    let ultimo = contatore;
+    if (!Number.isInteger(contatore)) {
+      ultimo = await FB.maxSeq({ idToken: bearer || '' });
+      letture.aggiungi(1, 'numero più alto');
+      await allineaContatore(ultimo, bearer, dry, letture, { mancante: true });
+    }
+    console.log(`${conto.totale} feedback totali: ${conto.numerati} già numerati, 0 da numerare (si parte da #${(Number.isInteger(ultimo) ? ultimo : 0) + 1}).`);
     console.log(letture.riga());
     return { total: conto.totale, numbered: 0, failures: 0, dry, letture: letture.totale };
   }
@@ -258,7 +267,7 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     else { console.error(`  ✗ ${id}: HTTP ${r.status} ${r.body}`); failures++; }
   }
   // Fin qui sono numeri dati da questo giro o provati: gli unici che possono alzare il contatore.
-  await allineaContatore(next - 1, bearer, dry, letture);
+  await allineaContatore(next - 1, bearer, dry, letture, { mancante: !Number.isInteger(contatore) });
   // Applicato: i numeri sul server non sono più quelli che la copia descrive.
   dopoApplicazione(COPIA, { dry, usaCopia, dir: copiaDir });
   console.log(letture.riga());
@@ -268,12 +277,13 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
 // Il contatore da cui i feedback nuovi prendono il numero: se un giro ha
 // assegnato numeri più alti, va allineato o i prossimi invii ripartirebbero da
 // un numero già usato (#583).
-async function allineaContatore(maxSeq, bearer, dry, letture = null) {
+// `mancante`: `maxSeq` è già oltre ogni numero in uso, e fa da pavimento al contatore che rinasce (niente seconda domanda).
+async function allineaContatore(maxSeq, bearer, dry, letture = null, { mancante = false } = {}) {
   if (dry || !(maxSeq > 0)) return;
   try {
     // Allinearlo vuol dire leggerlo: una lettura, e va nel conto come le altre.
     if (letture) letture.aggiungi(1, 'contatore');
-    const v = await FB.ensureSeqCounter(maxSeq, { idToken: bearer });
+    const v = await FB.ensureSeqCounter(maxSeq, { idToken: bearer, ...(mancante ? { pavimento: maxSeq } : {}) });
     console.log(`Contatore dei numeri allineato a ${v}.`);
   } catch (e) {
     console.error(`  ! contatore dei numeri non allineato: ${e?.message || e}`);

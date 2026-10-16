@@ -17,9 +17,11 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 const { backfillNumbers, CAMPI_NUMERAZIONE } = await import('../../scripts/backfill-feedback-numbers.mjs');
 
 // Un Firestore finto che risponde ai tre tipi di domanda e registra tutto.
-function firestoreFinto({ totale, numerati, documenti = [], contaRotta = false, contatore = null }) {
+// `senzaContatore`: il contatore non esiste finché qualcuno non lo scrive.
+function firestoreFinto({ totale, numerati, documenti = [], contaRotta = false, contatore = null, senzaContatore = false }) {
   const chiamate = { conteggi: [], scansioni: [], maxSeq: 0, patch: [], numeri: [], contatore: 0, contatoreScritto: [] };
   // Il contatore vero è almeno il numero più alto dato da un invio.
+  let manca = senzaContatore;
   let valore = contatore != null ? contatore
     : documenti.length ? Math.max(0, ...documenti.map((d) => Number(d.fields.seq?.integerValue || 0))) : totale;
   const fatto = async (url, opts) => {
@@ -45,9 +47,11 @@ function firestoreFinto({ totale, numerati, documenti = [], contaRotta = false, 
       chiamate.contatore += 1;
       if (opts && opts.method === 'PATCH') {
         valore = Number(corpo.fields.value.integerValue);
+        manca = false;
         chiamate.contatoreScritto.push(valore);
         return { ok: true, status: 200, json: async () => ({}) };
       }
+      if (manca) return { ok: false, status: 404, json: async () => ({}), text: async () => 'NOT_FOUND' };
       return { ok: true, status: 200, json: async () => ({ fields: { value: { integerValue: String(valore) } }, updateTime: 'T1' }) };
     }
     chiamate.patch.push(String(url));
@@ -199,4 +203,25 @@ test('un numero con la prova del mittente oltre il contatore lo alza', async () 
   await conFetch(finto, () => backfillNumbers('tok', { dry: false, usaCopia: false, copiaDir: cartellaTemporanea('backfill-8-') }));
   assert.deepEqual(finto.chiamate.numeri, [41]);
   assert.deepEqual(finto.chiamate.contatoreScritto, [41]);
+});
+
+// Senza contatore il punto di partenza non è il solo numero provato: i feedback senza prova hanno numeri dati
+// dal contatore di prima, e ripartire sotto di loro li ridarebbe.
+test('col contatore che manca si numera oltre ogni numero in uso, e il contatore rinasce lì', async () => {
+  const documenti = [
+    doc('a', 10, '2026-01-01T00:00:00Z', 'admin'),
+    doc('d', 25, '2026-01-02T00:00:00Z'),
+    doc('b', 0, '2026-01-03T00:00:00Z'),
+  ];
+  const finto = firestoreFinto({ totale: 3, numerati: 2, documenti, senzaContatore: true });
+  await conFetch(finto, () => backfillNumbers('tok', { dry: false, usaCopia: false, copiaDir: cartellaTemporanea('backfill-9-') }));
+  assert.deepEqual(finto.chiamate.numeri, [26]);
+  assert.deepEqual(finto.chiamate.contatoreScritto, [26]);
+});
+
+test('tutte numerate ma il contatore manca: rinasce sul numero più alto in uso', async () => {
+  const finto = firestoreFinto({ totale: 25, numerati: 25, senzaContatore: true });
+  const { dette } = await conFetch(finto, () => backfillNumbers('tok', { dry: false, usaCopia: false, copiaDir: cartellaTemporanea('backfill-10-') }));
+  assert.deepEqual(finto.chiamate.contatoreScritto, [25]);
+  assert.match(dette, /si parte da #26/);
 });

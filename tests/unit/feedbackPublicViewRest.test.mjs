@@ -205,6 +205,27 @@ test('un contatore INDIETRO si alza sempre, col pavimento o senza', async () => 
   });
 });
 
+// #923: chi non ha il massimo vero in mano (la vista pubblica oltre i 500) non ricrea il contatore sul solo numero
+// provato: lo chiede al server, o non lo crea.
+test('un contatore che manca rinasce sul numero più alto in uso, chiesto al server se nessuno lo passa', async () => {
+  const assente = { ok: false, status: 404, json: async () => ({}), text: async () => 'NOT_FOUND' };
+  const piuAlto = [{ document: { name: 'x/feedback/abc', fields: { seq: { integerValue: '900' } } } }];
+  await withFetch((call) => {
+    if (call.url.includes(':runQuery')) return okJson(piuAlto);
+    return call.method === 'PATCH' ? okJson({}) : assente;
+  }, async (calls) => {
+    assert.equal(await FB.ensureSeqCounter(880, { idToken: 'tok' }), 900);
+    assert.equal(calls.find((c) => c.method === 'PATCH').body.fields.value.integerValue, '900');
+  });
+  await withFetch((call) => {
+    if (call.url.includes(':runQuery')) return { ok: false, status: 503, json: async () => ({}), text: async () => 'giù' };
+    return call.method === 'PATCH' ? okJson({}) : assente;
+  }, async (calls) => {
+    await assert.rejects(FB.ensureSeqCounter(880, { idToken: 'tok' }));
+    assert.equal(calls.filter((c) => c.method === 'PATCH').length, 0, 'senza il massimo vero il contatore non si crea');
+  });
+});
+
 // ── Il travaso dei voti passa davvero per la rete ───────────────────────────
 
 test('la scheda che porta i voti storici li scrive, e la maschera li include', async () => {

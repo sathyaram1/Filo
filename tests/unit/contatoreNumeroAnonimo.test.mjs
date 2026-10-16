@@ -49,7 +49,7 @@ const ensureVero = FB.ensureSeqCounter;
 
 // Firestore in memoria: la collezione dei feedback e il contatore, con le
 // regole di firestore.rules sul contatore (owner: qualunque intero; chiunque
-// altro: avanti di uno, fino a un milione, sulla versione che ha letto).
+// altro: avanti di uno, fino a un milione, sulla versione che ha letto). `contatore: null`: non esiste.
 function firestore({ contatore, documenti }) {
   const db = { contatore, versione: 1, documenti: documenti.map((d) => ({ ...d })), creati: [] };
   globalThis.fetch = async (url, opts = {}) => {
@@ -60,11 +60,11 @@ function firestore({ contatore, documenti }) {
     const risposta = (status, json) => ({ ok: status < 300, status, json: async () => json, text: async () => JSON.stringify(json) });
     if (u.pathname.endsWith('/counters/feedbackSeq')) {
       const stato = { fields: { value: { integerValue: String(db.contatore) } }, updateTime: `v${db.versione}` };
-      if (metodo === 'GET') return risposta(200, stato);
+      if (metodo === 'GET') return db.contatore === null ? risposta(404, { error: 'NOT_FOUND' }) : risposta(200, stato);
       const nuovo = Number(corpo.fields.value.integerValue);
       const attesa = u.searchParams.get('currentDocument.updateTime');
       if (attesa && attesa !== stato.updateTime) return risposta(400, { error: 'FAILED_PRECONDITION' });
-      if (!owner && !(nuovo === db.contatore + 1 && nuovo <= 1000000)) return risposta(403, { error: 'PERMISSION_DENIED' });
+      if (!owner && !(db.contatore !== null && nuovo === db.contatore + 1 && nuovo <= 1000000)) return risposta(403, { error: 'PERMISSION_DENIED' });
       db.contatore = nuovo;
       db.versione += 1;
       return risposta(200, {});
@@ -153,5 +153,18 @@ test('un contatore gonfiato di uno in uno torna ancora giù, fino al numero più
   });
   await apriGestione(f);
   assert.equal(f.db.contatore, 900);
+  assert.equal(await FB.nextSeq(), 901);
+});
+
+test('un contatore che manca rinasce oltre ogni numero in uso, non sul solo numero provato', async () => {
+  const f = firestore({
+    contatore: null,
+    documenti: [
+      feedback('owner', 880, { senderProof: 'admin' }),
+      feedback('utente', 900),
+    ],
+  });
+  await apriGestione(f);
+  assert.equal(f.db.contatore, 900, 'dal solo numero provato i prossimi invii riprenderebbero numeri già dati');
   assert.equal(await FB.nextSeq(), 901);
 });
