@@ -107,8 +107,9 @@ const SUFFISSI_AMMESSI = {
   'src/main/services/safebrowse/brands.js': '*',
   // Finché il feedback sul seme anti-impronta non la toglie.
   'src/main/services/fingerprint.js': '*',
-  // Le voci della whitelist di safebrowse: gov.it vi copre ogni sito dello Stato; i secchi per percorso di Google Cloud.
-  'src/main/services/safebrowse/whitelist.js': ['gov.it', 'googleapis.com'],
+  // Le voci della whitelist di safebrowse: gov.it vi copre ogni sito dello Stato; i secchi per percorso di Google Cloud;
+  // le pagine che chiunque pubblica per percorso (Google Sites, Documenti), di cui safebrowse cerca il proprietario.
+  'src/main/services/safebrowse/whitelist.js': ['gov.it', 'googleapis.com', 'sites.google.com', 'docs.google.com'],
   // Gli host d'accesso dei fornitori d'identità, non dei siti: la finestra di login si riconosce dal suo host.
   'src/shared/authPopup.js': ['firebaseapp.com', 'amazoncognito.com'],
   // Il nome delle reti di casa (RFC 8375), che non ha un sito.
