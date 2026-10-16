@@ -773,6 +773,9 @@
     // La home aperta dal tasto destro sull'avviso chiede cosa le ha lasciato il main: la domanda a Filo sul sito o la
     // segnalazione del falso allarme, una volta sola. Solo pagine filo://. → { ok, richiesta: { tipo, testo } | null }
     CASA_RICHIESTA: 'casa_richiesta',
+    // #967 — i siti di cui l'utente si fida, solo da pagine filo://: `indirizzo` (l'«Apri comunque» di «Non trovo»)
+    // entra ridotto dal main; `voci` escono (Sicurezza, «Annulla»). → { ok, entrati, usciti, elenco }
+    SITI_FIDATI_IMPOSTA: 'siti_fidati_imposta', // { fidato, indirizzo? | voci?, avvisa? }
 
     // === Geo-block: proposta inline (proxy-per-tab-spec.md §5, feedback #151) ===
     // Broadcast main→content: un contenuto bloccato in Italia è stato rilevato su
