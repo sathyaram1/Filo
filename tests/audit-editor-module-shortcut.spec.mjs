@@ -525,21 +525,30 @@ test('un modulo senza un\'azione unica non offre la scorciatoia, e una vecchia s
   await expect(page.locator('#overlay')).toBeHidden();
 });
 
-// Con Shift un simbolo diventa un altro (la barra rovesciata diventa la barra
-// verticale): scritto con Shift non partirebbe mai; scritto col simbolo che esce sì.
-test('un simbolo con Shift si rifiuta, il simbolo che esce parte', async ({ openTab }) => {
+// Con Shift un simbolo diventa un altro, diverso per ogni tastiera (la barra rovesciata diventa la barra
+// verticale): scritto così non si sa quale tasto sia, premuto sì (#893). Si simula la tastiera americana.
+test('un simbolo con Shift, o senza un tasto suo, si preme invece di scriverlo, e premuto parte', async ({ openTab }) => {
   const page = await openTab(EDITOR);
   await page.waitForLoadState('domcontentloaded');
+  await page.addInitScript(() => {
+    const voci = [['Backslash', '\\'], ['Slash', '/'], ['Comma', ','], ['Minus', '-'], ['Equal', '='], ['Digit1', '1']];
+    Object.defineProperty(navigator.keyboard, 'getLayoutMap', { configurable: true, value: async () => new Map(voci) });
+  });
   await apriDocConModuli(page, [WC]);
 
   await enterSettingsMode(page);
   await page.locator('.ed-module[data-type="word-count"]').click();
-  for (const sc of ['Ctrl+Shift+\\', 'Ctrl+Shift+/', 'Ctrl+Maiusc+,', 'Ctrl+Shift+|']) {
+  for (const [sc, dice] of [['Ctrl+Shift+\\', 'Con Shift'], ['Ctrl+Shift+/', 'Con Shift'], ['Ctrl+Maiusc+,', 'Con Shift'],
+    ['Ctrl+Shift+|', 'non ha un tasto suo'], ['Ctrl+|', 'non ha un tasto suo']]) {
     await page.fill('#cfgShortcut', sc);
     await page.click('#cfgSave');
-    await expect(page.locator('#cfgShortcutTaken'), sc).toContainText('Con Shift');
+    await expect(page.locator('#cfgShortcutTaken'), sc).toContainText(dice);
+    await expect(page.locator('#cfgShortcutTaken'), sc).toContainText('premi la combinazione');
   }
-  await page.fill('#cfgShortcut', 'Ctrl+|');
+  await page.locator('#cfgShortcut').click();
+  await page.keyboard.press('Control+Shift+Backslash');
+  await expect(page.locator('#cfgShortcut')).toHaveValue('Ctrl+Shift+\\');
+  await expect(page.locator('#cfgShortcutTaken')).toBeHidden();
   await page.click('#cfgSave');
   await expect(page.locator('#overlay')).toBeHidden();
   await exitSettingsMode(page);
