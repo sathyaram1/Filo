@@ -135,9 +135,39 @@ function extractImages(node, images) {
 
 const VOCE_FILO = 'filo/eventi.jsonl';
 
-// Costruisce il Buffer ZIP a partire dallo storage Filo e, se c'è, dal filo.
-function buildExportZip(storageData, { filo = null } = {}) {
+// I segreti dell'utente entrano nell'archivio solo se chi esporta lo chiede (#905): chi riceve il file li userebbe.
+// Un proxy con utente e password nell'indirizzo vale quanto una chiave API.
+const PROXY_CON_CREDENZIALI = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i;
+const CAMPI_PROXY = ['datacenter', 'residential'];
+const pieno = (v) => typeof v === 'string' && v.trim() !== '';
+
+// I posti dei segreti nelle impostazioni, come [oggetto, campo].
+function campiSegreti(settings) {
+  const out = [];
+  if (!isPlainObject(settings)) return out;
+  if (isPlainObject(settings.apiKeys)) for (const k of Object.keys(settings.apiKeys)) out.push([settings.apiKeys, k]);
+  if (isPlainObject(settings.proxy)) {
+    for (const k of CAMPI_PROXY) if (pieno(settings.proxy[k]) && PROXY_CON_CREDENZIALI.test(settings.proxy[k].trim())) out.push([settings.proxy, k]);
+  }
+  return out;
+}
+
+function haSegreti(storageData) {
+  return campiSegreti(storageData && storageData.settings).some(([o, k]) => pieno(o[k]));
+}
+
+// Toglie i segreti da una copia dei dati: un campo assente all'importazione lascia quello di chi importa.
+function togliSegreti(dati) {
+  const s = dati && dati.settings;
+  for (const [o, k] of campiSegreti(s)) delete o[k];
+  if (isPlainObject(s) && isPlainObject(s.apiKeys)) delete s.apiKeys;
+  return dati;
+}
+
+// Costruisce il Buffer ZIP a partire dallo storage Filo e, se c'è, dal filo. `chiavi`: anche i segreti.
+function buildExportZip(storageData, { filo = null, chiavi = false } = {}) {
   const clone = JSON.parse(JSON.stringify(storageData ?? {}));
+  if (!chiavi) togliSegreti(clone);
   const images = [];
   extractImages(clone, images);
 
@@ -146,6 +176,7 @@ function buildExportZip(storageData, { filo = null } = {}) {
     exportedAt: new Date().toISOString(),
     imageCount: images.length,
     filo: !!(filo && filo.length),
+    chiavi: haSegreti(clone),
     note: 'Esportazione dati Filo. data.json contiene tutte le impostazioni e i '
       + 'contenuti; le immagini copiate/salvate sono nella cartella images/; '
       + 'le chat con Filo e le pagine visitate stanno in filo/eventi.jsonl, un evento per riga.',
