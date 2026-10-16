@@ -29,5 +29,6 @@ fatta dall'owner non si rimette in discussione e non è un rilievo.
   della specifica, e i `rilievi` del giro fermato si ri-provano. Quelli ancora
   aperti tornano nella critica, letti alla luce della risposta: un rilievo col
   `?` su cui l'owner ha scelto diventa un rilievo normale sulla strada scelta,
-  o sparisce se il ramo la segue già. Poi la correzione, come sempre.
+  o sparisce se il ramo la segue già. Dopo la critica, la risposta del server
+  ti manda a correggere come in ogni giro.
 - **Riallineamento.** Riprendi il riallineamento con la risposta davanti.
