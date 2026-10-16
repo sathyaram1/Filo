@@ -770,7 +770,10 @@ async function scriviTestaGruppo(ctx, S, { nuovi = new Map(), bytes = serializza
   const vecchi = await carichiGruppo(ctx, S, 0);
   const usati = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   const carichi = [null];
-  for (let s = 1; s < ke; s++) carichi[s] = nuovi.get(s) || (usati[s] && vecchi[s]) || ZERO;
+  for (let s = 1; s < ke; s++) {
+    if (!nuovi.has(s) && usati[s] && !vecchi[s]) throw daRiaprire();
+    carichi[s] = nuovi.get(s) || (usati[s] && vecchi[s]) || ZERO;
+  }
   carichi[0] = scriviTesta({
     L: S.L, creato: S.creato, aperto: S.aperto, contatore: S.contatore + 1, bytes, blocchiTabella: S.blocchiTabella,
   });
