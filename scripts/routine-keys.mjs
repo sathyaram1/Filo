@@ -159,7 +159,9 @@ async function main() {
     }
     await chiama({ op: 'lavori', slug: nome, lavori: potere });
     console.log(potere === 'server'
-      ? `"${nome}" prende solo i lavori server (a rete limitata e con l'interruttore acceso).`
+      ? `"${nome}" prende solo i lavori server (a rete limitata e con l'interruttore acceso).\n`
+        // Una chiave nasce a rete aperta, e a rete aperta la routine server non si accende (#1244): il passo si ricorda qui.
+        + `Se non l'hai già fatto, mettila a rete limitata, o la routine server resta spenta:\n    node scripts/routine-keys.mjs rete ${nome} limitata`
       : `"${nome}" prende i lavori normali, nessun lavoro server.`);
     return;
   }
