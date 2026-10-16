@@ -937,13 +937,21 @@ async function liberaEStringi(ctx, S, prima) {
   const G3 = Math.ceil(L3 / GRUPPO);
   const daRiscrivere = new Set(liberati.filter((j) => j >= GRUPPO && j < L3).map((j) => Math.floor(j / GRUPPO)));
   if (L3 < Lprima && L3 % GRUPPO && G3 - 1 >= 1) daRiscrivere.add(G3 - 1);
-  const voci = [];
-  for (const g of [...daRiscrivere].sort((a, b) => a - b)) {
-    const vecchi = await carichiGruppo(ctx, S, g);
-    const ke = Math.min(GRUPPO, L3 - GRUPPO * g);
-    voci.push({ g, carichi: Array.from({ length: ke }, (_, s) => (ora[GRUPPO * g + s] && vecchi[s]) || ZERO) });
+  for (const lotto of aLotti([...daRiscrivere].sort((a, b) => a - b))) {
+    // Un gruppo tutto liberato si riscrive a zero senza leggerlo: cancellare un file grosso non lo rilegge intero.
+    const usaQualcosa = (g) => Array.from({ length: Math.min(GRUPPO, L3 - GRUPPO * g) }, (_, s) => ora[GRUPPO * g + s]).some(Boolean);
+    const letti = await carichiGruppi(ctx, S, lotto.filter(usaQualcosa));
+    await riscriviGruppi(ctx, S, lotto.map((g) => {
+      const vecchi = letti.get(g) || [];
+      return {
+        g,
+        carichi: Array.from({ length: Math.min(GRUPPO, L3 - GRUPPO * g) }, (_, s) => {
+          if (ora[GRUPPO * g + s] && !vecchi[s]) throw daRiaprire();
+          return (ora[GRUPPO * g + s] && vecchi[s]) || ZERO;
+        }),
+      };
+    }));
   }
-  await riscriviGruppi(ctx, S, voci);
   // I liberati del gruppo 0 li ha già azzerati la testa nuova: un'altra testa serve solo se il segreto si accorcia.
   if (L3 >= Lprima) return;
   const oltre = [];
