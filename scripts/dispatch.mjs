@@ -1990,8 +1990,9 @@ async function finalizeBucket(bucket, fromServer) {
   // Rovesciando l'ordine si guadagna anche un'altra cosa: se il posizionamento
   // fallisce, il feedback resta in coda invece di restare marchiato "in
   // lavorazione" da nessuno.
+  const ripresa = !!(fromServer && fromServer.payload && fromServer.payload.ripresa && typeof fromServer.payload.ripresa === 'object');
   if (bucket.id && bucket.role !== 'prober') {
-    const pos = positionOnBranch(bucket);
+    const pos = positionOnBranch(bucket, { ripresa });
     if (!pos.ok) {
       if (pos.kind === 'permanent') {
         // Riprovare ogni 6h all'infinito è inutile: il feedback esce dal giro
