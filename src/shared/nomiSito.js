@@ -1,5 +1,5 @@
-// Nomi dei siti scritti dall'utente (#590): quando un dominio è valido per una lista, e come
-// si mostra un nome internazionale («xn--mnchen-3ya.de» → «münchen.de»). Logica pura.
+// Nomi dei siti scritti dall'utente (#590): come si riduce quello che incolla, quando un dominio è valido per
+// una lista, e come si mostra un nome internazionale («xn--mnchen-3ya.de» → «münchen.de»). Logica pura.
 // Regole: tests/unit/nomiSito.test.mjs.
 
 (function (global) {
