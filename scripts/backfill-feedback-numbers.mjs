@@ -259,8 +259,8 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     if (r.ok) console.log(`  ✓ #${next++} → ${id}  «${label}»`);
     else { console.error(`  ✗ ${id}: HTTP ${r.status} ${r.body}`); failures++; }
   }
-  const maxSeq = Math.max(next - 1, withSeq.reduce((m, d) => Math.max(m, intField(d, 'seq')), 0));
-  await allineaContatore(maxSeq, bearer, dry, letture);
+  // Fin qui sono numeri dati da questo giro o provati: gli unici che possono alzare il contatore.
+  await allineaContatore(next - 1, bearer, dry, letture);
   // Applicato: i numeri sul server non sono più quelli che la copia descrive.
   dopoApplicazione(COPIA, { dry, usaCopia, dir: copiaDir });
   console.log(letture.riga());
