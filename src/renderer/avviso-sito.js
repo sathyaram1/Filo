@@ -60,7 +60,7 @@
       level: s.level === 'pericoloso' ? 'pericoloso' : 'sospetto',
       title: String(s.title || ''),
       body: String(s.body || ''),
-      prima: s.prima === true,
+      prima: Number(s.prima) > 0,
     });
   });
 

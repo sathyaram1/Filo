@@ -7,6 +7,7 @@ const { pageHints } = require('../../content/safebrowseHints.js');
 // #965 — lotti di link in attesa per scheda (la pagina ne manda uno alla volta), e link da avviso tenuti pronti.
 const LINK_IN_CODA = 4;
 const LINK_SEGNALATI_MAX = 10000;
+let avvisiDiLink = 0;
 
 // In un riquadro di un altro sito la pagina sopra non si legge: se è lei a nasconderlo (trasparente, ritagliato,
 // coperto) lo dice il motore, che vede tutta la catena dei riquadri. Senza risposta in tempo vale mostrato.
@@ -165,7 +166,11 @@ const safebrowseMethods = {
     if (tab.sbAvviso && !tab.sbAvviso.prima) return false;
     const v = this._sbVerdettoLink(tab, url);
     if (!v) return false;
-    tab.sbAvviso = { level: v.level, message: v.message || null, url: String(url), prima: { apri } };
+    // Ogni clic è un avviso nuovo, da ridisegnare da capo (conferma vuota, «Continua» da riarmare); lo stesso link
+    // chiesto di nuovo mentre è a schermo no.
+    const a = tab.sbAvviso;
+    const n = a && a.prima && a.url === String(url) && a.level === v.level ? a.prima.n : ++avvisiDiLink;
+    tab.sbAvviso = { level: v.level, message: v.message || null, url: String(url), prima: { apri, n } };
     if (tab.id === this.activeId) this.layout();
     return true;
   },
