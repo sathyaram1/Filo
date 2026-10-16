@@ -29,6 +29,7 @@
     if (!owner || overviewLoaded) return;
     overviewLoaded = true;
     loadOverview().catch(() => {});
+    loadInstallazioni().catch(() => {});
   }
 
   async function load() {
@@ -279,6 +280,61 @@
     const posti = buoni.reduce((a, v) => a + Math.max(0, (Number(v.max) || 0) - (Number(v.used) || 0)), 0);
     lista.appendChild(riquadro(formatInt(buoni.length), buoni.length === 1 ? 'tuo invito da dare' : 'tuoi inviti da dare',
       `Codici usciti da qui con ancora un posto libero: ${formatInt(posti)} ${posti === 1 ? 'persona può entrare' : 'persone possono entrare'}.`));
+  }
+
+  // ── Le installazioni attive, dai contatori giornalieri (#969) ──────────────
+  // Copie di Filo che hanno spedito i numeri di ieri e del mese in corso: pseudonimi distinti, e uno pseudonimo vale un
+  // mese. Chi ha spento i contatori non c'è. Non letti: un trattino, mai uno zero; dietro il tasto destro si rilegge.
+  const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre',
+    'novembre', 'dicembre'];
+  let letturaInstallazioni = 0;
+
+  async function loadInstallazioni() {
+    const mia = ++letturaInstallazioni;
+    const r = await chrome.runtime.sendMessage({ type: MSG.CONTATORI_INSTALLAZIONI })
+      .catch((e) => ({ ok: false, error: String((e && e.message) || e) }));
+    if (mia !== letturaInstallazioni) return;
+    const i = r && r.ok ? r.installazioni : null;
+    if (!i) console.warn('[credits/owner] contatori non letti:', r && r.error);
+    const lista = $('ownerInstallazioni');
+    lista.innerHTML = '';
+    const ieri = i && i.ieri;
+    const mese = i && i.mese;
+    const nomeMese = (m) => MESI[Number(String(m || '').slice(5, 7)) - 1] || 'questo mese';
+    const quando = ieri ? giornoBreve(ieri.giorno) : 'ieri';
+    lista.append(
+      riquadroInstallazioni(ieri, (n) => `${n === 1 ? 'installazione attiva' : 'installazioni attive'} ieri`,
+        `Le copie di Filo che hanno mandato i contatori di ieri (${quando}). Chi li ha spenti non c'è.`, r),
+      riquadroInstallazioni(mese, (n) => `${n === 1 ? 'installazione attiva' : 'installazioni attive'} a ${nomeMese(mese && mese.mese)}`,
+        `Le copie di Filo che hanno mandato i contatori di almeno un giorno di ${nomeMese(mese && mese.mese)}, fino a ieri: `
+        + 'ognuna conta una volta. Chi li ha spenti non c\'è.', r),
+    );
+  }
+
+  // Prima che le regole coi contatori siano pubblicate il server nega la lettura: lo si dice, non «rientra».
+  function fraseContatori(raw) {
+    const t = String(raw || '');
+    if (/not_admin|sessione scaduta|not_signed_in/i.test(t)) return fraseGuasto(t);
+    if (/PERMISSION_DENIED|contatori 40[13]/i.test(t)) {
+      return 'il server li ha negati; se le regole coi contatori non sono ancora pubblicate, si pubblicano con npm run regole:pubblica';
+    }
+    return 'il server non risponde';
+  }
+
+  function riquadroInstallazioni(v, nome, spiega, r) {
+    const noto = Boolean(v && Number.isFinite(Number(v.n)));
+    const n = noto ? Number(v.n) : null;
+    const valore = !noto ? '—' : `${v.completo === false ? 'almeno ' : ''}${formatInt(n)}`;
+    const title = noto ? spiega : `I contatori non si sono letti: ${fraseContatori(r && r.error)}.`;
+    const li = riquadro(valore, nome(n), title, { nota: noto ? '' : 'non letti' });
+    li.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      apriMenu([
+        ...(noto ? [['Copia il numero', () => copia(String(n))]] : []),
+        ['Rileggi', () => { loadInstallazioni().catch(() => {}); }],
+      ], ev.clientX, ev.clientY);
+    });
+    return li;
   }
 
   // ── Chi ha usato Filo: il numero apre le persone che ha contato ────────────

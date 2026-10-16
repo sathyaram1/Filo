@@ -681,6 +681,12 @@
       doesNot: 'Non invia mai URL, testo delle conversazioni o dati personali: solo una nota generica sulla funzione mancante.',
     },
     {
+      id: 'contatori-anonimi', title: 'Contatori anonimi d\'uso', category: 'settings',
+      desc: 'Una volta al giorno Filo manda a chi lo sviluppa solo numeri del giorno prima: quante volte si è usata ogni funzione che usa un modello e quanto si è aspettata la prima risposta (in fasce), quante chiamate sono fallite per funzione, modello e host e con che tipo di guasto, la versione di Filo e la famiglia del sistema. Portano uno pseudonimo casuale che cambia ogni mese. Accesi di serie; i giorni non partiti partono al primo avvio dopo, e un invio fallito si riprova il giorno dopo.',
+      invoke: 'Preferenze → Impostazioni avanzate → "Manda i contatori anonimi", oppure chiedendolo a Filo ("spegni i contatori").',
+      doesNot: 'Non manda testi, indirizzi, titoli o nomi di file, e lo pseudonimo non è quello dei feedback né quello dei crediti. In incognito non conta niente; spenti, non conta niente, non manda niente e butta quello che non era ancora partito.',
+    },
+    {
       id: 'filo-shortcuts', title: 'Scorciatoie da tastiera di Filo', category: 'settings',
       desc: 'I tasti di Spiega, Traduci, Salva per dopo e Aiuto si cambiano. Una combinazione che Filo usa già (le schede, lo zoom, copia e incolla, il microfono delle chat, le altre tre azioni, un modulo dell\'Editor in qualunque documento) o che si prende il sistema viene rifiutata col motivo, senza salvarla. Il tasto vecchio torna alla pagina, e quelli nuovi valgono subito, su ogni pagina, anche dopo aver chiuso e riaperto Filo. Il menu del tasto destro e l\'elenco di Opzioni → Altro mostrano i tasti scelti; su Mac, coi tasti del Mac.',
       invoke: 'Preferenze → Impostazioni avanzate → «Scorciatoie da tastiera»: clicca la combinazione e premi i tasti nuovi (Esc lascia quella di prima); ↺ su una riga o «Ripristina i tasti di serie» le rimettono com\'erano. Oppure chiedilo a Filo: «metti la traduzione su Ctrl+Maiusc+Y» (su Mac Cmd al posto di Ctrl), «rimetti le scorciatoie di serie».',

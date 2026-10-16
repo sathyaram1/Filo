@@ -79,6 +79,15 @@
       dove: ['src/main/services/handlers/wallet.js'], prova: '/wallet-usage/',
     },
     {
+      id: 'contatori', nome: 'Il server di Filo, per i contatori giornalieri',
+      base: [FIRESTORE],
+      quando: 'avvio',
+      occasione: 'una volta al giorno, al primo avvio: i numeri del giorno prima, e di quelli rimasti indietro; a contatori spenti, niente',
+      riceve: 'per funzione usi e attese in fasce, chiamate fallite per modello, host e tipo, versione e famiglia del sistema, con uno pseudonimo che cambia ogni mese; mai testi, indirizzi o nomi di file',
+      frase: 'Una volta al giorno, al primo avvio, Filo manda al server i numeri del giorno prima',
+      dove: ['src/main/services/contatori.js'], prova: 'C.COLLEZIONE',
+    },
+    {
       id: 'feedback', nome: 'Il server di Filo, per i feedback',
       base: [FIRESTORE, STORAGE],
       quando: 'funzione',

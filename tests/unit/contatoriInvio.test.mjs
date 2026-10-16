@@ -66,7 +66,7 @@ function banco({ accesi = true, incognito = false, finestra = true, risposta = 2
 async function usa(b, action, { attesa = 0, errore = null, ok = true } = {}) {
   const h = b.s.apri(action);
   b.t += attesa;
-  h.visto();
+  if (ok) h.visto();
   if (errore) h.errore(errore, { modello: 'deepseek/deepseek-v4-pro', host: 'DeepInfra' });
   h.fine(ok);
   await attendi(); await attendi();
@@ -137,6 +137,16 @@ test('in incognito non si conta niente e non parte nessun documento', async () =
   b.t += GIORNO;
   await b.s.controlla();
   assert.equal(b.inviati.length, 0, JSON.stringify(b.inviati.map((x) => x.doc)));
+});
+
+test('con una finestra normale aperta accanto, quello che si fa in incognito resta fuori dai numeri', async () => {
+  const b = banco({ incognito: true, finestra: true });
+  await usa(b, A.TRANSLATE_PAGE, { attesa: 900 });
+  b.incognito = false;
+  await usa(b, A.HELP, { attesa: 100 });
+  b.t += GIORNO;
+  await b.s.controlla();
+  assert.deepEqual(b.inviati.map((x) => Object.keys(x.doc.uso)), [['help']]);
 });
 
 test('a contatori spenti non si conta niente e non parte niente, e quello che c’era si butta', async () => {
