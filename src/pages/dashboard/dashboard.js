@@ -580,22 +580,24 @@
 
   // L'icona di un sito la cerca il main, mai un servizio di terzi (#848). Si ricorda solo quella trovata:
   // un sito che non ha risposto si richiede al giro dopo, e lì decide il main quando riprovare.
+  // `soloCopie`: l'indirizzo al clic chiede l'OK, quindi l'icona non contatta il sito prima (#848).
   const iconeSiti = new Map();
-  function iconaDelSito(rawUrl) {
+  function iconaDelSito(rawUrl, { soloCopie = false } = {}) {
     let host = '';
     try {
       const u = new URL(String(rawUrl || ''));
       if (u.protocol === 'http:' || u.protocol === 'https:') host = u.host.toLowerCase();
     } catch (_) {}
     if (!host) return Promise.resolve('');
-    if (!iconeSiti.has(host)) {
-      const dimentica = () => { iconeSiti.delete(host); return ''; };
-      iconeSiti.set(host, send({ type: MSG.ICONA_SITO, url: String(rawUrl) }).then((r) => {
+    const chiave = `${soloCopie ? 'c' : 'r'}|${host}`;
+    if (!iconeSiti.has(chiave)) {
+      const dimentica = () => { iconeSiti.delete(chiave); return ''; };
+      iconeSiti.set(chiave, send({ type: MSG.ICONA_SITO, url: String(rawUrl), soloCopie }).then((r) => {
         const dato = r && r.ok && typeof r.dato === 'string' && /^data:image\//.test(r.dato) ? r.dato : '';
         return dato || dimentica();
       }, dimentica));
     }
-    return iconeSiti.get(host);
+    return iconeSiti.get(chiave);
   }
 
   // I suggerimenti sono UNA carta fra le altre (#870): li disegna la parte delle carte.
