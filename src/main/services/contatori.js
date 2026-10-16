@@ -279,7 +279,7 @@ function crea(dip = {}) {
       });
       if (!res.ok) {
         let det = '';
-        try { det = (await res.json())?.[0]?.error?.status || ''; } catch (_) {}
+        try { const j = await res.json(); det = (Array.isArray(j) ? j[0] : j)?.error?.status || ''; } catch (_) {}
         throw new Error(`contatori ${res.status}${det ? ` ${det}` : ''}`);
       }
       const righe = (await res.json()) || [];
