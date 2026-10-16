@@ -206,24 +206,28 @@ test('i quattro casi insieme: una carta ciascuno col numero, «Apri Inviti e ute
     await home.screenshot({ path: join(SHOTS, `wallet-owner-avvisi-${tema}.png`) });
   }
 
+  const voci = home.locator('.dash-menu .dash-menu-voce');
   const inviti = carte(home).filter({ hasText: 'Resta 1 ingresso con invito' });
   await inviti.click({ button: 'right', position: { x: 30, y: 12 } });
-  const voci = home.locator('.dash-menu .dash-menu-voce');
   await expect(voci.filter({ hasText: 'Apri Inviti e utenti' })).toBeVisible();
   await expect(voci.filter({ hasText: 'Chiudi' }).first()).toBeVisible();
   await home.screenshot({ path: join(SHOTS, 'wallet-owner-avvisi-menu.png') });
-  await voci.filter({ hasText: 'Apri Inviti e utenti' }).click();
-  await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/owner.html'), 'il tasto destro non apre la pagina dell’owner');
+  await home.keyboard.press('Escape');
 
   // Chiusa dall'owner, a una lettura nuova con la stessa situazione non torna.
-  await home.bringToFront();
   await inviti.locator('.dash-carta-az.secondaria').click();
   await expect(carte(home)).toHaveCount(3);
   const lette = stato.letture;
   await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WALLET_OWNER_OVERVIEW }));
   expect(stato.letture).toBeGreaterThan(lette);
   expect(await app.evaluate(() => globalThis.SN_WALLET_MAIN.controllaAvvisiOwner())).toBe('fatto');
+  expect((await avvisiOwner(app)).map((n) => n.caso).sort()).toEqual(['giornaliera', 'scarto', 'tetto']);
   await expect(carte(home)).toHaveCount(3);
+
+  // Il tasto destro apre la stessa pagina del pulsante.
+  await carte(home).filter({ hasText: 'del tetto' }).click({ button: 'right', position: { x: 30, y: 12 } });
+  await voci.filter({ hasText: 'Apri Inviti e utenti' }).click();
+  await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/owner.html'), 'il tasto destro non apre la pagina dell’owner');
 });
 
 test('chi non è owner non fa partire nessuna lettura: né la home, né il controllo dell’avvio, né quello delle sei ore', async ({ app }) => {
