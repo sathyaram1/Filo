@@ -154,4 +154,6 @@ test('dalla chat: aggiungere costa 3 e vuole la parola «conferma» a ogni livel
   const tolto = P.applicaElenco(pagina.elenco, { security: { safeBrowse: { trustedSites: ['team.com', 'docs.google.com/forms/d/e/MODULO-A/viewform'] } } });
   assert.deepEqual(tolto.lista, ['team.com']);
   assert.match(P.buildPreferencePartial('siti_di_cui_ti_fidi', 'aggiungi facebook').rifiuto, /non è un dominio/);
+  // Un sito senza nome (http://1.2.3.4 con la password) entra col suo indirizzo, e così si toglie.
+  assert.deepEqual(P.buildPreferencePartial('siti_di_cui_ti_fidi', 'togli http://1.2.3.4:8080/accesso').elenco.voci, ['1.2.3.4']);
 });

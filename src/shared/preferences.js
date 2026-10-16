@@ -444,12 +444,9 @@
   // e la parola «conferma», decisione dell'owner D48); toglierlo la rialza (costo 1). La voce è quella del «Continua»
   // (SN_SAFEBROWSE.voceFidata, nel main): il sito, o la pagina su una piattaforma dove chiunque pubblica.
   function voceFidataDa(p) {
-    const d = dominioDa(p);
-    if (!d) return '';
     const SB = global.SN_SAFEBROWSE;
-    let v = '';
-    try { v = SB && SB.voceFidata ? SB.voceFidata(p) || '' : ''; } catch (_) { v = ''; }
-    return v || d;
+    if (!SB || !SB.voceFidata) return dominioDa(p);
+    try { return SB.voceFidata(p) || ''; } catch (_) { return ''; }
   }
   function voceFidataLeggibile(x) {
     const s = String(x || '');

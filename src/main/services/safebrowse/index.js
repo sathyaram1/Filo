@@ -585,12 +585,16 @@ function impostaFidati(elenco) {
 function fidato(scope) {
   return !!scope && fidati.has(String(scope).toLowerCase());
 }
-// La voce dell'elenco per quello che l'utente scrive o incolla («login.Team.com», «https://team.com/x»): la stessa
-// chiave che darebbe il «Continua» su quella pagina; null se non è un sito.
+// La voce dell'elenco per quello che l'utente scrive o incolla («login.Team.com», «https://team.com/x», un IP): la
+// stessa chiave che darebbe il «Continua» su quella pagina; null se non è un sito (una parola sola, un suffisso).
 function voceFidata(scritto) {
   const s = String(scritto == null ? '' : scritto).trim();
-  if (!s) return null;
-  return scopeOf(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`);
+  if (!s || /\s/.test(s)) return null;
+  const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`;
+  const norm = normalizeMod.normalize(url);
+  if (!norm || !norm.ok || norm.single || norm.suffixOnly) return null;
+  const v = scopeOf(url);
+  return v && !/^\.|\.\./.test(v) ? v : null;
 }
 
 const API = {
