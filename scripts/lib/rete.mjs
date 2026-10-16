@@ -37,13 +37,14 @@ const attesaVera = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * fetch con altri tentativi sui soli errori di socket; una risposta HTTP, anche 5xx, torna com'è.
  * Dopo l'ultimo tentativo rilancia l'errore, con `tentativi` addosso.
+ * `ritentaSe` allarga il criterio a chi non ha niente da perdere aspettando (una costruzione in CI).
  */
-export async function fetchRitentato(url, init, { fetchImpl = fetch, tentativi = 3, attese = [300, 1500], sleep = attesaVera } = {}) {
+export async function fetchRitentato(url, init, { fetchImpl = fetch, tentativi = 3, attese = [300, 1500], sleep = attesaVera, ritentaSe = erroreDiSocket } = {}) {
   for (let i = 1; ; i++) {
     try {
       return await fetchImpl(url, init);
     } catch (e) {
-      if (i >= tentativi || !erroreDiSocket(e)) {
+      if (i >= tentativi || !ritentaSe(e)) {
         try { if (e && typeof e === 'object') e.tentativi = i; } catch (_) { /* errore non estendibile: si rilancia com'è */ }
         throw e;
       }
