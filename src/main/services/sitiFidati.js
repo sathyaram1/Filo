@@ -26,6 +26,8 @@ function elencoNuovo(prima, { aggiungi = [], togli = [] } = {}) {
 }
 
 // Il magazzino si rilegge e si riscrive intero: le scritture in fila (patterns/chi-rilegge-tutto-e-riscrive-tutto-mette-le-scritture-in-fila.md).
+// La scrittura passa da applySettingsUpdate, così schede, pagine e rilevatore lo sanno subito.
+let scrivi = (partial) => require('./handlers').applySettingsUpdate(partial);
 let coda = Promise.resolve();
 function cambia({ aggiungi = [], togli = [] } = {}) {
   const giro = coda.then(async () => {
@@ -35,7 +37,7 @@ function cambia({ aggiungi = [], togli = [] } = {}) {
     const entrati = dopo.filter((x) => !prima.includes(x));
     const usciti = prima.filter((x) => !dopo.includes(x));
     if (entrati.length || usciti.length) {
-      await require('./handlers').applySettingsUpdate({ security: { safeBrowse: { trustedSites: dopo } } });
+      await scrivi({ security: { safeBrowse: { trustedSites: dopo } } });
     }
     return { entrati, usciti, elenco: dopo };
   });
@@ -64,4 +66,4 @@ async function fidati(voce, { win = null, incognito = false } = {}) {
   return { ok: true, ...r };
 }
 
-module.exports = { elencoDi, elencoNuovo, leggibile, cambia, fidati };
+module.exports = { elencoDi, elencoNuovo, leggibile, cambia, fidati, _usaScrittura: (fn) => { scrivi = fn; } };
