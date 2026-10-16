@@ -622,6 +622,7 @@
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
     arenato: 'lavorazione arenata',
+    guasto: 'fermo per un guasto',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
   };
