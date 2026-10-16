@@ -1953,6 +1953,7 @@
     }),
     elencoCartelle(),
     sitiFiloSpento(),
+    sitiFidatiAvviso(),
     // #975 — non abbassa niente: cambia quale menu arriva per primo, e l'altro resta a Shift. Costo 1, come un tema.
     {
       ...elenco({
