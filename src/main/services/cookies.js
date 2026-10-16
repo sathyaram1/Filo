@@ -110,13 +110,13 @@ function getMode(settings) {
   return m === MODES.MANUAL || m === MODES.PRIVACY ? m : MODES.DEFAULT;
 }
 
-// Siti "fidati" (eTLD+1) che in Privacy restano connessi (partizione isolata ma
-// persistente). Legge trustedSites; per retrocompatibilità accetta anche la
-// vecchia chiave loginWhitelist.
+// Siti "fidati" che in Privacy restano connessi (partizione isolata ma persistente), ognuno al suo sito: una voce
+// scritta come mail.google.com o come indirizzo vale per google.com, da qualunque strada sia entrata (#876).
+// Per retrocompatibilità accetta anche la vecchia chiave loginWhitelist.
 function getTrustedSites(settings) {
   const c = settings && settings.security && settings.security.cookies;
   const list = (c && (c.trustedSites || c.loginWhitelist)) || [];
-  return Array.isArray(list) ? list : [];
+  return Array.isArray(list) ? Sito.sitiDelleVociIn(list) : [];
 }
 
 // Servizi (eTLD+1) dei contenuti incorporati a cui l'utente ha riattivato i cookie (#760).
