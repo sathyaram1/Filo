@@ -755,7 +755,7 @@ async function restauraMancanti(ctx, S, gruppi) {
 }
 
 function marcaDanneggiati(tabella, blocchi) {
-  const perso = new Uint8Array(Math.max(...blocchi) + 1);
+  const perso = new Uint8Array(blocchi.reduce((m, j) => Math.max(m, j), 0) + 1);
   for (const j of blocchi) perso[j] = 1;
   const tocca = ([s, m]) => {
     for (let j = s; j < Math.min(s + m, perso.length); j++) if (perso[j]) return true;
