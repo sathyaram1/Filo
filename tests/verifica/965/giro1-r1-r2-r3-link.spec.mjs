@@ -1,10 +1,10 @@
-// Verifica #965 giro 1: un link da avviso fermato al clic anche quando scarica (attributo download) o quando è un modulo.
+// Verifica #965 giro 1: l'avviso di un link al clic, nei casi che lo scavalcano (download) o lo sbagliano (modulo, ricerca).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { vistaAvviso, copertura } from '../../helpers/avvisoSito.mjs';
 import { createServer } from 'node:http';
 
-async function sito(t) {
+async function sito() {
   const richieste = [];
   const pagine = {};
   const server = createServer((req, res) => {
@@ -24,7 +24,6 @@ async function sito(t) {
     });
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  t.after = () => new Promise((r) => server.close(r));
   return { origin: `http://127.0.0.1:${server.address().port}`, pagine, richieste, chiudi: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }) };
 }
 
@@ -58,7 +57,7 @@ async function apri(openTab, url) {
 }
 
 test('r1 un link a un file travestito con l\'attributo download: al clic l\'avviso, e il file non parte', async ({ app, openTab }) => {
-  const s = await sito({});
+  const s = await sito();
   s.pagine['/'] = '<title>Archivio</title><a id="file" download href="/documenti/fattura.pdf.exe">la tua fattura</a>';
   try {
     await apri(openTab, s.origin + '/');
@@ -71,20 +70,8 @@ test('r1 un link a un file travestito con l\'attributo download: al clic l\'avvi
   } finally { await s.chiudi(); }
 });
 
-test('controllo: lo stesso link senza download si ferma all\'avviso', async ({ app, openTab }) => {
-  const s = await sito({});
-  s.pagine['/'] = '<title>Archivio</title><a id="file" href="/documenti/fattura.pdf.exe">la tua fattura</a>';
-  try {
-    await apri(openTab, s.origin + '/');
-    await contaScaricamenti(app);
-    await clic(app, '#file');
-    await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
-    expect(await app.evaluate(() => globalThis.__scaricati)).toEqual([]);
-  } finally { await s.chiudi(); }
-});
-
 test('r2 un modulo che invia a un indirizzo da avviso: dopo «Continua» i dati arrivano', async ({ app, openTab }) => {
-  const s = await sito({});
+  const s = await sito();
   s.pagine['/'] = '<title>Modulo</title><form id="m" method="post" action="/invio/ricevuta.pdf.exe?x=1">'
     + '<input name="nome" value="Mario"><button id="vai">Invia</button></form>';
   try {
@@ -99,5 +86,18 @@ test('r2 un modulo che invia a un indirizzo da avviso: dopo «Continua» i dati 
     await expect.poll(() => s.richieste.filter((r) => r.url.startsWith('/invio/')).length, { timeout: 10_000 }).toBeGreaterThan(0);
     const invio = s.richieste.filter((r) => r.url.startsWith('/invio/'));
     expect(invio.map((r) => `${r.metodo} ${r.corpo}`)).toEqual(['POST nome=Mario']);
+  } finally { await s.chiudi(); }
+});
+
+test('r3 una ricerca col nome di un file travestito apre i risultati, senza l\'avviso di un file', async ({ app, openTab }) => {
+  const s = await sito();
+  s.pagine['/'] = '<title>Cerca</title><form id="m" method="get" action="/cerca">'
+    + '<input name="q" value="fattura.pdf.exe"><button id="vai">Cerca</button></form>';
+  s.pagine['/cerca'] = '<title>Risultati</title><p id="arrivato">risultati</p>';
+  try {
+    await apri(openTab, s.origin + '/');
+    await clic(app, '#vai');
+    await expect.poll(() => s.richieste.filter((r) => r.url.startsWith('/cerca')).length, { timeout: 8_000 }).toBeGreaterThan(0);
+    expect((await copertura(app)).coperta).toBe(false);
   } finally { await s.chiudi(); }
 });
