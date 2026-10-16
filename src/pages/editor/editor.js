@@ -762,6 +762,7 @@
   // decide quando scrivere).
   function activateFile(raw) {
     doc = parseStoredDoc(raw) || parseStoredDoc(blankFileSerialized());
+    convertiScorciatoie(doc.modules);
     collection.activeId = doc.id;
     // Stato di vista che non deve "trascinarsi" da un file all'altro: torna
     // sempre alla vista testo (fuori dalla modalità modifica moduli).
