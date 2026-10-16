@@ -4164,8 +4164,13 @@
     return colpisce(altra, pressioneDi(fisica));
   }
   // Scritta a mano: { c } o { rifiuto }. Senza sapere com'è fatta la tastiera, una lettera o un simbolo restano testo.
-  function daScritta(sc) {
+  function daScritta(sc, m) {
     const r = TASTI.tastoFisicoDaScritta(sc, layoutTastiera, TASTI.piattaforma());
+    // Un simbolo da premere che però Filo o l'Editor si prendono comunque («Ctrl+_» è lo zoom): meglio dire quello.
+    if (r && r.rifiuto && m && (r.rifiuto.tipo === 'senzaTastoProprio' || r.rifiuto.tipo === 'simbolo')) {
+      const comeTesto = rifiuto({ nome: String(sc).trim() }, m);
+      if (comeTesto && (comeTesto.tipo === 'presa' || comeTesto.tipo === 'sistema')) return { rifiuto: comeTesto };
+    }
     if (r && r.rifiuto) return { rifiuto: r.rifiuto };
     return { c: r ? { nome: r.nome, tasto: r.tasto } : { nome: String(sc).trim() } };
   }
