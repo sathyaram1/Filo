@@ -70,6 +70,16 @@ test('elencoDaTesto e testoDaElenco: i siti ridotti senza doppioni, le righe sca
   assert.deepEqual(N.elencoDaTesto('').valid, []);
 });
 
+test('elencoDaTesto: più siti incollati sulla stessa riga valgono uno per uno, un indirizzo con virgole resta uno', () => {
+  assert.deepEqual(N.elencoDaTesto('docs.google.com, figma.com').valid, ['docs.google.com', 'figma.com']);
+  assert.deepEqual(N.elencoDaTesto('docs.google.com figma.com;notion.so').valid, ['docs.google.com', 'figma.com', 'notion.so']);
+  const r = N.elencoDaTesto('faceb, figma.com');
+  assert.deepEqual(r.valid, ['figma.com']);
+  assert.deepEqual(r.invalid, ['faceb']);
+  assert.equal(N.testoDaElenco(r.valid, r.scartate), 'faceb\nfigma.com');
+  assert.deepEqual(N.elencoDaTesto('https://www.esempio.it/cerca?q=a,b c').valid, ['esempio.it']);
+});
+
 test('ripulisciElenco: un elenco salvato prima della riduzione torna ai nomi; quello che non è un sito resta com\'era', () => {
   assert.deepEqual(N.ripulisciElenco(['https://docs.google.com/document', 'DOCS.google.com', 'www.esempio.it', '127.0.0.1', '', 3, '  ']),
     ['docs.google.com', 'esempio.it', '127.0.0.1']);
