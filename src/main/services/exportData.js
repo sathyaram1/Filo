@@ -203,8 +203,8 @@ function buildExportZip(storageData, { filo: filoDato = null, chiavi = false } =
     imageCount: images.length,
     filo: !!(filo && filo.length),
     chiavi: haSegreti(clone),
-    note: 'Esportazione dati Filo. data.json contiene tutte le impostazioni e i '
-      + 'contenuti; le immagini copiate/salvate sono nella cartella images/; '
+    note: 'Esportazione dati Filo. data.json contiene le impostazioni e i '
+      + 'contenuti (le chiavi API solo se «chiavi» qui sotto è true); le immagini copiate/salvate sono nella cartella images/; '
       + 'le chat con Filo e le pagine visitate stanno in filo/eventi.jsonl, un evento per riga.',
   };
 
