@@ -3991,11 +3991,14 @@
     const deletable = !isPinned(m);
     const libera = scorciatoiaLibera(m);
     const senzaAzione = !AZIONE_SCORCIATOIA[m.type];
+    const giaSalvata = candidatoDi(m.data);
+    const mostrata = nomeMostrato(giaSalvata);
     openOverlay(`<h3>${meta.label}</h3>
-      <div class="ed-field"${senzaAzione && !m.data.shortcut ? ' hidden' : ''}><label>Scorciatoia da tastiera</label>
-        <input type="text" id="cfgShortcut" placeholder="${libera ? `es. ${escapeHtml(libera)}` : ''}" value="${escapeHtml(m.data.shortcut || '')}" />
+      <div class="ed-field"${senzaAzione && !giaSalvata ? ' hidden' : ''}><label for="cfgShortcut">Scorciatoia da tastiera</label>
+        <input type="text" id="cfgShortcut" autocomplete="off" spellcheck="false" placeholder="Premi i tasti${libera ? `, es. ${escapeHtml(libera)}` : ''}" value="${escapeHtml(mostrata)}" />
         <div class="ed-field-hint" id="cfgShortcutHint" hidden>Usa almeno un modificatore (${escapeHtml(tasto('Ctrl'))} o Alt)${libera ? `, es. ${escapeHtml(libera)}` : ''}, così non ruba una lettera mentre scrivi.</div>
-        <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div></div>
+        <div class="ed-field-hint" id="cfgShortcutTaken" hidden></div>
+        <div class="ed-field-hint ed-field-nota" id="cfgShortcutNota" hidden></div></div>
       ${specific}
       <div class="ed-overlay-actions">
         ${deletable ? '<button class="ed-btn danger" id="cfgDelete">Elimina</button>' : ''}
