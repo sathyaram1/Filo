@@ -151,9 +151,8 @@ export async function publishPublicView({ dryRun = false } = {}) {
     for (const id of plan.remove) await FB.unpublishPublicCard(id, { idToken: bearer });
   }
 
-  // Il contatore dei numeri: si alza solo fino a un numero con la prova del
-  // mittente (#923); il massimo di tutti fa da pavimento per riportarlo giù,
-  // e solo se li abbiamo letti TUTTI.
+  // Il contatore si alza solo fino a un numero provato (#923); il massimo di tutti fa da
+  // pavimento per riportarlo giù, e solo se li abbiamo letti TUTTI.
   const maxSeq = FB.maxSeqProvato(feedbacks);
   const pavimento = tuttiLetti ? feedbacks.reduce((m, f) => Math.max(m, Number(f && f.seq) || 0), 0) : 0;
   let counter = null;
