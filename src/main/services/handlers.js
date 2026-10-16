@@ -4529,13 +4529,23 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     let userAgent = 'Filo desktop auto';
     try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()} auto`; } catch (_) {}
 
+    // #953: dalla copia dell'owner parte con la sua prova, che dice da dove viene senza farla sua (non l'ha letta né
+    // confermata: il nome resta `auto:`). Senza un accesso valido non parte: da anonima sembrerebbe di un estraneo.
+    let firma;
+    const Mittente = require('./feedbackMittente');
+    if (Mittente.dallOwner()) {
+      const idToken = await Mittente.tokenOwner().catch(() => '');
+      if (!idToken) { console.warn('[F4] segnalazione automatica dell\'owner non partita: manca il suo accesso'); return; }
+      firma = { idToken, soloAdmin: true };
+    }
+
     const result = await FB.submit({
       text: payload.text,
       name: payload.name,
       clientId: payload.clientId,
       userAgent,
       capabilityGapId: payload.capabilityGapId || undefined,
-    }).catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
+    }, firma).catch((e) => { console.warn('[F4] submit auto-feedback fallito:', e?.message || e); return null; });
 
     if (!result || !result.id) return;
     const feedbackId = result.id;
