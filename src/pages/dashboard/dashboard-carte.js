@@ -243,7 +243,7 @@
       chiave: `avviso:${n.id}`, tipo: 'avviso', icona: pronto ? 'download' : allarme ? 'warning' : 'bell',
       titolo: allarme ? 'Avviso' : 'Filo', stato: n.text, lungo: true,
       principale,
-      secondaria: scarica || pronto ? { etichetta: 'Chiudi', fai: chiudi } : null,
+      secondaria: scarica || pronto || pagina ? { etichetta: 'Chiudi', fai: chiudi } : null,
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: n.text,
     };
