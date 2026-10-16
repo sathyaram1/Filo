@@ -1573,7 +1573,7 @@
         timer = setTimeout(flush, 1500);
       });
       input.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape') return;
+        if (e.key !== 'Escape' || e.isComposing) return;
         e.preventDefault();
         e.stopPropagation();
         mostraFrase(input.closest('.fb-card'), input.dataset.id, false);
