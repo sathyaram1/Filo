@@ -1790,6 +1790,11 @@ export function tornaAllaLineaPrincipale() {
   return { ok: true, head: headSha(ROOT) };
 }
 
+// Un primo lavoro nasce su un ramo nuovo; quello che riparte dopo una sua segnalazione ha già il ramo, e il server lo dice (#1203). PURA.
+export function suRamoNuovo(bucket, ripresa) {
+  return bucket.role === 'new-work' && !(ripresa && String(bucket.branch || ''));
+}
+
 /**
  * A + D: posiziona la directory sul branch del bucket e registra nello stato
  * l'identità attesa del contenuto. FAIL CLOSED: se non riesce, il lavoro NON
@@ -1797,11 +1802,6 @@ export function tornaAllaLineaPrincipale() {
  *
  * @returns {{ok:true, branch:string}|{ok:false, kind:string, message:string}}
  */
-// Un primo lavoro nasce su un ramo nuovo; quello che riparte dopo una sua segnalazione ha già il ramo, e il server lo dice (#1203). PURA.
-export function suRamoNuovo(bucket, ripresa) {
-  return bucket.role === 'new-work' && !(ripresa && String(bucket.branch || ''));
-}
-
 function positionOnBranch(bucket, { ripresa = false } = {}) {
   const isNew = suRamoNuovo(bucket, ripresa);
   const prev = readState(bucket.id);
