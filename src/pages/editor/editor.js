@@ -4016,11 +4016,17 @@
     const cfgShortcut = $('cfgShortcut');
     const cfgShortcutHint = $('cfgShortcutHint');
     const cfgShortcutTaken = $('cfgShortcutTaken');
-    cfgShortcut.addEventListener('input', () => {
+    const cfgShortcutNota = $('cfgShortcutNota');
+    // L'ultima combinazione premuta nel campo: { mostrata, c }. Riscrivere a mano il campo la lascia.
+    let registrata = null;
+    let primaDellAttesa = null;
+    function pulisci() {
       cfgShortcut.classList.remove('ed-field-invalid');
       cfgShortcutHint.hidden = true;
       cfgShortcutTaken.hidden = true;
-    });
+      cfgShortcutNota.hidden = true;
+    }
+    cfgShortcut.addEventListener('input', () => { registrata = null; primaDellAttesa = null; pulisci(); });
     function mostraAvviso(testo) {
       cfgShortcut.classList.add('ed-field-invalid');
       cfgShortcutTaken.textContent = testo;
@@ -4032,20 +4038,68 @@
       cfgShortcutHint.hidden = false;
     }
     const AVVISO_SENZA_AZIONE = `«${meta.label}» non ha un'azione unica da far partire con un tasto: svuota il campo e salva.`;
+    // Col fuoco nel campo una combinazione con Ctrl, Cmd o Alt si registra invece di fare la sua cosa (#893);
+    // le lettere si scrivono, perché una scorciatoia si può anche scrivere a mano.
+    cfgShortcut.addEventListener('focus', () => avviaAscolto(cfgShortcut, {
+      premuto(e) {
+        const plat = TASTI.piattaforma();
+        const r = TASTI.tastoFisicoDaEvento(e, layoutTastiera, plat);
+        if (!r) return;
+        if (r.attesa) {
+          if (primaDellAttesa == null) primaDellAttesa = cfgShortcut.value;
+          const tenuti = [(e.ctrlKey || e.metaKey) && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', '…'].filter(Boolean);
+          cfgShortcut.value = TASTI.etichettaScritta(tenuti.join('+'), plat);
+          return;
+        }
+        if (primaDellAttesa != null) cfgShortcut.value = primaDellAttesa;
+        primaDellAttesa = null;
+        pulisci();
+        if (r.rifiuto) { mostraRifiuto(r.rifiuto); return; }
+        const c = { nome: r.nome, tasto: r.tasto, car: r.car };
+        registrata = { mostrata: TASTI.etichettaScritta(r.nome, plat), c };
+        cfgShortcut.value = registrata.mostrata;
+        const no = senzaAzione ? null : rifiuto(c, m);
+        if (no) mostraRifiuto(no);
+      },
+      lasciato(e) {
+        if (primaDellAttesa == null || e.ctrlKey || e.metaKey || e.altKey) return;
+        cfgShortcut.value = primaDellAttesa;
+        primaDellAttesa = null;
+      },
+    }));
+    cfgShortcut.addEventListener('blur', () => {
+      if (primaDellAttesa != null) cfgShortcut.value = primaDellAttesa;
+      primaDellAttesa = null;
+      fermaAscolto();
+    });
     // Una scorciatoia salvata prima di questi controlli può essere già morta:
     // lo si dice all'apertura, non solo quando la si riscrive.
-    const giaSalvata = String(m.data.shortcut || '').trim();
     const rifiutoGiaSalvata = rifiuto(giaSalvata, m);
     if (giaSalvata && senzaAzione) mostraAvviso(AVVISO_SENZA_AZIONE);
     else if (rifiutoGiaSalvata) mostraRifiuto(rifiutoGiaSalvata);
+    else if (giaSalvata && !giaSalvata.tasto) {
+      cfgShortcutNota.textContent = `Non so ancora quale tasto è ${mostrata} su questa tastiera: premi la combinazione per fissarla. Intanto parte come prima.`;
+      cfgShortcutNota.hidden = false;
+    }
     $('cfgSave').addEventListener('click', () => {
-      const rawShortcut = cfgShortcut.value.trim();
-      if (rawShortcut && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
-      const r = rifiuto(rawShortcut, m);
+      const scritta = cfgShortcut.value.trim();
+      if (scritta && senzaAzione) { mostraAvviso(AVVISO_SENZA_AZIONE); cfgShortcut.focus(); return; }
+      let c = null;
+      if (scritta && registrata && scritta === registrata.mostrata) c = registrata.c;
+      else if (scritta && giaSalvata && scritta === mostrata) c = giaSalvata;
+      else if (scritta) {
+        const v = daScritta(scritta);
+        if (v.rifiuto) { mostraRifiuto(v.rifiuto); cfgShortcut.focus(); return; }
+        c = v.c;
+      }
+      const r = rifiuto(c, m);
       if (r) { mostraRifiuto(r); cfgShortcut.focus(); return; }
       // Le scorciatoie di Filo la confrontano con quelle dei moduli salvati: un attimo dopo sarebbe già tardi (#842).
-      const nuovaScorciatoia = (m.data.shortcut || '') !== rawShortcut;
-      m.data.shortcut = rawShortcut;
+      const prima = `${m.data.shortcut || ''}|${m.data.tasto || ''}`;
+      m.data.shortcut = c ? c.nome : '';
+      if (c && c.tasto) m.data.tasto = c.tasto;
+      else delete m.data.tasto;
+      const nuovaScorciatoia = prima !== `${m.data.shortcut}|${m.data.tasto || ''}`;
       if (m.type === 'word-count') m.data.count = $('cfgCount').value;
       if (m.type === 'switch') {
         overlayBox.querySelectorAll('[data-pname]').forEach((inp) => { m.data.pages[Number(inp.dataset.pname)].name = inp.value; });
