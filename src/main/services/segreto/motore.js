@@ -996,20 +996,22 @@ async function riparaDichiarato(ctx, D) {
 
 // Niente qui restituisce o registra cosa è stato riparato: un «riparati N blocchi» direbbe che esistono altri segreti.
 async function riparaProprio(ctx, S) {
-  const G = Math.ceil(S.L / GRUPPO);
-  const usati = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   // Prima si segnano i file rovinati, poi i loro blocchi si riscrivono a zero: nell'ordine opposto un'interruzione
   // lascerebbe file che si leggono a zeri senza dirlo.
   const persi = [];
-  for (let g = 1; g < G; g++) {
+  const usatiPrima = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
+  for (let g = 1; g < Math.ceil(S.L / GRUPPO); g++) {
     const info = S.gruppi[g];
-    for (let s = info ? Math.min(info.k, kAtteso(S, g)) : 0; s < kAtteso(S, g); s++) if (usati[GRUPPO * g + s]) persi.push(GRUPPO * g + s);
+    for (let s = info ? Math.min(info.k, kAtteso(S, g)) : 0; s < kAtteso(S, g); s++) if (usatiPrima[GRUPPO * g + s]) persi.push(GRUPPO * g + s);
   }
   const tabella = new Map(S.tabella);
   if (persi.length && marcaDanneggiati(tabella, persi)) {
     // Stessa lunghezza, stessi blocchi: la tabella segnata si scrive dove sta, anche a contenitore pieno.
     await transazione(ctx, S, { tabella, bytes: serializzaTabella(tabella), blocchiTabella: S.blocchiTabella, L2: S.L }, new Map());
   }
+  // Dopo la tabella: la transazione può aver accorciato il segreto.
+  const G = Math.ceil(S.L / GRUPPO);
+  const usati = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   const parziali = [];
   const persiInteri = [];
   const daRifare = [];
