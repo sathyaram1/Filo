@@ -148,7 +148,8 @@
 
     // Tutto il resto passa da Ctrl, e su Mac Ctrl si preme Cmd.
     const out = [];
-    if (haCtrl) out.push('Cmd');
+    if (conControlECmd(modificatori)) out.push('Ctrl', 'Cmd');
+    else if (haCtrl) out.push('Cmd');
     if (haAlt) out.push('Alt');
     out.push(...altri, tastoFinale);
     return out.join('+');
