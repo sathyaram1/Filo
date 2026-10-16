@@ -250,7 +250,6 @@ module.exports = function register(on, ctx) {
         chats: filo.chats,
         pagine: filo.pagine,
         chiavi: haSegreti(parsed.data),
-        chiaviQui: haSegreti(correnti),
       };
     } catch (e) {
       // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"
