@@ -1964,6 +1964,8 @@
 
   function selectTab(tab) {
     if (!TABS.includes(tab)) return;
+    // Cambiare sezione è lasciare le schede: tornando, la frase riparte chiusa, come in Gestione cambiando feedback.
+    if (tab !== currentTab) fraseAperte.clear();
     currentTab = tab;
     tabsEl.querySelectorAll('[data-tab]').forEach((b) => {
       b.classList.toggle('fb-tab--active', b.dataset.tab === tab);
