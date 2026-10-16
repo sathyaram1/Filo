@@ -178,28 +178,10 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
       const [nuovo] = await avvisiOwner(app);
       expect(nuovo.id).not.toBe(primo.id);
 
-      // Alzato il tetto, la pagina dell'owner rilegge la vista: l'avviso non è più vero e se ne va.
+      // Alzato il tetto, la lettura della pagina dell'owner (la sua, sempre fresca): l'avviso non è più vero e se ne va.
       stato.dati = 30000;
-      const adm = () => app.evaluate(() => {
-        const Module = process.getBuiltinModule('module');
-        const path = process.getBuiltinModule('path');
-        const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
-        const ga = req('./auth/google-auth');
-        return [ga.isAdmin(), ga.isSignedIn(), JSON.stringify(ga.getProfile()), process.uptime()];
-      });
-      console.log('DEBUG1', JSON.stringify(await adm()));
-      await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.OPEN_URL, url: 'filo://credits/owner.html' }));
-      await home.waitForTimeout(3000);
-      console.log('DEBUG2', JSON.stringify(await adm()), stato.letture);
-      const ow = await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/owner.html'), 'x');
-      const t0 = Date.now();
-      const st = await ow.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WALLET_STATE }).then((r) => JSON.stringify(r).slice(0, 600), (e) => 'ERR ' + e.message));
-      console.log('DEBUG3', Date.now() - t0, st);
-      console.log('DEBUG4', await ow.evaluate(() => JSON.stringify([window.SN_PAGE_THEME, document.getElementById('ownerSection').hidden, document.readyState, typeof window.SN_WALLET])));
-      ow.on('console', (m) => console.log('PAGE', m.text()));
-      await ow.reload();
-      await ow.waitForTimeout(3000);
-      console.log('DEBUG5', stato.letture, await ow.evaluate(() => JSON.stringify([window.SN_PAGE_THEME, document.getElementById('ownerSection').hidden])));
+      const r = await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WALLET_OWNER_OVERVIEW }));
+      expect(r.overview.totals.grantedCredits).toBe(30000);
       await expect.poll(() => avvisiOwner(app), { timeout: 15_000 }).toEqual([]);
       await expect(carte(home)).toHaveCount(0, { timeout: 15_000 });
     } finally { await chiudiApp(app); }
