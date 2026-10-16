@@ -108,6 +108,10 @@
     $('sec-clip-clear').textContent = I18n.t('menu_paste_clear');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
+    for (const p of ['sec-export-keys', 'sec-wipe-export-keys']) {
+      $(`${p}-label`).textContent = I18n.t('security_export_keys_label');
+      $(`${p}-desc`).textContent = I18n.t('security_export_keys_desc');
+    }
     $('sec-import-btn').textContent = I18n.t('security_import_btn');
     $('sec-import-desc').textContent = I18n.t('security_import_desc');
     $('sec-wipe-btn').textContent = I18n.t('security_wipe_btn');
