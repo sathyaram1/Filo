@@ -11,18 +11,31 @@ const FETTA_MS = 8;
 
 const LIVELLI = new Set(['pericoloso', 'sospetto']);
 
-// Una doppia estensione sta nel percorso o in un parametro, scritta com'è letta: «%20» è uno spazio.
-function percorsoDi(u) {
+// I parametri che portano un file per nome. Il testo cercato (q, search, keywords…) non è un file: una ricerca di
+// «fattura.pdf.exe» apre dei risultati, non un programma.
+const PARAMETRI_FILE = /^(file|files|filename|fname|fn|f|name|nome|nomefile|attachment|allegato|download|dl|doc|document|documento)$/i;
+
+// Una doppia estensione sta nel percorso, in un parametro che porta un file o in un indirizzo passato come parametro
+// (un rimando), scritta com'è letta: «%20» è uno spazio. `nome`: il nome con cui il file arriva, se lo si sa già.
+function percorsoDi(u, nome = '') {
   const leggi = (s) => { try { return decodeURIComponent(s); } catch (_) { return s; } };
-  return leggi(u.pathname) + leggi(u.search);
+  let out = leggi(u.pathname);
+  for (const [k, val] of u.searchParams) {
+    let dentro = null;
+    try { dentro = /^https?:\/\//i.test(val) ? new URL(val) : null; } catch (_) { dentro = null; }
+    if (dentro) out += '?' + k + '=' + leggi(dentro.pathname);
+    else if (PARAMETRI_FILE.test(k)) out += '?' + k + '=' + val;
+  }
+  if (nome) out += '?nome=' + nome;
+  return out;
 }
 
 // Un link solo: null se non è un indirizzo web o se non c'è niente da dire.
-function esaminaLink(url, checkSync) {
+function esaminaLink(url, checkSync, nome = '') {
   let u;
   try { u = new URL(String(url)); } catch (_) { return null; }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-  const v = checkSync(u.href, { urlPath: percorsoDi(u) });
+  const v = checkSync(u.href, { urlPath: percorsoDi(u, nome) });
   if (!v || !LIVELLI.has(v.level)) return null;
   return { url: u.href, level: v.level, message: v.message || null, scope: v.scope || (v.norm && v.norm.registrable) || null };
 }
