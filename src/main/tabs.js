@@ -2537,6 +2537,11 @@ class TabManager {
         event.preventDefault();
         return;
       }
+      // #965 — un link da avviso non si apre prima dell'avviso, che compare qui, sulla pagina da cui parte.
+      if (this._sbPrimaDelClic(tab, url, (segna) => { segna(tab); this.navigate(tab.id, url); })) {
+        event.preventDefault();
+        return;
+      }
       if (this._needsRecreate(tab, url)) {
         event.preventDefault();
         this._recreateView(tab, url, { nuova: true });
