@@ -159,9 +159,10 @@ function indirizziDelMittente(sender) {
 // #843 — dall'Aiuto di un sito si spegne o si riaccende Filo solo lì: si aggiunge il nome del sito, si tolgono le voci
 // che lo coprono. Mai un altro sito, che il testo della pagina potrebbe far nominare.
 function filoSulSitoStesso(action, origine) {
-  const P = globalThis.SN_PREF || require('../../shared/preferences.js');
   const N = globalThis.SN_NOMI_SITO || require('../../shared/nomiSito.js');
   const D = globalThis.SN_PAGINE_DELICATE || require('../../shared/pagineDelicate.js');
+  if (!globalThis.SN_PREF) require('../../shared/preferences.js');
+  const P = globalThis.SN_PREF;
   const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
   const setter = P.setterDellaChiave(chiave);
   if (!setter || setter.scrive.length !== 1 || setter.scrive[0] !== 'blocklist') return false;
