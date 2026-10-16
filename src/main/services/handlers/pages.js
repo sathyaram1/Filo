@@ -69,6 +69,11 @@ module.exports = function register(on, ctx) {
 
   soloFilo(MSG.REMOVE_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.remove(msg.id) }));
 
+  soloFilo(MSG.RESTORE_SAVED_PAGE, async (msg) => {
+    const { pages, entry } = await SavedPages.rimetti(msg.id, await Categorizer.listCategories());
+    return { ok: !!entry, pages };
+  });
+
   soloFilo(MSG.CONSUME_SAVED_PAGE, async (msg) => ({ ok: true, pages: await SavedPages.consume(msg.id) }));
 
   // La miniatura la scatta il main dalla scheda di chi la chiede: un'immagine mandata dalla pagina qui non si decodifica (#839).
