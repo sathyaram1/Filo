@@ -93,8 +93,8 @@
     }
     .fb-filter:hover { color: var(--sn-fg); }
     /* La riga dei tasti: a sinistra la frase (fissa, qualunque sia il numero di azioni), a destra le azioni di stato. */
-    .fb-tasti { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
-    .fb-actions { flex: 1 1 auto; min-width: 0; display: flex; justify-content: flex-end; gap: 8px; }
+    .fb-tasti { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .fb-actions { flex: 1 1 auto; display: flex; justify-content: flex-end; gap: 8px; }
     /* Il tasto della frase ha la resa di Gestione: la freccia si gira da aperto, pallino e accento se una frase c'è già. */
     .fb-usernote-toggle::after {
       content: '▾'; display: inline-block; margin-left: 6px;
