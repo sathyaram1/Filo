@@ -571,9 +571,10 @@ module.exports = function register(on, ctx) {
     const s = await getEffectiveSettings();
     const interna = daFilo(origin, sender);
     let routing = providerRouting(s);
-    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando.
+    // La pagina dei predefiniti decide la lista di esclusione di tutti: l'avviso usa quella che sta modificando,
+    // senza la lista della chiave propria di chi la modifica (#962).
     if (interna && Array.isArray(msg.excluded)) {
-      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string') });
+      routing = providerRouting({ ...s, excludedProviders: msg.excluded.filter((x) => typeof x === 'string'), excludedProvidersOwnKey: null });
     }
     let entry = null;
     if (interna && typeof msg.provider === 'string' && typeof msg.model === 'string') {

@@ -437,9 +437,17 @@ module.exports = function register(on, ctx) {
         if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
         waitsFor = r.attese;
       }
+      // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
+      // partenza si chiede al documento, non alla copia della pagina.
+      const FB = globalThis.SN_FEEDBACK;
+      let localMerges;
+      if (status !== undefined && FB.statusToPublic(status) === 'open') {
+        const [ora] = await FB.getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
+        if (ora && ora.localMerges && FB.riapre(ora.statusPublic, status)) localMerges = null;
+      }
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, waitsFor },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso

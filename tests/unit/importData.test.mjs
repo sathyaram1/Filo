@@ -37,7 +37,8 @@ test('round-trip: quello che esporti è esattamente quello che reimporti', () =>
     ],
   };
 
-  const zip = buildExportZip(original);
+  // Con le chiavi chieste da chi esporta (#905): senza, escono dall'archivio (esportaSenzaChiavi.test.mjs).
+  const zip = buildExportZip(original, { chiavi: true });
   const back = readExportZip(zip);
 
   // I dati tornano identici: nessuna perdita, nessun percorso lasciato lì.
@@ -199,7 +200,7 @@ test('export → import su un profilo vuoto ricostruisce lo stato identico', () 
     filo_memory: { PROFILO: 'Mario' },
     clipboardHistory: [{ id: 'c1', type: 'image', dataUrl: RED_PNG_URL }],
   };
-  const { data } = readExportZip(buildExportZip(source));
+  const { data } = readExportZip(buildExportZip(source, { chiavi: true }));
   const { merged } = mergeImportedData({}, data);
   assert.deepEqual(merged, source);
 });

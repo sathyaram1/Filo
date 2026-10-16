@@ -70,6 +70,8 @@ il rilievo che riproduce.
 
 <!-- includi: _solo-in-locale.md -->
 
+<!-- includi: _guasto-in-attesa.md -->
+
 ## Consegna
 
 I tre testi (report, frase, changelog) li scrivi tu.

@@ -435,7 +435,6 @@
   const ICONA_SUGGERIMENTO = { gmail: 'mailOpen', calendar: 'calendar', editor: 'editor', file: 'folder', note: 'note', link: 'globe', web: 'globe' };
   function faviconDi(s) {
     const tipo = String((s.action && s.action.type) || '').toUpperCase();
-    const url = tipo === 'NAVIGA' ? d.faviconUrl(s.action.url) : '';
     const ico = el('span', 'dash-carta-voce-ico');
     ico.setAttribute('aria-hidden', 'true');
     const generica = () => {
@@ -445,14 +444,12 @@
       const nome = ICONA_SUGGERIMENTO[s.icon] || propria || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
       ico.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](14) : '';
     };
-    if (url) {
-      const img = el('img');
-      img.src = url;
-      img.alt = '';
-      img.referrerPolicy = 'no-referrer';
-      img.onerror = () => { img.remove(); generica(); };
-      ico.appendChild(img);
-    } else generica();
+    if (tipo !== 'NAVIGA') { generica(); return ico; }
+    const img = el('img');
+    img.alt = '';
+    img.onerror = () => { img.remove(); generica(); };
+    ico.appendChild(img);
+    d.iconaDelSito(s.action.url, { soloCopie: !!s.chiedeOk }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 

@@ -42,6 +42,11 @@
     }));
   }
 
+  // L'interruttore della chiave propria (#962) segue la chiave SALVATA, da qui o da Crediti: senza non ha effetto.
+  function mostraChiavePropria(settings) {
+    $('sec-own-key-providers').hidden = !window.SN_CONST.hasOwnOpenrouterKey(settings);
+  }
+
   function fillStaticText() {
     document.title = I18n.t('options_title');
     $('title').textContent = I18n.t('options_title');
@@ -49,6 +54,8 @@
     $('useDefaultModels-desc').textContent = I18n.t('options_use_default_models_desc');
     $('openWeightsOnly-label').textContent = I18n.t('options_open_weights_only');
     $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
+    $('ownKeyAllProviders-label').textContent = I18n.t('options_own_key_all_providers');
+    $('ownKeyAllProviders-desc').textContent = I18n.t('options_own_key_all_providers_desc');
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
@@ -365,6 +372,8 @@
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
     $('openWeightsOnly').checked = settings.openWeightsOnly === true;
+    $('ownKeyAllProviders').checked = settings.ownKeyAllProviders === true;
+    mostraChiavePropria(settings);
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
@@ -874,6 +883,7 @@
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
       openWeightsOnly: $('openWeightsOnly').checked,
+      ownKeyAllProviders: $('ownKeyAllProviders').checked,
       apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
@@ -956,6 +966,7 @@
         salta: (id, percorso, el) => staUsandoAdesso(el),
       });
       if (toccati.includes('useDefaultModels')) applyDefaultModelsVisibility();
+      mostraChiavePropria(msg.settings);
       if (toccati.length) renderOpenWeightsImpact();
       // Una chiave messa o tolta cambia crediti e dollari; la soglia cambia gli avvisi.
       if (toccati.includes('apiKey') || toccati.includes('useDefaultModels')) caricaStime();
