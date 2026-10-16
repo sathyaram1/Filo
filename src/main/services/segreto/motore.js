@@ -295,12 +295,35 @@ async function apriContenitore(percorso, dimensione) {
   } catch (e) {
     throw errore('CONTENITORE', 'Il contenitore non si apre.', { causa: e.code });
   }
-  const st = await fh.stat();
-  if (st.size !== dimensione) {
+  const st = await fh.stat({ bigint: true });
+  if (st.size !== BigInt(dimensione)) {
     await fh.close();
     throw errore('CONTENITORE', 'Il contenitore non ha la dimensione attesa.');
   }
-  return { fh, N: dimensione / BLOCCO, mappa: null };
+  return { fh, N: dimensione / BLOCCO, mappa: null, date: [st.atimeNs, st.mtimeNs] };
+}
+
+// Le date si scrivono al microsecondo, la grana di libuv: col mezzo microsecondo in più il troncamento ridà lo stesso
+// valore, e rimetterle a ogni operazione non le fa scivolare.
+function secondiDa(ns) {
+  const us = ns / 1000n;
+  return Number(us / 1_000_000n) + (Number(us % 1_000_000n) + 0.5) / 1e6;
+}
+
+// Le date del file restano quelle di prima: da fuori un contenitore usato e uno mai aperto non si distinguono. Si
+// rimettono solo se sono cambiate, perché rimetterle sposta la data di cambio stato.
+async function chiudiContenitore(ctx) {
+  try {
+    const st = await ctx.fh.stat({ bigint: true });
+    const micro = (ns) => ns / 1000n;
+    if (micro(st.atimeNs) !== micro(ctx.date[0]) || micro(st.mtimeNs) !== micro(ctx.date[1])) {
+      await ctx.fh.utimes(secondiDa(ctx.date[0]), secondiDa(ctx.date[1]));
+    }
+  } catch (_) {
+    // Un disco che non lascia rimettere le date non deve far fallire un'operazione già scritta.
+  } finally {
+    await ctx.fh.close();
+  }
 }
 
 const code = new Map();
