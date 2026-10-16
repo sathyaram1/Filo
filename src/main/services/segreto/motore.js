@@ -1133,16 +1133,16 @@ class Segreto {
       if (f.x) throw errore('DANNEGGIATO', 'Questo file si è rovinato e non si può più leggere.');
       const out = Buffer.alloc(f.d);
       const blocchi = daEstensioni(f.e);
-      const perGruppo = new Map();
-      for (let x = 0; x < blocchi.length; x++) {
-        const g = Math.floor(blocchi[x] / GRUPPO);
-        if (!perGruppo.has(g)) {
-          if (perGruppo.size > GRUPPI_PER_LOTTO) perGruppo.clear();
-          perGruppo.set(g, await carichiGruppo(ctx, S, g));
+      const dove = new Map(blocchi.map((j, x) => [j, x]));
+      for (const lotto of aLotti([...new Set(blocchi.map((j) => Math.floor(j / GRUPPO)))])) {
+        for (const [g, carichi] of await carichiGruppi(ctx, S, lotto)) {
+          for (let s = 0; s < GRUPPO; s++) {
+            const x = dove.get(GRUPPO * g + s);
+            if (x === undefined) continue;
+            if (!carichi[s]) throw errore('DANNEGGIATO', 'Questo file si è rovinato e non si può più leggere.');
+            carichi[s].copy(out, x * CARICO, 0, Math.min(CARICO, f.d - x * CARICO));
+          }
         }
-        const c = perGruppo.get(g)[blocchi[x] - GRUPPO * g];
-        if (!c) throw errore('DANNEGGIATO', 'Questo file si è rovinato e non si può più leggere.');
-        c.copy(out, x * CARICO, 0, Math.min(CARICO, f.d - x * CARICO));
       }
       return out;
     }, { muta: false });
