@@ -299,7 +299,8 @@
     const N = nomiSito();
     return N ? N.daScritto(raw) : '';
   }
-  function opElenco(v) {
+  // `voceDi`: come un pezzo scritto diventa la voce dell'elenco ('' se non è un sito).
+  function opElenco(v, voceDi = dominioDa) {
     const s = String(v == null ? '' : v).trim();
     if (!s) return null;
     if (SVUOTA.test(s)) return { op: 'sostituisci', voci: [] };
