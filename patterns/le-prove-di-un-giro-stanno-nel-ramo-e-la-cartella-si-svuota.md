@@ -82,7 +82,7 @@ diventare verdi. Pulizia e consegne leggono una prova per quello che fa il corpo
 il segno (#932): una segnata che passa («Expected to fail, but passed», rossa per
 Playwright) è una porta chiusa, e le si toglie il segno o la si toglie con la prova
 durevole; una segnata che fallisce come previsto (verde per Playwright) è una porta
-ancora aperta, e tolta ferma la consegna come ogni rossa. Prima la consegna rilanciava la
+ancora aperta, e tolta o cambiata ferma la consegna come ogni rossa. Prima la consegna rilanciava la
 prova col segno e respingeva proprio chi aveva corretto: l'unica strada era rimetterla
 com'era, rossa per il verificatore dopo. **Dopo un verdetto si può solo TOGLIERE**: una
 riga aggiunta lì, segno compreso, fa decadere il verdetto e costa un giro intero, e i due
