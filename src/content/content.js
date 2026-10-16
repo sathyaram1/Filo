@@ -554,6 +554,17 @@
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
   }
 
+  // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
+  const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+
+  // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
+  // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
+  function seguiSpento() {
+    const spento = isBlocked();
+    if (spento && self.__snFiloSpento !== true) { try { Menu.close(); } catch (_) {} }
+    self.__snFiloSpento = spento;
+  }
+
   function isBlocked() {
     const url = location.href;
     // #405 — dentro un riquadro incorporato "about:blank" e "about:srcdoc" NON
