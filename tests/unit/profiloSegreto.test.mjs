@@ -337,7 +337,10 @@ describe('da fuori', () => {
 
   test('nessun marcatore e nessuna intestazione in chiaro: né nomi né contenuti né il formato', () => {
     const buf = readFileSync(base.contenitore);
-    for (const s of ['MARCATORE-IN-CHIARO', 'filo-segreto', 'Alfa', 'zeri', '{"f":']) assert.equal(buf.indexOf(Buffer.from(s)), -1, s);
+    // Solo stringhe da otto byte in su: una più corta comparirebbe per caso in 16 MB di byte casuali.
+    for (const s of ['MARCATORE-IN-CHIARO', 'filo-segreto', '{"f":[{"n":', 'Beta\u0000\u0000\u0000\u0000']) {
+      assert.equal(buf.indexOf(Buffer.from(s)), -1, s);
+    }
     assert.equal(buf.indexOf(Buffer.alloc(64)), -1, 'una fila di zeri');
   });
 
