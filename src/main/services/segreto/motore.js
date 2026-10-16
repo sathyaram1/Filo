@@ -904,8 +904,9 @@ async function transazione(ctx, S, piano, dati) {
   const Lprima = S.L;
   const gruppi = [...new Set([...dati.keys()].filter((j) => j >= GRUPPO).map((j) => Math.floor(j / GRUPPO)))].sort((a, b) => a - b);
   // Prima di scrivere: il contenuto vecchio che deve restare accanto ai blocchi nuovi.
+  const rovinati = blocchiRovinati(Lprima, tabella);
   const servono = (g) => Array.from({ length: Math.max(0, Math.min(GRUPPO, Lprima - GRUPPO * g)) }, (_, s) => s)
-    .filter((s) => !dati.has(GRUPPO * g + s) && prima[GRUPPO * g + s]);
+    .filter((s) => !dati.has(GRUPPO * g + s) && prima[GRUPPO * g + s] && !rovinati[GRUPPO * g + s]);
   const vecchi = new Map();
   for (const lotto of aLotti(gruppi.filter((g) => servono(g).length))) {
     for (const [g, c] of await carichiGruppi(ctx, S, lotto)) {
