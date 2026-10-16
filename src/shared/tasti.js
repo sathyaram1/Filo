@@ -356,6 +356,7 @@
     'space', 'enter', 'escape', 'tab', 'backspace', 'delete', 'insert',
     'home', 'end', 'pageup', 'pagedown', 'contextmenu', 'pause', 'printscreen',
   ]);
+  const TASTO_FUNZIONE = /^f([1-9]|1[0-9]|2[0-4])$/;
   function tastoCanonico(nome) {
     const n = String(nome || '').toLowerCase().replace(/\s+/g, ' ');
     return SINONIMI_TASTO[n] || n;
@@ -376,7 +377,6 @@
     const s = mods.some((x) => SHIFT.test(x)) ? 's' : '';
     return `${c}${m}${a}${s}|${tastoCanonico(finale)}`;
   }
-  const TASTO_FUNZIONE = /^f([1-9]|1[0-9]|2[0-4])$/;
 
   // Scritti in forma canonica (Windows): `riservato` confronta per forma, e
   // Cmd vale Ctrl, quindi valgono anche scritti col tasto del Mac. Accanto a
@@ -451,7 +451,7 @@
     const f = forma(accel);
     if (!f) return false;
     const t = f.slice(f.indexOf('|') + 1);
-    return [...t].length === 1 || TASTI_CON_NOME.has(t) || /^f([1-9]|1[0-9]|2[0-4])$/.test(t);
+    return [...t].length === 1 || TASTI_CON_NOME.has(t) || TASTO_FUNZIONE.test(t);
   }
 
   // Il modificatore scritto, o '' se non è un modificatore che si sa premere.
@@ -500,11 +500,13 @@
   function combacia(ev, accel) {
     const f = forma(accel);
     if (!ev || !f) return false;
-    const c = modificatore(ev, 'ctrl') || modificatore(ev, 'meta') ? 'c' : '';
+    const [ctrl, meta] = [modificatore(ev, 'ctrl'), modificatore(ev, 'meta')];
+    const c = ctrl || meta ? 'c' : '';
+    const m = ctrl && meta ? 'm' : '';
     const a = modificatore(ev, 'alt') ? 'a' : '';
     const s = modificatore(ev, 'shift') ? 's' : '';
     const [mods, tasto] = [f.slice(0, f.indexOf('|')), f.slice(f.indexOf('|') + 1)];
-    const premuti = simbolo(tasto) ? `${c}${a}${mods.includes('s') ? 's' : ''}` : `${c}${a}${s}`;
+    const premuti = simbolo(tasto) ? `${c}${m}${a}${mods.includes('s') ? 's' : ''}` : `${c}${m}${a}${s}`;
     return mods === premuti && tastiDaEvento(ev).has(tasto);
   }
 
@@ -694,7 +696,7 @@
     if (code === 'Space' || key === ' ') return 'space';
     if ([...key].length === 1 && key > '\u00a0') return key.toLowerCase();
     const t = tastoCanonico(key);
-    return TASTI_CON_NOME.has(t) || /^f([1-9]|1[0-9]|2[0-4])$/.test(t) || /^[\u2190-\u2193]$/.test(t) ? t : '';
+    return TASTI_CON_NOME.has(t) || TASTO_FUNZIONE.test(t) || /^[\u2190-\u2193]$/.test(t) ? t : '';
   }
 
   const SOLO_MODIFICATORI = new Set(['Control', 'Alt', 'AltGraph', 'Shift', 'Meta', 'OS', 'Super', 'Hyper', 'Fn', 'CapsLock']);
