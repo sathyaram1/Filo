@@ -57,10 +57,13 @@ test('r1 salvare un file nuovo con la corrente che salta non rovina i file già 
     for (const w of registro) if (w) epoche[epoche.length - 1].push(w); else epoche.push([]);
     const guasti = [];
     for (let ep = 0; ep < epoche.length; ep++) {
-      for (const [quali, scelta] of [['solo sopra le copie vecchie', (w) => giaSue.has(w.p)], ['solo nei posti nuovi', (w) => !giaSue.has(w.p)]]) {
+      // Sono arrivate al disco le prime m scritture sopra le copie vecchie, nessuna di quelle nei posti nuovi.
+      const sopra = epoche[ep].filter((w) => giaSue.has(w.p));
+      for (let m = 1; m <= sopra.length; m++) {
+        const quali = `prime ${m} di ${sopra.length} scritte sopra le copie vecchie, nessuna nei posti nuovi`;
         const disco = Buffer.from(prima);
         for (let x = 0; x < ep; x++) for (const w of epoche[x]) w.dati.copy(disco, w.p * F.BLOCCO);
-        for (const w of epoche[ep]) if (scelta(w)) w.dati.copy(disco, w.p * F.BLOCCO);
+        for (const w of sopra.slice(0, m)) w.dati.copy(disco, w.p * F.BLOCCO);
         writeFileSync(base.contenitore, disco);
         const r = await M.apriSegreto({ ...base, nome: 'Casa' });
         const esito = { aperto: r.esito };
