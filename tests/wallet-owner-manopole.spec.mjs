@@ -339,15 +339,22 @@ test('gli ingressi con invito rimasti si cambiano dalla pagina, come le altre ma
   await expect(msg).toHaveText('Ingressi con invito rimasti: non può essere negativo.');
   await expect(msg).toHaveClass(/is-error/);
 
-  // Scritto alla italiana, con la virgola: il campo lo legge come decimale o come non-numero a seconda della
-  // lingua del sistema, e in tutti e due i casi lo dice.
+  // Scritto alla italiana, con la virgola: con il sistema in inglese il campo numerico buttava via la virgola,
+  // e «2,5» partiva come 25. Scritto o incollato, è un decimale.
   await page.fill('#knob-invitesRemaining', '');
   await campo.pressSequentially('2,5');
   await page.click('#knob-invitesRemaining-salva');
-  await expect(msg).toHaveText(/^Ingressi con invito rimasti: (un numero intero, senza virgola|ci vuole un numero)\.$/);
-  await page.fill('#knob-invitesRemaining', '2.5');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: un numero intero, senza virgola.');
+  await page.fill('#knob-invitesRemaining', '');
+  await app.evaluate(({ clipboard }) => clipboard.writeText('2,5'));
+  await campo.focus();
+  await page.keyboard.press('ControlOrMeta+V');
   await page.click('#knob-invitesRemaining-salva');
   await expect(msg).toHaveText('Ingressi con invito rimasti: un numero intero, senza virgola.');
+  await page.fill('#knob-invitesRemaining', '');
+  await campo.pressSequentially('venti');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: ci vuole un numero.');
   expect(patch.length).toBe(0);
 
   // Il main rifà il controllo: una parola, un negativo o un decimale non arrivano a config/credits nemmeno
