@@ -1031,6 +1031,7 @@ async function transazione(ctx, S, piano, dati) {
   await ctx.fh.datasync();
   S.tabella = tabella;
   S.blocchiTabella = blocchiTabella;
+  S.bytesTabella = Buffer.from(bytes);
   await scriviTestaGruppo(ctx, S, { nuovi: new Map([...dati].filter(([j]) => j < GRUPPO)), bytes });
   await liberaEStringi(ctx, S, prima);
 }
