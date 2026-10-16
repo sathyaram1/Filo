@@ -25,11 +25,16 @@ module.exports = function tieniFiloNellaRiscrittura() {
     const gia = trova(this, tipo, fn, o);
     if (gia >= 0) return aggiungi.call(this, tipo, segnati[gia].chiama, o);
     const s = { t: this, tipo, fn, o, cattura: cattura(o), chiama: fn };
-    // Un ascoltatore «una volta» già scattato non si rimette.
-    if (o && typeof o === 'object' && o.once) {
+    const unaVolta = !!(o && typeof o === 'object' && o.once);
+    if (unaVolta || s.cattura) {
       s.chiama = function (e) {
-        const i = segnati.indexOf(s);
-        if (i >= 0) segnati.splice(i, 1);
+        // Un tasto già consegnato in anticipo non si consegna due volte.
+        if (s.cattura && anticipati.has(e)) return undefined;
+        // Un ascoltatore «una volta» già scattato non si rimette.
+        if (unaVolta) {
+          const i = segnati.indexOf(s);
+          if (i >= 0) segnati.splice(i, 1);
+        }
         return fn.call(this, e);
       };
     }
