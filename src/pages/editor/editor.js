@@ -2558,8 +2558,8 @@
   // (src/content/content.js): se un modulo l'ha salvato, qui vince il modulo (#545).
   function dichiaraCtrlZ() {
     const annulla = TASTI_EDITOR.find((t) => t.suo === 'undo');
-    const preso = doc.modules.some((m) => AZIONE_SCORCIATOIA[m.type] && m.data && m.data.shortcut
-      && prendeIlTasto(annulla, TASTI.pressioneScritta(m.data.shortcut) || {}));
+    const preso = doc.modules.some((m) => AZIONE_SCORCIATOIA[m.type] && candidatoDi(m.data)
+      && prendeIlTasto(annulla, pressioneDi(candidatoDi(m.data)) || {}));
     if (preso) document.documentElement.dataset.filoCtrlZ = 'pagina';
     else delete document.documentElement.dataset.filoCtrlZ;
   }
