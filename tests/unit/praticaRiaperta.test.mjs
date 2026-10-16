@@ -230,9 +230,10 @@ test('finish: la parte dell’app tardiva con un ramo del server ancora fuori da
     assert.ok(chiusa(scritture), 'il seguito del server è l’ultima parte e la chiude');
     assert.match(r.testo, /Pratica #938 chiusa/);
   });
-  // Già aperta, o tardiva che non vale (la parte dell'app è già su main): non si riapre niente, decide la fusione.
+  // Già aperta, o chiusa dalla fusione di un altro lavoro: non si riapre niente, decide la fusione. Il seguito dello
+  // stesso ramo a parti già passate ha la prova sua, più sotto.
   for (const d of [pratica('p', { status: 'working', parti: { server: ORA - ORE, ramo: 'claude/x' } }),
-    pratica('p', { status: 'done', parti: { server: ORA - ORE, app: ORA - ORE, ramo: 'claude/x' } })]) {
+    pratica('p', { status: 'done', parti: { server: ORA - ORE, app: ORA - ORE, ramo: 'claude/altro' } })]) {
     await conRete({ p: d }, async (scritture) => {
       assert.equal(await riapriPerIlServer({ id: 'p', ramo: 'claude/x', pendingParts: inArrivo }, { of: conBearer, ora: ORA }), '');
       assert.equal(scritture.length, 0);
@@ -240,4 +241,55 @@ test('finish: la parte dell’app tardiva con un ramo del server ancora fuori da
   }
   const guasta = { partiDellaPratica: async () => { throw new Error('rete giù'); } };
   assert.match(await riapriPerIlServer({ id: 'p', ramo: 'claude/x', pendingParts: inArrivo }, { of: guasta, ora: ORA }), /non si legge \(rete giù\)/);
+});
+
+// Il terzo caso nell'ordine inverso: il seguito dell'app arriva prima del ramo del server, a pratica chiusa dalla
+// prima fusione dell'app. Chi arriva e trova l'altra parte in arrivo riapre, anche se la sua era già passata.
+test('finish: il seguito dell’app che arriva prima del server riapre la pratica chiusa dalla sua prima fusione', async () => {
+  const docs = { p: pratica('p', { status: 'done', parti: { app: ORA - 3 * ORE, ramo: 'claude/x' } }) };
+  const conBearer = {
+    partiDellaPratica: (id) => of.partiDellaPratica(id, OPTS),
+    scrivi: (id, to, nota) => of.scrivi(id, to, nota, OPTS),
+    annotaPratica: (id, nota) => of.annotaPratica(id, nota, OPTS),
+  };
+  const inArrivo = [{ part: 'server', branch: 'claude/x' }];
+  await conRete(docs, async (scritture) => {
+    const riga = await riapriPerIlServer({ id: 'p', ramo: 'claude/x', pendingParts: inArrivo }, { of: conBearer, ora: ORA });
+    assert.match(riga, /pratica riaperta \(«In lavorazione»\): l'aveva chiusa la fusione della parte dell’app .* claude\/x del server non è su main/);
+    assert.equal(stato(docs.p), 'working');
+    assert.deepEqual(parti(docs.p), {});
+    fondeLApp(docs.p, { ramo: 'claude/x', at: ORA, chiude: false });
+    const r = await serverFondi(['claude/x', '--feedback', 'p']);
+    assert.equal(r.k, 0, r.testo);
+    assert.ok(chiusa(scritture), 'il ramo del server è l’ultima parte e la chiude');
+  });
+  // Un seguito da un altro ramo, fuori tempo, o dopo un «stava tutto lì»: non è di questo lavoro, non si riapre.
+  for (const p of [{ app: ORA - 3 * ORE, ramo: 'claude/altro' }, { app: ORA - 49 * ORE, ramo: 'claude/x' },
+    { app: ORA - 3 * ORE, ramo: 'claude/x', solo: 'app' }]) {
+    await conRete({ p: pratica('p', { status: 'done', parti: p }) }, async (scritture) => {
+      assert.equal(await riapriPerIlServer({ id: 'p', ramo: 'claude/x', pendingParts: inArrivo }, { of: conBearer, ora: ORA }), '');
+      assert.equal(scritture.length, 0, JSON.stringify(p));
+    });
+  }
+});
+
+test('server:fondi: il seguito del server, a pratica chiusa con le due parti già passate, riapre se dell’app arriva ancora un ramo', async () => {
+  const docs = { p: pratica('p', { status: 'done', parti: { app: ORA - 5 * ORE, server: ORA - 3 * ORE, ramo: 'claude/x' } }) };
+  await conRete(docs, async (scritture) => {
+    const r = await serverFondi(['claude/x', '--feedback', 'p'], { ramiAperti: ['claude/x'] });
+    assert.equal(r.k, 0, r.testo);
+    assert.equal(r.lanci.length, 1);
+    assert.match(r.testo, /Pratica #938 riaperta: l'aveva chiusa la fusione della parte del server/);
+    assert.equal(chiusa(scritture), false);
+    assert.equal(stato(docs.p), 'working');
+    assert.deepEqual(conServer(docs.p), { ramo: 'claude/x' });
+  });
+  // Senza rami dell'app in arrivo resta il rifiuto di prima: la parte del server è già su main.
+  const ferma = { p: pratica('p', { status: 'done', parti: { app: ORA - 5 * ORE, server: ORA - 3 * ORE, ramo: 'claude/x' } }) };
+  await conRete(ferma, async (scritture) => {
+    const r = await serverFondi(['claude/x', '--feedback', 'p']);
+    assert.equal(r.k, 3, r.testo);
+    assert.match(r.testo, /già su main/);
+    assert.equal(scritture.length, 0);
+  });
 });
