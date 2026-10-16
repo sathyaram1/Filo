@@ -1230,7 +1230,8 @@ class Segreto {
 
   elencaFile() {
     const { S } = this.#vivo();
-    return [...S.tabella].map(([nome, f]) => ({ nome, dimensione: f.d, creato: f.c, modificato: f.m, danneggiato: !!f.x }));
+    return [...S.tabella].filter(([nome]) => nome !== RISERVA)
+      .map(([nome, f]) => ({ nome, dimensione: f.d, creato: f.c, modificato: f.m, danneggiato: !!f.x }));
   }
 
   info() {
