@@ -1,4 +1,4 @@
-// La pagina «Inviti e utenti» dell'owner (#652): le sette manopole dei crediti
+// La pagina «Inviti e utenti» dell'owner (#652): le manopole dei crediti
 // si cambiano da qui, i numeri che il server calcola si guardano e basta, e
 // ogni riga della tabella apre la scheda della persona.
 //
@@ -35,6 +35,8 @@ const patch = [];
 // comporta Firestore quando le regole non lasciano scrivere.
 let rifiutaPatch = false;
 const detailChiesti = [];
+// Quante volte la pagina ha chiesto i numeri calcolati: dopo un salvataggio li rilegge.
+let overviewChiesti = 0;
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
@@ -238,13 +240,13 @@ async function apriOwner(app) {
   return page;
 }
 
-test('le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
+test('le manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
 
-  // Ci sono tutte e sette, col valore che ha il server adesso.
-  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(7, { timeout: 15_000 });
+  // Ci sono tutte, col valore che ha il server adesso.
+  await expect(page.locator('#ownerKnobs .sn-manopola')).toHaveCount(8, { timeout: 15_000 });
   await expect(page.locator('#knob-dailyCredits')).toHaveValue('100');
   await expect(page.locator('#knob-entryCredits')).toHaveValue('5000');
   await expect(page.locator('#knob-rewardFeedbackClosed')).toHaveValue('50');
@@ -319,7 +321,7 @@ test('i numeri che il server calcola si leggono in cima, e non si possono toccar
   const page = await apriOwner(app);
 
   const numeri = page.locator('#ownerNumeri .sn-wallet-numero');
-  await expect(numeri).toHaveCount(9, { timeout: 15_000 });
+  await expect(numeri).toHaveCount(8, { timeout: 15_000 });
   // Un utente si conta al singolare.
   await expect(numeri.nth(0)).toContainText('utente');
   await expect(numeri.nth(0)).not.toContainText('utenti');
@@ -336,9 +338,9 @@ test('i numeri che il server calcola si leggono in cima, e non si possono toccar
   await expect(numeri.nth(6)).toContainText('crediti spesi');
   // Inviti ancora da dare: uno dei due ha posti liberi.
   await expect(numeri.nth(7)).toContainText('tuo invito da dare');
-  // Riscatti rimasti.
-  await expect(numeri.nth(8)).toContainText('9');
-  await expect(numeri.nth(8)).toContainText('riscatti rimasti');
+  // Gli ingressi con invito rimasti sono una manopola (#854): fra i numeri non si ripetono.
+  await expect(page.locator('#ownerNumeri')).not.toContainText('riscatti');
+  await expect(page.locator('#ownerNumeri')).not.toContainText('Ingressi con invito');
   // Sono numeri, non campi: nessuno di questi si scrive.
   expect(await page.locator('#ownerNumeri input').count()).toBe(0);
 });
@@ -409,7 +411,7 @@ test('un numero lasciato a metà parte da solo, si vede finché non è partito, 
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
 
   const scatola = page.locator('.sn-manopola[data-chiave="dailyCredits"]');
   const msg = page.locator('#knob-dailyCredits-msg');
@@ -453,7 +455,7 @@ test('un numero scritto non si perde ricaricando la pagina o chiudendo la scheda
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
   const page = await apriOwner(app);
-  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7, null, { timeout: 15_000 });
+  await page.waitForFunction(() => document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8, null, { timeout: 15_000 });
 
   await page.fill('#knob-dailyCredits', '500');
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('knob-dailyCredits');
@@ -534,7 +536,7 @@ test('manopole e numeri si leggono in tema chiaro e in tema scuro', async ({ app
     await page.reload();
     await page.waitForFunction(() => {
       const s = document.getElementById('ownerSection');
-      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 7;
+      return s && !s.hidden && document.querySelectorAll('#ownerKnobs .sn-manopola').length === 8;
     }, null, { timeout: 15_000 });
     // La pagina prende davvero il tema chiesto.
     expect(await page.evaluate(() => document.documentElement.getAttribute('data-sn-theme'))).toBe(tema);
