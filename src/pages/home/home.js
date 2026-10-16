@@ -353,14 +353,14 @@
     } finally { inCorso.delete(page.id); }
   }
 
-  async function rimuovi(page) {
+  async function rimuovi(page, { daTastiera = false } = {}) {
     if (inCorso.has(page.id) || !allPages.some((p) => p.id === page.id)) return;
     inCorso.add(page.id);
     try {
       const r = await send({ type: MSG.REMOVE_SAVED_PAGE, id: page.id });
       allPages = r?.pages || allPages.filter((p) => p.id !== page.id);
       render();
-      offriAnnulla(page);
+      offriAnnulla(page, { daTastiera });
     } finally { inCorso.delete(page.id); }
   }
 
