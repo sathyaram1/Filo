@@ -146,7 +146,10 @@ rimette com'era. Regge solo perché il codice la chiede al momento, da un punto 
 prova non arriverebbe più, e il caso Windows girerebbe da Linux. Uno spec in Electron
 fa lo stesso: la piattaforma la sceglie `perProva` nel main, e lo spec gira per ognuna
 (`tests/aggiornamenti-da-soli.spec.mjs`). Un `process.platform` letto dallo spec
-dà un ramo che la suite in GitHub non corre mai (#1171).
+dà un ramo che la suite in GitHub non corre mai (#1171). Un caso nuovo che non si
+sceglie la piattaforma è rosso anche su Linux: le prove dell'aggiornatore si rifanno
+con Node che si crede Windows e Mac (`tests/unit/aggiornamentiDaOgniSistema.test.mjs`,
+#1146). Da Windows non si finge: lì un caso che presume Linux è rosso da sé.
 
 **Il commit provato è vecchio** (#1185). Il cancello prova l'ultimo commit di main con
 la suite verde, che può stare giorni dietro la punta: gli stessi otto rossi, corretti
