@@ -358,12 +358,19 @@ export async function esegui(argv, deps = {}) {
       const k = lanciaFissato(cartella, a.ramo, daFondere, figlio, { ...fissate, prova: true });
       log(tardiva
         ? `PROVA: la pratica ${chi} non si riapre e, a fusione riuscita, ${dopo}.`
-        : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
+        : riapertaDa
+          ? `PROVA: la pratica ${chi} è chiusa, ma ${ramiApp.join(', ')} dell'app le è legato e non è su main: si riaprirebbe, andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`
+          : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
       return k;
     }
     if (tardiva) {
       log(`Pratica ${chi}: l'ha chiusa la fusione della parte ${NOME_PARTE.app} (${quando}), meno di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore fa: vale per quest'ultima parte.`);
     } else {
+      if (riapertaDa) {
+        const riaperta = await of.scrivi(r.id, 'todo', notaRiapertura, { bearer });
+        if (!riaperta.ok) { err(`La pratica ${chi} non si è riaperta (${riaperta.motivo}): non porto il ramo su main senza.`); return 1; }
+        log(`Pratica ${chi} riaperta: ${notaRiapertura.replace(/^Riaperta da server:fondi su \S+: /, '')}`);
+      }
       const presa = await of.annotaPratica(r.id, notaInizio(a.ramo), { bearer });
       if (!presa.ok) { err(`Pratica ${chi} non aggiornata (${presa.motivo}): non porto il ramo su main senza.`); return 1; }
       log(`Pratica ${chi}: ${presa.from === presa.to ? 'giro annotato' : 'presa in carico («In lavorazione»)'}.`);
