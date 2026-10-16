@@ -30,7 +30,7 @@
 //     onAttesaOwner(item, perche) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima);
 //     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
 //     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
-//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
+//   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito (payload.name = titolo già scelto)
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   accessoCambiato()                                       — l'owner è rientrato: riprova subito tutte le voci
 //   size()                                                  — voci in coda
