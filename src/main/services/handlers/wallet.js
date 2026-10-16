@@ -747,7 +747,10 @@ module.exports = function register(on, ctx) {
       return { title, text: esito.dire.map((a) => a.testo).join('\n\n') };
     });
     filaAllarmi = turno.catch(() => {});
-    return { ok: true, alarm: await turno };
+    const alarm = await turno;
+    // Gli avvisi nati dalla stessa lettura sono già fra le notifiche quando la home ha la risposta.
+    await filaAvvisi;
+    return { ok: true, alarm };
   }));
   on(MSG.WALLET_OWNER_GRANT, ownerOnly(async (msg) => {
     const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
