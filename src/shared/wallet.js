@@ -746,5 +746,7 @@
     formatCredits, PREMIO_ATTESA_MS, resolutionReward,
     // Chi usa Filo e se il conto OpenRouter regge (#820)
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
+    // Gli avvisi all'owner nella home (#855)
+    AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
