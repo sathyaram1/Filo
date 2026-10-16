@@ -385,6 +385,27 @@ test('le manopole dei crediti sono otto, hanno un nome e limiti sensati', () => 
   // Un invito per zero persone non è un invito: quella manopola parte da 1.
   assert.equal(W.knobOf('invitesMaxUses').min, 1);
   assert.equal(W.knobOf('non-esiste'), null);
+  // #854 — gli ingressi con invito si possono chiudere (zero) e aprire a molti: il tetto ferma un errore di
+  // battitura, non un lancio.
+  const ingressi = W.knobOf('invitesRemaining');
+  assert.equal(ingressi.etichetta, 'Ingressi con invito rimasti');
+  assert.equal(ingressi.aiuto, 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.');
+  assert.equal(ingressi.min, 0);
+  assert.ok(ingressi.max >= 1000000);
+});
+
+// #854 — il main rifà il controllo della pagina con la stessa tabella: un numero storto per gli ingressi
+// non arriva a config/credits nemmeno se la pagina venisse saltata.
+test('gli ingressi con invito si rifiutano come le altre manopole: negativi, decimali e parole no', async () => {
+  await import('../../src/shared/campoNumero.js');
+  const CN = globalThis.SN_CAMPO_NUMERO;
+  const k = W.knobOf('invitesRemaining');
+  const regole = { min: k.min, max: k.max, intero: true, etichetta: k.etichetta };
+  assert.deepEqual(CN.controlla('20', regole), { ok: true, valore: 20 });
+  assert.deepEqual(CN.controlla('0', regole), { ok: true, valore: 0 });
+  assert.equal(CN.controlla('-1', regole).testo, 'Ingressi con invito rimasti: non può essere negativo.');
+  assert.equal(CN.controlla('2,5', regole).testo, 'Ingressi con invito rimasti: un numero intero, senza virgola.');
+  assert.equal(CN.controlla('venti', regole).testo, 'Ingressi con invito rimasti: ci vuole un numero.');
 });
 
 // ── #816: le cifre dette fuori dalla pagina Crediti ─────────────────────────
