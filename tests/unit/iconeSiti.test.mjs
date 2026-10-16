@@ -98,6 +98,19 @@ test('un\'icona trovata non si richiede; una mancata si riprova solo dopo dieci 
   assert.deepEqual(ses.chiesti.map((c) => c.url).slice(2), ['https://manca.it/favicon.ico']);
 });
 
+test('un indirizzo che chiede l\'OK prende solo copie già in casa: scheda, icona salvata come dato, icona già trovata; mai la rete', async () => {
+  const ses = sessione({ 'https://spia.it/favicon.ico': PNG, 'https://spia.it/icona.png': PNG, 'https://noto.it/favicon.ico': PNG });
+  const { cercaIconaSito } = I.crea();
+  const solo = { ses, soloCopie: true };
+  assert.equal(await cercaIconaSito('https://spia.it/x', { ...solo, voci: async () => [{ url: 'https://spia.it/a', favicon: 'https://spia.it/icona.png' }] }), '');
+  assert.equal(await cercaIconaSito('https://spia.it/x', { ...solo, schede: [{ url: 'https://spia.it/b', favicon: DATO }] }), DATO);
+  assert.equal(await cercaIconaSito('https://spia.it/x', { ...solo, voci: async () => [{ url: 'https://spia.it/a', favicon: DATO }] }), DATO);
+  assert.deepEqual(ses.chiesti, []);
+  await cercaIconaSito('https://noto.it/', { ses });
+  assert.equal(await cercaIconaSito('https://noto.it/y', solo), DATO);
+  assert.deepEqual(ses.chiesti.map((c) => c.url), ['https://noto.it/favicon.ico']);
+});
+
 test('due richieste insieme per lo stesso sito ne fanno una; in incognito non si ricorda niente', async () => {
   const ses = sessione({ 'https://ok.it/favicon.ico': PNG });
   const { cercaIconaSito } = I.crea();
