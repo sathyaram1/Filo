@@ -121,7 +121,10 @@ const safebrowseMethods = {
     // I link esaminati e l'avviso di un link cliccato erano del documento di prima.
     tab._sbLinkGiro = (tab._sbLinkGiro || 0) + 1;
     tab._sbLink = null;
-    if (tab.sbAvviso && tab.sbAvviso.prima) tab.sbAvviso = null;
+    if (tab.sbAvviso && tab.sbAvviso.prima) {
+      tab.sbAvviso = null;
+      if (tab.id === this.activeId) this.layout();
+    }
     const sito = sitoDellaPagina(url, [tab._urlNavigato, tab._sbApertaDa]);
     if (!sito) { this._sbMostra(tab, null, null); return; }
     if (!SB) return;
