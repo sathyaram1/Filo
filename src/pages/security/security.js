@@ -172,7 +172,7 @@
   // Il tasto apre sotto di sé la conferma: prima l'esportazione, poi cosa sparisce, e il sì solo con la parola scritta.
   // Il cancello vero sta nel main (cancellaTutto.js), che rifà lo stesso controllo sulla parola.
   const PAROLA_CANCELLA = 'conferma';
-  const CONTROLLI_CANCELLA = ['sec-wipe-btn', 'sec-wipe-export', 'sec-wipe-identity', 'sec-wipe-word', 'sec-wipe-cancel'];
+  const CONTROLLI_CANCELLA = ['sec-wipe-btn', 'sec-wipe-export', 'sec-wipe-export-keys', 'sec-wipe-identity', 'sec-wipe-word', 'sec-wipe-cancel'];
   let cancellazioneInCorso = false;
 
   const parolaScritta = () => $('sec-wipe-word').value.trim().toLowerCase() === PAROLA_CANCELLA;
