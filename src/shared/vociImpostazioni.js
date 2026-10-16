@@ -141,7 +141,7 @@
         'fp-mode-default': 'security.fingerprint.mode',
         'fp-mode-privacy': 'security.fingerprint.mode',
       },
-      gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'sec-cookies-accessi': 'security.cookies.loggedSites', 'sec-cookies-riquadri': 'security.cookies.embedSites' },
+      gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'sec-cookies-accessi': 'security.cookies.loggedSites', 'sec-cookies-riquadri': 'security.cookies.embedSites', 'sec-safebrowse-fidati': 'security.safeBrowse.trustedSites' },
       altrove: { 'sec-perm-list': 'permessiSiti' },
       fuori: {
         'sec-clip-search': 'cerca fra le voci della cronologia appunti mostrate nella pagina: non è un valore da salvare',
@@ -157,6 +157,7 @@
         FILO_PAGINE_CANCELLA: 'CANCELLA_PAGINE',
         COOKIES_SITES: 'mostra i siti dove Filo ha già rifiutato i banner, da passare all’elenco dei banner visibili',
         PAGINE_DELICATE_CAMPI: 'mostra i siti dove Filo ha visto un campo password o carta; toglierne uno è l’elenco siti_non_delicati',
+        SITI_FIDATI_IMPOSTA: 'IMPOSTA_PREFERENZA',
         PROXY_STATUS: 'mostra se la connessione da un altro paese è configurata: non è un valore da cambiare qui',
         DOWNLOADS_LIST: 'legge i siti da cui sono scesi programmi, per proporre il sito preciso a chi scrive una piattaforma fra i programmi fidati: non è un valore da cambiare',
         EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file, le chiavi solo con la spunta): resta nella pagina',
@@ -273,7 +274,7 @@
     if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
-    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2 } : { come: '', chiave: '', conferma: false };
+    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2 || typeof s.costoDi === 'function' } : { come: '', chiave: '', conferma: false };
   }
   function minuscola(s) {
     return s.charAt(0).toLowerCase() + s.slice(1);

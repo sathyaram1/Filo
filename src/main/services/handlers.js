@@ -2418,7 +2418,7 @@ async function eseguiAzioneFilo(action, {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
       if (setter && (setter.scrive.includes('security.pagineDelicate.siti') || setter.scrive.includes('menuDelSito.siti')
-        || setter.scrive.includes('blocklist'))) {
+        || setter.scrive.includes('blocklist') || setter.scrive.includes('security.safeBrowse.trustedSites'))) {
         // Dall'Aiuto di un sito «questo sito» è lui, e le altre schede non si nominano (#843).
         const daSito = /^https?:/i.test(sender?.tab?.url || sender?.url || '');
         const { tm, tab } = daSito ? { tm: null, tab: { url: sender?.tab?.url || sender?.url } } : targetWebTab(sender);
