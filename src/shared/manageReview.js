@@ -552,6 +552,10 @@
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
       }
+      // Un guasto dell'ambiente non è lavoro locale né un verdetto (#1241): cosa fare sta nella domanda della nota.
+      if (statusReason === 'guasto') {
+        return { text: 'Fermo per un guasto, non per una scelta: cosa è successo e cosa puoi fare stanno nella domanda.', color: S.design.color };
+      }
       // Lo rimandano qui una sessione o una routine, su un feedback di chiunque (#914): la frase segue il mittente.
       if (statusReason === 'locale') {
         // Fidato o già approvato: basta il segno. Gli altri passano dal sì dell'owner (#913), che li segna anche fidati.
