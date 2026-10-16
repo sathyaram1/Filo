@@ -2085,6 +2085,16 @@ async function eseguiAzioneFilo(action, {
     } catch (_) {}
   }
 
+  // #845 — una pagina salvata si apre con l'indirizzo che ha in elenco, mai con uno scritto dal modello: lo mette qui il
+  // main, e la porta delle uscite lo guarda come quello di NAVIGA. Un id che non c'è non chiede niente.
+  if (type === 'APRI_SALVATA') {
+    let voce = null;
+    try { voce = (await SavedPages.list()).find((p) => p && p.id === String(action.id ?? '').trim()) || null; } catch (_) {}
+    if (!voce) return { executed: false, kept: true, output: { aperta: false, trovata: false } };
+    action.url = voce.url;
+    action._titolo = voce.title || '';
+  }
+
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
