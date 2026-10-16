@@ -1196,6 +1196,7 @@ class Segreto {
   // L'unica via per togliere un segreto: tutti i suoi blocchi riscritti a caso, la testa per ultima. La scansione
   // trova anche le copie rimaste lontano, che chi ha il nome potrebbe altrimenti ancora leggere.
   async cancella() {
+    const s = this.#s;
     await this.#op(async (ctx, S) => {
       S.letti = new Uint8Array(ctx.N);
       S.scansionato = false;
@@ -1207,12 +1208,15 @@ class Segreto {
       await ctx.fh.datasync();
       await distruggi(ctx, S, Array.from({ length: Math.min(2 * GRUPPO, 2 * S.L) }, (_, i) => i));
       await ctx.fh.datasync();
+      chiudiStato(s);
     });
-    chiudiStato(this.#s);
   }
 
+  // In coda come le operazioni: quelle già chieste finiscono con la chiave vera, mai con quella appena azzerata.
   async chiudi() {
-    chiudiStato(this.#s);
+    const s = this.#s;
+    if (s.chiuso) return;
+    await inCoda(s.chiave, async () => chiudiStato(s));
   }
 }
 
