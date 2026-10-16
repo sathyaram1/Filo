@@ -33,6 +33,7 @@ const net = require('./net');
 const gsb = require('./gsb');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
+const rimandi = require('./rimandi');
 
 // ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
