@@ -118,6 +118,10 @@ const safebrowseMethods = {
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!tab || !url) return;
+    // I link esaminati e l'avviso di un link cliccato erano del documento di prima.
+    tab._sbLinkGiro = (tab._sbLinkGiro || 0) + 1;
+    tab._sbLink = null;
+    if (tab.sbAvviso && tab.sbAvviso.prima) tab.sbAvviso = null;
     const sito = sitoDellaPagina(url, [tab._urlNavigato, tab._sbApertaDa]);
     if (!sito) { this._sbMostra(tab, null, null); return; }
     if (!SB) return;
