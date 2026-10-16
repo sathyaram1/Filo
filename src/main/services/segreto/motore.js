@@ -946,6 +946,7 @@ async function liberaEStringi(ctx, S, prima) {
   const G3 = Math.ceil(L3 / GRUPPO);
   const daRiscrivere = new Set(liberati.filter((j) => j >= GRUPPO && j < L3).map((j) => Math.floor(j / GRUPPO)));
   if (L3 < Lprima && L3 % GRUPPO && G3 - 1 >= 1) daRiscrivere.add(G3 - 1);
+  const rovinati = blocchiRovinati(S.L, S.tabella);
   for (const lotto of aLotti([...daRiscrivere].sort((a, b) => a - b))) {
     // Un gruppo tutto liberato si riscrive a zero senza leggerlo: cancellare un file grosso non lo rilegge intero.
     const usaQualcosa = (g) => Array.from({ length: Math.min(GRUPPO, L3 - GRUPPO * g) }, (_, s) => ora[GRUPPO * g + s]).some(Boolean);
@@ -955,7 +956,7 @@ async function liberaEStringi(ctx, S, prima) {
       return {
         g,
         carichi: Array.from({ length: Math.min(GRUPPO, L3 - GRUPPO * g) }, (_, s) => {
-          if (ora[GRUPPO * g + s] && !vecchi[s]) throw daRiaprire();
+          if (ora[GRUPPO * g + s] && !vecchi[s] && !rovinati[GRUPPO * g + s]) throw daRiaprire();
           return (ora[GRUPPO * g + s] && vecchi[s]) || ZERO;
         }),
       };
