@@ -126,6 +126,29 @@ test('in Privacy massima un fidato scritto come sottodominio o come indirizzo ti
   }
 });
 
+// Una piattaforma salvata prima che la si rifiutasse resta in elenco ma non tiene connesso nessun sito ospitato: la
+// lista lo dice accanto alla voce, come la casella dei programmi. Un suffisso salvato prima (gov.it) vale ancora: niente avviso.
+test('fra i siti dove resti connesso una piattaforma salvata prima porta il suo avviso', async ({ openTab }) => {
+  const sec = await openTab('filo://security/');
+  await sec.waitForSelector('input[name="cookie-mode"]', { timeout: 10_000 });
+  await sec.evaluate(() => chrome.runtime.sendMessage({
+    type: 'update_settings', settings: { security: { cookies: { mode: 'privacy', trustedSites: ['github.io', 'gov.it', 'uno.test'] } } },
+  }));
+  await sec.reload();
+  const voce = (nome) => sec.locator('#cookie-wl-list li', { has: sec.locator('span', { hasText: new RegExp(`^${nome.replace('.', '\\.')}$`) }) });
+  await expect(sec.locator('#cookie-wl-list li span')).toHaveText(['github.io', 'gov.it', 'uno.test'], { timeout: 10_000 });
+  await expect(voce('github.io').locator('.sn-cookie-wl-nota')).toHaveText(
+    '«github.io» raccoglie i siti di chiunque, quindi fidarsi di lui vorrebbe dire fidarsi di tutti. Scrivi il sito preciso, come nome.github.io.');
+  await expect(voce('gov.it').locator('.sn-cookie-wl-nota')).toHaveCount(0);
+  await expect(voce('uno.test').locator('.sn-cookie-wl-nota')).toHaveCount(0);
+  mkdirSync(SHOTS, { recursive: true });
+  await sec.locator('#cookie-wl-list').scrollIntoViewIfNeeded();
+  await sec.screenshot({ path: join(SHOTS, 'siti-fidati-piattaforma-salvata.png') });
+  await voce('github.io').locator('button').click();
+  await expect(sec.locator('#cookie-wl-list li span')).toHaveText(['gov.it', 'uno.test']);
+  await expect.poll(() => fidatiSalvati(sec), { timeout: 10_000 }).toEqual(['gov.it', 'uno.test']);
+});
+
 test.describe('programmi scaricati', () => {
   test.use({ hostInPiu: ['shop.esempio.test', 'cdn.esempio.test', 'alice.github.io', 'bob.github.io'] });
 
