@@ -191,6 +191,7 @@ test.beforeEach(() => {
   patch.length = 0;
   rifiutaPatch = false;
   detailChiesti.length = 0;
+  overviewChiesti = 0;
 });
 
 async function simulaOwner(app) {
