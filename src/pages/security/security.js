@@ -130,12 +130,23 @@
     $('savedHint').textContent = I18n.t('options_saved');
   }
 
+  // Le chiavi escono solo con la spunta (#905), che vale anche dalla conferma di «Cancella tutto»: è la stessa scelta.
+  const CASELLE_CHIAVI = ['sec-export-keys', 'sec-wipe-export-keys'];
+  function mostraCaselleChiavi(settings) {
+    const ci = !!SN_CONST.haSegreti(settings);
+    for (const id of CASELLE_CHIAVI) {
+      $(`${id}-row`).hidden = !ci;
+      if (!ci) $(id).checked = false;
+    }
+  }
+
   // `resta`: l'esito non sparisce (nella conferma di «Cancella tutto» dice che l'archivio c'è già).
   async function exportData({ btn = $('sec-export-btn'), hint = $('sec-export-hint'), fatto = 'security_export_done', resta = false } = {}) {
     btn.disabled = true;
     let riuscito = false;
     try {
-      const res = await chrome.runtime.sendMessage({ type: MSG.EXPORT_DATA });
+      const chiavi = CASELLE_CHIAVI.some((id) => !$(`${id}-row`).hidden && $(id).checked);
+      const res = await chrome.runtime.sendMessage({ type: MSG.EXPORT_DATA, chiavi });
       if (res && res.ok) {
         riuscito = true;
         hint.textContent = I18n.t(fatto);
