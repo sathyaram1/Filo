@@ -182,7 +182,9 @@ test('#876 giro 3 — S3 per regione, Google Drive, Discord: né coperti dal sit
     ['https://f000.backblazeb2.com/file/altro/setup.exe', 'backblazeb2.com'],
     ['https://s3.us-west-004.backblazeb2.com/altro/setup.exe', 'backblazeb2.com'],
   ]) assert.equal(E.fidato(url, [voce]), false, url);
-  for (const h of ['drive.google.com', 'cdn.discordapp.com', 'f000.backblazeb2.com']) assert.ok(E.sitoFidabile(h).piattaforma, h);
+  for (const h of ['eu-west-1.amazonaws.com', 'drive.google.com', 'cdn.discordapp.com', 'f000.backblazeb2.com']) {
+    assert.ok(E.sitoFidabile(h).piattaforma, h);
+  }
   // Il resto del sito resta fidato, e il secchio con nome resta di uno.
   assert.equal(E.fidato('https://dl.google.com/chrome/install/ChromeSetup.exe', ['google.com']), true);
   assert.equal(E.fidato('https://dl.discordapp.net/distro/DiscordSetup.exe', ['discordapp.net']), true);
