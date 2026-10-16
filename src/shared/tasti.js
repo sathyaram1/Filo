@@ -750,8 +750,8 @@
     if (r) return { rifiuto: r };
     const f = forma(testo);
     const mods = pezzi(testo).slice(0, -1).map((m) => m.toLowerCase());
-    const cmd = mods.some((m) => /^(cmd|command|comando|meta|\u2318)$/.test(m));
-    const control = mods.some((m) => /^(ctrl|control|controllo|\u2303)$/.test(m));
+    const cmd = mods.some((m) => COMANDO.test(m));
+    const control = mods.some((m) => CONTROL.test(m));
     if (suMac(esplicita) && control && !cmd && f.slice(0, f.indexOf('|')).includes('a')) return { accel: daForma(f.replace(/^c/, '')) };
     return { accel: daForma(f) };
   }
