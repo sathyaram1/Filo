@@ -131,9 +131,12 @@
     const form = e.target;
     const el = chiNomina && chiNomina.form === form ? chiNomina.el : null;
     chiNomina = null;
-    const da = (attr, prop) => (el && el.hasAttribute(attr) ? el[prop] : form[prop]);
-    invio = { dati: e.formData, action: da('formaction', 'action'), metodo: String(da('formmethod', 'method')).toLowerCase(),
-      enctype: da('formenctype', 'enctype'), charset: form.acceptCharset || '' };
+    // Dal prototipo: un campo chiamato «action» o «method» copre la proprietà omonima del modulo.
+    const delModulo = (p) => { try { return Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, p).get.call(form); } catch (_) { return ''; } };
+    const da = (attr, pBottone, pModulo) => (el && el.hasAttribute(attr) ? el[pBottone] : delModulo(pModulo));
+    invio = { dati: e.formData, action: da('formaction', 'formAction', 'action'),
+      metodo: String(da('formmethod', 'formMethod', 'method')).toLowerCase(),
+      enctype: da('formenctype', 'formEnctype', 'enctype'), charset: delModulo('acceptCharset') };
   }, true);
   document.addEventListener('click', (e) => {
     if (e.target && e.target.closest && e.target.closest('a[href], area[href]')) invio = null;
