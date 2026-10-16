@@ -11,6 +11,7 @@
     {
       version: '0.2.242', date: '2026-10-16',
       features: [
+        'Sotto ogni risposta nel riquadro di Spiega e Traduci c\'è «Copia». Un clic mette il testo negli appunti senza asterischi o simboli di formattazione, pronto da incollare dove ti serve.',
         'Le pagine salvate per dopo si ritrovano chiedendolo a Filo. Scrivi in chat «dov\'era quella ricetta che avevo salvato?» o «aprimi le pagine salvate sul campeggio» e Filo ti mostra quelle giuste da cliccare, o ti dice che non ce ne sono. «Aprila» la apre e la toglie da «Aperti per dopo», come il clic sulla lista. Sopra una pagina basta dire all\'Aiuto «salvala per dopo». La mette da parte con l\'anteprima, come il menu, e chiude la scheda.',
         'In «Aperti per dopo» il tasto destro su una pagina salvata ti lascia aprirla tenendola in lista, copiarne il link, spostarla in un\'altra categoria o in una nuova, e rimuoverla. Se la rimuovi per sbaglio, «Annulla» nell\'avviso la rimette dov\'era. Il menu si apre anche da tastiera, col tasto Menu o Maiusc+F10.',
         'Puoi spegnere Filo su un sito col tasto destro sulla pagina, «Spegni Filo su questo sito», o chiedendolo a Filo («spegni Filo su docs.google.com»). Lì il tasto destro lascia il clic al sito, e dove il sito non ha un suo menu trovi «Riaccendi Filo su questo sito». Le schede già aperte cambiano subito, senza ricaricare. Nella pagina Altro, sotto «Siti dove Filo è spento», puoi incollare un indirizzo intero e Filo lo riduce al nome del sito. Prima un indirizzo incollato lì non spegneva niente.',

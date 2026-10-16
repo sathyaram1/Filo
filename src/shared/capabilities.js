@@ -147,13 +147,13 @@
     // ─────────────────────── Azioni sul testo selezionato ────────────────────
     {
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
-      desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello.',
+      desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello. Nel riquadro della spiegazione estesa, sotto ogni risposta, «Copia» mette il testo negli appunti senza segni di formattazione.',
       invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Con {tasto:explain-selection}, o con la freccia accanto alla spiegazione, ne apri una più estesa in un riquadro sopra la selezione.',
       doesNot: 'Non spiega il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando. In incognito non prepara la spiegazione mentre selezioni: parte quando apri il tasto destro. Fuori dall’incognito la prepara solo se la selezione l’hai fatta tu (mouse, tastiera o dito) e non supera i 2000 caratteri; quella fatta da uno script del sito, o più lunga, parte anche lei dal tasto destro. Da una scheda partono al massimo 120 spiegazioni preparate al minuto: oltre, Filo le ferma e te lo dice.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
-      desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro.',
+      desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro, dove puoi fare altre domande. Sotto ogni risposta «Copia» mette il testo negli appunti senza segni di formattazione, coi numeri già calcolati.',
       invoke: 'Seleziona il testo e usa {tasto:translate-selection}: la traduzione compare in un riquadro sopra la selezione. Il menu del tasto destro non ha una voce per questo. La sua icona "Traduci" traduce tutta la pagina.',
       doesNot: 'Non traduce il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando.',
     },

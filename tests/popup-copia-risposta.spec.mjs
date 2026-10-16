@@ -140,5 +140,43 @@ test('Alt+E: anche l\'approfondimento si copia senza titoli né asterischi; uno 
   await expect.poll(() => conta(app, page, '.sn-msg-copia'), { timeout: 15_000 }).toBe(1);
   await clicca(app, page, '.sn-msg-copia');
   await expect.poll(async () => (await statoDi(app, page, '.sn-msg-copia'))?.classi || '').toContain('sn-copiato');
+  await page.waitForTimeout(300);
   try { await page.screenshot({ path: 'tests/.shots/popup-copia-scuro.png' }); } catch (_) {}
+});
+
+test('dentro il riquadro incorporato di un altro sito Copia funziona lo stesso', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await modelloFinto(app, ['Già pronto', 'The **cat** sleeps.']);
+  await app.evaluate(() => { globalThis.__n846 = 1; });
+  await app.evaluate(({ clipboard }) => clipboard.writeText('vecchio contenuto'));
+  // blocked.test è mappato su 127.0.0.1 dal fixture: origine diversa, e lì la pagina non può scrivere gli appunti.
+  const dentro = testServer.html('<!doctype html><html><body style="margin:0;padding:16px;font:16px sans-serif"><p>Il <span id="parola">gatto</span> dorme.</p></body></html>')
+    .replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:12px"><iframe id="embed" src="${dentro}" width="600" height="420"></iframe></body></html>`);
+  await page.frameLocator('#embed').locator('#parola').dblclick();
+  const frame = page.frames().find((f) => f !== page.mainFrame());
+  await comando(app, 'translate-selection');
+  await expect.poll(() => conta(app, page, '.sn-msg-copia', frame), { timeout: 15_000 }).toBe(1);
+  await clicca(app, page, '.sn-msg-copia', { frame });
+  await expect.poll(() => appunti(app)).toBe('The cat sleeps.');
+  expect((await statoDi(app, page, '.sn-msg-copia', frame)).classi).toContain('sn-copiato');
+});
+
+test('in una pagina di Filo il riquadro copia allo stesso modo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await modelloFinto(app, ['Già pronto', '*Ciao* **mondo**']);
+  await app.evaluate(() => { globalThis.__n846 = 1; });
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming && !!window.SN_CONST, null, { timeout: 8000 });
+  await page.evaluate(() => window.SN_POPUP.openStreaming({
+    action: window.SN_CONST.ACTIONS.TRANSLATE_SELECTION,
+    payload: { selection: 'hello world' },
+    anchor: { x: 120, y: 120 },
+    title: 'Traduzione',
+  }));
+  const tasto = page.locator('.sn-popup .sn-msg-copia');
+  await expect(tasto).toHaveCount(1, { timeout: 15_000 });
+  await tasto.click();
+  await expect.poll(() => appunti(app)).toBe('Ciao mondo');
+  await expect(tasto).toHaveClass(/sn-copiato/);
 });

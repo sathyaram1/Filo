@@ -834,9 +834,7 @@
     // lo dà solo GET; le scritture rispondono { ok } e basta.
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
-    // { text } → { ok }: scrive negli appunti di sistema E in cronologia. Il «Copia» delle risposte (#846): in un riquadro
-    // incorporato di un altro sito la pagina non può scrivere gli appunti, il main sì. Stesso cancello di PUSH.
-    COPY_TEXT_TO_CLIPBOARD: 'copy_text_to_clipboard',
+    COPY_TEXT_TO_CLIPBOARD: 'copy_text_to_clipboard', // { text } → { ok }: appunti di sistema e cronologia, dal «Copia» delle risposte (#846); cancello di PUSH
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
     REMOVE_CLIPBOARD_ENTRY: 'remove_clipboard_entry', // { entry }
     CLEAR_CLIPBOARD_HISTORY: 'clear_clipboard_history',
