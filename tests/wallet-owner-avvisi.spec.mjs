@@ -178,10 +178,11 @@ test('all’85% del tetto l’owner trova l’avviso nella home e il pulsante ap
       // Alzato il tetto, la pagina dell'owner rilegge la vista: l'avviso non è più vero e se ne va.
       stato.dati = 30000;
       const l0 = stato.letture;
-      const rr = await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.OPEN_URL, url: 'filo://credits/owner.html' }));
-      await home.waitForTimeout(4000);
-      console.log('DEBUG', JSON.stringify(rr), l0, stato.letture, JSON.stringify(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((w) => w._filoTabs).flatMap((w) => w._filoTabs.tabs.map((t) => `${t.url} | ${t.view ? t.view.webContents.getURL() : ''}`)))));
-      for (const p of app.windows()) console.log('WIN', p.url());
+      await home.evaluate(() => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.OPEN_URL, url: 'filo://credits/owner.html' }));
+      const owner = await aspettaFinestra(app, (w) => w.url().startsWith('filo://credits/owner.html'), 'la pagina dell’owner non si è aperta');
+      const t0 = Date.now();
+      await owner.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 30_000 }).catch(() => {});
+      console.log('DEBUG', Date.now() - t0, l0, stato.letture, await owner.evaluate(() => [document.getElementById('ownerSection').hidden, document.getElementById('ownerDenied').hidden, document.body.innerText.slice(0, 300)]));
       await expect.poll(() => avvisiOwner(app), { timeout: 15_000 }).toEqual([]);
       await expect(carte(home)).toHaveCount(0, { timeout: 15_000 });
     } finally { await chiudiApp(app); }
