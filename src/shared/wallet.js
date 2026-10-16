@@ -661,6 +661,7 @@
     if (!o) return [];
     const cfg = o.config && typeof o.config === 'object' ? o.config : {};
     const tot = o.totals && typeof o.totals === 'object' ? o.totals : {};
+    // In ordine di gravità: scritti insieme, la home li mostra in quest'ordine.
     const casi = [];
 
     const tetto = numeroO(tot.maxGrantCredits);
@@ -679,6 +680,16 @@
       });
     }
 
+    const giorno = o.daily && typeof o.daily === 'object' && o.daily.summary && typeof o.daily.summary === 'object' ? o.daily.summary : null;
+    if (giorno) {
+      const r = Math.max(0, Math.floor(numeroO(giorno.refused) || 0));
+      casi.push({
+        caso: 'giornaliera', numero: r,
+        marcatori: r > 0 ? ['giornaliera:rifiuti'] : [],
+        testo: `L'ultima quota del giorno non è arrivata a ${r === 1 ? '1 persona' : `${r} persone`}: il tetto dei crediti elargibili era pieno. Alza il tetto ${DOVE}.`,
+      });
+    }
+
     const inviti = numeroO(cfg.invitesRemaining);
     if (inviti != null) {
       const n = Math.max(0, Math.floor(inviti));
@@ -688,16 +699,6 @@
         testo: n === 0
           ? `Gli ingressi con invito sono finiti: chi riceve un invito adesso non riesce a entrare. Aggiungine ${DOVE}.`
           : `${n === 1 ? 'Resta 1 ingresso' : `Restano ${n} ingressi`} con invito, poi chi riceve un invito non riesce più a entrare. Aggiungine ${DOVE}.`,
-      });
-    }
-
-    const giorno = o.daily && typeof o.daily === 'object' && o.daily.summary && typeof o.daily.summary === 'object' ? o.daily.summary : null;
-    if (giorno) {
-      const r = Math.max(0, Math.floor(numeroO(giorno.refused) || 0));
-      casi.push({
-        caso: 'giornaliera', numero: r,
-        marcatori: r > 0 ? ['giornaliera:rifiuti'] : [],
-        testo: `L'ultima quota del giorno non è arrivata a ${r === 1 ? '1 persona' : `${r} persone`}: il tetto dei crediti elargibili era pieno. Alza il tetto ${DOVE}.`,
       });
     }
 
@@ -746,11 +747,15 @@
       for (const n of delCaso(caso)) { await mem.dismissNotification(n.id); cambiato = true; }
     };
     for (const caso of piano.togli) await togli(caso);
-    for (const c of piano.scrivi) {
+    // Le notifiche nuove vanno davanti: dall'ultimo, così il più grave resta in cima.
+    for (const c of piano.scrivi.slice().reverse()) {
       await togli(c.caso);
       await mem.addNotification({
         kind: 'alert', text: c.testo,
-        action: { tipo: AVVISO_OWNER, caso: c.caso, marcatori: c.marcatori, apri: PAGINA_OWNER, etichetta: 'Apri Inviti e utenti' },
+        action: {
+          tipo: AVVISO_OWNER, caso: c.caso, marcatori: c.marcatori, titolo: TITOLI_OWNER[c.caso] || '',
+          apri: PAGINA_OWNER, etichetta: 'Apri Inviti e utenti',
+        },
       });
       cambiato = true;
     }
