@@ -54,8 +54,8 @@
 //   node scripts/dispatch.mjs --record-secaudit <id> <pass|fail> --nota <file.md> [--ticket <b>]
 //   node scripts/dispatch.mjs --clear-state <id>
 //
-//   Nei --record-* il biglietto si rilegge dal promemoria (.claude/routine-ticket.json);
-//   `--ticket` è la scorta per quando il promemoria è andato perso.
+//   Nei --record-* le opzioni valgono in ogni posizione (leggiOpzioniRegistrazione). Il biglietto
+//   si rilegge dal promemoria (.claude/routine-ticket.json); `--ticket` è la scorta se è perso.
 //   Un argomento NON riconosciuto è un errore d'uso (exit 1) senza effetti
 //   collaterali: il promemoria si cancella solo all'avvio dichiarato di un giro
 //   locale senza biglietto, mai davanti a un argomento storpiato.
