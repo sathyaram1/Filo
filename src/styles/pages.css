@@ -630,6 +630,19 @@ section:has(#dictList) .sn-spell-add-row {
    affermerebbe un salvataggio totale che non c'è stato. */
 .sn-page .sn-saved-indicator.sn-hint-warn { color: var(--sn-error); }
 
+/* «Cancella tutti i dati» (#850): la conferma si apre sotto il tasto, col bordo d'allerta di ciò che sta per succedere. */
+.sn-page .sn-wipe-box {
+  border-color: var(--sn-error);
+  background: color-mix(in srgb, var(--sn-error) 4%, transparent);
+}
+.sn-page .sn-wipe-par { margin: 0 0 10px; }
+.sn-page .sn-wipe-title { margin-top: 16px; }
+.sn-page .sn-wipe-box > .sn-toggle-row { margin: 4px 0 4px; }
+.sn-page label.sn-wipe-word-label { margin: 16px 0 6px; color: var(--sn-fg); font-weight: 500; }
+.sn-page input.sn-wipe-word { max-width: 260px; }
+.sn-page .sn-wipe-actions { margin-top: 12px; }
+.sn-page .sn-saved-indicator.sn-wipe-hint { display: block; margin: 8px 0 0; }
+
 .sn-default-model-row {
   grid-template-columns: 120px 110px 1fr auto;
 }
