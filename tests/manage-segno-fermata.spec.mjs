@@ -182,6 +182,14 @@ test('fermo per un guasto: in lista e nel dettaglio si legge guasto, non lavoro 
   await expect(corpo).toContainText('stanno nella domanda');
   await expect(corpo).not.toContainText('questione di design');
 
+  // Il rombo del dettaglio dice la stessa cosa del segno in lista, e quale domanda aprire.
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  await expect(rombo).toHaveAttribute('title', /guasto/i);
+  await rombo.click();
+  await expect(corpo).not.toContainText('Nessuna segnalazione');
+  await expect(corpo).toContainText('D-9');
+
   for (const tema of ['dark', 'light']) {
     await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
     await page.waitForTimeout(150);
