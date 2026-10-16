@@ -136,9 +136,9 @@ test('un indirizzo che serve i file di tutti non entra fra i programmi fidati e 
     assert.equal(E.fidato(h.includes('://') ? h : `https://${h}/setup.exe`, [h]), false, h);
   }
   const frase = E.testoPiattaforma('githubusercontent.com', ['github.com', 'release-assets.githubusercontent.com']);
-  assert.match(frase, /«githubusercontent\.com» serve i file di chiunque/);
+  assert.match(frase, /«githubusercontent\.com» raccoglie i siti di chiunque/);
   assert.doesNotMatch(frase, /release-assets|nome\.githubusercontent/);
-  assert.match(E.testoPiattaforma('release-assets.githubusercontent.com'), /serve i file di chiunque.*fidarsi di tutti\.$/);
+  assert.match(E.testoPiattaforma('release-assets.githubusercontent.com'), /raccoglie i siti di chiunque.*fidarsi di tutti\.$/);
   // Il sito di chi pubblica resta un sito come gli altri.
   assert.deepEqual(E.sitoFidabile('github.com'), { sito: 'github.com' });
   assert.deepEqual(E.sitoFidabile('alice.github.io'), { sito: 'alice.github.io' });
