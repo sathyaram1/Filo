@@ -21,7 +21,8 @@ Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
    `clone`, `rete`, `servizio`, `strumento`, `permessi`; il nome è il programma
    che ha fallito (la prima parola del comando) o l'host che non risponde,
    minuscolo, senza percorsi, porte, numeri od orari (`guasto: rete
-   registry.npmjs.org`, `guasto: strumento xvfb-run`).
+   openrouter.ai`, `guasto: strumento gh`). Un guasto che sta in una riga
+   della lista prende il nome della riga, anche se la causa è la rete.
    `node scripts/domanda.mjs chiedi <file.json>` risponde `OK: domanda D-<n>
    aperta.`; con `RIFIUTATO dal server: …`, al posto del numero va quel
    messaggio esatto.
