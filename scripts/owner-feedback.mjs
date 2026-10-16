@@ -520,7 +520,7 @@ export async function scriviPriorita(id, raw, opts = {}) {
 }
 
 // Come li legge chi lancia la prova a vuoto: il valore che avrebbero, non solo il nome.
-const CAMPI_SPIEGATI = Object.freeze({ priority: 'cifrata', priorityManual: 'true, decisa a mano', updatedAt: 'adesso' });
+const CAMPI_SPIEGATI = Object.freeze({ priority: 'cifrata', priorityManual: 'true, decisa a mano', updatedAt: 'adesso', localMerges: 'via: riaperta, le parti su main ripartono da zero' });
 export function campiLeggibili(campi, priorita) {
   return (campi || []).map((c) => {
     if (c === 'priority' && Number.isInteger(priorita)) return `priority (${priorita}, cifrata)`;
@@ -710,7 +710,7 @@ export async function scrivi(id, to, nota, opts = {}) {
     body: JSON.stringify({ fields }),
   }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, from, to };
+  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}) };
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
@@ -897,7 +897,7 @@ if (isMain) {
   }
   console.log(r.dryRun
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${campiLeggibili(r.campi, priorita)}`
-    : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}.`);
+    : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}${r.partiAzzerate ? '; le parti del lavoro già su main ripartono da zero' : ''}.`);
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
     const promemoria = await fraseDaScrivere(id, riferimento, { bearer });

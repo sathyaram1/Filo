@@ -303,14 +303,22 @@ export async function esegui(argv, deps = {}) {
     const daFondere = verdetto || (ramoServer.sha ? { ok: true, server: { sha: ramoServer.sha } } : null);
     const letta = await of.partiDellaPratica(r.id, { bearer });
     if (!letta.ok) { err(`La pratica ${chi} non si legge (${letta.motivo}). Non ho toccato niente.`); return 3; }
-    // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915).
+    // Un ramo dell'app legato e fuori da main vince sul registro: è un seguito, o la pratica è stata riaperta.
+    const ramiApp = (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
+    // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915), salvo che dell'app
+    // arrivi ancora un ramo: lasciata chiusa, la pratica lo rifiuterebbe, quindi si riapre (#938).
     let tardiva = null;
+    let riapertaDa = null;
     if (letta.status === 'done') {
       const t = parteTardiva({
         status: letta.status, parti: letta.parti, parte: 'server', ramo: a.ramo, solo: a.soloServer, locale: letta.locale, ora: (deps.ora || Date.now)(),
       });
       if (!t.ok) { err(`La pratica ${chi} è chiusa e non vale per questo ramo: ${t.motivo}. Per un lavoro nuovo aprine una. Non ho toccato niente.`); return 3; }
-      tardiva = t;
+      if (ramiApp.length) {
+        const prova = await of.scrivi(r.id, 'todo', '', { bearer, dryRun: true });
+        if (!prova.ok) { err(`La pratica ${chi} è chiusa e ${ramiApp.join(', ')} dell'app, legato a lei, non è su main, ma non si riapre (${prova.motivo}). Non ho toccato niente.`); return 3; }
+        riapertaDa = t;
+      } else tardiva = t;
     } else {
       // La stessa presa in carico della verifica: rifiuta una pratica nei Ricevuti prima di muovere il server.
       const prova = await of.annotaPratica(r.id, notaInizio(a.ramo), { bearer, dryRun: true });
