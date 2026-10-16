@@ -1,6 +1,6 @@
-// Il mondo isolato di Filo si segna i propri ascoltatori su finestra e documento: li rimette quando la pagina si riscrive
-// (document.open) e sa consegnare loro un tasto prima degli script del sito (anticipa, #859). Va installato prima di ogni
-// altro ascoltatore. Regole: patterns/un-documento-riscritto-non-spegne-filo.md, patterns/esc-chiude-prima-il-riquadro-aperto-poi-la-modalita.md.
+// Il mondo isolato di Filo si segna i suoi ascoltatori su finestra e documento: li rimette se la pagina si riscrive
+// (document.open) e consegna loro l'Esc prima degli script del sito (#859). Va installato prima di ogni altro ascoltatore.
+// Regole: patterns/un-documento-riscritto-non-spegne-filo.md e patterns/esc-chiude-prima-il-riquadro-aperto-poi-la-modalita.md.
 
 // I segni che Filo tiene sulla radice (tema, moduli pronti); quelli dello zoom
 // descrivono una modalità che col documento vecchio si è chiusa.
