@@ -15,6 +15,9 @@ const SHA = /^[0-9a-f]{7,40}$/i;
 // Gitignorata: il salvataggio automatico non deve mai committarla.
 export const PREFISSO_RIPRISTINO = '_tolte-';
 
+// Per la fase 2, in cloud e in locale: chi corregge legge «Expected to fail, but passed» proprio quando ha chiuso la porta.
+export const ROSSO_ATTESO_CHIUSO = 'Una prova segnata come rosso atteso (`test.fail`) conta per quello che fa il suo corpo: quando passa («Expected to fail, but passed») la porta è chiusa e la consegna la prende per verde, quindi le togli il segno, o la togli insieme alla prova durevole.';
+
 const PROVA = /\.spec\.m?js$/;
 const CONFIG_PLAYWRIGHT = /^playwright\.config\.[cm]?[jt]s$/;
 const nelGiro = (f) => f.startsWith(PROVE_GIRO) && f.split('/').length >= 4
