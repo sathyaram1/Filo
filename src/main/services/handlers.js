@@ -4649,14 +4649,24 @@ function segnaSalvateNominate(textReply, azioni) {
   for (const x of lista) {
     if (!x || String(x.type || '').toUpperCase() !== 'CERCA_SALVATE' || !x._output || !Array.isArray(x._output.pagine)) continue;
     const trovate = [];
-    for (const p of x._output.pagine) {
-      if (!p || !p.id || aperte.has(p.id) || giaMostrate.has(p.id)) continue;
+    const pagine = x._output.pagine.filter((p) => p && p.id);
+    const cercate = (Array.isArray(x._output.cercatoCon) ? x._output.cercatoCon : String(x._output.cercato || '').split(/\s+/))
+      .map((w) => piano(w).replace(/[aeiou]$/, '')).filter((w) => w.length >= 3);
+    for (const p of pagine) {
+      if (aperte.has(p.id) || giaMostrate.has(p.id)) continue;
       let i = -1;
-      for (const nome of testo ? nomiDellaSalvata(p, piano) : []) {
+      const nomi = testo ? [...nomiDellaSalvata(p, piano), ...paroleSoloSue(p, pagine, cercate, piano)] : [];
+      for (const nome of nomi) {
         const k = posizioneDelNome(testo, nome);
         if (k >= 0 && (i < 0 || k < i)) i = k;
       }
       if (i >= 0) { trovate.push({ id: p.id, i }); giaMostrate.add(p.id); }
+    }
+    // Una pagina sola trovata con tutte le parole, e una risposta che la racconta senza nominarla né dire di no: è lei.
+    const sola = pagine.length === 1 && !x._output.allargata ? pagine[0] : null;
+    if (!trovate.length && sola && testo && !aperte.has(sola.id) && !giaMostrate.has(sola.id) && !NEGA_RISPOSTA.test(testo)) {
+      trovate.push({ id: sola.id, i: 0 });
+      giaMostrate.add(sola.id);
     }
     x._output.nominate = trovate.sort((a, b) => a.i - b.i).map((t) => t.id);
   }
