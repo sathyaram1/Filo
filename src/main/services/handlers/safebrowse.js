@@ -60,6 +60,21 @@ module.exports = function register(on, ctx) {
     return { ok: true, richiesta: win._filoTabs.richiestaCasa(tabId) };
   }));
 
+  // #967 — un sito entra fra quelli fidati solo col nome che ne ricava il main (`indirizzo`); ne escono le voci dette.
+  // In incognito non entra niente: la scelta resta nella scheda.
+  on(MSG.SITI_FIDATI_IMPOSTA, soloFilo(async (msg, sender) => {
+    const Fidati = require('../sitiFidati');
+    const win = winOf(sender);
+    if (msg && msg.fidato === true) {
+      const SB = globalThis.SN_SAFEBROWSE;
+      const voce = SB && typeof msg.indirizzo === 'string' ? SB.voceFidata(msg.indirizzo.slice(0, 2048)) : null;
+      if (!voce) return { ok: false, code: 'sito', error: 'Non è l\'indirizzo di un sito' };
+      return Fidati.fidati(voce, { win: msg.avvisa === true ? win : null, incognito: !!(sender && sender.isIncognito) });
+    }
+    const voci = Array.isArray(msg && msg.voci) ? msg.voci.filter((v) => typeof v === 'string').slice(0, 500) : [];
+    return { ok: true, ...(await Fidati.cambia({ togli: voci })) };
+  }));
+
   // Geo-block: l'utente ha accettato la proposta inline (#151) → instrada la tab
   // dal paese indicato. Il tabId arriva dal sender (content script).
   on(MSG.GEO_PROPOSE_ACCEPT, async (msg, sender) => {
