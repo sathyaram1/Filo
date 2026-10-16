@@ -41,7 +41,7 @@ test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge 
     const chi = `${ruolo} ${JSON.stringify(opts)}`;
     assert.ok(t.includes(SEZIONE), `${chi}: manca la sezione del guasto`);
     assert.match(t, /node scripts\/domanda\.mjs chiedi /, `${chi}: la domanda passa da domanda.mjs`);
-    assert.match(t, /release <biglietto> --role <il tuo ruolo> \\\n\s+--guasto/, `${chi}: il rilascio porta --guasto`);
+    assert.match(piatto(t), /release <biglietto> --role <il tuo ruolo> --guasto "<gruppo>, D-<n>/, `${chi}: il rilascio porta --guasto`);
   }
   for (const [ruolo, opts] of CHI_RISOLVE) {
     const t = readRoleInstructions(ruolo, opts);
@@ -56,8 +56,8 @@ test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge 
 
 test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando in locale), e il rimando non vieta più il server', () => {
   const pezzo = readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8');
-  assert.match(piatto(pezzo), /«non posso perché è rotto» → guasto: la domanda/);
-  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) → il rimando in locale/);
+  assert.match(piatto(pezzo), /«Non posso perché è rotto» è un guasto/);
+  assert.match(piatto(pezzo), /«dalla cloud non si fa, per regola» \([^)]*segreti[^)]*automazioni GitHub del server[^)]*macchina dell'owner\) è il rimando in locale/);
   for (const [ruolo, opts] of CHI_RISOLVE) {
     const t = piatto(readRoleInstructions(ruolo, opts));
     const locale = t.slice(t.indexOf('## Se il lavoro si fa solo in locale'), t.indexOf(ATTESA));
@@ -65,13 +65,13 @@ test('le istruzioni separano «è rotto» (domanda) da «per regola» (rimando i
     assert.doesNotMatch(locale, /non puoi[^.]*codice del server/i, `${ruolo}: il codice del server si tocca nei lavori server`);
     assert.match(locale, /per regola/);
     assert.ok(locale.includes('«Un guasto dell\'ambiente si dice con una domanda»'), `${ruolo}: un guasto rimanda alla sua sezione`);
-    assert.match(locale, /--reason locale --notes "Lavoro locale per regola:/, `${ruolo}: la nota dice che è lavoro locale davvero`);
+    assert.match(locale, /--reason locale \\ --notes "Lavoro locale per regola:/, `${ruolo}: la nota dice che è lavoro locale davvero`);
   }
 });
 
-/** La domanda del modello nel testo, coi segnaposti dell'identificativo riempiti. */
+/** La domanda del modello nel testo di chi risolve, coi segnaposti dell'identificativo riempiti. */
 function domandaDelModello() {
-  const pezzo = readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8');
+  const pezzo = readFileSync(join(RUOLI, '_guasto-in-attesa.md'), 'utf8');
   const m = /```json\n([\s\S]*?)\n\s*```/.exec(pezzo);
   assert.ok(m, 'il pezzo ha il modello JSON della domanda');
   const d = JSON.parse(m[1].split('<payload.id>').join(FEEDBACK_ID));
