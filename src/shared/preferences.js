@@ -362,7 +362,7 @@
     const errati = [];
     const rifiuti = [];
     for (const p of pezzi) {
-      let d = dominioDa(p);
+      let d = voceDi(p);
       // Togliere una piattaforma salvata prima che la si rifiutasse deve riuscire: lì resta com'è.
       const r = d && riduci ? riduci(d) : null;
       if (r && r.rifiuto && op !== 'togli') { if (!rifiuti.includes(r.rifiuto)) rifiuti.push(r.rifiuto); continue; }
