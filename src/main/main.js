@@ -85,6 +85,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoAuth = require('./auth/google-auth');
     globalThis.__filoUpdater = require('./updater');
     globalThis.__filoAlarmWatcher = require('./services/alarmWatcher');
+    globalThis.__filoCancellaTutto = require('./cancellaTutto');
   } catch (_) {}
 }
 
