@@ -4360,8 +4360,9 @@
   // il colpo di coda cade su un comando del pannello nuovo; chiuso, cade sul
   // foglio dietro (che apre "Aggiungi modulo"). Armano tutti e due.
   let overlayGen = 0;
-  function openOverlay(html) { staleClick.arm(); overlayGen++; overlayBox.innerHTML = html; overlay.hidden = false; }
-  function closeOverlay() { staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
+  // Un campo tolto col fuoco dentro non sempre manda il blur: l'ascolto dei tasti si chiude qui.
+  function openOverlay(html) { fermaAscolto(); staleClick.arm(); overlayGen++; overlayBox.innerHTML = html; overlay.hidden = false; }
+  function closeOverlay() { fermaAscolto(); staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
   // Allo scadere chiude solo sé stesso: chiudeva qualunque pannello ci fosse, compreso il commento aperto nel frattempo.
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
