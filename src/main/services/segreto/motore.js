@@ -499,7 +499,7 @@ async function cerca(ctx, S, ids, { pota = false } = {}) {
           continue;
         }
         a.r++;
-        if (!pre && ++a.vuoti > TENTATIVI_A_VUOTO) attivi.delete(i);
+        if (!pre && ++a.vuoti > tetto(i)) attivi.delete(i);
       }
     }
     await cedi();
