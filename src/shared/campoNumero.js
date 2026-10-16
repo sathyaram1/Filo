@@ -44,8 +44,10 @@
     if (!testo) return { ok: false, motivo: MOTIVI.VUOTO };
     // La virgola è come si scrivono i decimali in italiano: si legge come un
     // punto invece di buttarla via (1,5 non è 15). Un decimale dove serve un
-    // intero viene rifiutato dopo, con la frase giusta.
-    const n = Number(testo.replace(',', '.'));
+    // intero viene rifiutato dopo, con la frase giusta. Dove serve un intero,
+    // «10.000» o «10,000» sono diecimila: letti da decimale diventavano 10.
+    const migliaia = intero && /^[+-]?[1-9]\d{0,2}([.,]\d{3})+$/.test(testo);
+    const n = Number(migliaia ? testo.replace(/[.,]/g, '') : testo.replace(',', '.'));
     if (!Number.isFinite(n)) return { ok: false, motivo: MOTIVI.NON_NUMERO };
     if (intero && !Number.isInteger(n)) return { ok: false, motivo: MOTIVI.NON_INTERO };
     if (min != null && n < min) return { ok: false, motivo: MOTIVI.SOTTO };
