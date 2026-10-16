@@ -1009,9 +1009,10 @@ async function riparaProprio(ctx, S) {
     // Stessa lunghezza, stessi blocchi: la tabella segnata si scrive dove sta, anche a contenitore pieno.
     await transazione(ctx, S, { tabella, bytes: serializzaTabella(tabella), blocchiTabella: S.blocchiTabella, L2: S.L }, new Map());
   }
-  // Dopo la tabella: la transazione può aver accorciato il segreto.
-  const G = Math.ceil(S.L / GRUPPO);
+  // Dopo la tabella: la transazione può aver accorciato il segreto. I gruppi tutti oltre l'ultimo blocco usato non si
+  // riparano: li toglie l'accorciamento qui sotto.
   const usati = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
+  const G = Math.ceil((usati.lastIndexOf(1) + 1) / GRUPPO);
   const parziali = [];
   const persiInteri = [];
   const daRifare = [];
