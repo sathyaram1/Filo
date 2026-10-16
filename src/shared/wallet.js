@@ -684,7 +684,7 @@
         marcatori: n <= INVITI_POCHI ? [`inviti:${INVITI_POCHI}`] : [],
         testo: n === 0
           ? `Gli ingressi con invito sono finiti: chi riceve un invito adesso non riesce a entrare. Aggiungine ${DOVE}.`
-          : `${n === 1 ? 'Resta 1 ingresso' : `Restano ${n} ingressi`} con invito: dopo, chi riceve un invito non riuscirà a entrare. Aggiungine ${DOVE}.`,
+          : `${n === 1 ? 'Resta 1 ingresso' : `Restano ${n} ingressi`} con invito, poi chi riceve un invito non riesce più a entrare. Aggiungine ${DOVE}.`,
       });
     }
 
