@@ -233,8 +233,7 @@ module.exports = function register(on, ctx) {
       const filo = contaFilo(parsed);
       const { mergeImportedData, regolaImport, haSegreti } = require('../exportData');
       const dati = datiDaFondere(parsed.data);
-      const correnti = await datiCorrenti();
-      const { stats } = mergeImportedData(correnti, dati, opzioniFusione());
+      const { stats } = mergeImportedData(await datiCorrenti(), dati, opzioniFusione());
       return {
         ok: true,
         token,
