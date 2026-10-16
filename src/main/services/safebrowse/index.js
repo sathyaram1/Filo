@@ -430,6 +430,9 @@ function voceFidata(scritto) {
 const API = {
   checkSync,
   scopeOf,
+  impostaFidati,
+  fidato,
+  voceFidata,
   ownerOf,
   createOwnerBudget,
   analyze,
