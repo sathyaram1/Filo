@@ -1543,8 +1543,25 @@
       if (inAttesa) renderClipboard(inAttesa, { forza: true });
       else if (lista.querySelector('.sn-clip-gone')) renderClipboard(vociCorrenti, { forza: true });
     });
-    $('sec-export-btn').addEventListener('click', exportData);
+    $('sec-export-btn').addEventListener('click', () => exportData());
     $('sec-import-btn').addEventListener('click', importData);
+    $('sec-wipe-btn').addEventListener('click', apriCancellaTutto);
+    $('sec-wipe-export').addEventListener('click', () => exportData({
+      btn: $('sec-wipe-export'), hint: $('sec-wipe-export-hint'), fatto: 'security_wipe_export_done', resta: true,
+    }));
+    $('sec-wipe-word').addEventListener('input', aggiornaTastoCancella);
+    $('sec-wipe-word').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); cancellaTutto(); }
+    });
+    $('sec-wipe-go').addEventListener('click', cancellaTutto);
+    $('sec-wipe-cancel').addEventListener('click', () => { chiudiCancellaTutto(); $('sec-wipe-btn').focus(); });
+    $('sec-wipe-box').addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || cancellazioneInCorso) return;
+      e.preventDefault();
+      chiudiCancellaTutto();
+      $('sec-wipe-btn').focus();
+    });
+    window.addEventListener('hashchange', portaAlTasto);
     // La cronologia appunti cresce ALTROVE (ogni copia, in qualunque scheda) e
     // si accorcia altrove (il "×" del menu "Incolla"): una pagina lasciata
     // aperta mostrerebbe una lista vecchia, e su un dato che si va a
