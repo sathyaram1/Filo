@@ -680,17 +680,26 @@ function aLotti(lista, n = GRUPPI_PER_LOTTO) {
 async function caricaTabella(ctx, S, testa) {
   S.tabella = new Map();
   S.blocchiTabella = [];
+  S.bytesTabella = null;
   let bytes = testa.inTesta;
+  let t = bytes ? leggiTabella(bytes, S.L) : null;
   if (!bytes) {
+    const n = Math.ceil(testa.lunghezza / CARICO);
     const letti = await carichiGruppi(ctx, S, [...new Set(testa.blocchiTabella.map((j) => Math.floor(j / GRUPPO)))]);
-    const pezzi = testa.blocchiTabella.map((j) => letti.get(Math.floor(j / GRUPPO))[j % GRUPPO]);
-    if (pezzi.some((c) => !c)) return;
-    bytes = Buffer.concat(pezzi).subarray(0, testa.lunghezza);
+    for (let x = 0; x < testa.blocchiTabella.length && !t; x += n) {
+      const pezzi = testa.blocchiTabella.slice(x, x + n).map((j) => letti.get(Math.floor(j / GRUPPO))[j % GRUPPO]);
+      if (pezzi.some((c) => !c)) continue;
+      bytes = Buffer.concat(pezzi).subarray(0, testa.lunghezza);
+      t = leggiTabella(bytes, S.L);
+    }
   }
-  const t = leggiTabella(bytes, S.L);
-  if (!t) return;
-  S.tabella = t;
-  S.blocchiTabella = testa.blocchiTabella;
+  if (t) {
+    S.tabella = t;
+    S.blocchiTabella = testa.blocchiTabella;
+    S.bytesTabella = Buffer.from(bytes);
+  } else if (S.L > 1) {
+    S.tabella.set(RISERVA, { d: (S.L - 1) * CARICO, c: 0, m: 0, e: [[1, S.L - 1]], x: 1 });
+  }
 }
 
 async function caricaSegreto(ctx, S) {
