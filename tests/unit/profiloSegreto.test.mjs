@@ -539,7 +539,7 @@ describe('usato male', () => {
 });
 
 describe('danni', () => {
-  test('metà delle copie di ogni gruppo sparite: il segreto si riapre intero (e la scansione le ritrova)', async () => {
+  test('metà delle copie di ogni gruppo sparite: il segreto si riapre intero e torna con tutte le copie', async () => {
     const base = await contenitore(4 * MB);
     const s = await crea(base, 'Fragile');
     const d = randomBytes(150_000);
