@@ -628,6 +628,26 @@ test('più file appesi insieme si chiudono insieme, e se dopo non finisce più n
     /^\[test:unit\] ROSSO: tests\/unit\/x\.test\.mjs non è andato avanti per 20 minuti ed è stato chiuso; gli altri file sono andati avanti\.$/);
 });
 
+// #1235: chiusa la corsa, gli esiti dei file finiti dietro all'ultimo appeso sparivano.
+test('in fondo alla corsa l\'appeso che resta dopo una chiusura si chiude da solo; se dopo è partito qualcosa che non finisce, è ferma la corsa', () => {
+  const coda = guardiaPerFile(1000);
+  assert.equal(coda([{ via: 'a' }, { via: 'b' }, { via: 'c' }, {}], 0), null);
+  assert.equal(coda([{ fine: 'b' }], 300), null);
+  assert.deepEqual(coda([], 1000), { file: ['a'] }, 'b è finito da poco: la corsa è viva, si chiude solo il primo');
+  assert.equal(coda([{ fine: 'a' }], 1100), null);
+  assert.equal(coda([], 2099), null);
+  assert.deepEqual(coda([], 2100), { file: ['c'] }, 'dopo la chiusura non è partito niente: c è un appeso di prima, come a');
+  assert.equal(coda([{ fine: 'c' }], 2200), null);
+  assert.equal(coda([], 99_999), null);
+
+  const ferma = guardiaPerFile(1000);
+  ferma([{ via: 'a' }, { via: 'b' }, { via: 'c' }, {}], 0);
+  ferma([{ fine: 'b' }], 300);
+  assert.deepEqual(ferma([], 1000), { file: ['a'] });
+  assert.equal(ferma([{ fine: 'a' }, { via: 'd' }], 1100), null);
+  assert.deepEqual(ferma([], 2100), { tutto: true }, 'd è partito dopo la chiusura e non finisce nemmeno lui');
+});
+
 test('il processo del file da chiudere si trova dalla riga di comando, coi suoi figli, e solo sotto il node --test', () => {
   const lista = leggiProcessi([
     '  100     1 /usr/bin/node /home/u/Filo/scripts/run-unit-tests.mjs',
