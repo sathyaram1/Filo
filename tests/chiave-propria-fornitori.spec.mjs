@@ -41,8 +41,7 @@ async function chiaveNelPortafoglio(app, chiave) {
     const Module = process.getBuiltinModule('module');
     const path = process.getBuiltinModule('path');
     const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
-    const w = req('./auth/wallet-store');
-    if (k) w.save({ key: k, pseudonym: 'prova962' }); else w.clear();
+    req('./auth/wallet-store').save({ key: k, pseudonym: 'prova962' });
   }, chiave);
 }
 
@@ -101,6 +100,7 @@ test('A — l’interruttore compare nelle Opzioni solo con una chiave propria s
   await opt.reload();
   await expect(opt.locator('#ownKeyAllProviders')).toBeVisible({ timeout: 8_000 });
   await opt.locator('#sec-own-key-providers').screenshot({ path: `${SHOTS}/962-interruttore-scuro.png` });
+  await opt.screenshot({ path: `${SHOTS}/962-opzioni-scuro.png` });
 
   // Tolta la chiave sparisce, anche dopo aver ricaricato; rimessa torna com'era.
   await metti('');
@@ -155,7 +155,6 @@ test('C — chiave propria rifiutata con l’interruttore acceso: il ripiego sui
   expect(giri.map((r) => r.key).slice(0, 2)).toEqual([OWN, PERSONAL]);
   expect(ignoreDi(giri[0])).toBeNull();
   expect(ignoreDi(giri[1])).toEqual(expect.arrayContaining(['Google', 'OpenAI', 'xAI']));
-  await chiaveNelPortafoglio(app, '');
 });
 
 // Il modello finto della chat: un giro per elemento (come in impostazioni-dalla-chat.spec).
@@ -217,10 +216,9 @@ test('D — dalla chat: senza chiave propria Filo dice perché non lo accende; c
   await modelloFinto(app, [imposta(false, 'k3'), { text: 'Spento.' }]);
   await scrivi(chat, 'con la mia chiave non usare i fornitori esclusi');
   await expect.poll(async () => {
-    if (await confirmState(chat)) { try { await clickConfirm(chat); } catch (_) {} }
+    if (await confirmState(chat)) { try { await scrollConfirmToEnd(chat); await clickConfirm(chat); } catch (_) {} }
     return (await impostazioni(app)).ownKeyAllProviders;
   }, { timeout: 10_000 }).toBe(false);
   await expect(opt.locator('#ownKeyAllProviders')).not.toBeChecked({ timeout: 5_000 });
   await app.evaluate(() => { try { globalThis.__f962Restore?.(); } catch (_) {} });
-  await chiaveNelPortafoglio(app, '');
 });
