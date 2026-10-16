@@ -813,6 +813,6 @@ export function controllaProveTolte({
   return esitoProveTolte({
     rosse: r.rosse.filter((f) => prove.includes(f)), dallaPulizia: r.rosse.filter((f) => accorciate.includes(f)),
     shaPrima, conPulizia, messi, via: { ...(pulite ? pulite.via : {}), ...dal.via },
-    numeri, casi: r.casi, vecchie: vecchie || [], comando,
+    numeri, casi: r.casi, vecchie: vecchie || [], comando, segnate: r.segnate,
   });
 }
