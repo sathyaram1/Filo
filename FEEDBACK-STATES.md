@@ -370,7 +370,11 @@ dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
-arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
+arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`): ha già
+aperto una domanda col gruppo del guasto, e la nota ne porta il numero. Non è
+lavoro locale: quello resta `locale`, e la sua nota dice quale regola lo tiene
+fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
