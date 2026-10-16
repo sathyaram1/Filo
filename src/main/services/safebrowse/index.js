@@ -58,7 +58,7 @@ const sandboxCache = new TtlCache(30 * MIN);
 const llmCache = new TtlCache(HOUR);
 
 // Fetcher di rete iniettabili (default: assenti = best-effort no-op). gsbPeek dà il verdetto già in cache, senza rete.
-let providers = { gsb: null, gsbPeek: null, rdap: null, ct: null, sandbox: null, llm: null };
+let providers = { gsb: null, gsbPeek: null, rdap: null, ct: null, sandbox: null, destinazione: null, llm: null };
 // Chiave GSB letta a ogni verifica: la decide chi è dentro ADESSO (l'admin esce o entra senza ricollegare nulla, #679.4).
 let gsbKeyOf = null;
 function setProviders(fns) {
