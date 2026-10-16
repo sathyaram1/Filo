@@ -4687,7 +4687,9 @@
   // nell'archivio (un appunto scritto da Filo a editor chiuso): lo si cerca di nuovo dopo la fusione.
   const fileChiesto = (() => { try { return new URLSearchParams(location.search).get('file') || ''; } catch (_) { return ''; } })();
   activateFile((fileChiesto && STORE.findFile(collection, fileChiesto)) || STORE.activeFile(collection));
-  reloadFromArchive().then(() => {
+  const archivioLetto = reloadFromArchive().then(() => {
     if (fileChiesto && STORE.findFile(collection, fileChiesto) && (!doc || doc.id !== fileChiesto)) switchToFile(fileChiesto);
   });
+  // Dopo la fusione con l'archivio: scrivere prima cancellerebbe gli appunti che Filo ci ha messo (vedi loadCollection).
+  Promise.all([archivioLetto, leggiLayout()]).then(convertiCollezione, () => {});
 })();
