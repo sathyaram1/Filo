@@ -138,10 +138,12 @@
   }
 
   // Un sito in elenco copre tutto il suo sito (`cdn.sito.it` e `sito.it` sono uno), mai un altro: né
-  // `sito.it.evil.com`, né `bob.github.io` per chi ha scritto `alice.github.io`.
+  // `sito.it.evil.com`, né `bob.github.io` per chi ha scritto `alice.github.io`. Un indirizzo che consegna i file di
+  // chiunque (s3.<regione>.amazonaws.com, Google Drive) non lo copre nessuna voce, nemmeno il sito che lo contiene.
   function fidato(url, elenco) {
     const host = comeSito(url);
     if (!host) return false;
+    if (stessoSito().piattaforma(host, OSPITI)) return false;
     const s = stessoSito().sitoDi(host, OSPITI);
     return !!s && normalizzaSiti(elenco).includes(s);
   }
