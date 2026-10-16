@@ -20,7 +20,7 @@ const INSIEME_MAX = 2;
 const ARGON2_JS = require.resolve('hash-wasm/dist/argon2.umd.min.js');
 
 let codice = '';
-// Il sorgente si passa come testo: un thread che legge un percorso dentro l'archivio dell'app impacchettata non è garantito.
+// Il sorgente passa come testo: un thread che legge un percorso dentro l'archivio dell'app impacchettata non è garantito.
 function codiceThread() {
   if (!codice) {
     const lib = fs.readFileSync(ARGON2_JS, 'utf8');
