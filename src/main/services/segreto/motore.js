@@ -699,11 +699,18 @@ async function caricaSegreto(ctx, S) {
 
 // ── Scrittura ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
+// Il primo posto della catena letto e trovato estraneo è quasi sempre la casa vecchia della copia, coperta da un altro
+// segreto: rimetterla lì cancellerebbe proprio i blocchi sovrapposti di quello. Si salta: la ricerca dopo paga una lettura.
 function colloca(ctx, S, i) {
   const occ = ctx.mappa.occ;
+  let saltato = false;
   for (let r = 0; r < CATENA_MAX; r++) {
     const p = posizione(S.posto, ctx.N, i >> 1, i & 1, r);
     if (occ[p]) continue;
+    if (!saltato && S.letti[p]) {
+      saltato = true;
+      continue;
+    }
     S.spazzatura.delete(p);
     occupa(ctx, p, S.etichetta);
     S.pos[i] = p;
