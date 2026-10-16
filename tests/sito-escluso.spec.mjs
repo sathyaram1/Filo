@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 const SITO = 'filo-843.test';
 const DOCS = 'docs.filo-843.test';
@@ -137,16 +138,14 @@ test('dalla home: «spegni Filo su …» lo aggiunge senza togliere gli altri e 
 });
 
 test('«Ripristina tutto» in Preferenze svuota l\'elenco anche nella pagina Altro già aperta', async ({ app, openTab }) => {
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['banca-843.test', DOCS] }); });
+  await app.evaluate(async (_e, d) => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['banca-843.test', d] }); }, DOCS);
   const altro = await openTab('filo://options/altro.html');
   const casella = altro.locator('#blocklist');
   await expect(casella).toHaveValue(`banca-843.test\n${DOCS}`, { timeout: 8000 });
   const pref = await openTab('filo://preferences/preferences.html');
-  await app.evaluate(async () => {
-    const MSG = globalThis.SN_MSG.MSG;
-    await globalThis.SN_HANDLE_MESSAGE({ type: MSG.RESET_SETTINGS }, { url: 'filo://preferences/preferences.html' });
-  });
-  void pref;
+  await pref.locator('#resetAllSettings').scrollIntoViewIfNeeded();
+  await pref.locator('#resetAllSettings').click();
+  await clickConfirm(pref, 'ok', { timeout: 5000 });
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual([]);
   await altro.bringToFront();
   await expect(casella).toHaveValue('', { timeout: 5000 });
@@ -154,4 +153,53 @@ test('«Ripristina tutto» in Preferenze svuota l\'elenco anche nella pagina Alt
   await casella.click();
   await altro.keyboard.type(ALTRO);
   await expect.poll(() => esclusi(app), { timeout: 5000 }).toEqual([ALTRO]);
+});
+
+// L'Aiuto della pagina riceve la risposta della prima coppia [parola, risposta] la cui parola sta nell'ultima richiesta.
+async function aiutoFinto(app, risposte) {
+  await app.evaluate(async (_e, r) => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash', [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const P = globalThis.SN_PROVIDERS;
+    const risposta = ({ attempts, messages }) => {
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      if (!sistema.includes('# Protocollo di risposta')) return { text: '{"message":"Ciao.","suggestions":[],"issues":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      const ultimo = JSON.stringify([...messages].reverse().find((m) => m.role === 'user') || '');
+      const scelta = r.find(([parola]) => ultimo.includes(parola)) || r[r.length - 1];
+      return { text: scelta[1], model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+    P.completeWithFallback = async (o) => risposta(o);
+    P.streamCompleteWithFallback = async (o) => risposta(o);
+  }, risposte);
+}
+
+test('all\'Aiuto della pagina: «spegni Filo su questo sito» lo spegne lì, senza toccare gli altri, e «riaccendilo» lo riaccende', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['banca-843.test'] }); });
+  const filo = (valore, text) => JSON.stringify({ action: 'filo', filo: { type: 'IMPOSTA_PREFERENZA', chiave: 'siti_filo_spento', valore }, text });
+  await aiutoFinto(app, [['riaccendi', filo('togli questo sito', 'Lo riaccendo.')], ['spegni', filo('aggiungi questo sito', 'Lo spengo qui.')]]);
+  const page = await apriSu(openTab, testServer, DOCS);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const casella = page.locator('.sn-sidebar-input textarea');
+  await expect(casella).toBeVisible({ timeout: 8000 });
+
+  await casella.fill('spegni Filo su questo sito');
+  await casella.press('Enter');
+  await expect.poll(() => esclusi(app), { timeout: 10_000 }).toEqual(['banca-843.test', DOCS]);
+  await expect(page.locator('.sn-sidebar-log', { hasText: `Filo spento su ${DOCS}` })).toBeVisible({ timeout: 5000 });
+  await page.locator('#testo').click({ button: 'right' });
+  await expect.poll(() => finestraDiRiserva(app), { timeout: 5000 }).toContain('Riaccendi Filo su questo sito');
+  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await casella.fill('riaccendilo');
+  await casella.press('Enter');
+  await expect.poll(() => esclusi(app), { timeout: 10_000 }).toEqual(['banca-843.test']);
+  await expect(page.locator('.sn-sidebar-log', { hasText: `Filo riacceso su ${DOCS}` })).toBeVisible({ timeout: 5000 });
 });
