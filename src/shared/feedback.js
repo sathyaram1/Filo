@@ -1965,14 +1965,6 @@
     return statusPublicPrima === 'closed' && statusToPublic(statusDopo) === 'open';
   }
 
-  // Questa scrittura di `status` riapre una pratica che ha il registro delle parti? Lo dice il documento com'è adesso,
-  // non la copia di chi chiama: vale per ogni pagina che scrive lo stato.
-  async function partiDaAzzerare(id, status, { idToken = '' } = {}) {
-    if (!id || status === undefined || statusToPublic(status) !== 'open') return false;
-    const [ora] = await getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
-    return !!(ora && ora.localMerges && riapre(ora.statusPublic, status));
-  }
-
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
