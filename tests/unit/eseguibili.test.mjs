@@ -87,6 +87,58 @@ test('un sito fidato copre i suoi sottodomini, mai chi se lo mette davanti', () 
   assert.equal(E.fidato('https://mozilla.org/x.exe', []), false);
 });
 
+// #876 — la regola è quella di «stesso sito» (src/shared/stessoSito.js): un sito copre tutto il suo sito, una
+// piattaforma che ospita i siti di chiunque non copre nessuno e non entra.
+test('una piattaforma che ospita i siti di chiunque non entra fra i programmi fidati; il sito preciso sì', () => {
+  for (const p of ['github.io', 'vercel.app', 'netlify.app', 'githubusercontent.com', 'blogspot.com', 'wordpress.com',
+    'sharepoint.com', 'co.uk', 'https://github.io/', '*.github.io']) {
+    assert.ok(E.sitoFidabile(p).piattaforma, p);
+    assert.deepEqual(E.normalizzaSiti([p]), [], p);
+  }
+  assert.deepEqual(E.sitoFidabile('alice.github.io'), { sito: 'alice.github.io' });
+  assert.deepEqual(E.sitoFidabile('https://alice.github.io/progetto/setup.exe'), { sito: 'alice.github.io' });
+  assert.deepEqual(E.sitoFidabile('download.mozilla.org'), { sito: 'mozilla.org' });
+  assert.deepEqual(E.sitoFidabile('mio-blog.wordpress.com'), { sito: 'mio-blog.wordpress.com' });
+  assert.equal(E.sitoFidabile('mozilla'), null);
+
+  // Salvata prima che la si rifiutasse, github.io non fa più scendere i programmi di qualunque sito GitHub Pages.
+  assert.equal(E.fidato('https://bob.github.io/setup.exe', ['github.io']), false);
+  assert.equal(E.fidato('https://alice.github.io/setup.exe', ['alice.github.io']), true);
+  assert.equal(E.fidato('https://www.alice.github.io/setup.exe', ['alice.github.io']), true);
+  assert.equal(E.fidato('https://bob.github.io/setup.exe', ['alice.github.io']), false);
+  assert.equal(E.fidato('https://bob.wordpress.com/setup.exe', ['alice.wordpress.com']), false);
+  assert.equal(E.fidato('https://bbc.co.uk/setup.exe', ['co.uk']), false);
+  // I sottodomini di un sito sono lo stesso sito, in tutti e due i versi.
+  assert.equal(E.fidato('https://mozilla.org/setup.exe', ['download.mozilla.org']), true);
+  assert.equal(E.fidato('https://cdn.mozilla.org/setup.exe', ['https://download.mozilla.org/firefox']), true);
+});
+
+test('la casella dei programmi fidati: siti ridotti, piattaforme scartate al loro posto, e il perché col sito preciso', () => {
+  const r = E.elencoFidati('download.mozilla.org\ngithub.io\nhttps://alice.github.io/x.exe\nmozilla.org\nfaceb');
+  assert.deepEqual(r.valid, ['mozilla.org', 'alice.github.io']);
+  assert.deepEqual(r.invalid, ['github.io', 'faceb']);
+  assert.deepEqual(r.scartate, [{ riga: 'github.io', dopo: 1 }, { riga: 'faceb', dopo: 2 }]);
+  assert.deepEqual(r.piattaforme, ['github.io']);
+
+  const generica = E.testoPiattaforma('github.io');
+  assert.match(generica, /«github\.io» raccoglie i siti di chiunque/);
+  assert.match(generica, /come nome\.github\.io\.$/);
+  const dallaCronologia = E.testoPiattaforma('github.io', ['mozilla.org', 'docs.alice.github.io', 'bob.github.io', 'github.io']);
+  assert.match(dallaCronologia, /come alice\.github\.io o bob\.github\.io\.$/);
+});
+
+test('un riquadro dello stesso sito non rende incerta la pagina; uno di un altro ospite della piattaforma sì', () => {
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://shop.esempio.it', 'https://cdn.esempio.it']), false);
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://esempio.it:8443']), false);
+  assert.equal(E.riquadriDiAltri('alice.github.io', ['https://alice.github.io', 'https://bob.github.io']), true);
+  assert.equal(E.riquadriDiAltri('alice.wordpress.com', ['https://bob.wordpress.com']), true);
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://pubblicita.example']), true);
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', ['null']), true, 'un riquadro senza origine può essere di chiunque');
+  assert.equal(E.riquadriDiAltri('127.0.0.1', ['http://127.0.0.1:4000', 'http://localhost:4000']), true);
+  assert.equal(E.riquadriDiAltri('', []), true);
+  assert.equal(E.riquadriDiAltri('shop.esempio.it', []), false);
+});
+
 test('le righe scritte a mano si normalizzano, e le inservibili si scartano', () => {
   assert.deepEqual(
     E.normalizzaSiti(['https://www.Mozilla.org/download', ' apache.org ', '', 'apache.org']),
@@ -171,8 +223,10 @@ test('dopo un rimando la frase nomina il sito cliccato e quello che ha servito i
     assert.equal(E.servitoDa('mozilla.org', stesso), '', stesso);
     assert.equal(E.provenienza('mozilla.org', false, stesso), 'da mozilla.org');
   }
-  // Il genitore di chi è stato cliccato è un altro nome: la fiducia non lo copre.
-  assert.equal(E.servitoDa('cdn.sito.it', 'https://sito.it/a.exe'), 'sito.it');
+  // #876 — il genitore di chi è stato cliccato è lo stesso sito, come per la fiducia; un altro ospite della piattaforma no.
+  assert.equal(E.servitoDa('cdn.sito.it', 'https://sito.it/a.exe'), '');
+  assert.equal(E.servitoDa('alice.github.io', 'https://bob.github.io/a.exe'), 'bob.github.io');
+  assert.equal(E.servitoDa('alice.wordpress.com', 'https://bob.wordpress.com/a.exe'), 'bob.wordpress.com');
 });
 
 test('i formati che Windows monta o esegue senza essere un .exe sono nella lista (#588.1)', () => {

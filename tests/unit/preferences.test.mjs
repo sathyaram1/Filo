@@ -467,3 +467,27 @@ test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla v
   assert.deepEqual(P.applicaElenco(riaccendi.elenco, { blocklist: ['banca.it', 'docs.google.com'] }).partial, { blocklist: ['banca.it'] });
   assert.match(build('siti_filo_spento', 'aggiungi localhost').rifiuto, /localhost/);
 });
+
+// #876 — dalla chat i siti fidati si salvano come dalla pagina Sicurezza: al sito che coprono, e fra i programmi fidati
+// una piattaforma che ospita i siti di chiunque è un rifiuto col perché.
+test('#876 — i siti fidati dalla chat: il sito che la voce copre, e nessuna piattaforma fra i programmi', () => {
+  const cookie = build('siti_fidati_cookie', 'aggiungi https://mail.google.com/mail/u/0/, news.bbc.co.uk');
+  assert.deepEqual(cookie.elenco.voci, ['google.com', 'bbc.co.uk']);
+  assert.match(cookie.label, /google\.com, bbc\.co\.uk/);
+  const programmi = build('siti_fidati_programmi', 'aggiungi https://alice.github.io/x.exe download.mozilla.org');
+  assert.deepEqual(programmi.elenco.voci, ['alice.github.io', 'mozilla.org']);
+  const no = build('siti_fidati_programmi', 'aggiungi github.io');
+  assert.ok(no.rifiuto && !no.partial);
+  assert.match(no.rifiuto, /«github\.io» raccoglie i siti di chiunque.*nome\.github\.io/);
+  assert.ok(build('siti_fidati_programmi', 'solo vercel.app, mozilla.org').rifiuto);
+
+  // Una voce salvata prima della riduzione si toglie col suo sito, e non si raddoppia aggiungendolo.
+  const prima = { security: { cookies: { trustedSites: ['mail.google.com', 'libero.it'] }, downloads: { trustedSites: ['github.io', 'download.mozilla.org'] } } };
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_cookie', 'togli google.com').elenco, prima).partial,
+    { security: { cookies: { trustedSites: ['libero.it'] } } });
+  assert.ok(P.applicaElenco(build('siti_fidati_cookie', 'aggiungi gmail.mail.google.com').elenco, prima).invariato);
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_programmi', 'togli github.io').elenco, prima).partial,
+    { security: { downloads: { trustedSites: ['download.mozilla.org'] } } }, 'una piattaforma salvata prima si toglie');
+  assert.deepEqual(P.applicaElenco(build('siti_fidati_programmi', 'togli mozilla.org').elenco, prima).partial,
+    { security: { downloads: { trustedSites: ['github.io'] } } });
+});

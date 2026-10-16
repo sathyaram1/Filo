@@ -1,0 +1,199 @@
+// #876 — i siti fidati seguono la regola di «stesso sito» (src/shared/stessoSito.js) ovunque: in Privacy massima un
+// fidato scritto come sottodominio o come indirizzo resta connesso dopo il riavvio e la lista mostra il sito vero; fra i
+// programmi fidati una piattaforma che ospita i siti di chiunque non entra, e la pagina propone il sito preciso; un
+// riquadro di un sottodominio non rende incerta la provenienza di un programma.
+
+import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
+import { _electron as electron } from '@playwright/test';
+import { createServer } from 'node:http';
+import { rmSync, mkdirSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { primaFinestra } from './helpers/primaFinestra.mjs';
+
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const SHOTS = join(APP_ROOT, 'tests', '.shots');
+
+// Ogni host risponde con la stessa pagina: `?metti=<valore>` scrive un cookie che dura un giorno, poi lo si rilegge.
+async function serverSiti(pagine = {}) {
+  const srv = createServer((req, res) => {
+    const percorso = String(req.url || '').split('?')[0];
+    if (pagine[percorso]) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(pagine[percorso]);
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><html><body><p id="c"></p><script>
+      const v = new URLSearchParams(location.search).get('metti');
+      if (v) document.cookie = 'sessione=' + v + '; max-age=86400; path=/';
+      document.getElementById('c').textContent = document.cookie;
+    </script></body></html>`);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  return {
+    porta: srv.address().port,
+    async close() { try { srv.closeAllConnections?.(); } catch (_) {} await new Promise((r) => srv.close(r)); },
+  };
+}
+
+async function avvia(userData) {
+  const app = await electron.launch({
+    args: [...argomentiScala, '--host-resolver-rules=MAP *.test 127.0.0.1', '.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), FILO_TEST_ACCOLTO: '1', NODE_ENV: 'test' },
+  });
+  const shell = await primaFinestra(app);
+  await shell.waitForLoadState('domcontentloaded');
+  const apri = async (url) => {
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => { page = app.windows().find((w) => w.url() === url); return !!page; }, { timeout: 15_000 }).toBe(true);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    return page;
+  };
+  return { app, shell, apri };
+}
+
+const fidatiSalvati = (sec) => sec.evaluate(() => window.SN_STORAGE.getSettings().then((s) => s.security.cookies.trustedSites));
+
+test('in Privacy massima un fidato scritto come sottodominio o come indirizzo tiene connesso il suo sito dopo il riavvio', async () => {
+  test.setTimeout(180_000);
+  const srv = await serverSiti();
+  const userData = cartellaTemporanea('filo-test-');
+  const sito = (host, q = '') => `http://${host}:${srv.porta}/${q}`;
+  const posta = sito('posta.due.test', 'mail/u/0/');
+  try {
+    let run = await avvia(userData);
+    try {
+      const sec = await run.apri('filo://security/');
+      await sec.waitForSelector('input[name="cookie-mode"]', { timeout: 10_000 });
+      await sec.locator('input[name="cookie-mode"][value="privacy"]').check();
+      await expect(sec.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 5_000 });
+
+      // Come lo scrive l'utente: il nome che vede in una pagina, o l'indirizzo copiato dalla barra.
+      for (const scritto of ['posta.uno.test', posta]) {
+        await sec.locator('#cookie-wl-input').fill(scritto);
+        await sec.locator('#cookie-wl-input').press('Enter');
+      }
+      await expect(sec.locator('#cookie-wl-list li span')).toHaveText(['due.test', 'uno.test']);
+      await expect.poll(() => fidatiSalvati(sec), { timeout: 10_000 }).toEqual(['due.test', 'uno.test']);
+      await expect(sec.locator('#cookie-wl-error')).toBeHidden();
+      // Lo stesso sito scritto con un altro sottodominio è già nell'elenco.
+      await sec.locator('#cookie-wl-input').fill('www.uno.test');
+      await sec.locator('#cookie-wl-input').press('Enter');
+      await expect(sec.locator('#cookie-wl-error')).toContainText('"uno.test" è già nell\'elenco');
+      await expect(sec.locator('#cookie-wl-list li span')).toHaveCount(2);
+
+      // Una voce salvata come sottodominio prima della correzione vale senza riscriverla, e la lista la mostra al suo sito.
+      await sec.evaluate(() => chrome.runtime.sendMessage({
+        type: 'update_settings', settings: { security: { cookies: { trustedSites: ['due.test', 'uno.test', 'posta.tre.test'] } } },
+      }));
+      await sec.reload();
+      await expect(sec.locator('#cookie-wl-list li span')).toHaveText(['due.test', 'uno.test', 'tre.test'], { timeout: 10_000 });
+
+      for (const [url, v] of [[sito('posta.uno.test', '?metti=uno'), 'uno'], [`${posta}?metti=due`, 'due'],
+        [sito('posta.tre.test', '?metti=tre'), 'tre'], [sito('posta.quattro.test', '?metti=quattro'), 'quattro']]) {
+        const p = await run.apri(url);
+        await expect(p.locator('#c')).toHaveText(`sessione=${v}`, { timeout: 10_000 });
+      }
+      await run.app.evaluate(async ({ session }) => {
+        for (const s of ['uno', 'due', 'tre']) await session.fromPartition(`persist:filo-priv-${s}.test`).cookies.flushStore();
+      });
+    } finally {
+      await chiudiApp(run.app);
+    }
+
+    run = await avvia(userData);
+    try {
+      for (const [url, atteso] of [[sito('posta.uno.test'), 'sessione=uno'], [posta, 'sessione=due'],
+        [sito('posta.tre.test'), 'sessione=tre'], [sito('posta.quattro.test'), '']]) {
+        const p = await run.apri(url);
+        await expect(p.locator('#c')).toHaveText(atteso, { timeout: 10_000 });
+      }
+    } finally {
+      await chiudiApp(run.app);
+    }
+  } finally {
+    await srv.close();
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+test.describe('programmi scaricati', () => {
+  test.use({ hostInPiu: ['shop.esempio.test', 'cdn.esempio.test', 'alice.github.io', 'bob.github.io'] });
+
+  const elenco = (shell) => shell.evaluate(() => window.filoShell.downloads.list());
+  const voce = async (shell, nome) => ((await elenco(shell))?.items || []).find((it) => it.filename === nome) || null;
+  const domanda = (shell, nome) => shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: `«${nome}»` });
+
+  test('un riquadro di un sottodominio è lo stesso sito; quello di un altro utente della piattaforma no', async ({ shell, openTab }) => {
+    test.setTimeout(120_000);
+    const pagine = {
+      '/riquadro.html': `<!doctype html><html><body>
+        <a id="data" download="dalriquadro.exe" href="data:application/octet-stream;base64,TVoBAgME">scarica</a></body></html>`,
+    };
+    const srv = await serverSiti(pagine);
+    try {
+      for (const [pagina, riquadro, nome, atteso] of [
+        ['shop.esempio.test', 'cdn.esempio.test', 'dalriquadro.exe', 'programma da shop.esempio.test.'],
+        ['alice.github.io', 'bob.github.io', 'dalriquadro.exe', 'altri siti'],
+      ]) {
+        pagine[`/${pagina}.html`] = `<!doctype html><html><body><h1>Negozio</h1>
+          <iframe id="r" src="http://${riquadro}:${srv.porta}/riquadro.html" width="400" height="120"></iframe></body></html>`;
+        const page = await openTab(`http://${pagina}:${srv.porta}/${pagina}.html`);
+        await page.frameLocator('#r').locator('#data').click();
+        await expect.poll(async () => (await voce(shell, nome))?.state ?? null, { timeout: 20_000 }).toBe('pending');
+        const v = await voce(shell, nome);
+        expect(v.site).toBe(pagina);
+        expect(v.siteUncertain).toBe(atteso === 'altri siti');
+        await expect(domanda(shell, nome)).toContainText(atteso, { timeout: 10_000 });
+        await shell.evaluate((id) => window.filoShell.downloads.confirm?.(id, false), v.id).catch(() => {});
+        await shell.evaluate(() => window.filoShell.downloads.list()).then(async (r) => {
+          for (const it of (r && r.items) || []) await shell.evaluate((id) => window.filoShell.downloads.remove?.(id), it.id).catch(() => {});
+        });
+        await page.close().catch(() => {});
+      }
+    } finally { await srv.close(); }
+  });
+
+  test('fra i programmi fidati una piattaforma non entra: la pagina dice perché e propone il sito da cui hai scaricato', async ({ shell, openTab }) => {
+    test.setTimeout(120_000);
+    const pagine = {
+      '/p.html': '<!doctype html><html><body><a id="data" download="strumento.exe" href="data:application/octet-stream;base64,TVoBAgME">scarica</a></body></html>',
+    };
+    const srv = await serverSiti(pagine);
+    try {
+      const page = await openTab(`http://alice.github.io:${srv.porta}/p.html`);
+      await page.locator('#data').click();
+      await expect.poll(async () => (await voce(shell, 'strumento.exe'))?.state ?? null, { timeout: 20_000 }).toBe('pending');
+
+      const sec = await openTab('filo://security/');
+      const casella = sec.locator('#sec-dl-trusted');
+      await casella.fill('github.io\nhttps://download.mozilla.org/firefox\nfaceb');
+      await casella.press('Tab');
+      const errore = sec.locator('#sec-dl-trusted-error');
+      await expect(errore).toBeVisible({ timeout: 10_000 });
+      await expect(errore).toContainText('«github.io» raccoglie i siti di chiunque');
+      await expect(errore).toContainText('Scrivi il sito preciso, come alice.github.io.');
+      await expect(errore).toContainText('faceb');
+      const salvati = () => sec.evaluate(() => window.SN_STORAGE.getSettings().then((s) => s.security.downloads));
+      await expect.poll(async () => (await salvati()).trustedSites, { timeout: 10_000 }).toEqual(['mozilla.org']);
+      expect((await salvati()).righeScartate.map((x) => x.riga)).toEqual(['github.io', 'faceb']);
+      mkdirSync(SHOTS, { recursive: true });
+      await sec.locator('#sec-dl-exe-sub').screenshot({ path: join(SHOTS, 'fidati-piattaforma.png') });
+
+      // Riaperta, la pagina rimette la riga scartata al suo posto e ridice il perché.
+      await sec.reload();
+      await expect(sec.locator('#sec-dl-trusted')).toHaveValue('github.io\nmozilla.org\nfaceb', { timeout: 10_000 });
+      await expect(errore).toContainText('«github.io» raccoglie i siti di chiunque', { timeout: 10_000 });
+
+      // Il sito preciso entra, e copre solo sé.
+      await casella.fill('alice.github.io');
+      await casella.press('Tab');
+      await expect.poll(async () => (await salvati()).trustedSites, { timeout: 10_000 }).toEqual(['alice.github.io']);
+      await expect(errore).toBeHidden();
+    } finally { await srv.close(); }
+  });
+});
