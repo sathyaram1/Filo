@@ -1932,8 +1932,19 @@
     return n;
   }
 
+  /** Il tasto «Frase» da chiuso, uguale in Gestione e nella pagina Feedback (#857): acceso se una
+   *  frase c'è già, che si legge intera nell'hover. Soli spazi = nessuna frase. PURA. */
+  function tastoFrase(frase) {
+    const testo = String(frase == null ? '' : frase).trim();
+    return {
+      piena: !!testo,
+      titolo: testo ? `Frase già scritta: “${testo}”` : 'Scrivi la riga che leggerà chi ha segnalato',
+    };
+  }
+
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
+    tastoFrase,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi
     // grezzi. Lo usa listBoardTab qui dentro, e lo usa feedbackPublicView.js
     // (#583) per decidere se un feedback può avere una scheda pubblica: la

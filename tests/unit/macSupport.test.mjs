@@ -579,6 +579,9 @@ const TASTI_DI_FILO = {
   'CommandOrControl+-': 'rimpicciolisci la PAGINA',
   'CommandOrControl+0': 'riporta la PAGINA al 100%',
   'CommandOrControl+Shift+B': 'apre e chiude la barra laterale',
+  // Lo schermo intero ha il tasto abituale di ogni sistema (src/shared/tasti.js), e Filo lo ascolta ovunque.
+  F11: 'mette e toglie lo schermo intero',
+  'Ctrl+Cmd+F': 'mette e toglie lo schermo intero (la forma del Mac: F11 lì è del sistema)',
 };
 
 // I `role` che, su Mac, farebbero la cosa sbagliata al posto di Filo.
@@ -800,6 +803,56 @@ test('nessuno può assegnarsi un tasto che Filo si prende prima', () => {
   // deve chiedere qui invece di accettarla e non farla partire mai.
   assert.match(readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8'), /\.rifiutoScritta\(/,
     'l\'Editor salva ancora scorciatoie che non arriveranno mai al modulo');
+});
+
+test('lo schermo intero ha il tasto di ogni sistema, e chi sceglie una scorciatoia lo trova preso (#858)', () => {
+  require(join(ROOT, 'src', 'shared', 'tasti.js'));
+  const T = globalThis.SN_TASTI;
+  // F11 su Windows, Control+Cmd+F su Mac: due tasti diversi, non una riscrittura.
+  assert.equal(T.etichettaSchermoIntero('win32'), 'F11');
+  assert.equal(T.etichettaSchermoIntero('darwin'), 'Ctrl+Cmd+F');
+  assert.equal(T.riservato('F11', 'win32'), true, 'F11 lo prende Filo: un modulo dell\'Editor non partirebbe mai');
+  for (const scritta of ['Ctrl+Cmd+F', 'Control+Command+F', 'Cmd+Ctrl+F', 'ctrl + cmd + f']) {
+    assert.equal(T.riservato(scritta, 'darwin'), true, `${scritta} su Mac è lo schermo intero`);
+  }
+  assert.equal(T.rifiutoScritta('Ctrl+Cmd+F', 'darwin')?.cosa, 'mette e toglie lo schermo intero');
+  // Cmd tratta come Ctrl non deve inghiottire il Control: Cmd+F resta libero, e su Mac F11 è del sistema.
+  for (const libera of ['Cmd+F', 'Ctrl+F', 'F11']) {
+    assert.equal(T.riservato(libera, 'darwin'), false, `${libera} su Mac non è lo schermo intero`);
+  }
+  assert.equal(T.riservato('Ctrl+Cmd+F', 'win32'), false);
+  // Il nome scritto su Mac tiene i due tasti, invece di diventare «Cmd+F».
+  assert.equal(T.etichetta('Ctrl+Cmd+F', 'darwin'), 'Ctrl+Cmd+F');
+  assert.equal(T.etichettaScritta('Control+Command+F', 'darwin'), 'Ctrl+Cmd+F');
+
+  // Il tasto che parte è quello che si legge, nelle due forme dell'evento (DOM e before-input-event).
+  const premi = (mods, code, key) => ({ type: 'keyDown', code, key, ...mods });
+  assert.equal(T.comandoSchermoIntero(premi({ control: true, meta: true }, 'KeyF', 'f'), 'darwin'), true);
+  assert.equal(T.comandoSchermoIntero(premi({ ctrlKey: true, metaKey: true }, 'KeyF', 'f'), 'darwin'), true);
+  assert.equal(T.comandoSchermoIntero(premi({ meta: true }, 'KeyF', 'f'), 'darwin'), false, 'Cmd+F è la ricerca');
+  assert.equal(T.comandoSchermoIntero(premi({ control: true }, 'KeyF', 'f'), 'darwin'), false);
+  assert.equal(T.comandoSchermoIntero(premi({}, 'F11', 'F11'), 'darwin'), false);
+  assert.equal(T.comandoSchermoIntero(premi({}, 'F11', 'F11'), 'win32'), true);
+  assert.equal(T.comandoSchermoIntero(premi({ control: true, meta: true }, 'KeyF', 'f'), 'win32'), false);
+
+  // Una scorciatoia di un modulo con Control e Cmd insieme parte con tutti e due, non con Cmd soltanto.
+  assert.equal(T.combacia({ ctrlKey: true, metaKey: true, code: 'KeyG', key: 'g' }, 'Ctrl+Cmd+G'), true);
+  assert.equal(T.combacia({ metaKey: true, code: 'KeyG', key: 'g' }, 'Ctrl+Cmd+G'), false);
+  assert.equal(T.combacia({ ctrlKey: true, metaKey: true, code: 'KeyG', key: 'g' }, 'Cmd+G'), false);
+  assert.equal(T.combacia({ metaKey: true, code: 'KeyG', key: 'g' }, 'Cmd+G'), true);
+
+  // La barra dei menu mostra il tasto del sistema su cui gira.
+  const { template } = require(join(ROOT, 'src', 'main', 'menu.js'));
+  const voce = (p) => template(p).flatMap((m) => m.submenu || []).find((v) => v.label === 'Schermo intero');
+  assert.equal(voce('darwin').accelerator, 'Ctrl+Cmd+F');
+  assert.equal(voce('win32').accelerator, 'F11');
+  assert.equal(voce('win32').registerAccelerator, false, 'su Windows il tasto lo ascolta Filo, non la barra invisibile');
+
+  // E lo dicono, con il tasto di ogni sistema, il manifesto e l'elenco delle scorciatoie di Opzioni → Altro.
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  const testo = globalThis.SN_CAPABILITIES.get('fullscreen').invoke;
+  for (const forma of ['F11', 'Ctrl+Cmd+F']) assert.ok(testo.includes(forma), `il manifesto non dice ${forma}`);
+  assert.match(readFileSync(join(ROOT, 'src', 'pages', 'options', 'altro.js'), 'utf8'), /etichettaSchermoIntero\(\)/);
 });
 
 test('quello che si legge sul salto di scheda è quello che succede', () => {

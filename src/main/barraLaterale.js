@@ -471,7 +471,8 @@ class BarraLaterale {
       if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
       const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
         || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && !nav.pagina);
-      out.push({ id, icona, etichetta, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
+      const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
+      out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
     }
     return out;
   }

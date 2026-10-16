@@ -47,6 +47,10 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   il trascinamento, né la chat lo offrono.
 - **Clic e Invio fanno la stessa cosa.** A sinistra aprono nel filo; a destra aprono l'app della carta
   (`apri`), o nel filo se non ne ha una (`usaCarta`).
+- **Un avviso che porta a una pagina lo dice nella notifica.** Il main scrive `action.apri` (solo un indirizzo
+  `filo://`, `paginaDiAvviso` in `src/shared/carteHome.js`) ed `etichetta`: la carta ne fa il pulsante principale,
+  con «Chiudi» accanto, e il clic sulla carta resta «apri nel filo». `action.titolo` sostituisce «Avviso», perché
+  più avvisi insieme si distinguano senza leggerli. Gli avvisi senza questi campi restano come sono (#855).
 - **La colonna di sinistra ha un ordine solo.** `SN_CARTE_HOME.sinistra` decide quali carte ci sono e in che
   ordine, e `trovaSinistra` le riconosce dalle parole dell'utente: la home la disegna da lì e la chat
   (`CARTA_HOME`) la legge da lì, così «metti il forno in cima» sposta la carta che l'utente vede in cima.

@@ -131,6 +131,8 @@
   function aggiornaIcona(b, it) {
     b.dataset.id = it.id;
     b.setAttribute('aria-label', it.etichetta);
+    if (it.tasto) b.dataset.sugg = `${it.etichetta} (${it.tasto})`;
+    else delete b.dataset.sugg;
     b.setAttribute('aria-disabled', it.spenta ? 'true' : 'false');
     b.classList.toggle('accesa', !!it.accesa);
     if (b.dataset.icona !== it.icona) {

@@ -162,12 +162,25 @@ try {
 // per questo l'ascolto nasce qui, a document_start. Lo smista SN_FILO_UI.tastoNelRiquadro (src/shared/filoUi.js).
 try {
   for (const tipo of ['keydown', 'keypress', 'keyup']) {
-    window.addEventListener(tipo, (e) => {
+    const ascolto = (e) => {
       const UI = globalThis.SN_FILO_UI;
+      // L'Esc va prima a ogni ascolto di Filo: un sito che lo ferma sulla finestra lasciava aperto il riquadro (#859).
+      if (tipo === 'keydown' && e.key === 'Escape') { escPrimaAFilo(e, ascolto, UI); return; }
       if (UI && typeof UI.tastoNelRiquadro === 'function') UI.tastoNelRiquadro(e);
-    }, { capture: true });
+    };
+    window.addEventListener(tipo, ascolto, { capture: true });
   }
 } catch (_) { /* il bridge non deve MAI impedire il caricamento della pagina */ }
+
+// Solo il tasto dell'utente, o quello che il main ci consegna sopra lo schermo pieno del sito: uno fabbricato dal sito
+// fa il giro di sempre.
+function escPrimaAFilo(e, ascolto, UI) {
+  try {
+    if (!riscrittura || typeof riscrittura.anticipa !== 'function') return;
+    if (!e.isTrusted && !(UI && typeof UI.veroONostro === 'function' && UI.veroONostro(e))) return;
+    if (riscrittura.anticipa(e, ascolto)) e.stopImmediatePropagation();
+  } catch (_) {}
+}
 
 // Il clic destro si rigioca, in copia, quando l'handler vero è pronto.
 function replayContextMenu(e, clic) {
