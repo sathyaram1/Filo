@@ -71,7 +71,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { basename, dirname, isAbsolute, join, resolve, relative, sep } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
@@ -100,6 +100,7 @@ import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
+import { cloneDentroIlRepo } from './lib/git-server.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):
@@ -697,12 +698,7 @@ export function cartellaCloneServer(env = process.env) {
   return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
 }
 
-/** Il clone cade dentro il checkout di Filo? L'hook di salvataggio lo pubblicherebbe intero. PURA. */
-export function cloneDentroIlRepo(clone, root) {
-  const norm = (p) => (process.platform === 'win32' ? resolve(p).toLowerCase() : resolve(p));
-  const r = relative(norm(root), norm(clone));
-  return r === '' || (!r.startsWith('..') && !isAbsolute(r));
-}
+export { cloneDentroIlRepo };
 
 /** Le istruzioni del lavoro server, coi percorsi veri del clone e dello strumento delle credenziali. */
 export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts', 'routine-channel.mjs') } = {}) {
