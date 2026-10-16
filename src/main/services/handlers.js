@@ -4023,6 +4023,43 @@ function documentSearchesForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #845 — quello che CERCA_SALVATE ha trovato in «Aperti per dopo»: titoli e indirizzi li hanno scritti i siti, in busta.
+function salvateTrovateForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocks = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'CERCA_SALVATE' || !a._output) continue;
+    const o = a._output;
+    const cercato = o.cercato ? E.perCanaleSistema(o.cercato) : '';
+    const pagine = Array.isArray(o.pagine) ? o.pagine : [];
+    if (o.errore) { blocks.push('[La lista «Aperti per dopo» non si è potuta leggere: dillo all\'utente in una riga.]'); continue; }
+    if (!o.totale) {
+      blocks.push('[«Aperti per dopo» è vuota: l\'utente non ha ancora messo da parte nessuna pagina. Diglielo, e che una pagina si salva dal tasto destro → «Salva per dopo» o chiedendolo all\'Aiuto sopra la pagina.]');
+      continue;
+    }
+    if (!pagine.length) {
+      blocks.push(`[Nessuna delle ${o.totale} pagine di «Aperti per dopo» ha "${cercato}" nel titolo, nell'indirizzo o nella categoria. `
+        + 'Riprova con la parola che conta (una o due, oppure vuoto per vederle tutte) prima di dire all\'utente che non c\'è.]');
+      continue;
+    }
+    const righe = pagine.map((p) => {
+      const quando = p.savedAt ? new Date(p.savedAt).toLocaleDateString('it-IT') : '';
+      return `- [${p.id}] ${E.neutralizza(p.title || '(senza titolo)', { unaRiga: true })}${p.categoria ? ` · categoria ${E.neutralizza(p.categoria, { unaRiga: true })}` : ''}${quando ? ` · salvata il ${quando}` : ''}\n  ${p.url}`;
+    });
+    const quali = cercato ? `che combaciano con "${cercato}"` : 'salvate';
+    const oltre = o.trovate > pagine.length
+      ? ` Ne combaciano ${o.trovate}: qui le ${pagine.length} più recenti, le altre si vedono in «Aperti per dopo» o cercando parole più precise.` : '';
+    const largo = o.allargata && Array.isArray(o.cercatoCon) && o.cercatoCon.length
+      ? ` Nessuna conteneva tutte le parole: queste arrivano cercando "${E.perCanaleSistema(o.cercatoCon.join(' '))}", controlla che siano quelle giuste.` : '';
+    blocks.push(`[Le pagine di «Aperti per dopo» ${quali} (${o.trovate} su ${o.totale}).${oltre}${largo} `
+      + 'Nella risposta nomina quelle giuste col titolo così com\'è: sotto la risposta diventano bottoni che le aprono. '
+      + 'Per aprirne una adesso usa APRI_SALVATA con l\'id.]\n'
+      + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
+  }
+  return blocks.join('\n\n').trim();
+}
+
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
