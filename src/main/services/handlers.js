@@ -5840,6 +5840,7 @@ const handlerCtx = {
   modelGate: Gate,
   handleAIRequest,
   maybeCategorizeAsync,
+  apriPaginaSalvata,
   searchArchivedTabs,
   archivioDaCancellare,
   handleFiloChat,
