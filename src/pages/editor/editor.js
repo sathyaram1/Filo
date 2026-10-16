@@ -4048,7 +4048,8 @@
         if (!r) return;
         if (r.attesa) {
           if (primaDellAttesa == null) primaDellAttesa = cfgShortcut.value;
-          const tenuti = [(e.ctrlKey || e.metaKey) && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', '…'].filter(Boolean);
+          const mac = plat === 'darwin';
+          const tenuti = [(e.ctrlKey || (e.metaKey && mac)) && 'Ctrl', e.metaKey && !mac && 'Win', e.altKey && 'Alt', e.shiftKey && 'Shift', '…'].filter(Boolean);
           cfgShortcut.value = TASTI.etichettaScritta(tenuti.join('+'), plat);
           return;
         }
