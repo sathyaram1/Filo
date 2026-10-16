@@ -4273,8 +4273,17 @@
     { tasti: ['v'], cosa: 'incolla', delBrowser: true, fa: null },
     { tasti: ['v'], shift: true, cosa: 'incolla senza formattazione', delBrowser: true, fa: null },
     { tasti: ['a'], cosa: 'seleziona tutto', delBrowser: true, fa: null },
+    // Cancellare e muoversi per parole, o fino all'inizio e alla fine: un modulo li toglierebbe a chi scrive.
+    { cosa: 'serve a cancellare e a muoversi nel testo', scrittura: true, fa: null },
   ];
+  const TASTI_SCRITTURA = ['Backspace', 'Canc', '←', '→', '↑', '↓', 'Inizio', 'Fine'];
+  // Su Mac per parole si va con Opzione; Cmd vale Ctrl come ovunque.
+  function tastoDiScrittura(e) {
+    const mod = TASTI.suMac() && e.altKey && !e.ctrlKey && !e.metaKey ? 'Alt' : (e.ctrlKey || e.metaKey) ? 'Ctrl' : '';
+    return !!mod && TASTI_SCRITTURA.some((k) => TASTI.combacia(e, `${mod}+${k}`) || TASTI.combacia(e, `${mod}+Shift+${k}`));
+  }
   function prendeIlTasto(t, e) {
+    if (t.scrittura) return tastoDiScrittura(e);
     if (!(e.ctrlKey || e.metaKey)) return false;
     if (t.delBrowser && TASTI.suMac()) return false;
     if (t.prende) return t.prende(e);
