@@ -433,7 +433,11 @@
     APRI_SALVATA: {
       costo: 1,
       campo: 'web',
-      describe: (a) => (a && a.tieni === true ? 'Aprire una pagina salvata per dopo, lasciandola in lista' : 'Aprire una pagina salvata per dopo e toglierla dalla lista'),
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        const quale = t ? `«${t}»` : 'una pagina salvata per dopo';
+        return a && a.tieni === true ? `Aprire ${quale}, lasciandola in «Aperti per dopo»` : `Aprire ${quale} e toglierla da «Aperti per dopo»`;
+      },
       describeDone: (a) => {
         const o = (a && a._output) || {};
         const titolo = String(o.titolo || '').replace(/\s+/g, ' ').trim().slice(0, 80);
