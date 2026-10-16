@@ -26,10 +26,11 @@ const TESTA_FISSA = 32;
 const TABELLA_IN_TESTA = CARICO - TESTA_FISSA;
 const ESTENSIONI_MAX = Math.floor(TABELLA_IN_TESTA / 8);
 
-// Letture andate a vuoto prima di dare persa una copia. Quando le letture a vuoto superano un sedicesimo del
-// contenitore costa meno leggerlo tutto di fila, e la scansione trova anche le copie finite lontano.
+// Letture andate a vuoto prima di dare persa una copia: poche se il suo gruppo ha già le k che servono (la si rifà
+// dalla parità), di più se no. Oltre un quarto del contenitore in letture a vuoto costa meno leggerlo tutto di fila.
 const TENTATIVI_A_VUOTO = 32;
-const SCANSIONE_OLTRE = 1 / 16;
+const TENTATIVI_SE_REGGE = 8;
+const SCANSIONE_OLTRE = 1 / 4;
 const CATENA_MAX = 1 << 16;
 const BLOCCHI_PER_LETTURA = 256;
 const LETTURE_INSIEME = 8;
