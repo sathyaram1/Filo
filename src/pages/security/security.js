@@ -942,7 +942,7 @@
     $('sec-riquadri-modello').disabled = !conta;
   }
 
-  // "https://www.Gmail.com/x" → "gmail.com", '' se non è un sito: la riduzione di tutti gli elenchi di siti (#843).
+  // "https://www.Mail.Google.com/x" → "mail.google.com", '' se non è un sito: la riduzione di tutti gli elenchi (#843).
   const cleanDomain = window.SN_NOMI_SITO.daScritto;
   // Il sito che la voce tiene connesso: «https://mail.google.com/mail/u/0/» è google.com, come lo usa il main (#876).
   function sitoFidato(raw) {
