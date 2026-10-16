@@ -32,8 +32,9 @@ REGISTRATO con gli script, mentre lavori:
   il rapporto esce anonimo);
 - un guasto che ti impedisce di lavorare → una domanda, poi il rilascio col
   motivo (`node scripts/routine-channel.mjs release <biglietto>
-  --role <il tuo ruolo> --guasto "<motivo>"`), come nella sezione qui sotto: è così che il server smette di dare lavoro per
-  questo giro. Non "riportarlo" a parole: registralo.
+  --role <il tuo ruolo> --guasto "<motivo>"`), come nella sezione qui sotto: è
+  così che il server smette di dare lavoro per questo giro. Non "riportarlo" a
+  parole: registralo.
 
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
 conta niente. Se non l'hai registrato, non esiste.
