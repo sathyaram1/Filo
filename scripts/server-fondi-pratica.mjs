@@ -310,9 +310,10 @@ export async function esegui(argv, deps = {}) {
     let tardiva = null;
     let riapertaDa = null;
     if (letta.status === 'done') {
-      const t = parteTardiva({
+      const caso = {
         status: letta.status, parti: letta.parti, parte: 'server', ramo: a.ramo, solo: a.soloServer, locale: letta.locale, ora: (deps.ora || Date.now)(),
-      });
+      };
+      const t = ramiApp.length ? riaperturaConAltraInArrivo(caso) : parteTardiva(caso);
       if (!t.ok) { err(`La pratica ${chi} è chiusa e non vale per questo ramo: ${t.motivo}. Per un lavoro nuovo aprine una. Non ho toccato niente.`); return 3; }
       if (ramiApp.length) {
         const prova = await of.scrivi(r.id, 'todo', '', { bearer, dryRun: true });
