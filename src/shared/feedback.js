@@ -2363,9 +2363,8 @@
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).
     // Esportata perché owner-feedback.mjs (script .mjs) la riusa per scrivere statusPublic.
     statusToPublic,
-    // La riapertura svuota il registro delle parti (#938): la regola, e la domanda al documento.
+    // La riapertura svuota il registro delle parti (#938).
     riapre,
-    partiDaAzzerare,
     // Voti di verifica (DB4): substrato letto da board (DC*) e archiviazione (DC3).
     castVote,
     clearVote,
