@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, openSync, writeSync, closeSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, openSync, writeSync, closeSync, rmSync, writeFileSync, statSync, utimesSync } from 'node:fs';
 import { randomBytes, createHash } from 'node:crypto';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -674,5 +674,102 @@ describe('interruzioni', () => {
       assert.ok(integra(await impronta(base, 'T')), `taglio dopo ${n}: ridondanza non tornata`);
       rmSync(base.contenitore, { force: true });
     }
+  });
+});
+
+describe('chiudere mentre lavora', () => {
+  const TESTO = Buffer.from('TESTO-IN-CHIARO-DEL-SEGRETO '.repeat(400_000));
+
+  test('chiuso a metà salvataggio: il file si salva intero e niente nel contenitore si apre con la chiave azzerata', async () => {
+    const base = await contenitore(64 * MB);
+    const s = await crea(base, 'Chiuso');
+    await s.scriviFile('prima', 'contenuto di prima');
+    const mtime = statSync(base.contenitore).mtimeMs;
+    utimesSync(base.contenitore, new Date(2025, 0, 1), new Date(2025, 0, 1));
+    const fermo = statSync(base.contenitore).mtimeMs;
+    assert.notEqual(fermo, mtime);
+    const salva = s.scriviFile('grande', TESTO);
+    // Si chiude appena il salvataggio ha cominciato a scrivere: la data che cambia è il segno.
+    const fine = Date.now() + 10_000;
+    while (statSync(base.contenitore).mtimeMs === fermo && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 2));
+    assert.ok(Date.now() < fine, 'il salvataggio non è mai partito');
+    await s.chiudi();
+    await salva;
+    const buf = readFileSync(base.contenitore);
+    const zero = Buffer.alloc(32);
+    let aperti = 0;
+    for (let p = 0; p < buf.length / F.BLOCCO; p++) if (F.apriBlocco(zero, p, blocco(buf, p))) aperti++;
+    assert.equal(aperti, 0);
+    const r = await apri(base, 'Chiuso');
+    assert.deepEqual(r.segreto.elencaFile().map((f) => f.nome).sort(), ['grande', 'prima']);
+    assert.ok((await r.segreto.leggiFile('grande')).equals(TESTO));
+    await r.segreto.chiudi();
+    await assert.rejects(r.segreto.scriviFile('dopo', 'x'), (e) => e.codice === 'CHIUSO');
+    rmSync(base.contenitore, { force: true });
+  });
+
+  test('chiuso mentre un file si legge: la lettura finisce col contenuto giusto, non «rovinato»', async () => {
+    const base = await contenitore(64 * MB);
+    const s = await crea(base, 'Letto');
+    await s.scriviFile('grande', TESTO);
+    const leggi = s.leggiFile('grande');
+    await new Promise((ok) => setTimeout(ok, 5));
+    await s.chiudi();
+    assert.ok((await leggi).equals(TESTO));
+    rmSync(base.contenitore, { force: true });
+  });
+});
+
+describe('le date del contenitore', () => {
+  test('creare, scrivere, riaprire, cancellare e cercare un nome che non c’è le lasciano com’erano', async () => {
+    const base = await contenitore(16 * MB);
+    const installazione = new Date('2025-03-01T10:00:00.123Z');
+    utimesSync(base.contenitore, installazione, installazione);
+    const date = () => {
+      const st = statSync(base.contenitore, { bigint: true });
+      return [st.atimeNs, st.mtimeNs];
+    };
+    const attese = date();
+    const s = await crea(base, 'Datato');
+    await s.scriviFile('diario.txt', 'cose mie');
+    await s.cancellaFile('diario.txt');
+    await s.scriviFile('diario.txt', 'cose mie, di nuovo');
+    await s.chiudi();
+    assert.deepEqual(date(), attese, 'dopo aver creato e scritto');
+    for (let x = 0; x < 5; x++) await (await apri(base, 'Datato')).segreto.chiudi();
+    assert.deepEqual(date(), attese, 'dopo cinque riaperture: niente scivola');
+    assert.deepEqual(await apri(base, 'nome che non c’è'), NESSUNO);
+    assert.deepEqual(date(), attese, 'dopo un nome che non c’è');
+    await (await apri(base, 'Datato')).segreto.cancella();
+    assert.deepEqual(date(), attese, 'dopo la cancellazione');
+    rmSync(base.contenitore, { force: true });
+  });
+
+  test('un contenitore nuovo nasce con le date alla stessa grana con cui le operazioni le rimettono', async () => {
+    const base = await contenitore(1 * MB);
+    const st = statSync(base.contenitore, { bigint: true });
+    assert.equal(st.mtimeNs % 1000n, 0n);
+    await (await crea(base, 'Grana')).chiudi();
+    assert.equal(statSync(base.contenitore, { bigint: true }).mtimeNs, st.mtimeNs);
+    rmSync(base.contenitore, { force: true });
+  });
+});
+
+describe('dichiarato alla creazione, poi aperto come tutti i giorni', () => {
+  test('riaprire senza dichiarare chi si era scansato non gli sovrascrive nemmeno una copia', async () => {
+    // L'altro occupa poco più di metà del contenitore: le copie scansate stanno in fondo a catene lunghe.
+    const base = await contenitore(64 * MB);
+    const c = await crea(base, 'Casa');
+    for (let x = 0; x < 20; x++) await c.scriviFile(`c${x}`, randomBytes(MB));
+    await c.chiudi();
+    const prima = await impronta(base, 'Casa');
+    const d = await crea(base, 'Diario', ['Casa']);
+    for (let x = 0; x < 4; x++) await d.scriviFile(`d${x}`, randomBytes(MB));
+    await d.chiudi();
+    assert.equal(persi(prima, await impronta(base, 'Casa')), 0, 'mentre si dichiarava');
+    for (let x = 0; x < 2; x++) await (await apri(base, 'Diario')).segreto.chiudi();
+    assert.equal(persi(prima, await impronta(base, 'Casa')), 0, 'dopo le riaperture normali');
+    assert.ok(integra(await impronta(base, 'Diario')));
+    rmSync(base.contenitore, { force: true });
   });
 });
