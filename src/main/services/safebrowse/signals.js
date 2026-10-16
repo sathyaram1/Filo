@@ -156,7 +156,8 @@ function localSignals(norm, ctx = {}) {
 
   // Doppia estensione nell'URL.
   const path = ctx.urlPath || '';
-  if (path && DOUBLE_EXT.test(path)) out.push({ kind: 'double_extension' });
+  const doppia = path ? DOUBLE_EXT.exec(path) : null;
+  if (doppia) out.push({ kind: 'double_extension', file: nomeFile(path, doppia.index + doppia[0].length - doppia[3].length) });
 
   // Indizi di pagina (solo rinforzo).
   if (ctx.hasPassword) out.push({ kind: 'sensitive_input', field: 'password' });
