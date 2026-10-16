@@ -227,5 +227,5 @@
     return () => { try { rootEl.removeEventListener('click', onClick); } catch (_) {} };
   }
 
-  global.SN_MARKDOWN = { render, inlineMd, escapeHtml, safeLinkUrl, bindLinks, LINK_CLASS };
+  global.SN_MARKDOWN = { render, testo, inlineMd, escapeHtml, safeLinkUrl, bindLinks, LINK_CLASS };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
