@@ -281,8 +281,15 @@
   function authorKindOf(fb) {
     return (TH && TH.authorKind) ? TH.authorKind(fb || {}) : 'user';
   }
+  // Quello che Filo manda dalla copia dell'owner porta la sua prova (#953): l'etichetta lo dice, la categoria no.
+  const PER_CONTO_OWNER = {
+    owner: { icon: AUTHOR_META.owner.icon, label: 'Owner (scritto da Filo)' },
+    filo:  { icon: AUTHOR_META.filo.icon, label: 'Filo (per conto dell\'owner)' },
+  };
   function authorMetaOf(fb) {
-    return AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
+    const kind = authorKindOf(fb);
+    if (PER_CONTO_OWNER[kind] && TH && TH.filoPerConto && TH.filoPerConto(fb || {}) === 'owner') return PER_CONTO_OWNER[kind];
+    return AUTHOR_META[kind] || AUTHOR_META.user;
   }
   function authorIconHtml(fb) {
     const m = authorMetaOf(fb);
