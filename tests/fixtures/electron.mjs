@@ -180,15 +180,20 @@ export const test = base.extend({
     await use(() => aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'avvisi: la vista degli avvisi non è nata'));
   },
 
-  // Apre un URL come tab e ritorna la Page corrispondente al WebContentsView.
-  // Polling sull'URL: app.waitForEvent('window') può risolvere con la
-  // newtab (già pendente al boot), non con il tab appena aperto. Per evitare
-  // race usiamo app.windows() filtrato per hostname della URL richiesta.
+  // Apre un URL come scheda e torna la Page della scheda che Filo dice di aver aperto, arrivata sull'host chiesto: per
+  // indirizzo si prendeva una scheda vecchia o una finestra nascosta sullo stesso host (#877, tests/helpers/schede.mjs).
   openTab: async ({ app, shell }, use) => {
     const fn = async (url) => {
       const target = new URL(url).hostname;
-      await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-      const page = await aspettaFinestra(app, (w) => new URL(w.url()).hostname === target, `openTab: nessuna window per ${url}`);
+      const sulPosto = (w) => new URL(w.url()).hostname === target;
+      const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+      let page = null;
+      // Nessuna scheda (indirizzo fermato, sito bloccato): resta la ricerca per host, e il rosso dice perché.
+      if (!aperta?.id) page = await aspettaFinestra(app, sulPosto, `openTab: Filo non ha aperto una scheda per ${url} (${JSON.stringify(aperta)}) e nessuna finestra è su ${target}`);
+      else {
+        await expect.poll(async () => Boolean(page = await paginaDellaScheda(app, aperta.id, sulPosto)),
+          { message: `openTab: la scheda aperta per ${url} non è arrivata su ${target}`, timeout: 0, intervals: [100] }).toBe(true);
+      }
       await page.waitForLoadState('domcontentloaded').catch(() => {});
       return page;
     };
