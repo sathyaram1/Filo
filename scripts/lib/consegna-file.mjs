@@ -1,5 +1,5 @@
-// consegna-file.mjs — i pezzi grossi del payload di dispatch e le immagini escono dalla stampa e vanno,
-// interi, in file fuori dal repo. Non tronca mai: la stampa cita il percorso assoluto.
+// consegna-file.mjs — i pezzi grossi del payload di dispatch, le immagini e, se non basta, il testo del ruolo escono
+// dalla stampa e vanno, interi, in file fuori dal repo. Non tronca mai: la stampa cita il percorso assoluto.
 // Regole e prove: tests/unit/consegnaFile.test.mjs.
 
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
