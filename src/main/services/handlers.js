@@ -4644,11 +4644,13 @@ function segnaSalvateNominate(textReply, azioni) {
   const lista = Array.isArray(azioni) ? azioni : [];
   const aperte = new Set(lista.filter((x) => x && String(x.type || '').toUpperCase() === 'APRI_SALVATA' && x._output && x._output.aperta)
     .map((x) => x._output.id));
+  // Due ricerche nello stesso turno possono trovare la stessa pagina: il bottone è uno.
+  const giaMostrate = new Set();
   for (const x of lista) {
     if (!x || String(x.type || '').toUpperCase() !== 'CERCA_SALVATE' || !x._output || !Array.isArray(x._output.pagine)) continue;
     const trovate = [];
     for (const p of x._output.pagine) {
-      if (!p || !p.id || aperte.has(p.id)) continue;
+      if (!p || !p.id || aperte.has(p.id) || giaMostrate.has(p.id)) continue;
       let i = -1;
       for (const nome of testo ? nomiDellaSalvata(p, piano) : []) {
         const k = posizioneDelNome(testo, nome);
