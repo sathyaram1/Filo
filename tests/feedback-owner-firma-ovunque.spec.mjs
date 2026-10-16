@@ -69,7 +69,7 @@ test('l’owner senza accesso: la segnalazione dalla chat aspetta il suo rientro
   const vista = await avvisi();
   await expect(vista.locator('.shell-notif-msg', { hasText: 'aspetta il tuo accesso' }).first()).toBeVisible({ timeout: 0 });
   expect(await inviati(app)).toEqual([]);
-  expect((await mie(app)).map((v) => v.stato)).toEqual(['in partenza']);
+  expect((await mie(app)).map((v) => [v.stato, v.titolo])).toEqual([['in_partenza', 'Schermo intero']]);
 
   const rientro = await app.evaluate(async (_e, t) => {
     const M = process.getBuiltinModule('module');
