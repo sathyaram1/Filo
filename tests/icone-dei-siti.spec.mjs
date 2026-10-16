@@ -3,6 +3,11 @@
 // I siti sono finti e serviti dentro la sessione: ogni richiesta, compresa una a www.google.com, resta registrata.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const SHOTS = join(dirname(fileURLToPath(import.meta.url)), '.shots');
 
 const NEWTAB = 'filo://newtab/';
 const PNG_ROSSO = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4YaMBAAL8AS3/gzpXAAAAAElFTkSuQmCC';
@@ -86,6 +91,16 @@ test('la home e la chat mostrano l\'icona dei siti senza chiedere niente a Googl
   // Nella home non resta nessuna immagine caricata da un indirizzo: solo byte già scaricati dal main.
   const srcs = await home.evaluate(() => [...document.querySelectorAll('.dash-carta-voce-ico img, .dash-action-favicon')].map((i) => i.getAttribute('src') || ''));
   expect(srcs.filter((s) => s && !s.startsWith('data:image/'))).toEqual([]);
+
+  // Le foto della carta e delle righe, chiare e scure, in tests/.shots/.
+  mkdirSync(SHOTS, { recursive: true });
+  for (const tema of ['light', 'dark']) {
+    await home.evaluate((t) => new Promise((ok) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t } }, ok)), tema);
+    await expect(home.locator('html')).toHaveAttribute('data-sn-theme', tema);
+    await home.locator('#tieni .dash-carta[data-tipo="suggerimenti"]').screenshot({ path: join(SHOTS, `icone-dei-siti-home-${tema}.png`) });
+    await home.locator('#riga-con-icona').screenshot({ path: join(SHOTS, `icone-dei-siti-chat-${tema}.png`) });
+    await home.locator('#riga-senza-icona').screenshot({ path: join(SHOTS, `icone-dei-siti-chat-senza-${tema}.png`) });
+  }
 });
 
 test('l\'icona viene dalla scheda aperta e, chiusa la scheda, dall\'archivio: mai da /favicon.ico se il sito ne dichiara un\'altra', async ({ app, openTab }) => {
