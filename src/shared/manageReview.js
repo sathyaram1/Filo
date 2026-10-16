@@ -552,6 +552,10 @@
       if (statusReason === 'arenato') {
         return { text: 'La lavorazione si è arenata troppe volte: decidi tu.', color: S.design.color };
       }
+      // Un guasto dell'ambiente non è lavoro locale né un verdetto (#1241): cosa fare sta nella domanda della nota.
+      if (statusReason === 'guasto') {
+        return { text: 'Fermo per un guasto, non per una scelta: cosa è successo e cosa puoi fare stanno nella domanda.', color: S.design.color };
+      }
       // Lo rimandano qui una sessione o una routine, su un feedback di chiunque (#914): la frase segue il mittente.
       if (statusReason === 'locale') {
         // Fidato o già approvato: basta il segno. Gli altri passano dal sì dell'owner (#913), che li segna anche fidati.
@@ -618,6 +622,7 @@
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
     arenato: 'lavorazione arenata',
+    guasto: 'fermo per un guasto',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
   };
@@ -1511,9 +1516,23 @@
     const l = livelliOf(fb).l3;
     const segnalato = !!(l && String(l.esito || '').trim());
     if (chiedeLavoroLocale(fb)) return livelloL3Locale(fb, segnalato ? l : null, letto);
+    // Fermo al livello 3 senza una scelta da fare qui (guasto, arenato, loop): il rombo dice quello che dice il segno in
+    // lista, con l'ultima nota; verde solo se una domanda aperta aspetta l'owner (il guasto), grigio per gli altri.
+    const fermo = !attesa && !segnalato ? fermoAlLivello3(fb) : null;
     // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
     if (!letto) {
-      return nonLetto('l3', 'rombo', attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
+      return nonLetto('l3', 'rombo', fermo ? fermo.testo : attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
+    }
+    if (fermo) {
+      const nota = ultimaDomanda(fb);
+      const cifrata = valueUnreadable(fb && fb.notes);
+      return forma('l3', 'rombo', fermo.testo, fermo.domanda ? fermo.classe : null, 'fermo', {
+        titolo: fermo.testo,
+        righe: (nota && nota.ts) ? [riga('Quando', istanteDelTurno(nota.ts))] : [],
+        testo: cifrata ? TESTO_CIFRATO : ((nota && nota.body) || fermo.testo),
+        illeggibile: cifrata,
+        azioni: [],
+      });
     }
     const titolo = !attesa ? 'Segnalazione di Claude'
       : segnalato ? 'Domande e segnalazione di Claude' : 'Domande di Claude';
@@ -1759,8 +1778,18 @@
     decisione:{ forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo su una scelta che spetta a te: aspetta una tua risposta' },
     loop:     { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La verifica ha trovato un difetto che non si corregge più da soli' },
     arenato:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La lavorazione si è arenata troppe volte' },
+    guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
   };
+
+  /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
+  function fermoAlLivello3(fb) {
+    if (!fb || statusUnreadable(fb)) return null;
+    const { status, statusReason } = normalizeStatus(fb);
+    const motivo = String(statusReason || '');
+    const s = status === 'design' && Object.hasOwn(SEGNO_DESIGN, motivo) ? SEGNO_DESIGN[motivo] : null;
+    return s && s.livello === 'l3' && s.classe === 'design' && !MOTIVI_RISPOSTA.includes(motivo) ? s : null;
+  }
 
   /**
    * Il simbolo in lista che dice cosa ha fermato una pratica dei Ricevuti: la stessa forma del dettaglio

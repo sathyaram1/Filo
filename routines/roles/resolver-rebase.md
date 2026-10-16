@@ -38,6 +38,8 @@ l'ha rotto e cosa hai cambiato.
 
 <!-- includi: _solo-in-locale.md -->
 
+<!-- includi: _guasto-in-attesa.md -->
+
 ## Consegna
 
 ```bash

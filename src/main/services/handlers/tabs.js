@@ -4,7 +4,7 @@
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare } = ctx;
+  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare, sitoDaConfermare } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 
   on('_tabs:create', async (msg, sender) => {
@@ -145,6 +145,22 @@ module.exports = function register(on, ctx) {
   }));
 
   on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => ({ ok: true, tabs: await ArchivedTabs.clear() })));
+
+  // Solo le pagine di Filo: a un sito direbbe quali siti hai aperto, salvato o archiviato, e gli farebbe chiedere al main un indirizzo qualunque.
+  on(MSG.ICONA_SITO, soloFilo(async (msg, sender) => {
+    const { BrowserWindow, session } = require('electron');
+    const incognito = !!(sender && sender.isIncognito);
+    const schede = [];
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w._filoTabs && !!w._filoIncognito === incognito) schede.push(...w._filoTabs.tabs);
+    }
+    const voci = async () => [...await globalThis.SN_SAVED_PAGES.list(), ...await ArchivedTabs.list()];
+    const ses = (sender && sender.wc && sender.wc.session) || session.defaultSession;
+    // Un indirizzo che al clic chiede l'OK (#848): né il suggerimento né la sua icona contattano il sito prima dell'OK.
+    const soloCopie = (msg && msg.soloCopie === true) || !!(sitoDaConfermare && sitoDaConfermare(msg && msg.url));
+    const dato = await require('../iconeSiti').cercaIconaSito(msg && msg.url, { ses, schede, voci, incognito, soloCopie });
+    return { ok: true, dato };
+  }));
 
   on(MSG.REOPEN_ARCHIVED_TAB, async (msg, sender) => {
     // Riapre la scheda archiviata, ripristinando lo scroll registrato.

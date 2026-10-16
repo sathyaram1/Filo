@@ -123,6 +123,8 @@
         'sec-clip-search': 'cerca fra le voci della cronologia appunti mostrate nella pagina: non è un valore da salvare',
         'sec-wipe-identity': 'sceglie se «Cancella tutti i dati di Filo» porta via anche l’identità dei crediti: vale per quella conferma, non è un valore da salvare',
         'sec-wipe-word': 'la parola «conferma» che sblocca «Cancella tutti i dati di Filo»: la scrive l’utente, non è un valore da salvare',
+        'sec-export-keys': 'sceglie se l’archivio esportato porta anche le chiavi API: vale per quell’esportazione, non è un valore da salvare',
+        'sec-wipe-export-keys': 'la stessa scelta di «Includi le chiavi» dentro la conferma di «Cancella tutti i dati di Filo»: vale per quell’esportazione, non è un valore da salvare',
       },
       messaggi: {
         PERMESSI_SITI_GET: 'LEGGI_IMPOSTAZIONI',
@@ -132,7 +134,7 @@
         COOKIES_SITES: 'mostra i siti dove Filo ha già rifiutato i banner, da passare all’elenco dei banner visibili',
         PAGINE_DELICATE_CAMPI: 'mostra i siti dove Filo ha visto un campo password o carta; toglierne uno è l’elenco siti_non_delicati',
         PROXY_STATUS: 'mostra se la connessione da un altro paese è configurata: non è un valore da cambiare qui',
-        EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file): resta nella pagina',
+        EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file, le chiavi solo con la spunta): resta nella pagina',
         IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         CANCELLA_TUTTI_I_DATI: 'pulsante che fa un’azione (cancella tutti i dati di Filo con la parola scritta): resta nella pagina, la chat ci porta con NAVIGA e non cancella',
@@ -147,6 +149,7 @@
       campi: {
         useDefaultModels: 'useDefaultModels',
         openWeightsOnly: 'openWeightsOnly',
+        ownKeyAllProviders: 'ownKeyAllProviders',
         apiKey: 'apiKeys.openrouter',
         apiKeyTavily: 'apiKeys.tavily',
         monthlyLimit: 'monthlyLimitEur',

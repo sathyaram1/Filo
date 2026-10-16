@@ -82,7 +82,7 @@ import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifie
 import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
-import { numeraRilievi, rigaNumerata, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import { numeraRilievi, rigaNumerata, ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
 import { installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
@@ -779,6 +779,7 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
     'li tiene chiusi (se non ne scrive una, la prova del giro resta). Una prova del giro ancora rossa non si toglie e non si',
     'cambia mai: la consegna la rilancia com\'era e si ferma. Restano anche le prove dei rilievi che fermano il lavoro: le',
     'tratta chi riprende.',
+    ROSSO_ATTESO_CHIUSO,
     '',
     testo,
   );
@@ -1133,7 +1134,9 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     'LE TUE PROVE RESTANO NEL RAMO, e qui non c\'è un numero di feedback: la cartella',
     `del giro è \`${cartellaProveGiro(branch)}\` — dove la recipe qui sotto dice`,
     '`tests/verifica/<numero>/`, in locale si legge quella. Come si chiamano lo dice la',
-    'recipe (il numero del rilievo nel nome), e si committano prima della critica. Sei tu',
+    'recipe (il numero del rilievo nel nome), e si committano prima della critica, rosse',
+    'come le trovi: il segno di rosso atteso (`test.fail`) non va mai sulla prova di un',
+    'rilievo che stai per registrare, e quando va lo dice la recipe. Sei tu',
     'l\'unico a rilanciare quelle dei giri passati, e il momento è ADESSO, in partenza:',
     'sono il controllo delle porte riaperte, e dopo di te nessuno le rilancia. Se la',
     'cartella non c\'è, non c\'era niente da rilanciare — ma guarda la cartella, non il',

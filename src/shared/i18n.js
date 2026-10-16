@@ -309,6 +309,9 @@
     options_open_weights_only: 'Solo modelli a pesi aperti',
     options_open_weights_only_desc:
       'Spegne tutti i modelli proprietari — Anthropic compresa — e lascia lavorare solo modelli a pesi aperti serviti da fornitori indipendenti. Vale anche con i modelli predefiniti. Le funzioni che partivano da un modello proprietario passano al suo equivalente aperto; quelle senza equivalente si fermano e lo dicono, invece di tornare di nascosto su un modello proprietario.',
+    options_own_key_all_providers: 'Con la mia chiave, usa anche i fornitori esclusi',
+    options_own_key_all_providers_desc:
+      'Le richieste pagate con la tua chiave OpenRouter possono andare anche ai fornitori che Filo esclude, come Google o xAI. Così funzionano anche Gemini e Grok. Se OpenRouter rifiuta la tua chiave e Filo passa ai suoi crediti, l\'esclusione torna a valere.',
     options_open_weights_switched: 'Cambiano modello %s funzioni, che passano a: %s',
     options_open_weights_unavailable: 'Si fermano (nessun equivalente a pesi aperti): %s',
     options_open_weights_test_blocked:
@@ -764,6 +767,8 @@
       '.zip che contiene un data.json, il filo delle chat e delle pagine visitate e le ' +
       'immagini copiate come file separati. Utile come backup o per trasferire i dati ' +
       'su un altro computer.',
+    security_export_keys_label: 'Includi le chiavi',
+    security_export_keys_desc: 'Chi ha il file può usare le tue chiavi API. Trattalo come una password.',
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
@@ -802,6 +807,8 @@
     // %1 = quante restano fuori, %2 = il tetto
     security_import_pages_out: 'Pagine salvate che non entrano: %1. L’elenco ne tiene %2, le più recenti.',
     security_import_pages_out_mine: 'Fra queste, pagine che hai salvato adesso: %1. Dopo l’importazione non ci saranno più.',
+    security_import_senza_chiavi: 'Le chiavi API non sono nell’archivio. Quelle salvate qui restano come sono.',
+    security_import_proxy_senza_credenziali: 'Il proxy arriva senza utente e password: per usarlo, scrivi di nuovo a Filo il suo indirizzo intero.',
     security_import_nulla_perso: 'Nulla di ciò che hai ora viene cancellato: ',
     security_import_escono_mie: 'Di ciò che hai ora escono solo le pagine salvate più vecchie, contate qui sotto: ',
     security_import_confirm_ok: 'Importa',

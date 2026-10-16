@@ -837,6 +837,190 @@
     return a ? a.id : null;
   }
 
+  // ── Il tasto fisico: le scorciatoie dei moduli dell'Editor (#893) ─────────
+  // Si salva il TASTO ('cs|Digit1': modificatori come in `forma`, più il codice del DOM), non il carattere: Ctrl+! e
+  // Ctrl+Shift+1 sono un tasto solo, AltGr è Ctrl+Alt. `layout` (codice → carattere) viene da navigator.keyboard.getLayoutMap.
+  // Regole: tests/unit/tastoFisico.test.mjs.
+  const CODICI_NOMINATI = {
+    Space: 'space', Enter: 'enter', Escape: 'escape', Tab: 'tab', Backspace: 'backspace', Delete: 'delete',
+    Insert: 'insert', Home: 'home', End: 'end', PageUp: 'pageup', PageDown: 'pagedown', ContextMenu: 'contextmenu',
+    Pause: 'pause', PrintScreen: 'printscreen',
+    ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓',
+  };
+  // I tasti che scrivono: cosa scrivono lo dice la tastiera di chi preme.
+  const CODICI_SCRITTI = /^(Key[A-Z]|Digit[0-9]|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|IntlBackslash|IntlRo|IntlYen)$/;
+  const TASTIERINO = { NumpadAdd: '+', NumpadSubtract: '-', NumpadMultiply: '*', NumpadDivide: '/', NumpadDecimal: '.' };
+  const TASTO_SALVATO = /^(c?m?a?s?)\|([A-Za-z0-9]{1,20})$/;
+
+  // Il codice del tasto premuto, o '' se non è un tasto da scorciatoia. Le cifre del tastierino valgono la fila in
+  // alto, come prima che si salvasse il tasto: una scorciatoia scritta «Ctrl+Shift+1» partiva da tutte e due.
+  function codiceTasto(ev) {
+    const c = String((ev && ev.code) || '');
+    const m = /^Numpad([0-9])$/.exec(c);
+    if (m) return `Digit${m[1]}`;
+    if (c === 'NumpadEnter') return 'Enter';
+    return CODICI_SCRITTI.test(c) || CODICI_NOMINATI[c] || TASTIERINO[c] || TASTO_FUNZIONE.test(c.toLowerCase()) ? c : '';
+  }
+
+  function leggiTasto(tasto) {
+    const m = TASTO_SALVATO.exec(String(tasto || ''));
+    if (!m || (m[1].includes('m') && !m[1].includes('c')) || !/[ca]/.test(m[1]) || codiceTasto({ code: m[2] }) !== m[2]) return null;
+    return { mod: m[1], code: m[2] };
+  }
+  function tastoValido(tasto) { return !!leggiTasto(tasto); }
+
+  // Il carattere che il tasto scrive senza modificatori su questa tastiera ('' se non si sa).
+  function carattereDelTasto(code, layout) {
+    if (!layout || !code) return '';
+    const v = typeof layout.get === 'function' ? layout.get(code) : layout[code];
+    return typeof v === 'string' && [...v].length === 1 ? v.toLowerCase() : '';
+  }
+  function codiceDelCarattere(car, layout) {
+    if (!layout || !car) return '';
+    const voci = typeof layout.entries === 'function' ? [...layout.entries()] : Object.entries(layout);
+    const voce = voci.find(([c, v]) => CODICI_SCRITTI.test(c) && typeof v === 'string' && v.toLowerCase() === car);
+    return voce ? voce[0] : '';
+  }
+
+  function modificatoriDi(ev) {
+    const [ctrl, meta] = [modificatore(ev, 'ctrl'), modificatore(ev, 'meta')];
+    return `${ctrl || meta ? 'c' : ''}${ctrl && meta ? 'm' : ''}${modificatore(ev, 'alt') ? 'a' : ''}${modificatore(ev, 'shift') ? 's' : ''}`;
+  }
+
+  // Il nome del tasto nella forma che `forma` rilegge. `base`: il carattere visto premendolo senza Shift né Alt,
+  // per quando la tastiera non si sa; senza nessuno dei due un simbolo resta col nome del suo codice.
+  function nomeDelCodice(code, layout, base) {
+    let m;
+    if ((m = /^Digit([0-9])$/.exec(code))) return m[1];
+    if (CODICI_NOMINATI[code]) return NOMI_TASTO[CODICI_NOMINATI[code]] || CODICI_NOMINATI[code];
+    if (TASTO_FUNZIONE.test(code.toLowerCase())) return code.toUpperCase();
+    const scritto = TASTIERINO[code] || carattereDelTasto(code, layout) || (base && [...base].length === 1 ? base.toLowerCase() : '');
+    if ((m = /^Key([A-Z])$/.exec(code))) return /^[a-z]$/.test(scritto) ? scritto.toUpperCase() : m[1];
+    if (!scritto) return code;
+    return scritto === '+' ? 'Plus' : scritto;
+  }
+
+  // Il nome di un tasto salvato, in forma Windows ('Ctrl+Shift+1'): a chi legge lo si mostra con `etichettaScritta`.
+  function nomeTastoFisico(tasto, layout, base) {
+    const t = leggiTasto(tasto);
+    if (!t) return '';
+    const mod = t.mod;
+    return [mod.includes('c') && 'Ctrl', mod.includes('m') && 'Cmd', mod.includes('a') && 'Alt', mod.includes('s') && 'Shift',
+      nomeDelCodice(t.code, layout, base)].filter(Boolean).join('+');
+  }
+
+  // Il tasto premuto (evento del DOM) nella forma salvata: { tasto, nome, car }, { attesa } finché sono premuti solo
+  // modificatori, { rifiuto } se non si può usare. `car` è il carattere uscito: serve ai confronti coi tasti scritti.
+  function tastoFisicoDaEvento(ev, layout, esplicita) {
+    if (!ev) return null;
+    const key = String(ev.key || '');
+    if (SOLO_MODIFICATORI.has(key)) return { attesa: true };
+    const code = codiceTasto(ev);
+    if (!code) return { rifiuto: { tipo: 'tasto', nome: (key || String(ev.code || '') || '?').slice(0, 20) } };
+    const [ctrl, meta, alt] = [!!ev.ctrlKey, !!ev.metaKey, !!ev.altKey];
+    // Su Mac Control da solo, per `combacia`, è Cmd: salvato col nome di Cmd, non sarebbe il tasto premuto.
+    if (suMac(esplicita) ? ctrl && !meta : meta) return { rifiuto: { tipo: suMac(esplicita) ? 'macControl' : 'win' } };
+    if (!ctrl && !meta && !alt) return { rifiuto: { tipo: 'senzaModificatore' } };
+    const tasto = `${modificatoriDi(ev)}|${code}`;
+    const scritto = [...key].length === 1 ? key : '';
+    const base = scritto && !ev.shiftKey && !alt ? scritto : '';
+    // Sul tastierino il carattere non è quello della fila in alto (sulla francese il 6 lì è «-»).
+    const car = code === String(ev.code || '') ? scritto : '';
+    return { tasto, nome: nomeTastoFisico(tasto, layout, base), car };
+  }
+
+  // Una combinazione scritta («Ctrl+Shift+1») nella forma salvata: { tasto, nome }, { rifiuto }, o null se senza
+  // la tastiera non si sa quale tasto scrive quel carattere. Un simbolo che non ha un tasto suo («!») va premuto.
+  function tastoFisicoDaScritta(scritta, layout, esplicita) {
+    const testo = String(scritta == null ? '' : scritta).trim().replace(/\+\s*\+$/, '+Plus');
+    if (!testo) return null;
+    if (testo.length > 80) return { rifiuto: { tipo: 'tasto', nome: `${testo.slice(0, 20)}…` } };
+    const r = rifiutoDiForma(testo, esplicita);
+    if (r) return { rifiuto: r };
+    const f = forma(testo);
+    const mod = f.slice(0, f.indexOf('|'));
+    const k = f.slice(f.indexOf('|') + 1);
+    let code = '';
+    // La fila delle cifre è la stessa su ogni tastiera, anche dove la cifra si scrive con Shift (la francese).
+    if (/^[0-9]$/.test(k)) code = `Digit${k}`;
+    else if (TASTO_FUNZIONE.test(k)) code = k.toUpperCase();
+    else code = Object.keys(CODICI_NOMINATI).find((c) => CODICI_NOMINATI[c] === k) || '';
+    if (!code) {
+      if (!layout) return null;
+      const parti = pezzi(testo);
+      const ultimo = parti[parti.length - 1];
+      // «=» resta «=»: per `forma` è un sinonimo del più, ma è un altro tasto.
+      const car = [...ultimo].length === 1 ? ultimo.toLowerCase() : k;
+      code = codiceDelCarattere(car, layout);
+      if (!code) return { rifiuto: { tipo: 'senzaTastoProprio', nome: car } };
+      // Con Shift quel tasto scrive un altro simbolo, che la tastiera non dice: solo premendolo si sa quale (e se è dello zoom).
+      if (mod.includes('s') && !/^Key/.test(code)) return { rifiuto: { tipo: 'simbolo', nome: etichettaScritta(testo, esplicita), modificatore: 'Shift' } };
+    }
+    const tasto = `${mod}|${code}`;
+    return { tasto, nome: nomeTastoFisico(tasto, layout) };
+  }
+
+  // Il tasto premuto è quel tasto salvato? Cmd vale quanto Ctrl, come in `combacia`.
+  function combaciaFisico(ev, tasto) {
+    const t = leggiTasto(tasto);
+    return !!(ev && t) && codiceTasto(ev) === t.code && modificatoriDi(ev) === t.mod;
+  }
+
+  // La pressione di quel tasto su questa tastiera, con il key e il code che vede chi ascolta: così i controlli di sempre
+  // dicono se la prenderebbero. Un tasto di Filo si confronta col tasto che lo produce. `car`: il carattere visto premendolo.
+  function keyDelCodice(code, layout) {
+    let m;
+    if ((m = /^Digit([0-9])$/.exec(code))) return carattereDelTasto(code, layout) || m[1];
+    if ((m = /^Key([A-Z])$/.exec(code))) return carattereDelTasto(code, layout) || m[1].toLowerCase();
+    if (CODICI_NOMINATI[code]) return code === 'Space' ? ' ' : code;
+    if (TASTO_FUNZIONE.test(code.toLowerCase())) return code;
+    return TASTIERINO[code] || carattereDelTasto(code, layout);
+  }
+  function pressioneFisica(tasto, layout, esplicita, car) {
+    const t = leggiTasto(tasto);
+    if (!t) return null;
+    // Con Shift una cifra o un simbolo scrivono un carattere che la tastiera non dice: meglio nessuno che quello senza Shift
+    // (Ctrl+Shift+0 non è lo zoom, Ctrl+Shift+\ non è la barra laterale). Le cifre restano riconoscibili dal codice.
+    const ignoto = t.mod.includes('s') && CODICI_SCRITTI.test(t.code) && !/^Key/.test(t.code);
+    const key = car && [...car].length === 1 ? car : ignoto ? '' : keyDelCodice(t.code, layout);
+    const [c, cm, mac] = [t.mod.includes('c'), t.mod.includes('m'), suMac(esplicita)];
+    return {
+      ctrlKey: cm || (c && !mac), metaKey: cm || (c && mac),
+      altKey: t.mod.includes('a'), shiftKey: t.mod.includes('s'), key, code: t.code,
+    };
+  }
+
+  // Come `combacia`, ma il tasto si legge come lo leggono i controlli del main: il carattere uscito e la cifra della fila
+  // (il salto di scheda); la lettera del codice solo se il carattere non è latino (sulla AZERTY KeyQ scrive «a», non «q»).
+  function premutoCome(ev, accel) {
+    const f = forma(accel);
+    if (!ev || !f) return false;
+    const [mods, nome] = [f.slice(0, f.indexOf('|')), f.slice(f.indexOf('|') + 1)];
+    const premuti = modificatoriDi(ev);
+    if (simbolo(nome) ? premuti.replace('s', '') !== mods.replace('s', '') : premuti !== mods) return false;
+    const key = String(ev.key || '');
+    const code = String(ev.code || '');
+    const k = tastoCanonico([...key].length === 1 ? key.toLowerCase() : key);
+    if (k === nome) return true;
+    let m;
+    if ((m = /^(?:Digit|Numpad)(\d)$/.exec(code))) return m[1] === nome;
+    if ((m = /^Key([A-Z])$/.exec(code))) return !/^[a-z]$/.test(k) && m[1].toLowerCase() === nome;
+    return false;
+  }
+
+  // Perché un tasto salvato non arriverebbe mai a una pagina (il sistema, Filo, le chat), o null. `extra.nome`: come
+  // chiamarlo nel rifiuto; `extra.car`: il carattere visto premendolo.
+  function rifiutoFisico(tasto, layout, esplicita, extra) {
+    const { car, nome: dato } = extra || {};
+    const ev = pressioneFisica(tasto, layout, esplicita, car);
+    if (!ev) return null;
+    const nome = dato || etichettaScritta(nomeTastoFisico(tasto, layout), esplicita);
+    const sistema = PRESI_DAL_SISTEMA[piattaforma(esplicita)] || PRESI_DAL_SISTEMA.linux;
+    if (ev.code === 'PrintScreen' || sistema.some((a) => premutoCome(ev, a))) return { tipo: 'sistema', nome };
+    const preso = [...presi(esplicita), ...USATI_NELLE_CHAT].find(([a]) => premutoCome(ev, a));
+    return preso ? { tipo: 'presa', nome, cosa: preso[1] } : null;
+  }
+
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
@@ -847,5 +1031,6 @@
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,
     AZIONI_FILO, usaScorciatoieFilo, usaScorciatoieModuli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
     scorciatoiaDaEvento, scorciatoiaDaScritta, rifiutoScorciatoiaFilo, testoRifiutoFilo, combaciaFilo, azioneFiloDaTasto,
+    tastoValido, tastoFisicoDaEvento, tastoFisicoDaScritta, nomeTastoFisico, combaciaFisico, pressioneFisica, rifiutoFisico,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

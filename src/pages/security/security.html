@@ -306,6 +306,11 @@
         </div>
         <span class="sn-saved-indicator" id="sec-export-hint"></span>
       </div>
+      <!-- #905: senza la spunta l'archivio esce senza chiavi; la riga c'è solo se ci sono chiavi da portare. -->
+      <div class="sn-toggle-row" id="sec-export-keys-row" hidden>
+        <label><input type="checkbox" id="sec-export-keys"><span id="sec-export-keys-label"></span></label>
+        <span class="sn-muted" id="sec-export-keys-desc"></span>
+      </div>
 
       <div class="sn-toggle-row" id="sec-import-row" style="margin-top:18px">
         <div>
@@ -327,6 +332,10 @@
         <div class="sn-row">
           <button type="button" class="sn-btn sn-btn-secondary" id="sec-wipe-export"></button>
           <span class="sn-saved-indicator" id="sec-wipe-export-hint"></span>
+        </div>
+        <div class="sn-toggle-row" id="sec-wipe-export-keys-row" hidden>
+          <label><input type="checkbox" id="sec-wipe-export-keys"><span id="sec-wipe-export-keys-label"></span></label>
+          <span class="sn-muted" id="sec-wipe-export-keys-desc"></span>
         </div>
         <div class="sn-info-box-title sn-wipe-title" id="sec-wipe-list-title"></div>
         <p class="sn-wipe-par" id="sec-wipe-list"></p>
