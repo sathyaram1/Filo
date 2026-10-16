@@ -11,6 +11,7 @@
     {
       version: '0.2.243', date: '2026-10-16',
       features: [
+        'Un link che porta a un sosia di un marchio, o a un file che finge di essere un documento, ti avvisa appena lo clicchi, prima di aprirsi. Filo controlla i link della pagina mentre compaiono, senza mandare niente in rete, e il sito si apre solo se confermi. «Non aprire» ti lascia dove sei.',
         'Nell\'Editor la scorciatoia di un modulo si sceglie premendo i tasti. Clicchi nel campo e premi la combinazione. Filo ricorda il tasto e non il carattere, quindi funziona con qualunque tastiera, anche con AltGr, e se la combinazione è già presa te lo dice subito. Le scorciatoie che avevi continuano a funzionare.',
       ],
       fixes: [

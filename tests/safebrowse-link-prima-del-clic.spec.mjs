@@ -32,8 +32,10 @@ async function contaLaRete(app, pagine = {}) {
   }, pagine);
 }
 
-const richiesteVerso = (app, host) => app.evaluate((_, h) => globalThis.__richieste
-  .filter((u) => { try { return new URL(u).hostname.endsWith(h); } catch (_) { return false; } }), host);
+// `host`: il nome del sito, o un'espressione sul nome quando i siti sono tanti.
+const richiesteVerso = (app, host) => app.evaluate((_, { h, re }) => globalThis.__richieste.filter((u) => {
+  try { const n = new URL(u).hostname; return re ? new RegExp(re).test(n) : n === h || n.endsWith('.' + h); } catch (_) { return false; }
+}), host instanceof RegExp ? { re: host.source } : { h: host });
 const fornitori = (app) => app.evaluate(() => globalThis.__fornitori);
 
 // Il verdetto che il main tiene pronto per un link della scheda che lo mostra (null: non esaminato o pulito).
@@ -122,6 +124,7 @@ test('link sospetto che si apre in una scheda nuova: l\'avviso compare sulla pag
   await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
   await verdettiFiniti(app);
   expect((await copertura(app)).coperta).toBe(false);
+  // A sito aperto i controlli di rete partono: i fornitori finti delle altre prove contano davvero.
   expect(await fornitori(app)).not.toEqual([]);
 });
 
@@ -129,7 +132,7 @@ test('Ctrl+clic su un link da avviso: l\'avviso compare subito, e «Non aprire»
   await contaLaRete(app, {});
   const pagina = await testServer.openReady(openTab, '<title>Lista</title><a id="truffa" href="https://paypa1.com/premio">premio</a>');
   const forum = pagina.url();
-  await pagina.click('#truffa', { modifiers: [process.platform === 'darwin' ? 'Meta' : 'Control'] });
+  await pagina.click('#truffa', { modifiers: ['ControlOrMeta'] });
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
@@ -219,7 +222,7 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
 
   // Prima il link a schermo, poi quello in fondo, anche se nella pagina viene prima.
   expect((await esame()).segnalati).toEqual(['https://paypal-login.com/in-cima', 'https://paypa1.com/in-fondo']);
-  expect(await richiesteVerso(app, '.com')).toEqual([]);
+  expect(await richiesteVerso(app, /esempio-\d+\.com$|paypa1\.com$|paypal-login\.com$/)).toEqual([]);
   expect(await fornitori(app)).toEqual([]);
 
   // Il riferimento: lo stesso esame fatto in un colpo solo, su link nuovi della stessa forma. È il buco che l'esame
