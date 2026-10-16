@@ -440,6 +440,52 @@
     };
   }
 
+  // #967 — i siti di cui l'utente si fida: lì l'avviso «sospetto» non torna. Aggiungerne uno abbassa una difesa (costo 3
+  // e la parola «conferma», decisione dell'owner D48); toglierlo la rialza (costo 1). La voce è quella del «Continua»
+  // (SN_SAFEBROWSE.voceFidata, nel main): il sito, o la pagina su una piattaforma dove chiunque pubblica.
+  function voceFidataDa(p) {
+    const d = dominioDa(p);
+    if (!d) return '';
+    const SB = global.SN_SAFEBROWSE;
+    let v = '';
+    try { v = SB && SB.voceFidata ? SB.voceFidata(p) || '' : ''; } catch (_) { v = ''; }
+    return v || d;
+  }
+  function voceFidataLeggibile(x) {
+    const s = String(x || '');
+    const i = s.indexOf('/');
+    return i < 0 ? sitoLeggibile(s) : sitoLeggibile(s.slice(0, i)) + s.slice(i);
+  }
+  function sitiFidatiAvviso() {
+    const percorso = 'security.safeBrowse.trustedSites';
+    const nome = 'Siti di cui ti fidi';
+    const base = elenco({
+      keys: ['siti_di_cui_ti_fidi', 'siti di cui ti fidi', 'siti di cui mi fido', 'siti fidati per gli avvisi',
+        'siti fidati avviso sospetto', 'siti senza avviso sospetto', 'fidati del sito', 'mi fido del sito'],
+      percorso,
+      allentaSe: 'aggiungi',
+      nome,
+      aiuto: 'siti dove Filo non mostra più l\'avviso «sospetto» né «Non trovo questo indirizzo»; l\'avviso «pericoloso» resta. '
+        + 'Aggiungere chiede all\'utente la parola «conferma», togliere no. Per il sito aperto: «questo sito» (la scheda web davanti)',
+      risk: 'Su un sito di cui ti fidi Filo non ti mostra più l\'avviso «sospetto»: un nome che somiglia a un marchio, un dominio '
+        + 'nato da poco, una password chiesta senza connessione protetta. Restano l\'avviso «pericoloso» e la lista nera di Google.',
+    });
+    return {
+      ...base,
+      costo: 1,
+      costoDi: (b) => (b && b.elenco && b.elenco.op !== 'togli' && b.elenco.voci.length ? 3 : 1),
+      build(v) {
+        const o = opElenco(v, voceFidataDa);
+        if (!o || o.rifiuto) return o;
+        const lista = o.voci.map(voceFidataLeggibile).join(', ');
+        const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
+          : o.op === 'togli' ? `${nome} → togli ${lista}`
+            : (o.voci.length ? `${nome} → solo ${lista}` : `${nome} → svuota l'elenco`);
+        return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome } };
+      },
+    };
+  }
+
   // Si salva la forma «xn--» con cui il sito si confronta; a una persona si mostra münchen.de, come fa la pagina.
   function sitoLeggibile(x) {
     const N = nomiSito();
