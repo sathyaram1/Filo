@@ -10,6 +10,11 @@ const FBS = [
   { ...base, _id: 'fil', seq: 9904, name: 'Di Filo per un utente', clientId: 'auto:complaint' },
   { ...base, _id: 'ute', seq: 9905, name: 'Di un utente', clientId: 'tester@example.com' },
   { ...base, _id: 'npr', seq: 9906, name: 'Prefisso senza prova', clientId: 'owner:finto' },
+  // #953: quello che Filo manda dalla copia dell'owner lo dice, e senza la prova resta di un utente.
+  { ...base, _id: 'och', seq: 9907, name: 'Dalla chat dell’owner', clientId: 'owner:filo:chat', senderProof: 'admin' },
+  { ...base, _id: 'oau', seq: 9908, name: 'Automatica dell’owner', clientId: 'auto:complaint', senderProof: 'admin' },
+  { ...base, _id: 'fch', seq: 9909, name: 'Dalla chat di un utente', clientId: 'filo:chat' },
+  { ...base, _id: 'fin', seq: 9910, name: 'Chat dell’owner senza prova', clientId: 'owner:filo:chat' },
 ];
 
 test('la prima bolla dice lo stesso autore della testata, per ogni mittente', async ({ openTab }) => {
