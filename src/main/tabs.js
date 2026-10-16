@@ -634,6 +634,14 @@ class TabManager {
     return this.setContentFullscreen(!this.contentFullscreen);
   }
 
+  // Lo schermo pieno l'ha chiesto questa pagina col suo pulsante (un video): il tasto dello schermo intero
+  // premuto lì è suo, come l'Esc. Da un'altra scheda o dalla barra vale il tasto di Filo.
+  schermoPienoDi(wc) {
+    if (!this.pageFullscreen || !wc) return false;
+    const t = this.tabs.find((x) => x.id === this.pageFullscreenTabId);
+    return !!(t && t.view && t.view.webContents === wc);
+  }
+
   // Fa uscire dal fullscreen HTML5 la pagina che l'aveva chiesto, quando a
   // spegnere lo schermo intero è stato qualcun altro. Best-effort: se la scheda
   // non c'è più (chiusa, processo caduto) resta solo da dimenticarla, così la
