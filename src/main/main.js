@@ -14,6 +14,9 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// «Cancella tutti i dati di Filo» chiesto prima del riavvio (#850): prima che chiunque apra un file della cartella dei dati.
+try { require('./cancellaTutto').allAvvio(app); } catch (e) { console.error('[Filo] cancella tutto:', e?.message || e); }
+
 // Prima di qualsiasi sessione, che caricherebbe subito i dizionari del correttore scaricandoli da Google (#1084).
 try { require('./services/dizionari').prepara(app); } catch (_) {}
 
@@ -82,6 +85,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoAuth = require('./auth/google-auth');
     globalThis.__filoUpdater = require('./updater');
     globalThis.__filoAlarmWatcher = require('./services/alarmWatcher');
+    globalThis.__filoCancellaTutto = require('./cancellaTutto');
   } catch (_) {}
 }
 
@@ -283,6 +287,7 @@ app.whenReady().then(async () => {
   // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+  try { require('./cancellaTutto').annuncia(); } catch (_) {}
   // Chi è entrato in Filo quando l'accesso passava dal browser trova una volta l'invito a collegare YouTube, Gmail e
   // Drive nelle schede (#1123). Nei test no: comparirebbe in mezzo agli avvisi che gli spec contano.
   if (process.env.NODE_ENV !== 'test') {

@@ -811,6 +811,31 @@
     security_import_compressed: 'L’archivio è compresso in un formato che Filo non legge (bzip2 o LZMA): ricomprimilo come zip normale e riprova',
     security_import_encrypted: 'L’archivio è protetto da una password: scompattalo, ricomprimilo senza password e riprova',
     security_import_fail: 'Importazione non riuscita',
+    security_wipe_btn: 'Cancella tutti i dati di Filo',
+    security_wipe_desc: 'Toglie da questo computer tutto quello che Filo sa di te. Dopo, Filo riparte come appena installato.',
+    security_wipe_export_text:
+      'Prima esporta i tuoi dati. Dopo la cancellazione non si recuperano, ma con l’archivio li rimetti ' +
+      'dentro quando vuoi, anche su un altro computer.',
+    security_wipe_export_done: 'Archivio salvato',
+    security_wipe_list_title: 'Cosa sparisce',
+    security_wipe_list:
+      'Memorie, conversazioni e il loro archivio, cronologia AI, appunti e file dell’editor, pagine salvate, ' +
+      'pagine visitate, schede aperte e archiviate, download registrati, cronologia degli appunti copiati, ' +
+      'timer e notifiche, dizionario personale, impostazioni, cookie e dati dei siti, chiavi e accessi salvati, ' +
+      'la copia delle segnalazioni che hai mandato. I file che hai scaricato e i tuoi documenti restano dove sono. ' +
+      'Filo si chiude e si riapre vuoto, come appena installato.',
+    security_wipe_server:
+      'I feedback che hai già mandato restano sul server di Filo. Per toglierli scrivi a chi sviluppa Filo, ' +
+      'anche con un feedback, e li cancella a mano. L’archivio esportato tiene l’elenco di quelli che hai mandato.',
+    security_wipe_identity_label: 'Cancella anche l’identità dei crediti',
+    security_wipe_identity_desc:
+      'Se non la spunti resta, e con lei i crediti che hai sul server. Se la cancelli, quei crediti non si raggiungono più.',
+    security_wipe_word_label: 'Scrivi «conferma» per cancellare. Non si torna indietro.',
+    security_wipe_cancel: 'Annulla',
+    security_wipe_go: 'Cancella tutto e riavvia',
+    security_wipe_go_spento: 'Scrivi «conferma» nel campo qui sopra',
+    security_wipe_in_corso: 'Cancello e riavvio Filo…',
+    security_wipe_fail: 'Non sono riuscito a cominciare, e non ho cancellato niente. Riprova.',
 
     // Home
     home_title: 'Aperti per dopo',

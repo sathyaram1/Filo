@@ -38,6 +38,9 @@
     // né riscrivere lo storage (comprese le chiavi API).
     IMPORT_DATA_PREVIEW: 'import_data_preview',   // → { ok, fileName, exportedAt, sections, images, immaginiPerse, filoPerso, pagineFuori, token }
     IMPORT_DATA_APPLY: 'import_data_apply',       // { token } → { ok, added, updated, images }
+    // Solo dalla pagina Sicurezza (#850): Filo si chiude e al riavvio svuota la cartella dei dati.
+    CANCELLA_TUTTI_I_DATI: 'cancella_tutti_i_dati',             // { parola: 'conferma', ancheIdentita } → { ok } | { ok:false, error }
+    CANCELLA_TUTTI_I_DATI_STATO: 'cancella_tutti_i_dati_stato', // → { ok, identita, inCorso }
     GET_HISTORY: 'get_history',
     APPEND_HISTORY: 'append_history',             // { entry }
     REMOVE_HISTORY_ENTRY: 'remove_history_entry', // { id }

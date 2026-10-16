@@ -331,6 +331,15 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  // ── Cancella tutti i dati di Filo (#850) ────────────────────────────────
+  // Solo dalla pagina Sicurezza, dove l'utente ha scritto la parola: la chat ci porta, non cancella (cancellaTutto.js).
+  const dallaSicurezza = (origin) => /^filo:\/\/security\//.test(String(origin || ''));
+  on(MSG.CANCELLA_TUTTI_I_DATI, soloFilo(async (msg, sender, origin) => {
+    if (!dallaSicurezza(origin)) return vietato;
+    return require('../../cancellaTutto').chiedi({ parola: msg && msg.parola, ancheIdentita: !!msg && msg.ancheIdentita === true });
+  }));
+  on(MSG.CANCELLA_TUTTI_I_DATI_STATO, soloFilo(async () => ({ ok: true, ...require('../../cancellaTutto').stato() })));
+
   // ── Cronologia appunti ────────────────────────────────────────────────
   // Il menu «Incolla» vive dentro le pagine di qualunque sito: chi legge e chi scrive lo decide services/appuntiDaiSiti.js
   // (#589.4). Descrivere resta aperto: la descrizione arriva da un modello quando vuole, e serve l'immagine esatta.

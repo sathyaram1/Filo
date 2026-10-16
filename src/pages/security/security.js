@@ -110,33 +110,140 @@
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('sec-import-btn').textContent = I18n.t('security_import_btn');
     $('sec-import-desc').textContent = I18n.t('security_import_desc');
+    $('sec-wipe-btn').textContent = I18n.t('security_wipe_btn');
+    $('sec-wipe-desc').textContent = I18n.t('security_wipe_desc');
+    $('sec-wipe-export-text').textContent = I18n.t('security_wipe_export_text');
+    $('sec-wipe-export').textContent = I18n.t('security_export_btn');
+    $('sec-wipe-list-title').textContent = I18n.t('security_wipe_list_title');
+    $('sec-wipe-list').textContent = I18n.t('security_wipe_list');
+    $('sec-wipe-server').textContent = I18n.t('security_wipe_server');
+    $('sec-wipe-identity-label').textContent = I18n.t('security_wipe_identity_label');
+    $('sec-wipe-identity-desc').textContent = I18n.t('security_wipe_identity_desc');
+    $('sec-wipe-word-label').textContent = I18n.t('security_wipe_word_label');
+    $('sec-wipe-word').placeholder = 'conferma';
+    $('sec-wipe-cancel').textContent = I18n.t('security_wipe_cancel');
+    $('sec-wipe-go').textContent = I18n.t('security_wipe_go');
     $('savedHint').textContent = I18n.t('options_saved');
   }
 
-  async function exportData() {
-    const btn = $('sec-export-btn');
-    const hint = $('sec-export-hint');
+  // `resta`: l'esito non sparisce (nella conferma di «Cancella tutto» dice che l'archivio c'è già).
+  async function exportData({ btn = $('sec-export-btn'), hint = $('sec-export-hint'), fatto = 'security_export_done', resta = false } = {}) {
     btn.disabled = true;
+    let riuscito = false;
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.EXPORT_DATA });
       if (res && res.ok) {
-        hint.textContent = I18n.t('security_export_done');
-        hint.classList.remove('sn-error');
+        riuscito = true;
+        hint.textContent = I18n.t(fatto);
+        hint.classList.remove('sn-error', 'sn-hint-warn');
         hint.classList.add('sn-show');
       } else if (res && res.canceled) {
         // L'utente ha annullato il dialog: nessun messaggio.
       } else {
         hint.textContent = I18n.t('security_export_fail');
-        hint.classList.add('sn-show', 'sn-error');
+        hint.classList.add('sn-show', 'sn-error', 'sn-hint-warn');
       }
     } catch (_) {
       hint.textContent = I18n.t('security_export_fail');
-      hint.classList.add('sn-show', 'sn-error');
+      hint.classList.add('sn-show', 'sn-error', 'sn-hint-warn');
     } finally {
       btn.disabled = false;
-      clearTimeout(exportData._t);
-      exportData._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
+      clearTimeout(hint._t);
+      if (!(resta && riuscito)) hint._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
     }
+  }
+
+  // ── Cancella tutti i dati di Filo (#850) ────────────────────────────────
+  // Il tasto apre sotto di sé la conferma: prima l'esportazione, poi cosa sparisce, e il sì solo con la parola scritta.
+  // Il cancello vero sta nel main (cancellaTutto.js), che rifà lo stesso controllo sulla parola.
+  const PAROLA_CANCELLA = 'conferma';
+  const CONTROLLI_CANCELLA = ['sec-wipe-btn', 'sec-wipe-export', 'sec-wipe-identity', 'sec-wipe-word', 'sec-wipe-cancel'];
+  let cancellazioneInCorso = false;
+
+  const parolaScritta = () => $('sec-wipe-word').value.trim().toLowerCase() === PAROLA_CANCELLA;
+
+  function aggiornaTastoCancella() {
+    const go = $('sec-wipe-go');
+    go.disabled = cancellazioneInCorso || !parolaScritta();
+    go.title = parolaScritta() ? '' : I18n.t('security_wipe_go_spento');
+  }
+
+  function mostraEsitoCancella(testo, errore) {
+    const hint = $('sec-wipe-hint');
+    hint.textContent = testo;
+    hint.classList.toggle('sn-hint-warn', !!errore);
+    hint.classList.toggle('sn-show', !!testo);
+  }
+
+  async function apriCancellaTutto(e) {
+    // Un doppio clic aprirebbe e richiuderebbe subito: conta il primo.
+    if (e && e.detail > 1) return;
+    const box = $('sec-wipe-box');
+    if (!box.hidden) { chiudiCancellaTutto(); return; }
+    box.hidden = false;
+    $('sec-wipe-btn').setAttribute('aria-expanded', 'true');
+    aggiornaTastoCancella();
+    box.scrollIntoView({ block: 'nearest' });
+    $('sec-wipe-export').focus({ preventScroll: true });
+    // La scelta sull'identità compare solo se c'è un'identità: senza risposta resta nascosta, e l'identità resta.
+    let st = null;
+    try { st = await chrome.runtime.sendMessage({ type: MSG.CANCELLA_TUTTI_I_DATI_STATO }); } catch (_) {}
+    $('sec-wipe-identity-row').hidden = !(st && st.ok && st.identita);
+    if ($('sec-wipe-identity-row').hidden) $('sec-wipe-identity').checked = false;
+  }
+
+  function chiudiCancellaTutto() {
+    if (cancellazioneInCorso) return;
+    $('sec-wipe-box').hidden = true;
+    $('sec-wipe-btn').setAttribute('aria-expanded', 'false');
+    $('sec-wipe-word').value = '';
+    $('sec-wipe-identity').checked = false;
+    mostraEsitoCancella('', false);
+    aggiornaTastoCancella();
+  }
+
+  async function cancellaTutto(e) {
+    // La coda di un doppio clic non è un secondo sì.
+    if ((e && e.detail > 1) || cancellazioneInCorso || !parolaScritta()) return;
+    cancellazioneInCorso = true;
+    for (const id of CONTROLLI_CANCELLA) $(id).disabled = true;
+    aggiornaTastoCancella();
+    mostraEsitoCancella(I18n.t('security_wipe_in_corso'), false);
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({
+        type: MSG.CANCELLA_TUTTI_I_DATI,
+        parola: $('sec-wipe-word').value,
+        ancheIdentita: !$('sec-wipe-identity-row').hidden && $('sec-wipe-identity').checked,
+      });
+    } catch (_) {}
+    // Riuscito, Filo si chiude da sé: la pagina resta com'è fino all'ultimo.
+    if (r && r.ok) return;
+    cancellazioneInCorso = false;
+    for (const id of CONTROLLI_CANCELLA) $(id).disabled = false;
+    aggiornaTastoCancella();
+    mostraEsitoCancella(I18n.t('security_wipe_fail'), true);
+  }
+
+  // La chat porta qui con #cancella-tutto: sul tasto, che non cancella da solo.
+  function portaAlTasto() {
+    if (location.hash !== '#cancella-tutto') return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    const btn = $('sec-wipe-btn');
+    const centra = () => $('sec-wipe-row').scrollIntoView({ block: 'center' });
+    centra();
+    btn.focus({ preventScroll: true });
+    btn.classList.remove('sn-card-highlight');
+    void btn.offsetWidth;
+    btn.classList.add('sn-card-highlight');
+    btn.addEventListener('animationend', () => btn.classList.remove('sn-card-highlight'), { once: true });
+    // Le liste qui sopra arrivano dopo e spingono giù il tasto: lo si segue finché l'utente non si muove da sé.
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(centra) : null;
+    const GESTI = ['wheel', 'keydown', 'pointerdown', 'touchstart'];
+    const smetti = () => { ro?.disconnect(); for (const t of GESTI) removeEventListener(t, smetti, true); };
+    ro?.observe(document.body);
+    for (const t of GESTI) addEventListener(t, smetti, true);
+    setTimeout(smetti, 2000);
   }
 
   // #866 — le pagine visitate che il filo ricorda: si cancellano per periodo, e il popup dice quante prima del sì.
@@ -1380,7 +1487,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    load();
+    load().catch((e) => console.warn('[Sicurezza] caricamento:', e)).finally(portaAlTasto);
     // Tornando su questa scheda si rilegge, a meno che l'utente non abbia qui modifiche non salvate:
     // un'altra pagina Sicurezza può aver cambiato le liste nel frattempo.
     document.addEventListener('visibilitychange', () => {
@@ -1438,8 +1545,25 @@
       if (inAttesa) renderClipboard(inAttesa, { forza: true });
       else if (lista.querySelector('.sn-clip-gone')) renderClipboard(vociCorrenti, { forza: true });
     });
-    $('sec-export-btn').addEventListener('click', exportData);
+    $('sec-export-btn').addEventListener('click', () => exportData());
     $('sec-import-btn').addEventListener('click', importData);
+    $('sec-wipe-btn').addEventListener('click', apriCancellaTutto);
+    $('sec-wipe-export').addEventListener('click', () => exportData({
+      btn: $('sec-wipe-export'), hint: $('sec-wipe-export-hint'), fatto: 'security_wipe_export_done', resta: true,
+    }));
+    $('sec-wipe-word').addEventListener('input', aggiornaTastoCancella);
+    $('sec-wipe-word').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); cancellaTutto(); }
+    });
+    $('sec-wipe-go').addEventListener('click', cancellaTutto);
+    $('sec-wipe-cancel').addEventListener('click', () => { chiudiCancellaTutto(); $('sec-wipe-btn').focus(); });
+    $('sec-wipe-box').addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || cancellazioneInCorso) return;
+      e.preventDefault();
+      chiudiCancellaTutto();
+      $('sec-wipe-btn').focus();
+    });
+    window.addEventListener('hashchange', portaAlTasto);
     // La cronologia appunti cresce ALTROVE (ogni copia, in qualunque scheda) e
     // si accorcia altrove (il "×" del menu "Incolla"): una pagina lasciata
     // aperta mostrerebbe una lista vecchia, e su un dato che si va a
