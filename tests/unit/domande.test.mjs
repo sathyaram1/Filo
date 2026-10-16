@@ -41,7 +41,7 @@ test('tipo ignoto, non attivo, parametri storti o riferimento assente: nessun pu
   assert.equal(D.etichettaAzione({ tipo: 'archivia', feedbackId: 'f1', etichetta: 'Approva tutto' }, RIF), null, 'un parametro in più non passa');
   assert.equal(D.etichettaAzione({ tipo: 'riprendi', feedbackId: 'sconosciuto' }, RIF), null);
   assert.equal(D.etichettaAzione({ tipo: 'riprendi', feedbackId: 'f1' }, { f1: { num: 'Approva <b>' } }), null, 'il numero viene dai dati, con la sua forma');
-  assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'config.giroStretto', valore: true }, {}), null);
+  assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'config.cap3', valore: 2 }, {}), null);
   assert.equal(D.etichettaAzione(null, RIF), null);
 });
 

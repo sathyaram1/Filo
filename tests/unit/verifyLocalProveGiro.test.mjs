@@ -62,7 +62,7 @@ test('nessun testo manda chi corregge a rilanciare la cartella intera', () => {
   const leggi = (p) => readFileSync(new URL(p, ROOT), 'utf8');
   const superfici = [
     ['routines/roles/resolver.md', leggi('routines/roles/resolver.md')],
-    ['routines/roles/resolver-ripresa.md', leggi('routines/roles/resolver-ripresa.md')],
+    ['routines/roles/_ripresa.md', leggi('routines/roles/_ripresa.md')],
     ['routines/roles/resolver-rebase.md', leggi('routines/roles/resolver-rebase.md')],
     ['la coda della fase di correzione',
       codaText({ findings: [{ level: 2, text: 'rotto' }], derived: [], budgets: {}, branch: 'claude/giri-corti' })],
@@ -111,7 +111,6 @@ test('ovunque si dica di rilanciare le prove del giro, si dice anche come va scr
   const superfici = [
     ['CLAUDE.md', leggi('CLAUDE.md')],
     ['routines/roles/verifier.md', leggi('routines/roles/verifier.md')],
-    ['routines/roles/verifier-chiusura.md', leggi('routines/roles/verifier-chiusura.md')],
     ['routines/roles/verifier-riallineamento.md', leggi('routines/roles/verifier-riallineamento.md')],
     ['il compito consegnato a chi verifica in locale',
       buildVerifierBrief({ request: 'fai X', branch: 'claude/giri-corti', recipe: 'RECIPE' })],
@@ -157,7 +156,6 @@ test('la pulizia si registra solo a correzione aperta e con rilievi messi da par
   assert.equal(withFixed(p.state, 'r', { report: 'niente', sha: PULIZIA }).outcome, 'stop');
   const f = withFixed(p.state, 'r', { report: 'corretto', sha: ALTRO });
   assert.equal(f.outcome, 'fixed');
-  assert.equal(f.state.r.chiusura.shaPrima, PULIZIA);
   // La risposta persa si ristampa anche dal commit della pulizia.
   const rimandata = withCritique(p.state, 'r', { critique: 'provato tutto.\n[2i] rotto\n[1i] x', sha: PULIZIA, caps: { cap3: 5, cap2: 5, cap1: 2, cap0: 0 } });
   assert.equal(rimandata.replayed, true);

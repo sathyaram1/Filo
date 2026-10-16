@@ -1,12 +1,11 @@
-// L'ambito di una verifica (pieno, riallineamento, chiusura): quale testo di
-// ruolo riceve e come si scrive il suo perimetro. Lo usano dispatch (routine) e
-// verify-local (giro locale): una regola sola per le due strade.
+// L'ambito di una verifica (pieno, riallineamento): quale testo di ruolo riceve
+// e come si scrive il suo perimetro. Lo usano dispatch (routine) e verify-local
+// (giro locale): una regola sola per le due strade.
 
 // Un valore che non conosco vale «pieno»: mai meno verifica per un valore storto.
 export const VERIFIER_SCOPE_FILE = {
   pieno: 'verifier.md',
   riallineamento: 'verifier-riallineamento.md',
-  chiusura: 'verifier-chiusura.md',
 };
 
 /** L'ambito riconosciuto, e se quello ricevuto era sconosciuto. PURA. */
@@ -19,49 +18,16 @@ export function verifierScope(raw) {
 
 export const unaRiga = (v) => String(v ?? '').replace(/\s+/g, ' ').trim();
 
-// Lo sha finisce dentro un comando da copiare: solo esadecimale, o niente. Così il nome di un ramo.
+// Lo sha finisce dentro un comando da copiare: solo esadecimale, o niente.
 const soloSha = (v) => (/^[0-9a-f]{7,40}$/i.test(unaRiga(v)) ? unaRiga(v) : '');
-const soloRamo = (v) => (/^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(unaRiga(v)) ? unaRiga(v) : '');
-
-// Livello E sede, come il lettore della critica li pretende: un perimetro
-// scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta.
-const formatoMinimo = (list) => list.map((f) => `- [${f.level}${(['e', 'v'].includes(String(f.sede || '').toLowerCase()) ? String(f.sede).toLowerCase() : 'i')}${f.decision ? '?' : ''}] ${unaRiga(f.text)}`).join('\n');
-
-// La correzione passata anche dal ramo omonimo del server (#1062): il suo diff sta nel checkout di filo-security.
-function lineaServer(ramo, sha) {
-  if (!ramo) return [];
-  return [sha
-    ? `La correzione è passata anche dal ramo del server ${ramo}: nel checkout di filo-security il diff è \`git diff ${sha}..${ramo}\`.`
-    : `Il ramo del server ${ramo} è nato con la correzione: nel checkout di filo-security il diff è \`git diff origin/main...${ramo}\`.`];
-}
 
 /**
- * Il perimetro di un giro stretto, scritto come testo in coda al compito: un
- * JSON nel payload si può non guardare, un'istruzione no. '' per il giro
- * pieno. PURA.
+ * Il perimetro del giro dopo un riallineamento, scritto come testo in coda al
+ * compito: un JSON nel payload si può non guardare, un'istruzione no. '' per il
+ * giro pieno. PURA.
  */
-export function perimetroNote(scope, perimetro, formatFindings = formatoMinimo) {
+export function perimetroNote(scope, perimetro) {
   const p = perimetro && typeof perimetro === 'object' ? perimetro : {};
-  if (scope === 'chiusura') {
-    const rilievi = Array.isArray(p.rilievi) ? p.rilievi.filter((r) => r && unaRiga(r.text)) : [];
-    const sha = soloSha(p.shaPrima);
-    return [
-      '## Perimetro di questo giro',
-      '',
-      'Rilievi corretti nel giro prima:',
-      rilievi.length
-        ? formatFindings(rilievi)
-        : '  (non comunicati: ricavali dall\'ultima critica dei giri passati, e dillo nella tua)',
-      '',
-      sha
-        ? `Commit di partenza della correzione: \`${sha}\` — il diff da leggere è \`git diff ${sha}..HEAD\`.`
-        : 'Commit di partenza della correzione: non comunicato.',
-      // Un ramo riallineato fuori da qui (in cloud, o a mano) porta main nel diff: va detto.
-      ...(sha ? ['Se in quel diff trovi modifiche che non c\'entrano coi rilievi, dopo la correzione il ramo è stato',
-        'riallineato a `main`: ti interessano solo dove toccano la correzione.'] : []),
-      ...lineaServer(soloRamo(p.ramoServer), soloSha(p.shaPrimaServer)),
-    ].join('\n');
-  }
   if (scope === 'riallineamento') {
     const sha = soloSha(p.shaVerificato);
     const report = String(p.reportRebase ?? '').trim();

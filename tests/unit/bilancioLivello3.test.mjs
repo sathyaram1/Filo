@@ -190,7 +190,7 @@ test('le stampe del giro locale e delle routine dicono i quattro bilanci e i 2 m
 
 test('il compito della verifica locale dice dove stanno le decisioni dell\'owner, e che valgono come specifica', async () => {
   const { buildVerifierBrief } = await import('../../scripts/verify-local.mjs');
-  const brief = buildVerifierBrief({ request: 'fai X', branch: 'claude/x', recipe: '', history: [], scope: 'pieno' });
+  const brief = buildVerifierBrief({ request: 'fai X', branch: 'claude/x', recipe: '', history: [] });
   assert.match(brief, /DECISIONI DELL’OWNER: in un giro locale non c’è la conversazione del feedback/);
   assert.match(brief, /valgono come specifica insieme a lei/);
   assert.ok(brief.indexOf('DECISIONI DELL’OWNER') > brief.indexOf('COSA ERA STATO CHIESTO'), 'subito dopo la richiesta');

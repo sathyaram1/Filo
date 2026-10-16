@@ -701,7 +701,7 @@ async function setLavoriServer(on, idToken) {
 const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
 /** La forma di risposta coi bilanci tutti a `null`: un campo che nel documento non c'è resta vuoto. */
 function capsVuoti() {
-  const out = { fixInstructions: '', giroStretto: false };
+  const out = { fixInstructions: '' };
   for (const k of CAP_KEYS) out[k] = null;
   return out;
 }
@@ -734,8 +734,6 @@ async function getRoutineCaps(idToken) {
   for (const k of CAP_KEYS) {
     if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
   }
-  // Spento di serie: solo un true esplicito nel documento lo accende.
-  out.giroStretto = !!doc && doc.giroStretto === true;
   if (doc && typeof doc.fixInstructions === 'string') out.fixInstructions = doc.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX);
   return out;
 }
@@ -758,10 +756,6 @@ async function setRoutineCaps(patch, idToken) {
     fields.fixInstructions = toFsValue(p.fixInstructions.slice(0, FIX_INSTRUCTIONS_MAX));
     mask.push('fixInstructions');
   }
-  if (typeof p.giroStretto === 'boolean') {
-    fields.giroStretto = toFsValue(p.giroStretto);
-    mask.push('giroStretto');
-  }
   if (mask.length) await patchDoc(ROUTINES_DOC, fields, mask, idToken);
   try {
     return await getRoutineCaps(idToken);
@@ -769,7 +763,7 @@ async function setRoutineCaps(patch, idToken) {
     // Scritto ma non riletto: un salvataggio riuscito non deve sembrare fallito. Tornano i soli campi scritti.
     if (!mask.length) throw e;
     const scritto = capsVuoti();
-    for (const k of mask) scritto[k] = k === 'fixInstructions' ? p[k].slice(0, FIX_INSTRUCTIONS_MAX) : (k === 'giroStretto' ? p[k] : clampCap(p[k]));
+    for (const k of mask) scritto[k] = k === 'fixInstructions' ? p[k].slice(0, FIX_INSTRUCTIONS_MAX) : clampCap(p[k]);
     return scritto;
   }
 }

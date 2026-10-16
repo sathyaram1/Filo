@@ -650,37 +650,33 @@ test('nel repo c\'è il pezzo condiviso della ripresa, e il vecchio ruolo della 
   assert.match(segnala, /FERMA il lavoro/);
 });
 
-// ─── L'ambito della verifica (pieno / riallineamento / chiusura) ─────────────
+// ─── L'ambito della verifica (pieno / riallineamento) ─────────────────────────
 
 test('verifierScope: un valore sconosciuto vale pieno, e lo dice', () => {
   assert.deepEqual(verifierScope(undefined), { scope: 'pieno', sconosciuto: false });
   assert.deepEqual(verifierScope('pieno'), { scope: 'pieno', sconosciuto: false });
-  assert.deepEqual(verifierScope('chiusura'), { scope: 'chiusura', sconosciuto: false });
+  assert.deepEqual(verifierScope('chiusura'), { scope: 'pieno', sconosciuto: true }, 'il giro stretto non esiste più: un server vecchio ha la verifica completa');
   assert.deepEqual(verifierScope('riallineamento'), { scope: 'riallineamento', sconosciuto: false });
   assert.deepEqual(verifierScope('veloce'), { scope: 'pieno', sconosciuto: true });
   assert.deepEqual(verifierScope('constructor'), { scope: 'pieno', sconosciuto: true });
 });
 
 test('perimetroNote: il perimetro si legge come testo, non come JSON', () => {
-  const c = perimetroNote('chiusura', { rilievi: [{ level: 2, text: 'Salva non salva' }, { level: 1, text: 'bordo freddo', decision: true }], shaPrima: 'abc1234' });
-  assert.match(c, /\[2i\] Salva non salva/);
-  assert.match(c, /\[1i\?\] bordo freddo/);
-  assert.match(c, /git diff abc1234\.\.HEAD/);
-  assert.ok(!c.includes('{'), 'niente JSON grezzo nel compito');
   const r = perimetroNote('riallineamento', { reportRebase: 'conflitto nelle schede\nsolo meccanico', shaVerificato: 'def5678' });
   assert.match(r, /> conflitto nelle schede\n> solo meccanico/);
   assert.match(r, /git diff def5678\.\.HEAD/);
+  assert.ok(!r.includes('{'), 'niente JSON grezzo nel compito');
   assert.equal(perimetroNote('pieno', { rilievi: [] }), '');
+  assert.equal(perimetroNote('chiusura', { rilievi: [{ level: 2, text: 'x' }], shaPrima: 'abc1234' }), '', 'nessun perimetro di chiusura');
   // Lo sha finisce in un comando da copiare: uno storto non ci entra.
-  assert.ok(!perimetroNote('chiusura', { shaPrima: 'abc; rm -rf .' }).includes('rm -rf'));
-  assert.match(perimetroNote('chiusura', {}), /non comunicati/);
+  assert.ok(!perimetroNote('riallineamento', { shaVerificato: 'abc; rm -rf .' }).includes('rm -rf'));
+  assert.match(perimetroNote('riallineamento', {}), /non comunicato/);
 });
 
 test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro', () => {
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, 'verifier.md'), '# verifica piena\n');
-  writeFileSync(resolve(dir, 'verifier-chiusura.md'), '# verifica di chiusura\n');
   writeFileSync(resolve(dir, 'verifier-riallineamento.md'), '# verifica dopo il riallineamento\n');
   const consegna = (payload) => {
     const bucket = { role: 'verifier', id: 'x', num: '#9', branch: 'worker/x' };
@@ -700,11 +696,11 @@ test('emit: il valore di scope sceglie il testo del ruolo e accoda il perimetro'
   assert.equal(pieno.payload.scope, 'pieno');
   assert.ok(!('loopCount' in pieno), 'la busta non porta più il conto dei giri');
 
+  // Dopo una correzione la verifica è sempre completa (#1203): un server che chiede ancora la chiusura ha quella.
   const chiusura = consegna({ feedback: { text: 't' }, history: storia, scope: 'chiusura', perimetro: { rilievi: [{ level: 2, text: 'Salva non salva' }], shaPrima: 'abc1234' } });
-  assert.match(chiusura.instructions, /# verifica di chiusura/);
-  assert.match(chiusura.instructions, /Perimetro di questo giro[\s\S]*\[2i\] Salva non salva/);
-  assert.ok(!/Avvertenza di serie/.test(chiusura.instructions), 'il giro stretto non invita alla ricerca larga');
-  assert.equal(chiusura.payload.scope, 'chiusura');
+  assert.match(chiusura.instructions, /# verifica piena[\s\S]*Avvertenza di serie/);
+  assert.ok(!/Perimetro di questo giro/.test(chiusura.instructions));
+  assert.equal(chiusura.payload.scope, 'pieno');
 
   const riall = consegna({ feedback: { text: 't' }, scope: 'riallineamento', perimetro: { reportRebase: 'conflitto nelle schede' } });
   assert.match(riall.instructions, /# verifica dopo il riallineamento/);

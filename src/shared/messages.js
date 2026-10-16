@@ -659,8 +659,8 @@
     //         feedback derivato);
     //   cap0  giri per i soli rilievi di livello 0.
     // Li applica il SERVER quando registra la critica. Owner-only.
-    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap3, cap2, cap1, cap0, fixInstructions, giroStretto } | { ok:false, error }
-    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap3?, cap2?, cap1?, cap0?, fixInstructions?, giroStretto? } → come GET | { ok:false, error }
+    AUTOMATION_CAPS_GET: 'automation_caps_get',    // → { ok, cap3, cap2, cap1, cap0, fixInstructions } | { ok:false, error }
+    AUTOMATION_CAPS_SET: 'automation_caps_set',    // { cap3?, cap2?, cap1?, cap0?, fixInstructions? } → come GET | { ok:false, error }
     // Come partono le sessioni delle routine (doc config/routines):
     //   maxSessions      quante sessioni lavorano insieme (intero 1–20;
     //                    campo assente = 1);

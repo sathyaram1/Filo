@@ -686,7 +686,7 @@ module.exports = function register(on, ctx) {
   // quando registra la critica: cambiarli qui ha effetto sul prossimo giro.
   const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
   const capsReply = (caps) => {
-    const out = { ok: true, fixInstructions: caps.fixInstructions, giroStretto: caps.giroStretto === true };
+    const out = { ok: true, fixInstructions: caps.fixInstructions };
     for (const k of CAP_KEYS) out[k] = caps[k];
     return out;
   };
@@ -706,7 +706,7 @@ module.exports = function register(on, ctx) {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      const patch = { fixInstructions: msg.fixInstructions, giroStretto: msg.giroStretto };
+      const patch = { fixInstructions: msg.fixInstructions };
       for (const k of CAP_KEYS) patch[k] = msg[k];
       return capsReply(await Defaults.setRoutineCaps(patch, idToken));
     } catch (e) {

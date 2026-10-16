@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 
 const { derivatiAperti, verifierReplyText } = await import('../../scripts/dispatch.mjs');
 const VL = await import('../../scripts/verify-local.mjs');
-const { perimetroNote } = await import('../../scripts/lib/verifier-scope.mjs');
 
 const f = (level, sede, text, decision = false) => ({ level, sede, text, decision });
 
@@ -71,11 +70,10 @@ test('verify-local: un vicino di livello scritto 3 lasciato non corretto non fer
   assert.deepEqual(c.derived.map((x) => `${x.level}${x.sede}`), ['1i', '3v']);
 });
 
-test('i rifiuti di formato e il perimetro della chiusura conoscono la sede v', () => {
+test('i rifiuti di formato conoscono la sede v', () => {
   const SHA = 'a'.repeat(40);
   const s = VL.withRequest({}, 'r', { request: 'x', sha: SHA });
   const r = VL.withCritique(s, 'r', { critique: 'Provato.\n[2] senza sede', sha: SHA, caps: { cap3: 1, cap2: 1, cap1: 1, cap0: 1 } });
   assert.equal(r.ok, false);
   assert.match(r.reason, /«v» se è di un altro lavoro ma sta in un file che il ramo modifica già/);
-  assert.match(perimetroNote('chiusura', { rilievi: [f(2, 'v', 'vicino')], shaPrima: SHA }), /- \[2v\] vicino/);
 });

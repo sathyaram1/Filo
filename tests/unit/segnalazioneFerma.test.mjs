@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildVerifierBrief } from '../../scripts/verify-local.mjs';
 import { verifierReplyText } from '../../scripts/dispatch.mjs';
-import { perimetroNote } from '../../scripts/lib/verifier-scope.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -55,7 +54,7 @@ test('la nota per la chat e la risposta stampata dicono che i sospesi restano da
 });
 
 test('il compito della verifica locale insegna il formato che il lettore accetta', () => {
-  const brief = buildVerifierBrief({ request: 'Prova.', branch: 'claude/prova', recipe: '', history: [], scope: 'pieno', perimetro: [] });
+  const brief = buildVerifierBrief({ request: 'Prova.', branch: 'claude/prova', recipe: '', history: [] });
   const esempi = brief.split('\n').filter((l) => /^\s*\[\d/.test(l));
   assert.ok(esempi.length >= 2, 'il compito porta righe d\'esempio');
   for (const riga of esempi) {
@@ -64,12 +63,6 @@ test('il compito della verifica locale insegna il formato che il lettore accetta
   }
   assert.doesNotMatch(brief, /`\[1\?\]`/);
   assert.match(brief, /sede/);
-});
-
-test('il perimetro del giro stretto scrive i rilievi con la sede, nella forma di ripiego', () => {
-  const nota = perimetroNote('chiusura', { rilievi: [{ level: 2, sede: 'e', text: 'x', decision: true }, { level: 1, text: 'y' }] });
-  assert.match(nota, /- \[2e\?\] x/);
-  assert.match(nota, /- \[1i\] y/);
 });
 
 test('rombo di una pratica ferma per una scelta: la segnalazione si legge una volta sola', () => {

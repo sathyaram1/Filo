@@ -78,7 +78,7 @@ import { fileURLToPath } from 'node:url';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
-import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifier-scope.mjs';
+import { VERIFIER_SCOPE_FILE } from './lib/verifier-scope.mjs';
 import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
@@ -139,7 +139,7 @@ export function numeroFirestore(campo) {
 /**
  * I bilanci come stanno nel documento del server, uno per livello. Lancia con
  * un messaggio che dice cosa manca; mai un numero al posto di quello dell'owner.
- * @returns {Promise<{cap3:number, cap2:number, cap1:number, cap0:number, fixInstructions:string, giroStretto:boolean}>}
+ * @returns {Promise<{cap3:number, cap2:number, cap1:number, cap0:number, fixInstructions:string}>}
  */
 export async function leggiBilanciDalServer({
   fetchImpl = fetch, env = process.env, trovaRefresh = null, copiaDir = null, now = Date.now(),
@@ -195,8 +195,6 @@ export function bilanciDaCampi(fields) {
     throw new Error(`config/routines sul server non ha ${mancanti.join(', ')}: l'owner li imposta in Gestione → Automazioni (un numero, 0 compreso), poi si riprova. Non c'è un default.`);
   }
   if (fields.fixInstructions && typeof fields.fixInstructions.stringValue === 'string') out.fixInstructions = fields.fixInstructions.stringValue;
-  // Solo un true esplicito accende il giro stretto: assente o storto = spento.
-  out.giroStretto = !!(fields.giroStretto && fields.giroStretto.booleanValue === true);
   return out;
 }
 
@@ -354,9 +352,6 @@ export function withRequest(state, branch, { request, sha, at, feedbackId, feedb
     const num = feedbackId ? feedbackNum : prev.feedbackNum;
     if (num) s[branch].feedbackNum = Number(num) || String(num);
   }
-  // Il perimetro della chiusura vale per la verifica subito dopo una
-  // correzione (anche rilanciata), e per nessun'altra.
-  if (prev.chiusura && (prev.verdict === 'fixed' || !prev.verdict)) s[branch].chiusura = prev.chiusura;
   return s;
 }
 
@@ -588,9 +583,7 @@ export function withFixed(state, branch, { report, sha, at, dirty = false, dirty
     return { ok: true, state: s, outcome: 'pass', derived: lievi };
   }
   if (rounds.length) rounds[rounds.length - 1] = { ...rounds[rounds.length - 1], outcome: 'corretto' };
-  const chiusura = { rilievi: pending, shaPrima: partenza };
-  if (!serverFermo && server && server.sha) Object.assign(chiusura, { ramoServer: server.ramo, shaPrimaServer: partenzaServer });
-  s[branch] = { ...base, verdict: 'fixed', rounds, chiusura };
+  s[branch] = { ...base, verdict: 'fixed', rounds };
   return { ok: true, state: s, outcome: 'fixed', serverMosso: !serverFermo };
 }
 
@@ -969,25 +962,6 @@ function realignBeforeStart(root = ROOT) {
   return true;
 }
 
-// Un riallineamento a main riscrive i commit: dal vecchio commit di partenza il diff porterebbe
-// dentro tutto main. Si cerca il gemello per patch-id; '' se non c'è (il ruolo sa farne a meno).
-export function shaPrimaAllineato(shaPrima, root = ROOT, base = `origin/${MAIN}`) {
-  const sha = String(shaPrima || '').trim();
-  if (!/^[0-9a-f]{7,40}$/i.test(sha)) return '';
-  if (tryGit(['merge-base', '--is-ancestor', sha, 'HEAD'], root).ok) return sha;
-  const patchIds = (args) => {
-    try {
-      const diff = execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
-      const out = execFileSync('git', ['patch-id', '--stable'], { cwd: root, input: diff, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-      return out.split('\n').filter(Boolean).map((l) => l.trim().split(/\s+/));
-    } catch (_) { return []; }
-  };
-  const [mio] = patchIds(['show', sha]);
-  if (!mio) return '';
-  const gemello = patchIds(['log', '-p', `${base}..HEAD`]).find(([id]) => id === mio[0]);
-  return gemello ? gemello[1] : '';
-}
-
 export function currentBranch(root = ROOT) { return git(['rev-parse', '--abbrev-ref', 'HEAD'], root); }
 export function headSha(root = ROOT) { return git(['rev-parse', 'HEAD'], root); }
 
@@ -1083,8 +1057,7 @@ export function verdettoDelRamo(ramo, { radice = ROOT, cartellaServer } = {}) {
  * ramo; NON il diff, NON i file toccati, NON il report di chi ha lavorato.
  * PURA (testata): è il punto in cui l'isolamento o c'è o non c'è.
  */
-export function buildVerifierBrief({ request, branch, recipe, history, scope, perimetro, server = null }) {
-  const stretto = verifierScope(scope).scope === 'chiusura';
+export function buildVerifierBrief({ request, branch, recipe, history, server = null }) {
   const past = Array.isArray(history) && history.length
     ? ['', 'CRITICHE DEI GIRI PASSATI su questo stesso lavoro (dalla più vecchia): le porte già',
       'trovate vanno RI-PROVATE, non ri-scoperte come rilievi nuovi.',
@@ -1106,8 +1079,6 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     `(\`git diff --stat main...${branch}\`). I nomi sì, il contenuto no: una`,
     'bocciatura per assenza data guardando la cartella sbagliata è già costata',
     'un’intera implementazione rifatta da capo.',
-    ...(stretto ? ['IN QUESTO GIRO c’è una seconda eccezione, e la spiega la ricetta: il diff della sola',
-      'correzione (dal commit di partenza scritto in fondo) si legge.'] : []),
     '',
     'COSA ERA STATO CHIESTO (l’unica cosa che sai):',
     String(request || '').split('\n').map((l) => `  ${l}`).join('\n'),
@@ -1123,11 +1094,8 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
       'È lo stesso lavoro e il tuo esito vale anche per lui: le regole di isolamento valgono anche lì, e non cambiarlo.',
     ] : []),
     '',
-    ...(stretto
-      ? ['IL TUO COMPITO: un giro prima ha trovato dei rilievi e sono stati corretti. Controlla',
-        'la chiusura, dentro il perimetro scritto in fondo: usando l’app, non solo leggendo.']
-      : ['IL TUO COMPITO: prova a far fallire la cosa chiesta usandola davvero, come la',
-        'userebbe l’owner. Non ti basta che i test passino: apri l’app e prova.']),
+    'IL TUO COMPITO: prova a far fallire la cosa chiesta usandola davvero, come la',
+    'userebbe l’owner. Non ti basta che i test passino: apri l’app e prova.',
     '',
     '',
     'LE TUE PROVE RESTANO NEL RAMO, e qui non c\'è un numero di feedback: la cartella',
@@ -1168,19 +1136,13 @@ export function buildVerifierBrief({ request, branch, recipe, history, scope, pe
     '',
     '─── recipe della verifica (la stessa delle routine) ───',
     String(recipe || '(file-ruolo non trovato)'),
-    ...(stretto ? ['', perimetroNote('chiusura', perimetro, (l) => ROUND.formatFindings(l))] : []),
   ].join('\n');
 }
 
-/** Giro stretto solo con l'interruttore acceso E una correzione appena consegnata. PURA. */
-export function ambitoLocale(config, entry) {
-  const c = entry && entry.chiusura;
-  return config && config.giroStretto === true && c && Array.isArray(c.rilievi) && c.rilievi.length ? 'chiusura' : 'pieno';
-}
-
-export function readRecipe(root = ROOT, scope = 'pieno') {
+// Il giro locale è sempre una verifica completa: dopo una correzione si rifà tutta (#1203).
+export function readRecipe(root = ROOT) {
   const dir = resolve(root, 'routines', 'roles');
-  const f = resolve(dir, VERIFIER_SCOPE_FILE[verifierScope(scope).scope]);
+  const f = resolve(dir, VERIFIER_SCOPE_FILE.pieno);
   return existsSync(f) ? espandiInclusioni(readFileSync(f, 'utf8'), dir) : '';
 }
 
@@ -1327,16 +1289,6 @@ if (isMain) {
     const state = withRequest(readState(), b, {
       request, sha: headSha(), feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '', server: srvStart,
     });
-    const partenza = state[b].chiusura && state[b].chiusura.shaPrima;
-    if (partenza) {
-      const adesso = shaPrimaAllineato(partenza);
-      if (adesso !== partenza) {
-        state[b].chiusura = { ...state[b].chiusura, shaPrima: adesso };
-        console.error(adesso
-          ? `Il ramo è stato riallineato dopo la critica: il commit di partenza della correzione ora è ${adesso.slice(0, 8)}.`
-          : 'Il ramo è stato riallineato dopo la critica e il commit di partenza della correzione non si ritrova: il compito lo dice.');
-      }
-    }
     writeState(state);
     for (const riga of await registraNelRegistro({ ramo: b, sha: state[b].requestedSha || headSha(), feedbackId: state[b].feedbackId || '', server: srvStart })) console.error(riga);
     // La pratica racconta il lavoro: presa in carico al primo giro, e a ogni giro com'è andato quello prima.
@@ -1349,16 +1301,13 @@ if (isMain) {
         ? `Pratica ${chi}: ${a.from === a.to ? 'giro annotato' : 'presa in carico («In lavorazione») e giro annotato'}.`
         : `Pratica ${chi} non aggiornata (${a.motivo}): in Gestione questo giro non compare.`);
     }
-    const scope = ambitoLocale(capsStart, state[b]);
     console.log(buildVerifierBrief({
-      request, branch: b, recipe: readRecipe(ROOT, scope), history: historyFromRounds(state[b].rounds),
-      scope, perimetro: state[b].chiusura, server: srvStart,
+      request, branch: b, recipe: readRecipe(ROOT), history: historyFromRounds(state[b].rounds), server: srvStart,
     }));
     // I bilanci servono a chi guida, non a chi verifica: sapere prima quanti
     // giri restano per livello orienta il livello che si scrive. Vanno
     // sull'altro canale, fuori dal compito che si consegna.
     console.error(bilanciText(capsStart));
-    console.error('Ambito della verifica: ' + (scope === 'chiusura' ? 'chiusura (giro stretto acceso, e il giro prima è stato corretto)' : 'pieno'));
     if (srvStart && srvStart.sha) {
       console.error(`Parte del server: ${srvStart.ramo} di filo-security su ${srvStart.sha.slice(0, 8)}. Il verdetto vale per tutti e due i rami, e decade se uno dei due si muove.`);
       const sporco = testoServerSporco(srvStart, 'la critica si registra solo sui commit');

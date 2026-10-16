@@ -13,7 +13,6 @@ import { avviaConfigRoutinesFinto } from '../helpers/server-finto.mjs';
 import {
   checkoutDelRamo, confrontaServer, soloFusioniPulite, statoRamoServer, testoServerMossoDallAvvio,
 } from '../../scripts/lib/ramo-server.mjs';
-import { perimetroNote } from '../../scripts/lib/verifier-scope.mjs';
 
 const VL = await import('../../scripts/verify-local.mjs');
 const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
@@ -74,26 +73,23 @@ test('withCritique lega il verdetto al server; un server con modifiche non salva
   assert.equal(sporco.state.r.verdict, undefined);
 });
 
-test('withFixed: una correzione solo sul server è una correzione (#715), e il giro dopo sa da dove parte', () => {
+test('withFixed: una correzione solo sul server è una correzione (#715)', () => {
   const s = VL.withRequest({}, 'r', { request: 'fai X', sha: A, server: ora() });
   const fix = VL.withCritique(s, 'r', { critique: 'Provato.\n[2i] il server non salva', sha: A, caps: CAPS, server: ora() });
   const soloServer = VL.withFixed(fix.state, 'r', { report: 'corretto il server', sha: A, server: ora({ sha: S2 }) });
   assert.equal(soloServer.outcome, 'fixed', 'senza #1062 qui usciva «verifica superata» col rilievo non corretto');
   assert.equal(soloServer.state.r.verdict, 'fixed');
-  assert.deepEqual(soloServer.state.r.chiusura.shaPrimaServer, S1);
-  assert.match(perimetroNote('chiusura', soloServer.state.r.chiusura), /ramo del server claude\/x: nel checkout di filo-security il diff è `git diff 1{40}\.\.claude\/x`/);
   const niente = VL.withFixed(fix.state, 'r', { report: 'niente', sha: A, server: ora() });
   assert.equal(niente.outcome, 'stop', 'nessun commit nuovo da nessuna parte: il 2 resta aperto');
   const nato = VL.withFixed(VL.withCritique(VL.withRequest({}, 'r', { request: 'X', sha: A }), 'r', { critique: 'Provato.\n[2i] manca il server', sha: A, caps: CAPS }).state,
     'r', { report: 'aggiunto il server', sha: A, server: ora() });
   assert.equal(nato.outcome, 'fixed', 'un ramo del server nato con la correzione è un commit nuovo');
-  assert.match(perimetroNote('chiusura', nato.state.r.chiusura), /è nato con la correzione: .*git diff origin\/main\.\.\.claude\/x/);
   const sporco = VL.withFixed(fix.state, 'r', { report: 'corretto', sha: A, server: ora({ sha: S2, sporchi: [' M a.js'], checkout: '/srv' }) });
   assert.equal(sporco.ok, false);
   assert.match(sporco.reason, /consegna non registrata: nel checkout del server/);
 });
 
-test('testoServerMossoDallAvvio, checkoutDelRamo e il nome del ramo nel perimetro', () => {
+test('testoServerMossoDallAvvio e checkoutDelRamo', () => {
   assert.equal(testoServerMossoDallAvvio({ ramo: 'claude/x', sha: S1 }, ora()), '');
   assert.equal(testoServerMossoDallAvvio(null, null), '');
   assert.equal(testoServerMossoDallAvvio(null, ora({ dentroMain: true })), '', 'nato da main senza commit suoi');
@@ -102,7 +98,6 @@ test('testoServerMossoDallAvvio, checkoutDelRamo e il nome del ramo nel perimetr
   const porcelain = 'worktree /a\nHEAD 1\nbranch refs/heads/main\n\nworktree /b c\nHEAD 2\nbranch refs/heads/claude/x\n';
   assert.equal(checkoutDelRamo(porcelain, 'claude/x'), '/b c');
   assert.equal(checkoutDelRamo(porcelain, 'claude/y'), '');
-  assert.doesNotMatch(perimetroNote('chiusura', { rilievi: [], shaPrima: A, ramoServer: 'claude/x; rm -rf /', shaPrimaServer: S1 }), /rm -rf/);
 });
 
 // ─── I comandi veri: app in <base>/work, server in <base>/filo-security, come sulla macchina dell'owner ──────────

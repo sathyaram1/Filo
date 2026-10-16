@@ -87,7 +87,7 @@ import {
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
-import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote as perimetroNoteBase } from './lib/verifier-scope.mjs';
+import { VERIFIER_SCOPE_FILE, verifierScope, unaRiga, perimetroNote } from './lib/verifier-scope.mjs';
 import {
   readTicket as readRoutineTicket, writeTicket as writeRoutineTicket, clearTicket as clearRoutineTicket, looksLikeTicket,
   leggiBigliettoAMano,
@@ -711,10 +711,7 @@ export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts
 }
 
 // L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
-export { verifierScope };
-export function perimetroNote(scope, perimetro) {
-  return perimetroNoteBase(scope, perimetro, (l) => VERIFIER_ROUND.formatFindings(l));
-}
+export { verifierScope, perimetroNote };
 
 export function readRoleInstructions(role, { scope, ripresa = false } = {}) {
   const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope] : ROLE_FILE[role];
@@ -2068,8 +2065,8 @@ export function emit(bucket, ctx) {
   // L'avvertenza di serie si ACCODA alle istruzioni, non vive solo nel
   // payload: un dato in più si può non guardare, un'istruzione no.
   if (ambito.sconosciuto) process.stderr.write(`[dispatch] ambito di verifica sconosciuto («${unaRiga(ctx.scope).slice(0, 40)}»): consegno la verifica piena\n`);
-  // Nei giri stretti la serie non si consegna: inviterebbe alla ricerca larga
-  // che il testo del ruolo dice di non rifare.
+  // Dopo un riallineamento la serie non si consegna: inviterebbe alla ricerca
+  // larga che il testo del ruolo dice di non rifare.
   const serial = ambito.scope && ambito.scope !== 'pieno'
     ? perimetroNote(ambito.scope, ctx && ctx.perimetro)
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
