@@ -1281,6 +1281,11 @@
         }
         case 'copy_link': Actions?.copyUrlToClipboard(linkEl.href); break;
         case 'save_link': await Actions?.saveLink(linkEl); break;
+        case 'save_page': {
+          if (!(await Actions?.savePage())) { appendActionLog(`${label}: non riuscita`); return false; }
+          appendActionLog('pagina salvata in «Aperti per dopo»: chiudo la scheda');
+          return true;
+        }
         case 'share_link': await Actions?.shareLink(linkEl); break;
         default: appendActionLog(`${label}: non riuscita`); return false;
       }
