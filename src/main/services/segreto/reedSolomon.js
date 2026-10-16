@@ -43,12 +43,14 @@ function controllaK(k) {
   if (!Number.isInteger(k) || k < 1 || k > MAX_K) throw new RangeError(`un gruppo ha da 1 a ${MAX_K} blocchi di dati, non ${k}`);
 }
 
-function parita(dati) {
+// `righe`: solo le parità che servono (le altre restano null), per chi deve rifarne poche.
+function parita(dati, righe = null) {
   const k = dati.length;
   controllaK(k);
   const len = dati[0].length;
   if (dati.some((d) => d.length !== len)) throw new RangeError('i blocchi di un gruppo hanno tutti la stessa lunghezza');
   return Array.from({ length: k }, (_, i) => {
+    if (righe && !righe.includes(i)) return null;
     const p = new Uint8Array(len);
     for (let j = 0; j < k; j++) accumula(p, CAUCHY[i][j], dati[j]);
     return p;
