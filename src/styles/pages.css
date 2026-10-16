@@ -92,12 +92,13 @@ html, body {
 }
 .sn-page button.sn-btn-secondary:hover:not(:disabled) { background: var(--sn-hover); }
 
+/* Il rosso è il token d'allerta: nel tema scuro schiarisce da sé, e l'utente lo cambia come gli altri. */
 .sn-page button.sn-btn-danger {
   background: transparent;
-  color: #c0392b;
-  border: 1px solid #c0392b;
+  color: var(--sn-error);
+  border: 1px solid var(--sn-error);
 }
-.sn-page button.sn-btn-danger:hover:not(:disabled) { background: rgba(192, 57, 43, 0.1); opacity: 1; }
+.sn-page button.sn-btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--sn-error) 10%, transparent); opacity: 1; }
 
 .sn-page .sn-row {
   display: flex;
