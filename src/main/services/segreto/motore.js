@@ -755,10 +755,16 @@ async function restauraMancanti(ctx, S, gruppi) {
 }
 
 function marcaDanneggiati(tabella, blocchi) {
+  const perso = new Uint8Array(Math.max(...blocchi) + 1);
+  for (const j of blocchi) perso[j] = 1;
+  const tocca = ([s, m]) => {
+    for (let j = s; j < Math.min(s + m, perso.length); j++) if (perso[j]) return true;
+    return false;
+  };
   let cambiata = false;
   for (const [n, f] of tabella) {
     if (f.x) continue;
-    if (f.e.some(([s, m]) => blocchi.some((j) => j >= s && j < s + m))) {
+    if (f.e.some(tocca)) {
       tabella.set(n, { ...f, x: 1 });
       cambiata = true;
     }
