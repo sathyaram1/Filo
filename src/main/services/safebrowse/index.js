@@ -552,6 +552,7 @@ const API = {
   gsb,
   llm,
   sandbox,
+  rimandi,
 };
 
 globalThis.SN_SAFEBROWSE = API;
