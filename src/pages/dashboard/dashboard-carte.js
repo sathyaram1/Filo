@@ -449,7 +449,7 @@
     img.alt = '';
     img.onerror = () => { img.remove(); generica(); };
     ico.appendChild(img);
-    d.iconaDelSito(s.action.url).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
+    d.iconaDelSito(s.action.url, { soloCopie: !!s.chiedeOk }).then((dato) => { if (dato) img.src = dato; else img.onerror(); });
     return ico;
   }
 
