@@ -365,7 +365,8 @@ export function guardiaFermo(tetto = TETTO_FERMO_MS) {
  * - Se nello stesso tetto non è finito nessun file, con lui si chiudono i partiti da almeno un tetto: in fila dietro
  *   di lui costerebbero un tetto ciascuno (#1231).
  * - Se dopo una chiusura non finisce più nessun file per un altro tetto, è ferma la corsa (il disco pieno, #717), o
- *   chiudere non è servito.
+ *   chiudere non è servito: ma solo se il fermo è un chiuso o è partito qualcosa dopo. Altrimenti la corsa sta finendo
+ *   e il fermo è un altro appeso di prima, che si chiude da solo: chiusa la corsa, gli esiti dietro di lui sparivano (#1235).
  */
 export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   const partenza = new Map();
@@ -375,6 +376,7 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
   let dal = null;
   let ultimaFine = null;
   let chiusiSenzaFine = false;
+  let partitiAllaChiusura = 0;
   return (righe, ora) => {
     for (const r of righe) {
       if (r.via) { if (!partenza.has(r.via)) partenza.set(r.via, ora); }
@@ -388,11 +390,12 @@ export function guardiaPerFile(tetto = TETTO_FERMO_MS) {
     if (adesso !== primo) { primo = adesso; dal = ora; }
     if (primo === null || ora - dal < tetto) return null;
     dal = ora;
-    if (chiusiSenzaFine) return { tutto: true };
+    if (chiusiSenzaFine && (chiusi.has(primo) || partenza.size > partitiAllaChiusura)) return { tutto: true };
     const muta = ultimaFine === null || ora - ultimaFine >= tetto;
     const file = muta ? inCorso.filter((f) => f === primo || ora - partenza.get(f) >= tetto) : [primo];
     for (const f of file) chiusi.add(f);
     chiusiSenzaFine = true;
+    partitiAllaChiusura = partenza.size;
     return { file };
   };
 }

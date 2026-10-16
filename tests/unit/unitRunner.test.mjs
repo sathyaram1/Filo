@@ -538,22 +538,33 @@ test('la guardia conta il tempo fermo dal primo evento: un file lento che avanza
 test('un file appeso si chiude da solo, col suo nome e il tetto nel rosso, e gli altri file girano e dicono il loro esito', () => {
   const dir = cartellaTemporanea('filo-fermo-');
   try {
-    writeFileSync(join(dir, 'a-appeso-dopo.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
-    writeFileSync(join(dir, 'b-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano dopo il primo appeso', () => {});\n");
+    // I sani non hanno un tempo da rispettare (#1235): partono con gli appesi, e il primo appeso va avanti finché non
+    // sono usciti. Il tetto conta solo per gli appesi.
+    const usciti = ['b', 'd'].map((n) => join(dir, `${n}.uscito`));
+    const esceSegnando = (f) => `import { writeFileSync } from 'node:fs';\nprocess.on('exit', () => writeFileSync(${JSON.stringify(f)}, ''));\n`;
+    writeFileSync(join(dir, 'a-appeso-dopo.test.mjs'), "import { test } from 'node:test';\nimport { existsSync } from 'node:fs';\n"
+      + `const usciti = ${JSON.stringify(usciti)};\nconst oltre = Date.now() + 120_000;\n`
+      + "test('prima di appendersi', async (t) => {\n"
+      + "  while (!usciti.every((f) => existsSync(f))) {\n"
+      + "    if (Date.now() > oltre) throw new Error('i file sani non sono usciti in due minuti');\n"
+      + "    await t.test('aspetta i sani', () => new Promise((ok) => setTimeout(ok, 100)));\n"
+      + '  }\n});\nsetInterval(() => {}, 1000);\n');
+    writeFileSync(join(dir, 'b-sano.test.mjs'), `import { test } from 'node:test';\n${esceSegnando(usciti[0])}test('sano dopo il primo appeso', () => {});\n`);
     writeFileSync(join(dir, 'c-appeso-subito.test.mjs'), "setInterval(() => {}, 1000);\nawait new Promise(() => {});\n");
-    writeFileSync(join(dir, 'd-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano in fondo', () => {});\n");
-    // Sei secondi bastano a un file sano per partire e finire anche su una macchina lenta, dove a vuoto ci mette poco.
+    writeFileSync(join(dir, 'd-sano.test.mjs'), `import { test } from 'node:test';\n${esceSegnando(usciti[1])}test('sano in fondo', () => {});\n`);
     const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '6000' };
     delete env.NODE_TEST_CONTEXT;
-    const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    const r = spawnSync(process.execPath, [LANCIATORE, '--test-concurrency=4'], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    const uscita = `${r.stdout}\n${r.stderr}`;
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
-    assert.match(r.stdout, /^ok \d+ - sano dopo il primo appeso$/m);
-    assert.match(r.stdout, /^ok \d+ - sano in fondo$/m);
-    assert.match(r.stdout, /ROSSO: .*a-appeso-dopo\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso; gli altri file sono andati avanti/);
-    assert.match(r.stdout, /ROSSO: .*c-appeso-subito\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso/);
+    assert.match(r.stdout, /^ok \d+ - prima di appendersi$/m, uscita);
+    assert.match(r.stdout, /^ok \d+ - sano dopo il primo appeso$/m, uscita);
+    assert.match(r.stdout, /^ok \d+ - sano in fondo$/m, uscita);
+    assert.match(r.stdout, /ROSSO: .*a-appeso-dopo\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso; gli altri file sono andati avanti/, uscita);
+    assert.match(r.stdout, /ROSSO: .*c-appeso-subito\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso/, uscita);
     assert.match(r.stdout, /^not ok \d+ - .*c-appeso-subito\.test\.mjs$/m, 'node lo dà rosso');
-    assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/);
-    assert.doesNotMatch(r.stdout, /sano.*non è andato avanti/);
+    assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/, uscita);
+    assert.doesNotMatch(r.stdout, /sano.*non è andato avanti/, uscita);
     assert.equal(r.status, 1);
   } finally {
     togliCartella(dir);
@@ -615,6 +626,26 @@ test('più file appesi insieme si chiudono insieme, e se dopo non finisce più n
   assert.deepEqual(sani([], 2500), { file: ['c'] }, 'd è finito da sé: la corsa va avanti, e si continua a chiudere file');
   assert.match(testoFileChiusi([join(ROOT, 'tests', 'unit', 'x.test.mjs')], 20 * 60 * 1000, ROOT),
     /^\[test:unit\] ROSSO: tests\/unit\/x\.test\.mjs non è andato avanti per 20 minuti ed è stato chiuso; gli altri file sono andati avanti\.$/);
+});
+
+// #1235: chiusa la corsa, gli esiti dei file finiti dietro all'ultimo appeso sparivano.
+test('in fondo alla corsa l\'appeso che resta dopo una chiusura si chiude da solo; se dopo è partito qualcosa che non finisce, è ferma la corsa', () => {
+  const coda = guardiaPerFile(1000);
+  assert.equal(coda([{ via: 'a' }, { via: 'b' }, { via: 'c' }, {}], 0), null);
+  assert.equal(coda([{ fine: 'b' }], 300), null);
+  assert.deepEqual(coda([], 1000), { file: ['a'] }, 'b è finito da poco: la corsa è viva, si chiude solo il primo');
+  assert.equal(coda([{ fine: 'a' }], 1100), null);
+  assert.equal(coda([], 2099), null);
+  assert.deepEqual(coda([], 2100), { file: ['c'] }, 'dopo la chiusura non è partito niente: c è un appeso di prima, come a');
+  assert.equal(coda([{ fine: 'c' }], 2200), null);
+  assert.equal(coda([], 99_999), null);
+
+  const ferma = guardiaPerFile(1000);
+  ferma([{ via: 'a' }, { via: 'b' }, { via: 'c' }, {}], 0);
+  ferma([{ fine: 'b' }], 300);
+  assert.deepEqual(ferma([], 1000), { file: ['a'] });
+  assert.equal(ferma([{ fine: 'a' }, { via: 'd' }], 1100), null);
+  assert.deepEqual(ferma([], 2100), { tutto: true }, 'd è partito dopo la chiusura e non finisce nemmeno lui');
 });
 
 test('il processo del file da chiudere si trova dalla riga di comando, coi suoi figli, e solo sotto il node --test', () => {
@@ -714,21 +745,22 @@ test('--solo fa girare solo i file dati, con la guardia della corsa intera: un f
     writeFileSync(join(dir, 'scelto.test.mjs'), "import { test } from 'node:test';\ntest('scelto', () => {});\n");
     writeFileSync(join(dir, 'altro.test.mjs'), "import { test } from 'node:test';\ntest('altro', () => { throw new Error('non doveva girare'); });\n");
     writeFileSync(join(dir, 'fermo.test.mjs'), "import { test } from 'node:test';\ntest('prima di fermarsi', () => {});\nsetInterval(() => {}, 1000);\n");
-    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    const env = { ...process.env, FILO_UNIT_DIR: dir };
     delete env.NODE_TEST_CONTEXT;
-    const lancia = (...file) => spawnSync(process.execPath, [LANCIATORE, '--solo', ...file], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    // Il tetto piccolo solo dove c'è un fermo da chiudere: sotto carico un file sano può metterci di più a partire (#1235).
+    const lancia = (file, tetto = {}) => spawnSync(process.execPath, [LANCIATORE, '--solo', ...file], { env: { ...env, ...tetto }, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
 
-    const scelto = lancia(join(dir, 'scelto.test.mjs'));
+    const scelto = lancia([join(dir, 'scelto.test.mjs')]);
     assert.equal(scelto.status, 0, scelto.stdout + scelto.stderr);
     assert.match(scelto.stdout, /^ok 1 - scelto$/m);
     assert.doesNotMatch(scelto.stdout, /altro|fermo/);
 
-    const fermo = lancia(join(dir, 'fermo.test.mjs'));
+    const fermo = lancia([join(dir, 'fermo.test.mjs')], { FILO_UNIT_TETTO_FERMO_MS: '3000' });
     assert.notEqual(fermo.error?.code, 'ETIMEDOUT', 'la riprova è rimasta appesa');
     assert.match(fermo.stdout, /ROSSO: .*fermo\.test\.mjs non è andato avanti/);
     assert.equal(fermo.status, 1);
 
-    const vuoto = lancia();
+    const vuoto = lancia([]);
     assert.equal(vuoto.status, 1, 'zero file non è un verde');
     assert.match(vuoto.stderr, /--solo senza file/);
   } finally {
