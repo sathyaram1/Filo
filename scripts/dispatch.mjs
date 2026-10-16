@@ -408,9 +408,8 @@ export function secauditPassato(verdict) {
 export { MAX_LIVELLO_CHARS, leggiTestoLivello };
 export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 
-// Le opzioni dei --record-* e i comandi che le leggono. Si tolgono tutte PRIMA di leggere comando,
-// identificativo e testo, come il biglietto: rimaste fra i posizionali, la frase finiva nel report e
-// il suo nome faceva da identificativo (#879).
+// Si tolgono tutte PRIMA di leggere comando, identificativo e testo, come il biglietto: rimasta fra i
+// posizionali, la frase finiva nel report e il suo nome faceva da identificativo (#879).
 export const OPZIONI_REGISTRAZIONE = {
   '--segnala': { tipo: 'file', comandi: ['--record-verifier', '--record-fixed'] },
   '--nota': { tipo: 'file', comandi: ['--record-secaudit'] },
