@@ -91,6 +91,13 @@ test('«aprila» al turno dopo: la pagina trovata si apre e lascia la lista; con
       { text: 'Aperta, ed è rimasta in lista.' },
     ]);
     const page = await home(app);
+    // «Aperti per dopo» resta aperta in un'altra scheda: tornandoci non deve mostrare la pagina che la chat ha aperto.
+    await shell.evaluate(() => window.filoShell.tabs.open('filo://home/home.html'));
+    let lista = null;
+    await expect.poll(() => { lista = app.windows().find((w) => w.url().startsWith('filo://home/home.html')) || null; return !!lista; }, { timeout: 10_000 }).toBe(true);
+    await expect(lista.locator('.sn-card')).toHaveCount(3, { timeout: 10_000 });
+    const idDi = (prefisso) => shell.evaluate(async (p) => (await window.filoShell.tabs.snapshot()).tabs.find((t) => t.url.startsWith(p))?.id, prefisso);
+    await shell.evaluate((id) => window.filoShell.tabs.activate(id), await idDi('filo://newtab'));
     await chiedi(page, 'aprimi le pagine salvate sul campeggio');
     await expect(page.locator('.dash-salvata-btn')).toHaveCount(1, { timeout: 20_000 });
 
