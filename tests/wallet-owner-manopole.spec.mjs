@@ -402,6 +402,14 @@ test('gli ingressi con invito rimasti si cambiano dalla pagina, come le altre ma
   await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
   await expect(page.locator('#knob-invitesRemaining')).toHaveValue('20', { timeout: 15_000 });
   expect(patch.length).toBe(3);
+
+  // Mille scritto alla italiana è mille, non uno.
+  await page.locator('#knob-invitesRemaining').fill('');
+  await page.locator('#knob-invitesRemaining').pressSequentially('1.000');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(page.locator('#knob-invitesRemaining-msg')).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(1000);
+  await expect(page.locator('#knob-invitesRemaining')).toHaveValue('1000');
 });
 
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {
