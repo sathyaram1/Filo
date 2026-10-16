@@ -59,9 +59,23 @@ function typoBloccante(sld, token, dist) {
   return dist === 1 || osaDistance(sld.replace(/rn/g, 'm').replace(/vv/g, 'w'), token) <= 1;
 }
 
+// Il confronto coi marchi è la parte cara del verdetto, e dipende solo dal nome: una pagina con migliaia di link ne ha
+// pochi siti (#965). Tetto largo, il più vecchio esce per primo.
+const MEMO_MAX = 20000;
+const memo = new Map();
+function matchBrands(norm) {
+  const k = [norm.hostUnicode || norm.host, norm.registrable, norm.sldUnicode || norm.sld, norm.ospitato ? 1 : 0].join('|');
+  const noto = memo.get(k);
+  if (noto) return noto;
+  const r = cercaMarchi(norm);
+  memo.set(k, r);
+  if (memo.size > MEMO_MAX) memo.delete(memo.keys().next().value);
+  return r;
+}
+
 // Cerca la migliore corrispondenza di impersonazione fra i brand noti.
 // Ritorna { strict, weak, broad } dove ciascuno è null o { brand, reason, ... }.
-function matchBrands(norm) {
+function cercaMarchi(norm) {
   // Confronti SEMPRE sulla forma Unicode decodificata (un dominio camuffato in
   // punycode, es. xn--80ak6aa92e, va confrontato per ciò che mostra: "аррӏе").
   const sld = (norm.sldUnicode || norm.sld || '').toLowerCase();
