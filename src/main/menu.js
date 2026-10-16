@@ -170,8 +170,10 @@ function zoom(verso) {
   try { c.tab.view.webContents.send('filo:zoom-key', verso); } catch (_) {}
 }
 
-function schermoIntero() {
+// Dal tasto, lo schermo pieno chiesto dalla pagina (un video) resta suo, come in src/main/shortcuts.js.
+function schermoIntero(_voce, _finestra, evento) {
   const win = finestra();
+  if (evento && evento.triggeredByAccelerator && win && win._filoTabs && win._filoTabs.pageFullscreen) return;
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
 }
 
