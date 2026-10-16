@@ -9,6 +9,8 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+globalThis.self = globalThis;
+require(join(ROOT, 'src', 'shared', 'constants.js'));
 const { buildExportZip, readExportZip, mergeImportedData, unzip } = require(join(ROOT, 'src', 'main', 'services', 'exportData.js'));
 const C = globalThis.SN_CONST;
 
@@ -31,7 +33,7 @@ function sorgente() {
 }
 const FILO = Buffer.from(`{"tipo":"messaggio","testo":"imposta la chiave openrouter ${CHIAVE}"}\n{"tipo":"messaggio","testo":"grazie"}\n`, 'utf8');
 
-const voce = (zip, nome) => unzip(zip).find((e) => e.name === nome).buffer.toString('utf8');
+const voce = (zip, nome) => unzip(zip).voci.get(nome).toString('utf8');
 
 test('di serie l\'archivio non contiene nessuna chiave, da nessuna parte', () => {
   const zip = buildExportZip(sorgente(), { filo: FILO });
