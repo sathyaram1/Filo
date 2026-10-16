@@ -1175,41 +1175,9 @@
     }
   }
 
-  // Normalizza e valida ogni riga della blacklist come il campo "siti fidati":
-  // scarta schema/path/www, minuscolo, e tiene solo domini con estensione
-  // (niente IP o nomi a etichetta singola come "facebook"). Ritorna i domini
-  // validi (deduplicati) e le righe scartate così com'erano, per l'avviso; `scartate` le tiene
-  // col posto (quanti domini validi le precedevano), per ridarle dove l'utente le aveva scritte.
-  function parseBlacklist(raw) {
-    const valid = [];
-    const seen = new Set();
-    const invalid = [];
-    const scartate = [];
-    for (const line of String(raw || '').split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      const domain = cleanDomain(trimmed);
-      if (!domain) { invalid.push(trimmed); scartate.push({ riga: trimmed, dopo: valid.length }); continue; }
-      if (seen.has(domain)) continue;
-      seen.add(domain);
-      valid.push(domain);
-    }
-    return { valid, invalid, scartate };
-  }
-
-  function righe(validi, scartate) {
-    const v = (Array.isArray(validi) ? validi : []).filter((r) => typeof r === 'string' && r.trim());
-    const s = (Array.isArray(scartate) ? scartate : [])
-      .map((x) => (typeof x === 'string' ? { riga: x, dopo: v.length } : x))
-      .filter((x) => x && typeof x.riga === 'string' && x.riga.trim());
-    const posto = (x) => Math.max(0, Math.min(v.length, Math.floor(Number(x.dopo)) || 0));
-    const out = [];
-    for (let i = 0; i <= v.length; i++) {
-      for (const x of s) if (posto(x) === i) out.push(x.riga);
-      if (i < v.length) out.push(leggibile(v[i]));
-    }
-    return out.join('\n');
-  }
+  // Ogni riga ridotta come i siti fidati (niente IP né nomi senza estensione): i validi e le righe scartate col loro posto.
+  const parseBlacklist = window.SN_NOMI_SITO.elencoDaTesto;
+  const righe = window.SN_NOMI_SITO.testoDaElenco;
 
   // Le caselle di testo della pagina non hanno un «Salva» (#590.2): ognuna si iscrive qui e ne eredita pausa e uscite.
   // L'uscita vera accende gli avvisi anche se il testo è già partito col Ctrl di Ctrl+Tab, e il sito lasciato
