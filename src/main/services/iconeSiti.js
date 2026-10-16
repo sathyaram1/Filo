@@ -64,13 +64,21 @@ function crea({ adesso = () => Date.now(), iconaPer = IconaScheda.iconaPer } = {
 
   // `schede`: quelle aperte nelle finestre dello stesso tipo; `voci()`: salvate e archiviate, lette solo se servono.
   // In incognito (`incognito: true`) non si ricorda niente: finita la finestra, non resta traccia dei siti chiesti.
-  async function cercaIconaSito(url, { ses = null, schede = [], voci = async () => [], incognito = false } = {}) {
+  // `soloCopie`: l'indirizzo chiede l'OK prima di uscire, e il nome del sito può essere il dato; niente rete, solo copie già in casa.
+  async function cercaIconaSito(url, { ses = null, schede = [], voci = async () => [], incognito = false, soloCopie = false } = {}) {
     const sito = sitoDi(url);
     if (!sito) return '';
     const vista = copiaInScheda(sito, schede);
     if (vista) return vista;
     const chiave = `${incognito ? 'i' : 'n'}|${sito.host}`;
     const nota = ricordate.get(chiave);
+    if (soloCopie) {
+      if (nota && nota.dato) return nota.dato;
+      let copie;
+      try { copie = candidati(sito, await voci()).filter((u) => DATO_RE.test(u)); } catch (_) { copie = []; }
+      if (!copie.length) return '';
+      try { return (await iconaPer(null, copie, { cookie: false })).dato || ''; } catch (_) { return ''; }
+    }
     if (nota && nota.scade > adesso()) return nota.dato;
     if (inCorso.has(chiave)) return inCorso.get(chiave);
     const giro = (async () => {
