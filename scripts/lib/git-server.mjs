@@ -54,6 +54,18 @@ export function senzaToken(testo, token) {
 }
 
 /**
+ * Chi ha respinto git, dal suo stderr: dietro il proxy della sessione un rifiuto può non venire da GitHub, e dirlo di
+ * GitHub svia la diagnosi (#1233). → 'proxy' | 'github' | 'ignoto' (rifiuto non firmato) | '' (non è un rifiuto). PURA.
+ */
+export function chiHaRespinto(stderr) {
+  const t = String(stderr || '');
+  if (/from proxy|returned error: 407|^remote:.*proxy/im.test(t)) return 'proxy';
+  if (/^remote:.*(repository not found|invalid username or (password|token)|permission to \S+ denied|write access to repository not granted|password authentication|support for password)/im.test(t)) return 'github';
+  if (/authentication failed|could not read username|returned error: 40[134]|not found/i.test(t)) return 'ignoto';
+  return '';
+}
+
+/**
  * Le voci di git che fanno passare il token, e solo lui, verso filo-security. Senza token: solo gli azzeramenti, e
  * l'URL del repo resta sé stesso. `url` cambia solo nelle prove: il comando non lo espone. PURA.
  */
