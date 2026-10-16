@@ -979,7 +979,10 @@
   function pressioneFisica(tasto, layout, esplicita, car) {
     const t = leggiTasto(tasto);
     if (!t) return null;
-    const key = car && [...car].length === 1 ? car : keyDelCodice(t.code, layout);
+    // Con Shift una cifra o un simbolo scrivono un carattere che la tastiera non dice: meglio nessuno che quello senza Shift
+    // (Ctrl+Shift+0 non è lo zoom, Ctrl+Shift+\ non è la barra laterale). Le cifre restano riconoscibili dal codice.
+    const ignoto = t.mod.includes('s') && CODICI_SCRITTI.test(t.code) && !/^Key/.test(t.code);
+    const key = car && [...car].length === 1 ? car : ignoto ? '' : keyDelCodice(t.code, layout);
     const [c, cm, mac] = [t.mod.includes('c'), t.mod.includes('m'), suMac(esplicita)];
     return {
       ctrlKey: cm || (c && !mac), metaKey: cm || (c && mac),
