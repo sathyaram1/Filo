@@ -4609,6 +4609,42 @@ function fileNominatiDallaRisposta(textReply, azioni) {
     .map(({ r }, k) => ({ type: 'APRI_FILE', percorso: r.percorso, etichetta: r.nome, _callId: `trovato_${k}` }));
 }
 
+// #845 — le pagine trovate con CERCA_SALVATE che la risposta nomina diventano bottoni sotto la risposta, nell'ordine in
+// cui le nomina (`_output.nominate`). Nominata vuol dire il titolo, un suo pezzo di almeno due parole fra « - » o « | »
+// (il nome del sito da solo no: lo hanno tutte le sue pagine), o l'indirizzo; non scartata («non X»), né già aperta.
+function nomiDellaSalvata(p, piano) {
+  const titolo = piano(p.title);
+  const nomi = titolo.length >= 4 ? [titolo] : [];
+  for (const pezzo of titolo.split(/\s[-–—|·:]\s/)) {
+    const t = pezzo.trim();
+    if (t !== titolo && t.length >= 8 && t.includes(' ')) nomi.push(t);
+  }
+  const indirizzo = piano(String(p.url || '').replace(/^https?:\/\//i, '').replace(/\/+$/, ''));
+  if (indirizzo.length >= 6) nomi.push(indirizzo);
+  return nomi;
+}
+function segnaSalvateNominate(textReply, azioni) {
+  const piano = (s) => ChatArchive.normalizeForSearch(String(s || '')).replace(/[«»"“”‘’*_`]/g, ' ').replace(/\s+/g, ' ').trim();
+  const testo = piano(textReply);
+  const lista = Array.isArray(azioni) ? azioni : [];
+  const aperte = new Set(lista.filter((x) => x && String(x.type || '').toUpperCase() === 'APRI_SALVATA' && x._output && x._output.aperta)
+    .map((x) => x._output.id));
+  for (const x of lista) {
+    if (!x || String(x.type || '').toUpperCase() !== 'CERCA_SALVATE' || !x._output || !Array.isArray(x._output.pagine)) continue;
+    const trovate = [];
+    for (const p of x._output.pagine) {
+      if (!p || !p.id || aperte.has(p.id)) continue;
+      let i = -1;
+      for (const nome of testo ? nomiDellaSalvata(p, piano) : []) {
+        const k = posizioneDelNome(testo, nome);
+        if (k >= 0 && (i < 0 || k < i)) i = k;
+      }
+      if (i >= 0) trovate.push({ id: p.id, i });
+    }
+    x._output.nominate = trovate.sort((a, b) => a.i - b.i).map((t) => t.id);
+  }
+}
+
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
 // #868 — quanto si aspettano i pezzi vecchi del filo: oltre, il turno parte senza (l'attesa è attrito).
 const ATTESA_RICORDI_MS = 2500;
