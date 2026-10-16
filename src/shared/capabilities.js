@@ -312,14 +312,14 @@
     {
       id: 'save-for-later', title: 'Salva la pagina per dopo', category: 'save',
       desc: 'Mette da parte la pagina corrente (titolo, indirizzo, anteprima) e chiude la scheda, per riprenderla quando vuoi. Se salvi una pagina che avevi già messo da parte, aggiorna la voce esistente e la riporta in cima invece di crearne un doppione.',
-      invoke: '{tasto:save-for-later}, oppure menu del tasto destro → "Salva per dopo".',
+      invoke: '{tasto:save-for-later}, oppure menu del tasto destro → "Salva per dopo", oppure chiedendolo all’Aiuto sopra la pagina («salvala per dopo»): salva allo stesso modo e chiude la scheda.',
       doesNot: 'Salva i riferimenti e un’anteprima, non lo stato della pagina (moduli compilati, sessione). Vale solo per le pagine web: sulle schermate interne di Filo non fa nulla. Ne tiene al massimo 1000: oltre, la più vecchia esce dall’elenco e un avviso nella finestra dice quale.',
     },
     {
       id: 'open-for-later', title: 'Aperti per dopo', category: 'save',
       desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire. Con le categorie automatiche ogni pagina salvata prende una categoria scelta da un modello e la lista si raggruppa per categoria: sono spente di serie, e si accendono in Preferenze → Impostazioni avanzate → «Funzioni» o chiedendolo a Filo. Su ogni scheda il menu proprio (tasto destro, tasto Menu o Maiusc+F10): «Apri», «Apri e tienila in lista», «Copia link», «Sposta in…» (fra le categorie che ci sono o in una «Nuova categoria…»; compare solo se ci sono categorie) e «Rimuovi», che per qualche secondo si annulla dall’avviso.',
-      invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Anche cliccando la conferma che appare dopo «Salva per dopo». Clicca una scheda per riaprirla (si toglie dalla lista).',
-      doesNot: 'Non è la home: l’icona Home della barra laterale porta alla nuova scheda, non a questa lista.',
+      invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Anche cliccando la conferma che appare dopo «Salva per dopo». Clicca una scheda per riaprirla (si toglie dalla lista). Oppure a parole nella chat di Filo: «dov’era quella ricetta che avevo salvato?» o «aprimi le pagine salvate sul campeggio» cerca fra le pagine salvate per titolo, indirizzo e categoria e risponde con le pagine da cliccare (il clic le apre e le toglie dalla lista, come qui); «aprila» la apre e la toglie, «aprila ma tienila» la lascia in lista.',
+      doesNot: 'Non è la home: l’icona Home della barra laterale porta alla nuova scheda, non a questa lista. Chiedendo in chat si cerca per titolo, indirizzo e categoria, non nel contenuto delle pagine.',
     },
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
