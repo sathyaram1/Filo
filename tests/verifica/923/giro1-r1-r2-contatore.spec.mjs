@@ -115,7 +115,9 @@ for (const [come, contatore] of [
     });
     await apriGestione(f);
     const prossimo = await FB.nextSeq().catch((e) => `rifiutato: ${e.message}`);
-    expect(prossimo, `contatore dopo la sincronizzazione: ${f.db.contatore}`).toBe(901);
+    // Un numero nuovo, mai uno già dato: il valore esatto lo sceglie la cura.
+    expect(Number.isInteger(prossimo) && prossimo > 900 && prossimo < 1000000,
+      `prossimo: ${prossimo}, contatore dopo la sincronizzazione: ${f.db.contatore}`).toBe(true);
   });
 }
 
