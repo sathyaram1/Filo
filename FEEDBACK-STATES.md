@@ -359,11 +359,13 @@ resta — e il server lascia un **segnalibro di ripresa** nello stato del giro (
 è fermato, perché, i rilievi rimasti aperti). Nei casi `clarify` e `decisione` la
 dashboard offre la casella di risposta (su `loop` si rimette in coda e basta): la
 risposta dell'owner va nella conversazione, il feedback torna `todo`, e la coda —
-vedendo ramo e segnalibro — manda
-un **correttore sul ramo** (ruolo `fixer`, testo `resolver-ripresa.md`) con domanda,
-risposta e rilievi fermi nel payload (`ripresa`), non un risolutore da capo; dopo la
-sua consegna riprova un verificatore. Se la domanda era arrivata prima di avere un
-ramo, riprende un risolutore con la stessa `ripresa` nel payload. Un `→ In coda`
+vedendo il segnalibro, che registra il ruolo vero col suo caso — **fa ripartire il
+ruolo che si era fermato** (#1203), con domanda, risposta e rilievi fermi nel
+payload (`ripresa`) e il pezzo condiviso `_ripresa.md` in coda al suo testo: il
+primo lavoro riparte come primo lavoro (sul suo ramo, se ne aveva già uno); un
+verificatore fermato su una decisione, o chi correggeva fermato con una
+segnalazione, riparte come verifica completa, che poi corregge come ogni giro; un
+riallineamento riparte come riallineamento. Un `→ In coda`
 senza testo vale «va bene quello che è stato fatto nel frattempo»; un commento
 scritto approvando conta come risposta solo se è arrivato dopo lo stop; (4) fix bocciato
 dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
