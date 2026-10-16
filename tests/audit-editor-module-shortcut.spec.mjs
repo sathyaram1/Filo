@@ -257,7 +257,8 @@ test('una scorciatoia modulo che Filo si prende prima viene rifiutata', async ({
 const NOMI = [
   { scritto: 'Ctrl+Space', premi: 'Control+Space' },
   { scritto: 'Ctrl+Spazio', premi: 'Control+Space' },
-  { scritto: 'Ctrl+Up', premi: 'Control+ArrowUp' },
+  // Ctrl+Su no: nel foglio sale di un paragrafo, e un modulo non la prende.
+  { scritto: 'Alt+Up', premi: 'Alt+ArrowUp' },
   { scritto: 'Control+Shift+2', premi: 'Control+Shift+Digit2' },
   // Su Windows Ctrl+Esc apre Start: lì il campo la rifiuta (prova sotto).
   ...(process.platform === 'win32' ? [] : [{ scritto: 'Ctrl+Esc', premi: 'Control+Escape' }]),

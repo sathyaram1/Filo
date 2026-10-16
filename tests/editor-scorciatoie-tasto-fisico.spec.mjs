@@ -249,3 +249,71 @@ test('nel campo Ctrl+W non chiude la scheda: si registra e si rifiuta dicendo di
   await expect(page.locator('#overlay')).toBeHidden();
   await expect.poll(registra).toBe(false);
 });
+
+test('una combinazione premuta si toglie con Backspace, anche dopo Ctrl+A', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await tastiera(page, US);
+  await apriDocConModuli(page, [{ ...WC, data: { count: 'words', shortcut: 'Ctrl+Shift+K', tasto: 'cs|KeyK' } }]);
+
+  await modulo(page, 'word-count');
+  await page.locator('#cfgShortcut').click();
+  // Quella salvata è un pezzo solo: Canc la toglie, e salvando il modulo resta senza.
+  await page.keyboard.press('Delete');
+  await expect(page.locator('#cfgShortcut')).toHaveValue('');
+  await page.keyboard.press('Control+Shift+KeyJ');
+  await expect(page.locator('#cfgShortcut')).toHaveValue('Ctrl+Shift+J');
+  await page.keyboard.press('Control+KeyA');
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('seleziona tutto');
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('#cfgShortcut')).toHaveValue('');
+  await expect(page.locator('#cfgShortcutTaken')).toBeHidden();
+  await page.click('#cfgSave');
+  await expect(page.locator('#overlay')).toBeHidden();
+  await expect.poll(() => salvata(page, 'wc-t')).toEqual({ shortcut: '', tasto: '' });
+});
+
+test('i tasti con cui si scrive nel foglio non vanno a un modulo', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await tastiera(page, US);
+  // Salvata prima di questo controllo: il pannello lo dice, e nel foglio il tasto cancella la parola.
+  await apriDocConModuli(page, [{ ...WC, data: { count: 'words', shortcut: 'Ctrl+Backspace', tasto: 'c|Backspace' } }]);
+  await page.click('#doc');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Control+Backspace');
+  await expect(page.locator('#doc')).toHaveText('ciao ');
+  await expect(page.locator('#overlay')).toBeHidden();
+
+  await modulo(page, 'word-count');
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('cancellare e a muoversi nel testo');
+  await page.locator('#cfgShortcut').click();
+  for (const [premuta, nome] of [['Control+Delete', 'Ctrl+Canc'], ['Control+ArrowLeft', 'Ctrl+←'], ['Control+Shift+ArrowRight', 'Ctrl+Shift+→'], ['Control+End', 'Ctrl+Fine']]) {
+    await page.keyboard.press(premuta);
+    await expect(page.locator('#cfgShortcut')).toHaveValue(nome);
+    await expect(page.locator('#cfgShortcutTaken')).toContainText('cancellare e a muoversi nel testo');
+  }
+  for (const scritta of ['Ctrl+Backspace', 'Ctrl+Inizio', 'ctrl+shift+sinistra']) {
+    await page.fill('#cfgShortcut', scritta);
+    await page.click('#cfgSave');
+    await expect(page.locator('#cfgShortcutTaken')).toContainText('cancellare e a muoversi nel testo');
+  }
+  await expect(page.locator('#overlay')).toBeVisible();
+});
+
+test('su Mac Opzione+Backspace e Cmd+freccia restano al testo', async ({ openTab }) => {
+  const page = await openTab(EDITOR);
+  await page.waitForLoadState('domcontentloaded');
+  await tastiera(page, US);
+  await sistema(page, 'darwin');
+  await apriDocConModuli(page, [WC]);
+  await modulo(page, 'word-count');
+  await page.locator('#cfgShortcut').click();
+  await premi(page, { key: 'Backspace', code: 'Backspace', modifiers: 1 });
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('cancellare e a muoversi nel testo');
+  await premi(page, { key: 'ArrowDown', code: 'ArrowDown', modifiers: 4 | 8 });
+  await expect(page.locator('#cfgShortcutTaken')).toContainText('cancellare e a muoversi nel testo');
+  // Una lettera con Opzione resta libera.
+  await premi(page, { key: '˚', code: 'KeyK', modifiers: 1 });
+  await expect(page.locator('#cfgShortcutTaken')).toBeHidden();
+});
