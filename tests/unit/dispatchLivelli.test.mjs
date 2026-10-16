@@ -32,7 +32,7 @@ const {
   applySecaudit,
   defaultState,
   secauditPassato,
-  stripFileArg,
+  leggiOpzioniRegistrazione,
   leggiTestoLivello,
   fixedPayload,
   secauditPayload,
