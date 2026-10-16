@@ -204,6 +204,9 @@
     popup_calc_result: 'Risultato',
     popup_followup_placeholder: 'Domanda di follow-up… (Invio per inviare, Shift+Invio nuova riga)',
     popup_send: 'Invia',
+    popup_copy: 'Copia',
+    popup_copied: 'Copiato',
+    popup_copy_failed: 'Non copiato',
 
     // Errori
     err_no_api_key: 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti. In alternativa, lì puoi mettere una tua chiave OpenRouter.',
