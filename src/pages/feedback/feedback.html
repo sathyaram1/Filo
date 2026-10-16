@@ -92,7 +92,23 @@
       font-size: 12px; color: var(--sn-muted); cursor: pointer;
     }
     .fb-filter:hover { color: var(--sn-fg); }
-    .fb-actions { margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px; }
+    /* La riga dei tasti: a sinistra la frase (fissa, qualunque sia il numero di azioni), a destra le azioni di stato. */
+    .fb-tasti { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+    .fb-actions { margin-left: auto; display: flex; justify-content: flex-end; gap: 8px; }
+    /* Il tasto della frase ha la resa di Gestione: la freccia si gira da aperto, pallino e accento se una frase c'è già. */
+    .fb-usernote-toggle::after {
+      content: '▾'; display: inline-block; margin-left: 6px;
+      font-size: 11px; color: var(--sn-muted);
+      transition: transform calc(0.12s * var(--sn-motion, 1));
+    }
+    .fb-usernote-toggle[aria-expanded="true"]::after { transform: rotate(180deg); }
+    .sn-page button.fb-usernote-toggle.fb-usernote-piena {
+      border-color: var(--sn-accent, #c8763c);
+      color: var(--sn-accent, #c8763c);
+    }
+    .fb-usernote-toggle.fb-usernote-piena::before {
+      content: '●'; margin-right: 6px; font-size: 9px; vertical-align: middle;
+    }
     /* UN CLIC, UNA SCHEDA: mentre la scrittura è in volo la scheda si spegne, così il clic si VEDE — non vedendo
        niente veniva naturale premere una seconda volta — e poi resta al suo posto, con l'esito scritto. */
     .fb-card--busy { opacity: 0.55; }
