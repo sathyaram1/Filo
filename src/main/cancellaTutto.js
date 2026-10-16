@@ -97,6 +97,8 @@ function allAvvio(app) {
   try { dir = app.getPath('userData'); } catch (_) { return null; }
   const segno = leggiSegno(dir);
   if (!segno) return null;
+  // Una seconda copia aperta mentre la prima esce svuoterebbe la cartella sotto i suoi piedi: svuota chi tiene il lucchetto.
+  try { if (!app.requestSingleInstanceLock()) return null; } catch (_) {}
   const rimasti = svuota(dir, segno);
   const tentativi = (Number(segno.tentativi) || 0) + 1;
   if (rimasti.length && tentativi < TENTATIVI_MASSIMI) {
