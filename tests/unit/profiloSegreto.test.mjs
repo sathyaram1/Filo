@@ -117,14 +117,15 @@ describe('chiave: Argon2id nel thread a parte', () => {
     let giri = 0;
     const battito = setInterval(() => { giri++; }, 20);
     const t0 = Date.now();
-    const a = await K.derivaChiavi('un nome', SALE);
+    const a = await K.derivaChiavi('nome', Buffer.alloc(16, 1));
     const ms = Date.now() - t0;
     clearInterval(battito);
     t.diagnostic(`Argon2id t=3 m=256 MiB p=1: ${ms} ms`);
     assert.ok(ms > 100, `troppo veloce per parametri alti: ${ms} ms`);
     assert.ok(giri >= Math.floor(ms / 20) / 2, `il processo si è fermato durante la derivazione (${giri} battiti in ${ms} ms)`);
-    assert.equal(a.cifra.length, 32);
-    assert.notDeepEqual(a.cifra, a.posto);
+    // Le stesse in Node e nel Node di Electron: cambiano solo se cambiano parametri, etichette o libreria.
+    assert.equal(a.cifra.toString('hex'), 'cf42ef198024fcc2aa3a82988e7ed59988df2fa07de16ca7941d0ec39bcb3f40');
+    assert.equal(a.posto.toString('hex'), '365cd37700b4a9fa9fdf539e3279e2fb7dbd91abbb972b8f2d0abf90757050de');
   });
 
   test('stesso nome e sale danno le stesse chiavi; un sale diverso o un nome diverso no; un sale corto si rifiuta', async () => {
