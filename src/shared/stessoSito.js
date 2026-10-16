@@ -162,9 +162,12 @@
   // (release-assets.githubusercontent.com dà le release di ogni utente GitHub). Solo per il giudizio, mai per i cookie.
   const CONDIVISI = ['githubusercontent.com', 'googleusercontent.com', 'dropboxusercontent.com',
     'github-production-release-asset-2e65be.s3.amazonaws.com'];
+  // Questi lo sono da soli, non coi nomi sotto: storage.googleapis.com/<secchio>/… è di tutti, <secchio>.storage… è di uno.
+  const CONDIVISI_HOST = new Set(['storage.googleapis.com', 'commondatastorage.googleapis.com',
+    'storage-download.googleapis.com', 'firebasestorage.googleapis.com', 'www.googleapis.com']);
   function condiviso(voce) {
     const host = hostDi(voce).replace(/\.+$/, '');
-    return !!host && CONDIVISI.some((c) => host === c || host.endsWith(`.${c}`));
+    return !!host && (CONDIVISI_HOST.has(host) || CONDIVISI.some((c) => host === c || host.endsWith(`.${c}`)));
   }
 
   // Una voce che non è il sito di nessuno: un suffisso pubblico (co.uk) o una piattaforma che ospita i siti di chiunque
