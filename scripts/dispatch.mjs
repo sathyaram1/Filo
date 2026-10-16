@@ -2298,7 +2298,7 @@ if (isMainModule) {
         console.error(`Argomento non capito: ${avanzo[0]} — non ho registrato niente. Qui ci vanno solo l'identificativo, pass|fail e --nota <file.md>.`);
         process.exit(1);
       }
-      const testo = nota.file ? leggiTestoLivello(nota.file, 'nota') : { ok: true, testo: '' };
+      const testo = opz['--nota'] ? leggiTestoLivello(opz['--nota'], 'nota') : { ok: true, testo: '' };
       if (!testo.ok) { console.error(testo.message); process.exit(1); }
       // Un pass senza nota si ferma PRIMA di consegnare, con cosa scrivere.
       const ferma = secauditSenzaNota(verdict, testo.testo);
