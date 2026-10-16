@@ -721,8 +721,8 @@
     options_cookies_whitelist_placeholder: 'es. google.com',
     options_security_fidati_title: 'Siti di cui ti fidi',
     options_security_fidati_desc:
-      'Su questi siti Filo non mostra più l\'avviso «sospetto» e non ti chiede se l\'indirizzo esiste. L\'avviso ' +
-      '«pericoloso», come quello per un sito nella lista nera di Google, compare sempre.',
+      'Su questi siti Filo non mostra più l\'avviso «sospetto» e non ti dice più che non trova l\'indirizzo. ' +
+      'L\'avviso «pericoloso» compare sempre, anche per un sito nella lista nera di Google.',
     options_security_fidati_remove: 'Togli',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
@@ -768,7 +768,7 @@
     menu_spegni_filo: 'Spegni Filo su questo sito',
     menu_riaccendi_filo: 'Riaccendi Filo su questo sito',
     filo_spento_fatto: 'Filo è spento su %s.',
-    siti_fidati_fatto: '%s è fra i siti di cui ti fidi, in Sicurezza: Filo non lo mette più in dubbio.',
+    siti_fidati_fatto: '%s è fra i siti di cui ti fidi, e Filo non lo mette più in dubbio. L\'elenco sta in Sicurezza.',
     siti_fidati_annulla: 'Annulla',
     filo_riacceso_fatto: 'Filo è di nuovo acceso su %s.',
     filo_spento_annulla: 'Annulla',
