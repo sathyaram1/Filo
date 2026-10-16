@@ -13,8 +13,8 @@ export const PAYLOAD_IN_STAMPA_MAX = 8000;
 // Oltre 30.000 caratteri l'uscita di un comando finisce in un file d'appoggio dell'harness; il margine è
 // per le righe di stderr che arrivano insieme.
 export const STAMPA_MAX = 28000;
-// Oltre questo tetto, nemmeno col payload già scaricato, la stampa finirebbe nel file dell'harness, dove il ruolo è
-// una riga JSON che non si legge per intero: lì è il testo del ruolo a uscire, intero, in un file suo.
+// Sopra questo tetto, a payload già scaricato, la stampa con due righe di stderr finirebbe nel file dell'harness, dove
+// il ruolo è una riga JSON che non si legge per intero: lì esce il testo del ruolo, intero, in un file suo.
 export const STAMPA_TETTO = 29500;
 // Sotto questa taglia un pezzo resta in stampa: spostarlo costa una lettura e non libera niente.
 const PEZZO_MIN = 1000;
