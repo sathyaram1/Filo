@@ -2349,7 +2349,9 @@
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
+      // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
+      if (isBlocked()) return;
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }
