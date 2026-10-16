@@ -1,17 +1,23 @@
-// Stage 5 (detonation): apre un link sospetto in una finestra NASCOSTA e ISOLATA, segue i redirect e guarda dove finisce.
-// Solo un link non ancora aperto, mai una pagina già aperta (regola in index.js); non blocca mai il clic, e l'esito
-// può solo rinforzare un sospetto. Finestre vive, coda e vita massima hanno un tetto (#591): niente aperture a volontà.
+// Stage 5 (detonation): apre un link in una finestra NASCOSTA e ISOLATA, senza i dati dell'utente, e guarda dove porta.
+// Solo un link non ancora aperto, mai una pagina già aperta (regola in index.js); non blocca mai il clic. Finestre
+// vive, coda e vita massima hanno un tetto (#591, #966): una finestra alla volta, niente aperture a volontà.
 
 'use strict';
 
 const Permessi = require('../permessiPagine');
 
-const MAX_CONCURRENT = 2;
+// Una sola finestra nascosta viva, qualunque cosa la chieda (#966).
+const MAX_CONCURRENT = 1;
 // Oltre questa coda un link nuovo resta senza detonation (il verdetto locale vale comunque) e lo si scrive nel log.
 const MAX_QUEUE = 50;
 const LOAD_TIMEOUT_MS = 9000;
 // Vale anche dopo la fine del caricamento: qualunque cosa faccia la pagina, la finestra muore entro questo tempo.
 const MAX_LIFETIME_MS = 15000;
+// La ricerca della destinazione di un link accorciato: pochi secondi, poi resta il controllo all'apertura.
+const VITA_DESTINAZIONE_MS = 6000;
+// Un accorciato che risponde con una pagina sua rimanda di solito da script subito dopo: oltre, la destinazione è ignota.
+const ATTESA_RIMANDO_MS = 2500;
+const MAX_PASSI = 8;
 // Lo svuotamento della memoria fra due controlli non deve poter tenere fermo il posto.
 const CLEAR_TIMEOUT_MS = 3000;
 let detonators = 0;
@@ -31,10 +37,13 @@ function createDetonator({
   maxQueue = MAX_QUEUE,
   loadTimeoutMs = LOAD_TIMEOUT_MS,
   maxLifetimeMs = MAX_LIFETIME_MS,
+  vitaDestinazioneMs = VITA_DESTINAZIONE_MS,
+  attesaRimandoMs = ATTESA_RIMANDO_MS,
 } = {}) {
   const el = () => (typeof electron === 'function' ? electron() : electron);
   let live = 0;
   const queue = [];
+  const running = new Set();
   // Una memoria isolata per posto, riusata e svuotata fra un controllo e l'altro: Electron non ne libera mai una creata.
   const detonatorId = ++detonators;
   const freeSlots = Array.from({ length: maxConcurrent }, (_, i) => `filo-detonate-${detonatorId}-${i}`);
@@ -44,12 +53,14 @@ function createDetonator({
       const job = queue.shift();
       const partition = freeSlots.shift();
       live++;
+      running.add(job);
       Promise.resolve()
-        .then(() => runOne(job.url, job.evaluateFinal, partition))
+        .then(() => job.run(partition, job))
         .catch(() => ({ result: null, cleared: null }))
         .then(({ result, cleared }) => Promise.race([Promise.resolve(cleared).catch(() => {}), wait(CLEAR_TIMEOUT_MS)])
           .then(() => {
             live--;
+            running.delete(job);
             freeSlots.push(partition);
             job.resolve(result);
             pump();
@@ -57,35 +68,48 @@ function createDetonator({
     }
   }
 
-  // `evaluateFinal(finalUrl)` è iniettata: ri-valuta l'URL finale con i segnali locali.
-  function detonate(url, evaluateFinal) {
+  function enqueue(job) {
     const e = el();
     if (!e || !e.BrowserWindow || !e.session) return Promise.resolve(null);
     if (queue.length >= maxQueue) {
-      console.warn(`[safebrowse] coda della sandbox piena (${maxQueue}): ${url} resta col solo verdetto locale`);
+      console.warn(`[safebrowse] coda della sandbox piena (${maxQueue}): ${job.url} resta col solo verdetto locale`);
       return Promise.resolve(null);
     }
     return new Promise((resolve) => {
-      queue.push({ url, evaluateFinal, resolve });
+      queue.push({ ...job, resolve });
       pump();
     });
   }
 
-  function runOne(url, evaluateFinal, partition) {
+  // `evaluateFinal(finalUrl)` è iniettata: ri-valuta l'URL finale con i segnali locali.
+  function detonate(url, evaluateFinal) {
+    return enqueue({ url, run: (partition) => runOne(url, evaluateFinal, partition) });
+  }
+
+  // La destinazione vera di un link accorciato: si seguono i rimandi finché `prosegue(url)` dice che il passo è ancora
+  // un rimando, e ci si ferma PRIMA del primo che non lo è, che è la destinazione: il sito d'arrivo non riceve visite.
+  // Conta solo l'ultimo link chiesto: quello prima, in coda o già aperto, lascia il posto.
+  function destinazione(url, prosegue) {
+    for (const j of queue.filter((x) => x.corsia === 'destinazione')) {
+      queue.splice(queue.indexOf(j), 1);
+      j.resolve(null);
+    }
+    for (const j of running) if (j.corsia === 'destinazione' && j.annulla) j.annulla();
+    return enqueue({ url, corsia: 'destinazione', run: (partition, job) => runDestinazione(url, prosegue, partition, job) });
+  }
+
+  function finestra(partition) {
     const e = el();
     const ses = e.session.fromPartition(partition, { cache: false });
-    // Una pagina sospetta riaperta di nascosto: nessuno può rispondere a una sua domanda, microfono e appunti compresi.
+    // Una pagina riaperta di nascosto: nessuno può rispondere a una sua domanda, microfono e appunti compresi.
     Permessi.negaTutto(ses);
-
-    let downloadStarted = false;
-    let downloadName = '';
+    const download = { started: false, name: '' };
     const onDownload = (ev, item) => {
-      downloadStarted = true;
-      try { downloadName = item.getFilename(); } catch (_) {}
+      download.started = true;
+      try { download.name = item.getFilename(); } catch (_) {}
       ev.preventDefault(); // non scaricare davvero nulla
     };
     try { ses.on('will-download', onDownload); } catch (_) {}
-
     const win = new e.BrowserWindow({
       show: false,
       width: 1024,
@@ -101,18 +125,25 @@ function createDetonator({
         // niente preload: la pagina gira nuda, isolata dall'app.
       },
     });
-
     const wc = win.webContents;
-    const redirects = [];
-    let finalUrl = url;
-    let finished = false;
-
-    let cleared = null;
+    try {
+      wc.on('did-create-window', (child) => { try { child.destroy(); } catch (_) {} }); // niente popup
+      wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+    } catch (_) {}
     const cleanup = () => {
       try { if (!win.isDestroyed()) win.destroy(); } catch (_) {}
       try { if (typeof ses.removeListener === 'function') ses.removeListener('will-download', onDownload); } catch (_) {}
-      try { cleared = Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) { cleared = null; }
+      try { return Promise.resolve(ses.clearStorageData()).catch(() => {}); } catch (_) { return null; }
     };
+    return { wc, download, cleanup };
+  }
+
+  function runOne(url, evaluateFinal, partition) {
+    const { wc, download, cleanup } = finestra(partition);
+    const redirects = [];
+    let finalUrl = url;
+    let finished = false;
+    let cleared = null;
 
     return new Promise((resolve) => {
       let loadTimer = null;
@@ -122,10 +153,10 @@ function createDetonator({
         finished = true;
         clearTimeout(loadTimer);
         clearTimeout(lifeTimer);
-        cleanup();
-        resolve({ result: { verdict, finalUrl, redirects, download: downloadStarted ? (downloadName || true) : false, ...extra }, cleared });
+        cleared = cleanup();
+        resolve({ result: { verdict, finalUrl, redirects, download: download.started ? (download.name || true) : false, ...extra }, cleared });
       };
-      const byNow = () => (downloadStarted ? 'dangerous' : 'clean');
+      const byNow = () => (download.started ? 'dangerous' : 'clean');
 
       loadTimer = setTimeout(() => done(byNow()), loadTimeoutMs);
       lifeTimer = setTimeout(() => done(byNow(), { expired: true }), maxLifetimeMs);
@@ -133,13 +164,11 @@ function createDetonator({
       try {
         wc.on('did-redirect-navigation', (_e, u) => { if (u) { redirects.push(u); finalUrl = u; } });
         wc.on('did-navigate', (_e, u) => { if (u) finalUrl = u; });
-        wc.on('did-create-window', (child) => { try { child.destroy(); } catch (_) {} }); // niente popup
-        wc.setWindowOpenHandler(() => ({ action: 'deny' }));
 
         wc.on('did-stop-loading', async () => {
           clearTimeout(loadTimer);
           // Download forzato → pericoloso; altrimenti conta dove porta davvero il link.
-          if (downloadStarted) return done('dangerous');
+          if (download.started) return done('dangerous');
           let verdict = 'clean';
           if (typeof evaluateFinal === 'function' && finalUrl && finalUrl !== url) {
             try {
@@ -153,27 +182,74 @@ function createDetonator({
 
         wc.on('did-fail-load', (_e, code) => {
           // -3 = ABORTED (spesso per un download intercettato): decidono will-download e i timer.
-          if (code === -3 && downloadStarted) return;
+          if (code === -3 && download.started) return;
         });
 
         Promise.resolve(wc.loadURL(url)).catch(() => done(byNow()));
       } catch (_) {
-        if (!finished) { finished = true; clearTimeout(loadTimer); clearTimeout(lifeTimer); cleanup(); resolve({ result: null, cleared }); }
+        if (!finished) { finished = true; clearTimeout(loadTimer); clearTimeout(lifeTimer); cleared = cleanup(); resolve({ result: null, cleared }); }
       }
     });
   }
 
-  return { detonate, stats: () => ({ live, queued: queue.length }) };
+  function runDestinazione(url, prosegue, partition, job) {
+    const { wc, cleanup } = finestra(partition);
+    const passi = [url];
+    return new Promise((resolve) => {
+      let finito = false;
+      let attesa = null;
+      let vita = null;
+      const fine = (dest, extra = {}) => {
+        if (finito) return;
+        finito = true;
+        clearTimeout(vita);
+        clearTimeout(attesa);
+        resolve({ result: { destinazione: dest, passi, ...extra }, cleared: cleanup() });
+      };
+      job.annulla = () => fine(null, { annullato: true });
+      vita = setTimeout(() => fine(null, { expired: true }), vitaDestinazioneMs);
+      const passo = (ev, u) => {
+        if (finito || !u) return;
+        clearTimeout(attesa);
+        passi.push(u);
+        let ancora = false;
+        try { ancora = !!prosegue(u); } catch (_) {}
+        if (ancora && passi.length <= MAX_PASSI) return;
+        try { ev.preventDefault(); } catch (_) {}
+        fine(ancora ? null : u);
+      };
+      try {
+        wc.on('will-redirect', (ev, u, _inPlace, principale) => {
+          if (principale === false || (ev && ev.isMainFrame === false)) return;
+          passo(ev, (ev && ev.url) || u);
+        });
+        // Il rimando da script o da <meta> della pagina dell'accorciatore.
+        wc.on('will-navigate', (ev, u) => passo(ev, (ev && ev.url) || u));
+        wc.on('did-stop-loading', () => {
+          if (finito) return;
+          clearTimeout(attesa);
+          attesa = setTimeout(() => fine(null), attesaRimandoMs);
+        });
+        Promise.resolve(wc.loadURL(url)).catch(() => {});
+      } catch (_) {
+        fine(null);
+      }
+    });
+  }
+
+  return { detonate, destinazione, stats: () => ({ live, queued: queue.length }) };
 }
 
 const shared = createDetonator();
 
 module.exports = {
   detonate: shared.detonate,
+  destinazione: shared.destinazione,
   stats: shared.stats,
   createDetonator,
   MAX_CONCURRENT,
   MAX_QUEUE,
   LOAD_TIMEOUT_MS,
   MAX_LIFETIME_MS,
+  VITA_DESTINAZIONE_MS,
 };
