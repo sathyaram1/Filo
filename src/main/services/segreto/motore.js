@@ -1001,28 +1001,40 @@ async function riparaProprio(ctx, S) {
     await transazione(ctx, S, { tabella, bytes: serializzaTabella(tabella), blocchiTabella: S.blocchiTabella, L2: S.L }, new Map());
   }
   const parziali = [];
-  const intere = [];
+  const persiInteri = [];
+  const daRifare = [];
+  const blocchiDi = (g) => Array.from({ length: kAtteso(S, g) }, (_, s) => GRUPPO * g + s);
   for (let g = 1; g < G; g++) {
-    const ke = kAtteso(S, g);
     const info = S.gruppi[g];
-    const blocchi = Array.from({ length: ke }, (_, s) => GRUPPO * g + s);
     if (!info) {
-      intere.push({ g, carichi: blocchi.map(() => ZERO) });
+      persiInteri.push({ g, carichi: blocchiDi(g).map(() => ZERO) });
       continue;
     }
+    const blocchi = blocchiDi(g);
     const sporco = blocchi.some((j) => !usati[j] && !(valida(S, g, 2 * j) && S.zero[j]));
     const mancanti = blocchi.some((j) => !valida(S, g, 2 * j) || !valida(S, g, 2 * j + 1));
-    if (info.k === ke && !sporco) {
+    if (info.k === blocchi.length && !sporco) {
       if (mancanti) parziali.push(g);
-      continue;
+    } else {
+      daRifare.push(g);
     }
-    const vecchi = await carichiGruppo(ctx, S, g);
-    const coperti = Math.min(info.k, ke);
-    if (blocchi.some((j, s) => s < coperti && usati[j] && !vecchi[s])) throw errore('LETTURA', 'Il contenitore non si legge più come un attimo fa.');
-    intere.push({ g, carichi: blocchi.map((j, s) => (usati[j] && vecchi[s]) || ZERO) });
   }
   await restauraMancanti(ctx, S, parziali);
-  await riscriviGruppi(ctx, S, intere);
+  await riscriviGruppi(ctx, S, persiInteri);
+  for (const lotto of aLotti(daRifare)) {
+    const letti = await carichiGruppi(ctx, S, lotto);
+    await riscriviGruppi(ctx, S, lotto.map((g) => {
+      const vecchi = letti.get(g);
+      const coperti = Math.min(S.gruppi[g].k, vecchi.length);
+      return {
+        g,
+        carichi: blocchiDi(g).map((j, s) => {
+          if (s < coperti && usati[j] && !vecchi[s]) throw errore('LETTURA', 'Il contenitore non si legge più come un attimo fa.');
+          return (usati[j] && vecchi[s]) || ZERO;
+        }),
+      };
+    }));
+  }
   await distruggiSpazzatura(ctx, S);
   await ctx.fh.datasync();
   await scriviTestaGruppo(ctx, S);
