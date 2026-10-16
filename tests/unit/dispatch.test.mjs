@@ -44,6 +44,7 @@ const {
   applySecaudit,
   buildPayload,
   readRoleInstructions,
+  suRamoNuovo,
   serialAwarenessNote,
   defaultState,
   readState,
@@ -259,6 +260,7 @@ test('le decisioni dell\'owner arrivano a chi verifica, risolve, riprende e rial
   };
   assert.deepEqual(compito('verifier').decisioni, decisioni);
   assert.deepEqual(compito('new-work').decisioni, decisioni);
+  assert.deepEqual(compito('verifier', { ripresa: { domanda: 'q', risposta: 'r', rilievi: [] } }).decisioni, decisioni);
   assert.deepEqual(compito('fixer', { ripresa: { domanda: 'q', risposta: 'r', rilievi: [] } }).decisioni, decisioni);
   assert.deepEqual(compito('fixer').decisioni, decisioni, 'anche chi riallinea deve tenere le scelte dell\'owner');
   assert.equal(compito('secaudit').decisioni, undefined);
@@ -544,35 +546,45 @@ test('CLI: --record-fixed --ferma senza --segnala si ferma prima del server, e d
   assert.match(testo, /--segnala <file\.md> che ferma il lavoro/);
 });
 
-// ─── La ripresa dopo la risposta dell'owner ──────────────────────────────────
+// ─── La ripresa dopo la risposta dell'owner: riparte il ruolo che si era fermato (#1203) ───
 
-const RIPRESA = { motivo: 'decisione', ruolo: 'verifier', domanda: 'A o B?', risposta: 'B.', rilievi: [{ level: 2, text: 'non salva', decision: false }], at: '2026-09-23T08:00:00.000Z' };
+const RIPRESA = { motivo: 'decisione', ruolo: 'verifier', caso: 'pieno', domanda: 'A o B?', risposta: 'B.', rilievi: [{ level: 2, text: 'non salva', decision: false }], at: '2026-09-23T08:00:00.000Z' };
 
-test('buildPayload: il correttore che riprende riceve domanda, risposta, rilievi e la serie; il riallineamento resta com\'era', () => {
+test('buildPayload: la ripresa arriva al ruolo che riparte (verifica completa, primo lavoro, riallineamento), e solo quando c\'è', () => {
   const history = [{ verdict: 'critica', findings: [{ level: 2, text: 'non salva' }] }];
-  const rip = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, history, ripresa: RIPRESA });
-  assert.equal(rip.case, 'ripresa');
-  assert.equal(rip.ripresa.risposta, 'B.');
-  assert.deepEqual(rip.history, history, 'chi riprende a metà di un giro deve vedere le porte già trovate');
-  const rb = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, history, ripresa: null });
-  assert.equal(rb.case, 'riallineamento');
-  assert.ok(!('ripresa' in rb));
-  assert.ok(!('history' in rb));
+  const vf = buildPayload({ role: 'verifier', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, history, ripresa: RIPRESA });
+  assert.equal(vf.scope, 'pieno', 'un verificatore che riparte rifà la verifica completa');
+  assert.deepEqual(vf.ripresa, RIPRESA);
+  assert.deepEqual(vf.history, history, 'le porte già trovate restano davanti a chi riparte');
+  const nw = buildPayload({ role: 'new-work', id: 'A', num: '#1' }, { feedback: { text: 's' }, ripresa: { ...RIPRESA, ruolo: 'new-work', caso: 'primo-passaggio' } });
+  assert.equal(nw.case, 'primo-passaggio');
+  assert.equal(nw.ripresa.domanda, 'A o B?');
+  const rb = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, critique: 'conflitto in x.js', ripresa: { ...RIPRESA, ruolo: 'fixer', caso: 'riallineamento' } });
+  assert.equal(rb.case, 'riallineamento', 'il riallineamento fermato riparte come riallineamento');
+  assert.equal(rb.ripresa.risposta, 'B.');
+  assert.equal(rb.critique, 'conflitto in x.js');
+  assert.ok(!('history' in rb), 'il riallineamento non porta la serie, ripresa o no');
+  for (const role of ['verifier', 'new-work', 'fixer']) {
+    const senza = buildPayload({ role, id: 'A', num: '#1', branch: 'worker/A' }, { feedback: { text: 's' }, ripresa: null });
+    assert.ok(!('ripresa' in senza), `${role} senza ripresa: nessun campo`);
+  }
+  assert.ok(!('ripresa' in buildPayload({ role: 'secaudit', id: 'A', branch: 'worker/A' }, { diff: 'x', ripresa: RIPRESA })), 'il controllo di sicurezza non la riceve');
 });
 
-test('buildPayload: chi risolve riceve la ripresa solo quando c\'è', () => {
-  const con = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' }, ripresa: RIPRESA });
-  assert.equal(con.case, 'primo-passaggio');
-  assert.equal(con.ripresa.domanda, 'A o B?');
-  const senza = buildPayload({ role: 'new-work', id: 'a', num: '7' }, { feedback: { text: 't' } });
-  assert.ok(!('ripresa' in senza));
-});
-
-test('serverCtx: la ripresa passa dalla busta del server a chi riprende, e un valore storto non passa', () => {
-  const ok = serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' }, ripresa: RIPRESA } });
-  assert.deepEqual(ok.ripresa, RIPRESA);
+test('serverCtx: la ripresa passa dalla busta del server al ruolo che riparte, e un valore storto non passa', () => {
+  for (const role of ['verifier', 'new-work', 'fixer']) {
+    assert.deepEqual(serverCtx({ role }, { payload: { feedback: { text: 't' }, ripresa: RIPRESA } }).ripresa, RIPRESA, role);
+  }
   assert.equal(serverCtx({ role: 'new-work' }, { payload: { feedback: { text: 't' }, ripresa: 'sì' } }).ripresa, null);
   assert.equal(serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }).ripresa, null);
+});
+
+test('suRamoNuovo: il primo lavoro nasce su un ramo nuovo, tranne quando riparte col ramo che ha già', () => {
+  assert.equal(suRamoNuovo({ role: 'new-work', branch: '' }, false), true);
+  assert.equal(suRamoNuovo({ role: 'new-work', branch: 'worker/A-1' }, false), true, 'senza ripresa un ramo nella busta non cambia niente');
+  assert.equal(suRamoNuovo({ role: 'new-work', branch: '' }, true), true, 'fermato prima di avere un ramo: ne nasce uno');
+  assert.equal(suRamoNuovo({ role: 'new-work', branch: 'worker/A-1' }, true), false, 'fermato dopo aver consegnato: si riprende il suo');
+  assert.equal(suRamoNuovo({ role: 'verifier', branch: 'worker/A-1' }, true), false);
 });
 
 test('riallineamento per unit rossi sulla fusione (#929): l\'elenco dei test rotti scritto dal server arriva a chi riallinea', () => {
@@ -587,24 +599,37 @@ test('riallineamento per unit rossi sulla fusione (#929): l\'elenco dei test rot
   assert.match(testo, /Unit rossi sulla fusione/, 'il testo di ruolo dice cosa fare dei test elencati');
 });
 
-test('readRoleInstructions: il caso del correttore sceglie il testo (ripresa ≠ rebase), e un caso ignoto vale il rebase', () => {
+test('readRoleInstructions: il pezzo della ripresa si accoda al ruolo che riparte, prima del contratto, e solo con la ripresa', () => {
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, 'resolver.md'), '# ruolo resolver\n');
   writeFileSync(resolve(dir, 'resolver-rebase.md'), '# stai facendo un rebase\n');
-  writeFileSync(resolve(dir, 'resolver-ripresa.md'), '# stai riprendendo un lavoro fermo\n');
-  assert.match(readRoleInstructions('fixer', { caso: 'ripresa' }), /riprendendo un lavoro fermo/);
-  assert.match(readRoleInstructions('fixer', { caso: 'riallineamento' }), /stai facendo un rebase/);
-  assert.match(readRoleInstructions('fixer', {}), /stai facendo un rebase/);
-  assert.match(readRoleInstructions('fixer', { caso: 'constructor' }), /stai facendo un rebase/);
+  writeFileSync(resolve(dir, 'verifier.md'), '# verifica piena\n');
+  writeFileSync(resolve(dir, 'secaudit.md'), '# controllo di sicurezza\n');
+  writeFileSync(resolve(dir, '_ripresa.md'), '## Stai riprendendo un lavoro fermo\n<!-- includi: _pezzo-ripresa.md -->\n');
+  writeFileSync(resolve(dir, '_pezzo-ripresa.md'), 'la risposta vuota tiene la strada presa\n');
+  writeFileSync(resolve(dir, '_contratto-worker.md'), '# Contratto comune dei worker\n');
+  for (const [role, titolo] of [['new-work', '# ruolo resolver'], ['verifier', '# verifica piena'], ['fixer', '# stai facendo un rebase']]) {
+    const con = readRoleInstructions(role, { ripresa: true });
+    const [a, b, c] = [titolo, 'Stai riprendendo un lavoro fermo', 'Contratto comune'].map((x) => con.indexOf(x));
+    assert.ok(a >= 0 && b > a && c > b, `${role}: ruolo, poi ripresa, poi contratto`);
+    assert.ok(con.includes('la risposta vuota tiene la strada presa') && !con.includes('includi:'), `${role}: il pezzo è espanso`);
+    assert.ok(!readRoleInstructions(role).includes('Stai riprendendo'), `${role} senza ripresa non la riceve`);
+  }
+  assert.ok(!readRoleInstructions('secaudit', { ripresa: true }).includes('Stai riprendendo'), 'il controllo di sicurezza non riprende niente');
 });
 
-test('il testo di ruolo della ripresa esiste nel repo e dice da dove si riparte', () => {
-  const testo = readFileSync(fileURLToPath(new URL('../../routines/roles/resolver-ripresa.md', import.meta.url)), 'utf8');
+test('nel repo c\'è il pezzo condiviso della ripresa, e il vecchio ruolo della ripresa non c\'è più', () => {
+  const ruoli = fileURLToPath(new URL('../../routines/roles/', import.meta.url));
+  assert.ok(!existsSync(resolve(ruoli, 'resolver-ripresa.md')), 'resolver-ripresa.md è stato tolto');
+  const testo = readFileSync(resolve(ruoli, '_ripresa.md'), 'utf8');
   assert.match(testo, /payload\.ripresa/);
-  assert.match(testo, /risposta/);
-  assert.match(testo, /--record-fixed/);
-  assert.match(testo, /includi: _segnala\.md/);
-  const segnala = readFileSync(fileURLToPath(new URL('../../routines/roles/_segnala.md', import.meta.url)), 'utf8');
+  assert.match(testo.replace(/\s+/g, ' '), /\*\*Vuota\*\* vuol dire che ha rimesso in coda senza scrivere: vale la strada presa nel frattempo/);
+  assert.match(testo, /`rilievi`/);
+  assert.match(testo, /payload\.decisioni/, 'le decisioni precedenti');
+  for (const caso of [/\*\*Primo lavoro\.\*\*/, /\*\*Verifica\.\*\* La verifica è completa/, /\*\*Riallineamento\.\*\*/]) assert.match(testo, caso);
+  assert.doesNotMatch(readFileSync(resolve(ruoli, 'resolver.md'), 'utf8'), /payload\.ripresa/, 'la ripresa vive solo nel pezzo condiviso');
+  const segnala = readFileSync(resolve(ruoli, '_segnala.md'), 'utf8');
   assert.match(segnala, /FERMA il lavoro/);
 });
 
