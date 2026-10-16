@@ -184,8 +184,7 @@
       if (s && !S.piattaforma(s, OSPITI) && !sotto.includes(s)) sotto.push(s);
     }
     const preciso = sotto.length ? sotto.slice(0, 3).map((s) => N.leggibile(s)).join(' o ') : `nome.${N.leggibile(p)}`;
-    return `«${N.leggibile(p)}» raccoglie i siti di chiunque, quindi fidarsi di lui vorrebbe dire fidarsi di tutti. `
-      + `Scrivi il sito preciso, come ${preciso}.`;
+    return `${perche} Scrivi il sito preciso, come ${preciso}.`;
   }
 
   // Le frasi vivono qui perché le dicono tre superfici diverse (l'avviso della
