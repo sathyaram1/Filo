@@ -143,5 +143,6 @@ module.exports = function tieniFiloNellaRiscrittura() {
   return {
     // Chi aveva messo qualcosa nel documento vecchio (i fogli di stile) lo rimette qui.
     allaRiscrittura(fn) { if (typeof fn === 'function') dopo.push(fn); },
+    anticipa,
   };
 };
