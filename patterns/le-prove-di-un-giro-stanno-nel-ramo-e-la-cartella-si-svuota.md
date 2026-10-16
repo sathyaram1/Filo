@@ -75,9 +75,17 @@ la cartella.
 
 ## Il rosso atteso
 
-Nel commit di una correzione c'è anche il ripiego del rosso atteso
-(`test.fail(true, '<motivo>')` in testa al corpo). **Dopo un verdetto invece si può solo
-TOGLIERE**: una riga aggiunta lì fa decadere il verdetto e costa un giro intero, e i due
+Il segno (`test.fail(true, '<motivo>')` in testa al corpo) va solo sulla prova di un
+rilievo messo da parte che resta nel ramo, mai su quella di un rilievo che si corregge
+nello stesso giro: chi verifica committa le sue prove rosse, e chi corregge le vede
+diventare verdi. Pulizia e consegne leggono una prova per quello che fa il corpo, non per
+il segno (#932): una segnata che passa («Expected to fail, but passed», rossa per
+Playwright) è una porta chiusa, e le si toglie il segno o la si toglie con la prova
+durevole; una segnata che fallisce come previsto (verde per Playwright) è una porta
+ancora aperta, e tolta ferma la consegna come ogni rossa. Prima la consegna rilanciava la
+prova col segno e respingeva proprio chi aveva corretto: l'unica strada era rimetterla
+com'era, rossa per il verificatore dopo. **Dopo un verdetto si può solo TOGLIERE**: una
+riga aggiunta lì, segno compreso, fa decadere il verdetto e costa un giro intero, e i due
 cancelli (la chiusura in locale, il cancello di fusione del server) lo controllano.
 
 ## Fuori dalla suite, davvero
