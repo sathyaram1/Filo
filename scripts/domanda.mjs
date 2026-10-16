@@ -335,4 +335,8 @@ export async function esegui(argv, io = {}) {
 }
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
-if (isMain) esegui(process.argv.slice(2)).then((code) => process.exit(code));
+if (isMain) {
+  // Le ricette dei worker lo nominano (#1241): i comandi che stampa portano alla copia fissata degli strumenti.
+  absolutizeOutput(process.env.FILO_REPO_ROOT ? resolve(process.env.FILO_REPO_ROOT) : '');
+  esegui(process.argv.slice(2)).then((code) => process.exit(code));
+}
