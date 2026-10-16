@@ -68,12 +68,12 @@ release di GitHub.
   Dentro l'immagine c'è «Se Filo non si apre», che spiega il primo avvio.
 - **Linux.** Un AppImage. Se Filo può riscrivere il proprio file, la versione
   nuova si installa quando lo chiudi, o subito con «Riavvia e aggiorna». Se non
-  può, per esempio perché la cartella del file non si può scrivere, Filo
-  avvisa. La versione nuova allora si scarica da filo.red, prende il posto del
-  file vecchio, e al file va ridato il permesso di esecuzione.
+  può, per esempio perché la cartella del file non si può scrivere, Filo lo
+  segnala e la versione nuova si scarica a mano da filo.red: prende il posto
+  del file vecchio, e al file va ridato il permesso di esecuzione.
 
-Chi spegne «Installa gli aggiornamenti da solo» nelle Preferenze riceve la
-versione nuova solo quando preme «Installa».
+Su Windows e Linux, con «Installa gli aggiornamenti da solo» spento nelle
+Preferenze, la versione nuova arriva solo quando premi «Installa».
 
 ## Architettura
 
