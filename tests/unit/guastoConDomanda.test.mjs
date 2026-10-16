@@ -152,5 +152,5 @@ test('se il server rifiuta la domanda, chi chiede legge il motivo esatto: è que
   assert.match(r.stderr, /RIFIUTATO dal server: ruolo_non_ammesso: questo biglietto non apre domande/);
   assert.equal(arrivate.length, 1);
   const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'));
-  assert.match(pezzo, /Con `RIFIUTATO dal server: …` la domanda non è partita: nella nota e nel rilascio, al posto del numero, va quel messaggio esatto/);
+  assert.match(pezzo, /con `RIFIUTATO dal server: …` nella nota e nel rilascio va quel messaggio esatto, al posto del numero/);
 });
