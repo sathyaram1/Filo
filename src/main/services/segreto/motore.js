@@ -435,6 +435,14 @@ async function cerca(ctx, S, ids, { pota = false } = {}) {
   for (const i of ids) if (!(S.pos[i] >= 0)) attivi.set(i, { r: 0, vuoti: 0 });
   const occ = ctx.mappa.occ;
   let calcoli = 0;
+  const tetto = (i) => {
+    if (S.candidati) return TENTATIVI_A_VUOTO;
+    const g = Math.floor((i >> 1) / GRUPPO);
+    const ke = kAtteso(S, g);
+    let n = 0;
+    for (let x = 2 * GRUPPO * g; x < 2 * GRUPPO * g + 2 * ke; x++) if (S.pos[x] >= 0) n++;
+    return n >= ke ? TENTATIVI_SE_REGGE : TENTATIVI_A_VUOTO;
+  };
   while (attivi.size && !S.scansionato) {
     if (pota) {
       const kMax = S.candidati.reduce((m, c) => (c.j < GRUPPO ? Math.max(m, c.k) : m), 0);
