@@ -1,4 +1,4 @@
-// Rilevamento siti pericolosi per scheda (mixin di TabManager): verdetto, bypass e chiusura per (scheda, dominio).
+// Rilevamento siti pericolosi per scheda (mixin di TabManager): verdetto, «confermo» per (scheda, dominio), siti fidati.
 // L'avviso lo disegna la vista sopra la scheda (src/main/avvisoSito.js), mai la pagina; il content script manda indizi.
 // Niente blocca la navigazione. Regole: patterns/un-avviso-su-una-pagina-non-sta-dentro-la-pagina.md
 
