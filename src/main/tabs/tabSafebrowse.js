@@ -416,7 +416,9 @@ const safebrowseMethods = {
   _sbScelta(tab, scelta, dati = {}) {
     const a = tab && tab.sbAvviso;
     if (!a) return;
-    if (scelta === 'procedi') {
+    if (a.prima && ['procedi', 'continua', 'indietro'].includes(scelta)) {
+      this._sbSceltaPrima(tab, a, scelta, dati);
+    } else if (scelta === 'procedi') {
       if (a.level === 'pericoloso' && String(dati.testo || '').trim().toLowerCase() === 'confermo') {
         this.safebrowseProceed(tab.id, a.url);
       }
