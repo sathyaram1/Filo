@@ -840,6 +840,42 @@
     }).join('\n');
   }
 
+  // ── La frase per chi ha segnalato parte chiusa, come in Gestione (#497, #857) ──
+  // Si scrive una volta sola, e aperta su tutte le schede occupava la lista. Il tasto sta fuori da
+  // `.fb-actions`: quella scatola sono le azioni di stato, che esito e riapertura riscrivono.
+  const fraseAperte = new Set(); // id delle schede con la frase aperta: un ridisegno non la richiude
+
+  function tastoFraseHtml(f) {
+    const id = escapeHtml(f._id);
+    const t = MR.tastoFrase(f.userNote);
+    return `<button type="button" class="sn-btn sn-btn-secondary fb-usernote-toggle${t.piena ? ' fb-usernote-piena' : ''}"`
+      + ` data-id="${id}" aria-controls="fb-frase-${id}" aria-expanded="${fraseAperte.has(f._id)}"`
+      + ` title="${escapeHtml(t.titolo)}">Frase</button>`;
+  }
+
+  // Aperta riceve il cursore (chi preme vuole scrivere); chiusa rende il fuoco al tasto. Il blur salva.
+  function mostraFrase(card, id, aperta) {
+    const box = card && card.querySelector('.fb-usernote-box');
+    if (!box) return;
+    const tasto = card.querySelector('.fb-usernote-toggle');
+    box.hidden = !aperta;
+    if (aperta) fraseAperte.add(id); else fraseAperte.delete(id);
+    if (tasto) tasto.setAttribute('aria-expanded', aperta ? 'true' : 'false');
+    const input = box.querySelector('.fb-usernote');
+    if (aperta && input) input.focus();
+    else if (!aperta && tasto) tasto.focus();
+  }
+
+  // Da chiusa, solo il tasto dice che una frase c'è: porta il segno di quello che è stato salvato.
+  function riflettiFrase(id) {
+    const item = all.find((f) => f._id === id);
+    const tasto = listEl.querySelector(`.fb-usernote-toggle[data-id="${cssEsc(id)}"]`);
+    if (!item || !tasto) return;
+    const t = MR.tastoFrase(item.userNote);
+    tasto.classList.toggle('fb-usernote-piena', t.piena);
+    tasto.title = t.titolo;
+  }
+
   // ── UN CLIC, UNA SCHEDA ───────────────────────────────────────────────────
   // Qui i pulsanti vivono DENTRO la scheda, in una lista che si riordina da sé.
   // Finché ogni azione ridisegnava la lista, appena la scheda usciva dalla
@@ -978,8 +1014,8 @@
     const id = el.dataset && el.dataset.id;
     if (!id) return null;
     // Distingue le textarea con stesso data-id (es. note) dalla classe.
-    const cls = el.classList && el.classList.contains('fb-notes') ? 'fb-notes'
-      : (el.classList && el.classList.contains('fb-usernote') ? 'fb-usernote' : null);
+    // Anche il tasto della frase: Esc gli rende il fuoco, e un ridisegno dal vivo non deve toglierglielo.
+    const cls = ['fb-notes', 'fb-usernote', 'fb-usernote-toggle'].find((c) => el.classList && el.classList.contains(c)) || null;
     if (!cls) return null;
     return {
       cls,
@@ -1193,12 +1229,17 @@
         ? `<label class="fb-notes-label">${notesLabelText}
              <textarea class="fb-notes" data-id="${escapeHtml(f._id)}" data-tail="${escapeHtml(tailStr)}" rows="3" placeholder="${escapeHtml(notesPlaceholder)}">${escapeHtml(headText || '')}</textarea>
            </label>
-           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>
-           <label class="fb-usernote-label">Frase per chi ha segnalato:
-             <input type="text" class="fb-usernote" data-id="${escapeHtml(f._id)}" maxlength="500"
-                    placeholder="Una riga in chiaro: cosa può fare adesso. La casella qui sopra la legge solo tu."
-                    value="${escapeHtml(String(f.userNote || ''))}">
-           </label>`
+           <div class="fb-attach-mount" data-id="${escapeHtml(f._id)}" data-kind="notes"></div>`
+        : '';
+      // Sotto la riga dei tasti: aprendosi non sposta il tasto, e il secondo clic lo ritrova.
+      const fraseBlock = notesEditable
+        ? `<div class="fb-usernote-box" id="fb-frase-${escapeHtml(f._id)}"${fraseAperte.has(f._id) ? '' : ' hidden'}>
+             <label class="fb-usernote-label">Frase per chi ha segnalato: è quello che legge quando il feedback si chiude
+               <input type="text" class="fb-usernote" data-id="${escapeHtml(f._id)}" maxlength="500"
+                      placeholder="Una riga in chiaro: cosa può fare adesso."
+                      value="${escapeHtml(String(f.userNote || ''))}">
+             </label>
+           </div>`
         : '';
       // Tab Chiarimenti: rispondi alle domande di Filo come un turno di chat. La
       // risposta si APPENDE allo storico (conserva la domanda) e il feedback
@@ -1232,7 +1273,8 @@
           ${notesBlock}
           ${tailThreadHtml}
           ${replyBlock}
-          <div class="fb-actions">${actionsFor(f)}</div>
+          <div class="fb-tasti">${notesEditable ? tastoFraseHtml(f) : ''}<div class="fb-actions">${actionsFor(f)}</div></div>
+          ${fraseBlock}
         </article>
       `;
     }).join('');
@@ -1519,12 +1561,30 @@
         if (!item) return;
         const v = input.value.slice(0, 500);
         if (String(item.userNote || '') === v) return;
-        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true });
+        patch(id, { userNote: v }, { userNote: v }, { silenzioso: true }).then((ok) => {
+          if (ok) { riflettiFrase(id); return; }
+          // Come in Gestione: se il salvataggio fallisce a casella chiusa, si riapre su quello che c'è davvero.
+          mostraFrase(listEl.querySelector(`.fb-card[data-id="${cssEsc(id)}"]`), id, true);
+        });
       };
       input.addEventListener('blur', flush);
       input.addEventListener('input', () => {
         clearTimeout(timer);
         timer = setTimeout(flush, 1500);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape' || e.isComposing) return;
+        e.preventDefault();
+        e.stopPropagation();
+        mostraFrase(input.closest('.fb-card'), input.dataset.id, false);
+      });
+    });
+
+    root.querySelectorAll('.fb-usernote-toggle').forEach((b) => {
+      b.addEventListener('click', () => {
+        const card = b.closest('.fb-card');
+        const box = card && card.querySelector('.fb-usernote-box');
+        if (box) mostraFrase(card, b.dataset.id, box.hidden);
       });
     });
   }
@@ -1908,6 +1968,8 @@
 
   function selectTab(tab) {
     if (!TABS.includes(tab)) return;
+    // Cambiare sezione è lasciare le schede: tornando, la frase riparte chiusa, come in Gestione cambiando feedback.
+    if (tab !== currentTab) fraseAperte.clear();
     currentTab = tab;
     tabsEl.querySelectorAll('[data-tab]').forEach((b) => {
       b.classList.toggle('fb-tab--active', b.dataset.tab === tab);

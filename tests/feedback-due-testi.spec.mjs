@@ -53,12 +53,18 @@ async function setupAdmin(page, feedback) {
   await page.waitForFunction(() => document.querySelectorAll('.fb-card').length > 0, null, { timeout: 10_000 });
 }
 
+// Dal #857 la frase parte chiusa anche qui, come in Gestione: si apre col suo tasto sulla riga della scheda.
+async function apriFrase(page, id) {
+  await page.locator(`.fb-usernote-toggle[data-id="${id}"]`).click();
+  await expect(page.locator(`.fb-usernote[data-id="${id}"]`)).toBeVisible();
+}
+
 test('la frase per chi ha segnalato si scrive dalla dashboard e arriva a destinazione', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(page, DA_RISOLVERE);
+  await apriFrase(page, 'mock-due-testi');
 
   const campo = page.locator('.fb-usernote[data-id="mock-due-testi"]');
-  await expect(campo).toBeVisible();
 
   await campo.fill('Ora puoi rimuovere un modello dalle impostazioni.');
   await campo.blur();
@@ -81,6 +87,7 @@ test('il salvataggio automatico non tocca quello che si sta scrivendo', async ({
   // mandato il feedback.
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(page, DA_RISOLVERE);
+  await apriFrase(page, 'mock-due-testi');
 
   const campo = page.locator('.fb-usernote[data-id="mock-due-testi"]');
   await campo.click();
@@ -98,6 +105,7 @@ test('chiudendo il feedback la frase viaggia con la chiusura', async ({ openTab 
   // nient'altro.
   const page = await openTab(FEEDBACK_URL);
   await setupAdmin(page, DA_RISOLVERE);
+  await apriFrase(page, 'mock-due-testi');
 
   await page.locator('.fb-usernote[data-id="mock-due-testi"]').fill('Ora puoi rimuovere un modello.');
   await page.locator('.fb-act[data-id="mock-due-testi"][data-to="done"]').click();

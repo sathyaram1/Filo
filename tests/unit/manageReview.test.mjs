@@ -1806,3 +1806,10 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
   assert.equal(MR.inAttesaFusioneServer(rev('fusione_server')), true);
   assert.equal(MR.inAttesaFusioneServer(rev('suite_server')), false);
 });
+
+test('tastoFrase: acceso solo con una frase vera, che si legge intera nell\'hover (#857)', () => {
+  assert.deepEqual(MR.tastoFrase('Ora puoi farlo.'), { piena: true, titolo: 'Frase già scritta: “Ora puoi farlo.”' });
+  for (const vuota of [undefined, null, '', '   ']) {
+    assert.deepEqual(MR.tastoFrase(vuota), { piena: false, titolo: 'Scrivi la riga che leggerà chi ha segnalato' });
+  }
+});

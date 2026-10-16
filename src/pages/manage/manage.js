@@ -4465,11 +4465,9 @@
   // nell'hover, così l'owner sa se sta scrivendo o riscrivendo.
   function riflettiFrase(frase) {
     if (!mgUserNoteToggle) return;
-    const testo = String(frase || '').trim();
-    mgUserNoteToggle.classList.toggle('mg-usernote-piena', !!testo);
-    mgUserNoteToggle.title = testo
-      ? `Frase già scritta: “${testo}”`
-      : 'Scrivi la riga che leggerà chi ha segnalato';
+    const t = MR.tastoFrase(frase);
+    mgUserNoteToggle.classList.toggle('mg-usernote-piena', t.piena);
+    mgUserNoteToggle.title = t.titolo;
   }
 
   if (mgUserNoteToggle) {
@@ -4672,6 +4670,13 @@
     mgUserNoteText.addEventListener('blur', () => { salvaFraseAutomatico(); });
     mgUserNoteText.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); salvaFraseAMano(); }
+      // Un Esc chiude una cosa sola: senza fermarlo, chiuderebbe anche la ricerca aperta. Il blur salva.
+      else if (e.key === 'Escape' && !e.isComposing) {
+        e.preventDefault();
+        e.stopPropagation();
+        collassaFrase();
+        if (mgUserNoteToggle) mgUserNoteToggle.focus();
+      }
     });
   }
 
