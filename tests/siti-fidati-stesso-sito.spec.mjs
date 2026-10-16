@@ -81,6 +81,13 @@ test('in Privacy massima un fidato scritto come sottodominio o come indirizzo ti
       await sec.locator('#cookie-wl-input').press('Enter');
       await expect(sec.locator('#cookie-wl-error')).toContainText('"uno.test" è già nell\'elenco');
       await expect(sec.locator('#cookie-wl-list li span')).toHaveCount(2);
+      // Una piattaforma non è il sito di nessuno: non entra, la pagina dice perché e il testo resta da correggere.
+      await sec.locator('#cookie-wl-input').fill('github.io');
+      await sec.locator('#cookie-wl-input').press('Enter');
+      await expect(sec.locator('#cookie-wl-error')).toContainText('«github.io» raccoglie i siti di chiunque');
+      await expect(sec.locator('#cookie-wl-input')).toHaveValue('github.io');
+      await expect(sec.locator('#cookie-wl-list li span')).toHaveCount(2);
+      await sec.locator('#cookie-wl-input').fill('');
 
       // Una voce salvata come sottodominio prima della correzione vale senza riscriverla, e la lista la mostra al suo sito.
       await sec.evaluate(() => chrome.runtime.sendMessage({
