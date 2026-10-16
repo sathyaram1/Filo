@@ -399,7 +399,7 @@ module.exports = function register(on, ctx) {
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, trimmed);
     clipboardChanged();
     return { ok: true };
-  });
+  }
 
   on(MSG.UPDATE_CLIPBOARD_DESCRIPTION, async (msg) => {
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
