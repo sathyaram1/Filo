@@ -249,6 +249,37 @@ describe('due segreti nello stesso contenitore', () => {
   });
 });
 
+describe('la riparazione di un segreto grande non insegue quello che lo ha coperto', () => {
+  // Casa tiene circa il 44% dei posti: rimettendo le sue copie dove stavano cancellerebbe quasi metà di Diario.
+  test('riaperto Casa, Diario (scritto dopo senza dichiararlo) si riapre intero; e così a turno', async () => {
+    const base = await contenitore(64 * MB);
+    const FOTO = randomBytes(14 * MB);
+    const NOTE = randomBytes(4 * MB);
+    try {
+      let s = await crea(base, 'Casa');
+      await s.scriviFile('foto', FOTO);
+      await s.chiudi();
+      s = await crea(base, 'Diario');
+      await s.scriviFile('note', NOTE);
+      await s.chiudi();
+      for (const [nome, altro, file, dati] of [['Casa', 'Diario', 'foto', FOTO], ['Diario', 'Casa', 'note', NOTE], ['Casa', 'Diario', 'foto', FOTO]]) {
+        const prima = await impronta(base, altro);
+        const r = await apri(base, nome);
+        assert.equal(r.esito, 'aperto', nome);
+        assert.ok((await r.segreto.leggiFile(file)).equals(dati), nome);
+        await r.segreto.chiudi();
+        const tolte = persi(prima, await impronta(base, altro));
+        assert.ok(tolte < prima.copie.size / 5, `la riparazione di ${nome} ha tolto ${tolte} copie su ${prima.copie.size} di ${altro}`);
+      }
+      const r = await apri(base, 'Diario');
+      assert.ok((await r.segreto.leggiFile('note')).equals(NOTE));
+      await r.segreto.chiudi();
+    } finally {
+      rmSync(base.contenitore, { force: true });
+    }
+  });
+});
+
 describe('segreti dichiarati', () => {
   let base;
   before(async () => { base = await contenitore(256 * MB); });
