@@ -389,7 +389,7 @@
     avviso(I18n.t('home_moved', nomeCategoria(r.page?.categoryId)));
   }
 
-  // L'«Annulla» dura quanto gli altri avvisi (si ferma col puntatore sopra) e non lo sfratta un avviso nuovo:
+  // L'«Annulla» resta più di un avviso semplice, si ferma col puntatore sopra e non lo sfratta un avviso nuovo:
   // per quella scheda è l'unica strada per tornare indietro.
   function offriAnnulla(page) {
     const P = window.SN_POPUP;
