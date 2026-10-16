@@ -55,6 +55,9 @@
   // <vm>.<regione>.cloudapp.azure.com), che la PSL non descrive: per il giudizio la zona è della piattaforma. Senza, una
   // macchina virtuale di chiunque passa per azure.com, che è in whitelist.
   const AZURE_ZONA = /^(?:z\d+\.web\.core\.windows\.net|[a-z]\d+\.azurefd\.net|[a-z0-9-]+\.cloudapp\.azure\.com)$/;
+  // Così la regione di Amazon (eu-west-1.amazonaws.com) non è un cliente: senza, s3.eu-west-1.amazonaws.com/<secchio>/…,
+  // che consegna i secchi di tutti, avrebbe per sito la regione, e la regione si potrebbe proporre come sito preciso.
+  const AWS_REGIONE = /^[a-z]{2}(?:-gov|-iso[a-z]?)?-[a-z]+-\d+\.amazonaws\.com$/;
 
   // Estrae l'eTLD+1 (dominio registrabile) e il public suffix da un hostname già ASCII, minuscolo e senza porta.
   // `soloPsl`: solo le piattaforme che il web separa (cookie); senza, anche quelle che separa solo il giudizio.
