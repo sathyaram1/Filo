@@ -9,6 +9,7 @@
 //                                  onUpdate(verdict). Le chiamate NON bloccano.
 //                                  ctx.daAprire: un link non ancora aperto (solo
 //                                  lì la sandbox); ctx.incognito: niente LLM né sandbox.
+//   checkLink(url) / checkLinks()  i link di una pagina, coi soli controlli locali (links.js).
 //   recordCert(host, st)           registra l'esito del certificato visto da
 //                                  Electron (certificate-error / did-navigate).
 //   setProviders(fns)              inietta i fetcher di rete (Task 4/5).
@@ -30,6 +31,7 @@ const net = require('./net');
 const gsb = require('./gsb');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
+const links = require('./links');
 
 // ── Cache TTL semplice ──────────────────────────────────────────────────
 class TtlCache {
@@ -407,6 +409,9 @@ function scopeOf(url) {
 
 const API = {
   checkSync,
+  // #965 — il verdetto locale di un link non ancora aperto ({ url, level, message, scope } o null), e i link a fette.
+  checkLink: (url) => links.esaminaLink(url, checkSync),
+  checkLinks: (urls, opts = {}) => links.esaminaAFette(urls, { ...opts, checkSync }),
   scopeOf,
   ownerOf,
   createOwnerBudget,
@@ -444,6 +449,7 @@ const API = {
   gsb,
   llm,
   sandbox,
+  links,
 };
 
 globalThis.SN_SAFEBROWSE = API;
