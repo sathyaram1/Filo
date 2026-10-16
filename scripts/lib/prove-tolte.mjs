@@ -104,8 +104,15 @@ export function soloDiMessiDaParte(prova, messi, rossi = null, vecchie = []) {
  */
 export function esitoProveTolte({
   rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0, via = {}, numeri, casi = {}, vecchie = [], comando = '',
+  segnate = [],
 } = {}) {
   if (!rosse.length && !dallaPulizia.length) return { ferma: false, testo: '' };
+  // Senza questa riga chi vede «passed» su una prova segnata come rosso atteso crede che il rifiuto sbagli.
+  const attese = (Array.isArray(segnate) ? segnate : []).filter((f) => rosse.includes(f) || dallaPulizia.includes(f));
+  const segno = attese.length ? [
+    `${attese.length === 1 ? 'Una è segnata' : `${attese.length} sono segnate`} come rosso atteso (test.fail), e Playwright ${attese.length === 1 ? 'la dà verde perché fallisce' : 'le dà verdi perché falliscono'}`,
+    `come previsto: qui conta il corpo, ed è ancora rosso (${attese.map((f) => f.split('/').pop()).join(', ')}).`,
+  ] : [];
   const dove = via && typeof via === 'object' ? via : {};
   const usa = (f) => (Array.isArray(dove[f]) && dove[f].length ? `usa ${dove[f].map(nomeAiuto).join(', ')}` : '');
   const riga = (f) => `  · ${f}${usa(f) ? ` (${usa(f)})` : ''}`;
