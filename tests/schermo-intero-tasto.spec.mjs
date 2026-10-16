@@ -122,6 +122,17 @@ test('un video a schermo pieno col suo pulsante si tiene F11, ed Esc ne esce com
 
   await premi(app, 'scheda', 'Escape');
   await expect.poll(async () => (await stato(app)).schermoIntero, { timeout: 8000 }).toBe(false);
+
+  // Il tasto è della pagina solo premuto lì: dalla barra in alto F11 esce, e il video esce con lei.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
+    return wc.executeJavaScript('document.getElementById("box").requestFullscreen().catch(()=>{}); true', true);
+  });
+  await expect.poll(async () => (await stato(app)).dellaPagina, { timeout: 8000 }).toBe(true);
+  await premi(app, 'shell', 'F11');
+  await expect.poll(async () => (await stato(app)).schermoIntero, { timeout: 8000 }).toBe(false);
+  expect((await stato(app)).dellaPagina).toBe(false);
 });
 
 test('il nome del tasto si legge nel suggerimento della barra laterale e fra le scorciatoie', async ({ app, openTab, testServer }) => {
