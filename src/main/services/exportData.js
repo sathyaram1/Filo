@@ -510,6 +510,7 @@ const REGOLE_ALTRE_CHIAVI = {
   walletNotice: 'stato',
   walletPendingInvite: 'stato',
   walletUsageQueue: 'stato',
+  avvisoChiaviInChiaro: 'stato',
   'filo.editor.notesMigrated': 'stato',
   sn_qr_in_primary_migrated: 'stato',
   sn_aiuto_di_serie_migrated: 'stato',
