@@ -174,6 +174,7 @@ export function esitoProveTolte({
       'Una prova, o un suo caso, si toglie solo verde, insieme alla prova durevole che la sostituisce.',
       ...casiRestati,
       ...lasciate,
+      ...segno,
     ].join('\n'),
   };
 }
