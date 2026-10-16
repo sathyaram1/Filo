@@ -402,9 +402,11 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
+      // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938).
+      const localMerges = await globalThis.SN_FEEDBACK.partiDaAzzerare(id, status, { idToken }) ? null : undefined;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
