@@ -622,8 +622,11 @@ function unisciSveglie(local, imported, prossima, adesso) {
 function senzaSegretiVuoti(dati) {
   if (!isPlainObject(dati.settings)) return dati;
   const settings = JSON.parse(JSON.stringify(dati.settings));
-  if (isPlainObject(settings.apiKeys)) for (const k of Object.keys(settings.apiKeys)) if (!pieno(settings.apiKeys[k])) delete settings.apiKeys[k];
-  if (isPlainObject(settings.proxy)) for (const k of CAMPI_PROXY) if (k in settings.proxy && !pieno(settings.proxy[k])) delete settings.proxy[k];
+  const via = (o, campi) => { if (isPlainObject(o)) for (const k of campi) if (k in o && !pieno(o[k])) delete o[k]; };
+  via(settings.apiKeys, isPlainObject(settings.apiKeys) ? Object.keys(settings.apiKeys) : []);
+  via(settings.proxy, CAMPI_PROXY);
+  via(isPlainObject(settings.security) ? settings.security.safeBrowse : null, ['safeBrowsingKey']);
+  if ('apiKeys' in settings && !isPlainObject(settings.apiKeys)) delete settings.apiKeys;
   return { ...dati, settings };
 }
 
