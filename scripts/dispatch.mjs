@@ -2153,7 +2153,7 @@ export function emit(bucket, ctx) {
     process.stderr.write(`[dispatch] non riesco a scrivere i pezzi grossi del payload in file (${e.message}): restano nella stampa\n`);
     payload = immaginiSenzaByte(pieno, e.message);
   }
-  const out = stampaCon(payload);
+  const out = stampaCon(payload, istr, fileIstr);
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
 }
