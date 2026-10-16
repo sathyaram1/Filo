@@ -9,6 +9,9 @@
 //                                  onUpdate(verdict). Le chiamate NON bloccano.
 //                                  ctx.daAprire: un link non ancora aperto (solo
 //                                  lì la sandbox); ctx.incognito: niente LLM né sandbox.
+//   preverifica(url, ctx)          puntatore fermo su un link accorciato o di rimando
+//                                  (#966): lista nera e destinazione prima del clic.
+//   preverdetto(url)               il risultato di preverifica per quel link, se c'è.
 //   recordCert(host, st)           registra l'esito del certificato visto da
 //                                  Electron (certificate-error / did-navigate).
 //   setProviders(fns)              inietta i fetcher di rete (Task 4/5).
