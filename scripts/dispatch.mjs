@@ -744,6 +744,7 @@ export function readRoleInstructions(role, { scope, ripresa = false } = {}) {
  *              conflitto, o gli unit rossi sulla fusione con il loro elenco (#929).
  *   - new-work (resolver, caso `primo-passaggio`): il feedback decifrato.
  *   - prober:   niente.
+ *   Verifier, fixer e new-work che ripartono dopo una risposta dell'owner ricevono anche `ripresa`.
  *
  * @param {object} bucket  bucket costruito dalla busta del server
  * @param {object} ctx     { diff?, feedback? } dati già raccolti dal chiamante
