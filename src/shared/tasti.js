@@ -531,7 +531,7 @@
     if (!f) return null;
     const mods = f.slice(0, f.indexOf('|'));
     return {
-      ctrlKey: mods.includes('c'), metaKey: false,
+      ctrlKey: mods.includes('c'), metaKey: mods.includes('m'),
       altKey: mods.includes('a'), shiftKey: mods.includes('s'),
       key: f.slice(f.indexOf('|') + 1), code: '',
     };
