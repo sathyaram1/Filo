@@ -636,6 +636,102 @@
     return { dire: (conto.allarmi || []).filter((a) => !prima.includes(a.kind)), detti: accesi };
   }
 
+  // ── Gli avvisi all'owner fra le notifiche della home (#855) ─────────────────
+  // Un caso per ogni cosa che ferma gli utenti, un marcatore per ogni soglia superata. Un caso che la vista non dice
+  // (campo assente) non è rientrato: non compare nell'elenco, e la sua carta resta com'era.
+  const AVVISO_OWNER = 'crediti-owner';
+  const PAGINA_OWNER = 'filo://credits/owner.html';
+  const SOGLIE_TETTO = Object.freeze([80, 95]);
+  const INVITI_POCHI = 2;
+  const PSEUDONIMI_DETTI = 3;
+  const DOVE = 'nella pagina Inviti e utenti';
+
+  const alPercento = (p) => (/^(1|8|11|8\d)$/.test(String(p)) ? `all'${p}%` : `al ${p}%`);
+  function elencoBreve(nomi) {
+    const altri = nomi.length - PSEUDONIMI_DETTI;
+    const primi = nomi.slice(0, PSEUDONIMI_DETTI).join(', ');
+    return altri > 0 ? `${primi} e ${altri === 1 ? 'un altro' : `altri ${altri}`}` : primi;
+  }
+
+  function avvisiOwner(overview) {
+    const o = overview && typeof overview === 'object' ? overview : null;
+    if (!o) return [];
+    const cfg = o.config && typeof o.config === 'object' ? o.config : {};
+    const tot = o.totals && typeof o.totals === 'object' ? o.totals : {};
+    const casi = [];
+
+    const tetto = numeroO(tot.maxGrantCredits);
+    const dati = numeroO(tot.grantedCredits);
+    if (tetto != null && dati != null) {
+      // Un tetto a zero non lascia regalare niente: è già pieno.
+      const cento = (tetto > 0 ? dati / tetto : 1) * 100 + 1e-9;
+      const p = Math.floor(cento);
+      const quanti = `${crediti0(dati)} su ${crediti0(tetto)}`;
+      casi.push({
+        caso: 'tetto', numero: p,
+        marcatori: SOGLIE_TETTO.filter((s) => cento >= s).map((s) => `tetto:${s}`),
+        testo: p >= 100
+          ? `I crediti regalati hanno raggiunto il tetto: ${quanti}. La quota del giorno e i nuovi ingressi vengono rifiutati finché non alzi il tetto ${DOVE}.`
+          : `I crediti regalati sono ${alPercento(p)} del tetto: ${quanti}. Alza il tetto ${DOVE}, o la quota del giorno e i nuovi ingressi verranno rifiutati.`,
+      });
+    }
+
+    const inviti = numeroO(cfg.invitesRemaining);
+    if (inviti != null) {
+      const n = Math.max(0, Math.floor(inviti));
+      casi.push({
+        caso: 'inviti', numero: n,
+        marcatori: n <= INVITI_POCHI ? [`inviti:${INVITI_POCHI}`] : [],
+        testo: n === 0
+          ? `Gli ingressi con invito sono finiti: chi riceve un invito adesso non riesce a entrare. Aggiungine ${DOVE}.`
+          : `${n === 1 ? 'Resta 1 ingresso' : `Restano ${n} ingressi`} con invito: dopo, chi riceve un invito non riuscirà a entrare. Aggiungine ${DOVE}.`,
+      });
+    }
+
+    const giorno = o.daily && typeof o.daily === 'object' && o.daily.summary && typeof o.daily.summary === 'object' ? o.daily.summary : null;
+    if (giorno) {
+      const r = Math.max(0, Math.floor(numeroO(giorno.refused) || 0));
+      casi.push({
+        caso: 'giornaliera', numero: r,
+        marcatori: r > 0 ? ['giornaliera:rifiuti'] : [],
+        testo: `L'ultima quota del giorno non è arrivata a ${r === 1 ? '1 persona' : `${r} persone`}: il tetto dei crediti elargibili era pieno. Alza il tetto ${DOVE}.`,
+      });
+    }
+
+    // Ogni portafoglio segnato è un marcatore: uno nuovo si ridice anche se un altro era già segnato.
+    const utenti = Array.isArray(o.users) ? o.users : null;
+    const rs = o.reconcile && typeof o.reconcile === 'object' && o.reconcile.summary && typeof o.reconcile.summary === 'object' ? o.reconcile.summary : null;
+    const riassunto = rs ? numeroO(rs.flagged) : null;
+    if (utenti || riassunto != null) {
+      const segnati = [...new Set((utenti || [])
+        .filter((u) => u && u.reconcile && u.reconcile.flagged && typeof u.pseudonym === 'string' && u.pseudonym)
+        .map((u) => u.pseudonym))].sort();
+      const n = segnati.length || Math.max(0, Math.floor(riassunto || 0));
+      casi.push({
+        caso: 'scarto', numero: n,
+        marcatori: segnati.length ? segnati.map((p) => `scarto:${p}`) : (n > 0 ? ['scarto:?'] : []),
+        testo: `La riconciliazione ha trovato uno scarto su ${n === 1 ? '1 portafoglio' : `${n} portafogli`}${segnati.length ? ` (${elencoBreve(segnati)})` : ''}: qualcuno consuma senza scrivere il registro d'uso. Le righe segnate sono ${DOVE}.`,
+      });
+    }
+    return casi;
+  }
+
+  // Un marcatore mai detto scrive una carta nuova al posto di quella del suo caso; gli stessi marcatori riscrivono
+  // solo il numero; un caso letto senza marcatori toglie la carta e li scorda, così quando torna si ridice.
+  function avvisiOwnerPiano(detti, casi) {
+    const prima = Array.isArray(detti) ? detti.filter((k) => typeof k === 'string') : [];
+    const elenco = Array.isArray(casi) ? casi.filter((c) => c && typeof c.caso === 'string' && Array.isArray(c.marcatori)) : [];
+    const letti = new Set(elenco.map((c) => c.caso));
+    const piano = { scrivi: [], riscrivi: [], togli: [] };
+    for (const c of elenco) {
+      if (!c.marcatori.length) piano.togli.push(c.caso);
+      else if (c.marcatori.some((k) => !prima.includes(k))) piano.scrivi.push(c);
+      else piano.riscrivi.push(c);
+    }
+    const restano = prima.filter((k) => !letti.has(k.split(':')[0]));
+    return { ...piano, detti: [...restano, ...elenco.flatMap((c) => c.marcatori)] };
+  }
+
   global.SN_WALLET = {
     USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
