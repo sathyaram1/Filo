@@ -94,6 +94,13 @@
   // Anche i nomi italiani e i simboli del Mac: un modificatore che non si
   // riconosce sparirebbe dalla forma e la scorciatoia scatterebbe senza (#545.1).
   const CTRL = /^(ctrl|control|controllo|cmd|command|comando|meta|\u2318|\u2303)$/;
+  // Scritti INSIEME sono due tasti (Control e Cmd del Mac): Ctrl+Cmd+F non \u00e8 Cmd+F.
+  const CONTROL = /^(ctrl|control|controllo|\u2303)$/;
+  const COMANDO = /^(cmd|command|comando|meta|\u2318)$/;
+  function conControlECmd(modificatori) {
+    const m = modificatori.map((x) => String(x).toLowerCase());
+    return m.some((x) => CONTROL.test(x)) && m.some((x) => COMANDO.test(x));
+  }
   const ALT = /^(alt|option|opt|opzione|\u2325)$/;
   const SHIFT = /^(shift|maiusc|maiuscolo|maiuscole|\u21e7)$/;
 
