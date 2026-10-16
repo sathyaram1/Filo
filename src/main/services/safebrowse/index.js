@@ -90,6 +90,7 @@ function configure(opts = {}) {
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
     llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
     sandbox: enableSandbox ? ((url) => sandbox.detonate(url, (finalUrl) => checkSync(finalUrl))) : null,
+    destinazione: enableSandbox ? ((url) => sandbox.destinazione(url, (passo) => !!rimandi.tipo(passo))) : null,
   });
   gsbKeyOf = keyOf;
 }
