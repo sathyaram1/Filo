@@ -54,6 +54,16 @@ const schedeWeb = (app) => app.evaluate(({ BrowserWindow }) => {
   return w._filoTabs.tabs.map((t) => t.view.webContents.getURL()).filter((u) => /^https?:/.test(u));
 });
 
+// Chi clicca un link ha la finestra davanti e la pagina sotto le dita: l'avviso che compare prende la tastiera da lì.
+const fuocoAllaPagina = (app) => app.evaluate(({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
+  win.focus();
+  win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId).view.webContents.focus();
+});
+
+// Il clic su un link fermato prima di aprirsi non avvia nessuna navigazione da aspettare.
+const clicFermato = (pagina, sel, opz = {}) => pagina.click(sel, { ...opz, noWaitAfter: true });
+
 // Le analisi in volo finite e il verdetto della pagina chiesto di nuovo: un avviso che dovesse tornare, è tornato.
 async function verdettiFiniti(app) {
   await app.evaluate(async () => { await globalThis.SN_SAFEBROWSE._settled(); });
@@ -64,6 +74,7 @@ test('link a un\'imitazione di marchio: verdetto pronto senza rete, al clic l\'a
   const pagina = await testServer.openReady(openTab, '<title>Forum</title><p>Ciao, entra qui: '
     + '<a id="truffa" href="https://paypa1.com/login">Accedi a PayPal</a> oppure '
     + '<a id="vera" href="https://www.wikipedia.org/wiki/PayPal">leggi di PayPal</a></p>');
+  await fuocoAllaPagina(app);
   const forum = pagina.url();
 
   await expect.poll(() => verdettoPronto(app, 'https://paypa1.com/login')).toBe('pericoloso');
@@ -72,7 +83,7 @@ test('link a un\'imitazione di marchio: verdetto pronto senza rete, al clic l\'a
   expect(await richiesteVerso(app, 'wikipedia.org')).toEqual([]);
   expect(await fornitori(app)).toEqual([]);
 
-  await pagina.click('#truffa');
+  await clicFermato(pagina, '#truffa');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
   await expect(avviso.getByText(/Il dominio è paypa1\.com/)).toBeVisible();
@@ -89,7 +100,7 @@ test('link a un\'imitazione di marchio: verdetto pronto senza rete, al clic l\'a
   expect(await richiesteVerso(app, 'paypa1.com')).toEqual([]);
 
   // Di nuovo, e stavolta «confermo»: il sito si apre nella stessa scheda, e l'avviso non si ripete a pagina aperta.
-  await pagina.click('#truffa');
+  await clicFermato(pagina, '#truffa');
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
   await scriviDallaTastiera(app, 'confermo');
   await avviso.getByRole('button', { name: 'Procedi comunque' }).click();
@@ -107,10 +118,11 @@ test('link sospetto che si apre in una scheda nuova: l\'avviso compare sulla pag
   await contaLaRete(app, { 'paypal-login.com/conto': '<title>Conto</title><p>conto</p>' });
   const pagina = await testServer.openReady(openTab, '<title>Notizie</title>'
     + '<a id="simile" target="_blank" href="https://paypal-login.com/conto">il tuo conto</a>');
+  await fuocoAllaPagina(app);
   const forum = pagina.url();
   await expect.poll(() => verdettoPronto(app, 'https://paypal-login.com/conto')).toBe('sospetto');
 
-  await pagina.click('#simile');
+  await clicFermato(pagina, '#simile');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('PayPal? Controlla l\'indirizzo')).toBeVisible();
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
@@ -131,8 +143,9 @@ test('link sospetto che si apre in una scheda nuova: l\'avviso compare sulla pag
 test('Ctrl+clic su un link da avviso: l\'avviso compare subito, e «Non aprire» non lascia schede', async ({ app, openTab, testServer }) => {
   await contaLaRete(app, {});
   const pagina = await testServer.openReady(openTab, '<title>Lista</title><a id="truffa" href="https://paypa1.com/premio">premio</a>');
+  await fuocoAllaPagina(app);
   const forum = pagina.url();
-  await pagina.click('#truffa', { modifiers: ['ControlOrMeta'] });
+  await clicFermato(pagina, '#truffa', { modifiers: ['ControlOrMeta'] });
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
   await expect.poll(() => copertura(app)).toEqual(COPERTA);
@@ -146,8 +159,9 @@ test('un link a un file travestito: l\'avviso nomina il file prima che parta', a
   await contaLaRete(app, {});
   const pagina = await testServer.openReady(openTab, '<title>Posta</title>'
     + '<a id="file" href="https://archivio-documenti.example.com/fattura.pdf.exe">la tua fattura</a>');
+  await fuocoAllaPagina(app);
   await expect.poll(() => verdettoPronto(app, 'https://archivio-documenti.example.com/fattura.pdf.exe')).toBe('sospetto');
-  await pagina.click('#file');
+  await clicFermato(pagina, '#file');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('File travestito')).toBeVisible();
   await expect(avviso.getByText(/«fattura\.pdf\.exe»: sembra un documento, ma è un programma/)).toBeVisible();
@@ -162,12 +176,13 @@ test('un link che compare scorrendo ha il verdetto pronto prima del clic, e il c
     + ' if (scrollY + innerHeight < document.body.scrollHeight - 50) return;'
     + ' var a = document.createElement("a"); a.id = "nuovo"; a.href = "https://paypa1.com/offerta"; a.textContent = "offerta";'
     + ' document.getElementById("fondo").appendChild(a); });</script>');
+  await fuocoAllaPagina(app);
   expect(await verdettoPronto(app, 'https://paypa1.com/offerta')).toBe(null);
   await pagina.mouse.wheel(0, 5000);
   await expect(pagina.locator('#nuovo')).toBeAttached();
   await expect.poll(() => verdettoPronto(app, 'https://paypa1.com/offerta')).toBe('pericoloso');
   expect(await richiesteVerso(app, 'paypa1.com')).toEqual([]);
-  await pagina.click('#nuovo');
+  await clicFermato(pagina, '#nuovo');
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
   expect(await richiesteVerso(app, 'paypa1.com')).toEqual([]);
@@ -197,6 +212,7 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
     setTimeout(giro, 1);
   });
   const pagina = await testServer.openReady(openTab, html);
+  await fuocoAllaPagina(app);
   // La pagina misura i suoi, da quando è pronta.
   await pagina.evaluate(() => {
     window.__buco = { max: 0, attivo: true };
@@ -240,7 +256,7 @@ test('una pagina con 5.000 link resta reattiva: esame a lotti, prima i link a sc
   expect(buchiPagina, `pagina ferma al più ${buchiPagina.toFixed(1)} ms; in un colpo solo ${unColpo.toFixed(1)} ms`).toBeLessThan(tetto);
 
   // E il link in fondo, a esame finito, ferma il clic.
-  await pagina.locator('#giu').click();
+  await pagina.locator('#giu').click({ noWaitAfter: true });
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText('Attenzione: questo non è PayPal')).toBeVisible();
   expect(await richiesteVerso(app, 'paypa1.com')).toEqual([]);
