@@ -1131,6 +1131,8 @@
 
   $('ownerInvitesForm').addEventListener('submit', (ev) => { Promise.resolve(ownerInvites(ev)).catch(() => {}); });
   $('ownerGrantForm').addEventListener('submit', (ev) => { Promise.resolve(ownerGrant(ev)).catch(() => {}); });
+  window.SN_CAMPO_NUMERO.virgolaComePunto($('ownerInviteCount'));
+  window.SN_CAMPO_NUMERO.virgolaComePunto($('ownerGrantCredits'));
 
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
