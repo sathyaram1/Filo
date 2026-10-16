@@ -840,6 +840,42 @@
     }).join('\n');
   }
 
+  // ── La frase per chi ha segnalato parte chiusa, come in Gestione (#497, #857) ──
+  // Si scrive una volta sola, e aperta su tutte le schede occupava la lista. Il tasto sta fuori da
+  // `.fb-actions`: quella scatola sono le azioni di stato, che esito e riapertura riscrivono.
+  const fraseAperte = new Set(); // id delle schede con la frase aperta: un ridisegno non la richiude
+
+  function tastoFraseHtml(f) {
+    const id = escapeHtml(f._id);
+    const t = MR.tastoFrase(f.userNote);
+    return `<button type="button" class="sn-btn sn-btn-secondary fb-usernote-toggle${t.piena ? ' fb-usernote-piena' : ''}"`
+      + ` data-id="${id}" aria-controls="fb-frase-${id}" aria-expanded="${fraseAperte.has(f._id)}"`
+      + ` title="${escapeHtml(t.titolo)}">Frase</button>`;
+  }
+
+  // Aperta riceve il cursore (chi preme vuole scrivere); chiusa rende il fuoco al tasto. Il blur salva.
+  function mostraFrase(card, id, aperta) {
+    const box = card && card.querySelector('.fb-usernote-box');
+    if (!box) return;
+    const tasto = card.querySelector('.fb-usernote-toggle');
+    box.hidden = !aperta;
+    if (aperta) fraseAperte.add(id); else fraseAperte.delete(id);
+    if (tasto) tasto.setAttribute('aria-expanded', aperta ? 'true' : 'false');
+    const input = box.querySelector('.fb-usernote');
+    if (aperta && input) input.focus();
+    else if (!aperta && tasto) tasto.focus();
+  }
+
+  // Da chiusa, solo il tasto dice che una frase c'è: porta il segno di quello che è stato salvato.
+  function riflettiFrase(id) {
+    const item = all.find((f) => f._id === id);
+    const tasto = listEl.querySelector(`.fb-usernote-toggle[data-id="${cssEsc(id)}"]`);
+    if (!item || !tasto) return;
+    const t = MR.tastoFrase(item.userNote);
+    tasto.classList.toggle('fb-usernote-piena', t.piena);
+    tasto.title = t.titolo;
+  }
+
   // ── UN CLIC, UNA SCHEDA ───────────────────────────────────────────────────
   // Qui i pulsanti vivono DENTRO la scheda, in una lista che si riordina da sé.
   // Finché ogni azione ridisegnava la lista, appena la scheda usciva dalla
