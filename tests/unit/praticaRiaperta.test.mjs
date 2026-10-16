@@ -66,6 +66,12 @@ async function conRete(docs, fn) {
 
 const stato = (d) => d.fields.status.stringValue;
 const parti = (d) => partiDaCampi(d.fields);
+// registraParte firma l'ora vera: qui conta che la parte del server ci sia.
+const conServer = (d) => {
+  const { server, ...resto } = parti(d);
+  assert.ok(server > 0, 'manca la parte del server');
+  return resto;
+};
 
 // Quello che scrive il server quando fonde la parte dell'app (ownerMerge, in filo-security): la parte, campo per campo.
 function fondeLApp(d, { ramo, at, chiude }) {
@@ -112,7 +118,7 @@ test('updateStatus dell’app: col registro da togliere la maschera lo nomina e 
   assert.doesNotMatch(chiamate[1].url, /localMerges/);
 });
 
-test('npm run feedback: riaprire (da fatta o da archiviata) svuota il registro; un’approvazione dai Ricevuti no', async () => {
+test('npm run feedback: riaprire (da fatta o da archiviata) svuota il registro; un passaggio fra stati aperti no', async () => {
   for (const da of ['done', 'archived']) {
     const docs = { p: pratica('p', { status: da, parti: { app: ORA - 30 * ORE, server: ORA - 29 * ORE, ramo: 'claude/x' } }) };
     await conRete(docs, async (scritture) => {
@@ -127,12 +133,12 @@ test('npm run feedback: riaprire (da fatta o da archiviata) svuota il registro; 
       assert.equal(stato(docs.p), 'todo');
     });
   }
-  const ricevuta = { p: pratica('p', { status: 'design', parti: { server: ORA - ORE, ramo: 'claude/x' } }) };
-  await conRete(ricevuta, async () => {
-    const r = await of.scrivi('p', 'todo', '', OPTS);
+  const aperta = { p: pratica('p', { status: 'todo', parti: { server: ORA - ORE, ramo: 'claude/x' } }) };
+  await conRete(aperta, async () => {
+    const r = await of.scrivi('p', 'working', '', { ...OPTS, attore: 'routine' });
     assert.equal(r.ok, true, r.motivo);
     assert.equal(r.partiAzzerate, undefined);
-    assert.deepEqual(parti(ricevuta.p), { server: ORA - ORE, ramo: 'claude/x' }, 'la pratica non era chiusa: le sue parti restano');
+    assert.deepEqual(parti(aperta.p), { server: ORA - ORE, ramo: 'claude/x' }, 'la pratica non era chiusa: le sue parti restano');
   });
   const senza = { p: pratica('p', { status: 'done' }) };
   await conRete(senza, async (scritture) => {
@@ -151,7 +157,7 @@ test('caso 1: riaperta, arriva prima il seguito del server: non la richiude, e l
     assert.equal(chiusa(scritture), false, 'la parte dell’app della tornata prima non conta più');
     assert.match(r.testo, /resta aperta: manca la parte dell’app/);
     assert.equal(stato(docs.p), 'working');
-    assert.deepEqual(parti(docs.p), { server: ORA, ramo: 'claude/x' });
+    assert.deepEqual(conServer(docs.p), { ramo: 'claude/x' });
   });
 });
 
@@ -165,7 +171,7 @@ test('caso 2: riaperta, arriva prima il seguito dell’app e la chiude: il segui
     assert.equal(r.lanci.length, 1, 'il seguito del server arriva su main');
     assert.match(r.testo, /resta chiusa, con la nota di quest'ultima parte/);
     assert.equal(stato(docs.p), 'done');
-    assert.deepEqual(parti(docs.p), { app: ORA - ORE, server: ORA, ramo: 'claude/x' });
+    assert.deepEqual(conServer(docs.p), { app: ORA - ORE, ramo: 'claude/x' });
     assert.ok(scritture.length >= 2);
   });
 });
@@ -186,7 +192,7 @@ test('caso 3: chiusa dall’app prima che il ramo del server esista, poi un segu
     assert.equal(chiusa(scritture), false);
     assert.equal(stato(docs.p), 'working', 'il seguito dell’app la troverà aperta, e la chiuderà lui');
     assert.equal(docs.p.fields.statusPublic.stringValue, 'open');
-    assert.deepEqual(parti(docs.p), { server: ORA, ramo: 'claude/x' }, 'la parte dell’app del giro chiuso non conta più');
+    assert.deepEqual(conServer(docs.p), { ramo: 'claude/x' }, 'la parte dell’app del giro chiuso non conta più');
     assert.match(docs.p.fields.notes.stringValue, /Riaperta da server:fondi su claude\/x/);
   });
 });
