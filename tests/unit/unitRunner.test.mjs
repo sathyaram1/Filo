@@ -538,22 +538,33 @@ test('la guardia conta il tempo fermo dal primo evento: un file lento che avanza
 test('un file appeso si chiude da solo, col suo nome e il tetto nel rosso, e gli altri file girano e dicono il loro esito', () => {
   const dir = cartellaTemporanea('filo-fermo-');
   try {
-    writeFileSync(join(dir, 'a-appeso-dopo.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
-    writeFileSync(join(dir, 'b-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano dopo il primo appeso', () => {});\n");
+    // I sani non hanno un tempo da rispettare (#1235): partono con gli appesi, e il primo appeso va avanti finché non
+    // sono usciti. Il tetto conta solo per gli appesi.
+    const usciti = ['b', 'd'].map((n) => join(dir, `${n}.uscito`));
+    const esceSegnando = (f) => `import { writeFileSync } from 'node:fs';\nprocess.on('exit', () => writeFileSync(${JSON.stringify(f)}, ''));\n`;
+    writeFileSync(join(dir, 'a-appeso-dopo.test.mjs'), "import { test } from 'node:test';\nimport { existsSync } from 'node:fs';\n"
+      + `const usciti = ${JSON.stringify(usciti)};\nconst oltre = Date.now() + 120_000;\n`
+      + "test('prima di appendersi', async (t) => {\n"
+      + "  while (!usciti.every((f) => existsSync(f))) {\n"
+      + "    if (Date.now() > oltre) throw new Error('i file sani non sono usciti in due minuti');\n"
+      + "    await t.test('aspetta i sani', () => new Promise((ok) => setTimeout(ok, 100)));\n"
+      + '  }\n});\nsetInterval(() => {}, 1000);\n');
+    writeFileSync(join(dir, 'b-sano.test.mjs'), `import { test } from 'node:test';\n${esceSegnando(usciti[0])}test('sano dopo il primo appeso', () => {});\n`);
     writeFileSync(join(dir, 'c-appeso-subito.test.mjs'), "setInterval(() => {}, 1000);\nawait new Promise(() => {});\n");
-    writeFileSync(join(dir, 'd-sano.test.mjs'), "import { test } from 'node:test';\ntest('sano in fondo', () => {});\n");
-    // Sei secondi bastano a un file sano per partire e finire anche su una macchina lenta, dove a vuoto ci mette poco.
+    writeFileSync(join(dir, 'd-sano.test.mjs'), `import { test } from 'node:test';\n${esceSegnando(usciti[1])}test('sano in fondo', () => {});\n`);
     const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '6000' };
     delete env.NODE_TEST_CONTEXT;
-    const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    const r = spawnSync(process.execPath, [LANCIATORE, '--test-concurrency=4'], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    const uscita = `${r.stdout}\n${r.stderr}`;
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
-    assert.match(r.stdout, /^ok \d+ - sano dopo il primo appeso$/m);
-    assert.match(r.stdout, /^ok \d+ - sano in fondo$/m);
-    assert.match(r.stdout, /ROSSO: .*a-appeso-dopo\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso; gli altri file sono andati avanti/);
-    assert.match(r.stdout, /ROSSO: .*c-appeso-subito\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso/);
+    assert.match(r.stdout, /^ok \d+ - prima di appendersi$/m, uscita);
+    assert.match(r.stdout, /^ok \d+ - sano dopo il primo appeso$/m, uscita);
+    assert.match(r.stdout, /^ok \d+ - sano in fondo$/m, uscita);
+    assert.match(r.stdout, /ROSSO: .*a-appeso-dopo\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso; gli altri file sono andati avanti/, uscita);
+    assert.match(r.stdout, /ROSSO: .*c-appeso-subito\.test\.mjs non è andato avanti per 6 secondi ed è stato chiuso/, uscita);
     assert.match(r.stdout, /^not ok \d+ - .*c-appeso-subito\.test\.mjs$/m, 'node lo dà rosso');
-    assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/);
-    assert.doesNotMatch(r.stdout, /sano.*non è andato avanti/);
+    assert.doesNotMatch(r.stdout, /la corsa è stata chiusa/, uscita);
+    assert.doesNotMatch(r.stdout, /sano.*non è andato avanti/, uscita);
     assert.equal(r.status, 1);
   } finally {
     togliCartella(dir);
