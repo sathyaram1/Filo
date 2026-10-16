@@ -317,6 +317,86 @@ test('le manopole si salvano davvero, un numero storto non arriva al server e «
   expect(patch.length).toBe(2);
 });
 
+// #854 — gli ingressi con invito erano un numero in sola lettura: per aprire Filo a più persone l'owner
+// doveva passare dalla console di Firebase.
+test('gli ingressi con invito rimasti si cambiano dalla pagina, come le altre manopole', async ({ app }) => {
+  configDoc.invitesRemaining = 0;
+  expect(await simulaOwner(app)).toBe(true);
+  await dirottaFirestore(app, base);
+  const page = await apriOwner(app);
+
+  const campo = page.locator('#knob-invitesRemaining');
+  const msg = page.locator('#knob-invitesRemaining-msg');
+  const riga = page.locator('.sn-manopola[data-chiave="invitesRemaining"]');
+  await expect(campo).toHaveValue('0', { timeout: 15_000 });
+  await expect(riga.locator('label')).toHaveText('Ingressi con invito rimasti');
+  await expect(campo).toHaveAttribute('title', 'Quante persone possono ancora entrare con un invito, in tutto. A zero nessun invito funziona più.');
+  // Il numero sta in un posto solo: la manopola.
+  await expect(page.locator('#ownerNumeri')).not.toContainText('riscatti');
+
+  await page.fill('#knob-invitesRemaining', '-1');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: non può essere negativo.');
+  await expect(msg).toHaveClass(/is-error/);
+
+  // Scritto alla italiana, con la virgola: il campo lo legge come decimale o come non-numero a seconda della
+  // lingua del sistema, e in tutti e due i casi lo dice.
+  await page.fill('#knob-invitesRemaining', '');
+  await campo.pressSequentially('2,5');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText(/^Ingressi con invito rimasti: (un numero intero, senza virgola|ci vuole un numero)\.$/);
+  await page.fill('#knob-invitesRemaining', '2.5');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Ingressi con invito rimasti: un numero intero, senza virgola.');
+  expect(patch.length).toBe(0);
+
+  // Il main rifà il controllo: una parola, un negativo o un decimale non arrivano a config/credits nemmeno
+  // saltando la pagina.
+  const diretti = await page.evaluate(async (valori) => {
+    const out = [];
+    for (const v of valori) {
+      const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WALLET_OWNER_KNOBS_SET, patch: { invitesRemaining: v } });
+      out.push({ ok: Boolean(r && r.ok), error: String((r && r.error) || '') });
+    }
+    return out;
+  }, ['venti', -1, 2.5]);
+  expect(diretti.map((d) => d.ok)).toEqual([false, false, false]);
+  expect(diretti[0].error).toContain('ci vuole un numero');
+  expect(diretti[1].error).toContain('non può essere negativo');
+  expect(diretti[2].error).toContain('un numero intero');
+  expect(patch.length).toBe(0);
+  expect(configDoc.invitesRemaining).toBe(0);
+
+  // Da 0 a 20: arriva al server solo quel campo, e i numeri calcolati accanto si rileggono.
+  const letturePrima = overviewChiesti;
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(patch.length).toBe(1);
+  expect(patch[0].mask).toEqual(['invitesRemaining']);
+  expect(patch[0].valori).toEqual({ invitesRemaining: 20 });
+  expect(configDoc.dailyCredits).toBe(100);
+  await expect(campo).toHaveValue('20');
+  await expect.poll(() => overviewChiesti, { timeout: 10_000 }).toBeGreaterThan(letturePrima);
+
+  // «Rimetti com'era» riporta lo zero, sul server.
+  await page.click('#knob-invitesRemaining-rimetti');
+  await expect(msg).toHaveText('Rimesso com’era.', { timeout: 15_000 });
+  await expect(campo).toHaveValue('0');
+  expect(patch[1].valori).toEqual({ invitesRemaining: 0 });
+  expect(configDoc.invitesRemaining).toBe(0);
+
+  // Risalvato a 20 e riaperta la pagina, si legge 20.
+  await page.fill('#knob-invitesRemaining', '20');
+  await page.click('#knob-invitesRemaining-salva');
+  await expect(msg).toHaveText('Salvato.', { timeout: 15_000 });
+  expect(configDoc.invitesRemaining).toBe(20);
+  await page.reload();
+  await page.waitForFunction(() => { const s = document.getElementById('ownerSection'); return s && !s.hidden; }, null, { timeout: 15_000 });
+  await expect(page.locator('#knob-invitesRemaining')).toHaveValue('20', { timeout: 15_000 });
+  expect(patch.length).toBe(3);
+});
+
 test('i numeri che il server calcola si leggono in cima, e non si possono toccare', async ({ app }) => {
   expect(await simulaOwner(app)).toBe(true);
   await dirottaFirestore(app, base);
