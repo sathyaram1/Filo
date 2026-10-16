@@ -170,10 +170,10 @@ function zoom(verso) {
   try { c.tab.view.webContents.send('filo:zoom-key', verso); } catch (_) {}
 }
 
-// Dal tasto, lo schermo pieno chiesto dalla pagina (un video) resta suo, come in src/main/shortcuts.js.
+// Dal tasto, lo schermo pieno chiesto dalla pagina a fuoco (un video) resta suo, come in src/main/shortcuts.js.
 function schermoIntero(_voce, _finestra, evento) {
   const win = finestra();
-  if (evento && evento.triggeredByAccelerator && win && win._filoTabs && win._filoTabs.pageFullscreen) return;
+  if (evento && evento.triggeredByAccelerator && win && win._filoTabs && win._filoTabs.schermoPienoDi(contenutoAFuoco())) return;
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
 }
 
