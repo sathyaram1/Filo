@@ -1142,7 +1142,7 @@ class Segreto {
         if (muta && !e.prima) chiudiStato(s);
         throw e;
       } finally {
-        await ctx.fh.close();
+        await chiudiContenitore(ctx);
       }
     });
   }
