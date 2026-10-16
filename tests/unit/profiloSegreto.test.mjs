@@ -643,6 +643,62 @@ describe('danni', () => {
     assert.ok(integra(await impronta(base, 'Aperto')));
     rmSync(base.contenitore, { force: true });
   });
+
+  // L'elenco dei file fuori dalla testa: perso il suo gruppo, prima si perdeva il segreto intero e la riparazione ne
+  // cancellava ogni blocco.
+  const conElenco = async (base, nome) => {
+    const s = await crea(base, nome);
+    const foto = randomBytes(2 * MB);
+    await s.scriviFile('foto', foto);
+    for (let x = 0; x < 100; x++) await s.scriviFile(`nota-${x}.txt`, `nota numero ${x}`);
+    await s.chiudi();
+    const prima = await impronta(base, nome);
+    const c0 = prima.copie.get(0);
+    const testa = F.leggiTesta(F.leggiPrefisso(F.apriBlocco(prima.chiavi.cifra, c0.p, blocco(readFileSync(base.contenitore), c0.p))).carico);
+    const t = testa.blocchiTabella.length / 2;
+    const gruppo = (j) => Math.floor(j / F.GRUPPO);
+    const copiaA = new Set(testa.blocchiTabella.slice(0, t).map(gruppo));
+    const copiaB = new Set(testa.blocchiTabella.slice(t).map(gruppo));
+    const undiciDi = (gruppi) => [...gruppi].flatMap((g) => [...prima.copie].filter(([i]) => gruppo(i >> 1) === g).slice(0, 11).map(([, c]) => c.p));
+    return { foto, prima, copiaA, copiaB, undiciDi, gruppo };
+  };
+
+  test('perso il gruppo di una copia dell’elenco dei file, i file si leggono tutti e l’elenco torna doppio', async () => {
+    const base = await contenitore(16 * MB);
+    const { foto, copiaA, copiaB, undiciDi } = await conElenco(base, 'Elenco');
+    assert.ok(copiaA.size && [...copiaA].every((g) => !copiaB.has(g)), 'le due copie dell’elenco stanno in gruppi diversi');
+    for (const persa of [copiaA, copiaB]) {
+      sporca(base, undiciDi(persa));
+      const r = await apri(base, 'Elenco');
+      const file = r.segreto.elencaFile();
+      assert.equal(file.length, 101);
+      assert.ok((await r.segreto.leggiFile('foto')).equals(foto));
+      assert.equal((await r.segreto.leggiFile('nota-99.txt')).toString(), 'nota numero 99');
+      await r.segreto.chiudi();
+      assert.ok(integra(await impronta(base, 'Elenco')), 'la riparazione non ha rimesso la copia persa dell’elenco');
+    }
+    rmSync(base.contenitore, { force: true });
+  });
+
+  test('perse tutte e due le copie dell’elenco: niente del segreto si cancella, nemmeno scrivendoci dopo', async () => {
+    const base = await contenitore(16 * MB);
+    const { prima, copiaA, copiaB, undiciDi, gruppo } = await conElenco(base, 'Senza');
+    const toccati = new Set([...copiaA, ...copiaB]);
+    sporca(base, undiciDi(toccati));
+    const intatte = [...prima.copie].filter(([i]) => !toccati.has(gruppo(i >> 1)) && gruppo(i >> 1) > 0);
+    const ferme = (imp) => intatte.filter(([i, c]) => { const d = imp.copie.get(i); return d && d.p === c.p && d.v === c.v; }).length;
+    let r = await apri(base, 'Senza');
+    assert.equal(r.esito, 'aperto');
+    assert.deepEqual(r.segreto.elencaFile(), []);
+    await r.segreto.scriviFile('nuovo', 'dopo');
+    await r.segreto.chiudi();
+    r = await apri(base, 'Senza');
+    assert.deepEqual(r.segreto.elencaFile().map((f) => f.nome), ['nuovo']);
+    assert.equal((await r.segreto.leggiFile('nuovo')).toString(), 'dopo');
+    await r.segreto.chiudi();
+    assert.equal(ferme(await impronta(base, 'Senza')), intatte.length, 'la riparazione ha cancellato blocchi che non sapeva di chi fossero');
+    rmSync(base.contenitore, { force: true });
+  });
 });
 
 describe('interruzioni', () => {
