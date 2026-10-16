@@ -699,14 +699,33 @@ async function caricaSegreto(ctx, S) {
 
 // ── Scrittura ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-// Il primo posto della catena letto e trovato estraneo è quasi sempre la casa vecchia della copia, coperta da un altro
-// segreto: rimetterla lì cancellerebbe proprio i blocchi sovrapposti di quello. Si salta: la ricerca dopo paga una lettura.
+// Una copia persa stava, quasi sempre, nel primo posto della sua catena letto e trovato estraneo: lì adesso c'è il
+// blocco di chi l'ha coperta. Quei posti, di tutte le copie perse, la riparazione non li riusa.
+async function segnaCaseVecchie(ctx, S) {
+  S.caseVecchie = new Uint8Array(ctx.N);
+  const occ = ctx.mappa.occ;
+  let calcoli = 0;
+  for (let i = 0; i < 2 * S.L; i++) {
+    if (S.pos[i] >= 0) continue;
+    for (let r = 0; r < CATENA_MAX; r++) {
+      if (++calcoli % 4096 === 0) await cedi();
+      const p = posizione(S.posto, ctx.N, i >> 1, i & 1, r);
+      if (occ[p]) continue;
+      if (S.letti[p]) S.caseVecchie[p] = 1;
+      break;
+    }
+  }
+}
+
+// Saltate le case vecchie, si salta anche il primo posto estraneo che resta: la casa vecchia di una copia che, quando fu
+// scritta, trovò il primo posto preso da un'altra copia persa anche lei. La ricerca dopo paga una lettura o due.
 function colloca(ctx, S, i) {
   const occ = ctx.mappa.occ;
+  const vecchie = S.caseVecchie;
   let saltato = false;
   for (let r = 0; r < CATENA_MAX; r++) {
     const p = posizione(S.posto, ctx.N, i >> 1, i & 1, r);
-    if (occ[p]) continue;
+    if (occ[p] || (vecchie && vecchie[p])) continue;
     if (!saltato && S.letti[p]) {
       saltato = true;
       continue;
