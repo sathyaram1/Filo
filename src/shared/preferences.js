@@ -315,7 +315,7 @@
     const voci = [];
     const errati = [];
     for (const p of pezzi) {
-      const d = dominioDa(p);
+      const d = voceDi(p);
       if (!d) errati.push(p);
       else if (!voci.includes(d)) voci.push(d);
     }
