@@ -28,6 +28,7 @@
       ],
       fixes: [
         'Su alcuni siti Esc non chiudeva il menu del tasto destro né gli altri riquadri di Filo, e a schermo intero ti faceva uscire lasciandoli aperti sopra la pagina. Adesso il primo Esc chiude il riquadro e lo schermo intero resta. Con l\'Esc dopo esci.',
+        'Filo non chiede più a Google le icone dei siti che ti suggerisce nella home o che apre per te in chat, e Google non vede più quali siti frequenti. Usa quelle già viste nelle tue schede, nell\'archivio e nelle pagine salvate, o le chiede al sito stesso.',
         'Nell\'Editor Ctrl+Shift+T, W, L e R non si possono più dare a un modulo: Filo ti dice che aprono una scheda, la chiudono, portano alla home o ricaricano la pagina. Prima si salvavano senza avvisi e alla pressione facevano quello invece del modulo.',
       ],
     },
