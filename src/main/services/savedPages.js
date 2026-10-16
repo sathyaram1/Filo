@@ -91,11 +91,45 @@
     return entry;
   }
 
+  // Le voci appena tolte restano qui per l'«Annulla»: la pagina chiede solo l'id, e la voce (miniatura compresa)
+  // torna da qui, non da quello che manda la pagina (#839).
+  const rimosse = new Map();
+  const RIMOSSE_TETTO = 200;
+
   async function remove(id) {
     const pages = await list();
+    const indice = pages.findIndex((p) => p.id === id);
+    if (indice < 0) return pages;
+    rimosse.delete(id);
+    rimosse.set(id, { entry: pages[indice], indice });
+    while (rimosse.size > RIMOSSE_TETTO) rimosse.delete(rimosse.keys().next().value);
     const filtered = pages.filter((p) => p.id !== id);
     await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: filtered });
     return filtered;
+  }
+
+  // Rimette una voce tolta dov'era, con la sua data e la sua categoria (se nel frattempo quella categoria è
+  // stata eliminata, la voce torna fra le non categorizzate invece di finire in un gruppo che non si vede).
+  async function rimetti(id, categorie) {
+    const tolta = rimosse.get(id);
+    const pages = await list();
+    if (!tolta) return { pages, entry: null };
+    rimosse.delete(id);
+    // Risalvata nel frattempo: resta quella più nuova, senza doppioni.
+    if (pages.some((p) => p.id === id || p.url === tolta.entry.url)) return { pages, entry: null };
+    const entry = { ...tolta.entry };
+    if (entry.categoryId && Array.isArray(categorie)) {
+      const cat = categorie.find((c) => c.id === entry.categoryId);
+      entry.categoryId = cat ? cat.id : null;
+      entry.category = cat ? cat.name : null;
+    }
+    // L'elenco va dal più recente: si rientra davanti alla prima più vecchia, così due «Annulla» di fila
+    // rimettono anche l'ordine fra loro.
+    let i = entry.savedAt ? pages.findIndex((p) => (p.savedAt || '') < entry.savedAt) : Math.min(tolta.indice, pages.length);
+    if (i < 0) i = pages.length;
+    pages.splice(i, 0, entry);
+    await scriviNelTetto(pages);
+    return { pages, entry };
   }
 
   // "Consuma": rimuove dalla lista. Usato quando l'utente apre una scheda.
