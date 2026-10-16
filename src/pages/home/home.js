@@ -468,7 +468,7 @@
       { label: I18n.t('home_menu_copy_link'), run: () => copiaLink(page) },
     ];
     if (categories.length) voci.push({ label: I18n.t('home_menu_move'), run: () => apriMenuSposta(x, y, page) });
-    voci.push({ label: I18n.t('home_remove'), run: () => rimuovi(page) });
+    voci.push({ label: I18n.t('home_remove'), run: (o) => rimuovi(page, o) });
     openMenuAt(x, y, voci);
   }
 
