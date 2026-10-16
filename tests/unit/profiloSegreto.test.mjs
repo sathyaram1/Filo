@@ -201,7 +201,7 @@ describe('due segreti nello stesso contenitore', () => {
     const r = await apri(base, 'Alfa');
     assert.equal(r.esito, 'aperto');
     assert.deepEqual(r.segreto.elencaFile().map((f) => [f.nome, f.dimensione, f.danneggiato]),
-      [['nota.txt', 34, false], ['foto.bin', 300_000, false], ['vuoto', 0, false]]);
+      [['nota.txt', Buffer.byteLength('ciao 🌍, <b>non è markup</b>'), false], ['foto.bin', 300_000, false], ['vuoto', 0, false]]);
     assert.equal((await r.segreto.leggiFile('nota.txt')).toString(), 'ciao 🌍, <b>non è markup</b>');
     assert.ok((await r.segreto.leggiFile('foto.bin')).equals(foto));
     assert.equal((await r.segreto.leggiFile('vuoto')).length, 0);
