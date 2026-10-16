@@ -58,7 +58,7 @@ test('ogni ruolo che lavora riceve la domanda di guasto; chi risolve o corregge 
 test('il gruppo di un guasto non dipende dalle parole di chi cade', () => {
   const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-con-domanda.md'), 'utf8'));
   for (const nome of ['filo-security', 'github', 'npm', 'electron']) assert.ok(pezzo.includes(`\`guasto: ${nome}\``), nome);
-  assert.match(pezzo, /`guasto: <causa> <nome>`: la causa è una di `credenziali`, `clone`, `rete`, `servizio`, `strumento`, `permessi`/);
+  assert.match(pezzo, /`guasto: <causa> <nome>`, la causa fra `credenziali` `clone` `rete` `servizio` `strumento` `permessi`/);
   assert.doesNotMatch(pezzo, /come la nomina il messaggio/);
   const server = piatto(readFileSync(join(RUOLI, '_lavoro-server.md'), 'utf8'));
   assert.ok(server.includes('`guasto: filo-security`'), 'il lavoro server usa lo stesso nome della lista');
