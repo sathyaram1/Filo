@@ -243,7 +243,7 @@ controprove della stessa pagina senza niente aperto sopra e della modalità di
 Filo.
 
 **Aspettare di vedere chi ha usato il tasto vale solo se i nostri lo vedono
-per primi.** Tutta la regola qui sopra guarda il tasto a giro finito, e
+per primi.** La regola guarda il tasto a giro finito, e
 presuppone che i riquadri di Filo l'abbiano ricevuto. Un sito che ascolta l'Esc
 in cattura sulla FINESTRA (molti lo fanno per chiudere le proprie finestre) e lo
 ferma arriva prima di ogni riquadro, che ascolta sul documento: il menu restava
@@ -266,8 +266,8 @@ Un Esc chiude UN piano: con un riquadro di Filo aperto sopra una finestra del
 sito, il primo chiude il nostro e il secondo arriva al sito. La regola generale:
 **prima di aspettare di vedere chi ha usato un tasto, assicurati che i tuoi lo
 ricevano.** Prove in `tests/esc-sito-che-si-tiene-il-tasto.spec.mjs`, col
-sito che ferma l'Esc con `stopPropagation` e con `stopImmediatePropagation`.
-Resta fuori l'ascolto di un riquadro su un suo elemento (non su finestra o
+sito che ferma l'Esc con `stopPropagation` e con `stopImmediatePropagation`; le
+regole della copia in `tests/unit/escAnticipato.test.mjs`. Resta fuori l'ascolto di un riquadro su un suo elemento (non su finestra o
 documento): non viene anticipato. Oggi chiude l'Esc solo così il pannello del
 canale red-team, che ascolta sulla sua radice; chi scrive un riquadro nuovo
 ascolti l'Esc in cattura sul documento, come tutti gli altri.
