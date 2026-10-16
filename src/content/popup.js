@@ -1134,6 +1134,15 @@
   // «Copia» sotto ogni risposta: una traduzione si chiede quasi sempre per usarla altrove (#846). Nasce a risposta
   // finita, quindi non copia mai un pezzo, e copia il testo come si legge, senza marcature né note sotto.
   const COPIATO_MS = 1600;
+  // Gli appunti li scrive il main, che mette il testo anche in cronologia come il «Copia» del tasto destro: in un
+  // riquadro incorporato di un altro sito la pagina non ne ha il permesso. Se il main dice no, ci prova la pagina.
+  async function copiaTesto(testo) {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text: testo });
+      if (r && r.ok) return true;
+    } catch (_) {}
+    try { await navigator.clipboard.writeText(testo); return true; } catch (_) { return false; }
+  }
   const iconaCopia = (nome) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](14) : '');
   function tastoCopia(wrap, sorgente) {
     const Md = global.SN_MARKDOWN;
