@@ -10,7 +10,9 @@
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.243', date: '2026-10-16',
-      features: [],
+      features: [
+        'Nell\'Editor la scorciatoia di un modulo si sceglie premendo i tasti. Clicchi nel campo e premi la combinazione. Filo ricorda il tasto e non il carattere, quindi funziona con qualunque tastiera, anche con AltGr, e se la combinazione è già presa te lo dice subito. Le scorciatoie che avevi continuano a funzionare.',
+      ],
       fixes: [
         'L\'archivio che esporti da Sicurezza non porta più le tue chiavi API, nemmeno quelle copiate o scritte in chat, a meno che tu non spunti «Includi le chiavi». Importarlo non tocca le chiavi che hai già. Gli archivi fatti prima le contengono, quindi trattali come una password. Su un computer senza portachiavi di sistema, Filo ti dice una volta che salva le chiavi in chiaro.',
       ],
