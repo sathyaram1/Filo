@@ -4639,6 +4639,20 @@ function nomiDellaSalvata(p, piano) {
   if (indirizzo.length >= 6) nomi.push(indirizzo);
   return nomi;
 }
+// Parole che una risposta sulle pagine salvate dice comunque («salvata il 3 ottobre», «eccola»): non nominano nessuna.
+const PAROLE_DELLA_RISPOSTA = new Set([
+  'salvata', 'salvato', 'salvate', 'salvati', 'pagina', 'pagine', 'trovata', 'trovato', 'trovate', 'trovati', 'aperta',
+  'aperto', 'aperte', 'ricerca', 'eccola', 'eccole', 'eccolo', 'gennaio', 'febbraio', 'aprile', 'maggio', 'giugno',
+  'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre', 'lunedi', 'martedi', 'mercoledi', 'giovedi',
+  'venerdi', 'sabato', 'domenica',
+]);
+const NEGA_RISPOSTA = /(?<![\p{L}])(?:non|nessun[aeo]?|niente|nulla)(?![\p{L}])/iu;
+function paroleSoloSue(p, pagine, cercate, piano) {
+  const parole = (s) => piano(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const altre = new Set(pagine.filter((q) => q !== p).flatMap((q) => parole(q.title)));
+  return ChatArchive.terminiCheDistinguono(parole(p.title)).filter((w) => w.length >= 6 && !/^\d+$/.test(w)
+    && !PAROLE_DELLA_RISPOSTA.has(w) && !altre.has(w) && !cercate.some((c) => w.startsWith(c)));
+}
 function segnaSalvateNominate(textReply, azioni) {
   const piano = (s) => ChatArchive.normalizeForSearch(String(s || '')).replace(/[«»"“”‘’*_`]/g, ' ').replace(/\s+/g, ' ').trim();
   const testo = piano(textReply);
