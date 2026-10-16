@@ -224,10 +224,11 @@ const CHIAVE_IN_CHIARO = 'avvisoChiaviInChiaro';
 let inChiaroInCorso = false;
 
 function testoChiaviInChiaro() {
-  const rimedio = process.platform === 'linux'
-    ? 'Se installi o sblocchi un portachiavi (GNOME Keyring o KWallet) e riapri Filo, le cifra da solo.'
-    : 'Quando il portachiavi torna disponibile, alla riapertura Filo le cifra da solo.';
-  return `Su questo computer il portachiavi del sistema non risponde, quindi Filo salva le tue chiavi API in chiaro nella sua cartella dei dati: chi può leggere i tuoi file può leggere anche loro. ${rimedio}`;
+  const base = 'Filo non trova un portachiavi di sistema, quindi salva le tue chiavi API in chiaro nella sua cartella dei dati: chi può aprire i tuoi file può leggerle.';
+  let backend = '';
+  try { backend = safeStorage.getSelectedStorageBackend?.() || ''; } catch (_) {}
+  const consiglio = require('../portachiavi').consiglioPortachiavi({ platform: process.platform, backend, perChe: 'Per cifrarle' });
+  return consiglio ? `${base} ${consiglio}` : base;
 }
 
 function chiaviInChiaro() {
