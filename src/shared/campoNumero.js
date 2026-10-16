@@ -113,6 +113,20 @@
 
   // ── La parte con il DOM ────────────────────────────────────────────────────
 
+  // Un campo numerico con la lingua del sistema in inglese butta via la virgola mentre la si scrive o incolla:
+  // «2,5» diventava 25 e si salvava (#854). Qui la virgola entra come punto, e `leggi` la tratta da decimale.
+  function virgolaComePunto(input) {
+    if (!input || input.__snVirgola) return;
+    input.__snVirgola = true;
+    input.addEventListener('beforeinput', (ev) => {
+      const t = ev.data != null ? ev.data : (ev.dataTransfer ? ev.dataTransfer.getData('text/plain') : '');
+      if (!t || !t.includes(',')) return;
+      ev.preventDefault();
+      const doc = input.ownerDocument || (typeof document !== 'undefined' ? document : null);
+      if (doc) doc.execCommand('insertText', false, t.replace(/,/g, '.'));
+    });
+  }
+
   /**
    * Cuce campo, pulsante «Salva», pulsante «Rimetti com'era» e riga d'esito.
    *
