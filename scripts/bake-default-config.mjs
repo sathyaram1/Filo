@@ -198,6 +198,12 @@ const FONTE_SAFE_BROWSING = {
 /** Perché il server non ha dato la chiave, in una frase. PURA. */
 export function descriviEsitoServer(esito) {
   const e = esito || {};
+  const frase = fraseDellEsito(e);
+  // Chi legge deve distinguere un singhiozzo da un server giù: quanti tentativi, in quanto tempo.
+  return e.tentativi > 1 ? `${frase} Così anche al ${e.tentativi}° tentativo, dopo ${e.attesaS || 0} s di attese.` : frase;
+}
+
+function fraseDellEsito(e) {
   switch (e.stato) {
     case 'passphrase-assente':
       return 'La costruzione non ha nemmeno interrogato il server: FILO_BUILD_PASSPHRASE è assente dal job.';
