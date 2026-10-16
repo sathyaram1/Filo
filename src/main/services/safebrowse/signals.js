@@ -133,7 +133,7 @@ function cercaMarchi(norm) {
 
 // Doppia estensione eseguibile nell'URL (es. fattura.pdf.exe): forte indizio
 // di download ingannevole.
-const DOUBLE_EXT = /\.(pdf|jpe?g|png|gif|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp[34]|avi|html?)\.(exe|scr|bat|cmd|com|pif|vbs|vbe|js|jar|msi|apk|dmg|ps1|hta|cpl)(\?|#|$)/i;
+const DOUBLE_EXT = /\.(pdf|jpe?g|png|gif|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp[34]|avi|html?)\.(exe|scr|bat|cmd|com|pif|vbs|vbe|js|jar|msi|apk|dmg|ps1|hta|cpl)(\?|#|&|$)/i;
 
 // Il nome del file travestito, come lo dirà l'avviso: l'ultimo pezzo del percorso o del parametro che lo porta.
 function nomeFile(path, fine) {
