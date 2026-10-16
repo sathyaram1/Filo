@@ -758,6 +758,7 @@ module.exports = function register(on, ctx) {
     // accanto deve muoversi: si avvisano le pagine, come a ogni cambio di saldo.
     if (result && result.ok) {
       ultimaLettura = null;
+      vistaLetta = null;
       try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     }
     return { result };
