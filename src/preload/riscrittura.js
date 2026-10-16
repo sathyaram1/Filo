@@ -18,6 +18,59 @@ module.exports = function tieniFiloNellaRiscrittura() {
   const cattura = (o) => !!(o === true || (o && typeof o === 'object' && o.capture));
   const nostro = (t) => t === window || t === document;
   const trova = (t, tipo, fn, o) => segnati.findIndex((s) => s.t === t && s.tipo === tipo && s.fn === fn && s.cattura === cattura(o));
+  const anticipati = new WeakSet();
+
+  // Consegna `e` adesso agli ascolti in cattura di Filo che verrebbero dopo `da` (il primo ascolto della finestra),
+  // nell'ordine in cui li vedrebbe: un sito che ferma il tasto dalla sua cattura sulla finestra arriva prima di
+  // loro. Vedono una copia con le regole della propagazione, poi il giro vero li salta. True se uno l'ha fermato.
+  function anticipa(e, da) {
+    let fermato = false;
+    let subito = false;
+    let corrente = null;
+    let fase = 0;
+    let passivo = false;
+    const copia = new Proxy(e, {
+      get(t, k) {
+        if (k === 'currentTarget') return corrente;
+        if (k === 'eventPhase') return fase;
+        if (k === 'cancelBubble') return fermato;
+        if (k === 'stopPropagation') return () => { fermato = true; };
+        if (k === 'stopImmediatePropagation') return () => { fermato = true; subito = true; };
+        if (k === 'preventDefault') return () => { if (!passivo) t.preventDefault(); };
+        const v = Reflect.get(t, k);
+        return typeof v === 'function' && k !== 'constructor' ? v.bind(t) : v;
+      },
+      set(t, k, v) {
+        if (k === 'cancelBubble') { if (v) fermato = true; return true; }
+        if (k === 'returnValue') { if (v === false && !passivo) t.preventDefault(); return true; }
+        return Reflect.set(t, k, v);
+      },
+    });
+    const tappe = e.target === window ? [window] : [window, document];
+    for (const t of tappe) {
+      if (fermato) break;
+      corrente = t;
+      fase = e.target === t ? 2 : 1;
+      let qui = segnati.filter((s) => s.t === t && s.tipo === e.type && s.cattura);
+      if (t === window) {
+        const io = qui.findIndex((s) => s.fn === da);
+        qui = qui.slice(io + 1);
+      }
+      for (const s of qui) {
+        if (subito) break;
+        // Tolto da un ascolto di prima, o col segnale annullato: il browser non lo chiamerebbe più.
+        if (!segnati.includes(s)) continue;
+        if (s.o && typeof s.o === 'object' && s.o.signal && s.o.signal.aborted) continue;
+        passivo = !!(s.o && typeof s.o === 'object' && s.o.passive);
+        try { s.fn.call(t, copia); } catch (err) {
+          try { (globalThis.reportError || console.error)(err); } catch (_) {}
+        }
+        if (s.o && typeof s.o === 'object' && s.o.once) { try { proto.removeEventListener.call(t, s.tipo, s.fn, s.o); } catch (_) {} }
+      }
+    }
+    anticipati.add(e);
+    return fermato;
+  }
 
   proto.addEventListener = function (tipo, fn, o) {
     if (!nostro(this) || typeof fn !== 'function') return aggiungi.call(this, tipo, fn, o);
