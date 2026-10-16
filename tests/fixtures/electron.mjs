@@ -22,6 +22,7 @@ import { createServer } from 'node:http';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
+import { paginaDellaScheda } from '../helpers/schede.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..', '..');
