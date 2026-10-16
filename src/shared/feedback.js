@@ -2354,6 +2354,7 @@
     ensureSeqCounter,
     nextSeq,
     maxSeq,
+    maxSeqProvato,
     // Tetto del caricamento e resa onesta dei conteggi che ne derivano (#495).
     LIST_PAGE_SIZE,
     // La proiezione degli elenchi e il suo complemento: chi elenca chiede
