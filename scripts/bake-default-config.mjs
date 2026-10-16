@@ -86,51 +86,74 @@ function primaStringa(...valori) {
   return '';
 }
 
-// Ritorna `{ apiKeys, esito }`: le chiavi e PERCHÉ non ci sono, che è quello
-// che serve a chi legge il guasto — degradare in silenzio non è degradare.
-// Non lancia: si ripiega sui segreti del job, perché una versione con quelle
-// chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
-async function fetchRemoteKeys(passphrase) {
-  if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
+// Un singhiozzo di rete del runner fermava una piattaforma intera mentre le altre, nello stesso
+// minuto, il server lo raggiungevano (#1240): si ritenta ciò che può guarire aspettando, un rifiuto no.
+export const ATTESE_SERVER_MS = [5000, 15000, 30000];
+const TEMPO_PER_TENTATIVO_MS = 30000;
+const attesaVera = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Riprovare può cambiare la risposta? Rete, 408, 429 e 5xx sì; un rifiuto o un JSON storto no. PURA. */
+export function esitoDaRitentare(esito) {
+  const e = esito || {};
+  if (e.stato === 'rete') return true;
+  if (e.stato !== 'http') return false;
+  return e.status === 408 || e.status === 429 || e.status >= 500;
+}
+
+async function chiediUnaVolta(passphrase, fetchImpl) {
   try {
-    const res = await fetch(`${CANALE}/buildKeys`, {
+    const res = await fetchImpl(`${CANALE}/buildKeys`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ passphrase }),
+      signal: AbortSignal.timeout(TEMPO_PER_TENTATIVO_MS),
     });
-    if (!res.ok) {
-      const esito = { stato: 'http', status: res.status };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
-    }
+    if (!res.ok) return { apiKeys: {}, esito: { stato: 'http', status: res.status } };
     const j = await res.json().catch(() => null);
-    if (!j || typeof j !== 'object') {
-      const esito = { stato: 'illeggibile' };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
-    }
+    if (!j || typeof j !== 'object') return { apiKeys: {}, esito: { stato: 'illeggibile' } };
     // Il rifiuto arriva con HTTP 200 e `ok:false`: finiva in un `{}`
     // indistinguibile da «il documento non ha quella chiave», e non diceva niente.
     if (j.ok === false) {
-      const esito = { stato: 'rifiutato', reason: primaStringa(j.reason, j.error, j.message) };
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-      return { apiKeys: {}, esito };
+      return { apiKeys: {}, esito: { stato: 'rifiutato', reason: primaStringa(j.reason, j.error, j.message) } };
     }
-    const apiKeys = (j && j.apiKeys && typeof j.apiKeys === 'object') ? { ...j.apiKeys } : {};
+    const apiKeys = (j.apiKeys && typeof j.apiKeys === 'object') ? { ...j.apiKeys } : {};
     const sb = pickSafeBrowsing(j);
     if (sb) apiKeys.safeBrowsing = sb;
     const esito = Object.values(apiKeys).some((v) => typeof v === 'string' && v.trim())
       ? { stato: 'ok' }
       : { stato: 'senza-chiavi' };
-    if (esito.stato === 'senza-chiavi') {
-      console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-    }
     return { apiKeys, esito };
   } catch (e) {
-    const esito = { stato: 'rete', messaggio: e.message };
-    console.warn(`[bake] ${descriviEsitoServer(esito)} Uso i secret d'ambiente.`);
-    return { apiKeys: {}, esito };
+    return { apiKeys: {}, esito: { stato: 'rete', messaggio: descriviErroreDiRete(e) } };
   }
+}
+
+// Ritorna `{ apiKeys, esito }`: le chiavi e PERCHÉ non ci sono, che è quello
+// che serve a chi legge il guasto — degradare in silenzio non è degradare.
+// Non lancia: si ripiega sui segreti del job, perché una versione con quelle
+// chiavi è meglio di nessuna versione. Se non resta niente decide main, e ferma.
+export async function fetchRemoteKeys(passphrase, { fetchImpl = fetch, attese = ATTESE_SERVER_MS, sleep = attesaVera } = {}) {
+  if (!passphrase) return { apiKeys: {}, esito: { stato: 'passphrase-assente' } };
+  const tentativi = attese.length + 1;
+  let r;
+  let fatti = 0;
+  let attesoMs = 0;
+  for (;;) {
+    r = await chiediUnaVolta(passphrase, fetchImpl);
+    fatti++;
+    if (fatti >= tentativi || !esitoDaRitentare(r.esito)) break;
+    const ms = attese[fatti - 1] || 0;
+    console.warn(`[bake] tentativo ${fatti} di ${tentativi}: ${descriviEsitoServer(r.esito)} Riprovo fra ${Math.round(ms / 1000)} s.`);
+    await sleep(ms);
+    attesoMs += ms;
+  }
+  if (fatti > 1) Object.assign(r.esito, { tentativi: fatti, attesaS: Math.round(attesoMs / 1000) });
+  if (r.esito.stato !== 'ok') {
+    console.warn(`[bake] ${descriviEsitoServer(r.esito)} Uso i secret d'ambiente.`);
+  } else if (fatti > 1) {
+    console.warn(`::warning::Chiavi dal server al tentativo ${fatti} di ${tentativi}: prima il server non rispondeva.`);
+  }
+  return r;
 }
 
 function envKey(name) {
