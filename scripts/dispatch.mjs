@@ -1683,6 +1683,11 @@ const SEMBRA_OPZIONE = (a) => {
   return s.length > 1 && ['-', '‐', '‑', '‒', '–', '—', '−'].includes(s[0]) && !/^[0-9]/.test(s.slice(1));
 };
 
+/** Un'opzione rimasta al posto dell'identificativo: lo stato locale finiva sotto il suo nome (#879). PURA. */
+export function idCheSembraOpzione(id, ammesse) {
+  return `Argomento non capito al posto dell'identificativo: ${id} — non ho registrato niente. Qui le opzioni sono ${ammesse}, in qualunque posizione; poi vengono l'identificativo e il resto.`;
+}
+
 export function usageText() {
   return [
     'Uso: node scripts/dispatch.mjs <comando>',
