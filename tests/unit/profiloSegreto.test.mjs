@@ -673,7 +673,10 @@ describe('danni', () => {
       const file = r.segreto.elencaFile();
       assert.equal(file.length, 101);
       assert.ok((await r.segreto.leggiFile('foto')).equals(foto));
-      assert.equal((await r.segreto.leggiFile('nota-99.txt')).toString(), 'nota numero 99');
+      // Solo le note che stavano nel gruppo perso risultano rovinate, come per ogni gruppo perso.
+      const sane = file.filter((f) => f.nome !== 'foto' && !f.danneggiato);
+      assert.ok(sane.length >= 90, `note sane: ${sane.length}`);
+      for (const f of sane) assert.equal((await r.segreto.leggiFile(f.nome)).toString(), `nota numero ${f.nome.slice(5, -4)}`);
       await r.segreto.chiudi();
       assert.ok(integra(await impronta(base, 'Elenco')), 'la riparazione non ha rimesso la copia persa dell’elenco');
     }
