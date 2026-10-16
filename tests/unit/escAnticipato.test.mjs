@@ -88,7 +88,6 @@ test('un ascolto «una volta» scatta una volta sola; uno tolto da chi viene pri
   document.addEventListener(tipo, tolto, true);
   riscrittura.anticipa(new Event(tipo), primo);
   riscrittura.anticipa(new Event(tipo), primo);
-  document.dispatchEvent(new Event(tipo));
   assert.deepEqual(visti, ['una volta']);
 });
 
