@@ -110,6 +110,19 @@
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('sec-import-btn').textContent = I18n.t('security_import_btn');
     $('sec-import-desc').textContent = I18n.t('security_import_desc');
+    $('sec-wipe-btn').textContent = I18n.t('security_wipe_btn');
+    $('sec-wipe-desc').textContent = I18n.t('security_wipe_desc');
+    $('sec-wipe-export-text').textContent = I18n.t('security_wipe_export_text');
+    $('sec-wipe-export').textContent = I18n.t('security_export_btn');
+    $('sec-wipe-list-title').textContent = I18n.t('security_wipe_list_title');
+    $('sec-wipe-list').textContent = I18n.t('security_wipe_list');
+    $('sec-wipe-server').textContent = I18n.t('security_wipe_server');
+    $('sec-wipe-identity-label').textContent = I18n.t('security_wipe_identity_label');
+    $('sec-wipe-identity-desc').textContent = I18n.t('security_wipe_identity_desc');
+    $('sec-wipe-word-label').textContent = I18n.t('security_wipe_word_label');
+    $('sec-wipe-word').placeholder = 'conferma';
+    $('sec-wipe-cancel').textContent = I18n.t('security_wipe_cancel');
+    $('sec-wipe-go').textContent = I18n.t('security_wipe_go');
     $('savedHint').textContent = I18n.t('options_saved');
   }
 
