@@ -174,10 +174,9 @@
   function testoPiattaforma(p, esempi) {
     const N = nomiSito();
     const S = stessoSito();
+    const perche = `«${N.leggibile(p)}» raccoglie i siti di chiunque, quindi fidarsi di lui vorrebbe dire fidarsi di tutti.`;
     // Sotto un indirizzo che serve i file di tutti non c'è un sito preciso da proporre.
-    if (S.condiviso(p)) {
-      return `«${N.leggibile(p)}» serve i file di chiunque, quindi fidarsi di lui vorrebbe dire fidarsi di tutti.`;
-    }
+    if (S.condiviso(p)) return perche;
     const sotto = [];
     for (const e of Array.isArray(esempi) ? esempi : []) {
       const h = comeSito(e);
