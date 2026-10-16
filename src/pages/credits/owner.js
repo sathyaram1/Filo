@@ -1056,14 +1056,12 @@
 
   // Il numero intero scritto in un campo numerico, o null se non è un intero
   // (vuoto, testo che il browser non traduce in numero, decimali: «10,7» non
-  // sono crediti). Niente arrotondamenti muti.
+  // sono crediti). Niente arrotondamenti muti. Le migliaia col punto le legge
+  // `leggi`, come nelle manopole: «10.000» non è 10.
   function numeroIntero(input) {
     if (!input || (input.validity && input.validity.badInput)) return null;
-    const raw = String(input.value || '').trim();
-    if (!raw) return null;
-    const n = Number(raw);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
-    return n;
+    const esito = window.SN_CAMPO_NUMERO.leggi(input.value, { intero: true });
+    return esito.ok ? esito.valore : null;
   }
   function rifiuta(msg, input, testo) {
     msg.hidden = false;
