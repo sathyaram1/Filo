@@ -127,6 +127,23 @@ test('la casella dei programmi fidati: siti ridotti, piattaforme scartate al lor
   assert.match(dallaCronologia, /come alice\.github\.io o bob\.github\.io\.$/);
 });
 
+// Dopo una release GitHub il file arriva da release-assets.githubusercontent.com, che serve le release di chiunque:
+// proporlo come «sito preciso» rifarebbe entrare tutti dalla porta che il rifiuto chiude.
+test('un indirizzo che serve i file di tutti non entra fra i programmi fidati e non si propone come sito preciso', () => {
+  for (const h of ['release-assets.githubusercontent.com', 'objects.githubusercontent.com', 'https://raw.githubusercontent.com/a/b/x.exe',
+    'doc-0s-4c-docs.googleusercontent.com', 'dl.dropboxusercontent.com', 'github-production-release-asset-2e65be.s3.amazonaws.com']) {
+    assert.ok(E.sitoFidabile(h).piattaforma, h);
+    assert.equal(E.fidato(h.includes('://') ? h : `https://${h}/setup.exe`, [h]), false, h);
+  }
+  const frase = E.testoPiattaforma('githubusercontent.com', ['github.com', 'release-assets.githubusercontent.com']);
+  assert.match(frase, /«githubusercontent\.com» serve i file di chiunque/);
+  assert.doesNotMatch(frase, /release-assets|nome\.githubusercontent/);
+  assert.match(E.testoPiattaforma('release-assets.githubusercontent.com'), /serve i file di chiunque\.$/);
+  // Il sito di chi pubblica resta un sito come gli altri.
+  assert.deepEqual(E.sitoFidabile('github.com'), { sito: 'github.com' });
+  assert.deepEqual(E.sitoFidabile('alice.github.io'), { sito: 'alice.github.io' });
+});
+
 test('un riquadro dello stesso sito non rende incerta la pagina; uno di un altro ospite della piattaforma sì', () => {
   assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://shop.esempio.it', 'https://cdn.esempio.it']), false);
   assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://esempio.it:8443']), false);
