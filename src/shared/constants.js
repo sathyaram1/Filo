@@ -1224,6 +1224,26 @@
     return PROVIDER_ORDER.filter((p) => (apiKeys || {})[p]);
   }
 
+  // I posti dei segreti dell'utente nelle impostazioni, come [oggetto, campo]: l'esportazione li porta solo se
+  // chiesto (#905). Un proxy con utente e password nell'indirizzo vale quanto una chiave API. PURA.
+  const PROXY_CON_CREDENZIALI = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i;
+  const oggetto = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  const pieno = (v) => typeof v === 'string' && v.trim() !== '';
+  function campiSegreti(s) {
+    const out = [];
+    if (!oggetto(s)) return out;
+    if (oggetto(s.apiKeys)) for (const k of Object.keys(s.apiKeys)) out.push([s.apiKeys, k]);
+    if (oggetto(s.proxy)) {
+      for (const k of ['datacenter', 'residential']) if (pieno(s.proxy[k]) && PROXY_CON_CREDENZIALI.test(s.proxy[k].trim())) out.push([s.proxy, k]);
+    }
+    const sb = oggetto(s.security) ? s.security.safeBrowse : null;
+    if (oggetto(sb) && 'safeBrowsingKey' in sb) out.push([sb, 'safeBrowsingKey']);
+    return out;
+  }
+  function haSegreti(s) {
+    return campiSegreti(s).some(([o, k]) => pieno(o[k]));
+  }
+
   // Filo può servire questa funzione? Si guarda quello che la chiamata userà,
   // mai `settings.provider`: se nomina un fornitore ritirato, mente (#663). PURA.
   // `cfg` e non `settings`: gira solo nel main, e la sentinella delle letture sui siti non la deve contare.
