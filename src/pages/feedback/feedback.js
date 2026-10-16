@@ -1237,7 +1237,8 @@
           ${notesBlock}
           ${tailThreadHtml}
           ${replyBlock}
-          <div class="fb-actions">${actionsFor(f)}</div>
+          <div class="fb-tasti">${notesEditable ? tastoFraseHtml(f) : ''}<div class="fb-actions">${actionsFor(f)}</div></div>
+          ${fraseBlock}
         </article>
       `;
     }).join('');
