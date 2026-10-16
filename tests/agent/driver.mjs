@@ -26,6 +26,7 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 import { primaFinestra } from '../helpers/primaFinestra.mjs';
+import { paginaDellaScheda } from '../helpers/schede.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const APP_ROOT = resolve(__dirname, '..', '..');
@@ -318,24 +319,16 @@ function resolveExecutable(name) {
   }
 }
 
-// Trova la Page della tab attiva interrogando il main per l'URL attivo.
+// Per scheda e non per indirizzo: due home, o due schede sullo stesso sito, hanno lo stesso (#877). Una scheda appena
+// nata si aspetta un poco, finché Playwright non ne ha la Page.
 export async function activeView(app, shell) {
-  const activeUrl = await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const tabs = win._filoTabs;
-    if (!tabs) return null;
-    const t = tabs.tabs.find((x) => x.id === tabs.activeId);
-    return t ? t.view.webContents.getURL() : null;
-  });
-  if (!activeUrl) return null;
-  // match per URL esatto; fallback per hostname
-  const pages = app.windows();
-  let p = pages.find((w) => { try { return w.url() === activeUrl; } catch { return false; } });
-  if (!p) {
-    const host = (() => { try { return new URL(activeUrl).hostname; } catch { return null; } })();
-    p = pages.find((w) => { try { return new URL(w.url()).hostname === host; } catch { return false; } });
+  const scadenza = Date.now() + 2000;
+  for (;;) {
+    const id = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs)?._filoTabs.activeId || null);
+    const page = id ? await paginaDellaScheda(app, id) : null;
+    if (page || !id || Date.now() > scadenza) return page;
+    await sleep(100);
   }
-  return p || null;
 }
 
 // Script eseguito in pagina: trova elementi interagibili visibili e ne ritorna i rect.
