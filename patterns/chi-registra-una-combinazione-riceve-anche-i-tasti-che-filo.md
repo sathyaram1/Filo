@@ -3,7 +3,7 @@
 [← Tutti i pattern](../PATTERNS.md)
 
 Una pagina che fa premere una combinazione per sceglierla (le scorciatoie di Spiega, Traduci, Salva per dopo e
-Aiuto nelle Preferenze, #842) deve vedere ogni tasto premuto, anche quelli che il main prende prima della pagina:
+Aiuto nelle Preferenze, #842; quella di un modulo dell'Editor, #893) deve vedere ogni tasto premuto, anche quelli che il main prende prima della pagina:
 Ctrl+T, Ctrl+W, lo zoom, la barra laterale, le quattro azioni stesse. Senza, Ctrl+T apriva una scheda invece di
 essere rifiutato col perché, e Alt+T faceva partire la traduzione a chi voleva solo spostarla.
 
