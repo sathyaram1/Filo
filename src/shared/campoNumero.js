@@ -321,5 +321,5 @@
     return { mostra, salvaOra, rimettiOra, dillo, stato };
   }
 
-  global.SN_CAMPO_NUMERO = { MOTIVI, leggi, frase, controlla, controllaCampo, collega };
+  global.SN_CAMPO_NUMERO = { MOTIVI, leggi, frase, controlla, controllaCampo, collega, virgolaComePunto };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
