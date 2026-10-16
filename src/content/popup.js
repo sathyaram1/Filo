@@ -1131,6 +1131,49 @@
     return el;
   }
 
+  // «Copia» sotto ogni risposta: una traduzione si chiede quasi sempre per usarla altrove (#846). Nasce a risposta
+  // finita, quindi non copia mai un pezzo, e copia il testo come si legge, senza marcature né note sotto.
+  const COPIATO_MS = 1600;
+  const iconaCopia = (nome) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](14) : '');
+  function tastoCopia(wrap, sorgente) {
+    const Md = global.SN_MARKDOWN;
+    const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
+    if (!wrap || !testo.trim()) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-msg-copia';
+    const mostra = (stato) => {
+      const chiave = stato === 'ok' ? 'popup_copied' : stato === 'no' ? 'popup_copy_failed' : 'popup_copy';
+      btn.dataset.etichetta = I18n.t(chiave);
+      btn.setAttribute('aria-label', I18n.t(chiave));
+      btn.classList.toggle('sn-copiato', stato === 'ok');
+      btn.classList.toggle('sn-non-copiato', stato === 'no');
+      const svg = iconaCopia(stato === 'ok' ? 'check' : 'copy');
+      if (svg) btn.innerHTML = svg; else btn.textContent = I18n.t(chiave);
+    };
+    mostra(null);
+    let timer = null;
+    // Il fuoco resta nella riga per scrivere: copiare non vuol dire aver finito di fare domande.
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', async (e) => {
+      if (!e.isTrusted) return;
+      let ok = false;
+      try { await navigator.clipboard.writeText(testo); ok = true; } catch (_) {}
+      // Come il «Copia» del tasto destro: quello che Filo mette negli appunti lo ritrova Incolla.
+      if (ok) {
+        try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry: { type: 'text', text: testo } })).catch(() => {}); } catch (_) {}
+      }
+      clearTimeout(timer);
+      mostra(ok ? 'ok' : 'no');
+      timer = setTimeout(() => mostra(null), COPIATO_MS);
+    });
+    const riga = document.createElement('div');
+    riga.className = 'sn-msg-azioni';
+    riga.appendChild(btn);
+    wrap.appendChild(riga);
+    return btn;
+  }
+
   // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
   // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
   // posa), l'informazione resta comunque: passando sopra l'intestazione.
