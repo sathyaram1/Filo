@@ -13,6 +13,7 @@
     try { chrome.runtime.sendMessage(msg, cb); } catch (_) { cb(null); }
   }
 
+  // Link per messaggio, sotto il tetto del main (LOTTO_MAX in links.js); se il main ne vuole meno lo dice e si scende.
   let lotto = 200;
   const mandati = new Set();
   const visti = new WeakSet();
