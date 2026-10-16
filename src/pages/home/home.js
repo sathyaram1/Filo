@@ -573,7 +573,8 @@
       opt.textContent = it.label;
       // I nomi delle categorie li sceglie un modello o chi scrive: lunghi si accorciano, e il nome intero resta qui.
       opt.title = it.label;
-      opt.addEventListener('click', () => { closeCtxMenu(); it.run(); });
+      // detail 0: la voce l'ha scelta Invio o Spazio, non un clic.
+      opt.addEventListener('click', (e) => { closeCtxMenu(); it.run({ daTastiera: e.detail === 0 }); });
       menu.appendChild(opt);
     }
     if (campo) menu.appendChild(campo);
