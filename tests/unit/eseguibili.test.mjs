@@ -144,6 +144,25 @@ test('un indirizzo che serve i file di tutti non entra fra i programmi fidati e 
   assert.deepEqual(E.sitoFidabile('alice.github.io'), { sito: 'alice.github.io' });
 });
 
+// storage.googleapis.com/<secchio>/… dà i file di ogni cliente di Google Cloud: né proposta né accettata; il secchio
+// scritto come nome (<secchio>.storage.googleapis.com) è di uno, e resta fidabile da solo.
+test('#876 giro 2 — i secchi di Google Cloud: l\'host di tutti non entra, il secchio con nome sì e copre solo sé', () => {
+  for (const h of ['storage.googleapis.com', 'commondatastorage.googleapis.com', 'firebasestorage.googleapis.com',
+    'storage-download.googleapis.com', 'www.googleapis.com', 'https://storage.googleapis.com/secchio/setup.exe']) {
+    assert.ok(E.sitoFidabile(h).piattaforma, h);
+    assert.equal(E.fidato('https://storage.googleapis.com/altro/setup.exe', [h]), false, h);
+  }
+  for (const esempi of [['storage.googleapis.com', 'firebasestorage.googleapis.com'], ['storage.googleapis.com']]) {
+    const frase = E.testoPiattaforma('googleapis.com', esempi);
+    assert.match(frase, /«googleapis\.com» raccoglie i siti di chiunque.*fidarsi di tutti\.$/);
+    assert.doesNotMatch(frase, /storage|nome\.googleapis/);
+  }
+  assert.match(E.testoPiattaforma('googleapis.com', ['mio.storage.googleapis.com']), /come mio\.storage\.googleapis\.com\.$/);
+  assert.deepEqual(E.sitoFidabile('mio.storage.googleapis.com'), { sito: 'mio.storage.googleapis.com' });
+  assert.equal(E.fidato('https://mio.storage.googleapis.com/setup.exe', ['mio.storage.googleapis.com']), true);
+  assert.equal(E.fidato('https://altro.storage.googleapis.com/setup.exe', ['mio.storage.googleapis.com']), false);
+});
+
 test('un riquadro dello stesso sito non rende incerta la pagina; uno di un altro ospite della piattaforma sì', () => {
   assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://shop.esempio.it', 'https://cdn.esempio.it']), false);
   assert.equal(E.riquadriDiAltri('shop.esempio.it', ['https://esempio.it:8443']), false);
