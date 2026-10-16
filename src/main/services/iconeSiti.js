@@ -18,7 +18,7 @@ const DATO_RE = /^data:image\//i;
 function sitoDi(url) {
   try {
     const u = new URL(String(url || ''));
-    if (u.protocol !== 'http:' && u.protocol !== 'https:' || !u.host) return null;
+    if ((u.protocol !== 'http:' && u.protocol !== 'https:') || !u.host) return null;
     const host = u.host.toLowerCase();
     return { host, origine: `${u.protocol}//${host}`, nome: host.replace(/^www\./, '') };
   } catch (_) { return null; }
