@@ -20,9 +20,8 @@ module.exports = function tieniFiloNellaRiscrittura() {
   const trova = (t, tipo, fn, o) => segnati.findIndex((s) => s.t === t && s.tipo === tipo && s.fn === fn && s.cattura === cattura(o));
   const anticipati = new WeakSet();
 
-  // Consegna `e` adesso agli ascolti in cattura di Filo che verrebbero dopo `da` (il primo ascolto della finestra),
-  // nell'ordine in cui li vedrebbe: un sito che ferma il tasto dalla sua cattura sulla finestra arriva prima di
-  // loro. Vedono una copia con le regole della propagazione, poi il giro vero li salta. True se uno l'ha fermato.
+  // Gli ascolti in cattura di Filo dopo `da` vedono `e` adesso, in una copia che rispetta la propagazione, e il giro vero
+  // li salta: la cattura del sito sulla finestra non arriva più prima di loro. True se uno l'ha fermato.
   function anticipa(e, da) {
     let fermato = false;
     let subito = false;
