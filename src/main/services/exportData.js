@@ -533,9 +533,8 @@ const REGOLE_ALTRE_CHIAVI = {
 let regolePerChiave = null;
 function regolaImport(chiave) {
   if (!regolePerChiave) {
-    if (!globalThis.SN_CONST) require('../../shared/constants.js');
     regolePerChiave = new Map(Object.entries(REGOLE_ALTRE_CHIAVI));
-    for (const [nome, valore] of Object.entries(globalThis.SN_CONST.STORAGE_KEYS)) {
+    for (const [nome, valore] of Object.entries(costanti().STORAGE_KEYS)) {
       if (REGOLE_IMPORT[nome]) regolePerChiave.set(valore, REGOLE_IMPORT[nome]);
     }
   }
