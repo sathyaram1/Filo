@@ -802,19 +802,7 @@ export function buildPayload(bucket, ctx = {}) {
         scope: verifierScope(ctx.scope).scope,
         ...(ctx.perimetro && typeof ctx.perimetro === 'object' ? { perimetro: ctx.perimetro } : {}),
       };
-    case 'fixer': {
-      // La ripresa dopo la risposta dell'owner: il lavoro si era fermato su una
-      // domanda, e chi riprende riceve domanda, risposta, i rilievi fermi e
-      // la serie delle critiche (il lavoro può essere a metà di un giro).
-      const rip = ctx.ripresa && typeof ctx.ripresa === 'object' ? ctx.ripresa : null;
-      if (rip) {
-        return {
-          case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
-          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx),
-          history: Array.isArray(ctx.history) ? ctx.history : [],
-          historyDropped: Number(ctx.historyDropped) || 0,
-        };
-      }
+    case 'fixer':
       // Riallineamento del ramo: il lavoro era già verificato, quindi niente serie. Il perché lo scrive il server
       // (conflitto, o unit rossi sulla fusione con l'elenco dei test, #929): senza, chi riallinea non sa cosa far tornare verde.
       return {
@@ -826,15 +814,10 @@ export function buildPayload(bucket, ctx = {}) {
         ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
         ...conImmagini(ctx),
+        ...conRipresa(ctx),
       };
-    }
-    case 'new-work': {
-      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx) };
-      // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
-      // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
-      if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
-      return out;
-    }
+    case 'new-work':
+      return { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx), ...conRipresa(ctx) };
     case 'halt':
       // Guasto: nessun lavoro, solo il motivo per cui non si può lavorare.
       return { kind: bucket.kind || 'transient', message: bucket.message || '' };
