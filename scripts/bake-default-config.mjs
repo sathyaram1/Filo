@@ -336,7 +336,7 @@ async function avvisa(mancanti, righe) {
       console.warn(`::warning::Feedback dell'allarme non consegnato (${res.status}${body.reason ? ` ${body.reason}` : ''}): di questa pubblicazione ferma resta solo il guasto qui sopra.`);
     }
   } catch (e) {
-    console.warn(`::warning::Feedback dell'allarme non consegnato (${e.message}): di questa pubblicazione ferma resta solo il guasto qui sopra.`);
+    console.warn(`::warning::Feedback dell'allarme non consegnato (${descriviErroreDiRete(e)}): di questa pubblicazione ferma resta solo il guasto qui sopra.`);
   }
 }
 
