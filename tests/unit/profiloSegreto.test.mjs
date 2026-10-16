@@ -381,10 +381,11 @@ describe('cancellazione', () => {
     const b = await crea(base, 'Beta');
     await b.scriviFile('b', 'resto io');
     await b.chiudi();
+    // L'apertura ripara Alfa e può toccare Beta, che l'ha scritto sopra senza dichiararlo: si fotografa dopo.
+    const r = await apri(base, 'Alfa');
     const prima = await impronta(base, 'Alfa');
     const primaB = await impronta(base, 'Beta');
     const buf0 = readFileSync(base.contenitore);
-    const r = await apri(base, 'Alfa');
     await r.segreto.cancella();
     assert.throws(() => r.segreto.elencaFile(), (e) => e.codice === 'CHIUSO');
     assert.deepEqual(await apri(base, 'Alfa'), NESSUNO);
