@@ -1014,7 +1014,7 @@
     // Conferma CLICCABILE che porta alla lista (#252): rimpiazza il vecchio
     // toast muto + chiusura a 600ms (troppo rapida per farci qualcosa).
     showSaveConfirm(entry);
-    return entry || { id: null };
+    return entry;
   }
 
   // Riquadro di conferma di "Salva per dopo" (#252). La scheda salvata sta per
