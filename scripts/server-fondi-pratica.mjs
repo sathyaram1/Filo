@@ -328,12 +328,13 @@ export async function esegui(argv, deps = {}) {
     const lancia = deps.lancia || lanciaServer;
     // La parte dell'app già su main: questa è l'ultima. Altrimenti l'app può ancora arrivare, anche da un ramo che da
     // qui non si vede, e la pratica si chiude solo a parola (--solo-server), che resta scritta per chi arrivasse dopo.
-    // Un ramo dell'app legato e fuori da main vince sul registro: è un seguito, o la pratica è stata riaperta.
-    const ramiApp = tardiva ? [] : (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
     const ultima = !!letta.parti.app && !ramiApp.length;
     const solo = a.soloServer && !ultima && !tardiva;
     const chiude = !tardiva && (ultima || solo);
-    const quando = tardiva ? new Date(tardiva.at).toISOString() : '';
+    const quando = tardiva || riapertaDa ? new Date((tardiva || riapertaDa).at).toISOString() : '';
+    const notaRiapertura = riapertaDa
+      ? `Riaperta da server:fondi su ${a.ramo}: l'aveva chiusa la fusione della parte ${NOME_PARTE.app} (${quando}), ma ${ramiApp.join(', ')} dell'app è legato a questa pratica e non è su main. Le parti già su main ripartono da zero.`
+      : '';
     const numero = chi.replace(/^#/, '');
     const chiudeApp = `la chiude la fusione di ${ramiApp.length ? ramiApp.join(', ') : 'quella parte'} (npm run finish -- --feedback ${numero})`;
     const soloComando = `npm run server:fondi -- ${a.ramo} --feedback ${numero} --solo-server`;
