@@ -2042,8 +2042,10 @@ async function eseguiAzioneFilo(action, {
     try {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
-      if (setter && (setter.scrive.includes('security.pagineDelicate.siti') || setter.scrive.includes('menuDelSito.siti'))) {
-        const { tm, tab } = targetWebTab(sender);
+      if (setter && ['security.pagineDelicate.siti', 'menuDelSito.siti', 'blocklist'].some((p) => setter.scrive.includes(p))) {
+        // Dall'Aiuto di un sito «questo sito» è lui, e le altre schede non si nominano (#843).
+        const daSito = /^https?:/i.test(sender?.tab?.url || sender?.url || '');
+        const { tm, tab } = daSito ? { tm: null, tab: { url: sender?.tab?.url || sender?.url } } : targetWebTab(sender);
         const schede = tm ? tm.tabs.filter((t) => !t.isInternal).map((t) => ({ url: t.url, title: t.title })) : [];
         const r = globalThis.SN_PAGINE_DELICATE.risolviSchede(
           action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
