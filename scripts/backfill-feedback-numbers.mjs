@@ -81,11 +81,21 @@ export function ordinaPerArrivo(docs) {
 }
 
 // ── Cosa si scarica per NUMERARE ─────────────────────────────────────────────
-// Quattro campi: la data d'arrivo (l'ordine dei numeri), il numero che c'è già,
-// e il titolo per la riga che si stampa. Il testo della segnalazione — cifrato,
-// qualche KB, più note e allegati — qui non serve a niente, e moltiplicato per
-// la collezione intera era il conto di Firestore di settembre 2026 (#680).
-export const CAMPI_NUMERAZIONE = ['name', 'createdAt', 'seq', 'subSeq'];
+// La data d'arrivo (l'ordine dei numeri), il numero che c'è già e la prova del
+// mittente (solo un numero provato conta, #923), più il titolo per la riga che
+// si stampa. Il testo della segnalazione — cifrato, qualche KB, più note e
+// allegati — qui non serve a niente, e moltiplicato per la collezione intera
+// era il conto di Firestore di settembre 2026 (#680).
+export const CAMPI_NUMERAZIONE = ['name', 'createdAt', 'seq', 'subSeq', 'senderProof'];
+
+// Da dove partono i numeri nuovi: oltre il contatore (ogni numero dato da un
+// invio ne è uscito) e oltre ogni numero con la prova del mittente. Non oltre
+// il massimo di tutti: un numero anonimo lo sceglie chi manda, fino a un
+// milione, e il contatore portato lassù non numererebbe più nessuno (#923).
+function ultimoNumeroBuono(contatore, docs) {
+  const provato = FB.maxSeqProvato(docs.map((d) => ({ seq: intField(d, 'seq'), senderProof: strField(d, 'senderProof') })));
+  return Math.max(Number.isInteger(contatore) ? contatore : 0, provato);
+}
 
 // Il nome con cui la lettura si mette da parte fra la prova a secco e
 // l'applicazione (lib/scansione-secco).
