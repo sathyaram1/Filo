@@ -136,9 +136,11 @@
       ? String(payload.submissionId)
       : `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const dallOwner = !!(opts && opts.dallOwner);
+    // Un titolo già scritto (quello che Filo propone in chat e l'utente conferma) non si rigenera.
+    const titolo = payload && typeof payload.name === 'string' && payload.name.trim() ? payload.name : null;
     // Dedup su submissionId: due invii della stessa bozza non accodano due voci.
     if (!queue.some((it) => it.id === id)) {
-      queue.push({ id, payload, name: null, prepared: false, queuedAt: Date.now(), attempts: 0, dallOwner });
+      queue.push({ id, payload, name: titolo, prepared: !!titolo, queuedAt: Date.now(), attempts: 0, dallOwner });
       if (queue.length > MAX_ITEMS) queue = queue.slice(-MAX_ITEMS);
       await persist();
     }
