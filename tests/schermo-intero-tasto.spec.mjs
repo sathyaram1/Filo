@@ -1,7 +1,8 @@
 // #858 — da tastiera si entra a schermo intero: F11 su Windows e Linux (Ctrl+Cmd+F su Mac, nelle unit),
 // da una pagina web, da una pagina di Filo col fuoco nel campo dell'indirizzo, dalla barra in alto e dalla
 // barra laterale; premuto di nuovo esce, ed Esc esce come prima. Il video a schermo pieno col suo pulsante
-// si tiene il tasto. I tasti passano da sendInputEvent: quelli di Playwright non toccano before-input-event.
+// si tiene il tasto, e il nome del tasto si legge dove si legge la voce. I tasti passano da sendInputEvent:
+// quelli di Playwright non toccano before-input-event, dove Filo li ascolta.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi, mettiNelMenu } from './helpers/barra.mjs';
@@ -148,10 +149,12 @@ test('il nome del tasto si legge nel suggerimento della barra laterale e fra le 
 });
 
 test('rimessa nel menu del tasto destro, l\'icona dello schermo intero nomina il tasto passandoci sopra', async ({ app, openTab, testServer }) => {
-  await mettiNelMenu(app, ['fullscreen'], 'primary');
-  const page = await testServer.openReady(openTab, PAGINA);
-  await page.locator('#box').click({ button: 'right' });
-  const voce = page.locator('[data-sn-icon-id="fullscreen"], .sn-menu-row-btn[aria-label="Schermo intero"]').first();
+  await mettiNelMenu(app, ['fullscreen']);
+  const page = await testServer.openReady(openTab, '<!doctype html><title>Sito</title><body style="margin:0"><p id="t">parola dentro una frase</p></body>');
+  await page.locator('#t').click({ button: 'right' });
+  await expect(page.locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
+  const voce = page.locator('[data-sn-icon-id="fullscreen"]').first();
+  if (await voce.count() === 0) await page.locator('.sn-menu-row-overflow').first().click();
   await expect(voce).toBeVisible({ timeout: 8000 });
   await expect(voce).toHaveAttribute('aria-label', 'Schermo intero');
   await voce.hover();
