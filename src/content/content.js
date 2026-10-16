@@ -333,10 +333,13 @@
       if (escInoltrato) return;
       escInoltrato = true;
       try {
-        document.dispatchEvent(new KeyboardEvent('keydown', {
+        const tasto = new KeyboardEvent('keydown', {
           key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
           bubbles: true, cancelable: true, composed: true,
-        }));
+        });
+        // Segnato come nostro: il primo ascolto della pagina lo dà ai riquadri di Filo prima che al sito (#859).
+        try { self.SN_FILO_UI?.nostro?.(tasto); } catch (_) {}
+        document.dispatchEvent(tasto);
       } catch (_) {}
       escInoltrato = false;
     };
