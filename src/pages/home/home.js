@@ -602,6 +602,14 @@
     }, 0);
   }
 
+  // La lista cambia anche da altre strade (la chat che apre o cerca una pagina, «Salva per dopo» in un'altra scheda):
+  // tornando su questa scheda si rilegge, così un clic non apre una pagina che non c'è più.
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible' || !allPages) return;
+    await leggiElenco();
+    render();
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
     load();
     $('search').addEventListener('input', () => render());
