@@ -1491,14 +1491,7 @@
         + 'ricordare di te fra una visita e l’altra, toglierlo fa durare i suoi cookie solo per la visita.',
     }),
     elencoCartelle(),
-    elenco({
-      keys: ['domini_esclusi', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
-      percorso: 'blocklist',
-      nome: 'Domini dove Filo non interviene',
-      aiuto: 'siti dove Filo non aggiunge niente alle pagine',
-      risk: 'Cambia i siti dove Filo non interviene sulle pagine: lì non aggiunge niente alla pagina, '
-        + 'né i suoi menu né i suoi aiuti.',
-    }),
+    sitiFiloSpento(),
     // #975 — non abbassa niente: cambia quale menu arriva per primo, e l'altro resta a Shift. Costo 1, come un tema.
     {
       ...elenco({
