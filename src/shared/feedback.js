@@ -634,30 +634,41 @@
     return null;
   }
 
-  // Rimette il contatore in pari: lo crea se manca, lo alza se un `seq` più
-  // alto è già in giro (backfill, migrazioni, numeri assegnati a mano). Solo
-  // owner: serve il token admin. Torna il valore in vigore alla fine.
-  //
-  // `allowLower` lo RIPORTA GIÙ quando è più alto di qualunque `seq` esistente.
-  // Serve perché farlo avanzare di uno lo può fare chiunque (è ciò che fa chi
-  // invia, e non c'è modo di distinguerlo da chi lo alza a vuoto): senza questo,
-  // un estraneo che lo spinge a diecimila lascerebbe i feedback nuovi con numeri
-  // assurdi per sempre, e l'unica cura sarebbe la console. Si passa `true` SOLO
-  // con il numero più alto VERO in mano (SN_FEEDBACK.maxSeq, che lo chiede al
-  // server): con il massimo dei soli feedback caricati si riassegnerebbero
-  // numeri già usati.
-  //
-  // Anche col massimo vero resta una corsa: un invio fra la nostra lettura e la
-  // nostra scrittura assegna un numero che noi non abbiamo visto, e abbassare
-  // lo farebbe riusare. Per questo si scende solo quando lo scarto è più largo
-  // di qualunque corsa realistica (SEQ_LOWER_MARGIN): uno scarto di uno o due è
-  // gente che sta inviando adesso, uno scarto di cento è un contatore gonfiato.
-  // Uno scarto piccolo resta com'è: sono numeri saltati, cioè un'etichetta con
-  // un buco, e vale meno del rischio di stamparne due uguali.
+  // La prova del mittente (#595) la scrivono solo l'owner e il server: gemello di SENDER_PROOFS in feedbackThread.js.
+  const PROVE_MITTENTE = ['admin', 'server'];
+
+  // Il `seq` più alto fra le righe con la prova del mittente: l'unico che può ALZARE il contatore (#923).
+  // Un `seq` anonimo lo sceglie chi manda, fino al tetto delle regole.
+  function maxSeqProvato(rows) {
+    let max = 0;
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (!r || !PROVE_MITTENTE.includes(r.senderProof)) continue;
+      const n = Number(r.seq);
+      if (Number.isInteger(n) && n > max) max = n;
+    }
+    return max;
+  }
+
+  // Rimette il contatore in pari. Solo owner: serve il token admin. Torna il
+  // valore in vigore alla fine. Due numeri che non si scambiano (#923):
+  //   · `provato` lo ALZA (lo crea, se manca): un `seq` con la prova del
+  //     mittente (maxSeqProvato) o assegnato da chi chiama. Mai il massimo di
+  //     tutti: un documento anonimo a un milione porterebbe il contatore oltre
+  //     il tetto delle regole, e da lì nessun feedback avrebbe più un numero.
+  //   · `opts.pavimento` lo ABBASSA: il `seq` più alto di TUTTI, esatto
+  //     (SN_FEEDBACK.maxSeq). Farlo avanzare di uno lo può chiunque, e senza
+  //     questo un contatore gonfiato resterebbe gonfiato; sotto il pavimento
+  //     non si scende, o si riuserebbero numeri già dati. Mai il massimo dei
+  //     soli feedback caricati.
+  // Anche col pavimento vero resta una corsa (un invio fra la nostra lettura e
+  // la nostra scrittura): si scende solo oltre SEQ_LOWER_MARGIN, perché un
+  // numero saltato vale meno di due numeri uguali.
   const SEQ_LOWER_MARGIN = 10;
 
-  async function ensureSeqCounter(maxSeq, opts = {}) {
-    const value = Math.max(0, Math.trunc(Number(maxSeq) || 0));
+  async function ensureSeqCounter(provato, opts = {}) {
+    const alza = Math.max(0, Math.trunc(Number(provato) || 0));
+    const p = Math.trunc(Number(opts.pavimento));
+    const pavimento = Number.isInteger(p) && p > 0 ? Math.max(p, alza) : null;
     const docUrl = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}`;
     const headers = { 'Content-Type': 'application/json' };
     if (opts.idToken) headers.Authorization = `Bearer ${opts.idToken}`;
@@ -671,9 +682,10 @@
     } else if (res.status !== 404) {
       throw new Error(`firestore contatore non leggibile (${res.status})`);
     }
-    if (current === value) return current;
-    if (current > value && !opts.allowLower) return current;
-    if (current > value && current - value < SEQ_LOWER_MARGIN) return current;
+    let value = null;
+    if (alza > 0 && current < alza) value = alza;
+    else if (pavimento !== null && current - pavimento >= SEQ_LOWER_MARGIN) value = pavimento;
+    if (value === null) return current;
     const w = await fetch(`${docUrl}?updateMask.fieldPaths=value&key=${API_KEY}`, {
       method: 'PATCH',
       headers,
