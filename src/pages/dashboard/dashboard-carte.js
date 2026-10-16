@@ -435,7 +435,6 @@
   const ICONA_SUGGERIMENTO = { gmail: 'mailOpen', calendar: 'calendar', editor: 'editor', file: 'folder', note: 'note', link: 'globe', web: 'globe' };
   function faviconDi(s) {
     const tipo = String((s.action && s.action.type) || '').toUpperCase();
-    const url = tipo === 'NAVIGA' ? d.faviconUrl(s.action.url) : '';
     const ico = el('span', 'dash-carta-voce-ico');
     ico.setAttribute('aria-hidden', 'true');
     const generica = () => {
