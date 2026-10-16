@@ -306,7 +306,7 @@
     removeBtn.textContent = I18n.t('home_remove');
     removeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      rimuovi(page);
+      rimuovi(page, { daTastiera: e.detail === 0 });
     });
     actions.appendChild(removeBtn);
     card.appendChild(actions);
